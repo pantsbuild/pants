@@ -12,6 +12,7 @@ from collections import defaultdict
 from contextlib import closing
 from xml.etree import ElementTree
 
+from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
@@ -1000,11 +1001,14 @@ class ZincCompile(BaseZincCompile):
         def is_jvm_or_resource_target(t):
             return isinstance(t, (JvmTarget, JvmApp, JarLibrary, Resources))
 
+        def is_synthetic_or_can_derive_synthetic(t):
+            return t.is_synthetic or isinstance(t, JavaThriftLibrary)
+
         jvm_and_resources_target_roots = set(
             filter(is_jvm_or_resource_target, self.context.target_roots)
         )
         jvm_and_resources_target_roots_minus_synthetic_addresses = set(
-            t.address for t in filter(lambda x: not x.is_synthetic, jvm_and_resources_target_roots)
+            t.address for t in filter(lambda x: not is_synthetic_or_can_derive_synthetic(x), jvm_and_resources_target_roots)
         )
         all_targets = set(self.context.targets())
         modulizable_targets = set(
@@ -1017,7 +1021,7 @@ class ZincCompile(BaseZincCompile):
             )
             if is_jvm_or_resource_target(t)
         )
-        synthetic_modulizable_targets = set(filter(lambda x: x.is_synthetic, modulizable_targets))
+        synthetic_modulizable_targets = set(filter(lambda x: is_synthetic_or_can_derive_synthetic(x), modulizable_targets))
         if len(synthetic_modulizable_targets) > 0:
             # TODO(yic): improve the error message to show the dependency chain that caused
             # a synthetic target depending on a non-synthetic one.
