@@ -6,9 +6,7 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
-boxfuture = { path = "../boxfuture" }
-futures01 = { package = "futures", version = "0.1" }
-futures = { version = "0.3", features = ["compat"] }
+futures = "0.3"
 parking_lot = "0.6"
 tokio = { version = "0.2", features = ["time"] }
 
