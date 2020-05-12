@@ -4,25 +4,18 @@
 from typing import List, Optional, Set
 from unittest import skip
 
-from pants.backend.codegen.thrift.java.java_thrift_library import (
-    JavaThriftLibrary as JavaThriftLibraryV1,
-)
-from pants.backend.jvm.targets.java_library import JavaLibrary as JavaLibraryV1
-from pants.backend.jvm.targets.jvm_app import JvmApp as JvmAppV1
-from pants.backend.jvm.targets.jvm_binary import JvmBinary as JvmBinaryV1
-from pants.backend.jvm.targets.scala_library import ScalaLibrary as ScalaLibraryV1
+from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
 from pants.backend.project_info import filedeps
-from pants.backend.python.target_types import PythonLibrary
-from pants.backend.python.targets.python_library import PythonLibrary as PythonLibraryV1
-from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.build_graph.resources import Resources as ResourcesV1
-from pants.build_graph.target import Target as TargetV1
-from pants.core.target_types import GenericTarget, Resources
+from pants.engine.target import Dependencies, Sources, Target
 from pants.testutil.goal_rule_test_base import GoalRuleTestBase
 
 
-class FileDepsTest(GoalRuleTestBase):
+class MockTarget(Target):
+    alias = "tgt"
+    core_fields = (Sources, Dependencies)
 
+
+class FiledepsTest(GoalRuleTestBase):
     goal_cls = filedeps.Filedeps
 
     @classmethod
@@ -31,36 +24,19 @@ class FileDepsTest(GoalRuleTestBase):
 
     @classmethod
     def target_types(cls):
-        return [GenericTarget, Resources, PythonLibrary]
+        return [MockTarget, ProtobufLibrary]
 
-    @classmethod
-    def alias_groups(cls) -> BuildFileAliases:
-        return BuildFileAliases(
-            targets={
-                "target": TargetV1,
-                "resources": ResourcesV1,
-                "java_library": JavaLibraryV1,
-                "java_thrift_library": JavaThriftLibraryV1,
-                "jvm_app": JvmAppV1,
-                "jvm_binary": JvmBinaryV1,
-                "scala_library": ScalaLibraryV1,
-                "python_library": PythonLibraryV1,
-            },
-        )
-
-    def create_python_library(
+    def setup_target(
         self,
         path: str,
         *,
         sources: Optional[List[str]] = None,
-        dependencies: Optional[List[str]] = None
+        dependencies: Optional[List[str]] = None,
     ) -> None:
-        self.create_library(
-            path=path,
-            target_type="python_library",
-            name="target",
-            sources=sources or [],
-            dependencies=dependencies or [],
+        if sources:
+            self.create_files(path, sources)
+        self.add_to_build_file(
+            path, f"tgt(sources={sources or []}, dependencies={dependencies or []})",
         )
 
     def assert_filedeps(
@@ -69,9 +45,9 @@ class FileDepsTest(GoalRuleTestBase):
         targets: List[str],
         expected: Set[str],
         transitive: bool = False,
-        globs: bool = False
+        globs: bool = False,
     ) -> None:
-        args = ["--no-filedeps2-absolute"]
+        args = []
         if globs:
             args.append("--filedeps2-globs")
         if transitive:
@@ -82,25 +58,25 @@ class FileDepsTest(GoalRuleTestBase):
         self.assert_filedeps(targets=[], expected=set())
 
     def test_one_target_no_source(self) -> None:
-        self.add_to_build_file("some/target", target="target()")
+        self.setup_target("some/target")
         self.assert_filedeps(targets=["some/target"], expected={"some/target/BUILD"})
 
     def test_one_target_one_source(self) -> None:
-        self.create_python_library("some/target", sources=["file.py"])
+        self.setup_target("some/target", sources=["file.py"])
         self.assert_filedeps(
             targets=["some/target"], expected={"some/target/BUILD", "some/target/file.py"}
         )
 
     def test_one_target_multiple_source(self) -> None:
-        self.create_python_library("some/target", sources=["file1.py", "file2.py"])
+        self.setup_target("some/target", sources=["file1.py", "file2.py"])
         self.assert_filedeps(
             targets=["some/target"],
             expected={"some/target/BUILD", "some/target/file1.py", "some/target/file2.py"},
         )
 
     def test_one_target_no_source_one_dep(self) -> None:
-        self.create_python_library("dep/target", sources=["file.py"])
-        self.create_python_library("some/target", dependencies=["dep/target"])
+        self.setup_target("dep/target", sources=["file.py"])
+        self.setup_target("some/target", dependencies=["dep/target"])
         self.assert_filedeps(targets=["some/target"], expected={"some/target/BUILD"})
         self.assert_filedeps(
             targets=["some/target"],
@@ -109,8 +85,8 @@ class FileDepsTest(GoalRuleTestBase):
         )
 
     def test_one_target_one_source_with_dep(self) -> None:
-        self.create_python_library("dep/target", sources=["file.py"])
-        self.create_python_library("some/target", sources=["file.py"], dependencies=["dep/target"])
+        self.setup_target("dep/target", sources=["file.py"])
+        self.setup_target("some/target", sources=["file.py"], dependencies=["dep/target"])
         direct_files = {"some/target/BUILD", "some/target/file.py"}
         self.assert_filedeps(
             targets=["some/target"], expected=direct_files,
@@ -122,8 +98,8 @@ class FileDepsTest(GoalRuleTestBase):
         )
 
     def test_multiple_targets_one_source(self) -> None:
-        self.create_python_library("some/target", sources=["file.py"])
-        self.create_python_library("other/target", sources=["file.py"])
+        self.setup_target("some/target", sources=["file.py"])
+        self.setup_target("other/target", sources=["file.py"])
         self.assert_filedeps(
             targets=["some/target", "other/target"],
             expected={
@@ -135,12 +111,10 @@ class FileDepsTest(GoalRuleTestBase):
         )
 
     def test_multiple_targets_one_source_with_dep(self) -> None:
-        self.create_python_library("dep1/target", sources=["file.py"])
-        self.create_python_library("dep2/target", sources=["file.py"])
-        self.create_python_library("some/target", sources=["file.py"], dependencies=["dep1/target"])
-        self.create_python_library(
-            "other/target", sources=["file.py"], dependencies=["dep2/target"]
-        )
+        self.setup_target("dep1/target", sources=["file.py"])
+        self.setup_target("dep2/target", sources=["file.py"])
+        self.setup_target("some/target", sources=["file.py"], dependencies=["dep1/target"])
+        self.setup_target("other/target", sources=["file.py"], dependencies=["dep2/target"])
         direct_files = {
             "some/target/BUILD",
             "some/target/file.py",
@@ -163,9 +137,9 @@ class FileDepsTest(GoalRuleTestBase):
         )
 
     def test_multiple_targets_one_source_overlapping(self) -> None:
-        self.create_python_library("dep/target", sources=["file.py"])
-        self.create_python_library("some/target", sources=["file.py"], dependencies=["dep/target"])
-        self.create_python_library("other/target", sources=["file.py"], dependencies=["dep/target"])
+        self.setup_target("dep/target", sources=["file.py"])
+        self.setup_target("some/target", sources=["file.py"], dependencies=["dep/target"])
+        self.setup_target("other/target", sources=["file.py"], dependencies=["dep/target"])
         direct_files = {
             "some/target/BUILD",
             "some/target/file.py",
@@ -181,7 +155,7 @@ class FileDepsTest(GoalRuleTestBase):
 
     def test_globs(self) -> None:
         self.create_files("some/target", ["test1.py", "test2.py"])
-        self.add_to_build_file("some/target", target="target(name='target', sources=['test*.py'])")
+        self.add_to_build_file("some/target", target="tgt(sources=['test*.py'])")
         self.assert_filedeps(
             targets=["some/target"],
             expected={"some/target/BUILD", "some/target/test*.py"},
@@ -189,14 +163,15 @@ class FileDepsTest(GoalRuleTestBase):
         )
 
     def test_build_with_file_ext(self) -> None:
-        self.create_file("some/target/BUILD.ext", contents="target()")
+        self.create_file("some/target/BUILD.ext", contents="tgt()")
         self.assert_filedeps(targets=["some/target"], expected={"some/target/BUILD.ext"})
 
-    def test_resources(self) -> None:
-        self.create_resources("src/resources", "data", "data.json")
+    def test_codegen_targets_use_protocol_files(self) -> None:
+        # That is, don't output generated files.
+        self.create_file("some/target/f.proto")
+        self.add_to_build_file("some/target", "protobuf_library()")
         self.assert_filedeps(
-            targets=["src/resources:data"],
-            expected={"src/resources/BUILD", "src/resources/data.json"},
+            targets=["some/target"], expected={"some/target/BUILD", "some/target/f.proto"}
         )
 
     @skip(
@@ -215,39 +190,6 @@ class FileDepsTest(GoalRuleTestBase):
         expected = {"src/java/BUILD", "src/java/j.java", "src/scala/BUILD", "src/scala/s.scala"}
         self.assert_filedeps(targets=["src/java"], expected=expected)
         self.assert_filedeps(targets=["src/scala"], expected=expected)
-
-    @skip("Unskip once we have codegen bindings.")
-    def test_filter_out_synthetic_targets(self) -> None:
-        self.create_library(
-            path="src/thrift/storage",
-            target_type="java_thrift_library",
-            name="storage",
-            sources=["data_types.thrift"],
-        )
-        java_lib = self.create_library(
-            path="src/java/lib",
-            target_type="java_library",
-            name="lib",
-            sources=["lib1.java"],
-            dependencies=["src/thrift/storage"],
-        )
-        self.create_file(".pants.d/gen/thrift/java/storage/Angle.java")
-        synthetic_java_lib = self.make_target(
-            spec=".pants.d/gen/thrift/java/storage",
-            target_type=JavaLibraryV1,
-            derived_from=self.target("src/thrift/storage"),
-            sources=["Angle.java"],
-        )
-        java_lib.inject_dependency(synthetic_java_lib.address)
-        self.assert_filedeps(
-            targets=["src/java/lib"],
-            expected={
-                "src/java/lib/BUILD",
-                "src/java/lib/lib1.java",
-                "src/thrift/storage/BUILD",
-                "src/thrift/storage/data_types.thrift",
-            },
-        )
 
     @skip(
         "V2 does not yet hydrate bundles or binary attributes for jvm_app. After this is added,"
