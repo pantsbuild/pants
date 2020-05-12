@@ -33,13 +33,13 @@ class ExclusiveRequestTimeout(Exception):
 class DaemonPantsRunner(RawFdRunner):
     """A RawFdRunner (callable) that will be called for each client request to Pantsd."""
 
-    def __init__(self, scheduler_service: SchedulerService):
+    def __init__(self, scheduler_service: SchedulerService) -> None:
         super().__init__()
         self._scheduler_service = scheduler_service
         self._run_lock = Lock()
 
     @staticmethod
-    def _send_stderr(stderr_fd: int, msg: str):
+    def _send_stderr(stderr_fd: int, msg: str) -> None:
         """Used to send stderr on a raw filehandle _before_ stdio replacement.
 
         After stdio replacement has happened via `stdio_as` (which mutates sys.std*, and thus cannot

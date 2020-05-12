@@ -121,7 +121,7 @@ def _stdio_stream_as(src_fd: int, dst_fd: int, dst_sys_attribute: str, mode: str
                 termios.tcdrain(dst_fd)
             else:
                 new_dst.flush()
-        except:  # noqa: E722
+        except BaseException:
             pass
         new_dst.close()
 

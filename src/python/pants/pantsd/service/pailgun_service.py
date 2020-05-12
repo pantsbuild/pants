@@ -47,7 +47,7 @@ class PailgunService(PantsService):
                 # has exited.
                 self.pailgun_port()
                 time.sleep(0.5)
-        except:  # noqa: E722
+        except BaseException:
             logger.error("pailgun service shutting down due to an error", exc_info=True)
             self.terminate()
         finally:

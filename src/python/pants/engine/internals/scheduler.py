@@ -366,7 +366,7 @@ class Scheduler:
         """
         return cast(int, self._native.nailgun_server_await_bound(self._scheduler, nailgun_server))
 
-    def new_nailgun_server(self, port_requested: int, runner: RawFdRunner) -> Any:
+    def new_nailgun_server(self, port_requested: int, runner: RawFdRunner):
         """Creates a nailgun server with a requested port.
 
         Returns the server and the actual port it bound to.

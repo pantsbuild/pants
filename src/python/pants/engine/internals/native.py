@@ -923,7 +923,7 @@ class Native(metaclass=SingletonMetaclass):
         result = self.lib.nailgun_server_await_bound(scheduler, nailgun_server)
         return cast(int, self.context.raise_or_return(result))
 
-    def new_nailgun_server(self, scheduler, port: int, runner: RawFdRunner) -> Any:
+    def new_nailgun_server(self, scheduler, port: int, runner: RawFdRunner):
         nailgun_server = self.context.raise_raw_or_return(
             self.lib.nailgun_server_create(scheduler, port, Function(self.context.to_key(runner)))
         )
