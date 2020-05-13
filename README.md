@@ -1,6 +1,8 @@
 # Pants Build System
 
-Pants is a scalable build system for _monorepos_: codebases containing multiple projects, often using multiple programming languages and frameworks, in a single unified code repos
+Pants is a scalable build system for _monorepos_: codebases containing 
+multiple projects, often using multiple programming languages and frameworks, 
+in a single unified code repository.
 
 Some noteworthy features include:
 
@@ -30,6 +32,8 @@ To run Pants, you need:
 
 * Linux or macOS.
 * Python 3.6+ discoverable on your `PATH`.
+* A C compiler, system headers, Python headers (to compile native Python modules) and the `libffi`
+ library and headers (to compile and link modules that use CFFI to access native code).
 * Internet access (so that Pants can fully bootstrap itself).
 
 Additionally, if you use the JVM backend to work with Java or Scala code:

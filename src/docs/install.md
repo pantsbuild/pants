@@ -6,6 +6,8 @@ beginning, make sure your machine fits the requirements. At a minimum, Pants req
 
 * Linux or macOS.
 * Python 3.6+.
+* A C compiler, system headers, Python headers (to compile native Python modules) and the `libffi`
+ library and headers (to compile and link modules that use CFFI to access native code).
 * Internet access (so that Pants can fully bootstrap itself).
 
 Additionally, if you use the JVM backend to work with Java or Scala code:
