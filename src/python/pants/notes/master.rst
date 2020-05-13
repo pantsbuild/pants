@@ -4,6 +4,48 @@ Master Pre-Releases
 This document describes development releases which occur weekly from master, and which have
 not undergone the vetting associated with ``stable`` releases.
 
+1.28.0rc0 (5/13/2020)
+---------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Always activate V2 `pants.backend.pants_info` and `pants.backend.project_info` (#9742)
+  `PR #9742 <https://github.com/pantsbuild/pants/pull/9742>`_
+
+* Deprecate `filedeps` defaulting to `--absolute` (#9746)
+  `PR #9746 <https://github.com/pantsbuild/pants/pull/9746>`_
+
+* Upgrade to pex 2.1.10. (#9744)
+  `PR #9744 <https://github.com/pantsbuild/pants/pull/9744>`_
+
+* Upgrade Pygments from 2.3.1 to 2.6.1 (#9739)
+  `PR #9739 <https://github.com/pantsbuild/pants/pull/9739>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Restructure v2 UI (#9672)
+  `PR #9672 <https://github.com/pantsbuild/pants/pull/9672>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Port the pantsd nailgun server to rust (#9722)
+  `PR #9722 <https://github.com/pantsbuild/pants/pull/9722>`_
+
+* Provide more useful and consistent console UI messages (#9720)
+  `PR #9720 <https://github.com/pantsbuild/pants/pull/9720>`_
+
+* Batch all fsync calls at the end of materialize_directory. (#9738)
+  `PR #9738 <https://github.com/pantsbuild/pants/pull/9738>`_
+
+* More simplification of SourceRoots. (#9728)
+  `PR #9728 <https://github.com/pantsbuild/pants/pull/9728>`_
+
+* Add white space between rule graph errors (#9740)
+  `PR #9728 <https://github.com/pantsbuild/pants/pull/9740>`_
+
 1.28.0.dev2 (5/9/2020)
 ----------------------
 
