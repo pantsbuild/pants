@@ -35,6 +35,12 @@ New Features
 * Restructure v2 UI (#9672)
   `PR #9672 <https://github.com/pantsbuild/pants/pull/9672>`_
 
+Bugfixes
+~~~~~~~~
+
+* Fix write_stderr in native.py (#9753)
+  `PR #9753 <https://github.com/pantsbuild/pants/pull/9753>`_
+
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
