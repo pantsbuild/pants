@@ -4,15 +4,10 @@
 import logging
 from typing import List, Optional, Tuple, cast
 
-from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
-from pants.base.specs import Specs
 from pants.engine.fs import PathGlobs, Snapshot
-from pants.engine.internals.scheduler import ExecutionError, ExecutionTimeoutError
+from pants.engine.internals.scheduler import ExecutionTimeoutError
 from pants.engine.unions import UnionMembership
-from pants.goal.run_tracker import RunTracker
-from pants.init.engine_initializer import LegacyGraphScheduler, LegacyGraphSession
-from pants.option.options import Options
-from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.init.engine_initializer import LegacyGraphScheduler
 from pants.pantsd.service.fs_event_service import FSEventService
 from pants.pantsd.service.pants_service import PantsService
 
@@ -142,7 +137,7 @@ class SchedulerService(PantsService):
             self._logger.critical(f"The scheduler was invalidated: {e}")
             self.terminate()
 
-    def prepare_graph(self, options: Options) -> LegacyGraphSession:
+    def prepare(self) -> LegacyGraphScheduler:
         # If any nodes exist in the product graph, wait for the initial watchman event to avoid
         # racing watchman startup vs invalidation events.
         if self._fs_event_service is not None and self._scheduler.graph_len() > 0:
@@ -150,79 +145,7 @@ class SchedulerService(PantsService):
                 f"fs event service is running and graph_len > 0: waiting for initial watchman event"
             )
             self._fs_event_service.await_started()
-
-        global_options = options.for_global_scope()
-        build_id = RunTracker.global_instance().run_id
-        v2_ui = global_options.get("v2_ui", False)
-        use_colors = global_options.get("colors", True)
-        zipkin_trace_v2 = options.for_scope("reporting").zipkin_trace_v2
-        return self._graph_helper.new_session(
-            zipkin_trace_v2, build_id, v2_ui=v2_ui, use_colors=use_colors
-        )
-
-    def graph_run_v2(
-        self,
-        session: LegacyGraphSession,
-        specs: Specs,
-        options: Options,
-        options_bootstrapper: OptionsBootstrapper,
-    ) -> int:
-        """Perform an entire v2 run.
-
-        The exit_code in the return indicates whether any issue was encountered.
-        """
-
-        global_options = options.for_global_scope()
-        perform_loop = global_options.get("loop", False)
-        v2 = global_options.v2
-
-        if not perform_loop:
-            return self._body(session, options, options_bootstrapper, specs, v2, poll=False)
-
-        iterations = global_options.loop_max
-        exit_code = PANTS_SUCCEEDED_EXIT_CODE
-
-        while iterations and not self._state.is_terminating:
-            # NB: We generate a new "run id" per iteration of the loop in order to allow us to
-            # observe fresh values for Goals. See notes in `scheduler.rs`.
-            session.scheduler_session.new_run_id()
-            try:
-                exit_code = self._body(session, options, options_bootstrapper, specs, v2, poll=True)
-            except ExecutionError as e:
-                self._logger.warning(e)
-            iterations -= 1
-
-        return exit_code
-
-    def _body(
-        self,
-        session: LegacyGraphSession,
-        options: Options,
-        options_bootstrapper: OptionsBootstrapper,
-        specs: Specs,
-        v2: bool,
-        poll: bool,
-    ) -> int:
-        exit_code = PANTS_SUCCEEDED_EXIT_CODE
-
-        _, ambiguous_goals, v2_goals = options.goals_by_version
-
-        if v2_goals or (ambiguous_goals and v2):
-            goals = v2_goals + (ambiguous_goals if v2 else tuple())
-
-            # When polling we use a delay (only applied in cases where we have waited for something
-            # to do) in order to avoid re-running too quickly when changes arrive in clusters.
-            exit_code = session.run_goal_rules(
-                options_bootstrapper=options_bootstrapper,
-                union_membership=self._union_membership,
-                options=options,
-                goals=goals,
-                specs=specs,
-                poll=poll,
-                poll_delay=(0.1 if poll else None),
-            )
-
-        return exit_code
+        return self._graph_helper
 
     def run(self):
         """Main service entrypoint."""

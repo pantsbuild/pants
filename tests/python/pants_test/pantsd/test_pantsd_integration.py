@@ -715,7 +715,7 @@ Interrupted by user over pailgun client!
             ctx.checker.assert_running()
             self.assert_failure(result)
             # Assert that the desired exception has been triggered once.
-            self.assertRegex(result.stderr_data, r"Exception message:.*badreq==99.99.99")
+            self.assertRegex(result.stderr_data, r"ERROR:.*badreq==99.99.99")
             # Assert that it has only been triggered once.
             self.assertNotIn(
                 "During handling of the above exception, another exception occurred:",

@@ -69,7 +69,7 @@ class TestExceptionSink(TestBase):
                 "setproctitle.getproctitle", autospec=True, spec_set=True
             ) as getproctitle_mock:
                 getproctitle_mock.return_value = fake_process_title
-                sink.log_exception(msg)
+                sink._log_exception(msg)
                 getproctitle_mock.assert_called_once()
 
             # This should have created two log files, one specific to the current pid.
@@ -109,7 +109,7 @@ pid: {pid}
                     sink, "_try_write_with_flush", autospec=sink
                 ) as mock_write:
                     mock_write.side_effect = ExceptionSink.ExceptionSinkError("fake write failure")
-                    sink.log_exception("XXX")
+                    sink._log_exception("XXX")
         errors = list(captured.errors())
         self.assertEqual(2, len(errors))
 

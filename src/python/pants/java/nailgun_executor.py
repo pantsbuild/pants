@@ -166,7 +166,7 @@ class NailgunExecutor(Executor, FingerprintedProcessManager):
                     logger.debug(
                         "Executing via {ng_desc}: {cmd}".format(ng_desc=nailgun, cmd=this.cmd)
                     )
-                    return nailgun.execute(main, cwd, *args)
+                    return nailgun.execute(main, args, cwd=cwd)
                 except (NailgunClient.NailgunError, self.InitialNailgunConnectTimedOut) as e:
                     self.terminate()
                     raise self.Error(

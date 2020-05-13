@@ -22,7 +22,7 @@ from pants.engine.fs import (
     MaterializeDirectoryResult,
     PathGlobsAndRoot,
 )
-from pants.engine.internals.native import Function, TypeId
+from pants.engine.internals.native import Function, RawFdRunner, TypeId
 from pants.engine.internals.nodes import Return, Throw
 from pants.engine.rules import Rule, RuleIndex, TaskRule
 from pants.engine.selectors import Params
@@ -357,6 +357,21 @@ class Scheduler:
 
     def garbage_collect_store(self):
         self._native.lib.garbage_collect_store(self._scheduler)
+
+    def nailgun_server_await_bound(self, nailgun_server) -> int:
+        """Blocks until the server has bound a port, and then returns the port.
+
+        Returns the actual port the server has successfully bound to, or raises an exception if the
+        server has exited.
+        """
+        return cast(int, self._native.nailgun_server_await_bound(self._scheduler, nailgun_server))
+
+    def new_nailgun_server(self, port_requested: int, runner: RawFdRunner):
+        """Creates a nailgun server with a requested port.
+
+        Returns the server and the actual port it bound to.
+        """
+        return self._native.new_nailgun_server(self._scheduler, port_requested, runner)
 
     def new_session(self, zipkin_trace_v2, build_id, v2_ui=False, should_report_workunits=False):
         """Creates a new SchedulerSession for this Scheduler."""

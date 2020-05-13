@@ -34,7 +34,7 @@
 // The engine crate contains some C interop which we use, notably externs which are functions and
 // types from Python which we can read from our Rust. This particular wrapper crate is just for how
 // we expose ourselves back to Python.
-#![type_length_limit = "1744838"]
+#![type_length_limit = "2066838"]
 
 mod cffi_externs;
 
@@ -57,6 +57,7 @@ use std::fs::File;
 use std::io;
 use std::mem;
 use std::os::raw;
+use std::os::unix::ffi::OsStrExt;
 use std::panic;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -204,6 +205,104 @@ pub struct RawResult {
   raw_pointer: *const raw::c_void,
 }
 
+impl RawResult {
+  fn new<T>(res: Result<T, String>) -> RawResult {
+    match res {
+      Ok(t) => RawResult {
+        is_throw: false,
+        raw_pointer: Box::into_raw(Box::new(t)) as *const raw::c_void,
+        throw_handle: Handle(std::ptr::null()),
+      },
+      Err(err) => RawResult {
+        is_throw: true,
+        throw_handle: externs::create_exception(&err).into(),
+        raw_pointer: std::ptr::null(),
+      },
+    }
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn nailgun_server_create(
+  scheduler_ptr: *mut Scheduler,
+  port: u16,
+  runner: Function,
+) -> RawResult {
+  with_scheduler(scheduler_ptr, |scheduler| {
+    let runner = externs::val_for(&runner.0);
+    let executor = scheduler.core.executor.clone();
+    let server_future =
+      nailgun::Server::new(executor, port, move |exe: nailgun::RawFdExecution| {
+        let command = externs::store_utf8(&exe.cmd.command);
+        let args = externs::store_tuple(&{
+          exe
+            .cmd
+            .args
+            .iter()
+            .map(|s| externs::store_utf8(s))
+            .collect::<Vec<_>>()
+        });
+        let env = externs::store_dict(&{
+          exe
+            .cmd
+            .env
+            .iter()
+            .map(|(k, v)| (externs::store_utf8(k), externs::store_utf8(v)))
+            .collect::<Vec<_>>()
+        });
+        let working_dir = externs::store_bytes(exe.cmd.working_dir.as_os_str().as_bytes());
+        let stdin_fd = externs::store_i64(exe.stdin_fd.into());
+        let stdout_fd = externs::store_i64(exe.stdout_fd.into());
+        let stderr_fd = externs::store_i64(exe.stderr_fd.into());
+        let runner_args = vec![
+          command,
+          args,
+          env,
+          working_dir,
+          stdin_fd,
+          stdout_fd,
+          stderr_fd,
+        ];
+        match externs::call(&runner, &runner_args) {
+          Ok(exit_code_val) => {
+            // TODO: We don't currently expose a "project_i32", but it will not be necessary with
+            // https://github.com/pantsbuild/pants/pull/9593.
+            nailgun::ExitCode(externs::val_to_str(&exit_code_val).parse().unwrap())
+          }
+          Err(e) => {
+            error!("Uncaught exception in nailgun handler: {:#?}", e);
+            nailgun::ExitCode(1)
+          }
+        }
+      });
+    RawResult::new(scheduler.core.executor.block_on(server_future))
+  })
+}
+
+#[no_mangle]
+pub extern "C" fn nailgun_server_await_bound(
+  scheduler_ptr: *mut Scheduler,
+  nailgun_server_ptr: *mut nailgun::Server,
+) -> PyResult {
+  with_scheduler(scheduler_ptr, |scheduler| {
+    with_nailgun_server(nailgun_server_ptr, |nailgun_server| {
+      scheduler
+        .core
+        .executor
+        .block_on(nailgun_server.await_bound())
+        .map(|port| externs::store_u64(port as u64))
+        .into()
+    })
+  })
+}
+
+#[no_mangle]
+pub extern "C" fn nailgun_server_destroy(nailgun_server_ptr: *mut nailgun::Server) {
+  let server = unsafe { Box::from_raw(nailgun_server_ptr) };
+  // NB: We do not wait for the server to have exited.
+  server.shutdown();
+}
+
 ///
 /// Given a set of Tasks and type information, creates a Scheduler.
 ///
@@ -242,7 +341,7 @@ pub extern "C" fn scheduler_create(
   remote_execution_headers_buf: BufferBuffer,
   process_execution_local_enable_nailgun: bool,
 ) -> RawResult {
-  match make_core(
+  let core_res = make_core(
     tasks_ptr,
     types,
     build_root_buf,
@@ -272,18 +371,8 @@ pub extern "C" fn scheduler_create(
     process_execution_use_local_cache,
     remote_execution_headers_buf,
     process_execution_local_enable_nailgun,
-  ) {
-    Ok(core) => RawResult {
-      is_throw: false,
-      raw_pointer: Box::into_raw(Box::new(Scheduler::new(core))) as *const raw::c_void,
-      throw_handle: Handle(std::ptr::null()),
-    },
-    Err(err) => RawResult {
-      is_throw: true,
-      throw_handle: externs::create_exception(&err).into(),
-      raw_pointer: std::ptr::null(),
-    },
-  }
+  );
+  RawResult::new(core_res.map(Scheduler::new))
 }
 
 fn make_core(
@@ -1337,8 +1426,8 @@ fn block_in_place_and_wait<T, E>(f: impl Future<Item = T, Error = E>) -> Result<
 }
 
 ///
-/// Scheduler and Session are intended to be shared between threads, and so their context
-/// methods provide immutable references. The remaining types are not intended to be shared
+/// Scheduler, Session, and nailgun::Server are intended to be shared between threads, and so their
+/// context methods provide immutable references. The remaining types are not intended to be shared
 /// between threads, so mutable access is provided.
 ///
 fn with_scheduler<F, T>(scheduler_ptr: *mut Scheduler, f: F) -> T
@@ -1361,6 +1450,19 @@ where
   let session = unsafe { Box::from_raw(session_ptr) };
   let t = f(&session);
   mem::forget(session);
+  t
+}
+
+///
+/// See `with_scheduler`.
+///
+fn with_nailgun_server<F, T>(nailgun_server_ptr: *mut nailgun::Server, f: F) -> T
+where
+  F: FnOnce(&nailgun::Server) -> T,
+{
+  let nailgun_server = unsafe { Box::from_raw(nailgun_server_ptr) };
+  let t = f(&nailgun_server);
+  mem::forget(nailgun_server);
   t
 }
 

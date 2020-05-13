@@ -15,21 +15,11 @@ class LifecycleStubs(Subsystem):
     def register_options(cls, register):
         super().register_options(register)
         register(
-            "--add-exiter-message",
-            type=str,
-            default=None,
-            help="Add a message which displays to stderr on fatal exit.",
-        )
-        register(
             "--new-interactive-stream-output-file",
             type=file_option,
             default=None,
             help="Redirect interactive output into a separate file.",
         )
-
-    @memoized_property
-    def add_exiter_message(self):
-        return self.get_options().add_exiter_message
 
     @memoized_property
     def new_interactive_stream_output_file(self):

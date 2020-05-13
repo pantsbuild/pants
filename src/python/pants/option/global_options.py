@@ -625,6 +625,9 @@ class GlobalOptions(Subsystem):
             "--pantsd-pailgun-host",
             advanced=True,
             default="127.0.0.1",
+            removal_version="1.30.0.dev0",
+            removal_hint="The nailgun protocol is not authenticated, and so only binds to "
+            "127.0.0.1.",
             help="The host to bind the pants nailgun server to.",
         )
         register(
@@ -1069,13 +1072,6 @@ class GlobalOptions(Subsystem):
 
         Raises pants.option.errors.OptionsError on validation failure.
         """
-        if opts.get("loop") and not opts.enable_pantsd:
-            # TODO: This remains the case today because there are two spots that
-            # call `run_goal_rules`: fixing in a followup.
-            raise OptionsError(
-                "The `--loop` option requires `--enable-pantsd`, in order to watch files."
-            )
-
         if opts.remote_execution and not opts.remote_execution_server:
             raise OptionsError(
                 "The `--remote-execution` option requires also setting "

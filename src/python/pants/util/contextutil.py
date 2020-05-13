@@ -7,6 +7,7 @@ import shutil
 import signal
 import sys
 import tempfile
+import termios
 import threading
 import time
 import uuid
@@ -15,7 +16,7 @@ from contextlib import closing, contextmanager
 from queue import Queue
 from socketserver import TCPServer
 from types import FrameType
-from typing import IO, Any, Callable, Iterator, Mapping, Optional, Type, Union, cast
+from typing import IO, Any, Callable, Iterator, Mapping, Optional, Tuple, Type, Union, cast
 
 from colors import green
 
@@ -85,6 +86,17 @@ def hermetic_environment_as(**kwargs: Optional[str]) -> Iterator[None]:
 
 
 @contextmanager
+def argv_as(args: Tuple[str, ...]) -> Iterator[None]:
+    """Temporarily set `sys.argv` to the supplied value."""
+    old_args = sys.argv
+    try:
+        sys.argv = list(args)
+        yield
+    finally:
+        sys.argv = old_args
+
+
+@contextmanager
 def _stdio_stream_as(src_fd: int, dst_fd: int, dst_sys_attribute: str, mode: str) -> Iterator[None]:
     """Replace the given dst_fd and attribute on `sys` with an open handle to the given src_fd."""
     if src_fd == -1:
@@ -99,10 +111,18 @@ def _stdio_stream_as(src_fd: int, dst_fd: int, dst_sys_attribute: str, mode: str
 
     # Open up a new file handle to temporarily replace the python-level io object, then yield.
     new_dst = os.fdopen(dst_fd, mode)
+    is_atty = new_dst.isatty()
     setattr(sys, dst_sys_attribute, new_dst)
     try:
         yield
     finally:
+        try:
+            if is_atty:
+                termios.tcdrain(dst_fd)
+            else:
+                new_dst.flush()
+        except BaseException:
+            pass
         new_dst.close()
 
         # Restore the python and os level file handles.

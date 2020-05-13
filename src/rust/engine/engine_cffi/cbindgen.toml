@@ -33,8 +33,9 @@ parse_deps = true
 # We need to parse the engine crate to codegen PyResult (because externs are both something we use
 # from Python in engine, and something we expose to python in engine_cffi).
 #
-# We need to parse the logging crate to codegen PythonLogLevel and Destination.
-include = ["engine", "logging"]
+# We need to parse the logging crate to codegen PythonLogLevel and Destination and the nailgun
+# crate to expose Server.
+include = ["engine", "logging", "nailgun"]
 
 [export]
 # TODO: wrapped_PyInit_native_engine is declared twice if not excluded here, figure out why.

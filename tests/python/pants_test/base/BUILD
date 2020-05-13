@@ -213,10 +213,11 @@ python_tests(
   sources = ['test_exception_sink_integration.py'],
   dependencies = [
     'src/python/pants/base:exception_sink',
-    'src/python/pants/util:osutil',
     'src/python/pants/testutil:int-test',
+    'src/python/pants/util:osutil',
     'testprojects/src/python:coordinated_runs_directory',
     'testprojects:pants_plugins_directory',
+    'tests/python/pants_test/pantsd:pantsd_integration_test_base',
   ],
   tags = {'platform_specific_behavior', 'integration', 'partially_type_checked'},
   # NB: This frequently times out, but due to hanging. So, we want to fail eagerly. See
