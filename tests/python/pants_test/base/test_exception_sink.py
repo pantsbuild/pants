@@ -56,7 +56,6 @@ class TestExceptionSink(TestBase):
             sink.reset_log_location("/")
 
     def test_log_exception(self):
-        fake_process_title = "fake_title"
         msg = "XXX"
         sink = self._gen_sink_subclass()
         pid = os.getpid()
@@ -65,12 +64,7 @@ class TestExceptionSink(TestBase):
             # Check that tmpdir exists, and log an exception into that directory.
             sink.reset_log_location(tmpdir)
 
-            with unittest.mock.patch(
-                "setproctitle.getproctitle", autospec=True, spec_set=True
-            ) as getproctitle_mock:
-                getproctitle_mock.return_value = fake_process_title
-                sink._log_exception(msg)
-                getproctitle_mock.assert_called_once()
+            sink._log_exception(msg)
 
             # This should have created two log files, one specific to the current pid.
             self.assertEqual(os.listdir(tmpdir), [".pids"])
@@ -88,12 +82,11 @@ class TestExceptionSink(TestBase):
             # We only logged a single error, so the files should both contain only that single log entry.
             err_rx = """\
 timestamp: ([^\n]+)
-process title: {fake_process_title}
 sys.argv: ([^\n]+)
 pid: {pid}
 {msg}
 """.format(
-                fake_process_title=re.escape(fake_process_title), pid=pid, msg=msg
+                pid=pid, msg=msg
             )
             with open(cur_process_error_log_path, "r") as cur_pid_file:
                 self.assertRegex(cur_pid_file.read(), err_rx)

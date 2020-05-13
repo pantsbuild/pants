@@ -12,8 +12,6 @@ import traceback
 from contextlib import contextmanager
 from typing import Optional
 
-import setproctitle
-
 from pants.util.dirutil import safe_mkdir, safe_open
 from pants.util.meta import classproperty
 from pants.util.osutil import Pid
@@ -346,7 +344,6 @@ class ExceptionSink:
     # NB: This includes a trailing newline, but no leading newline.
     _EXCEPTION_LOG_FORMAT = """\
 timestamp: {timestamp}
-process title: {process_title}
 sys.argv: {args}
 pid: {pid}
 {message}
@@ -355,11 +352,7 @@ pid: {pid}
     @classmethod
     def _format_exception_message(cls, msg, pid):
         return cls._EXCEPTION_LOG_FORMAT.format(
-            timestamp=cls._iso_timestamp_for_now(),
-            process_title=setproctitle.getproctitle(),
-            args=sys.argv,
-            pid=pid,
-            message=msg,
+            timestamp=cls._iso_timestamp_for_now(), args=sys.argv, pid=pid, message=msg,
         )
 
     _traceback_omitted_default_text = "(backtrace omitted)"

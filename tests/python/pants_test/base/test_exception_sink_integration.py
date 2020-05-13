@@ -19,7 +19,6 @@ class ExceptionSinkIntegrationTest(PantsDaemonIntegrationTestBase):
             file_contents,
             """\
 timestamp: ([^\n]+)
-process title: ([^\n]+)
 sys\\.argv: ([^\n]+)
 pid: {pid}
 Exception caught: \\([^)]*\\)
@@ -132,7 +131,6 @@ Exception message:.* 1 Exception encountered:
             contents,
             """\
 timestamp: ([^\n]+)
-process title: ([^\n]+)
 sys\\.argv: ([^\n]+)
 pid: {pid}
 Signal {signum} \\({signame}\\) was raised\\. Exiting with failure\\.
