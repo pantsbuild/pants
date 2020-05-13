@@ -65,7 +65,6 @@ use std::panic;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tempfile::TempDir;
-use tokio;
 use workunit_store::{Workunit, WorkunitState};
 
 #[cfg(test)]
