@@ -306,7 +306,7 @@ class ExportDepAsJar(ConsoleTask):
         if not current_target.is_synthetic:
             info["globs"] = current_target.globs_relative_to_buildroot()
 
-        libraries_for_target = set(
+        libraries_for_target = OrderedSet(
             [self._jar_id(jar) for jar in iter_transitive_jars(current_target)]
         )
         for dep in sorted(flat_non_modulizable_deps_for_modulizable_targets[current_target]):

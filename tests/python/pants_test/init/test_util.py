@@ -3,7 +3,7 @@
 
 import os
 from contextlib import contextmanager
-from typing import Generator
+from typing import Iterator
 
 from pants.fs.fs import safe_filename_from_path
 from pants.init.util import init_workdir
@@ -14,7 +14,7 @@ from pants.util.contextutil import temporary_dir
 
 class UtilTest(TestBase):
     @contextmanager
-    def physical_workdir_base(self) -> Generator[OptionValueContainer, None, None]:
+    def physical_workdir_base(self) -> Iterator[OptionValueContainer]:
         with temporary_dir(cleanup=False) as physical_workdir_base:
             bootstrap_options = self.get_bootstrap_options(
                 [f"--pants-physical-workdir-base={physical_workdir_base}"]

@@ -12,6 +12,7 @@ from collections import defaultdict
 from contextlib import closing
 from xml.etree import ElementTree
 
+from pants.backend.codegen.thrift.java.java_thrift_library import JavaThriftLibrary
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.subsystems.java import Java
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
@@ -200,6 +201,14 @@ class BaseZincCompile(JvmCompile):
             help="Have the Zinc compiler record information on Warnings and Errors. "
             "For each target, send the count of diagnostics of each severity (Hint, Information, "
             "Warning, Error) to the reporting server.",
+        )
+
+        register(
+            "--error-on-synthetic-modulizable-targets",
+            advanced=True,
+            type=bool,
+            default=False,
+            help="If true, error if modulizable targets contain any synthetic target.",
         )
 
     @classmethod
@@ -998,13 +1007,23 @@ class ZincCompile(BaseZincCompile):
             return set()
 
         def is_jvm_or_resource_target(t):
-            return isinstance(t, (JvmTarget, JvmApp, JarLibrary, Resources))
+            return (
+                isinstance(t, (JvmTarget, JvmApp, JarLibrary, Resources))
+                or t.type_alias == "target"
+            )
+
+        def is_synthetic_or_can_derive_synthetic(t):
+            return t.is_synthetic or isinstance(t, JavaThriftLibrary)
 
         jvm_and_resources_target_roots = set(
             filter(is_jvm_or_resource_target, self.context.target_roots)
         )
         jvm_and_resources_target_roots_minus_synthetic_addresses = set(
-            t.address for t in filter(lambda x: not x.is_synthetic, jvm_and_resources_target_roots)
+            t.address
+            for t in filter(
+                lambda x: not is_synthetic_or_can_derive_synthetic(x),
+                jvm_and_resources_target_roots,
+            )
         )
         all_targets = set(self.context.targets())
         modulizable_targets = set(
@@ -1017,16 +1036,28 @@ class ZincCompile(BaseZincCompile):
             )
             if is_jvm_or_resource_target(t)
         )
-        synthetic_modulizable_targets = set(filter(lambda x: x.is_synthetic, modulizable_targets))
+        synthetic_modulizable_targets = set(
+            filter(lambda x: is_synthetic_or_can_derive_synthetic(x), modulizable_targets)
+        )
         if len(synthetic_modulizable_targets) > 0:
+            formatted_targets = "\n".join(
+                f"{t.address.spec}\n\tderived from {t.derived_from.address.spec}"
+                for t in synthetic_modulizable_targets
+            )
             # TODO(yic): improve the error message to show the dependency chain that caused
             # a synthetic target depending on a non-synthetic one.
-            raise TaskError(
-                f"Modulizable targets must not contain any synthetic target, but in this case the "
+            msg = (
+                f"Modulizable targets must not contain any synthetic target, but in this "
+                f"case the "
                 f"following synthetic targets depend on other non-synthetic modules:\n"
-                f"{synthetic_modulizable_targets}\n"
-                f"One approach that may help is to reduce the scope of the import to further avoid synthetic targets."
+                f"{formatted_targets}\n"
+                f"One approach that may help is to reduce the scope of the import to "
+                f"further avoid synthetic targets."
             )
+            if self.get_options().error_on_synthetic_modulizable_targets:
+                raise TaskError(msg)
+            else:
+                self.context.log.warn(msg)
 
         self.context.products.get_data("jvm_modulizable_targets", set).update(modulizable_targets)
         return modulizable_targets
