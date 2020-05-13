@@ -468,11 +468,8 @@ impl Scheduler {
       if let Ok(res) = receiver.recv_timeout(Self::compute_refresh_delay(deadline)) {
         // Completed successfully.
         break Ok(Self::execute_record_results(&request.roots, &session, res));
-      } else if let Err(e) = Self::maybe_display_render(
-          &self.core.graph,
-          &roots,
-          &session,
-          &mut tasks)
+      } else if let Err(e) =
+        Self::maybe_display_render(&self.core.graph, &roots, &session, &mut tasks)
       {
         break Err(e);
       } else if deadline.map(|d| d < Instant::now()).unwrap_or(false) {

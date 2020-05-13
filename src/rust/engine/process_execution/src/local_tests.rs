@@ -785,7 +785,9 @@ async fn working_directory() {
   );
 }
 
-async fn run_command_locally(req: ExecuteProcessRequest) -> Result<FallibleExecuteProcessResult, String> {
+async fn run_command_locally(
+  req: ExecuteProcessRequest,
+) -> Result<FallibleExecuteProcessResult, String> {
   let work_dir = TempDir::new().unwrap();
   run_command_locally_in_dir_with_cleanup(req, work_dir.path().to_owned()).await
 }

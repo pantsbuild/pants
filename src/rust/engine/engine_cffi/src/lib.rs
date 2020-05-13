@@ -40,8 +40,8 @@ mod cffi_externs;
 
 use engine::externs::*;
 use engine::{
-  externs, nodes, Core, ExecutionRequest, ExecutionTermination, Failure, Function, Handle,
-  Key, Params, Rule, Scheduler, Session, Tasks, TypeId, Types, Value,
+  externs, nodes, Core, ExecutionRequest, ExecutionTermination, Failure, Function, Handle, Key,
+  Params, Rule, Scheduler, Session, Tasks, TypeId, Types, Value,
 };
 use futures::compat::Future01CompatExt;
 use futures01::{future, Future};

@@ -86,7 +86,10 @@ async fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
     },
   };
 
-  let uncached_result = caching.run(request.clone().into(), Context::default()).compat().await;
+  let uncached_result = caching
+    .run(request.clone().into(), Context::default())
+    .compat()
+    .await;
 
   assert_eq!(local_result, uncached_result);
 

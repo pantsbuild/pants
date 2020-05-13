@@ -83,8 +83,14 @@ impl InvalidationWatcher {
     let canonical_build_root =
       std::fs::canonicalize(build_root.as_path()).map_err(|e| format!("{:?}", e))?;
     let (watch_sender, watch_receiver) = crossbeam_channel::unbounded();
-    let mut watcher: RecommendedWatcher = Watcher::new(watch_sender, Duration::from_millis(50))
-      .map_err(|e| format!("Failed to begin watching the filesystem: {}", e))?;
+    let mut watcher: RecommendedWatcher = Watcher::new_immediate(move |ev| {
+      if watch_sender.send(ev).is_err() {
+        // The watch thread shutting down first is ok, because it can exit when the Invalidatable
+        // is dropped.
+        debug!("Watch thread has shutdown, but Watcher is still running.");
+      }
+    })
+    .map_err(|e| format!("Failed to begin watching the filesystem: {}", e))?;
 
     let (liveness_sender, liveness_receiver) = crossbeam_channel::unbounded();
     if enabled {

@@ -147,6 +147,10 @@ impl CommandRunner {
           .map(Bytes::from)
           .map_err(|err| format!("Error serializing execute process result to cache: {}", err))
       })
-      .and_then(move |bytes| process_execution_store.store_bytes(fingerprint, bytes, false).compat())
+      .and_then(move |bytes| {
+        process_execution_store
+          .store_bytes(fingerprint, bytes, false)
+          .compat()
+      })
   }
 }
