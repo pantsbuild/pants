@@ -1,32 +1,37 @@
 # Pants Build System
 
-Pants is a build system for software projects in a variety of languages.
-It works particularly well for a source code repository that contains
-many distinct projects.
+Pants is a scalable build system for _monorepos_: codebases containing multiple projects, often using multiple programming languages and frameworks, in a single unified code repos
 
-Friendly documentation: http://www.pantsbuild.org/
+Some noteworthy features include:
+
+* Explicit dependency modeling.
+* Fine-grained invalidation.
+* Shared result caching.
+* Concurrent execution.
+* Remote execution.
+* Unified interface for multiple tools and languages.
+* Extensibility and customizability via a plugin API.
+
+Documentation:
+
+ * V2 version of Pants (Python only, for now): https://pants.readme.io/docs/welcome-to-pants
+ * V1 version of Pants: http://www.pantsbuild.org/
 
 We release to [PyPI](https://pypi.org/pypi)
 [![version](https://img.shields.io/pypi/v/pantsbuild.pants.svg)](https://pypi.org/pypi/pantsbuild.pants)
 [![license](https://img.shields.io/pypi/l/pantsbuild.pants.svg)](https://pypi.org/pypi/pantsbuild.pants)
 
 We use [Travis CI](https://travis-ci.org) to verify the build
-[![Build Status](https://travis-ci.org/pantsbuild/pants.svg?branch=master)](https://travis-ci.org/pantsbuild/pants/branches).
-
-We use [Coveralls](https://coveralls.io) to monitor test coverage
-[![Coverage Status](https://coveralls.io/repos/pantsbuild/pants/badge.png?branch=master)](https://coveralls.io/r/pantsbuild/pants).
+[![Build Status](https://travis-ci.com/pantsbuild/pants.svg?branch=master)](https://travis-ci.com/pantsbuild/pants/branches).
 
 # Requirements
 
-At a minimum, Pants requires the following to run properly:
+To run Pants, you need:
 
 * Linux or macOS.
-* Python 3.6+.
-* A C compiler, system headers, Python headers (to compile native Python modules) and the libffi
-  library and headers (to compile and link modules that use CFFI to access native code).
-* Internet access (so that Pants can fully bootstrap itself)
+* Python 3.6+ discoverable on your `PATH`.
+* Internet access (so that Pants can fully bootstrap itself).
 
-Additionally, if you use the JVM backend to work with Java or Scala code (installed by default):
+Additionally, if you use the JVM backend to work with Java or Scala code:
 
 * OpenJDK or Oracle JDK version 8 or greater.
-
