@@ -1007,7 +1007,10 @@ class ZincCompile(BaseZincCompile):
             return set()
 
         def is_jvm_or_resource_target(t):
-            return isinstance(t, (JvmTarget, JvmApp, JarLibrary, Resources))
+            return (
+                isinstance(t, (JvmTarget, JvmApp, JarLibrary, Resources))
+                or t.type_alias == "target"
+            )
 
         def is_synthetic_or_can_derive_synthetic(t):
             return t.is_synthetic or isinstance(t, JavaThriftLibrary)
