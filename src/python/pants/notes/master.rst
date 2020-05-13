@@ -16,11 +16,17 @@ API Changes
 * Deprecate `filedeps` defaulting to `--absolute` (#9746)
   `PR #9746 <https://github.com/pantsbuild/pants/pull/9746>`_
 
+* Deprecate, instead of error, when Python targets have non-Python sources (#9752)
+  `PR #9752 <https://github.com/pantsbuild/pants/pull/9752>`_
+
 * Upgrade to pex 2.1.10. (#9744)
   `PR #9744 <https://github.com/pantsbuild/pants/pull/9744>`_
 
 * Upgrade Pygments from 2.3.1 to 2.6.1 (#9739)
   `PR #9739 <https://github.com/pantsbuild/pants/pull/9739>`_
+
+* Upgrade psutil from 5.6.3 to 5.7.0 (#9743)
+  `PR #9743 <https://github.com/pantsbuild/pants/pull/9743>`_
 
 New Features
 ~~~~~~~~~~~~
@@ -44,7 +50,7 @@ Refactoring, Improvements, and Tooling
   `PR #9728 <https://github.com/pantsbuild/pants/pull/9728>`_
 
 * Add white space between rule graph errors (#9740)
-  `PR #9728 <https://github.com/pantsbuild/pants/pull/9740>`_
+  `PR #9740 <https://github.com/pantsbuild/pants/pull/9740>`_
 
 1.28.0.dev2 (5/9/2020)
 ----------------------
