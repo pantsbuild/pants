@@ -38,7 +38,7 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 use store::UploadSummary;
-use workunit_store::{with_workunit, WorkUnitStore, WorkunitMetadata};
+use workunit_store::{with_workunit, WorkunitMetadata, WorkunitStore};
 
 use async_semaphore::AsyncSemaphore;
 use hashing::Digest;
@@ -350,12 +350,12 @@ impl AddAssign<UploadSummary> for ExecutionStats {
 
 #[derive(Clone, Default)]
 pub struct Context {
-  workunit_store: WorkUnitStore,
+  workunit_store: WorkunitStore,
   build_id: String,
 }
 
 impl Context {
-  pub fn new(workunit_store: WorkUnitStore, build_id: String) -> Context {
+  pub fn new(workunit_store: WorkunitStore, build_id: String) -> Context {
     Context {
       workunit_store,
       build_id,
