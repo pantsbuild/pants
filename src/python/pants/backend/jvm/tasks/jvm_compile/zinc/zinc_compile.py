@@ -1046,7 +1046,7 @@ class ZincCompile(BaseZincCompile):
             msg = (
                 f"Modulizable targets must not contain any synthetic target, but in this "
                 f"case the "
-                f"following synthetic targets depend on other non-synthetformatted_targetsic modules:\n"
+                f"following synthetic targets depend on other non-synthetic modules:\n"
                 f"{formatted_targets}\n"
                 f"One approach that may help is to reduce the scope of the import to "
                 f"further avoid synthetic targets."
