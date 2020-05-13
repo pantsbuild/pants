@@ -2,10 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os.path
+from pathlib import PurePath
 from typing import Iterable, Optional, Sequence, Tuple, Union, cast
 
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
+from pants.base.deprecated import deprecated_conditional
 from pants.core.util_rules.determine_source_files import SourceFiles
 from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
@@ -35,7 +37,22 @@ from pants.python.python_setup import PythonSetup
 
 
 class PythonSources(Sources):
-    expected_file_extensions = (".py",)
+    # TODO: uncomment this once done with the deprecation of using non-Python files.
+    # expected_file_extensions = (".py",)
+    def validate_snapshot(self, snapshot: Snapshot) -> None:
+        super().validate_snapshot(snapshot)
+        non_python_files = [fp for fp in snapshot.files if PurePath(fp).suffix != ".py"]
+        deprecated_conditional(
+            lambda: bool(non_python_files),
+            entity_description="Python targets including non-Python files",
+            removal_version="1.29.0.dev0",
+            hint_message=(
+                f"The {repr(self.alias)} field in target {self.address} should only contain "
+                f"files that end in '.py', but it had these files: {sorted(non_python_files)}.\n\n"
+                "Instead, put those files in another target, like a `resources` target, and add "
+                "that target to the `dependencies` field of this target."
+            ),
+        )
 
 
 class PythonInterpreterCompatibility(StringOrStringSequenceField):

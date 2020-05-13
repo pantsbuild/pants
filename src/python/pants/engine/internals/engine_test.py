@@ -279,9 +279,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
         )
 
     def test_illegal_root_selection(self):
-        rules = [
-            RootRule(B),
-        ]
+        rules = [RootRule(B)]
 
         scheduler = self.scheduler(rules, include_trace_on_error=False)
 
@@ -290,14 +288,12 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
             list(scheduler.product_request(A, subjects=[(B())]))
 
         self.assert_equal_with_printing(
-            """No installed @rules return the type A. Is the @rule that you're expecting to run registered?""",
+            "No installed @rules return the type A. Is the @rule that you're expecting to run registered?",
             str(cm.exception),
         )
 
     def test_non_existing_root_fails_differently(self):
-        rules = [
-            upcast,
-        ]
+        rules = [upcast]
 
         with self.assertRaises(Exception) as cm:
             list(self.mk_scheduler(rules=rules, include_trace_on_error=False))
@@ -306,6 +302,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
             dedent(
                 f"""
                 Rules with errors: 1
+
                   {fmt_rule(upcast)}:
                     No rule was available to compute MyInt. Maybe declare RootRule(MyInt)?
                 """

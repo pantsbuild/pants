@@ -902,7 +902,7 @@ class Native(metaclass=SingletonMetaclass):
         return self.lib.write_stdout(session, msg.encode())
 
     def write_stderr(self, session, msg: str):
-        return self.lib.write_stdout(session, msg.encode())
+        return self.lib.write_stderr(session, msg.encode())
 
     def flush_log(self):
         return self.lib.flush_log()
