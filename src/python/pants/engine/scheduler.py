@@ -556,7 +556,7 @@ class SchedulerSession:
             self._trace_on_error([exc], request)
             return PANTS_FAILED_EXIT_CODE
         _, state = returns[0]
-        return state.value.exit_code
+        return cast(int, state.value.exit_code)
 
     def product_request(
         self,
