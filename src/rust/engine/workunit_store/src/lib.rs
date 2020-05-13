@@ -200,20 +200,21 @@ impl WorkUnitStore {
     let mut res = HashMap::new();
     while let Some((dur, span_id)) = queue.pop() {
       let record = inner.workunit_records.get(&span_id).unwrap();
-      let (name, blocked) = match record {
+      let (desc, blocked) = match record {
         WorkunitRecord::Started(StartedWorkUnit {
-          name,
-          metadata: WorkunitMetadata { blocked, .. },
+          metadata: WorkunitMetadata { blocked, desc, .. },
           ..
-        }) => (name.clone(), *blocked),
+        }) => (desc, *blocked),
         WorkunitRecord::Completed(WorkUnit {
-          name,
-          metadata: WorkunitMetadata { blocked, .. },
+          metadata: WorkunitMetadata { blocked, desc, .. },
           ..
-        }) => (name.clone(), *blocked),
+        }) => (desc, *blocked),
       };
       let maybe_duration = if blocked { None } else { Some(dur) };
-      res.insert(name, maybe_duration);
+      if let Some(effective_name) = desc {
+        res.insert(effective_name.to_string(), maybe_duration);
+      }
+
       if res.len() >= k {
         break;
       }

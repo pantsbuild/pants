@@ -17,11 +17,10 @@ use crate::nodes::{NodeKey, Select, Tracer, Visualizer};
 
 use graph::{InvalidationResult, LastObserved};
 use hashing;
-use indexmap::IndexMap;
 use log::{debug, info, warn};
-use logging::logger::LOGGER;
 use parking_lot::Mutex;
-use ui::{EngineDisplay, KeyboardCommand};
+use task_executor::Executor;
+use ui::ConsoleUI;
 use uuid::Uuid;
 use watch::Invalidatable;
 use workunit_store::WorkUnitStore;
@@ -46,7 +45,7 @@ struct InnerSession {
   roots: Mutex<HashMap<Root, Option<LastObserved>>>,
   // If enabled, the display that will render the progress of the V2 engine. This is only
   // Some(_) if the --v2-ui option is enabled.
-  display: Option<Arc<Mutex<EngineDisplay>>>,
+  display: Option<Mutex<ConsoleUI>>,
   // If enabled, Zipkin spans for v2 engine will be collected.
   should_record_zipkin_spans: bool,
   // A place to store info about workunits in rust part
@@ -75,10 +74,9 @@ impl Session {
     build_id: String,
     should_report_workunits: bool,
   ) -> Session {
-    let display = if should_render_ui && EngineDisplay::stdout_is_tty() {
-      let mut display = EngineDisplay::new();
-      display.initialize(num_cpus::get());
-      Some(Arc::new(Mutex::new(display)))
+    let workunit_store = WorkUnitStore::new();
+    let display = if should_render_ui {
+      Some(Mutex::new(ConsoleUI::new(workunit_store.clone())))
     } else {
       None
     };
@@ -88,7 +86,7 @@ impl Session {
       roots: Mutex::new(HashMap::new()),
       display,
       should_record_zipkin_spans,
-      workunit_store: WorkUnitStore::new(),
+      workunit_store,
       build_id,
       run_id: Mutex::new(Uuid::new_v4()),
       should_report_workunits,
@@ -121,10 +119,6 @@ impl Session {
     self.0.preceding_graph_size
   }
 
-  fn maybe_display(&self) -> Option<&Arc<Mutex<EngineDisplay>>> {
-    self.0.display.as_ref()
-  }
-
   pub fn should_record_zipkin_spans(&self) -> bool {
     self.0.should_record_zipkin_spans
   }
@@ -152,31 +146,27 @@ impl Session {
   }
 
   pub fn write_stdout(&self, msg: &str) {
-    if let Some(display) = self.maybe_display() {
-      let mut d = display.lock();
-      d.write_stdout(msg);
+    if let Some(display) = &self.0.display {
+      let display = display.lock();
+      display.write_stdout(msg);
+    } else {
+      print!("{}", msg);
     }
   }
 
   pub fn write_stderr(&self, msg: &str) {
-    if let Some(display) = self.maybe_display() {
-      let mut d = display.lock();
-      d.write_stderr(msg);
+    if let Some(display) = &self.0.display {
+      let display = display.lock();
+      display.write_stderr(msg);
+    } else {
+      eprint!("{}", msg);
     }
   }
 
   pub fn with_console_ui_disabled<F: FnOnce() -> T, T>(&self, f: F) -> T {
-    if let Some(display) = self.maybe_display() {
-      {
-        let mut d = display.lock();
-        d.suspend()
-      }
-      let output = f();
-      {
-        let mut d = display.lock();
-        d.unsuspend();
-      }
-      output
+    if let Some(display) = &self.0.display {
+      let display = display.lock();
+      display.with_console_ui_disabled(f)
     } else {
       f()
     }
@@ -184,6 +174,39 @@ impl Session {
 
   pub fn should_handle_workunits(&self) -> bool {
     self.should_report_workunits() || self.should_record_zipkin_spans()
+  }
+
+  fn maybe_display_initialize(&self, executor: &Executor) {
+    if let Some(display) = &self.0.display {
+      let session = self.clone();
+      let mut display = display.lock();
+      let res = display.initialize(
+        executor.clone(),
+        Box::new(move |msg: &str| session.write_stderr(msg)),
+      );
+      if let Err(e) = res {
+        warn!("{}", e);
+      }
+    }
+  }
+
+  async fn maybe_display_teardown(&self) {
+    if let Some(display) = &self.0.display {
+      let teardown = {
+        let mut display = display.lock();
+        display.teardown()
+      };
+      if let Err(e) = teardown.await {
+        warn!("{}", e);
+      }
+    }
+  }
+
+  fn maybe_display_render(&self) {
+    if let Some(display) = &self.0.display {
+      let mut display = display.lock();
+      display.render();
+    }
   }
 }
 
@@ -377,7 +400,7 @@ impl Scheduler {
   }
 
   ///
-  /// Attempts to complete all of the given roots, and send the result on the given mpsc Sender,
+  /// Attempts to complete all of the given roots, and send a FinalResult on the given mpsc Sender,
   /// which allows the caller to poll a channel for the result without blocking uninterruptibly
   /// on a Future.
   ///
@@ -402,6 +425,7 @@ impl Scheduler {
           .collect::<Vec<_>>(),
       )
       .await;
+
       let _ = sender.send(res);
     });
   }
@@ -451,131 +475,33 @@ impl Scheduler {
     let (sender, receiver) = mpsc::channel();
     self.execute_helper(request, session, sender);
 
-    // This map keeps the k most relevant jobs in assigned possitions.
-    // Keys are positions in the display (display workers) and the values are the actual jobs to print.
-    let mut tasks = IndexMap::new();
+    let interval = Duration::from_millis(1000 / ConsoleUI::render_rate_hz());
     let deadline = request.timeout.map(|timeout| Instant::now() + timeout);
 
-    let maybe_display_handle = Self::maybe_display_initialize(&session);
+    session.maybe_display_initialize(&self.core.executor);
     let result = loop {
-      if let Ok(res) = receiver.recv_timeout(Self::compute_refresh_delay(deadline)) {
+      if let Ok(res) = receiver.recv_timeout(Self::refresh_delay(interval, deadline)) {
         // Completed successfully.
         break Ok(Self::execute_record_results(&request.roots, &session, res));
-      } else if let Err(e) = Self::maybe_display_render(&session, &mut tasks) {
-        // The display indicated that we should exit.
-        break Err(e);
       } else if deadline.map(|d| d < Instant::now()).unwrap_or(false) {
         // The timeout on the request has been exceeded.
         break Err(ExecutionTermination::Timeout);
       }
+      session.maybe_display_render();
     };
-    Self::maybe_display_teardown(session, maybe_display_handle);
+    self
+      .core
+      .executor
+      .block_on(session.maybe_display_teardown());
 
     result
   }
 
-  fn compute_refresh_delay(deadline: Option<Instant>) -> Duration {
-    let refresh_interval = Duration::from_millis(100);
+  fn refresh_delay(refresh_interval: Duration, deadline: Option<Instant>) -> Duration {
     deadline
       .and_then(|deadline| deadline.checked_duration_since(Instant::now()))
       .map(|duration_till_deadline| std::cmp::min(refresh_interval, duration_till_deadline))
       .unwrap_or(refresh_interval)
-  }
-
-  fn maybe_display_initialize(session: &Session) -> Option<Uuid> {
-    if let Some(display) = session.maybe_display() {
-      {
-        let mut display = display.lock();
-        display.start();
-      }
-      Some(LOGGER.register_engine_display(display.clone()))
-    } else {
-      None
-    }
-  }
-
-  fn maybe_display_teardown(session: &Session, handle: Option<Uuid>) {
-    if let Some(handle) = handle {
-      LOGGER.deregister_engine_display(handle);
-    }
-    if let Some(display) = session.maybe_display() {
-      let mut display = display.lock();
-      display.finish();
-    }
-  }
-
-  fn maybe_display_render(
-    session: &Session,
-    tasks_to_display: &mut IndexMap<String, Option<Duration>>,
-  ) -> Result<(), ExecutionTermination> {
-    let display = if let Some(display) = session.maybe_display() {
-      display
-    } else {
-      return Ok(());
-    };
-    let workunit_store = session.workunit_store();
-
-    // Update the graph. To do that, we iterate over heavy hitters.
-
-    let worker_count = {
-      let d = display.lock();
-      d.worker_count()
-    };
-    let heavy_hitters = workunit_store.heavy_hitters(worker_count);
-
-    // Insert every one in the set of tasks to display.
-    // For tasks already here, the durations are overwritten.
-    tasks_to_display.extend(heavy_hitters.clone().into_iter());
-
-    // And remove the tasks that no longer should be there.
-    for (task, _) in tasks_to_display.clone().into_iter() {
-      if !heavy_hitters.contains_key(&task) {
-        tasks_to_display.swap_remove(&task);
-      }
-    }
-
-    for (i, item) in tasks_to_display.iter().enumerate() {
-      let label = item.0;
-      let maybe_duration = item.1;
-      let duration_label = match maybe_duration {
-        None => "(Waiting) ".to_string(),
-        Some(duration) => {
-          let duration_secs: f64 = (duration.as_millis() as f64) / 1000.0;
-          format!("{:.2}s ", duration_secs)
-        }
-      };
-      let mut d = display.lock();
-      d.update(i.to_string(), format!("{}{}", duration_label, label));
-    }
-
-    // If the number of ongoing tasks is less than the number of workers,
-    // fill the rest of the workers with empty string.
-    // TODO(yic): further improve the UI. https://github.com/pantsbuild/pants/issues/6666
-    let worker_count = {
-      let d = display.lock();
-      d.worker_count()
-    };
-
-    let mut d = display.lock();
-    for i in tasks_to_display.len()..worker_count {
-      d.update(i.to_string(), "".to_string());
-    }
-
-    match d.render() {
-      Err(e) => {
-        warn!("{}", e);
-        Ok(())
-      }
-      Ok(KeyboardCommand::CtrlC) => {
-        info!("Exiting early in response to Ctrl-C");
-        {
-          let mut display = display.lock();
-          display.finish();
-        }
-        Err(ExecutionTermination::KeyboardInterrupt)
-      }
-      Ok(KeyboardCommand::None) => Ok(()),
-    }
   }
 }
 

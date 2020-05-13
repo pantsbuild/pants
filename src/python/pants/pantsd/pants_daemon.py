@@ -13,17 +13,11 @@ from setproctitle import setproctitle as set_process_title
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink, SignalHandler
-from pants.base.exiter import Exiter
 from pants.bin.daemon_pants_runner import DaemonPantsRunner
 from pants.engine.internals.native import Native
 from pants.engine.unions import UnionMembership
 from pants.init.engine_initializer import EngineInitializer
-from pants.init.logging import (
-    clear_previous_loggers,
-    init_rust_logger,
-    setup_logging_to_file,
-    setup_logging_to_stderr,
-)
+from pants.init.logging import clear_logging_handlers, init_rust_logger, setup_logging_to_file
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -129,9 +123,7 @@ class PantsDaemon(FingerprintedProcessManager):
             stub_pantsd = cls.create(options_bootstrapper, full_init=False)
             with stub_pantsd._services.lifecycle_lock:
                 if stub_pantsd.needs_restart(stub_pantsd.options_fingerprint):
-                    # Once we determine we actually need to launch, recreate with full initialization.
-                    pantsd = cls.create(options_bootstrapper)
-                    return pantsd.launch()
+                    return stub_pantsd.launch()
                 else:
                     # We're already launched.
                     return PantsDaemon.Handle(
@@ -148,7 +140,7 @@ class PantsDaemon(FingerprintedProcessManager):
             :returns: A Handle for the pantsd instance.
             :rtype: PantsDaemon.Handle
             """
-            pantsd = cls.create(options_bootstrapper)
+            pantsd = cls.create(options_bootstrapper, full_init=False)
             with pantsd._services.lifecycle_lock:
                 # N.B. This will call `pantsd.terminate()` before starting.
                 return pantsd.launch()
@@ -165,8 +157,6 @@ class PantsDaemon(FingerprintedProcessManager):
             """
             bootstrap_options = options_bootstrapper.bootstrap_options
             bootstrap_options_values = bootstrap_options.for_global_scope()
-            # TODO: https://github.com/pantsbuild/pants/issues/3479
-            watchman = WatchmanLauncher.create(bootstrap_options_values).watchman
 
             native: Optional[Native] = None
             build_root: Optional[str] = None
@@ -178,10 +168,13 @@ class PantsDaemon(FingerprintedProcessManager):
                 legacy_graph_scheduler = EngineInitializer.setup_legacy_graph(
                     native, options_bootstrapper, build_config
                 )
+                # TODO: https://github.com/pantsbuild/pants/issues/3479
+                watchman = WatchmanLauncher.create(bootstrap_options_values).watchman
                 services = cls._setup_services(
                     build_root,
                     bootstrap_options_values,
                     legacy_graph_scheduler,
+                    native,
                     watchman,
                     union_membership=UnionMembership(build_config.union_rules()),
                 )
@@ -209,6 +202,7 @@ class PantsDaemon(FingerprintedProcessManager):
             build_root,
             bootstrap_options,
             legacy_graph_scheduler,
+            native,
             watchman,
             union_membership: UnionMembership,
         ):
@@ -216,7 +210,7 @@ class PantsDaemon(FingerprintedProcessManager):
 
             :returns: A PantsServices instance.
             """
-            should_shutdown_after_run = bootstrap_options.shutdown_pantsd_after_run
+            native.override_thread_logging_destination_to_just_pantsd()
             fs_event_service = (
                 FSEventService(
                     watchman, scheduler=legacy_graph_scheduler.scheduler, build_root=build_root
@@ -238,10 +232,9 @@ class PantsDaemon(FingerprintedProcessManager):
             )
 
             pailgun_service = PailgunService(
-                (bootstrap_options.pantsd_pailgun_host, bootstrap_options.pantsd_pailgun_port),
-                DaemonPantsRunner,
+                bootstrap_options.pantsd_pailgun_port,
+                DaemonPantsRunner(scheduler_service),
                 scheduler_service,
-                should_shutdown_after_run,
             )
 
             store_gc_service = StoreGCService(legacy_graph_scheduler.scheduler)
@@ -257,7 +250,7 @@ class PantsDaemon(FingerprintedProcessManager):
                     )
                     if service is not None
                 ),
-                port_map=dict(pailgun=pailgun_service.pailgun_port),
+                port_map=dict(pailgun=pailgun_service.pailgun_port()),
             )
 
     def __init__(
@@ -360,8 +353,7 @@ class PantsDaemon(FingerprintedProcessManager):
 
             level = self._log_level
             ignores = bootstrap_options.for_global_scope().ignore_pants_warnings
-            clear_previous_loggers()
-            setup_logging_to_stderr(level, warnings_filter_regexes=ignores)
+            clear_logging_handlers()
             log_dir = os.path.join(self._work_dir, self.name)
             log_handler = setup_logging_to_file(
                 level, log_dir=log_dir, log_filename=self.LOG_NAME, warnings_filter_regexes=ignores
@@ -482,11 +474,8 @@ class PantsDaemon(FingerprintedProcessManager):
         os.environ.pop("PYTHONPATH")
 
         # Switch log output to the daemon's log stream from here forward.
-        # Also, register an exiter using os._exit to ensure we only close stdio streams once.
         self._close_stdio()
-        with self._pantsd_logging() as log_stream, ExceptionSink.exiter_as(
-            lambda _: Exiter(exiter=os._exit)
-        ):
+        with self._pantsd_logging() as log_stream:
 
             # We don't have any stdio streams to log to anymore, so we log to a file.
             # We don't override the faulthandler destination because the stream we get will proxy things

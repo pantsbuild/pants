@@ -30,6 +30,7 @@ members = [
   "graph",
   "hashing",
   "logging",
+  "nailgun",
   "process_execution",
   "process_executor",
   "rule_graph",
@@ -66,6 +67,7 @@ default-members = [
   "graph",
   "hashing",
   "logging",
+  "nailgun",
   "process_execution",
   "process_executor",
   "rule_graph",
@@ -99,6 +101,7 @@ itertools = "0.8.2"
 lazy_static = "1"
 log = "0.4"
 logging = { path = "logging" }
+nailgun = { path = "nailgun" }
 num_cpus = "1"
 num_enum = "0.4"
 parking_lot = "0.6"

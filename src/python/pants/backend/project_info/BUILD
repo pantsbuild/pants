@@ -30,10 +30,7 @@ python_tests(
   sources=['*_test.py', '!*_integration_test.py'],
   dependencies = [
     ':project_info',
-    'src/python/pants/backend/codegen/thrift/java',
-    'src/python/pants/backend/jvm:artifact',
-    'src/python/pants/backend/jvm:repository',
-    'src/python/pants/backend/jvm/targets:all',
+    'src/python/pants/backend/codegen/protobuf',
     'src/python/pants/backend/python/rules',
     'src/python/pants/backend/python/targets',
     'src/python/pants/core/util_rules',

@@ -134,7 +134,7 @@ class TestNailgunClient(unittest.TestCase):
     @unittest.mock.patch.object(NailgunClient, "try_connect", **PATCH_OPTS)
     @unittest.mock.patch("pants.java.nailgun_client.NailgunClientSession", **PATCH_OPTS)
     def test_execute(self, mock_session, mock_try_connect):
-        self.nailgun_client.execute("test")
+        self.nailgun_client.execute("test", [])
         self.assertEqual(mock_try_connect.call_count, 1)
         self.assertEqual(mock_session.call_count, 1)
 
@@ -146,7 +146,7 @@ class TestNailgunClient(unittest.TestCase):
         )
 
         with self.assertRaises(NailgunClient.NailgunConnectionError):
-            self.nailgun_client.execute("test")
+            self.nailgun_client.execute("test", [])
 
     @unittest.mock.patch.object(NailgunClient, "try_connect", **PATCH_OPTS)
     @unittest.mock.patch("pants.java.nailgun_client.NailgunClientSession", **PATCH_OPTS)
@@ -154,7 +154,7 @@ class TestNailgunClient(unittest.TestCase):
         mock_session.return_value.execute.side_effect = socket.error("oops")
 
         with self.assertRaises(NailgunClient.NailgunError):
-            self.nailgun_client.execute("test")
+            self.nailgun_client.execute("test", [])
 
     @unittest.mock.patch.object(NailgunClient, "try_connect", **PATCH_OPTS)
     @unittest.mock.patch("pants.java.nailgun_client.NailgunClientSession", **PATCH_OPTS)
@@ -163,7 +163,7 @@ class TestNailgunClient(unittest.TestCase):
         mock_session.return_value.execute.side_effect = NailgunProtocol.ProtocolError("oops")
 
         with self.assertRaises(NailgunClient.NailgunError):
-            self.nailgun_client.execute("test")
+            self.nailgun_client.execute("test", [])
 
     def test_repr(self):
         self.assertIsNotNone(repr(self.nailgun_client))

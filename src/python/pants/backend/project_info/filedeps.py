@@ -32,10 +32,10 @@ class FiledepsOptions(LineOriented, GoalSubsystem):
         register(
             "--absolute",
             type=bool,
-            default=True,
+            default=False,
             help=(
-                "If True, output with absolute path; else, output with path relative to the "
-                "build root."
+                "If True, output with absolute path. If unspecified, output with path relative to "
+                "the build root."
             ),
         )
         register(
@@ -51,8 +51,10 @@ class FiledepsOptions(LineOriented, GoalSubsystem):
             "--transitive",
             type=bool,
             default=False,
-            help="If True, list files from all transitive dependencies. If unspecified, list "
-            "files from direct dependencies only.",
+            help=(
+                "If True, list files from all dependencies, including transitive dependencies. If "
+                "unspecified, only list files from the target."
+            ),
         )
 
 

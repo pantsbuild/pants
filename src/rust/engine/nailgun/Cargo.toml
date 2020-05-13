@@ -1,0 +1,18 @@
+[package]
+version = "0.0.1"
+edition = "2018"
+name = "nailgun"
+authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+publish = false
+
+[dependencies]
+bytes = "0.5"
+futures = "0.3"
+log = "0.4"
+nails = "0.5.1"
+os_pipe = "0.9"
+task_executor = { path = "../task_executor" }
+tokio = { version = "0.2", features = ["tcp", "fs", "sync"] }
+
+[dev-dependencies]
+tokio = { version = "0.2", features = ["dns", "rt-threaded", "macros"] }

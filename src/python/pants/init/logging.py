@@ -6,8 +6,8 @@ import logging
 import os
 import sys
 import warnings
-from logging import LogRecord, StreamHandler
-from typing import List, Optional, TextIO
+from logging import Formatter, Handler, LogRecord, StreamHandler
+from typing import List, Optional, TextIO, Tuple
 
 import pants.util.logging as pants_logging
 from pants.base.exception_sink import ExceptionSink
@@ -23,8 +23,7 @@ logging.addLevelName(pants_logging.TRACE, "TRACE")
 
 
 def init_rust_logger(log_level: LogLevel, log_show_rust_3rdparty: bool) -> None:
-    native = Native()
-    native.init_rust_logging(log_level.level, log_show_rust_3rdparty)
+    Native().init_rust_logging(log_level.level, log_show_rust_3rdparty)
 
 
 class NativeHandler(StreamHandler):
@@ -68,10 +67,31 @@ class NativeHandler(StreamHandler):
         )
 
 
-def clear_previous_loggers() -> None:
+class ExceptionFormatter(Formatter):
+    """Uses the `--print-exception-stacktrace` option to decide whether to render stacktraces."""
+
+    def formatException(self, exc_info):
+        if ExceptionSink.should_print_exception_stacktrace:
+            return super().formatException(exc_info)
+        return "\n(Use --print-exception-stacktrace to see more error details.)"
+
+
+def clear_logging_handlers():
     logger = logging.getLogger(None)
-    for handler in logger.handlers:
+    for handler in get_logging_handlers():
         logger.removeHandler(handler)
+
+
+def get_logging_handlers() -> Tuple[Handler, ...]:
+    logger = logging.getLogger(None)
+    return tuple(logger.handlers)
+
+
+def set_logging_handlers(handlers: Tuple[Handler, ...]):
+    clear_logging_handlers()
+    logger = logging.getLogger(None)
+    for handler in handlers:
+        logger.addHandler(handler)
 
 
 def _common_logging_setup(level: LogLevel, warnings_filter_regexes: Optional[List[str]]) -> None:
@@ -96,6 +116,27 @@ def _common_logging_setup(level: LogLevel, warnings_filter_regexes: Optional[Lis
         requests_logger.propagate = True
 
 
+def setup_logging(global_bootstrap_options):
+    """Sets up logging for a pants run.
+
+    This is called in two contexts: 1) PantsRunner, 2) DaemonPantsRunner. In the latter case, the
+    loggers are saved and restored around this call, so in both cases it runs with no handlers
+    configured (and asserts so!).
+    """
+    if get_logging_handlers():
+        raise AssertionError("setup_logging should not be called while Handlers are installed.")
+
+    ignores = global_bootstrap_options.ignore_pants_warnings
+    global_level = global_bootstrap_options.level
+    level = LogLevel.ERROR if getattr(global_bootstrap_options, "quiet", False) else global_level
+    log_dir = global_bootstrap_options.logdir
+
+    Native().init_rust_logging(level.level, global_bootstrap_options.log_show_rust_3rdparty)
+    setup_logging_to_stderr(level, warnings_filter_regexes=ignores)
+    if log_dir:
+        setup_logging_to_file(global_level, log_dir=log_dir, warnings_filter_regexes=ignores)
+
+
 def setup_logging_to_stderr(
     level: LogLevel, *, warnings_filter_regexes: Optional[List[str]] = None
 ) -> None:
@@ -108,6 +149,7 @@ def setup_logging_to_stderr(
 
     python_logger = logging.getLogger(None)
     handler = NativeHandler(level, stream=sys.stderr)
+    handler.setFormatter(ExceptionFormatter())
     python_logger.addHandler(handler)
     LogLevel.TRACE.set_level_for(python_logger)
 
@@ -129,7 +171,7 @@ def setup_logging_to_file(
 
     fd = native.setup_pantsd_logger(log_path, level.level)
     ExceptionSink.reset_interactive_output_stream(os.fdopen(os.dup(fd), "a"))
-    native_handler = NativeHandler(level, native_filename=log_path)
+    handler = NativeHandler(level, native_filename=log_path)
 
-    logger.addHandler(native_handler)
-    return native_handler
+    logger.addHandler(handler)
+    return handler
