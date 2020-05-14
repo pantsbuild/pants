@@ -940,7 +940,7 @@ class Native(metaclass=SingletonMetaclass):
         self,
         scheduler,
         should_record_zipkin_spans,
-        should_render_ui,
+        dynamic_ui: bool,
         build_id,
         should_report_workunits: bool,
     ):
@@ -948,7 +948,7 @@ class Native(metaclass=SingletonMetaclass):
             self.lib.session_create(
                 scheduler,
                 should_record_zipkin_spans,
-                should_render_ui,
+                dynamic_ui,
                 self.context.utf8_buf(build_id),
                 should_report_workunits,
             ),

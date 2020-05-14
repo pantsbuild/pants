@@ -50,7 +50,7 @@ def load_backends_and_plugins(
                 "1) Avoids unnecessary prework. This new implementation should be faster to run.",
                 (
                     "2) Has less verbose output. Pants will now only show what isort itself outputs. "
-                    "(Use `--v2-ui` if you want to see the work Pants is doing behind-the-scenes.)"
+                    "(Use `--dyanmic-ui` if you want to see the work Pants is doing behind-the-scenes.)"
                 ),
                 (
                     "3) Works with `./pants lint` automatically. When you run `./pants lint`, Pants "

@@ -386,13 +386,17 @@ class Scheduler:
         return self._native.new_nailgun_server(self._scheduler, port_requested, runner)
 
     def new_session(
-        self, zipkin_trace_v2, build_id, v2_ui=False, should_report_workunits=False
+        self,
+        zipkin_trace_v2: bool,
+        build_id,
+        dynamic_ui: bool = False,
+        should_report_workunits: bool = False,
     ) -> "SchedulerSession":
         """Creates a new SchedulerSession for this Scheduler."""
         return SchedulerSession(
             self,
             self._native.new_session(
-                self._scheduler, zipkin_trace_v2, v2_ui, build_id, should_report_workunits,
+                self._scheduler, zipkin_trace_v2, dynamic_ui, build_id, should_report_workunits,
             ),
         )
 
