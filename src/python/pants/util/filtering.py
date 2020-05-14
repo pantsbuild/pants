@@ -6,33 +6,15 @@ from typing import Callable, Iterable, Sequence, Tuple, TypeVar
 
 from pants.base.deprecated import deprecated
 
-_identity = lambda x: x
-
-
-def _extract_modifier(modified_param: str) -> Tuple[Callable[[bool], bool], str]:
-    if modified_param.startswith("+"):
-        return _identity, modified_param[1:]
-    if modified_param.startswith("-"):
-        return operator.not_, modified_param[1:]
-    return _identity, modified_param
-
-
 _T = TypeVar("_T")
 Filter = Callable[[_T], bool]
 
 
-def create_filters(
-    predicate_params: Iterable[str], predicate_factory: Callable[[str], Filter]
-) -> Sequence[Filter]:
-    """Create filter functions from a list of string parameters.
-
-    :param predicate_params: A list of predicate_param arguments as in `create_filter`.
-    :param predicate_factory: As in `create_filter`.
-    """
-    filters = []
-    for predicate_param in predicate_params:
-        filters.append(create_filter(predicate_param, predicate_factory))
-    return filters
+def _extract_modifier(modified_param: str) -> Tuple[Callable[[bool], bool], str]:
+    if modified_param.startswith("-"):
+        return operator.not_, modified_param[1:]
+    identity_func = lambda x: x
+    return identity_func, modified_param[1:] if modified_param.startswith("+") else modified_param
 
 
 def create_filter(predicate_param: str, predicate_factory: Callable[[str], Filter]) -> Filter:
@@ -48,9 +30,9 @@ def create_filter(predicate_param: str, predicate_factory: Callable[[str], Filte
     :return: A filter function of one argument that is the logical OR of the predicates for each of
              the comma-separated arguments. If the comma-separated list was prefixed by a '-',
              the sense of the filter is inverted.
+
+    :API: public
     """
-    # NOTE: Do not inline this into create_filters above. A separate function is necessary
-    # in order to capture the different closure on each invocation.
     modifier, param = _extract_modifier(predicate_param)
     predicates = [predicate_factory(p) for p in param.split(",")]
 
@@ -58,6 +40,22 @@ def create_filter(predicate_param: str, predicate_factory: Callable[[str], Filte
         return modifier(any(pred(x) for pred in predicates))
 
     return filt
+
+
+def create_filters(
+    predicate_params: Iterable[str], predicate_factory: Callable[[str], Filter]
+) -> Sequence[Filter]:
+    """Create filter functions from a list of string parameters.
+
+    :param predicate_params: A list of predicate_param arguments as in `create_filter`.
+    :param predicate_factory: As in `create_filter`.
+
+    :API: public
+    """
+    filters = []
+    for predicate_param in predicate_params:
+        filters.append(create_filter(predicate_param, predicate_factory))
+    return filters
 
 
 @deprecated(
