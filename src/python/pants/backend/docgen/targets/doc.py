@@ -56,7 +56,7 @@ class Page(Target):
     wiki: ::
 
        page(name='mypage',
-         source='mypage.md',
+         sources=['mypage.md'],
          provides=[
            wiki_artifact(wiki=Wiki('foozle', <url builder>),
                          space='my_space',

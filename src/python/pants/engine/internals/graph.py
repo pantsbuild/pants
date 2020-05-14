@@ -70,22 +70,6 @@ async def resolve_target(
     address = cast(Address, kwargs.pop("address"))
     kwargs.pop("name", None)
 
-    # We convert `source` into `sources` because the Target API has no `Source` field, only
-    # `Sources`.
-    if "source" in kwargs and "sources" in kwargs:
-        raise TargetDefinitionException(
-            address, "Cannot specify both `source` and `sources` fields."
-        )
-    if "source" in kwargs:
-        source = kwargs.pop("source")
-        if not isinstance(source, str):
-            raise TargetDefinitionException(
-                address,
-                f"The `source` field must be a string containing a path relative to the target, "
-                f"but got {source} of type {type(source)}.",
-            )
-        kwargs["sources"] = [source]
-
     target_type = registered_target_types.aliases_to_types.get(type_alias, None)
     if target_type is None:
         raise TargetDefinitionException(

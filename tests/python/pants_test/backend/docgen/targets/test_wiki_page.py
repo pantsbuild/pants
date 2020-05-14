@@ -31,8 +31,9 @@ class WikiPageTest(TestBase):
             dedent(
                 """
 
-                page(name='readme',
-                  source='README.md',
+                page(
+                  name='readme',
+                  sources=['README.md'],
                   links=[':readme2'],
                   provides=[
                     wiki_artifact(
@@ -43,7 +44,8 @@ class WikiPageTest(TestBase):
                   ],
                 )
 
-                page(name='readme2',
+                page(
+                  name='readme2',
                   sources=['README2.md'],
                   links=[':readme'],
                   provides=[
@@ -113,8 +115,9 @@ class WikiPageTest(TestBase):
                 "src/docs",
                 dedent(
                     """
-                    page(name='readme3',
-                      source='README.md',
+                    page(
+                      name='readme3',
+                      sources=['README.md'],
                       provides=[
                         wiki_artifact(
                           wiki=confluence,

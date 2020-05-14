@@ -51,7 +51,7 @@ class ClocTest(GoalRuleTestBase):
         self.create_file(
             f"{java_dir}/Ignored.java", "// We do not expect this file to appear in counts."
         )
-        self.add_to_build_file(java_dir, "java_library(source='Foo.java')")
+        self.add_to_build_file(java_dir, "java_library(sources=['Foo.java'])")
 
         result = self.execute_rule(args=[py_dir, java_dir])
         assert_counts(result.stdout, "Python", num_files=2, blank=2, comment=3, code=2)
