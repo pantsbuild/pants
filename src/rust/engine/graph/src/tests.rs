@@ -649,7 +649,7 @@ impl Node for TNode {
     self.1
   }
 
-  fn canonical_name(&self) -> String {
+  fn workunit_name(&self) -> String {
     format!("{}", self)
   }
 }

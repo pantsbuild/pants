@@ -1065,7 +1065,7 @@ impl Node for NodeKey {
     let started_workunit_id = {
       let display = context.session.should_handle_workunits()
         && (self.user_facing_name().is_some() || self.display_info().is_some());
-      let name = self.canonical_name();
+      let name = self.workunit_name();
       let span_id = new_span_id();
 
       // We're starting a new workunit: record our parent, and set the current parent to our span.
@@ -1156,14 +1156,14 @@ impl Node for NodeKey {
     }
   }
 
-  fn canonical_name(&self) -> String {
+  fn workunit_name(&self) -> String {
     match self {
       NodeKey::Task(_) => self
         .display_info()
         .and_then(|di| di.name.as_ref())
         .map(|s| s.to_owned())
         .unwrap_or_else(|| format!("{}", self)),
-      NodeKey::MultiPlatformExecuteProcess(mp_epr) => mp_epr.0.canonical_name(),
+      NodeKey::MultiPlatformExecuteProcess(mp_epr) => mp_epr.0.workunit_name(),
       _ => format!("{}", self),
     }
   }
