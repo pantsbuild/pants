@@ -69,11 +69,6 @@ class OwnersNotFoundBehavior(Enum):
         return GlobMatchErrorBehavior(self.value)
 
 
-class BuildFileImportsBehavior(Enum):
-    warn = "warn"
-    error = "error"
-
-
 @dataclass(frozen=True)
 class ExecutionOptions:
     """A collection of all options related to (remote) execution of processes.
@@ -705,23 +700,6 @@ class GlobalOptions(Subsystem):
             default=None,
             help="The path to the watchman UNIX socket. This can be overridden if the default "
             "absolute path length exceeds the maximum allowed by the OS.",
-        )
-
-        # This option changes the parser behavior in a fundamental way (which currently invalidates
-        # all caches), and needs to be parsed out early, so we make it a bootstrap option.
-        register(
-            "--build-file-imports",
-            type=BuildFileImportsBehavior,
-            default=BuildFileImportsBehavior.error,
-            advanced=True,
-            removal_version="1.29.0.dev0",
-            removal_hint=(
-                "Import statements should be avoided in BUILD files because they can easily break "
-                "Pants caching and lead to stale results. If you still need to keep the "
-                "functionality you have from import statements, consider rewriting your code into "
-                "a Pants plugin: https://www.pantsbuild.org/howto_plugin.html."
-            ),
-            help="Whether to allow import statements in BUILD files",
         )
 
         register(

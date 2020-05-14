@@ -9,7 +9,6 @@ from pants.base.exceptions import DuplicateNameError, MappingError, Unaddressabl
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.internals.objects import Serializable
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
-from pants.option.global_options import BuildFileImportsBehavior
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
 
@@ -168,7 +167,6 @@ class AddressMapper:
 
     parser: Parser
     prelude_glob_patterns: Tuple[str, ...]
-    build_file_imports_behavior: BuildFileImportsBehavior
     build_patterns: Tuple[str, ...]
     build_ignore_patterns: Tuple[str, ...]
     exclude_target_regexps: Tuple[str, ...]
@@ -178,7 +176,6 @@ class AddressMapper:
         self,
         parser: Parser,
         prelude_glob_patterns,
-        build_file_imports_behavior,
         build_patterns: Optional[Iterable[str]] = None,
         build_ignore_patterns: Optional[Iterable[str]] = None,
         exclude_target_regexps: Optional[Iterable[str]] = None,
@@ -197,7 +194,6 @@ class AddressMapper:
         """
         self.parser = parser
         self.prelude_glob_patterns = prelude_glob_patterns
-        self.build_file_imports_behavior = build_file_imports_behavior
         self.build_patterns = tuple(build_patterns or ["BUILD", "BUILD.*"])
         self.build_ignore_patterns = tuple(build_ignore_patterns or [])
         self.exclude_target_regexps = tuple(exclude_target_regexps or [])
