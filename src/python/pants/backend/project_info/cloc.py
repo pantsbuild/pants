@@ -42,7 +42,7 @@ class DownloadedClocScript:
 class CountLinesOfCodeOptions(GoalSubsystem):
     """Count lines of code."""
 
-    name = "cloc2"
+    name = "cloc"
 
     @classmethod
     def register_options(cls, register) -> None:
@@ -123,9 +123,9 @@ async def run_cloc(
         console.print_stdout(line)
 
     if options.values.ignored:
-        console.print_stdout("\nIgnored the following files:")
+        console.print_stderr("\nIgnored the following files:")
         for line in file_outputs[ignore_filename].splitlines():
-            console.print_stdout(line)
+            console.print_stderr(line)
 
     return CountLinesOfCode(exit_code=0)
 

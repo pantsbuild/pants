@@ -1,32 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-
-python_tests(
-  name='cloc',
-  sources=['test_cloc.py'],
-  coverage=['pants.backend.graph_info.tasks.cloc'],
-  dependencies=[
-    'src/python/pants/backend/graph_info/tasks',
-    'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/backend/python/targets',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/core/util_rules',
-    'src/python/pants/testutil:task_test_base',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_tests(
-  name='cloc_integration',
-  sources=['test_cloc_integration.py'],
-  dependencies=[
-    'src/python/pants/testutil:int-test',
-    'testprojects/src/python:python_targets_directory',
-  ],
-  tags = {'integration', 'partially_type_checked'},
-)
-
 python_tests(
   name = 'dependees',
   sources = ['test_dependees.py'],
