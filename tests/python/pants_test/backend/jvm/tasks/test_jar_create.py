@@ -137,7 +137,7 @@ class JarCreateExecuteTest(JarCreateTestBase):
         self.binary = self.jvm_binary(
             test_path("src/java/com/twitter/baz"),
             "baz",
-            sourcse=["b.java"],
+            sources=["b.java"],
             dependencies=[test_path("src/resources/com/twitter:spam")],
         )
         self.empty_sl = self.scala_library(test_path("src/scala/com/foo"), "foo", ["dupe.scala"])

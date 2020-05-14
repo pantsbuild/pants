@@ -147,13 +147,3 @@ class WikiPageTest(TestBase):
         self.add_to_build_file("", "page(name='page', sources=['exists.md', 'also-exists.md'])")
         with self.assertRaisesRegex(AddressLookupError, r"//:page.*exactly 1 source, but found 2"):
             self.target(":page")
-
-    def test_source_and_sources(self):
-        self.create_files("", ["exists.md", "also-exists.md"])
-        self.add_to_build_file(
-            "", "page(name='page', source=['exists.md'], sources=['also-exists.md'])",
-        )
-        with self.assertRaisesRegex(
-            AddressLookupError, r"//:page: Cannot specify both source and sources attribute"
-        ):
-            self.target(":page")
