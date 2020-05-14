@@ -5,12 +5,9 @@ target(
   name = 'all_directories',
   dependencies = [
     ':hello_directory',
-    ':useantlr_directory',
-    ':usejaxb_directory',
     ':useproto_directory',
     ':useprotoimports_directory',
     ':usethrift_directory',
-    ':usewire_directory',
   ],
 )
 
@@ -20,24 +17,6 @@ files(
   dependencies = [
     'examples/src/java/org/pantsbuild/example:hello_directory',
     'examples/src/resources/org/pantsbuild/example:hello_directory',
-  ],
-)
-
-files(
-  name = 'useantlr_directory',
-  sources = ['useantlr/**/*'],
-  dependencies = [
-    'examples/src/java/org/pantsbuild/example:antlr3_directory',
-    'examples/src/java/org/pantsbuild/example:antlr4_directory',
-  ],
-)
-
-files(
-  name = 'usejaxb_directory',
-  sources = ['usejaxb/**/*'],
-  dependencies = [
-    'examples/src/java/org/pantsbuild/example:jaxb_directory',
-    'examples/src/resources/org/pantsbuild/example:jaxb_directory',
   ],
 )
 
@@ -63,13 +42,5 @@ files(
   dependencies = [
     'examples/src/thrift/org/pantsbuild/example:distance_directory',
     'examples/src/thrift/org/pantsbuild/example:precipitation_directory',
-  ],
-)
-
-files(
-  name = 'usewire_directory',
-  sources = ['usethrift/**/*'],
-  dependencies = [
-    'examples/src/wire/org/pantsbuild/example:temperature_directory',
   ],
 )

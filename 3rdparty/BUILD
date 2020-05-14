@@ -36,21 +36,6 @@ jar_library(name='javax-activation',
               jar('com.sun.activation', 'javax.activation', '1.2.0'),
             ])
 
-jar_library(name='jaxb-api',
-            jars=[
-              jar('javax.xml.bind', 'jaxb-api', '2.3.0'),
-            ])
-
-jar_library(name='jaxb-core',
-            jars=[
-              jar('com.sun.xml.bind', 'jaxb-core', '2.3.0'),
-            ])
-
-jar_library(name='jaxb-impl',
-            jars=[
-              jar('com.sun.xml.bind', 'jaxb-impl', '2.3.0'),
-            ])
-
 jar_library(name='jsr305',
             jars=[
               jar('com.google.code.findbugs', 'jsr305', '3.0.2'),
@@ -157,10 +142,3 @@ jar_library(name='scalatest',
             jars=[
               scala_jar('org.scalatest', 'scalatest', '3.0.8')
             ])
-
-jar_library(name='wire-runtime',
-            jars=[
-              jar(org='com.squareup.wire', name='wire-runtime', rev='1.8.0'),
-            ],
-            # javac uses undeclared types to build the MessageBuilder API.
-            scope='forced',)

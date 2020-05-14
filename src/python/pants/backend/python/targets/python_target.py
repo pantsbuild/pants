@@ -27,7 +27,7 @@ class PythonTarget(Target):
         :param dependencies: The addresses of targets that this target depends on.
           These dependencies may
           be ``python_library``-like targets (``python_library``,
-          ``python_thrift_library``, ``python_antlr_library`` and so forth) or
+          ``python_thrift_library``, ``resources`` and so forth) or
           ``python_requirement_library`` targets.
         :type dependencies: list of strings
         :param sources: Files to "include". Paths are relative to the

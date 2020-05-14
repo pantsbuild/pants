@@ -108,14 +108,14 @@ class IdeaPluginIntegrationTest(PantsRunIntegrationTest):
         self._run_and_check([target])
 
     def test_idea_plugin_single_directory(self):
-        target = "testprojects/src/python/antlr::"
+        target = "testprojects/src/python/sources::"
         self._run_and_check([target])
 
     def test_idea_plugin_incremental_import(self):
-        target = "testprojects/src/python/antlr::"
+        target = "testprojects/src/python/sources::"
         self._run_and_check([target], incremental_import=1337)
 
     def test_idea_plugin_multiple_targets(self):
         target_a = "examples/src/scala/org/pantsbuild/example/hello:"
-        target_b = "testprojects/src/python/antlr::"
+        target_b = "testprojects/src/python/sources::"
         self._run_and_check([target_a, target_b])
