@@ -1,29 +1,6 @@
 # JVM artifacts that Pants itself depends on.
 # http://pantsbuild.github.io/dev_tasks.html#jvm-tool-bootstrapping
 
-target(
-  name = 'scala-js-cli',
-  dependencies=[
-    'contrib/scalajs/3rdparty/jvm/org/scala-js:cli'
-  ],
-)
-
-target(
-  name = 'scala-js-compiler',
-  dependencies=[
-    'contrib/scalajs/3rdparty/jvm/org/scala-js:compiler',
-    'contrib/scalajs/3rdparty/jvm/org/scala-js:library',
-  ],
-)
-
-target(
-  name = 'scala-js-library',
-  dependencies = [
-    'contrib/scalajs/3rdparty/jvm/org/scala-js:library',
-  ],
-)
-
-
 # TODO: Attempting to use these targets fails because BootstrapJvmTools.get_alternate_target_roots()
 # doesn't descend into dependent target directories and uses the same build_graph it starts with.
 # target(
