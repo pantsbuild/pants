@@ -68,7 +68,7 @@ python_tests(
     sources=["test_python_testprojects_src_integration.py"],
     dependencies=[":projects_test_base", "testprojects/src/python:all_directories",],
     tags={"integration", "partially_type_checked"},
-    timeout=120,
+    timeout=150,
 )
 
 python_tests(
