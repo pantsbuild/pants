@@ -1162,9 +1162,14 @@ impl Node for NodeKey {
         .display_info()
         .and_then(|di| di.name.as_ref())
         .map(|s| s.to_owned())
-        .unwrap_or_else(|| format!("{}", self)),
+        .unwrap_or_else(|| "<unnamed_rule>".to_string()),
       NodeKey::MultiPlatformExecuteProcess(mp_epr) => mp_epr.0.workunit_name(),
-      _ => format!("{}", self),
+      NodeKey::Snapshot(..) => "snapshot".to_string(),
+      NodeKey::DigestFile(..) => "digest_file".to_string(),
+      NodeKey::DownloadedFile(..) => "downloaded_file".to_string(),
+      NodeKey::ReadLink(..) => "read_link".to_string(),
+      NodeKey::Scandir(_) => "scandir".to_string(),
+      NodeKey::Select(..) => "select".to_string(),
     }
   }
 }

@@ -277,7 +277,7 @@ impl MultiPlatformProcess {
   }
 
   pub fn workunit_name(&self) -> String {
-    "MultiPlatformProcess".to_string()
+    "multi_platform_process".to_string()
   }
 }
 
