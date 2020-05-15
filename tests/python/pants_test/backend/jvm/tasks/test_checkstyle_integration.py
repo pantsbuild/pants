@@ -100,14 +100,7 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
             f for f in os.listdir(current_root) if f.endswith(".toml") or f.startswith("BUILD")
         )
         files_to_copy.update(
-            (
-                "pants",
-                "3rdparty",
-                "build-support",
-                "src",
-                ".isort.cfg",
-                "pyproject.toml",
-            )
+            ("pants", "3rdparty", "build-support", "src", ".isort.cfg", "pyproject.toml")
         )
         with temporary_dir() as temp_root:
             temp_root = os.path.normpath(temp_root)
