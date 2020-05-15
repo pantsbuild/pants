@@ -35,7 +35,6 @@ from pants.engine.internals.scheduler_test_base import SchedulerTestBase
 from pants.engine.internals.struct import Struct, StructWithDeps
 from pants.engine.legacy.structs import TargetAdaptor
 from pants.engine.rules import rule
-from pants.option.global_options import BuildFileImportsBehavior
 from pants.testutil.engine.util import MockGet, Target, run_rule
 from pants.util.frozendict import FrozenDict
 from pants.util.objects import Exactly
@@ -44,11 +43,7 @@ from pants.util.objects import Exactly
 class ParseAddressFamilyTest(unittest.TestCase):
     def test_empty(self) -> None:
         """Test that parsing an empty BUILD file results in an empty AddressFamily."""
-        address_mapper = AddressMapper(
-            parser=JsonParser(TEST_TABLE),
-            prelude_glob_patterns=(),
-            build_file_imports_behavior=BuildFileImportsBehavior.error,
-        )
+        address_mapper = AddressMapper(parser=JsonParser(TEST_TABLE), prelude_glob_patterns=())
         af = run_rule(
             parse_address_family,
             rule_args=[address_mapper, BuildFilePreludeSymbols(FrozenDict()), Dir("/dev/null")],
@@ -70,11 +65,7 @@ class ParseAddressFamilyTest(unittest.TestCase):
 
 class AddressesFromAddressFamiliesTest(unittest.TestCase):
     def _address_mapper(self) -> AddressMapper:
-        return AddressMapper(
-            JsonParser(TEST_TABLE),
-            prelude_glob_patterns=(),
-            build_file_imports_behavior=BuildFileImportsBehavior.error,
-        )
+        return AddressMapper(JsonParser(TEST_TABLE), prelude_glob_patterns=())
 
     def _snapshot(self) -> Snapshot:
         return Snapshot(Digest("xx", 2), ("root/BUILD",), ())
@@ -238,10 +229,7 @@ TEST_TABLE = SymbolTable(
 class GraphTestBase(unittest.TestCase, SchedulerTestBase):
     def create(self, build_patterns=None, parser=None) -> SchedulerSession:
         address_mapper = AddressMapper(
-            parser=parser,
-            prelude_glob_patterns=(),
-            build_file_imports_behavior=BuildFileImportsBehavior.error,
-            build_patterns=build_patterns,
+            parser=parser, prelude_glob_patterns=(), build_patterns=build_patterns
         )
 
         @rule
@@ -441,7 +429,6 @@ class PreludeParsingTest(unittest.TestCase):
     def test_good_prelude(self) -> None:
         address_mapper = unittest.mock.Mock()
         address_mapper.prelude_glob_patterns = ("prelude",)
-        address_mapper.build_file_imports_behavior = BuildFileImportsBehavior.error
 
         symbols = run_rule(
             evalute_preludes,
@@ -466,7 +453,6 @@ class PreludeParsingTest(unittest.TestCase):
     def test_syntax_error(self) -> None:
         address_mapper = unittest.mock.Mock()
         address_mapper.prelude_glob_patterns = ("prelude",)
-        address_mapper.build_file_imports_behavior = BuildFileImportsBehavior.error
 
         with self.assertRaisesRegex(
             Exception, "Error parsing prelude file /dev/null/prelude: name 'blah' is not defined"
@@ -501,7 +487,6 @@ class PreludeParsingTest(unittest.TestCase):
 
         address_mapper = unittest.mock.Mock()
         address_mapper.prelude_glob_patterns = ("prelude",)
-        address_mapper.build_file_imports_behavior = BuildFileImportsBehavior.error
 
         with self.assertRaisesRegex(
             Exception, "Import used in /dev/null/prelude at line 1\\. Import statements are banned"

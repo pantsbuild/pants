@@ -57,7 +57,6 @@ from pants.engine.unions import UnionMembership
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.option.global_options import (
     DEFAULT_EXECUTION_OPTIONS,
-    BuildFileImportsBehavior,
     ExecutionOptions,
     GlobMatchErrorBehavior,
 )
@@ -318,7 +317,6 @@ class EngineInitializer:
             bootstrap_options.local_store_dir,
             bootstrap_options.local_execution_root_dir,
             bootstrap_options.build_file_prelude_globs,
-            bootstrap_options.build_file_imports,
             options_bootstrapper,
             build_configuration,
             build_root=build_root,
@@ -340,7 +338,6 @@ class EngineInitializer:
         local_store_dir: str,
         local_execution_root_dir: str,
         build_file_prelude_globs: Tuple[str, ...],
-        build_file_imports_behavior: BuildFileImportsBehavior,
         options_bootstrapper: OptionsBootstrapper,
         build_configuration: BuildConfiguration,
         build_root: Optional[str] = None,
@@ -357,8 +354,6 @@ class EngineInitializer:
         :param local_store_dir: The directory to use for storing the engine's LMDB store in.
         :param local_execution_root_dir: The directory to use for local execution sandboxes.
         :param build_file_prelude_globs: Globs to match files to be prepended to all BUILD files.
-        :param build_file_imports_behavior: How to behave if a BUILD file being parsed tries to use
-                                            import statements.
         :param build_root: A path to be used as the build root. If None, then default is used.
         :param native: An instance of the native-engine subsystem.
         :param options_bootstrapper: A `OptionsBootstrapper` object containing bootstrap options.
@@ -391,13 +386,10 @@ class EngineInitializer:
         execution_options = execution_options or DEFAULT_EXECUTION_OPTIONS
 
         # Register "literal" subjects required for these rules.
-        parser = LegacyPythonCallbacksParser(
-            symbol_table, build_file_aliases, build_file_imports_behavior
-        )
+        parser = LegacyPythonCallbacksParser(symbol_table, build_file_aliases)
         address_mapper = AddressMapper(
             parser=parser,
             prelude_glob_patterns=build_file_prelude_globs,
-            build_file_imports_behavior=build_file_imports_behavior,
             build_ignore_patterns=build_ignore_patterns,
             exclude_target_regexps=exclude_target_regexps,
             subproject_roots=subproject_roots,

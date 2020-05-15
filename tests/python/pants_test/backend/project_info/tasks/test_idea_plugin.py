@@ -10,17 +10,17 @@ class IdeaPluginTest(unittest.TestCase):
     def test_project_name(self) -> None:
         targets = [
             "examples/src/scala/org/pantsbuild/example/hello:",
-            "testprojects/src/python/antlr::",
+            "testprojects/src/python/sources::",
         ]
         self.assertEqual(
-            "examples.src.scala.org.pantsbuild.example.hello:__testprojects.src.python.antlr::",
+            "examples.src.scala.org.pantsbuild.example.hello:__testprojects.src.python.sources::",
             IdeaPluginGen.get_project_name(targets),
         )
 
     def test_long_project_name(self) -> None:
         targets = [
             "examples/src/scala/org/pantsbuild/example/hello/really/long/fake/project/name:",
-            "testprojects/src/python/antlr::",
+            "testprojects/src/python/print_env::",
             "testprojects/src/python/sources::",
             "testprojects/src/python/unicode::",
             "testprojects/src/python/another/long/project/name::",
@@ -29,7 +29,7 @@ class IdeaPluginTest(unittest.TestCase):
         self.assertEqual(
             (
                 "examples.src.scala.org.pantsbuild.example.hello.really.long.fake.project.name:"
-                "__testprojects.src.python.antlr::"
+                "__testprojects.src.python.print_env::"
                 "__testprojects.src.python.sources::"
                 "__testprojects.src.python.unicode::"
                 "__testprojects.src.python.another.long.project.name::"

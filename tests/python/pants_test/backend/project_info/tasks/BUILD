@@ -176,7 +176,7 @@ python_tests(
     'src/python/pants/backend/project_info/tasks:idea_plugin_gen',
     'src/python/pants/testutil:int-test',
     'examples/src/scala/org/pantsbuild/example:hello_directory',
-    'testprojects/src/python:antlr_directory',
+    'testprojects/src/python:sources_directory',
   ],
   tags = {'integration', 'partially_type_checked'},
 )
