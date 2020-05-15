@@ -3,6 +3,3 @@
 
 # A pure scala library, with no Java or 3rdparty dependencies.
 scala_library()
-scala_js_library(name='fact-js',
-  sources=['*.scala'],
-)
