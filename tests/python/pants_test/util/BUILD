@@ -73,15 +73,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'filtering',
-  sources = ['test_filtering.py'],
-  dependencies = [
-    'src/python/pants/util:filtering',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_tests(
   name = 'memo',
   sources = ['test_memo.py'],
   dependencies = [
