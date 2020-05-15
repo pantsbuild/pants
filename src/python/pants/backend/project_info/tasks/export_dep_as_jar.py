@@ -5,9 +5,8 @@ import json
 import os
 import zipfile
 from collections import defaultdict
-from typing import Dict, List, Tuple
-
-from twitter.common.collections import OrderedSet
+from dataclasses import dataclass
+from typing import Callable, Dict, List, Tuple
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
@@ -29,6 +28,30 @@ from pants.java.jar.jar_dependency_utils import M2Coordinate
 from pants.task.console_task import ConsoleTask
 from pants.util.contextutil import temporary_file
 from pants.util.memo import memoized_property
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+
+
+@dataclass()
+class FlatDependenciesInfo:
+    """Holds flat meta information about the runtime and compile time dependencies of a target.
+
+    Compile time dependencies should respect strict_deps, whereas runtime deps should not.
+    """
+
+    compile_deps: FrozenOrderedSet[Target]
+    runtime_deps: FrozenOrderedSet[Target]
+
+    @staticmethod
+    def empty() -> "FlatDependenciesInfo":
+        return FlatDependenciesInfo(
+            compile_deps=FrozenOrderedSet(), runtime_deps=FrozenOrderedSet(),
+        )
+
+    def __add__(self, other: "FlatDependenciesInfo") -> "FlatDependenciesInfo":
+        return FlatDependenciesInfo(
+            compile_deps=self.compile_deps.union(other.compile_deps),
+            runtime_deps=self.runtime_deps.union(other.runtime_deps),
+        )
 
 
 class ExportDepAsJar(ConsoleTask):
@@ -243,7 +266,7 @@ class ExportDepAsJar(ConsoleTask):
         resource_target_map,
         runtime_classpath,
         zinc_args_for_target,
-        flat_non_modulizable_deps_for_modulizable_targets,
+        flat_non_modulizable_deps_for_modulizable_targets: Dict[Target, FlatDependenciesInfo],
     ):
         """
         :type current_target:pants.build_graph.target.Target
@@ -252,7 +275,8 @@ class ExportDepAsJar(ConsoleTask):
             # this means 'dependencies'
             "targets": [],
             "source_dependencies_in_classpath": [],
-            "libraries": [],
+            "compile_libraries": [],
+            "runtime_libraries": [],
             "roots": [],
             "id": current_target.id,
             "target_type": ExportDepAsJar._get_target_type(
@@ -309,9 +333,15 @@ class ExportDepAsJar(ConsoleTask):
         libraries_for_target = OrderedSet(
             [self._jar_id(jar) for jar in iter_transitive_jars(current_target)]
         )
-        for dep in sorted(flat_non_modulizable_deps_for_modulizable_targets[current_target]):
-            libraries_for_target.update(_full_library_set_for_target(dep))
-        info["libraries"].extend(libraries_for_target)
+        compile_libraries_for_target = libraries_for_target.copy()
+        for dep in flat_non_modulizable_deps_for_modulizable_targets[current_target].compile_deps:
+            compile_libraries_for_target.update(_full_library_set_for_target(dep))
+        info["compile_libraries"].extend(compile_libraries_for_target)
+
+        runtime_libraries_for_target = libraries_for_target.copy()
+        for dep in flat_non_modulizable_deps_for_modulizable_targets[current_target].runtime_deps:
+            runtime_libraries_for_target.update(_full_library_set_for_target(dep))
+        info["runtime_libraries"].extend(runtime_libraries_for_target)
 
         info["roots"] = [
             {
@@ -453,7 +483,9 @@ class ExportDepAsJar(ConsoleTask):
             target, JvmTarget
         ) and DependencyContext.global_instance().defaulted_property(target, "strict_deps")
 
-    def _flat_non_modulizable_deps_for_modulizable_targets(self, modulizable_targets):
+    def _flat_non_modulizable_deps_for_modulizable_targets(
+        self, modulizable_targets: FrozenOrderedSet[Target]
+    ) -> Dict[Target, FlatDependenciesInfo]:
         """Collect flat dependencies for targets that will end up in libraries. When visiting a
         target, we don't expand the dependencies that are modulizable targets, since we need to
         reflect those relationships in a separate way later on.
@@ -471,30 +503,73 @@ class ExportDepAsJar(ConsoleTask):
         Therefore, when computing the library entries for A, we need to walk the (transitive) modulizable dependency graph,
         and accumulate the entries in the map.
 
-        This function takes strict_deps into account when generating the graph.
+        Each entry in the map returned from this function contains two pieces of information:
+            - compile_deps contains the dependencies needed to form the compile classpath.
+                These respect strict_deps.
+            - runtime_deps contains the dependencies needed to form the runtime classpath.
+                These do not respect strict_deps.
         """
-        flat_deps: Dict[Target, OrderedSet[Target]] = {}
+        flat_deps: Dict[Target, FlatDependenciesInfo] = {}
 
-        def create_entry_for_target(target: Target) -> None:
-            target_key = target
+        def _aggregate_entries_from_dependencies(
+            dep_list: List[Target],
+            field_accessor: Callable[[FlatDependenciesInfo], FrozenOrderedSet[Target]],
+        ) -> FrozenOrderedSet[Target]:
+            aggregated_entries: OrderedSet[Target] = OrderedSet()
+            for dep in dep_list:
+                dep_entry: FrozenOrderedSet[Target] = field_accessor(
+                    flat_deps.get(dep, FlatDependenciesInfo.empty())
+                )
+                aggregated_entries.update(dep_entry.union({dep}))
+            return FrozenOrderedSet(aggregated_entries)
+
+        def insert_entry_for_target(target: Target) -> None:
+            # Compile dependencies take into account strict_deps...
             if self._is_strict_deps(target):
-                dependencies = target.strict_dependencies(DependencyContext.global_instance())
+                compile_dependencies = target.strict_dependencies(
+                    DependencyContext.global_instance()
+                )
             else:
-                dependencies = target.dependencies
-            non_modulizable_deps = [dep for dep in dependencies if dep not in modulizable_targets]
-            entry: OrderedSet[Target] = OrderedSet()
-            for dep in non_modulizable_deps:
-                entry.update(OrderedSet([*flat_deps.get(dep, set()), dep]))
-            flat_deps[target_key] = OrderedSet(entry)
+                compile_dependencies = target.dependencies
+            non_modulizable_compile_deps = [
+                dep for dep in compile_dependencies if dep not in modulizable_targets
+            ]
+            compile_entry = _aggregate_entries_from_dependencies(
+                non_modulizable_compile_deps, lambda fdi: fdi.compile_deps
+            )
 
+            # Whereas runtime dependencies do not
+            non_modulizable_runtime_deps = [
+                dep for dep in target.dependencies if dep not in modulizable_targets
+            ]
+            runtime_entry = _aggregate_entries_from_dependencies(
+                non_modulizable_runtime_deps, lambda fdi: fdi.runtime_deps
+            )
+
+            flat_deps[target] = FlatDependenciesInfo(
+                compile_deps=compile_entry, runtime_deps=runtime_entry,
+            )
+
+        # We pre-seed the map with entries for targets with strict deps.
+        # This avoids expanding the strict_deps targets in the latter traversal.
+        # N.B. This takes M*N time, where
+        #  - N is the size of the transitive dep graph of targets with strict_deps
+        #  - M is the number of targets with strict_deps.
         targets_with_strict_deps = [t for t in modulizable_targets if self._is_strict_deps(t)]
         for t in targets_with_strict_deps:
-            flat_deps[t] = OrderedSet(t.strict_dependencies(DependencyContext.global_instance()))
+            flat_deps[t] = FlatDependenciesInfo(
+                compile_deps=FrozenOrderedSet(
+                    t.strict_dependencies(DependencyContext.global_instance())
+                ),
+                runtime_deps=FrozenOrderedSet(
+                    [dep for dep in t.closure() if dep not in modulizable_targets]
+                ),
+            )
 
         self.context.build_graph.walk_transitive_dependency_graph(
             addresses=[t.address for t in modulizable_targets if not self._is_strict_deps(t)],
             # Work is to populate the entry of the map by merging the entries of all of the deps.
-            work=create_entry_for_target,
+            work=insert_entry_for_target,
             # We pre-populate the dict according to several principles (e.g. strict_deps),
             # so a target being there means that there is no need to expand.
             predicate=lambda target: target not in flat_deps.keys(),
@@ -536,7 +611,7 @@ class ExportDepAsJar(ConsoleTask):
             )
 
         flat_non_modulizable_deps_for_modulizable_targets: Dict[
-            Target, OrderedSet[Target]
+            Target, FlatDependenciesInfo
         ] = self._flat_non_modulizable_deps_for_modulizable_targets(modulizable_targets)
 
         for target in modulizable_targets:

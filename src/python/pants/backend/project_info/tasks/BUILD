@@ -84,6 +84,7 @@ python_library(
     'src/python/pants/java:executor',
     'src/python/pants/task',
     'src/python/pants/util:memo',
+    'src/python/pants/util:ordered_set',
   ],
   tags = {'partially_type_checked'},
 )
