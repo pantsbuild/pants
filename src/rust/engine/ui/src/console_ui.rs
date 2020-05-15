@@ -37,16 +37,16 @@ use uuid::Uuid;
 
 use logging::logger::{StdioHandler, LOGGER};
 use task_executor::Executor;
-use workunit_store::WorkUnitStore;
+use workunit_store::WorkunitStore;
 
 pub struct ConsoleUI {
-  workunit_store: WorkUnitStore,
+  workunit_store: WorkunitStore,
   // While the UI is running, there will be an Instance present.
   instance: Option<Instance>,
 }
 
 impl ConsoleUI {
-  pub fn new(workunit_store: WorkUnitStore) -> ConsoleUI {
+  pub fn new(workunit_store: WorkunitStore) -> ConsoleUI {
     ConsoleUI {
       workunit_store,
       instance: None,
@@ -124,7 +124,7 @@ impl ConsoleUI {
   }
 
   ///
-  /// Updates all of the swimlane ProgressBars with new data from the WorkUnitStore. For this
+  /// Updates all of the swimlane ProgressBars with new data from the WorkunitStore. For this
   /// method to have any effect, the `initialize` method must have been called first.
   ///
   /// *Technically this method does not do the "render"ing: rather, the `MultiProgress` instance

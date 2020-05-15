@@ -23,7 +23,7 @@ use task_executor::Executor;
 use ui::ConsoleUI;
 use uuid::Uuid;
 use watch::Invalidatable;
-use workunit_store::WorkUnitStore;
+use workunit_store::WorkunitStore;
 
 pub enum ExecutionTermination {
   KeyboardInterrupt,
@@ -49,7 +49,7 @@ struct InnerSession {
   // If enabled, Zipkin spans for v2 engine will be collected.
   should_record_zipkin_spans: bool,
   // A place to store info about workunits in rust part
-  workunit_store: WorkUnitStore,
+  workunit_store: WorkunitStore,
   // The unique id for this Session: used for metrics gathering purposes.
   build_id: String,
   // An id used to control the visibility of uncacheable rules. Generally this is identical for an
@@ -74,7 +74,7 @@ impl Session {
     build_id: String,
     should_report_workunits: bool,
   ) -> Session {
-    let workunit_store = WorkUnitStore::new();
+    let workunit_store = WorkunitStore::new();
     let display = if should_render_ui {
       Some(Mutex::new(ConsoleUI::new(workunit_store.clone())))
     } else {
@@ -127,7 +127,7 @@ impl Session {
     self.0.should_report_workunits
   }
 
-  pub fn workunit_store(&self) -> WorkUnitStore {
+  pub fn workunit_store(&self) -> WorkunitStore {
     self.0.workunit_store.clone()
   }
 
