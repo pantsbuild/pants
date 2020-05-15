@@ -213,7 +213,7 @@ def maybe_get_remote_execution_oauth_token_path(
 
 
 # -------------------------------------------------------------------------
-# Blacklists
+# Block lists
 # -------------------------------------------------------------------------
 
 Target = str
@@ -304,13 +304,9 @@ class TestTargetSets(NamedTuple):
             .split("\n")
         )
 
-        blacklisted_chroot_targets = get_listed_targets(f"{test_type}_chroot_blacklist.txt")
-        blacklisted_v2_targets = get_listed_targets(f"{test_type}_v2_blacklist.txt")
-        blacklisted_remote_targets = get_listed_targets(f"{test_type}_remote_blacklist.txt")
-
-        v1_no_chroot_targets = blacklisted_chroot_targets
-        v1_chroot_targets = blacklisted_v2_targets
-        v2_local_targets = blacklisted_remote_targets
+        v1_no_chroot_targets = get_listed_targets(f"{test_type}_chroot_block_list.txt")
+        v1_chroot_targets = get_listed_targets(f"{test_type}_v2_block_list.txt")
+        v2_local_targets = get_listed_targets(f"{test_type}_remote_block_list.txt")
         v2_remote_targets = (
             all_targets - v2_local_targets - v1_chroot_targets - v1_no_chroot_targets
         )

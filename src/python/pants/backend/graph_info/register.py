@@ -4,7 +4,6 @@
 """Various goals for insights on your project's graph, such as finding the path between any two
 targets."""
 
-from pants.backend.graph_info.tasks.cloc import CountLinesOfCode
 from pants.backend.graph_info.tasks.dependees import ReverseDepmap
 from pants.backend.graph_info.tasks.filemap import Filemap
 from pants.backend.graph_info.tasks.filter import Filter
@@ -22,4 +21,3 @@ def register_goals():
     task(name="minimize", action=MinimalCover).install()
     task(name="filter", action=Filter).install()
     task(name="sort", action=SortTargets).install()
-    task(name="cloc", action=CountLinesOfCode).install()
