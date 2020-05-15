@@ -17,7 +17,8 @@ contrib_plugin(
   description='scala.js support for pants (deprecated).',
   build_file_aliases=True,
   register_goals=True,
-  global_subsystems=True
+  global_subsystems=True,
+  target_types=True,
 )
 
 python_library(

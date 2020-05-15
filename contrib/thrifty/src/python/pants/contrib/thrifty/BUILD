@@ -24,4 +24,5 @@ contrib_plugin(
   ],
   register_goals=True,
   build_file_aliases=True,
+  target_types=True,
 )

@@ -15,6 +15,7 @@ contrib_plugin(
   description='Go language support for pants.',
   build_file_aliases=True,
   register_goals=True,
+  target_types=True,
 )
 
 python_library(
