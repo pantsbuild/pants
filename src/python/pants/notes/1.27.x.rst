@@ -7,6 +7,21 @@ The ``1.27.x`` series deprecates several unused backends and plugins. Please
 see https://groups.google.com/forum/#!topic/pants-devel/ngMZRIJvwHM for more
 information.
 
+1.27.0rc2 (5/15/2020)
+---------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Deprecate, instead of error, when Python targets have non-Python sources (#9752)
+  `PR #9752 <https://github.com/pantsbuild/pants/pull/9752>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix Target API bindings not loading for plugins (#9789)
+  `PR #9789 <https://github.com/pantsbuild/pants/pull/9789>`_
+
 1.27.0rc1 (5/7/2020)
 --------------------
 
