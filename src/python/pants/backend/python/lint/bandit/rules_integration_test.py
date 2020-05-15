@@ -131,7 +131,7 @@ class BanditIntegrationTest(ExternalToolTestBase):
             [FileContent("bad.py", b"aws_key = 'JalrXUtnFEMI/K7MDENG/bPxRfiCYzEXAMPLEKEY'\n")]
         )
         result = self.run_bandit(
-            [target], additional_args=["--bandit-extra-requirements=bandit-aws>0.0.1,<0.0.3"]
+            [target], additional_args=["--bandit-extra-requirements=bandit-aws"]
         )
         assert result.exit_code == 1
         assert "Issue: [C100:hardcoded_aws_key]" in result.stdout
