@@ -7,11 +7,6 @@ files(
 )
 
 files(
-  name = 'jaxb_directory',
-  sources = ['jaxb/**/*'],
-)
-
-files(
   name = 'names_directory',
   sources = ['names/**/*'],
 )

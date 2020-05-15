@@ -5,6 +5,7 @@ python_tests(
   name='tests',
   dependencies=[
     '3rdparty/python:dataclasses',
+    ':filtering',
     ':frozendict',
     ':ordered_set',
   ],
@@ -77,7 +78,10 @@ python_library(
 python_library(
   name = 'filtering',
   sources = ['filtering.py'],
-  tags = {'partially_type_checked'},
+  dependencies = [
+    'src/python/pants/base:deprecated',
+  ],
+  tags = {'type_checked'},
 )
 
 python_library(

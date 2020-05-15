@@ -30,7 +30,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tokio::runtime::Handle;
 use tokio::time::{delay_for, timeout};
-use workunit_store::{WorkUnit, WorkUnitStore, WorkunitMetadata};
+use workunit_store::{Workunit, WorkunitMetadata, WorkunitState, WorkunitStore};
 
 #[derive(Debug, PartialEq)]
 enum StdoutType {
@@ -793,7 +793,7 @@ async fn sends_headers() {
   )
   .unwrap();
   let context = Context {
-    workunit_store: WorkUnitStore::default(),
+    workunit_store: WorkunitStore::default(),
     build_id: String::from("marmosets"),
   };
   command_runner
@@ -2234,11 +2234,11 @@ async fn extract_output_files_from_response_no_prefix() {
   )
 }
 
-fn workunits_with_constant_span_id(workunit_store: &mut WorkUnitStore) -> HashSet<WorkUnit> {
+fn workunits_with_constant_span_id(workunit_store: &mut WorkunitStore) -> HashSet<Workunit> {
   workunit_store.with_latest_workunits(|_, completed_workunits| {
     completed_workunits
       .iter()
-      .map(|workunit| WorkUnit {
+      .map(|workunit| Workunit {
         span_id: String::from("ignore"),
         ..workunit.clone()
       })
@@ -2248,7 +2248,7 @@ fn workunits_with_constant_span_id(workunit_store: &mut WorkUnitStore) -> HashSe
 
 #[tokio::test]
 async fn remote_workunits_are_stored() {
-  let mut workunit_store = WorkUnitStore::new();
+  let mut workunit_store = WorkunitStore::new();
   workunit_store.init_thread_state(None);
   let op_name = "gimme-foo".to_string();
   let testdata = TestData::roland();
@@ -2287,41 +2287,49 @@ async fn remote_workunits_are_stored() {
   use concrete_time::TimeSpan;
 
   let want_workunits = hashset! {
-    WorkUnit {
+    Workunit {
       name: String::from("remote execution action scheduling"),
-      time_span: TimeSpan {
+      state: WorkunitState::Completed {
+        time_span: TimeSpan {
           start: Duration::new(0, 0),
           duration: Duration::new(1, 0),
+        }
       },
       span_id: String::from("ignore"),
       parent_id: None,
       metadata: WorkunitMetadata::new(),
     },
-    WorkUnit {
+    Workunit {
       name: String::from("remote execution worker input fetching"),
-      time_span: TimeSpan {
+      state: WorkunitState::Completed {
+        time_span: TimeSpan {
           start: Duration::new(2, 0),
           duration: Duration::new(1, 0),
+        }
       },
       span_id: String::from("ignore"),
       parent_id: None,
       metadata: WorkunitMetadata::new(),
     },
-    WorkUnit {
+    Workunit {
       name: String::from("remote execution worker command executing"),
-      time_span: TimeSpan {
+      state: WorkunitState::Completed {
+        time_span: TimeSpan {
           start: Duration::new(4, 0),
           duration: Duration::new(1, 0),
+        }
       },
       span_id: String::from("ignore"),
       parent_id: None,
       metadata: WorkunitMetadata::new(),
     },
-    WorkUnit {
+    Workunit {
       name: String::from("remote execution worker output uploading"),
-      time_span: TimeSpan {
+      state: WorkunitState::Completed {
+        time_span: TimeSpan {
           start: Duration::new(6, 0),
           duration: Duration::new(1, 0),
+        }
       },
       span_id: String::from("ignore"),
       parent_id: None,

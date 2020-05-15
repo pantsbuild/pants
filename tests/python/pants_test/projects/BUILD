@@ -9,18 +9,6 @@ python_library(
 )
 
 python_tests(
-    name="antlr_projects_integration",
-    sources=["test_antlr_projects_integration.py"],
-    dependencies=[
-        ":projects_test_base",
-        "examples/src/antlr/org/pantsbuild/example:all_directories",
-        "testprojects/src/antlr/python:all_directories",
-    ],
-    tags={"integration", "partially_type_checked"},
-    timeout=200,
-)
-
-python_tests(
     name="java_examples_integration",
     sources=["test_java_examples_integration.py"],
     dependencies=[
@@ -80,7 +68,7 @@ python_tests(
     sources=["test_python_testprojects_src_integration.py"],
     dependencies=[":projects_test_base", "testprojects/src/python:all_directories",],
     tags={"integration", "partially_type_checked"},
-    timeout=120,
+    timeout=150,
 )
 
 python_tests(
@@ -125,15 +113,4 @@ python_tests(
     ],
     tags={"integration", "partially_type_checked"},
     timeout=360,
-)
-
-python_tests(
-    name="wire_projects_integration",
-    sources=["test_wire_projects_integration.py"],
-    dependencies=[
-        ":projects_test_base",
-        "examples/src/wire/org/pantsbuild/example:all_directories",
-    ],
-    tags={"integration", "partially_type_checked"},
-    timeout=220,
 )

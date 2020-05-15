@@ -4,7 +4,6 @@
 target(
   name = 'all_directories',
   dependencies = [
-    ':antlr_directory',
     ':bad_requirements_directory',
     ':build_file_imports_function_directory',
     ':build_file_imports_module_directory',
@@ -18,14 +17,6 @@ target(
     ':python_targets_directory',
     ':sources_directory',
     ':unicode_directory',
-  ],
-)
-
-files(
-  name = 'antlr_directory',
-  sources = ['antlr/**/*'],
-  dependencies = [
-    'testprojects/src/antlr/python:test_directory',
   ],
 )
 

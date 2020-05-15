@@ -77,7 +77,6 @@ backend_packages2.add = [
 ]
 ignore_pants_warnings = [
   "DEPRECATED: the pantsbuild.pants.contrib",
-  "DEPRECATED: the antlr, jaxb, ragel, and wire codegen backends",
 ]
 
 # The invalidation globs cover the PYTHONPATH by default, but we additionally add the rust code.
@@ -195,9 +194,6 @@ deps = ["examples/3rdparty/python:thrift"]
 
 [gen.thrifty]
 allow_dups = true
-
-[gen.antlr-py]
-antlr3_deps = ["3rdparty/python:antlr-3.1.3"]
 
 [gen.go-protobuf]
 import_target = "contrib/go/examples/src/protobuf/org/pantsbuild/example:protobuf-deps"

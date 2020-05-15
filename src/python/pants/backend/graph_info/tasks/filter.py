@@ -9,7 +9,7 @@ from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exceptions import TaskError
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.task.console_task import ConsoleTask
-from pants.util.filtering import create_filters, wrap_filters
+from pants.util.filtering import and_filters, create_filters
 
 
 class Filter(TargetFilterTaskMixin, ConsoleTask):
@@ -123,10 +123,10 @@ class Filter(TargetFilterTaskMixin, ConsoleTask):
         self._filters.extend(create_filters(self.get_options().tag_regex, filter_for_tag_regex))
 
     def console_output(self, _):
-        wrapped_filter = wrap_filters(self._filters)
+        anded_filter = and_filters(self._filters)
         filtered = set()
         for target in self.context.target_roots:
             if target not in filtered:
                 filtered.add(target)
-                if wrapped_filter(target):
+                if anded_filter(target):
                     yield target.address.spec

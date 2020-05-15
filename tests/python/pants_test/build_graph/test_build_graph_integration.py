@@ -32,22 +32,6 @@ class BuildGraphIntegrationTest(PantsRunIntegrationTest):
 
     def banned_import(self, dir):
         with self.file_renamed(dir, "TEST_BUILD", "BUILD"):
-            pants_run = self.run_pants(
-                ["--build-file-imports=error", "run", f"{dir}:hello"],
-                print_exception_stacktrace=False,
-            )
+            pants_run = self.run_pants(["run", f"{dir}:hello"], print_exception_stacktrace=False)
             self.assert_failure(pants_run)
-            assert f"Import used in {dir}/BUILD at line" in pants_run.stderr_data
-
-    def test_warn_module_import(self):
-        self.warn_import("testprojects/src/python/build_file_imports_module")
-
-    def test_warn_function_import(self):
-        self.warn_import("testprojects/src/python/build_file_imports_function")
-
-    def warn_import(self, dir):
-        with self.file_renamed(dir, "TEST_BUILD", "BUILD"):
-            pants_run = self.run_pants(["--build-file-imports=warn", "run", f"{dir}:hello"])
-            self.assert_success(pants_run)
-            assert "Hello\n" in pants_run.stdout_data
             assert f"Import used in {dir}/BUILD at line" in pants_run.stderr_data

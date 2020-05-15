@@ -75,7 +75,7 @@ helps here. Instead of building something, it echoes a summary of the goals and 
 
     bootstrap [bootstrap-jvm-tools->BootstrapJvmTools]
     imports [ivy-imports->IvyImports]
-    gen [thrift->ApacheThriftGen, scrooge->ScroogeGen, protoc->ProtobufGen, antlr->AntlrGen, ragel->RagelGen, jaxb->JaxbGen, aapt->AaptGen]
+    gen [thrift->ApacheThriftGen, scrooge->ScroogeGen, protoc->ProtobufGen]
     resolve [ivy->IvyResolve]
     compile [jvm->SingletonGroupTask]
     $
