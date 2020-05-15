@@ -21,8 +21,9 @@ from pkg_resources import (
 from pants.base.exceptions import BuildConfigurationError
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.build_graph.target import Target
+from pants.build_graph.target import Target as TargetV1
 from pants.engine.rules import RootRule, rule
+from pants.engine.target import COMMON_TARGET_FIELDS, Target
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar
 from pants.init.extension_loader import (
@@ -59,24 +60,34 @@ class DummySubsystem2(Subsystem):
     options_scope = "dummy-subsystem2"
 
 
-class DummyTarget(Target):
+class DummyV1Target(TargetV1):
     @classmethod
     def subsystems(cls):
         return (DummySubsystem1,)
 
 
-class DummyTarget2(Target):
+class DummyV1Target2(TargetV1):
     @classmethod
     def subsystems(cls):
         return (DummySubsystem2,)
 
 
-class DummyObject1(object):
+class DummyTarget(Target):
+    alias = "dummy_tgt"
+    core_fields = COMMON_TARGET_FIELDS
+
+
+class DummyTarget2(Target):
+    alias = "dummy_tgt2"
+    core_fields = ()
+
+
+class DummyObject1:
     # Test that registering an object with no subsystems() method succeeds.
     pass
 
 
-class DummyObject2(object):
+class DummyObject2:
     @classmethod
     def subsystems(cls):
         return (DummySubsystem2,)
@@ -128,6 +139,7 @@ class LoaderTest(unittest.TestCase):
         register_goals=None,
         global_subsystems=None,
         rules=None,
+        target_types=None,
         module_name="register",
     ):
 
@@ -150,12 +162,13 @@ class LoaderTest(unittest.TestCase):
             register_entrypoint("global_subsystems", global_subsystems)
             register_entrypoint("register_goals", register_goals)
             register_entrypoint("rules", rules)
+            register_entrypoint("targets2", target_types)
 
             yield package_name
         finally:
             del sys.modules[package_name]
 
-    def assert_empty_aliases(self):
+    def assert_empty(self):
         registered_aliases = self.build_configuration.registered_aliases()
         self.assertEqual(0, len(registered_aliases.target_types))
         self.assertEqual(0, len(registered_aliases.target_macro_factories))
@@ -163,23 +176,24 @@ class LoaderTest(unittest.TestCase):
         self.assertEqual(0, len(registered_aliases.context_aware_object_factories))
         self.assertEqual(self.build_configuration.optionables(), OrderedSet())
         self.assertEqual(0, len(self.build_configuration.rules()))
+        self.assertEqual(0, len(self.build_configuration.targets()))
 
     def test_load_valid_empty(self):
         with self.create_register() as backend_package:
             load_backend(self.build_configuration, backend_package, is_v1_backend=True)
-            self.assert_empty_aliases()
+            self.assert_empty()
 
     def test_load_valid_partial_aliases(self):
         aliases = BuildFileAliases(
-            targets={"bob": DummyTarget}, objects={"obj1": DummyObject1, "obj2": DummyObject2}
+            targets={"bob": DummyV1Target}, objects={"obj1": DummyObject1, "obj2": DummyObject2}
         )
         with self.create_register(build_file_aliases=lambda: aliases) as backend_package:
             load_backend(self.build_configuration, backend_package, is_v1_backend=False)
-            self.assert_empty_aliases()
+            self.assert_empty()
 
             load_backend(self.build_configuration, backend_package, is_v1_backend=True)
             registered_aliases = self.build_configuration.registered_aliases()
-            self.assertEqual(DummyTarget, registered_aliases.target_types["bob"])
+            self.assertEqual(DummyV1Target, registered_aliases.target_types["bob"])
             self.assertEqual(DummyObject1, registered_aliases.objects["obj1"])
             self.assertEqual(DummyObject2, registered_aliases.objects["obj2"])
             self.assertEqual(
@@ -199,7 +213,7 @@ class LoaderTest(unittest.TestCase):
             self.assertEqual(0, len(Goal.all()))
 
             load_backend(self.build_configuration, backend_package, is_v1_backend=True)
-            self.assert_empty_aliases()
+            self.assert_empty()
             self.assertEqual(1, len(Goal.all()))
 
             task_names = Goal.by_name("jack").ordered_task_names()
@@ -232,7 +246,9 @@ class LoaderTest(unittest.TestCase):
             self.load_plugins(["Foobar"], is_v1_plugin=False)
 
     @staticmethod
-    def get_mock_plugin(name, version, reg=None, alias=None, after=None, rules=None):
+    def get_mock_plugin(
+        name, version, reg=None, alias=None, after=None, rules=None, target_types=None
+    ):
         """Make a fake Distribution (optionally with entry points)
 
         Note the entry points do not actually point to code in the returned distribution --
@@ -249,6 +265,7 @@ class LoaderTest(unittest.TestCase):
         :param callable alias: Optional callable for build_file_aliases entry point
         :param callable after: Optional callable for load_after list entry point
         :param callable rules: Optional callable for rules entry point
+        :param callable target_types: Optional callable for target_types entry point
         """
 
         plugin_pkg = f"demoplugin{uuid.uuid4().hex}"
@@ -277,6 +294,10 @@ class LoaderTest(unittest.TestCase):
         if rules is not None:
             setattr(plugin, "qux", rules)
             entry_lines.append(f"rules = {module_name}:qux\n")
+
+        if target_types is not None:
+            setattr(plugin, "tofu", target_types)
+            entry_lines.append(f"targets2 = {module_name}:tofu\n")
 
         if entry_lines:
             entry_data = "[pantsbuild.plugin]\n{}\n".format("\n".join(entry_lines))
@@ -338,25 +359,25 @@ class LoaderTest(unittest.TestCase):
     def test_plugin_installs_alias(self):
         def reg_alias():
             return BuildFileAliases(
-                targets={"pluginalias": DummyTarget},
+                targets={"pluginalias": DummyV1Target},
                 objects={"FROMPLUGIN1": DummyObject1, "FROMPLUGIN2": DummyObject2},
             )
 
         self.working_set.add(self.get_mock_plugin("aliasdemo", "0.0.1", alias=reg_alias))
 
         # Start with no aliases.
-        self.assert_empty_aliases()
+        self.assert_empty()
 
         # Ensure alias isn't created in a v2 world.
         self.load_plugins(["aliasdemo"], is_v1_plugin=False)
-        self.assert_empty_aliases()
+        self.assert_empty()
 
         # Now load the plugin which defines aliases.
         self.load_plugins(["aliasdemo"], is_v1_plugin=True)
 
         # Aliases now exist.
         registered_aliases = self.build_configuration.registered_aliases()
-        self.assertEqual(DummyTarget, registered_aliases.target_types["pluginalias"])
+        self.assertEqual(DummyV1Target, registered_aliases.target_types["pluginalias"])
         self.assertEqual(DummyObject1, registered_aliases.objects["FROMPLUGIN1"])
         self.assertEqual(DummyObject2, registered_aliases.objects["FROMPLUGIN2"])
         self.assertEqual(
@@ -403,13 +424,43 @@ class LoaderTest(unittest.TestCase):
             [example_rule.rule, RootRule(RootType), example_plugin_rule.rule],
         )
 
+    def test_target_types(self):
+        def targets2():
+            return [DummyTarget, DummyTarget2]
+
+        with self.create_register(target_types=targets2) as backend_package:
+            load_backend(self.build_configuration, backend_package, is_v1_backend=True)
+            assert self.build_configuration.targets() == OrderedSet([DummyTarget, DummyTarget2])
+
+            load_backend(self.build_configuration, backend_package, is_v1_backend=False)
+            assert self.build_configuration.targets() == OrderedSet([DummyTarget, DummyTarget2])
+
+        class PluginTarget(Target):
+            alias = "plugin_tgt"
+            core_fields = ()
+
+        def plugin_targets():
+            return [PluginTarget]
+
+        self.working_set.add(
+            self.get_mock_plugin("new-targets", "0.0.1", target_types=plugin_targets)
+        )
+        self.load_plugins(["new-targets"], is_v1_plugin=True)
+        assert self.build_configuration.targets() == OrderedSet(
+            [DummyTarget, DummyTarget2, PluginTarget]
+        )
+        self.load_plugins(["new-targets"], is_v1_plugin=False)
+        assert self.build_configuration.targets() == OrderedSet(
+            [DummyTarget, DummyTarget2, PluginTarget]
+        )
+
     def test_backend_plugin_ordering(self):
         def reg_alias():
-            return BuildFileAliases(targets={"override-alias": DummyTarget2})
+            return BuildFileAliases(targets={"override-alias": DummyV1Target2})
 
         self.working_set.add(self.get_mock_plugin("pluginalias", "0.0.1", alias=reg_alias))
         plugins = ["pluginalias==0.0.1"]
-        aliases = BuildFileAliases(targets={"override-alias": DummyTarget})
+        aliases = BuildFileAliases(targets={"override-alias": DummyV1Target})
         with self.create_register(build_file_aliases=lambda: aliases) as backend_module:
             backends = [backend_module]
             load_backends_and_plugins(
@@ -423,4 +474,4 @@ class LoaderTest(unittest.TestCase):
         # The backend should load first, then the plugins, therefore the alias registered in
         # the plugin will override the alias registered by the backend
         registered_aliases = self.build_configuration.registered_aliases()
-        self.assertEqual(DummyTarget2, registered_aliases.target_types["override-alias"])
+        self.assertEqual(DummyV1Target2, registered_aliases.target_types["override-alias"])

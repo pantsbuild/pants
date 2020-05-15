@@ -175,6 +175,7 @@ class PantsPluginV1(PythonLibraryV1):
         global_subsystems=False,
         register_goals=False,
         rules=False,
+        target_types=False,
         **kwargs,
     ):
         """
@@ -192,6 +193,8 @@ class PantsPluginV1(PythonLibraryV1):
                                     registers the 'register_goals' 'pantsbuild.plugin' entrypoint.
         :param bool rules: If `True`, register.py:rules must be defined and registers the 'rules'
                            'pantsbuild.plugin' entrypoint.
+        :param bool target_types: If `True`, register.py:target_types must be defined and registers
+                                  the 'target_types' 'pantsbuild.plugin' entrypoint.
         """
         if not distribution_name.startswith("pantsbuild.pants."):
             raise ValueError(
@@ -211,20 +214,21 @@ class PantsPluginV1(PythonLibraryV1):
 
         super().__init__(address, payload, provides=setup_py, **kwargs)
 
-        if build_file_aliases or register_goals or global_subsystems or rules:
+        if build_file_aliases or register_goals or global_subsystems or rules or target_types:
             module = os.path.relpath(address.spec_path, self.target_base).replace(os.sep, ".")
-            entrypoints = []
+            entry_points = []
             if build_file_aliases:
-                entrypoints.append(f"build_file_aliases = {module}.register:build_file_aliases")
+                entry_points.append(f"build_file_aliases = {module}.register:build_file_aliases")
             if register_goals:
-                entrypoints.append(f"register_goals = {module}.register:register_goals")
+                entry_points.append(f"register_goals = {module}.register:register_goals")
             if global_subsystems:
-                entrypoints.append(f"global_subsystems = {module}.register:global_subsystems")
+                entry_points.append(f"global_subsystems = {module}.register:global_subsystems")
             if rules:
-                entrypoints.append(f"rules = {module}.register:rules")
-            entry_points = {"pantsbuild.plugin": entrypoints}
+                entry_points.append(f"rules = {module}.register:rules")
+            if target_types:
+                entry_points.append(f"targets2 = {module}.register:targets2")
 
-            setup_py.setup_py_keywords["entry_points"] = entry_points
+            setup_py.setup_py_keywords["entry_points"] = {"pantsbuild.plugin": entry_points}
             self.mark_invalidation_hash_dirty()  # To pickup the PythonArtifact (setup_py) changes.
 
 
@@ -306,12 +310,20 @@ class PantsRulesToggle(BoolField):
     default = False
 
 
+class PantsTargetTypesToggle(BoolField):
+    """If `True`, register.py:target_types must be defined and registers the 'target_types'
+    'pantsbuild.plugin' entrypoint."""
+
+    alias = "target_types"
+    default = False
+
+
 class PantsPlugin(Target):
     """A Pants plugin published by pantsbuild."""
 
     alias = "pants_plugin"
     core_fields = (
-        *FrozenOrderedSet(PythonLibrary.core_fields) - {DescriptionField},  # type: ignore[misc]
+        *(FrozenOrderedSet(PythonLibrary.core_fields) - {DescriptionField}),  # type: ignore[misc]
         PantsPluginDistributionName,
         PantsPluginDescription,
         PantsPluginAdditionalClassifiers,
@@ -319,6 +331,7 @@ class PantsPlugin(Target):
         PantsGlobalSubsystemsToggle,
         PantsRegisterGoalsToggle,
         PantsRulesToggle,
+        PantsTargetTypesToggle,
     )
 
 

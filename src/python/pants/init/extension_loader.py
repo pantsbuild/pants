@@ -238,9 +238,6 @@ def load_plugins(
             if "build_file_aliases2" in entries:
                 build_file_aliases2 = entries["build_file_aliases2"].load()()
                 build_configuration.register_aliases(build_file_aliases2)
-            if "targets2" in entries:
-                targets = entries["targets2"].load()()
-                build_configuration.register_targets(targets)
         loaded[dist.as_requirement().key] = dist
 
 
