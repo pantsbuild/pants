@@ -25,7 +25,6 @@ from pants.engine.internals.scheduler_test_base import SchedulerTestBase
 from pants.engine.internals.struct import Struct
 from pants.engine.rules import rule
 from pants.engine.selectors import Get, MultiGet
-from pants.option.global_options import BuildFileImportsBehavior
 from pants.testutil.engine.util import TARGET_TABLE, Target
 from pants.util.dirutil import safe_open
 from pants.util.frozendict import FrozenDict
@@ -169,7 +168,6 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
         address_mapper = AddressMapper(
             parser=JsonParser(TARGET_TABLE),
             prelude_glob_patterns=(),
-            build_file_imports_behavior=BuildFileImportsBehavior.error,
             build_patterns=("*.BUILD.json",),
         )
 
@@ -204,11 +202,6 @@ class AddressMapperTest(unittest.TestCase, SchedulerTestBase):
         build_file = os.path.join(self.build_root, "a/c", "c.BUILD.json")
         with safe_open(build_file, "w") as fp:
             fp.write('{"type_alias": "struct", "name": "c"}')
-
-        # Exists on disk, but not yet in memory.
-        with self.assertRaises(Exception):
-            self.resolve(spec)
-
         self.scheduler.invalidate_files(["a/c"])
 
         # Success.

@@ -118,9 +118,12 @@ class OptionsInitializer:
 
         add(global_options.pants_workdir)
         add(global_options.pants_distdir)
-        # NB: We punch a hole in the ignore patterns to allow pants to directly watch process
-        # metadata that is written to disk.
+        # TODO: We punch a hole in the ignore patterns to allow pantsd to directly watch process
+        # metadata that is written to disk, but we re-ignore the watchman directory (which
+        # contains a named pipe). Over time, as more of the pantsd server components are ported to
+        # rust, we will be able to remove this special case.
         add(global_options.pants_subprocessdir, include=True)
+        add(os.path.join(global_options.pants_subprocessdir, "watchman"))
 
         return pants_ignore
 

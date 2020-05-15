@@ -245,7 +245,9 @@ async def addresses_with_origins_from_filesystem_specs(
             msg = (
                 f"No owning targets could be found for the file `{file_path}`.\n\nPlease check "
                 f"that there is a BUILD file in `{file_path.parent}` with a target whose `sources` field "
-                f"includes `{file_path}`. See https://www.pantsbuild.org/build_files.html."
+                f"includes `{file_path}`. See https://pants.readme.io/docs/targets for more "
+                "information on target definitions.\n"
+                "If you would like to ignore un-owned files, please pass `--owners-not-found-behavior=ignore`."
             )
             if global_options.options.owners_not_found_behavior == OwnersNotFoundBehavior.warn:
                 logger.warning(msg)

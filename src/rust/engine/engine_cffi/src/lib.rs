@@ -63,7 +63,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tempfile::TempDir;
 use tokio;
-use workunit_store::{StartedWorkUnit, WorkUnit};
+use workunit_store::{Workunit, WorkunitState};
 
 #[cfg(test)]
 mod tests;
@@ -520,69 +520,13 @@ fn make_core(
   )
 }
 
-fn started_workunit_to_py_value(started_workunit: &StartedWorkUnit) -> Option<Value> {
+fn workunit_to_py_value(workunit: &Workunit) -> Option<Value> {
   use std::time::UNIX_EPOCH;
-  let duration = started_workunit
-    .start_time
-    .duration_since(UNIX_EPOCH)
-    .unwrap_or_else(|_| Duration::default());
-  let mut dict_entries = vec![
-    (
-      externs::store_utf8("name"),
-      externs::store_utf8(&started_workunit.name),
-    ),
-    (
-      externs::store_utf8("start_secs"),
-      externs::store_u64(duration.as_secs()),
-    ),
-    (
-      externs::store_utf8("start_nanos"),
-      externs::store_u64(duration.subsec_nanos() as u64),
-    ),
-    (
-      externs::store_utf8("span_id"),
-      externs::store_utf8(&started_workunit.span_id),
-    ),
-  ];
 
-  if let Some(parent_id) = &started_workunit.parent_id {
-    dict_entries.push((
-      externs::store_utf8("parent_id"),
-      externs::store_utf8(parent_id),
-    ));
-  }
-
-  if let Some(desc) = &started_workunit.metadata.desc.as_ref() {
-    dict_entries.push((
-      externs::store_utf8("description"),
-      externs::store_utf8(desc),
-    ));
-  }
-
-  Some(externs::store_dict(&dict_entries.as_slice()))
-}
-
-fn workunit_to_py_value(workunit: &WorkUnit) -> Option<Value> {
   let mut dict_entries = vec![
     (
       externs::store_utf8("name"),
       externs::store_utf8(&workunit.name),
-    ),
-    (
-      externs::store_utf8("start_secs"),
-      externs::store_u64(workunit.time_span.start.secs),
-    ),
-    (
-      externs::store_utf8("start_nanos"),
-      externs::store_u64(u64::from(workunit.time_span.start.nanos)),
-    ),
-    (
-      externs::store_utf8("duration_secs"),
-      externs::store_u64(workunit.time_span.duration.secs),
-    ),
-    (
-      externs::store_utf8("duration_nanos"),
-      externs::store_u64(u64::from(workunit.time_span.duration.nanos)),
     ),
     (
       externs::store_utf8("span_id"),
@@ -596,6 +540,44 @@ fn workunit_to_py_value(workunit: &WorkUnit) -> Option<Value> {
     ));
   }
 
+  match workunit.state {
+    WorkunitState::Started { start_time } => {
+      let duration = start_time
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_else(|_| Duration::default());
+      dict_entries.extend_from_slice(&[
+        (
+          externs::store_utf8("start_secs"),
+          externs::store_u64(duration.as_secs()),
+        ),
+        (
+          externs::store_utf8("start_nanos"),
+          externs::store_u64(duration.subsec_nanos() as u64),
+        ),
+      ])
+    }
+    WorkunitState::Completed { time_span } => {
+      dict_entries.extend_from_slice(&[
+        (
+          externs::store_utf8("start_secs"),
+          externs::store_u64(time_span.start.secs),
+        ),
+        (
+          externs::store_utf8("start_nanos"),
+          externs::store_u64(u64::from(time_span.start.nanos)),
+        ),
+        (
+          externs::store_utf8("duration_secs"),
+          externs::store_u64(time_span.duration.secs),
+        ),
+        (
+          externs::store_utf8("duration_nanos"),
+          externs::store_u64(u64::from(time_span.duration.nanos)),
+        ),
+      ]);
+    }
+  };
+
   if let Some(desc) = &workunit.metadata.desc.as_ref() {
     dict_entries.push((
       externs::store_utf8("description"),
@@ -606,18 +588,9 @@ fn workunit_to_py_value(workunit: &WorkUnit) -> Option<Value> {
   Some(externs::store_dict(&dict_entries.as_slice()))
 }
 
-fn workunits_to_py_tuple_value<'a>(workunits: impl Iterator<Item = &'a WorkUnit>) -> Value {
+fn workunits_to_py_tuple_value<'a>(workunits: impl Iterator<Item = &'a Workunit>) -> Value {
   let workunit_values = workunits
-    .flat_map(|workunit: &WorkUnit| workunit_to_py_value(workunit))
-    .collect::<Vec<_>>();
-  externs::store_tuple(&workunit_values)
-}
-
-fn started_workunits_to_py_tuple_value<'a>(
-  workunits: impl Iterator<Item = &'a StartedWorkUnit>,
-) -> Value {
-  let workunit_values = workunits
-    .flat_map(|started_workunit: &StartedWorkUnit| started_workunit_to_py_value(started_workunit))
+    .flat_map(|workunit: &Workunit| workunit_to_py_value(workunit))
     .collect::<Vec<_>>();
   externs::store_tuple(&workunit_values)
 }
@@ -633,7 +606,7 @@ pub extern "C" fn poll_session_workunits(
         .workunit_store()
         .with_latest_workunits(|started, completed| {
           let mut started_iter = started.iter();
-          let started = started_workunits_to_py_tuple_value(&mut started_iter);
+          let started = workunits_to_py_tuple_value(&mut started_iter);
 
           let mut completed_iter = completed.iter();
           let completed = workunits_to_py_tuple_value(&mut completed_iter);

@@ -29,7 +29,7 @@ use crate::{
 };
 use std;
 use std::cmp::min;
-use workunit_store::WorkUnitStore;
+use workunit_store::WorkunitStore;
 
 // Environment variable which is exclusively used for cache key invalidation.
 // This may be not specified in an Process, and may be populated only by the
@@ -758,7 +758,7 @@ fn maybe_add_workunit(
   name: &str,
   time_span: concrete_time::TimeSpan,
   parent_id: Option<String>,
-  workunit_store: &WorkUnitStore,
+  workunit_store: &WorkunitStore,
 ) {
   //  TODO: workunits for scheduling, fetching, executing and uploading should be recorded
   //   only if '--reporting-zipkin-trace-v2' is set

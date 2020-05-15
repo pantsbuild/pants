@@ -5,16 +5,12 @@ target(
   name = 'all_directories',
   dependencies = [
     ':annotation_directory',
-    ':antlr3_directory',
-    ':antlr4_directory',
     ':autovalue_directory',
     ':hello_directory',
     ':java_sources_directory',
     ':javac_directory',
-    ':jaxb_directory',
     ':make_it_rain_directory',
     ':protobuf_directory',
-    ':wire_directory',
     # NB: See `:java_sources_directory` for why we must declare this dependency here.
     'examples/src/scala/org/pantsbuild/example:scala_with_java_sources_directory'
   ],
@@ -73,25 +69,6 @@ page(
 files(
   name = 'annotation_directory',
   sources = ['annotation/**/*'],
-  dependencies = [
-    'examples/src/antlr/org/pantsbuild/example:exp_directory',
-  ],
-)
-
-files(
-  name = 'antlr3_directory',
-  sources = ['antlr3/**/*'],
-  dependencies = [
-    'examples/src/antlr/org/pantsbuild/example:exp_directory',
-  ],
-)
-
-files(
-  name = 'antlr4_directory',
-  sources = ['antlr4/**/*'],
-  dependencies = [
-    'examples/src/antlr/org/pantsbuild/example:exp_directory',
-  ],
 )
 
 files(
@@ -122,14 +99,6 @@ files(
 )
 
 files(
-  name = 'jaxb_directory',
-  sources = ['jaxb/**/*'],
-  dependencies = [
-    'examples/src/resources/org/pantsbuild/example:jaxb_directory',
-  ],
-)
-
-files(
   name = 'make_it_rain_directory',
   sources = ['make_it_rain/**/*'],
   dependencies = [
@@ -145,15 +114,5 @@ files(
     'examples/src/protobuf/org/pantsbuild/example:distance_directory',
     'examples/src/protobuf/org/pantsbuild/example:imports_directory',
     'examples/src/protobuf/org/pantsbuild/example:unpacked_jars_directory',
-  ],
-)
-
-files(
-  name = 'wire_directory',
-  sources = ['wire/**/*'],
-  dependencies = [
-    'examples/src/wire/org/pantsbuild/example:element_directory',
-    'examples/src/wire/org/pantsbuild/example:roots_directory',
-    'examples/src/wire/org/pantsbuild/example:temperature_directory',
   ],
 )

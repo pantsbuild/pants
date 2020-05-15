@@ -13,7 +13,6 @@ from pants.engine.internals.build_files import error_on_imports
 from pants.engine.internals.objects import Serializable
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, SymbolTable
 from pants.engine.legacy.structs import BundleAdaptor, TargetAdaptor
-from pants.option.global_options import BuildFileImportsBehavior
 from pants.util.memo import memoized_property
 
 logger = logging.getLogger(__name__)
@@ -29,22 +28,14 @@ class LegacyPythonCallbacksParser(Parser):
     macros and target factories.
     """
 
-    def __init__(
-        self,
-        symbol_table: SymbolTable,
-        aliases: BuildFileAliases,
-        build_file_imports_behavior: BuildFileImportsBehavior,
-    ) -> None:
+    def __init__(self, symbol_table: SymbolTable, aliases: BuildFileAliases) -> None:
         """
         :param symbol_table: A SymbolTable for this parser, which will be overlaid with the given
           additional aliases.
         :param aliases: Additional BuildFileAliases to register.
-        :param build_file_imports_behavior: How to behave if a BUILD file being parsed tries to use
-          import statements.
         """
         super().__init__()
         self._symbols, self._parse_context = self._generate_symbols(symbol_table, aliases)
-        self._build_file_imports_behavior = build_file_imports_behavior
 
     @staticmethod
     def _generate_symbols(
@@ -139,6 +130,6 @@ class LegacyPythonCallbacksParser(Parser):
         self._parse_context._storage.clear(os.path.dirname(filepath))
         exec(python, self._make_symbols(extra_symbols))
 
-        error_on_imports(python, filepath, self._build_file_imports_behavior)
+        error_on_imports(python, filepath)
 
         return list(self._parse_context._storage.objects)

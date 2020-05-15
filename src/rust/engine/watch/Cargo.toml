@@ -13,11 +13,7 @@ graph = { path = "../graph" }
 hashing = { path = "../hashing" }
 log = "0.4"
 logging = { path = "../logging" }
-# notify is currently an experimental API, we are pinning to https://docs.rs/notify/5.0.0-pre.1/notify/
-# because the latest prerelease at time of writing has removed the debounced watcher which we would like to use.
-# The author suggests they will add the debounced watcher back into the stable 5.0.0 release. When that happens
-# we can move to it.
-notify = { git = "https://github.com/notify-rs/notify", rev = "fba00891d9105e2f581c69fbe415a58cb7966fdd" }
+notify = "5.0.0-pre.2"
 parking_lot = "0.6"
 task_executor = { path = "../task_executor" }
 
