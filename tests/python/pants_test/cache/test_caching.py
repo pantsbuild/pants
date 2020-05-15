@@ -59,7 +59,7 @@ class LocalCachingTest(TaskTestBase):
             read_from=[self.artifact_cache],
             write=True,
         )
-        self.add_to_build_file("", f'dummy_library(name = "t", source = "{self._filename}")')
+        self.add_to_build_file("", f'dummy_library(name = "t", sources = ["{self._filename}]")')
         self._target = self.target(":t")
         context = self.context(for_task_types=[DummyTask], target_roots=[self._target])
         self.task = self.create_task(context)
