@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import DefaultDict, List, Tuple, Union, cast
 
-from pants.base.exceptions import ResolveError, TargetDefinitionException
+from pants.base.exceptions import ResolveError
 from pants.base.specs import (
     AddressSpecs,
     AscendantAddresses,
