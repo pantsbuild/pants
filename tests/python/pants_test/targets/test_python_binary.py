@@ -33,12 +33,12 @@ class TestPythonBinary(TestBase):
             "",
             """python_binary(
   name = "binary1",
-  source = "blork.py",
+  sources = ["blork.py"],
 )
 
 python_binary(
   name = "binary2",
-  source = "bin/blork.py",
+  sources = ["bin/blork.py"],
 )""",
         )
         assert self.target(":binary1").entry_point == "blork"
@@ -75,28 +75,28 @@ python_binary(
     def test_python_binary_with_entry_point_and_source_mismatch(self):
         self.create_file("binary1/hork.py")
         self.add_to_build_file(
-            "binary1", 'python_binary(entry_point = "blork", source = "hork.py")',
+            "binary1", 'python_binary(entry_point = "blork", sources = ["hork.py"])',
         )
         with self.assertRaises(TargetDefinitionException):
             self.target("binary1")
 
         self.create_file("binary2/hork.py")
         self.add_to_build_file(
-            "binary2", 'python_binary(entry_point = "blork:main", source = "hork.py")',
+            "binary2", 'python_binary(entry_point = "blork:main", sources = ["hork.py"])',
         )
         with self.assertRaises(TargetDefinitionException):
             self.target("binary2")
 
         self.create_file("binary3/blork.py")
         self.add_to_build_file(
-            "binary3", 'python_binary(entry_point = "bin.blork", source = "blork.py")',
+            "binary3", 'python_binary(entry_point = "bin.blork", sources = ["blork.py"])',
         )
         with self.assertRaises(TargetDefinitionException):
             self.target("binary3")
 
         self.create_file("binary4/bin.py")
         self.add_to_build_file(
-            "binary4", 'python_binary(entry_point = "bin.blork", source = "bin.py")',
+            "binary4", 'python_binary(entry_point = "bin.blork", sources = ["bin.py"])',
         )
         with self.assertRaises(TargetDefinitionException):
             self.target("binary4")

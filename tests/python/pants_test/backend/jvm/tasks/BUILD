@@ -714,7 +714,7 @@ python_tests(
     'testprojects/src/scala/org/pantsbuild/testproject:procedure_syntax_directory',
     'testprojects/src/scala/org/pantsbuild/testproject:rsc_compat_directory',
   ],
-  timeout=340,
+  timeout=370,
   tags = {'integration', 'partially_type_checked'},
 )
 

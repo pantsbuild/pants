@@ -81,18 +81,18 @@ class JarCreateExecuteTest(JarCreateTestBase):
             java_sources=java_sources,
         )
 
-    def jvm_binary(self, path, name, source=None, dependencies=None):
-        self.create_files(path, [source])
+    def jvm_binary(self, path, name, sources, dependencies):
+        self.create_files(path, sources)
         self.add_to_build_file(
             path,
             dedent(
-                """
-                jvm_binary(name=%(name)r,
-                  source=%(source)r,
-                  dependencies=[%(dependencies)r],
+                f"""
+                jvm_binary(
+                  name={name!r},
+                  sources={sources},
+                  dependencies={dependencies},
                 )
                 """
-                % dict(name=name, source=source, dependencies=dependencies)
             ),
         )
         return self.target(f"{path}:{name}")
@@ -137,8 +137,8 @@ class JarCreateExecuteTest(JarCreateTestBase):
         self.binary = self.jvm_binary(
             test_path("src/java/com/twitter/baz"),
             "baz",
-            source="b.java",
-            dependencies=test_path("src/resources/com/twitter:spam"),
+            sources=["b.java"],
+            dependencies=[test_path("src/resources/com/twitter:spam")],
         )
         self.empty_sl = self.scala_library(test_path("src/scala/com/foo"), "foo", ["dupe.scala"])
 

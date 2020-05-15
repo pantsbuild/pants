@@ -51,7 +51,7 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
         test_build = os.path.join(test_project, "BUILD")
         test_src = os.path.join(test_project, "main.py")
         test_pex = "dist/cache_fields.pex"
-        zipsafe_target_tmpl = "python_binary(source='main.py', zip_safe={})"
+        zipsafe_target_tmpl = "python_binary(sources=['main.py'], zip_safe={})"
 
         with self.caching_config() as config, self.mock_buildroot() as buildroot, buildroot.pushd():
             build = functools.partial(
@@ -65,7 +65,7 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
             buildroot.write_file(test_src, "")
 
             # Create a pex from a simple python_binary target and assert it has zip_safe=True (default).
-            buildroot.write_file(test_build, "python_binary(source='main.py')")
+            buildroot.write_file(test_build, "python_binary(sources=['main.py'])")
             self.assert_success(build())
             self.assert_pex_attribute(test_pex, "zip_safe", True)
 
@@ -151,7 +151,7 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
                 dedent(
                     """
                     python_binary(
-                      source='main.py',
+                      sources=['main.py'],
                       dependencies=[':numpy'],
                       {target_platforms}
                     )

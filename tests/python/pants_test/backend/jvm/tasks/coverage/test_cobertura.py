@@ -76,7 +76,7 @@ class TestCobertura(TestBase):
         self.binary_target = self.make_target(
             spec="//foo:foo-binary",
             target_type=JvmBinary,
-            source="Foo.java",
+            sources=["Foo.java"],
             dependencies=[self.jar_lib],
         )
 
