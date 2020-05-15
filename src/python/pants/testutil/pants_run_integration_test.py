@@ -624,7 +624,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
             "rust-toolchain",
             "src",
         )
-        dirs_to_copy = ("3rdparty", "contrib") + tuple(dirs_to_copy or [])
+        dirs_to_copy = ("3rdparty", *(dirs_to_copy or []))
 
         with self.temporary_workdir() as tmp_dir:
             for filename in files_to_copy:

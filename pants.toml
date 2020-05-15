@@ -23,40 +23,24 @@ v2 = false
 
 # Enable our own custom loose-source plugins as well as contribs.
 pythonpath = [
-  "%(buildroot)s/contrib/avro/src/python",
   "%(buildroot)s/contrib/awslambda/python/src/python",
   "%(buildroot)s/contrib/buildrefactor/src/python",
   "%(buildroot)s/contrib/codeanalysis/src/python",
-  "%(buildroot)s/contrib/cpp/src/python",
   "%(buildroot)s/contrib/confluence/src/python",
-  "%(buildroot)s/contrib/errorprone/src/python",
-  "%(buildroot)s/contrib/findbugs/src/python",
   "%(buildroot)s/contrib/go/src/python",
-  "%(buildroot)s/contrib/googlejavaformat/src/python",
-  "%(buildroot)s/contrib/jax_ws/src/python",
   "%(buildroot)s/contrib/mypy/src/python",
   "%(buildroot)s/contrib/node/src/python",
-  "%(buildroot)s/contrib/scalajs/src/python",
   "%(buildroot)s/contrib/scrooge/src/python",
-  "%(buildroot)s/contrib/thrifty/src/python",
   "%(buildroot)s/pants-plugins/src/python",
 ]
 backend_packages.add = [
   "pants.backend.docgen",
-  "pants.contrib.avro",
   "pants.contrib.buildrefactor",
   "pants.contrib.codeanalysis",
-  "pants.contrib.cpp",
   "pants.contrib.confluence",
-  "pants.contrib.errorprone",
-  "pants.contrib.findbugs",
   "pants.contrib.go",
-  "pants.contrib.googlejavaformat",
-  "pants.contrib.jax_ws",
-  "pants.contrib.scalajs",
   "pants.contrib.node",
   "pants.contrib.scrooge",
-  "pants.contrib.thrifty",
   "internal_backend.repositories",
   "internal_backend.sitegen",
   "internal_backend.utilities",
@@ -74,9 +58,6 @@ backend_packages2.add = [
   "pants.backend.python.lint.flake8",
   "pants.backend.python.lint.isort",
   "internal_backend.rules_for_testing",
-]
-ignore_pants_warnings = [
-  "DEPRECATED: the pantsbuild.pants.contrib",
 ]
 
 # The invalidation globs cover the PYTHONPATH by default, but we additionally add the rust code.
@@ -192,30 +173,8 @@ deps = ["3rdparty:thrift"]
 [gen.thrift-py]
 deps = ["examples/3rdparty/python:thrift"]
 
-[gen.thrifty]
-allow_dups = true
-
 [gen.go-protobuf]
 import_target = "contrib/go/examples/src/protobuf/org/pantsbuild/example:protobuf-deps"
-
-[compile.errorprone]
-command_line_options = [
-  # See http://errorprone.info/bugpatterns for all patterns
-  '-Xep:CatchAndPrintStackTrace:OFF',
-  '-Xep:StringSplitter:OFF',
-]
-exclude_patterns = [
-  'contrib/errorprone/tests/java/org/pantsbuild/contrib/errorprone:error',
-  'testprojects/src/java/org/pantsbuild/testproject/.*'
-]
-
-[compile.findbugs]
-max_rank = 4
-fail_on_error = true
-exclude_patterns = [
-  'contrib/findbugs/tests/java/org/pantsbuild/contrib/findbugs:high',
-  'testprojects/src/java/org/pantsbuild/testproject/.*',
-]
 
 [compile.rsc]
 jvm_options = ['-Xmx4g', '-XX:+UseConcMarkSweepGC', '-XX:ParallelGCThreads=4']
@@ -275,9 +234,6 @@ ignore = "%(pants_supportdir)s/eslint/.eslintignore"
 [flake8]
 config = "build-support/flake8/.flake8"
 extra_requirements.add = ["flake8-pantsbuild>=2.0,<3"]
-
-[google-java-format]
-skip = true
 
 [isort]
 config = [".isort.cfg", "contrib/.isort.cfg", "examples/.isort.cfg"]

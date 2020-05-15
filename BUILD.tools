@@ -1,29 +1,6 @@
 # JVM artifacts that Pants itself depends on.
 # http://pantsbuild.github.io/dev_tasks.html#jvm-tool-bootstrapping
 
-target(
-  name = 'scala-js-cli',
-  dependencies=[
-    'contrib/scalajs/3rdparty/jvm/org/scala-js:cli'
-  ],
-)
-
-target(
-  name = 'scala-js-compiler',
-  dependencies=[
-    'contrib/scalajs/3rdparty/jvm/org/scala-js:compiler',
-    'contrib/scalajs/3rdparty/jvm/org/scala-js:library',
-  ],
-)
-
-target(
-  name = 'scala-js-library',
-  dependencies = [
-    'contrib/scalajs/3rdparty/jvm/org/scala-js:library',
-  ],
-)
-
-
 # TODO: Attempting to use these targets fails because BootstrapJvmTools.get_alternate_target_roots()
 # doesn't descend into dependent target directories and uses the same build_graph it starts with.
 # target(
@@ -82,16 +59,5 @@ jar_library(
   jars = [
     jar(org='java', name='javac', rev='9+181-r4173-1',
         url='https://raw.githubusercontent.com/toolchainlabs/binhost/master/java/javac/9+181-r4173-1/javac-9+181-r4173-1.jar'),
-  ],
-)
-
-# Runtime dependencies for the Avro Java generated code.
-avro_rev = '1.8.2'
-
-jar_library(
-  name = 'avro-java-runtime',
-  jars = [
-    jar(org='org.apache.avro', name='avro', rev=avro_rev),
-    jar(org='org.apache.avro', name='avro-ipc', rev=avro_rev),
   ],
 )

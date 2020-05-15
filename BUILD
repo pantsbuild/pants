@@ -16,9 +16,6 @@ files(
 files(
   name = 'build_tools',
   sources = ['BUILD.tools'],
-  dependencies = [
-    ':scalajs_3rdparty_directory',
-  ],
 )
 
 files(
@@ -29,11 +26,6 @@ files(
 files(
   name = 'isort_cfg',
   sources = ['.isort.cfg'],
-)
-
-files(
-  name = 'scalajs_3rdparty_directory',
-  sources = ['contrib/scalajs/3rdparty/**/*'],
 )
 
 files(
