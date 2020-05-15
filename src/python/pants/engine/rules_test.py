@@ -25,7 +25,6 @@ from pants.engine.rules import (
     rule,
 )
 from pants.engine.selectors import Get
-from pants.option.global_options import BuildFileImportsBehavior
 from pants.testutil.engine.util import (
     TARGET_TABLE,
     MockGet,
@@ -666,10 +665,7 @@ class RuleGraphTest(TestBase):
 
     def test_full_graph_for_planner_example(self):
         address_mapper = AddressMapper(
-            JsonParser(TARGET_TABLE),
-            prelude_glob_patterns=(),
-            build_file_imports_behavior=BuildFileImportsBehavior.error,
-            build_patterns="*.BUILD.json",
+            JsonParser(TARGET_TABLE), prelude_glob_patterns=(), build_patterns="*.BUILD.json",
         )
         rules = create_graph_rules(address_mapper) + create_fs_rules()
 

@@ -30,7 +30,6 @@ from pants.engine.selectors import Params
 from pants.engine.target import Target
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.util import clean_global_runtime_state
-from pants.option.global_options import BuildFileImportsBehavior
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source.source_root import SourceRootConfig
 from pants.source.wrapped_globs import EagerFilesetWithSpec
@@ -415,7 +414,6 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
             local_store_dir=local_store_dir,
             local_execution_root_dir=local_execution_root_dir,
             build_file_prelude_globs=(),
-            build_file_imports_behavior=BuildFileImportsBehavior.error,
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
             native=init_native(),
             options_bootstrapper=options_bootstrapper,
