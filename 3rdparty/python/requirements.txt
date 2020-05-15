@@ -20,7 +20,7 @@ fasteners==0.15.0
 mypy==0.770
 
 Markdown==2.1.1
-packaging==16.8
+packaging==20.3
 parameterized==0.6.1
 pathspec==0.8.0
 pex==2.1.10
