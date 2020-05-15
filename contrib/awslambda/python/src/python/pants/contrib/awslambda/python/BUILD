@@ -15,4 +15,5 @@ contrib_plugin(
   description='Pants plugin for creating deployable AWS Lambdas out of python code.',
   build_file_aliases=True,
   register_goals=True,
+  target_types=True,
 )

@@ -15,5 +15,6 @@ contrib_plugin(
   description='C++ pants plugin (deprecated).',
   build_file_aliases=True,
   register_goals=True,
+  target_types=True,
   tags = {"partially_type_checked"},
 )
