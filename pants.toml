@@ -83,17 +83,7 @@ pants_ignore.add = [
 ]
 
 [source]
-root_patterns = [
-  "src/*",
-  "src/main/*",
-  "src/test/*",
-  "^/src/go/src",
-  "test/*",
-  "tests/*",
-  "3rdparty/*",
-  "^/build-support/bin",
-  "^/build-support/migration-support"
-]
+roots = "@source_roots.json"
 
 [cache]
 # Caching is on globally by default, but we disable it here for development purposes.

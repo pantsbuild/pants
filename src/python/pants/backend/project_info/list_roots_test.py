@@ -109,6 +109,7 @@ class RootsTest(GoalRuleTestBase):
     def rules(cls):
         return super().rules() + list_roots.rules()
 
+    # Delete these *_deprecated tests in 1.30.0.dev0.
     def test_no_langs_deprecated(self):
         source_roots = json.dumps({"fakeroot": tuple()})
         self.create_dir("fakeroot")
@@ -130,16 +131,16 @@ class RootsTest(GoalRuleTestBase):
     def test_single_source_root(self):
         source_roots = json.dumps(["fakeroot"])
         self.create_dir("fakeroot")
-        self.assert_console_output("fakeroot", args=[f"--source-root-patterns={source_roots}"])
+        self.assert_console_output("fakeroot", args=[f"--source-roots={source_roots}"])
 
     def test_multiple_source_roots(self):
         self.create_dir("fakerootA")
         self.create_dir("fakerootB")
         source_roots = json.dumps(["fakerootA", "fakerootB"])
         self.assert_console_output(
-            "fakerootA", "fakerootB", args=[f"--source-root-patterns={source_roots}"]
+            "fakerootA", "fakerootB", args=[f"--source-roots={source_roots}"]
         )
 
     def test_buildroot_is_source_root(self):
-        source_roots = json.dumps(["^"])
-        self.assert_console_output(".", args=[f"--source-root-patterns={source_roots}"])
+        source_roots = json.dumps(["."])
+        self.assert_console_output(".", args=[f"--source-roots={source_roots}"])
