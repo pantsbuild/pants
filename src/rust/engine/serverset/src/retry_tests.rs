@@ -3,9 +3,10 @@ use maplit::hashset;
 use std::time::Duration;
 use testutil::owned_string_vec;
 
-#[test]
-fn retries() {
-  let mut runtime = tokio::runtime::Runtime::new().unwrap();
+use futures::compat::Future01CompatExt;
+
+#[tokio::test]
+async fn retries() {
   let s = Serverset::new(
     owned_string_vec(&["good", "bad", "enough"]),
     |s| {
@@ -22,17 +23,18 @@ fn retries() {
   let mut saw = hashset![];
   for _ in 0..3 {
     saw.insert(
-      runtime
-        .block_on(Retry(s.clone()).all_errors_immediately(|v| v, 1))
+      Retry(s.clone())
+        .all_errors_immediately(|v| v, 1)
+        .compat()
+        .await
         .unwrap(),
     );
   }
   assert_eq!(saw, hashset!["good".to_owned(), "enough".to_owned()]);
 }
 
-#[test]
-fn gives_up_on_enough_bad() {
-  let mut runtime = tokio::runtime::Runtime::new().unwrap();
+#[tokio::test]
+async fn gives_up_on_enough_bad() {
   let s = Serverset::new(
     vec!["bad".to_owned()],
     |s| Err(s.to_owned()),
@@ -42,6 +44,9 @@ fn gives_up_on_enough_bad() {
   .unwrap();
   assert_eq!(
     Err(format!("Failed after 5 retries; last failure: bad")),
-    runtime.block_on(Retry(s).all_errors_immediately(|v: Result<u8, _>| v, 5))
+    Retry(s)
+      .all_errors_immediately(|v: Result<u8, _>| v, 5)
+      .compat()
+      .await
   );
 }

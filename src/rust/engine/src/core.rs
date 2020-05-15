@@ -294,7 +294,7 @@ pub enum Failure {
 impl fmt::Display for Failure {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     match self {
-      Failure::Invalidated => write!(f, "Exhausted retries due to changed files."),
+      Failure::Invalidated => write!(f, "Giving up on retrying due to changed files."),
       Failure::Throw(exc, _) => write!(f, "{}", externs::val_to_str(exc)),
     }
   }

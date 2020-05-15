@@ -1,13 +1,12 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use std;
+use std::collections::{BTreeMap, HashSet};
 use std::convert::{Into, TryInto};
+use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-
-use futures01::Future;
 
 use crate::core::{Failure, TypeId};
 use crate::handles::maybe_drop_handles;
@@ -15,10 +14,13 @@ use crate::nodes::{NodeKey, WrappedNode};
 use crate::scheduler::Session;
 use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
+
 use boxfuture::{BoxFuture, Boxable};
-use core::clone::Clone;
-use fs::{safe_create_dir_all_ioerror, PosixFS};
-use graph::{EntryId, Graph, NodeContext};
+use fs::{safe_create_dir_all_ioerror, GitignoreStyleExcludes, PosixFS};
+use futures::compat::Future01CompatExt;
+use futures01::Future;
+use graph::{EntryId, Graph, InvalidationResult, NodeContext};
+use log::info;
 use process_execution::{
   self, speculate::SpeculatingCommandRunner, BoundedCommandRunner, ExecuteProcessRequestMetadata,
   PlatformConstraint,
@@ -27,8 +29,10 @@ use rand::seq::SliceRandom;
 use reqwest;
 use rule_graph::RuleGraph;
 use sharded_lmdb::ShardedLmdb;
-use std::collections::BTreeMap;
 use store::Store;
+use tokio::runtime::{Builder, Runtime};
+use uuid::Uuid;
+use watch::{Invalidatable, InvalidationWatcher};
 
 const GIGABYTES: usize = 1024 * 1024 * 1024;
 
@@ -41,15 +45,17 @@ const GIGABYTES: usize = 1024 * 1024 * 1024;
 /// https://github.com/tokio-rs/tokio/issues/369 is resolved.
 ///
 pub struct Core {
-  pub graph: Graph<NodeKey>,
+  pub graph: Arc<InvalidatableGraph>,
   pub tasks: Tasks,
   pub rule_graph: RuleGraph<Rule>,
   pub types: Types,
+  pub runtime: Runtime,
   pub executor: task_executor::Executor,
   store: Store,
   pub command_runner: Box<dyn process_execution::CommandRunner>,
-  pub http_client: reqwest::r#async::Client,
+  pub http_client: reqwest::Client,
   pub vfs: PosixFS,
+  pub watcher: Arc<InvalidationWatcher>,
   pub build_root: PathBuf,
 }
 
@@ -82,12 +88,24 @@ impl Core {
     process_execution_use_local_cache: bool,
     remote_execution_headers: BTreeMap<String, String>,
     process_execution_local_enable_nailgun: bool,
+    experimental_fs_watcher: bool,
   ) -> Result<Core, String> {
     // Randomize CAS address order to avoid thundering herds from common config.
     let mut remote_store_servers = remote_store_servers;
     remote_store_servers.shuffle(&mut rand::thread_rng());
 
-    let executor = task_executor::Executor::new();
+    let runtime = Builder::new()
+      // This use of Builder (rather than just Runtime::new()) is to allow us to lower the
+      // max_threads setting. As of tokio `0.2.13`, the core threads default to num_cpus, and
+      // the max threads default to a fixed value of 512. In practice, it appears to be slower
+      // to allow 512 threads, and with the default stack size, 512 threads would use 1GB of RAM.
+      .core_threads(num_cpus::get())
+      .max_threads(num_cpus::get() * 4)
+      .threaded_scheduler()
+      .enable_all()
+      .build()
+      .map_err(|e| format!("Failed to start the runtime: {}", e))?;
+    let executor = task_executor::Executor::new(runtime.handle().clone());
     // We re-use these certs for both the execution and store service; they're generally tied together.
     let root_ca_certs = if let Some(path) = remote_root_ca_certs_path {
       Some(
@@ -218,24 +236,42 @@ impl Core {
         metadata: process_execution_metadata,
       })
     }
+    let graph = Arc::new(InvalidatableGraph(Graph::new()));
 
-    let http_client = reqwest::r#async::Client::new();
+    let http_client = reqwest::Client::new();
     let rule_graph = RuleGraph::new(tasks.as_map(), root_subject_types);
 
+    let ignorer = GitignoreStyleExcludes::create(&ignore_patterns).map_err(|e| {
+      format!(
+        "Could not parse build ignore inputs {:?}: {:?}",
+        ignore_patterns, e
+      )
+    })?;
+
+    let watcher = InvalidationWatcher::new(
+      executor.clone(),
+      build_root.clone(),
+      ignorer.clone(),
+      experimental_fs_watcher,
+    )?;
+    watcher.start(&graph);
+
     Ok(Core {
-      graph: Graph::new(),
+      graph: graph,
       tasks: tasks,
       rule_graph: rule_graph,
       types: types,
+      runtime,
       executor: executor.clone(),
       store,
       command_runner,
       http_client,
       // TODO: Errors in initialization should definitely be exposed as python
       // exceptions, rather than as panics.
-      vfs: PosixFS::new(&build_root, &ignore_patterns, executor)
+      vfs: PosixFS::new(&build_root, ignorer, executor)
         .map_err(|e| format!("Could not initialize VFS: {:?}", e))?,
-      build_root: build_root,
+      build_root,
+      watcher,
     })
   }
 
@@ -244,19 +280,49 @@ impl Core {
   }
 }
 
+pub struct InvalidatableGraph(Graph<NodeKey>);
+
+impl Invalidatable for InvalidatableGraph {
+  fn invalidate(&self, paths: &HashSet<PathBuf>, caller: &str) -> usize {
+    let InvalidationResult { cleared, dirtied } = self.invalidate_from_roots(move |node| {
+      if let Some(fs_subject) = node.fs_subject() {
+        paths.contains(fs_subject)
+      } else {
+        false
+      }
+    });
+    info!(
+      "{} invalidation: cleared {} and dirtied {} nodes for: {:?}",
+      caller, cleared, dirtied, paths
+    );
+    cleared + dirtied
+  }
+}
+
+impl Deref for InvalidatableGraph {
+  type Target = Graph<NodeKey>;
+
+  fn deref(&self) -> &Graph<NodeKey> {
+    &self.0
+  }
+}
+
 #[derive(Clone)]
 pub struct Context {
   entry_id: Option<EntryId>,
   pub core: Arc<Core>,
   pub session: Session,
+  run_id: Uuid,
 }
 
 impl Context {
   pub fn new(core: Arc<Core>, session: Session) -> Context {
+    let run_id = session.run_id();
     Context {
       entry_id: None,
       core,
       session,
+      run_id,
     }
   }
 
@@ -266,12 +332,10 @@ impl Context {
   pub fn get<N: WrappedNode>(&self, node: N) -> BoxFuture<N::Item, Failure> {
     // TODO: Odd place for this... could do it periodically in the background?
     maybe_drop_handles();
-    let result = if let Some(entry_id) = self.entry_id {
-      self.core.graph.get(entry_id, self, node.into()).to_boxed()
-    } else {
-      self.core.graph.create(node.into(), self).to_boxed()
-    };
-    result
+    self
+      .core
+      .graph
+      .get(self.entry_id, self, node.into())
       .map(|node_result| {
         node_result
           .try_into()
@@ -283,7 +347,7 @@ impl Context {
 
 impl NodeContext for Context {
   type Node = NodeKey;
-  type SessionId = String;
+  type RunId = Uuid;
 
   ///
   /// Clones this Context for a new EntryId. Because the Core of the context is an Arc, this
@@ -294,11 +358,12 @@ impl NodeContext for Context {
       entry_id: Some(entry_id),
       core: self.core.clone(),
       session: self.session.clone(),
+      run_id: self.run_id,
     }
   }
 
-  fn session_id(&self) -> &Self::SessionId {
-    self.session.build_id()
+  fn run_id(&self) -> &Self::RunId {
+    &self.run_id
   }
 
   fn graph(&self) -> &Graph<NodeKey> {
@@ -309,6 +374,8 @@ impl NodeContext for Context {
   where
     F: Future<Item = (), Error = ()> + Send + 'static,
   {
-    self.core.executor.spawn_and_ignore(future);
+    self.core.executor.spawn_and_ignore(async move {
+      let _ = future.compat().await;
+    });
   }
 }

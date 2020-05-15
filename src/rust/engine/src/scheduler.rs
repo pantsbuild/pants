@@ -6,24 +6,29 @@ use std::convert::TryInto;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::{mpsc, Arc};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
-use futures01::future::{self, Future};
+use futures::compat::Future01CompatExt;
+use futures::future;
 
 use crate::context::{Context, Core};
 use crate::core::{Failure, Params, TypeId, Value};
 use crate::nodes::{NodeKey, Select, Tracer, Visualizer};
-use graph::{Graph, InvalidationResult};
+
+use graph::{Graph, InvalidationResult, LastObserved};
 use hashing;
 use indexmap::IndexMap;
 use log::{debug, info, warn};
 use logging::logger::LOGGER;
 use parking_lot::Mutex;
 use ui::{EngineDisplay, KeyboardCommand};
+use uuid::Uuid;
+use watch::Invalidatable;
 use workunit_store::WorkUnitStore;
 
 pub enum ExecutionTermination {
   KeyboardInterrupt,
+  Timeout,
 }
 
 ///
@@ -36,8 +41,9 @@ pub enum ExecutionTermination {
 struct InnerSession {
   // The total size of the graph at Session-creation time.
   preceding_graph_size: usize,
-  // The set of roots that have been requested within this session.
-  roots: Mutex<HashSet<Root>>,
+  // The set of roots that have been requested within this session, with associated LastObserved
+  // times if they were polled.
+  roots: Mutex<HashMap<Root, Option<LastObserved>>>,
   // If enabled, the display that will render the progress of the V2 engine. This is only
   // Some(_) if the --v2-ui option is enabled.
   display: Option<Arc<Mutex<EngineDisplay>>>,
@@ -45,8 +51,16 @@ struct InnerSession {
   should_record_zipkin_spans: bool,
   // A place to store info about workunits in rust part
   workunit_store: WorkUnitStore,
-  // The unique id for this run. Used as the id of the session, and for metrics gathering purposes.
+  // The unique id for this Session: used for metrics gathering purposes.
   build_id: String,
+  // An id used to control the visibility of uncacheable rules. Generally this is identical for an
+  // entire Session, but in some cases (in particular, a `--loop`) the caller wants to retain the
+  // same Session while still observing new values for uncacheable rules like Goals.
+  //
+  // TODO: Figure out how the `--loop` interplays with metrics. It's possible that for metrics
+  // purposes, each iteration of a loop should be considered to be a new Session, but for now the
+  // Session/build_id would be stable.
+  run_id: Mutex<Uuid>,
   should_report_workunits: bool,
 }
 
@@ -72,24 +86,36 @@ impl Session {
 
     let inner_session = InnerSession {
       preceding_graph_size: scheduler.core.graph.len(),
-      roots: Mutex::new(HashSet::new()),
+      roots: Mutex::new(HashMap::new()),
       display,
       should_record_zipkin_spans,
       workunit_store: WorkUnitStore::new(),
       build_id,
+      run_id: Mutex::new(Uuid::new_v4()),
       should_report_workunits,
     };
     Session(Arc::new(inner_session))
   }
 
-  fn extend(&self, new_roots: &[Root]) {
+  fn extend(&self, new_roots: Vec<(Root, Option<LastObserved>)>) {
     let mut roots = self.0.roots.lock();
-    roots.extend(new_roots.iter().cloned());
+    roots.extend(new_roots);
+  }
+
+  fn zip_last_observed(&self, inputs: &[Root]) -> Vec<(Root, Option<LastObserved>)> {
+    let roots = self.0.roots.lock();
+    inputs
+      .iter()
+      .map(|root| {
+        let last_observed = roots.get(root).cloned().unwrap_or(None);
+        (root.clone(), last_observed)
+      })
+      .collect()
   }
 
   fn root_nodes(&self) -> Vec<NodeKey> {
     let roots = self.0.roots.lock();
-    roots.iter().map(|r| r.clone().into()).collect()
+    roots.keys().map(|r| r.clone().into()).collect()
   }
 
   pub fn preceding_graph_size(&self) -> usize {
@@ -114,6 +140,16 @@ impl Session {
 
   pub fn build_id(&self) -> &String {
     &self.0.build_id
+  }
+
+  pub fn run_id(&self) -> Uuid {
+    let run_id = self.0.run_id.lock();
+    *run_id
+  }
+
+  pub fn new_run_id(&self) {
+    let mut run_id = self.0.run_id.lock();
+    *run_id = Uuid::new_v4();
   }
 
   pub fn write_stdout(&self, msg: &str) {
@@ -155,11 +191,34 @@ impl Session {
 pub struct ExecutionRequest {
   // Set of roots for an execution, in the order they were declared.
   pub roots: Vec<Root>,
+  // An ExecutionRequest with `poll` set will wait for _all_ of the given roots to have changed
+  // since their previous observed value in this Session before returning them.
+  //
+  // Example: if an ExecutionRequest is made twice in a row for roots within the same Session,
+  // and this value is set, the first run will request the roots and return immediately when they
+  // complete. The second request will check whether the roots have changed, and if they haven't
+  // changed, will wait until they have (or until the timeout elapses) before re-requesting them.
+  //
+  // TODO: The `poll`, `poll_delay`, and `timeout` parameters exist to support a coarse-grained API
+  // for synchronous Node-watching to Python. Rather than further expanding this `execute` API, we
+  // should likely port those usecases to rust.
+  pub poll: bool,
+  // If poll is set, a delay to apply after having noticed that Nodes have changed and before
+  // requesting them.
+  pub poll_delay: Option<Duration>,
+  // A timeout applied globally to the request. When a request times out, work is _not_ cancelled,
+  // and will continue to completion in the background.
+  pub timeout: Option<Duration>,
 }
 
 impl ExecutionRequest {
   pub fn new() -> ExecutionRequest {
-    ExecutionRequest { roots: Vec::new() }
+    ExecutionRequest {
+      roots: Vec::new(),
+      poll: false,
+      poll_delay: None,
+      timeout: None,
+    }
   }
 
   ///
@@ -227,22 +286,7 @@ impl Scheduler {
   /// Invalidate the invalidation roots represented by the given Paths.
   ///
   pub fn invalidate(&self, paths: &HashSet<PathBuf>) -> usize {
-    let InvalidationResult { cleared, dirtied } =
-      self.core.graph.invalidate_from_roots(move |node| {
-        if let Some(fs_subject) = node.fs_subject() {
-          paths.contains(fs_subject)
-        } else {
-          false
-        }
-      });
-    // TODO: The rust log level is not currently set correctly in a pantsd context. To ensure that
-    // we see this even at `info` level, we set it to warn. #6004 should address this by making
-    // rust logging re-configuration an explicit step in `src/python/pants/init/logging.py`.
-    warn!(
-      "invalidation: cleared {} and dirtied {} nodes for: {:?}",
-      cleared, dirtied, paths
-    );
-    cleared + dirtied
+    self.core.graph.invalidate(paths, "watchman")
   }
 
   ///
@@ -282,6 +326,18 @@ impl Scheduler {
   }
 
   ///
+  /// Return unit if the Scheduler is still valid, or an error string if something has invalidated
+  /// the Scheduler, indicating that it should re-initialize. See InvalidationWatcher.
+  ///
+  pub fn is_valid(&self) -> Result<(), String> {
+    let core = self.core.clone();
+    self.core.executor.block_on(async move {
+      // Confirm that our InvalidationWatcher is still alive.
+      core.watcher.is_valid().await
+    })
+  }
+
+  ///
   /// Return all Digests currently in memory in this Scheduler.
   ///
   pub fn all_digests(&self, session: &Session) -> Vec<hashing::Digest> {
@@ -289,66 +345,92 @@ impl Scheduler {
     self.core.graph.all_digests(&context)
   }
 
+  async fn poll_or_create(
+    context: &Context,
+    root: Root,
+    last_observed: Option<LastObserved>,
+    poll: bool,
+    poll_delay: Option<Duration>,
+  ) -> ObservedValueResult {
+    let (result, last_observed) = if poll {
+      let (result, last_observed) = context
+        .core
+        .graph
+        .poll(root.into(), last_observed, poll_delay, &context)
+        .await?;
+      (result, Some(last_observed))
+    } else {
+      let result = context
+        .core
+        .graph
+        .create(root.into(), &context)
+        .compat()
+        .await?;
+      (result, None)
+    };
+
+    Ok((
+      result
+        .try_into()
+        .unwrap_or_else(|e| panic!("A Node implementation was ambiguous: {:?}", e)),
+      last_observed,
+    ))
+  }
+
   ///
-  /// Attempts to complete all of the given roots, retrying the entire set (up to `count`
-  /// times) if any of them fail with `Failure::Invalidated`. Sends the result on the given
-  /// mpsc Sender, which allows the caller to poll a channel for the result without blocking
-  /// uninterruptibly on a Future.
-  ///
-  /// In common usage, graph entries won't be repeatedly invalidated, but in a case where they
-  /// were (say by an automated process changing files under pants), we'd want to eventually
-  /// give up.
+  /// Attempts to complete all of the given roots, and send the result on the given mpsc Sender,
+  /// which allows the caller to poll a channel for the result without blocking uninterruptibly
+  /// on a Future.
   ///
   fn execute_helper(
-    context: Context,
-    sender: mpsc::Sender<Vec<Result<Value, Failure>>>,
-    roots: Vec<Root>,
-    count: usize,
+    &self,
+    request: &ExecutionRequest,
+    session: &Session,
+    sender: mpsc::Sender<Vec<ObservedValueResult>>,
   ) {
+    let context = Context::new(self.core.clone(), session.clone());
+    let roots = session.zip_last_observed(&request.roots);
+    let poll = request.poll;
+    let poll_delay = request.poll_delay;
     let core = context.core.clone();
-    // Attempt all roots in parallel, failing fast to retry for `Invalidated`.
-    let roots_res = future::join_all(
-      roots
-        .clone()
-        .into_iter()
-        .map(|root| {
-          context
-            .core
-            .graph
-            .create(root.clone().into(), &context)
-            .then::<_, Result<Result<Value, Failure>, Failure>>(move |r| {
-              match r {
-                Err(Failure::Invalidated) if count > 0 => {
-                  // A node was invalidated: fail quickly so that all roots can be retried.
-                  Err(Failure::Invalidated)
-                }
-                other => {
-                  // Otherwise (if it is a success, some other type of Failure, or if we've run
-                  // out of retries) recover to complete the join, which will cause the results to
-                  // propagate to the user.
-                  debug!("Root {} completed.", NodeKey::Select(Box::new(root)));
-                  Ok(other.map(|res| {
-                    res
-                      .try_into()
-                      .unwrap_or_else(|_| panic!("A Node implementation was ambiguous."))
-                  }))
-                }
-              }
-            })
+    core.executor.spawn_and_ignore(async move {
+      let res = future::join_all(
+        roots
+          .into_iter()
+          .map(|(root, last_observed)| {
+            Self::poll_or_create(&context, root, last_observed, poll, poll_delay)
+          })
+          .collect::<Vec<_>>(),
+      )
+      .await;
+      let _ = sender.send(res);
+    });
+  }
+
+  fn execute_record_results(
+    roots: &[Root],
+    session: &Session,
+    results: Vec<ObservedValueResult>,
+  ) -> Vec<Result<Value, Failure>> {
+    // Store the roots that were operated on and their LastObserved values.
+    session.extend(
+      results
+        .iter()
+        .zip(roots.iter())
+        .map(|(result, root)| {
+          let last_observed = result
+            .as_ref()
+            .ok()
+            .and_then(|(_value, last_observed)| *last_observed);
+          (root.clone(), last_observed)
         })
         .collect::<Vec<_>>(),
     );
 
-    // If the join failed (due to `Invalidated`, since that is the only error we propagate), retry
-    // the entire set of roots.
-    core.executor.spawn_and_ignore(roots_res.then(move |res| {
-      if let Ok(res) = res {
-        sender.send(res).map_err(|_| ())
-      } else {
-        Scheduler::execute_helper(context, sender, roots, count - 1);
-        Ok(())
-      }
-    }));
+    results
+      .into_iter()
+      .map(|res| res.map(|(value, _last_observed)| value))
+      .collect()
   }
 
   ///
@@ -358,18 +440,17 @@ impl Scheduler {
     &self,
     request: &ExecutionRequest,
     session: &Session,
-  ) -> Result<Vec<RootResult>, ExecutionTermination> {
-    // Bootstrap tasks for the roots, and then wait for all of them.
-    debug!("Launching {} roots.", request.roots.len());
+  ) -> Result<Vec<Result<Value, Failure>>, ExecutionTermination> {
+    debug!(
+      "Launching {} roots (poll={}).",
+      request.roots.len(),
+      request.poll
+    );
 
-    session.extend(&request.roots);
-
-    // Wait for all roots to complete. Failure here should be impossible, because each
+    // Spawn and wait for all roots to complete. Failure here should be impossible, because each
     // individual Future in the join was (eventually) mapped into success.
-    let context = Context::new(self.core.clone(), session.clone());
     let (sender, receiver) = mpsc::channel();
-
-    Scheduler::execute_helper(context, sender, request.roots.clone(), 8);
+    self.execute_helper(request, session, sender);
     let roots: Vec<NodeKey> = request
       .roots
       .clone()
@@ -379,62 +460,70 @@ impl Scheduler {
 
     // This map keeps the k most relevant jobs in assigned possitions.
     // Keys are positions in the display (display workers) and the values are the actual jobs to print.
-    let mut tasks_to_display = IndexMap::new();
-    let refresh_interval = Duration::from_millis(100);
+    let mut tasks = IndexMap::new();
+    let deadline = request.timeout.map(|timeout| Instant::now() + timeout);
 
-    Ok(match session.maybe_display() {
-      Some(display) => {
-        {
-          let mut display = display.lock();
-          display.start();
-        }
-        let unique_handle = LOGGER.register_engine_display(display.clone());
-
-        let results = loop {
-          if let Ok(res) = receiver.recv_timeout(refresh_interval) {
-            break res;
-          } else {
-            let render_result = Scheduler::display_ongoing_tasks(
-              &self.core.graph,
-              &roots,
-              display,
-              &mut tasks_to_display,
-            );
-            match render_result {
-              Err(e) => warn!("{}", e),
-              Ok(KeyboardCommand::CtrlC) => {
-                info!("Exiting early in response to Ctrl-C");
-                {
-                  let mut display = display.lock();
-                  display.finish();
-                }
-                return Err(ExecutionTermination::KeyboardInterrupt);
-              }
-              Ok(KeyboardCommand::None) => (),
-            };
-          }
-        };
-        LOGGER.deregister_engine_display(unique_handle);
-        {
-          let mut display = display.lock();
-          display.finish();
-        }
-        results
+    let maybe_display_handle = Self::maybe_display_initialize(&session);
+    let result = loop {
+      if let Ok(res) = receiver.recv_timeout(Self::compute_refresh_delay(deadline)) {
+        // Completed successfully.
+        break Ok(Self::execute_record_results(&request.roots, &session, res));
+      } else if let Err(e) =
+        Self::maybe_display_render(&self.core.graph, &roots, &session, &mut tasks)
+      {
+        break Err(e);
+      } else if deadline.map(|d| d < Instant::now()).unwrap_or(false) {
+        // The timeout on the request has been exceeded.
+        break Err(ExecutionTermination::Timeout);
       }
-      None => loop {
-        if let Ok(res) = receiver.recv_timeout(refresh_interval) {
-          break res;
-        }
-      },
-    })
+    };
+    Self::maybe_display_teardown(session, maybe_display_handle);
+
+    result
   }
 
-  fn display_ongoing_tasks(
+  fn compute_refresh_delay(deadline: Option<Instant>) -> Duration {
+    let refresh_interval = Duration::from_millis(100);
+    deadline
+      .and_then(|deadline| deadline.checked_duration_since(Instant::now()))
+      .map(|duration_till_deadline| std::cmp::min(refresh_interval, duration_till_deadline))
+      .unwrap_or(refresh_interval)
+  }
+
+  fn maybe_display_initialize(session: &Session) -> Option<Uuid> {
+    if let Some(display) = session.maybe_display() {
+      {
+        let mut display = display.lock();
+        display.start();
+      }
+      Some(LOGGER.register_engine_display(display.clone()))
+    } else {
+      None
+    }
+  }
+
+  fn maybe_display_teardown(session: &Session, handle: Option<Uuid>) {
+    if let Some(handle) = handle {
+      LOGGER.deregister_engine_display(handle);
+    }
+    if let Some(display) = session.maybe_display() {
+      let mut display = display.lock();
+      display.finish();
+    }
+  }
+
+  fn maybe_display_render(
     graph: &Graph<NodeKey>,
     roots: &[NodeKey],
-    display: &Mutex<EngineDisplay>,
+    session: &Session,
     tasks_to_display: &mut IndexMap<String, Duration>,
-  ) -> Result<KeyboardCommand, String> {
+  ) -> Result<(), ExecutionTermination> {
+    let display = if let Some(display) = session.maybe_display() {
+      display
+    } else {
+      return Ok(());
+    };
+
     // Update the graph. To do that, we iterate over heavy hitters.
 
     let worker_count = {
@@ -474,7 +563,22 @@ impl Scheduler {
     for i in tasks_to_display.len()..worker_count {
       d.update(i.to_string(), "".to_string());
     }
-    d.render()
+
+    match d.render() {
+      Err(e) => {
+        warn!("{}", e);
+        Ok(())
+      }
+      Ok(KeyboardCommand::CtrlC) => {
+        info!("Exiting early in response to Ctrl-C");
+        {
+          let mut display = display.lock();
+          display.finish();
+        }
+        Err(ExecutionTermination::KeyboardInterrupt)
+      }
+      Ok(KeyboardCommand::None) => Ok(()),
+    }
   }
 }
 
@@ -491,4 +595,4 @@ impl Drop for Scheduler {
 ///
 type Root = Select;
 
-pub type RootResult = Result<Value, Failure>;
+pub type ObservedValueResult = Result<(Value, Option<LastObserved>), Failure>;

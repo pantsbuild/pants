@@ -110,6 +110,7 @@ class ExecutionOptions:
     remote_execution_extra_platform_properties: Any
     remote_execution_headers: Any
     process_execution_local_enable_nailgun: bool
+    experimental_fs_watcher: bool
 
     @classmethod
     def from_bootstrap_options(cls, bootstrap_options):
@@ -135,6 +136,7 @@ class ExecutionOptions:
             remote_execution_extra_platform_properties=bootstrap_options.remote_execution_extra_platform_properties,
             remote_execution_headers=bootstrap_options.remote_execution_headers,
             process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
+            experimental_fs_watcher=bootstrap_options.experimental_fs_watcher,
         )
 
 
@@ -160,6 +162,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_execution_extra_platform_properties=[],
     remote_execution_headers={},
     process_execution_local_enable_nailgun=False,
+    experimental_fs_watcher=True,
 )
 
 
@@ -719,10 +722,18 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
             type=list,
             default=[],
             help="Filesystem events matching any of these globs will trigger a daemon restart. "
-            "The `--pythonpath` and `--pants-config-files` are inherently invalidated.",
+            "Pants' own code, plugins, and `--pants-config-files` are inherently invalidated.",
         )
 
         # Watchman options.
+        register(
+            "--watchman-enable",
+            type=bool,
+            advanced=True,
+            default=True,
+            help="Use the watchman daemon filesystem event watcher to watch for changes "
+            "in the buildroot. Disable this to rely solely on the experimental pants engine filesystem watcher.",
+        )
         register(
             "--watchman-version", advanced=True, default="4.9.0-pants1", help="Watchman version."
         )
@@ -933,6 +944,14 @@ class GlobalOptionsRegistrar(SubsystemClientMixin, Optionable):
             default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_enable_nailgun,
             help="Whether or not to use nailgun to run the requests that are marked as nailgunnable.",
             advanced=True,
+        )
+        register(
+            "--experimental-fs-watcher",
+            type=bool,
+            default=False,
+            advanced=True,
+            help="Whether to use the engine filesystem watcher which registers the workspace"
+            " for kernel file change events",
         )
 
     @classmethod

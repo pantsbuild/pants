@@ -78,8 +78,13 @@ backend_packages2 = [
   "internal_backend.rules_for_testing",
 ]
 
-# The pants script in this repo consumes these files to run pants
-pantsd_invalidation_globs.add = ["src/python/**/*.py"]
+# The invalidation globs cover the PYTHONPATH by default, but we additionally add the rust code.
+pantsd_invalidation_globs.add = [
+  "!*_test.py",
+  # NB: The `target` directory is ignored via `pants_ignore` below.
+  "src/rust/engine/**/*.rs",
+  "src/rust/engine/**/*.toml",
+]
 # Path patterns to ignore for filesystem operations on top of the builtin patterns.
 pants_ignore.add = [
   # venv directories under build-support.
@@ -87,6 +92,8 @@ pants_ignore.add = [
   "/build-support/*.venv/",
   # An absolute symlink to the Pants Rust toolchain sources.
   "/build-support/bin/native/src",
+  # We shouldn't walk or watch the rust compiler artifacts because it is slow.
+  "/src/rust/engine/target",
 ]
 
 build_file_imports = "error"

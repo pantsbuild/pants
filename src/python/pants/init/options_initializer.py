@@ -3,7 +3,6 @@
 
 import logging
 import os
-import re
 import sys
 
 import pkg_resources
@@ -108,18 +107,21 @@ class OptionsInitializer:
         """
         pants_ignore = list(global_options.pants_ignore)
 
-        def add_ignore(absolute_path):
+        def add(absolute_path, include=False):
             # To ensure that the path is ignored regardless of whether it is a symlink or a directory, we
             # strip trailing slashes (which would signal that we wanted to ignore only directories).
             maybe_rel_path = fast_relpath_optional(absolute_path, buildroot)
-            # Exclude temp workdir from <pants_ignore>.
-            # temp workdir is /path/to/<pants_workdir>/tmp/tmp<process_id>.pants.d
-            if maybe_rel_path and not re.search("tmp/tmp(.+).pants.d", maybe_rel_path):
+            if maybe_rel_path:
                 rel_path = maybe_rel_path.rstrip(os.path.sep)
-                pants_ignore.append(f"/{rel_path}")
+                prefix = "!" if include else ""
+                pants_ignore.append(f"{prefix}/{rel_path}")
 
-        add_ignore(global_options.pants_workdir)
-        add_ignore(global_options.pants_distdir)
+        add(global_options.pants_workdir)
+        add(global_options.pants_distdir)
+        # NB: We punch a hole in the ignore patterns to allow pants to directly watch process
+        # metadata that is written to disk.
+        add(global_options.pants_subprocessdir, include=True)
+
         return pants_ignore
 
     @staticmethod
@@ -129,23 +131,28 @@ class OptionsInitializer:
         Combines --pythonpath and --pants-config-files files that are in {buildroot} dir with those
         invalidation_globs provided by users.
         """
-        invalidation_globs = []
-        globs = (
-            bootstrap_options.pythonpath
+        invalidation_globs = set()
+        globs = set(
+            sys.path
+            + bootstrap_options.pythonpath
             + bootstrap_options.pants_config_files
             + bootstrap_options.pantsd_invalidation_globs
         )
 
         for glob in globs:
-            glob_relpath = os.path.relpath(glob, buildroot)
-            if glob_relpath and (not glob_relpath.startswith("../")):
-                invalidation_globs.extend([glob_relpath, glob_relpath + "/**"])
+            if glob.startswith("!"):
+                invalidation_globs.add(glob)
+                continue
+
+            glob_relpath = fast_relpath_optional(glob, buildroot) if os.path.isabs(glob) else glob
+            if glob_relpath:
+                invalidation_globs.update([glob_relpath, glob_relpath + "/**"])
             else:
-                logging.getLogger(__name__).warning(
+                logger.debug(
                     f"Changes to {glob}, outside of the buildroot, will not be invalidated."
                 )
 
-        return invalidation_globs
+        return list(sorted(invalidation_globs))
 
     @classmethod
     def create(cls, options_bootstrapper, build_configuration, init_subsystems=True):

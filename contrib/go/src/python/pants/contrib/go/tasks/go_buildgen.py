@@ -307,14 +307,21 @@ class GoBuildgen(GoTask):
         remote = self.get_options().remote
         existing_go_buildfiles = set()
 
-        def gather_go_buildfiles(rel_path):
-            address_mapper = self.context.address_mapper
-            for build_file in address_mapper.scan_build_files(base_path=rel_path):
-                existing_go_buildfiles.add(build_file)
+        # We scan for existing BUILD files containing Go targets before we begin to materialize
+        # things, because once we have created files (possibly next to existing files), collisions
+        # between the existing definitions and the new definitions are possible.
+        def gather_go_buildfiles(rel_path, is_relevant_target):
+            for build_file in self.context.address_mapper.scan_build_files(rel_path):
+                spec_path = os.path.dirname(build_file)
+                for address in self.context.address_mapper.addresses_in_spec_path(spec_path):
+                    if is_relevant_target(self.context.build_graph.resolve_address(address)):
+                        existing_go_buildfiles.add(address.rel_path)
 
-        gather_go_buildfiles(generation_result.local_root)
+        gather_go_buildfiles(generation_result.local_root, lambda t: isinstance(t, GoLocalSource))
         if remote and generation_result.remote_root != generation_result.local_root:
-            gather_go_buildfiles(generation_result.remote_root)
+            gather_go_buildfiles(
+                generation_result.remote_root, lambda t: isinstance(t, GoRemoteLibrary)
+            )
 
         targets = set(self.context.build_graph.targets(self.is_go))
         if remote and generation_result.remote_root:
@@ -324,6 +331,7 @@ class GoBuildgen(GoTask):
             remote_root = os.path.join(get_buildroot(), generation_result.remote_root)
             targets.update(self.context.scan(remote_root).targets(self.is_remote_lib))
 
+        # Generate targets, and discard any BUILD files that were overwritten.
         failed_results = []
         for result in self.generate_build_files(targets):
             existing_go_buildfiles.discard(result.build_file_path)
@@ -331,15 +339,12 @@ class GoBuildgen(GoTask):
             if result.failed:
                 failed_results.append(result)
 
+        # Finally, unlink any BUILD files that were invalidated but not otherwise overwritten.
         if existing_go_buildfiles:
             deleted = []
             for existing_go_buildfile in existing_go_buildfiles:
-                spec_path = os.path.dirname(existing_go_buildfile)
-                for address in self.context.address_mapper.addresses_in_spec_path(spec_path):
-                    target = self.context.build_graph.resolve_address(address)
-                    if isinstance(target, GoLocalSource):
-                        os.unlink(os.path.join(get_buildroot(), existing_go_buildfile))
-                        deleted.append(existing_go_buildfile)
+                os.unlink(os.path.join(get_buildroot(), existing_go_buildfile))
+                deleted.append(existing_go_buildfile)
             if deleted:
                 self.context.log.info(
                     "Deleted the following obsolete BUILD files:\n\t{}".format(

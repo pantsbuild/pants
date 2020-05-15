@@ -26,7 +26,7 @@
 #![allow(clippy::mutex_atomic)]
 
 use bytes::Bytes;
-use futures01::{future, Future};
+use futures::future::BoxFuture;
 use hashing::Fingerprint;
 use lmdb::{
   self, Database, DatabaseFlags, Environment, EnvironmentCopyFlags, EnvironmentFlags,
@@ -169,14 +169,17 @@ impl ShardedLmdb {
     self.lmdbs.values().cloned().collect()
   }
 
-  pub fn store_bytes(
-    &self,
+  ///
+  /// TODO: See the note on references in ASYNC.md.
+  ///
+  pub fn store_bytes<'a, 'b>(
+    &'a self,
     key: Fingerprint,
     bytes: Bytes,
     initial_lease: bool,
-  ) -> impl Future<Item = (), Error = String> {
+  ) -> BoxFuture<'b, Result<(), String>> {
     let store = self.clone();
-    self.executor.spawn_on_io_pool(future::lazy(move || {
+    self.executor.spawn_blocking(move || {
       let (env, db, lease_database) = store.get(&key);
       let put_res = env.begin_rw_txn().and_then(|mut txn| {
         txn.put(db, &key, &bytes, WriteFlags::NO_OVERWRITE)?;
@@ -196,7 +199,7 @@ impl ShardedLmdb {
         Err(lmdb::Error::KeyExist) => Ok(()),
         Err(err) => Err(format!("Error storing key {:?}: {}", key.to_hex(), err)),
       }
-    }))
+    })
   }
 
   fn lease(
@@ -221,16 +224,21 @@ impl ShardedLmdb {
     (now_since_epoch + time::Duration::from_secs(2 * 60 * 60)).as_secs()
   }
 
+  ///
+  /// TODO: See the note on references in ASYNC.md.
+  ///
   pub fn load_bytes_with<
+    'a,
+    'b,
     T: Send + 'static,
     F: Fn(Bytes) -> Result<T, String> + Send + Sync + 'static,
   >(
-    &self,
+    &'a self,
     fingerprint: Fingerprint,
     f: F,
-  ) -> impl Future<Item = Option<T>, Error = String> {
+  ) -> BoxFuture<'b, Result<Option<T>, String>> {
     let store = self.clone();
-    self.executor.spawn_on_io_pool(future::lazy(move || {
+    self.executor.spawn_blocking(move || {
       let (env, db, _) = store.get(&fingerprint);
       let ro_txn = env
         .begin_ro_txn()
@@ -244,7 +252,7 @@ impl ShardedLmdb {
           err,
         )),
       })
-    }))
+    })
   }
 
   #[allow(clippy::identity_conversion)] // False positive: https://github.com/rust-lang/rust-clippy/issues/3913

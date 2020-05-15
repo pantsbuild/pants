@@ -6,96 +6,98 @@ use crate::{
 };
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
+use futures::compat::Future01CompatExt;
+use futures::future::{FutureExt, TryFutureExt};
 use futures01::future::Future;
 use hashing::EMPTY_DIGEST;
 use parking_lot::Mutex;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use tokio;
-use tokio_timer::Delay;
+use tokio::time::delay_for;
 
-#[test]
-fn test_no_speculation() {
+#[tokio::test]
+async fn test_no_speculation() {
   let (result, call_counter, finished_counter) =
-    run_speculation_test(0, 0, 100, false, false, true, true);
+    run_speculation_test(0, 0, 100, false, false, true, true).await;
   assert_eq![1, *call_counter.lock()];
   assert_eq![1, *finished_counter.lock()];
   assert_eq![result.unwrap().stdout, Bytes::from("m1")];
 }
 
-#[test]
-fn test_speculate() {
+#[tokio::test]
+async fn test_speculate() {
   let (result, call_counter, finished_counter) =
-    run_speculation_test(100, 0, 10, false, false, true, true);
+    run_speculation_test(100, 0, 10, false, false, true, true).await;
   assert_eq![2, *call_counter.lock()];
   assert_eq![1, *finished_counter.lock()];
   assert_eq![result.unwrap().stdout, Bytes::from("m2")]
 }
 
-#[test]
-fn first_req_slow_success() {
+#[tokio::test]
+async fn first_req_slow_success() {
   let (result, call_counter, finished_counter) =
-    run_speculation_test(500, 1000, 250, false, false, true, true);
+    run_speculation_test(500, 1000, 250, false, false, true, true).await;
   assert_eq![2, *call_counter.lock()];
   assert_eq![1, *finished_counter.lock()];
   assert_eq![result.unwrap().stdout, Bytes::from("m1")]
 }
 
-#[test]
-fn first_req_slow_fail() {
+#[tokio::test]
+async fn first_req_slow_fail() {
   let (result, call_counter, finished_counter) =
-    run_speculation_test(1000, 0, 100, true, false, true, true);
+    run_speculation_test(1000, 0, 100, true, false, true, true).await;
   assert_eq![2, *call_counter.lock()];
   assert_eq![1, *finished_counter.lock()];
   assert_eq![result.unwrap().stdout, Bytes::from("m2")]
 }
 
-#[test]
-fn first_req_fast_fail() {
+#[tokio::test]
+async fn first_req_fast_fail() {
   let (result, call_counter, finished_counter) =
-    run_speculation_test(500, 1000, 250, true, false, true, true);
+    run_speculation_test(500, 1000, 250, true, false, true, true).await;
   assert_eq![2, *call_counter.lock()];
   assert_eq![1, *finished_counter.lock()];
   assert_eq![result.unwrap_err(), Bytes::from("m1")]
 }
 
-#[test]
-fn only_fail_on_primary_result() {
+#[tokio::test]
+async fn only_fail_on_primary_result() {
   let (result, call_counter, finished_counter) =
-    run_speculation_test(1000, 0, 100, true, true, true, true);
+    run_speculation_test(1000, 0, 100, true, true, true, true).await;
   assert_eq![2, *call_counter.lock()];
   assert_eq![2, *finished_counter.lock()];
   assert_eq![result.unwrap_err(), Bytes::from("m1")]
 }
 
-#[test]
-fn platform_compatible_with_1st_runs_once() {
+#[tokio::test]
+async fn platform_compatible_with_1st_runs_once() {
   let (result, call_counter, finished_counter) =
-    run_speculation_test(0, 0, 100, false, false, true, false);
+    run_speculation_test(0, 0, 100, false, false, true, false).await;
   assert_eq![1, *call_counter.lock()];
   assert_eq![1, *finished_counter.lock()];
   assert_eq![result.unwrap().stdout, Bytes::from("m1")]
 }
 
-#[test]
-fn platform_compatible_with_2nd_runs_once() {
+#[tokio::test]
+async fn platform_compatible_with_2nd_runs_once() {
   let (result, call_counter, finished_counter) =
-    run_speculation_test(0, 0, 100, false, false, false, true);
+    run_speculation_test(0, 0, 100, false, false, false, true).await;
   assert_eq![1, *call_counter.lock()];
   assert_eq![1, *finished_counter.lock()];
   assert_eq![result.unwrap().stdout, Bytes::from("m2")]
 }
 
-#[test]
-fn platform_compatible_with_both_speculates() {
+#[tokio::test]
+async fn platform_compatible_with_both_speculates() {
   let (result, call_counter, finished_counter) =
-    run_speculation_test(1000, 1000, 500, false, false, true, true);
+    run_speculation_test(1000, 1000, 500, false, false, true, true).await;
   assert_eq![2, *call_counter.lock()];
   assert_eq![1, *finished_counter.lock()];
   assert_eq![result.unwrap().stdout, Bytes::from("m1")]
 }
 
-fn run_speculation_test(
+async fn run_speculation_test(
   r1_latency_ms: u64,
   r2_latency_ms: u64,
   speculation_delay_ms: u64,
@@ -108,7 +110,6 @@ fn run_speculation_test(
   Arc<Mutex<u32>>,
   Arc<Mutex<u32>>,
 ) {
-  let runtime = tokio::runtime::Runtime::new().unwrap();
   let execute_request = echo_foo_request();
   let msg1: String = "m1".into();
   let msg2: String = "m2".into();
@@ -135,7 +136,7 @@ fn run_speculation_test(
     Duration::from_millis(speculation_delay_ms),
   );
   (
-    runtime.block_on_all(runner.run(execute_request, context)),
+    runner.run(execute_request, context).compat().await,
     call_counter,
     finished_counter,
   )
@@ -210,7 +211,7 @@ impl CommandRunner for DelayedCommandRunner {
     _req: MultiPlatformExecuteProcessRequest,
     _context: Context,
   ) -> BoxFuture<FallibleExecuteProcessResult, String> {
-    let delay = Delay::new(Instant::now() + self.delay);
+    let delay = delay_for(self.delay).unit_error().compat();
     let exec_result = self.result.clone();
     let command_runner = self.clone();
     command_runner.incr_call_counter();

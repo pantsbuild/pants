@@ -5,6 +5,7 @@ use crate::{
 use std::sync::Arc;
 
 use bytes::Bytes;
+use futures::future::TryFutureExt;
 use futures01::{future, Future};
 use log::{debug, warn};
 use protobuf::Message;
@@ -93,6 +94,7 @@ impl CommandRunner {
           .map_err(|e| format!("Invalid ExecuteResponse: {:?}", e))?;
         Ok(execute_response)
       })
+      .compat()
       .and_then(move |maybe_execute_response| {
         if let Some(execute_response) = maybe_execute_response {
           crate::remote::populate_fallible_execution_result(
@@ -145,6 +147,10 @@ impl CommandRunner {
           .map(Bytes::from)
           .map_err(|err| format!("Error serializing execute process result to cache: {}", err))
       })
-      .and_then(move |bytes| process_execution_store.store_bytes(fingerprint, bytes, false))
+      .and_then(move |bytes| {
+        process_execution_store
+          .store_bytes(fingerprint, bytes, false)
+          .compat()
+      })
   }
 }

@@ -1,22 +1,23 @@
 [package]
 version = "0.0.1"
 edition = "2018"
-name = "fs"
+name = "watch"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
-async-trait = "0.1"
-bytes = "0.4.5"
+crossbeam-channel = "0.3"
+fs = { path = "../fs" }
 futures = "0.3"
-glob = "0.2.11"
-ignore = "0.4.4"
-lazy_static = "1"
+graph = { path = "../graph" }
+hashing = { path = "../hashing" }
 log = "0.4"
+logging = { path = "../logging" }
+notify = "5.0.0-pre.2"
 parking_lot = "0.6"
 task_executor = { path = "../task_executor" }
-tempfile = "3"
 
 [dev-dependencies]
+tempfile = "3"
 testutil = { path = "../testutil" }
 tokio = { version = "0.2", features = ["rt-core", "macros"] }

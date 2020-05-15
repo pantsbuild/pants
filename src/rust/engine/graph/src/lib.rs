@@ -29,10 +29,12 @@ use hashing;
 
 use petgraph;
 
-mod entry;
+// make the entry module public for testing purposes. We use it to contruct mock
+// graph entries in the notify watch tests.
+pub mod entry;
 mod node;
 
-pub use crate::entry::Entry;
+pub use crate::entry::{Entry, EntryState};
 use crate::entry::{Generation, RunToken};
 
 use std::collections::binary_heap::BinaryHeap;
@@ -45,6 +47,8 @@ use std::time::{Duration, Instant};
 
 use fnv::FnvHasher;
 
+use futures::compat::Future01CompatExt;
+use futures::future::{FutureExt, TryFutureExt};
 use futures01::future::{self, Future};
 use indexmap::IndexSet;
 use log::{debug, trace, warn};
@@ -52,6 +56,7 @@ use parking_lot::Mutex;
 use petgraph::graph::DiGraph;
 use petgraph::visit::EdgeRef;
 use petgraph::Direction;
+use tokio::time::delay_for;
 
 pub use crate::node::{EntryId, Node, NodeContext, NodeError, NodeTracer, NodeVisualizer};
 use boxfuture::{BoxFuture, Boxable};
@@ -164,7 +169,9 @@ impl<N: Node> InnerGraph<N> {
     // Search for an existing path from dst to src.
     let mut roots = VecDeque::new();
     roots.push_back(root);
-    self.walk(roots, direction).any(|eid| eid == needle)
+    self
+      .walk(roots, direction, |_| false)
+      .any(|eid| eid == needle)
   }
 
   ///
@@ -285,12 +292,18 @@ impl<N: Node> InnerGraph<N> {
   /// The Walk will iterate over all nodes that descend from the roots in the direction of
   /// traversal but won't necessarily be in topological order.
   ///
-  fn walk(&self, roots: VecDeque<EntryId>, direction: Direction) -> Walk<'_, N> {
+  fn walk<F: Fn(&EntryId) -> bool>(
+    &self,
+    roots: VecDeque<EntryId>,
+    direction: Direction,
+    stop_walking_predicate: F,
+  ) -> Walk<'_, N, F> {
     Walk {
       graph: self,
       direction: direction,
       deque: roots,
       walked: HashSet::default(),
+      stop_walking_predicate,
     }
   }
 
@@ -313,8 +326,11 @@ impl<N: Node> InnerGraph<N> {
     let root_ids: HashSet<_, FNV> = self
       .nodes
       .iter()
-      .filter_map(|(entry, &entry_id)| {
-        if predicate(entry) {
+      .filter_map(|(node, &entry_id)| {
+        // A NotStarted entry does not need clearing, and we can assume that its dependencies are
+        // either already dirtied, or have never observed a value for it. Filtering these redundant
+        // events helps to "debounce" invalidation (ie, avoid redundent re-dirtying of dependencies).
+        if predicate(node) && self.unsafe_entry_for_id(entry_id).is_started() {
           Some(entry_id)
         } else {
           None
@@ -323,7 +339,11 @@ impl<N: Node> InnerGraph<N> {
       .collect();
     // And their transitive dependencies, which will be dirtied.
     let transitive_ids: Vec<_> = self
-      .walk(root_ids.iter().cloned().collect(), Direction::Incoming)
+      .walk(
+        root_ids.iter().cloned().collect(),
+        Direction::Incoming,
+        |_| false,
+      )
       .filter(|eid| !root_ids.contains(eid))
       .collect();
 
@@ -384,7 +404,7 @@ impl<N: Node> InnerGraph<N> {
       .cloned()
       .collect();
 
-    for eid in self.walk(root_entries, Direction::Outgoing) {
+    for eid in self.walk(root_entries, Direction::Outgoing, |_| false) {
       let entry = self.unsafe_entry_for_id(eid);
       let node_str = entry.format(context);
 
@@ -600,7 +620,9 @@ impl<N: Node> InnerGraph<N> {
       .collect();
     self
       .digests_internal(
-        self.walk(root_ids, Direction::Outgoing).collect(),
+        self
+          .walk(root_ids, Direction::Outgoing, |_| false)
+          .collect(),
         context.clone(),
       )
       .count()
@@ -651,61 +673,142 @@ impl<N: Node> Graph<N> {
     inner.nodes.len()
   }
 
-  ///
-  /// In the context of the given src Node, declare a dependency on the given dst Node and
-  /// begin its execution if it has not already started.
-  ///
-  pub fn get(
+  fn get_inner(
     &self,
-    src_id: EntryId,
+    src_id: Option<EntryId>,
     context: &N::Context,
     dst_node: N,
-  ) -> BoxFuture<N::Item, N::Error> {
-    let maybe_entry_and_id = {
+  ) -> BoxFuture<(N::Item, Generation), N::Error> {
+    // Compute information about the dst under the Graph lock, and then release it.
+    let (dst_retry, mut entry, entry_id) = {
       // Get or create the destination, and then insert the dep and return its state.
       let mut inner = self.inner.lock();
       if inner.draining {
-        None
-      } else {
-        let dst_id = {
-          // TODO: doing cycle detection under the lock... unfortunate, but probably unavoidable
-          // without a much more complicated algorithm.
-          let potential_dst_id = inner.ensure_entry(dst_node);
-          if let Some(cycle_path) =
-            Self::report_cycle(src_id, potential_dst_id, &mut inner, context)
-          {
-            // Cyclic dependency: render an error.
-            let path_strs = cycle_path
-              .into_iter()
-              .map(|e| e.node().to_string())
-              .collect();
-            return future::err(N::Error::cyclic(path_strs)).to_boxed();
-          } else {
-            // Valid dependency.
-            trace!(
-              "Adding dependency from {:?} to {:?}",
-              inner.entry_for_id(src_id).unwrap().node(),
-              inner.entry_for_id(potential_dst_id).unwrap().node()
-            );
-            potential_dst_id
-          }
-        };
+        return future::err(N::Error::invalidated()).to_boxed();
+      }
+
+      // TODO: doing cycle detection under the lock... unfortunate, but probably unavoidable
+      // without a much more complicated algorithm.
+      let dst_id = inner.ensure_entry(dst_node);
+      let dst_retry = if let Some(src_id) = src_id {
+        if let Some(cycle_path) = Self::report_cycle(src_id, dst_id, &mut inner, context) {
+          // Cyclic dependency: render an error.
+          let path_strs = cycle_path
+            .into_iter()
+            .map(|e| e.node().to_string())
+            .collect();
+          return future::err(N::Error::cyclic(path_strs)).to_boxed();
+        }
+
+        // Valid dependency.
+        trace!(
+          "Adding dependency from {:?} to {:?}",
+          inner.entry_for_id(src_id).unwrap().node(),
+          inner.entry_for_id(dst_id).unwrap().node()
+        );
         // All edges get a weight of 1.0 so that we can Bellman-Ford over the graph, treating each
         // edge as having equal weight.
         inner.pg.add_edge(src_id, dst_id, 1.0);
-        inner
-          .entry_for_id(dst_id)
-          .cloned()
-          .map(|entry| (entry, dst_id))
+
+        // We can retry the dst Node if the src Node is not cacheable. If the src is not cacheable,
+        // it only be allowed to run once, and so Node invalidation does not pass through it.
+        !inner.entry_for_id(src_id).unwrap().node().cacheable()
+      } else {
+        // Otherwise, this is an external request: always retry.
+        trace!(
+          "Requesting node {:?}",
+          inner.entry_for_id(dst_id).unwrap().node()
+        );
+        true
+      };
+
+      let dst_entry = inner.entry_for_id(dst_id).cloned().unwrap();
+      (dst_retry, dst_entry, dst_id)
+    };
+
+    // Return the state of the destination.
+    if dst_retry {
+      // Retry the dst a number of times to handle Node invalidation.
+      let context = context.clone();
+      let uncached_node = async move {
+        let mut counter: usize = 8;
+        loop {
+          counter -= 1;
+          if counter == 0 {
+            break Err(N::Error::exhausted());
+          }
+          let dep_res = entry.get(&context, entry_id).compat().await;
+          match dep_res {
+            Ok(r) => break Ok(r),
+            Err(err) if err == N::Error::invalidated() => continue,
+            Err(other_err) => break Err(other_err),
+          }
+        }
+      };
+      uncached_node.boxed().compat().to_boxed()
+    } else {
+      // Not retriable.
+      entry.get(context, entry_id)
+    }
+  }
+
+  ///
+  /// Request the given dst Node, optionally in the context of the given src Node.
+  ///
+  /// If there is no src Node, or the src Node is not cacheable, this method will retry for
+  /// invalidation until the Node completes.
+  ///
+  pub fn get(
+    &self,
+    src_id: Option<EntryId>,
+    context: &N::Context,
+    dst_node: N,
+  ) -> BoxFuture<N::Item, N::Error> {
+    self
+      .get_inner(src_id, context, dst_node)
+      .map(|(res, _generation)| res)
+      .to_boxed()
+  }
+
+  ///
+  /// Return the value of the given Node. Shorthand for `self.get(None, context, node)`.
+  ///
+  pub fn create(&self, node: N, context: &N::Context) -> BoxFuture<N::Item, N::Error> {
+    self.get(None, context, node)
+  }
+
+  ///
+  /// Gets the value of the given Node (optionally waiting for it to have changed since the given
+  /// LastObserved token), and then returns its new value and a new LastObserved token.
+  ///
+  pub async fn poll(
+    &self,
+    node: N,
+    token: Option<LastObserved>,
+    delay: Option<Duration>,
+    context: &N::Context,
+  ) -> Result<(N::Item, LastObserved), N::Error> {
+    // If the node is currently clean at the given token, Entry::poll will delay until it has
+    // changed in some way.
+    if let Some(LastObserved(generation)) = token {
+      let entry = {
+        let mut inner = self.inner.lock();
+        let entry_id = inner.ensure_entry(node.clone());
+        inner.unsafe_entry_for_id(entry_id).clone()
+      };
+      entry
+        .poll(context, generation)
+        .compat()
+        .await
+        .expect("Polling is infalliable");
+      if let Some(delay) = delay {
+        delay_for(delay).await;
       }
     };
 
-    // Declare the dep, and return the state of the destination.
-    if let Some((mut entry, entry_id)) = maybe_entry_and_id {
-      entry.get(context, entry_id).map(|(res, _)| res).to_boxed()
-    } else {
-      future::err(N::Error::invalidated()).to_boxed()
-    }
+    // Re-request the Node.
+    let (res, generation) = self.get_inner(None, context, node).compat().await?;
+    Ok((res, LastObserved(generation)))
   }
 
   fn report_cycle(
@@ -772,26 +875,6 @@ impl<N: Node> Graph<N> {
     F: Fn(&Entry<N>) -> Duration,
   {
     self.inner.lock().critical_path(roots, duration)
-  }
-
-  ///
-  /// Create the given Node if it does not already exist.
-  ///
-  pub fn create(&self, node: N, context: &N::Context) -> BoxFuture<N::Item, N::Error> {
-    let maybe_entry_and_id = {
-      let mut inner = self.inner.lock();
-      if inner.draining {
-        None
-      } else {
-        let id = inner.ensure_entry(node);
-        inner.entry_for_id(id).cloned().map(|entry| (entry, id))
-      }
-    };
-    if let Some((mut entry, entry_id)) = maybe_entry_and_id {
-      entry.get(context, entry_id).map(|(res, _)| res).to_boxed()
-    } else {
-      future::err(N::Error::invalidated()).to_boxed()
-    }
   }
 
   ///
@@ -867,7 +950,7 @@ impl<N: Node> Graph<N> {
   /// TODO: We don't track which generation actually added which edges, so over time nodes will end
   /// up with spurious dependencies. This is mostly sound, but may lead to over-invalidation and
   /// doing more work than is necessary.
-  /// As an example, if generation 0 or X depends on A and B, and generation 1 of X depends on C,
+  /// As an example, if generation 0 of X depends on A and B, and generation 1 of X depends on C,
   /// nothing will prune the dependencies from X onto A and B, so generation 1 of X will have
   /// dependencies on A, B, and C in the graph, even though running it only depends on C.
   /// At some point we should address this, but we must be careful with how we do so; anything which
@@ -889,9 +972,9 @@ impl<N: Node> Graph<N> {
     run_token: RunToken,
     result: Option<Result<N::Item, N::Error>>,
   ) {
-    let (entry, has_dirty_dependencies, dep_generations) = {
+    let (entry, has_uncacheable_deps, dep_generations) = {
       let inner = self.inner.lock();
-      let mut has_dirty_dependencies = false;
+      let mut has_uncacheable_deps = false;
       // Get the Generations of all dependencies of the Node. We can trust that these have not changed
       // since we began executing, as long as we are not currently marked dirty (see the method doc).
       let dep_generations = inner
@@ -899,18 +982,19 @@ impl<N: Node> Graph<N> {
         .neighbors_directed(entry_id, Direction::Outgoing)
         .filter_map(|dep_id| inner.entry_for_id(dep_id))
         .map(|entry| {
-          // If a dependency is uncacheable or currently dirty, this Node should complete as dirty,
-          // independent of matching Generation values. This is to allow for the behaviour that an
-          // uncacheable Node should always have dirty dependents, transitively.
-          if !entry.node().cacheable(context) || !entry.is_clean(context) {
-            has_dirty_dependencies = true;
+          // If a dependency is itself uncacheable or has uncacheable deps, this Node should
+          // also complete as having uncacheable dpes, independent of matching Generation values.
+          // This is to allow for the behaviour that an uncacheable Node should always have "dirty"
+          // (marked as UncacheableDependencies) dependents, transitively.
+          if !entry.node().cacheable() || entry.has_uncacheable_deps() {
+            has_uncacheable_deps = true;
           }
           entry.generation()
         })
         .collect();
       (
         inner.entry_for_id(entry_id).cloned(),
-        has_dirty_dependencies,
+        has_uncacheable_deps,
         dep_generations,
       )
     };
@@ -922,7 +1006,7 @@ impl<N: Node> Graph<N> {
         run_token,
         dep_generations,
         result,
-        has_dirty_dependencies,
+        has_uncacheable_deps,
         &mut inner,
       );
     }
@@ -1010,26 +1094,39 @@ impl<N: Node> Graph<N> {
 }
 
 ///
+/// An opaque token that represents a particular observed "version" of a Node.
+///
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct LastObserved(Generation);
+
+///
 /// Represents the state of a particular walk through a Graph. Implements Iterator and has the same
 /// lifetime as the Graph itself.
 ///
-struct Walk<'a, N: Node> {
+struct Walk<'a, N: Node, F>
+where
+  F: Fn(&EntryId) -> bool,
+{
   graph: &'a InnerGraph<N>,
   direction: Direction,
   deque: VecDeque<EntryId>,
   walked: HashSet<EntryId, FNV>,
+  stop_walking_predicate: F,
 }
 
-impl<'a, N: Node + 'a> Iterator for Walk<'a, N> {
+impl<'a, N: Node + 'a, F: Fn(&EntryId) -> bool> Iterator for Walk<'a, N, F> {
   type Item = EntryId;
 
   fn next(&mut self) -> Option<Self::Item> {
     while let Some(id) = self.deque.pop_front() {
-      if !self.walked.insert(id) {
+      // Visit this node and it neighbors if this node has not yet be visited and we aren't
+      // stopping our walk at this node, based on if it satifies the stop_walking_predicate.
+      // This mechanism gives us a way to selectively dirty parts of the graph respecting node boundaries
+      // like uncacheable nodes, which sholdn't be dirtied.
+      if !self.walked.insert(id) || (self.stop_walking_predicate)(&id) {
         continue;
       }
 
-      // Queue the neighbors of the entry and then return it.
       self
         .deque
         .extend(self.graph.pg.neighbors_directed(id, self.direction));

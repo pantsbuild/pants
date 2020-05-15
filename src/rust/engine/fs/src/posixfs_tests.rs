@@ -2,33 +2,35 @@ use tempfile;
 use testutil;
 
 use crate::{
-  Dir, DirectoryListing, File, GlobExpansionConjunction, GlobMatching, Link, PathGlobs, PathStat,
-  PathStatGetter, PosixFS, Stat, StrictGlobMatching, SymlinkBehavior, VFS,
+  Dir, DirectoryListing, File, GitignoreStyleExcludes, GlobExpansionConjunction, GlobMatching,
+  Link, PathGlobs, PathStat, PathStatGetter, PosixFS, Stat, StrictGlobMatching, SymlinkBehavior,
+  VFS,
 };
-use boxfuture::{BoxFuture, Boxable};
-use futures01::future::{self, Future};
+
+use async_trait::async_trait;
 use std;
 use std::collections::HashMap;
 use std::path::{Components, Path, PathBuf};
 use std::sync::Arc;
 use testutil::make_file;
+use tokio::runtime::Handle;
 
-#[test]
-fn is_executable_false() {
+#[tokio::test]
+async fn is_executable_false() {
   let dir = tempfile::TempDir::new().unwrap();
   make_file(&dir.path().join("marmosets"), &[], 0o611);
-  assert_only_file_is_executable(dir.path(), false);
+  assert_only_file_is_executable(dir.path(), false).await;
 }
 
-#[test]
-fn is_executable_true() {
+#[tokio::test]
+async fn is_executable_true() {
   let dir = tempfile::TempDir::new().unwrap();
   make_file(&dir.path().join("photograph_marmosets"), &[], 0o700);
-  assert_only_file_is_executable(dir.path(), true);
+  assert_only_file_is_executable(dir.path(), true).await;
 }
 
-#[test]
-fn read_file() {
+#[tokio::test]
+async fn read_file() {
   let dir = tempfile::TempDir::new().unwrap();
   let path = PathBuf::from("marmosets");
   let content = "cute".as_bytes().to_vec();
@@ -38,37 +40,37 @@ fn read_file() {
     0o600,
   );
   let fs = new_posixfs(&dir.path());
-  let mut rt = tokio::runtime::Runtime::new().unwrap();
-  let file_content = rt
-    .block_on(fs.read_file(&File {
+  let file_content = fs
+    .read_file(&File {
       path: path.clone(),
       is_executable: false,
-    }))
+    })
+    .await
     .unwrap();
   assert_eq!(file_content.path, path);
   assert_eq!(file_content.content, content);
 }
 
-#[test]
-fn read_file_missing() {
+#[tokio::test]
+async fn read_file_missing() {
   let dir = tempfile::TempDir::new().unwrap();
   new_posixfs(&dir.path())
     .read_file(&File {
       path: PathBuf::from("marmosets"),
       is_executable: false,
     })
-    .wait()
+    .await
     .expect_err("Expected error");
 }
 
-#[test]
-fn stat_executable_file() {
+#[tokio::test]
+async fn stat_executable_file() {
   let dir = tempfile::TempDir::new().unwrap();
   let posix_fs = new_posixfs(&dir.path());
   let path = PathBuf::from("photograph_marmosets");
   make_file(&dir.path().join(&path), &[], 0o700);
   assert_eq!(
-    posix_fs.stat_sync(path.clone()).unwrap(),
+    posix_fs.stat_sync(path.clone()).unwrap().unwrap(),
     super::Stat::File(File {
       path: path,
       is_executable: true,
@@ -76,14 +78,14 @@ fn stat_executable_file() {
   )
 }
 
-#[test]
-fn stat_nonexecutable_file() {
+#[tokio::test]
+async fn stat_nonexecutable_file() {
   let dir = tempfile::TempDir::new().unwrap();
   let posix_fs = new_posixfs(&dir.path());
   let path = PathBuf::from("marmosets");
   make_file(&dir.path().join(&path), &[], 0o600);
   assert_eq!(
-    posix_fs.stat_sync(path.clone()).unwrap(),
+    posix_fs.stat_sync(path.clone()).unwrap().unwrap(),
     super::Stat::File(File {
       path: path,
       is_executable: false,
@@ -91,20 +93,20 @@ fn stat_nonexecutable_file() {
   )
 }
 
-#[test]
-fn stat_dir() {
+#[tokio::test]
+async fn stat_dir() {
   let dir = tempfile::TempDir::new().unwrap();
   let posix_fs = new_posixfs(&dir.path());
   let path = PathBuf::from("enclosure");
   std::fs::create_dir(dir.path().join(&path)).unwrap();
   assert_eq!(
-    posix_fs.stat_sync(path.clone()).unwrap(),
+    posix_fs.stat_sync(path.clone()).unwrap().unwrap(),
     super::Stat::Dir(Dir(path))
   )
 }
 
-#[test]
-fn stat_symlink() {
+#[tokio::test]
+async fn stat_symlink() {
   let dir = tempfile::TempDir::new().unwrap();
   let posix_fs = new_posixfs(&dir.path());
   let path = PathBuf::from("marmosets");
@@ -113,13 +115,13 @@ fn stat_symlink() {
   let link_path = PathBuf::from("remarkably_similar_marmoset");
   std::os::unix::fs::symlink(&dir.path().join(path), dir.path().join(&link_path)).unwrap();
   assert_eq!(
-    posix_fs.stat_sync(link_path.clone()).unwrap(),
+    posix_fs.stat_sync(link_path.clone()).unwrap().unwrap(),
     super::Stat::Link(Link(link_path))
   )
 }
 
-#[test]
-fn stat_symlink_oblivious() {
+#[tokio::test]
+async fn stat_symlink_oblivious() {
   let dir = tempfile::TempDir::new().unwrap();
   let posix_fs = new_posixfs_symlink_oblivious(&dir.path());
   let path = PathBuf::from("marmosets");
@@ -129,7 +131,7 @@ fn stat_symlink_oblivious() {
   std::os::unix::fs::symlink(&dir.path().join(path), dir.path().join(&link_path)).unwrap();
   // Symlink oblivious stat will give us the destination type.
   assert_eq!(
-    posix_fs.stat_sync(link_path.clone()).unwrap(),
+    posix_fs.stat_sync(link_path.clone()).unwrap().unwrap(),
     super::Stat::File(File {
       path: link_path,
       is_executable: false,
@@ -137,37 +139,37 @@ fn stat_symlink_oblivious() {
   )
 }
 
-#[test]
-fn stat_other() {
+#[tokio::test]
+async fn stat_other() {
   new_posixfs("/dev")
     .stat_sync(PathBuf::from("null"))
     .expect_err("Want error");
 }
 
-#[test]
-fn stat_missing() {
+#[tokio::test]
+async fn stat_missing() {
   let dir = tempfile::TempDir::new().unwrap();
   let posix_fs = new_posixfs(&dir.path());
-  posix_fs
-    .stat_sync(PathBuf::from("no_marmosets"))
-    .expect_err("Want error");
+  assert_eq!(
+    posix_fs.stat_sync(PathBuf::from("no_marmosets")).unwrap(),
+    None,
+  );
 }
 
-#[test]
-fn scandir_empty() {
+#[tokio::test]
+async fn scandir_empty() {
   let dir = tempfile::TempDir::new().unwrap();
   let posix_fs = new_posixfs(&dir.path());
   let path = PathBuf::from("empty_enclosure");
   std::fs::create_dir(dir.path().join(&path)).unwrap();
-  let mut runtime = tokio::runtime::Runtime::new().unwrap();
   assert_eq!(
-    runtime.block_on(posix_fs.scandir(Dir(path))).unwrap(),
+    posix_fs.scandir(Dir(path)).await.unwrap(),
     DirectoryListing(vec![])
   );
 }
 
-#[test]
-fn scandir() {
+#[tokio::test]
+async fn scandir() {
   let dir = tempfile::TempDir::new().unwrap();
   let path = PathBuf::from("enclosure");
   std::fs::create_dir(dir.path().join(&path)).unwrap();
@@ -195,12 +197,11 @@ fn scandir() {
     0o600,
   );
 
-  let mut runtime = tokio::runtime::Runtime::new().unwrap();
-
   // Symlink aware.
   assert_eq!(
-    runtime
-      .block_on(new_posixfs(&dir.path()).scandir(Dir(path.clone())))
+    new_posixfs(&dir.path())
+      .scandir(Dir(path.clone()))
+      .await
       .unwrap(),
     DirectoryListing(vec![
       Stat::File(File {
@@ -222,8 +223,9 @@ fn scandir() {
 
   // Symlink oblivious.
   assert_eq!(
-    runtime
-      .block_on(new_posixfs_symlink_oblivious(&dir.path()).scandir(Dir(path)))
+    new_posixfs_symlink_oblivious(&dir.path())
+      .scandir(Dir(path))
+      .await
       .unwrap(),
     DirectoryListing(vec![
       Stat::File(File {
@@ -247,18 +249,18 @@ fn scandir() {
   );
 }
 
-#[test]
-fn scandir_missing() {
+#[tokio::test]
+async fn scandir_missing() {
   let dir = tempfile::TempDir::new().unwrap();
   let posix_fs = new_posixfs(&dir.path());
   posix_fs
     .scandir(Dir(PathBuf::from("no_marmosets_here")))
-    .wait()
+    .await
     .expect_err("Want error");
 }
 
-#[test]
-fn path_stats_for_paths() {
+#[tokio::test]
+async fn path_stats_for_paths() {
   let dir = tempfile::TempDir::new().unwrap();
   let root_path = dir.path();
 
@@ -284,9 +286,8 @@ fn path_stats_for_paths() {
   std::os::unix::fs::symlink("doesnotexist", &root_path.join("symlink_to_nothing")).unwrap();
 
   let posix_fs = Arc::new(new_posixfs(&root_path));
-  let mut runtime = tokio::runtime::Runtime::new().unwrap();
-  let path_stats = runtime
-    .block_on(posix_fs.path_stats(vec![
+  let path_stats = posix_fs
+    .path_stats(vec![
       PathBuf::from("executable_file"),
       PathBuf::from("regular_file"),
       PathBuf::from("dir"),
@@ -295,7 +296,8 @@ fn path_stats_for_paths() {
       PathBuf::from("dir_symlink"),
       PathBuf::from("symlink_to_nothing"),
       PathBuf::from("doesnotexist"),
-    ]))
+    ])
+    .await
     .unwrap();
   let v: Vec<Option<PathStat>> = vec![
     Some(PathStat::file(
@@ -340,8 +342,8 @@ fn path_stats_for_paths() {
   assert_eq!(v, path_stats);
 }
 
-#[test]
-fn memfs_expand_basic() {
+#[tokio::test]
+async fn memfs_expand_basic() {
   // Create two files, with the effect that there is a nested directory for the longer path.
   let p1 = PathBuf::from("some/file");
   let p2 = PathBuf::from("some/other");
@@ -354,7 +356,7 @@ fn memfs_expand_basic() {
   .unwrap();
 
   assert_eq!(
-    fs.expand(globs).wait().unwrap(),
+    fs.expand(globs).await.unwrap(),
     vec![
       PathStat::file(
         p1.clone(),
@@ -368,12 +370,9 @@ fn memfs_expand_basic() {
   );
 }
 
-fn assert_only_file_is_executable(path: &Path, want_is_executable: bool) {
+async fn assert_only_file_is_executable(path: &Path, want_is_executable: bool) {
   let fs = new_posixfs(path);
-  let mut runtime = tokio::runtime::Runtime::new().unwrap();
-  let stats = runtime
-    .block_on(fs.scandir(Dir(PathBuf::from("."))))
-    .unwrap();
+  let stats = fs.scandir(Dir(PathBuf::from("."))).await.unwrap();
   assert_eq!(stats.0.len(), 1);
   match stats.0.get(0).unwrap() {
     &super::Stat::File(File {
@@ -384,14 +383,19 @@ fn assert_only_file_is_executable(path: &Path, want_is_executable: bool) {
 }
 
 fn new_posixfs<P: AsRef<Path>>(dir: P) -> PosixFS {
-  PosixFS::new(dir.as_ref(), &[], task_executor::Executor::new()).unwrap()
+  PosixFS::new(
+    dir.as_ref(),
+    GitignoreStyleExcludes::create(&[]).unwrap(),
+    task_executor::Executor::new(Handle::current()),
+  )
+  .unwrap()
 }
 
 fn new_posixfs_symlink_oblivious<P: AsRef<Path>>(dir: P) -> PosixFS {
   PosixFS::new_with_symlink_behavior(
     dir.as_ref(),
-    &[],
-    task_executor::Executor::new(),
+    GitignoreStyleExcludes::create(&[]).unwrap(),
+    task_executor::Executor::new(Handle::current()),
     SymlinkBehavior::Oblivious,
   )
   .unwrap()
@@ -446,21 +450,19 @@ impl MemFS {
   }
 }
 
+#[async_trait]
 impl VFS<String> for Arc<MemFS> {
-  fn read_link(&self, link: &Link) -> BoxFuture<PathBuf, String> {
+  async fn read_link(&self, link: &Link) -> Result<PathBuf, String> {
     // The creation of a static filesystem does not allow for Links.
-    future::err(format!("{:?} does not exist within this filesystem.", link)).to_boxed()
+    Err(format!("{:?} does not exist within this filesystem.", link))
   }
 
-  fn scandir(&self, dir: Dir) -> BoxFuture<Arc<DirectoryListing>, String> {
-    future::result(
-      self
-        .contents
-        .get(&dir)
-        .cloned()
-        .ok_or_else(|| format!("{:?} does not exist within this filesystem.", dir)),
-    )
-    .to_boxed()
+  async fn scandir(&self, dir: Dir) -> Result<Arc<DirectoryListing>, String> {
+    self
+      .contents
+      .get(&dir)
+      .cloned()
+      .ok_or_else(|| format!("{:?} does not exist within this filesystem.", dir))
   }
 
   fn is_ignored(&self, _stat: &Stat) -> bool {

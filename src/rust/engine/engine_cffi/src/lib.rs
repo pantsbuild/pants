@@ -40,9 +40,10 @@ mod cffi_externs;
 
 use engine::externs::*;
 use engine::{
-  externs, nodes, Core, ExecutionRequest, ExecutionTermination, Function, Handle, Key, Params,
-  RootResult, Rule, Scheduler, Session, Tasks, TypeId, Types, Value,
+  externs, nodes, Core, ExecutionRequest, ExecutionTermination, Failure, Function, Handle, Key,
+  Params, Rule, Scheduler, Session, Tasks, TypeId, Types, Value,
 };
+use futures::compat::Future01CompatExt;
 use futures01::{future, Future};
 use hashing::{Digest, EMPTY_DIGEST};
 use log::{error, warn, Log};
@@ -65,18 +66,40 @@ use workunit_store::WorkUnit;
 #[cfg(test)]
 mod tests;
 
+///
+/// A clone of ExecutionTermination with a "no error" case in order to handle the fact that
+/// cbindgen cannot handle Options.
+///
+#[repr(u8)]
+pub enum RawExecutionTermination {
+  KeyboardInterrupt,
+  Timeout,
+  NoError,
+}
+
+impl From<ExecutionTermination> for RawExecutionTermination {
+  fn from(et: ExecutionTermination) -> Self {
+    match et {
+      ExecutionTermination::KeyboardInterrupt => RawExecutionTermination::KeyboardInterrupt,
+      ExecutionTermination::Timeout => RawExecutionTermination::Timeout,
+    }
+  }
+}
+
 // TODO: Consider renaming and making generic for collections of PyResults.
 #[repr(C)]
 pub struct RawNodes {
+  err: RawExecutionTermination,
   nodes_ptr: *const PyResult,
   nodes_len: u64,
   nodes: Vec<PyResult>,
 }
 
 impl RawNodes {
-  fn create(node_states: Vec<RootResult>) -> Box<RawNodes> {
+  fn create(node_states: Vec<Result<Value, Failure>>) -> Box<RawNodes> {
     let nodes = node_states.into_iter().map(PyResult::from).collect();
     let mut raw_nodes = Box::new(RawNodes {
+      err: RawExecutionTermination::NoError,
       nodes_ptr: Vec::new().as_ptr(),
       nodes_len: 0,
       nodes: nodes,
@@ -85,6 +108,15 @@ impl RawNodes {
     raw_nodes.nodes_ptr = raw_nodes.nodes.as_ptr();
     raw_nodes.nodes_len = raw_nodes.nodes.len() as u64;
     raw_nodes
+  }
+
+  fn create_for_error(err: ExecutionTermination) -> Box<RawNodes> {
+    Box::new(RawNodes {
+      err: err.into(),
+      nodes_ptr: Vec::new().as_ptr(),
+      nodes_len: 0,
+      nodes: Vec::new(),
+    })
   }
 }
 
@@ -206,6 +238,7 @@ pub extern "C" fn scheduler_create(
   process_execution_use_local_cache: bool,
   remote_execution_headers_buf: BufferBuffer,
   process_execution_local_enable_nailgun: bool,
+  experimental_fs_watcher: bool,
 ) -> RawResult {
   match make_core(
     tasks_ptr,
@@ -235,6 +268,7 @@ pub extern "C" fn scheduler_create(
     process_execution_use_local_cache,
     remote_execution_headers_buf,
     process_execution_local_enable_nailgun,
+    experimental_fs_watcher,
   ) {
     Ok(core) => RawResult {
       is_throw: false,
@@ -277,6 +311,7 @@ fn make_core(
   process_execution_use_local_cache: bool,
   remote_execution_headers_buf: BufferBuffer,
   process_execution_local_enable_nailgun: bool,
+  experimental_fs_watcher: bool,
 ) -> Result<Core, String> {
   let root_type_ids = root_type_ids.to_vec();
   let ignore_patterns = ignore_patterns_buf
@@ -385,6 +420,7 @@ fn make_core(
     process_execution_use_local_cache,
     remote_execution_headers,
     process_execution_local_enable_nailgun,
+    experimental_fs_watcher,
   )
 }
 
@@ -502,10 +538,7 @@ pub extern "C" fn scheduler_execute(
       with_session(session_ptr, |session| {
         match scheduler.execute(execution_request, session) {
           Ok(raw_results) => Box::into_raw(RawNodes::create(raw_results)),
-          //TODO: Passing a raw null pointer to Python is a less-than-ideal way
-          //of noting an error condition. When we have a better way to send complicated
-          //error-signaling values over the FFI boundary, we should revisit this.
-          Err(ExecutionTermination::KeyboardInterrupt) => std::ptr::null(),
+          Err(e) => Box::into_raw(RawNodes::create_for_error(e)),
         }
       })
     })
@@ -532,6 +565,33 @@ pub extern "C" fn execution_add_root_select(
         .and_then(|params| scheduler.add_root_select(execution_request, params, product))
         .into()
     })
+  })
+}
+
+#[no_mangle]
+pub extern "C" fn execution_set_poll(execution_request_ptr: *mut ExecutionRequest, poll: bool) {
+  with_execution_request(execution_request_ptr, |execution_request| {
+    execution_request.poll = poll;
+  })
+}
+
+#[no_mangle]
+pub extern "C" fn execution_set_poll_delay(
+  execution_request_ptr: *mut ExecutionRequest,
+  poll_delay_in_ms: u64,
+) {
+  with_execution_request(execution_request_ptr, |execution_request| {
+    execution_request.poll_delay = Some(Duration::from_millis(poll_delay_in_ms));
+  })
+}
+
+#[no_mangle]
+pub extern "C" fn execution_set_timeout(
+  execution_request_ptr: *mut ExecutionRequest,
+  timeout_in_ms: u64,
+) {
+  with_execution_request(execution_request_ptr, |execution_request| {
+    execution_request.timeout = Some(Duration::from_millis(timeout_in_ms));
   })
 }
 
@@ -606,6 +666,11 @@ pub extern "C" fn graph_invalidate_all_paths(scheduler_ptr: *mut Scheduler) -> u
   with_scheduler(scheduler_ptr, |scheduler| {
     scheduler.invalidate_all_paths() as u64
   })
+}
+
+#[no_mangle]
+pub extern "C" fn check_invalidation_watcher_liveness(scheduler_ptr: *mut Scheduler) -> PyResult {
+  with_scheduler(scheduler_ptr, |scheduler| scheduler.is_valid().into())
 }
 
 #[no_mangle]
@@ -708,6 +773,11 @@ pub extern "C" fn session_create(
       should_report_workunits,
     )))
   })
+}
+
+#[no_mangle]
+pub extern "C" fn session_new_run_id(session_ptr: *mut Session) {
+  with_session(session_ptr, |session| session.new_run_id())
 }
 
 #[no_mangle]
@@ -896,7 +966,8 @@ pub extern "C" fn capture_snapshots(
           })
           .collect::<Vec<_>>(),
       )
-      .map(|values| externs::store_tuple(&values)),
+      .map(|values| externs::store_tuple(&values))
+      .compat(),
     )
   })
   .into()
@@ -926,11 +997,10 @@ pub extern "C" fn merge_directories(
     scheduler
       .core
       .executor
-      .block_on(store::Snapshot::merge_directories(
-        scheduler.core.store(),
-        digests,
-        workunit_store,
-      ))
+      .block_on(
+        store::Snapshot::merge_directories(scheduler.core.store(), digests, workunit_store)
+          .compat(),
+      )
       .map(|dir| nodes::Snapshot::store_directory(&scheduler.core, &dir))
       .into()
   })
@@ -975,13 +1045,11 @@ pub extern "C" fn run_local_interactive_process(
               None => unreachable!()
             };
 
-            let write_operation = scheduler.core.store().materialize_directory(
+            scheduler.core.store().materialize_directory(
               destination,
               digest,
               session.workunit_store(),
-            );
-
-            scheduler.core.executor.spawn_on_io_pool(write_operation).wait()?;
+            ).wait()?;
           }
         }
 
@@ -1058,7 +1126,7 @@ pub extern "C" fn materialize_directories(
     let types = &scheduler.core.types;
     let construct_materialize_directories_results = types.construct_materialize_directories_results;
     let construct_materialize_directory_result = types.construct_materialize_directory_result;
-    let work_future = future::join_all(
+    future::join_all(
       digests_and_path_prefixes
         .into_iter()
         .map(|(digest, path_prefix)| {
@@ -1105,9 +1173,8 @@ pub extern "C" fn materialize_directories(
         &[externs::store_tuple(&entries)],
       );
       output
-    });
-
-    scheduler.core.executor.spawn_on_io_pool(work_future).wait()
+    })
+    .wait()
   })
   .into()
 }
@@ -1120,7 +1187,7 @@ pub extern "C" fn init_logging(level: u64, show_rust_3rdparty_logs: bool) {
 
 #[no_mangle]
 pub extern "C" fn setup_pantsd_logger(log_file_ptr: *const raw::c_char, level: u64) -> PyResult {
-  logging::set_destination(Destination::Pantsd);
+  logging::set_thread_destination(Destination::Pantsd);
 
   let path_str = unsafe { CStr::from_ptr(log_file_ptr).to_string_lossy().into_owned() };
   let path = PathBuf::from(path_str);
@@ -1134,7 +1201,7 @@ pub extern "C" fn setup_pantsd_logger(log_file_ptr: *const raw::c_char, level: u
 // Might be called before externs are set, therefore can't return a PyResult
 #[no_mangle]
 pub extern "C" fn setup_stderr_logger(level: u64) {
-  logging::set_destination(Destination::Stderr);
+  logging::set_thread_destination(Destination::Stderr);
   LOGGER
     .set_stderr_logger(level)
     .expect("Error setting up STDERR logger");
@@ -1173,7 +1240,7 @@ pub extern "C" fn flush_log() {
 
 #[no_mangle]
 pub extern "C" fn override_thread_logging_destination(destination: Destination) {
-  logging::set_destination(destination);
+  logging::set_thread_destination(destination);
 }
 
 fn graph_full(scheduler: &Scheduler, subject_types: Vec<TypeId>) -> RuleGraph<Rule> {
@@ -1202,7 +1269,7 @@ where
   F: FnOnce(&Scheduler) -> T,
 {
   let scheduler = unsafe { Box::from_raw(scheduler_ptr) };
-  let t = f(&scheduler);
+  let t = scheduler.core.runtime.enter(|| f(&scheduler));
   mem::forget(scheduler);
   t
 }
