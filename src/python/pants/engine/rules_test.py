@@ -267,8 +267,11 @@ class RuleTest(TestBase):
                 return False
 
         error_str = str(cm.exception)
-        assert "invalid_rule has a side-effecting parameter" in error_str
-        assert "pants.engine.console.Console" in error_str
+        assert (
+            "(@rule pants.engine.rules_test:invalid_rule) has a side-effecting parameter"
+            in error_str
+        )
+        assert "pants.util.meta.Console" in error_str
 
 
 class RuleIndexTest(TestBase):
