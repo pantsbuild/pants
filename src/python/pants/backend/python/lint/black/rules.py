@@ -100,7 +100,7 @@ async def setup(
     config_path: Optional[str] = black.options.config
     config_snapshot_request = Get[Snapshot](
         PathGlobs(
-            globs=tuple([config_path] if config_path else []),
+            globs=[config_path] if config_path else [],
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
             description_of_origin="the option `--black-config`",
         )

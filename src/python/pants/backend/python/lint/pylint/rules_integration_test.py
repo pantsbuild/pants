@@ -21,6 +21,8 @@ from pants.engine.target import Dependencies, Sources, TargetWithOrigin
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option.util import create_options_bootstrapper
 
+PYLINT_FAILURE_RETURN_CODE = 16
+
 
 class PylintIntegrationTest(ExternalToolTestBase):
     # See http://pylint.pycqa.org/en/latest/user_guide/run.html#exit-codes for exit codes.
@@ -86,6 +88,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
         config: Optional[str] = None,
         passthrough_args: Optional[str] = None,
         skip: bool = False,
+        additional_args: Optional[List[str]] = None,
     ) -> LintResult:
         args = ["--backend-packages2=pants.backend.python.lint.pylint"]
         if config:
@@ -95,6 +98,8 @@ class PylintIntegrationTest(ExternalToolTestBase):
             args.append(f"--pylint-args='{passthrough_args}'")
         if skip:
             args.append(f"--pylint-skip")
+        if additional_args:
+            args.extend(additional_args)
         return self.request_single_product(
             LintResult,
             Params(
@@ -112,13 +117,13 @@ class PylintIntegrationTest(ExternalToolTestBase):
     def test_failing_source(self) -> None:
         target = self.make_target_with_origin([self.bad_source])
         result = self.run_pylint([target])
-        assert result.exit_code == 16  # convention message issued
+        assert result.exit_code == PYLINT_FAILURE_RETURN_CODE
         assert "bad.py:2:0: C0103" in result.stdout
 
     def test_mixed_sources(self) -> None:
         target = self.make_target_with_origin([self.good_source, self.bad_source])
         result = self.run_pylint([target])
-        assert result.exit_code == 16  # convention message issued
+        assert result.exit_code == PYLINT_FAILURE_RETURN_CODE
         assert "good.py" not in result.stdout
         assert "bad.py:2:0: C0103" in result.stdout
 
@@ -128,7 +133,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
             self.make_target_with_origin([self.bad_source], name="t2"),
         ]
         result = self.run_pylint(targets)
-        assert result.exit_code == 16  # convention message issued
+        assert result.exit_code == PYLINT_FAILURE_RETURN_CODE
         assert "good.py" not in result.stdout
         assert "bad.py:2:0: C0103" in result.stdout
 
@@ -195,3 +200,29 @@ class PylintIntegrationTest(ExternalToolTestBase):
         target = self.make_target_with_origin([self.bad_source])
         result = self.run_pylint([target], skip=True)
         assert result == LintResult.noop()
+
+    def test_3rdparty_plugin(self) -> None:
+        source_content = dedent(
+            """\
+            '''Docstring.'''
+
+            import unittest
+
+            class PluginTest(unittest.TestCase):
+                '''Docstring.'''
+
+                def test_plugin(self):
+                    '''Docstring.'''
+                    self.assertEqual(True, True)
+            """
+        )
+        target = self.make_target_with_origin(
+            [FileContent(f"{self.source_root}/thirdparty_plugin.py", source_content.encode())]
+        )
+        result = self.run_pylint(
+            [target],
+            additional_args=["--pylint-extra-requirements=pylint-unittest>=0.1.3,<0.2"],
+            passthrough_args="--load-plugins=pylint_unittest",
+        )
+        assert result.exit_code == 4
+        assert "thirdparty_plugin.py:10:8: W5301" in result.stdout

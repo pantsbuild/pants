@@ -51,6 +51,7 @@ class BanditIntegrationTest(ExternalToolTestBase):
         config: Optional[str] = None,
         passthrough_args: Optional[str] = None,
         skip: bool = False,
+        additional_args: Optional[List[str]] = None,
     ) -> LintResult:
         args = ["--backend-packages2=pants.backend.python.lint.bandit"]
         if config:
@@ -60,6 +61,8 @@ class BanditIntegrationTest(ExternalToolTestBase):
             args.append(f"--bandit-args={passthrough_args}")
         if skip:
             args.append(f"--bandit-skip")
+        if additional_args:
+            args.extend(additional_args)
         return self.request_single_product(
             LintResult,
             Params(
@@ -122,3 +125,13 @@ class BanditIntegrationTest(ExternalToolTestBase):
         target = self.make_target_with_origin([self.bad_source])
         result = self.run_bandit([target], skip=True)
         assert result == LintResult.noop()
+
+    def test_3rdparty_plugin(self) -> None:
+        target = self.make_target_with_origin(
+            [FileContent("bad.py", b"aws_key = 'JalrXUtnFEMI/K7MDENG/bPxRfiCYzEXAMPLEKEY'\n")]
+        )
+        result = self.run_bandit(
+            [target], additional_args=["--bandit-extra-requirements=bandit-aws"]
+        )
+        assert result.exit_code == 1
+        assert "Issue: [C100:hardcoded_aws_key]" in result.stdout
