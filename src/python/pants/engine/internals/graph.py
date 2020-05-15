@@ -40,6 +40,7 @@ from pants.engine.target import (
     TargetWithOrigin,
     TransitiveTarget,
     TransitiveTargets,
+    UnrecognizedTargetTypeException,
     WrappedTarget,
 )
 from pants.engine.unions import UnionMembership
@@ -88,11 +89,7 @@ async def resolve_target(
 
     target_type = registered_target_types.aliases_to_types.get(type_alias, None)
     if target_type is None:
-        raise TargetDefinitionException(
-            address,
-            f"Target type {repr(type_alias)} is not recognized. All valid target types: "
-            f"{sorted(registered_target_types.aliases)}.",
-        )
+        raise UnrecognizedTargetTypeException(type_alias, registered_target_types, address=address)
 
     # Not every target type has the Dependencies field registered, but the StructWithDependencies
     # code means that `kwargs` will always have an entry. We must remove `dependencies` from

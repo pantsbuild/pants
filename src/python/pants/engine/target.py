@@ -833,6 +833,21 @@ class InvalidFieldChoiceException(InvalidFieldException):
         )
 
 
+class UnrecognizedTargetTypeException(Exception):
+    def __init__(
+        self,
+        target_type: str,
+        registered_target_types: RegisteredTargetTypes,
+        *,
+        address: Optional[Address] = None,
+    ) -> None:
+        for_address = f"for address {address}" if address else ""
+        super().__init__(
+            f"Target type {repr(target_type)} is not registered{for_address}.\n\nAll valid target "
+            f"types: {sorted(registered_target_types.aliases)}"
+        )
+
+
 # NB: This has a tight coupling to goals. Feel free to change this if necessary.
 class NoValidTargetsException(Exception):
     def __init__(
