@@ -1,7 +1,6 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.codegen.wire.java.register import build_file_aliases as register_codegen
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.build_graph.register import build_file_aliases as register_core
 from pants.java.jar.jar_dependency import JarDependency
@@ -20,7 +19,7 @@ class JavaThriftyGenTest(TaskTestBase):
 
     @classmethod
     def alias_groups(cls):
-        return register_core().merge(register_codegen())
+        return register_core()
 
     def _create_fake_thrifty_tool(self):
         self.make_target(
