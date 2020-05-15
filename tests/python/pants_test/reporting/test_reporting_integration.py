@@ -214,7 +214,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
             command = [
                 "-ldebug",
                 f"--reporting-zipkin-endpoint={endpoint}",
-                "cloc",
+                "minimize",
                 "examples/src/java/org/pantsbuild/example/hello/simple",
             ]
 
@@ -234,7 +234,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
             parent_id = main_span[0]["id"]
             main_children = self.find_spans_by_parentId(trace, parent_id)
             self.assertTrue(main_children)
-            self.assertTrue(any(span["name"] == "cloc" for span in main_children))
+            self.assertTrue(any(span["name"] == "minimize" for span in main_children))
 
     def test_zipkin_reporter_with_given_trace_id_parent_id(self):
         ZipkinHandler = zipkin_handler()
@@ -247,7 +247,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
                 f"--reporting-zipkin-endpoint={endpoint}",
                 f"--reporting-zipkin-trace-id={trace_id}",
                 f"--reporting-zipkin-parent-id={parent_span_id}",
-                "cloc",
+                "minimize",
                 "examples/src/java/org/pantsbuild/example/hello/simple",
             ]
 
@@ -272,7 +272,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
             parent_id = main_span[0]["id"]
             main_children = self.find_spans_by_parentId(trace, parent_id)
             self.assertTrue(main_children)
-            self.assertTrue(any(span["name"] == "cloc" for span in main_children))
+            self.assertTrue(any(span["name"] == "minimize" for span in main_children))
 
     def test_zipkin_reporter_with_zero_sample_rate(self):
         ZipkinHandler = zipkin_handler()
@@ -282,7 +282,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
                 "-ldebug",
                 f"--reporting-zipkin-endpoint={endpoint}",
                 "--reporting-zipkin-sample-rate=0.0",
-                "cloc",
+                "minimize",
                 "examples/src/java/org/pantsbuild/example/hello/simple",
             ]
 
@@ -303,7 +303,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
                 "-ldebug",
                 f"--reporting-zipkin-endpoint={endpoint}",
                 "--reporting-zipkin-trace-v2",
-                "cloc",
+                "minimize",
                 "examples/src/java/org/pantsbuild/example/hello/simple",
             ]
 

@@ -63,9 +63,9 @@ class ClocTest(GoalRuleTestBase):
         self.create_file(f"{py_dir}/empty.py", "")
         self.add_to_build_file(py_dir, "python_library()")
 
-        result = self.execute_rule(args=[py_dir, "--cloc2-ignored"])
-        assert "Ignored the following files:" in result.stdout
-        assert "empty.py: zero sized file" in result.stdout
+        result = self.execute_rule(args=[py_dir, "--cloc-ignored"])
+        assert "Ignored the following files:" in result.stderr
+        assert "empty.py: zero sized file" in result.stderr
 
     def test_filesystem_specs_with_owners(self) -> None:
         """Even if a file belongs to a target which has multiple sources, we should only run over
