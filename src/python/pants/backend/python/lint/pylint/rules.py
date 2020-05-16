@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Optional, Tuple, cast
+from typing import Tuple, cast
 
 from pants.backend.python.lint.pylint.subsystem import Pylint
 from pants.backend.python.rules import download_pex_bin, importable_python_sources, pex
@@ -19,12 +19,12 @@ from pants.backend.python.target_types import PythonInterpreterCompatibility, Py
 from pants.core.goals.lint import LinterFieldSet, LinterFieldSets, LintResult
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
-from pants.engine.addresses import Addresses
+from pants.engine.addresses import Address, Addresses
 from pants.engine.fs import Digest, MergeDigests, PathGlobs, Snapshot
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import SubsystemRule, named_rule
 from pants.engine.selectors import Get, MultiGet
-from pants.engine.target import Dependencies, Targets
+from pants.engine.target import Dependencies, Targets, TransitiveTargets
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
@@ -46,10 +46,10 @@ class PylintFieldSets(LinterFieldSets):
 
 def generate_args(*, specified_source_files: SourceFiles, pylint: Pylint) -> Tuple[str, ...]:
     args = []
-    if pylint.options.config is not None:
-        args.append(f"--rcfile={pylint.options.config}")
-    args.extend(pylint.options.args)
-    args.extend(sorted(specified_source_files.snapshot.files))
+    if pylint.config is not None:
+        args.append(f"--rcfile={pylint.config}")
+    args.extend(pylint.args)
+    args.extend(specified_source_files.files)
     return tuple(args)
 
 
@@ -60,16 +60,26 @@ async def pylint_lint(
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> LintResult:
-    if pylint.options.skip:
+    if pylint.skip:
         return LintResult.noop()
+
+    plugin_targets_request = Get[TransitiveTargets](
+        Addresses(Address.parse(plugin_addr) for plugin_addr in pylint.source_plugins)
+    )
 
     # Pylint needs direct dependencies in the chroot to ensure that imports are valid. However, it
     # doesn't lint those direct dependencies nor does it care about transitive dependencies.
-    addresses = []
+    linted_addresses = []
     for field_set in field_sets:
-        addresses.append(field_set.address)
-        addresses.extend(field_set.dependencies.value or ())
-    targets = await Get[Targets](Addresses(addresses))
+        linted_addresses.append(field_set.address)
+        linted_addresses.extend(field_set.dependencies.value or ())
+    linted_targets_request = Get[Targets](Addresses(linted_addresses))
+
+    plugin_targets, linted_targets = cast(
+        Tuple[TransitiveTargets, Targets],
+        await MultiGet([plugin_targets_request, linted_targets_request]),
+    )
+    targets = Targets((*plugin_targets.closure, *linted_targets))
 
     # NB: Pylint output depends upon which Python interpreter version it's run with. We ensure that
     # each target runs with its own interpreter constraints. See
@@ -77,6 +87,9 @@ async def pylint_lint(
     interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
         (field_set.compatibility for field_set in field_sets), python_setup
     )
+    # TODO: does Pylint need 3rd party dependencies in the built PEX to understand direct imports?
+    #  If so, add a test for this and fix as a precursor. We would want a tool PEX and a
+    #  requirements PEX, like we do with pytest.
     requirements_pex_request = Get[Pex](
         PexRequest(
             output_filename="pylint.pex",
@@ -86,10 +99,9 @@ async def pylint_lint(
         )
     )
 
-    config_path: Optional[str] = pylint.options.config
     config_snapshot_request = Get[Snapshot](
         PathGlobs(
-            globs=[config_path] if config_path else [],
+            globs=[pylint.config] if pylint.config else [],
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
             description_of_origin="the option `--pylint-config`",
         )

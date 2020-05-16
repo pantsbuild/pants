@@ -5,9 +5,14 @@ from pathlib import PurePath
 from textwrap import dedent
 from typing import List, Optional
 
+from pants.backend.python.lint.pylint.plugin_target_type import PylintSourcePlugin
 from pants.backend.python.lint.pylint.rules import PylintFieldSet, PylintFieldSets
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
-from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonLibrary
+from pants.backend.python.target_types import (
+    PythonInterpreterCompatibility,
+    PythonLibrary,
+    PythonRequirementLibrary,
+)
 from pants.backend.python.targets.python_library import PythonLibrary as PythonLibraryV1
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -18,6 +23,7 @@ from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.engine.target import Dependencies, Sources, TargetWithOrigin
+from pants.python.python_requirement import PythonRequirement
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option.util import create_options_bootstrapper
 
@@ -36,11 +42,14 @@ class PylintIntegrationTest(ExternalToolTestBase):
 
     @classmethod
     def alias_groups(cls) -> BuildFileAliases:
-        return BuildFileAliases(targets={"python_library": PythonLibraryV1})
+        return BuildFileAliases(
+            targets={"python_library": PythonLibraryV1},
+            objects={"python_requirement": PythonRequirement},
+        )
 
     @classmethod
     def target_types(cls):
-        return [PythonLibrary]
+        return [PythonLibrary, PylintSourcePlugin, PythonRequirementLibrary]
 
     @classmethod
     def rules(cls):
@@ -226,3 +235,61 @@ class PylintIntegrationTest(ExternalToolTestBase):
         )
         assert result.exit_code == 4
         assert "thirdparty_plugin.py:10:8: W5301" in result.stdout
+
+    def test_source_plugin(self) -> None:
+        plugin_content = dedent(
+            """
+            from pylint.checkers import BaseChecker
+            from pylint.interfaces import IAstroidChecker
+
+            class PrintChecker(BaseChecker):
+                __implements__ = IAstroidChecker
+                name = "print_checker"
+                msgs = {
+                    "PB001": ("`print` statements are banned", "print-statement-used", ""),
+                }
+
+                def visit_call(self, node):
+                    if node.func.name == "print":
+                        self.add_message("print-statement-used", node=node)
+
+            def register(linter):
+                linter.register_checker(PrintChecker(linter)
+            """
+        )
+        self.create_file("build-support/pylint_plugin.py", plugin_content)
+        self.add_to_build_file(
+            "",
+            dedent(
+                """\
+                python_requirement_library(
+                    name='pylint',
+                    requirements=[python_requirement('pylint>=2.4.4,<2.5')],
+                )
+                """
+            ),
+        )
+        self.add_to_build_file(
+            "build-support",
+            dedent(
+                """\
+                pylint_source_plugin(
+                    name='pylint_plugin',
+                    sources=['pylint_plugin.py'],
+                    dependencies=['//:pylint'],
+                )"""
+            ),
+        )
+        target = self.make_target_with_origin(
+            [FileContent(f"{self.source_root}/source_plugin.py", b"'''Docstring.'''\nprint()\n")]
+        )
+        result = self.run_pylint(
+            [target],
+            additional_args=[
+                "--pylint-source-plugins=['build-support:pylint_plugin']",
+                f"--source-root-patterns=['build-support', '{self.source_root}']",
+            ],
+            passthrough_args="--load-plugins=pylint_plugin",
+        )
+        assert result.exit_code == 4
+        assert "source_plugin.py:2:0: PB001" in result.stdout
