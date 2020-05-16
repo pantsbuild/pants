@@ -26,7 +26,7 @@ from pants.engine.rules import SubsystemRule, named_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Dependencies, Targets, TransitiveTargets
 from pants.engine.unions import UnionRule
-from pants.option.global_options import GlobMatchErrorBehavior
+from pants.option.global_options import GlobalOptions, GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
 from pants.util.strutil import pluralize
 
@@ -59,12 +59,18 @@ async def pylint_lint(
     pylint: Pylint,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
+    global_options: GlobalOptions,
 ) -> LintResult:
     if pylint.skip:
         return LintResult.noop()
 
     if pylint.source_plugins and not pylint.config:
-        raise ValueError("TODO: instructions that they need to specify init-hook and load-plugins.")
+        raise ValueError(
+            "You specified `--pylint-source-plugins` but did not specify `--pylint-config`. Please "
+            "create a pylintrc config file and configure `init-hook` and `load-plugins`. Run "
+            f"`{global_options.options.pants_bin_name} target-types "
+            "--details=pylint_source_plugin` for instructions."
+        )
 
     plugin_targets_request = Get[TransitiveTargets](
         Addresses(Address.parse(plugin_addr) for plugin_addr in pylint.source_plugins)
@@ -84,11 +90,17 @@ async def pylint_lint(
     )
     targets = Targets((*plugin_targets.closure, *linted_targets))
 
-    # NB: Pylint output depends upon which Python interpreter version it's run with. We ensure that
-    # each target runs with its own interpreter constraints. See
+    # NB: Pylint output depends upon which Python interpreter version it's run with. See
     # http://pylint.pycqa.org/en/latest/faq.html#what-versions-of-python-is-pylint-supporting.
     interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
-        (field_set.compatibility for field_set in field_sets), python_setup
+        (
+            *(field_set.compatibility for field_set in field_sets),
+            *(
+                plugin_tgt.get(PythonInterpreterCompatibility)
+                for plugin_tgt in plugin_targets.roots
+            ),
+        ),
+        python_setup,
     )
     # TODO: does Pylint need 3rd party dependencies in the built PEX to understand direct imports?
     #  If so, add a test for this and fix as a precursor. We would want a tool PEX and a

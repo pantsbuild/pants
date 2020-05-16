@@ -283,7 +283,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
         config_content = dedent(
             """\
             [MASTER]
-            init-hook="import sys, pathlib; sys.path.append(pathlib.Path.cwd() / 'plugins')" 
+            init-hook="import pathlib, sys; sys.path.append(pathlib.Path.cwd() / 'plugins')" 
             load-plugins=print_plugin
             """
         )

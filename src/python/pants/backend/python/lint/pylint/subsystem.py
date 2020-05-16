@@ -38,13 +38,11 @@ class Pylint(PythonToolBase):
             type=list,
             member_type=target_option,
             advanced=True,
-            # TODO: instructions about init-hook.
             help=(
                 "An optional list of `pylint_source_plugin` target addresses. This allows you to "
-                "load custom plugins defined in source code. To instead load third-party plugins, "
-                "add the requirement string to `--pylint-extra-requirements`. With both types of "
-                "plugins, configure the option `load-plugins` in your config file. See "
-                "https://pants.readme.io/docs/python-linters-and-formatters."
+                "load custom plugins defined in source code. Run the goal `target-types "
+                "--details=pylint_source_plugin` for instructions, including how to load "
+                "third-party plugins."
             ),
         )
 
