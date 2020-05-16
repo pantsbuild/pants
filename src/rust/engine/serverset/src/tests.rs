@@ -1,11 +1,12 @@
 use crate::{BackoffConfig, Health, Serverset};
-use futures::compat::Future01CompatExt;
-use futures01::{future, Future};
-use parking_lot::Mutex;
+
 use std;
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
+
+use futures::future;
+use parking_lot::Mutex;
 use testutil::owned_string_vec;
 use tokio::time::delay_for;
 
@@ -30,7 +31,7 @@ async fn one_request_works() {
   )
   .unwrap();
 
-  assert_eq!(s.next().compat().await.unwrap().0, "good".to_owned());
+  assert_eq!(s.next().await.unwrap().0, "good".to_owned());
 }
 
 #[tokio::test]
@@ -144,14 +145,14 @@ async fn waits_if_all_unhealthy() {
   // means they should be marked as unavailable for 20ms each.
   for _ in 0..4 {
     let s = s.clone();
-    let (_server, token) = s.next().compat().await.unwrap();
+    let (_server, token) = s.next().await.unwrap();
     s.report_health(token, Health::Unhealthy);
   }
 
   let start = std::time::Instant::now();
 
   // This should take at least 20ms because both servers are marked as unhealthy.
-  let _ = s.next().compat().await.unwrap();
+  let _ = s.next().await.unwrap();
 
   // Make sure we waited for at least 10ms; we should have waited 20ms, but it may have taken a
   // little time to mark a server as unhealthy, so we have some padding between what we expect
@@ -167,20 +168,22 @@ async fn waits_if_all_unhealthy() {
 async fn expect_both(s: &Serverset<String>, repetitions: usize) {
   let visited = Arc::new(Mutex::new(HashSet::new()));
 
-  future::join_all(
+  future::try_join_all(
     (0..repetitions)
       .into_iter()
       .map(|_| {
         let saw = visited.clone();
         let s = s.clone();
-        s.next().map(move |(server, token)| {
+        async move {
+          let (server, token) = s.next().await?;
           saw.lock().insert(server);
-          s.report_health(token, Health::Healthy)
-        })
+          s.report_health(token, Health::Healthy);
+          let res: Result<_, String> = Ok(());
+          res
+        }
       })
       .collect::<Vec<_>>(),
   )
-  .compat()
   .await
   .unwrap();
 
@@ -193,7 +196,7 @@ async fn mark_bad_as_bad(s: &Serverset<String>, health: Health) {
   for _ in 0..2 {
     let s = s.clone();
     let mark_bad_as_baded_bad = mark_bad_as_baded_bad.clone();
-    let (server, token) = s.next().compat().await.unwrap();
+    let (server, token) = s.next().await.unwrap();
     if &server == "bad" {
       *mark_bad_as_baded_bad.lock() = true;
       s.report_health(token, health);
@@ -217,7 +220,7 @@ async fn expect_only_good(s: &Serverset<String>, duration: Duration) {
     let s = s.clone();
     let should_break = should_break.clone();
     let did_get_at_least_one_good = did_get_at_least_one_good.clone();
-    let (server, token) = s.next().compat().await.unwrap();
+    let (server, token) = s.next().await.unwrap();
     if start.elapsed() < duration - buffer {
       assert_eq!("good", &server);
       *did_get_at_least_one_good.lock() = true;

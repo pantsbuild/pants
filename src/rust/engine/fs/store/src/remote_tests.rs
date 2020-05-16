@@ -139,7 +139,7 @@ async fn write_file_one_chunk() {
 
   let store = new_byte_store(&cas);
   assert_eq!(
-    store.store_bytes(testdata.bytes()).await,
+    store.store_bytes(&testdata.bytes()).await,
     Ok(testdata.digest())
   );
 
@@ -170,7 +170,7 @@ async fn write_file_multiple_chunks() {
   let fingerprint = big_file_fingerprint();
 
   assert_eq!(
-    store.store_bytes(all_the_henries.clone()).await,
+    store.store_bytes(&all_the_henries).await,
     Ok(big_file_digest())
   );
 
@@ -198,7 +198,7 @@ async fn write_empty_file() {
 
   let store = new_byte_store(&cas);
   assert_eq!(
-    store.store_bytes(empty_file.bytes()).await,
+    store.store_bytes(&empty_file.bytes()).await,
     Ok(empty_file.digest())
   );
 
@@ -215,7 +215,7 @@ async fn write_file_errors() {
 
   let store = new_byte_store(&cas);
   let error = store
-    .store_bytes(TestData::roland().bytes())
+    .store_bytes(&TestData::roland().bytes())
     .await
     .expect_err("Want error");
   assert!(
@@ -244,7 +244,7 @@ async fn write_connection_error() {
   )
   .unwrap();
   let error = store
-    .store_bytes(TestData::roland().bytes())
+    .store_bytes(&TestData::roland().bytes())
     .await
     .expect_err("Want error");
   assert!(

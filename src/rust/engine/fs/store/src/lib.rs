@@ -24,6 +24,7 @@
 #![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
+#![type_length_limit = "8576838"]
 
 #[macro_use]
 extern crate log;
@@ -315,7 +316,7 @@ impl Store {
   ///
   pub async fn load_file_bytes_with<
     T: Send + 'static,
-    F: Fn(Bytes) -> T + Send + Sync + 'static,
+    F: Fn(&[u8]) -> T + Send + Sync + 'static,
   >(
     &self,
     digest: Digest,
@@ -330,8 +331,8 @@ impl Store {
       .load_bytes_with(
         EntryType::File,
         digest,
-        move |v: Bytes| Ok(f_local(v)),
-        move |v: Bytes| Ok(f_remote(v)),
+        move |v: &[u8]| Ok(f_local(v)),
+        move |v: Bytes| Ok(f_remote(&v)),
       )
       .await
   }
@@ -372,7 +373,7 @@ impl Store {
         digest,
         // Trust that locally stored values were canonical when they were written into the CAS,
         // don't bother to check this, as it's slightly expensive.
-        move |bytes: Bytes| {
+        move |bytes: &[u8]| {
           let mut directory = bazel_protos::remote_execution::Directory::new();
           directory.merge_from_bytes(&bytes).map_err(|e| {
             format!(
@@ -406,7 +407,7 @@ impl Store {
   ///
   async fn load_bytes_with<
     T: Send + 'static,
-    FLocal: Fn(Bytes) -> Result<T, String> + Send + Sync + 'static,
+    FLocal: Fn(&[u8]) -> Result<T, String> + Send + Sync + 'static,
     FRemote: Fn(Bytes) -> Result<T, String> + Send + Sync + 'static,
   >(
     &self,
@@ -523,10 +524,11 @@ impl Store {
               let remote = remote2.clone();
 
               Box::pin(async move {
+                let executor = local.executor().clone();
                 let maybe_upload = local
                   .load_bytes_with(entry_type, digest, move |bytes| {
-                    let remote = remote.clone();
-                    Box::pin(async move { remote.store_bytes(bytes).await }).compat()
+                    // NB: `load_bytes_with` runs on a spawned thread which we can safely block.
+                    executor.block_on(remote.store_bytes(bytes))
                   })
                   .await?;
                 match maybe_upload {
@@ -857,7 +859,9 @@ impl Store {
     res.boxed().compat().to_boxed()
   }
 
-  // Returns files sorted by their path.
+  ///
+  /// Returns files sorted by their path.
+  ///
   pub fn contents_for_directory(&self, digest: Digest) -> BoxFuture<Vec<FileContent>, String> {
     self
       .walk(digest, move |store, path_so_far, _, directory| {
@@ -871,7 +875,9 @@ impl Store {
               let file_node_digest: Result<_, _> = file_node.get_digest().into();
               let store = store.clone();
               let res = async move {
-                let maybe_bytes = store.load_file_bytes_with(file_node_digest?, |b| b).await?;
+                let maybe_bytes = store
+                  .load_file_bytes_with(file_node_digest?, |b| b.into())
+                  .await?;
                 maybe_bytes
                   .ok_or_else(|| format!("Couldn't find file contents for {:?}", path))
                   .map(|(content, _metadata)| FileContent {

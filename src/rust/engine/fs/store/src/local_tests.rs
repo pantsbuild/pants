@@ -486,7 +486,7 @@ async fn empty_file_is_known() {
   let empty_file = TestData::empty();
   assert_eq!(
     store
-      .load_bytes_with(EntryType::File, empty_file.digest(), |b| b)
+      .load_bytes_with(EntryType::File, empty_file.digest(), |b| Bytes::from(b))
       .await,
     Ok(Some(empty_file.bytes())),
   )
@@ -499,7 +499,7 @@ async fn empty_directory_is_known() {
   let empty_dir = TestDirectory::empty();
   assert_eq!(
     store
-      .load_bytes_with(EntryType::Directory, empty_dir.digest(), |b| b)
+      .load_bytes_with(EntryType::Directory, empty_dir.digest(), |b| Bytes::from(b))
       .await,
     Ok(Some(empty_dir.bytes())),
   )
@@ -533,7 +533,9 @@ pub async fn load_bytes(
   entry_type: EntryType,
   digest: Digest,
 ) -> Result<Option<Bytes>, String> {
-  store.load_bytes_with(entry_type, digest, |b| b).await
+  store
+    .load_bytes_with(entry_type, digest, |b| Bytes::from(b))
+    .await
 }
 
 async fn prime_store_with_file_bytes(store: &ByteStore, bytes: Bytes) -> Digest {

@@ -71,7 +71,9 @@ pub fn extra_big_file_bytes() -> Bytes {
 }
 
 pub async fn load_file_bytes(store: &Store, digest: Digest) -> Result<Option<Bytes>, String> {
-  let option = store.load_file_bytes_with(digest, |bytes| bytes).await?;
+  let option = store
+    .load_file_bytes_with(digest, |bytes| Bytes::from(bytes))
+    .await?;
   Ok(option.map(|(bytes, _metadata)| bytes))
 }
 
@@ -916,7 +918,7 @@ async fn instance_name_download() {
 
   assert_eq!(
     store_with_remote
-      .load_file_bytes_with(TestData::roland().digest(), |b| b,)
+      .load_file_bytes_with(TestData::roland().digest(), |b| Bytes::from(b))
       .await
       .unwrap()
       .unwrap()
@@ -997,7 +999,7 @@ async fn auth_download() {
 
   assert_eq!(
     store_with_remote
-      .load_file_bytes_with(TestData::roland().digest(), |b| b,)
+      .load_file_bytes_with(TestData::roland().digest(), |b| Bytes::from(b))
       .await
       .unwrap()
       .unwrap()
