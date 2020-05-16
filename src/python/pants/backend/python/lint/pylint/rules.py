@@ -132,7 +132,7 @@ async def pylint_lint(
     # TODO(John Sirois): Support shading python binaries:
     #   https://github.com/pantsbuild/pants/issues/9206
     # Right now any Pylint transitive requirements will shadow corresponding user
-    # requirements which could lead to problems.
+    # requirements, which could lead to problems.
     pylint_runner_pex_args = ["--pex-path", ":".join(["pylint.pex", "requirements.pex"])]
     if pylint.source_plugins:
         # NB: Pylint requires explicitly loading source plugins through PYTHONPATH. To do this, we

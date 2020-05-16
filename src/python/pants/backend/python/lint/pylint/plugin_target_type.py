@@ -14,8 +14,9 @@ class PylintPluginSources(PythonSources):
 class PylintPluginDependencies(Dependencies):
     """Addresses to other targets that this plugin depends on.
 
-    These targets must either be third-party Python dependencies or be located within this target's
-    same directory or a subdirectory.
+    These targets must either be third-party Python dependencies
+    (https://pants.readme.io/docs/python-third-party-dependencies) or be located within this
+    target's same directory or a subdirectory.
     """
 
 
@@ -29,11 +30,11 @@ class PylintSourcePlugin(Target):
             `sources` field.
         3. Add the parent directory of your target to the `root_patterns` option in the `[source]`
             scope. For example, if your plugin is at `build-support/pylint/custom_plugin.py`, add
-            'build-support/pylint'. This is necessary for Pylint to discover your plugin. See
-            https://pants.readme.io/docs/source-roots.
-        4. Add `load-plugins=$module_name` to your config file. For example, if your Python file is
-            called `custom_plugin.py`, set `load-plugins=custom_plugin.py`. Set the `config` option
-            in the `[pylint]` scope to point to your config file.
+            'build-support/pylint'. This is necessary for Pants to know how to tell Pylint to
+            discover your plugin. See https://pants.readme.io/docs/source-roots.
+        4. Add `load-plugins=$module_name` to your Pylint config file. For example, if your Python
+            file is called `custom_plugin.py`, set `load-plugins=custom_plugin`. Set the `config`
+            option in the `[pylint]` scope to point to your Pylint config file.
         5. Set the option `source_plugins` in the `[pylint]` scope to include this target's
             address, e.g. `source_plugins = ["build-support/pylint:plugin"]`.
 
