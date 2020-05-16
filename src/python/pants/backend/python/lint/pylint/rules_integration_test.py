@@ -7,8 +7,13 @@ from typing import List, Optional
 
 from pants.backend.python.lint.pylint.rules import PylintFieldSet, PylintFieldSets
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
-from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonLibrary
+from pants.backend.python.target_types import (
+    PythonInterpreterCompatibility,
+    PythonLibrary,
+    PythonRequirementLibrary,
+)
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.lint import LintResult
 from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
@@ -16,6 +21,7 @@ from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.engine.target import Dependencies, Sources, TargetWithOrigin
+from pants.python.python_requirement import PythonRequirement
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option.util import create_options_bootstrapper
 
@@ -33,8 +39,12 @@ class PylintIntegrationTest(ExternalToolTestBase):
     )
 
     @classmethod
+    def alias_groups(cls):
+        return BuildFileAliases(objects={"python_requirement": PythonRequirement})
+
+    @classmethod
     def target_types(cls):
-        return [PythonLibrary]
+        return [PythonLibrary, PythonRequirementLibrary]
 
     @classmethod
     def rules(cls):
@@ -150,6 +160,22 @@ class PylintIntegrationTest(ExternalToolTestBase):
 
     def test_includes_direct_dependencies(self) -> None:
         self.add_to_build_file(
+            "",
+            dedent(
+                """\
+                python_requirement_library(
+                    name='transitive_req',
+                    requirements=[python_requirement('django')],
+                )
+                
+                python_requirement_library(
+                    name='direct_req',
+                    requirements=[python_requirement('ansicolors')],
+                )
+                """
+            ),
+        )
+        self.add_to_build_file(
             self.source_root, "python_library(name='transitive_dep', sources=[])\n"
         )
         self.create_file(
@@ -171,7 +197,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
                 python_library(
                     name='direct_dep',
                     sources=['direct_dep.py'],
-                    dependencies=[':transitive_dep'],
+                    dependencies=[':transitive_dep', '//:transitive_req'],
                 )
                 """
             ),
@@ -180,14 +206,15 @@ class PylintIntegrationTest(ExternalToolTestBase):
         source_content = dedent(
             """\
             '''Pylint will check that variables exist and are used.'''
+            from colors import green
             from direct_dep import THIS_VARIABLE_EXISTS
-
-            print(THIS_VARIABLE_EXISTS)
+            
+            print(green(THIS_VARIABLE_EXISTS))
             """
         )
         target = self.make_target_with_origin(
             source_files=[FileContent(f"{self.source_root}/target.py", source_content.encode())],
-            dependencies=[Address(self.source_root, "direct_dep")],
+            dependencies=[Address(self.source_root, "direct_dep"), Address("", "direct_req")],
         )
 
         result = self.run_pylint([target])
