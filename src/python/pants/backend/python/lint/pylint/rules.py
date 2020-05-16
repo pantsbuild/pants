@@ -69,11 +69,11 @@ async def pylint_lint(
 
     # Pylint needs direct dependencies in the chroot to ensure that imports are valid. However, it
     # doesn't lint those direct dependencies nor does it care about transitive dependencies.
-    linted_addresses = []
+    addresses_with_dependencies = []
     for field_set in field_sets:
-        linted_addresses.append(field_set.address)
-        linted_addresses.extend(field_set.dependencies.value or ())
-    targets = await Get[Targets](Addresses(linted_addresses))
+        addresses_with_dependencies.append(field_set.address)
+        addresses_with_dependencies.extend(field_set.dependencies.value or ())
+    targets = await Get[Targets](Addresses(addresses_with_dependencies))
 
     # NB: Pylint output depends upon which Python interpreter version it's run with. We ensure that
     # each target runs with its own interpreter constraints. See
