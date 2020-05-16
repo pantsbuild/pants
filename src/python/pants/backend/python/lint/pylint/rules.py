@@ -53,7 +53,7 @@ def generate_args(*, specified_source_files: SourceFiles, pylint: Pylint) -> Tup
     if pylint.config is not None:
         args.append(f"--rcfile={pylint.config}")
     args.extend(pylint.args)
-    args.extend(sorted(specified_source_files.files))
+    args.extend(specified_source_files.files)
     return tuple(args)
 
 
