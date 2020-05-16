@@ -1,8 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.python.target_types import COMMON_PYTHON_FIELDS, Dependencies, PythonSources
-from pants.engine.target import Target
+from pants.backend.python.target_types import COMMON_PYTHON_FIELDS, PythonSources
+from pants.engine.target import Dependencies, Target
 from pants.util.ordered_set import FrozenOrderedSet
 
 

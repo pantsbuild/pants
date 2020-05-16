@@ -20,7 +20,6 @@ from pants.backend.python.target_types import (
     PythonRequirementsField,
     PythonSources,
 )
-from pants.base.build_root import BuildRoot
 from pants.core.goals.lint import LinterFieldSet, LinterFieldSets, LintResult
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
@@ -64,7 +63,6 @@ async def pylint_lint(
     pylint: Pylint,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
-    build_root: BuildRoot,
 ) -> LintResult:
     if pylint.skip:
         return LintResult.noop()
@@ -131,19 +129,22 @@ async def pylint_lint(
             interpreter_constraints=interpreter_constraints,
         )
     )
+    # TODO(John Sirois): Support shading python binaries:
+    #   https://github.com/pantsbuild/pants/issues/9206
+    # Right now any Pylint transitive requirements will shadow corresponding user
+    # requirements which could lead to problems.
+    pylint_runner_pex_args = ["--pex-path", ":".join(["pylint.pex", "requirements.pex"])]
+    if pylint.source_plugins:
+        # NB: Pylint requires explicitly loading source plugins through PYTHONPATH. To do this, we
+        # set `PYTHONPATH: ./`. But, PEX normally ignores PYTHONPATH for hermiticity, so we must
+        # tell it to use the value.
+        pylint_runner_pex_args.append("--inherit-path=fallback")
     pylint_runner_pex_request = Get[Pex](
         PexRequest(
             output_filename="pylint_runner.pex",
             entry_point=pylint.get_entry_point(),
             interpreter_constraints=interpreter_constraints,
-            additional_args=(
-                "--pex-path",
-                # TODO(John Sirois): Support shading python binaries:
-                #   https://github.com/pantsbuild/pants/issues/9206
-                # Right now any Pylint transitive requirements will shadow corresponding user
-                # requirements which could lead to problems.
-                ":".join(["pylint.pex", "requirements.pex"]),
-            ),
+            additional_args=pylint_runner_pex_args,
         )
     )
 
@@ -203,9 +204,12 @@ async def pylint_lint(
     process = pylint_runner_pex.create_process(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
-        pex_path=f"./pylint_runner.pex",
-        # TODO: figure out how to get this working with PEX..
-        env={"PYTHONPATH": build_root.path},
+        pex_path="./pylint_runner.pex",
+        # NB: Pylint source plugins must be explicitly loaded via PYTHONPATH. The value must
+        # point to the plugin's directory, rather than to a parent directory, because
+        # `load-plugins` takes a module name rather than a path to the module. This means users
+        # must specify the parent directory as a source root pattern.
+        env={"PYTHONPATH": "./"} if pylint.source_plugins else None,
         pex_args=generate_args(specified_source_files=specified_source_files, pylint=pylint),
         input_digest=input_digest,
         description=f"Run Pylint on {pluralize(len(field_sets), 'target')}: {address_references}.",
