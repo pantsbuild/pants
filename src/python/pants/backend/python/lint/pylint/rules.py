@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Optional, Tuple, cast
+from typing import Tuple, cast
 
 from pants.backend.python.lint.pylint.subsystem import Pylint
 from pants.backend.python.rules import download_pex_bin, importable_python_sources, pex
@@ -15,7 +15,11 @@ from pants.backend.python.rules.pex import (
 )
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
-from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonSources
+from pants.backend.python.target_types import (
+    PythonInterpreterCompatibility,
+    PythonRequirementsField,
+    PythonSources,
+)
 from pants.core.goals.lint import LinterFieldSet, LinterFieldSets, LintResult
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
@@ -46,10 +50,10 @@ class PylintFieldSets(LinterFieldSets):
 
 def generate_args(*, specified_source_files: SourceFiles, pylint: Pylint) -> Tuple[str, ...]:
     args = []
-    if pylint.options.config is not None:
-        args.append(f"--rcfile={pylint.options.config}")
-    args.extend(pylint.options.args)
-    args.extend(sorted(specified_source_files.snapshot.files))
+    if pylint.config is not None:
+        args.append(f"--rcfile={pylint.config}")
+    args.extend(pylint.args)
+    args.extend(specified_source_files.files)
     return tuple(args)
 
 
@@ -60,16 +64,16 @@ async def pylint_lint(
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> LintResult:
-    if pylint.options.skip:
+    if pylint.skip:
         return LintResult.noop()
 
     # Pylint needs direct dependencies in the chroot to ensure that imports are valid. However, it
     # doesn't lint those direct dependencies nor does it care about transitive dependencies.
-    addresses = []
+    addresses_with_dependencies = []
     for field_set in field_sets:
-        addresses.append(field_set.address)
-        addresses.extend(field_set.dependencies.value or ())
-    targets = await Get[Targets](Addresses(addresses))
+        addresses_with_dependencies.append(field_set.address)
+        addresses_with_dependencies.extend(field_set.dependencies.value or ())
+    targets = await Get[Targets](Addresses(addresses_with_dependencies))
 
     # NB: Pylint output depends upon which Python interpreter version it's run with. We ensure that
     # each target runs with its own interpreter constraints. See
@@ -77,7 +81,10 @@ async def pylint_lint(
     interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
         (field_set.compatibility for field_set in field_sets), python_setup
     )
-    requirements_pex_request = Get[Pex](
+
+    # We build one PEX with Pylint requirements and another with all direct 3rd-party dependencies.
+    # Splitting this into two PEXes gives us finer-grained caching. We then merge via `--pex-path`.
+    pylint_pex_request = Get[Pex](
         PexRequest(
             output_filename="pylint.pex",
             requirements=PexRequirements(pylint.get_requirement_specs()),
@@ -85,11 +92,36 @@ async def pylint_lint(
             entry_point=pylint.get_entry_point(),
         )
     )
+    requirements_pex_request = Get[Pex](
+        PexRequest(
+            output_filename="requirements.pex",
+            requirements=PexRequirements.create_from_requirement_fields(
+                tgt[PythonRequirementsField]
+                for tgt in targets
+                if tgt.has_field(PythonRequirementsField)
+            ),
+            interpreter_constraints=interpreter_constraints,
+        )
+    )
+    pylint_runner_pex_request = Get[Pex](
+        PexRequest(
+            output_filename="pylint_runner.pex",
+            entry_point=pylint.get_entry_point(),
+            interpreter_constraints=interpreter_constraints,
+            additional_args=(
+                "--pex-path",
+                # TODO(John Sirois): Support shading python binaries:
+                #   https://github.com/pantsbuild/pants/issues/9206
+                # Right now any Pylint transitive requirements will shadow corresponding user
+                # requirements which could lead to problems.
+                ":".join(["pylint.pex", "requirements.pex"]),
+            ),
+        )
+    )
 
-    config_path: Optional[str] = pylint.options.config
     config_snapshot_request = Get[Snapshot](
         PathGlobs(
-            globs=[config_path] if config_path else [],
+            globs=[pylint.config] if pylint.config else [],
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
             description_of_origin="the option `--pylint-config`",
         )
@@ -103,11 +135,20 @@ async def pylint_lint(
         )
     )
 
-    requirements_pex, config_snapshot, prepared_python_sources, specified_source_files = cast(
-        Tuple[Pex, Snapshot, ImportablePythonSources, SourceFiles],
+    (
+        pylint_pex,
+        requirements_pex,
+        pylint_runner_pex,
+        config_snapshot,
+        prepared_python_sources,
+        specified_source_files,
+    ) = cast(
+        Tuple[Pex, Pex, Pex, Snapshot, ImportablePythonSources, SourceFiles],
         await MultiGet(
             [
+                pylint_pex_request,
                 requirements_pex_request,
+                pylint_runner_pex_request,
                 config_snapshot_request,
                 prepare_python_sources_request,
                 specified_source_files_request,
@@ -118,7 +159,9 @@ async def pylint_lint(
     input_digest = await Get[Digest](
         MergeDigests(
             (
+                pylint_pex.digest,
                 requirements_pex.digest,
+                pylint_runner_pex.digest,
                 config_snapshot.digest,
                 prepared_python_sources.snapshot.digest,
             )
@@ -132,7 +175,7 @@ async def pylint_lint(
     process = requirements_pex.create_process(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
-        pex_path=f"./pylint.pex",
+        pex_path=f"./pylint_runner.pex",
         pex_args=generate_args(specified_source_files=specified_source_files, pylint=pylint),
         input_digest=input_digest,
         description=f"Run Pylint on {pluralize(len(field_sets), 'target')}: {address_references}.",
