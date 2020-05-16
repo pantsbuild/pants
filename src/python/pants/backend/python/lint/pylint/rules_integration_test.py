@@ -244,7 +244,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
 
             class PrintChecker(BaseChecker):
                 __implements__ = IAstroidChecker
-                name = "print_checker"
+                name = "print_plugin"
                 msgs = {
                     "C9871": ("`print` statements are banned", "print-statement-used", ""),
                 }
@@ -254,7 +254,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
                         self.add_message("print-statement-used", node=node)
 
             def register(linter):
-                linter.register_checker(PrintChecker(linter)
+                linter.register_checker(PrintChecker(linter))
             """
         )
         self.create_file("build-support/plugins/print_plugin.py", plugin_content)
@@ -280,6 +280,13 @@ class PylintIntegrationTest(ExternalToolTestBase):
                 )"""
             ),
         )
+        config_content = dedent(
+            """\
+            [MASTER]
+            init-hook="import sys, pathlib; sys.path.append(pathlib.Path.cwd() / 'plugins')" 
+            load-plugins=print_plugin
+            """
+        )
         target = self.make_target_with_origin(
             [FileContent(f"{self.source_root}/source_plugin.py", b"'''Docstring.'''\nprint()\n")]
         )
@@ -289,8 +296,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
                 "--pylint-source-plugins=['build-support/plugins:print_plugin']",
                 f"--source-root-patterns=['build-support', '{self.source_root}']",
             ],
-            passthrough_args="--load-plugins=print_plugin",
+            config=config_content,
         )
-        # print(result)
-        assert result.exit_code == 4
+        assert result.exit_code == PYLINT_FAILURE_RETURN_CODE
         assert "source_plugin.py:2:0: C9871" in result.stdout

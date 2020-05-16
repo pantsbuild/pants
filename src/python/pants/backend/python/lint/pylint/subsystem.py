@@ -38,6 +38,7 @@ class Pylint(PythonToolBase):
             type=list,
             member_type=target_option,
             advanced=True,
+            # TODO: instructions about init-hook.
             help=(
                 "An optional list of `pylint_source_plugin` target addresses. This allows you to "
                 "load custom plugins defined in source code. To instead load third-party plugins, "

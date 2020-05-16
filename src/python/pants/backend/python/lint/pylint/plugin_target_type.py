@@ -19,4 +19,5 @@ class PylintSourcePlugin(Target):
     """
 
     alias = "pylint_source_plugin"
+    # TODO: make this more like a `python_library`.
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, PylintPluginSources)

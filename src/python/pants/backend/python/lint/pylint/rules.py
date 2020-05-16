@@ -63,6 +63,9 @@ async def pylint_lint(
     if pylint.skip:
         return LintResult.noop()
 
+    if pylint.source_plugins and not pylint.config:
+        raise ValueError("TODO: instructions that they need to specify init-hook and load-plugins.")
+
     plugin_targets_request = Get[TransitiveTargets](
         Addresses(Address.parse(plugin_addr) for plugin_addr in pylint.source_plugins)
     )
@@ -127,7 +130,6 @@ async def pylint_lint(
         ),
     )
 
-    # print(prepared_python_sources.snapshot.files)
     input_digest = await Get[Digest](
         MergeDigests(
             (
@@ -145,7 +147,6 @@ async def pylint_lint(
     process = requirements_pex.create_process(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
-        env={"PYTHONPATH": "./plugins"},
         pex_path=f"./pylint.pex",
         pex_args=generate_args(specified_source_files=specified_source_files, pylint=pylint),
         input_digest=input_digest,
