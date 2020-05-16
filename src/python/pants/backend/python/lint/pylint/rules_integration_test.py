@@ -8,9 +8,7 @@ from typing import List, Optional
 from pants.backend.python.lint.pylint.rules import PylintFieldSet, PylintFieldSets
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
 from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonLibrary
-from pants.backend.python.targets.python_library import PythonLibrary as PythonLibraryV1
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
-from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.lint import LintResult
 from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
@@ -21,11 +19,11 @@ from pants.engine.target import Dependencies, Sources, TargetWithOrigin
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option.util import create_options_bootstrapper
 
+# See http://pylint.pycqa.org/en/latest/user_guide/run.html#exit-codes for exit codes.
 PYLINT_FAILURE_RETURN_CODE = 16
 
 
 class PylintIntegrationTest(ExternalToolTestBase):
-    # See http://pylint.pycqa.org/en/latest/user_guide/run.html#exit-codes for exit codes.
     source_root = "src/python"
     good_source = FileContent(
         path=f"{source_root}/good.py", content=b"'''docstring'''\nUPPERCASE_CONSTANT = ''\n",
@@ -33,10 +31,6 @@ class PylintIntegrationTest(ExternalToolTestBase):
     bad_source = FileContent(
         path=f"{source_root}/bad.py", content=b"'''docstring'''\nlowercase_constant = ''\n",
     )
-
-    @classmethod
-    def alias_groups(cls) -> BuildFileAliases:
-        return BuildFileAliases(targets={"python_library": PythonLibraryV1})
 
     @classmethod
     def target_types(cls):
@@ -63,12 +57,9 @@ class PylintIntegrationTest(ExternalToolTestBase):
         for source_file in source_files:
             self.create_file(source_file.path, source_file.content.decode())
         source_globs = [PurePath(source_file.path).name for source_file in source_files]
-        self.create_library(
-            path=self.source_root, target_type=PythonLibrary.alias, name=name, sources=source_globs
+        self.add_to_build_file(
+            self.source_root, f"python_library(name='{name}', sources={source_globs})\n"
         )
-        # We must re-write the files because `create_library` will have over-written the content.
-        for source_file in source_files:
-            self.create_file(source_file.path, source_file.content.decode())
         target = PythonLibrary(
             {
                 Sources.alias: source_globs,
@@ -158,38 +149,45 @@ class PylintIntegrationTest(ExternalToolTestBase):
         assert "Your code has been rated at 10.00/10" in result.stdout.strip()
 
     def test_includes_direct_dependencies(self) -> None:
-        self.make_target_with_origin(source_files=[], name="transitive_dependency")
-
-        direct_dependency_content = dedent(
-            """\
-            # No docstring because Pylint doesn't lint dependencies
-
-            from transitive_dep import doesnt_matter_if_variable_exists
-
-            THIS_VARIABLE_EXISTS = ''
-            """
+        self.add_to_build_file(
+            self.source_root, "python_library(name='transitive_dep', sources=[])\n"
         )
-        self.make_target_with_origin(
-            source_files=[
-                FileContent(
-                    f"{self.source_root}/direct_dependency.py", direct_dependency_content.encode()
+        self.create_file(
+            f"{self.source_root}/direct_dep.py",
+            dedent(
+                """\
+                # No docstring - Pylint doesn't lint dependencies.
+
+                from transitive_dep import doesnt_matter_if_variable_exists
+
+                THIS_VARIABLE_EXISTS = ''
+                """
+            ),
+        )
+        self.add_to_build_file(
+            self.source_root,
+            dedent(
+                """\
+                python_library(
+                    name='direct_dep',
+                    sources=['direct_dep.py'],
+                    dependencies=[':transitive_dep'],
                 )
-            ],
-            name="direct_dependency",
-            dependencies=[Address(self.source_root, "transitive_dependency")],
+                """
+            ),
         )
 
         source_content = dedent(
             """\
-            '''Code is not executed, but Pylint will check that variables exist and are used'''
-            from direct_dependency import THIS_VARIABLE_EXISTS
+            '''Pylint will check that variables exist and are used.'''
+            from direct_dep import THIS_VARIABLE_EXISTS
 
             print(THIS_VARIABLE_EXISTS)
             """
         )
         target = self.make_target_with_origin(
             source_files=[FileContent(f"{self.source_root}/target.py", source_content.encode())],
-            dependencies=[Address(self.source_root, "direct_dependency")],
+            dependencies=[Address(self.source_root, "direct_dep")],
         )
 
         result = self.run_pylint([target])
