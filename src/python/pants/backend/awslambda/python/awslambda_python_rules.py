@@ -68,7 +68,10 @@ async def create_python_awslambda(
     # (Running the "hello world" lambda in the example code will report the platform, and can be
     # used to verify correctness of these platform strings.)
     py_major, py_minor = field_set.runtime.to_interpreter_version()
-    platform = f"manylinux2014_x86_64-cp-{py_major}{py_minor}-cp{py_major}{py_minor}m"
+    platform = f"manylinux2014_x86_64-cp-{py_major}{py_minor}-cp{py_major}{py_minor}"
+    # set pymalloc ABI flag - this was removed in python 3.8 https://bugs.python.org/issue36707
+    if py_major <= 3 and py_minor < 8:
+        platform += "m"
     if (py_major, py_minor) == (2, 7):
         platform += "u"
     pex_request = TwoStepPexFromTargetsRequest(
