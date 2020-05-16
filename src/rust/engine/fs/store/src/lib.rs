@@ -24,6 +24,7 @@
 #![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
+#![type_length_limit = "8576838"]
 
 #[macro_use]
 extern crate log;
@@ -523,12 +524,11 @@ impl Store {
               let remote = remote2.clone();
 
               Box::pin(async move {
+                let executor = local.executor().clone();
                 let maybe_upload = local
                   .load_bytes_with(entry_type, digest, move |bytes| {
-                    let remote = remote.clone();
-                    // TODO: This is a copy: could block here to upload without copying.
-                    let bytes = Bytes::from(bytes);
-                    Box::pin(async move { remote.store_bytes(bytes).await }).compat()
+                    // NB: `load_bytes_with` runs on a spawned thread which we can safely block.
+                    executor.block_on(remote.store_bytes(bytes))
                   })
                   .await?;
                 match maybe_upload {

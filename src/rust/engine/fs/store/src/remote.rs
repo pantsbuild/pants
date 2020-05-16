@@ -102,7 +102,7 @@ impl ByteStore {
     .await
   }
 
-  pub async fn store_bytes(&self, bytes: Bytes) -> Result<Digest, String> {
+  pub async fn store_bytes(&self, bytes: &[u8]) -> Result<Digest, String> {
     let start_time = std::time::SystemTime::now();
 
     let mut hasher = Sha256::default();
@@ -124,7 +124,6 @@ impl ByteStore {
       .with_byte_stream_client(move |client| {
         let resource_name = resource_name.clone();
         let store = store.clone();
-        let bytes = bytes.clone();
         async move {
           let (sender, receiver) = client
             .write_opt(call_option(&store.headers, None)?.timeout(store.upload_timeout))
@@ -137,7 +136,6 @@ impl ByteStore {
 
           let chunk_size_bytes = store.chunk_size_bytes;
           let resource_name = resource_name.clone();
-          let bytes = bytes.clone();
           let stream = futures01::stream::unfold::<_, _, future::FutureResult<_, grpcio::Error>, _>(
             (0, false),
             move |(offset, has_sent_any)| {
@@ -149,7 +147,7 @@ impl ByteStore {
                 req.set_write_offset(offset as i64);
                 let next_offset = min(offset + chunk_size_bytes, bytes.len());
                 req.set_finish_write(next_offset == bytes.len());
-                req.set_data(bytes.slice(offset, next_offset));
+                req.set_data(Bytes::from(&bytes[offset..next_offset]));
                 Some(future::ok((
                   (req, grpcio::WriteFlags::default()),
                   (next_offset, true),
