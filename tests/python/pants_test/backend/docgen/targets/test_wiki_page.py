@@ -31,8 +31,9 @@ class WikiPageTest(TestBase):
             dedent(
                 """
 
-                page(name='readme',
-                  source='README.md',
+                page(
+                  name='readme',
+                  sources=['README.md'],
                   links=[':readme2'],
                   provides=[
                     wiki_artifact(
@@ -43,7 +44,8 @@ class WikiPageTest(TestBase):
                   ],
                 )
 
-                page(name='readme2',
+                page(
+                  name='readme2',
                   sources=['README2.md'],
                   links=[':readme'],
                   provides=[
@@ -113,8 +115,9 @@ class WikiPageTest(TestBase):
                 "src/docs",
                 dedent(
                     """
-                    page(name='readme3',
-                      source='README.md',
+                    page(
+                      name='readme3',
+                      sources=['README.md'],
                       provides=[
                         wiki_artifact(
                           wiki=confluence,
@@ -143,14 +146,4 @@ class WikiPageTest(TestBase):
         self.create_files("", ["exists.md", "also-exists.md"])
         self.add_to_build_file("", "page(name='page', sources=['exists.md', 'also-exists.md'])")
         with self.assertRaisesRegex(AddressLookupError, r"//:page.*exactly 1 source, but found 2"):
-            self.target(":page")
-
-    def test_source_and_sources(self):
-        self.create_files("", ["exists.md", "also-exists.md"])
-        self.add_to_build_file(
-            "", "page(name='page', source=['exists.md'], sources=['also-exists.md'])",
-        )
-        with self.assertRaisesRegex(
-            AddressLookupError, r"//:page: Cannot specify both source and sources attribute"
-        ):
             self.target(":page")

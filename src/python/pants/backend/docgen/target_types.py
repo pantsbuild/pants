@@ -64,7 +64,7 @@ class Page(Target):
 
         page(
             name='home_page',
-            source='home_page.md',
+            sources=['home_page.md'],
             provides=[
                 wiki_artifact(
                     wiki=Wiki('foozle', <url builder>),

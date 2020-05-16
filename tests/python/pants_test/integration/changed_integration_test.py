@@ -160,7 +160,7 @@ def create_isolated_git_repo():
                       dependencies=[
                         'src/resources/org/pantsbuild/resourceonly:resource',
                       ],
-                      source='helloworld.java',
+                      sources=['helloworld.java'],
                       main='org.pantsbuild.helloworld.HelloWorld',
                     )
                     """,
@@ -206,13 +206,13 @@ def create_isolated_git_repo():
 class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
 
     TEST_MAPPING = {
-        # A `jvm_binary` with `source='file.name'`.
+        # A `jvm_binary` with `sources=['file.name']`.
         "src/java/org/pantsbuild/helloworld/helloworld.java": dict(
             none=["src/java/org/pantsbuild/helloworld:helloworld"],
             direct=["src/java/org/pantsbuild/helloworld:helloworld"],
             transitive=["src/java/org/pantsbuild/helloworld:helloworld"],
         ),
-        # A `python_binary` with `source='file.name'`.
+        # A `python_binary` with `sources=['file.name']`.
         "src/python/python_targets/test_binary.py": dict(
             none=["src/python/python_targets:test"],
             direct=["src/python/python_targets:test"],

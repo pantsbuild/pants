@@ -114,7 +114,7 @@ class MarkdownToHtmlTest(TaskTestBase):
 
     def test_rst_render_empty(self):
         self.create_file("empty.rst")
-        self.add_to_build_file("", 'page(name = "empty_rst", source = "empty.rst")')
+        self.add_to_build_file("", 'page(name = "empty_rst", sources = ["empty.rst"])')
         empty_rst = self.target(":empty_rst")
         task = self.create_task(self.context(target_roots=[empty_rst]))
         task.execute()
@@ -130,7 +130,7 @@ class MarkdownToHtmlTest(TaskTestBase):
                 """
             ),
         )
-        self.add_to_build_file("", 'page(name = "bad_rst", source = "bad.rst")')
+        self.add_to_build_file("", 'page(name = "bad_rst", sources = ["bad.rst"])')
         bad_rst = self.target(":bad_rst")
         task = self.create_task(self.context(target_roots=[bad_rst]))
         with self.assertRaises(TaskError):
@@ -159,7 +159,7 @@ class MarkdownToHtmlTest(TaskTestBase):
                 """
             ),
         )
-        self.add_to_build_file("", 'page(name = "bad_rst", source = "bad.rst")')
+        self.add_to_build_file("", 'page(name = "bad_rst", sources = ["bad.rst"])')
         self.set_options(ignore_failure=True)
         bad_rst = self.target(":bad_rst")
         context = self.context(target_roots=[bad_rst])
@@ -190,7 +190,7 @@ class MarkdownToHtmlTest(TaskTestBase):
                 """
             ),
         )
-        self.add_to_build_file("", 'page(name = "good_rst", source = "good.rst")')
+        self.add_to_build_file("", 'page(name = "good_rst", sources = ["good.rst"])')
         good_rst = self.target(":good_rst")
         context = self.context(target_roots=[good_rst])
         task = self.create_task(context)

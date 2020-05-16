@@ -107,16 +107,6 @@ class JvmBinaryTest(TestBase):
         )  # <object object at 0x...>
         self.assertEqual(Duplicate.FAIL, jar_rules.default_dup_action)
 
-    def test_bad_source_declaration(self):
-        self.create_file("foo/foo.py")
-        self.add_to_build_file(
-            "", 'jvm_binary(name = "foo", main = "com.example.Foo", source = ["foo.py"])',
-        )
-        with self.assertRaisesRegex(
-            AddressLookupError, r"Invalid target.*foo.*source must be a str"
-        ):
-            self.target(":foo")
-
     def test_bad_sources_declaration(self):
         self.create_file("foo/foo.py")
         self.create_file("foo/bar.py")

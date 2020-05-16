@@ -5,6 +5,33 @@ This document describes releases leading up to the ``1.28.x`` ``stable`` series.
 
 See https://pants.readme.io/docs/release-notes-1-28 for an overview of the changes in this release.
 
+1.28.0rc1 (5/15/2020)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fix Target API bindings not loading for plugins (#9788)
+  `PR #9788 <https://github.com/pantsbuild/pants/pull/9788>`_
+
+* Further refine the "include `.pids`" hack. (#9773)
+  `PR #9773 <https://github.com/pantsbuild/pants/pull/9773>`_
+
+* Move away from the debounced notify watcher (#9754)
+  `PR #9754 <https://github.com/pantsbuild/pants/pull/9754>`_
+
+* Upgrade toml from 0.10.0 to 0.10.1 (#9768)
+  `PR #9768 <https://github.com/pantsbuild/pants/pull/9768>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Mention --owners-not-found-behavior option when owners are not found (#9770)
+  `PR #9770 <https://github.com/pantsbuild/pants/pull/9770>`_
+
+* Disable capturing core dumps in travis. (#9769)
+  `PR #9769 <https://github.com/pantsbuild/pants/pull/9769>`_
+
 1.28.0rc0 (5/13/2020)
 ---------------------
 
