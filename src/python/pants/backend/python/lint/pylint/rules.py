@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Optional, Tuple, cast
+from typing import Tuple, cast
 
 from pants.backend.python.lint.pylint.subsystem import Pylint
 from pants.backend.python.rules import download_pex_bin, importable_python_sources, pex
@@ -50,10 +50,10 @@ class PylintFieldSets(LinterFieldSets):
 
 def generate_args(*, specified_source_files: SourceFiles, pylint: Pylint) -> Tuple[str, ...]:
     args = []
-    if pylint.options.config is not None:
-        args.append(f"--rcfile={pylint.options.config}")
-    args.extend(pylint.options.args)
-    args.extend(sorted(specified_source_files.snapshot.files))
+    if pylint.config is not None:
+        args.append(f"--rcfile={pylint.config}")
+    args.extend(pylint.args)
+    args.extend(sorted(specified_source_files.files))
     return tuple(args)
 
 
@@ -64,16 +64,16 @@ async def pylint_lint(
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> LintResult:
-    if pylint.options.skip:
+    if pylint.skip:
         return LintResult.noop()
 
     # Pylint needs direct dependencies in the chroot to ensure that imports are valid. However, it
     # doesn't lint those direct dependencies nor does it care about transitive dependencies.
-    addresses = []
+    linted_addresses = []
     for field_set in field_sets:
-        addresses.append(field_set.address)
-        addresses.extend(field_set.dependencies.value or ())
-    targets = await Get[Targets](Addresses(addresses))
+        linted_addresses.append(field_set.address)
+        linted_addresses.extend(field_set.dependencies.value or ())
+    targets = await Get[Targets](Addresses(linted_addresses))
 
     # NB: Pylint output depends upon which Python interpreter version it's run with. We ensure that
     # each target runs with its own interpreter constraints. See
@@ -119,10 +119,9 @@ async def pylint_lint(
         )
     )
 
-    config_path: Optional[str] = pylint.options.config
     config_snapshot_request = Get[Snapshot](
         PathGlobs(
-            globs=[config_path] if config_path else [],
+            globs=[pylint.config] if pylint.config else [],
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
             description_of_origin="the option `--pylint-config`",
         )
