@@ -441,7 +441,7 @@ class Options:
 
     @frozen_after_init
     @dataclass(unsafe_hash=True)
-    class _ScopedFlagNameForFuzzyMatching:
+    class ScopedFlagNameForFuzzyMatching:
         """Specify how a registered option would look like on the command line.
 
         This information enables fuzzy matching to suggest correct option names when a user specifies an
@@ -473,7 +473,9 @@ class Options:
             return re.sub(r"^-+", "", self.scoped_arg)
 
     @memoized_property
-    def _all_scoped_flag_names_for_fuzzy_matching(self):
+    def _all_scoped_flag_names_for_fuzzy_matching(
+        self,
+    ) -> List["Options.ScopedFlagNameForFuzzyMatching"]:
         """A list of all registered flags in all their registered scopes.
 
         This list is used for fuzzy matching against unrecognized option names across registered
@@ -485,7 +487,7 @@ class Options:
             scope = parser.scope
             known_args = parser.known_args
             for arg in known_args:
-                scoped_flag = self._ScopedFlagNameForFuzzyMatching(scope=scope, arg=arg,)
+                scoped_flag = self.ScopedFlagNameForFuzzyMatching(scope=scope, arg=arg,)
                 all_scoped_flag_names.append(scoped_flag)
 
         self.walk_parsers(register_all_scoped_names)

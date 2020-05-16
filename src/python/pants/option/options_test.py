@@ -1413,9 +1413,22 @@ class OptionsTest(TestBase):
             )
 
         with self.assertRaisesWithMessage(
-            ParseError, "Unrecognized command line flags on global scope: --aaaaaaaaaasdf."
+            ParseError,
+            (
+                "Unrecognized command line flag '--aasdf' on global scope. Run `./pants "
+                "help-advanced` for all available options."
+            ),
         ):
-            parse_joined_command_line("--aaaaaaaaaasdf").for_global_scope()
+            parse_joined_command_line("--aasdf").for_global_scope()
+
+        with self.assertRaisesWithMessage(
+            ParseError,
+            (
+                "Unrecognized command line flags on global scope: --aasdf, --aasdy. Run "
+                "`./pants help-advanced` for all available options."
+            ),
+        ):
+            parse_joined_command_line("--aasdf", "--aasdy").for_global_scope()
 
         with self.assertRaisesWithMessage(
             ParseError,
@@ -1438,12 +1451,24 @@ class OptionsTest(TestBase):
                 "--c=[]",
             ).for_global_scope()
 
+        # When some flags have suggestions, but >=1 don't, we both gives suggestions and point to
+        # `help-advanced`.
+        with self.assertRaisesWithMessage(
+            ParseError,
+            (
+                "Unrecognized command line flags on global scope: --aasdf, --config-overide. "
+                "Run `./pants help-advanced` for all available options. Suggestions:\n"
+                "--config-overide: [--config-override]"
+            ),
+        ):
+            parse_joined_command_line("--aasdf", "--config-overide").for_global_scope()
+
         with self.assertRaisesWithMessage(
             ParseError,
             dedent(
                 """\
-                Unrecognized command line flags on scope 'simple': --sam. Suggestions:
-                --sam: [--simple-spam, --simple-dashed-spam, --a, --num, --scoped-a-bit-spam, --scoped-and-dashed-spam]"""
+                Unrecognized command line flag '--sam' on scope 'simple'. Suggestions:
+                --simple-spam, --simple-dashed-spam, --a, --num, --scoped-a-bit-spam, --scoped-and-dashed-spam"""
             ),
         ):
             parse_joined_command_line(
@@ -1455,8 +1480,8 @@ class OptionsTest(TestBase):
             ParseError,
             dedent(
                 """\
-                Unrecognized command line flags on scope 'compile': --modifylogs. Suggestions:
-                --modifylogs: [--compile-scala-modifylogs]"""
+                Unrecognized command line flag '--modifylogs' on scope 'compile'. Suggestions:
+                --compile-scala-modifylogs"""
             ),
         ):
             parse_joined_command_line(
@@ -1468,8 +1493,8 @@ class OptionsTest(TestBase):
             ParseError,
             dedent(
                 """\
-                Unrecognized command line flags on scope 'cache.compile.scala': --modifylogs. Suggestions:
-                --modifylogs: [--compile-scala-modifylogs]"""
+                Unrecognized command line flag '--modifylogs' on scope 'cache.compile.scala'. Suggestions:
+                --compile-scala-modifylogs"""
             ),
         ):
             parse_joined_command_line(
