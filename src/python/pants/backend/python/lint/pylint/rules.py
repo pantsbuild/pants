@@ -100,8 +100,9 @@ async def pylint_lint(
         (
             *(field_set.compatibility for field_set in field_sets),
             *(
-                plugin_tgt.get(PythonInterpreterCompatibility)
-                for plugin_tgt in plugin_targets.roots
+                plugin_tgt[PythonInterpreterCompatibility]
+                for plugin_tgt in plugin_targets.closure
+                if plugin_tgt.has_field(PythonInterpreterCompatibility)
             ),
         ),
         python_setup,
@@ -112,7 +113,16 @@ async def pylint_lint(
     pylint_pex_request = Get[Pex](
         PexRequest(
             output_filename="pylint.pex",
-            requirements=PexRequirements(pylint.get_requirement_specs()),
+            requirements=PexRequirements(
+                [
+                    *pylint.get_requirement_specs(),
+                    *PexRequirements.create_from_requirement_fields(
+                        plugin_tgt[PythonRequirementsField]
+                        for plugin_tgt in plugin_targets.closure
+                        if plugin_tgt.has_field(PythonRequirementsField)
+                    ),
+                ]
+            ),
             interpreter_constraints=interpreter_constraints,
             entry_point=pylint.get_entry_point(),
         )
@@ -122,7 +132,7 @@ async def pylint_lint(
             output_filename="requirements.pex",
             requirements=PexRequirements.create_from_requirement_fields(
                 tgt[PythonRequirementsField]
-                for tgt in targets
+                for tgt in targets_with_dependencies
                 if tgt.has_field(PythonRequirementsField)
             ),
             interpreter_constraints=interpreter_constraints,

@@ -254,27 +254,8 @@ class PylintIntegrationTest(ExternalToolTestBase):
         assert "thirdparty_plugin.py:10:8: W5301" in result.stdout
 
     def test_source_plugin(self) -> None:
-        plugin_content = dedent(
-            """
-            from pylint.checkers import BaseChecker
-            from pylint.interfaces import IAstroidChecker
-
-            class PrintChecker(BaseChecker):
-                __implements__ = IAstroidChecker
-                name = "print_plugin"
-                msgs = {
-                    "C9871": ("`print` statements are banned", "print-statement-used", ""),
-                }
-
-                def visit_call(self, node):
-                    if node.func.name == "print":
-                        self.add_message("print-statement-used", node=node)
-
-            def register(linter):
-                linter.register_checker(PrintChecker(linter))
-            """
-        )
-        self.create_file("build-support/plugins/print_plugin.py", plugin_content)
+        # NB: We make this source plugin fairly complex by having it use transitive dependencies.
+        # This is to ensure that we can correctly support complex plugins with dependencies.
         self.add_to_build_file(
             "",
             dedent(
@@ -283,6 +264,48 @@ class PylintIntegrationTest(ExternalToolTestBase):
                     name='pylint',
                     requirements=[python_requirement('pylint>=2.4.4,<2.5')],
                 )
+                
+                python_requirement_library(
+                    name='colors',
+                    requirements=[python_requirement('ansicolors')],
+                )
+                """
+            ),
+        )
+        self.create_file(
+            "build-support/plugins/dep.py",
+            dedent(
+                """\
+                from colors import red
+
+                def is_print(node):
+                    _ = red("Test that transitive deps are loaded.")
+                    return node.func.name == "print"
+                """
+            ),
+        )
+        self.create_file(
+            "build-support/plugins/print_plugin.py",
+            dedent(
+                """\
+                from pylint.checkers import BaseChecker
+                from pylint.interfaces import IAstroidChecker
+
+                from plugins.dep import is_print
+
+                class PrintChecker(BaseChecker):
+                    __implements__ = IAstroidChecker
+                    name = "print_plugin"
+                    msgs = {
+                        "C9871": ("`print` statements are banned", "print-statement-used", ""),
+                    }
+
+                    def visit_call(self, node):
+                        if is_print(node):
+                            self.add_message("print-statement-used", node=node)
+
+                def register(linter):
+                    linter.register_checker(PrintChecker(linter))
                 """
             ),
         )
@@ -290,11 +313,18 @@ class PylintIntegrationTest(ExternalToolTestBase):
             "build-support/plugins",
             dedent(
                 """\
+                python_library(
+                    name='dep',
+                    sources=['dep.py'],
+                    dependencies=['//:colors'],
+                )
+
                 pylint_source_plugin(
                     name='print_plugin',
                     sources=['print_plugin.py'],
-                    dependencies=['//:pylint'],
-                )"""
+                    dependencies=[':dep', '//:pylint'],
+                )
+                """
             ),
         )
         config_content = dedent(
