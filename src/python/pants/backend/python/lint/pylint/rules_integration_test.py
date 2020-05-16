@@ -255,7 +255,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
 
     def test_source_plugin(self) -> None:
         # NB: We make this source plugin fairly complex by having it use transitive dependencies.
-        # This is to ensure that we can correctly support complex plugins with dependencies.
+        # This is to ensure that we can correctly support plugins with dependencies.
         self.add_to_build_file(
             "",
             dedent(
@@ -273,7 +273,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
             ),
         )
         self.create_file(
-            "build-support/plugins/dep.py",
+            "build-support/plugins/subdir/dep.py",
             dedent(
                 """\
                 from colors import red
@@ -284,6 +284,9 @@ class PylintIntegrationTest(ExternalToolTestBase):
                 """
             ),
         )
+        self.add_to_build_file(
+            "build-support/plugins/subdir", "python_library(dependencies=['//:colors'])"
+        )
         self.create_file(
             "build-support/plugins/print_plugin.py",
             dedent(
@@ -291,7 +294,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
                 from pylint.checkers import BaseChecker
                 from pylint.interfaces import IAstroidChecker
 
-                from plugins.dep import is_print
+                from subdir.dep import is_print
 
                 class PrintChecker(BaseChecker):
                     __implements__ = IAstroidChecker
@@ -313,16 +316,10 @@ class PylintIntegrationTest(ExternalToolTestBase):
             "build-support/plugins",
             dedent(
                 """\
-                python_library(
-                    name='dep',
-                    sources=['dep.py'],
-                    dependencies=['//:colors'],
-                )
-
                 pylint_source_plugin(
                     name='print_plugin',
                     sources=['print_plugin.py'],
-                    dependencies=[':dep', '//:pylint'],
+                    dependencies=['//:pylint', 'build-support/plugins/subdir'],
                 )
                 """
             ),
@@ -330,7 +327,6 @@ class PylintIntegrationTest(ExternalToolTestBase):
         config_content = dedent(
             """\
             [MASTER]
-            init-hook="import pathlib, sys; sys.path.append(pathlib.Path.cwd() / 'plugins')" 
             load-plugins=print_plugin
             """
         )
@@ -341,7 +337,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
             [target],
             additional_args=[
                 "--pylint-source-plugins=['build-support/plugins:print_plugin']",
-                f"--source-root-patterns=['build-support', '{self.source_root}']",
+                f"--source-root-patterns=['build-support/plugins', '{self.source_root}']",
             ],
             config=config_content,
         )

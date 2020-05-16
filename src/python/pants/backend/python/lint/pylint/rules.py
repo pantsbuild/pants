@@ -20,6 +20,7 @@ from pants.backend.python.target_types import (
     PythonRequirementsField,
     PythonSources,
 )
+from pants.base.build_root import BuildRoot
 from pants.core.goals.lint import LinterFieldSet, LinterFieldSets, LintResult
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
@@ -30,7 +31,7 @@ from pants.engine.rules import SubsystemRule, named_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Dependencies, Targets, TransitiveTargets
 from pants.engine.unions import UnionRule
-from pants.option.global_options import GlobalOptions, GlobMatchErrorBehavior
+from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
 from pants.util.strutil import pluralize
 
@@ -63,18 +64,10 @@ async def pylint_lint(
     pylint: Pylint,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
-    global_options: GlobalOptions,
+    build_root: BuildRoot,
 ) -> LintResult:
     if pylint.skip:
         return LintResult.noop()
-
-    if pylint.source_plugins and not pylint.config:
-        raise ValueError(
-            "You specified `--pylint-source-plugins` but did not specify `--pylint-config`. Please "
-            "create a pylintrc config file and configure `init-hook` and `load-plugins`. Run "
-            f"`{global_options.options.pants_bin_name} target-types "
-            "--details=pylint_source_plugin` for instructions."
-        )
 
     plugin_targets_request = Get[TransitiveTargets](
         Addresses(Address.parse(plugin_addr) for plugin_addr in pylint.source_plugins)
@@ -207,10 +200,12 @@ async def pylint_lint(
         sorted(field_set.address.reference() for field_set in field_sets)
     )
 
-    process = requirements_pex.create_process(
+    process = pylint_runner_pex.create_process(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path=f"./pylint_runner.pex",
+        # TODO: figure out how to get this working with PEX..
+        env={"PYTHONPATH": build_root.path},
         pex_args=generate_args(specified_source_files=specified_source_files, pylint=pylint),
         input_digest=input_digest,
         description=f"Run Pylint on {pluralize(len(field_sets), 'target')}: {address_references}.",
