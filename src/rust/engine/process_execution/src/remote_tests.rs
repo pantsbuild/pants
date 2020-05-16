@@ -1015,7 +1015,7 @@ async fn ensure_inline_stdio_is_stored() {
   {
     assert_eq!(
       local_store
-        .load_file_bytes_with(test_stdout.digest(), |v| v,)
+        .load_file_bytes_with(test_stdout.digest(), |v| Bytes::from(v))
         .await
         .unwrap()
         .unwrap()
@@ -1024,7 +1024,7 @@ async fn ensure_inline_stdio_is_stored() {
     );
     assert_eq!(
       local_store
-        .load_file_bytes_with(test_stderr.digest(), |v| v,)
+        .load_file_bytes_with(test_stderr.digest(), |v| Bytes::from(v))
         .await
         .unwrap()
         .unwrap()
