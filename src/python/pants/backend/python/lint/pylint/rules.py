@@ -127,6 +127,7 @@ async def pylint_lint(
         ),
     )
 
+    # print(prepared_python_sources.snapshot.files)
     input_digest = await Get[Digest](
         MergeDigests(
             (
@@ -144,6 +145,7 @@ async def pylint_lint(
     process = requirements_pex.create_process(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
+        env={"PYTHONPATH": "./plugins"},
         pex_path=f"./pylint.pex",
         pex_args=generate_args(specified_source_files=specified_source_files, pylint=pylint),
         input_digest=input_digest,

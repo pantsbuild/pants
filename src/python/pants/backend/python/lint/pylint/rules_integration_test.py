@@ -246,7 +246,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
                 __implements__ = IAstroidChecker
                 name = "print_checker"
                 msgs = {
-                    "PB001": ("`print` statements are banned", "print-statement-used", ""),
+                    "C9871": ("`print` statements are banned", "print-statement-used", ""),
                 }
 
                 def visit_call(self, node):
@@ -257,7 +257,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
                 linter.register_checker(PrintChecker(linter)
             """
         )
-        self.create_file("build-support/pylint_plugin.py", plugin_content)
+        self.create_file("build-support/plugins/print_plugin.py", plugin_content)
         self.add_to_build_file(
             "",
             dedent(
@@ -270,12 +270,12 @@ class PylintIntegrationTest(ExternalToolTestBase):
             ),
         )
         self.add_to_build_file(
-            "build-support",
+            "build-support/plugins",
             dedent(
                 """\
                 pylint_source_plugin(
-                    name='pylint_plugin',
-                    sources=['pylint_plugin.py'],
+                    name='print_plugin',
+                    sources=['print_plugin.py'],
                     dependencies=['//:pylint'],
                 )"""
             ),
@@ -286,10 +286,11 @@ class PylintIntegrationTest(ExternalToolTestBase):
         result = self.run_pylint(
             [target],
             additional_args=[
-                "--pylint-source-plugins=['build-support:pylint_plugin']",
+                "--pylint-source-plugins=['build-support/plugins:print_plugin']",
                 f"--source-root-patterns=['build-support', '{self.source_root}']",
             ],
-            passthrough_args="--load-plugins=pylint_plugin",
+            passthrough_args="--load-plugins=print_plugin",
         )
+        # print(result)
         assert result.exit_code == 4
-        assert "source_plugin.py:2:0: PB001" in result.stdout
+        assert "source_plugin.py:2:0: C9871" in result.stdout
