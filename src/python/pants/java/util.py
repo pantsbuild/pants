@@ -316,7 +316,7 @@ def relativize_classpath(classpath, root_dir, followlinks=True):
     """
 
     def relativize_url(url, root_dir):
-        # When symlink is involed, root_dir concatenated with the returned relpath may not exist.
+        # When symlink is involved, root_dir concatenated with the returned relpath may not exist.
         # Consider on mac `/var` is a symlink of `/private/var`, the relative path of subdirectories
         # under /var to any other directories under `/` computed by os.path.relpath misses one level
         # of `..`. Use os.path.realpath to guarantee returned relpath can always be located.
