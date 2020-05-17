@@ -298,6 +298,29 @@ pub enum Failure {
   },
 }
 
+impl Failure {
+  ///
+  /// Consumes this Failure to produce a new Failure with an additional engine_traceback entry.
+  ///
+  pub fn with_pushed_frame(self, frame: &impl fmt::Display) -> Failure {
+    match self {
+      Failure::Invalidated => Failure::Invalidated,
+      Failure::Throw {
+        val,
+        python_traceback,
+        mut engine_traceback,
+      } => {
+        engine_traceback.push(format!("{}", frame));
+        Failure::Throw {
+          val,
+          python_traceback,
+          engine_traceback,
+        }
+      }
+    }
+  }
+}
+
 impl fmt::Display for Failure {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     match self {
@@ -307,13 +330,17 @@ impl fmt::Display for Failure {
   }
 }
 
+pub fn native_python_traceback(msg: &str) -> String {
+  format!(
+    "Traceback (no traceback):\n  <pants native internals>\nException: {}",
+    msg
+  )
+}
+
 pub fn throw(msg: &str) -> Failure {
   Failure::Throw {
     val: externs::create_exception(msg),
-    python_traceback: format!(
-      "Traceback (no traceback):\n  <pants native internals>\nException: {}",
-      msg
-    ),
+    python_traceback: native_python_traceback(msg),
     engine_traceback: Vec::new(),
   }
 }

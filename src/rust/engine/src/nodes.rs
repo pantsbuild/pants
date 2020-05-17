@@ -32,7 +32,7 @@ use hashing;
 use process_execution::{self, MultiPlatformProcess, PlatformConstraint, Process, RelativePath};
 use rule_graph;
 
-use graph::{Entry, Node, NodeError, NodeTracer, NodeVisualizer};
+use graph::{Entry, Node, NodeError, NodeVisualizer};
 use store::{self, StoreFileByDigest};
 use workunit_store::{new_span_id, scope_task_workunit_state, WorkunitMetadata};
 
@@ -89,10 +89,6 @@ pub trait WrappedNode: Into<NodeKey> {
 
 ///
 /// A Node that selects a product for some Params.
-///
-/// A Select can be satisfied by multiple sources, but fails if multiple sources produce a value.
-/// The 'params' represent a series of type-keyed parameters that will be used by Nodes in the
-/// subgraph below this Select.
 ///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Select {
@@ -960,45 +956,6 @@ impl NodeVisualizer<NodeKey> for Visualizer {
   }
 }
 
-pub struct Tracer;
-
-impl NodeTracer<NodeKey> for Tracer {
-  fn is_bottom(result: Option<Result<NodeResult, Failure>>) -> bool {
-    match result {
-      Some(Err(Failure::Invalidated)) => false,
-      Some(Err(Failure::Throw { .. })) => false,
-      Some(Ok(_)) => true,
-      None => {
-        // A Node with no state is either still running, or effectively cancelled
-        // because a dependent failed. In either case, it's not useful to render
-        // them, as we don't know whether they would have succeeded or failed.
-        true
-      }
-    }
-  }
-
-  fn state_str(indent: &str, result: Option<Result<NodeResult, Failure>>) -> String {
-    match result {
-      None => "<None>".to_string(),
-      Some(Ok(ref x)) => format!("{:?}", x),
-      Some(Err(Failure::Throw {
-        ref val,
-        ref python_traceback,
-        ..
-      })) => format!(
-        "Throw({})\n{}",
-        externs::val_to_str(val),
-        python_traceback
-          .split('\n')
-          .map(|l| format!("{}    {}", indent, l))
-          .collect::<Vec<_>>()
-          .join("\n")
-      ),
-      Some(Err(Failure::Invalidated)) => "Invalidated".to_string(),
-    }
-  }
-}
-
 ///
 /// There is large variance in the sizes of the members of this enum, so a few of them are boxed.
 ///
@@ -1063,24 +1020,26 @@ impl Node for NodeKey {
   fn run(self, context: Context) -> NodeFuture<NodeResult> {
     let mut workunit_state = workunit_store::expect_workunit_state();
 
-    let started_workunit_id = {
+    let (started_workunit_id, user_facing_name) = {
+      let user_facing_name = self.user_facing_name();
       let display = context.session.should_handle_workunits()
-        && (self.user_facing_name().is_some() || self.display_info().is_some());
+        && (user_facing_name.is_some() || self.display_info().is_some());
       let name = self.workunit_name();
       let span_id = new_span_id();
 
       // We're starting a new workunit: record our parent, and set the current parent to our span.
       let parent_id = std::mem::replace(&mut workunit_state.parent_id, Some(span_id.clone()));
       let metadata = WorkunitMetadata {
-        desc: self.user_facing_name(),
+        desc: user_facing_name.clone(),
         display,
         blocked: false,
       };
 
-      context
+      let started_workunit_id = context
         .session
         .workunit_store()
-        .start_workunit(span_id, name, parent_id, metadata)
+        .start_workunit(span_id, name, parent_id, metadata);
+      (started_workunit_id, user_facing_name)
     };
 
     scope_task_workunit_state(Some(workunit_state), async move {
@@ -1097,7 +1056,7 @@ impl Node for NodeKey {
         Ok(())
       };
 
-      let result = match maybe_watch {
+      let mut result = match maybe_watch {
         Ok(()) => match self {
           NodeKey::DigestFile(n) => n.run(context).map(NodeResult::from).compat().await,
           NodeKey::DownloadedFile(n) => n.run(context).map(NodeResult::from).compat().await,
@@ -1112,6 +1071,9 @@ impl Node for NodeKey {
         },
         Err(e) => Err(e),
       };
+      if let Some(user_facing_name) = user_facing_name {
+        result = result.map_err(|failure| failure.with_pushed_frame(&user_facing_name));
+      }
       context2
         .session
         .workunit_store()

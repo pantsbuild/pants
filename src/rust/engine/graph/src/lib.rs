@@ -38,7 +38,7 @@ pub use crate::entry::{Entry, EntryState};
 use crate::entry::{Generation, RunToken};
 
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::fs::{File, OpenOptions};
+use std::fs::File;
 use std::hash::BuildHasherDefault;
 use std::io::{self, BufWriter, Write};
 use std::path::Path;
@@ -49,7 +49,6 @@ use fnv::FnvHasher;
 use futures::compat::Future01CompatExt;
 use futures::future::{FutureExt, TryFutureExt};
 use futures01::future::{self, Future};
-use indexmap::IndexSet;
 use log::{debug, trace, warn};
 use parking_lot::Mutex;
 use petgraph::graph::DiGraph;
@@ -57,7 +56,7 @@ use petgraph::visit::EdgeRef;
 use petgraph::Direction;
 use tokio::time::delay_for;
 
-pub use crate::node::{EntryId, Node, NodeContext, NodeError, NodeTracer, NodeVisualizer};
+pub use crate::node::{EntryId, Node, NodeContext, NodeError, NodeVisualizer};
 use boxfuture::{BoxFuture, Boxable};
 
 type FNV = BuildHasherDefault<FnvHasher>;
@@ -424,133 +423,6 @@ impl<N: Node> InnerGraph<N> {
     }
 
     f.write_all(b"}\n")?;
-    Ok(())
-  }
-
-  fn trace<T: NodeTracer<N>>(
-    &self,
-    roots: &[N],
-    file_path: &Path,
-    context: &N::Context,
-  ) -> Result<(), String> {
-    let root_ids: IndexSet<EntryId, FNV> = roots
-      .iter()
-      .filter_map(|nk| self.entry_id(nk))
-      .cloned()
-      .collect();
-
-    // Find all bottom Nodes for the trace by walking recursively under the roots.
-    let bottom_nodes = {
-      let mut queue: VecDeque<_> = root_ids.iter().cloned().collect();
-      let mut visited: HashSet<EntryId, FNV> = HashSet::default();
-      let mut bottom_nodes = Vec::new();
-      while let Some(id) = queue.pop_front() {
-        if !visited.insert(id) {
-          continue;
-        }
-
-        // If all dependencies are bottom nodes, then we represent a failure.
-        let mut non_bottom_deps = self
-          .pg
-          .neighbors_directed(id, Direction::Outgoing)
-          .filter(|dep_id| !T::is_bottom(self.unsafe_entry_for_id(*dep_id).peek(context)))
-          .peekable();
-
-        if non_bottom_deps.peek().is_none() {
-          bottom_nodes.push(id);
-        } else {
-          // Otherwise, continue recursing on `rest`.
-          queue.extend(non_bottom_deps);
-        }
-      }
-      bottom_nodes
-    };
-
-    // Invert the graph into a evenly-weighted dependent graph by cloning it and stripping out
-    // the Nodes (to avoid cloning them), adding equal edge weights, and then reversing it.
-    // Because we do not remove any Nodes or edges, all EntryIds remain stable.
-    let dependent_graph = {
-      let mut dg = self.pg.filter_map(|_, _| Some(()), |_, _| Some(1.0));
-      dg.reverse();
-      dg
-    };
-
-    // Render the shortest path through the dependent graph to any root for each bottom_node.
-    for bottom_node in bottom_nodes {
-      // We use Bellman Ford because it actually records paths, unlike Dijkstra's.
-      let (path_weights, paths) = petgraph::algo::bellman_ford(&dependent_graph, bottom_node)
-        .unwrap_or_else(|e| {
-          panic!(
-            "There should not be any negative edge weights. Got: {:?}",
-            e
-          )
-        });
-
-      // Find the root with the shortest path weight.
-      let minimum_path_id = root_ids
-        .iter()
-        .min_by_key(|root_id| path_weights[root_id.index()] as usize)
-        .ok_or_else(|| "Encountered a Node that was not reachable from any roots.".to_owned())?;
-
-      // Collect the path by walking through the `paths` Vec, which contains the indexes of
-      // predecessor Nodes along a path to the bottom Node.
-      let path = {
-        let mut next_id = *minimum_path_id;
-        let mut path = Vec::new();
-        path.push(next_id);
-        while let Some(current_id) = paths[next_id.index()] {
-          path.push(current_id);
-          if current_id == bottom_node {
-            break;
-          }
-          next_id = current_id;
-        }
-        path
-      };
-
-      // Render the path.
-      self
-        .trace_render_path_to_file::<T>(&path, file_path, context)
-        .map_err(|e| format!("Failed to render trace to {:?}: {}", file_path, e))?;
-    }
-
-    Ok(())
-  }
-
-  ///
-  /// Renders a Graph path to the given file path.
-  ///
-  fn trace_render_path_to_file<T: NodeTracer<N>>(
-    &self,
-    path: &[EntryId],
-    file_path: &Path,
-    context: &N::Context,
-  ) -> io::Result<()> {
-    let file = OpenOptions::new().append(true).open(file_path)?;
-    let mut f = BufWriter::new(file);
-
-    let format = |eid: EntryId, depth: usize, is_last: bool| -> String {
-      let entry = self.unsafe_entry_for_id(eid);
-      let indent = "  ".repeat(depth);
-      let output = format!("{}Computing {}", indent, entry.node());
-      if is_last {
-        format!(
-          "{}\n{}  {}",
-          output,
-          indent,
-          T::state_str(&indent, entry.peek(context))
-        )
-      } else {
-        output
-      }
-    };
-
-    let mut path_iter = path.iter().enumerate().peekable();
-    while let Some((depth, id)) = path_iter.next() {
-      writeln!(&mut f, "{}", format(*id, depth, path_iter.peek().is_none()))?;
-    }
-
-    f.write_all(b"\n")?;
     Ok(())
   }
 
@@ -967,16 +839,6 @@ impl<N: Node> Graph<N> {
   pub fn invalidate_from_roots<P: Fn(&N) -> bool>(&self, predicate: P) -> InvalidationResult {
     let mut inner = self.inner.lock();
     inner.invalidate_from_roots(predicate)
-  }
-
-  pub fn trace<T: NodeTracer<N>>(
-    &self,
-    roots: &[N],
-    path: &Path,
-    context: &N::Context,
-  ) -> Result<(), String> {
-    let inner = self.inner.lock();
-    inner.trace::<T>(roots, path, context)
   }
 
   pub fn visualize<V: NodeVisualizer<N>>(
