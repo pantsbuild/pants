@@ -36,7 +36,7 @@ class ReportTestSuite:
 
     @classmethod
     def merged(cls, report_test_suites, error_on_conflict=True, logger=None):
-        """Merges any like-named test suites into one test suite encompasing all the suite's test
+        """Merges any like-named test suites into one test suite encompassing all the suite's test
         cases.
 
         :param report_test_suites: A sequence of test suites to merge results from.
