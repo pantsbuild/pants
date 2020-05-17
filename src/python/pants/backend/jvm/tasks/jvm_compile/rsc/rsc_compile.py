@@ -949,7 +949,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
                 break
         # TODO: figure out and document when would this happen.
         if runjava_workunit is None:
-            raise Exception("couldnt find work unit for underlying execution")
+            raise Exception("could not find work unit for underlying execution")
         return runjava_workunit
 
     # Mostly a copy-paste from ZincCompile.compile with many options removed
