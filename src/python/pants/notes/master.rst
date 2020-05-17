@@ -14016,7 +14016,7 @@ Options:
   Option is no longer used, `--version` is used to specify the major
   version. The runtime is created based on major version. The runtime
   target will be defined at the address `//:scala-library` unless it is
-  overriden by the option `--runtime-spec` and a `--version` is set to
+  overridden by the option `--runtime-spec` and a `--version` is set to
   custom.
 
 * `--spec-excludes`:
