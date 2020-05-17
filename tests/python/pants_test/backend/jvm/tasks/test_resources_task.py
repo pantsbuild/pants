@@ -175,14 +175,14 @@ class MinimalImplResourcesTaskTest(ResourcesTaskTestBase):
         self.assert_products(task, self.target("a:1"), 1, expected_confs=("a", "b"))
 
 
-class CustomInvalidationStrategtResourcesTaskTest(ResourcesTaskTestBase):
+class CustomInvalidationStrategyResourcesTaskTest(ResourcesTaskTestBase):
     class TagsInvalidationStrategy(DefaultFingerprintStrategy):
         def compute_fingerprint(self, target):
             return stable_json_sha1(sorted(target.tags))
 
     class CustomInvalidationStrategyResourcesTask(ResourcesTaskTestBase.MinimalImplResourcesTask):
         def create_invalidation_strategy(self):
-            return CustomInvalidationStrategtResourcesTaskTest.TagsInvalidationStrategy()
+            return CustomInvalidationStrategyResourcesTaskTest.TagsInvalidationStrategy()
 
     @classmethod
     def task_type(cls):
