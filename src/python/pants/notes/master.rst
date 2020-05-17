@@ -4401,7 +4401,7 @@ Bugfixes
 * Reinstate PosixFS Threadpool (#7848)
   `PR #7848 <https://github.com/pantsbuild/pants/pull/7848>`_
 
-* Fix remoting of V2 Python test runnner not being able to discover the Python interpreter (#7844)
+* Fix remoting of V2 Python test runner not being able to discover the Python interpreter (#7844)
   `PR #7844 <https://github.com/pantsbuild/pants/pull/7844>`_
 
 * Fix .pyc files being included to partially get reproducible PEX builds (#7841)
