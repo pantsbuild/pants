@@ -10928,7 +10928,7 @@ Refactoring, Improvements, and Tooling
 * Shard contrib tests. (#4650)
   `PR #4650 <https://github.com/pantsbuild/pants/pull/4650>`_
 
-* Fix new `PytestRun` task deselction handling. (#4648)
+* Fix new `PytestRun` task deselection handling. (#4648)
   `PR #4648 <https://github.com/pantsbuild/pants/pull/4648>`_
 
 * Simplify `TaskBase.invalidated`. (#4642)
