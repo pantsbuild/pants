@@ -84,7 +84,7 @@ class VersionedTargetSet:
         self._cache_manager.update(self)
 
     def force_invalidate(self):
-        # Note: This method isn't exposted as Public because the api is not yet
+        # Note: This method isn't exposed as Public because the api is not yet
         # finalized, however it is currently used by Square for plugins.  There is
         # an open OSS issue to finalize this API.  Please take care when changing
         # until https://github.com/pantsbuild/pants/issues/2532 is resolved.
