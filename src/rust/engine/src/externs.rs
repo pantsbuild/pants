@@ -417,9 +417,13 @@ pub struct PyResult {
 }
 
 impl PyResult {
-  fn failure_from(v: Value) -> Failure {
-    let traceback = project_str(&v, "_formatted_exc");
-    Failure::Throw(v, traceback)
+  fn failure_from(val: Value) -> Failure {
+    let python_traceback = project_str(&val, "_formatted_exc");
+    Failure::Throw {
+      val,
+      python_traceback,
+      engine_traceback: Vec::new(),
+    }
   }
 }
 
@@ -439,7 +443,7 @@ impl From<Result<Value, Failure>> for PyResult {
       Err(f) => {
         let val = match f {
           f @ Failure::Invalidated => create_exception(&format!("{}", f)),
-          Failure::Throw(exc, _) => exc,
+          Failure::Throw { val, .. } => val,
         };
         PyResult {
           is_throw: true,

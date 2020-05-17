@@ -61,10 +61,7 @@ impl VFS<Failure> for Context {
   }
 
   fn mk_error(msg: &str) -> Failure {
-    Failure::Throw(
-      externs::create_exception(msg),
-      "<pants native internals>".to_string(),
-    )
+    throw(msg)
   }
 }
 
@@ -949,7 +946,7 @@ impl NodeVisualizer<NodeKey> for Visualizer {
     let max_colors = 12;
     match entry.peek(context) {
       None => "white".to_string(),
-      Some(Err(Failure::Throw(..))) => "4".to_string(),
+      Some(Err(Failure::Throw { .. })) => "4".to_string(),
       Some(Err(Failure::Invalidated)) => "12".to_string(),
       Some(Ok(_)) => {
         let viz_colors_len = self.viz_colors.len();
@@ -969,7 +966,7 @@ impl NodeTracer<NodeKey> for Tracer {
   fn is_bottom(result: Option<Result<NodeResult, Failure>>) -> bool {
     match result {
       Some(Err(Failure::Invalidated)) => false,
-      Some(Err(Failure::Throw(..))) => false,
+      Some(Err(Failure::Throw { .. })) => false,
       Some(Ok(_)) => true,
       None => {
         // A Node with no state is either still running, or effectively cancelled
@@ -984,10 +981,14 @@ impl NodeTracer<NodeKey> for Tracer {
     match result {
       None => "<None>".to_string(),
       Some(Ok(ref x)) => format!("{:?}", x),
-      Some(Err(Failure::Throw(ref x, ref traceback))) => format!(
+      Some(Err(Failure::Throw {
+        ref val,
+        ref python_traceback,
+        ..
+      })) => format!(
         "Throw({})\n{}",
-        externs::val_to_str(x),
-        traceback
+        externs::val_to_str(val),
+        python_traceback
           .split('\n')
           .map(|l| format!("{}    {}", indent, l))
           .collect::<Vec<_>>()
