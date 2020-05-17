@@ -12187,7 +12187,7 @@ API Changes
 * Surface --dereference-symlinks flag to task caching level
   `RB #4338 <https://rbcommons.com/s/twitter/r/4338>`_
 
-* support mutually_exclusive_group paramater in option registration
+* support mutually_exclusive_group parameter in option registration
   `RB #4336 <https://rbcommons.com/s/twitter/r/4336>`_
 
 * Deprecate the `java_tests` alias in favor of `junit_tests`.
