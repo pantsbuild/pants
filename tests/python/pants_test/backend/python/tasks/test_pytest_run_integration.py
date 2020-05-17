@@ -63,7 +63,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
 
     @skip_unless_python27_and_python3_present
     def test_pants_test_interpreter_selection_with_pexrc(self):
-        """Test the pants test goal with intepreters selected from a PEX_PYTHON_PATH defined in a
+        """Test the pants test goal with interpreters selected from a PEX_PYTHON_PATH defined in a
         pexrc file on disk."""
         py27_path, py3_path = python_interpreter_path(PY_27), python_interpreter_path(PY_3)
         with setup_pexrc_with_pex_python_path([py27_path, py3_path]):
