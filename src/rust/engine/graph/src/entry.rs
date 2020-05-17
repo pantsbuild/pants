@@ -236,7 +236,7 @@ impl<N: Node> Entry<N> {
   /// that will be satisfied when it is changed in any way. If the node is not clean, or the
   /// generation mismatches, returns immediately.
   ///
-  /// NB: The returned Future is infalliable.
+  /// NB: The returned Future is infallible.
   ///
   pub fn poll(&self, context: &N::Context, last_seen_generation: Generation) -> BoxFuture<(), ()> {
     let mut state = self.state.lock();
