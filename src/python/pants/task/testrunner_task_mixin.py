@@ -411,7 +411,7 @@ class ChrootedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
 
     Provides support for testing (per target) options and helps ensure correct caching behavior.
 
-    It's expected that mixees implement proper chrooting (see `run_tests_in_chroot`) to support
+    It's expected that mixins implement proper chrooting (see `run_tests_in_chroot`) to support
     correct successful test result caching.
     """
 
