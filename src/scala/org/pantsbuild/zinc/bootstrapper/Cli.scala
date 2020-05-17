@@ -60,7 +60,7 @@ object Cli {
       .validate { file =>
         if (file.exists) success else failure(s"$file does not exist.")
       }
-      .text("Path to the scala rumtime library.")
+      .text("Path to the scala runtime library.")
 
     opt[File]("scala-reflect")
       .required()
