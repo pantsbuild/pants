@@ -27,7 +27,7 @@ class ThriftUtilTest(unittest.TestCase):
                 include "sub/a_included.thrift" //Todo comment
                 include "b_included.thrift"
                 include "c_included.thrift" #jibberish
-                include "d_included.thrift" some ramdon
+                include "d_included.thrift" some random
                 """,
             )
 
