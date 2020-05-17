@@ -420,7 +420,7 @@ Bugfixes
 * Markdown writer errors are written properly (#6975)
   `PR #6975 <https://github.com/pantsbuild/pants/pull/6975>`_
 
-* Fix unused_must_use, error in the futrue (#6999)
+* Fix unused_must_use, error in the future (#6999)
   `PR #6999 <https://github.com/pantsbuild/pants/pull/6999>`_
 
 * Add python version to the native cache key (#6991)
