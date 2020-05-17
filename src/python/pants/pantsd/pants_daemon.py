@@ -573,7 +573,7 @@ class PantsDaemon(FingerprintedProcessManager):
         """Overrides ProcessManager.needs_restart, to account for the case where pantsd is running
         but we want to shutdown after this run.
 
-        :param option_fingerprint: A fingeprint of the global bootstrap options.
+        :param option_fingerprint: A fingerprint of the global bootstrap options.
         :return: True if the daemon needs to restart.
         """
         should_shutdown_after_run = (
