@@ -218,7 +218,7 @@ def ensure_headings_linkable(soups):
 
 def ensure_page_headings_linkable(soup):
     # To avoid re-assigning an existing id, note 'em down.
-    # Case-insensitve because distinguishing links #Foo and #foo would be weird.
+    # Case-insensitive because distinguishing links #Foo and #foo would be weird.
     existing_anchors = find_existing_anchors(soup)
     count = 100
     for tag in soup.find_all(_heading_re):
