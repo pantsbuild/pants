@@ -19787,7 +19787,7 @@ Bugfixes
   - Dust off the Task Developer's Guide and `rm` the "pagerank" example
   - Add a `sitegen` task, create site with better navigation
   - For 'goal builddict', generate `.rst` and `.html`, not just `.rst`
-  - Narrow setup 'Operating System' classfiers to known-good
+  - Narrow setup 'Operating System' classifiers to known-good
 
   `Issue #16 <https://github.com/pantsbuild/pex/issues/16>`_
   `Issue #461 <https://github.com/pantsbuild/pants/issues/461>`_
