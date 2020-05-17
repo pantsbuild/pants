@@ -6056,7 +6056,7 @@ Refactoring, Improvements, and Tooling
 * Engine can store dict (#6996)
   `PR #6996 <https://github.com/pantsbuild/pants/pull/6996>`_
 
-* Programatically add rust config to vendored protos (#7000)
+* Programmatically add rust config to vendored protos (#7000)
   `PR #7000 <https://github.com/pantsbuild/pants/pull/7000>`_
 
 * Engine can store bools (#6994)
