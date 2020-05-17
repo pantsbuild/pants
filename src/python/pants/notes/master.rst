@@ -16059,7 +16059,7 @@ Bugfixes
 * Fix `BuildFileAddressMapper.scan_addresses`.
   `RB #2974 <https://rbcommons.com/s/twitter/r/2974>`_
 
-* Fix catchall except statments
+* Fix catchall except statements
   `RB #2971 <https://rbcommons.com/s/twitter/r/2971>`_
 
 * Fix pinger cache bug and add test.
