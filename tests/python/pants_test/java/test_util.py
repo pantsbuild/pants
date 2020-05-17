@@ -84,7 +84,7 @@ class ExecuteJavaTest(unittest.TestCase):
                     synthetic_jar_dir=self.SYNTHETIC_JAR_DIR,
                 )
 
-    def test_execute_java_no_synthentic_jar(self):
+    def test_execute_java_no_synthetic_jar(self):
         """
         :API: public
         """
