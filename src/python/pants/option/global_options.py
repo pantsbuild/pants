@@ -164,7 +164,7 @@ class GlobalOptions(Subsystem):
         alone parsed.
 
         Bootstrap option values can be interpolated into the config file, and can be referenced
-        programatically in registration code, e.g., as register.bootstrap.pants_workdir.
+        programmatically in registration code, e.g., as register.bootstrap.pants_workdir.
 
         Note that regular code can also access these options as normal global-scope options. Their
         status as "bootstrap options" is only pertinent during option registration.
