@@ -12,7 +12,7 @@
 # 	PEX_PYTHON_PATH=/path/to/python2.7:/path/to/python3.6
 #
 # Note that the basename of the python binaries specified must either be 'python' or 
-# 'pythonX.Y'. Specifing only major version (i.e. python3) will be ignored by Pants 
+# 'pythonX.Y'. Specifying only major version (i.e. python3) will be ignored by Pants 
 # interpreter filtration.
 # 
 
