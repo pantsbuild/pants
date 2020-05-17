@@ -355,7 +355,7 @@ Bugfixes
 * Fix `py-thrift-namespace-clash-check` type issue when logging with `--no-strict` mode (#7864)
   `PR #7864 <https://github.com/pantsbuild/pants/pull/7864>`_
 
-* Re-instate PosixFS Threadpool (#7848)
+* Reinstate PosixFS Threadpool (#7848)
   `PR #7848 <https://github.com/pantsbuild/pants/pull/7848>`_
 
 * Fix remoting of V2 Python test runnner not being able to discover the Python interpreter (#7844)
