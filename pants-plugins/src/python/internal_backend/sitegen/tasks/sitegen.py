@@ -234,7 +234,7 @@ def ensure_page_headings_linkable(soup):
 
 
 def link_pantsrefs(soups, precomputed):
-    """Transorm soups: <a pantsref="foo"> becomes <a href="../foo_page.html#foo">"""
+    """Transform soups: <a pantsref="foo"> becomes <a href="../foo_page.html#foo">"""
     for (page, soup) in soups.items():
         for a in soup.find_all("a"):
             if not a.has_attr("pantsref"):
