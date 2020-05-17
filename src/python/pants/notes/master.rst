@@ -14148,7 +14148,7 @@ Refactoring, Improvements, and Tooling
 * Bump the junit runner release to 1.0.4 to pick up latest code changes
   `RB #3599 <https://rbcommons.com/s/twitter/r/3599>`_
 
-* Re-add the ConsoleRunnerOutputTests and consolodate them into ConsoleRunnerTest, also move test clases used for testing into junit/lib directory
+* Re-add the ConsoleRunnerOutputTests and consolodate them into ConsoleRunnerTest, also move test classes used for testing into junit/lib directory
   `RB #2406 <https://rbcommons.com/s/twitter/r/2406>`_
   `RB #3588 <https://rbcommons.com/s/twitter/r/3588>`_
 
