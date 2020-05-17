@@ -16216,7 +16216,7 @@ Small improvements, Refactoring and Tooling
 * Make sure tests/python/pants_test:all runs all the tests
   `RB #2932 <https://rbcommons.com/s/twitter/r/2932>`_
 
-* Seperate out AddressMapper from Graph.
+* Separate out AddressMapper from Graph.
   `RB #2931 <https://rbcommons.com/s/twitter/r/2931>`_
 
 * Add timeout configuration to Pinger and add unittest.
