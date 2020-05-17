@@ -37,7 +37,7 @@ public class AnnotatedParallelClassesAndMethodsTest1 {
   }
 
   @Test
-  public void apmcatest11() throws Exception {
+  public void apcamtest11() throws Exception {
     awaitLatch("apcamtest11");
   }
 
