@@ -71,7 +71,7 @@ def execute_java(
     :param list workunit_labels: an optional sequence of labels for the work unit
     :param string cwd: optionally set the working directory
     :param WorkUnit.LogConfig workunit_log_config: an optional tuple of options affecting reporting
-    :param bool create_synthetic_jar: whether to create a synthentic jar that includes the original
+    :param bool create_synthetic_jar: whether to create a synthetic jar that includes the original
       classpath in its manifest.
     :param string synthetic_jar_dir: an optional directory to store the synthetic jar, if `None`
       a temporary directory will be provided and cleaned up upon process exit.
@@ -138,7 +138,7 @@ def execute_java_async(
     :param list workunit_labels: an optional sequence of labels for the work unit
     :param string cwd: optionally set the working directory
     :param WorkUnit.LogConfig workunit_log_config: an optional tuple of options affecting reporting
-    :param bool create_synthetic_jar: whether to create a synthentic jar that includes the original
+    :param bool create_synthetic_jar: whether to create a synthetic jar that includes the original
       classpath in its manifest.
     :param string synthetic_jar_dir: an optional directory to store the synthetic jar, if `None`
       a temporary directory will be provided and cleaned up upon process exit.
