@@ -168,10 +168,10 @@ async fn dropped_future_is_removed_from_queue() {
   let waiter = handle2.with_acquired(|| future::ready(()));
   let join_handle2 = tokio::spawn(async move {
     match future::select(delay_for(Duration::from_millis(100)), waiter.boxed()).await {
-      future::Either::Left(((), waiter_fute)) => {
+      future::Either::Left(((), waiter_future)) => {
         tx_thread2.send(()).unwrap();
         rx_thread2.await.unwrap();
-        drop(waiter_fute);
+        drop(waiter_future);
         ()
       }
       future::Either::Right(_) => {
