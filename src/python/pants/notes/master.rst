@@ -7015,7 +7015,7 @@ Bugfixes
 * pass through `compatibility` to synthetic python thrift targets (#6499)
   `PR #6499 <https://github.com/pantsbuild/pants/pull/6499>`_
 
-* Apply  workaround similer to #6409 to bootstrapper (#6498)
+* Apply  workaround similar to #6409 to bootstrapper (#6498)
   `PR #6498 <https://github.com/pantsbuild/pants/pull/6498>`_
 
 * Fix encoding of workunits under pantsd (#6505)
