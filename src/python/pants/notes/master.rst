@@ -15734,7 +15734,7 @@ of both the options and reporting systems.
 API Changes
 ~~~~~~~~~~~
 
-* Remove support for `type_` in jar_dependency. It has been superceded by the 'ext' argument
+* Remove support for `type_` in jar_dependency. It has been superseded by the 'ext' argument
   `Issue #2442 <https://github.com/pantsbuild/pants/issues/2442>`_
   `RB #3038 <https://rbcommons.com/s/twitter/r/3038>`_
 
