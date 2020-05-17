@@ -11320,7 +11320,7 @@ client stubs from WSDL sources. Thanks to Chris Heisterkamp for this!
 
 The release also pulls in a few fixes for python requirement resolution in the PEX library used by
 pants. In the past, the python-setup.resolver_allow_prereleases configuration option would not
-always be resepected; it now is. Additionally, a longstanding bug in transitive requirement
+always be respected; it now is. Additionally, a longstanding bug in transitive requirement
 resolution that would lead to erroneous 'Ambiguous resolvable' errors has now been fixed. Thanks to
 Todd Gardner and Nathan Butler for these fixes!
 
