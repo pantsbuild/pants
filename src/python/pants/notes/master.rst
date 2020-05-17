@@ -16791,7 +16791,7 @@ Small improvements, Refactoring and Tooling
 * Tighten up the node target hierarchy.
   `RB #2736 <https://rbcommons.com/s/twitter/r/2736>`_
 
-* Ensure pipeline failuires fail CI.
+* Ensure pipeline failures fail CI.
   `RB #2731 <https://rbcommons.com/s/twitter/r/2731>`_
 
 * Record the BUILD target alias in BuildFileAddress.
