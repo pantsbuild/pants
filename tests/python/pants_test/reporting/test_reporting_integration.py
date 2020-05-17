@@ -317,7 +317,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
 
             trace = assert_single_element(ZipkinHandler.traces.values())
 
-            v2_span_name_part = "Snapshot"
+            v2_span_name_part = "snapshot"
             self.assertTrue(
                 any(v2_span_name_part in span["name"] for span in trace),
                 "There is no span that contains '{}' in it's name. The trace:{}".format(
@@ -349,7 +349,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
 
             trace = assert_single_element(ZipkinHandler.traces.values())
 
-            v2_span_name_part = "Snapshot"
+            v2_span_name_part = "snapshot"
             self.assertTrue(
                 any(v2_span_name_part in span["name"] for span in trace),
                 "There is no span that contains '{}' in it's name. The trace:{}".format(
