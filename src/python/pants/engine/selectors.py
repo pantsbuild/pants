@@ -25,7 +25,7 @@ class Get(Generic[_Product]):
     """
 
     product: Type[_Product]
-    # TODO: Consider attemping to create a Get[_Product, _Subject] which still allows for the 2-arg
+    # TODO: Consider attempting to create a Get[_Product, _Subject] which still allows for the 2-arg
     # Get form, and then making this Type[_Subject]!
     subject_declared_type: Type
     subject: Optional[Any]
