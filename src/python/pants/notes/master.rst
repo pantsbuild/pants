@@ -12277,7 +12277,7 @@ Refactoring, Improvements, and Tooling
 * [python-ng] A task to select a python interpreter.
   `RB #4346 <https://rbcommons.com/s/twitter/r/4346>`_
 
-* Parallize thrift linter
+* Parallelize thrift linter
   `RB #4351 <https://rbcommons.com/s/twitter/r/4351>`_
 
 * normalize filespec exclude usage
