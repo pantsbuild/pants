@@ -12232,7 +12232,7 @@ Bugfixes
   `RB #4253 <https://rbcommons.com/s/twitter/r/4253>`_
   `RB #4314 <https://rbcommons.com/s/twitter/r/4314>`_
 
-* Fix exlucde_target_regexp breakage in test-changed and --files option breakage in changed with diffspec
+* Fix exclude_target_regexp breakage in test-changed and --files option breakage in changed with diffspec
   `RB #4321 <https://rbcommons.com/s/twitter/r/4321>`_
 
 * Prevent cleanup error at end of pants test with --test-junit-html-report option, update safe_rmtree to be symlink aware
