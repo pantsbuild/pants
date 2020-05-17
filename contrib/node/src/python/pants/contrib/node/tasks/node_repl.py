@@ -83,5 +83,5 @@ class NodeRepl(ReplTaskMixin, NodeTask):
         #   self-contained.
         # 2. There's no simple entry point (binary) for Node.js packages. A package may start from
         #   node, babel-node, babel-polyfill, webpack, etc.
-        # In addition, since the repl task is modifing the package.json and there is no lockdown,
+        # In addition, since the repl task is modifying the package.json and there is no lockdown,
         # it is impossible to use yarnpkg to start repl unless the dependency resolver is removed.
