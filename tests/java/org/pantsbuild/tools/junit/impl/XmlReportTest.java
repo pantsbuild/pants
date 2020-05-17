@@ -24,7 +24,7 @@ import org.pantsbuild.tools.junit.lib.XmlReportAssumeTest;
 import org.pantsbuild.tools.junit.lib.XmlReportFailInSetupTest;
 import org.pantsbuild.tools.junit.lib.XmlReportFailingParameterizedTest;
 import org.pantsbuild.tools.junit.lib.XmlReportFailingTestRunnerTest;
-import org.pantsbuild.tools.junit.lib.XmlReportFirstTestIngoredTest;
+import org.pantsbuild.tools.junit.lib.XmlReportFirstTestIgnoredTest;
 import org.pantsbuild.tools.junit.lib.XmlReportIgnoredTestSuiteTest;
 import org.pantsbuild.tools.junit.lib.XmlReportMockitoStubbingTest;
 import org.pantsbuild.tools.junit.lib.XmlReportTestSuite;
@@ -155,7 +155,7 @@ public class XmlReportTest extends ConsoleRunnerTestBase {
 
   @Test
   public void testXmlReportFirstTestIgnored() throws Exception {
-    String testClassName = XmlReportFirstTestIngoredTest.class.getCanonicalName();
+    String testClassName = XmlReportFirstTestIgnoredTest.class.getCanonicalName();
     AntJunitXmlReportListener.TestSuite testSuite = runTestAndParseXml(testClassName, false);
 
     assertNotNull(testSuite);
