@@ -10410,7 +10410,7 @@ Bugfixes
 * Repair requests range pin to include higher versions. (#4916)
   `PR #4916 <https://github.com/pantsbuild/pants/pull/4916>`_
 
-* Use Jessie not Weezy for docker image on travis (#4912)
+* Use Jessie not Wheezy for docker image on travis (#4912)
   `PR #4912 <https://github.com/pantsbuild/pants/pull/4912>`_
 
 * Fixup build script to rebuild only when needed. (#4908)
