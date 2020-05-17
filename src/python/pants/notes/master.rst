@@ -18978,7 +18978,7 @@ Bugfixes and features
 * Fixup Config to find DEFAULT values for missing sections
   `RB #1851 <https://rbcommons.com/s/twitter/r/1851>`_
 
-* Get published artifact classfier from config
+* Get published artifact classifier from config
   `RB #1857 <https://rbcommons.com/s/twitter/r/1857>`_
 
 * Make Context.targets() include synthetic targets
