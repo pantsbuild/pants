@@ -12,6 +12,7 @@
   "contrib/confluence/src/python",
   "contrib/go/3rdparty/go",
   "contrib/go/examples/3rdparty/go",
+  "contrib/go/examples/src/go",
   "contrib/go/examples/src/go/src",
   "contrib/go/examples/src/protobuf",
   "contrib/go/src/python",
