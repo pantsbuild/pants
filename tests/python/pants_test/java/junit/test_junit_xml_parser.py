@@ -200,7 +200,7 @@ class TestParseFailedTargets(unittest.TestCase):
                 fp.write(
                     """
                     <testsuite failures="1" errors="0">
-                      <testcase classname="org.pantsbuild.subpackage.AnotherFailure" name="testAnotherFailue">
+                      <testcase classname="org.pantsbuild.subpackage.AnotherFailure" name="testAnotherFailure">
                         <failure/>
                       </testcase>
                     </testsuite>
@@ -216,7 +216,7 @@ class TestParseFailedTargets(unittest.TestCase):
                     },
                     "Jane": {JUnitTest("org.pantsbuild.Error", "testError")},
                     "Mary": {
-                        JUnitTest("org.pantsbuild.subpackage.AnotherFailure", "testAnotherFailue")
+                        JUnitTest("org.pantsbuild.subpackage.AnotherFailure", "testAnotherFailure")
                     },
                 },
                 failed_targets,

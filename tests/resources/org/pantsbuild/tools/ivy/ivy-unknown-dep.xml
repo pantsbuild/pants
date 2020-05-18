@@ -5,6 +5,6 @@
       status="release"
   />
   <dependencies>
-    <dependency org="unknwon" name="unknown" rev="1.0"/>
+    <dependency org="unknown" name="unknown" rev="1.0"/>
   </dependencies>
 </ivy-module>

@@ -926,7 +926,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     # The classpath is parameterized so that we can have a single nailgun instance serving all of our
     # execution requests.
     def _runtool_nonhermetic(self, parent_workunit, classpath, main, tool_name, distribution, ctx):
-        # Scalac -Youtline cannot coexist with zinc jar in the same nailgun in a mulitithreaded run
+        # Scalac -Youtline cannot coexist with zinc jar in the same nailgun in a multithreaded run
         # Forcing scalac -Youtline to run as a separate process circumvents this problem
         use_youtline = tool_name == "scalac-outliner"
 
@@ -949,7 +949,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
                 break
         # TODO: figure out and document when would this happen.
         if runjava_workunit is None:
-            raise Exception("couldnt find work unit for underlying execution")
+            raise Exception("could not find work unit for underlying execution")
         return runjava_workunit
 
     # Mostly a copy-paste from ZincCompile.compile with many options removed

@@ -25,7 +25,7 @@ python_library(
     description='A scalable build tool for large, complex, heterogeneous repos.',
     namespace_packages=['pants', 'pants.backend'],
     # NB: by setting `ext_modules`, we signal to setup_py and bdist_wheel that this library
-    # has native code. As a consquence, bdist_wheel pins the ABI (application binary interface)
+    # has native code. As a consequence, bdist_wheel pins the ABI (application binary interface)
     # used when creating the wheel, which is a good thing. We should be setting this ABI to ensure
     # consumers of pantsbuild.pants are using a compatible interpreter.
     # TODO(7344): the tuple syntax for ext_modules is deprecated. Use Extension once we support it.

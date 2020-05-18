@@ -221,7 +221,7 @@ public class JarBuilder implements Closeable {
     }
 
     /**
-     * Creates a handler that merges well-known mergeable resources and otherwise skips duplicates.
+     * Creates a handler that merges well-known mergable resources and otherwise skips duplicates.
      * <p>
      * Merged resources include META-INF/services/ files.
      * </p>

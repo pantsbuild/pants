@@ -131,7 +131,7 @@ your version number commit is present. After confirming this, run:
     $ ./build-support/bin/release.sh -n
 
 This will perform a dry run local build of the pantsbuild.pants wheel
-and other related package wheelss, install them in a virtualenv and then
+and other related package wheels, install them in a virtualenv and then
 smoke test basic operations.
 
 Note that in addition to CI checking dry runs work, the release publish

@@ -300,7 +300,7 @@ class SimpleCodegenTaskTest(TaskTestBase):
         for source in bad.sources_relative_to_source_root():
             self.assertNotIn(source, tuple(parent.sources_relative_to_source_root()))
 
-    def test_duplicated_code_generation_nodupes(self):
+    def test_duplicated_code_generation_nodups(self):
         # Without the duplicated target, either mode is fine.
         targets = self._get_duplication_test_targets()[:-1]
         self._do_test_duplication(targets, allow_dups=False, should_fail=False)

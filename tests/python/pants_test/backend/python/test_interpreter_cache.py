@@ -75,7 +75,7 @@ class TestInterpreterCache(TestBase):
             )
 
     @skip_unless_python27_and_python36_present
-    def test_interpereter_cache_setup_using_pex_python_paths(self):
+    def test_interpreter_cache_setup_using_pex_python_paths(self):
         """Test cache setup using interpreters from a mocked PEX_PYTHON_PATH."""
         py27_path, py36_path = python_interpreter_path(PY_27), python_interpreter_path(PY_36)
         with setup_pexrc_with_pex_python_path([py27_path, py36_path]):

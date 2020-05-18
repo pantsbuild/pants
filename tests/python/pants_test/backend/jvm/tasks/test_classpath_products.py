@@ -532,7 +532,7 @@ class ClasspathProductsTest(TestBase):
                 excludes={Exclude(org="org", name="y")},
             )
 
-        # incrementally delete the resource dendendency
+        # incrementally delete the resource dependency
         classpath_products = ClasspathProducts(self.pants_workdir)
         classpath_products.add_for_target(a, [("default", self._create_file("a.jar"))])
         self._test_canonical_classpath_helper(
