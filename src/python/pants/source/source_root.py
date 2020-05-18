@@ -5,7 +5,7 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Dict, List, Optional, Sequence, Set, Tuple
+from typing import Dict, Iterable, Optional, Sequence, Set, Tuple
 
 from pants.base.deprecated import deprecated_conditional
 from pants.engine.collection import Collection
@@ -33,7 +33,7 @@ class SourceRoots:
 
     def __init__(
         self,
-        roots: List[str],
+        roots: Iterable[str],
         fail_if_unmatched: bool = True,
         source_root_config: Optional["SourceRootConfig"] = None,
     ) -> None:
@@ -41,7 +41,7 @@ class SourceRoots:
 
         Non-test code should not instantiate directly. See SourceRootConfig.get_source_roots().
         """
-        self._roots: Set[PurePath] = set(PurePath(root) for root in roots)
+        self._roots = set(PurePath(root) for root in roots)
         # TODO: In 1.30.0.dev0 remove the trie entirely.
         self._trie = None if self._roots else source_root_config.create_trie()
         self._fail_if_unmatched = fail_if_unmatched
@@ -260,11 +260,10 @@ class SourceRootConfig(Subsystem):
             # explicit about this when integrating Pants.  It's a fairly trivial thing to do.
             default=[],
             advanced=True,
-            help="A list of source roots, relative to the repo root. A source root represents "
-            "the root of a package hierarchy, e.g., when resolving imports. See "
-            "https://pants.readme.io/docs/source-roots. "
-            "Use `^` to signify that the buildroot itself is a source root. "
-            "See https://pants.readme.io/docs/source-roots.",
+            help="A list of source roots, relative to the repository root. A source root "
+            "represents the root of a package hierarchy, e.g., when resolving imports. "
+            'Use "." to signify that the repository root itself is a source root. '
+            "See https://pants.readme.io/docs/source-roots. ",
         )
 
     @memoized_method
@@ -292,9 +291,9 @@ class SourceRootConfig(Subsystem):
             lambda: True,
             removal_version="1.30.0.dev0",
             entity_description="the *_root_patterns and *_roots options",
-            hint_message="Explicitly list your source roots with the `root_patterns` option in "
+            hint_message="Explicitly list your source roots with the `roots` option in "
             "the [source] scope. See https://pants.readme.io/docs/source-roots. "
-            f"Your current roots are covered by: [{', '.join(legacy_patterns)}]",
+            f"See your current roots with `{self.options.pants_bin_name} roots`.",
         )
         return trie
 
