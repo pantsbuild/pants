@@ -43,7 +43,7 @@ class SourceRoots:
         """
         self._roots = set(PurePath(root) for root in roots)
         # TODO: In 1.30.0.dev0 remove the trie entirely.
-        self._trie = None if self._roots else source_root_config.create_trie()  # type: ignore
+        self._trie = None if self._roots else source_root_config.create_trie()  # type: ignore[union-attr]
         self._fail_if_unmatched = fail_if_unmatched
 
     def add_source_root(self, path):
@@ -101,7 +101,7 @@ class SourceRoots:
             return SourceRoot(path)
 
     def traverse(self) -> Set[str]:
-        return sorted(str(r) for r in self._roots) if self._roots else self._trie.traverse()  # type: ignore
+        return sorted(str(r) for r in self._roots) if self._roots else self._trie.traverse()  # type: ignore[union-attr]
 
 
 class SourceRootConfig(Subsystem):
