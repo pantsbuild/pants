@@ -8,7 +8,6 @@ from pants.base.exiter import ExitCode
 from pants.base.specs import AddressSpecs, FilesystemSpecs, SingleAddress, Specs
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.build_graph.build_file_parser import BuildFileParser
 from pants.engine.addresses import Addresses
 from pants.engine.legacy.graph import LegacyBuildGraph
 from pants.engine.legacy.round_engine import RoundEngine
@@ -102,7 +101,6 @@ class GoalRunnerFactory:
 
     def _setup_context(self):
         with self._run_tracker.new_workunit(name="setup", labels=[WorkUnitLabel.SETUP]):
-            build_file_parser = BuildFileParser(self._build_config, self._root_dir)
             build_graph, address_mapper = self._graph_session.create_build_graph(
                 self._specs, self._root_dir
             )
@@ -128,7 +126,6 @@ class GoalRunnerFactory:
                 target_roots=target_root_instances,
                 requested_goals=self._options.goals,
                 build_graph=build_graph,
-                build_file_parser=build_file_parser,
                 build_configuration=self._build_config,
                 address_mapper=address_mapper,
                 invalidation_report=invalidation_report,

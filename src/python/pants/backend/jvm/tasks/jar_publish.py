@@ -18,12 +18,10 @@ from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.backend.jvm.tasks.jar_task import JarTask
 from pants.backend.jvm.tasks.properties import Properties
 from pants.base.build_environment import get_buildroot, get_scm
-from pants.base.build_file import BuildFile
 from pants.base.exceptions import TaskError
 from pants.base.generator import Generator, TemplateData
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
-from pants.build_graph.build_file_parser import BuildFileParser
 from pants.build_graph.build_graph import sort_targets
 from pants.ivy.bootstrapper import Bootstrapper
 from pants.ivy.ivy import Ivy
@@ -507,11 +505,7 @@ class JarPublish(HasTransitiveOptionMixin, ScmPublishMixin, JarTask):
                     if not self._is_exported(target):
                         raise TaskError(f"{coordinate} is not an exported target")
                     return target.provides.org, target.provides.name
-                except (
-                    BuildFile.BuildFileError,
-                    BuildFileParser.BuildFileParserError,
-                    AddressLookupError,
-                ) as e:
+                except AddressLookupError as e:
                     raise TaskError(f"{e!r}\n  Problem identifying target at {spec}")
 
         self.overrides = {}
