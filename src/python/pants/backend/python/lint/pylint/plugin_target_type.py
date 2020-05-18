@@ -16,7 +16,7 @@ class PylintPluginDependencies(Dependencies):
 
     These targets must either be third-party Python dependencies
     (https://pants.readme.io/docs/python-third-party-dependencies) or be located within this
-    target's same directory or a subdirectory.
+    target's same directory or a subdirectory, due to restrictions with Pylint plugins.
     """
 
 
@@ -42,7 +42,7 @@ class PylintSourcePlugin(Target):
     scope (see https://pants.readme.io/docs/python-linters-and-formatters). Set `load-plugins` in
     your config file, like you'd do with a source plugin.
 
-    This target is treated similarly to a `python_library` target. For example, Python linters
+    This target type is treated similarly to a `python_library` target. For example, Python linters
     and formatters will run on this target.
 
     You can include other targets in the `dependencies` field, so long as those targets are

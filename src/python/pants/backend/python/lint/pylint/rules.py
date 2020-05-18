@@ -24,7 +24,7 @@ from pants.core.goals.lint import LinterFieldSet, LinterFieldSets, LintResult
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.engine.addresses import Address, Addresses
-from pants.engine.fs import Digest, MergeDigests, PathGlobs, Snapshot
+from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests, PathGlobs, Snapshot
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import SubsystemRule, named_rule
 from pants.engine.selectors import Get, MultiGet
@@ -83,7 +83,6 @@ async def pylint_lint(
         Tuple[TransitiveTargets, Targets],
         await MultiGet([plugin_targets_request, targets_with_dependencies_request]),
     )
-    targets = Targets((*plugin_targets.closure, *targets_with_dependencies))
 
     # NB: Pylint output depends upon which Python interpreter version it's run with. See
     # http://pylint.pycqa.org/en/latest/faq.html#what-versions-of-python-is-pylint-supporting.
@@ -156,7 +155,10 @@ async def pylint_lint(
         )
     )
 
-    prepare_python_sources_request = Get[ImportablePythonSources](Targets, targets)
+    prepare_plugin_sources_request = Get[ImportablePythonSources](Targets(plugin_targets.closure))
+    prepare_python_sources_request = Get[ImportablePythonSources](
+        Targets(targets_with_dependencies)
+    )
     specified_source_files_request = Get[SourceFiles](
         SpecifiedSourceFilesRequest(
             ((field_set.sources, field_set.origin) for field_set in field_sets),
@@ -169,20 +171,30 @@ async def pylint_lint(
         requirements_pex,
         pylint_runner_pex,
         config_snapshot,
+        prepared_plugin_sources,
         prepared_python_sources,
         specified_source_files,
     ) = cast(
-        Tuple[Pex, Pex, Pex, Snapshot, ImportablePythonSources, SourceFiles],
+        Tuple[
+            Pex, Pex, Pex, Snapshot, ImportablePythonSources, ImportablePythonSources, SourceFiles
+        ],
         await MultiGet(
             [
                 pylint_pex_request,
                 requirements_pex_request,
                 pylint_runner_pex_request,
                 config_snapshot_request,
+                prepare_plugin_sources_request,
                 prepare_python_sources_request,
                 specified_source_files_request,
             ]
         ),
+    )
+
+    prefixed_plugin_sources = (
+        await Get[Digest](AddPrefix(prepared_plugin_sources.snapshot.digest, "__plugins"))
+        if pylint.source_plugins
+        else EMPTY_DIGEST
     )
 
     input_digest = await Get[Digest](
@@ -192,6 +204,7 @@ async def pylint_lint(
                 requirements_pex.digest,
                 pylint_runner_pex.digest,
                 config_snapshot.digest,
+                prefixed_plugin_sources,
                 prepared_python_sources.snapshot.digest,
             )
         ),
@@ -206,10 +219,11 @@ async def pylint_lint(
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path="./pylint_runner.pex",
         # NB: Pylint source plugins must be explicitly loaded via PYTHONPATH. The value must
-        # point to the plugin's directory, rather than to a parent directory, because
-        # `load-plugins` takes a module name rather than a path to the module. This means users
-        # must specify the parent directory as a source root pattern.
-        env={"PYTHONPATH": "./"} if pylint.source_plugins else None,
+        # point to the plugin's directory, rather than to a parent's directory, because
+        # `load-plugins` takes a module name rather than a path to the module; i.e. `plugin`, but
+        # not `path.to.plugin`. (This means users must have specified the parent directory as a
+        # source root.)
+        env={"PYTHONPATH": "./__plugins"} if pylint.source_plugins else None,
         pex_args=generate_args(specified_source_files=specified_source_files, pylint=pylint),
         input_digest=input_digest,
         description=f"Run Pylint on {pluralize(len(field_sets), 'target')}: {address_references}.",
