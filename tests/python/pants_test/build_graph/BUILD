@@ -54,17 +54,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'build_file_parser',
-  sources = ['test_build_file_parser.py'],
-  dependencies = [
-    'src/python/pants/base:build_file',
-    'src/python/pants/build_graph',
-    'src/python/pants/testutil:test_base',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_tests(
   sources = ['test_build_graph.py'],
   dependencies = [
     'src/python/pants/java/jar',
