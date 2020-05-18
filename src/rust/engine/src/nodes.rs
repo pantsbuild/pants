@@ -942,9 +942,7 @@ impl NodeVisualizer<NodeKey> for Visualizer {
     let max_colors = 12;
     match entry.peek(context) {
       None => "white".to_string(),
-      Some(Err(Failure::Throw { .. })) => "4".to_string(),
-      Some(Err(Failure::Invalidated)) => "12".to_string(),
-      Some(Ok(_)) => {
+      Some(_) => {
         let viz_colors_len = self.viz_colors.len();
         self
           .viz_colors
