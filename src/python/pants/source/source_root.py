@@ -43,7 +43,7 @@ class SourceRoots:
         """
         self._roots = set(PurePath(root) for root in roots)
         # TODO: In 1.30.0.dev0 remove the trie entirely.
-        self._trie = None if self._roots else source_root_config.create_trie()
+        self._trie = None if self._roots else source_root_config.create_trie()  # type: ignore
         self._fail_if_unmatched = fail_if_unmatched
 
     def add_source_root(self, path):
@@ -69,9 +69,9 @@ class SourceRoots:
 
         Raises an error if there is no known source root for the path.
         """
-        matched = self._find_root(PurePath(path))
-        if matched:
-            return SourceRoot(path=str(matched))
+        matched_path = self._find_root(PurePath(path))
+        if matched_path:
+            return SourceRoot(path=str(matched_path))
         if self._trie:
             matched = self._trie.find(path)
             if matched:
@@ -101,7 +101,7 @@ class SourceRoots:
             return SourceRoot(path)
 
     def traverse(self) -> Set[str]:
-        return sorted(str(r) for r in self._roots) if self._roots else self._trie.traverse()
+        return sorted(str(r) for r in self._roots) if self._roots else self._trie.traverse()  # type: ignore
 
 
 class SourceRootConfig(Subsystem):
