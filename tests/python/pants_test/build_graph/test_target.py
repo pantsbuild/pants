@@ -114,7 +114,7 @@ class TargetTest(TestBase):
                 "tag_targets_mappings": {
                     "special_tag": ["foo:bar", "path/to/target:foo", "path/to/target"],
                     "special_tag2": ["path/to/target:target", "//base:foo"],
-                    "nonextant_target_tag": ["i/dont/exist"],
+                    "nonexistent_target_tag": ["i/dont/exist"],
                 }
             }
         }

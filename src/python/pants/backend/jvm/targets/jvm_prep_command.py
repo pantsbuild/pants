@@ -65,7 +65,7 @@ class JvmPrepCommand(RuntimePlatformMixin, JvmTarget):
         **kwargs
     ):
         """
-        :param args: A list of command-line args to the excutable.
+        :param args: A list of command-line args to the executable.
         :param goal: Pants goal to run this command in [test, binary or compile]. If not specified,
                      runs in 'test'
         :param jvm_options: extra options to pass the JVM

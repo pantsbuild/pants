@@ -31,7 +31,7 @@ class ReverseDepmap(ConsoleTask):
             "--transitive",
             type=bool,
             default=False,
-            help="Whether to include only the first level of dependendees.",
+            help="Whether to include only the first level of dependencies.",
         )
 
     def __init__(self, *args, **kwargs):

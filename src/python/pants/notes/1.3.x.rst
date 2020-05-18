@@ -483,7 +483,7 @@ client stubs from WSDL sources. Thanks to Chris Heisterkamp for this!
 
 The release also pulls in a few fixes for python requirement resolution in the PEX library used by
 pants. In the past, the python-setup.resolver_allow_prereleases configuration option would not
-always be resepected; it now is. Additionally, a longstanding bug in transitive requirement
+always be respected; it now is. Additionally, a longstanding bug in transitive requirement
 resolution that would lead to erroneous 'Ambiguous resolvable' errors has now been fixed. Thanks to
 Todd Gardner and Nathan Butler for these fixes!
 
@@ -1350,7 +1350,7 @@ API Changes
 * Surface --dereference-symlinks flag to task caching level
   `RB #4338 <https://rbcommons.com/s/twitter/r/4338>`_
 
-* support mutually_exclusive_group paramater in option registration
+* support mutually_exclusive_group parameter in option registration
   `RB #4336 <https://rbcommons.com/s/twitter/r/4336>`_
 
 * Deprecate the `java_tests` alias in favor of `junit_tests`.
@@ -1395,7 +1395,7 @@ Bugfixes
   `RB #4253 <https://rbcommons.com/s/twitter/r/4253>`_
   `RB #4314 <https://rbcommons.com/s/twitter/r/4314>`_
 
-* Fix exlucde_target_regexp breakage in test-changed and --files option breakage in changed with diffspec
+* Fix exclude_target_regexp breakage in test-changed and --files option breakage in changed with diffspec
   `RB #4321 <https://rbcommons.com/s/twitter/r/4321>`_
 
 * Prevent cleanup error at end of pants test with --test-junit-html-report option, update safe_rmtree to be symlink aware
@@ -1430,7 +1430,7 @@ Refactoring, Improvements, and Tooling
   `RB #4342 <https://rbcommons.com/s/twitter/r/4342>`_
   `RB #4340 <https://rbcommons.com/s/twitter/r/4340>`_
 
-* Perf improvement: rebase analyis file once instead of multiple times
+* Perf improvement: rebase analysis file once instead of multiple times
   `Issue #8 <https://github.com/pantsbuild/zincutils/issues/8>`_
   `RB #4352 <https://rbcommons.com/s/twitter/r/4352>`_
 
@@ -1440,7 +1440,7 @@ Refactoring, Improvements, and Tooling
 * [python-ng] A task to select a python interpreter.
   `RB #4346 <https://rbcommons.com/s/twitter/r/4346>`_
 
-* Parallize thrift linter
+* Parallelize thrift linter
   `RB #4351 <https://rbcommons.com/s/twitter/r/4351>`_
 
 * normalize filespec exclude usage

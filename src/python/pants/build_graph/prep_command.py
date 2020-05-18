@@ -55,7 +55,7 @@ class PrepCommand(Target):
         :API: public
 
         :param prep_executable: The path to the executable that should be run.
-        :param prep_args: A list of command-line args to the excutable.
+        :param prep_args: A list of command-line args to the executable.
         :param prep_environ: If True, the output of the command will be treated as
           a \\\\0-separated list of key=value pairs to insert into the environment.
           Note that this will pollute the environment for all future tests, so

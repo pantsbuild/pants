@@ -86,7 +86,7 @@ impl<N: Node> InnerGraph<N> {
     self.nodes.get(node)
   }
 
-  // TODO: Now that we never delete Entries, we should consider making this infalliable.
+  // TODO: Now that we never delete Entries, we should consider making this infallible.
   fn entry_for_id(&self, id: EntryId) -> Option<&Entry<N>> {
     self.pg.node_weight(id)
   }
@@ -744,7 +744,7 @@ impl<N: Node> Graph<N> {
         .poll(context, generation)
         .compat()
         .await
-        .expect("Polling is infalliable");
+        .expect("Polling is infallible");
       if let Some(delay) = delay {
         delay_for(delay).await;
       }

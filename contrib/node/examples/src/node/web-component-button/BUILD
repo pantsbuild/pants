@@ -27,7 +27,7 @@ node_test(
   tags={'integration', 'partially_type_checked'},
 )
 
-# Contains non-transpiled codes including all subdirectories under node_modules dirctory.
+# Contains non-transpiled codes including all subdirectories under node_modules directory.
 node_bundle(
   name='web-component-button-bundle',
   node_module=':web-component-button'

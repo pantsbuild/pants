@@ -420,7 +420,7 @@ Bugfixes
 * Markdown writer errors are written properly (#6975)
   `PR #6975 <https://github.com/pantsbuild/pants/pull/6975>`_
 
-* Fix unused_must_use, error in the futrue (#6999)
+* Fix unused_must_use, error in the future (#6999)
   `PR #6999 <https://github.com/pantsbuild/pants/pull/6999>`_
 
 * Add python version to the native cache key (#6991)
@@ -466,7 +466,7 @@ Refactoring, Improvements, and Tooling
 * Engine can store dict (#6996)
   `PR #6996 <https://github.com/pantsbuild/pants/pull/6996>`_
 
-* Programatically add rust config to vendored protos (#7000)
+* Programmatically add rust config to vendored protos (#7000)
   `PR #7000 <https://github.com/pantsbuild/pants/pull/7000>`_
 
 * Engine can store bools (#6994)

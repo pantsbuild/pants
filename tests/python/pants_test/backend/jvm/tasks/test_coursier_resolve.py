@@ -263,8 +263,8 @@ class CoursierResolveTest(NailgunTaskTestBase):
     def test_when_invalid_hardlink_and_coursier_cache_should_trigger_resolve(self):
         jar_lib = self._make_junit_target()
         with self._temp_workdir():
-            with temporary_dir() as couriser_cache_dir, self._temp_task_cache_dir():
-                self.set_options_for_scope("coursier", cache_dir=couriser_cache_dir)
+            with temporary_dir() as coursier_cache_dir, self._temp_task_cache_dir():
+                self.set_options_for_scope("coursier", cache_dir=coursier_cache_dir)
 
                 context = self.context(target_roots=[jar_lib])
                 task = self.execute(context)
@@ -284,7 +284,7 @@ class CoursierResolveTest(NailgunTaskTestBase):
                 safe_delete(path)
 
                 # Remove coursier's cache
-                safe_rmtree(couriser_cache_dir)
+                safe_rmtree(coursier_cache_dir)
 
                 util.execute_runner = MagicMock()
 

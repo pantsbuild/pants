@@ -51,7 +51,7 @@ class BuildConfigurationTest(unittest.TestCase):
             self.assertEqual("jake", target_proxy.addressed_name)
             self.assertEqual(Fred, target_proxy.addressed_type)
 
-    def test_register_target_macro_facory(self):
+    def test_register_target_macro_factory(self):
         class Fred(Target):
             pass
 

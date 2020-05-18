@@ -291,7 +291,7 @@ Refactoring, Improvements, and Tooling
 * [rsc] break out metacp-ing jars into a separate job in RscCompile (#6538)
   `PR #6538 <https://github.com/pantsbuild/pants/pull/6538>`_
 
-* Relativise paths (#6553)
+* Relativize paths (#6553)
   `PR #6558 <https://github.com/pantsbuild/pants/issues/6558>`_
   `PR #6553 <https://github.com/pantsbuild/pants/pull/6553>`_
 
@@ -313,7 +313,7 @@ Refactoring, Improvements, and Tooling
 * Use .jdk dir for hermetic execution (#6502)
   `PR #6502 <https://github.com/pantsbuild/pants/pull/6502>`_
 
-* Relativise path to compiler bridge (#6546)
+* Relativize path to compiler bridge (#6546)
   `PR #6546 <https://github.com/pantsbuild/pants/pull/6546>`_
 
 * Make the sizes of the members of `enum Node` more uniform (#6545)
@@ -362,7 +362,7 @@ Bugfixes
 * pass through `compatibility` to synthetic python thrift targets (#6499)
   `PR #6499 <https://github.com/pantsbuild/pants/pull/6499>`_
 
-* Apply  workaround similer to #6409 to bootstrapper (#6498)
+* Apply  workaround similar to #6409 to bootstrapper (#6498)
   `PR #6498 <https://github.com/pantsbuild/pants/pull/6498>`_
 
 * Fix encoding of workunits under pantsd (#6505)

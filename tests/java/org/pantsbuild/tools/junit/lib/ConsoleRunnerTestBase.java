@@ -26,7 +26,7 @@ public abstract class ConsoleRunnerTestBase {
   private static final String USE_EXPERIMENTAL_RUNNER_FLAG = "-use-experimental-runner";
   private static final String PARALLEL_THREADS_FLAG = "-parallel-threads";
 
-  private static final String DEFAULT_TEST_PACKGE = "org.pantsbuild.tools.junit.lib.";
+  private static final String DEFAULT_TEST_PACKAGE = "org.pantsbuild.tools.junit.lib.";
 
   protected TestParameters parameters;
 
@@ -113,8 +113,8 @@ public abstract class ConsoleRunnerTestBase {
     List<String> testArgs = new ArrayList<String>();
     for (String arg : Splitter.on(" ").split(argsString)) {
       // Prepend the package name to tests to allow shorthand command line invocation
-      if (arg.contains("Test") && !arg.contains(DEFAULT_TEST_PACKGE)) {
-        arg = DEFAULT_TEST_PACKGE + arg;
+      if (arg.contains("Test") && !arg.contains(DEFAULT_TEST_PACKAGE)) {
+        arg = DEFAULT_TEST_PACKAGE + arg;
       }
       testArgs.add(arg);
     }

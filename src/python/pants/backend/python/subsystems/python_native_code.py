@@ -44,7 +44,7 @@ class PythonNativeCode(Subsystem):
             advanced=True,
             help="The extensions recognized for native source files in `python_dist()` sources.",
         )
-        # TODO(#7735): move the --cpp-flags and --ld-flags to a general subprocess support subystem.
+        # TODO(#7735): move the --cpp-flags and --ld-flags to a general subprocess support subsystem.
         register(
             "--cpp-flags",
             type=list,

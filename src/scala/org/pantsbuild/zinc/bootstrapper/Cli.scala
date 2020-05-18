@@ -18,7 +18,7 @@ case class Configuration(
 
 object Cli {
   val CliParser = new scopt.OptionParser[Configuration]("scopt") {
-    head("zinc-boostrapper", "0.0.1")
+    head("zinc-bootstrapper", "0.0.1")
 
     opt[File]('o', "out")
       .required()
@@ -60,7 +60,7 @@ object Cli {
       .validate { file =>
         if (file.exists) success else failure(s"$file does not exist.")
       }
-      .text("Path to the scala rumtime library.")
+      .text("Path to the scala runtime library.")
 
     opt[File]("scala-reflect")
       .required()

@@ -57,7 +57,7 @@ public class ConcurrentComputer extends Computer {
             // TODO(zundel): Change long wait?
             boolean awaitResult = fService.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
             if (!awaitResult) {
-              throw new ConcurrentTestRunnerException("Did not terminate all tests sucessfully.");
+              throw new ConcurrentTestRunnerException("Did not terminate all tests successfully.");
             }
             for (Future<?> testResult : testResults.keySet()) {
               if (testResult.isDone()) {
