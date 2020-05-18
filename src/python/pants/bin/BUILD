@@ -88,6 +88,7 @@ python_binary(
     'build-support/regexes',
     'build-support/scalafmt',
     'build-support/scalastyle',
+    'build-support/source_roots',
     'contrib:plugins',
     'pants-plugins/src/python/internal_backend:plugins',
   ],

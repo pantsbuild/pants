@@ -83,7 +83,7 @@ pants_ignore.add = [
 ]
 
 [source]
-roots = "@source_roots.json"
+roots = "@build-support/source_roots/source_roots.json"
 
 [cache]
 # Caching is on globally by default, but we disable it here for development purposes.

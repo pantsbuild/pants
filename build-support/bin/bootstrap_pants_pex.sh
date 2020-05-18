@@ -58,6 +58,7 @@ function calculate_pants_pex_current_hash() {
      "${REPO_ROOT}/build-support/regexes" \
      "${REPO_ROOT}/build-support/scalafmt" \
      "${REPO_ROOT}/build-support/scalastyle" \
+     "${REPO_ROOT}/build-support/source_roots" \
      "${REPO_ROOT}/contrib" \
      "${REPO_ROOT}/src/python" \
      "${REPO_ROOT}/pants-plugins" \
