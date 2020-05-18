@@ -10,7 +10,7 @@ travis_parallelism = 4
 
 [GLOBAL]
 # Override color support detection - we want colors and Travis supports them.
-use_colors = true
+colors = true
 
 [black]
 args = ["--quiet"]
