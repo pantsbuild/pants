@@ -1,7 +1,6 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import logging
 from typing import Set
 
 from pants.engine.console import Console
@@ -10,8 +9,6 @@ from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import SubsystemRule, goal_rule, rule
 from pants.engine.selectors import Get
 from pants.source.source_root import AllSourceRoots, SourceRoot, SourceRootConfig
-
-logger = logging.getLogger(__name__)
 
 
 class RootsOptions(LineOriented, GoalSubsystem):
@@ -61,9 +58,9 @@ async def all_roots(source_root_config: SourceRootConfig) -> AllSourceRoots:
 
 
 @goal_rule
-async def list_roots(console: Console, options: RootsOptions, all_roots: AllSourceRoots) -> Roots:
+async def list_roots(console: Console, options: RootsOptions, asr: AllSourceRoots) -> Roots:
     with options.line_oriented(console) as print_stdout:
-        for src_root in sorted(all_roots, key=lambda x: x.path):
+        for src_root in sorted(asr, key=lambda x: x.path):
             print_stdout(src_root.path or ".")
     return Roots(exit_code=0)
 
