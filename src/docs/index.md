@@ -30,7 +30,7 @@ Medium and [[other companies|pants('src/docs:powered_by')]].
 
 <br/>
 
-If you are only using Python in your project, check out https://pants.readme.io/docs/welcome-to-pants for documentation using the improved V2 implementation.
+If you are only using Python in your project, check out [pants.readme.io/docs](https://pants.readme.io/docs) for documentation using the improved V2 implementation.
 
 Getting Started
 ---------------

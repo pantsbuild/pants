@@ -122,19 +122,13 @@ class PantsReleases(Subsystem):
     def _branch_name(cls, version):
         """Defines a mapping between versions and branches.
 
-        In particular, `-dev` suffixed releases always live on master. Any other (modern) release
-        lives in a branch.
+        All releases, including dev releases, map to a particular branch page.
         """
         suffix = version.public[len(version.base_version) :]
         components = version.base_version.split(".") + [suffix]
-        if suffix == "" or suffix.startswith("rc"):
-            # An un-suffixed, or suffixed-with-rc version is a release from a stable branch.
-            return "{}.{}.x".format(*components[:2])
-        elif suffix.startswith(".dev"):
-            # Suffixed `dev` release version in master.
-            return "master"
-        else:
+        if suffix != "" and not (suffix.startswith("rc") or suffix.startswith("dev")):
             raise ValueError(f"Unparseable pants version number: {version}")
+        return "{}.{}.x".format(*components[:2])
 
     def notes_for_version(self, version) -> str:
         """Given the parsed Version of pants, return its release notes.
