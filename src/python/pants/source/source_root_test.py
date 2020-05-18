@@ -1,24 +1,47 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+import pytest
 
-from pants.source.source_root import SourceRoot, SourceRoots, SourceRootTrie
+from pants.source.source_root import NoSourceRootError, SourceRoot, SourceRoots, SourceRootTrie
 from pants.testutil.test_base import TestBase
 
 
 def test_source_root_at_buildroot() -> None:
-    srs = SourceRoots([""])
+    srs = SourceRoots(["/"])
     assert SourceRoot(".") == srs.strict_find_by_path("foo/bar.py")
     assert SourceRoot(".") == srs.strict_find_by_path("foo/")
     assert SourceRoot(".") == srs.strict_find_by_path("foo")
 
 
-def test_source_roots() -> None:
-    srs = SourceRoots(["root1", "foo/root2", "root1/root3"])
+def test_fixed_source_roots() -> None:
+    srs = SourceRoots(["/root1", "/foo/root2", "/root1/root3"])
     assert SourceRoot("root1") == srs.strict_find_by_path("root1/bar.py")
     assert SourceRoot("foo/root2") == srs.strict_find_by_path("foo/root2/bar/baz.py")
     assert SourceRoot("root1/root3") == srs.strict_find_by_path("root1/root3/qux.py")
     assert SourceRoot("root1/root3") == srs.strict_find_by_path("root1/root3/qux/quux.py")
     assert SourceRoot("root1/root3") == srs.strict_find_by_path("root1/root3")
+    with pytest.raises(NoSourceRootError):
+        srs.strict_find_by_path("blah/blah.py")
+
+
+def test_source_root_suffixes() -> None:
+    srs = SourceRoots(["src/python", "/"])
+    assert SourceRoot("src/python") == srs.strict_find_by_path("src/python/foo/bar.py")
+    assert SourceRoot("src/python/foo/src/python") == srs.strict_find_by_path(
+        "src/python/foo/src/python/bar.py"
+    )
+    assert SourceRoot(".") == srs.strict_find_by_path("foo/bar.py")
+
+
+def test_source_root_patterns() -> None:
+    srs = SourceRoots(["src/*", "/project/*"])
+    assert SourceRoot("src/python") == srs.strict_find_by_path("src/python/foo/bar.py")
+    assert SourceRoot("src/python/foo/src/shell") == srs.strict_find_by_path(
+        "src/python/foo/src/shell/bar.sh"
+    )
+    assert SourceRoot("project/python") == srs.strict_find_by_path("project/python/foo/bar.py")
+    with pytest.raises(NoSourceRootError):
+        srs.strict_find_by_path("prefix/project/python/foo/bar.py")
 
 
 class SourceRootTest(TestBase):

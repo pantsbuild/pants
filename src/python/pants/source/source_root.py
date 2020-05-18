@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class SourceRoot:
-    path: str
+    path: str  # Relative path from the repo root.
 
 
 class NoSourceRootError(Exception):
@@ -28,23 +28,15 @@ class AllSourceRoots(Collection[SourceRoot]):
     pass
 
 
-class SourceRoots:
-    """An interface for querying source roots."""
+class SourceRootPatternMatcher:
+    # We perform pattern matching against absolute paths, where "/" represents the repo root.
+    _repo_root = PurePath(os.path.sep)
 
-    def __init__(
-        self,
-        roots: Iterable[str],
-        fail_if_unmatched: bool = True,
-        source_root_config: Optional["SourceRootConfig"] = None,
-    ) -> None:
-        """Create an object for querying source roots via patterns in a trie.
+    def __init__(self, root_patterns: Iterable[str]):
+        self._root_patterns = list(root_patterns)
 
-        Non-test code should not instantiate directly. See SourceRootConfig.get_source_roots().
-        """
-        self._roots = set(PurePath(root) for root in roots)
-        # TODO: In 1.30.0.dev0 remove the trie entirely.
-        self._trie = None if self._roots else source_root_config.create_trie()  # type: ignore[union-attr]
-        self._fail_if_unmatched = fail_if_unmatched
+    def get_patterns(self) -> Tuple[str, ...]:
+        return tuple(self._root_patterns)
 
     def add_source_root(self, path):
         """Add the specified fixed source root, which must be relative to the buildroot.
@@ -53,23 +45,66 @@ class SourceRoots:
         unknown structure.  Tests should prefer to use dirs that match our source root patterns
         instead of explicitly setting source roots here.
         """
-        self._roots.add(PurePath(path))
+        self._root_patterns.append(str(self._repo_root / path))
 
-    def _find_root(self, path: PurePath) -> Optional[PurePath]:
-        while str(path) != ".":
-            if path in self._roots:
-                return path
-            path = path.parent
-        if path in self._roots:
-            return path
+    def _match_root_patterns(self, putative_root: PurePath) -> bool:
+        for pattern in self._root_patterns:
+            if putative_root.match(pattern):
+                return True
+        return False
+
+    def find_root(self, relpath: str) -> Optional[PurePath]:
+        """Return the source root for the given path, relative to the repo root."""
+        # Note: This is currently O(n) where n is the number of patterns, which
+        # we expect to be small.  We can optimize if it becomes necessary.
+        putative_root = self._repo_root / relpath
+        while putative_root != self._repo_root:
+            if self._match_root_patterns(putative_root):
+                return putative_root.relative_to(self._repo_root)
+            putative_root = putative_root.parent
+        if self._match_root_patterns(putative_root):
+            return putative_root.relative_to(self._repo_root)
         return None
+
+
+class SourceRoots:
+    """An interface for querying source roots."""
+
+    # TODO: Can be simplified/merged into SourceRootPatternMatcher once the deprecated trie is gone.
+
+    def __init__(
+        self,
+        root_patterns: Iterable[str],
+        fail_if_unmatched: bool = True,
+        source_root_config: Optional["SourceRootConfig"] = None,
+    ) -> None:
+        """Create an object for querying source roots via patterns in a trie.
+
+        Non-test code should not instantiate directly. See SourceRootConfig.get_source_roots().
+        """
+        self._pattern_matcher = SourceRootPatternMatcher(root_patterns)
+        # TODO: In 1.30.0.dev0 remove the trie entirely.
+        self._trie = None if self._pattern_matcher.get_patterns() else source_root_config.create_trie()  # type: ignore[union-attr]
+        self._fail_if_unmatched = fail_if_unmatched
+
+    # We perform pattern matching against absolute paths, where "/" represents the repo root.
+    _repo_root = PurePath(os.path.sep)
+
+    def add_source_root(self, path):
+        """Add the specified fixed source root, which must be relative to the buildroot.
+
+        Useful in a limited set of circumstances, e.g., when unpacking sources from a jar with
+        unknown structure.  Tests should prefer to use dirs that match our source root patterns
+        instead of explicitly setting source roots here.
+        """
+        self._pattern_matcher.add_source_root(path)
 
     def strict_find_by_path(self, path: str) -> SourceRoot:
         """Find the source root for the given path.
 
         Raises an error if there is no known source root for the path.
         """
-        matched_path = self._find_root(PurePath(path))
+        matched_path = self._pattern_matcher.find_root(path)
         if matched_path:
             return SourceRoot(path=str(matched_path))
         if self._trie:
@@ -100,8 +135,8 @@ class SourceRoots:
             # If no source root is found, use the path directly.
             return SourceRoot(path)
 
-    def traverse(self) -> Set[str]:
-        return sorted(str(r) for r in self._roots) if self._roots else self._trie.traverse()  # type: ignore[union-attr]
+    def get_patterns(self) -> Set[str]:
+        return self._trie.traverse() if self._trie else sorted(self._pattern_matcher.get_patterns())
 
 
 class SourceRootConfig(Subsystem):
@@ -185,7 +220,7 @@ class SourceRootConfig(Subsystem):
             default=cls._DEFAULT_SOURCE_ROOT_PATTERNS,
             advanced=True,
             removal_version="1.30.0.dev0",
-            removal_hint="Use --roots instead.",
+            removal_hint="Use --root-patterns instead.",
             help=pattern_help_fmt.format("source"),
         )
         register(
@@ -196,7 +231,7 @@ class SourceRootConfig(Subsystem):
             default=cls._DEFAULT_TEST_ROOT_PATTERNS,
             advanced=True,
             removal_version="1.30.0.dev0",
-            removal_hint="Use --roots instead.",
+            removal_hint="Use --root-patterns instead.",
             help=pattern_help_fmt.format("test"),
         )
         register(
@@ -207,7 +242,7 @@ class SourceRootConfig(Subsystem):
             default=cls._DEFAULT_THIRDPARTY_ROOT_PATTERNS,
             advanced=True,
             removal_version="1.30.0.dev0",
-            removal_hint="Use --roots instead.",
+            removal_hint="Use --root-patterns instead.",
             help=pattern_help_fmt.format("third-party"),
         )
 
@@ -224,7 +259,7 @@ class SourceRootConfig(Subsystem):
             default=cls._DEFAULT_SOURCE_ROOTS,
             advanced=True,
             removal_version="1.30.0.dev0",
-            removal_hint="Use --roots instead.",
+            removal_hint="Use --root-patterns instead.",
             help=fixed_help_fmt.format("source"),
         )
         register(
@@ -235,7 +270,7 @@ class SourceRootConfig(Subsystem):
             default=cls._DEFAULT_TEST_ROOTS,
             advanced=True,
             removal_version="1.30.0.dev0",
-            removal_hint="Use --roots instead.",
+            removal_hint="Use --root-patterns instead.",
             help=fixed_help_fmt.format("test"),
         )
         register(
@@ -246,13 +281,13 @@ class SourceRootConfig(Subsystem):
             default=cls._DEFAULT_THIRDPARTY_ROOTS,
             advanced=True,
             removal_version="1.30.0.dev0",
-            removal_hint="Use --roots instead.",
+            removal_hint="Use --root-patterns instead.",
             help=fixed_help_fmt.format("third-party"),
         )
 
         register(
-            "--roots",
-            metavar='["path/to/root1", "path/to/root2", ...]',
+            "--root-patterns",
+            metavar='["pattern1", "pattern2", ...]',
             type=list,
             fingerprint=True,
             # For Python a good default might be the repo root, but that would be a bad default
@@ -260,15 +295,19 @@ class SourceRootConfig(Subsystem):
             # explicit about this when integrating Pants.  It's a fairly trivial thing to do.
             default=[],
             advanced=True,
-            help="A list of source roots, relative to the repository root. A source root "
-            "represents the root of a package hierarchy, e.g., when resolving imports. "
-            'Use "." to signify that the repository root itself is a source root. '
-            "See https://pants.readme.io/docs/source-roots. ",
+            help="A list of source root suffixes. A directory with this suffix will be considered "
+            "a potential source root. E.g., `src/python` will match `<buildroot>/src/python`, "
+            "`<buildroot>/project1/src/python` etc. Prepend a `/` to anchor the match at the "
+            "buildroot.  E.g., `/src/python` will match `<buildroot>/src/python` but not "
+            "`<buildroot>/project1/src/python`.  A `*` wildcard will match a single path segment, "
+            "e.g., `src/*` will match `<buildroot>/src/python` and `<buildroot>/src/rust`. "
+            "Use `/` to signify that the buildroot itself is a source root. "
+            "See https://pants.readme.io/docs/source-roots.",
         )
 
     @memoized_method
     def get_source_roots(self):
-        return SourceRoots(self.options.roots, self.options.unmatched == "fail", self)
+        return SourceRoots(self.options.root_patterns, self.options.unmatched == "fail", self)
 
     def create_trie(self) -> "SourceRootTrie":
         """Create a trie of source root patterns from options."""
@@ -291,7 +330,7 @@ class SourceRootConfig(Subsystem):
             lambda: True,
             removal_version="1.30.0.dev0",
             entity_description="the *_root_patterns and *_roots options",
-            hint_message="Explicitly list your source roots with the `roots` option in "
+            hint_message="Explicitly list your source roots with the `root_patterns` option in "
             "the [source] scope. See https://pants.readme.io/docs/source-roots. "
             f"See your current roots with `{self.options.pants_bin_name} roots`.",
         )
