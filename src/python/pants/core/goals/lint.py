@@ -33,10 +33,20 @@ class LintResult:
 
     @staticmethod
     def from_fallible_process_result(
-        process_result: FallibleProcessResult, *, linter_name: str, strip_chroot_path: bool = False
+        process_result: FallibleProcessResult,
+        *,
+        linter_name: str,
+        strip_chroot_path: bool = False,
+        rstrip: bool = False
     ) -> "LintResult":
         def prep_output(s: bytes) -> str:
-            return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
+            if strip_chroot_path:
+                s = strip_v2_chroot_path(s)
+            else:
+                s.decode()
+            if rstrip:
+                s = s.rstrip()
+            return s
 
         return LintResult(
             exit_code=process_result.exit_code,
