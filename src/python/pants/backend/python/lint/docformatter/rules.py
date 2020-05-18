@@ -155,7 +155,7 @@ async def docformatter_lint(
         return LintResult.noop()
     setup = await Get[Setup](SetupRequest(field_sets, check_only=True))
     result = await Get[FallibleProcessResult](Process, setup.process)
-    return LintResult.from_fallible_process_result(result, linter_name="Docformatter")
+    return LintResult.from_fallible_process_result(result, linter_name="Docformatter", rstrip=True)
 
 
 def rules():
