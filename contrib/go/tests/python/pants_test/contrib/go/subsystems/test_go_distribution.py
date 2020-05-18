@@ -39,7 +39,7 @@ class GoDistributionTest(unittest.TestCase):
         go_env = go_distribution.go_env()
 
         # As of go 1.8, when GOPATH is unset (set to ''), it defaults to ~/go (assuming HOME is set -
-        # and we can't unset that since it might legitmately be used by the subcommand) - so we manually
+        # and we can't unset that since it might legitimately be used by the subcommand) - so we manually
         # fetch the "unset" default value here as our expected value for tests below.
         # The key thing to note here is this default value is used only when `gopath` passed to
         # `GoDistribution` is None, implying the command to be run does not need or use a GOPATH.

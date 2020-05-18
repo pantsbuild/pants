@@ -108,14 +108,14 @@ class M2Coordinate(object):
         :rtype: string
         """
 
-        def maybe_compenent(component):
+        def maybe_component(component):
             return "-{}".format(component) if component else ""
 
         return "{org}-{name}{rev}{classifier}.{ext}".format(
             org=self.org,
             name=self.name,
-            rev=maybe_compenent(self.rev),
-            classifier=maybe_compenent(self.classifier),
+            rev=maybe_component(self.rev),
+            classifier=maybe_component(self.classifier),
             ext=self.ext,
         )
 

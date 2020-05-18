@@ -19,7 +19,7 @@ class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
         """Temporarily create a BUILD file in the root for custom scala testing."""
         if os.path.exists(self.tmp_build_file_path):
             raise RuntimeError(
-                "BUILD file exists failing to avoid overwritting file."
+                "BUILD file exists failing to avoid overwriting file."
                 "Ensure that file does not exist from a previous run"
             )
         path = os.path.join(self.target_path, path_suffix)

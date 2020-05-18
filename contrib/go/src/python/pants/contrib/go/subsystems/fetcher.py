@@ -113,7 +113,7 @@ class ArchiveFetcher(Fetcher):
         super().__init__(import_path)
         self._import_prefix = import_prefix
         self._url_info = url_info
-        self._archive_retriver = archive_retriever
+        self._archive_retriever = archive_retriever
 
     def root(self):
         return self._import_prefix
@@ -132,4 +132,4 @@ class ArchiveFetcher(Fetcher):
 
     def _fetch(self, archive_url, strip_level, dest):
         # Note: Broken out into a separate function so we can mock it out easily in tests.
-        self._archive_retriver.fetch_archive(archive_url, strip_level, dest)
+        self._archive_retriever.fetch_archive(archive_url, strip_level, dest)

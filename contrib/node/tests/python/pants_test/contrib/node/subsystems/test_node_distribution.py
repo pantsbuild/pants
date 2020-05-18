@@ -76,7 +76,7 @@ class NodeDistributionTest(unittest.TestCase):
         injected_paths = node_path_cmd.check_output().strip().split(os.pathsep)
         self.assertEqual(node_bin_path, injected_paths[0])
 
-    def test_node_command_path_injection_with_overrided_path(self):
+    def test_node_command_path_injection_with_overridden_path(self):
         node_path_cmd = self.distribution.node_command(
             args=["--eval", 'console.log(process.env["PATH"])']
         )

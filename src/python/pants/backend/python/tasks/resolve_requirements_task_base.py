@@ -123,7 +123,7 @@ class ResolveRequirementsTaskBase(Task):
 
     @classmethod
     @contextmanager
-    def merged_pex(cls, path, pex_info, interpreter, pexes, interpeter_constraints=None):
+    def merged_pex(cls, path, pex_info, interpreter, pexes, interpreter_constraints=None):
         """Yields a pex builder at path with the given pexes already merged.
 
         :rtype: :class:`pex.pex_builder.PEXBuilder`
@@ -135,13 +135,13 @@ class ResolveRequirementsTaskBase(Task):
 
         with safe_concurrent_creation(path) as safe_path:
             builder = PEXBuilder(safe_path, interpreter, pex_info=pex_info)
-            if interpeter_constraints:
-                for constraint in interpeter_constraints:
+            if interpreter_constraints:
+                for constraint in interpreter_constraints:
                     builder.add_interpreter_constraint(constraint)
             yield builder
 
     @classmethod
-    def merge_pexes(cls, path, pex_info, interpreter, pexes, interpeter_constraints=None):
+    def merge_pexes(cls, path, pex_info, interpreter, pexes, interpreter_constraints=None):
         """Generates a merged pex at path."""
-        with cls.merged_pex(path, pex_info, interpreter, pexes, interpeter_constraints) as builder:
+        with cls.merged_pex(path, pex_info, interpreter, pexes, interpreter_constraints) as builder:
             builder.freeze(bytecode_compile=False)

@@ -2926,7 +2926,7 @@ Refactoring, Improvements, and Tooling
 * Move testinfra code from `tests/python/pants_tests` to `src/python/pants/testutil` (#8400)
   `PR #8400 <https://github.com/pantsbuild/pants/pull/8400>`_
 
-* Add a buffer for queueing process execution to remote timeout (#8432)
+* Add a buffer for queuing process execution to remote timeout (#8432)
   `PR #8432 <https://github.com/pantsbuild/pants/pull/8432>`_
 
 * Eagerly fail deprecated options (#8556)
@@ -3339,7 +3339,7 @@ New Features
 * add --transitive flag to ConsoleTask! (#8224)
   `PR #8224 <https://github.com/pantsbuild/pants/pull/8224>`_
 
-* Support mypy plugins and 3rdpary type definitions. (#8328)
+* Support mypy plugins and 3rdparty type definitions. (#8328)
   `PR #8328 <https://github.com/pantsbuild/pants/pull/8328>`_
 
 * Enable incremental compile for zinc hermetic by adding scratch input digest for local ExecuteProcessRequest (#8282)
@@ -4398,10 +4398,10 @@ Bugfixes
 * Fix `py-thrift-namespace-clash-check` type issue when logging with `--no-strict` mode (#7864)
   `PR #7864 <https://github.com/pantsbuild/pants/pull/7864>`_
 
-* Re-instate PosixFS Threadpool (#7848)
+* Reinstate PosixFS Threadpool (#7848)
   `PR #7848 <https://github.com/pantsbuild/pants/pull/7848>`_
 
-* Fix remoting of V2 Python test runnner not being able to discover the Python interpreter (#7844)
+* Fix remoting of V2 Python test runner not being able to discover the Python interpreter (#7844)
   `PR #7844 <https://github.com/pantsbuild/pants/pull/7844>`_
 
 * Fix .pyc files being included to partially get reproducible PEX builds (#7841)
@@ -6010,7 +6010,7 @@ Bugfixes
 * Markdown writer errors are written properly (#6975)
   `PR #6975 <https://github.com/pantsbuild/pants/pull/6975>`_
 
-* Fix unused_must_use, error in the futrue (#6999)
+* Fix unused_must_use, error in the future (#6999)
   `PR #6999 <https://github.com/pantsbuild/pants/pull/6999>`_
 
 * Add python version to the native cache key (#6991)
@@ -6056,7 +6056,7 @@ Refactoring, Improvements, and Tooling
 * Engine can store dict (#6996)
   `PR #6996 <https://github.com/pantsbuild/pants/pull/6996>`_
 
-* Programatically add rust config to vendored protos (#7000)
+* Programmatically add rust config to vendored protos (#7000)
   `PR #7000 <https://github.com/pantsbuild/pants/pull/7000>`_
 
 * Engine can store bools (#6994)
@@ -6944,7 +6944,7 @@ Refactoring, Improvements, and Tooling
 * [rsc] break out metacp-ing jars into a separate job in RscCompile (#6538)
   `PR #6538 <https://github.com/pantsbuild/pants/pull/6538>`_
 
-* Relativise paths (#6553)
+* Relativize paths (#6553)
   `PR #6558 <https://github.com/pantsbuild/pants/issues/6558>`_
   `PR #6553 <https://github.com/pantsbuild/pants/pull/6553>`_
 
@@ -6966,7 +6966,7 @@ Refactoring, Improvements, and Tooling
 * Use .jdk dir for hermetic execution (#6502)
   `PR #6502 <https://github.com/pantsbuild/pants/pull/6502>`_
 
-* Relativise path to compiler bridge (#6546)
+* Relativize path to compiler bridge (#6546)
   `PR #6546 <https://github.com/pantsbuild/pants/pull/6546>`_
 
 * Make the sizes of the members of `enum Node` more uniform (#6545)
@@ -7015,7 +7015,7 @@ Bugfixes
 * pass through `compatibility` to synthetic python thrift targets (#6499)
   `PR #6499 <https://github.com/pantsbuild/pants/pull/6499>`_
 
-* Apply  workaround similer to #6409 to bootstrapper (#6498)
+* Apply  workaround similar to #6409 to bootstrapper (#6498)
   `PR #6498 <https://github.com/pantsbuild/pants/pull/6498>`_
 
 * Fix encoding of workunits under pantsd (#6505)
@@ -8012,7 +8012,7 @@ Refactoring, Improvements, and Tooling
 * Clean up process execution python API (#6051)
   `PR #6051 <https://github.com/pantsbuild/pants/pull/6051>`_
 
-* Skip pyprep and pytest-prep if there are no python targest (#6039)
+* Skip pyprep and pytest-prep if there are no python targets (#6039)
   `PR #6039 <https://github.com/pantsbuild/pants/pull/6039>`_
 
 * Simplify rust code (#6043)
@@ -10410,7 +10410,7 @@ Bugfixes
 * Repair requests range pin to include higher versions. (#4916)
   `PR #4916 <https://github.com/pantsbuild/pants/pull/4916>`_
 
-* Use Jessie not Weezy for docker image on travis (#4912)
+* Use Jessie not Wheezy for docker image on travis (#4912)
   `PR #4912 <https://github.com/pantsbuild/pants/pull/4912>`_
 
 * Fixup build script to rebuild only when needed. (#4908)
@@ -10928,7 +10928,7 @@ Refactoring, Improvements, and Tooling
 * Shard contrib tests. (#4650)
   `PR #4650 <https://github.com/pantsbuild/pants/pull/4650>`_
 
-* Fix new `PytestRun` task deselction handling. (#4648)
+* Fix new `PytestRun` task deselection handling. (#4648)
   `PR #4648 <https://github.com/pantsbuild/pants/pull/4648>`_
 
 * Simplify `TaskBase.invalidated`. (#4642)
@@ -11320,7 +11320,7 @@ client stubs from WSDL sources. Thanks to Chris Heisterkamp for this!
 
 The release also pulls in a few fixes for python requirement resolution in the PEX library used by
 pants. In the past, the python-setup.resolver_allow_prereleases configuration option would not
-always be resepected; it now is. Additionally, a longstanding bug in transitive requirement
+always be respected; it now is. Additionally, a longstanding bug in transitive requirement
 resolution that would lead to erroneous 'Ambiguous resolvable' errors has now been fixed. Thanks to
 Todd Gardner and Nathan Butler for these fixes!
 
@@ -12187,7 +12187,7 @@ API Changes
 * Surface --dereference-symlinks flag to task caching level
   `RB #4338 <https://rbcommons.com/s/twitter/r/4338>`_
 
-* support mutually_exclusive_group paramater in option registration
+* support mutually_exclusive_group parameter in option registration
   `RB #4336 <https://rbcommons.com/s/twitter/r/4336>`_
 
 * Deprecate the `java_tests` alias in favor of `junit_tests`.
@@ -12232,7 +12232,7 @@ Bugfixes
   `RB #4253 <https://rbcommons.com/s/twitter/r/4253>`_
   `RB #4314 <https://rbcommons.com/s/twitter/r/4314>`_
 
-* Fix exlucde_target_regexp breakage in test-changed and --files option breakage in changed with diffspec
+* Fix exclude_target_regexp breakage in test-changed and --files option breakage in changed with diffspec
   `RB #4321 <https://rbcommons.com/s/twitter/r/4321>`_
 
 * Prevent cleanup error at end of pants test with --test-junit-html-report option, update safe_rmtree to be symlink aware
@@ -12267,7 +12267,7 @@ Refactoring, Improvements, and Tooling
   `RB #4342 <https://rbcommons.com/s/twitter/r/4342>`_
   `RB #4340 <https://rbcommons.com/s/twitter/r/4340>`_
 
-* Perf improvement: rebase analyis file once instead of multiple times
+* Perf improvement: rebase analysis file once instead of multiple times
   `Issue #8 <https://github.com/pantsbuild/zincutils/issues/8>`_
   `RB #4352 <https://rbcommons.com/s/twitter/r/4352>`_
 
@@ -12277,7 +12277,7 @@ Refactoring, Improvements, and Tooling
 * [python-ng] A task to select a python interpreter.
   `RB #4346 <https://rbcommons.com/s/twitter/r/4346>`_
 
-* Parallize thrift linter
+* Parallelize thrift linter
   `RB #4351 <https://rbcommons.com/s/twitter/r/4351>`_
 
 * normalize filespec exclude usage
@@ -13486,7 +13486,7 @@ This release has several changes to tooling, lots of documentation updates, and 
 API Changes
 ~~~~~~~~~~~
 
-* Add 'transitve' and 'scope' attributes to export of target
+* Add 'transitive' and 'scope' attributes to export of target
   `RB #3582 <https://rbcommons.com/s/twitter/r/3582>`_
   `RB #3845 <https://rbcommons.com/s/twitter/r/3845>`_
 
@@ -14016,7 +14016,7 @@ Options:
   Option is no longer used, `--version` is used to specify the major
   version. The runtime is created based on major version. The runtime
   target will be defined at the address `//:scala-library` unless it is
-  overriden by the option `--runtime-spec` and a `--version` is set to
+  overridden by the option `--runtime-spec` and a `--version` is set to
   custom.
 
 * `--spec-excludes`:
@@ -14148,7 +14148,7 @@ Refactoring, Improvements, and Tooling
 * Bump the junit runner release to 1.0.4 to pick up latest code changes
   `RB #3599 <https://rbcommons.com/s/twitter/r/3599>`_
 
-* Re-add the ConsoleRunnerOutputTests and consolodate them into ConsoleRunnerTest, also move test clases used for testing into junit/lib directory
+* Re-add the ConsoleRunnerOutputTests and consolidate them into ConsoleRunnerTest, also move test classes used for testing into junit/lib directory
   `RB #2406 <https://rbcommons.com/s/twitter/r/2406>`_
   `RB #3588 <https://rbcommons.com/s/twitter/r/3588>`_
 
@@ -15734,7 +15734,7 @@ of both the options and reporting systems.
 API Changes
 ~~~~~~~~~~~
 
-* Remove support for `type_` in jar_dependency. It has been superceded by the 'ext' argument
+* Remove support for `type_` in jar_dependency. It has been superseded by the 'ext' argument
   `Issue #2442 <https://github.com/pantsbuild/pants/issues/2442>`_
   `RB #3038 <https://rbcommons.com/s/twitter/r/3038>`_
 
@@ -16059,7 +16059,7 @@ Bugfixes
 * Fix `BuildFileAddressMapper.scan_addresses`.
   `RB #2974 <https://rbcommons.com/s/twitter/r/2974>`_
 
-* Fix catchall except statments
+* Fix catchall except statements
   `RB #2971 <https://rbcommons.com/s/twitter/r/2971>`_
 
 * Fix pinger cache bug and add test.
@@ -16216,7 +16216,7 @@ Small improvements, Refactoring and Tooling
 * Make sure tests/python/pants_test:all runs all the tests
   `RB #2932 <https://rbcommons.com/s/twitter/r/2932>`_
 
-* Seperate out AddressMapper from Graph.
+* Separate out AddressMapper from Graph.
   `RB #2931 <https://rbcommons.com/s/twitter/r/2931>`_
 
 * Add timeout configuration to Pinger and add unittest.
@@ -16791,7 +16791,7 @@ Small improvements, Refactoring and Tooling
 * Tighten up the node target hierarchy.
   `RB #2736 <https://rbcommons.com/s/twitter/r/2736>`_
 
-* Ensure pipeline failuires fail CI.
+* Ensure pipeline failures fail CI.
   `RB #2731 <https://rbcommons.com/s/twitter/r/2731>`_
 
 * Record the BUILD target alias in BuildFileAddress.
@@ -18978,7 +18978,7 @@ Bugfixes and features
 * Fixup Config to find DEFAULT values for missing sections
   `RB #1851 <https://rbcommons.com/s/twitter/r/1851>`_
 
-* Get published artifact classfier from config
+* Get published artifact classifier from config
   `RB #1857 <https://rbcommons.com/s/twitter/r/1857>`_
 
 * Make Context.targets() include synthetic targets
@@ -19787,7 +19787,7 @@ Bugfixes
   - Dust off the Task Developer's Guide and `rm` the "pagerank" example
   - Add a `sitegen` task, create site with better navigation
   - For 'goal builddict', generate `.rst` and `.html`, not just `.rst`
-  - Narrow setup 'Operating System' classfiers to known-good
+  - Narrow setup 'Operating System' classifiers to known-good
 
   `Issue #16 <https://github.com/pantsbuild/pex/issues/16>`_
   `Issue #461 <https://github.com/pantsbuild/pants/issues/461>`_

@@ -126,6 +126,7 @@ done
 no_regen_pex="${NO_REGEN_PEX:-${TRAVIS}}"
 if [[ "${test_goal_used}" == 'true' && "${no_regen_pex}" != 'true' ]]; then
   "$HERE/build-support/bin/bootstrap_pants_pex.sh"
+  echo -e "Finished bootstrapping pants.pex for integration tests.\n" >&2
 fi
 
 exec_pants_bare "$@"

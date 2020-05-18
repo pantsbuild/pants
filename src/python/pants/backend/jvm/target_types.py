@@ -629,7 +629,7 @@ class JvmPrepCommandMainClass(StringField):
 
 
 class JvmPrepCommandArgs(StringSequenceField):
-    """A list of command-line args to the excutable."""
+    """A list of command-line args to the executable."""
 
     alias = "args"
 

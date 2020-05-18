@@ -21,7 +21,7 @@ public class XmlReportMockitoStubbingTest {
   @Mock SSLSession sslSession;
 
   @Test
-  public void testUnnecesaryMockingError() {
+  public void testUnnecessaryMockingError() {
     when(sslSession.getCipherSuite()).thenReturn("cipher");
     Assert.assertTrue(true);
   }

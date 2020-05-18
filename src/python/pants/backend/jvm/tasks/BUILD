@@ -304,7 +304,6 @@ python_library(
     'src/python/pants/backend/jvm/targets:scala',
     'src/python/pants/backend/jvm:ossrh_publication_metadata',
     'src/python/pants/base:build_environment',
-    'src/python/pants/base:build_file',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:generator',
     'src/python/pants/build_graph',

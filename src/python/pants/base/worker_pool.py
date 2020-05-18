@@ -37,7 +37,7 @@ class WorkerPool:
         self.thread_lock = threading.Lock()
         self.thread_counter = 0
 
-        def intitialize():
+        def initialize():
             with self.thread_lock:
                 threading.current_thread().name = "{}-{}".format(
                     thread_name_prefix, self.thread_counter
@@ -46,7 +46,7 @@ class WorkerPool:
             self._run_tracker.register_thread(parent_workunit)
 
         # All workers accrue work to the same root.
-        self._pool = ThreadPool(processes=num_workers, initializer=intitialize,)
+        self._pool = ThreadPool(processes=num_workers, initializer=initialize,)
         # We mustn't shutdown when there are pending workchains, as they may need to submit work
         # in the future, and the pool doesn't know about this yet.
         self._pending_workchains = 0

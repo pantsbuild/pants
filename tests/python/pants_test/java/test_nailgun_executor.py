@@ -86,7 +86,7 @@ class NailgunExecutorTest(TestBase):
             mock_open.return_value = stdout_read
             mock_read_file.return_value = "err"
             # The stdout write pipe has no input and hasn't been closed, so the selector.select() should
-            # time out regardless of the timemout argument, and raise.
+            # time out regardless of the timeout argument, and raise.
             with self.assertRaisesWithMessage(
                 NailgunExecutor.InitialNailgunConnectTimedOut,
                 """\
