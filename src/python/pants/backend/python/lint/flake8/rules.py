@@ -127,7 +127,7 @@ async def flake8_lint(
         description=f"Run Flake8 on {pluralize(len(field_sets), 'target')}: {address_references}.",
     )
     result = await Get[FallibleProcessResult](Process, process)
-    return LintResult.from_fallible_process_result(result, linter_name="Flake8")
+    return LintResult.from_fallible_process_result(result, linter_name="Flake8", rstrip=True)
 
 
 def rules():
