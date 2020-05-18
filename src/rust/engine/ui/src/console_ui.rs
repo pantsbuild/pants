@@ -25,12 +25,9 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use std::future::Future;
-use std::pin::Pin;
-use std::sync::Arc;
 use std::time::Duration;
 
-use futures::future::{self, FutureExt, TryFutureExt};
+use futures::future::FutureExt;
 use indexmap::IndexMap;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle};
 use uuid::Uuid;
@@ -66,7 +63,14 @@ impl ConsoleUI {
     10
   }
 
-  pub fn write_stdout(&self, msg: &str) {
+  pub fn render_interval() -> Duration {
+    Duration::from_millis(1000 / Self::render_rate_hz())
+  }
+
+  pub fn write_stdout(&mut self, msg: &str) {
+    if self.instance.is_some() {
+      self.teardown();
+    }
     print!("{}", msg);
   }
 
@@ -78,19 +82,13 @@ impl ConsoleUI {
     }
   }
 
-  pub fn with_console_ui_disabled<F: FnOnce() -> T, T>(&self, f: F) -> T {
-    if let Some(instance) = &self.instance {
-      instance
-        .multi_progress
-        .set_draw_target(ProgressDrawTarget::hidden());
-      let res = f();
-      instance
-        .multi_progress
-        .set_draw_target(Self::default_draw_target());
-      res
-    } else {
-      f()
+  pub fn with_console_ui_disabled<F: FnOnce() -> T, T>(&mut self, f: F) -> T {
+    if self.instance.is_some() {
+      self.teardown();
     }
+    let interval = Duration::from_millis(1000 / Self::render_rate_hz());
+    std::thread::sleep(interval);
+    f()
   }
 
   fn setup_bars(num_swimlanes: usize) -> (MultiProgress, Vec<ProgressBar>) {
@@ -178,9 +176,7 @@ impl ConsoleUI {
 
     // Setup bars, and then spawning rendering of the bars into a background task.
     let (multi_progress, bars) = Self::setup_bars(num_cpus::get());
-    let multi_progress = Arc::new(multi_progress);
-    let multi_progress_task = {
-      let multi_progress = multi_progress.clone();
+    let _multi_progress_task = {
       executor
         .spawn_blocking(move || multi_progress.join())
         .boxed()
@@ -189,8 +185,6 @@ impl ConsoleUI {
     self.instance = Some(Instance {
       tasks_to_display: IndexMap::new(),
       logger_handle: LOGGER.register_stderr_handler(stderr_handler),
-      multi_progress,
-      multi_progress_task,
       bars,
     });
     Ok(())
@@ -199,15 +193,12 @@ impl ConsoleUI {
   ///
   /// If the ConsoleUI is running, completes it.
   ///
-  pub fn teardown(&mut self) -> impl Future<Output = Result<(), String>> {
+  pub fn teardown(&mut self) {
     if let Some(instance) = self.instance.take() {
       LOGGER.deregister_stderr_handler(instance.logger_handle);
-      instance
-        .multi_progress_task
-        .map_err(|e| format!("Failed to render UI: {}", e))
-        .boxed()
-    } else {
-      future::ok(()).boxed()
+      std::mem::drop(instance);
+      let interval = Duration::from_millis(1000 / Self::render_rate_hz());
+      std::thread::sleep(interval);
     }
   }
 }
@@ -215,8 +206,6 @@ impl ConsoleUI {
 /// The state for one run of the ConsoleUI.
 struct Instance {
   tasks_to_display: IndexMap<String, Option<Duration>>,
-  multi_progress: Arc<MultiProgress>,
-  multi_progress_task: Pin<Box<dyn Future<Output = std::io::Result<()>> + Send>>,
   bars: Vec<ProgressBar>,
   logger_handle: Uuid,
 }
