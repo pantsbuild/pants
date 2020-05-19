@@ -515,8 +515,8 @@ class Targets(Collection[Target]):
     """
 
     def expect_single(self) -> Target:
-        assert_single_address([tgt.address for tgt in self.dependencies])
-        return self.dependencies[0]
+        assert_single_address([tgt.address for tgt in self])
+        return self[0]
 
 
 class TargetsWithOrigins(Collection[TargetWithOrigin]):
@@ -528,10 +528,8 @@ class TargetsWithOrigins(Collection[TargetWithOrigin]):
     """
 
     def expect_single(self) -> TargetWithOrigin:
-        assert_single_address(
-            [tgt_with_origin.target.address for tgt_with_origin in self.dependencies]
-        )
-        return self.dependencies[0]
+        assert_single_address([tgt_with_origin.target.address for tgt_with_origin in self])
+        return self[0]
 
     @memoized_property
     def targets(self) -> Tuple[Target, ...]:

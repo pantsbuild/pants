@@ -99,9 +99,8 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
         addresses = self._resolve_addresses(
             address_specs, address_family, snapshot, self._address_mapper()
         )
-
-        self.assertEqual(len(addresses.dependencies), 1)
-        self.assertEqual(addresses.dependencies[0].spec, "a:a")
+        assert len(addresses) == 1
+        assert addresses[0].spec == "a:a"
 
     def test_tag_filter(self) -> None:
         """Test that targets are filtered based on `tags`."""
@@ -118,9 +117,8 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
         targets = self._resolve_addresses(
             address_specs, address_family, self._snapshot(), self._address_mapper()
         )
-
-        self.assertEqual(len(targets.dependencies), 1)
-        self.assertEqual(targets.dependencies[0].spec, "root:b")
+        assert len(targets) == 1
+        assert targets[0].spec == "root:b"
 
     def test_fails_on_nonexistent_specs(self) -> None:
         """Test that address specs referring to nonexistent targets raise a ResolveError."""
@@ -159,9 +157,8 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
         targets = self._resolve_addresses(
             address_specs, address_family, self._snapshot(), self._address_mapper()
         )
-
-        self.assertEqual(len(targets.dependencies), 1)
-        self.assertEqual(targets.dependencies[0].spec, "root:not_me")
+        assert len(targets) == 1
+        assert targets[0].spec == "root:not_me"
 
     def test_exclude_pattern_with_single_address(self) -> None:
         """Test that single address targets are filtered based on exclude patterns."""
@@ -173,8 +170,7 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
         targets = self._resolve_addresses(
             address_specs, address_family, self._snapshot(), self._address_mapper()
         )
-
-        self.assertEqual(len(targets.dependencies), 0)
+        assert len(targets.dependencies) == 0
 
 
 class ApacheThriftConfiguration(StructWithDeps):

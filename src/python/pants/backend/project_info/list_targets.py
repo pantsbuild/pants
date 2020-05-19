@@ -48,7 +48,7 @@ class List(Goal):
 
 @goal_rule
 async def list_targets(addresses: Addresses, options: ListOptions, console: Console) -> List:
-    if not addresses.dependencies:
+    if not addresses:
         console.print_stderr(f"WARNING: No targets were matched in goal `{options.name}`.")
         return List(exit_code=0)
 
