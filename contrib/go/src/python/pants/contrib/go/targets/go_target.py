@@ -43,7 +43,7 @@ class GoTarget(Target):
         All other packages are of the form 'path' or 'path/subpath', etc.
 
         If the given path is either absolute or relative (includes the parent dir path signifier, '..'),
-        then an error is raised since the path cannot be noramlized.
+        then an error is raised since the path cannot be normalized.
 
         :param string package_path: The Go package path to normalize.
         :raises: `ValueError` if the package path cannot be normalized.
