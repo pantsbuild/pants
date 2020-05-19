@@ -20,6 +20,10 @@ class SourceRoot:
     path: str  # Relative path from the repo root.
 
 
+class InvalidSourceRootPatternError(Exception):
+    """Indicates an invalid pattern was provided."""
+
+
 class NoSourceRootError(Exception):
     """Indicates we failed to map a source file to a source root."""
 
@@ -32,7 +36,12 @@ class SourceRootPatternMatcher:
     # We perform pattern matching against absolute paths, where "/" represents the repo root.
     _repo_root = PurePath(os.path.sep)
 
-    def __init__(self, root_patterns: Iterable[str]):
+    def __init__(self, root_patterns: Iterable[str]) -> None:
+        for root_pattern in root_patterns:
+            if ".." in root_pattern.split(os.path.sep):
+                raise InvalidSourceRootPatternError(
+                    f".. disallowed in source root pattern: {root_pattern}"
+                )
         self._root_patterns = list(root_patterns)
 
     def get_patterns(self) -> Tuple[str, ...]:
@@ -57,6 +66,8 @@ class SourceRootPatternMatcher:
         """Return the source root for the given path, relative to the repo root."""
         # Note: This is currently O(n) where n is the number of patterns, which
         # we expect to be small.  We can optimize if it becomes necessary.
+        if ".." in relpath.split(os.path.sep):
+            raise NoSourceRootError(f".. disallowed in source root searches: {relpath}")
         putative_root = self._repo_root / relpath
         while putative_root != self._repo_root:
             if self._match_root_patterns(putative_root):

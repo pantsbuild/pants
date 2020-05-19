@@ -11,6 +11,8 @@ def test_source_root_at_buildroot() -> None:
     assert SourceRoot(".") == srs.strict_find_by_path("foo/bar.py")
     assert SourceRoot(".") == srs.strict_find_by_path("foo/")
     assert SourceRoot(".") == srs.strict_find_by_path("foo")
+    with pytest.raises(NoSourceRootError):
+        srs.strict_find_by_path("../foo/bar.py")
 
 
 def test_fixed_source_roots() -> None:
