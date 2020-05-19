@@ -292,7 +292,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
             str(cm.exception),
         )
 
-    def test_non_existing_root_fails_differently(self):
+    def test_nonexistent_root_fails_differently(self):
         rules = [upcast]
 
         with self.assertRaises(Exception) as cm:

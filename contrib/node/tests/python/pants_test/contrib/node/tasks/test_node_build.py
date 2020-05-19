@@ -137,9 +137,9 @@ class TestNodeBuild(TaskTestBase):
         with open(os.path.join(target_paths[0], "output_file"), "r") as f:
             self.assertEqual(f.read(), "Hello, world!\n")
 
-    def test_run_non_existing_script(self):
+    def test_run_nonexistent_script(self):
         package_json_file = self.create_file("src/node/build_test/package.json", contents="{}")
-        build_script = "my_non_existing_build_script"
+        build_script = "my_nonexistent_build_script"
         target = self.make_target(
             spec="src/node/build_test",
             target_type=NodeModule,
