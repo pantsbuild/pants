@@ -25,7 +25,7 @@ from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
 
-from pants.contrib.python.checks.tasks.python_eval_subsystem import PythonEval as PythonEvalSubystem
+from pants.contrib.python.checks.tasks.python_eval_subsystem import PythonEval as PythonEvalSubsystem
 
 
 class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
@@ -45,14 +45,14 @@ class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
     @classmethod
     def subsystem_dependencies(cls):
         return super().subsystem_dependencies() + (
-            PythonEvalSubystem,
+            PythonEvalSubsystem,
             PexBuilderWrapper.Factory,
             PythonInterpreterCache,
         )
 
     @property
     def skip_execution(self):
-        return PythonEvalSubystem.global_instance().options.skip
+        return PythonEvalSubsystem.global_instance().options.skip
 
     @classmethod
     def prepare(cls, options, round_manager):
