@@ -217,7 +217,7 @@ class IdeaPluginGen(ConsoleTask):
             return output.name
 
     def _write_to_tempfile(self, content):
-        """Writes coontent to a temp file and returns the path to that file."""
+        """Writes content to a temp file and returns the path to that file."""
         with temporary_file(cleanup=False, binary_mode=False) as output:
             output.write(content)
             return output.name
