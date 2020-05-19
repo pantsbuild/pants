@@ -1413,37 +1413,67 @@ class OptionsTest(TestBase):
             )
 
         with self.assertRaisesWithMessage(
-            ParseError, "Unrecognized command line flags on global scope: --aaaaaaaaaasdf."
+            ParseError,
+            (
+                "Unrecognized command line flag '--aasdf' on global scope.\n\n(Run `./pants "
+                "help-advanced` for all available options.)"
+            ),
         ):
-            parse_joined_command_line("--aaaaaaaaaasdf").for_global_scope()
+            parse_joined_command_line("--aasdf").for_global_scope()
+
+        with self.assertRaisesWithMessage(
+            ParseError,
+            (
+                "Unrecognized command line flags on global scope: --aasdf, --aasdy.\n\n(Run "
+                "`./pants help-advanced` for all available options.)"
+            ),
+        ):
+            parse_joined_command_line("--aasdf", "--aasdy").for_global_scope()
 
         with self.assertRaisesWithMessage(
             ParseError,
             dedent(
                 """\
-                Unrecognized command line flags on global scope: -v, --config-overide, --c. Suggestions:
+                Unrecognized command line flags on global scope: -v, --config-overridden, --c.
+                Suggestions:
                 -v: [--v2, --verbose, --a, --b, --y, -n, -z, --compile-c]
-                --config-overide: [--config-override]
-                --c: [--compile-c, --compile-scala-modifycompile, --compile-scala-modifylogs, --config-override, --a, --b, --y, -n, -z, --v2]"""
+                --config-overridden: [--config-override]
+                --c: [--compile-c, --compile-scala-modifycompile, --compile-scala-modifylogs, --config-override, --a, --b, --y, -n, -z, --v2]
+
+                (Run `./pants help-advanced` for all available options.)"""
             ),
         ):
             parse_joined_command_line(
                 # A nonexistent short-form option -- other short-form options should be displayed.
                 "-vd",
-                # A misspelling of `--config-override=val` (without the second r) should show the correct
-                # option name.
-                "--config-overide=val",
-                # An option name without the correct prefix scope should match all flags with the same or
-                # similar unscoped option names.
+                # An incorrect form of `--config-override=val` (`ridden` instead of `ride`) should
+                # show the correct option name.
+                "--config-overridden=val",
+                # An option name without the correct prefix scope should match all flags with the
+                # same or similar unscoped option names.
                 "--c=[]",
             ).for_global_scope()
+
+        # Test when only some flags have suggestsions.
+        with self.assertRaisesWithMessage(
+            ParseError,
+            (
+                "Unrecognized command line flags on global scope: --aasdf, --config-overridden.\n"
+                "Suggestions:\n"
+                "--config-overridden: [--config-override]\n\n"
+                "(Run `./pants help-advanced` for all available options.)"
+            ),
+        ):
+            parse_joined_command_line("--aasdf", "--config-overridden").for_global_scope()
 
         with self.assertRaisesWithMessage(
             ParseError,
             dedent(
                 """\
-                Unrecognized command line flags on scope 'simple': --sam. Suggestions:
-                --sam: [--simple-spam, --simple-dashed-spam, --a, --num, --scoped-a-bit-spam, --scoped-and-dashed-spam]"""
+                Unrecognized command line flag '--sam' on scope 'simple'. Suggestions:
+                --simple-spam, --simple-dashed-spam, --a, --num, --scoped-a-bit-spam, --scoped-and-dashed-spam
+
+                (Run `./pants help-advanced simple` for all available options.)"""
             ),
         ):
             parse_joined_command_line(
@@ -1455,8 +1485,10 @@ class OptionsTest(TestBase):
             ParseError,
             dedent(
                 """\
-                Unrecognized command line flags on scope 'compile': --modifylogs. Suggestions:
-                --modifylogs: [--compile-scala-modifylogs]"""
+                Unrecognized command line flag '--modifylogs' on scope 'compile'. Suggestions:
+                --compile-scala-modifylogs
+
+                (Run `./pants help-advanced compile` for all available options.)"""
             ),
         ):
             parse_joined_command_line(
@@ -1468,8 +1500,11 @@ class OptionsTest(TestBase):
             ParseError,
             dedent(
                 """\
-                Unrecognized command line flags on scope 'cache.compile.scala': --modifylogs. Suggestions:
-                --modifylogs: [--compile-scala-modifylogs]"""
+                Unrecognized command line flag '--modifylogs' on scope 'cache.compile.scala'.
+                Suggestions:
+                --compile-scala-modifylogs
+
+                (Run `./pants help-advanced cache.compile.scala` for all available options.)"""
             ),
         ):
             parse_joined_command_line(
