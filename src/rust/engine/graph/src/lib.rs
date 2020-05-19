@@ -29,7 +29,7 @@ use hashing;
 
 use petgraph;
 
-// make the entry module public for testing purposes. We use it to contruct mock
+// make the entry module public for testing purposes. We use it to construct mock
 // graph entries in the notify watch tests.
 pub mod entry;
 mod node;
