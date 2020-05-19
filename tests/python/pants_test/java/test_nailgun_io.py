@@ -73,5 +73,5 @@ class TestNailgunStreamWriter(unittest.TestCase):
         mock_select.return_value = ([self.in_fd], [self.in_fd], [])
         mock_read.return_value = b""  # EOF.
         self.writer.run()
-        self.assertFalse(self.writer.is_alive())
-        self.assertEqual(mock_select.call_count, 1)
+        assert self.writer.is_alive() is False
+        assert mock_select.call_count == 1
