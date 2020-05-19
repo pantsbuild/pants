@@ -12,8 +12,8 @@ readonly NATIVE_ROOT="${REPO_ROOT}/src/rust/engine"
 
 # N.B. Set $MODE to "release" for much faster Pants runs, but slower compiles.
 # We optimize for faster compiles to reduce the barrier to entry for new contributors
-# (https://github.com/pantsbuild/pants/issues/9822). Most core Pants devs will want to permanently
-# configure MODE=release.
+# (https://github.com/pantsbuild/pants/issues/9822). Most core Pants devs will want to configure
+# MODE=release when working on Python, but keep the default when developing on Rust.
 readonly MODE="${MODE:-debug}"
 case "$MODE" in
   release) MODE_FLAG="--release" ;;
