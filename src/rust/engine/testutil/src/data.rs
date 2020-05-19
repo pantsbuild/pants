@@ -27,7 +27,7 @@ impl TestData {
     TestData::new("Pug")
   }
 
-  pub fn fourty_chars() -> TestData {
+  pub fn forty_chars() -> TestData {
     TestData::new(
       "0123456789012345678901234567890123456789\
        0123456789012345678901234567890123456789",
