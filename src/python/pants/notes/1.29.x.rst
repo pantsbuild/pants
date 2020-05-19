@@ -74,6 +74,9 @@ Bugfixes
 * Further refine the "include `.pids`" hack. (#9773)
   `PR #9773 <https://github.com/pantsbuild/pants/pull/9773>`_
 
+* Do not memoize failures in the Graph. (#9817)
+  `PR #9817 <https://github.com/pantsbuild/pants/pull/9817>`_
+
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
