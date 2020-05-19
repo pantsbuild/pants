@@ -9,7 +9,7 @@ from pants.base.build_file import BuildFile
 from pants.util.dirutil import fast_relpath, longest_dir_prefix
 from pants.util.strutil import strip_prefix
 
-# @ is reserved for configuring variant, see `addressable.parse_variants`
+# @ is currently unused, but reserved for possible future needs.
 BANNED_CHARS_IN_TARGET_NAME = frozenset("@")
 
 
