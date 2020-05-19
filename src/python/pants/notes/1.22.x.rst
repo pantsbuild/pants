@@ -379,7 +379,7 @@ New Features
 * add --transitive flag to ConsoleTask! (#8224)
   `PR #8224 <https://github.com/pantsbuild/pants/pull/8224>`_
 
-* Support mypy plugins and 3rdpary type definitions. (#8328)
+* Support mypy plugins and 3rdparty type definitions. (#8328)
   `PR #8328 <https://github.com/pantsbuild/pants/pull/8328>`_
 
 * Enable incremental compile for zinc hermetic by adding scratch input digest for local ExecuteProcessRequest (#8282)

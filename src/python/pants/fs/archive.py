@@ -24,7 +24,7 @@ class Archiver(ABC):
         :param string path: path to the zipfile to extract from
         :param string outdir: directory to extract files into
         :param bool concurrency_safe: True to use concurrency safe method.  Concurrency safe extraction
-          will be performed on a temporary directory and the extacted directory will then be renamed
+          will be performed on a temporary directory and the extracted directory will then be renamed
           atomically to the outdir.  As a side effect, concurrency safe extraction will not allow
           overlay of extracted contents onto an existing outdir.
         """

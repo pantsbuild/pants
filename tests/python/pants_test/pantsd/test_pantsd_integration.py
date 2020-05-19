@@ -90,7 +90,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             self.assertIn("Current thread 0x", "\n".join(read_pantsd_log(ctx.workdir)))
 
     def test_pantsd_pantsd_runner_doesnt_die_after_failed_run(self):
-        # Check for no stray pantsd prcesses.
+        # Check for no stray pantsd processes.
         with no_lingering_process_by_command("pantsd"):
             with self.pantsd_test_context() as (workdir, pantsd_config, checker):
                 # Run target that throws an exception in pants.

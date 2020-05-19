@@ -97,7 +97,7 @@ class Serializable(ABC):
     >>> Serializable(**s._asdict()) == s
 
     Additionally the dict must also contain nothing except Serializables, python primitive values,
-    ie: dicts, lists, strings, numbers, bool values, etc or Resolvables that resolve to Serilizables
+    ie: dicts, lists, strings, numbers, bool values, etc or Resolvables that resolve to Serializables
     or primitive values.
 
     Any :class:`collections.namedtuple` satisfies the Serializable contract automatically via duck

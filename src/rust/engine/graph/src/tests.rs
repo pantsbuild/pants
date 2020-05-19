@@ -174,7 +174,7 @@ fn invalidate_randomly() {
     let node_output = match graph.create(TNode::new(range), &context).wait() {
       Ok(output) => output,
       Err(TError::Invalidated) => {
-        // Some amnount of concurrent invalidation is expected: retry.
+        // Some amount of concurrent invalidation is expected: retry.
         continue;
       }
       Err(e) => panic!(
@@ -649,7 +649,7 @@ impl Node for TNode {
     self.1
   }
 
-  fn canonical_name(&self) -> String {
+  fn workunit_name(&self) -> String {
     format!("{}", self)
   }
 }

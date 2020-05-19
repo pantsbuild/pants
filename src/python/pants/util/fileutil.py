@@ -24,7 +24,7 @@ def atomic_copy(src: str, dst: str) -> None:
 def safe_temp_edit(filename: str) -> Iterator[str]:
     """Safely modify a file within context that automatically reverts any changes afterwards.
 
-    The file mutatation occurs in place. The file is backed up in a temporary file before edits
+    The file mutation occurs in place. The file is backed up in a temporary file before edits
     occur and when the context is closed, the mutated file is discarded and replaced with the backup.
 
     WARNING: There may be a chance that the file may not be restored and this method should be used

@@ -15,7 +15,7 @@ class SpecSet {
   }
 
   /**
-   * Remove and return all specs that match the specfied Concurrency parameter and have no
+   * Remove and return all specs that match the specified Concurrency parameter and have no
    * separate test methods defined.
    */
   public SpecSet extract(Concurrency concurrencyFilter) {

@@ -63,4 +63,4 @@ class TestSubprocessProcessHandler(unittest.TestCase):
         )
         # Sadly, this test doesn't test that sys.std{out,err} also receive the output.
         # You can see it when you run it, but any way we have of spying on sys.std{out,err}
-        # isn't picklable enough to write a test which works.
+        # isn't pickleable enough to write a test which works.

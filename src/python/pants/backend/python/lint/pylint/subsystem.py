@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from typing import List, Optional, cast
+
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.option.custom_types import file_option, shell_str
 
@@ -31,3 +33,15 @@ class Pylint(PythonToolBase):
             advanced=True,
             help="Path to `pylintrc` or alternative Pylint config file",
         )
+
+    @property
+    def skip(self) -> bool:
+        return cast(bool, self.options.skip)
+
+    @property
+    def args(self) -> List[str]:
+        return cast(List[str], self.options.args)
+
+    @property
+    def config(self) -> Optional[str]:
+        return cast(Optional[str], self.options.config)

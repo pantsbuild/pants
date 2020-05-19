@@ -3,7 +3,7 @@
 package org.pantsbuild.testproject.coverage.one;
 
 /**
- * This is a trivial class for use in testing pants java code covearge
+ * This is a trivial class for use in testing pants java code coverage
  * functionality. It is initialized with a given value, and has methods
  * to return the value, +/- some other value.
  */

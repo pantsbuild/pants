@@ -289,7 +289,7 @@ impl ShardedLmdb {
 
   pub async fn load_bytes_with<
     T: Send + 'static,
-    F: Fn(Bytes) -> Result<T, String> + Send + Sync + 'static,
+    F: Fn(&[u8]) -> Result<T, String> + Send + Sync + 'static,
   >(
     &self,
     fingerprint: Fingerprint,
@@ -305,7 +305,7 @@ impl ShardedLmdb {
           .begin_ro_txn()
           .map_err(|err| format!("Failed to begin read transaction: {}", err));
         ro_txn.and_then(|txn| match txn.get(db, &effective_key) {
-          Ok(bytes) => f(Bytes::from(bytes)).map(Some),
+          Ok(bytes) => f(bytes).map(Some),
           Err(lmdb::Error::NotFound) => Ok(None),
           Err(err) => Err(format!(
             "Error loading versioned key {:?}: {}",

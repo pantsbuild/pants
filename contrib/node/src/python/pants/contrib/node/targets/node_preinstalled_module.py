@@ -12,7 +12,7 @@ class NodePreinstalledModule(NodeModule):
 
     This is basically an example, to demonstrate how additional types of NodeModule targets with
     their own resolvers (in this case NodePreinstalledModuleResolver), which still work with
-    NodeTest, can be registered. To be generallly correct, this target type and associated resolver
+    NodeTest, can be registered. To be generally correct, this target type and associated resolver
     would have to use platform- and Node-version-specific node_modules archives, rather than just a
     single dependencies_archive_url used verbatim. Consider NodePreinstalledModule and
     NodePreinstalledModuleResolver subject to future change or removal for now.

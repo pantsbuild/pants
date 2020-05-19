@@ -318,14 +318,12 @@ class Target(ABC):
         """
 
     def __repr__(self) -> str:
+        fields = ", ".join(str(field) for field in self.field_values.values())
         return (
             f"{self.__class__}("
             f"address={self.address}, "
             f"alias={repr(self.alias)}, "
-            f"core_fields={list(self.core_fields)}, "
-            f"plugin_fields={list(self.plugin_fields)}, "
-            f"field_values={list(self.field_values.values())}"
-            f")"
+            f"{fields})"
         )
 
     def __str__(self) -> str:

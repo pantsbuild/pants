@@ -278,7 +278,7 @@ def more_specific(
 class AddressSpecsMatcher:
     """Contains filters for the output of a AddressSpecs match.
 
-    This class is separated out from `AddressSpecs` to allow for both stuctural equality of the
+    This class is separated out from `AddressSpecs` to allow for both structural equality of the
     `tags` and `exclude_patterns`, and for caching of their compiled forms using
     `@memoized_property` (which uses the hash of the class instance in its key, and results in a
     very large key when used with `AddressSpecs` directly).

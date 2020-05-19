@@ -541,7 +541,10 @@ async fn execute(top_match: &clap::ArgMatches<'_>) -> Result<(), ExitError> {
         .parse::<usize>()
         .expect("size_bytes must be a non-negative number");
       let digest = Digest(fingerprint, size_bytes);
-      let v = match store.load_file_bytes_with(digest, |bytes| bytes).await? {
+      let v = match store
+        .load_file_bytes_with(digest, |bytes| bytes.into())
+        .await?
+      {
         None => {
           let maybe_dir = store.load_directory(digest).await?;
           maybe_dir.map(|(dir, _metadata)| {

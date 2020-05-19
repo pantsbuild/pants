@@ -421,7 +421,7 @@ impl super::CommandRunner for CommandRunner {
       attempts += &format!("\nAttempt {}: {:?}", i, attempt);
     }
     debug!(
-      "Finished remote exceution of {} after {} attempts: Stats: {}",
+      "Finished remote execution of {} after {} attempts: Stats: {}",
       description,
       response.execution_attempts.len(),
       attempts
@@ -905,7 +905,7 @@ fn extract_stdout(
       try_future!(stdout_digest_result.map_err(|err| format!("Error extracting stdout: {}", err)));
     Box::pin(async move {
       let (bytes, _metadata) = store
-        .load_file_bytes_with(stdout_digest, |v| v)
+        .load_file_bytes_with(stdout_digest, |v| v.into())
         .map_err(move |error| {
           format!(
             "Error fetching stdout digest ({:?}): {:?}",
@@ -952,7 +952,7 @@ fn extract_stderr(
 
     Box::pin(async move {
       let (bytes, _metadata) = store
-        .load_file_bytes_with(stderr_digest, |v| v)
+        .load_file_bytes_with(stderr_digest, |v| v.into())
         .map_err(move |error| {
           format!(
             "Error fetching stderr digest ({:?}): {:?}",

@@ -49,7 +49,7 @@ is represented by a dictionary as follows:
 ## Targets
 
 The targets field contains all of the targets exported from pants BUILD file definitions.  The
-value for targets is represented by a dctionary of target specs mapped to a dictionary of the
+value for targets is represented by a dictionary of target specs mapped to a dictionary of the
 fields defined in the target:
 
 `{ <target_spec> : <target_field_mapping> }`

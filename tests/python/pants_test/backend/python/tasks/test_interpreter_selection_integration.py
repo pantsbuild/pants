@@ -85,7 +85,7 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
             "Unable to detect a suitable interpreter for compatibilities", pants_run.stdout_data
         )
         self.assertIn(
-            "CPython<2.7", pants_run.stdout_data, "Did not output requested compatibiility."
+            "CPython<2.7", pants_run.stdout_data, "Did not output requested compatibility."
         )
         self.assertIn(f"Conflicting targets: {binary_target}", pants_run.stdout_data)
         # NB: we expect the error message to print *all* interpreters resolved by Pants. However,

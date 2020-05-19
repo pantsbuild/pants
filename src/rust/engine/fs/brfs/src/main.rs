@@ -580,7 +580,7 @@ impl fuse::Filesystem for BuildResultFS {
                   let begin = std::cmp::min(offset as usize, bytes.len());
                   let end = std::cmp::min(offset as usize + size as usize, bytes.len());
                   let mut reply = reply.lock();
-                  reply.take().unwrap().data(&bytes.slice(begin, end));
+                  reply.take().unwrap().data(&bytes[begin..end]);
                 })
                 .await
             })

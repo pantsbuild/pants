@@ -48,7 +48,9 @@ pub trait Node: Clone + Debug + Display + Eq + Hash + Send + 'static {
     None
   }
 
-  fn canonical_name(&self) -> String;
+  /// Provides the `name` field in workunits associated with this node. These names
+  /// should be friendly to machine-parsing (i.e. "my_node" rather than "My awesome node!").
+  fn workunit_name(&self) -> String;
 }
 
 pub trait NodeError: Clone + Debug + Eq + Send {

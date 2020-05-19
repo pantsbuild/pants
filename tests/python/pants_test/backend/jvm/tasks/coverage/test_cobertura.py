@@ -198,7 +198,7 @@ class TestCobertura(TestBase):
 
     def _get_fake_execute_java(self):
         def _fake_execute_java(classpath, main, jvm_options, args, workunit_factory, workunit_name):
-            # at some point we could add assertions here for expected paramerter values
+            # at some point we could add assertions here for expected parameter values
             pass
 
         return _fake_execute_java

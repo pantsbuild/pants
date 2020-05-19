@@ -176,7 +176,7 @@ There are a few ways to avoid or work around these problems. A simple method
 is to use the [strict ivy conflict manager](http://ant.apache.org/ivy/history/2.4.0/settings/conflict-managers.html),
 which will cause the jar resolution to fail with an error if it detects two
 artifacts with conflicting versions. This has the advantage of forcing a dev
-to be aware of (and make a decision about) confliction versions.
+to be aware of (and make a decision about) conflicting versions.
 
 You could also disable transitive jar resolution altogether, and explicitly
 declare every dependency you need. This ensures that you have total control

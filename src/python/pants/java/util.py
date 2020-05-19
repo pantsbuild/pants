@@ -71,7 +71,7 @@ def execute_java(
     :param list workunit_labels: an optional sequence of labels for the work unit
     :param string cwd: optionally set the working directory
     :param WorkUnit.LogConfig workunit_log_config: an optional tuple of options affecting reporting
-    :param bool create_synthetic_jar: whether to create a synthentic jar that includes the original
+    :param bool create_synthetic_jar: whether to create a synthetic jar that includes the original
       classpath in its manifest.
     :param string synthetic_jar_dir: an optional directory to store the synthetic jar, if `None`
       a temporary directory will be provided and cleaned up upon process exit.
@@ -138,7 +138,7 @@ def execute_java_async(
     :param list workunit_labels: an optional sequence of labels for the work unit
     :param string cwd: optionally set the working directory
     :param WorkUnit.LogConfig workunit_log_config: an optional tuple of options affecting reporting
-    :param bool create_synthetic_jar: whether to create a synthentic jar that includes the original
+    :param bool create_synthetic_jar: whether to create a synthetic jar that includes the original
       classpath in its manifest.
     :param string synthetic_jar_dir: an optional directory to store the synthetic jar, if `None`
       a temporary directory will be provided and cleaned up upon process exit.
@@ -316,7 +316,7 @@ def relativize_classpath(classpath, root_dir, followlinks=True):
     """
 
     def relativize_url(url, root_dir):
-        # When symlink is involed, root_dir concatenated with the returned relpath may not exist.
+        # When symlink is involved, root_dir concatenated with the returned relpath may not exist.
         # Consider on mac `/var` is a symlink of `/private/var`, the relative path of subdirectories
         # under /var to any other directories under `/` computed by os.path.relpath misses one level
         # of `..`. Use os.path.realpath to guarantee returned relpath can always be located.

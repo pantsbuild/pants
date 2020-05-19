@@ -33,7 +33,7 @@ See `mypy`'s usage screen for more information.
 ## Open Issues
 
 - It remains to be seen how this plugin should deal with imports of third-party modules for which
-there are no type stubs in the `typeshed` project. (A copy of `typeshed` is emedded For now, it is
+there are no type stubs in the `typeshed` project. (A copy of `typeshed` is embedded For now, it is
 recommended to pass `--follow-imports=silent` as a pass-through argument on the Pants
 command-line.
 
