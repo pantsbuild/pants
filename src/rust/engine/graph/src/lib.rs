@@ -1059,7 +1059,7 @@ impl<'a, N: Node + 'a, F: Fn(&EntryId) -> bool> Iterator for Walk<'a, N, F> {
   fn next(&mut self) -> Option<Self::Item> {
     while let Some(id) = self.deque.pop_front() {
       // Visit this node and it neighbors if this node has not yet be visited and we aren't
-      // stopping our walk at this node, based on if it satifies the stop_walking_predicate.
+      // stopping our walk at this node, based on if it satisfies the stop_walking_predicate.
       // This mechanism gives us a way to selectively dirty parts of the graph respecting node boundaries
       // like uncacheable nodes, which sholdn't be dirtied.
       if !self.walked.insert(id) || (self.stop_walking_predicate)(&id) {
