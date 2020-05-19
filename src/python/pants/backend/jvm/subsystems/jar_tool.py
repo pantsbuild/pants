@@ -16,7 +16,7 @@ class JarTool(JvmToolMixin, Subsystem):
         cls.register_jvm_tool(
             register,
             "jar-tool",
-            classpath=[JarDependency(org="org.pantsbuild", name="jar-tool", rev="0.0.16")],
+            classpath=[JarDependency(org="org.pantsbuild", name="jar-tool", rev="0.0.17")],
         )
 
     def run(self, context, runjava, args):

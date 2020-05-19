@@ -32,7 +32,7 @@ class ScalaRepl(JvmToolTaskMixin, ReplTaskMixin, JvmTask):
         cls.register_jvm_tool(
             register,
             "pants-runner",
-            classpath=[JarDependency(org="org.pantsbuild", name="pants-runner", rev="0.0.1")],
+            classpath=[JarDependency(org="org.pantsbuild", name="pants-runner", rev="0.0.8")],
             main=ScalaRepl._RUNNER_MAIN,
         )
 
