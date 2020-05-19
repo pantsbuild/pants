@@ -486,15 +486,12 @@ class GlobalOptions(Subsystem):
             help="Write logs to files under this directory.",
         )
 
-        # This facilitates bootstrap-time configuration of pantsd usage such that we can
-        # determine whether or not to use the Pailgun client to invoke a given pants run
-        # without resorting to heavier options parsing.
         register(
             "--enable-pantsd",
             advanced=True,
             type=bool,
-            default=False,
-            help="Enables use of the pants daemon (and implicitly, the v2 engine). (Beta)",
+            default=True,
+            help="Enables use of the pants daemon. (Beta)",
         )
 
         # Whether or not to make necessary arrangements to have concurrent runs in pants.
