@@ -36,7 +36,7 @@ class JvmPlatformTest(TestBase):
         assert parse("9") == rev("9")
         assert parse("10") == rev("10")
         assert parse("11") == rev("11")
-        assert parse("11.0") == rev("11")
+        assert parse("11.0") == rev("11.0")
         with self.assertRaisesWithMessage(ValueError, "Unsupported Java version 5"):
             parse("5")
 
