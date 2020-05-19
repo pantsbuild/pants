@@ -22,7 +22,7 @@ The [`PantsDaemon`](https://github.com/pantsbuild/pants/blob/master/src/python/p
 Initialization is encapsulated in the `PantsDaemon.Factory.create()` method.
 `PantsDaemon` is a `ProcessManager`, which means one can know if it's alive, or if it needs to restart.
 
-`PantsDaemon`s can be `launch()`ed, which will terminate the process it was running, and call `daemon_spawn()` to fork a new process. This new process will run the code in `PantsDaemon.post_fork_child()`, which in short means it will run `os.spawnve` to execute the `pants_daemon.py:launch()` function, which will call `PantsDaemon.run_sync()`. `run_sync()` does a lot of things, but the vital things are calling `_setup_services()` to spin up services, and `_run_services()` to start an infinte loop polling them. More on services later.
+`PantsDaemon`s can be `launch()`ed, which will terminate the process it was running, and call `daemon_spawn()` to fork a new process. This new process will run the code in `PantsDaemon.post_fork_child()`, which in short means it will run `os.spawnve` to execute the `pants_daemon.py:launch()` function, which will call `PantsDaemon.run_sync()`. `run_sync()` does a lot of things, but the vital things are calling `_setup_services()` to spin up services, and `_run_services()` to start an infinite loop polling them. More on services later.
 
 Pailgun
 -------
