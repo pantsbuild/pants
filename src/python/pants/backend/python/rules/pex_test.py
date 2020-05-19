@@ -327,7 +327,7 @@ class PexTest(ExternalToolTestBase):
         assert pex_output["info"]["interpreter_constraints"] == []
 
     def test_additional_inputs(self) -> None:
-        # We use pex's --preamble-file option to set a custom premable from a file.
+        # We use pex's --preamble-file option to set a custom preamble from a file.
         # This verifies that the file was indeed provided as additional input to the pex call.
         preamble_file = "custom_preamble.txt"
         preamble = "#!CUSTOM PREAMBLE\n"
