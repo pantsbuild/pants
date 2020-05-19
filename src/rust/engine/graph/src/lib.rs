@@ -328,7 +328,7 @@ impl<N: Node> InnerGraph<N> {
       .filter_map(|(node, &entry_id)| {
         // A NotStarted entry does not need clearing, and we can assume that its dependencies are
         // either already dirtied, or have never observed a value for it. Filtering these redundant
-        // events helps to "debounce" invalidation (ie, avoid redundent re-dirtying of dependencies).
+        // events helps to "debounce" invalidation (ie, avoid redundant re-dirtying of dependencies).
         if predicate(node) && self.unsafe_entry_for_id(entry_id).is_started() {
           Some(entry_id)
         } else {
