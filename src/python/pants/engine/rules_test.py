@@ -286,7 +286,7 @@ class RuleIndexTest(TestBase):
 
 
 class RuleArgumentAnnotationTest(unittest.TestCase):
-    def test_annoations_kwargs(self):
+    def test_annotations_kwargs(self):
         @named_rule
         def a_named_rule(a: int, b: str) -> bool:
             return False
