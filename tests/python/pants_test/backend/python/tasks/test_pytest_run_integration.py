@@ -28,7 +28,7 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
     pytest_setup_for_python_2_tests = {
         "pytest": {
             "version": "pytest==4.6.6",  # so that we can run Python 2 tests
-            "pytest_plugins": ["zipp==1.0.0"],  # transitive dep of Pytest
+            "pytest_plugins": ["zipp==1.0.0", "configparser==4.0.2"],  # transitive dep of Pytest
         }
     }
 
