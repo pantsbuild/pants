@@ -24,7 +24,7 @@ class ZincCompileTest(JvmToolTaskTestBase):
         task = self.create_task(context)
         return task
 
-    def test_spaces_preservend_when_populating_zinc_args_product_from_argfile(self):
+    def test_spaces_preserved_when_populating_zinc_args_product_from_argfile(self):
         with temporary_file_path() as arg_file_path:
             compile_contexts = {
                 self.java_target: CompileContext(
