@@ -16,7 +16,7 @@ from pants.util.ordered_set import OrderedSet
 logger = logging.getLogger(__name__)
 
 
-def is_build_file_name(name: str) -> bool:
+def _is_build_file_name(name: str) -> bool:
     return bool(re.match(rf"^BUILD(\.[a-zA-Z0-9_-]+)?$", name))
 
 
