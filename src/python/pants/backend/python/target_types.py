@@ -45,7 +45,7 @@ class PythonSources(Sources):
         deprecated_conditional(
             lambda: bool(non_python_files),
             entity_description="Python targets including non-Python files",
-            removal_version="1.29.0.dev0",
+            removal_version="1.29.0.dev1",
             hint_message=(
                 f"The {repr(self.alias)} field in target {self.address} should only contain "
                 f"files that end in '.py', but it had these files: {sorted(non_python_files)}.\n\n"

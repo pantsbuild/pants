@@ -1,0 +1,159 @@
+1.29.x Stable Releases
+======================
+
+This document describes releases leading up to the ``1.29.x`` ``stable`` series.
+
+See https://pants.readme.io/docs/release-notes-1-29 for an overview of the changes in this release.
+
+1.29.0.dev0 (5/19/2020)
+-----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Remove stale and private `pants.contrib.buildgen` plugin (#9811)
+  `PR #9811 <https://github.com/pantsbuild/pants/pull/9811>`_
+
+* Remove deprecated Antlr, Jaxb, Ragel, and Wire codegen backends (#9761)
+  `PR #9761 <https://github.com/pantsbuild/pants/pull/9761>`_
+
+* Remove deprecated contrib plugins (#9762)
+  `PR #9762 <https://github.com/pantsbuild/pants/pull/9762>`_
+
+* Remove unsafe ability to import Python in BUILD files (#9771)
+  `PR #9771 <https://github.com/pantsbuild/pants/pull/9771>`_
+
+* Remove deprecated `source` field in favor of `sources` (#9766)
+  `PR #9766 <https://github.com/pantsbuild/pants/pull/9766>`_
+
+* Remove `--cloc-transitive` and replace V1 implementation with V2 (#9763)
+  `PR #9763 <https://github.com/pantsbuild/pants/pull/9763>`_
+
+* Upggrade cffi from 1.13.2 to .114.0 (#9767)
+  `PR #9767 <https://github.com/pantsbuild/pants/pull/9767>`_
+
+* Upgrade py_zipkin from 0.18.4 to 0.20.0 (#9777)
+  `PR #9777 <https://github.com/pantsbuild/pants/pull/9777>`_
+
+* Upgrade toml from 0.10.0 to 0.10.1 (#9768)
+  `PR #9768 <https://github.com/pantsbuild/pants/pull/9768>`_
+
+* Upgrade packaging from 16.8 to 20.3 (#9786)
+  `PR #9786 <https://github.com/pantsbuild/pants/pull/9786>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Add support to Pylint for first-party source plugins (#9792)
+  `PR #9792 <https://github.com/pantsbuild/pants/pull/9792>`_
+
+* Add V2 implementation of `filter` (#9785)
+  `PR #9785 <https://github.com/pantsbuild/pants/pull/9785>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix Pylint when a target has third-party dependencies (#9794)
+  `PR #9794 <https://github.com/pantsbuild/pants/pull/9794>`_
+
+* Omit `m` suffix in platform for AWS Lambdas using Python 3.8 (#9796)
+  `PR #9796 <https://github.com/pantsbuild/pants/pull/9796>`_
+
+* Improve error message when a single command line argument is invalid (#9795)
+  `PR #9795 <https://github.com/pantsbuild/pants/pull/9795>`_
+
+* Set correct project name for `./pants idea-plugin` (#9783)
+  `PR #9783 <https://github.com/pantsbuild/pants/pull/9783>`_
+
+* Fix Target API bindings not loading for plugins (#9788)
+  `PR #9788 <https://github.com/pantsbuild/pants/pull/9788>`_
+
+* Move away from the debounced notify watcher (#9754)
+  `PR #9754 <https://github.com/pantsbuild/pants/pull/9754>`_
+
+* Further refine the "include `.pids`" hack. (#9773)
+  `PR #9773 <https://github.com/pantsbuild/pants/pull/9773>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Re-implement source roots without using a trie (#9799)
+  `PR #9799 <https://github.com/pantsbuild/pants/pull/9799>`_
+
+* Render failures via explicit traceback construction rather than graph walks (#9797)
+  `PR #9797 <https://github.com/pantsbuild/pants/pull/9797>`_
+
+* Refactor Workunit types (#9759)
+  `PR #9759 <https://github.com/pantsbuild/pants/pull/9759>`_
+
+* Standardized workunit names (#9774)
+  `PR #9774 <https://github.com/pantsbuild/pants/pull/9774>`_
+
+* Remove unused variants experiment (#9820)
+  `PR #9820 <https://github.com/pantsbuild/pants/pull/9820>`_
+
+* Stop using `Collection.dependencies` in most places internally (#9816)
+  `PR #9816 <https://github.com/pantsbuild/pants/pull/9816>`_
+
+* Remove unused `BuildFileParser` (#9802)
+  `PR #9802 <https://github.com/pantsbuild/pants/pull/9802>`_
+
+* Improve the `repr` for V2 `Target` (#9808)
+  `PR #9808 <https://github.com/pantsbuild/pants/pull/9808>`_
+
+* Add type hints to `pants.util.filtering` (#9772)
+  `PR #9772 <https://github.com/pantsbuild/pants/pull/9772>`_
+
+* Remove forced copying in local load_bytes_with (#9793)
+  `PR #9793 <https://github.com/pantsbuild/pants/pull/9793>`_
+
+* use @decorated_type_checkable for side-effecting rules! (#9780)
+  `PR #9780 <https://github.com/pantsbuild/pants/pull/9780>`_
+
+Testing
+~~~~~~~
+
+* Enable color output in travis (#9801)
+  `PR #9801 <https://github.com/pantsbuild/pants/pull/9801>`_
+
+* Use v2 binary directly for test bootstrap. (#9798)
+  `PR #9798 <https://github.com/pantsbuild/pants/pull/9798>`_
+
+* Disable capturing core dumps in travis. (#9769)
+  `PR #9769 <https://github.com/pantsbuild/pants/pull/9769>`_
+
+* Add tests for using plugins with Bandit, Flake8, and Pylint (#9787)
+  `PR #9787 <https://github.com/pantsbuild/pants/pull/9787>`_
+
+* Use the term "block list" for internal CI setup (#9784)
+  `PR #9784 <https://github.com/pantsbuild/pants/pull/9784>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Stop putting pre-release notes in `master.html` in favor of branch notes (#9809)
+  `PR #9809 <https://github.com/pantsbuild/pants/pull/9809>`_
+
+* Reference the V2 docsite in the README and index page (#9756)
+  `PR #9756 <https://github.com/pantsbuild/pants/pull/9756>`_
+
+* Fix several typos in source code (#9813)
+  `PR #9813 <https://github.com/pantsbuild/pants/pull/9813>`_
+
+* Fix several typos in source code (#9800)
+  `PR #9800 <https://github.com/pantsbuild/pants/pull/9800>`_
+
+* Fix dependees flag help string. (#9805)
+  `PR #9805 <https://github.com/pantsbuild/pants/pull/9805>`_
+
+* Mention --owners-not-found-behavior option when owners are not found (#9770)
+  `PR #9770 <https://github.com/pantsbuild/pants/pull/9770>`_
+
+* Slightly update the documentation about pantsd (#8665)
+  `PR #8665 <https://github.com/pantsbuild/pants/pull/8665>`_
+
+* Prepare 1.28.0rc1. (#9791)
+  `PR #9791 <https://github.com/pantsbuild/pants/pull/9791>`_
+
+* Prepare 1.27.0rc2 release notes (#9790)
+  `PR #9790 <https://github.com/pantsbuild/pants/pull/9790>`_

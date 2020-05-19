@@ -22,6 +22,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Bruno Bieth
 + Caitie McCaffrey
 + Chris Aniszczyk
++ Chris Borckholder
 + Chris Burroughs
 + Chris Chen
 + Chris Heisterkamp
@@ -103,6 +104,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Jonathan Coveney
 + Jonathan D. Simms
 + Jonathan Sokolowski
++ Josh Soref
 + Joshua Cohen
 + Joshua Humphries
 + Justin Trobec

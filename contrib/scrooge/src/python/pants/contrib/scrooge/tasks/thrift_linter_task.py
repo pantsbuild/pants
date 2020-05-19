@@ -38,15 +38,6 @@ class ThriftLinterTask(LintTaskMixin, NailgunTask):
     def register_options(cls, register):
         super().register_options(register)
         register(
-            "--strict",
-            type=bool,
-            fingerprint=True,
-            removal_version="1.29.0.dev0",
-            removal_hint="Use `--scrooge-linter-strict` instead",
-            help="Fail the goal if thrift linter errors are found. Overrides the "
-            "`strict-default` option.",
-        )
-        register(
             "--ignore-errors",
             default=False,
             advanced=True,
@@ -83,15 +74,10 @@ class ThriftLinterTask(LintTaskMixin, NailgunTask):
         # 1. the option --[no-]strict, but only if explicitly set.
         # 2. java_thrift_library target in BUILD file, thrift_linter_strict = False,
         # 3. options, --[no-]strict-default
-        task_options = self.get_options()
         subsystem_options = ScroogeLinter.global_instance().options
 
-        # NB: _resolve_conflicting_options() used to assert that both options aren't configured.
-        self._resolve_conflicting_options(old_option="strict", new_option="strict")
         if not subsystem_options.is_default("strict"):
             return self._to_bool(subsystem_options.strict)
-        if not task_options.is_default("strict"):
-            return self._to_bool(task_options.strict)
 
         if target.thrift_linter_strict is not None:
             return self._to_bool(target.thrift_linter_strict)
