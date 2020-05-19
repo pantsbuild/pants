@@ -27,11 +27,17 @@ async def all_roots(source_root_config: SourceRootConfig) -> AllSourceRoots:
     source_roots = source_root_config.get_source_roots()
 
     all_paths: Set[str] = set()
-    for path in source_roots.traverse():
+    for path in source_roots.get_patterns():
+        # Remove these first two branches in 1.30.0.dev0, after the trie implementation is deleted.
         if path == "^":
             all_paths.add("**")
         elif path.startswith("^/"):
             all_paths.add(f"{path[2:]}/")
+
+        elif path == "/":
+            all_paths.add("**")
+        elif path.startswith("/"):
+            all_paths.add(f"{path[1:]}/")
         else:
             all_paths.add(f"**/{path}/")
 
@@ -52,9 +58,9 @@ async def all_roots(source_root_config: SourceRootConfig) -> AllSourceRoots:
 
 
 @goal_rule
-async def list_roots(console: Console, options: RootsOptions, all_roots: AllSourceRoots) -> Roots:
+async def list_roots(console: Console, options: RootsOptions, asr: AllSourceRoots) -> Roots:
     with options.line_oriented(console) as print_stdout:
-        for src_root in sorted(all_roots, key=lambda x: x.path):
+        for src_root in sorted(asr, key=lambda x: x.path):
             print_stdout(src_root.path or ".")
     return Roots(exit_code=0)
 

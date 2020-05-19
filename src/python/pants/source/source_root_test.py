@@ -1,12 +1,55 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.source.source_root import SourceRoot, SourceRootConfig, SourceRootTrie
+import pytest
+
+from pants.source.source_root import NoSourceRootError, SourceRoot, SourceRoots, SourceRootTrie
 from pants.testutil.test_base import TestBase
 
 
+def test_source_root_at_buildroot() -> None:
+    srs = SourceRoots(["/"])
+    assert SourceRoot(".") == srs.strict_find_by_path("foo/bar.py")
+    assert SourceRoot(".") == srs.strict_find_by_path("foo/")
+    assert SourceRoot(".") == srs.strict_find_by_path("foo")
+    with pytest.raises(NoSourceRootError):
+        srs.strict_find_by_path("../foo/bar.py")
+
+
+def test_fixed_source_roots() -> None:
+    srs = SourceRoots(["/root1", "/foo/root2", "/root1/root3"])
+    assert SourceRoot("root1") == srs.strict_find_by_path("root1/bar.py")
+    assert SourceRoot("foo/root2") == srs.strict_find_by_path("foo/root2/bar/baz.py")
+    assert SourceRoot("root1/root3") == srs.strict_find_by_path("root1/root3/qux.py")
+    assert SourceRoot("root1/root3") == srs.strict_find_by_path("root1/root3/qux/quux.py")
+    assert SourceRoot("root1/root3") == srs.strict_find_by_path("root1/root3")
+    with pytest.raises(NoSourceRootError):
+        srs.strict_find_by_path("blah/blah.py")
+
+
+def test_source_root_suffixes() -> None:
+    srs = SourceRoots(["src/python", "/"])
+    assert SourceRoot("src/python") == srs.strict_find_by_path("src/python/foo/bar.py")
+    assert SourceRoot("src/python/foo/src/python") == srs.strict_find_by_path(
+        "src/python/foo/src/python/bar.py"
+    )
+    assert SourceRoot(".") == srs.strict_find_by_path("foo/bar.py")
+
+
+def test_source_root_patterns() -> None:
+    srs = SourceRoots(["src/*", "/project/*"])
+    assert SourceRoot("src/python") == srs.strict_find_by_path("src/python/foo/bar.py")
+    assert SourceRoot("src/python/foo/src/shell") == srs.strict_find_by_path(
+        "src/python/foo/src/shell/bar.sh"
+    )
+    assert SourceRoot("project/python") == srs.strict_find_by_path("project/python/foo/bar.py")
+    with pytest.raises(NoSourceRootError):
+        srs.strict_find_by_path("prefix/project/python/foo/bar.py")
+
+
 class SourceRootTest(TestBase):
-    def test_source_root_trie(self):
+    # TODO: Delete all the *_deprecated tests below in 1.30.0.dev0.
+    def test_source_root_trie_deprecated(self):
         trie = SourceRootTrie()
         self.assertIsNone(trie.find("src/java/org/pantsbuild/foo/Foo.java"))
 
@@ -104,7 +147,7 @@ class SourceRootTest(TestBase):
         trie.add_fixed("")
         self.assertEqual(root(""), trie.find("foo/bar/baz.py"))
 
-    def test_source_root_trie_traverse(self):
+    def test_source_root_trie_traverse_deprecated(self):
         def make_trie() -> SourceRootTrie:
             return SourceRootTrie()
 
@@ -134,19 +177,19 @@ class SourceRootTest(TestBase):
             {"src/*/code", "^/src/scala-source-code", "src/main/*/code"}, trie.traverse()
         )
 
-    def test_fixed_source_root_at_buildroot(self):
+    def test_fixed_source_root_at_buildroot_deprecated(self):
         trie = SourceRootTrie()
         trie.add_fixed("",)
 
         self.assertEqual(SourceRoot(""), trie.find("foo/proto/bar/baz.proto"))
 
-    def test_source_root_pattern_at_buildroot(self):
+    def test_source_root_pattern_at_buildroot_deprecated(self):
         trie = SourceRootTrie()
         trie.add_pattern("*")
 
         self.assertEqual(SourceRoot("java"), trie.find("java/bar/baz.proto"))
 
-    def test_invalid_patterns(self):
+    def test_invalid_patterns_deprecated(self):
         trie = SourceRootTrie()
         # Bad normalization.
         self.assertRaises(SourceRootTrie.InvalidPath, lambda: trie.add_fixed("foo/bar/"))
@@ -156,7 +199,7 @@ class SourceRootTest(TestBase):
         # Asterisk in fixed pattern.
         self.assertRaises(SourceRootTrie.InvalidPath, lambda: trie.add_fixed("src/*"))
 
-    def test_trie_traversal(self):
+    def test_trie_traversal_deprecated(self):
         trie = SourceRootTrie()
         trie.add_pattern("foo1/bar1/baz1")
         trie.add_pattern("foo1/bar1/baz2/qux")
@@ -192,51 +235,4 @@ class SourceRootTest(TestBase):
         # Test the fixed() method.
         self.assertEqual(
             {"fixed1/bar1", "fixed2/bar2"}, set(trie.fixed()),
-        )
-
-    def test_all_roots(self):
-        self.create_dir("contrib/go/examples/3rdparty/go")
-        self.create_dir("contrib/go/examples/src/go/src")
-        self.create_dir("src/java")
-        self.create_dir("src/python")
-        self.create_dir("src/kotlin")
-        self.create_dir("src/example/java")
-        self.create_dir("src/example/python")
-        self.create_dir("my/project/src/java")
-        self.create_dir("fixed/root/jvm")
-        self.create_dir("not/a/srcroot/java")
-
-        options = {
-            "pants_ignore": [],
-            "source_root_patterns": ["src/*", "src/example/*"],
-            "source_roots": {
-                # Fixed roots should trump patterns which would detect contrib/go/examples/src/go here.
-                "contrib/go/examples/src/go/src": ["go"],
-                # Dir does not exist, should not be listed as a root.
-                "java": ["java"],
-            },
-        }
-        options.update(self.options[""])  # We need inherited values for pants_workdir etc.
-
-        self.context(
-            for_subsystems=[SourceRootConfig], options={SourceRootConfig.options_scope: options}
-        )
-        source_roots = SourceRootConfig.global_instance().get_source_roots()
-        # Ensure that we see any manually added roots.
-        source_roots.add_source_root("fixed/root/jvm")
-        source_roots.all_roots()
-
-        self.assertEqual(
-            {
-                SourceRoot("contrib/go/examples/3rdparty/go"),
-                SourceRoot("contrib/go/examples/src/go/src"),
-                SourceRoot("src/java"),
-                SourceRoot("src/python"),
-                SourceRoot("src/kotlin"),
-                SourceRoot("src/example/java"),
-                SourceRoot("src/example/python"),
-                SourceRoot("my/project/src/java"),
-                SourceRoot("fixed/root/jvm"),
-            },
-            set(source_roots.all_roots()),
         )
