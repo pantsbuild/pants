@@ -139,7 +139,7 @@ class TestNodeBuild(TaskTestBase):
 
     def test_run_non_existing_script(self):
         package_json_file = self.create_file("src/node/build_test/package.json", contents="{}")
-        build_script = "my_non_existing_build_scirpt"
+        build_script = "my_non_existing_build_script"
         target = self.make_target(
             spec="src/node/build_test",
             target_type=NodeModule,
