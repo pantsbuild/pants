@@ -134,9 +134,8 @@ async def pylint_lint(
     # requirements, which could lead to problems.
     pylint_runner_pex_args = ["--pex-path", ":".join(["pylint.pex", "requirements.pex"])]
     if pylint.source_plugins:
-        # NB: Pylint requires explicitly loading source plugins through PYTHONPATH. To do this, we
-        # set `PYTHONPATH: ./`. But, PEX normally ignores PYTHONPATH for hermiticity, so we must
-        # tell it to use the value.
+        # NB: See below for why we set PYTHONPATH to load source plugins. This setting is necessary
+        # for PEX to pick up the PYTHONPATH value.
         pylint_runner_pex_args.append("--inherit-path=fallback")
     pylint_runner_pex_request = Get[Pex](
         PexRequest(

@@ -11,12 +11,13 @@ class PylintPluginSources(PythonSources):
     expected_file_extensions = (".py",)
 
 
+# NB: We solely subclass this to change the docstring.
 class PylintPluginDependencies(Dependencies):
     """Addresses to other targets that this plugin depends on.
 
-    These targets must either be third-party Python dependencies
-    (https://pants.readme.io/docs/python-third-party-dependencies) or be located within this
-    target's same directory or a subdirectory, due to restrictions with Pylint plugins.
+    Due to restrictions with Pylint plugins, these targets must either be third-party Python
+    dependencies (https://pants.readme.io/docs/python-third-party-dependencies) or be located
+    within this target's same directory or a subdirectory.
     """
 
 
