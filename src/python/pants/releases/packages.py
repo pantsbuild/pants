@@ -93,10 +93,6 @@ def contrib_packages():
       "//contrib/scrooge/src/python/pants/contrib/scrooge:plugin",
     ),
     Package(
-      "pantsbuild.pants.contrib.buildgen",
-      "//contrib/buildgen/src/python/pants/contrib/buildgen:plugin",
-    ),
-    Package(
       "pantsbuild.pants.contrib.go",
       "//contrib/go/src/python/pants/contrib/go:plugin",
     ),
