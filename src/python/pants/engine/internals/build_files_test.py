@@ -30,7 +30,7 @@ from pants.engine.internals.examples.parsers import (
 from pants.engine.internals.mapper import AddressFamily, AddressMapper
 from pants.engine.internals.nodes import Return, State, Throw
 from pants.engine.internals.parser import BuildFilePreludeSymbols, HydratedStruct, SymbolTable
-from pants.engine.internals.scheduler import ExecutionRequest, SchedulerSession
+from pants.engine.internals.scheduler import ExecutionError, ExecutionRequest, SchedulerSession
 from pants.engine.internals.scheduler_test_base import SchedulerTestBase
 from pants.engine.internals.struct import Struct, StructWithDeps
 from pants.engine.legacy.structs import TargetAdaptor
@@ -345,9 +345,10 @@ class InlinedGraphTest(GraphTestBase):
         # Confirm that the root failed, and that a cycle occurred deeper in the graph.
         request, state = self._populate(scheduler, parsed_address)
         self.assertEqual(type(state), Throw)
-        trace_message = "\n".join(scheduler.trace(request))
+        with self.assertRaises(ExecutionError) as cm:
+            scheduler._raise_on_error([state])
+        trace_message = str(cm.exception)
 
-        self.assert_throws_are_leaves(trace_message, Throw.__name__)
         if expected_regex:
             print(trace_message)
             self.assertRegex(trace_message, expected_regex)
@@ -360,28 +361,6 @@ class InlinedGraphTest(GraphTestBase):
             parsed_address,
             f"(?ms)Dep graph contained a cycle:.*{cyclic_address_str}.* <-.*{cyclic_address_str}.* <-",
         )
-
-    def assert_throws_are_leaves(self, error_msg, throw_name) -> None:
-        def indent_of(s: str) -> int:
-            return len(s) - len(s.lstrip())
-
-        def assert_equal_or_more_indentation(
-            more_indented_line: str, less_indented_line: str
-        ) -> None:
-            self.assertTrue(
-                indent_of(more_indented_line) >= indent_of(less_indented_line),
-                '\n"{}"\nshould have more equal or more indentation than\n"{}"\n{}'.format(
-                    more_indented_line, less_indented_line, error_msg
-                ),
-            )
-
-        lines = error_msg.splitlines()
-        line_indices_of_throws = [i for i, v in enumerate(lines) if throw_name in v]
-        for idx in line_indices_of_throws:
-            # Make sure lines with Throw have more or equal indentation than its neighbors.
-            current_line = lines[idx]
-            line_above = lines[max(0, idx - 1)]
-            assert_equal_or_more_indentation(current_line, line_above)
 
     def test_cycle_self(self) -> None:
         self.do_test_cycle("graph_test:self_cycle", "graph_test:self_cycle")

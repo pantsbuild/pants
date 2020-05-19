@@ -11,14 +11,10 @@ from typing import List
 
 from pants.engine.internals.native import Native
 from pants.engine.internals.scheduler import ExecutionError, SchedulerSession
-from pants.engine.rules import RootRule, rule
+from pants.engine.rules import RootRule, named_rule, rule
 from pants.engine.selectors import Get, Params
 from pants.engine.unions import UnionRule, union
-from pants.testutil.engine.util import (
-    assert_equal_with_printing,
-    fmt_rust_function,
-    remove_locations_from_traceback,
-)
+from pants.testutil.engine.util import assert_equal_with_printing, remove_locations_from_traceback
 from pants.testutil.test_base import TestBase
 
 
@@ -36,7 +32,7 @@ def fn_raises(x):
     raise Exception(f"An exception for {type(x).__name__}")
 
 
-@rule
+@named_rule(desc="Nested raise")
 def nested_raise(x: B) -> A:  # type: ignore[return]
     fn_raises(x)
 
@@ -261,8 +257,8 @@ class SchedulerWithNestedRaiseTest(TestBase):
             # `a_typecheck_fail_test` above expects `wrapper.inner` to be a `B`.
             self.request_single_product(A, Params(TypeCheckFailWrapper(A())))
 
-        expected_regex = "Exception: WithDeps.*did not declare a dependency on JustGet"
-        assert re.search(expected_regex, str(cm.exception))
+        expected_regex = "WithDeps.*did not declare a dependency on JustGet"
+        self.assertRegex(str(cm.exception), expected_regex)
 
     def test_unhashable_failure(self):
         """Test that unhashable Get(...) params result in a structured error."""
@@ -358,25 +354,29 @@ class SchedulerWithNestedRaiseTest(TestBase):
     def test_trace_includes_rule_exception_traceback(self):
         # Execute a request that will trigger the nested raise, and then directly inspect its trace.
         request = self.scheduler.execution_request([A], [B()])
-        self.scheduler.execute(request)
+        _, throws = self.scheduler.execute(request)
 
-        trace = remove_locations_from_traceback("\n".join(self.scheduler.trace(request)))
+        with self.assertRaises(ExecutionError) as cm:
+            self.scheduler._raise_on_error([t for _, t in throws])
+
+        trace = remove_locations_from_traceback(str(cm.exception))
         assert_equal_with_printing(
             self,
             dedent(
                 f"""\
-                Computing Select(B(), A)
-                  Computing Task({fmt_rust_function(nested_raise)}(), B(), A, true)
-                    Throw(An exception for B)
-                      Traceback (most recent call last):
-                        File LOCATION-INFO, in call
-                          val = func(*args)
-                        File LOCATION-INFO, in nested_raise
-                          fn_raises(x)
-                        File LOCATION-INFO, in fn_raises
-                          raise Exception(f"An exception for {{type(x).__name__}}")
-                      Exception: An exception for B"""
-            )
-            + "\n\n",  # Traces include two empty lines after.
+                 1 Exception encountered:
+
+                 Engine traceback:
+                   in Nested raise
+                 Traceback (most recent call last):
+                   File LOCATION-INFO, in call
+                     val = func(*args)
+                   File LOCATION-INFO, in nested_raise
+                     fn_raises(x)
+                   File LOCATION-INFO, in fn_raises
+                     raise Exception(f"An exception for {{type(x).__name__}}")
+                 Exception: An exception for B
+                 """
+            ),
             trace,
         )

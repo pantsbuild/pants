@@ -685,8 +685,8 @@ class ExternContext:
 
     def raise_or_return(self, pyresult):
         """Consumes the given PyResult to raise/return the exception/value it represents."""
-        value = self.from_value(pyresult.handle)
-        self._handles.remove(pyresult.handle)
+        value = self.from_value(pyresult.result)
+        self._handles.remove(pyresult.result)
         if pyresult.is_throw:
             raise value
         else:

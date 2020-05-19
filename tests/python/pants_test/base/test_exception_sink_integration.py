@@ -26,6 +26,7 @@ Exception caught: \\([^)]*\\)
 (.|\n)*
 
 Exception message:.* 1 Exception encountered:
+
   ResolveError: "this-target-does-not-exist" was not found in namespace ""\\. Did you mean one of:
 """.format(
                 pid=pid

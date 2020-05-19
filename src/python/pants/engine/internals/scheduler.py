@@ -8,12 +8,23 @@ import time
 import traceback
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Tuple, Type, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    List,
+    NoReturn,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    Union,
+    cast,
+)
 
 from typing_extensions import TypedDict
 
 from pants.base.exception_sink import ExceptionSink
-from pants.base.exiter import PANTS_FAILED_EXIT_CODE
 from pants.engine.collection import Collection
 from pants.engine.fs import (
     Digest,
@@ -66,9 +77,6 @@ class ExecutionError(Exception):
     def __init__(self, message, wrapped_exceptions=None):
         super().__init__(message)
         self.wrapped_exceptions = wrapped_exceptions or ()
-
-    def end_user_messages(self):
-        return [str(exc) for exc in self.wrapped_exceptions]
 
 
 class ExecutionTimeoutError(ExecutionError):
@@ -328,8 +336,12 @@ class Scheduler:
                 )
 
                 if raw_root.is_throw:
-                    state = Throw(self._from_value(raw_root.handle))
-                elif raw_root.handle == self._native.ffi.NULL:
+                    state = Throw(
+                        self._from_value(raw_root.result),
+                        python_traceback=self._from_value(raw_root.python_traceback),
+                        engine_traceback=self._from_value(raw_root.engine_traceback),
+                    )
+                elif raw_root.result == self._native.ffi.NULL:
                     # NB: We expect all NULL handles to correspond to uncaught exceptions which are collected
                     # in `self._native._peek_cffi_extern_method_runtime_exceptions()`!
                     if not remaining_runtime_exceptions_to_capture:
@@ -340,7 +352,7 @@ class Scheduler:
                     matching_runtime_exception = remaining_runtime_exceptions_to_capture.pop(0)
                     state = Throw(matching_runtime_exception)
                 else:
-                    state = Return(self._from_value(raw_root.handle))
+                    state = Return(self._from_value(raw_root.result))
                 roots.append(state)
         finally:
             self._native.lib.nodes_destroy(raw_roots)
@@ -425,11 +437,6 @@ class SchedulerSession:
         nodes in each iteration of its loop.
         """
         self._scheduler._native.lib.session_new_run_id(self._session)
-
-    def trace(self, execution_request):
-        """Yields a stringified 'stacktrace' starting from the scheduler's roots."""
-        for line in self._scheduler.graph_trace(self._session, execution_request.native):
-            yield line
 
     def visualize_graph_to_file(self, filename):
         """Visualize a graph walk by writing graphviz `dot` output to a file.
@@ -534,22 +541,30 @@ class SchedulerSession:
         throws = tuple((root, state) for root, state in roots if type(state) is Throw)
         return cast(Tuple[Tuple[Return, ...], Tuple[Throw, ...]], (returns, throws))
 
-    def _trace_on_error(self, unique_exceptions, request):
-        exception_noun = pluralize(len(unique_exceptions), "Exception")
+    def _raise_on_error(self, throws: List[Throw]) -> NoReturn:
+        exception_noun = pluralize(len(throws), "Exception")
+
         if self._scheduler.include_trace_on_error:
-            cumulative_trace = "\n".join(self.trace(request))
+            throw = throws[0]
+            etb = throw.engine_traceback
+            python_traceback_str = throw.python_traceback or ""
+            engine_traceback_str = ""
+            others_msg = f"\n(and {len(throws) - 1} more)" if len(throws) > 1 else ""
+            if etb:
+                sep = "\n  in "
+                engine_traceback_str = "Engine traceback:" + sep + sep.join(reversed(etb)) + "\n"
             raise ExecutionError(
-                "{} encountered:\n{}".format(exception_noun, cumulative_trace), unique_exceptions,
+                f"{exception_noun} encountered:\n\n"
+                f"{engine_traceback_str}"
+                f"{python_traceback_str}"
+                f"{others_msg}",
+                wrapped_exceptions=tuple(t.exc for t in throws),
             )
         else:
+            exception_strs = "\n  ".join(f"{type(t.exc).__name__}: {str(t.exc)}" for t in throws)
             raise ExecutionError(
-                "{} encountered:\n  {}".format(
-                    exception_noun,
-                    "\n  ".join(
-                        "{}: {}".format(type(t).__name__, str(t)) for t in unique_exceptions
-                    ),
-                ),
-                unique_exceptions,
+                f"{exception_noun} encountered:\n\n" f"  {exception_strs}\n",
+                wrapped_exceptions=tuple(t.exc for t in throws),
             )
 
     def run_goal_rule(
@@ -579,10 +594,7 @@ class SchedulerSession:
         returns, throws = self.execute(request)
 
         if throws:
-            _, state = throws[0]
-            exc = state.exc
-            self._trace_on_error([exc], request)
-            return PANTS_FAILED_EXIT_CODE
+            self._raise_on_error([t for _, t in throws])
         _, state = returns[0]
         return cast(int, state.value.exit_code)
 
@@ -667,8 +679,7 @@ class SchedulerSession:
 
         # Throw handling.
         if throws:
-            unique_exceptions = tuple({t.exc for _, t in throws})
-            self._trace_on_error(unique_exceptions, request)
+            self._raise_on_error([t for _, t in throws])
 
         # Everything is a Return: we rely on the fact that roots are ordered to preserve subject
         # order in output lists.
