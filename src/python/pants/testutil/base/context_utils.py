@@ -62,7 +62,7 @@ class TestContext(Context):
         def report_target_info(self, scope, target, keys, val):
             pass
 
-    class TestLogger(logging.getLoggerClass()):  # type: ignore[misc] # MyPy does't understand this dynamic base class
+    class TestLogger(logging.getLoggerClass()):  # type: ignore[misc] # MyPy doesn't understand this dynamic base class
         """A logger that converts our structured records into flat ones.
 
         This is so we can use a regular logger in tests instead of our reporting machinery.

@@ -72,7 +72,7 @@ class FetcherFactory(Subsystem):
             "1. The default revision string to use when no `rev` is supplied; ie 'HEAD' or "
             "'master' for git.\n"
             "2. An integer indicating the number of leading path components to strip from "
-            "files upacked from the archive.",
+            "files unpacked from the archive.",
         )
 
     def get_fetcher(self, import_path):

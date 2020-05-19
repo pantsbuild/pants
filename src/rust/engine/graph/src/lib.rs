@@ -29,7 +29,7 @@ use hashing;
 
 use petgraph;
 
-// make the entry module public for testing purposes. We use it to contruct mock
+// make the entry module public for testing purposes. We use it to construct mock
 // graph entries in the notify watch tests.
 pub mod entry;
 mod node;
@@ -328,7 +328,7 @@ impl<N: Node> InnerGraph<N> {
       .filter_map(|(node, &entry_id)| {
         // A NotStarted entry does not need clearing, and we can assume that its dependencies are
         // either already dirtied, or have never observed a value for it. Filtering these redundant
-        // events helps to "debounce" invalidation (ie, avoid redundent re-dirtying of dependencies).
+        // events helps to "debounce" invalidation (ie, avoid redundant re-dirtying of dependencies).
         if predicate(node) && self.unsafe_entry_for_id(entry_id).is_started() {
           Some(entry_id)
         } else {
@@ -1059,9 +1059,9 @@ impl<'a, N: Node + 'a, F: Fn(&EntryId) -> bool> Iterator for Walk<'a, N, F> {
   fn next(&mut self) -> Option<Self::Item> {
     while let Some(id) = self.deque.pop_front() {
       // Visit this node and it neighbors if this node has not yet be visited and we aren't
-      // stopping our walk at this node, based on if it satifies the stop_walking_predicate.
+      // stopping our walk at this node, based on if it satisfies the stop_walking_predicate.
       // This mechanism gives us a way to selectively dirty parts of the graph respecting node boundaries
-      // like uncacheable nodes, which sholdn't be dirtied.
+      // like uncacheable nodes, which shouldn't be dirtied.
       if !self.walked.insert(id) || (self.stop_walking_predicate)(&id) {
         continue;
       }

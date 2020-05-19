@@ -18,7 +18,7 @@ from pants.engine.internals.build_files import (
     ResolvedTypeMismatchError,
     addresses_with_origins_from_address_families,
     create_graph_rules,
-    evalute_preludes,
+    evaluate_preludes,
     parse_address_family,
     strip_address_origins,
 )
@@ -427,7 +427,7 @@ class PreludeParsingTest(unittest.TestCase):
         address_mapper.prelude_glob_patterns = ("prelude",)
 
         symbols = run_rule(
-            evalute_preludes,
+            evaluate_preludes,
             rule_args=[address_mapper,],
             mock_gets=[
                 MockGet(
@@ -454,7 +454,7 @@ class PreludeParsingTest(unittest.TestCase):
             Exception, "Error parsing prelude file /dev/null/prelude: name 'blah' is not defined"
         ):
             run_rule(
-                evalute_preludes,
+                evaluate_preludes,
                 rule_args=[address_mapper,],
                 mock_gets=[
                     MockGet(
@@ -488,7 +488,7 @@ class PreludeParsingTest(unittest.TestCase):
             Exception, "Import used in /dev/null/prelude at line 1\\. Import statements are banned"
         ):
             run_rule(
-                evalute_preludes,
+                evaluate_preludes,
                 rule_args=[address_mapper,],
                 mock_gets=[
                     MockGet(

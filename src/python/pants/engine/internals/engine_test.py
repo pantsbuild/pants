@@ -292,7 +292,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
             str(cm.exception),
         )
 
-    def test_non_existing_root_fails_differently(self):
+    def test_nonexistent_root_fails_differently(self):
         rules = [upcast]
 
         with self.assertRaises(Exception) as cm:
@@ -380,7 +380,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
             "rule_four",
         }
 
-        # Because of the artifical delay in rule_one, it should have time to be reported as
+        # Because of the artificial delay in rule_one, it should have time to be reported as
         # started but not yet finished.
         started = list(itertools.chain.from_iterable(tracker.started_workunit_chunks))
         assert len(list(item for item in started if item["name"] == "rule_one")) > 0

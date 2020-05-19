@@ -17,7 +17,7 @@ See the Changelog section below for differences between versions of the export f
   project.
   - "targets" : Dictionary of targets defined in BUILD files.
   - "distributions" : Information about JVM distributions.
-  - "jvm_platforms" : Information about JVM platforms(language level and additionals arguments).
+  - "jvm_platforms" : Information about JVM platforms(language level and additional arguments).
   - "python_setup" : Information about Python setup(interpreters and chroots for them).
 
 ## Version

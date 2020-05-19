@@ -142,7 +142,7 @@ def find_packages(
     # See which packages are pkg_resources-style namespace packages.
     # Note that implicit PEP 420 namespace packages and pkgutil-style namespace packages
     # should *not* be listed in the setup namespace_packages kwarg. That's for pkg_resources-style
-    # namespace pacakges only. See https://github.com/pypa/sample-namespace-packages/.
+    # namespace packages only. See https://github.com/pypa/sample-namespace-packages/.
     namespace_packages: Set[str] = set()
     init_py_by_path: Dict[str, bytes] = {ipc.path: ipc.content for ipc in init_py_contents}
     for pkg in packages:

@@ -57,7 +57,7 @@ class GoalSubsystem(SubsystemClientMixin, Optionable):
     @classmethod
     def conflict_free_name(cls):
         # v2 goal names ending in '2' are assumed to be so-named to avoid conflict with a v1 goal.
-        # If we're in v2-exclusivce mode, strip off the '2', so we can use the more natural name.
+        # If we're in v2-exclusive mode, strip off the '2', so we can use the more natural name.
         # Note that this implies a change of options scope when changing to v2-only mode: options
         # on the foo2 scope will need to be moved to the foo scope. But we already expect options
         # changes when switching to v2-exclusive mode (e.g., some v1 options aren't even registered

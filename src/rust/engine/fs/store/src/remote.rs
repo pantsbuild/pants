@@ -196,7 +196,7 @@ impl ByteStore {
             Ok(digest)
           } else {
             Err(format!(
-              "Uploading file with digest {:?}: want commited size {} but got {}",
+              "Uploading file with digest {:?}: want committed size {} but got {}",
               digest,
               len,
               received.get_committed_size()

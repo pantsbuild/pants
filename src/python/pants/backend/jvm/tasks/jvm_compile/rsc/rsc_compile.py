@@ -1019,7 +1019,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
             tool_classpath = self._scalac_classpath
             # In fact, nailgun should not be used for -Youtline
             # in case of self.ExecutionStrategy.nailgun,
-            # we will force the scalac -Youtline invokation to run via subprocess
+            # we will force the scalac -Youtline invocation to run via subprocess
             nailgun_classpath = self._scalac_classpath
         else:
             main = "rsc.cli.Main"

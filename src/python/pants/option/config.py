@@ -120,7 +120,7 @@ class Config(ABC):
     def _determine_seed_values(*, seed_values: Optional[SeedValues] = None) -> Dict[str, str]:
         """We pre-populate several default values to allow %([key-name])s interpolation.
 
-        This sets up those defaults and checks if the user overrided any of the values.
+        This sets up those defaults and checks if the user overrode any of the values.
         """
         safe_seed_values = seed_values or {}
         buildroot = cast(str, safe_seed_values.get("buildroot", get_buildroot()))
@@ -261,8 +261,8 @@ class _IniValues(_ConfigValues):
         return self.parser.defaults()
 
 
-_TomlPrimitve = Union[bool, int, float, str]
-_TomlValue = Union[_TomlPrimitve, List[_TomlPrimitve]]
+_TomlPrimitive = Union[bool, int, float, str]
+_TomlValue = Union[_TomlPrimitive, List[_TomlPrimitive]]
 
 
 @dataclass(frozen=True)
@@ -384,7 +384,7 @@ class _TomlValues(_ConfigValues):
 
         if isinstance(raw_value, list):
 
-            def stringify_list_member(member: _TomlPrimitve) -> str:
+            def stringify_list_member(member: _TomlPrimitive) -> str:
                 if not isinstance(member, str):
                     return str(member)
                 interpolated_member = possibly_interpolate(member) if interpolate else member

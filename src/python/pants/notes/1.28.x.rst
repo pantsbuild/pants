@@ -143,7 +143,7 @@ Bugfixes
 * Remove deprecation warning from ivy_imports.py. (#9696)
   `PR #9696 <https://github.com/pantsbuild/pants/pull/9696>`_
 
-* Fix `PYTHONPATH` comingling in sitepackages. (#9690)
+* Fix `PYTHONPATH` commingling in sitepackages. (#9690)
   `PR #9690 <https://github.com/pantsbuild/pants/pull/9690>`_
 
 Refactoring, Improvements, and Tooling

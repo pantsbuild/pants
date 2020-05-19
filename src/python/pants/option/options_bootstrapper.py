@@ -231,7 +231,7 @@ class OptionsBootstrapper:
         """Get the full Options instance bootstrapped by this object for the given known scopes.
 
         :param known_scope_infos: ScopeInfos for all scopes that may be encountered.
-        :returns: A bootrapped Options instance that also carries options for all the supplied known
+        :returns: A bootstrapped Options instance that also carries options for all the supplied known
                   scopes.
         """
         return self._full_options(

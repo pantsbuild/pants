@@ -110,7 +110,7 @@ with the additional information needed to publish artifacts. Here is an example 
              login <login>
              password <password>
 
-           The realm must match the kind of repository you are publishing to. For Sonotype Nexus, use:
+           The realm must match the kind of repository you are publishing to. For Sonatype Nexus, use:
 
            realm="Sonatype Nexus Repository Manager"
 
