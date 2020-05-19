@@ -1434,10 +1434,10 @@ class OptionsTest(TestBase):
             ParseError,
             dedent(
                 """\
-                Unrecognized command line flags on global scope: -v, --config-overide, --c.
+                Unrecognized command line flags on global scope: -v, --config-overridden, --c.
                 Suggestions:
                 -v: [--v2, --verbose, --a, --b, --y, -n, -z, --compile-c]
-                --config-overide: [--config-override]
+                --config-overridden: [--config-override]
                 --c: [--compile-c, --compile-scala-modifycompile, --compile-scala-modifylogs, --config-override, --a, --b, --y, -n, -z, --v2]
 
                 (Run `./pants help-advanced` for all available options.)"""
@@ -1446,11 +1446,11 @@ class OptionsTest(TestBase):
             parse_joined_command_line(
                 # A nonexistent short-form option -- other short-form options should be displayed.
                 "-vd",
-                # A misspelling of `--config-override=val` (without the second r) should show the correct
-                # option name.
-                "--config-overide=val",
-                # An option name without the correct prefix scope should match all flags with the same or
-                # similar unscoped option names.
+                # An incorrect form of `--config-override=val` (`ridden` instead of `ride`) should
+                # show the correct option name.
+                "--config-overridden=val",
+                # An option name without the correct prefix scope should match all flags with the
+                # same or similar unscoped option names.
                 "--c=[]",
             ).for_global_scope()
 
@@ -1458,13 +1458,13 @@ class OptionsTest(TestBase):
         with self.assertRaisesWithMessage(
             ParseError,
             (
-                "Unrecognized command line flags on global scope: --aasdf, --config-overide.\n"
+                "Unrecognized command line flags on global scope: --aasdf, --config-overridden.\n"
                 "Suggestions:\n"
-                "--config-overide: [--config-override]\n\n"
+                "--config-overridden: [--config-override]\n\n"
                 "(Run `./pants help-advanced` for all available options.)"
             ),
         ):
-            parse_joined_command_line("--aasdf", "--config-overide").for_global_scope()
+            parse_joined_command_line("--aasdf", "--config-overridden").for_global_scope()
 
         with self.assertRaisesWithMessage(
             ParseError,
