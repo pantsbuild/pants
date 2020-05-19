@@ -4,7 +4,7 @@
 from typing import List, Optional, cast
 
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
-from pants.option.custom_types import file_option, shell_str
+from pants.option.custom_types import file_option, shell_str, target_option
 
 
 class Pylint(PythonToolBase):
@@ -33,6 +33,18 @@ class Pylint(PythonToolBase):
             advanced=True,
             help="Path to `pylintrc` or alternative Pylint config file",
         )
+        register(
+            "--source-plugins",
+            type=list,
+            member_type=target_option,
+            advanced=True,
+            help=(
+                "An optional list of `pylint_source_plugin` target addresses. This allows you to "
+                "load custom plugins defined in source code. Run the goal `target-types "
+                "--details=pylint_source_plugin` for instructions, including how to load "
+                "third-party plugins."
+            ),
+        )
 
     @property
     def skip(self) -> bool:
@@ -45,3 +57,7 @@ class Pylint(PythonToolBase):
     @property
     def config(self) -> Optional[str]:
         return cast(Optional[str], self.options.config)
+
+    @property
+    def source_plugins(self) -> List[str]:
+        return cast(List[str], self.options.source_plugins)

@@ -5,6 +5,7 @@ from pathlib import PurePath
 from textwrap import dedent
 from typing import List, Optional
 
+from pants.backend.python.lint.pylint.plugin_target_type import PylintSourcePlugin
 from pants.backend.python.lint.pylint.rules import PylintFieldSet, PylintFieldSets
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
 from pants.backend.python.target_types import (
@@ -44,7 +45,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
 
     @classmethod
     def target_types(cls):
-        return [PythonLibrary, PythonRequirementLibrary]
+        return [PythonLibrary, PythonRequirementLibrary, PylintSourcePlugin]
 
     @classmethod
     def rules(cls):
@@ -251,3 +252,94 @@ class PylintIntegrationTest(ExternalToolTestBase):
         )
         assert result.exit_code == 4
         assert "thirdparty_plugin.py:10:8: W5301" in result.stdout
+
+    def test_source_plugin(self) -> None:
+        # NB: We make this source plugin fairly complex by having it use transitive dependencies.
+        # This is to ensure that we can correctly support plugins with dependencies.
+        self.add_to_build_file(
+            "",
+            dedent(
+                """\
+                python_requirement_library(
+                    name='pylint',
+                    requirements=[python_requirement('pylint>=2.4.4,<2.5')],
+                )
+                
+                python_requirement_library(
+                    name='colors',
+                    requirements=[python_requirement('ansicolors')],
+                )
+                """
+            ),
+        )
+        self.create_file(
+            "build-support/plugins/subdir/dep.py",
+            dedent(
+                """\
+                from colors import red
+
+                def is_print(node):
+                    _ = red("Test that transitive deps are loaded.")
+                    return node.func.name == "print"
+                """
+            ),
+        )
+        self.add_to_build_file(
+            "build-support/plugins/subdir", "python_library(dependencies=['//:colors'])"
+        )
+        self.create_file(
+            "build-support/plugins/print_plugin.py",
+            dedent(
+                """\
+                from pylint.checkers import BaseChecker
+                from pylint.interfaces import IAstroidChecker
+
+                from subdir.dep import is_print
+
+                class PrintChecker(BaseChecker):
+                    __implements__ = IAstroidChecker
+                    name = "print_plugin"
+                    msgs = {
+                        "C9871": ("`print` statements are banned", "print-statement-used", ""),
+                    }
+
+                    def visit_call(self, node):
+                        if is_print(node):
+                            self.add_message("print-statement-used", node=node)
+
+                def register(linter):
+                    linter.register_checker(PrintChecker(linter))
+                """
+            ),
+        )
+        self.add_to_build_file(
+            "build-support/plugins",
+            dedent(
+                """\
+                pylint_source_plugin(
+                    name='print_plugin',
+                    sources=['print_plugin.py'],
+                    dependencies=['//:pylint', 'build-support/plugins/subdir'],
+                )
+                """
+            ),
+        )
+        config_content = dedent(
+            """\
+            [MASTER]
+            load-plugins=print_plugin
+            """
+        )
+        target = self.make_target_with_origin(
+            [FileContent(f"{self.source_root}/source_plugin.py", b"'''Docstring.'''\nprint()\n")]
+        )
+        result = self.run_pylint(
+            [target],
+            additional_args=[
+                "--pylint-source-plugins=['build-support/plugins:print_plugin']",
+                f"--source-root-patterns=['build-support/plugins', '{self.source_root}']",
+            ],
+            config=config_content,
+        )
+        assert result.exit_code == PYLINT_FAILURE_RETURN_CODE
+        assert "source_plugin.py:2:0: C9871" in result.stdout
