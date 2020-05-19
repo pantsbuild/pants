@@ -307,7 +307,7 @@ class LocalPantsRunner:
 
         if additional_messages:
             # NB: We do not log to the exceptions log in this case, because we expect that these are
-            # higher level unstructed errors: strutured versions will already have been written at
+            # higher level unstructed errors: structured versions will already have been written at
             # various places.
             logger.error("\n".join(additional_messages))
 
