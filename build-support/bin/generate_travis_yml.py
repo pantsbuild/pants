@@ -100,6 +100,8 @@ GLOBAL_ENV_VARS = [
         )
     },
     'RUST_BACKTRACE="all"',
+    # We optimize for faster Pants runs at the expense of slower compiles.
+    "MODE=release",
 ]
 
 # ----------------------------------------------------------------------
@@ -739,7 +741,7 @@ def _osx_sanity_check(
         **osx_shard(python_version=python_version, osx_image=osx_image),
         "name": f"OSX 10.{os_version_number} sanity check (Python {python_version.decimal})",
         "script": [
-            f"MODE=debug ./build-support/bin/ci.py --sanity-checks --python-version {python_version.decimal}"
+            f"./build-support/bin/ci.py --sanity-checks --python-version {python_version.decimal}"
         ],
     }
     safe_append(

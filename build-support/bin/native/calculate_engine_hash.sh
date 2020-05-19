@@ -10,11 +10,14 @@ source "${REPO_ROOT}/build-support/common.sh"
 
 readonly NATIVE_ROOT="${REPO_ROOT}/src/rust/engine"
 
-# N.B. Set $MODE to "debug" for faster builds.
-readonly MODE="${MODE:-release}"
+# N.B. Set $MODE to "release" for much faster Pants runs, but slower compiles.
+# We optimize for faster compiles to reduce the barrier to entry for new contributors
+# (https://github.com/pantsbuild/pants/issues/9822). Most core Pants devs will want to permanently
+# configure MODE=release.
+readonly MODE="${MODE:-debug}"
 case "$MODE" in
-  debug) MODE_FLAG="" ;;
-  *) MODE_FLAG="--release" ;;
+  release) MODE_FLAG="--release" ;;
+  *) MODE_FLAG="" ;;
 esac
 
 RUST_TOOLCHAIN="$(cat "${REPO_ROOT}/rust-toolchain")"

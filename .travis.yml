@@ -30,6 +30,7 @@ env:
   - AWS_ACCESS_KEY_ID__TO_BE_REEXPORTED_ON_DEPLOYS=AKIAV6A6G7RQWPRUWIXR
   - secure: hFVAQGLVkexzTd3f9NF+JoG1dE+CPICKqOcdvQYv8+YB2rwwqu0/J6MnqKUZSmec4AM4ZvyPUBIHnSw8aMJysYs+GZ6iG/8ZRRmdbmo2WBPbSZ+ThRZxx/F6AjmovUmf8Zt366ZAZXpc9NHKREkTUGl6UL7FFe9+ouVnb90asdw=
   - RUST_BACKTRACE="all"
+  - MODE=release
 jobs:
   include:
   - addons:
@@ -1542,7 +1543,7 @@ jobs:
     os: osx
     osx_image: xcode9.2
     script:
-    - MODE=debug ./build-support/bin/ci.py --sanity-checks --python-version 3.6
+    - ./build-support/bin/ci.py --sanity-checks --python-version 3.6
     stage: Test Pants
   - before_install:
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64
@@ -1568,7 +1569,7 @@ jobs:
     os: osx
     osx_image: xcode9.2
     script:
-    - MODE=debug ./build-support/bin/ci.py --sanity-checks --python-version 3.7
+    - ./build-support/bin/ci.py --sanity-checks --python-version 3.7
     stage: Test Pants (Cron)
   - before_install:
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64
@@ -1594,7 +1595,7 @@ jobs:
     os: osx
     osx_image: xcode10.1
     script:
-    - MODE=debug ./build-support/bin/ci.py --sanity-checks --python-version 3.6
+    - ./build-support/bin/ci.py --sanity-checks --python-version 3.6
     stage: Test Pants
   - before_install:
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64
@@ -1620,7 +1621,7 @@ jobs:
     os: osx
     osx_image: xcode10.1
     script:
-    - MODE=debug ./build-support/bin/ci.py --sanity-checks --python-version 3.7
+    - ./build-support/bin/ci.py --sanity-checks --python-version 3.7
     stage: Test Pants (Cron)
   - addons:
       apt:
