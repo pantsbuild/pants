@@ -335,8 +335,8 @@ class ProcessTest(TestBase):
             FilesContent, process_result.output_digest,
         )
 
-        self.assertEqual(
-            files_content_result.dependencies, (FileContent("roland", b"European Burmese", False),)
+        assert files_content_result == FilesContent(
+            [FileContent("roland", b"European Burmese", False)]
         )
 
     def test_timeout(self):
@@ -364,16 +364,12 @@ class Simple {
         request = JavacCompileRequest(
             BinaryLocation("/usr/bin/javac"), JavacSources(("simple/Simple.java",)),
         )
-
         result = self.request_single_product(JavacCompileResult, request)
-        files_content = self.request_single_product(FilesContent, result.digest).dependencies
-
-        self.assertEqual(
-            tuple(sorted(("simple/Simple.java", "simple/Simple.class",))),
-            tuple(sorted(file.path for file in files_content)),
+        files_content = self.request_single_product(FilesContent, result.digest)
+        assert sorted(["simple/Simple.java", "simple/Simple.class"]) == sorted(
+            file.path for file in files_content
         )
-
-        self.assertGreater(len(files_content[0].content), 0)
+        assert len(files_content[0].content) > 0
 
     def test_javac_compilation_example_failure(self):
         self.create_dir("simple")

@@ -62,7 +62,7 @@ class GoalRunnerFactory:
         self._kill_nailguns = self._global_options.kill_nailguns
 
         # V1 tasks do not understand FilesystemSpecs, so we eagerly convert them into AddressSpecs.
-        if self._specs.filesystem_specs.dependencies:
+        if self._specs.filesystem_specs:
             (owned_addresses,) = self._graph_session.scheduler_session.product_request(
                 Addresses, [Params(self._specs.filesystem_specs, self._options_bootstrapper)]
             )
