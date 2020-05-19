@@ -44,13 +44,13 @@ class ExportDepAsJarIntegrationTest(ScalacPluginIntegrationTestBase):
 
         for (key, expected_option_values) in expected_options_patterns.items():
             result_options = target_info[key]
-            strigified_result_options = " ".join(result_options)
+            stringified_result_options = " ".join(result_options)
 
             expected_option_values += self.commonly_expected_options[key]
 
             assert len(expected_option_values) == len(result_options)
             for pattern in expected_option_values:
-                assert (pattern in result_options) or re.match(pattern, strigified_result_options)
+                assert (pattern in result_options) or re.match(pattern, stringified_result_options)
 
     def test_compile_with_compiler_options(self):
         target_to_test = f"{self.scalac_test_targets_dir}/compiler_options:with_nonfatal_warnings"
