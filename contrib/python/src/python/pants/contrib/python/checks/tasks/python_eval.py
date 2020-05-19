@@ -25,7 +25,9 @@ from pex.pex import PEX
 from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
 
-from pants.contrib.python.checks.tasks.python_eval_subsystem import PythonEval as PythonEvalSubsystem
+from pants.contrib.python.checks.tasks.python_eval_subsystem import (
+    PythonEval as PythonEvalSubsystem,
+)
 
 
 class PythonEval(LintTaskMixin, ResolveRequirementsTaskBase):
