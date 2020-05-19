@@ -120,7 +120,7 @@ class Config(ABC):
     def _determine_seed_values(*, seed_values: Optional[SeedValues] = None) -> Dict[str, str]:
         """We pre-populate several default values to allow %([key-name])s interpolation.
 
-        This sets up those defaults and checks if the user overrided any of the values.
+        This sets up those defaults and checks if the user overrode any of the values.
         """
         safe_seed_values = seed_values or {}
         buildroot = cast(str, safe_seed_values.get("buildroot", get_buildroot()))
