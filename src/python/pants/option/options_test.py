@@ -1415,8 +1415,8 @@ class OptionsTest(TestBase):
         with self.assertRaisesWithMessage(
             ParseError,
             (
-                "Unrecognized command line flag '--aasdf' on global scope. Run `./pants "
-                "help-advanced` for all available options."
+                "Unrecognized command line flag '--aasdf' on global scope.\n\n(Run `./pants "
+                "help-advanced` for all available options.)"
             ),
         ):
             parse_joined_command_line("--aasdf").for_global_scope()
@@ -1424,8 +1424,8 @@ class OptionsTest(TestBase):
         with self.assertRaisesWithMessage(
             ParseError,
             (
-                "Unrecognized command line flags on global scope: --aasdf, --aasdy. Run "
-                "`./pants help-advanced` for all available options."
+                "Unrecognized command line flags on global scope: --aasdf, --aasdy.\n\n(Run "
+                "`./pants help-advanced` for all available options.)"
             ),
         ):
             parse_joined_command_line("--aasdf", "--aasdy").for_global_scope()
@@ -1437,7 +1437,9 @@ class OptionsTest(TestBase):
                 Unrecognized command line flags on global scope: -v, --config-overide, --c. Suggestions:
                 -v: [--v2, --verbose, --a, --b, --y, -n, -z, --compile-c]
                 --config-overide: [--config-override]
-                --c: [--compile-c, --compile-scala-modifycompile, --compile-scala-modifylogs, --config-override, --a, --b, --y, -n, -z, --v2]"""
+                --c: [--compile-c, --compile-scala-modifycompile, --compile-scala-modifylogs, --config-override, --a, --b, --y, -n, -z, --v2]
+
+                (Run `./pants help-advanced` for all available options.)"""
             ),
         ):
             parse_joined_command_line(
@@ -1451,14 +1453,14 @@ class OptionsTest(TestBase):
                 "--c=[]",
             ).for_global_scope()
 
-        # When some flags have suggestions, but >=1 don't, we both gives suggestions and point to
-        # `help-advanced`.
+        # Test when only some flags have suggestsions.
         with self.assertRaisesWithMessage(
             ParseError,
             (
                 "Unrecognized command line flags on global scope: --aasdf, --config-overide. "
-                "Run `./pants help-advanced` for all available options. Suggestions:\n"
-                "--config-overide: [--config-override]"
+                "Suggestions:\n"
+                "--config-overide: [--config-override]\n\n"
+                "(Run `./pants help-advanced` for all available options.)"
             ),
         ):
             parse_joined_command_line("--aasdf", "--config-overide").for_global_scope()
@@ -1468,7 +1470,9 @@ class OptionsTest(TestBase):
             dedent(
                 """\
                 Unrecognized command line flag '--sam' on scope 'simple'. Suggestions:
-                --simple-spam, --simple-dashed-spam, --a, --num, --scoped-a-bit-spam, --scoped-and-dashed-spam"""
+                --simple-spam, --simple-dashed-spam, --a, --num, --scoped-a-bit-spam, --scoped-and-dashed-spam
+
+                (Run `./pants help-advanced simple` for all available options.)"""
             ),
         ):
             parse_joined_command_line(
@@ -1481,7 +1485,9 @@ class OptionsTest(TestBase):
             dedent(
                 """\
                 Unrecognized command line flag '--modifylogs' on scope 'compile'. Suggestions:
-                --compile-scala-modifylogs"""
+                --compile-scala-modifylogs
+
+                (Run `./pants help-advanced compile` for all available options.)"""
             ),
         ):
             parse_joined_command_line(
@@ -1494,7 +1500,9 @@ class OptionsTest(TestBase):
             dedent(
                 """\
                 Unrecognized command line flag '--modifylogs' on scope 'cache.compile.scala'. Suggestions:
-                --compile-scala-modifylogs"""
+                --compile-scala-modifylogs
+
+                (Run `./pants help-advanced cache.compile.scala` for all available options.)"""
             ),
         ):
             parse_joined_command_line(

@@ -399,28 +399,25 @@ class Parser:
         scope = self._scope_str()
         help_instructions_scope = f" {self.scope}" if self.scope != GLOBAL_SCOPE else ""
         help_instructions = (
-            f"Run `./pants help-advanced{help_instructions_scope}` for all available options."
+            f"(Run `./pants help-advanced{help_instructions_scope}` for all available options.)"
         )
+
         if len(flags) == 1:
             matches = list(matching_flags.values())[0] if matching_flags else []
             suggestions_message = (
-                f"Suggestions:\n{', '.join(matches)}" if matches else help_instructions
+                f" Suggestions:\n{', '.join(matches)}" if matching_flags else ''
             )
             raise ParseError(
-                f"Unrecognized command line flag {repr(flags[0])} on {scope}. {suggestions_message}"
+                f"Unrecognized command line flag {repr(flags[0])} on {scope}.{suggestions_message}"
+                f"\n\n{help_instructions}"
             )
         suggestions = "\n".join(
             f"{flag_name}: [{', '.join(matches)}]" for flag_name, matches in matching_flags.items()
         )
-        if not matching_flags:
-            suggestions_message = help_instructions
-        elif len(matching_flags) == len(flags):
-            suggestions_message = f"Suggestions:\n{suggestions}"
-        else:
-            suggestions_message = f"{help_instructions} Suggestions:\n{suggestions}"
+        suggestions_message = f" Suggestions:\n{suggestions}" if matching_flags else ''
         raise ParseError(
             f"Unrecognized command line flags on {scope}: "
-            f"{', '.join(flags)}. {suggestions_message}"
+            f"{', '.join(flags)}.{suggestions_message}\n\n{help_instructions}"
         )
 
     def option_registrations_iter(self):
