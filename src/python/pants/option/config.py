@@ -261,8 +261,8 @@ class _IniValues(_ConfigValues):
         return self.parser.defaults()
 
 
-_TomlPrimitve = Union[bool, int, float, str]
-_TomlValue = Union[_TomlPrimitve, List[_TomlPrimitve]]
+_TomlPrimitive = Union[bool, int, float, str]
+_TomlValue = Union[_TomlPrimitive, List[_TomlPrimitive]]
 
 
 @dataclass(frozen=True)
@@ -384,7 +384,7 @@ class _TomlValues(_ConfigValues):
 
         if isinstance(raw_value, list):
 
-            def stringify_list_member(member: _TomlPrimitve) -> str:
+            def stringify_list_member(member: _TomlPrimitive) -> str:
                 if not isinstance(member, str):
                     return str(member)
                 interpolated_member = possibly_interpolate(member) if interpolate else member
