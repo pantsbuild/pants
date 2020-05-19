@@ -43,7 +43,7 @@ def _key_func(entry):
 
 
 @rule
-async def evalute_preludes(address_mapper: AddressMapper) -> BuildFilePreludeSymbols:
+async def evaluate_preludes(address_mapper: AddressMapper) -> BuildFilePreludeSymbols:
     snapshot = await Get[Snapshot](
         PathGlobs(
             address_mapper.prelude_glob_patterns,
@@ -357,7 +357,7 @@ def create_graph_rules(address_mapper: AddressMapper):
         parse_address_family,
         find_build_file,
         find_build_files,
-        evalute_preludes,
+        evaluate_preludes,
         # AddressSpec handling: locate directories that contain build files, and request
         # AddressFamilies for each of them.
         addresses_with_origins_from_address_families,
