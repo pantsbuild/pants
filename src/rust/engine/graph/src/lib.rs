@@ -459,7 +459,7 @@ impl<N: Node> InnerGraph<N> {
       .into_iter()
       .filter_map(move |eid| self.entry_for_id(eid))
       .filter_map(move |entry| match entry.peek(&context) {
-        Some(Ok(item)) => N::digest(item),
+        Some(item) => N::digest(item),
         _ => None,
       })
   }
