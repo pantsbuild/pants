@@ -1,3 +1,4 @@
+# NB: While we don't use this page anymore, we keep it to avoid broken URLs.
 page(
   name='notes-master',
   sources=['master.rst']
