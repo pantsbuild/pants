@@ -438,7 +438,7 @@ class ChrootedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
 
     def check_artifact_cache_for(self, invalidation_check):
         # TODO(https://github.com/pantsbuild/pants/issues/9734): Remove this override and leverage
-        #  default target level caching suport now that the --fast option is removed.
+        #  default target level caching support now that the --fast option is removed.
         # Tests generate artifacts, namely junit.xml and coverage reports, that cover the full target
         # set whether that is all targets in the context (`--fast`) or each target individually
         # (`--no-fast`).

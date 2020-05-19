@@ -72,7 +72,7 @@ class JvmCompileTest(NailgunTaskTestBase):
             "compile_classpath", ClasspathProducts.init_func(self.pants_workdir)
         )
         # This should cause the jvm compile execution to exclude target roots and their
-        # dependess from the set of relevant targets.
+        # dependees from the set of relevant targets.
         for rp in required_products:
             context.products.require_data(rp)
         self.execute(context)
@@ -98,7 +98,7 @@ class JvmCompileTest(NailgunTaskTestBase):
     def test_modulized_targets_are_compiled_when_runtime_classpath_is_requested(self):
         targets = self.make_linear_graph(["a", "b", "c", "d", "e"], target_type=JavaLibrary)
         # This should cause the jvm compile execution to exclude target roots and their
-        # dependess from the set of relevant targets.
+        # dependees from the set of relevant targets.
         runtime_classpath = self.create_and_return_classpath_products(
             targets, ["runtime_classpath"]
         )

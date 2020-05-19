@@ -13,7 +13,7 @@ use futures::future;
 
 use crate::context::{Context, Core};
 use crate::core::{Failure, Params, TypeId, Value};
-use crate::nodes::{NodeKey, Select, Tracer, Visualizer};
+use crate::nodes::{NodeKey, Select, Visualizer};
 
 use graph::{InvalidationResult, LastObserved};
 use hashing;
@@ -242,14 +242,6 @@ impl ExecutionRequest {
       timeout: None,
     }
   }
-
-  ///
-  /// Roots are limited to `Select`, which is known to produce a Value. This method
-  /// exists to satisfy Graph APIs which need instances of the NodeKey enum.
-  ///
-  fn root_nodes(&self) -> Vec<NodeKey> {
-    self.roots.iter().map(|r| r.clone().into()).collect()
-  }
 }
 
 ///
@@ -272,20 +264,6 @@ impl Scheduler {
       .core
       .graph
       .visualize(Visualizer::default(), &session.root_nodes(), path, &context)
-  }
-
-  pub fn trace(
-    &self,
-    session: &Session,
-    request: &ExecutionRequest,
-    path: &Path,
-  ) -> Result<(), String> {
-    let context = Context::new(self.core.clone(), session.clone());
-    self
-      .core
-      .graph
-      .trace::<Tracer>(&request.root_nodes(), path, &context)?;
-    Ok(())
   }
 
   pub fn add_root_select(

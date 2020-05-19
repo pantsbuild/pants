@@ -34,7 +34,7 @@ class Zinc:
     """Configuration for Pants' zinc wrapper tool."""
 
     ZINC_COMPILE_MAIN = "org.pantsbuild.zinc.compiler.Main"
-    ZINC_BOOTSTRAPER_MAIN = "org.pantsbuild.zinc.bootstrapper.Main"
+    ZINC_BOOTSTRAPPER_MAIN = "org.pantsbuild.zinc.bootstrapper.Main"
     DEFAULT_CONFS = ["default"]
 
     ZINC_COMPILER_TOOL_NAME = "zinc"
@@ -92,7 +92,7 @@ class Zinc:
                 register,
                 Zinc.ZINC_BOOTSTRAPPER_TOOL_NAME,
                 classpath=[JarDependency("org.pantsbuild", "zinc-bootstrapper_2.12", "0.0.12")],
-                main=Zinc.ZINC_BOOTSTRAPER_MAIN,
+                main=Zinc.ZINC_BOOTSTRAPPER_MAIN,
                 custom_rules=shader_rules,
             )
 
@@ -349,7 +349,7 @@ class Zinc:
         )
         argv = tuple(
             [".jdk/bin/java"]
-            + ["-cp", bootstrapper, Zinc.ZINC_BOOTSTRAPER_MAIN]
+            + ["-cp", bootstrapper, Zinc.ZINC_BOOTSTRAPPER_MAIN]
             + bootstrapper_args
         )
         req = Process(

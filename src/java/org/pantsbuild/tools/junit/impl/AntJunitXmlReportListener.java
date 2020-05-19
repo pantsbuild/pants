@@ -574,7 +574,7 @@ class AntJunitXmlReportListener extends RunListener {
    * actually gets run.
    *
    * Situations where this happens:
-   *   - testFailure() gets passed Desription.TEST_MECHANISM
+   *   - testFailure() gets passed Description.TEST_MECHANISM
    *   - Class initialization fails and the Description passed to testFailure() may only have a
    *   string description.
    *

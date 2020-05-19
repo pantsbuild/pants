@@ -87,12 +87,12 @@ root_patterns = [
   "src/*",
   "src/main/*",
   "src/test/*",
-  "^/src/go/src",
+  "/src/go/src",
   "test/*",
   "tests/*",
   "3rdparty/*",
-  "^/build-support/bin",
-  "^/build-support/migration-support"
+  "/build-support/bin",
+  "/build-support/migration-support"
 ]
 
 [cache]

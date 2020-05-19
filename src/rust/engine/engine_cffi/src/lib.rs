@@ -848,28 +848,6 @@ pub extern "C" fn graph_visualize(
 }
 
 #[no_mangle]
-pub extern "C" fn graph_trace(
-  scheduler_ptr: *mut Scheduler,
-  session_ptr: *mut Session,
-  execution_request_ptr: *mut ExecutionRequest,
-  path_ptr: *const raw::c_char,
-) {
-  let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
-  let path = PathBuf::from(path_str);
-  with_scheduler(scheduler_ptr, |scheduler| {
-    with_session(session_ptr, |session| {
-      with_execution_request(execution_request_ptr, |execution_request| {
-        scheduler
-          .trace(session, execution_request, path.as_path())
-          .unwrap_or_else(|e| {
-            println!("Failed to write trace to {}: {:?}", path.display(), e);
-          });
-      });
-    });
-  });
-}
-
-#[no_mangle]
 pub extern "C" fn nodes_destroy(raw_nodes_ptr: *mut RawNodes) {
   let _ = unsafe { Box::from_raw(raw_nodes_ptr) };
 }

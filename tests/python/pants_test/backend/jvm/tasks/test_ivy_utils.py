@@ -205,7 +205,7 @@ class IvyUtilsGenerateIvyTest(IvyUtilsTestBase):
         self.assertIs(v2, IvyUtils._resolve_conflict(v1, v2))
         self.assertIs(v2, IvyUtils._resolve_conflict(v2, v1))
 
-    def test_resove_conflict_no_conflicts(self):
+    def test_resolve_conflict_no_conflicts(self):
         v1 = JarDependency("org.example", "foo", "1", force=False)
         v1_force = JarDependency("org.example", "foo", "1", force=True)
         v2 = JarDependency("org.example", "foo", "2", force=False)

@@ -248,7 +248,7 @@ API Changes
 New Features
 ~~~~~~~~~~~~
 
-* Add `fast-depedencies` V2 rule (#8759)
+* Add `fast-dependencies` V2 rule (#8759)
   `PR #8759 <https://github.com/pantsbuild/pants/pull/8759>`_
 
 Bugfixes

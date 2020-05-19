@@ -88,26 +88,6 @@ pub trait NodeVisualizer<N: Node> {
 }
 
 ///
-/// A trait used to visualize Nodes for the purposes of CLI-output tracing.
-///
-pub trait NodeTracer<N: Node> {
-  ///
-  /// Returns true if the given Node Result represents the "bottom" of a trace.
-  ///
-  /// A trace represents a sub-dag of the entire Graph, and a "bottom" Node result represents
-  /// a boundary that the trace stops before (ie, a bottom Node will not be rendered in the trace,
-  /// but anything that depends on a bottom Node will be).
-  ///
-  fn is_bottom(result: Option<Result<N::Item, N::Error>>) -> bool;
-
-  ///
-  /// Renders the given result for a trace. The trace will already be indented by `indent`, but
-  /// an implementer creating a multi-line output would need to indent them as well.
-  ///
-  fn state_str(indent: &str, result: Option<Result<N::Item, N::Error>>) -> String;
-}
-
-///
 /// A context passed between Nodes that also stores an EntryId to uniquely identify them.
 ///
 pub trait NodeContext: Clone + Send + Sync + 'static {

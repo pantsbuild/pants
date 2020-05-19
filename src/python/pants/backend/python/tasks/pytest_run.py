@@ -713,7 +713,7 @@ class PytestRun(ChrootedTestRunnerTaskMixin, Task):
 
             # NB: While passthrough args are not supported in v2 yet, as discussed on #9075, it seems
             # likely that we can find a way to preserve the ability to use passthrough args for
-            # umabiguous goals in v2.
+            # unambiguous goals in v2.
             args.extend([*self.get_passthru_args(), *PyTest.global_instance().options.args])
 
             args.extend(test_args)
