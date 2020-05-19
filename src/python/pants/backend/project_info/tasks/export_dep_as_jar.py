@@ -5,6 +5,7 @@ import json
 import os
 import zipfile
 from collections import defaultdict
+from copy import copy
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Tuple
 
@@ -333,12 +334,12 @@ class ExportDepAsJar(ConsoleTask):
         libraries_for_target = OrderedSet(
             [self._jar_id(jar) for jar in iter_transitive_jars(current_target)]
         )
-        compile_libraries_for_target = libraries_for_target.copy()
+        compile_libraries_for_target = copy(libraries_for_target)
         for dep in flat_non_modulizable_deps_for_modulizable_targets[current_target].compile_deps:
             compile_libraries_for_target.update(_full_library_set_for_target(dep))
         info["compile_libraries"].extend(compile_libraries_for_target)
 
-        runtime_libraries_for_target = libraries_for_target.copy()
+        runtime_libraries_for_target = copy(libraries_for_target)
         for dep in flat_non_modulizable_deps_for_modulizable_targets[current_target].runtime_deps:
             runtime_libraries_for_target.update(_full_library_set_for_target(dep))
         info["runtime_libraries"].extend(runtime_libraries_for_target)
