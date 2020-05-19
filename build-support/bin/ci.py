@@ -630,8 +630,7 @@ def run_integration_tests_v2(*, oauth_token_path: Optional[str] = None) -> None:
 def run_plugin_tests(*, oauth_token_path: Optional[str] = None) -> None:
     _run_command(
         TestStrategy.v2_remote.pants_command(
-            targets={"pants-plugins/src/python::", "pants-plugins/tests/python::"},
-            oauth_token_path=oauth_token_path,
+            targets={"pants-plugins/src/python::"}, oauth_token_path=oauth_token_path
         ),
         slug="BackendTests",
         start_message="Running internal backend Python tests",

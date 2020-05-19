@@ -16,3 +16,10 @@ python_library(
   tags = {"partially_type_checked"},
 )
 
+python_tests(
+  dependencies=[
+    ':plugin',
+    'src/python/pants/base:revision',
+  ],
+  tags = {"type_checked"},
+)

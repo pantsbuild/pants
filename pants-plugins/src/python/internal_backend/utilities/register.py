@@ -119,14 +119,14 @@ class PantsReleases(Subsystem):
         return self.get_options().branch_notes
 
     @classmethod
-    def _branch_name(cls, version):
+    def _branch_name(cls, version) -> str:
         """Defines a mapping between versions and branches.
 
         All releases, including dev releases, map to a particular branch page.
         """
         suffix = version.public[len(version.base_version) :]
         components = version.base_version.split(".") + [suffix]
-        if suffix != "" and not (suffix.startswith("rc") or suffix.startswith("dev")):
+        if suffix != "" and not (suffix.startswith("rc") or suffix.startswith(".dev")):
             raise ValueError(f"Unparseable pants version number: {version}")
         return "{}.{}.x".format(*components[:2])
 
