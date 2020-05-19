@@ -380,7 +380,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
             "rule_four",
         }
 
-        # Because of the artifical delay in rule_one, it should have time to be reported as
+        # Because of the artificial delay in rule_one, it should have time to be reported as
         # started but not yet finished.
         started = list(itertools.chain.from_iterable(tracker.started_workunit_chunks))
         assert len(list(item for item in started if item["name"] == "rule_one")) > 0
