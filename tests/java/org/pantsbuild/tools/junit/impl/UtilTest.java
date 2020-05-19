@@ -77,7 +77,7 @@ public class UtilTest {
         Util.sanitizeSuiteName("Thequickbrownfoxjumpedoverthelazydog."));
     assertEquals("이것은-한국인", Util.sanitizeSuiteName("이것은 한국인..."));
     String sanitizedPunctuations = Util.sanitizeSuiteName("`~!@#$%^&*()+-=[]{}\\/<>|");
-    assertTrue("Sanitized punctuations were't converted to all hyphens: " + sanitizedPunctuations,
+    assertTrue("Sanitized punctuations weren't converted to all hyphens: " + sanitizedPunctuations,
         sanitizedPunctuations.matches("^[-]+$"));
   }
 
