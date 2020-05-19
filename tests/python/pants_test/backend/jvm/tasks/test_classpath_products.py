@@ -616,7 +616,7 @@ class ClasspathProductsTest(TestBase):
         targets,
         libs_dir,
         expected_canonical_classpath,
-        expected_classspath_files,
+        expected_classpath_files,
         excludes=None,
     ):
         """Helper method to call `create_canonical_classpath` and verify generated canonical
@@ -626,7 +626,7 @@ class ClasspathProductsTest(TestBase):
         :param list targets: List of targets to generate canonical classpath from.
         :param string libs_dir: Directory where canonical classpath are to be generated.
         :param list expected_canonical_classpath: List of canonical classpath relative to a base directory.
-        :param dict expected_classspath_files: A dict of classpath.txt path to its expected content.
+        :param dict expected_classpath_files: A dict of classpath.txt path to its expected content.
         """
         canonical_classpath = ClasspathProducts.create_canonical_classpath(
             classpath_products,
@@ -644,16 +644,16 @@ class ClasspathProductsTest(TestBase):
         # check canonical path created contain the exact set of files, no more, no less
         self.assertTrue(
             contains_exact_files(
-                libs_dir, expected_canonical_classpath + list(expected_classspath_files.keys())
+                libs_dir, expected_canonical_classpath + list(expected_classpath_files.keys())
             )
         )
 
         # check the content of classpath.txt
-        for classpath_file in expected_classspath_files:
+        for classpath_file in expected_classpath_files:
             self.assertTrue(
                 check_file_content(
                     os.path.join(libs_dir, classpath_file),
-                    expected_classspath_files[classpath_file],
+                    expected_classpath_files[classpath_file],
                 )
             )
 
