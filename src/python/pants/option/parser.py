@@ -7,6 +7,7 @@ import itertools
 import json
 import os
 import re
+import textwrap
 import traceback
 from collections import defaultdict
 from dataclasses import dataclass
@@ -404,21 +405,30 @@ class Parser:
 
         if len(flags) == 1:
             matches = list(matching_flags.values())[0] if matching_flags else []
-            suggestions_message = (
-                f" Suggestions:\n{', '.join(matches)}" if matching_flags else ''
+            message = textwrap.fill(
+                (
+                    f"Unrecognized command line flag {repr(flags[0])} on {scope}."
+                    f"{' Suggestions:' if matching_flags else ''}\n"
+                ),
+                80,
             )
-            raise ParseError(
-                f"Unrecognized command line flag {repr(flags[0])} on {scope}.{suggestions_message}"
-                f"\n\n{help_instructions}"
+            if matching_flags:
+                message += f"\n{', '.join(matches)}"
+            raise ParseError(f"{message}\n\n{help_instructions}")
+        message = textwrap.fill(
+            (
+                f"Unrecognized command line flags on {scope}: {', '.join(flags)}."
+                f"{' Suggestions:' if matching_flags else ''}\n"
+            ),
+            80,
+        )
+        if matching_flags:
+            suggestions = "\n".join(
+                f"{flag_name}: [{', '.join(matches)}]"
+                for flag_name, matches in matching_flags.items()
             )
-        suggestions = "\n".join(
-            f"{flag_name}: [{', '.join(matches)}]" for flag_name, matches in matching_flags.items()
-        )
-        suggestions_message = f" Suggestions:\n{suggestions}" if matching_flags else ''
-        raise ParseError(
-            f"Unrecognized command line flags on {scope}: "
-            f"{', '.join(flags)}.{suggestions_message}\n\n{help_instructions}"
-        )
+            message += f"\n{suggestions}"
+        raise ParseError(f"{message}\n\n{help_instructions}")
 
     def option_registrations_iter(self):
         """Returns an iterator over the normalized registration arguments of each option in this

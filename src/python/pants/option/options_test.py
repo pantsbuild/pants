@@ -1434,7 +1434,8 @@ class OptionsTest(TestBase):
             ParseError,
             dedent(
                 """\
-                Unrecognized command line flags on global scope: -v, --config-overide, --c. Suggestions:
+                Unrecognized command line flags on global scope: -v, --config-overide, --c.
+                Suggestions:
                 -v: [--v2, --verbose, --a, --b, --y, -n, -z, --compile-c]
                 --config-overide: [--config-override]
                 --c: [--compile-c, --compile-scala-modifycompile, --compile-scala-modifylogs, --config-override, --a, --b, --y, -n, -z, --v2]
@@ -1457,7 +1458,7 @@ class OptionsTest(TestBase):
         with self.assertRaisesWithMessage(
             ParseError,
             (
-                "Unrecognized command line flags on global scope: --aasdf, --config-overide. "
+                "Unrecognized command line flags on global scope: --aasdf, --config-overide.\n"
                 "Suggestions:\n"
                 "--config-overide: [--config-override]\n\n"
                 "(Run `./pants help-advanced` for all available options.)"
@@ -1499,7 +1500,8 @@ class OptionsTest(TestBase):
             ParseError,
             dedent(
                 """\
-                Unrecognized command line flag '--modifylogs' on scope 'cache.compile.scala'. Suggestions:
+                Unrecognized command line flag '--modifylogs' on scope 'cache.compile.scala'.
+                Suggestions:
                 --compile-scala-modifylogs
 
                 (Run `./pants help-advanced cache.compile.scala` for all available options.)"""
