@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from functools import update_wrapper
 from typing import Any, Set, Tuple, Type
 
-from pants.build_graph.address import Address, BuildFileAddress
+from pants.build_graph.address import Address
 from pants.engine.internals.objects import Resolvable, Serializable
 from pants.util.objects import TypeConstraintError
 
@@ -310,44 +310,3 @@ def addressable_dict(type_constraint):
     :type type_constraint: :class:`TypeConstraint`
     """
     return _addressable_wrapper(AddressableDict, type_constraint)
-
-
-# TODO(John Sirois): Move variants into Address 1st class as part of merging the engine/exp
-# into the mainline (if they survive).
-# TODO: Variants currently require an explicit name (and thus a `:`) in order to parse correctly.
-def strip_variants(address):
-    """Return a copy of the given address with the variants (if any) stripped from the name.
-
-    :rtype: :class:`pants.build_graph.address.Address`
-    """
-    address, _ = parse_variants(address)
-    return address
-
-
-def _extract_variants(address, variants_str):
-    """Return the variants (if any) represented by the given variants_str.
-
-    :returns: The variants or else `None` if there are none.
-    :rtype: tuple of tuples (key, value) strings
-    """
-
-    def entries():
-        for entry in variants_str.split(","):
-            key, _, value = entry.partition("=")
-            if not key or not value:
-                raise ValueError("Invalid variants after the @ in: {}".format(address))
-            yield (key, value)
-
-    return tuple(entries())
-
-
-def parse_variants(address):
-    target_name, at_sign, variants_str = address.target_name.partition("@")
-    if not at_sign:
-        return address, None
-    variants = _extract_variants(address, variants_str) if variants_str else None
-    if isinstance(address, BuildFileAddress):
-        normalized_address = BuildFileAddress(rel_path=address.rel_path, target_name=target_name)
-    else:
-        normalized_address = Address(spec_path=address.spec_path, target_name=target_name)
-    return normalized_address, variants
