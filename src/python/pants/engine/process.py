@@ -33,7 +33,6 @@ class Process:
     output_files: Tuple[str, ...]
     output_directories: Tuple[str, ...]
     timeout_seconds: Union[int, float]
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: Digest
     jdk_home: Optional[str]
     is_nailgunnable: bool
 
@@ -48,7 +47,6 @@ class Process:
         output_files: Optional[Iterable[str]] = None,
         output_directories: Optional[Iterable[str]] = None,
         timeout_seconds: Optional[Union[int, float]] = None,
-        unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: Digest = EMPTY_DIGEST,
         jdk_home: Optional[str] = None,
         is_nailgunnable: bool = False,
     ) -> None:
@@ -84,9 +82,6 @@ class Process:
         self.output_directories = tuple(output_directories or ())
         # NB: A negative or None time value is normalized to -1 to ease the transfer to Rust.
         self.timeout_seconds = timeout_seconds if timeout_seconds and timeout_seconds > 0 else -1
-        self.unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule = (
-            unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule
-        )
         self.jdk_home = jdk_home
         self.is_nailgunnable = is_nailgunnable
 

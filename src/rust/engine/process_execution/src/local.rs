@@ -337,13 +337,6 @@ pub trait CapturedWorkdir {
       .materialize_directory(workdir_path.clone(), req.input_files)
       .compat()
       .await?;
-    let _metadata = store
-      .materialize_directory(
-        workdir_path.clone(),
-        req.unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule,
-      )
-      .compat()
-      .await?;
     let workdir_path2 = workdir_path.clone();
     let output_file_paths = req.output_files.clone();
     let output_dir_paths = req.output_directories.clone();

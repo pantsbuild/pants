@@ -42,7 +42,6 @@ fn mock_nailgunnable_request(jdk_home: Option<PathBuf>) -> Process {
     output_directories: Default::default(),
     timeout: Default::default(),
     description: "".to_string(),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
     jdk_home: jdk_home,
     target_platform: PlatformConstraint::Darwin,
     is_nailgunnable: true,

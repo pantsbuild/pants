@@ -44,69 +44,6 @@ enum StderrType {
   Digest(Digest),
 }
 
-/// This test checks that `unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule`
-/// is ignored for remoting by showing EPR with different digests of
-/// `unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule`
-/// end up having the same bazel_protos::remote_execution::ExecuteRequest.
-#[tokio::test]
-async fn local_only_scratch_files_ignored() {
-  let input_directory = TestDirectory::containing_roland();
-  let req1 = Process {
-    argv: owned_string_vec(&["/bin/echo", "yo"]),
-    env: vec![("SOME".to_owned(), "value".to_owned())]
-      .into_iter()
-      .collect(),
-    working_directory: None,
-    input_files: input_directory.digest(),
-    // Intentionally poorly sorted:
-    output_files: vec!["path/to/file", "other/file"]
-      .into_iter()
-      .map(PathBuf::from)
-      .collect(),
-    output_directories: vec!["directory/name"]
-      .into_iter()
-      .map(PathBuf::from)
-      .collect(),
-    timeout: one_second(),
-    description: "some description".to_owned(),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
-      hashing::EMPTY_DIGEST,
-    jdk_home: None,
-    target_platform: PlatformConstraint::None,
-    is_nailgunnable: false,
-  };
-
-  let req2 = Process {
-    argv: owned_string_vec(&["/bin/echo", "yo"]),
-    env: vec![("SOME".to_owned(), "value".to_owned())]
-      .into_iter()
-      .collect(),
-    working_directory: None,
-    input_files: input_directory.digest(),
-    // Intentionally poorly sorted:
-    output_files: vec!["path/to/file", "other/file"]
-      .into_iter()
-      .map(PathBuf::from)
-      .collect(),
-    output_directories: vec!["directory/name"]
-      .into_iter()
-      .map(PathBuf::from)
-      .collect(),
-    timeout: one_second(),
-    description: "some description".to_owned(),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
-      TestDirectory::containing_falcons_dir().digest(),
-    jdk_home: None,
-    target_platform: PlatformConstraint::None,
-    is_nailgunnable: false,
-  };
-
-  assert_eq!(
-    crate::remote::make_execute_request(&req1, empty_request_metadata()),
-    crate::remote::make_execute_request(&req2, empty_request_metadata()),
-  );
-}
-
 #[tokio::test]
 async fn make_execute_request() {
   let input_directory = TestDirectory::containing_roland();
@@ -128,8 +65,6 @@ async fn make_execute_request() {
       .collect(),
     timeout: one_second(),
     description: "some description".to_owned(),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
-      hashing::EMPTY_DIGEST,
     jdk_home: None,
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
@@ -212,8 +147,6 @@ async fn make_execute_request_with_instance_name() {
       .collect(),
     timeout: one_second(),
     description: "some description".to_owned(),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
-      hashing::EMPTY_DIGEST,
     jdk_home: None,
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
@@ -304,8 +237,6 @@ async fn make_execute_request_with_cache_key_gen_version() {
       .collect(),
     timeout: one_second(),
     description: "some description".to_owned(),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
-      hashing::EMPTY_DIGEST,
     jdk_home: None,
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
@@ -392,8 +323,6 @@ async fn make_execute_request_with_jdk() {
     output_directories: BTreeSet::new(),
     timeout: one_second(),
     description: "some description".to_owned(),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
-      hashing::EMPTY_DIGEST,
     jdk_home: Some(PathBuf::from("/tmp")),
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
@@ -458,8 +387,6 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
     output_directories: BTreeSet::new(),
     timeout: one_second(),
     description: "some description".to_owned(),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
-      hashing::EMPTY_DIGEST,
     jdk_home: Some(PathBuf::from("/tmp")),
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
@@ -566,8 +493,6 @@ async fn server_rejecting_execute_request_gives_error() {
             output_directories: BTreeSet::new(),
             timeout: one_second(),
             description: "wrong command".to_string(),
-            unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
-              hashing::EMPTY_DIGEST,
             jdk_home: None,
             target_platform: PlatformConstraint::None,
             is_nailgunnable: false,
@@ -1098,8 +1023,6 @@ async fn timeout_after_sufficiently_delayed_getoperations() {
     output_directories: BTreeSet::new(),
     timeout: Some(request_timeout),
     description: "echo-a-foo".to_string(),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
-      hashing::EMPTY_DIGEST,
     jdk_home: None,
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
@@ -1153,8 +1076,6 @@ async fn dropped_request_cancels() {
     output_directories: BTreeSet::new(),
     timeout: Some(request_timeout),
     description: "echo-a-foo".to_string(),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
-      hashing::EMPTY_DIGEST,
     jdk_home: None,
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
@@ -2350,8 +2271,6 @@ pub fn echo_foo_request() -> MultiPlatformProcess {
     output_directories: BTreeSet::new(),
     timeout: Some(Duration::from_millis(5000)),
     description: "echo a foo".to_string(),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
-      hashing::EMPTY_DIGEST,
     jdk_home: None,
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
@@ -2665,8 +2584,6 @@ fn cat_roland_request() -> MultiPlatformProcess {
     output_directories: BTreeSet::new(),
     timeout: one_second(),
     description: "cat a roland".to_string(),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
-      hashing::EMPTY_DIGEST,
     jdk_home: None,
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
@@ -2684,8 +2601,6 @@ fn echo_roland_request() -> MultiPlatformProcess {
     output_directories: BTreeSet::new(),
     timeout: one_second(),
     description: "unleash a roaring meow".to_string(),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
-      hashing::EMPTY_DIGEST,
     jdk_home: None,
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,

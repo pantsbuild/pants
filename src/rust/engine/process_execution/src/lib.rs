@@ -225,13 +225,6 @@ pub struct Process {
   #[derivative(PartialEq = "ignore", Hash = "ignore")]
   pub description: String,
 
-  // This will be materialized for local Process only.
-  // Eventually we want to remove this.
-  // Context: https://github.com/pantsbuild/pants/issues/8314
-  // Think twice before using it.
-  #[derivative(PartialEq = "ignore", Hash = "ignore")]
-  pub unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
-    hashing::Digest,
   ///
   /// If present, a symlink will be created at .jdk which points to this directory for local
   /// execution, or a system-installed JDK (ignoring the value of the present Some) for remote
@@ -244,6 +237,32 @@ pub struct Process {
   pub target_platform: PlatformConstraint,
 
   pub is_nailgunnable: bool,
+}
+
+impl Process {
+  ///
+  /// Constructs a Process with default values for most fields, after which the builder pattern can
+  /// be used to set values.
+  ///
+  /// We use the more ergonomic (but possibly slightly slower) "move self for each builder method"
+  /// pattern, so production usage should probably prefer to construct the Process struct wholesale.
+  ///
+  fn new(argv: Vec<String>) -> Process {
+    Process {
+      argv,
+      env: BTreeMap::new(),
+      working_directory: None,
+      input_files: EMPTY_DIGEST,
+      output_files: BTreeSet::new(),
+      output_directories: BTreeSet::new(),
+      timeout: None,
+      description: "".to_string(),
+      append_only_caches: BTreeSet::new(),
+      jdk_home: None,
+      target_platform: PlatformConstraint::None,
+      is_nailgunnable: false,
+    }
+  }
 }
 
 impl TryFrom<MultiPlatformProcess> for Process {

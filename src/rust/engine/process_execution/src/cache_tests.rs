@@ -56,8 +56,6 @@ async fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
     output_directories: BTreeSet::new(),
     timeout: Some(Duration::from_millis(1000)),
     description: "bash".to_string(),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
-      hashing::EMPTY_DIGEST,
     jdk_home: None,
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
