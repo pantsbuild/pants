@@ -327,25 +327,21 @@ class Options:
         return scope in self._known_scope_to_info
 
     def passthru_args_for_scope(self, scope: str) -> List[str]:
-        # Passthru args "belong" to the last scope mentioned on the command-line.
-
-        # Note: If that last scope is a goal, we allow all tasks in that goal to access the passthru
-        # args. This is to allow the more intuitive
-        # pants run <target> -- <passthru args>
-        # instead of requiring
-        # pants run.py <target> -- <passthru args>.
-        #
-        # However note that in the case where multiple tasks run in the same goal, e.g.,
-        # pants test <target> -- <passthru args>
-        # Then, e.g., both junit and pytest will get the passthru args even though the user probably
-        # only intended them to go to one of them. If the wrong one is not a no-op then the error will
-        # be unpredictable. However this is  not a common case, and can be circumvented with an
-        # explicit test.pytest or test.junit scope.
+        # NB: The concept of passthru argument "ownership" will go away in 1.31.0.dev0, at which
+        # point _all_ scopes which register passthrough args will receive them and this method can
+        # go away. But because Subsystems have never been able to receive passthrough args before,
+        # we can begin applying that behavior to them unambiguously before the deprecation. The
+        # only way a Subsystem or v2 Goal will actually receive a passthrough arg is if they
+        # register an option as `passthrough=True`.
+        if not scope:
+            return []
         if (
-            scope
-            and self._passthru_owner
+            self._passthru_owner
             and scope.startswith(self._passthru_owner)
             and (len(scope) == len(self._passthru_owner) or scope[len(self._passthru_owner)] == ".")
+        ) or self._parser_hierarchy.get_parser_by_scope(scope).scope_info.category in (
+            ScopeInfo.SUBSYSTEM,
+            ScopeInfo.GOAL,
         ):
             return self._passthru
         return []
@@ -492,17 +488,25 @@ class Options:
         self.walk_parsers(register_all_scoped_names)
         return sorted(all_scoped_flag_names, key=lambda flag_info: flag_info.scoped_arg)
 
-    def _make_parse_args_request(self, flags_in_scope, namespace, include_passive_options=False):
+    def _make_parse_args_request(
+        self,
+        flags_in_scope,
+        namespace: OptionValueContainer,
+        scope: str,
+        include_passive_options: bool = False,
+    ) -> Parser.ParseArgsRequest:
         levenshtein_max_distance = (
             self._bootstrap_option_values.option_name_check_distance
             if self._bootstrap_option_values
             else 0
         )
+
         return Parser.ParseArgsRequest(
             flags_in_scope=flags_in_scope,
             namespace=namespace,
             get_all_scoped_flag_names=lambda: self._all_scoped_flag_names_for_fuzzy_matching,
             levenshtein_max_distance=levenshtein_max_distance,
+            passthrough_args=self.passthru_args_for_scope(scope),
             include_passive_options=include_passive_options,
         )
 
@@ -531,7 +535,7 @@ class Options:
         # Now add our values.
         flags_in_scope = self._scope_to_flags.get(scope, [])
         parse_args_request = self._make_parse_args_request(
-            flags_in_scope, values, include_passive_options
+            flags_in_scope, values, scope, include_passive_options
         )
         self._parser_hierarchy.get_parser_by_scope(scope).parse_args(parse_args_request)
 

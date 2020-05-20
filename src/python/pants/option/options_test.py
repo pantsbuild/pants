@@ -868,14 +868,34 @@ class OptionsTest(TestBase):
             sorted_specs = sorted(options.specs)
             self.assertEqual(["bar", "fleem:tgt", "foo", "morx:tgt"], sorted_specs)
 
-    def test_passthru_args(self):
+    def test_passthru_args_ownership(self):
+        # TODO: Ownership of passthrough args will go away in 1.31.0.dev0, and all scopes that claim
+        # passthrough args will receive them, regardless of position. This test should then shrink
+        # or be deleted.
         options = self._parse(flags="compile foo -- bar --baz")
+
         self.assertEqual(["bar", "--baz"], options.passthru_args_for_scope("compile"))
         self.assertEqual(["bar", "--baz"], options.passthru_args_for_scope("compile.java"))
         self.assertEqual(["bar", "--baz"], options.passthru_args_for_scope("compile.scala"))
         self.assertEqual([], options.passthru_args_for_scope("test"))
         self.assertEqual([], options.passthru_args_for_scope(""))
         self.assertEqual([], options.passthru_args_for_scope(None))
+
+    def test_passthru_args_subsystems_and_goals(self):
+        # Test that subsystems and goals receive passthrough args regardless of position.
+        options = self._parse(flags="")
+        options = Options.create(
+            env={},
+            config={},
+            known_scope_infos=[global_scope(), task("test"), subsystem("foo")],
+            args=["./pants", "test", "target", "--", "bar", "--baz"],
+        )
+
+        # All subsystems and goals, and (for now, only) the last v1 goal/task on the CLI should
+        # receive passthrough args. See the TODO in `test_passthru_args_ownership` for more info.
+        self.assertEqual(["bar", "--baz"], options.passthru_args_for_scope("foo"))
+        self.assertEqual(["bar", "--baz"], options.passthru_args_for_scope("test"))
+        self.assertEqual([], options.passthru_args_for_scope(""))
 
     def test_global_scope_env_vars(self):
         def check_pants_foo(expected_val, env):
