@@ -7,10 +7,8 @@ jobs:
     runs-on: ubuntu-latest
     name: Verify that the PR has a valid label
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
       - name: Verify PR label action
-        uses: ./
+        uses: jesusvasquez333/verify-pr-label-action@v1.1.0
         id: verify-pr-label
         with:
           github-token: "${{ secrets.GITHUB_TOKEN }}"
