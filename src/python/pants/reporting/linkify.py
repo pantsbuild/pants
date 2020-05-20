@@ -3,9 +3,9 @@
 
 import os
 import re
+from pathlib import Path
 
-from pants.base.build_file import BuildFile
-from pants.base.file_system_project_tree import FileSystemProjectTree
+from pants.base.build_file import _is_build_file_name
 
 # A regex to recognize substrings that are probably URLs or file paths. Broken down for readability.
 _PREFIX = r"(https?://)?/?"  # http://, https:// or / or nothing.
@@ -67,20 +67,19 @@ def linkify(buildroot, s, memoized_urls):
             # The path is not located inside the buildroot, so it's definitely not a BUILD file.
             return None
         else:
-            # The path is located in the buildroot: see if it's a reference to a target in a BUILD file.
+            # The path is located in the buildroot: see if it's a reference to a target in a
+            # BUILD file.
             parts = path.split(":")
-            if len(parts) == 2:
-                putative_dir = parts[0]
-            else:
-                putative_dir = path
-            if os.path.isdir(os.path.join(buildroot, putative_dir)):
-                build_files = list(
-                    BuildFile.get_build_files_family(FileSystemProjectTree(buildroot), putative_dir)
+            putative_dir = parts[0] if len(parts) == 2 else path
+            if Path(buildroot, putative_dir).is_dir():
+                build_files = sorted(
+                    build_file
+                    for build_file in Path(buildroot, putative_dir).glob(f"BUILD*")
+                    if _is_build_file_name(build_file.name) and build_file.is_file()
                 )
-                if build_files:
-                    path = build_files[0].relpath
-                else:
+                if not build_files:
                     return None
+                path = str(build_files[0].relative_to(buildroot))
 
         if os.path.exists(os.path.join(buildroot, path)):
             # The reporting server serves file content at /browse/<path_from_buildroot>.

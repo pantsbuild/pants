@@ -16,6 +16,10 @@ from pants.util.ordered_set import OrderedSet
 logger = logging.getLogger(__name__)
 
 
+def _is_build_file_name(name: str) -> bool:
+    return bool(re.match(rf"^BUILD(\.[a-zA-Z0-9_-]+)?$", name))
+
+
 # Note: Significant effort has been made to keep the types BuildFile, BuildGraph, Address, and
 # Target separated appropriately.  Don't add references to those other types to this module.
 class BuildFile(ABC):

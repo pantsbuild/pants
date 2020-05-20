@@ -4,7 +4,7 @@
 import logging
 import os
 
-from pants.base.build_file import BuildFile
+from pants.base.build_file import _is_build_file_name
 from pants.base.exceptions import ResolveError
 from pants.base.specs import AddressSpecs, DescendantAddresses, SiblingAddresses
 from pants.build_graph.address_lookup_error import AddressLookupError
@@ -45,7 +45,7 @@ class LegacyAddressMapper(AddressMapper):
         return any(
             address.spec_path == os.path.dirname(fp)
             for fp in file_paths
-            if BuildFile._is_buildfile_name(os.path.basename(fp))
+            if _is_build_file_name(os.path.basename(fp))
         )
 
     @staticmethod
