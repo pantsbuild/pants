@@ -5,7 +5,7 @@ This document describes releases leading up to the ``1.28.x`` ``stable`` series.
 
 See https://pants.readme.io/docs/release-notes-1-28 for an overview of the changes in this release.
 
-1.28.0rc2 (5/19/2020)
+1.28.0rc2 (5/20/2020)
 ---------------------
 
 Bugfixes
@@ -16,6 +16,9 @@ Bugfixes
 
 * Omit `m` suffix in platform for AWS Lambdas using Python 3.8 (#9796)
   `PR #9796 <https://github.com/pantsbuild/pants/pull/9796>`_
+
+* Fix console UI redraw issues (#9812)
+  `PR #9812 <https://github.com/pantsbuild/pants/pull/9812>`_
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
