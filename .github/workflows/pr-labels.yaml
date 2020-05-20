@@ -1,0 +1,17 @@
+on:
+  pull_request:
+   types: [opened, labeled, unlabeled, synchronize]
+
+jobs:
+  check_pr_labels:
+    runs-on: ubuntu-latest
+    name: Verify that the PR has a valid label
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Verify PR label action
+        uses: ./
+        id: verify-pr-label
+        with:
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+          valid-labels: 'release:api-changes, release:testing, release:refactoring, release:features, release:bugfixes, release:documentation'
