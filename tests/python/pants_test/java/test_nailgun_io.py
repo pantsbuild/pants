@@ -64,3 +64,14 @@ class TestNailgunStreamWriter(unittest.TestCase):
                 unittest.mock.call(unittest.mock.ANY, ChunkType.STDIN_EOF),
             ]
         )
+
+    @unittest.mock.patch("os.close")
+    @unittest.mock.patch("os.read")
+    @unittest.mock.patch("select.select")
+    def test_run_exits_for_closed_and_errored_socket(self, mock_select, mock_read, mock_close):
+        # When stdin is closed, select can indicate that it is both empty and errored.
+        mock_select.return_value = ([self.in_fd], [self.in_fd], [])
+        mock_read.return_value = b""  # EOF.
+        self.writer.run()
+        assert self.writer.is_alive() is False
+        assert mock_select.call_count == 1
