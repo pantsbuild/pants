@@ -62,7 +62,11 @@ mod speculate_tests;
 
 pub mod nailgun;
 
+pub mod named_caches;
+
 extern crate uname;
+
+pub use crate::named_caches::{NamedCache, NamedCaches};
 
 #[derive(PartialOrd, Ord, Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum Platform {
@@ -226,6 +230,18 @@ pub struct Process {
   pub description: String,
 
   ///
+  /// Declares that this process uses the given named caches (which might have associated config
+  /// in the future). Caches are exposed to processes as environment variables named
+  /// `_APPEND_ONLY_CACHE_$name` that will refer to absolute paths in the filesystem. A @rule
+  /// wrapped process must defensively check for the presence of the relevant variable, and disable
+  /// use of that cache if it is not defined.
+  ///
+  /// These caches are globally shared and so must be concurrency safe: a consumer of the cache
+  /// must never assume that it has exclusive access to the provided directory.
+  ///
+  pub append_only_caches: BTreeSet<NamedCache>,
+
+  ///
   /// If present, a symlink will be created at .jdk which points to this directory for local
   /// execution, or a system-installed JDK (ignoring the value of the present Some) for remote
   /// execution.
@@ -260,6 +276,7 @@ impl Process {
       output_directories: BTreeSet::new(),
       timeout: None,
       description: "".to_string(),
+      append_only_caches: BTreeSet::new(),
       jdk_home: None,
       target_platform: PlatformConstraint::None,
       is_nailgunnable: false,

@@ -5,7 +5,7 @@ import itertools
 import logging
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import Dict, Iterable, Optional, Tuple, Union
+from typing import Dict, Iterable, Optional, Set, Tuple, Union
 
 from pants.engine.fs import EMPTY_DIGEST, Digest
 from pants.engine.platform import Platform, PlatformConstraint
@@ -23,13 +23,12 @@ class ProductDescription:
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class Process:
-    # TODO: add a method to hack together a `process_executor` invocation command line which
-    # reproduces this process execution request to make debugging remote executions effortless!
     argv: Tuple[str, ...]
     description: str
     input_digest: Digest
     working_directory: Optional[str]
     env: Tuple[str, ...]
+    append_only_caches: Tuple[str, ...]
     output_files: Tuple[str, ...]
     output_directories: Tuple[str, ...]
     timeout_seconds: Union[int, float]
@@ -44,6 +43,7 @@ class Process:
         input_digest: Digest = EMPTY_DIGEST,
         working_directory: Optional[str] = None,
         env: Optional[Dict[str, str]] = None,
+        append_only_caches: Optional[Set[str]] = None,
         output_files: Optional[Iterable[str]] = None,
         output_directories: Optional[Iterable[str]] = None,
         timeout_seconds: Optional[Union[int, float]] = None,
@@ -78,6 +78,7 @@ class Process:
         self.input_digest = input_digest
         self.working_directory = working_directory
         self.env = tuple(itertools.chain.from_iterable((env or {}).items()))
+        self.append_only_caches = tuple(sorted(append_only_caches or set()))
         self.output_files = tuple(output_files or ())
         self.output_directories = tuple(output_directories or ())
         # NB: A negative or None time value is normalized to -1 to ease the transfer to Rust.

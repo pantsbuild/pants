@@ -29,7 +29,9 @@ use fs::{
   PathGlobs, PathStat, PreparedPathGlobs, StrictGlobMatching, VFS,
 };
 use hashing;
-use process_execution::{self, MultiPlatformProcess, PlatformConstraint, Process, RelativePath};
+use process_execution::{
+  self, MultiPlatformProcess, NamedCache, PlatformConstraint, Process, RelativePath,
+};
 use rule_graph;
 
 use graph::{Entry, Node, NodeError, NodeVisualizer};
@@ -259,6 +261,11 @@ impl MultiPlatformExecuteProcess {
 
     let description = externs::project_str(&value, "description");
 
+    let append_only_caches = externs::project_multi_strs(&value, "append_only_caches")
+      .into_iter()
+      .map(NamedCache::new)
+      .collect::<Result<_, String>>()?;
+
     let jdk_home = {
       let val = externs::project_str(&value, "jdk_home");
       if val.is_empty() {
@@ -279,6 +286,7 @@ impl MultiPlatformExecuteProcess {
       output_directories,
       timeout,
       description,
+      append_only_caches,
       jdk_home,
       target_platform,
       is_nailgunnable,

@@ -1,5 +1,4 @@
-use std::collections::btree_map::BTreeMap;
-use std::collections::btree_set::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
@@ -15,8 +14,8 @@ use tokio::net::TcpStream;
 use crate::local::CapturedWorkdir;
 use crate::nailgun::nailgun_pool::NailgunProcessName;
 use crate::{
-  Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, PlatformConstraint,
-  Process, ProcessMetadata,
+  Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, NamedCaches, Platform,
+  PlatformConstraint, Process, ProcessMetadata,
 };
 
 #[cfg(test)]
@@ -61,6 +60,7 @@ fn construct_nailgun_server_request(
     output_directories: BTreeSet::new(),
     timeout: Some(Duration::new(1000, 0)),
     description: format!("Start a nailgun server for {}", nailgun_name),
+    append_only_caches: BTreeSet::new(),
     jdk_home: Some(jdk),
     target_platform: platform_constraint,
     is_nailgunnable: true,
@@ -76,6 +76,7 @@ fn construct_nailgun_client_request(
     argv: _argv,
     input_files,
     description,
+    append_only_caches,
     env: original_request_env,
     working_directory,
     output_files,
@@ -90,6 +91,7 @@ fn construct_nailgun_client_request(
     argv: client_args,
     input_files,
     description,
+    append_only_caches,
     env: original_request_env,
     working_directory,
     output_files,
@@ -130,9 +132,9 @@ impl CommandRunner {
       inner: Arc::new(runner),
       nailgun_pool: NailgunPool::new(),
       async_semaphore: AsyncSemaphore::new(1),
-      metadata: metadata,
-      workdir_base: workdir_base,
-      executor: executor,
+      metadata,
+      workdir_base,
+      executor,
     }
   }
 
@@ -201,6 +203,10 @@ impl super::CommandRunner for CommandRunner {
 }
 
 impl CapturedWorkdir for CommandRunner {
+  fn named_caches(&self) -> Option<&NamedCaches> {
+    self.inner.named_caches()
+  }
+
   fn run_in_workdir<'a, 'b, 'c>(
     &'a self,
     workdir_path: &'b Path,
@@ -242,6 +248,26 @@ impl CapturedWorkdir for CommandRunner {
     let build_id = context.build_id;
     let store = self.inner.store.clone();
 
+    let client_req = construct_nailgun_client_request(req2, client_main_class, client_args);
+    let mut client_env = client_req
+      .env
+      .iter()
+      .map(|(k, v)| (k.clone(), v.clone()))
+      .collect::<Vec<_>>();
+    if let Some(named_caches) = self.named_caches() {
+      let decoded_local_env = named_caches
+        .local_env(&req.append_only_caches)
+        .map(|(k, v)| match (k.to_str(), v.to_str()) {
+          (Some(k), Some(v)) => Ok((k.to_owned(), v.to_owned())),
+          _ => Err(format!(
+            "Local cache environment could not be decoded as UTF8: {:?}: {:?}",
+            k, v
+          )),
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+      client_env.extend(decoded_local_env.into_iter());
+    };
+
     // Streams to read child output from
     let (stdio_write, stdio_read) = child_channel::<ChildOutput>();
     let (_stdin_write, stdin_read) = child_channel::<ChildInput>();
@@ -268,15 +294,10 @@ impl CapturedWorkdir for CommandRunner {
       .and_then(move |nailgun_port| {
         // Run the client request in the nailgun we have active.
         debug!("Got nailgun port {} for {}", nailgun_port, nailgun_name2);
-        let client_req = construct_nailgun_client_request(req2, client_main_class, client_args);
         let cmd = Command {
           command: client_req.argv[0].clone(),
           args: client_req.argv[1..].to_vec(),
-          env: client_req
-            .env
-            .iter()
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect(),
+          env: client_env,
           working_dir: client_workdir,
         };
         trace!("Client request: {:#?}", client_req);

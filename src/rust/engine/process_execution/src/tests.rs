@@ -17,6 +17,7 @@ fn process_equality() {
     output_directories: BTreeSet::new(),
     timeout,
     description,
+    append_only_caches: BTreeSet::new(),
     jdk_home: None,
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,

@@ -25,8 +25,8 @@ use tokio::time::timeout;
 use tokio_util::codec::{BytesCodec, FramedRead};
 
 use crate::{
-  Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, PlatformConstraint,
-  Process,
+  Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, NamedCaches, Platform,
+  PlatformConstraint, Process,
 };
 
 use bytes::{Bytes, BytesMut};
@@ -36,6 +36,7 @@ pub struct CommandRunner {
   pub store: Store,
   executor: task_executor::Executor,
   work_dir_base: PathBuf,
+  named_caches: Option<NamedCaches>,
   cleanup_local_dirs: bool,
   platform: Platform,
 }
@@ -45,12 +46,14 @@ impl CommandRunner {
     store: Store,
     executor: task_executor::Executor,
     work_dir_base: PathBuf,
+    named_caches: Option<NamedCaches>,
     cleanup_local_dirs: bool,
   ) -> CommandRunner {
     CommandRunner {
       store,
       executor,
       work_dir_base,
+      named_caches,
       cleanup_local_dirs,
       platform: Platform::current().unwrap(),
     }
@@ -271,21 +274,29 @@ impl super::CommandRunner for CommandRunner {
 }
 
 impl CapturedWorkdir for CommandRunner {
+  fn named_caches(&self) -> Option<&NamedCaches> {
+    self.named_caches.as_ref()
+  }
+
   fn run_in_workdir<'a, 'b, 'c>(
     &'a self,
     workdir_path: &'b Path,
     req: Process,
     _context: Context,
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String> {
-    StreamedHermeticCommand::new(&req.argv[0])
+    let mut command = StreamedHermeticCommand::new(&req.argv[0]);
+    command
       .args(&req.argv[1..])
       .current_dir(if let Some(ref working_directory) = req.working_directory {
         workdir_path.join(working_directory)
       } else {
         workdir_path.to_owned()
       })
-      .envs(&req.env)
-      .stream(&req)
+      .envs(&req.env);
+    if let Some(named_caches) = self.named_caches() {
+      command.envs(named_caches.local_env(&req.append_only_caches));
+    }
+    command.stream(&req)
   }
 }
 
@@ -330,6 +341,14 @@ pub trait CapturedWorkdir {
       }
     };
 
+    // If named caches are configured, collect the paths to create. The environment variables that
+    // will describe these locations to the process are applied in `run_in_workdir`.
+    let named_cache_paths = if let Some(named_caches) = self.named_caches() {
+      named_caches.local_paths(&req.append_only_caches).collect()
+    } else {
+      vec![]
+    };
+
     // Start with async materialization of input snapshots, followed by synchronous materialization
     // of other configured inputs. Note that we don't do this in parallel, as that might cause
     // non-determinism when paths overlap.
@@ -361,6 +380,7 @@ pub trait CapturedWorkdir {
           .chain(output_dir_paths.iter())
           .filter_map(|rel_path| rel_path.parent())
           .map(|parent_relpath| workdir_path2.join(parent_relpath))
+          .chain(named_cache_paths.into_iter())
           .collect();
         for path in parent_paths_to_create {
           create_dir_all(path.clone()).map_err(|err| {
@@ -454,6 +474,8 @@ pub trait CapturedWorkdir {
       }
     }
   }
+
+  fn named_caches(&self) -> Option<&NamedCaches>;
 
   ///
   /// TODO: See the note on references in ASYNC.md.

@@ -14,7 +14,7 @@ fn mock_nailgun_runner(workdir_base: Option<PathBuf>) -> CommandRunner {
   let executor = task_executor::Executor::new(Handle::current());
   let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
   let local_runner =
-    crate::local::CommandRunner::new(store, executor.clone(), std::env::temp_dir(), true);
+    crate::local::CommandRunner::new(store, executor.clone(), std::env::temp_dir(), None, true);
   let metadata = ProcessMetadata {
     instance_name: None,
     cache_key_gen_version: None,
@@ -42,6 +42,7 @@ fn mock_nailgunnable_request(jdk_home: Option<PathBuf>) -> Process {
     output_directories: Default::default(),
     timeout: Default::default(),
     description: "".to_string(),
+    append_only_caches: Default::default(),
     jdk_home: jdk_home,
     target_platform: PlatformConstraint::Darwin,
     is_nailgunnable: true,

@@ -343,6 +343,7 @@ async fn jdk_symlink() {
     output_directories: BTreeSet::new(),
     timeout: one_second(),
     description: "cat roland".to_string(),
+    append_only_caches: BTreeSet::new(),
     jdk_home: Some(preserved_work_tmpdir.path().to_path_buf()),
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
@@ -487,6 +488,7 @@ async fn timeout() {
     output_directories: BTreeSet::new(),
     timeout: Some(Duration::from_millis(100)),
     description: "sleepy-cat".to_string(),
+    append_only_caches: BTreeSet::new(),
     jdk_home: None,
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
@@ -532,6 +534,7 @@ async fn working_directory() {
       output_directories: BTreeSet::new(),
       timeout: one_second(),
       description: "confused-cat".to_string(),
+      append_only_caches: BTreeSet::new(),
       jdk_home: None,
       target_platform: PlatformConstraint::None,
       is_nailgunnable: false,
@@ -579,7 +582,7 @@ async fn run_command_locally_in_dir(
   let executor = executor.unwrap_or_else(|| task_executor::Executor::new(Handle::current()));
   let store =
     store.unwrap_or_else(|| Store::local_only(executor.clone(), store_dir.path()).unwrap());
-  let runner = crate::local::CommandRunner::new(store, executor.clone(), dir, cleanup);
+  let runner = crate::local::CommandRunner::new(store, executor.clone(), dir, None, cleanup);
   runner.run(req.into(), Context::default()).await
 }
 
