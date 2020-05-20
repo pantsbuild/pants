@@ -27,7 +27,6 @@
 
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::Arc;
 use std::time::Duration;
 
 use futures::future::{self, FutureExt, TryFutureExt};
@@ -66,8 +65,16 @@ impl ConsoleUI {
     10
   }
 
-  pub fn write_stdout(&self, msg: &str) {
+  pub fn render_interval() -> Duration {
+    Duration::from_millis(1000 / Self::render_rate_hz())
+  }
+
+  pub async fn write_stdout(&mut self, msg: &str) -> Result<(), String> {
+    if self.instance.is_some() {
+      self.teardown().await?;
+    }
     print!("{}", msg);
+    Ok(())
   }
 
   pub fn write_stderr(&self, msg: &str) {
@@ -78,16 +85,10 @@ impl ConsoleUI {
     }
   }
 
-  pub fn with_console_ui_disabled<F: FnOnce() -> T, T>(&self, f: F) -> T {
-    if let Some(instance) = &self.instance {
-      instance
-        .multi_progress
-        .set_draw_target(ProgressDrawTarget::hidden());
-      let res = f();
-      instance
-        .multi_progress
-        .set_draw_target(Self::default_draw_target());
-      res
+  pub async fn with_console_ui_disabled<F: FnOnce() -> T, T>(&mut self, f: F) -> T {
+    if self.instance.is_some() {
+      self.teardown().await.unwrap();
+      f()
     } else {
       f()
     }
@@ -178,9 +179,7 @@ impl ConsoleUI {
 
     // Setup bars, and then spawning rendering of the bars into a background task.
     let (multi_progress, bars) = Self::setup_bars(num_cpus::get());
-    let multi_progress = Arc::new(multi_progress);
     let multi_progress_task = {
-      let multi_progress = multi_progress.clone();
       executor
         .spawn_blocking(move || multi_progress.join())
         .boxed()
@@ -188,9 +187,8 @@ impl ConsoleUI {
 
     self.instance = Some(Instance {
       tasks_to_display: IndexMap::new(),
-      logger_handle: LOGGER.register_stderr_handler(stderr_handler),
-      multi_progress,
       multi_progress_task,
+      logger_handle: LOGGER.register_stderr_handler(stderr_handler),
       bars,
     });
     Ok(())
@@ -215,7 +213,6 @@ impl ConsoleUI {
 /// The state for one run of the ConsoleUI.
 struct Instance {
   tasks_to_display: IndexMap<String, Option<Duration>>,
-  multi_progress: Arc<MultiProgress>,
   multi_progress_task: Pin<Box<dyn Future<Output = std::io::Result<()>> + Send>>,
   bars: Vec<ProgressBar>,
   logger_handle: Uuid,

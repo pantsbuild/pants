@@ -145,12 +145,13 @@ impl Session {
     *run_id = Uuid::new_v4();
   }
 
-  pub fn write_stdout(&self, msg: &str) {
+  pub async fn write_stdout(&self, msg: &str) -> Result<(), String> {
     if let Some(display) = &self.0.display {
-      let display = display.lock();
-      display.write_stdout(msg);
+      let mut display = display.lock();
+      display.write_stdout(msg).await
     } else {
       print!("{}", msg);
+      Ok(())
     }
   }
 
@@ -163,10 +164,10 @@ impl Session {
     }
   }
 
-  pub fn with_console_ui_disabled<F: FnOnce() -> T, T>(&self, f: F) -> T {
+  pub async fn with_console_ui_disabled<F: FnOnce() -> T, T>(&self, f: F) -> T {
     if let Some(display) = &self.0.display {
-      let display = display.lock();
-      display.with_console_ui_disabled(f)
+      let mut display = display.lock();
+      display.with_console_ui_disabled(f).await
     } else {
       f()
     }
@@ -475,7 +476,7 @@ impl Scheduler {
     let (sender, receiver) = mpsc::channel();
     self.execute_helper(request, session, sender);
 
-    let interval = Duration::from_millis(1000 / ConsoleUI::render_rate_hz());
+    let interval = ConsoleUI::render_interval();
     let deadline = request.timeout.map(|timeout| Instant::now() + timeout);
 
     session.maybe_display_initialize(&self.core.executor);

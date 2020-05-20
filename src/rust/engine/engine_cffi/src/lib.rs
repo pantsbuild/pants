@@ -43,6 +43,8 @@ use engine::{
   externs, nodes, Core, ExecutionRequest, ExecutionTermination, Failure, Function, Handle,
   Intrinsics, Key, Params, Rule, Scheduler, Session, Tasks, TypeId, Types, Value,
 };
+
+use futures::future::FutureExt;
 use futures::future::{self as future03, TryFutureExt};
 use futures01::{future, Future};
 use hashing::{Digest, EMPTY_DIGEST};
@@ -1173,7 +1175,8 @@ pub extern "C" fn run_local_interactive_process(
 
   with_scheduler(scheduler_ptr, |scheduler| {
     with_session(session_ptr, |session| {
-      session.with_console_ui_disabled(|| {
+      let output: Result<Value, String> = block_in_place_and_wait(
+      session.with_console_ui_disabled(|| -> Result<Value, String> {
         let types = &scheduler.core.types;
         let construct_interactive_process_result = types.construct_interactive_process_result;
 
@@ -1246,9 +1249,12 @@ pub extern "C" fn run_local_interactive_process(
         ));
         output
       })
+      .boxed_local()
+      .compat()
+      );
+      output.into()
     })
   })
-  .into()
 }
 
 #[no_mangle]
@@ -1378,11 +1384,11 @@ pub extern "C" fn write_log(msg: *const raw::c_char, level: u64, target: *const 
 }
 
 #[no_mangle]
-pub extern "C" fn write_stdout(session_ptr: *mut Session, msg: *const raw::c_char) {
+pub extern "C" fn write_stdout(session_ptr: *mut Session, msg: *const raw::c_char) -> PyResult {
   with_session(session_ptr, |session| {
     let message_str = unsafe { CStr::from_ptr(msg).to_string_lossy() };
-    session.write_stdout(&message_str);
-  });
+    block_in_place_and_wait(session.write_stdout(&message_str).boxed_local().compat()).into()
+  })
 }
 
 #[no_mangle]

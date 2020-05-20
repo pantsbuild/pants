@@ -373,7 +373,9 @@ class Scheduler:
         """
         return self._native.new_nailgun_server(self._scheduler, port_requested, runner)
 
-    def new_session(self, zipkin_trace_v2, build_id, v2_ui=False, should_report_workunits=False):
+    def new_session(
+        self, zipkin_trace_v2, build_id, v2_ui=False, should_report_workunits=False
+    ) -> "SchedulerSession":
         """Creates a new SchedulerSession for this Scheduler."""
         return SchedulerSession(
             self,
@@ -410,6 +412,10 @@ class SchedulerSession:
     @property
     def scheduler(self):
         return self._scheduler
+
+    @property
+    def session(self):
+        return self._session
 
     def poll_workunits(self) -> PolledWorkunits:
         return cast(PolledWorkunits, self._scheduler.poll_workunits(self._session))
