@@ -25,7 +25,7 @@ class PexBin(ExternalTool):
     name = "pex"
     default_version = "v2.1.11"
     default_known_versions = [
-        f"v2.1.10|{plat}|01cca03feeb605ccc6ea3cbf0d4c3df10e847a9ace5d40298c8b3be5ce3c05a4|2631388"
+        f"v2.1.11|{plat}|01cca03feeb605ccc6ea3cbf0d4c3df10e847a9ace5d40298c8b3be5ce3c05a4|2631388"
         for plat in ["darwin", "linux"]
     ]
 
