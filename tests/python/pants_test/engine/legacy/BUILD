@@ -89,7 +89,7 @@ python_tests(
     'testprojects/tests/python/pants:dummies_directory',
   ],
   tags = {'integration', 'partially_type_checked'},
-  timeout = 270,
+  timeout = 480,
 )
 
 python_tests(

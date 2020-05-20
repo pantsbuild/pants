@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from typing import List, Optional
+from unittest import skip
 
 import pytest
 
@@ -22,6 +23,7 @@ from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
 
+@skip("Twitter does not use flake8")
 class Flake8IntegrationTest(TestBase):
 
     good_source = FileContent(path="test/good.py", content=b"print('Nothing suspicious here..')\n")

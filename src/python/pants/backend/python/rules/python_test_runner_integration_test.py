@@ -124,7 +124,7 @@ class PythonTestRunnerIntegrationTest(TestBase):
             "--backend-packages2=pants.backend.python",
             # pin to lower versions so that we can run Python 2 tests
             "--pytest-version=pytest>=4.6.6,<4.7",
-            "--pytest-pytest-plugins=['zipp==1.0.0']",
+            "--pytest-pytest-plugins=['zipp==1.0.0', 'configparser==4.0.2']",
         ]
         if passthrough_args:
             args.append(f"--pytest-args='{passthrough_args}'")

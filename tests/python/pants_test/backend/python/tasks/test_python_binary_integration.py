@@ -7,6 +7,7 @@ import os
 import subprocess
 from contextlib import contextmanager
 from textwrap import dedent
+from unittest import skip
 
 from pex.pex_info import PexInfo
 
@@ -216,6 +217,7 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
             "testprojects/src/python/python_distribution/ctypes:bin", result.stderr_data
         )
 
+    @skip("manylinux2010 from grpcio-1.29 does not work with pex1")
     def test_generate_ipex_tensorflow(self):
         with temporary_dir() as tmp_distdir:
             with self.pants_results(
