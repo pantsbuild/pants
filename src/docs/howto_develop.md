@@ -1,60 +1,14 @@
 Pants Developers Guide
 ======================
 
-This page describes the developer workflow when changing Pants itself. (If you wanted
-instructions for using Pants to develop other programs, please see
-[[First Tutorial|pants('src/docs:first_tutorial')]].)
+See [the new docs](https://pants.readme.io/docs/contributor-sources) for how to set up Pants to develop locally.
 
-These instructions assume you've already
-<a pantsref="download_source_code">downloaded the source code</a>.
-
-Running from sources
---------------------
-
-As Pants is implemented in Python it can be run directly from sources.
-
-    :::bash
-    $ ./pants goals
-    <remainder of output omitted for brevity>
-
-If you want to run Pants from sources, but in another repo to test changes before a release, you
-can run it like so:
-
-    :::bash
-    (other repo) $ PANTS_DEV=0 PANTS_PLUGINS="[]" \
-      PANTS_PYTHONPATH="+['/path/to/pants/repo/contrib/python/src/python']" \
-      PANTS_BACKEND_PACKAGES="+['pants.contrib.python.checks']" \
-      PANTS_VERSION=1.2.0-dev0 \
-      /path/to/pants/repo/pants compile ::
-
-Here the environment variables are used to make sure any pants plugins your other repo uses will
-also be run from pants sources. Explaining each environment variable:
-
-* `PANTS_DEV`: The `./pants` runner script in this repo will set this to 1 and export it unless
-  explicitly set to 0 in the environment. When `PANTS_DEV=1`, pants will resolve certain packages
-  such as checkstyle checkers from paths to source targets instead of 3rdparty requirements, which
-  will most likely fail in another repo.
-+ `PANTS_PLUGINS`: This should always be as-shown, ie: an empty list.
-+ `PANTS_PYTHONPATH`: This is a comma-separated list of PYTHONPATH elements. Note the plus symbol
-  before the list - this indicates the given elements should be appended to the PYTHONPATH.
-  The values can be taken from the Pants repo's `pants.toml`. You'll need one path per plugin your other
-  repo uses.
-+ `PANTS_BACKEND_PACKAGES`: This is a comma-separated list of plugin package names. Note the plus
-  symbol before the list - this indicates the given elements should be appended to the PYTHONPATH.
-  These values can also be taken from the Pants repo's `pants.toml`. You'll need one package name per
-  plugin your other repo uses.
-+ `PANTS_VERSION`: The version of Pants required by the repo.
-
-If your other repo uses plugins but you don't use this environment variable technique, or you do use
-it but miss one or more plugins, pants will still run, but the result can be confusing since the
-plugins not covered by the environment variable settings will run from a cached binary distribution
-and not from your local edits to pants.  It's worth adding temporary print statements to make sure
-you're hitting your code edits if you aren't using a debugger.
+The rest of this page documents things that have not yet been moved to the new site.
 
 Building Pants PEX for Production
 -----------------------------------
 
-You will usually want to use an official published version of pants. But what if you want to
+You will usually want to use an official published version of Pants. But what if you want to
 let some of your internal users try out the latest and greatest unreleased code?
 What if you want to create a custom build of pants with some unpublished patches?
 In that case, you want to build a production ready version of pants including dependencies for
@@ -136,136 +90,6 @@ A user can just copy this pex to the top of their Pants workspace and use it:
     $ cp /mnt/fd0/pants.pex .
     $ ./pants.pex goal test examples/tests/java/org/pantsbuild/example/hello/greet:
 
-Testing
--------
-
-<a pantsmark="dev_run_all_tests"> </a>
-
-### Running Tests
-
-Pants has many tests. There are BUILD targets to run those tests. We try to keep them passing.
-[A Travis-CI job](https://travis-ci.org/pantsbuild/pants) runs tests on each SHA pushed to
-origin on `github.com/pantsbuild/pants`.
-
-Most test are runnable as regular Pants test targets. To find tests that work with a particular
-feature, you might explore `tests/python/pants_tests/.../BUILD`.
-
-Before [[contributing a change to Pants|pants('src/docs:howto_contribute')]],
-make sure it passes **all** of our continuous integration (CI) tests: everything builds,
-all tests pass. Our tests are hard and slow to run all of locally, so we recommend that you create
-a pull request, and allow travis to run them. You can reproduce failures by running
-
-    :::bash
-    $ ./build-support/bin/ci.py
-
-with whatever relevant flags reproduce the failure (`./build-support/bin/ci.py --help` will list the
-available flags). The relevant flags are in the log for the shard on a line that looks something
-like `./build-support/bin/ci.py --lint --sanity-checks --python-version 3.7`.
-
-To run tests for a specific target, run the below, substituting the target(s) with what you'd like to test:
-
-    :::bash
-    $ ./pants test tests/python/pants_test/util:strutil
-
-You may filter out the often-slow integration tests like this;
-
-    :::bash
-    $ ./pants --tag=-integration test tests/python/pants_test/goal::
-
-If you only want to run tests for changed targets, then you can use the
-`test-changed` goal:
-
-    :::bash
-    $ ./pants test-changed
-
-You can run your code through the Travis-CI before you submit a change. Travis-CI is integrated
-with the pull requests for the `pantsbuild/pants` repo. Travis-CI will test it soon after the pull
-request is created. It will queue up a new job every time you subsequently push your branch.
-
-To kick off a new CI-build, push a branch to
-<a pantsref="download_source_code">your fork</a> of `pantsbuild/pants`.
-Create a pull request on the `pantsbuild/pants` [repo](https://github.com/pantsbuild/pants),
-not your fork. If you are posting a review request, put the pull request number into the Bug
-field. Then, when you close the request, you can navigate from the bug number to easily close
-the pull request.
-
-If your CI-build failed in Travis-CI, and the failure looks like it's not due to your change, please
-go to https://github.com/pantsbuild/pants/issues/9386 and follow the instructions there to deal with
-the misbehaving test. After you've done that, you can ask in slack for someone to restart the shard.
-That will cause the shard to re-run its tests.
-
-#### Advanced: Remote execution of tests
-Pants is in the early stages of running its tests through Google's Remote Build Execution service
-(RBE), meaning that each step of the testing process (e.g. resolving requirements or running Pytest)
-may be run with a distinct remote worker through Google Cloud, rather than running locally. This
-allows for highly parallel runs of our large CI suite.
-
-To use this feature locally, you must download the Google Cloud SDK and log in through the CLI to
-your Google account via `gcloud auth login` and `gcloud auth application-default login`. Then, if
-you have the permissions to use Pants's remote resources, you can turn on remoting for tests by
-passing the `--remote-execution-enabled` flag to `ci.py`, such as:
-
-    :::bash
-    $ build-support/bin/ci.py --python-tests-v2 --remote-execution-enabled
-
-To use remote execution for a specific test(s), run this:
-
-    :::bash
-    $ ./pants --pants-config-files=pants.remote.toml \
-      --remote-oauth-bearer-token-path=<(gcloud auth application-default print-access-token | perl -p -e 'chomp if eof') \
-      --no-v1 --v2 test tests/python/pants_test/util:strutil 
-
-Debugging
----------
-
-To run Pants under `pdb` and set a breakpoint, you can typically add
-
-    :::python
-    import pdb; pdb.set_trace()
-
-...where you first want to break. If the code is in a test, you can use ipdb for a much nicer debugger
-
-    :::python
-    import ipdb; ipdb.set_trace()
-
-To run tests and bring up `pdb` for failing tests, you can pass `--pdb` to
-`--pytest-args`:
-
-    :::bash
-    $ ./pants --pytest-args='--pdb' test tests/python/pants_test/tasks:
-    ... plenty of test output ...
-    tests/python/pants_test/tasks/test_targets_help.py E
-    >>>>>>>>>>>>>>>>>>>>>>>>>>>>>> traceback >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-
-    cls = <class 'pants_test.tasks.test_targets_help.TargetsHelpTest'>
-
-        @classmethod
-        def setUpClass(cls):
-    >     super().setUpClass()
-    E     AttributeError: 'super' object has no attribute 'setUpClass'
-
-    tests/python/pants_test/tasks/test_targets_help.py:24: AttributeError
-    >>>>>>>>>>>>>>>>>>>>>>>>>>>>> entering PDB >>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-    > /Users/lhosken/workspace/pants/tests/python/pants_test/tasks/test_targets_help.py(24)setUpClass()
-    -> super().setUpClass()
-    (Pdb)
-
-When debugging tests, the test might time out. You can turn off timeouts with `--no-pytest-timeouts`.
-
-To start an interactive Python shell that can `import` Pants modules,
-use the usual `./pants repl` on a `python_library` target that builds (or
-depends on) the modules you want:
-
-    :::bash
-    $ ./pants repl src/python/pants/build_graph
-    /Users/lhosken/workspace/pants src/python/pants/build_graph
-    Python 2.6.8 (unknown, Mar  9 2014, 22:16:00)
-    [GCC 4.2.1 Compatible Apple LLVM 5.0 (clang-500.0.68)] on darwin
-    Type "help", "copyright", "credits" or "license" for more information.
-    (InteractiveConsole)
-    >>> from pants.build_graph.target import Target
-    >>>
-
 Developing and Debugging a JVM Tool
 -----------------------------------
 
@@ -315,7 +139,7 @@ section or in the `[DEFAULT]` section of `pants.toml`.
     [DEFAULT]
     execution_strategy = "subprocess"
 
-###JVM Tool Development Tips
+### JVM Tool Development Tips
 
 If you need to debug the tool under nailgun, make
 sure you run `pants goal ng-killall` or `pants goal clean-all` after you update the

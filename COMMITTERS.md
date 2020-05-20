@@ -2,16 +2,14 @@ Active Committers
 =================
 
 * Benjy Weinberger
-* Chris Heisterkamp
 * Daniel McClanahan
 * Daniel Wagner-Hall
-* Dorothy Ordogh
-* Ity Kaul
+* Eric Arellano
+* Greg Shuflin
+* Henry Fuller
 * John Sirois
-* Kris Wilson
-* Larry Hosken
-* Mateo Rodriguez
 * Nora Howard
+* Pierre Chevalier
 * Stu Hood
 * Yi Cheng
 
@@ -19,11 +17,16 @@ Emeritus
 ========
 
 * Andy Reitz
+* Chris Heisterkamp
 * David Taylor
 * David Turner
+* Dorothy Ordogh
 * Eric Ayers
 * Fedor Korotkov
 * Garrett Malmquist
+* Kris Wilson
+* Larry Hosken
+* Mateo Rodriguez
 * Matt Olsen
 * Patrick Lawson
 * Peiyu Wang
