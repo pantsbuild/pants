@@ -19,7 +19,6 @@ python_tests(
   name = 'build_configuration',
   sources = ['test_build_configuration.py'],
   dependencies = [
-    'src/python/pants/base:build_file',
     'src/python/pants/build_graph',
     'src/python/pants/engine:addresses',
     'src/python/pants/engine:rules',
