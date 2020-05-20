@@ -145,12 +145,13 @@ impl Session {
     *run_id = Uuid::new_v4();
   }
 
-  pub fn write_stdout(&self, msg: &str) {
+  pub async fn write_stdout(&self, msg: &str) -> Result<(), String> {
     if let Some(display) = &self.0.display {
       let mut display = display.lock();
-      display.write_stdout(msg);
+      display.write_stdout(msg).await
     } else {
       print!("{}", msg);
+      Ok(())
     }
   }
 
@@ -163,10 +164,10 @@ impl Session {
     }
   }
 
-  pub fn with_console_ui_disabled<F: FnOnce() -> T, T>(&self, f: F) -> T {
+  pub async fn with_console_ui_disabled<F: FnOnce() -> T, T>(&self, f: F) -> T {
     if let Some(display) = &self.0.display {
       let mut display = display.lock();
-      display.with_console_ui_disabled(f)
+      display.with_console_ui_disabled(f).await
     } else {
       f()
     }
@@ -192,8 +193,13 @@ impl Session {
 
   async fn maybe_display_teardown(&self) {
     if let Some(display) = &self.0.display {
-      let mut display = display.lock();
-      display.teardown()
+      let teardown = {
+        let mut display = display.lock();
+        display.teardown()
+      };
+      if let Err(e) = teardown.await {
+        warn!("{}", e);
+      }
     }
   }
 
