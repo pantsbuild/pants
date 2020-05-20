@@ -899,7 +899,8 @@ class Native(metaclass=SingletonMetaclass):
         return self.lib.write_log(msg.encode(), level, target.encode())
 
     def write_stdout(self, session, msg: str):
-        return self.lib.write_stdout(session, msg.encode())
+        res = self.lib.write_stdout(session, msg.encode())
+        self.context.raise_or_return(res)
 
     def write_stderr(self, session, msg: str):
         return self.lib.write_stderr(session, msg.encode())
