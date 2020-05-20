@@ -7,6 +7,7 @@ Active Committers
 * Eric Arellano
 * Greg Shuflin
 * Henry Fuller
+* Ity Kaul
 * John Sirois
 * Nora Howard
 * Pierre Chevalier
