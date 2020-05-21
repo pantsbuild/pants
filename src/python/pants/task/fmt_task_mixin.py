@@ -29,8 +29,8 @@ class FmtTaskMixin:
             )
         if is_scalafix and only == "scalafix" and skipped:
             raise ValueError(
-                f"Invalid flag combination. You cannot both set `--fmt-only=scalafix` and "
-                f"`--scalafix-skip`.",
+                "Invalid flag combination. You cannot both set `--fmt-only=scalafix` and "
+                "`--scalafix-skip`.",
             )
 
         if only == "scalafix" and not is_scalafix:

@@ -74,7 +74,7 @@ def linkify(buildroot, s, memoized_urls):
             if Path(buildroot, putative_dir).is_dir():
                 build_files = sorted(
                     build_file
-                    for build_file in Path(buildroot, putative_dir).glob(f"BUILD*")
+                    for build_file in Path(buildroot, putative_dir).glob("BUILD*")
                     if _is_build_file_name(build_file.name) and build_file.is_file()
                 )
                 if not build_files:

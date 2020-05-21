@@ -173,4 +173,4 @@ class ScalaFixCheck(LintTaskMixin, ScalafixTask):
 
     def process_result(self, result):
         if result != 0:
-            raise TaskError(f"Targets failed scalafix checks.")
+            raise TaskError("Targets failed scalafix checks.")

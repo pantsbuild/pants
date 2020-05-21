@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 def _is_build_file_name(name: str) -> bool:
-    return bool(re.match(rf"^BUILD(\.[a-zA-Z0-9_-]+)?$", name))
+    return bool(re.match(r"^BUILD(\.[a-zA-Z0-9_-]+)?$", name))
 
 
 # Note: Significant effort has been made to keep the types BuildFile, BuildGraph, Address, and

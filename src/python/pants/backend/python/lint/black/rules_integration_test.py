@@ -57,7 +57,7 @@ class BlackIntegrationTest(ExternalToolTestBase):
         if passthrough_args:
             args.append(f"--black-args='{passthrough_args}'")
         if skip:
-            args.append(f"--black-skip")
+            args.append("--black-skip")
         options_bootstrapper = create_options_bootstrapper(args=args)
         field_sets = [BlackFieldSet.create(tgt) for tgt in targets]
         lint_result = self.request_single_product(

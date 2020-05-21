@@ -79,7 +79,7 @@ class ScoveragePlatform(InjectablesMixin, Subsystem):
     def injectables_address_spec_mapping(self):
         return {
             # Target spec for scoverage plugin.
-            "scoverage": [f"//:scoverage"],
+            "scoverage": ["//:scoverage"],
         }
 
     def is_blacklisted(self, target_address_spec) -> bool:

@@ -42,12 +42,12 @@ class PythonAWSLambda(Target):
         dependencies = self.dependencies
         if len(dependencies) != 1:
             raise TargetDefinitionException(
-                self, f"An app must define exactly one binary " "dependency, have: {dependencies}"
+                self, f"An app must define exactly one binary dependency, have: {dependencies}"
             )
         binary = dependencies[0]
         if not isinstance(binary, PythonBinary):
             raise TargetDefinitionException(
-                self, f"Expected binary dependency to be a python_binary " "target, found {binary}"
+                self, f"Expected binary dependency to be a python_binary target, found {binary}"
             )
         return binary
 

@@ -121,7 +121,7 @@ async def flake8_lint(
     process = requirements_pex.create_process(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
-        pex_path=f"./flake8.pex",
+        pex_path="./flake8.pex",
         pex_args=generate_args(specified_source_files=specified_source_files, flake8=flake8),
         input_digest=input_digest,
         description=f"Run Flake8 on {pluralize(len(field_sets), 'target')}: {address_references}.",

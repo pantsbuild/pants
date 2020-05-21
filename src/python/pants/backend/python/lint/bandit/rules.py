@@ -120,7 +120,7 @@ async def bandit_lint(
     process = requirements_pex.create_process(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
-        pex_path=f"./bandit.pex",
+        pex_path="./bandit.pex",
         pex_args=generate_args(specified_source_files=specified_source_files, bandit=bandit),
         input_digest=input_digest,
         description=f"Run Bandit on {pluralize(len(field_sets), 'target')}: {address_references}.",

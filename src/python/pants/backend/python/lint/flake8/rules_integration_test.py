@@ -61,7 +61,7 @@ class Flake8IntegrationTest(ExternalToolTestBase):
         if passthrough_args:
             args.append(f"--flake8-args='{passthrough_args}'")
         if skip:
-            args.append(f"--flake8-skip")
+            args.append("--flake8-skip")
         if additional_args:
             args.extend(additional_args)
         return self.request_single_product(
