@@ -29,7 +29,7 @@ class Package:
   def __init__(self, name, target, bdist_wheel_flags=None):
     self.name = name
     self.target = target
-    self.bdist_wheel_flags = bdist_wheel_flags or ("--python-tag", "py36.py37")
+    self.bdist_wheel_flags = bdist_wheel_flags or ("--python-tag", "py36.py37.py38")
 
   def __lt__(self, other):
     return self.name < other.name
