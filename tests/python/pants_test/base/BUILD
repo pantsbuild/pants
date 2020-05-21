@@ -102,25 +102,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'pants_ignore_file_system',
-  sources = ['test_pants_ignore_file_system.py'],
-  dependencies = [
-    ':pants_ignore_test_base',
-    'src/python/pants/base:project_tree',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_library(
-  name = 'pants_ignore_test_base',
-  sources = ['pants_ignore_test_base.py'],
-  dependencies = [
-    ':project_tree_test_base',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_tests(
   name = 'payload',
   sources = ['test_payload.py'],
   dependencies = [
@@ -140,15 +121,6 @@ python_tests(
     'src/python/pants/base:payload_field',
     'src/python/pants/python',
     'src/python/pants/testutil:test_base',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_library(
-  name = 'project_tree_test_base',
-  sources = ['project_tree_test_base.py'],
-  dependencies = [
-    'src/python/pants/util:dirutil',
   ],
   tags = {"partially_type_checked"},
 )

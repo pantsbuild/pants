@@ -899,7 +899,8 @@ class Native(metaclass=SingletonMetaclass):
         return self.lib.write_log(msg.encode(), level, target.encode())
 
     def write_stdout(self, session, msg: str):
-        return self.lib.write_stdout(session, msg.encode())
+        res = self.lib.write_stdout(session, msg.encode())
+        self.context.raise_or_return(res)
 
     def write_stderr(self, session, msg: str):
         return self.lib.write_stderr(session, msg.encode())
@@ -939,7 +940,7 @@ class Native(metaclass=SingletonMetaclass):
         self,
         scheduler,
         should_record_zipkin_spans,
-        should_render_ui,
+        dynamic_ui: bool,
         build_id,
         should_report_workunits: bool,
     ):
@@ -947,7 +948,7 @@ class Native(metaclass=SingletonMetaclass):
             self.lib.session_create(
                 scheduler,
                 should_record_zipkin_spans,
-                should_render_ui,
+                dynamic_ui,
                 self.context.utf8_buf(build_id),
                 should_report_workunits,
             ),

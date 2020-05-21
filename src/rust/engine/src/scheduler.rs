@@ -44,7 +44,7 @@ struct InnerSession {
   // times if they were polled.
   roots: Mutex<HashMap<Root, Option<LastObserved>>>,
   // If enabled, the display that will render the progress of the V2 engine. This is only
-  // Some(_) if the --v2-ui option is enabled.
+  // Some(_) if the --dynamic-ui option is enabled.
   display: Option<Mutex<ConsoleUI>>,
   // If enabled, Zipkin spans for v2 engine will be collected.
   should_record_zipkin_spans: bool,
@@ -145,12 +145,13 @@ impl Session {
     *run_id = Uuid::new_v4();
   }
 
-  pub fn write_stdout(&self, msg: &str) {
+  pub async fn write_stdout(&self, msg: &str) -> Result<(), String> {
     if let Some(display) = &self.0.display {
-      let display = display.lock();
-      display.write_stdout(msg);
+      let mut display = display.lock();
+      display.write_stdout(msg).await
     } else {
       print!("{}", msg);
+      Ok(())
     }
   }
 
@@ -163,10 +164,10 @@ impl Session {
     }
   }
 
-  pub fn with_console_ui_disabled<F: FnOnce() -> T, T>(&self, f: F) -> T {
+  pub async fn with_console_ui_disabled<F: FnOnce() -> T, T>(&self, f: F) -> T {
     if let Some(display) = &self.0.display {
-      let display = display.lock();
-      display.with_console_ui_disabled(f)
+      let mut display = display.lock();
+      display.with_console_ui_disabled(f).await
     } else {
       f()
     }
@@ -453,7 +454,7 @@ impl Scheduler {
     let (sender, receiver) = mpsc::channel();
     self.execute_helper(request, session, sender);
 
-    let interval = Duration::from_millis(1000 / ConsoleUI::render_rate_hz());
+    let interval = ConsoleUI::render_interval();
     let deadline = request.timeout.map(|timeout| Instant::now() + timeout);
 
     session.maybe_display_initialize(&self.core.executor);

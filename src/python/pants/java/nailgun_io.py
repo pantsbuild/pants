@@ -91,10 +91,14 @@ class NailgunStreamWriter(_StoppableDaemonThread):
             try:
                 os.close(fileno)
             finally:
-                self.stop_reading_from_fd(fileno)
+                self._stop_reading_from_fd(fileno)
 
-    def stop_reading_from_fd(self, fileno):
-        self._in_fds.remove(fileno)
+    def _stop_reading_from_fd(self, fileno):
+        """Stop reading from the given fd.
+
+        May safely be called multiple times.
+        """
+        self._in_fds = [fd for fd in self._in_fds if fd != fileno]
 
     def run(self):
         while self._in_fds and not self.is_stopped:
@@ -109,10 +113,7 @@ class NailgunStreamWriter(_StoppableDaemonThread):
             self.do_run(readable_fds, errored_fds)
 
     def do_run(self, readable_fds, errored_fds):
-        """Represents one iteration of the infinite reading cycle.
-
-        Subclasses should override this.
-        """
+        """Represents one iteration of the infinite reading cycle."""
         if readable_fds:
             for fileno in readable_fds:
                 data = os.read(fileno, self._buf_size)
@@ -125,4 +126,4 @@ class NailgunStreamWriter(_StoppableDaemonThread):
 
         if errored_fds:
             for fileno in errored_fds:
-                self.stop_reading_from_fd(fileno)
+                self._stop_reading_from_fd(fileno)

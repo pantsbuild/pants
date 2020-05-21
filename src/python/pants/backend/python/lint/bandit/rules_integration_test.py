@@ -60,7 +60,7 @@ class BanditIntegrationTest(ExternalToolTestBase):
         if passthrough_args:
             args.append(f"--bandit-args={passthrough_args}")
         if skip:
-            args.append(f"--bandit-skip")
+            args.append("--bandit-skip")
         if additional_args:
             args.extend(additional_args)
         return self.request_single_product(

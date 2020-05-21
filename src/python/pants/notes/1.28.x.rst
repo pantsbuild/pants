@@ -5,6 +5,33 @@ This document describes releases leading up to the ``1.28.x`` ``stable`` series.
 
 See https://pants.readme.io/docs/release-notes-1-28 for an overview of the changes in this release.
 
+1.28.0rc2 (5/20/2020)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fix harmless error rendered when stdin is closed under pantsd (#9828)
+  `PR #9828 <https://github.com/pantsbuild/pants/pull/9828>`_
+
+* Omit `m` suffix in platform for AWS Lambdas using Python 3.8 (#9796)
+  `PR #9796 <https://github.com/pantsbuild/pants/pull/9796>`_
+
+* Fix console UI redraw issues (#9812)
+  `PR #9812 <https://github.com/pantsbuild/pants/pull/9812>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Standardized workunit names (#9774)
+  `PR #9774 <https://github.com/pantsbuild/pants/pull/9774>`_
+
+* Re-implement source roots without using a trie (#9799)
+  `PR #9799 <https://github.com/pantsbuild/pants/pull/9799>`_
+
+* Improve the `repr` for V2 `Target` (#9808)
+  `PR #9808 <https://github.com/pantsbuild/pants/pull/9808>`_
+
 1.28.0rc1 (5/15/2020)
 ---------------------
 

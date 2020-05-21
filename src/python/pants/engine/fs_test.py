@@ -749,7 +749,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
 
             if not self.try_with_backoff(assertion_fn):
                 raise AssertionError(
-                    f"Deleting parent dir and could still read file from original snapshot."
+                    "Deleting parent dir and could still read file from original snapshot."
                 )
 
     def assert_mutated_digest(

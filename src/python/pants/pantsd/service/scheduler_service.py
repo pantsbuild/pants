@@ -134,7 +134,7 @@ class SchedulerService(PantsService):
             self._scheduler.check_invalidation_watcher_liveness()
         except Exception as e:
             # Watcher failed for some reason
-            self._logger.critical(f"The scheduler was invalidated: {e}")
+            self._logger.critical(f"The scheduler was invalidated: {e!r}")
             self.terminate()
 
     def prepare(self) -> LegacyGraphScheduler:
@@ -142,7 +142,7 @@ class SchedulerService(PantsService):
         # racing watchman startup vs invalidation events.
         if self._fs_event_service is not None and self._scheduler.graph_len() > 0:
             self._logger.debug(
-                f"fs event service is running and graph_len > 0: waiting for initial watchman event"
+                "fs event service is running and graph_len > 0: waiting for initial watchman event"
             )
             self._fs_event_service.await_started()
         return self._graph_helper

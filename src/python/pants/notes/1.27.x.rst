@@ -7,6 +7,11 @@ The ``1.27.x`` series deprecates several unused backends and plugins. Please
 see https://groups.google.com/forum/#!topic/pants-devel/ngMZRIJvwHM for more
 information.
 
+1.27.0 (5/20/2020)
+-------------------
+
+The first stable release in the ``1.27.x`` series, with no changes since the previous release candidate!
+
 1.27.0rc2 (5/15/2020)
 ---------------------
 

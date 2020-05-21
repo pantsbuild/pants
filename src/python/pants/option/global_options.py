@@ -915,13 +915,23 @@ class GlobalOptions(Subsystem):
             "tags ('-' prefix).  Useful with ::, to find subsets of targets "
             "(e.g., integration tests.)",
         )
+        register(
+            "--dynamic-ui",
+            type=bool,
+            default=sys.stderr.isatty(),
+            daemon=False,
+            help="Display a dynamically-updating console UI as pants runs.",
+        )
 
         register(
             "--v2-ui",
             default=False,
+            dest="dynamic_ui",
             type=bool,
             daemon=False,
             passive=not register.bootstrap.v2,
+            removal_version="1.31.0.dev0",
+            removal_hint="Use --dynamic-ui instead.",
             help="Whether to show v2 engine execution progress.",
         )
 

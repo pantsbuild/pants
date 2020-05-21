@@ -50,7 +50,7 @@ class DocformatterIntegrationTest(ExternalToolTestBase):
         if passthrough_args:
             args.append(f"--docformatter-args='{passthrough_args}'")
         if skip:
-            args.append(f"--docformatter-skip")
+            args.append("--docformatter-skip")
         options_bootstrapper = create_options_bootstrapper(args=args)
         field_sets = [DocformatterFieldSet.create(tgt) for tgt in targets]
         lint_result = self.request_single_product(
