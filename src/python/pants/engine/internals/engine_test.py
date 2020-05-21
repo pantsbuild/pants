@@ -18,6 +18,7 @@ from pants.testutil.engine.util import (
     fmt_rule,
     remove_locations_from_traceback,
 )
+from pants.util.logging import LogLevel
 
 
 class A:
@@ -392,10 +393,41 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
         r3 = next(item for item in finished if item["name"] == "rule_three")
         r4 = next(item for item in finished if item["name"] == "rule_four")
 
-        assert r1.get("parent_id", None) is None
+        # rule_one should have a parent ID that is not emitted because of its low log level
+        r1_parent_id = r1["parent_id"]
+        assert r1_parent_id not in set(item["span_id"] for item in (r1, r2, r3, r4))
+
         assert r2["parent_id"] == r1["span_id"]
         assert r3["parent_id"] == r1["span_id"]
         assert r4["parent_id"] == r2["span_id"]
 
         assert r3["description"] == "Rule number 3"
         assert r4["description"] == "Rule number 4"
+
+    def test_streaming_workunit_log_levels(self):
+        rules = [RootRule(Input), rule_one_function, rule_two, rule_three, rule_four]
+        scheduler = self.mk_scheduler(
+            rules, include_trace_on_error=False, should_report_workunits=True
+        )
+        tracker = self.WorkunitTracker()
+        handler = StreamingWorkunitHandler(
+            scheduler,
+            callbacks=[tracker.add],
+            report_interval_seconds=0.01,
+            max_workunit_verbosity=LogLevel.TRACE,
+        )
+
+        with handler.session():
+            i = Input()
+            scheduler.product_request(Beta, subjects=[i])
+
+        assert tracker.finished
+        finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+
+        # With the max_workunit_verbosity set to TRACE, we should see the workunit corresponding to the Select node.
+        select = next(
+            item
+            for item in finished
+            if item["name"] not in {"rule_one", "rule_two", "rule_three", "rule_four"}
+        )
+        assert select["name"] == "select"

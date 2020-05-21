@@ -48,12 +48,13 @@ use futures::future::FutureExt;
 use futures::future::{self as future03, TryFutureExt};
 use futures01::{future, Future};
 use hashing::{Digest, EMPTY_DIGEST};
-use log::{error, warn, Log};
+use log::{self, error, warn, Log};
 use logging::logger::LOGGER;
-use logging::{Destination, Logger};
+use logging::{Destination, Logger, PythonLogLevel};
 use rule_graph::RuleGraph;
 use std::any::Any;
 use std::borrow::Borrow;
+use std::convert::TryInto;
 use std::ffi::CStr;
 use std::fs::File;
 use std::io;
@@ -590,8 +591,12 @@ fn workunit_to_py_value(workunit: &Workunit) -> Option<Value> {
   Some(externs::store_dict(&dict_entries.as_slice()))
 }
 
-fn workunits_to_py_tuple_value<'a>(workunits: impl Iterator<Item = &'a Workunit>) -> Value {
+fn workunits_to_py_tuple_value<'a>(
+  workunits: impl Iterator<Item = &'a Workunit>,
+  max_log_verbosity: log::Level,
+) -> Value {
   let workunit_values = workunits
+    .filter(|workunit| workunit.metadata.level <= max_log_verbosity)
     .flat_map(|workunit: &Workunit| workunit_to_py_value(workunit))
     .collect::<Vec<_>>();
   externs::store_tuple(&workunit_values)
@@ -601,17 +606,30 @@ fn workunits_to_py_tuple_value<'a>(workunits: impl Iterator<Item = &'a Workunit>
 pub extern "C" fn poll_session_workunits(
   scheduler_ptr: *mut Scheduler,
   session_ptr: *mut Session,
+  max_log_verbosity_level: u64,
 ) -> Handle {
+  let py_level: Result<PythonLogLevel, _> = max_log_verbosity_level.try_into();
+  let max_log_verbosity: log::Level = match py_level {
+    Ok(level) => level.into(),
+    Err(e) => {
+      println!(
+        "Error setting streaming workunit log level: {}. Defaulting to 'Info'.",
+        e
+      );
+      log::Level::Info
+    }
+  };
+
   with_scheduler(scheduler_ptr, |_scheduler| {
     with_session(session_ptr, |session| {
       let value = session
         .workunit_store()
         .with_latest_workunits(|started, completed| {
           let mut started_iter = started.iter();
-          let started = workunits_to_py_tuple_value(&mut started_iter);
+          let started = workunits_to_py_tuple_value(&mut started_iter, max_log_verbosity);
 
           let mut completed_iter = completed.iter();
-          let completed = workunits_to_py_tuple_value(&mut completed_iter);
+          let completed = workunits_to_py_tuple_value(&mut completed_iter, max_log_verbosity);
 
           externs::store_tuple(&[started, completed])
         });
@@ -639,7 +657,7 @@ pub extern "C" fn scheduler_metrics(
       if session.should_record_zipkin_spans() {
         let workunits = session.workunit_store().get_workunits();
         let mut iter = workunits.iter();
-        let value = workunits_to_py_tuple_value(&mut iter);
+        let value = workunits_to_py_tuple_value(&mut iter, log::Level::Info);
         values.push((externs::store_utf8("engine_workunits"), value));
       };
       externs::store_dict(values.as_slice()).into()
