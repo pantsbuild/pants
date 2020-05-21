@@ -484,19 +484,7 @@ async fn server_rejecting_execute_request_gives_error() {
       mock::execution_server::MockExecution::new(
         "wrong-command".to_string(),
         crate::remote::make_execute_request(
-          &Process {
-            argv: owned_string_vec(&["/bin/echo", "-n", "bar"]),
-            env: BTreeMap::new(),
-            working_directory: None,
-            input_files: EMPTY_DIGEST,
-            output_files: BTreeSet::new(),
-            output_directories: BTreeSet::new(),
-            timeout: one_second(),
-            description: "wrong command".to_string(),
-            jdk_home: None,
-            target_platform: PlatformConstraint::None,
-            is_nailgunnable: false,
-          },
+          &Process::new(owned_string_vec(&["/bin/echo", "-n", "bar"])),
           empty_request_metadata(),
         )
         .unwrap()

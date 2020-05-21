@@ -1,14 +1,11 @@
 use crate::{
-  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform,
-  PlatformConstraint, Process, ProcessMetadata,
+  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, Process,
+  ProcessMetadata,
 };
-use hashing::EMPTY_DIGEST;
 use sharded_lmdb::ShardedLmdb;
-use std::collections::{BTreeMap, BTreeSet};
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration;
 use store::Store;
 use tempfile::TempDir;
 use testutil::data::TestData;
@@ -28,6 +25,7 @@ async fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
     store.clone(),
     runtime.clone(),
     work_dir.path().to_owned(),
+    None,
     true,
   );
 
@@ -44,22 +42,11 @@ async fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
     })
     .unwrap();
 
-  let request = Process {
-    argv: vec![
-      testutil::path::find_bash(),
-      format!("{}", script_path.display()),
-    ],
-    env: BTreeMap::new(),
-    working_directory: None,
-    input_files: EMPTY_DIGEST,
-    output_files: vec![PathBuf::from("roland")].into_iter().collect(),
-    output_directories: BTreeSet::new(),
-    timeout: Some(Duration::from_millis(1000)),
-    description: "bash".to_string(),
-    jdk_home: None,
-    target_platform: PlatformConstraint::None,
-    is_nailgunnable: false,
-  };
+  let request = Process::new(vec![
+    testutil::path::find_bash(),
+    format!("{}", script_path.display()),
+  ])
+  .output_files(vec![PathBuf::from("roland")].into_iter().collect());
 
   let local_result = local.run(request.clone().into(), Context::default()).await;
 

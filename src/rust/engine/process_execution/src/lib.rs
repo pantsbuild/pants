@@ -245,23 +245,49 @@ impl Process {
   /// be used to set values.
   ///
   /// We use the more ergonomic (but possibly slightly slower) "move self for each builder method"
-  /// pattern, so production usage should probably prefer to construct the Process struct wholesale.
+  /// pattern, so this method is only enabled for test usage: production usage should construct the
+  /// Process struct wholesale. We can reconsider this if we end up with more production callsites
+  /// that require partial options.
   ///
-  fn new(argv: Vec<String>) -> Process {
+  #[cfg(test)]
+  pub fn new(argv: Vec<String>) -> Process {
     Process {
       argv,
       env: BTreeMap::new(),
       working_directory: None,
-      input_files: EMPTY_DIGEST,
+      input_files: hashing::EMPTY_DIGEST,
       output_files: BTreeSet::new(),
       output_directories: BTreeSet::new(),
       timeout: None,
       description: "".to_string(),
-      append_only_caches: BTreeSet::new(),
       jdk_home: None,
       target_platform: PlatformConstraint::None,
       is_nailgunnable: false,
     }
+  }
+
+  ///
+  /// Replaces the environment for this process.
+  ///
+  pub fn env(mut self, env: BTreeMap<String, String>) -> Process {
+    self.env = env;
+    self
+  }
+
+  ///
+  /// Replaces the output files for this process.
+  ///
+  pub fn output_files(mut self, output_files: BTreeSet<PathBuf>) -> Process {
+    self.output_files = output_files;
+    self
+  }
+
+  ///
+  /// Replaces the output directories for this process.
+  ///
+  pub fn output_directories(mut self, output_directories: BTreeSet<PathBuf>) -> Process {
+    self.output_directories = output_directories;
+    self
   }
 }
 
