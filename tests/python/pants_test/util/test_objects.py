@@ -75,7 +75,7 @@ def test_get_docstring() -> None:
 
     assert get_docstring_summary(MultilineSummaryWithDetails) == long_summary
     assert get_docstring(MultilineSummaryWithDetails) == dedent(
-        f"""\
+        """\
         This is all one sentence, it's just really really really long so it stretches to a whole
         new line.
 

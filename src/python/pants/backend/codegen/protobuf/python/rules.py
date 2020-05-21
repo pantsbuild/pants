@@ -35,7 +35,7 @@ async def generate_python_from_protobuf(
     # TODO(#9650): replace this with a proper intrinsic to create empty directories.
     create_output_dir_request = Get[ProcessResult](
         Process(
-            (f"/bin/mkdir", output_dir),
+            ("/bin/mkdir", output_dir),
             description=f"Create the directory {output_dir}",
             output_directories=(output_dir,),
         )

@@ -363,7 +363,7 @@ class SchedulerWithNestedRaiseTest(TestBase):
         assert_equal_with_printing(
             self,
             dedent(
-                f"""\
+                """\
                  1 Exception encountered:
 
                  Engine traceback:
@@ -374,7 +374,7 @@ class SchedulerWithNestedRaiseTest(TestBase):
                    File LOCATION-INFO, in nested_raise
                      fn_raises(x)
                    File LOCATION-INFO, in fn_raises
-                     raise Exception(f"An exception for {{type(x).__name__}}")
+                     raise Exception(f"An exception for {type(x).__name__}")
                  Exception: An exception for B
                  """
             ),

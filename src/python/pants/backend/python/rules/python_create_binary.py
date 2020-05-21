@@ -56,7 +56,7 @@ class PythonBinaryFieldSet(BinaryFieldSet):
         if self.shebang.value is not None:
             args.append(f"--python-shebang={self.shebang.value}")
         if self.zip_safe.value is False:
-            args.append(f"--not-zip-safe")
+            args.append("--not-zip-safe")
         return tuple(args)
 
 

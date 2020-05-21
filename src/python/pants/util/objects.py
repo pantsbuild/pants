@@ -79,7 +79,7 @@ def get_docstring(
 def pretty_print_type_hint(hint: Any) -> str:
     if getattr(hint, "__origin__", None) == Union:
         union_members = hint.__args__
-        hint_str = f" | ".join(pretty_print_type_hint(member) for member in union_members)
+        hint_str = " | ".join(pretty_print_type_hint(member) for member in union_members)
     # NB: Checking for GenericMeta is only for Python 3.6 because some `typing` classes like
     # `typing.Iterable` have its type, whereas Python 3.7+ removes it. Remove this check
     # once we drop support for Python 3.6.

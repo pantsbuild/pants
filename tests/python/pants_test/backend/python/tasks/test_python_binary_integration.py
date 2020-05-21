@@ -223,7 +223,7 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
                     f"--pants-distdir={tmp_distdir}",
                     # tensorflow==1.14.0 has a setuptools>=41.0.0 requirement, so the .ipex resolve fails
                     # without this override.
-                    f"--pex-builder-wrapper-setuptools-version=41.0.0",
+                    "--pex-builder-wrapper-setuptools-version=41.0.0",
                     "--binary-py-generate-ipex",
                     "binary",
                     "examples/src/python/example/tensorflow_custom_op:show-tf-version",

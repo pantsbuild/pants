@@ -64,7 +64,7 @@ class IsortIntegrationTest(ExternalToolTestBase):
         if passthrough_args:
             args.append(f"--isort-args='{passthrough_args}'")
         if skip:
-            args.append(f"--isort-skip")
+            args.append("--isort-skip")
         options_bootstrapper = create_options_bootstrapper(args=args)
         field_sets = [IsortFieldSet.create(tgt) for tgt in targets]
         lint_result = self.request_single_product(

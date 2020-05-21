@@ -99,7 +99,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
         if passthrough_args:
             args.append(f"--pylint-args='{passthrough_args}'")
         if skip:
-            args.append(f"--pylint-skip")
+            args.append("--pylint-skip")
         if additional_args:
             args.extend(additional_args)
         return self.request_single_product(
