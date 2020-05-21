@@ -123,8 +123,10 @@ def native_engine_so_in_s3_cache(*, aws_bucket: str, native_engine_so_aws_key: s
     ).stdout.decode()
     if not ls_output:
         return False
-    num_versions = len(json.loads(ls_output)["Versions"])
-    if num_versions > 1:
+    versions = json.loads(ls_output).get("Versions")
+    if versions is None:
+        return False
+    if len(versions) > 1:
         die(
             f"Multiple copies found of {native_engine_so_aws_key} in AWS S3. This is not allowed "
             "as a security precaution. Please raise this failure in the #infra channel "
