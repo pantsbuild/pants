@@ -10,7 +10,7 @@ import pytest
 from typing_extensions import final
 
 from pants.base.specs import FilesystemLiteralSpec
-from pants.engine.addresses import Address
+from pants.engine.addresses import Address, Addresses
 from pants.engine.fs import EMPTY_DIGEST, FileContent, InputFilesContent, PathGlobs, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import RootRule, rule
@@ -20,6 +20,8 @@ from pants.engine.target import (
     AmbiguousImplementationsException,
     AsyncField,
     BoolField,
+    Dependencies,
+    DependenciesRequest,
     DictStringToStringField,
     DictStringToStringSequenceField,
     FieldSet,
@@ -1032,3 +1034,26 @@ class TestCodegen(TestBase):
         assert "IrrelevantSources" not in str(exc)
         assert "* FortranGenerator1 -> FortranSources" in str(exc)
         assert "* SmalltalkGenerator -> SmalltalkSources" in str(exc)
+
+
+# -----------------------------------------------------------------------------------------------
+# Test Dependencies
+# -----------------------------------------------------------------------------------------------
+
+
+class TestDependencies(TestBase):
+    @classmethod
+    def rules(cls):
+        return (*super().rules(), RootRule(DependenciesRequest))
+
+    def test_normal_resolution(self) -> None:
+        addr = Address.parse("src/fortran:lib")
+        deps = Addresses([Address.parse("//:dep1"), Address.parse("//:dep2")])
+        deps_field = Dependencies(deps, address=addr)
+        assert self.request_single_product(Addresses, DependenciesRequest(deps_field)) == deps
+
+        # Also test that we handle no dependencies.
+        empty_deps_field = Dependencies(deps, address=addr)
+        assert self.request_single_product(
+            Addresses, DependenciesRequest(empty_deps_field)
+        ) == Addresses([])
