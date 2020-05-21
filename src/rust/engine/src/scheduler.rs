@@ -44,7 +44,7 @@ struct InnerSession {
   // times if they were polled.
   roots: Mutex<HashMap<Root, Option<LastObserved>>>,
   // If enabled, the display that will render the progress of the V2 engine. This is only
-  // Some(_) if the --v2-ui option is enabled.
+  // Some(_) if the --dynamic-ui option is enabled.
   display: Option<Mutex<ConsoleUI>>,
   // If enabled, Zipkin spans for v2 engine will be collected.
   should_record_zipkin_spans: bool,

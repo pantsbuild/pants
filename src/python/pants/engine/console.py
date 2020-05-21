@@ -55,7 +55,7 @@ class Console:
         the system stdout/stderr. If they are not defined, the effective stdout/stderr are proxied
         to Rust engine intrinsic code if there is a scheduler session provided, or just written to
         the standard Python-provided stdout/stderr if it is None. A scheduler session is provided if
-        --v2-ui is set.
+        --dynamic-ui is set.
         """
 
         has_scheduler = session is not None
