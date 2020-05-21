@@ -13,7 +13,7 @@ from pants.base.project_tree import Dir
 from pants.base.specs import AddressSpecs, SiblingAddresses, SingleAddress
 from pants.engine.addresses import Address, Addresses
 from pants.engine.fs import Digest, FileContent, FilesContent, PathGlobs, Snapshot, create_fs_rules
-from pants.engine.internals.addressable import addressable, addressable_dict
+from pants.engine.internals.addressable import addressable
 from pants.engine.internals.build_files import (
     ResolvedTypeMismatchError,
     addresses_with_origins_from_address_families,
@@ -197,17 +197,12 @@ class ApacheThriftConfiguration(StructWithDeps):
 class PublishConfiguration(Struct):
     # An example of addressable and addressable_mapping field wrappers.
 
-    def __init__(self, default_repo, repos, name=None, **kwargs):
+    def __init__(self, default_repo, name=None, **kwargs):
         super().__init__(name=name, **kwargs)
         self.default_repo = default_repo
-        self.repos = repos
 
     @addressable(Exactly(Struct))
     def default_repo(self):
-        """"""
-
-    @addressable_dict(Exactly(Struct))
-    def repos(self):
         """"""
 
 
@@ -286,16 +281,7 @@ class InlinedGraphTest(GraphTestBase):
         expected_java1 = Target(
             address=address("java1"),
             configurations=[
-                PublishConfiguration(
-                    type_alias="PublishConfig",
-                    default_repo=public,
-                    repos={
-                        "jake": Struct(
-                            type_alias="Struct", url="https://dl.bintray.com/pantsbuild/maven"
-                        ),
-                        "jane": public,
-                    },
-                ),
+                PublishConfiguration(type_alias="PublishConfig", default_repo=public),
                 nonstrict,
                 ApacheThriftConfiguration(
                     type_alias="ApacheThriftConfig",

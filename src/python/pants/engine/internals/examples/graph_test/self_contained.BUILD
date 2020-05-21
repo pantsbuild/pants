@@ -21,12 +21,6 @@ Target(
   configurations=[
     PublishConfig(
       default_repo=':public',
-      repos={
-        'jake': Struct(
-          url='https://dl.bintray.com/pantsbuild/maven'
-        ),
-        'jane': ':public'
-      }
     )
   ]
 )
