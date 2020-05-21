@@ -27,7 +27,7 @@ from typing_extensions import final
 from pants.base.specs import OriginSpec
 from pants.build_graph.app_base import Bundle
 from pants.engine.addresses import Address, Addresses, assert_single_address
-from pants.engine.collection import Collection
+from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.fs import (
     EMPTY_SNAPSHOT,
     GlobExpansionConjunction,
@@ -37,7 +37,7 @@ from pants.engine.fs import (
 )
 from pants.engine.legacy.structs import BundleAdaptor
 from pants.engine.rules import RootRule, rule
-from pants.engine.selectors import Get
+from pants.engine.selectors import Get, MultiGet
 from pants.engine.unions import UnionMembership, union
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper, Filespec
 from pants.util.collections import ensure_list, ensure_str_list
@@ -1570,9 +1570,65 @@ class DependenciesRequest:
     field: Dependencies
 
 
+@union
+@dataclass(frozen=True)
+class InjectDependenciesRequest(ABC):
+    """A request to inject dependencies, in addition to those explicitly provided.
+
+    To set up a new injection, subclass this class. Set the class property `inject_for` to the
+    type of `Dependencies` field you want to inject for, such as `FortranDependencies`. This will
+    cause the class, and any subclass, to have the injection. Register this subclass with
+    `UnionRule(InjectDependenciesRequest, InjectFortranDependencies)`, for example.
+
+    Then, create a rule that takes the subclass as a parameter and returns `InjectedDependencies`.
+
+    For example:
+
+        class FortranDependencies(Dependencies):
+            pass
+
+        class InjectFortranDependencies(InjectDependenciesRequest):
+            inject_for = FortranDependencies
+
+        @rule
+        def inject_fortran_dependencies(request: InjectFortranDependencies) -> InjectedDependencies:
+            return InjectedDependencies([Address.parse("//:injected")]
+
+        def rules():
+            return [
+                inject_fortran_dependencies,
+                UnionRule(InjectDependenciesRequest, InjectFortranDependencies),
+            ]
+    """
+
+    field: Dependencies
+    inject_for: ClassVar[Type[Dependencies]]
+
+
+class InjectedDependencies(DeduplicatedCollection[Address]):
+    sort_input = True
+
+
 @rule
-def resolve_dependencies(request: DependenciesRequest) -> Addresses:
-    return Addresses(request.field.sanitized_raw_value or ())
+async def resolve_dependencies(
+    request: DependenciesRequest, union_membership: UnionMembership
+) -> Addresses:
+    provided = request.field.sanitized_raw_value or ()
+
+    # Inject any dependencies. This is determined by the `request.field` class. For example, if
+    # there is a rule to inject for FortranDependencies, then FortranDependencies and any subclass
+    # of FortranDependencies will use that rule.
+    inject_request_types = cast(
+        Iterable[Type[InjectDependenciesRequest]],
+        union_membership.union_rules.get(InjectDependenciesRequest, ()),
+    )
+    injected = await MultiGet(
+        Get[InjectedDependencies](InjectDependenciesRequest, inject_request_type(request.field))
+        for inject_request_type in inject_request_types
+        if isinstance(request.field, inject_request_type.inject_for)
+    )
+
+    return Addresses(sorted([*provided, *itertools.chain.from_iterable(injected)]))
 
 
 # -----------------------------------------------------------------------------------------------
@@ -1687,4 +1743,5 @@ def rules():
         RootRule(TargetsToValidFieldSetsRequest),
         RootRule(HydrateSourcesRequest),
         RootRule(DependenciesRequest),
+        RootRule(InjectDependenciesRequest),
     ]
