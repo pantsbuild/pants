@@ -1053,7 +1053,7 @@ class TestDependencies(TestBase):
         assert self.request_single_product(Addresses, DependenciesRequest(deps_field)) == deps
 
         # Also test that we handle no dependencies.
-        empty_deps_field = Dependencies(deps, address=addr)
+        empty_deps_field = Dependencies(None, address=addr)
         assert self.request_single_product(
             Addresses, DependenciesRequest(empty_deps_field)
         ) == Addresses([])
