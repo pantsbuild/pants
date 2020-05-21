@@ -22,14 +22,7 @@
   "configurations": [
     {
       "type_alias": "PublishConfig",
-      "default_repo": ":public",
-      "repos": {
-        "jake": {
-          "type_alias": "Struct",
-          "url": "https://dl.bintray.com/pantsbuild/maven"
-        },
-        "jane": ":public"
-      }
+      "default_repo": ":public"
     },
     # TODO(John Sirois): Just use 1 config - this mixed embedded and referenced items just show
     # off / prove the capabilities of the new BUILD graph parser.

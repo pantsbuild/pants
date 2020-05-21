@@ -7,7 +7,6 @@ from pants.engine.internals.addressable import (
     MutationError,
     NotSerializableError,
     addressable,
-    addressable_dict,
     addressable_sequence,
 )
 from pants.engine.internals.objects import Resolvable, Serializable
@@ -184,87 +183,3 @@ class AddressableListTest(unittest.TestCase):
         series = self.Series([42])
         with self.assertRaises(MutationError):
             series.values = [37]
-
-
-class AddressableDictTest(unittest.TestCase):
-    class Varz(SimpleSerializable):
-        def __init__(self, varz):
-            super(AddressableDictTest.Varz, self).__init__()
-            self.varz = varz
-
-        @addressable_dict(Exactly(int, float))
-        def varz(self):
-            """Return a snapshot of the current /varz.
-
-            :rtype dict of string -> int or float
-            """
-
-    def test_none(self):
-        varz = self.Varz(None)
-
-        self.assertEqual({}, varz.varz)
-
-    def test_values(self):
-        varz = self.Varz({"meaning of life": 42, "fine structure constant": 1 / 137.0})
-
-        self.assertEqual({"meaning of life": 42, "fine structure constant": 1 / 137.0}, varz.varz)
-
-    def test_addresses(self):
-        varz = self.Varz({"meaning of life": "//:meaning-of-life"})
-
-        self.assertEqual({"meaning of life": "//:meaning-of-life"}, varz.varz)
-
-    def test_resolvables(self):
-        resolvable_value = CountingResolvable("//:fine-structure-constant", 1 / 137.0)
-        varz = self.Varz({"fine structure constant": resolvable_value})
-
-        self.assertEqual({"fine structure constant": 1 / 137.0}, varz.varz)
-        self.assertEqual(1, resolvable_value.resolutions)
-
-        self.assertEqual(1 / 137.0, varz.varz["fine structure constant"])
-        self.assertEqual(2, resolvable_value.resolutions)
-
-    def test_mixed(self):
-        resolvable_value = CountingResolvable("//:fine-structure-constant", 1 / 137.0)
-        varz = self.Varz(
-            {
-                "prime": 37,
-                "meaning of life": "//:meaning-of-life",
-                "fine structure constant": resolvable_value,
-            }
-        )
-
-        self.assertEqual(0, resolvable_value.resolutions)
-
-        self.assertEqual(
-            {
-                "prime": 37,
-                "meaning of life": "//:meaning-of-life",
-                "fine structure constant": 1 / 137.0,
-            },
-            varz.varz,
-        )
-        self.assertEqual(1, resolvable_value.resolutions)
-
-        self.assertEqual(1 / 137.0, varz.varz["fine structure constant"])
-        self.assertEqual(2, resolvable_value.resolutions)
-
-    def test_type_mismatch_container(self):
-        with self.assertRaises(TypeError):
-            self.Varz([42, 1 / 137.0])
-
-    def test_type_mismatch_value(self):
-        with self.assertRaises(TypeConstraintError):
-            self.Varz({"meaning of life": 42, "fine structure constant": False})
-
-    def test_type_mismatch_resolvable(self):
-        resolvable_item = CountingResolvable("//:fine-structure-constant", True)
-        varz = self.Varz({"meaning of life": 42, "fine structure constant": resolvable_item})
-
-        with self.assertRaises(TypeConstraintError):
-            varz.varz
-
-    def test_single_assignment(self):
-        varz = self.Varz({"meaning of life": 42})
-        with self.assertRaises(MutationError):
-            varz.varz = {"fine structure constant": 1 / 137.0}

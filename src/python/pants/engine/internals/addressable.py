@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import inspect
-from collections.abc import Mapping
 from functools import update_wrapper
 from typing import Any, Set, Tuple, Type
 
@@ -273,40 +272,3 @@ def addressable_sequence(type_constraint):
     :type type_constraint: :class:`TypeConstraint`
     """
     return _addressable_wrapper(AddressableSequence, type_constraint)
-
-
-class AddressableDict(AddressableDescriptor):
-    def _checked_value(self, instance, value):
-        if value is None:
-            return None
-
-        if not isinstance(value, Mapping):
-            raise TypeError(
-                "The {} property of {} must be a dict, given {} of type {}".format(
-                    self._name, instance, value, type(value).__name__
-                )
-            )
-        return {
-            k: super(AddressableDict, self)._checked_value(instance, v) for k, v in value.items()
-        }
-
-    def _resolve_value(self, instance, value):
-        return (
-            {k: super(AddressableDict, self)._resolve_value(instance, v) for k, v in value.items()}
-            if value
-            else {}
-        )
-
-
-def addressable_dict(type_constraint):
-    """Marks a dicts's values as satisfying a given type constraint.
-
-    Some (or all) values in the dict may be :class:`pants.engine.objects.Resolvable` values to
-    resolve later.
-
-    See :class:`AddressableDescriptor` for more details.
-
-    :param type_constraint: The type constraint the dict's values must all satisfy.
-    :type type_constraint: :class:`TypeConstraint`
-    """
-    return _addressable_wrapper(AddressableDict, type_constraint)
