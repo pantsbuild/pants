@@ -17,6 +17,7 @@ from pants.init.plugin_resolver import PluginResolver
 from pants.option.global_options import GlobalOptions
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import fast_relpath_optional
+from pants.util.ordered_set import OrderedSet
 
 logger = logging.getLogger(__name__)
 
@@ -134,13 +135,15 @@ class OptionsInitializer:
         Combines --pythonpath and --pants-config-files files that are in {buildroot} dir with those
         invalidation_globs provided by users.
         """
-        invalidation_globs = set()
-        globs = set(
-            sys.path
-            + bootstrap_options.pythonpath
-            + bootstrap_options.pants_config_files
-            + bootstrap_options.pantsd_invalidation_globs
-        )
+        invalidation_globs = OrderedSet()
+        globs = [
+            *sys.path,
+            *bootstrap_options.pythonpath,
+            *bootstrap_options.pants_config_files,
+            "!*.pyc",
+            "!__pycache__/",
+            *bootstrap_options.pantsd_invalidation_globs,
+        ]
 
         for glob in globs:
             if glob.startswith("!"):
@@ -155,7 +158,7 @@ class OptionsInitializer:
                     f"Changes to {glob}, outside of the buildroot, will not be invalidated."
                 )
 
-        return list(sorted(invalidation_globs))
+        return list(invalidation_globs)
 
     @classmethod
     def create(cls, options_bootstrapper, build_configuration, init_subsystems=True):
