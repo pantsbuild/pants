@@ -62,14 +62,12 @@ pub enum WorkunitState {
 pub struct WorkunitMetadata {
   pub desc: Option<String>,
   pub level: Level,
-  pub display: bool,
   pub blocked: bool,
 }
 
 impl WorkunitMetadata {
   pub fn new() -> WorkunitMetadata {
     WorkunitMetadata {
-      display: true,
       level: Level::Info,
       desc: None,
       blocked: false,
@@ -91,13 +89,6 @@ pub struct WorkUnitInnerStore {
   completed_ids: Vec<SpanId>,
   last_seen_started_idx: usize,
   last_seen_completed_idx: usize,
-}
-
-fn should_display_workunit(workunit_records: &HashMap<SpanId, Workunit>, id: &str) -> bool {
-  match workunit_records.get(id) {
-    None => false,
-    Some(record) => record.metadata.display,
-  }
 }
 
 impl WorkunitStore {
@@ -268,44 +259,15 @@ impl WorkunitStore {
     let inner_store: &mut WorkUnitInnerStore = &mut *inner_guard;
     let workunit_records = &inner_store.workunit_records;
 
-    let compute_should_display = |workunit: Workunit| -> Workunit {
-      let mut parent_id: Option<SpanId> = workunit.parent_id;
-      loop {
-        if let Some(current_parent_id) = parent_id {
-          if should_display_workunit(workunit_records, &current_parent_id) {
-            return Workunit {
-              parent_id: Some(current_parent_id),
-              ..workunit
-            };
-          } else {
-            let new_parent_id: Option<SpanId> = workunit_records
-              .get(&current_parent_id.clone())
-              .and_then(|workunit| match &workunit.parent_id {
-                Some(id) => Some(id.clone()),
-                None => None,
-              });
-            parent_id = new_parent_id;
-          }
-        } else {
-          return Workunit {
-            parent_id: None,
-            ..workunit
-          };
-        }
-      }
-    };
-
     let cur_len = inner_store.started_ids.len();
     let latest: usize = inner_store.last_seen_started_idx;
     let started_workunits: Vec<Workunit> = inner_store.started_ids[latest..cur_len]
       .iter()
       .flat_map(|id| workunit_records.get(id))
       .flat_map(|workunit| match workunit.state {
-        WorkunitState::Started { .. } if workunit.metadata.display => Some(workunit.clone()),
-        WorkunitState::Started { .. } => None,
+        WorkunitState::Started { .. } => Some(workunit.clone()),
         WorkunitState::Completed { .. } => None,
       })
-      .map(compute_should_display)
       .collect();
     inner_store.last_seen_started_idx = cur_len;
 
@@ -316,11 +278,9 @@ impl WorkunitStore {
       .iter()
       .flat_map(|id| workunit_records.get(id))
       .flat_map(|workunit| match workunit.state {
-        WorkunitState::Completed { .. } if workunit.metadata.display => Some(workunit.clone()),
-        WorkunitState::Completed { .. } => None,
+        WorkunitState::Completed { .. } => Some(workunit.clone()),
         WorkunitState::Started { .. } => None,
       })
-      .map(compute_should_display)
       .collect();
     inner_store.last_seen_completed_idx = cur_len;
 

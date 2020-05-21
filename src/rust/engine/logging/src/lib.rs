@@ -56,7 +56,7 @@ use num_enum::TryFromPrimitive;
 // This is a hard-coding of constants in the standard logging python package.
 #[derive(Debug, Eq, PartialEq, TryFromPrimitive, Clone, Copy)]
 #[repr(u64)]
-enum PythonLogLevel {
+pub enum PythonLogLevel {
   NotSet = 0,
   // Trace doesn't exist in a Python world, so set it to "a bit lower than Debug".
   Trace = 5,
