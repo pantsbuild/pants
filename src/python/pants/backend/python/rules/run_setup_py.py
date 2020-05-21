@@ -66,7 +66,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership
 from pants.option.custom_types import shell_str
 from pants.python.python_setup import PythonSetup
-from pants.source.source_root import SourceRootConfig
+from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)
@@ -460,9 +460,7 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
 
 
 @rule
-async def get_sources(
-    request: SetupPySourcesRequest, source_root_config: SourceRootConfig
-) -> SetupPySources:
+async def get_sources(request: SetupPySourcesRequest) -> SetupPySources:
     targets = request.targets
     stripped_srcs_list = await MultiGet(
         Get[SourceRootStrippedSources](
@@ -494,7 +492,6 @@ async def get_sources(
     init_py_contents = await Get[FilesContent](Digest, init_pys_snapshot.digest)
 
     packages, namespace_packages, package_data = find_packages(
-        source_roots=source_root_config.get_source_roots(),
         tgts_and_stripped_srcs=list(zip(targets, stripped_srcs_list)),
         init_py_contents=init_py_contents,
         py2=request.py2,
@@ -508,14 +505,11 @@ async def get_sources(
 
 
 @rule
-async def get_ancestor_init_py(
-    targets: Targets, source_root_config: SourceRootConfig
-) -> AncestorInitPyFiles:
+async def get_ancestor_init_py(targets: Targets) -> AncestorInitPyFiles:
     """Find any ancestor __init__.py files for the given targets.
 
     Includes sibling __init__.py files. Returns the files stripped of their source roots.
     """
-    source_roots = source_root_config.get_source_roots()
     sources = await Get[SourceFiles](
         AllSourceFilesRequest(
             (tgt.get(Sources) for tgt in targets),
@@ -525,9 +519,11 @@ async def get_ancestor_init_py(
     )
     # Find the ancestors of all dirs containing .py files, including those dirs themselves.
     source_dir_ancestors: Set[Tuple[str, str]] = set()  # Items are (src_root, path incl. src_root).
-    for fp in sources.snapshot.files:
-        source_dir_ancestor = os.path.dirname(fp)
-        source_root = source_roots.strict_find_by_path(fp).path
+    source_roots = await MultiGet(
+        Get[SourceRoot](SourceRootRequest(path)) for path in sources.snapshot.files
+    )
+    for path, source_root in zip(sources.snapshot.files, source_roots):
+        source_dir_ancestor = os.path.dirname(path)
         # Do not allow the repository root to leak (i.e., '.' should not be a package in setup.py).
         while source_dir_ancestor != source_root:
             source_dir_ancestors.add((source_root, source_dir_ancestor))

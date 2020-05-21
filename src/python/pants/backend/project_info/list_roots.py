@@ -7,8 +7,14 @@ from pants.engine.console import Console
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import SubsystemRule, goal_rule, rule
-from pants.engine.selectors import Get
-from pants.source.source_root import AllSourceRoots, SourceRoot, SourceRootConfig
+from pants.engine.selectors import Get, MultiGet
+from pants.source.source_root import (
+    AllSourceRoots,
+    SourceRootConfig,
+    SourceRootRequest,
+    SourceRootResponse,
+)
+from pants.source.source_root import rules as source_root_rules
 
 
 class RootsOptions(LineOriented, GoalSubsystem):
@@ -23,7 +29,6 @@ class Roots(Goal):
 
 @rule
 async def all_roots(source_root_config: SourceRootConfig) -> AllSourceRoots:
-
     source_roots = source_root_config.get_source_roots()
 
     all_paths: Set[str] = set()
@@ -43,17 +48,14 @@ async def all_roots(source_root_config: SourceRootConfig) -> AllSourceRoots:
 
     snapshot = await Get[Snapshot](PathGlobs(globs=sorted(all_paths)))
 
-    all_source_roots: Set[SourceRoot] = set()
-
     # The globs above can match on subdirectories of the source roots.
     # For instance, `src/*/` might match 'src/rust/' as well as
     # 'src/rust/engine/process_execution/bazel_protos/src/gen'.
     # So we use find_by_path to verify every candidate source root.
-    for directory in snapshot.dirs:
-        match: SourceRoot = source_roots.find_by_path(directory)
-        if match:
-            all_source_roots.add(match)
-
+    responses = await MultiGet(Get[SourceRootResponse](SourceRootRequest(d)) for d in snapshot.dirs)
+    all_source_roots = {
+        response.source_root for response in responses if response.source_root is not None
+    }
     return AllSourceRoots(all_source_roots)
 
 
@@ -66,4 +68,4 @@ async def list_roots(console: Console, options: RootsOptions, asr: AllSourceRoot
 
 
 def rules():
-    return [all_roots, list_roots, SubsystemRule(SourceRootConfig)]
+    return [*source_root_rules(), all_roots, list_roots, SubsystemRule(SourceRootConfig)]

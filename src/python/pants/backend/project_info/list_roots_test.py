@@ -5,7 +5,12 @@ import json
 
 from pants.backend.project_info import list_roots
 from pants.engine.fs import Digest, PathGlobs, Snapshot
-from pants.source.source_root import SourceRoot, SourceRootConfig
+from pants.source.source_root import (
+    SourceRoot,
+    SourceRootConfig,
+    SourceRootRequest,
+    SourceRootResponse,
+)
 from pants.testutil.engine.util import MockGet, run_rule
 from pants.testutil.goal_rule_test_base import GoalRuleTestBase
 from pants.testutil.test_base import TestBase
@@ -53,10 +58,20 @@ class AllRootsTest(TestBase):
             )
             return Snapshot(Digest("abcdef", 10), (), dirs)
 
+        def source_root(req: SourceRootRequest) -> SourceRootResponse:
+            return SourceRootResponse(source_roots.find_by_path(req.path))
+
         output = run_rule(
             list_roots.all_roots,
             rule_args=[source_root_config],
-            mock_gets=[MockGet(product_type=Snapshot, subject_type=PathGlobs, mock=provider_rule)],
+            mock_gets=[
+                MockGet(product_type=Snapshot, subject_type=PathGlobs, mock=provider_rule),
+                MockGet(
+                    product_type=SourceRootResponse,
+                    subject_type=SourceRootRequest,
+                    mock=source_root,
+                ),
+            ],
         )
 
         self.assertEqual(
@@ -87,16 +102,27 @@ class AllRootsTest(TestBase):
         )
 
         source_root_config = SourceRootConfig.global_instance()
+        source_roots = source_root_config.get_source_roots()
 
         # This function mocks out reading real directories off the file system
         def provider_rule(path_globs: PathGlobs) -> Snapshot:
             dirs = ("foo",)  # A python package at the buildroot.
             return Snapshot(Digest("abcdef", 10), (), dirs)
 
+        def source_root(req: SourceRootRequest) -> SourceRootResponse:
+            return SourceRootResponse(source_roots.find_by_path(req.path))
+
         output = run_rule(
             list_roots.all_roots,
             rule_args=[source_root_config],
-            mock_gets=[MockGet(product_type=Snapshot, subject_type=PathGlobs, mock=provider_rule)],
+            mock_gets=[
+                MockGet(product_type=Snapshot, subject_type=PathGlobs, mock=provider_rule),
+                MockGet(
+                    product_type=SourceRootResponse,
+                    subject_type=SourceRootRequest,
+                    mock=source_root,
+                ),
+            ],
         )
 
         self.assertEqual({SourceRoot("")}, set(output))
@@ -107,7 +133,7 @@ class RootsTest(GoalRuleTestBase):
 
     @classmethod
     def rules(cls):
-        return super().rules() + list_roots.rules()
+        return [*super().rules(), *list_roots.rules()]
 
     # Delete these *_deprecated tests in 1.30.0.dev0.
     def test_no_langs_deprecated(self):

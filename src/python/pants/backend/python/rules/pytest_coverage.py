@@ -8,7 +8,7 @@ from enum import Enum
 from io import StringIO
 from pathlib import PurePath
 from textwrap import dedent
-from typing import Optional, Tuple
+from typing import Optional
 
 import pkg_resources
 
@@ -30,6 +30,7 @@ from pants.core.goals.test import (
     FilesystemCoverageReport,
 )
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
+from pants.core.util_rules.strip_source_roots import SourceRootStrippedSources, StripSnapshotRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import (
     AddPrefix,
@@ -139,29 +140,24 @@ class CoverageConfig:
 
 
 @rule
-async def create_coverage_config(
-    coverage_config_request: CoverageConfigRequest, source_root_config: SourceRootConfig
-) -> CoverageConfig:
+async def create_coverage_config(coverage_config_request: CoverageConfigRequest) -> CoverageConfig:
     sources = await Get[SourceFiles](
         AllSourceFilesRequest((tgt.get(Sources) for tgt in coverage_config_request.targets))
     )
     init_injected = await Get[InitInjectedSnapshot](InjectInitRequest(sources.snapshot))
-    source_roots = source_root_config.get_source_roots()
+
+    source_root_stripped_sources = await Get[SourceRootStrippedSources](
+        StripSnapshotRequest(snapshot=init_injected.snapshot)
+    )
 
     # Generate a map from source root stripped source to its source root. eg:
     #  {'pants/testutil/subsystem/util.py': 'src/python'}. This is so that coverage reports
     #  referencing /chroot/path/pants/testutil/subsystem/util.py can be mapped back to the actual
     #  sources they reference when generating coverage reports.
-    def stripped_file_with_source_root(file_name: str) -> Tuple[str, str]:
-        source_root_object = source_roots.find_by_path(file_name)
-        source_root = source_root_object.path if source_root_object is not None else ""
-        stripped_path = file_name[len(source_root) + 1 :]
-        return stripped_path, source_root
-
-    stripped_files_to_source_roots = dict(
-        stripped_file_with_source_root(filename)
-        for filename in sorted(init_injected.snapshot.files)
-    )
+    stripped_files_to_source_roots = {}
+    for source_root, files in source_root_stripped_sources.root_to_relfiles.items():
+        for file in files:
+            stripped_files_to_source_roots[file] = source_root
 
     default_config = dedent(
         """
