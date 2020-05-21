@@ -47,7 +47,7 @@ class Binary(Goal):
 async def create_binary(workspace: Workspace, dist_dir: DistDir, build_root: BuildRoot) -> Binary:
     targets_to_valid_field_sets = await Get[TargetsToValidFieldSets](
         TargetsToValidFieldSetsRequest(
-            BinaryFieldSet, goal_description=f"the `binary` goal", error_if_no_valid_targets=True
+            BinaryFieldSet, goal_description="the `binary` goal", error_if_no_valid_targets=True
         )
     )
     binaries = await MultiGet(

@@ -248,7 +248,7 @@ def rule_decorator(*args, **kwargs) -> Callable:
         annotations = DEFAULT_RULE_ANNOTATIONS
         if any(x is not None for x in (canonical_name, desc)):
             raise UnrecognizedRuleArgument(
-                f"@rules that are not @named_rules or @goal_rules do not accept keyword arguments"
+                "@rules that are not @named_rules or @goal_rules do not accept keyword arguments"
             )
 
     if (
