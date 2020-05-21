@@ -34,7 +34,7 @@ use rule_graph;
 
 use graph::{Entry, Node, NodeError, NodeVisualizer};
 use store::{self, StoreFileByDigest};
-use workunit_store::{new_span_id, scope_task_workunit_state, WorkunitMetadata};
+use workunit_store::{new_span_id, scope_task_workunit_state, Level, WorkunitMetadata};
 
 pub type NodeFuture<T> = BoxFuture<T, Failure>;
 
@@ -1029,6 +1029,7 @@ impl Node for NodeKey {
       let parent_id = std::mem::replace(&mut workunit_state.parent_id, Some(span_id.clone()));
       let metadata = WorkunitMetadata {
         desc: user_facing_name.clone(),
+        level: Level::Info,
         display,
         blocked: false,
       };

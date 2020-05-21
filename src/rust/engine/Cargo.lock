@@ -3873,6 +3873,7 @@ name = "workunit_store"
 version = "0.0.1"
 dependencies = [
  "concrete_time 0.0.1",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "parking_lot 0.6.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "petgraph 0.4.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",

@@ -26,6 +26,7 @@
 #![allow(clippy::mutex_atomic)]
 
 use concrete_time::TimeSpan;
+pub use log::Level;
 use parking_lot::Mutex;
 use petgraph::graph::{DiGraph, NodeIndex};
 use rand::thread_rng;
@@ -60,6 +61,7 @@ pub enum WorkunitState {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct WorkunitMetadata {
   pub desc: Option<String>,
+  pub level: Level,
   pub display: bool,
   pub blocked: bool,
 }
@@ -68,6 +70,7 @@ impl WorkunitMetadata {
   pub fn new() -> WorkunitMetadata {
     WorkunitMetadata {
       display: true,
+      level: Level::Info,
       desc: None,
       blocked: false,
     }
