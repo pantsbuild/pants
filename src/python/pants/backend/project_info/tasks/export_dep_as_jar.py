@@ -7,7 +7,7 @@ import zipfile
 from collections import defaultdict
 from copy import copy
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Tuple
+from typing import Callable, Dict, List, Tuple, Iterable
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
@@ -28,8 +28,25 @@ from pants.java.distribution.distribution import DistributionLocator
 from pants.java.jar.jar_dependency_utils import M2Coordinate
 from pants.task.console_task import ConsoleTask
 from pants.util.contextutil import temporary_file
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_property, memoized, memoized_method
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+
+
+class ModulizableTargetsWithIds(FrozenOrderedSet[Target]):
+    """
+    Optimization.
+    Using `target in modulizable_target_set` directly uses structural equality, which is both
+    expensive and unnecessary for this use case.
+    Instead, we wrap the set to use reference equality.
+    """
+
+    def __init__(self, iterable: Iterable[Target]) -> None:
+        super().__init__(iterable)
+        self._idset = FrozenOrderedSet([id(target) for target in iterable])
+
+    def __contains__(self, target):
+        assert isinstance(target, Target)
+        return id(target) in self._idset
 
 
 @dataclass()
@@ -255,7 +272,7 @@ class ExportDepAsJar(ConsoleTask):
             transitive_targets = OrderedSet(info_entry)
             self.context.build_graph.walk_transitive_dependency_graph(
                 addresses=[target.address],
-                predicate=lambda d: d in modulizable_target_set,
+                predicate=lambda d: self.target_is_modulizable(d, modulizable_target_set),
                 work=lambda d: transitive_targets.add(d.address.spec),
             )
             return tuple(transitive_targets)
@@ -285,7 +302,7 @@ class ExportDepAsJar(ConsoleTask):
             ),
             "is_synthetic": current_target.is_synthetic,
             "pants_target_type": self._get_pants_target_alias(type(current_target)),
-            "is_target_root": current_target in modulizable_target_set,
+            "is_target_root": self.target_is_modulizable(current_target, modulizable_target_set),
             "transitive": current_target.transitive,
             "scope": str(current_target.scope),
             "scalac_args": ExportDepAsJar._extract_arguments_with_prefix_from_zinc_args(
@@ -353,7 +370,7 @@ class ExportDepAsJar(ConsoleTask):
         ]
 
         for dep in current_target.dependencies:
-            if dep in modulizable_target_set:
+            if self.target_is_modulizable(dep, modulizable_target_set):
                 info["targets"].append(dep.address.spec)
 
         if isinstance(current_target, ScalaLibrary):
@@ -484,8 +501,17 @@ class ExportDepAsJar(ConsoleTask):
             target, JvmTarget
         ) and DependencyContext.global_instance().defaulted_property(target, "strict_deps")
 
+    def target_is_modulizable(self, target, modulizable_targets: ModulizableTargetsWithIds):
+        """
+        This method exists solely to differentiate thecase
+        """
+        # if not self._modulizable_target_ids:
+        #     self._modulizable_target_ids = FrozenOrderedSet([id(target) for target in modulizable_targets])
+        return target in modulizable_targets
+
     def _flat_non_modulizable_deps_for_modulizable_targets(
-        self, modulizable_targets: FrozenOrderedSet[Target]
+        self,
+       modulizable_targets: ModulizableTargetsWithIds
     ) -> Dict[Target, FlatDependenciesInfo]:
         """Collect flat dependencies for targets that will end up in libraries. When visiting a
         target, we don't expand the dependencies that are modulizable targets, since we need to
@@ -533,7 +559,7 @@ class ExportDepAsJar(ConsoleTask):
             else:
                 compile_dependencies = target.dependencies
             non_modulizable_compile_deps = [
-                dep for dep in compile_dependencies if dep not in modulizable_targets
+                dep for dep in compile_dependencies if not self.target_is_modulizable(target, modulizable_targets)
             ]
             compile_entry = _aggregate_entries_from_dependencies(
                 non_modulizable_compile_deps, lambda fdi: fdi.compile_deps
@@ -541,7 +567,7 @@ class ExportDepAsJar(ConsoleTask):
 
             # Whereas runtime dependencies do not
             non_modulizable_runtime_deps = [
-                dep for dep in target.dependencies if dep not in modulizable_targets
+                dep for dep in target.dependencies if not self.target_is_modulizable(target, modulizable_targets)
             ]
             runtime_entry = _aggregate_entries_from_dependencies(
                 non_modulizable_runtime_deps, lambda fdi: fdi.runtime_deps
@@ -563,7 +589,7 @@ class ExportDepAsJar(ConsoleTask):
                     t.strict_dependencies(DependencyContext.global_instance())
                 ),
                 runtime_deps=FrozenOrderedSet(
-                    [dep for dep in t.closure() if dep not in modulizable_targets]
+                    [dep for dep in t.closure() if self.target_is_modulizable(dep, modulizable_targets)]
                 ),
             )
 
@@ -601,15 +627,16 @@ class ExportDepAsJar(ConsoleTask):
                 if isinstance(dep, Resources):
                     resource_target_map[dep] = t
 
-        modulizable_targets = self._get_targets_to_make_into_modules(
+        modulizable_targets = ModulizableTargetsWithIds(self._get_targets_to_make_into_modules(
             resource_target_map, runtime_classpath
-        )
+        ))
         non_modulizable_targets = all_targets.difference(modulizable_targets)
 
         for t in non_modulizable_targets:
             libraries_map[t.id] = self._make_libraries_entry(
                 t, resource_target_map, runtime_classpath
             )
+
 
         flat_non_modulizable_deps_for_modulizable_targets: Dict[
             Target, FlatDependenciesInfo
