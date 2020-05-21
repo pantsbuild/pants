@@ -97,6 +97,12 @@ def create_options(options, passthru_args=None, fingerprintable_options=None):
             if isinstance(options_for_this_scope, _FakeOptionValues):
                 options_for_this_scope = options_for_this_scope.option_values
 
+            if passthru_args:
+                pa = options_for_this_scope.get("passthrough_args", [])
+                if isinstance(pa, RankedValue):
+                    pa = pa.value
+                options_for_this_scope["passthrough_args"] = [*pa, *passthru_args]
+
             scoped_options = {}
             if scope:
                 scoped_options.update(self.for_scope(enclosing_scope(scope)).option_values)
