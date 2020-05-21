@@ -1,6 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from textwrap import dedent
 from typing import Any, Iterable, Mapping, Optional
 
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
@@ -23,7 +24,7 @@ class HermeticPex:
         description: str,
         input_digest: Digest,
         env: Optional[Mapping[str, str]] = None,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> Process:
         """Creates an Process that will run a PEX hermetically.
 
@@ -45,24 +46,31 @@ class HermeticPex:
         # execution (so long as `env` is populated with a `PATH` env var and `python` is discoverable
         # somewhere on that PATH). This is only used to run the downloaded PEX tool; it is not
         # necessarily the interpreter that PEX will use to execute the generated .pex file.
+        escaped_pex_args = " ".join(f"'{arg}'" for arg in pex_args)
+        script = dedent(
+            f"""
+            export PEX_ROOT="${{_APPEND_ONLY_CACHE_pex_root:-pex_root}}"
+            export RUNTIME_PEX_ROOT="$PEX_ROOT"
+            python '{pex_path}' {escaped_pex_args}
+            """
+        )
+
         # TODO(#7735): Set --python-setup-interpreter-search-paths differently for the host and target
         # platforms, when we introduce platforms in https://github.com/pantsbuild/pants/issues/7735.
-        argv = ("python", pex_path, *pex_args)
-
         hermetic_env = dict(
             PATH=create_path_env_var(python_setup.interpreter_search_paths),
-            PEX_ROOT="./pex_root",
             PEX_INHERIT_PATH="false",
             PEX_IGNORE_RCFILES="true",
-            **subprocess_encoding_environment.invocation_environment_dict
+            **subprocess_encoding_environment.invocation_environment_dict,
         )
         if env:
             hermetic_env.update(env)
 
         return Process(
-            argv=argv,
+            argv=("/bin/bash", "-c", script),
             input_digest=input_digest,
             description=description,
             env=hermetic_env,
-            **kwargs
+            append_only_caches={"pex_root"},
+            **kwargs,
         )
