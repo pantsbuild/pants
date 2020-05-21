@@ -30,6 +30,7 @@ from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
     Dependencies,
+    DependenciesRequest,
     HydratedSources,
     HydrateSourcesRequest,
     RegisteredTargetTypes,
@@ -124,11 +125,10 @@ async def resolve_targets_with_origins(
 @rule
 async def transitive_target(wrapped_root: WrappedTarget) -> TransitiveTarget:
     root = wrapped_root.target
-    dependencies = (
-        await MultiGet(Get[TransitiveTarget](Address, d) for d in root[Dependencies].value or ())
-        if root.has_field(Dependencies)
-        else tuple()
-    )
+    if not root.has_field(Dependencies):
+        return TransitiveTarget(root, ())
+    dependency_addresses = await Get[Addresses](DependenciesRequest(root[Dependencies]))
+    dependencies = await MultiGet(Get[TransitiveTarget](Address, d) for d in dependency_addresses)
     return TransitiveTarget(root, dependencies)
 
 

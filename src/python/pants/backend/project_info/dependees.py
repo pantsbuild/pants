@@ -11,8 +11,8 @@ from pants.engine.addresses import Address, Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import goal_rule
-from pants.engine.selectors import Get
-from pants.engine.target import Dependencies, Targets
+from pants.engine.selectors import Get, MultiGet
+from pants.engine.target import Dependencies, DependenciesRequest, Targets
 
 
 class DependeesOutputFormat(Enum):
@@ -83,9 +83,13 @@ async def dependees_goal(
 ) -> Dependees:
     # Get every target in the project so that we can iterate over them to find their dependencies.
     all_targets = await Get[Targets](AddressSpecs([DescendantAddresses("")]))
+    dependencies_per_target = await MultiGet(
+        Get[Addresses](DependenciesRequest(tgt.get(Dependencies))) for tgt in all_targets
+    )
+
     address_to_dependees = defaultdict(set)
-    for tgt in all_targets:
-        for dependency in tgt.get(Dependencies).value or ():
+    for tgt, dependencies in zip(all_targets, dependencies_per_target):
+        for dependency in dependencies:
             address_to_dependees[dependency].add(tgt.address)
 
     # JSON should output each distinct specified target with its dependees, unlike the `text`

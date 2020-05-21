@@ -56,6 +56,7 @@ from pants.engine.rules import SubsystemRule, goal_rule, named_rule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
     Dependencies,
+    DependenciesRequest,
     Sources,
     Target,
     Targets,
@@ -586,13 +587,12 @@ async def get_requirements(
     #  true dependencies. Plus, in the specific realm of setup-py, since we must exclude indirect
     #  deps across exported target boundaries, it's not a big stretch to just insist that
     #  requirements must be direct deps.
-    direct_deps_addrs = sorted(
-        set(itertools.chain.from_iterable(tgt.get(Dependencies).value or () for tgt in owned_by_us))
+    direct_deps_tgts = await MultiGet(
+        Get[Targets](DependenciesRequest(tgt.get(Dependencies))) for tgt in owned_by_us
     )
-    direct_deps_tgts = await Get[Targets](Addresses(direct_deps_addrs))
     reqs = PexRequirements.create_from_requirement_fields(
         tgt[PythonRequirementsField]
-        for tgt in direct_deps_tgts
+        for tgt in itertools.chain.from_iterable(direct_deps_tgts)
         if tgt.has_field(PythonRequirementsField)
     )
     req_strs = list(reqs)

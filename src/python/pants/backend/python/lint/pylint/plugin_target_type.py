@@ -58,7 +58,7 @@ class PylintSourcePlugin(Target):
 
     alias = "pylint_source_plugin"
     core_fields = (
-        *(FrozenOrderedSet(COMMON_PYTHON_FIELDS) - {Dependencies}),
+        *(FrozenOrderedSet(COMMON_PYTHON_FIELDS) - {Dependencies}),  # type: ignore[misc]
         PylintPluginDependencies,
         PylintPluginSources,
     )

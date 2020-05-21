@@ -26,7 +26,7 @@ from typing_extensions import final
 
 from pants.base.specs import OriginSpec
 from pants.build_graph.app_base import Bundle
-from pants.engine.addresses import Address, assert_single_address
+from pants.engine.addresses import Address, Addresses, assert_single_address
 from pants.engine.collection import Collection
 from pants.engine.fs import (
     EMPTY_SNAPSHOT,
@@ -1537,6 +1537,45 @@ async def hydrate_sources(
 
 
 # -----------------------------------------------------------------------------------------------
+# `Dependencies` field
+# -----------------------------------------------------------------------------------------------
+
+# NB: To hydrate the dependencies, use one of:
+#   await Get[Addresses](DependenciesRequest(tgt[Dependencies])
+#   await Get[Targets](DependenciesRequest(tgt[Dependencies])
+#   await Get[TransitiveTargets](DependenciesRequest(tgt[Dependencies])
+class Dependencies(AsyncField):
+    """Addresses to other targets that this target depends on, e.g. `['helloworld/subdir:lib']`."""
+
+    alias = "dependencies"
+    sanitized_raw_value: Optional[Tuple[Address, ...]]
+    default = None
+
+    # NB: The type hint for `raw_value` is a lie. While we do expect end-users to use
+    # Iterable[str], the Struct and Addressable code will have already converted those strings
+    # into a List[Address]. But, that's an implementation detail and we don't want our
+    # documentation, which is auto-generated from these type hints, to leak that.
+    @classmethod
+    def sanitize_raw_value(
+        cls, raw_value: Optional[Iterable[str]], *, address: Address
+    ) -> Optional[Tuple[Address, ...]]:
+        value_or_default = super().sanitize_raw_value(raw_value, address=address)
+        if value_or_default is None:
+            return None
+        return tuple(sorted(value_or_default))
+
+
+@dataclass(frozen=True)
+class DependenciesRequest:
+    field: Dependencies
+
+
+@rule
+def resolve_dependencies(request: DependenciesRequest) -> Addresses:
+    return Addresses(request.field.sanitized_raw_value or ())
+
+
+# -----------------------------------------------------------------------------------------------
 # Other common Fields used across most targets
 # -----------------------------------------------------------------------------------------------
 
@@ -1589,29 +1628,6 @@ class IntransitiveField(BoolField):
 
 
 COMMON_TARGET_FIELDS = (Tags, DescriptionField, NoCacheField, ScopeField, IntransitiveField)
-
-
-# NB: To hydrate the dependencies into Targets, use
-# `await Get[Targets](Addresses(tgt[Dependencies].value)`.
-class Dependencies(PrimitiveField):
-    """Addresses to other targets that this target depends on, e.g. `['src/python/project:lib']`."""
-
-    alias = "dependencies"
-    value: Optional[Tuple[Address, ...]]
-    default = None
-
-    # NB: The type hint for `raw_value` is a lie. While we do expect end-users to use
-    # Iterable[str], the Struct and Addressable code will have already converted those strings
-    # into a List[Address]. But, that's an implementation detail and we don't want our
-    # documentation, which is auto-generated from these type hints, to leak that.
-    @classmethod
-    def compute_value(
-        cls, raw_value: Optional[Iterable[str]], *, address: Address
-    ) -> Optional[Tuple[Address, ...]]:
-        value_or_default = super().compute_value(raw_value, address=address)
-        if value_or_default is None:
-            return None
-        return tuple(sorted(value_or_default))
 
 
 # TODO: figure out what support looks like for this with the Target API. The expected value is an
@@ -1667,6 +1683,8 @@ def rules():
     return [
         find_valid_field_sets,
         hydrate_sources,
+        resolve_dependencies,
         RootRule(TargetsToValidFieldSetsRequest),
         RootRule(HydrateSourcesRequest),
+        RootRule(DependenciesRequest),
     ]

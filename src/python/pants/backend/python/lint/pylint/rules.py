@@ -1,6 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import itertools
 from dataclasses import dataclass
 from typing import Tuple, cast
 
@@ -28,7 +29,7 @@ from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests, PathG
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import SubsystemRule, named_rule
 from pants.engine.selectors import Get, MultiGet
-from pants.engine.target import Dependencies, Targets, TransitiveTargets
+from pants.engine.target import Dependencies, DependenciesRequest, Targets, TransitiveTargets
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
@@ -67,21 +68,23 @@ async def pylint_lint(
     if pylint.skip:
         return LintResult.noop()
 
+    # Pylint needs direct dependencies in the chroot to ensure that imports are valid. However, it
+    # doesn't lint those direct dependencies nor does it care about transitive dependencies.
+    per_target_dependencies = await MultiGet(
+        Get[Targets](DependenciesRequest(field_set.dependencies)) for field_set in field_sets
+    )
+
     plugin_targets_request = Get[TransitiveTargets](
         Addresses(Address.parse(plugin_addr) for plugin_addr in pylint.source_plugins)
     )
-
-    # Pylint needs direct dependencies in the chroot to ensure that imports are valid. However, it
-    # doesn't lint those direct dependencies nor does it care about transitive dependencies.
-    addresses_with_dependencies = []
-    for field_set in field_sets:
-        addresses_with_dependencies.append(field_set.address)
-        addresses_with_dependencies.extend(field_set.dependencies.value or ())
-    targets_with_dependencies_request = Get[Targets](Addresses(addresses_with_dependencies))
-
-    plugin_targets, targets_with_dependencies = cast(
+    linted_targets_request = Get[Targets](Addresses(field_set.address for field_set in field_sets))
+    plugin_targets, linted_targets = cast(
         Tuple[TransitiveTargets, Targets],
-        await MultiGet([plugin_targets_request, targets_with_dependencies_request]),
+        await MultiGet([plugin_targets_request, linted_targets_request]),
+    )
+
+    targets_with_dependencies = Targets(
+        [*linted_targets, *itertools.chain.from_iterable(per_target_dependencies)]
     )
 
     # NB: Pylint output depends upon which Python interpreter version it's run with. See
@@ -156,7 +159,7 @@ async def pylint_lint(
 
     prepare_plugin_sources_request = Get[ImportablePythonSources](Targets(plugin_targets.closure))
     prepare_python_sources_request = Get[ImportablePythonSources](
-        Targets(targets_with_dependencies)
+        Targets, targets_with_dependencies
     )
     specified_source_files_request = Get[SourceFiles](
         SpecifiedSourceFilesRequest(
