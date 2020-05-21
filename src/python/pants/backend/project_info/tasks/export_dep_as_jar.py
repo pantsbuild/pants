@@ -7,7 +7,7 @@ import zipfile
 from collections import defaultdict
 from copy import copy
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Tuple
+from typing import Callable, Dict, Iterable, List, Tuple
 
 from pants.backend.jvm.subsystems.dependency_context import DependencyContext
 from pants.backend.jvm.subsystems.jvm_platform import JvmPlatform
@@ -30,6 +30,22 @@ from pants.task.console_task import ConsoleTask
 from pants.util.contextutil import temporary_file
 from pants.util.memo import memoized_property
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+
+
+class ModulizableTargetsWithIds(FrozenOrderedSet[Target]):
+    """Optimization.
+
+    Using `target in modulizable_target_set` directly uses structural equality, which is both
+    expensive and unnecessary for this use case. Instead, we wrap the set to use reference equality.
+    """
+
+    def __init__(self, iterable: Iterable[Target]) -> None:
+        super().__init__(iterable)
+        self._idset = FrozenOrderedSet([id(target) for target in iterable])
+
+    def __contains__(self, target):
+        assert isinstance(target, Target)
+        return id(target) in self._idset
 
 
 @dataclass()
@@ -263,7 +279,7 @@ class ExportDepAsJar(ConsoleTask):
     def _process_target(
         self,
         current_target: Target,
-        modulizable_target_set,
+        modulizable_target_set: ModulizableTargetsWithIds,
         resource_target_map,
         runtime_classpath,
         zinc_args_for_target,
@@ -485,7 +501,7 @@ class ExportDepAsJar(ConsoleTask):
         ) and DependencyContext.global_instance().defaulted_property(target, "strict_deps")
 
     def _flat_non_modulizable_deps_for_modulizable_targets(
-        self, modulizable_targets: FrozenOrderedSet[Target]
+        self, modulizable_targets: ModulizableTargetsWithIds
     ) -> Dict[Target, FlatDependenciesInfo]:
         """Collect flat dependencies for targets that will end up in libraries. When visiting a
         target, we don't expand the dependencies that are modulizable targets, since we need to
@@ -601,8 +617,8 @@ class ExportDepAsJar(ConsoleTask):
                 if isinstance(dep, Resources):
                     resource_target_map[dep] = t
 
-        modulizable_targets = self._get_targets_to_make_into_modules(
-            resource_target_map, runtime_classpath
+        modulizable_targets = ModulizableTargetsWithIds(
+            self._get_targets_to_make_into_modules(resource_target_map, runtime_classpath)
         )
         non_modulizable_targets = all_targets.difference(modulizable_targets)
 
