@@ -5,7 +5,6 @@ python_tests(
   name = 'address',
   sources = ['test_address.py'],
   dependencies = [
-    'src/python/pants/base:build_file',
     'src/python/pants/base:build_root',
     'src/python/pants/build_graph',
     'src/python/pants/util:contextutil',

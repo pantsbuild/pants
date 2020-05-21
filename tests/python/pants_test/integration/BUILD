@@ -90,7 +90,6 @@ python_tests(
   name = 'filemap_integration',
   sources = ['filemap_integration_test.py'],
   dependencies = [
-    'src/python/pants/base:project_tree',
     'src/python/pants/testutil:int-test',
     'testprojects/src/python:sources_directory',
     'testprojects/tests/python/pants:file_sets_directory',
