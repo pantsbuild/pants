@@ -11,9 +11,9 @@ from pants.engine.addresses import Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import goal_rule
-from pants.engine.selectors import Get
+from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Dependencies as DependenciesField
-from pants.engine.target import Targets, TransitiveTargets
+from pants.engine.target import DependenciesRequest, Targets, TransitiveTargets
 from pants.util.ordered_set import FrozenOrderedSet
 
 
@@ -63,13 +63,10 @@ async def dependencies(
         targets = Targets(transitive_targets.closure - FrozenOrderedSet(transitive_targets.roots))
     else:
         target_roots = await Get[Targets](Addresses, addresses)
-        targets = await Get[Targets](
-            Addresses(
-                itertools.chain.from_iterable(
-                    tgt.get(DependenciesField).value or () for tgt in target_roots
-                )
-            )
+        dependencies_per_target_root = await MultiGet(
+            Get[Targets](DependenciesRequest(tgt.get(DependenciesField))) for tgt in target_roots
         )
+        targets = Targets(itertools.chain.from_iterable(dependencies_per_target_root))
 
     include_3rdparty = options.values.type in [
         DependencyType.THIRD_PARTY,
