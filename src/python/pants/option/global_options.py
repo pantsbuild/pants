@@ -930,7 +930,7 @@ class GlobalOptions(Subsystem):
             type=bool,
             daemon=False,
             passive=not register.bootstrap.v2,
-            removal_version="1.30.0.dev0",
+            removal_version="1.31.0.dev0",
             removal_hint="Use --dynamic-ui instead.",
             help="Whether to show v2 engine execution progress.",
         )
