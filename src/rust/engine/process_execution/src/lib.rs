@@ -30,6 +30,7 @@ extern crate derivative;
 
 use async_trait::async_trait;
 use bytes::Bytes;
+pub use log::Level;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryFrom;
@@ -441,6 +442,7 @@ impl CommandRunner for BoundedCommandRunner {
       .unwrap_or_else(|| "<Unnamed process>".to_string());
     let outer_metadata = WorkunitMetadata {
       desc: Some(desc.clone()),
+      level: Level::Info,
       display: false,
       blocked: true,
     };
@@ -453,6 +455,7 @@ impl CommandRunner for BoundedCommandRunner {
       semaphore.with_acquired(move || {
         let metadata = WorkunitMetadata {
           desc: Some(desc),
+          level: Level::Info,
           display: false,
           blocked: false,
         };
