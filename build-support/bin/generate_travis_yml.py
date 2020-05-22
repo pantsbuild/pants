@@ -313,6 +313,7 @@ def linux_shard(
         "os": "linux",
         "dist": "bionic",
         "python": ["2.7", "3.6", "3.7"],
+        "jdk": "openjdk8",
         "addons": {
             "apt": {
                 "packages": [
