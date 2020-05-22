@@ -10,7 +10,7 @@ from pants_test.backend.python.pants_requirement_integration_test_base import (
 
 
 class PantsRequirementIntegrationTest(PantsRequirementIntegrationTestBase):
-    """A pants plugin should be able to depend on a pants_requirement() alone to declare its
+    """A Pants plugin should be able to depend on a pants_requirement() alone to declare its
     dependencies on pants modules.
 
     This plugin, when added to the pythonpath and backend_packages, should be able to declare new

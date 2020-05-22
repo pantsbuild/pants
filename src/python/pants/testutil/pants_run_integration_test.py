@@ -210,6 +210,8 @@ class PantsRunIntegrationTest(unittest.TestCase):
             # Ensure that the underlying ./pants invocation doesn't run from sources
             # (and therefore bootstrap) if we don't want it to.
             "RUN_PANTS_FROM_PEX",
+            # Whether to compile Rust in debug or release mode.
+            "MODE",
         ]
 
     def setUp(self):

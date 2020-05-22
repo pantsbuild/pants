@@ -25,6 +25,9 @@ class PantsRequirementIntegrationTestBase(PantsRunIntegrationTest):
         with environment_as(
             _PANTS_VERSION_OVERRIDE=unstable_version,
             PANTS_PANTS_RELEASES_BRANCH_NOTES="{'0.0.x': 'pants.toml'}",
+            # We propagate whether to compile Rust in debug or release mode to avoid having to
+            # recompile the engine.
+            MODE=os.environ.get("MODE", ""),
         ):
             pants_run = self.run_pants(["--version"])
             self.assert_success(pants_run)
