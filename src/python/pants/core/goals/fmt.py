@@ -173,10 +173,7 @@ async def fmt(
     workspace: Workspace,
     union_membership: UnionMembership,
 ) -> Fmt:
-    language_target_collection_types: Iterable[Type[LanguageFmtTargets]] = (
-        union_membership.union_rules[LanguageFmtTargets]
-    )
-
+    language_target_collection_types = union_membership[LanguageFmtTargets]
     language_target_collections: Iterable[LanguageFmtTargets] = tuple(
         language_target_collection_type(
             TargetsWithOrigins(
