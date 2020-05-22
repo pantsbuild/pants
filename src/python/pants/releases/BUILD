@@ -11,5 +11,9 @@ python_binary(
   tags = {"partially_type_checked"},
 )
 
-# Note that packages.py is not part of a target, it should be run with pex.
-# Its dependencies and such can be found in build-support/bin/release.sh.
+# While this is a target, it should be run with pex. See build-support/bin/release.sh.
+python_binary(
+  name = "packages",
+  sources = ["packages.py"],
+  tags = {"type_checked"},
+)
