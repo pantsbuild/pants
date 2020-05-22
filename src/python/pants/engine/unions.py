@@ -62,9 +62,27 @@ class UnionMembership:
         )
 
     def __getitem__(self, union_type: Type[_T]) -> FrozenOrderedSet[Type[_T]]:
+        """Get all members of this union type.
+
+        If the union type does not exist because it has no members registered, this will raise an
+        IndexError.
+
+        Note that the type hint assumes that all union members will have subclassed the union type
+        - this is only a convention and is not actually enforced. So, you may have inaccurate type
+        hints.
+        """
         return self.union_rules[union_type]
 
     def get(self, union_type: Type[_T]) -> FrozenOrderedSet[Type[_T]]:
+        """Get all members of this union type.
+
+        If the union type does not exist because it has no members registered, return an empty
+        FrozenOrderedSet.
+
+        Note that the type hint assumes that all union members will have subclassed the union type
+        - this is only a convention and is not actually enforced. So, you may have inaccurate type
+        hints.
+        """
         return self.union_rules.get(union_type, FrozenOrderedSet())  # type: ignore[arg-type]
 
     def is_member(self, union_type: Type, putative_member: Type) -> bool:
