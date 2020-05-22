@@ -9,6 +9,7 @@ import sys
 from collections import defaultdict
 from configparser import ConfigParser
 from functools import total_ordering
+from typing import Dict, Optional, Set, Tuple, cast
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -18,13 +19,15 @@ COLOR_BLUE = "\x1b[34m"
 COLOR_RESET = "\x1b[0m"
 
 
-def banner(message):
-    print("{}[=== {} ===]{}".format(COLOR_BLUE, message, COLOR_RESET))
+def banner(message: str) -> None:
+    print(f"{COLOR_BLUE}[=== {message} ===]{COLOR_RESET}")
 
 
 @total_ordering
 class Package:
-    def __init__(self, name, target, bdist_wheel_flags=None):
+    def __init__(
+        self, name: str, target: str, bdist_wheel_flags: Optional[Tuple[str, ...]] = None
+    ) -> None:
         self.name = name
         self.target = target
         self.bdist_wheel_flags = bdist_wheel_flags or ("--python-tag", "py36.py37.py38")
@@ -42,11 +45,11 @@ class Package:
         return self.name
 
     def __repr__(self):
-        return "Package<name={}>".format(self.name)
+        return f"Package<name={self.name}>"
 
-    def exists(self):
-        req = Request("https://pypi.org/pypi/{}".format(self.name))
-        req.get_method = lambda: "HEAD"
+    def exists(self) -> bool:
+        req = Request(f"https://pypi.org/pypi/{self.name}")
+        req.get_method = lambda: "HEAD"  # type: ignore[assignment]
         try:
             urlopen(req)
             return True
@@ -55,13 +58,13 @@ class Package:
                 return False
             raise
 
-    def latest_version(self):
-        f = urlopen("https://pypi.org/pypi/{}/json".format(self.name))
+    def latest_version(self) -> str:
+        f = urlopen(f"https://pypi.org/pypi/{self.name}/json")
         j = json.load(f)
-        return j["info"]["version"]
+        return cast(str, j["info"]["version"])
 
-    def owners(self):
-        url = "https://pypi.org/pypi/{}/{}".format(self.name, self.latest_version())
+    def owners(self) -> Set[str]:
+        url = f"https://pypi.org/pypi/{self.name}/{self.latest_version()}"
         url_content = urlopen(url).read()
         parser = BeautifulSoup(url_content, "html.parser")
         owners = {
@@ -71,7 +74,7 @@ class Package:
         return owners
 
 
-def core_packages():
+def core_packages() -> Set[Package]:
     # N.B. We constrain the ABI (Application Binary Interface) to cp36 to allow pantsbuild.pants to
     # work with any Python 3 version>= 3.6. We are able to get this future compatibility by specifying
     # `abi3`, which signifies any version >= 3.6 must work. This is possible to set because in
@@ -90,7 +93,7 @@ def core_packages():
     }
 
 
-def contrib_packages():
+def contrib_packages() -> Set[Package]:
     return {
         Package(
             "pantsbuild.pants.contrib.scrooge",
@@ -127,18 +130,22 @@ def contrib_packages():
     }
 
 
-def all_packages():
+def all_packages() -> Set[Package]:
     return core_packages().union(contrib_packages())
 
 
-def build_and_print_packages(version):
+def build_and_print_packages(version: str) -> None:
     packages_by_flags = defaultdict(list)
     for package in sorted(all_packages()):
         packages_by_flags[package.bdist_wheel_flags].append(package)
 
-    for (flags, packages) in packages_by_flags.items():
-        args = ("./pants", "setup-py", "--run=bdist_wheel {}".format(" ".join(flags))) + tuple(
-            package.target for package in packages
+    for flags, packages in packages_by_flags.items():
+        bdist_flags = " ".join(flags)
+        args = (
+            "./pants",
+            "setup-py",
+            f"--run=bdist_wheel {bdist_flags}",
+            *(package.target for package in packages),
         )
         try:
             # We print stdout to stderr because release.sh is expecting stdout to only be package names.
@@ -146,44 +153,40 @@ def build_and_print_packages(version):
             for package in packages:
                 print(package.name)
         except subprocess.CalledProcessError:
+            failed_packages = ",".join(package.name for package in packages)
+            failed_targets = " ".join(package.target for package in packages)
             print(
-                "Failed to build packages {names} for {version} with targets {targets}".format(
-                    names=",".join(package.name for package in packages),
-                    version=version,
-                    targets=" ".join(package.target for package in packages),
-                ),
+                f"Failed to build packages {failed_packages} for {version} with targets "
+                f"{failed_targets}",
                 file=sys.stderr,
             )
             raise
 
 
-def get_pypi_config(section, option):
+def get_pypi_config(section: str, option: str) -> str:
     config = ConfigParser()
     config.read(os.path.expanduser("~/.pypirc"))
 
     if not config.has_option(section, option):
-        raise ValueError(
-            "Your ~/.pypirc must define a {} option in the {} section".format(option, section)
-        )
+        raise ValueError(f"Your ~/.pypirc must define a {option} option in the {section} section")
     return config.get(section, option)
 
 
-def check_ownership(users, minimum_owner_count=3):
+def check_ownership(users, minimum_owner_count: int = 3) -> None:
     minimum_owner_count = max(len(users), minimum_owner_count)
     packages = sorted(all_packages())
-    banner("Checking package ownership for {} packages".format(len(packages)))
+    banner(f"Checking package ownership for {len(packages)} packages")
     users = {user.lower() for user in users}
     insufficient = set()
-    unowned = dict()
+    unowned: Dict[str, Set[Package]] = dict()
 
-    def check_ownership(i, package):
+    def check_ownership(i: int, package: Package) -> None:
         banner(
-            "[{}/{}] checking ownership for {}: > {} releasers including {}".format(
-                i, len(packages), package, minimum_owner_count, ", ".join(users)
-            )
+            f"[{i}/{len(packages)}] checking ownership for {package}: > {minimum_owner_count} "
+            f"releasers including {', '.join(users)}"
         )
         if not package.exists():
-            print("The {} package is new! There are no owners yet.".format(package.name))
+            print(f"The {package.name} package is new! There are no owners yet.")
             return
 
         owners = package.owners()
@@ -199,35 +202,35 @@ def check_ownership(users, minimum_owner_count=3):
 
     if insufficient or unowned:
         if unowned:
-            for user, packages in sorted(unowned.items()):
+            for user, unowned_packages in sorted(unowned.items()):
+                formatted_unowned = "\n".join(package.name for package in sorted(packages))
                 print(
-                    "Pypi account {} needs to be added as an owner for the following packages:\n{}".format(
-                        user, "\n".join(package.name for package in sorted(packages))
-                    ),
+                    f"PyPI account {user} needs to be added as an owner for the following "
+                    f"packages:\n{formatted_unowned}",
                     file=sys.stderr,
                 )
 
         if insufficient:
+            insufficient_packages = "\n".join(package.name for package in insufficient)
             print(
-                "The following packages have fewer than {} owners but should be setup for all releasers:\n{}".format(
-                    minimum_owner_count, "\n".join(package.name for package in insufficient)
-                )
+                f"The following packages have fewer than {minimum_owner_count} owners but should be "
+                f"setup for all releasers:\n{insufficient_packages}",
+                file=sys.stderr,
             )
 
         sys.exit(1)
 
 
-def _create_parser():
+def _create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command")
-    # list
+
     parser_list = subparsers.add_parser("list")
     parser_list.add_argument("--with-packages", action="store_true")
-    # list-owners
+
     subparsers.add_parser("list-owners")
-    # check-my-ownership
     subparsers.add_parser("check-my-ownership")
-    # build_and_print
+
     parser_build_and_print = subparsers.add_parser("build_and_print")
     parser_build_and_print.add_argument("version")
     return parser
@@ -239,7 +242,7 @@ if args.command == "list":
     if args.with_packages:
         print(
             "\n".join(
-                "{} {} {}".format(package.name, package.target, " ".join(package.bdist_wheel_flags))
+                f"{package.name} {package.target} {' '.join(package.bdist_wheel_flags)}"
                 for package in sorted(all_packages())
             )
         )
@@ -249,17 +252,16 @@ elif args.command == "list-owners":
     for package in sorted(all_packages()):
         if not package.exists():
             print(
-                "The {} package is new!  There are no owners yet.".format(package.name),
-                file=sys.stderr,
+                f"The {package.name} package is new!  There are no owners yet.", file=sys.stderr,
             )
             continue
-        print("Owners of {}:".format(package.name))
+        print(f"Owners of {package.name}:")
         for owner in sorted(package.owners()):
-            print("{}".format(owner))
+            print(f"{owner}")
 elif args.command == "check-my-ownership":
     me = get_pypi_config("server-login", "username")
     check_ownership({me})
 elif args.command == "build_and_print":
     build_and_print_packages(args.version)
 else:
-    raise argparse.ArgumentError("Didn't recognise arguments {}".format(args))
+    raise argparse.ArgumentError(f"Didn't recognise arguments {args}")
