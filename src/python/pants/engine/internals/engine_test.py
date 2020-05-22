@@ -404,6 +404,8 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
         assert r3["description"] == "Rule number 3"
         assert r4["description"] == "Rule number 4"
 
+        assert r4["log_level"] == "INFO"
+
     def test_streaming_workunit_log_levels(self):
         rules = [RootRule(Input), rule_one_function, rule_two, rule_three, rule_four]
         scheduler = self.mk_scheduler(
@@ -431,3 +433,4 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
             if item["name"] not in {"rule_one", "rule_two", "rule_three", "rule_four"}
         )
         assert select["name"] == "select"
+        assert select["log_level"] == "TRACE"

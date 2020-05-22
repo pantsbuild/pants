@@ -535,6 +535,10 @@ fn workunit_to_py_value(workunit: &Workunit) -> Option<Value> {
       externs::store_utf8("span_id"),
       externs::store_utf8(&workunit.span_id),
     ),
+    (
+      externs::store_utf8("log_level"),
+      externs::store_utf8(&workunit.metadata.level.to_string()),
+    ),
   ];
   if let Some(parent_id) = &workunit.parent_id {
     dict_entries.push((
