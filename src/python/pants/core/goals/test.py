@@ -284,7 +284,7 @@ async def run_tests(
             Type[CoverageData], Type[CoverageDataCollection]
         ] = {
             collection_cls.element_type: collection_cls
-            for collection_cls in union_membership.union_rules[CoverageDataCollection]
+            for collection_cls in union_membership[CoverageDataCollection]
         }
         coverage_collections: List[CoverageDataCollection] = []
         for data_cls, data in itertools.groupby(all_coverage_data, lambda data: type(data)):

@@ -4,7 +4,7 @@
 from abc import ABC
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import ClassVar, Iterable, Tuple, Type, cast
+from typing import ClassVar, Dict, Tuple, Type, cast
 
 from pants.base.build_root import BuildRoot
 from pants.engine.console import Console
@@ -74,21 +74,15 @@ async def run_repl(
     union_membership: UnionMembership,
     global_options: GlobalOptions,
 ) -> Repl:
-
-    # We can guarantee that we will only even enter this `goal_rule` if there exists an implementer
-    # of the `ReplImplementation` union because `LegacyGraphSession.run_goal_rules()` will not
-    # execute this rule's body if there are no implementations registered.
-    membership: Iterable[Type[ReplImplementation]] = union_membership.union_rules[
-        ReplImplementation
-    ]
-    implementations = {impl.name: impl for impl in membership}
-
     default_repl = "python"
-    repl_shell_name = cast(str, options.values.shell or default_repl)
+    repl_shell_name = cast(str, options.values.shell) or default_repl
 
+    implementations: Dict[str, Type[ReplImplementation]] = {
+        impl.name: impl for impl in union_membership[ReplImplementation]
+    }
     repl_implementation_cls = implementations.get(repl_shell_name)
     if repl_implementation_cls is None:
-        available = sorted(set(implementations.keys()))
+        available = sorted(implementations.keys())
         console.print_stderr(
             f"{repr(repl_shell_name)} is not a registered REPL. Available REPLs (which may "
             f"be specified through the option `--repl-shell`): {available}"

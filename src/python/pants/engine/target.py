@@ -1337,9 +1337,7 @@ class Sources(AsyncField):
         This method is useful when you need to filter targets before hydrating them, such as how
         you may filter targets via `tgt.has_field(MyField)`.
         """
-        generate_request_types: Iterable[
-            Type[GenerateSourcesRequest]
-        ] = union_membership.union_rules.get(GenerateSourcesRequest, ())
+        generate_request_types = union_membership.get(GenerateSourcesRequest)
         return any(
             issubclass(cls, generate_request_type.input)
             and issubclass(generate_request_type.output, output_type)
@@ -1460,9 +1458,7 @@ async def hydrate_sources(
     # to determine if the sources_field is valid or not.
     # We could alternatively use `sources_field.can_generate()`, but we want to error if there are
     # 2+ generators due to ambiguity.
-    generate_request_types: Iterable[
-        Type[GenerateSourcesRequest]
-    ] = union_membership.union_rules.get(GenerateSourcesRequest, ())
+    generate_request_types = union_membership.get(GenerateSourcesRequest)
     relevant_generate_request_types = [
         generate_request_type
         for generate_request_type in generate_request_types
@@ -1618,10 +1614,7 @@ async def resolve_dependencies(
     # Inject any dependencies. This is determined by the `request.field` class. For example, if
     # there is a rule to inject for FortranDependencies, then FortranDependencies and any subclass
     # of FortranDependencies will use that rule.
-    inject_request_types = cast(
-        Iterable[Type[InjectDependenciesRequest]],
-        union_membership.union_rules.get(InjectDependenciesRequest, ()),
-    )
+    inject_request_types = union_membership.get(InjectDependenciesRequest)
     injected = await MultiGet(
         Get[InjectedDependencies](InjectDependenciesRequest, inject_request_type(request.field))
         for inject_request_type in inject_request_types

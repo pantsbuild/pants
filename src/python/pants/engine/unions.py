@@ -1,9 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import typing
 from dataclasses import dataclass
-from typing import Iterable, Mapping, Type
+from typing import Iterable, Mapping, Type, TypeVar
 
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import decorated_type_checkable, frozen_after_init
@@ -49,6 +48,9 @@ def union(cls):
     )
 
 
+_T = TypeVar("_T")
+
+
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class UnionMembership:
@@ -58,6 +60,12 @@ class UnionMembership:
         self.union_rules = FrozenDict(
             {base: FrozenOrderedSet(members) for base, members in union_rules.items()}
         )
+
+    def __getitem__(self, union_type: Type[_T]) -> FrozenOrderedSet[Type[_T]]:
+        return self.union_rules[union_type]
+
+    def get(self, union_type: Type[_T]) -> FrozenOrderedSet[Type[_T]]:
+        return self.union_rules.get(union_type, FrozenOrderedSet())  # type: ignore[arg-type]
 
     def is_member(self, union_type: Type, putative_member: Type) -> bool:
         members = self.union_rules.get(union_type)
@@ -69,7 +77,7 @@ class UnionMembership:
         """Check whether the union has an implementation or not."""
         return bool(self.union_rules.get(union_type))
 
-    def has_members_for_all(self, union_types: typing.Iterable[Type]) -> bool:
+    def has_members_for_all(self, union_types: Iterable[Type]) -> bool:
         """Check whether every union given has an implementation or not."""
         return all(self.has_members(union_type) for union_type in union_types)
 

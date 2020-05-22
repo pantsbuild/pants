@@ -105,17 +105,14 @@ async def lint(
     options: LintOptions,
     union_membership: UnionMembership,
 ) -> Lint:
-    field_set_collection_types: Iterable[Type[LinterFieldSets]] = union_membership.union_rules[
-        LinterFieldSets
-    ]
-
+    field_set_collection_types = union_membership[LinterFieldSets]
     field_set_collections: Iterable[LinterFieldSets] = tuple(
         field_set_collection_type(
             field_set_collection_type.field_set_type.create(target_with_origin)
             for target_with_origin in targets_with_origins
             if field_set_collection_type.field_set_type.is_valid(target_with_origin.target)
         )
-        for field_set_collection_type in field_set_collection_types
+        for field_set_collection_type in union_membership[LinterFieldSets]
     )
     field_set_collections_with_sources: Iterable[FieldSetsWithSources] = await MultiGet(
         Get[FieldSetsWithSources](FieldSetsWithSourcesRequest(field_set_collection))
