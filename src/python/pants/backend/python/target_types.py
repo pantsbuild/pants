@@ -2,10 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os.path
-from typing import Iterable, Optional, Tuple, Union, cast
+from pathlib import PurePath
+from typing import Iterable, Optional, Sequence, Tuple, Union, cast
 
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
+from pants.base.deprecated import deprecated_conditional
 from pants.core.util_rules.determine_source_files import SourceFiles
 from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
@@ -35,15 +37,34 @@ from pants.python.python_setup import PythonSetup
 
 
 class PythonSources(Sources):
-    expected_file_extensions = (".py",)
+    # TODO: uncomment this once done with the deprecation of using non-Python files.
+    # expected_file_extensions = (".py",)
+    def validate_snapshot(self, snapshot: Snapshot) -> None:
+        super().validate_snapshot(snapshot)
+        non_python_files = [fp for fp in snapshot.files if PurePath(fp).suffix != ".py"]
+        deprecated_conditional(
+            lambda: bool(non_python_files),
+            entity_description="Python targets including non-Python files",
+            removal_version="1.29.0.dev1",
+            hint_message=(
+                f"The {repr(self.alias)} field in target {self.address} should only contain "
+                f"files that end in '.py', but it had these files: {sorted(non_python_files)}.\n\n"
+                "Instead, put those files in another target, like a `resources` target, and add "
+                "that target to the `dependencies` field of this target."
+            ),
+        )
 
 
 class PythonInterpreterCompatibility(StringOrStringSequenceField):
     """A string for Python interpreter constraints on this target.
 
     This should be written in Requirement-style format, e.g. `CPython==2.7.*` or `CPython>=3.6,<4`.
-
     As a shortcut, you can leave off `CPython`, e.g. `>=2.7` will be expanded to `CPython>=2.7`.
+
+    If this is left off, this will default to the option `interpreter_constraints` in the
+    [python-setup] scope.
+
+    See https://pants.readme.io/docs/python-interpreter-compatibility.
     """
 
     alias = "compatibility"
@@ -57,7 +78,10 @@ class PythonInterpreterCompatibility(StringOrStringSequenceField):
 
 
 class PythonProvidesField(ScalarField, ProvidesField):
-    """The`setup.py` kwargs for the external artifact built from this target."""
+    """The`setup.py` kwargs for the external artifact built from this target.
+
+    See https://pants.readme.io/docs/python-setup-py-goal.
+    """
 
     expected_type = PythonArtifact
     expected_type_description = "setup_py(**kwargs)"
@@ -133,21 +157,38 @@ class PythonApp(Target):
 
 
 class PythonBinarySources(PythonSources):
+    """A single file containing the executable, such as ['app.py'].
+
+    You can leave this off if you include the executable file in one of this target's
+    `dependencies` and explicitly set this target's `entry_point`.
+
+    This must have 0 or 1 files, but no more. If you depend on more files, put them in a
+    `python_library` target and include that target in the `dependencies` field.
+    """
+
     expected_num_files = range(0, 2)
+
+    @staticmethod
+    def translate_source_file_to_entry_point(stripped_sources: Sequence[str]) -> Optional[str]:
+        # We assume we have 0-1 sources, which is enforced by PythonBinarySources.
+        if len(stripped_sources) != 1:
+            return None
+        module_base, _ = os.path.splitext(stripped_sources[0])
+        return module_base.replace(os.path.sep, ".")
 
 
 class PythonEntryPoint(StringField):
     """The default entry point for the binary.
 
-    If omitted, Pants will try to infer the entry point by looking at the `source` argument for a
-    `__main__` function.
+    If omitted, Pants will use the module name from the `sources` field, e.g. `project/app.py` will
+    become the entry point `project.app` .
     """
 
     alias = "entry_point"
 
 
 class PythonPlatforms(StringOrStringSequenceField):
-    """Extra platforms to target when building a Python binary.
+    """The platforms the built PEX should be compatible with.
 
     This defaults to the current platform, but can be overridden to different platforms. You can
     give a list of multiple platforms to create a multiplatform PEX.
@@ -194,7 +235,7 @@ class PexZipSafe(BoolField):
 
 
 class PexAlwaysWriteCache(BoolField):
-    """Whether Pex should always write the .deps cache of the Pex file to disk or not.
+    """Whether PEX should always write the .deps cache of the .pex file to disk or not.
 
     This can use less memory in RAM constrained environments.
     """
@@ -204,14 +245,14 @@ class PexAlwaysWriteCache(BoolField):
 
 
 class PexIgnoreErrors(BoolField):
-    """Should we ignore when Pex cannot resolve dependencies?"""
+    """Should we ignore when PEX cannot resolve dependencies?"""
 
     alias = "ignore_errors"
     default = False
 
 
 class PexShebang(StringField):
-    """For the generated Pex, use this shebang."""
+    """For the generated PEX, use this shebang."""
 
     alias = "shebang"
 
@@ -220,18 +261,18 @@ class PexShebang(StringField):
 #  How would that work with the Target API? Likely, make this an AsyncField and in the rule
 #  request the corresponding subsystem. For now, we ignore the option.
 class PexEmitWarnings(BoolField):
-    """Whether or not to emit Pex warnings at runtime."""
+    """Whether or not to emit PEX warnings at runtime."""
 
     alias = "emit_warnings"
     default = True
 
 
 class PythonBinary(Target):
-    """A Python target that can be converted into an executable Pex file.
+    """A Python target that can be converted into an executable PEX file.
 
-    Pex files are self-contained executable files that contain a complete Python
-    environment capable of running the target. For more information about Pex files, see
-    http://pantsbuild.github.io/python-readme.html#how-pex-files-work.
+    PEX files are self-contained executable files that contain a complete Python environment capable
+    of running the target. For more information about PEX files, see
+    https://pants.readme.io/docs/pex-files.
     """
 
     alias = "python_binary"
@@ -275,7 +316,11 @@ class PythonTestsSources(PythonSources):
 
 
 class PythonCoverage(StringOrStringSequenceField):
-    """The module(s) whose coverage should be generated, e.g. `['pants.util']`."""
+    """A list of the module(s) you expect this test target to cover.
+
+    Usually, Pants and pytest-cov can auto-discover this if your tests are located in the same
+    folder as the `python_library` code, but this is useful if the tests are not collocated.
+    """
 
     alias = "coverage"
 
@@ -307,7 +352,7 @@ class PythonCoverage(StringOrStringSequenceField):
 class PythonTestsTimeout(IntField):
     """A timeout (in seconds) which covers the total runtime of all tests in this target.
 
-    This only applies if `--pytest-timeouts` is set to True.
+    This only applies if the option `--pytest-timeouts` is set to True.
     """
 
     alias = "timeout"
@@ -338,7 +383,12 @@ class PythonTestsTimeout(IntField):
 
 
 class PythonTests(Target):
-    """Python tests (either Pytest-style or unittest style)."""
+    """Python tests.
+
+    These may be written in either Pytest-style or unittest style.
+
+    See https://pants.readme.io/docs/python-test-goal.
+    """
 
     alias = "python_tests"
     core_fields = (*COMMON_PYTHON_FIELDS, PythonTestsSources, PythonCoverage, PythonTestsTimeout)
@@ -384,7 +434,15 @@ class PythonDistribution(Target):
 
 
 class PythonRequirementsField(SequenceField):
-    """A sequence of `python_requirement` objects."""
+    """A sequence of `python_requirement` objects.
+
+    For example:
+
+        requirements = [
+            python_requirement('dep1==1.8'),
+            python_requirement('dep2>=3.0,<3.1'),
+        ]
+    """
 
     alias = "requirements"
     expected_element_type = PythonRequirement
@@ -402,7 +460,15 @@ class PythonRequirementsField(SequenceField):
 
 
 class PythonRequirementLibrary(Target):
-    """A set of Pip requirements."""
+    """A set of Pip requirements.
+
+    This target is useful when you want to declare Python requirements inline in a BUILD file. If
+    you have a `requirements.txt` file already, you can instead use the macro
+    `python_requirements()` to convert each requirement into a `python_requirement_library()` target
+    automatically.
+
+    See https://pants.readme.io/docs/python-third-party-dependencies.
+    """
 
     alias = "python_requirement_library"
     core_fields = (*COMMON_TARGET_FIELDS, Dependencies, PythonRequirementsField)
@@ -472,14 +538,6 @@ class UnpackedWheelsWithinDataSubdir(BoolField):
 
     alias = "within_data_subdir"
     default = False
-
-    @classmethod
-    def compute_value(  # type: ignore[override]
-        cls, raw_value: Optional[Union[bool, str]], *, address: Address
-    ) -> Union[bool, str]:
-        if isinstance(raw_value, str):
-            return raw_value
-        return super().compute_value(raw_value, address=address)
 
 
 class UnpackedWheels(Target):

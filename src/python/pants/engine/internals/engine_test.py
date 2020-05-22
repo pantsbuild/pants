@@ -16,7 +16,6 @@ from pants.reporting.streaming_workunit_handler import StreamingWorkunitHandler
 from pants.testutil.engine.util import (
     assert_equal_with_printing,
     fmt_rule,
-    fmt_rust_function,
     remove_locations_from_traceback,
 )
 
@@ -160,7 +159,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
             list(scheduler.product_request(A, subjects=[(B())]))
 
         self.assert_equal_with_printing(
-            "1 Exception encountered:\n  Exception: An exception for B", str(cm.exception)
+            "1 Exception encountered:\n\n  Exception: An exception for B\n", str(cm.exception)
         )
 
     def test_no_include_trace_error_multiple_paths_raises_executionerror(self):
@@ -178,8 +177,10 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
             dedent(
                 """
                 2 Exceptions encountered:
+
                   Exception: An exception for B
-                  Exception: An exception for B"""
+                  Exception: An exception for B
+                """
             ).lstrip(),
             str(cm.exception),
         )
@@ -196,22 +197,19 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
 
         self.assert_equal_with_printing(
             dedent(
-                f"""
-                1 Exception encountered:
-                Computing Select(<{__name__}.B object at 0xEEEEEEEEE>, A)
-                  Computing Task({fmt_rust_function(nested_raise)}(), <{__name__}.B object at 0xEEEEEEEEE>, A, true)
-                    Throw(An exception for B)
-                      Traceback (most recent call last):
-                        File LOCATION-INFO, in call
-                          val = func(*args)
-                        File LOCATION-INFO, in nested_raise
-                          fn_raises(x)
-                        File LOCATION-INFO, in fn_raises
-                          raise Exception(f"An exception for {{type(x).__name__}}")
-                      Exception: An exception for B
                 """
-            ).lstrip()
-            + "\n",
+                1 Exception encountered:
+
+                Traceback (most recent call last):
+                  File LOCATION-INFO, in call
+                    val = func(*args)
+                  File LOCATION-INFO, in nested_raise
+                    fn_raises(x)
+                  File LOCATION-INFO, in fn_raises
+                    raise Exception(f"An exception for {type(x).__name__}")
+                Exception: An exception for B
+                """
+            ).lstrip(),
             remove_locations_from_traceback(str(cm.exception)),
         )
 
@@ -279,9 +277,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
         )
 
     def test_illegal_root_selection(self):
-        rules = [
-            RootRule(B),
-        ]
+        rules = [RootRule(B)]
 
         scheduler = self.scheduler(rules, include_trace_on_error=False)
 
@@ -290,14 +286,12 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
             list(scheduler.product_request(A, subjects=[(B())]))
 
         self.assert_equal_with_printing(
-            """No installed @rules return the type A. Is the @rule that you're expecting to run registered?""",
+            "No installed @rules return the type A. Is the @rule that you're expecting to run registered?",
             str(cm.exception),
         )
 
-    def test_non_existing_root_fails_differently(self):
-        rules = [
-            upcast,
-        ]
+    def test_nonexistent_root_fails_differently(self):
+        rules = [upcast]
 
         with self.assertRaises(Exception) as cm:
             list(self.mk_scheduler(rules=rules, include_trace_on_error=False))
@@ -306,6 +300,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
             dedent(
                 f"""
                 Rules with errors: 1
+
                   {fmt_rule(upcast)}:
                     No rule was available to compute MyInt. Maybe declare RootRule(MyInt)?
                 """
@@ -348,7 +343,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
 
         flattened = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
         # The execution of the single named @rule "fib" should be providing this one workunit.
-        self.assertEquals(len(flattened), 1)
+        self.assertEqual(len(flattened), 1)
 
         tracker.finished_workunit_chunks = []
         with handler.session():
@@ -383,7 +378,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
             "rule_four",
         }
 
-        # Because of the artifical delay in rule_one, it should have time to be reported as
+        # Because of the artificial delay in rule_one, it should have time to be reported as
         # started but not yet finished.
         started = list(itertools.chain.from_iterable(tracker.started_workunit_chunks))
         assert len(list(item for item in started if item["name"] == "rule_one")) > 0

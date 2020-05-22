@@ -4,5 +4,5 @@
 # Used for integration tests of using custom javac jars.
 jar_library(name='custom_javactool_for_testing',
             jars=[
-              jar('org.pantsbuild', 'custom_javactool_for_testing', '0.0.1')
+              jar('org.pantsbuild', 'custom_javactool_for_testing', '0.0.7')
             ])

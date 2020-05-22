@@ -351,7 +351,6 @@ def linux_shard(
             )
     if use_docker:
         setup["services"] = ["docker"]
-        safe_append(setup, "before_script", "ulimit -c unlimited")
     return setup
 
 
@@ -395,7 +394,7 @@ def osx_shard(
     setup = {
         "os": "osx",
         "language": "generic",
-        "before_script": ["ulimit -c unlimited", "ulimit -n 8192"],
+        "before_script": ["ulimit -n 8192"],
         "before_install": [
             "curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq",
             "chmod 755 /usr/local/bin/jq",
@@ -509,7 +508,7 @@ def clippy() -> Dict:
         **linux_fuse_shard(),
         "name": "Clippy (Rust linter)",
         "stage": Stage.test.value,
-        "before_script": ["ulimit -c unlimited", "ulimit -n 8192"],
+        "before_script": ["ulimit -n 8192"],
         "script": ["./build-support/bin/ci.py --clippy"],
         "env": ["CACHE_NAME=clippy"],
         "if": SKIP_RUST_CONDITION,
@@ -600,7 +599,7 @@ def build_wheels_osx() -> Dict:
 
 
 def integration_tests_v1(python_version: PythonVersion) -> List[Dict]:
-    num_integration_shards = 7
+    num_integration_shards = 6
 
     def make_shard(*, shard_num: int) -> Dict:
         shard = {
@@ -643,7 +642,7 @@ def integration_tests_v2(python_version: PythonVersion) -> Dict:
 _RUST_TESTS_BASE: Dict = {
     **CACHE_NATIVE_ENGINE,
     "stage": Stage.test.value,
-    "before_script": ["ulimit -c unlimited", "ulimit -n 8192"],
+    "before_script": ["ulimit -n 8192"],
     # NB: We also build `fs_util` in this shard to leverage having had compiled the engine. This
     # requires setting PREPARE_DEPLOY=1.
     "script": ["./build-support/bin/ci.py --rust-tests", "./build-support/bin/release.sh -f"],

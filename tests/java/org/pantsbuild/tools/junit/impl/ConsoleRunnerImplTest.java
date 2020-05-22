@@ -46,7 +46,7 @@ import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.fail;
 
 /**
- * These tests are similar to the tests in ConsoleRunnerTest but they create a ConosoleRunnerImpl
+ * These tests are similar to the tests in ConsoleRunnerTest but they create a ConsoleRunnerImpl
  * directory so they can capture and make assertions on the output.
  */
 public class ConsoleRunnerImplTest {

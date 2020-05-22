@@ -25,8 +25,12 @@ Adding support for other languages, frameworks and code generators is straightfo
 
 <p class="index-intro-text"></p>
 
-Pants is a collaborative open-source project, built and used by Twitter, Foursquare, Square,
+Pants is a collaborative open-source project, built and used by Twitter, Toolchain, Foursquare, Square,
 Medium and [[other companies|pants('src/docs:powered_by')]].
+
+<br/>
+
+If you are only using Python in your project, check out [pants.readme.io/docs](https://pants.readme.io/docs) for documentation using the improved V2 implementation.
 
 Getting Started
 ---------------

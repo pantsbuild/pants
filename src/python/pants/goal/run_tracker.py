@@ -17,7 +17,7 @@ from typing import Any, Dict, Optional
 import requests
 
 from pants.auth.basic_auth import BasicAuth
-from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
+from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
 from pants.base.run_info import RunInfo
 from pants.base.worker_pool import SubprocPool, WorkerPool
 from pants.base.workunit import WorkUnit, WorkUnitLabel
@@ -213,7 +213,7 @@ class RunTracker(Subsystem):
         # }
         self._target_to_data = {}
 
-        self._end_memoized_result = None
+        self._end_memoized_result: Optional[ExitCode] = None
 
     def set_sorted_goal_infos(self, sorted_goal_infos):
         self._sorted_goal_infos = sorted_goal_infos
@@ -430,7 +430,7 @@ class RunTracker(Subsystem):
         """
 
         def error(msg):
-            # Report aleady closed, so just print error.
+            # Report already closed, so just print error.
             print(f"WARNING: Failed to upload stats to {stats_url} due to {msg}", file=sys.stderr)
             return False
 
@@ -557,7 +557,7 @@ class RunTracker(Subsystem):
     def has_ended(self) -> bool:
         return self._end_memoized_result is not None
 
-    def end(self):
+    def end(self) -> ExitCode:
         """This pants run is over, so stop tracking it.
 
         Note: If end() has been called once, subsequent calls are no-ops.

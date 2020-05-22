@@ -316,7 +316,8 @@ def resolve_conflicting_options(
     if old_configured and new_configured:
 
         def format_option(*, scope: str, option: str) -> str:
-            return f"`--{scope}-{option}`".replace("_", "-")
+            scope_preamble = "--" if scope == "" else f"--{scope}-"
+            return f"`{scope_preamble}{option}`".replace("_", "-")
 
         old_display = format_option(scope=old_scope, option=old_option)
         new_display = format_option(scope=new_scope, option=new_option)
@@ -328,16 +329,3 @@ def resolve_conflicting_options(
     if old_configured:
         return old_container.get(old_option)
     return new_container.get(new_option)
-
-
-def _deprecated_contrib_plugin(plugin_name: str) -> None:
-    warn_or_error(
-        removal_version="1.29.0.dev0",
-        deprecated_entity_description=f"the {plugin_name} plugin",
-        hint=(
-            f"The {repr(plugin_name)} plugin is being removed due to low usage.\n\nTo prepare for "
-            f"this change, please remove {repr(plugin_name)} from 'plugins' in `pants.toml` or "
-            "`pants.ini`.\n\nIf you still depend on this plugin, please email pants-devel "
-            "<pants-devel@googlegroups.com> or message us on Slack and we will keep this plugin."
-        ),
-    )

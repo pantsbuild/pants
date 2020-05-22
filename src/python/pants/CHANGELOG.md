@@ -1,7 +1,6 @@
 Release Notes
 =============
 
-Release notes are now organized by the branch from which the release occurred. See:
+Release notes are organized by the branch from which the release occurred.
 
-* [[1.0.x Stable Releases|pants('src/python/pants/notes:notes-1.0.x')]]
-* [[Master Pre-Releases|pants('src/python/pants/notes:notes-master')]]
+See [pants.readme.io/docs](https://pants.readme.io/docs) for summaries of each minor release, along with links to detailed change logs.

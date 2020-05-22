@@ -5,7 +5,6 @@ python_tests(
   name = 'address',
   sources = ['test_address.py'],
   dependencies = [
-    'src/python/pants/base:build_file',
     'src/python/pants/base:build_root',
     'src/python/pants/build_graph',
     'src/python/pants/util:contextutil',
@@ -19,7 +18,6 @@ python_tests(
   name = 'build_configuration',
   sources = ['test_build_configuration.py'],
   dependencies = [
-    'src/python/pants/base:build_file',
     'src/python/pants/build_graph',
     'src/python/pants/engine:addresses',
     'src/python/pants/engine:rules',
@@ -49,17 +47,6 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/engine/legacy:graph',
     'src/python/pants/testutil/subsystem',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_tests(
-  name = 'build_file_parser',
-  sources = ['test_build_file_parser.py'],
-  dependencies = [
-    'src/python/pants/base:build_file',
-    'src/python/pants/build_graph',
-    'src/python/pants/testutil:test_base',
   ],
   tags = {"partially_type_checked"},
 )

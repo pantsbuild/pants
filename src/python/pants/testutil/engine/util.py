@@ -1,10 +1,10 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import os
 import re
 from dataclasses import dataclass
 from io import StringIO
+from pathlib import Path
 from types import CoroutineType, GeneratorType
 from typing import (
     Any,
@@ -22,7 +22,6 @@ from typing import (
 
 from colors import blue, cyan, green, magenta, red
 
-from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.goal import GoalSubsystem
 from pants.engine.internals.addressable import addressable_sequence
 from pants.engine.internals.native import Native
@@ -212,13 +211,13 @@ def init_native():
 def create_scheduler(rules, union_rules=None, validate=True, native=None):
     """Create a Scheduler."""
     native = native or init_native()
-    tree = FileSystemProjectTree(os.getcwd())
     return Scheduler(
         native=native,
-        ignore_patterns=tree.ignore_patterns,
+        ignore_patterns=[],
         use_gitignore=False,
-        build_root=tree.build_root,
+        build_root=str(Path.cwd()),
         local_store_dir="./.pants.d",
+        local_execution_root_dir="./.pants.d",
         rules=rules,
         union_rules=union_rules,
         execution_options=DEFAULT_EXECUTION_OPTIONS,

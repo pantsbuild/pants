@@ -84,7 +84,7 @@ class ExecuteJavaTest(unittest.TestCase):
                     synthetic_jar_dir=self.SYNTHETIC_JAR_DIR,
                 )
 
-    def test_execute_java_no_synthentic_jar(self):
+    def test_execute_java_no_synthetic_jar(self):
         """
         :API: public
         """
@@ -120,11 +120,11 @@ class SafeClasspathTest(unittest.TestCase):
         RESOURCES = "resources"
         LIB_DIR = "libs"
         JAR_FILE = "A.jar"
-        SYNTHENTIC_JAR_DIR = "synthetic_jar_dir"
+        SYNTHETIC_JAR_DIR = "synthetic_jar_dir"
 
         basedir = safe_mkdtemp()
         lib_dir = os.path.join(basedir, LIB_DIR)
-        synthetic_jar_dir = os.path.join(basedir, SYNTHENTIC_JAR_DIR)
+        synthetic_jar_dir = os.path.join(basedir, SYNTHETIC_JAR_DIR)
         resource_dir = os.path.join(lib_dir, RESOURCES)
         jar_file = os.path.join(lib_dir, JAR_FILE)
 

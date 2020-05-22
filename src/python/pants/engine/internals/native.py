@@ -10,11 +10,13 @@ import sysconfig
 import traceback
 from contextlib import closing
 from types import CoroutineType
-from typing import Any, Iterable, List, NamedTuple, Tuple, Type, cast
+from typing import Any, Dict, Iterable, List, NamedTuple, Tuple, Type, cast
 
 import cffi
 import pkg_resources
+from typing_extensions import Protocol
 
+from pants.base.exiter import ExitCode
 from pants.base.project_tree import Dir, File, Link
 from pants.engine.addresses import Address
 from pants.engine.fs import (
@@ -605,6 +607,20 @@ class RawResult(NamedTuple):
     raw_pointer: Any
 
 
+class RawFdRunner(Protocol):
+    def __call__(
+        self,
+        command: str,
+        args: Tuple[str, ...],
+        env: Dict[str, str],
+        working_directory: bytes,
+        stdin_fd: int,
+        stdout_fd: int,
+        stderr_fd: int,
+    ) -> ExitCode:
+        ...
+
+
 class ExternContext:
     """A wrapper around python objects used in static extern functions in this module.
 
@@ -669,12 +685,21 @@ class ExternContext:
 
     def raise_or_return(self, pyresult):
         """Consumes the given PyResult to raise/return the exception/value it represents."""
-        value = self.from_value(pyresult.handle)
-        self._handles.remove(pyresult.handle)
+        value = self.from_value(pyresult.result)
+        self._handles.remove(pyresult.result)
         if pyresult.is_throw:
             raise value
         else:
             return value
+
+    def raise_raw_or_return(self, raw_result):
+        """Consumes the given RawResult to raise/return the exception/value it represents."""
+        if raw_result.is_throw:
+            value = self.from_value(raw_result.throw_handle)
+            self.drop_handles([raw_result.throw_handle])
+            raise value
+        else:
+            return raw_result.raw_pointer
 
     def drop_handles(self, handles):
         self._handles -= set(handles)
@@ -874,10 +899,11 @@ class Native(metaclass=SingletonMetaclass):
         return self.lib.write_log(msg.encode(), level, target.encode())
 
     def write_stdout(self, session, msg: str):
-        return self.lib.write_stdout(session, msg.encode())
+        res = self.lib.write_stdout(session, msg.encode())
+        self.context.raise_or_return(res)
 
     def write_stderr(self, session, msg: str):
-        return self.lib.write_stdout(session, msg.encode())
+        return self.lib.write_stderr(session, msg.encode())
 
     def flush_log(self):
         return self.lib.flush_log()
@@ -894,6 +920,16 @@ class Native(metaclass=SingletonMetaclass):
         result = self.lib.match_path_globs(path_globs, paths_buf)
         return cast(bool, self.context.raise_or_return(result))
 
+    def nailgun_server_await_bound(self, scheduler, nailgun_server) -> int:
+        result = self.lib.nailgun_server_await_bound(scheduler, nailgun_server)
+        return cast(int, self.context.raise_or_return(result))
+
+    def new_nailgun_server(self, scheduler, port: int, runner: RawFdRunner):
+        nailgun_server = self.context.raise_raw_or_return(
+            self.lib.nailgun_server_create(scheduler, port, Function(self.context.to_key(runner)))
+        )
+        return self.gc(nailgun_server, self.lib.nailgun_server_destroy)
+
     def new_tasks(self):
         return self.gc(self.lib.tasks_create(), self.lib.tasks_destroy)
 
@@ -904,7 +940,7 @@ class Native(metaclass=SingletonMetaclass):
         self,
         scheduler,
         should_record_zipkin_spans,
-        should_render_ui,
+        dynamic_ui: bool,
         build_id,
         should_report_workunits: bool,
     ):
@@ -912,7 +948,7 @@ class Native(metaclass=SingletonMetaclass):
             self.lib.session_create(
                 scheduler,
                 should_record_zipkin_spans,
-                should_render_ui,
+                dynamic_ui,
                 self.context.utf8_buf(build_id),
                 should_report_workunits,
             ),
@@ -923,8 +959,9 @@ class Native(metaclass=SingletonMetaclass):
         self,
         tasks,
         root_subject_types,
-        build_root,
-        local_store_dir,
+        build_root: str,
+        local_store_dir: str,
+        local_execution_root_dir: str,
         ignore_patterns: List[str],
         use_gitignore: bool,
         execution_options,
@@ -971,12 +1008,13 @@ class Native(metaclass=SingletonMetaclass):
             construct_platform=func(Platform),
         )
 
-        scheduler_result = self.lib.scheduler_create(
+        scheduler_raw_result = self.lib.scheduler_create(
             tasks,
             engine_types,
             # Project tree.
             self.context.utf8_buf(build_root),
             self.context.utf8_buf(local_store_dir),
+            self.context.utf8_buf(local_execution_root_dir),
             self.context.utf8_buf_buf(ignore_patterns),
             use_gitignore,
             self.to_ids_buf(root_subject_types),
@@ -1003,14 +1041,8 @@ class Native(metaclass=SingletonMetaclass):
             execution_options.process_execution_use_local_cache,
             self.context.utf8_dict(execution_options.remote_execution_headers),
             execution_options.process_execution_local_enable_nailgun,
-            execution_options.experimental_fs_watcher,
         )
-        if scheduler_result.is_throw:
-            value = self.context.from_value(scheduler_result.throw_handle)
-            self.context.drop_handles([scheduler_result.throw_handle])
-            raise value
-        else:
-            scheduler = scheduler_result.raw_pointer
+        scheduler = self.context.raise_raw_or_return(scheduler_raw_result)
         return self.gc(scheduler, self.lib.scheduler_destroy)
 
     def set_panic_handler(self):

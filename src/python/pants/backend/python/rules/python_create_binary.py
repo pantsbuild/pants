@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Tuple
 
 from pants.backend.python.rules.pex import PexPlatforms, TwoStepPex
 from pants.backend.python.rules.pex_from_targets import (
@@ -20,7 +20,6 @@ from pants.backend.python.target_types import (
     PythonEntryPoint,
 )
 from pants.backend.python.target_types import PythonPlatforms as PythonPlatformsField
-from pants.backend.python.targets.python_binary import PythonBinary
 from pants.core.goals.binary import BinaryFieldSet, CreatedBinary
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
 from pants.engine.addresses import Addresses
@@ -57,25 +56,18 @@ class PythonBinaryFieldSet(BinaryFieldSet):
         if self.shebang.value is not None:
             args.append(f"--python-shebang={self.shebang.value}")
         if self.zip_safe.value is False:
-            args.append(f"--not-zip-safe")
+            args.append("--not-zip-safe")
         return tuple(args)
 
 
 @rule
 async def create_python_binary(field_set: PythonBinaryFieldSet) -> CreatedBinary:
-    entry_point: Optional[str]
-    if field_set.entry_point.value is not None:
-        entry_point = field_set.entry_point.value
-    else:
+    entry_point = field_set.entry_point.value
+    if entry_point is None:
         source_files = await Get[SourceFiles](
             AllSourceFilesRequest([field_set.sources], strip_source_roots=True)
         )
-        # NB: `PythonBinarySources` enforces that we have 0-1 sources.
-        if len(source_files.files) == 1:
-            module_name = source_files.files[0]
-            entry_point = PythonBinary.translate_source_path_to_py_module_specifier(module_name)
-        else:
-            entry_point = None
+        entry_point = PythonBinarySources.translate_source_file_to_entry_point(source_files.files)
 
     output_filename = f"{field_set.address.target_name}.pex"
     two_step_pex = await Get[TwoStepPex](

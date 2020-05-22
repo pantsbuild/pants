@@ -1,9 +1,8 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import os
+from pathlib import Path
 
-from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -28,17 +27,11 @@ class FilemapIntegrationTest(PantsRunIntegrationTest):
 
     def setUp(self):
         super().setUp()
-
-        project_tree = FileSystemProjectTree(os.path.abspath(self.PATH_PREFIX), ["BUILD", ".*"])
-        scan_set = set()
-
-        def should_ignore(file):
-            return file.endswith(".pyc") or file.endswith("__init__.py")
-
-        for root, dirs, files in project_tree.walk(""):
-            scan_set.update({os.path.join(root, f) for f in files if not should_ignore(f)})
-
-        self.assertEqual(scan_set, self.TEST_EXCLUDE_FILES)
+        assert self.TEST_EXCLUDE_FILES == {
+            str(fp.relative_to(self.PATH_PREFIX))
+            for fp in Path(self.PATH_PREFIX).rglob("*.py")
+            if not fp.name == "__init__.py"
+        }
 
     def _mk_target(self, test_name):
         return f"{self.PATH_PREFIX}:{test_name}"

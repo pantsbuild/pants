@@ -4,7 +4,7 @@
 import logging
 from abc import ABC
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -52,4 +52,6 @@ class Return(State):
 class Throw(State):
     """Indicates that a Node should have been able to return a value, but failed."""
 
-    exc: Any
+    exc: Exception
+    python_traceback: Optional[str] = None
+    engine_traceback: Tuple[str, ...] = tuple()

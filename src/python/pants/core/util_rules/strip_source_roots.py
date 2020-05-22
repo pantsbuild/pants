@@ -21,7 +21,7 @@ from pants.engine.rules import RootRule, SubsystemRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import HydratedSources, HydrateSourcesRequest
 from pants.engine.target import Sources as SourcesField
-from pants.source.source_root import NoSourceRootError, SourceRootConfig
+from pants.source.source_root import SourceRootConfig
 from pants.util.meta import frozen_after_init
 
 
@@ -81,25 +81,20 @@ async def strip_source_roots_from_snapshot(
 ) -> SourceRootStrippedSources:
     """Removes source roots from a snapshot, e.g. `src/python/pants/util/strutil.py` ->
     `pants/util/strutil.py`."""
+    if not request.snapshot.files:
+        return SourceRootStrippedSources(request.snapshot)
+
     source_roots_object = source_root_config.get_source_roots()
 
     def determine_source_root(path: str) -> str:
-        source_root = source_roots_object.safe_find_by_path(path)
-        if source_root is not None:
-            return cast(str, source_root.path)
-        if source_root_config.options.unmatched == "fail":
-            raise NoSourceRootError(f"Could not find a source root for `{path}`.")
-        # Otherwise, create a source root by using the parent directory.
-        return PurePath(path).parent.as_posix()
+        return cast(str, source_roots_object.strict_find_by_path(path).path)
 
     if request.representative_path is not None:
-        resulting_digest = await Get[Digest](
-            RemovePrefix(
-                request.snapshot.digest, determine_source_root(request.representative_path),
-            )
-        )
-        resulting_snapshot = await Get[Snapshot](Digest, resulting_digest)
-        return SourceRootStrippedSources(snapshot=resulting_snapshot)
+        source_root = determine_source_root(request.representative_path)
+        if source_root == ".":
+            return SourceRootStrippedSources(request.snapshot)
+        resulting_snapshot = await Get[Snapshot](RemovePrefix(request.snapshot.digest, source_root))
+        return SourceRootStrippedSources(resulting_snapshot)
 
     files_grouped_by_source_root = {
         source_root: tuple(files)
@@ -107,6 +102,14 @@ async def strip_source_roots_from_snapshot(
             request.snapshot.files, key=determine_source_root
         )
     }
+
+    if len(files_grouped_by_source_root) == 1:
+        source_root = next(iter(files_grouped_by_source_root.keys()))
+        if source_root == ".":
+            return SourceRootStrippedSources(request.snapshot)
+        resulting_snapshot = await Get[Snapshot](RemovePrefix(request.snapshot.digest, source_root))
+        return SourceRootStrippedSources(resulting_snapshot)
+
     snapshot_subsets = await MultiGet(
         Get[Snapshot](SnapshotSubset(request.snapshot.digest, PathGlobs(files)))
         for files in files_grouped_by_source_root.values()
@@ -116,8 +119,7 @@ async def strip_source_roots_from_snapshot(
         for snapshot, source_root in zip(snapshot_subsets, files_grouped_by_source_root.keys())
     )
 
-    merged_result = await Get[Digest](MergeDigests(resulting_digests))
-    resulting_snapshot = await Get[Snapshot](Digest, merged_result)
+    resulting_snapshot = await Get[Snapshot](MergeDigests(resulting_digests))
     return SourceRootStrippedSources(resulting_snapshot)
 
 

@@ -7,7 +7,7 @@ import time
 import unittest
 import unittest.mock
 
-from pants.java.nailgun_io import NailgunStreamWriter, Pipe, PipedNailgunStreamWriter
+from pants.java.nailgun_io import NailgunStreamWriter
 from pants.java.nailgun_protocol import ChunkType, NailgunProtocol
 
 PATCH_OPTS = dict(autospec=True, spec_set=True)
@@ -65,33 +65,13 @@ class TestNailgunStreamWriter(unittest.TestCase):
             ]
         )
 
-
-class TestPipedNailgunStreamWriter(unittest.TestCase):
-    def setUp(self):
-        self.mock_socket = unittest.mock.Mock()
-
+    @unittest.mock.patch("os.close")
     @unittest.mock.patch("os.read")
     @unittest.mock.patch("select.select")
-    @unittest.mock.patch.object(NailgunProtocol, "write_chunk")
-    def test_auto_shutdown_on_write_end_closed(self, mock_writer, mock_select, mock_read):
-        pipe = Pipe.create(False)
-        test_data = [b"A"] * 1000 + [b""]
-        mock_read.side_effect = test_data
-        mock_select.side_effect = [([pipe.read_fd], [], [])] * len(test_data)
-
-        writer = PipedNailgunStreamWriter(
-            pipes=[pipe],
-            socket=self.mock_socket,
-            chunk_type=(ChunkType.STDOUT,),
-            chunk_eof_type=None,
-            buf_size=len(b"A"),
-        )
-
-        with writer.running():
-            pipe.stop_writing()
-            writer.join(1)
-            self.assertFalse(writer.is_alive())
-
-        mock_writer.assert_has_calls(
-            [unittest.mock.call(unittest.mock.ANY, ChunkType.STDOUT, b"A")] * (len(test_data) - 1)
-        )
+    def test_run_exits_for_closed_and_errored_socket(self, mock_select, mock_read, mock_close):
+        # When stdin is closed, select can indicate that it is both empty and errored.
+        mock_select.return_value = ([self.in_fd], [self.in_fd], [])
+        mock_read.return_value = b""  # EOF.
+        self.writer.run()
+        assert self.writer.is_alive() is False
+        assert mock_select.call_count == 1

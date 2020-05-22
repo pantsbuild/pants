@@ -9,7 +9,7 @@ This document outlines all the moving pieces of pantsd, and explains how it work
 ProcessManager
 --------------
 
-[`ProcessManager`](https://github.com/pantsbuild/pants/blob/master/src/python/pants/pantsd/process_manager.py#223) is a class designed to keep track of processes. Besides changing their state (paused, terminating...), it allows a process to fork in different ways. Classes that extend `ProcessManager` can (and often do) inject code to be run before and after forking by overriding the functions `pre_fork`, `post_fork_child`, `post_fork_parent`. Some examples of usage of these functions are [`DaemonPantsRunner`](https://github.com/pantsbuild/pants/blob/master/src/python/pants/bin/daemon_pants_runner.py#74) invoking a [`LocalPantsRunner`](https://github.com/pantsbuild/pants/blob/master/src/python/pants/bin/local_pants_runner.py#28) in its `post_fork_child`, to fulfill a request to [`PailgunServer`](https://github.com/pantsbuild/pants/blob/master/src/python/pants/pantsd/pailgun_server.py#91).
+[`ProcessManager`](https://github.com/pantsbuild/pants/blob/master/src/python/pants/pantsd/process_manager.py#223) is a class designed to keep track of processes. Besides changing their state (paused, terminating...), it allows a process to fork in different ways. Classes that extend `ProcessManager` can (and often do) inject code to be run before and after forking by overriding the functions `pre_fork`, `post_fork_child`, `post_fork_parent`. An example of one of these functions is in [`NailgunExecutor`](https://github.com/pantsbuild/pants/blob/aa70d5a3911f78ac9e1f64d2a85ff9dbec1b9dd0/src/python/pants/java/nailgun_executor.py#L296), where we start a Nailgun server that we can connect to, after forking the main Pants process.
 
 The `PantsDaemon` Class
 -----------------------
@@ -22,7 +22,7 @@ The [`PantsDaemon`](https://github.com/pantsbuild/pants/blob/master/src/python/p
 Initialization is encapsulated in the `PantsDaemon.Factory.create()` method.
 `PantsDaemon` is a `ProcessManager`, which means one can know if it's alive, or if it needs to restart.
 
-`PantsDaemon`s can be `launch()`ed, which will terminate the process it was running, and call `daemon_spawn()` to fork a new process. This new process will run the code in `PantsDaemon.post_fork_child()`, which in short means it will run `os.spawnve` to execute the `pants_daemon.py:launch()` function, which will call `PantsDaemon.run_sync()`. `run_sync()` does a lot of things, but the vital things are calling `_setup_services()` to spin up services, and `_run_services()` to start an infinte loop polling them. 
+`PantsDaemon`s can be `launch()`ed, which will terminate the process it was running, and call `daemon_spawn()` to fork a new process. This new process will run the code in `PantsDaemon.post_fork_child()`, which in short means it will run `os.spawnve` to execute the `pants_daemon.py:launch()` function, which will call `PantsDaemon.run_sync()`. `run_sync()` does a lot of things, but the vital things are calling `_setup_services()` to spin up services, and `_run_services()` to start an infinite loop polling them. More on services later.
 
 Pailgun
 -------
@@ -31,7 +31,7 @@ The [Nailgun Protocol](http://www.martiansoftware.com/nailgun/protocol.html) is 
 
 The protocol is subject to change slightly in [#6579](https://github.com/pantsbuild/pants/pull/6579).
 
-In Pantsd, [`PailgunServer`](https://github.com/pantsbuild/pants/blob/master/src/python/pants/pantsd/pailgun_server.py#91) is the class responsible for reading Pailgun requests and handling them, by spawning a [`PailgunHandler`](https://github.com/pantsbuild/pants/blob/master/src/python/pants/pantsd/pailgun_server.py#52).
+In Pantsd, [`PailgunServer`](https://github.com/pantsbuild/pants/blob/master/src/python/pants/pantsd/pailgun_server.py#91) is the class responsible for reading Pailgun requests and handling them, by spawning [`PailgunHandler`](https://github.com/pantsbuild/pants/blob/master/src/python/pants/pantsd/pailgun_server.py#52)s in new threads.
 
 Services
 --------
@@ -45,7 +45,7 @@ Examples of services are [`FSEventService`](https://github.com/pantsbuild/pants/
 A `PailgunService` is a `PantsService` which spins up and polls a `PailgunServer`.
 A `PailgunServer` is a `TCPServer` with `ThreadingMixIn`, which listens to Pailgun requests in a socket and spins up instances of `PailgunHandler`s to handle them. It overrides `ThreadingMixIn.process_request_thread()` to spin up one thread and one handler per request. A `PailgunServer` holds a reference to the class `DaemonPantsRunner`, which can be used to run pants from the server.
 A `PailgunHandler` is a class that parses the requests sent to the server, and uses `DaemonPantsRunner` to invoke pants with the environment and arguments specified by the request.
-A `DaemonPantsRunner` implements a `run()` method that creates an instance of `LocalPantsRunner`.
+A `DaemonPantsRunner` implements a `run()` method that creates an instance of `LocalPantsRunner`, which will be used to run the requested pants command.
 
 An end-to-end run with Pantsd
 -----------------------------
@@ -65,7 +65,7 @@ If we run the command `./pants --enable-pantsd list src/scala::`, the following 
   * With a handle to the pantsd process, `RemotePantsRunner` will now call `_run_pants_with_retry()`, which will try to `_connect_and_execute()` to the port supplied by the handle, probably more than once.
   To do that, it will create a `NailgunClient` instance with will use the pailgun protocol described above to tell the pantsd process to invoke pants, with a call along the lines of:
   `result = client.execute('./pants', *self._args, **modified_env)`
-  * After that request is finished, it will record the result and the local process will exit.
+  * After that request is finished, it will record the result and the local process will exit. But before that happens, this is what happens from the pantsd side:
 
 3. The `PailgunService` will receive that request, and it will handle it as follows:
   * `PailgunService` is endlessly polling for requests via calling `PailgunServer.handle_request()`.

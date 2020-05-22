@@ -7,52 +7,44 @@ from typing import Any, Iterable, Mapping, Optional
 from pants.backend.python.rules.hermetic_pex import HermeticPex
 from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
-from pants.binaries.binary_tool import BinaryToolFetchRequest, Script, ToolForPlatform, ToolVersion
-from pants.binaries.binary_util import BinaryToolUrlGenerator
-from pants.engine.fs import Digest, SingleFileExecutable, Snapshot
-from pants.engine.platform import PlatformConstraint
+from pants.core.util_rules.external_tool import (
+    DownloadedExternalTool,
+    ExternalTool,
+    ExternalToolRequest,
+)
+from pants.engine.fs import Digest
+from pants.engine.platform import Platform
 from pants.engine.process import Process
 from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get
 from pants.python.python_setup import PythonSetup
 
 
-class PexBinUrlGenerator(BinaryToolUrlGenerator):
-    def generate_urls(self, version, host_platform):
-        return [f"https://github.com/pantsbuild/pex/releases/download/{version}/pex"]
+class PexBin(ExternalTool):
+    options_scope = "download-pex-bin"
+    name = "pex"
+    default_version = "v2.1.11"
+    default_known_versions = [
+        f"v2.1.11|{plat}|01cca03feeb605ccc6ea3cbf0d4c3df10e847a9ace5d40298c8b3be5ce3c05a4|2631388"
+        for plat in ["darwin", "linux"]
+    ]
+
+    def generate_url(self, plat: Platform) -> str:
+        return f"https://github.com/pantsbuild/pex/releases/download/{self.options.version}/pex"
 
 
 @dataclass(frozen=True)
 class DownloadedPexBin(HermeticPex):
-    exe: SingleFileExecutable
+    downloaded_tool: DownloadedExternalTool
 
     @property
     def executable(self) -> str:
-        return self.exe.exe_filename
+        return self.downloaded_tool.exe
 
     @property
     def digest(self) -> Digest:
         """A directory digest containing the Pex executable."""
-        return self.exe.digest
-
-    class Factory(Script):
-        options_scope = "download-pex-bin"
-        name = "pex"
-        default_version = "v2.1.9"
-
-        # Note: You can compute the digest and size using:
-        # curl -L https://github.com/pantsbuild/pex/releases/download/vX.Y.Z/pex | tee >(wc -c) >(shasum -a 256) >/dev/null
-        default_versions_and_digests = {
-            PlatformConstraint.none: ToolForPlatform(
-                digest=Digest(
-                    "4e2677ce7270dd04d767e93e1904c90aa8c7f4f53b76f3615215970b45d100d7", 2624111
-                ),
-                version=ToolVersion("v2.1.9"),
-            ),
-        }
-
-        def get_external_url_generator(self):
-            return PexBinUrlGenerator()
+        return self.downloaded_tool.digest
 
     def create_process(  # type: ignore[override]
         self,
@@ -62,7 +54,7 @@ class DownloadedPexBin(HermeticPex):
         *,
         pex_args: Iterable[str],
         description: str,
-        input_files: Optional[Digest] = None,
+        input_digest: Optional[Digest] = None,
         env: Optional[Mapping[str, str]] = None,
         **kwargs: Any,
     ) -> Process:
@@ -75,10 +67,10 @@ class DownloadedPexBin(HermeticPex):
         :param pex_build_environment: The build environment for the pex tool.
         :param pex_args: The arguments to pass to the pex CLI tool.
         :param description: A description of the process execution to be performed.
-        :param input_files: The files that contain the pex CLI tool itself and any input files it
-                            needs to run against. By default, this is just the files that contain
-                            the PEX CLI tool itself. To merge in additional files, include
-                            `self.digest` in a `MergeDigests` request.
+        :param input_digest: The directory digest that contain the PEX CLI tool itself and any
+                             input files it needs to run against. By default, this is just the
+                             files that contain the PEX CLI tool itself. To merge in additional
+                             files, include `self.digest` in a `MergeDigests` request.
         :param env: The environment to run the PEX in.
         :param kwargs: Any additional :class:`Process` kwargs to pass through.
         """
@@ -92,17 +84,19 @@ class DownloadedPexBin(HermeticPex):
             pex_path=self.executable,
             pex_args=pex_args,
             description=description,
-            input_files=input_files or self.digest,
+            input_digest=input_digest or self.digest,
             env=env,
             **kwargs,
         )
 
 
 @rule
-async def download_pex_bin(pex_binary_tool: DownloadedPexBin.Factory) -> DownloadedPexBin:
-    snapshot = await Get[Snapshot](BinaryToolFetchRequest(pex_binary_tool))
-    return DownloadedPexBin(SingleFileExecutable(snapshot))
+async def download_pex_bin(pex_binary_tool: PexBin) -> DownloadedPexBin:
+    downloaded_tool = await Get[DownloadedExternalTool](
+        ExternalToolRequest, pex_binary_tool.get_request(Platform.current)
+    )
+    return DownloadedPexBin(downloaded_tool)
 
 
 def rules():
-    return [download_pex_bin, SubsystemRule(DownloadedPexBin.Factory)]
+    return [download_pex_bin, SubsystemRule(PexBin)]

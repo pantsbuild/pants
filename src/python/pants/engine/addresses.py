@@ -25,8 +25,8 @@ def assert_single_address(addresses: Sequence[Address]) -> None:
 
 class Addresses(Collection[Address]):
     def expect_single(self) -> Address:
-        assert_single_address(self.dependencies)
-        return self.dependencies[0]
+        assert_single_address(self)
+        return self[0]
 
 
 @dataclass(frozen=True)
@@ -39,10 +39,8 @@ class AddressWithOrigin:
 
 class AddressesWithOrigins(Collection[AddressWithOrigin]):
     def expect_single(self) -> AddressWithOrigin:
-        assert_single_address(
-            [address_with_origin.address for address_with_origin in self.dependencies]
-        )
-        return self.dependencies[0]
+        assert_single_address([address_with_origin.address for address_with_origin in self])
+        return self[0]
 
 
 class BuildFileAddresses(Collection[BuildFileAddress]):

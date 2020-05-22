@@ -119,22 +119,16 @@ class PantsReleases(Subsystem):
         return self.get_options().branch_notes
 
     @classmethod
-    def _branch_name(cls, version):
+    def _branch_name(cls, version) -> str:
         """Defines a mapping between versions and branches.
 
-        In particular, `-dev` suffixed releases always live on master. Any other (modern) release
-        lives in a branch.
+        All releases, including dev releases, map to a particular branch page.
         """
         suffix = version.public[len(version.base_version) :]
         components = version.base_version.split(".") + [suffix]
-        if suffix == "" or suffix.startswith("rc"):
-            # An un-suffixed, or suffixed-with-rc version is a release from a stable branch.
-            return "{}.{}.x".format(*components[:2])
-        elif suffix.startswith(".dev"):
-            # Suffixed `dev` release version in master.
-            return "master"
-        else:
+        if suffix != "" and not (suffix.startswith("rc") or suffix.startswith(".dev")):
             raise ValueError(f"Unparseable pants version number: {version}")
+        return "{}.{}.x".format(*components[:2])
 
     def notes_for_version(self, version) -> str:
         """Given the parsed Version of pants, return its release notes.
@@ -175,6 +169,7 @@ class PantsPluginV1(PythonLibraryV1):
         global_subsystems=False,
         register_goals=False,
         rules=False,
+        target_types=False,
         **kwargs,
     ):
         """
@@ -192,6 +187,8 @@ class PantsPluginV1(PythonLibraryV1):
                                     registers the 'register_goals' 'pantsbuild.plugin' entrypoint.
         :param bool rules: If `True`, register.py:rules must be defined and registers the 'rules'
                            'pantsbuild.plugin' entrypoint.
+        :param bool target_types: If `True`, register.py:target_types must be defined and registers
+                                  the 'target_types' 'pantsbuild.plugin' entrypoint.
         """
         if not distribution_name.startswith("pantsbuild.pants."):
             raise ValueError(
@@ -211,20 +208,21 @@ class PantsPluginV1(PythonLibraryV1):
 
         super().__init__(address, payload, provides=setup_py, **kwargs)
 
-        if build_file_aliases or register_goals or global_subsystems or rules:
+        if build_file_aliases or register_goals or global_subsystems or rules or target_types:
             module = os.path.relpath(address.spec_path, self.target_base).replace(os.sep, ".")
-            entrypoints = []
+            entry_points = []
             if build_file_aliases:
-                entrypoints.append(f"build_file_aliases = {module}.register:build_file_aliases")
+                entry_points.append(f"build_file_aliases = {module}.register:build_file_aliases")
             if register_goals:
-                entrypoints.append(f"register_goals = {module}.register:register_goals")
+                entry_points.append(f"register_goals = {module}.register:register_goals")
             if global_subsystems:
-                entrypoints.append(f"global_subsystems = {module}.register:global_subsystems")
+                entry_points.append(f"global_subsystems = {module}.register:global_subsystems")
             if rules:
-                entrypoints.append(f"rules = {module}.register:rules")
-            entry_points = {"pantsbuild.plugin": entrypoints}
+                entry_points.append(f"rules = {module}.register:rules")
+            if target_types:
+                entry_points.append(f"target_types = {module}.register:target_types")
 
-            setup_py.setup_py_keywords["entry_points"] = entry_points
+            setup_py.setup_py_keywords["entry_points"] = {"pantsbuild.plugin": entry_points}
             self.mark_invalidation_hash_dirty()  # To pickup the PythonArtifact (setup_py) changes.
 
 
@@ -306,12 +304,20 @@ class PantsRulesToggle(BoolField):
     default = False
 
 
+class PantsTargetTypesToggle(BoolField):
+    """If `True`, register.py:target_types must be defined and registers the 'target_types'
+    'pantsbuild.plugin' entrypoint."""
+
+    alias = "target_types"
+    default = False
+
+
 class PantsPlugin(Target):
     """A Pants plugin published by pantsbuild."""
 
     alias = "pants_plugin"
     core_fields = (
-        *FrozenOrderedSet(PythonLibrary.core_fields) - {DescriptionField},  # type: ignore[misc]
+        *(FrozenOrderedSet(PythonLibrary.core_fields) - {DescriptionField}),  # type: ignore[misc]
         PantsPluginDistributionName,
         PantsPluginDescription,
         PantsPluginAdditionalClassifiers,
@@ -319,6 +325,7 @@ class PantsPlugin(Target):
         PantsGlobalSubsystemsToggle,
         PantsRegisterGoalsToggle,
         PantsRulesToggle,
+        PantsTargetTypesToggle,
     )
 
 

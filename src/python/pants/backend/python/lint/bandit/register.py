@@ -3,7 +3,8 @@
 
 """Security linter for Python.
 
-See https://bandit.readthedocs.io/en/latest/.
+See https://pants.readme.io/docs/python-linters-and-formatters and
+https://bandit.readthedocs.io/en/latest/.
 """
 
 from pants.backend.python.lint.bandit import rules as bandit_rules

@@ -8,6 +8,7 @@ from contextlib import contextmanager
 from typing import List, Mapping
 
 from pants.base.exception_sink import ExceptionSink, SignalHandler
+from pants.base.exiter import ExitCode
 from pants.console.stty_utils import STTYSettings
 from pants.java.nailgun_client import NailgunClient
 from pants.java.nailgun_protocol import NailgunProtocol
@@ -58,7 +59,6 @@ class RemotePantsRunner:
     class Terminated(Exception):
         """Raised when an active run is terminated mid-flight."""
 
-    PANTS_COMMAND = "pants"
     RECOVERABLE_EXCEPTIONS = (
         NailgunClient.NailgunConnectionError,
         NailgunClient.NailgunExecutionError,
@@ -66,7 +66,6 @@ class RemotePantsRunner:
 
     def __init__(
         self,
-        exiter,
         args: List[str],
         env: Mapping[str, str],
         options_bootstrapper: OptionsBootstrapper,
@@ -75,7 +74,6 @@ class RemotePantsRunner:
         stderr=None,
     ) -> None:
         """
-        :param Exiter exiter: The Exiter instance to use for this run.
         :param args: The arguments (e.g. sys.argv) for this run.
         :param env: The environment (e.g. os.environ) for this run.
         :param options_bootstrapper: The bootstrap options.
@@ -84,7 +82,6 @@ class RemotePantsRunner:
         :param file stderr: The stream representing stderr.
         """
         self._start_time = time.time()
-        self._exiter = exiter
         self._args = args
         self._env = env
         self._options_bootstrapper = options_bootstrapper
@@ -109,7 +106,9 @@ class RemotePantsRunner:
         """Minimal backoff strategy for daemon restarts."""
         time.sleep(attempt + (attempt - 1))
 
-    def _run_pants_with_retry(self, pantsd_handle: PantsDaemon.Handle, retries: int = 3):
+    def _run_pants_with_retry(
+        self, pantsd_handle: PantsDaemon.Handle, retries: int = 3
+    ) -> ExitCode:
         """Runs pants remotely with retry and recovery for nascent executions.
 
         :param pantsd_handle: A Handle for the daemon to connect to.
@@ -147,11 +146,11 @@ class RemotePantsRunner:
                 traceback = sys.exc_info()[2]
                 raise self._extract_remote_exception(pantsd_handle.pid, e).with_traceback(traceback)
 
-    def _connect_and_execute(self, pantsd_handle: PantsDaemon.Handle):
+    def _connect_and_execute(self, pantsd_handle: PantsDaemon.Handle) -> ExitCode:
         port = pantsd_handle.port
         pid = pantsd_handle.pid
         # Merge the nailgun TTY capability environment variables with the passed environment dict.
-        ng_env = NailgunProtocol.isatty_to_env(self._stdin, self._stdout, self._stderr)
+        ng_env = NailgunProtocol.ttynames_to_env(self._stdin, self._stdout, self._stderr)
         modified_env = {
             **self._env,
             **ng_env,
@@ -178,10 +177,7 @@ class RemotePantsRunner:
 
         with self._trapped_signals(client, pantsd_handle.pid), STTYSettings.preserved():
             # Execute the command on the pailgun.
-            result = client.execute(self.PANTS_COMMAND, *self._args, **modified_env)
-
-        # Exit.
-        self._exiter.exit(result)
+            return client.execute(self._args[0], self._args[1:], modified_env)
 
     def _extract_remote_exception(self, pantsd_pid, nailgun_error):
         """Given a NailgunError, returns a Terminated exception with additional info (where
@@ -211,6 +207,6 @@ class RemotePantsRunner:
     def _restart_pantsd(self):
         return PantsDaemon.Factory.restart(options_bootstrapper=self._options_bootstrapper)
 
-    def run(self, args=None) -> None:
+    def run(self, start_time: float) -> ExitCode:
         handle = PantsDaemon.Factory.maybe_launch(options_bootstrapper=self._options_bootstrapper)
-        self._run_pants_with_retry(handle)
+        return self._run_pants_with_retry(handle)

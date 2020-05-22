@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import DefaultDict, List, Tuple, Union, cast
 
-from pants.base.exceptions import ResolveError, TargetDefinitionException
+from pants.base.exceptions import ResolveError
 from pants.base.specs import (
     AddressSpecs,
     AscendantAddresses,
@@ -30,6 +30,7 @@ from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
     Dependencies,
+    DependenciesRequest,
     HydratedSources,
     HydrateSourcesRequest,
     RegisteredTargetTypes,
@@ -40,6 +41,7 @@ from pants.engine.target import (
     TargetWithOrigin,
     TransitiveTarget,
     TransitiveTargets,
+    UnrecognizedTargetTypeException,
     WrappedTarget,
 )
 from pants.engine.unions import UnionMembership
@@ -70,29 +72,9 @@ async def resolve_target(
     address = cast(Address, kwargs.pop("address"))
     kwargs.pop("name", None)
 
-    # We convert `source` into `sources` because the Target API has no `Source` field, only
-    # `Sources`.
-    if "source" in kwargs and "sources" in kwargs:
-        raise TargetDefinitionException(
-            address, "Cannot specify both `source` and `sources` fields."
-        )
-    if "source" in kwargs:
-        source = kwargs.pop("source")
-        if not isinstance(source, str):
-            raise TargetDefinitionException(
-                address,
-                f"The `source` field must be a string containing a path relative to the target, "
-                f"but got {source} of type {type(source)}.",
-            )
-        kwargs["sources"] = [source]
-
     target_type = registered_target_types.aliases_to_types.get(type_alias, None)
     if target_type is None:
-        raise TargetDefinitionException(
-            address,
-            f"Target type {repr(type_alias)} is not recognized. All valid target types: "
-            f"{sorted(registered_target_types.aliases)}.",
-        )
+        raise UnrecognizedTargetTypeException(type_alias, registered_target_types, address=address)
 
     # Not every target type has the Dependencies field registered, but the StructWithDependencies
     # code means that `kwargs` will always have an entry. We must remove `dependencies` from
@@ -143,11 +125,10 @@ async def resolve_targets_with_origins(
 @rule
 async def transitive_target(wrapped_root: WrappedTarget) -> TransitiveTarget:
     root = wrapped_root.target
-    dependencies = (
-        await MultiGet(Get[TransitiveTarget](Address, d) for d in root[Dependencies].value or ())
-        if root.has_field(Dependencies)
-        else tuple()
-    )
+    if not root.has_field(Dependencies):
+        return TransitiveTarget(root, ())
+    dependency_addresses = await Get[Addresses](DependenciesRequest(root[Dependencies]))
+    dependencies = await MultiGet(Get[TransitiveTarget](Address, d) for d in dependency_addresses)
     return TransitiveTarget(root, dependencies)
 
 
@@ -261,7 +242,9 @@ async def addresses_with_origins_from_filesystem_specs(
             msg = (
                 f"No owning targets could be found for the file `{file_path}`.\n\nPlease check "
                 f"that there is a BUILD file in `{file_path.parent}` with a target whose `sources` field "
-                f"includes `{file_path}`. See https://www.pantsbuild.org/build_files.html."
+                f"includes `{file_path}`. See https://pants.readme.io/docs/targets for more "
+                "information on target definitions.\n"
+                "If you would like to ignore un-owned files, please pass `--owners-not-found-behavior=ignore`."
             )
             if global_options.options.owners_not_found_behavior == OwnersNotFoundBehavior.warn:
                 logger.warning(msg)

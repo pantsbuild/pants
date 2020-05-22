@@ -24,6 +24,10 @@
 #![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
+#![type_length_limit = "8576838"]
+
+#[macro_use]
+extern crate log;
 
 mod snapshot;
 pub use crate::snapshot::{OneOffStoreFileByDigest, Snapshot, StoreFileByDigest};
@@ -312,7 +316,7 @@ impl Store {
   ///
   pub async fn load_file_bytes_with<
     T: Send + 'static,
-    F: Fn(Bytes) -> T + Send + Sync + 'static,
+    F: Fn(&[u8]) -> T + Send + Sync + 'static,
   >(
     &self,
     digest: Digest,
@@ -327,8 +331,8 @@ impl Store {
       .load_bytes_with(
         EntryType::File,
         digest,
-        move |v: Bytes| Ok(f_local(v)),
-        move |v: Bytes| Ok(f_remote(v)),
+        move |v: &[u8]| Ok(f_local(v)),
+        move |v: Bytes| Ok(f_remote(&v)),
       )
       .await
   }
@@ -369,7 +373,7 @@ impl Store {
         digest,
         // Trust that locally stored values were canonical when they were written into the CAS,
         // don't bother to check this, as it's slightly expensive.
-        move |bytes: Bytes| {
+        move |bytes: &[u8]| {
           let mut directory = bazel_protos::remote_execution::Directory::new();
           directory.merge_from_bytes(&bytes).map_err(|e| {
             format!(
@@ -403,7 +407,7 @@ impl Store {
   ///
   async fn load_bytes_with<
     T: Send + 'static,
-    FLocal: Fn(Bytes) -> Result<T, String> + Send + Sync + 'static,
+    FLocal: Fn(&[u8]) -> Result<T, String> + Send + Sync + 'static,
     FRemote: Fn(Bytes) -> Result<T, String> + Send + Sync + 'static,
   >(
     &self,
@@ -520,10 +524,11 @@ impl Store {
               let remote = remote2.clone();
 
               Box::pin(async move {
+                let executor = local.executor().clone();
                 let maybe_upload = local
                   .load_bytes_with(entry_type, digest, move |bytes| {
-                    let remote = remote.clone();
-                    Box::pin(async move { remote.store_bytes(bytes).await }).compat()
+                    // NB: `load_bytes_with` runs on a spawned thread which we can safely block.
+                    executor.block_on(remote.store_bytes(bytes))
                   })
                   .await?;
                 match maybe_upload {
@@ -676,13 +681,40 @@ impl Store {
     digest: Digest,
   ) -> BoxFuture<DirectoryMaterializeMetadata, String> {
     let root = Arc::new(Mutex::new(None));
+    let executor = self.local.executor().clone();
     self
       .materialize_directory_helper(
-        destination,
+        destination.clone(),
         RootOrParentMetadataBuilder::Root(root.clone()),
         digest,
       )
-      .map(|()| Arc::try_unwrap(root).unwrap().into_inner().unwrap().build())
+      .and_then(move |()| {
+        let materialize_metadata = Arc::try_unwrap(root).unwrap().into_inner().unwrap().build();
+        // We fundamentally materialize files for other processes to read; as such, we must ensure
+        // data is flushed to disk and visible to them as opposed to just our process. Even though
+        // we need to re-open all written files, executing all fsyncs at the end of the
+        // materialize call is significantly faster than doing it as we go.
+        future::join_all(
+          materialize_metadata
+            .to_path_list()
+            .into_iter()
+            .map(|path| {
+              let path = destination.join(path);
+              executor
+                .spawn_blocking(move || {
+                  OpenOptions::new()
+                    .write(true)
+                    .create(false)
+                    .open(path)?
+                    .sync_all()
+                })
+                .compat()
+            })
+            .collect::<Vec<_>>(),
+        )
+        .map_err(|e| format!("Failed to fsync directory contents: {}", e))
+        .map(move |_| materialize_metadata)
+      })
       .to_boxed()
   }
 
@@ -692,90 +724,103 @@ impl Store {
     root_or_parent_metadata: RootOrParentMetadataBuilder,
     digest: Digest,
   ) -> BoxFuture<(), String> {
-    if let RootOrParentMetadataBuilder::Root(..) = root_or_parent_metadata {
-      try_future!(fs::safe_create_dir_all(&destination));
-    } else {
-      try_future!(fs::safe_create_dir(&destination));
-    }
-
-    let loaded_directory = {
-      let store = self.clone();
-      let res = async move { store.load_directory(digest).await };
-      res.boxed().compat()
-    };
-
     let store = self.clone();
-    loaded_directory
-      .and_then(move |directory_and_metadata_opt| {
-        let (directory, metadata) = directory_and_metadata_opt
-          .ok_or_else(|| format!("Directory with digest {:?} not found", digest))?;
-        let (child_directories, child_files) = match root_or_parent_metadata {
-          RootOrParentMetadataBuilder::Root(root) => {
-            let builder = DirectoryMaterializeMetadataBuilder::new(metadata);
-            let child_directories = builder.child_directories.clone();
-            let child_files = builder.child_files.clone();
-            *root.lock() = Some(builder);
-            (child_directories, child_files)
-          }
-          RootOrParentMetadataBuilder::Parent((
-            dir_name,
-            parent_child_directories,
-            _parent_files,
-          )) => {
-            let builder = DirectoryMaterializeMetadataBuilder::new(metadata);
-            let child_directories = builder.child_directories.clone();
-            let child_files = builder.child_files.clone();
-            parent_child_directories.lock().insert(dir_name, builder);
-            (child_directories, child_files)
-          }
-        };
-        Ok((directory, child_directories, child_files))
-      })
-      .and_then(move |(directory, child_directories, child_files)| {
-        let file_futures = directory
-          .get_files()
-          .iter()
-          .map(|file_node| {
-            let store = store.clone();
-            let path = destination.join(file_node.get_name());
-            let digest = try_future!(file_node.get_digest().into());
-            let child_files = child_files.clone();
-            let name = file_node.get_name().to_owned();
-            store
-              .materialize_file(path, digest, file_node.is_executable)
-              .map(move |metadata| child_files.lock().insert(name, metadata))
-              .to_boxed()
-          })
-          .collect::<Vec<_>>();
-        let directory_futures = directory
-          .get_directories()
-          .iter()
-          .map(|directory_node| {
-            let store = store.clone();
-            let path = destination.join(directory_node.get_name());
-            let digest = try_future!(directory_node.get_digest().into());
+    async move {
+      if let RootOrParentMetadataBuilder::Root(..) = root_or_parent_metadata {
+        let destination = destination.clone();
+        store
+          .local
+          .executor()
+          .spawn_blocking(move || fs::safe_create_dir_all(&destination))
+          .await?;
+      } else {
+        let destination = destination.clone();
+        store
+          .local
+          .executor()
+          .spawn_blocking(move || fs::safe_create_dir(&destination))
+          .await?;
+      }
 
-            let builder = RootOrParentMetadataBuilder::Parent((
-              directory_node.get_name().to_owned(),
-              child_directories.clone(),
-              child_files.clone(),
-            ));
+      let (directory, metadata) = store
+        .load_directory(digest)
+        .await?
+        .ok_or_else(|| format!("Directory with digest {:?} not found", digest))?;
 
-            store.materialize_directory_helper(path, builder, digest)
-          })
-          .collect::<Vec<_>>();
-        future::join_all(file_futures)
-          .join(future::join_all(directory_futures))
-          .map(|_| ())
-      })
-      .to_boxed()
+      let (child_directories, child_files) = match root_or_parent_metadata {
+        RootOrParentMetadataBuilder::Root(root) => {
+          let builder = DirectoryMaterializeMetadataBuilder::new(metadata);
+          let child_directories = builder.child_directories.clone();
+          let child_files = builder.child_files.clone();
+          *root.lock() = Some(builder);
+          (child_directories, child_files)
+        }
+        RootOrParentMetadataBuilder::Parent((
+          dir_name,
+          parent_child_directories,
+          _parent_files,
+        )) => {
+          let builder = DirectoryMaterializeMetadataBuilder::new(metadata);
+          let child_directories = builder.child_directories.clone();
+          let child_files = builder.child_files.clone();
+          parent_child_directories.lock().insert(dir_name, builder);
+          (child_directories, child_files)
+        }
+      };
+
+      let file_futures = directory
+        .get_files()
+        .iter()
+        .map(|file_node| {
+          let store = store.clone();
+          let path = destination.join(file_node.get_name());
+          let digest = try_future!(file_node.get_digest().into());
+          let child_files = child_files.clone();
+          let name = file_node.get_name().to_owned();
+          store
+            .materialize_file(path, digest, file_node.is_executable, false)
+            .map(move |metadata| child_files.lock().insert(name, metadata))
+            .to_boxed()
+        })
+        .collect::<Vec<_>>();
+      let directory_futures = directory
+        .get_directories()
+        .iter()
+        .map(|directory_node| {
+          let store = store.clone();
+          let path = destination.join(directory_node.get_name());
+          let digest = try_future!(directory_node.get_digest().into());
+
+          let builder = RootOrParentMetadataBuilder::Parent((
+            directory_node.get_name().to_owned(),
+            child_directories.clone(),
+            child_files.clone(),
+          ));
+
+          store.materialize_directory_helper(path, builder, digest)
+        })
+        .collect::<Vec<_>>();
+      let _ = future::join_all(file_futures)
+        .join(future::join_all(directory_futures))
+        .compat()
+        .await?;
+      Ok(())
+    }
+    .boxed()
+    .compat()
+    .to_boxed()
   }
 
+  ///
+  /// Materializes a single file. This method is private because generally files should be
+  /// materialized together via `materialize_directory`, which handles batch fsync'ing.
+  ///
   fn materialize_file(
     &self,
     destination: PathBuf,
     digest: Digest,
     is_executable: bool,
+    fsync: bool,
   ) -> BoxFuture<LoadMetadata, String> {
     let store = self.clone();
     let res = async move {
@@ -795,10 +840,11 @@ impl Store {
           })
           .and_then(|mut f| {
             f.write_all(&bytes)?;
-            // See `materialize_directory`, but we fundamentally materialize files for other
-            // processes to read; as such, we must ensure data is flushed to disk and visible
-            // to them as opposed to just our process.
-            f.sync_all()
+            if fsync {
+              f.sync_all()
+            } else {
+              Ok(())
+            }
           })
           .map_err(|e| format!("Error writing file {:?}: {:?}", destination, e))
         })
@@ -813,7 +859,9 @@ impl Store {
     res.boxed().compat().to_boxed()
   }
 
-  // Returns files sorted by their path.
+  ///
+  /// Returns files sorted by their path.
+  ///
   pub fn contents_for_directory(&self, digest: Digest) -> BoxFuture<Vec<FileContent>, String> {
     self
       .walk(digest, move |store, path_so_far, _, directory| {
@@ -827,7 +875,9 @@ impl Store {
               let file_node_digest: Result<_, _> = file_node.get_digest().into();
               let store = store.clone();
               let res = async move {
-                let maybe_bytes = store.load_file_bytes_with(file_node_digest?, |b| b).await?;
+                let maybe_bytes = store
+                  .load_file_bytes_with(file_node_digest?, |b| b.into())
+                  .await?;
                 maybe_bytes
                   .ok_or_else(|| format!("Couldn't find file contents for {:?}", path))
                   .map(|(content, _metadata)| FileContent {

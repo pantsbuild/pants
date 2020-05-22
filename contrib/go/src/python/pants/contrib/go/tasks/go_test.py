@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from pants.base.build_environment import get_buildroot
 from pants.base.workunit import WorkUnitLabel
-from pants.task.testrunner_task_mixin import PartitionedTestRunnerTaskMixin, TestResult
+from pants.task.testrunner_task_mixin import ChrootedTestRunnerTaskMixin, TestResult
 from pants.util.memo import memoized_property
 from pants.util.process_handler import SubprocessProcessHandler
 from pants.util.strutil import create_path_env_var, safe_shlex_join, safe_shlex_split
@@ -14,7 +14,7 @@ from pants.util.strutil import create_path_env_var, safe_shlex_join, safe_shlex_
 from pants.contrib.go.tasks.go_workspace_task import GoWorkspaceTask
 
 
-class GoTest(PartitionedTestRunnerTaskMixin, GoWorkspaceTask):
+class GoTest(ChrootedTestRunnerTaskMixin, GoWorkspaceTask):
     """Runs `go test` on Go packages.
 
     To run a library's tests, GoTest only requires a Go workspace to be initialized (see
@@ -63,24 +63,13 @@ class GoTest(PartitionedTestRunnerTaskMixin, GoWorkspaceTask):
         }
 
     @contextmanager
-    def partitions(self, per_target, all_targets, test_targets):
-        if per_target:
+    def tests(self, all_targets, test_targets):
+        def iter_tests():
+            for test_target in test_targets:
+                args = (self._generate_args_for_targets([test_target]),)
+                yield test_target, args
 
-            def iter_partitions():
-                for test_target in test_targets:
-                    partition = (test_target,)
-                    args = (self._generate_args_for_targets([test_target]),)
-                    yield partition, args
-
-        else:
-
-            def iter_partitions():
-                if test_targets:
-                    partition = tuple(test_targets)
-                    args = (self._generate_args_for_targets(test_targets),)
-                    yield partition, args
-
-        yield iter_partitions
+        yield iter_tests
 
     def collect_files(self, *args):
         """This task currently doesn't have any output that it would store in an artifact cache."""

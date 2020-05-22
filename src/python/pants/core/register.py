@@ -7,14 +7,6 @@ These are always activated and cannot be disabled.
 """
 
 from pants.core.goals import binary, fmt, lint, repl, run, test
-from pants.core.project_info import (
-    cloc,
-    filedeps,
-    list_roots,
-    list_target_types,
-    list_targets,
-    list_targets_old,
-)
 from pants.core.target_types import (
     AliasTarget,
     Files,
@@ -35,13 +27,6 @@ from pants.core.util_rules import (
 
 def rules():
     return [
-        # project_info
-        *cloc.rules(),
-        *filedeps.rules(),
-        *list_roots.rules(),
-        *list_target_types.rules(),
-        *list_targets.rules(),
-        *list_targets_old.rules(),
         # goals
         *binary.rules(),
         *fmt.rules(),

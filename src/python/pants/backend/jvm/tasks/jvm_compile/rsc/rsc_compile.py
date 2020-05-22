@@ -897,7 +897,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
 
         epr = Process(
             argv=tuple(cmd),
-            input_files=epr_input_files,
+            input_digest=epr_input_files,
             output_files=(fast_relpath(ctx.rsc_jar_file.path, get_buildroot()),),
             output_directories=tuple(),
             timeout_seconds=15 * 60,
@@ -926,7 +926,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
     # The classpath is parameterized so that we can have a single nailgun instance serving all of our
     # execution requests.
     def _runtool_nonhermetic(self, parent_workunit, classpath, main, tool_name, distribution, ctx):
-        # Scalac -Youtline cannot coexist with zinc jar in the same nailgun in a mulitithreaded run
+        # Scalac -Youtline cannot coexist with zinc jar in the same nailgun in a multithreaded run
         # Forcing scalac -Youtline to run as a separate process circumvents this problem
         use_youtline = tool_name == "scalac-outliner"
 
@@ -949,7 +949,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
                 break
         # TODO: figure out and document when would this happen.
         if runjava_workunit is None:
-            raise Exception("couldnt find work unit for underlying execution")
+            raise Exception("could not find work unit for underlying execution")
         return runjava_workunit
 
     # Mostly a copy-paste from ZincCompile.compile with many options removed
@@ -1019,7 +1019,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
             tool_classpath = self._scalac_classpath
             # In fact, nailgun should not be used for -Youtline
             # in case of self.ExecutionStrategy.nailgun,
-            # we will force the scalac -Youtline invokation to run via subprocess
+            # we will force the scalac -Youtline invocation to run via subprocess
             nailgun_classpath = self._scalac_classpath
         else:
             main = "rsc.cli.Main"

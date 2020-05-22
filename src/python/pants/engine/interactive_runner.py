@@ -21,13 +21,14 @@ class InteractiveProcessResult:
 class InteractiveProcessRequest:
     argv: Tuple[str, ...]
     env: Tuple[str, ...] = ()
-    input_files: Digest = EMPTY_DIGEST
+    input_digest: Digest = EMPTY_DIGEST
     run_in_workspace: bool = False
 
     def __post_init__(self):
-        if self.input_files != EMPTY_DIGEST and self.run_in_workspace:
+        if self.input_digest != EMPTY_DIGEST and self.run_in_workspace:
             raise ValueError(
-                "InteractiveProessRequest should use the Workspace API to materialize any needed files when it runs in the workspace"
+                "InteractiveProcessRequest should use the Workspace API to materialize any needed "
+                "files when it runs in the workspace"
             )
 
 

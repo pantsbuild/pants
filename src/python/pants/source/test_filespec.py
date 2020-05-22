@@ -34,9 +34,9 @@ class FilespecTest(TestBase):
         snapshot = self.request_single_product(Snapshot, PathGlobs([glob]))
         if negate:
             subset = set(expected_matches).intersection(set(snapshot.files))
-            self.assertEquals(subset, set(), f"{glob} {match_state} path(s) {subset}")
+            self.assertEqual(subset, set(), f"{glob} {match_state} path(s) {subset}")
         else:
-            self.assertEquals(sorted(expected_matches), sorted(snapshot.files))
+            self.assertEqual(sorted(expected_matches), sorted(snapshot.files))
 
     def test_matches_single_star_0(self) -> None:
         self.assert_rule_match("a/b/*/f.py", ("a/b/c/f.py", "a/b/q/f.py"))

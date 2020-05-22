@@ -5,10 +5,14 @@ from pathlib import PurePath
 from textwrap import dedent
 from typing import List, Optional
 
+from pants.backend.python.lint.pylint.plugin_target_type import PylintSourcePlugin
 from pants.backend.python.lint.pylint.rules import PylintFieldSet, PylintFieldSets
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
-from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonLibrary
-from pants.backend.python.targets.python_library import PythonLibrary as PythonLibraryV1
+from pants.backend.python.target_types import (
+    PythonInterpreterCompatibility,
+    PythonLibrary,
+    PythonRequirementLibrary,
+)
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.lint import LintResult
@@ -18,12 +22,15 @@ from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.engine.target import Dependencies, Sources, TargetWithOrigin
+from pants.python.python_requirement import PythonRequirement
+from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option.util import create_options_bootstrapper
-from pants.testutil.test_base import TestBase
+
+# See http://pylint.pycqa.org/en/latest/user_guide/run.html#exit-codes for exit codes.
+PYLINT_FAILURE_RETURN_CODE = 16
 
 
-class PylintIntegrationTest(TestBase):
-    # See http://pylint.pycqa.org/en/latest/user_guide/run.html#exit-codes for exit codes.
+class PylintIntegrationTest(ExternalToolTestBase):
     source_root = "src/python"
     good_source = FileContent(
         path=f"{source_root}/good.py", content=b"'''docstring'''\nUPPERCASE_CONSTANT = ''\n",
@@ -33,12 +40,12 @@ class PylintIntegrationTest(TestBase):
     )
 
     @classmethod
-    def alias_groups(cls) -> BuildFileAliases:
-        return BuildFileAliases(targets={"python_library": PythonLibraryV1})
+    def alias_groups(cls):
+        return BuildFileAliases(objects={"python_requirement": PythonRequirement})
 
     @classmethod
     def target_types(cls):
-        return [PythonLibrary]
+        return [PythonLibrary, PythonRequirementLibrary, PylintSourcePlugin]
 
     @classmethod
     def rules(cls):
@@ -61,12 +68,9 @@ class PylintIntegrationTest(TestBase):
         for source_file in source_files:
             self.create_file(source_file.path, source_file.content.decode())
         source_globs = [PurePath(source_file.path).name for source_file in source_files]
-        self.create_library(
-            path=self.source_root, target_type=PythonLibrary.alias, name=name, sources=source_globs
+        self.add_to_build_file(
+            self.source_root, f"python_library(name='{name}', sources={source_globs})\n"
         )
-        # We must re-write the files because `create_library` will have over-written the content.
-        for source_file in source_files:
-            self.create_file(source_file.path, source_file.content.decode())
         target = PythonLibrary(
             {
                 Sources.alias: source_globs,
@@ -86,6 +90,7 @@ class PylintIntegrationTest(TestBase):
         config: Optional[str] = None,
         passthrough_args: Optional[str] = None,
         skip: bool = False,
+        additional_args: Optional[List[str]] = None,
     ) -> LintResult:
         args = ["--backend-packages2=pants.backend.python.lint.pylint"]
         if config:
@@ -94,7 +99,9 @@ class PylintIntegrationTest(TestBase):
         if passthrough_args:
             args.append(f"--pylint-args='{passthrough_args}'")
         if skip:
-            args.append(f"--pylint-skip")
+            args.append("--pylint-skip")
+        if additional_args:
+            args.extend(additional_args)
         return self.request_single_product(
             LintResult,
             Params(
@@ -112,13 +119,13 @@ class PylintIntegrationTest(TestBase):
     def test_failing_source(self) -> None:
         target = self.make_target_with_origin([self.bad_source])
         result = self.run_pylint([target])
-        assert result.exit_code == 16  # convention message issued
+        assert result.exit_code == PYLINT_FAILURE_RETURN_CODE
         assert "bad.py:2:0: C0103" in result.stdout
 
     def test_mixed_sources(self) -> None:
         target = self.make_target_with_origin([self.good_source, self.bad_source])
         result = self.run_pylint([target])
-        assert result.exit_code == 16  # convention message issued
+        assert result.exit_code == PYLINT_FAILURE_RETURN_CODE
         assert "good.py" not in result.stdout
         assert "bad.py:2:0: C0103" in result.stdout
 
@@ -128,7 +135,7 @@ class PylintIntegrationTest(TestBase):
             self.make_target_with_origin([self.bad_source], name="t2"),
         ]
         result = self.run_pylint(targets)
-        assert result.exit_code == 16  # convention message issued
+        assert result.exit_code == PYLINT_FAILURE_RETURN_CODE
         assert "good.py" not in result.stdout
         assert "bad.py:2:0: C0103" in result.stdout
 
@@ -153,38 +160,62 @@ class PylintIntegrationTest(TestBase):
         assert "Your code has been rated at 10.00/10" in result.stdout.strip()
 
     def test_includes_direct_dependencies(self) -> None:
-        self.make_target_with_origin(source_files=[], name="transitive_dependency")
-
-        direct_dependency_content = dedent(
-            """\
-            # No docstring because Pylint doesn't lint dependencies
-
-            from transitive_dep import doesnt_matter_if_variable_exists
-
-            THIS_VARIABLE_EXISTS = ''
-            """
-        )
-        self.make_target_with_origin(
-            source_files=[
-                FileContent(
-                    f"{self.source_root}/direct_dependency.py", direct_dependency_content.encode()
+        self.add_to_build_file(
+            "",
+            dedent(
+                """\
+                python_requirement_library(
+                    name='transitive_req',
+                    requirements=[python_requirement('django')],
                 )
-            ],
-            name="direct_dependency",
-            dependencies=[Address(self.source_root, "transitive_dependency")],
+                
+                python_requirement_library(
+                    name='direct_req',
+                    requirements=[python_requirement('ansicolors')],
+                )
+                """
+            ),
+        )
+        self.add_to_build_file(
+            self.source_root, "python_library(name='transitive_dep', sources=[])\n"
+        )
+        self.create_file(
+            f"{self.source_root}/direct_dep.py",
+            dedent(
+                """\
+                # No docstring - Pylint doesn't lint dependencies.
+
+                from transitive_dep import doesnt_matter_if_variable_exists
+
+                THIS_VARIABLE_EXISTS = ''
+                """
+            ),
+        )
+        self.add_to_build_file(
+            self.source_root,
+            dedent(
+                """\
+                python_library(
+                    name='direct_dep',
+                    sources=['direct_dep.py'],
+                    dependencies=[':transitive_dep', '//:transitive_req'],
+                )
+                """
+            ),
         )
 
         source_content = dedent(
             """\
-            '''Code is not executed, but Pylint will check that variables exist and are used'''
-            from direct_dependency import THIS_VARIABLE_EXISTS
-
-            print(THIS_VARIABLE_EXISTS)
+            '''Pylint will check that variables exist and are used.'''
+            from colors import green
+            from direct_dep import THIS_VARIABLE_EXISTS
+            
+            print(green(THIS_VARIABLE_EXISTS))
             """
         )
         target = self.make_target_with_origin(
             source_files=[FileContent(f"{self.source_root}/target.py", source_content.encode())],
-            dependencies=[Address(self.source_root, "direct_dependency")],
+            dependencies=[Address(self.source_root, "direct_dep"), Address("", "direct_req")],
         )
 
         result = self.run_pylint([target])
@@ -195,3 +226,120 @@ class PylintIntegrationTest(TestBase):
         target = self.make_target_with_origin([self.bad_source])
         result = self.run_pylint([target], skip=True)
         assert result == LintResult.noop()
+
+    def test_3rdparty_plugin(self) -> None:
+        source_content = dedent(
+            """\
+            '''Docstring.'''
+
+            import unittest
+
+            class PluginTest(unittest.TestCase):
+                '''Docstring.'''
+
+                def test_plugin(self):
+                    '''Docstring.'''
+                    self.assertEqual(True, True)
+            """
+        )
+        target = self.make_target_with_origin(
+            [FileContent(f"{self.source_root}/thirdparty_plugin.py", source_content.encode())]
+        )
+        result = self.run_pylint(
+            [target],
+            additional_args=["--pylint-extra-requirements=pylint-unittest>=0.1.3,<0.2"],
+            passthrough_args="--load-plugins=pylint_unittest",
+        )
+        assert result.exit_code == 4
+        assert "thirdparty_plugin.py:10:8: W5301" in result.stdout
+
+    def test_source_plugin(self) -> None:
+        # NB: We make this source plugin fairly complex by having it use transitive dependencies.
+        # This is to ensure that we can correctly support plugins with dependencies.
+        self.add_to_build_file(
+            "",
+            dedent(
+                """\
+                python_requirement_library(
+                    name='pylint',
+                    requirements=[python_requirement('pylint>=2.4.4,<2.5')],
+                )
+                
+                python_requirement_library(
+                    name='colors',
+                    requirements=[python_requirement('ansicolors')],
+                )
+                """
+            ),
+        )
+        self.create_file(
+            "build-support/plugins/subdir/dep.py",
+            dedent(
+                """\
+                from colors import red
+
+                def is_print(node):
+                    _ = red("Test that transitive deps are loaded.")
+                    return node.func.name == "print"
+                """
+            ),
+        )
+        self.add_to_build_file(
+            "build-support/plugins/subdir", "python_library(dependencies=['//:colors'])"
+        )
+        self.create_file(
+            "build-support/plugins/print_plugin.py",
+            dedent(
+                """\
+                from pylint.checkers import BaseChecker
+                from pylint.interfaces import IAstroidChecker
+
+                from subdir.dep import is_print
+
+                class PrintChecker(BaseChecker):
+                    __implements__ = IAstroidChecker
+                    name = "print_plugin"
+                    msgs = {
+                        "C9871": ("`print` statements are banned", "print-statement-used", ""),
+                    }
+
+                    def visit_call(self, node):
+                        if is_print(node):
+                            self.add_message("print-statement-used", node=node)
+
+                def register(linter):
+                    linter.register_checker(PrintChecker(linter))
+                """
+            ),
+        )
+        self.add_to_build_file(
+            "build-support/plugins",
+            dedent(
+                """\
+                pylint_source_plugin(
+                    name='print_plugin',
+                    sources=['print_plugin.py'],
+                    dependencies=['//:pylint', 'build-support/plugins/subdir'],
+                )
+                """
+            ),
+        )
+        config_content = dedent(
+            """\
+            [MASTER]
+            load-plugins=print_plugin
+            """
+        )
+        target = self.make_target_with_origin(
+            [FileContent(f"{self.source_root}/source_plugin.py", b"'''Docstring.'''\nprint()\n")]
+        )
+        result = self.run_pylint(
+            [target],
+            additional_args=[
+                "--pylint-source-plugins=['build-support/plugins:print_plugin']",
+                f"--source-root-patterns=['build-support/plugins', '{self.source_root}']",
+            ],
+            config=config_content,
+        )
+        assert result.exit_code == PYLINT_FAILURE_RETURN_CODE
+        assert "source_plugin.py:2:0: C9871" in result.stdout

@@ -140,7 +140,7 @@ class FileDepsTest(ConsoleTaskTestBase, AbstractTestGenerator):
                 """
                 jvm_binary(
                   name='bin',
-                  source='main.java',
+                  sources=['main.java'],
                   main='bin.Main',
                   dependencies=[
                     'src/java/lib'

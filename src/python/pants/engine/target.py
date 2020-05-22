@@ -26,8 +26,8 @@ from typing_extensions import final
 
 from pants.base.specs import OriginSpec
 from pants.build_graph.app_base import Bundle
-from pants.engine.addresses import Address, assert_single_address
-from pants.engine.collection import Collection
+from pants.engine.addresses import Address, Addresses, assert_single_address
+from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.fs import (
     EMPTY_SNAPSHOT,
     GlobExpansionConjunction,
@@ -37,7 +37,7 @@ from pants.engine.fs import (
 )
 from pants.engine.legacy.structs import BundleAdaptor
 from pants.engine.rules import RootRule, rule
-from pants.engine.selectors import Get
+from pants.engine.selectors import Get, MultiGet
 from pants.engine.unions import UnionMembership, union
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper, Filespec
 from pants.util.collections import ensure_list, ensure_str_list
@@ -318,14 +318,12 @@ class Target(ABC):
         """
 
     def __repr__(self) -> str:
+        fields = ", ".join(str(field) for field in self.field_values.values())
         return (
             f"{self.__class__}("
             f"address={self.address}, "
             f"alias={repr(self.alias)}, "
-            f"core_fields={list(self.core_fields)}, "
-            f"plugin_fields={list(self.plugin_fields)}, "
-            f"field_values={list(self.field_values.values())}"
-            f")"
+            f"{fields})"
         )
 
     def __str__(self) -> str:
@@ -517,8 +515,8 @@ class Targets(Collection[Target]):
     """
 
     def expect_single(self) -> Target:
-        assert_single_address([tgt.address for tgt in self.dependencies])
-        return self.dependencies[0]
+        assert_single_address([tgt.address for tgt in self])
+        return self[0]
 
 
 class TargetsWithOrigins(Collection[TargetWithOrigin]):
@@ -530,10 +528,8 @@ class TargetsWithOrigins(Collection[TargetWithOrigin]):
     """
 
     def expect_single(self) -> TargetWithOrigin:
-        assert_single_address(
-            [tgt_with_origin.target.address for tgt_with_origin in self.dependencies]
-        )
-        return self.dependencies[0]
+        assert_single_address([tgt_with_origin.target.address for tgt_with_origin in self])
+        return self[0]
 
     @memoized_property
     def targets(self) -> Tuple[Target, ...]:
@@ -830,6 +826,21 @@ class InvalidFieldChoiceException(InvalidFieldException):
         super().__init__(
             f"The {repr(field_alias)} field in target {address} must be one of "
             f"{sorted(valid_choices)}, but was {repr(raw_value)}."
+        )
+
+
+class UnrecognizedTargetTypeException(Exception):
+    def __init__(
+        self,
+        target_type: str,
+        registered_target_types: RegisteredTargetTypes,
+        *,
+        address: Optional[Address] = None,
+    ) -> None:
+        for_address = f"for address {address}" if address else ""
+        super().__init__(
+            f"Target type {repr(target_type)} is not registered{for_address}.\n\nAll valid target "
+            f"types: {sorted(registered_target_types.aliases)}"
         )
 
 
@@ -1526,6 +1537,101 @@ async def hydrate_sources(
 
 
 # -----------------------------------------------------------------------------------------------
+# `Dependencies` field
+# -----------------------------------------------------------------------------------------------
+
+# NB: To hydrate the dependencies, use one of:
+#   await Get[Addresses](DependenciesRequest(tgt[Dependencies])
+#   await Get[Targets](DependenciesRequest(tgt[Dependencies])
+#   await Get[TransitiveTargets](DependenciesRequest(tgt[Dependencies])
+class Dependencies(AsyncField):
+    """Addresses to other targets that this target depends on, e.g. `['helloworld/subdir:lib']`."""
+
+    alias = "dependencies"
+    sanitized_raw_value: Optional[Tuple[Address, ...]]
+    default = None
+
+    # NB: The type hint for `raw_value` is a lie. While we do expect end-users to use
+    # Iterable[str], the Struct and Addressable code will have already converted those strings
+    # into a List[Address]. But, that's an implementation detail and we don't want our
+    # documentation, which is auto-generated from these type hints, to leak that.
+    @classmethod
+    def sanitize_raw_value(
+        cls, raw_value: Optional[Iterable[str]], *, address: Address
+    ) -> Optional[Tuple[Address, ...]]:
+        value_or_default = super().sanitize_raw_value(raw_value, address=address)
+        if value_or_default is None:
+            return None
+        return tuple(sorted(value_or_default))
+
+
+@dataclass(frozen=True)
+class DependenciesRequest:
+    field: Dependencies
+
+
+@union
+@dataclass(frozen=True)
+class InjectDependenciesRequest(ABC):
+    """A request to inject dependencies, in addition to those explicitly provided.
+
+    To set up a new injection, subclass this class. Set the class property `inject_for` to the
+    type of `Dependencies` field you want to inject for, such as `FortranDependencies`. This will
+    cause the class, and any subclass, to have the injection. Register this subclass with
+    `UnionRule(InjectDependenciesRequest, InjectFortranDependencies)`, for example.
+
+    Then, create a rule that takes the subclass as a parameter and returns `InjectedDependencies`.
+
+    For example:
+
+        class FortranDependencies(Dependencies):
+            pass
+
+        class InjectFortranDependencies(InjectDependenciesRequest):
+            inject_for = FortranDependencies
+
+        @rule
+        def inject_fortran_dependencies(request: InjectFortranDependencies) -> InjectedDependencies:
+            return InjectedDependencies([Address.parse("//:injected")]
+
+        def rules():
+            return [
+                inject_fortran_dependencies,
+                UnionRule(InjectDependenciesRequest, InjectFortranDependencies),
+            ]
+    """
+
+    field: Dependencies
+    inject_for: ClassVar[Type[Dependencies]]
+
+
+class InjectedDependencies(DeduplicatedCollection[Address]):
+    sort_input = True
+
+
+@rule
+async def resolve_dependencies(
+    request: DependenciesRequest, union_membership: UnionMembership
+) -> Addresses:
+    provided = request.field.sanitized_raw_value or ()
+
+    # Inject any dependencies. This is determined by the `request.field` class. For example, if
+    # there is a rule to inject for FortranDependencies, then FortranDependencies and any subclass
+    # of FortranDependencies will use that rule.
+    inject_request_types = cast(
+        Iterable[Type[InjectDependenciesRequest]],
+        union_membership.union_rules.get(InjectDependenciesRequest, ()),
+    )
+    injected = await MultiGet(
+        Get[InjectedDependencies](InjectDependenciesRequest, inject_request_type(request.field))
+        for inject_request_type in inject_request_types
+        if isinstance(request.field, inject_request_type.inject_for)
+    )
+
+    return Addresses(sorted([*provided, *itertools.chain.from_iterable(injected)]))
+
+
+# -----------------------------------------------------------------------------------------------
 # Other common Fields used across most targets
 # -----------------------------------------------------------------------------------------------
 
@@ -1578,29 +1684,6 @@ class IntransitiveField(BoolField):
 
 
 COMMON_TARGET_FIELDS = (Tags, DescriptionField, NoCacheField, ScopeField, IntransitiveField)
-
-
-# NB: To hydrate the dependencies into Targets, use
-# `await Get[Targets](Addresses(tgt[Dependencies].value)`.
-class Dependencies(PrimitiveField):
-    """Addresses to other targets that this target depends on, e.g. `['src/python/project:lib']`."""
-
-    alias = "dependencies"
-    value: Optional[Tuple[Address, ...]]
-    default = None
-
-    # NB: The type hint for `raw_value` is a lie. While we do expect end-users to use
-    # Iterable[str], the Struct and Addressable code will have already converted those strings
-    # into a List[Address]. But, that's an implementation detail and we don't want our
-    # documentation, which is auto-generated from these type hints, to leak that.
-    @classmethod
-    def compute_value(
-        cls, raw_value: Optional[Iterable[str]], *, address: Address
-    ) -> Optional[Tuple[Address, ...]]:
-        value_or_default = super().compute_value(raw_value, address=address)
-        if value_or_default is None:
-            return None
-        return tuple(sorted(value_or_default))
 
 
 # TODO: figure out what support looks like for this with the Target API. The expected value is an
@@ -1656,6 +1739,9 @@ def rules():
     return [
         find_valid_field_sets,
         hydrate_sources,
+        resolve_dependencies,
         RootRule(TargetsToValidFieldSetsRequest),
         RootRule(HydrateSourcesRequest),
+        RootRule(DependenciesRequest),
+        RootRule(InjectDependenciesRequest),
     ]

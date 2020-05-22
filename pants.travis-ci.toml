@@ -8,6 +8,10 @@ execution_strategy = "subprocess"
 # overhead or else just generally thrash the container and slow things down.
 travis_parallelism = 4
 
+[GLOBAL]
+# Override color support detection - we want colors and Travis supports them.
+colors = true
+
 [black]
 args = ["--quiet"]
 

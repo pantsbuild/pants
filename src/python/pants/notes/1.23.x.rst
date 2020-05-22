@@ -272,7 +272,7 @@ Refactoring, Improvements, and Tooling
 * Move testinfra code from `tests/python/pants_tests` to `src/python/pants/testutil` (#8400)
   `PR #8400 <https://github.com/pantsbuild/pants/pull/8400>`_
 
-* Add a buffer for queueing process execution to remote timeout (#8432)
+* Add a buffer for queuing process execution to remote timeout (#8432)
   `PR #8432 <https://github.com/pantsbuild/pants/pull/8432>`_
 
 * Eagerly fail deprecated options (#8556)

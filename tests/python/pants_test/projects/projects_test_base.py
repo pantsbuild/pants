@@ -29,7 +29,6 @@ class ProjectsTestBase(PantsRunIntegrationTest):
         # Targets that are intended to fail
         negative_test_targets = [
             "testprojects/maven_layout/provided_patching/leaf:fail",
-            "testprojects/src/antlr/python/test:antlr_failure",
             "testprojects/src/java/org/pantsbuild/testproject/compilation_warnings:fatal",
             "testprojects/src/java/org/pantsbuild/testproject/dummies:compilation_failure_target",
             "testprojects/src/java/org/pantsbuild/testproject/junit/earlyexit:tests",
@@ -59,12 +58,6 @@ class ProjectsTestBase(PantsRunIntegrationTest):
             "testprojects/tests/java/org/pantsbuild/testproject/parallel.*",
             "testprojects/src/python/python_distribution/fasthello_with_install_requires.*",
             "testprojects/src/python/unicode/compilation_failure",
-        ]
-
-        # Interpreter will not resolve correctly when Pants is constrained to Python 3
-        python2_only = [
-            # tested in test_antlr_py_gen_integration.py
-            "testprojects/src/python/antlr",
         ]
 
         # Targets for testing timeouts. These should only be run during specific integration tests,
@@ -102,7 +95,6 @@ class ProjectsTestBase(PantsRunIntegrationTest):
         return [
             *known_failing_targets,
             *negative_test_targets,
-            *python2_only,
             *timeout_targets,
             *deliberately_conflicting_targets,
             *simply_skip,

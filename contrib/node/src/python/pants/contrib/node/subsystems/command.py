@@ -25,7 +25,7 @@ class Command(namedtuple("Command", ["executable", "args", "extra_paths"])):
         return [self.executable] + (self.args or [])
 
     def _prepare_env(self, kwargs):
-        """Returns a modifed copy of kwargs['env'], and a copy of kwargs with 'env' removed.
+        """Returns a modified copy of kwargs['env'], and a copy of kwargs with 'env' removed.
 
         If there is no 'env' field in the kwargs, os.environ.copy() is used.
         env['PATH'] is set/modified to contain the Node distribution's bin directory at the front.

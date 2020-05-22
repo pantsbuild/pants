@@ -63,7 +63,7 @@ class ExportTest(ConsoleTaskTestBase):
         init_subsystems([JUnit, ScalaPlatform, ScoveragePlatform], scala_options)
 
         self.make_target(
-            ":jar-tool", JarLibrary, jars=[JarDependency("org.pantsbuild", "jar-tool", "0.0.10")]
+            ":jar-tool", JarLibrary, jars=[JarDependency("org.pantsbuild", "jar-tool", "0.0.17")]
         )
 
         # NB: `test_has_python_requirements` will attempt to inject every possible scala compiler target

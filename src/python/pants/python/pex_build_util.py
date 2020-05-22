@@ -299,7 +299,7 @@ class PexBuilderWrapper:
         """Multi-platform dependency resolution for PEX files.
 
         Returns a tuple containing a list of distributions that must be included in order to satisfy a
-        set of requirements, and the transitive == requirements for thosee distributions. This may
+        set of requirements, and the transitive == requirements for those distributions. This may
         involve distributions for multiple platforms.
 
         :param interpreter: The :class:`PythonInterpreter` to resolve for.

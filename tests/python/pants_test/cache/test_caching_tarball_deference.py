@@ -117,7 +117,9 @@ class LocalCachingTarballDereferenceTest(TaskTestBase):
             regular_file=regular_file,
             regular_file_in_results_dir=regular_file_in_results_dir,
         )
-        self.add_to_build_file("", f'dummy_cache_library(name = "t", source = "{self._filename}")')
+        self.add_to_build_file(
+            "", f'dummy_cache_library(name = "t", sources = ["{self._filename}"])'
+        )
         self._target = self.target(":t")
         context = self.context(for_task_types=[DummyCacheTask], target_roots=[self._target])
         self.task = self.create_task(context)

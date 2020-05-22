@@ -1,3 +1,4 @@
+# NB: While we don't use this page anymore, we keep it to avoid broken URLs.
 page(
   name='notes-master',
   sources=['master.rst']
@@ -141,4 +142,14 @@ page(
 page(
   name='notes-1.27.x',
   sources=['1.27.x.rst']
+)
+
+page(
+  name='notes-1.28.x',
+  sources=['1.28.x.rst']
+)
+
+page(
+  name='notes-1.29.x',
+  sources=['1.29.x.rst']
 )

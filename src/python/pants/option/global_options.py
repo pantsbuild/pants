@@ -4,6 +4,7 @@
 import multiprocessing
 import os
 import sys
+import tempfile
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
@@ -68,11 +69,6 @@ class OwnersNotFoundBehavior(Enum):
         return GlobMatchErrorBehavior(self.value)
 
 
-class BuildFileImportsBehavior(Enum):
-    warn = "warn"
-    error = "error"
-
-
 @dataclass(frozen=True)
 class ExecutionOptions:
     """A collection of all options related to (remote) execution of processes.
@@ -102,7 +98,6 @@ class ExecutionOptions:
     remote_execution_extra_platform_properties: Any
     remote_execution_headers: Any
     process_execution_local_enable_nailgun: bool
-    experimental_fs_watcher: bool
 
     @classmethod
     def from_bootstrap_options(cls, bootstrap_options):
@@ -128,7 +123,6 @@ class ExecutionOptions:
             remote_execution_extra_platform_properties=bootstrap_options.remote_execution_extra_platform_properties,
             remote_execution_headers=bootstrap_options.remote_execution_headers,
             process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
-            experimental_fs_watcher=bootstrap_options.experimental_fs_watcher,
         )
 
 
@@ -154,7 +148,6 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_execution_extra_platform_properties=[],
     remote_execution_headers={},
     process_execution_local_enable_nailgun=False,
-    experimental_fs_watcher=True,
 )
 
 
@@ -171,7 +164,7 @@ class GlobalOptions(Subsystem):
         alone parsed.
 
         Bootstrap option values can be interpolated into the config file, and can be referenced
-        programatically in registration code, e.g., as register.bootstrap.pants_workdir.
+        programmatically in registration code, e.g., as register.bootstrap.pants_workdir.
 
         Note that regular code can also access these options as normal global-scope options. Their
         status as "bootstrap options" is only pertinent during option registration.
@@ -294,15 +287,10 @@ class GlobalOptions(Subsystem):
                 "pants.backend.python.lint.isort",
                 "pants.backend.jvm",
                 "pants.backend.native",
-                "pants.backend.codegen.antlr.java",
-                "pants.backend.codegen.antlr.python",
-                "pants.backend.codegen.jaxb",
                 "pants.backend.codegen.protobuf.java",
-                "pants.backend.codegen.ragel.java",
                 "pants.backend.codegen.thrift.java",
                 "pants.backend.codegen.thrift.python",
                 "pants.backend.codegen.grpcio.python",
-                "pants.backend.codegen.wire.java",
                 "pants.backend.project_info",
                 "pants.cache",
             ],
@@ -627,6 +615,9 @@ class GlobalOptions(Subsystem):
             "--pantsd-pailgun-host",
             advanced=True,
             default="127.0.0.1",
+            removal_version="1.30.0.dev0",
+            removal_hint="The nailgun protocol is not authenticated, and so only binds to "
+            "127.0.0.1.",
             help="The host to bind the pants nailgun server to.",
         )
         register(
@@ -657,7 +648,7 @@ class GlobalOptions(Subsystem):
             type=list,
             default=[],
             help="Filesystem events matching any of these globs will trigger a daemon restart. "
-            "The `--pythonpath` and `--pants-config-files` are inherently invalidated.",
+            "Pants' own code, plugins, and `--pants-config-files` are inherently invalidated.",
         )
 
         # Watchman options.
@@ -665,9 +656,11 @@ class GlobalOptions(Subsystem):
             "--watchman-enable",
             type=bool,
             advanced=True,
-            default=True,
+            default=False,
+            removal_version="1.30.0.dev0",
+            removal_hint="The native watcher is now sufficient to monitor for filesystem changes.",
             help="Use the watchman daemon filesystem event watcher to watch for changes "
-            "in the buildroot. Disable this to rely solely on the experimental pants engine filesystem watcher.",
+            "in the buildroot in addition to the built in watcher.",
         )
         register(
             "--watchman-version", advanced=True, default="4.9.0-pants1", help="Watchman version."
@@ -704,23 +697,6 @@ class GlobalOptions(Subsystem):
             "absolute path length exceeds the maximum allowed by the OS.",
         )
 
-        # This option changes the parser behavior in a fundamental way (which currently invalidates
-        # all caches), and needs to be parsed out early, so we make it a bootstrap option.
-        register(
-            "--build-file-imports",
-            type=BuildFileImportsBehavior,
-            default=BuildFileImportsBehavior.error,
-            advanced=True,
-            removal_version="1.29.0.dev0",
-            removal_hint=(
-                "Import statements should be avoided in BUILD files because they can easily break "
-                "Pants caching and lead to stale results. If you still need to keep the "
-                "functionality you have from import statements, consider rewriting your code into "
-                "a Pants plugin: https://www.pantsbuild.org/howto_plugin.html."
-            ),
-            help="Whether to allow import statements in BUILD files",
-        )
-
         register(
             "--build-file-prelude-globs",
             advanced=True,
@@ -740,7 +716,12 @@ class GlobalOptions(Subsystem):
             # fs::Store::default_path
             default=os.path.expanduser("~/.cache/pants/lmdb_store"),
         )
-
+        register(
+            "--local-execution-root-dir",
+            advanced=True,
+            help="Directory to use for engine's local process execution sandboxing.",
+            default=tempfile.gettempdir(),
+        )
         register(
             "--remote-execution",
             advanced=True,
@@ -903,6 +884,8 @@ class GlobalOptions(Subsystem):
             type=bool,
             default=True,
             advanced=True,
+            removal_version="1.30.0.dev0",
+            removal_hint="Enabled by default: flag is disabled.",
             help="Whether to use the engine filesystem watcher which registers the workspace"
             " for kernel file change events",
         )
@@ -932,13 +915,21 @@ class GlobalOptions(Subsystem):
             "tags ('-' prefix).  Useful with ::, to find subsets of targets "
             "(e.g., integration tests.)",
         )
+        register(
+            "--dynamic-ui",
+            type=bool,
+            default=sys.stderr.isatty(),
+            daemon=False,
+            help="Display a dynamically-updating console UI as pants runs.",
+        )
 
         register(
             "--v2-ui",
             default=False,
             type=bool,
             daemon=False,
-            passive=not register.bootstrap.v2,
+            removal_version="1.31.0.dev0",
+            removal_hint="Use --dynamic-ui instead.",
             help="Whether to show v2 engine execution progress.",
         )
 
@@ -1062,11 +1053,6 @@ class GlobalOptions(Subsystem):
 
         Raises pants.option.errors.OptionsError on validation failure.
         """
-        if opts.get("loop") and not opts.enable_pantsd:
-            raise OptionsError(
-                "The `--loop` option requires `--enable-pantsd`, in order to watch files."
-            )
-
         if opts.remote_execution and not opts.remote_execution_server:
             raise OptionsError(
                 "The `--remote-execution` option requires also setting "

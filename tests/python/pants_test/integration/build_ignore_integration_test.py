@@ -80,7 +80,7 @@ class IgnorePatternsPantsIniIntegrationTest(PantsRunIntegrationTest):
                 "--transitive",
                 "testprojects/tests/python/pants/constants_only::",
             ],
-            config={"DEFAULT": {"build_ignore": ["testprojects/src/antlr"]}},
+            config={"DEFAULT": {"build_ignore": ["testprojects/src/java"]}},
         )
 
         self.assert_success(run_result)

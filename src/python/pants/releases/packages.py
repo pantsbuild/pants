@@ -29,7 +29,7 @@ class Package:
   def __init__(self, name, target, bdist_wheel_flags=None):
     self.name = name
     self.target = target
-    self.bdist_wheel_flags = bdist_wheel_flags or ("--python-tag", "py36.py37")
+    self.bdist_wheel_flags = bdist_wheel_flags or ("--python-tag", "py36.py37.py38")
 
   def __lt__(self, other):
     return self.name < other.name
@@ -93,20 +93,12 @@ def contrib_packages():
       "//contrib/scrooge/src/python/pants/contrib/scrooge:plugin",
     ),
     Package(
-      "pantsbuild.pants.contrib.buildgen",
-      "//contrib/buildgen/src/python/pants/contrib/buildgen:plugin",
-    ),
-    Package(
       "pantsbuild.pants.contrib.go",
       "//contrib/go/src/python/pants/contrib/go:plugin",
     ),
     Package(
       "pantsbuild.pants.contrib.node",
       "//contrib/node/src/python/pants/contrib/node:plugin",
-    ),
-    Package(
-      "pantsbuild.pants.contrib.scalajs",
-      "//contrib/scalajs/src/python/pants/contrib/scalajs:plugin",
     ),
     Package(
       "pantsbuild.pants.contrib.python.checks",
@@ -118,44 +110,16 @@ def contrib_packages():
       bdist_wheel_flags=("--universal",),
     ),
     Package(
-      "pantsbuild.pants.contrib.findbugs",
-      "//contrib/findbugs/src/python/pants/contrib/findbugs:plugin",
-    ),
-    Package(
-      "pantsbuild.pants.contrib.cpp",
-      "//contrib/cpp/src/python/pants/contrib/cpp:plugin",
-    ),
-    Package(
       "pantsbuild.pants.contrib.confluence",
       "//contrib/confluence/src/python/pants/contrib/confluence:plugin",
-    ),
-    Package(
-      "pantsbuild.pants.contrib.errorprone",
-      "//contrib/errorprone/src/python/pants/contrib/errorprone:plugin",
     ),
     Package(
       "pantsbuild.pants.contrib.codeanalysis",
       "//contrib/codeanalysis/src/python/pants/contrib/codeanalysis:plugin",
     ),
     Package(
-      "pantsbuild.pants.contrib.jax_ws",
-      "//contrib/jax_ws/src/python/pants/contrib/jax_ws:plugin",
-    ),
-    Package(
       "pantsbuild.pants.contrib.mypy",
       "//contrib/mypy/src/python/pants/contrib/mypy:plugin",
-    ),
-    Package(
-      "pantsbuild.pants.contrib.avro",
-      "//contrib/avro/src/python/pants/contrib/avro:plugin",
-    ),
-    Package(
-      "pantsbuild.pants.contrib.thrifty",
-      "//contrib/thrifty/src/python/pants/contrib/thrifty:plugin",
-    ),
-    Package(
-      "pantsbuild.pants.contrib.googlejavaformat",
-      "//contrib/googlejavaformat/src/python/pants/contrib/googlejavaformat:plugin",
     ),
     Package(
       "pantsbuild.pants.contrib.awslambda_python",

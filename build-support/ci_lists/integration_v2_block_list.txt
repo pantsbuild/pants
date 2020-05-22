@@ -1,0 +1,14 @@
+tests/python/pants_test/backend/jvm/subsystems:jar_dependency_management_integration
+tests/python/pants_test/backend/jvm/tasks/jvm_compile/java:cache_compile_integration
+tests/python/pants_test/backend/jvm/tasks/jvm_compile/java:java_compile_integration
+tests/python/pants_test/backend/jvm/tasks/jvm_compile/java:zinc_compile_integration
+tests/python/pants_test/backend/jvm/tasks/jvm_compile/rsc:rsc_compile_integration
+tests/python/pants_test/backend/jvm/tasks/jvm_compile/zinc:zinc_compile_integration
+tests/python/pants_test/backend/jvm/tasks/jvm_compile/zinc:zinc_compile_integration_with_zjars
+tests/python/pants_test/backend/jvm/tasks:jar_publish_integration
+tests/python/pants_test/backend/jvm/tasks:junit_run_integration
+tests/python/pants_test/backend/jvm/tasks:junit_tests_concurrency_integration
+tests/python/pants_test/backend/jvm/tasks:junit_tests_integration
+tests/python/pants_test/backend/jvm/tasks:jvm_run_integration
+tests/python/pants_test/reporting:reporting_integration
+tests/python/pants_test/tasks:bootstrap_jvm_tools_integration

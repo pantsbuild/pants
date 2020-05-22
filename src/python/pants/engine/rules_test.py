@@ -25,7 +25,6 @@ from pants.engine.rules import (
     rule,
 )
 from pants.engine.selectors import Get
-from pants.option.global_options import BuildFileImportsBehavior
 from pants.testutil.engine.util import (
     TARGET_TABLE,
     MockGet,
@@ -268,8 +267,11 @@ class RuleTest(TestBase):
                 return False
 
         error_str = str(cm.exception)
-        assert "invalid_rule has a side-effecting parameter" in error_str
-        assert "pants.engine.console.Console" in error_str
+        assert (
+            "(@rule pants.engine.rules_test:invalid_rule) has a side-effecting parameter"
+            in error_str
+        )
+        assert "pants.util.meta.Console" in error_str
 
 
 class RuleIndexTest(TestBase):
@@ -284,7 +286,7 @@ class RuleIndexTest(TestBase):
 
 
 class RuleArgumentAnnotationTest(unittest.TestCase):
-    def test_annoations_kwargs(self):
+    def test_annotations_kwargs(self):
         @named_rule
         def a_named_rule(a: int, b: str) -> bool:
             return False
@@ -401,10 +403,10 @@ class RuleGraphTest(TestBase):
 
     def test_ruleset_with_missing_product_type(self):
         @rule
-        def a_from_b_noop(b: B) -> A:
+        def a_from_b(b: B) -> A:
             pass
 
-        rules = _suba_root_rules + [a_from_b_noop]
+        rules = [RootRule(SubA), a_from_b]
 
         with self.assertRaises(Exception) as cm:
             create_scheduler(rules)
@@ -413,7 +415,8 @@ class RuleGraphTest(TestBase):
             dedent(
                 f"""\
                 Rules with errors: 1
-                  {fmt_rule(a_from_b_noop)}:
+
+                  {fmt_rule(a_from_b)}:
                     No rule was available to compute B with parameter type SubA
                 """
             ).strip(),
@@ -449,10 +452,13 @@ class RuleGraphTest(TestBase):
             dedent(
                 f"""\
                 Rules with errors: 3
+
                   {fmt_rule(a_from_b_and_c)}:
                     Was not reachable, either because no rules could produce the params or because it was shadowed by another @rule.
+
                   {fmt_rule(a_from_c_and_b)}:
                     Was not reachable, either because no rules could produce the params or because it was shadowed by another @rule.
+
                   {fmt_rule(d_from_a)}:
                     Ambiguous rules to compute A with parameter types (B, C):
                       {fmt_graph_rule(a_from_b_and_c)}
@@ -477,6 +483,7 @@ class RuleGraphTest(TestBase):
             dedent(
                 f"""\
                 Rules with errors: 1
+
                   {fmt_rule(a_from_b_and_c)}:
                     No rule was available to compute B with parameter type SubA
                     No rule was available to compute C with parameter type SubA
@@ -514,8 +521,10 @@ class RuleGraphTest(TestBase):
             dedent(
                 f"""\
                 Rules with errors: 2
+
                   {fmt_rule(a_from_b)}:
                     No rule was available to compute B with parameter type C
+
                   {fmt_rule(b_from_suba)}:
                     No rule was available to compute SubA with parameter type C
                 """
@@ -546,6 +555,7 @@ class RuleGraphTest(TestBase):
             dedent(
                 f"""\
                 Rules with errors: 1
+
                   {fmt_rule(d_from_c)}:
                     No rule was available to compute C with parameter type A
                 """
@@ -583,11 +593,14 @@ class RuleGraphTest(TestBase):
             dedent(
                 f"""\
                 Rules with errors: 3
+
                   {fmt_rule(a_from_c)}:
                     Was not reachable, either because no rules could produce the params or because it was shadowed by another @rule.
                   {fmt_rule(b_from_d)}:
+
                     No rule was available to compute D with parameter type SubA
                   {fmt_rule(d_from_a_and_suba, gets=[("A", "C")])}:
+
                     No rule was available to compute A with parameter type SubA
                 """
             ).strip(),
@@ -618,6 +631,7 @@ class RuleGraphTest(TestBase):
             dedent(
                 f"""\
                 Rules with errors: 1
+
                   {fmt_rule(d_for_b)}:
                     Was not reachable, either because no rules could produce the params or because it was shadowed by another @rule.
                 """
@@ -654,10 +668,7 @@ class RuleGraphTest(TestBase):
 
     def test_full_graph_for_planner_example(self):
         address_mapper = AddressMapper(
-            JsonParser(TARGET_TABLE),
-            prelude_glob_patterns=(),
-            build_file_imports_behavior=BuildFileImportsBehavior.error,
-            build_patterns="*.BUILD.json",
+            JsonParser(TARGET_TABLE), prelude_glob_patterns=(), build_patterns="*.BUILD.json",
         )
         rules = create_graph_rules(address_mapper) + create_fs_rules()
 

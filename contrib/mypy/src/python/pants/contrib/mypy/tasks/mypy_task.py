@@ -44,7 +44,7 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
     'In context' meaning in the sub-graph where a whitelisted target is the root
     """
 
-    _MYPY_COMPATIBLE_INTERPETER_CONSTRAINT = ">=3.5"
+    _MYPY_COMPATIBLE_INTERPRETER_CONSTRAINT = ">=3.5"
     _PYTHON_SOURCE_EXTENSION = ".py"
 
     @classmethod
@@ -86,7 +86,7 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
 
     def find_mypy_interpreter(self):
         interpreters = self._interpreter_cache.setup(
-            filters=[self._MYPY_COMPATIBLE_INTERPETER_CONSTRAINT]
+            filters=[self._MYPY_COMPATIBLE_INTERPRETER_CONSTRAINT]
         )
         return min(interpreters) if interpreters else None
 
@@ -183,12 +183,17 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
                 pexes=[mypy_requirement_pex, *extra_pexes],
             ) as builder:
                 with temporary_file(binary_mode=False) as exe_fp:
-                    # MyPy searches for types for a package in packages containing a `py.types` marker file
-                    # or else in a sibling `<package>-stubs` package as per PEP-0561. Going further than that
-                    # PEP, MyPy restricts its search to `site-packages`. Since PEX deliberately isolates
-                    # itself from `site-packages` as part of its raison d'etre, we monkey-patch
-                    # `site.getsitepackages` to look inside the scrubbed PEX sys.path before handing off to
-                    # `mypy`.
+                    # MyPy searches for types for a package in packages containing a `py.types`
+                    # marker file or else in a sibling `<package>-stubs` package as per PEP-0561.
+                    # Going further than that PEP, MyPy restricts its search to `site-packages`.
+                    # Since PEX deliberately isolates itself from `site-packages` as part of its
+                    # raison d'etre, we monkey-patch `site.getsitepackages` to look inside the
+                    # scrubbed PEX sys.path before handing off to `mypy`.
+                    #
+                    # As a complication, MyPy does its own validation to ensure packages aren't
+                    # both available in site-packages and on the PYTHONPATH. As such, we elide all
+                    # PYTHONPATH entries from artificial site-packages we set up since MyPy will
+                    # manually scan PYTHONPATH outside this PEX to find packages.
                     #
                     # See:
                     #   https://mypy.readthedocs.io/en/stable/installed_packages.html#installed-packages
@@ -196,14 +201,20 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
                     exe_fp.write(
                         dedent(
                             """
+                            import os
                             import runpy
                             import site
                             import sys
-                
-                
-                            site.getsitepackages = lambda: sys.path[:]
-                
+
+                            PYTHONPATH = frozenset(
+                                os.path.realpath(p)
+                                for p in os.environ.get('PYTHONPATH', '').split(os.pathsep)
+                            )
                             
+                            site.getsitepackages = lambda: [
+                                p for p in sys.path if os.path.realpath(p) not in PYTHONPATH
+                            ]
+
                             runpy.run_module('mypy', run_name='__main__')
                             """
                         )
@@ -220,7 +231,7 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
         mypy_interpreter = self.find_mypy_interpreter()
         if not mypy_interpreter:
             raise TaskError(
-                f"Unable to find a Python {self._MYPY_COMPATIBLE_INTERPETER_CONSTRAINT} "
+                f"Unable to find a Python {self._MYPY_COMPATIBLE_INTERPRETER_CONSTRAINT} "
                 f"interpreter (required for mypy)."
             )
 
@@ -239,7 +250,7 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
         extra_pexes = []
         if self.get_options().include_requirements:
             if interpreter_for_targets.identity.matches(
-                self._MYPY_COMPATIBLE_INTERPETER_CONSTRAINT
+                self._MYPY_COMPATIBLE_INTERPRETER_CONSTRAINT
             ):
                 extra_pexes.append(
                     self.context.products.get_data(ResolveRequirements.REQUIREMENTS_PEX)
@@ -249,7 +260,7 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
                 self.context.log.warn(
                     f"The --include-requirements option is set, but the current target's requirements have "
                     f"been resolved for {interpreter_for_targets.identity} which is not compatible with mypy "
-                    f"which needs {self._MYPY_COMPATIBLE_INTERPETER_CONSTRAINT}: omitting resolved "
+                    f"which needs {self._MYPY_COMPATIBLE_INTERPRETER_CONSTRAINT}: omitting resolved "
                     f"requirements from the mypy PYTHONPATH."
                 )
 

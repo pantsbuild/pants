@@ -37,7 +37,7 @@ def allow_underscores(num):
 
 @allow_underscores(1)
 def is_upper_camel(name):
-    """UpperCamel, AllowingHTTPAbbrevations, _WithUpToOneUnderscoreAllowable."""
+    """UpperCamel, AllowingHTTPAbbreviations, _WithUpToOneUnderscoreAllowable."""
     return bool(UPPER_CAMEL_RE.match(name) and not ALL_UPPER_CASE_RE.match(name))
 
 

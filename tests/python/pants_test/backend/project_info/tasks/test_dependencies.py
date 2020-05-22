@@ -3,7 +3,7 @@
 
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.backend.jvm.targets.java_library import JavaLibrary
-from pants.backend.project_info.rules.dependencies import DependencyType
+from pants.backend.project_info.dependencies import DependencyType
 from pants.backend.project_info.tasks.dependencies import Dependencies
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
@@ -133,7 +133,7 @@ class PythonDependenciesTests(ConsoleTaskTestBase):
         python_inner_with_external = self.make_target(
             "dependencies:python_inner_with_external",
             target_type=PythonRequirementLibrary,
-            requirements=[PythonRequirement("antlr_python_runtime==3.1.3")],
+            requirements=[PythonRequirement("ansicolors==1.1.8")],
         )
 
         self.make_target(
@@ -149,7 +149,7 @@ class PythonDependenciesTests(ConsoleTaskTestBase):
             "dependencies:python_inner",
             "dependencies:python_leaf",
             "dependencies:python_inner_with_external",
-            "antlr_python_runtime==3.1.3",
+            "ansicolors==1.1.8",
             targets=[self.target("dependencies:python_root")],
             options={"transitive": True, "type": DependencyType.SOURCE_AND_THIRD_PARTY},
         )
@@ -166,7 +166,7 @@ class PythonDependenciesTests(ConsoleTaskTestBase):
 
     def test_transitive_3rdparty_dependencies(self):
         self.assert_console_output_ordered(
-            "antlr_python_runtime==3.1.3",
+            "ansicolors==1.1.8",
             targets=[self.target("dependencies:python_root")],
             options={"transitive": True, "type": DependencyType.THIRD_PARTY},
         )
@@ -181,7 +181,7 @@ class PythonDependenciesTests(ConsoleTaskTestBase):
 
     def test_3rdparty_dependencies(self):
         self.assert_console_output_ordered(
-            "antlr_python_runtime==3.1.3",
+            "ansicolors==1.1.8",
             targets=[self.target("dependencies:python_root")],
             options={"type": DependencyType.THIRD_PARTY},
         )

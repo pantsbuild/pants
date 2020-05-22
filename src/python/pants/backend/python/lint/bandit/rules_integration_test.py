@@ -13,11 +13,11 @@ from pants.engine.fs import FileContent
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.engine.target import TargetWithOrigin
+from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option.util import create_options_bootstrapper
-from pants.testutil.test_base import TestBase
 
 
-class BanditIntegrationTest(TestBase):
+class BanditIntegrationTest(ExternalToolTestBase):
 
     good_source = FileContent(path="good.py", content=b"hashlib.sha256()\n")
     # MD5 is a insecure hashing function
@@ -51,6 +51,7 @@ class BanditIntegrationTest(TestBase):
         config: Optional[str] = None,
         passthrough_args: Optional[str] = None,
         skip: bool = False,
+        additional_args: Optional[List[str]] = None,
     ) -> LintResult:
         args = ["--backend-packages2=pants.backend.python.lint.bandit"]
         if config:
@@ -59,7 +60,9 @@ class BanditIntegrationTest(TestBase):
         if passthrough_args:
             args.append(f"--bandit-args={passthrough_args}")
         if skip:
-            args.append(f"--bandit-skip")
+            args.append("--bandit-skip")
+        if additional_args:
+            args.extend(additional_args)
         return self.request_single_product(
             LintResult,
             Params(
@@ -122,3 +125,13 @@ class BanditIntegrationTest(TestBase):
         target = self.make_target_with_origin([self.bad_source])
         result = self.run_bandit([target], skip=True)
         assert result == LintResult.noop()
+
+    def test_3rdparty_plugin(self) -> None:
+        target = self.make_target_with_origin(
+            [FileContent("bad.py", b"aws_key = 'JalrXUtnFEMI/K7MDENG/bPxRfiCYzEXAMPLEKEY'\n")]
+        )
+        result = self.run_bandit(
+            [target], additional_args=["--bandit-extra-requirements=bandit-aws"]
+        )
+        assert result.exit_code == 1
+        assert "Issue: [C100:hardcoded_aws_key]" in result.stdout

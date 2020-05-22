@@ -74,7 +74,7 @@ especially relevant.
 > Pants also includes support for using the ScalaTest framework.  The
 > testing framework automatically picks up scala tests that extend the
 > org.scalatest.Suite class and runs them
-> using org.scalatest.junit.JUnitRunner.
+> using org.scalatestplus.junit.JUnitRunner.
 >
 > Most other scala test frameworks support running with JUnit via a base
 > class/trait or via a `@RunWith` annotation; so you can use
@@ -87,9 +87,7 @@ especially relevant.
 > A `java_thrift_library` generates Java code from `.thrift` source; a
 > JVM target that has this target in its `dependencies` can `import` the
 > generated Java code. A `java_protobuf_library` is similar, but
-> generates Java code from protobuffer source. A `jaxb_library`
-> definition generates code to read and write XML using an XML schema
-> (.xsd files).
+> generates Java code from protobuffer source.
 
 BUILD for a Simple Binary
 -------------------------

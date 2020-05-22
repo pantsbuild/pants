@@ -13,12 +13,12 @@ from pants.engine.fs import FileContent
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.engine.target import TargetWithOrigin
+from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.interpreter_selection_utils import skip_unless_python27_and_python3_present
 from pants.testutil.option.util import create_options_bootstrapper
-from pants.testutil.test_base import TestBase
 
 
-class Flake8IntegrationTest(TestBase):
+class Flake8IntegrationTest(ExternalToolTestBase):
 
     good_source = FileContent(path="good.py", content=b"print('Nothing suspicious here..')\n")
     bad_source = FileContent(path="bad.py", content=b"import typing\n")  # unused import
@@ -52,6 +52,7 @@ class Flake8IntegrationTest(TestBase):
         config: Optional[str] = None,
         passthrough_args: Optional[str] = None,
         skip: bool = False,
+        additional_args: Optional[List[str]] = None,
     ) -> LintResult:
         args = ["--backend-packages2=pants.backend.python.lint.flake8"]
         if config:
@@ -60,7 +61,9 @@ class Flake8IntegrationTest(TestBase):
         if passthrough_args:
             args.append(f"--flake8-args='{passthrough_args}'")
         if skip:
-            args.append(f"--flake8-skip")
+            args.append("--flake8-skip")
+        if additional_args:
+            args.extend(additional_args)
         return self.request_single_product(
             LintResult,
             Params(
@@ -137,3 +140,13 @@ class Flake8IntegrationTest(TestBase):
         target = self.make_target_with_origin([self.bad_source])
         result = self.run_flake8([target], skip=True)
         assert result == LintResult.noop()
+
+    def test_3rdparty_plugin(self) -> None:
+        target = self.make_target_with_origin(
+            [FileContent("bad.py", b"'constant' and 'constant2'\n")]
+        )
+        result = self.run_flake8(
+            [target], additional_args=["--flake8-extra-requirements=flake8-pantsbuild>=2.0,<3"]
+        )
+        assert result.exit_code == 1
+        assert "bad.py:1:1: PB11" in result.stdout

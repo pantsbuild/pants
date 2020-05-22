@@ -106,14 +106,14 @@ class ArchiveFetcher(Fetcher):
                       remote import path\'s `rev`, `import_prefix`, and `pkg`.
         - default_rev: Fetch this rev if no other rev is specified.
         - strip_level: An integer indicating the number of leading path components to strip from
-                       files upacked from the archive.
+                       files unpacked from the archive.
         """
 
     def __init__(self, import_path, import_prefix, url_info, archive_retriever):
         super().__init__(import_path)
         self._import_prefix = import_prefix
         self._url_info = url_info
-        self._archive_retriver = archive_retriever
+        self._archive_retriever = archive_retriever
 
     def root(self):
         return self._import_prefix
@@ -132,4 +132,4 @@ class ArchiveFetcher(Fetcher):
 
     def _fetch(self, archive_url, strip_level, dest):
         # Note: Broken out into a separate function so we can mock it out easily in tests.
-        self._archive_retriver.fetch_archive(archive_url, strip_level, dest)
+        self._archive_retriever.fetch_archive(archive_url, strip_level, dest)

@@ -25,7 +25,7 @@ python_library(
     description='A scalable build tool for large, complex, heterogeneous repos.',
     namespace_packages=['pants', 'pants.backend'],
     # NB: by setting `ext_modules`, we signal to setup_py and bdist_wheel that this library
-    # has native code. As a consquence, bdist_wheel pins the ABI (application binary interface)
+    # has native code. As a consequence, bdist_wheel pins the ABI (application binary interface)
     # used when creating the wheel, which is a good thing. We should be setting this ABI to ensure
     # consumers of pantsbuild.pants are using a compatible interpreter.
     # TODO(7344): the tuple syntax for ext_modules is deprecated. Use Extension once we support it.
@@ -67,10 +67,6 @@ resources(
 page(
   name='changelog',
   sources=['CHANGELOG.md'],
-  links=[
-    'src/python/pants/notes:notes-1.0.x',
-    'src/python/pants/notes:notes-master',
-  ],
   description='''
 This file is no longer a changelog, but remains in this location in order to avoid breaking
 older changelog links unnecessarily. Could consider removing it by 2.0.x, perhaps.

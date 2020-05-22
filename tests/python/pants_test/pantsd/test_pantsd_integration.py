@@ -90,7 +90,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             self.assertIn("Current thread 0x", "\n".join(read_pantsd_log(ctx.workdir)))
 
     def test_pantsd_pantsd_runner_doesnt_die_after_failed_run(self):
-        # Check for no stray pantsd prcesses.
+        # Check for no stray pantsd processes.
         with no_lingering_process_by_command("pantsd"):
             with self.pantsd_test_context() as (workdir, pantsd_config, checker):
                 # Run target that throws an exception in pants.
@@ -303,7 +303,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             # Check the logs.
             ctx.checker.assert_running()
             self.assertRegex(
-                full_pantsd_log(), r"watching invalidating files:.*{}".format(test_dir)
+                full_pantsd_log(), r"watching invalidation patterns:.*{}".format(test_dir)
             )
 
             # Create a new file in test_dir
@@ -313,7 +313,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
                 ctx.checker.assert_stopped()
 
-            self.assertIn("saw file events covered by invalidation globs", full_pantsd_log())
+            self.assertIn("saw filesystem changes covered by invalidation globs", full_pantsd_log())
 
     def test_pantsd_invalidation_pants_toml_file(self):
         # Test tmp_pants_toml (--pants-config-files=$tmp_pants_toml)'s removal
@@ -715,7 +715,7 @@ Interrupted by user over pailgun client!
             ctx.checker.assert_running()
             self.assert_failure(result)
             # Assert that the desired exception has been triggered once.
-            self.assertRegex(result.stderr_data, r"Exception message:.*badreq==99.99.99")
+            self.assertRegex(result.stderr_data, r"ERROR:.*badreq==99.99.99")
             # Assert that it has only been triggered once.
             self.assertNotIn(
                 "During handling of the above exception, another exception occurred:",

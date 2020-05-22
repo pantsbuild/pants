@@ -16,7 +16,7 @@ from pants.engine.unions import UnionRule, union
 from pants.option.optionable import OptionableFactory
 from pants.util.collections import assert_single_element
 from pants.util.memo import memoized
-from pants.util.meta import frozen_after_init
+from pants.util.meta import decorated_type_checkable, frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 
@@ -29,11 +29,11 @@ class RuleAnnotations:
 DEFAULT_RULE_ANNOTATIONS = RuleAnnotations()
 
 
+@decorated_type_checkable
 def side_effecting(cls):
     """Annotates a class to indicate that it is a side-effecting type, which needs to be handled
     specially with respect to rule caching semantics."""
-    cls.__side_effecting = True
-    return cls
+    return side_effecting.define_instance_of(cls)
 
 
 class _RuleVisitor(ast.NodeVisitor):
@@ -248,7 +248,7 @@ def rule_decorator(*args, **kwargs) -> Callable:
         annotations = DEFAULT_RULE_ANNOTATIONS
         if any(x is not None for x in (canonical_name, desc)):
             raise UnrecognizedRuleArgument(
-                f"@rules that are not @named_rules or @goal_rules do not accept keyword arguments"
+                "@rules that are not @named_rules or @goal_rules do not accept keyword arguments"
             )
 
     if (
@@ -293,9 +293,9 @@ def validate_parameter_types(
 ) -> None:
     if cacheable:
         for ty in parameter_types:
-            if getattr(ty, "__side_effecting", False):
+            if side_effecting.is_instance(ty):
                 raise ValueError(
-                    f"Non-console `@rule` {func_id} has a side-effecting parameter: {ty}"
+                    f"A `@rule` that was not a @goal_rule ({func_id}) has a side-effecting parameter: {ty}"
                 )
 
 

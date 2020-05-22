@@ -141,8 +141,8 @@ class Git(Scm):
         origins = list(origin_urls())
         if len(origins) != 1:
             raise Scm.LocalException(
-                f"Unable to find remote named 'origin' that accepts pushes "
-                "amongst:\n{git_output}"
+                "Unable to find remote named 'origin' that accepts pushes "
+                f"amongst:\n{git_output}"
             )
         return origins[0]
 

@@ -252,7 +252,7 @@ class BundleTest(TestBase):
         self.create_file(os.path.join(spec_path, "three.xml"))
         self.assertNotEqual(fingerprint_before, calc_fingerprint(include_three_xml=True))
 
-    def test_jvmapp_fingerprinting_with_non_existing_files(self):
+    def test_jvmapp_fingerprinting_with_nonexistent_files(self):
         spec_path = "y"
 
         def calc_fingerprint():
@@ -261,13 +261,13 @@ class BundleTest(TestBase):
                 "y:app", JvmApp, dependencies=[], bundles=[_bundle(spec_path)(fileset=["one.xml"])]
             ).payload.fingerprint()
 
-        fingerprint_non_existing_file = calc_fingerprint()
+        fingerprint_nonexistent_file = calc_fingerprint()
         self.create_file(os.path.join(spec_path, "one.xml"))
         fingerprint_empty_file = calc_fingerprint()
         self.create_file(os.path.join(spec_path, "one.xml"), contents="some content")
         fingerprint_file_with_content = calc_fingerprint()
 
-        self.assertNotEqual(fingerprint_empty_file, fingerprint_non_existing_file)
+        self.assertNotEqual(fingerprint_empty_file, fingerprint_nonexistent_file)
         self.assertNotEqual(fingerprint_empty_file, fingerprint_file_with_content)
         self.assertNotEqual(fingerprint_file_with_content, fingerprint_empty_file)
 

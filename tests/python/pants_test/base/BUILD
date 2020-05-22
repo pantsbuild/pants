@@ -102,25 +102,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'pants_ignore_file_system',
-  sources = ['test_pants_ignore_file_system.py'],
-  dependencies = [
-    ':pants_ignore_test_base',
-    'src/python/pants/base:project_tree',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_library(
-  name = 'pants_ignore_test_base',
-  sources = ['pants_ignore_test_base.py'],
-  dependencies = [
-    ':project_tree_test_base',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_tests(
   name = 'payload',
   sources = ['test_payload.py'],
   dependencies = [
@@ -140,15 +121,6 @@ python_tests(
     'src/python/pants/base:payload_field',
     'src/python/pants/python',
     'src/python/pants/testutil:test_base',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_library(
-  name = 'project_tree_test_base',
-  sources = ['project_tree_test_base.py'],
-  dependencies = [
-    'src/python/pants/util:dirutil',
   ],
   tags = {"partially_type_checked"},
 )
@@ -213,10 +185,11 @@ python_tests(
   sources = ['test_exception_sink_integration.py'],
   dependencies = [
     'src/python/pants/base:exception_sink',
-    'src/python/pants/util:osutil',
     'src/python/pants/testutil:int-test',
+    'src/python/pants/util:osutil',
     'testprojects/src/python:coordinated_runs_directory',
     'testprojects:pants_plugins_directory',
+    'tests/python/pants_test/pantsd:pantsd_integration_test_base',
   ],
   tags = {'platform_specific_behavior', 'integration', 'partially_type_checked'},
   # NB: This frequently times out, but due to hanging. So, we want to fail eagerly. See

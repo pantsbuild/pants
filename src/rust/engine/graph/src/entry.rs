@@ -58,31 +58,52 @@ impl Generation {
 /// same values as they did when this Node was last run; if so, the value can be re-used
 /// (and should be marked "Clean").
 ///
-/// If the value is Uncacheable it may only be consumed in the Session that produced it, and should
-/// be recomputed in a new Session.
+/// If the value is Uncacheable it may only be consumed in the same Run that produced it, and should
+/// be recomputed in a new Run.
+///
+/// A value of type UncacheableDependencies has Uncacheable dependencies, and is treated as
+/// equivalent to Dirty in all cases except when `poll`d: since `poll` requests are waiting for
+/// meaningful work to do, they need to differentiate between a truly invalidated/changed (Dirty)
+/// Node and a Node that would be re-cleaned once per session.
 ///
 /// If the value is Clean, the consumer can simply use the value as-is.
 ///
 #[derive(Clone, Debug)]
 pub enum EntryResult<N: Node> {
-  Clean(Result<N::Item, N::Error>),
-  Dirty(Result<N::Item, N::Error>),
-  Uncacheable(
-    Result<N::Item, N::Error>,
-    <<N as Node>::Context as NodeContext>::SessionId,
-  ),
+  Clean(N::Item),
+  UncacheableDependencies(N::Item),
+  Dirty(N::Item),
+  Uncacheable(N::Item, <<N as Node>::Context as NodeContext>::RunId),
 }
 
 impl<N: Node> EntryResult<N> {
   fn is_clean(&self, context: &N::Context) -> bool {
     match self {
       EntryResult::Clean(..) => true,
-      EntryResult::Uncacheable(_, session_id) => context.session_id() == session_id,
+      EntryResult::Uncacheable(_, run_id) => context.run_id() == run_id,
       EntryResult::Dirty(..) => false,
+      EntryResult::UncacheableDependencies(..) => false,
     }
   }
 
-  fn peek(&self, context: &N::Context) -> Option<Result<N::Item, N::Error>> {
+  fn has_uncacheable_deps(&self) -> bool {
+    match self {
+      EntryResult::Uncacheable(_, _) | EntryResult::UncacheableDependencies(_) => true,
+      EntryResult::Clean(..) | EntryResult::Dirty(..) => false,
+    }
+  }
+
+  /// Returns true if this result should block for polling (because there is no work to do
+  /// currently to clean it).
+  fn poll_should_wait(&self, context: &N::Context) -> bool {
+    match self {
+      EntryResult::Uncacheable(_, run_id) => context.run_id() == run_id,
+      EntryResult::Dirty(..) => false,
+      EntryResult::UncacheableDependencies(_) | EntryResult::Clean(..) => true,
+    }
+  }
+
+  fn peek(&self, context: &N::Context) -> Option<N::Item> {
     if self.is_clean(context) {
       Some(self.as_ref().clone())
     } else {
@@ -90,32 +111,44 @@ impl<N: Node> EntryResult<N> {
     }
   }
 
-  /// Iff the value is Clean, mark it Dirty.
+  /// If the value is in a Clean state, mark it Dirty.
   fn dirty(&mut self) {
-    if let EntryResult::Clean(value) = self {
-      *self = EntryResult::Dirty(value.clone())
+    match self {
+      EntryResult::Clean(v) | EntryResult::UncacheableDependencies(v) => {
+        *self = EntryResult::Dirty(v.clone());
+      }
+      EntryResult::Dirty(_) | EntryResult::Uncacheable(_, _) => {}
     }
   }
 
-  /// Iff the value is Dirty, mark it Clean.
+  /// If the value is Dirty, mark it Clean.
   fn clean(&mut self) {
     if let EntryResult::Dirty(value) = self {
       *self = EntryResult::Clean(value.clone())
     }
   }
-}
 
-impl<N: Node> AsRef<Result<N::Item, N::Error>> for EntryResult<N> {
-  fn as_ref(&self) -> &Result<N::Item, N::Error> {
-    match self {
-      EntryResult::Clean(v) => v,
-      EntryResult::Dirty(v) => v,
-      EntryResult::Uncacheable(v, _) => v,
+  /// If the value is Dirty, mark it UncacheableDependencies.
+  fn uncacheable_deps(&mut self) {
+    if let EntryResult::Dirty(value) = self {
+      *self = EntryResult::UncacheableDependencies(value.clone())
     }
   }
 }
 
-#[allow(clippy::type_complexity)]
+impl<N: Node> AsRef<N::Item> for EntryResult<N> {
+  fn as_ref(&self) -> &N::Item {
+    match self {
+      EntryResult::Clean(v) => v,
+      EntryResult::Dirty(v) => v,
+      EntryResult::Uncacheable(v, _) => v,
+      EntryResult::UncacheableDependencies(v) => v,
+    }
+  }
+}
+
+type Waiter<N> = oneshot::Sender<Result<(<N as Node>::Item, Generation), <N as Node>::Error>>;
+
 #[derive(Debug)]
 pub enum EntryState<N: Node> {
   // A node that has either been explicitly cleared, or has not yet started Running. In this state
@@ -137,16 +170,20 @@ pub enum EntryState<N: Node> {
   Running {
     run_token: RunToken,
     generation: Generation,
-    waiters: Vec<oneshot::Sender<Result<(N::Item, Generation), N::Error>>>,
+    waiters: Vec<Waiter<N>>,
     previous_result: Option<EntryResult<N>>,
     dirty: bool,
   },
   // A node that has completed, and then possibly been marked dirty. Because marking a node
   // dirty does not eagerly re-execute any logic, it will stay this way until a caller moves it
   // back to Running.
+  //
+  // A Completed entry can have "pollers" whom are waiting for the Node to either be dirtied or
+  // otherwise invalidated.
   Completed {
     run_token: RunToken,
     generation: Generation,
+    pollers: Vec<oneshot::Sender<()>>,
     result: EntryResult<N>,
     dep_generations: Vec<Generation>,
   },
@@ -193,9 +230,45 @@ impl<N: Node> Entry<N> {
   }
 
   ///
+  /// If this Node is currently complete and clean with the given Generation, then return a Future
+  /// that will be satisfied when it is changed in any way. If the node is not clean, or the
+  /// generation mismatches, returns immediately.
+  ///
+  /// NB: The returned Future is infallible.
+  ///
+  pub fn poll(&self, context: &N::Context, last_seen_generation: Generation) -> BoxFuture<(), ()> {
+    let mut state = self.state.lock();
+    match *state {
+      EntryState::Completed {
+        ref result,
+        generation,
+        ref mut pollers,
+        ..
+      } => {
+        if generation == last_seen_generation && result.poll_should_wait(context) {
+          // The Node is currently clean with the observed generation: add a poller on the
+          // Completed node that will be notified when it is dirtied or dropped. If the Node moves
+          // to another state, the received will be notified that the sender was dropped, and it
+          // will be converted into a successful result.
+          let (send, recv) = oneshot::channel();
+          pollers.push(send);
+          recv.then(|_| Ok(())).to_boxed()
+        } else {
+          // The Node is not clean, or the generation has changed.
+          future::ok(()).to_boxed()
+        }
+      }
+      _ => {
+        // The Node is not Completed, and should be requested.
+        future::ok(()).to_boxed()
+      }
+    }
+  }
+
+  ///
   /// If the Future for this Node has already completed, returns a clone of its result.
   ///
-  pub fn peek(&self, context: &N::Context) -> Option<Result<N::Item, N::Error>> {
+  pub fn peek(&self, context: &N::Context) -> Option<N::Item> {
     let state = self.state.lock();
     match *state {
       EntryState::Completed { ref result, .. } => result.peek(context),
@@ -315,7 +388,7 @@ impl<N: Node> Entry<N> {
           generation,
           ..
         } if result.is_clean(context) => {
-          return future::result(result.as_ref().clone())
+          return future::result(Ok(result.as_ref().clone()))
             .map(move |res| (res, generation))
             .to_boxed();
         }
@@ -342,6 +415,7 @@ impl<N: Node> Entry<N> {
         EntryState::Completed {
           run_token,
           generation,
+          pollers,
           result,
           dep_generations,
         } => {
@@ -355,12 +429,14 @@ impl<N: Node> Entry<N> {
             "A clean Node should not reach this point: {:?}",
             result
           );
+          // NB: Explicitly drop the pollers: would happen anyway, but avoids an unused variable.
+          mem::drop(pollers);
           // The Node has already completed but needs to re-run. If the Node is dirty, we are the
           // first caller to request it since it was marked dirty. We attempt to clean it (which
           // will cause it to re-run if the dep_generations mismatch).
           //
           // On the other hand, if the Node is uncacheable, we store the previous result as
-          // Uncacheable, which allows its value to be used only within the current Session.
+          // Uncacheable, which allows its value to be used only within the current Run.
           Self::run(
             context,
             &self.node,
@@ -406,7 +482,7 @@ impl<N: Node> Entry<N> {
     result_run_token: RunToken,
     dep_generations: Vec<Generation>,
     result: Option<Result<N::Item, N::Error>>,
-    has_dirty_dependencies: bool,
+    has_uncacheable_deps: bool,
     _graph: &mut super::InnerGraph<N>,
   ) {
     let mut state = self.state.lock();
@@ -427,98 +503,116 @@ impl<N: Node> Entry<N> {
       EntryState::Running {
         waiters,
         run_token,
-        generation,
+        mut generation,
         mut previous_result,
         dirty,
         ..
       } => {
-        if result == Some(Err(N::Error::invalidated())) {
-          // Because it is always ephemeral, invalidation is the only type of Err that we do not
-          // persist in the Graph. Instead, swap the Node to NotStarted to drop all waiters,
-          // causing them to also experience invalidation (transitively).
-          trace!(
-            "Not completing node {:?} because it was invalidated before completing.",
-            self.node
-          );
-          if let Some(previous_result) = previous_result.as_mut() {
-            previous_result.dirty();
+        match result {
+          _ if dirty => {
+            // The node was dirtied while it was running. The dep_generations and new result cannot
+            // be trusted and were never published. We continue to use the previous result.
+            trace!(
+              "Not completing node {:?} because it was dirtied before completing.",
+              self.node
+            );
+            if let Some(previous_result) = previous_result.as_mut() {
+              previous_result.dirty();
+            }
+            Self::run(
+              context,
+              &self.node,
+              entry_id,
+              run_token,
+              generation,
+              None,
+              previous_result,
+            )
           }
-          EntryState::NotStarted {
-            run_token: run_token.next(),
-            generation,
-            previous_result,
+          Some(Err(e)) => {
+            if let Some(previous_result) = previous_result.as_mut() {
+              previous_result.dirty();
+            }
+            self.notify_waiters(waiters, Err(e));
+            EntryState::NotStarted {
+              run_token: run_token.next(),
+              generation,
+              previous_result,
+            }
           }
-        } else if dirty {
-          // The node was dirtied while it was running. The dep_generations and new result cannot
-          // be trusted and were never published. We continue to use the previous result.
-          trace!(
-            "Not completing node {:?} because it was dirtied before completing.",
-            self.node
-          );
-          if let Some(previous_result) = previous_result.as_mut() {
-            previous_result.dirty();
-          }
-          Self::run(
-            context,
-            &self.node,
-            entry_id,
-            run_token,
-            generation,
-            None,
-            previous_result,
-          )
-        } else {
-          // If the new result does not match the previous result, the generation increments.
-          let (generation, next_result) = if let Some(result) = result {
-            let next_result = if !self.node.cacheable() {
-              EntryResult::Uncacheable(result, context.session_id().clone())
-            } else if has_dirty_dependencies {
-              EntryResult::Dirty(result)
+          Some(Ok(result)) => {
+            // If the new result does not match the previous result, the generation increments.
+            let next_result: EntryResult<N> = if !self.node.cacheable() {
+              EntryResult::Uncacheable(result, context.run_id().clone())
+            } else if has_uncacheable_deps {
+              EntryResult::UncacheableDependencies(result)
             } else {
               EntryResult::Clean(result)
             };
-            if Some(next_result.as_ref()) == previous_result.as_ref().map(EntryResult::as_ref) {
-              // Node was re-executed, but had the same result value.
-              (generation, next_result)
-            } else {
-              (generation.next(), next_result)
+            if Some(next_result.as_ref()) != previous_result.as_ref().map(EntryResult::as_ref) {
+              // Node was re-executed (ie not cleaned) and had a different result value.
+              generation = generation.next()
+            };
+            self.notify_waiters(waiters, Ok((next_result.as_ref().clone(), generation)));
+            EntryState::Completed {
+              result: next_result,
+              pollers: Vec::new(),
+              dep_generations,
+              run_token,
+              generation,
             }
-          } else {
-            // Node was marked clean.
+          }
+          None => {
+            // Node was clean.
             // NB: The `expect` here avoids a clone and a comparison: see the method docs.
             let mut result =
               previous_result.expect("A Node cannot be marked clean without a previous result.");
-            if has_dirty_dependencies {
-              result.dirty();
+            if has_uncacheable_deps {
+              result.uncacheable_deps();
             } else {
               result.clean();
             }
-            (generation, result)
-          };
-          // Notify all waiters (ignoring any that have gone away), and then store the value.
-          // A waiter will go away whenever they drop the `Future` `Receiver` of the value, perhaps
-          // due to failure of another Future in a `join` or `join_all`, or due to a timeout at the
-          // root of a request.
-          trace!(
-            "Completing node {:?} (generation {:?}) with {} waiters: {:?}",
-            self.node,
-            generation,
-            waiters.len(),
-            next_result,
-          );
-          for waiter in waiters {
-            let _ = waiter.send(next_result.as_ref().clone().map(|res| (res, generation)));
-          }
-          EntryState::Completed {
-            result: next_result,
-            dep_generations,
-            run_token,
-            generation,
+            self.notify_waiters(waiters, Ok((result.as_ref().clone(), generation)));
+            EntryState::Completed {
+              result,
+              pollers: Vec::new(),
+              dep_generations,
+              run_token,
+              generation,
+            }
           }
         }
       }
       s => s,
     };
+  }
+
+  ///
+  /// Notify the given waiters (ignoring any that have gone away).
+  ///
+  /// A waiter will go away whenever they drop the `Future` `Receiver` of the value, perhaps due
+  /// to failure of another Future in a `join` or `join_all`, or due to a timeout at the root of
+  /// a request.
+  ///
+  fn notify_waiters(
+    &self,
+    mut waiters: Vec<Waiter<N>>,
+    next_result: Result<(N::Item, Generation), N::Error>,
+  ) {
+    trace!(
+      "Notifying {} waiters of node {:?}: {:?}",
+      waiters.len(),
+      self.node,
+      next_result,
+    );
+    // We pop off one waiter to avoid cloning for the last waiter (which might be the only waiter).
+    let last_waiter = waiters.pop();
+    for waiter in waiters {
+      let _ = waiter.send(next_result.clone());
+    }
+    if let Some(waiter) = last_waiter {
+      let _ = waiter.send(next_result);
+    }
   }
 
   ///
@@ -611,12 +705,30 @@ impl<N: Node> Entry<N> {
     trace!("Dirtying node {:?}", self.node);
     match state {
       &mut EntryState::Running { ref mut dirty, .. } => {
-        *dirty = true;
+        // An uncacheable node can never be marked dirty.
+        if self.node.cacheable() {
+          *dirty = true;
+        }
       }
-      &mut EntryState::Completed { ref mut result, .. } => {
+      &mut EntryState::Completed {
+        ref mut result,
+        ref mut pollers,
+        ..
+      } => {
+        // Notify all pollers (ignoring any that have gone away.)
+        for poller in pollers.drain(..) {
+          let _ = poller.send(());
+        }
         result.dirty();
       }
       &mut EntryState::NotStarted { .. } => {}
+    }
+  }
+
+  pub fn is_started(&self) -> bool {
+    match *self.state.lock() {
+      EntryState::NotStarted { .. } => false,
+      EntryState::Completed { .. } | EntryState::Running { .. } => true,
     }
   }
 
@@ -640,10 +752,16 @@ impl<N: Node> Entry<N> {
     }
   }
 
+  pub fn has_uncacheable_deps(&self) -> bool {
+    match *self.state.lock() {
+      EntryState::Completed { ref result, .. } => result.has_uncacheable_deps(),
+      EntryState::NotStarted { .. } | EntryState::Running { .. } => false,
+    }
+  }
+
   pub(crate) fn format(&self, context: &N::Context) -> String {
     let state = match self.peek(context) {
-      Some(Ok(ref nr)) => format!("{:?}", nr),
-      Some(Err(ref x)) => format!("{:?}", x),
+      Some(ref nr) => format!("{:?}", nr),
       None => "<None>".to_string(),
     };
     format!("{} == {}", self.node, state).replace("\"", "\\\"")

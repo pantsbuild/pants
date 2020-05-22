@@ -21,7 +21,7 @@ class HermeticPex:
         pex_path: str,
         pex_args: Iterable[str],
         description: str,
-        input_files: Digest,
+        input_digest: Digest,
         env: Optional[Mapping[str, str]] = None,
         **kwargs: Any
     ) -> Process:
@@ -34,8 +34,8 @@ class HermeticPex:
                          pex).
         :param pex_args: The arguments to pass to the PEX executable.
         :param description: A description of the process execution to be performed.
-        :param input_files: The files that contain the pex itself and any input files it needs to
-                            run against.
+        :param input_digest: The directory digest that contains the PEX itself and any input files
+                             it needs to run against.
         :param env: The environment to run the PEX in.
         :param **kwargs: Any additional :class:`Process` kwargs to pass through.
         """
@@ -60,5 +60,9 @@ class HermeticPex:
             hermetic_env.update(env)
 
         return Process(
-            argv=argv, input_files=input_files, description=description, env=hermetic_env, **kwargs
+            argv=argv,
+            input_digest=input_digest,
+            description=description,
+            env=hermetic_env,
+            **kwargs
         )

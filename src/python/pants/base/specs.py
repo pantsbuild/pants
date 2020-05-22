@@ -24,7 +24,7 @@ from pants.option.custom_types import GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.collections import assert_single_element
 from pants.util.dirutil import fast_relpath_optional, recursive_dirname
-from pants.util.filtering import create_filters, wrap_filters
+from pants.util.filtering import and_filters, create_filters
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
 
@@ -278,7 +278,7 @@ def more_specific(
 class AddressSpecsMatcher:
     """Contains filters for the output of a AddressSpecs match.
 
-    This class is separated out from `AddressSpecs` to allow for both stuctural equality of the
+    This class is separated out from `AddressSpecs` to allow for both structural equality of the
     `tags` and `exclude_patterns`, and for caching of their compiled forms using
     `@memoized_property` (which uses the hash of the class instance in its key, and results in a
     very large key when used with `AddressSpecs` directly).
@@ -313,7 +313,7 @@ class AddressSpecsMatcher:
 
             return filter_target
 
-        return wrap_filters(create_filters(self.tags, filter_for_tag))
+        return and_filters(create_filters(self.tags, filter_for_tag))
 
     def matches_target_address_pair(self, address, target) -> bool:
         """

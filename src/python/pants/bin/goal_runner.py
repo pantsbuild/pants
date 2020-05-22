@@ -2,13 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-import sys
 from typing import List
 
+from pants.base.exiter import ExitCode
 from pants.base.specs import AddressSpecs, FilesystemSpecs, SingleAddress, Specs
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.build_graph.build_file_parser import BuildFileParser
 from pants.engine.addresses import Addresses
 from pants.engine.legacy.graph import LegacyBuildGraph
 from pants.engine.legacy.round_engine import RoundEngine
@@ -38,7 +37,6 @@ class GoalRunnerFactory:
         reporting: Reporting,
         graph_session: LegacyGraphSession,
         specs: Specs,
-        exiter=sys.exit,
     ) -> None:
         """
         :param root_dir: The root directory of the pants workspace (aka the "build root").
@@ -48,7 +46,6 @@ class GoalRunnerFactory:
         :param reporting: The global, pre-initialized Reporting instance.
         :param graph_session: The graph session for this run.
         :param specs: The specs for this run, i.e. either the address or filesystem specs.
-        :param func exiter: A function that accepts an exit code value and exits. (for tests, Optional)
         """
         self._root_dir = root_dir
         self._options_bootstrapper = options_bootstrapper
@@ -58,7 +55,6 @@ class GoalRunnerFactory:
         self._reporting = reporting
         self._graph_session = graph_session
         self._specs = specs
-        self._exiter = exiter
 
         self._global_options = options.for_global_scope()
         self._fail_fast = self._global_options.fail_fast
@@ -66,7 +62,7 @@ class GoalRunnerFactory:
         self._kill_nailguns = self._global_options.kill_nailguns
 
         # V1 tasks do not understand FilesystemSpecs, so we eagerly convert them into AddressSpecs.
-        if self._specs.filesystem_specs.dependencies:
+        if self._specs.filesystem_specs:
             (owned_addresses,) = self._graph_session.scheduler_session.product_request(
                 Addresses, [Params(self._specs.filesystem_specs, self._options_bootstrapper)]
             )
@@ -105,7 +101,6 @@ class GoalRunnerFactory:
 
     def _setup_context(self):
         with self._run_tracker.new_workunit(name="setup", labels=[WorkUnitLabel.SETUP]):
-            build_file_parser = BuildFileParser(self._build_config, self._root_dir)
             build_graph, address_mapper = self._graph_session.create_build_graph(
                 self._specs, self._root_dir
             )
@@ -131,7 +126,6 @@ class GoalRunnerFactory:
                 target_roots=target_root_instances,
                 requested_goals=self._options.goals,
                 build_graph=build_graph,
-                build_file_parser=build_file_parser,
                 build_configuration=self._build_config,
                 address_mapper=address_mapper,
                 invalidation_report=invalidation_report,
@@ -182,7 +176,7 @@ class GoalRunner:
         )
         return False
 
-    def _execute_engine(self) -> int:
+    def _execute_engine(self) -> ExitCode:
         engine = RoundEngine()
         sorted_goal_infos = engine.sort_goals(self._context, self._goals)
         RunTracker.global_instance().set_sorted_goal_infos(sorted_goal_infos)
@@ -193,7 +187,7 @@ class GoalRunner:
 
         return result
 
-    def _run_goals(self) -> int:
+    def _run_goals(self) -> ExitCode:
         should_kill_nailguns = self._kill_nailguns
 
         try:
@@ -221,7 +215,7 @@ class GoalRunner:
 
         return result
 
-    def run(self) -> int:
+    def run(self) -> ExitCode:
         global_options = self._context.options.for_global_scope()
 
         if not self._is_valid_workdir(global_options.pants_workdir):

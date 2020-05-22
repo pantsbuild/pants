@@ -366,7 +366,7 @@ Refactoring, Improvements, and Tooling
 * Clean up process execution python API (#6051)
   `PR #6051 <https://github.com/pantsbuild/pants/pull/6051>`_
 
-* Skip pyprep and pytest-prep if there are no python targest (#6039)
+* Skip pyprep and pytest-prep if there are no python targets (#6039)
   `PR #6039 <https://github.com/pantsbuild/pants/pull/6039>`_
 
 * Simplify rust code (#6043)

@@ -2,60 +2,64 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from collections import namedtuple
+from functools import total_ordering
 from typing import Optional, Sequence, Tuple
 
 from pants.base.build_file import BuildFile
+from pants.base.deprecated import deprecated_conditional, warn_or_error
 from pants.util.dirutil import fast_relpath, longest_dir_prefix
 from pants.util.strutil import strip_prefix
 
-# @ is reserved for configuring variant, see `addressable.parse_variants`
+# @ is currently unused, but reserved for possible future needs.
 BANNED_CHARS_IN_TARGET_NAME = frozenset("@")
 
 
 def parse_spec(
     spec: str, relative_to: Optional[str] = None, subproject_roots: Optional[Sequence[str]] = None,
 ) -> Tuple[str, str]:
-    """Parses a target address spec and returns the path from the root of the repo to this Target
-    and Target name.
+    """Parses a target address spec and returns the path from the root of the repo to this target
+    and target name.
 
     :API: public
 
-    :param string spec: Target address spec.
-    :param string relative_to: path to use for sibling specs, ie: ':another_in_same_build_family',
+    :param spec: Target address spec.
+    :param relative_to: path to use for sibling specs, ie: ':another_in_same_build_family',
       interprets the missing spec_path part as `relative_to`.
-    :param list subproject_roots: Paths that correspond with embedded build roots under
+    :param subproject_roots: Paths that correspond with embedded build roots under
       the current build root.
 
-    For Example::
+    For example:
 
-      some_target(name='mytarget',
-        dependencies=['path/to/buildfile:targetname']
-      )
+        some_target(
+            name='mytarget',
+            dependencies=['path/to/buildfile:targetname'],
+        )
 
-    Where ``path/to/buildfile:targetname`` is the dependent target address spec
+    Where `path/to/buildfile:targetname` is the dependent target address spec.
 
-    In case the target name is empty it returns the last component of the path as target name, ie::
+    In case the target name is empty, it returns the last component of the path as target name, ie:
 
-      spec_path, target_name = parse_spec('path/to/buildfile/foo')
+        spec_path, target_name = parse_spec('path/to/buildfile/foo')
 
-    Will return spec_path as 'path/to/buildfile/foo' and target_name as 'foo'.
+    will return spec_path as 'path/to/buildfile/foo' and target_name as 'foo'.
 
     Optionally, specs can be prefixed with '//' to denote an absolute spec path.  This is normally
     not significant except when a spec referring to a root level target is needed from deeper in
-    the tree.  For example, in ``path/to/buildfile/BUILD``::
+    the tree. For example, in `path/to/buildfile/BUILD`:
 
-      some_target(name='mytarget',
-        dependencies=[':targetname']
-      )
+        some_target(
+            name='mytarget',
+            dependencies=[':targetname'],
+        )
 
-    The ``targetname`` spec refers to a target defined in ``path/to/buildfile/BUILD*``.  If instead
-    you want to reference ``targetname`` in a root level BUILD file, use the absolute form.
-    For example::
+    The `targetname` spec refers to a target defined in `path/to/buildfile/BUILD*`. If instead
+    you want to reference `targetname` in a root level BUILD file, use the absolute form.
+    For example:
 
-      some_target(name='mytarget',
-        dependencies=['//:targetname']
-      )
+        some_target(
+            name='mytarget',
+            dependencies=['//:targetname'],
+        )
     """
 
     def normalize_absolute_refs(ref: str) -> str:
@@ -89,10 +93,8 @@ def parse_spec(
     return spec_path, target_name
 
 
-# TODO: this isn't used anywhere in Pants, but it's a public API so we can't delete it immediately.
-# It's unclear, though, in a deprecation warning what should be the alternative that we recommend
-# people use?
-class Addresses(namedtuple("Addresses", ["addresses", "rel_path"])):
+@total_ordering
+class Addresses:
     """Used as a sentinel type for identifying a list of string specs.
 
     addresses: list of string specs
@@ -101,6 +103,33 @@ class Addresses(namedtuple("Addresses", ["addresses", "rel_path"])):
 
     :API: public
     """
+
+    def __init__(self, addresses, rel_path):
+        self.addresses = addresses
+        self.rel_path = rel_path
+        warn_or_error(
+            removal_version="1.31.0.dev0",
+            deprecated_entity_description="build_graph.address.Addresses",
+            hint="To store a collection of Addresses, use engine.addresses.Addresses instead.",
+        )
+
+    def __iter__(self):
+        return iter((self.addresses, self.rel_path))
+
+    def __lt__(self, other):
+        try:
+            return tuple(self) < tuple(other)
+        except TypeError:
+            return NotImplemented
+
+    def __eq__(self, other):
+        try:
+            return tuple(self) == tuple(other)
+        except TypeError:
+            return NotImplemented
+
+    def __hash__(self):
+        return hash((self.addresses, self.rel_path))
 
 
 class InvalidSpecPath(ValueError):
@@ -115,19 +144,18 @@ class Address:
     """A target address.
 
     An address is a unique name representing a
-    :class:`pants.build_graph.target.Target`. It's composed of the
-    path from the root of the repo to the Target plus the target name.
+    `pants.engine.target.Target`. It's composed of the
+    path from the root of the repo to the target plus the target name.
 
     While not their only use, a noteworthy use of addresses is specifying
     target dependencies. For example:
 
-    ::
+        some_target(
+            name='mytarget',
+            dependencies=['path/to/buildfile:targetname'],
+        )
 
-      some_target(name='mytarget',
-        dependencies=['path/to/buildfile:targetname']
-      )
-
-    Where ``path/to/buildfile:targetname`` is the dependent target address.
+    Where `path/to/buildfile:targetname` is the dependent target address.
     """
 
     @classmethod
@@ -187,7 +215,7 @@ class Address:
 
     def __init__(self, spec_path: str, target_name: str) -> None:
         """
-        :param spec_path: The path from the root of the repo to this Target.
+        :param spec_path: The path from the root of the repo to this target.
         :param target_name: The name of a target this Address refers to.
         """
         self._spec_path = self.sanitize_path(spec_path)
@@ -241,10 +269,9 @@ class Address:
         """
         if referencing_path is not None and self._spec_path == referencing_path:
             return self.relative_spec
-        elif os.path.basename(self._spec_path) != self._target_name:
+        if os.path.basename(self._spec_path) != self._target_name:
             return self.spec
-        else:
-            return self._spec_path
+        return self._spec_path
 
     def __eq__(self, other):
         if not isinstance(other, Address):
@@ -280,13 +307,20 @@ class BuildFileAddress(Address):
         rel_path: Optional[str] = None,
     ) -> None:
         """
-    :param build_file: The build file that contains the object this address points to.
-    :param rel_path: The BUILD files' path, relative to the root_dir.
-    :param target_name: The name of the target within the BUILD file; defaults to the default
-                        target, aka the name of the BUILD file parent dir.
+        :param build_file: The build file that contains the object this address points to.
+        :param rel_path: The BUILD files' path, relative to the root_dir.
+        :param target_name: The name of the target within the BUILD file; defaults to the default
+                            target, aka the name of the BUILD file parent dir.
 
-    :API: public
-    """
+        :API: public
+        """
+        deprecated_conditional(
+            lambda: build_file is not None,
+            removal_version="1.31.0.dev0",
+            entity_description="using `build_file` as a parameter to `BuildFileAddress`",
+            hint_message="Use the arguments `target_name` and `rel_path` instead.",
+        )
+
         if rel_path is None:
             if build_file is None:
                 raise ValueError(
@@ -304,7 +338,10 @@ class BuildFileAddress(Address):
         """Convert this BuildFileAddress to an Address."""
         # This is weird, since BuildFileAddress is a subtype of Address, but the engine's exact
         # type matching requires a new instance.
-        # TODO: Possibly BuildFileAddress should wrap an Address instead of subclassing it.
+        # TODO: Possibly create a new class like `AddressWithBuild` that wraps an `Address`. This
+        #  is weird to subclass `Address` but break Liskov substitution in many places, like the
+        #  constructor. The blocker is that this type is used widely by V1 and it can't be cleanly
+        #  deprecated.
         return Address(spec_path=self.spec_path, target_name=self.target_name)
 
     def __repr__(self) -> str:

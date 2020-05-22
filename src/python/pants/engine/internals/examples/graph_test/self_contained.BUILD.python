@@ -16,12 +16,6 @@ java1 = Target(
   configurations=[
     PublishConfig(
       default_repo=':public',
-      repos={
-        'jake': Struct(
-          url='https://dl.bintray.com/pantsbuild/maven'
-        ),
-        'jane': ':public'
-      }
     ),
     # TODO(John Sirois): Just use 1 config - this mixed embedded and referenced items just show
     # off / prove the capabilities of the new BUILD graph parser.

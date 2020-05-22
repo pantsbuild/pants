@@ -138,6 +138,7 @@ class IdeaPluginGen(ConsoleTask):
         safe_mkdir(output_dir)
 
         with temporary_dir(root_dir=output_dir, cleanup=False) as output_project_dir:
+            self.project_name = self.get_project_name(self.context.options.specs)
             self.gen_project_workdir = output_project_dir
             self.idea_workspace_filename = os.path.join(
                 self.gen_project_workdir, ".idea", "workspace.xml"
@@ -145,6 +146,7 @@ class IdeaPluginGen(ConsoleTask):
             self.idea_modules_filename = os.path.join(
                 self.gen_project_workdir, ".idea", "modules.xml"
             )
+            self.idea_name_filename = os.path.join(self.gen_project_workdir, ".idea", ".name")
             self.intellij_output_dir = os.path.join(self.gen_project_workdir, "out")
             self.intellij_idea_dir = os.path.join(self.gen_project_workdir, ".idea")
 
@@ -197,9 +199,11 @@ class IdeaPluginGen(ConsoleTask):
 
         idea_ws = gen_file(self.idea_workspace_template, workspace=configured_workspace)
         idea_modules = gen_file(self.idea_modules_template, project=configured_project)
+        idea_dotname = self._write_to_tempfile(self.project_name)
 
         shutil.move(idea_ws, self.idea_workspace_filename)
         shutil.move(idea_modules, self.idea_modules_filename)
+        shutil.move(idea_dotname, self.idea_name_filename)
 
         return self.gen_project_workdir
 
@@ -210,6 +214,12 @@ class IdeaPluginGen(ConsoleTask):
         """
         with temporary_file(cleanup=False, binary_mode=False) as output:
             generator.write(output)
+            return output.name
+
+    def _write_to_tempfile(self, content):
+        """Writes content to a temp file and returns the path to that file."""
+        with temporary_file(cleanup=False, binary_mode=False) as output:
+            output.write(content)
             return output.name
 
     def console_output(self, _targets):

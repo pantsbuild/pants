@@ -76,7 +76,7 @@ class TestCobertura(TestBase):
         self.binary_target = self.make_target(
             spec="//foo:foo-binary",
             target_type=JvmBinary,
-            source="Foo.java",
+            sources=["Foo.java"],
             dependencies=[self.jar_lib],
         )
 
@@ -198,7 +198,7 @@ class TestCobertura(TestBase):
 
     def _get_fake_execute_java(self):
         def _fake_execute_java(classpath, main, jvm_options, args, workunit_factory, workunit_name):
-            # at some point we could add assertions here for expected paramerter values
+            # at some point we could add assertions here for expected parameter values
             pass
 
         return _fake_execute_java

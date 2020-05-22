@@ -1,7 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import logging
 import os.path
 import tokenize
 from collections.abc import Mapping
@@ -28,7 +27,7 @@ from pants.engine.internals.parser import BuildFilePreludeSymbols, HydratedStruc
 from pants.engine.internals.struct import Struct
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
-from pants.option.global_options import BuildFileImportsBehavior, GlobMatchErrorBehavior
+from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.frozendict import FrozenDict
 from pants.util.objects import TypeConstraintError
 from pants.util.ordered_set import OrderedSet
@@ -44,7 +43,7 @@ def _key_func(entry):
 
 
 @rule
-async def evalute_preludes(address_mapper: AddressMapper) -> BuildFilePreludeSymbols:
+async def evaluate_preludes(address_mapper: AddressMapper) -> BuildFilePreludeSymbols:
     snapshot = await Get[Snapshot](
         PathGlobs(
             address_mapper.prelude_glob_patterns,
@@ -60,9 +59,7 @@ async def evalute_preludes(address_mapper: AddressMapper) -> BuildFilePreludeSym
             exec(content, values)
         except Exception as e:
             raise Exception(f"Error parsing prelude file {file_content.path}: {e}")
-        error_on_imports(
-            file_content_str, file_content.path, address_mapper.build_file_imports_behavior
-        )
+        error_on_imports(file_content_str, file_content.path)
     # __builtins__ is a dict, so isn't hashable, and can't be put in a FrozenDict.
     # Fortunately, we don't care about it - preludes should not be able to override builtins, so we just pop it out.
     # TODO: Give a nice error message if a prelude tries to set a expose a non-hashable value.
@@ -321,39 +318,29 @@ def _address_spec_to_globs(address_mapper: AddressMapper, address_specs: Address
     return PathGlobs(globs=(*patterns, *(f"!{p}" for p in address_mapper.build_ignore_patterns)))
 
 
-def error_on_imports(
-    build_file_content: str, filepath: str, behavior: BuildFileImportsBehavior
-) -> None:
-    # Perform this check after successful execution, so we know the python is valid (and should
+def error_on_imports(build_file_content: str, filepath: str) -> None:
+    # Perform this check after successful execution, so we know the Python is valid (and should
     # tokenize properly!)
     # Note that this is incredibly poor sandboxing. There are many ways to get around it.
     # But it's sufficient to tell most users who aren't being actively malicious that they're doing
     # something wrong, and it has a low performance overhead.
-    if "import" in build_file_content:
-        io_wrapped_python = StringIO(build_file_content)
-        for token in tokenize.generate_tokens(io_wrapped_python.readline):
-            token_str = token[1]
-            lineno, _ = token[2]
+    if "import" not in build_file_content:
+        return
+    io_wrapped_python = StringIO(build_file_content)
+    for token in tokenize.generate_tokens(io_wrapped_python.readline):
+        token_str = token[1]
+        lineno, _ = token[2]
 
-            if token_str != "import":
-                continue
+        if token_str != "import":
+            continue
 
-            if behavior == BuildFileImportsBehavior.warn:
-                logger = logging.getLogger(__name__)
-                logger.warning(
-                    f"Import used in {filepath} at line {lineno}. Import statements should "
-                    f"be avoided in BUILD files because they can easily break Pants caching and lead to "
-                    f"stale results. Instead, consider rewriting your code into a Pants plugin: "
-                    f"https://www.pantsbuild.org/howto_plugin.html"
-                )
-            else:
-                raise ParseError(
-                    f"Import used in {filepath} at line {lineno}. Import statements are banned in "
-                    f"BUILD files in this repository and should generally be avoided because "
-                    f"they can easily break Pants caching and lead to stale results. Instead, consider "
-                    f"rewriting your code into a Pants plugin: "
-                    f"https://www.pantsbuild.org/howto_plugin.html"
-                )
+        raise ParseError(
+            f"Import used in {filepath} at line {lineno}. Import statements are banned in "
+            "BUILD files because they can easily break Pants caching and lead to stale results. "
+            "\n\nInstead, consider writing a macro (https://pants.readme.io/docs/macros) or writing "
+            "a plugin (https://pants.readme.io/docs/plugins-overview). If you are using the V1 "
+            "version of Pants, see https://www.pantsbuild.org/howto_plugin.html."
+        )
 
 
 def create_graph_rules(address_mapper: AddressMapper):
@@ -370,7 +357,7 @@ def create_graph_rules(address_mapper: AddressMapper):
         parse_address_family,
         find_build_file,
         find_build_files,
-        evalute_preludes,
+        evaluate_preludes,
         # AddressSpec handling: locate directories that contain build files, and request
         # AddressFamilies for each of them.
         addresses_with_origins_from_address_families,

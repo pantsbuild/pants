@@ -243,7 +243,7 @@ class JavacCompile(JvmCompile):
 
         process = Process(
             argv=tuple(cmd),
-            input_files=input_snapshot.digest,
+            input_digest=input_snapshot.digest,
             output_files=output_files,
             description=f"Compiling {ctx.target.address.spec} with javac",
         )

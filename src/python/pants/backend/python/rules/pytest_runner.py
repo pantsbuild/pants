@@ -3,7 +3,7 @@
 
 import functools
 from dataclasses import dataclass
-from typing import Any, List, Optional, Tuple, Union, cast
+from typing import List, Optional, Tuple, Union, cast
 
 from pants.backend.python.rules.importable_python_sources import ImportablePythonSources
 from pants.backend.python.rules.pex import (
@@ -63,7 +63,7 @@ class PythonTestFieldSet(TestFieldSet):
 class TestTargetSetup:
     test_runner_pex: Pex
     args: Tuple[str, ...]
-    input_files_digest: Digest
+    input_digest: Digest
     timeout_seconds: Optional[int]
     xml_dir: Optional[str]
     junit_family: str
@@ -109,9 +109,9 @@ async def setup_pytest_for_target(
     # and then by Pytest). See https://github.com/jaraco/zipp/pull/26.
     additional_args_for_pytest = ("--not-zip-safe",)
 
-    run_coverage = test_options.values.run_coverage
+    use_coverage = test_options.values.use_coverage
     plugin_file_digest: Optional[Digest] = (
-        await Get[Digest](InputFilesContent, COVERAGE_PLUGIN_INPUT) if run_coverage else None
+        await Get[Digest](InputFilesContent, COVERAGE_PLUGIN_INPUT) if use_coverage else None
     )
 
     pytest_pex_request = pex_request(
@@ -155,14 +155,14 @@ async def setup_pytest_for_target(
     #   https://github.com/pantsbuild/pants/issues/9294
     # Some awkward code follows in order to execute 5-6 items concurrently given the current state
     # of MultiGet typing / API. Improve this since we should encourage full concurrency in general.
-    requests: List[Get[Any]] = [
+    requests: List[Get] = [
         Get[Pex](PexRequest, pytest_pex_request),
         Get[Pex](PexFromTargetsRequest, requirements_pex_request),
         Get[Pex](PexRequest, test_runner_pex_request),
         Get[ImportablePythonSources](Targets(all_targets)),
         Get[SourceFiles](SpecifiedSourceFilesRequest, specified_source_files_request),
     ]
-    if run_coverage:
+    if use_coverage:
         requests.append(
             Get[CoverageConfig](
                 CoverageConfigRequest(
@@ -193,13 +193,13 @@ async def setup_pytest_for_target(
         pytest_pex.digest,
         test_runner_pex.digest,
     ]
-    if run_coverage:
+    if use_coverage:
         coverage_config = rest[0]
         digests_to_merge.append(coverage_config.digest)
-    merged_input_files = await Get[Digest](MergeDigests(digests_to_merge))
+    input_digest = await Get[Digest](MergeDigests(digests_to_merge))
 
     coverage_args = []
-    if run_coverage:
+    if use_coverage:
         coverage_args = [
             "--cov-report=",  # To not generate any output. https://pytest-cov.readthedocs.io/en/latest/config.html
         ]
@@ -212,7 +212,7 @@ async def setup_pytest_for_target(
     return TestTargetSetup(
         test_runner_pex=test_runner_pex,
         args=(*pytest.options.args, *coverage_args, *specified_source_file_names),
-        input_files_digest=merged_input_files,
+        input_digest=input_digest,
         timeout_seconds=field_set.timeout.calculate_from_global_options(pytest),
         xml_dir=pytest.options.junit_xml_dir,
         junit_family=pytest.options.junit_family,
@@ -237,8 +237,8 @@ async def run_python_test(
         )
     env = {"PYTEST_ADDOPTS": " ".join(add_opts)}
 
-    run_coverage = test_options.values.run_coverage
-    output_dirs = [".coverage"] if run_coverage else []
+    use_coverage = test_options.values.use_coverage
+    output_dirs = [".coverage"] if use_coverage else []
     if test_setup.xml_dir:
         output_dirs.append(test_results_file)
     process = test_setup.test_runner_pex.create_process(
@@ -246,7 +246,7 @@ async def run_python_test(
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path=f"./{test_setup.test_runner_pex.output_filename}",
         pex_args=test_setup.args,
-        input_files=test_setup.input_files_digest,
+        input_digest=test_setup.input_digest,
         output_directories=tuple(output_dirs) if output_dirs else None,
         description=f"Run Pytest for {field_set.address.reference()}",
         timeout_seconds=test_setup.timeout_seconds,
@@ -255,7 +255,7 @@ async def run_python_test(
     result = await Get[FallibleProcessResult](Process, process)
 
     coverage_data = None
-    if run_coverage:
+    if use_coverage:
         coverage_snapshot = await Get[Snapshot](
             SnapshotSubset(result.output_digest, PathGlobs([".coverage"]))
         )
@@ -280,7 +280,7 @@ async def debug_python_test(test_setup: TestTargetSetup) -> TestDebugRequest:
     run_request = InteractiveProcessRequest(
         argv=(test_setup.test_runner_pex.output_filename, *test_setup.args),
         run_in_workspace=False,
-        input_files=test_setup.input_files_digest,
+        input_digest=test_setup.input_digest,
     )
     return TestDebugRequest(run_request)
 

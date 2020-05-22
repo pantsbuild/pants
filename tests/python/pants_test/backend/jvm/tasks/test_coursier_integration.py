@@ -5,7 +5,7 @@
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class CouriserIntegrationTest(PantsRunIntegrationTest):
+class CoursierIntegrationTest(PantsRunIntegrationTest):
     def test_coursier_show_report(self):
         with self.temporary_workdir() as workdir:
             # Run the coursier report twice in a row with the same workdir to check that

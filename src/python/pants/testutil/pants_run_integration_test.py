@@ -17,7 +17,7 @@ from typing import Any, Callable, List, Optional, Union
 from colors import strip_color
 
 from pants.base.build_environment import get_buildroot
-from pants.base.build_file import BuildFile
+from pants.base.build_file import _is_build_file_name
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.fs.archive import ZIP
 from pants.option.config import TomlSerializer
@@ -115,29 +115,26 @@ def ensure_daemon(f):
 
     def wrapper(self, *args, **kwargs):
         for enable_daemon in [False, True]:
-            with temporary_dir() as subprocess_dir:
-                enable_daemon_str = str(enable_daemon)
-                env = {
-                    "HERMETIC_ENV": "PANTS_ENABLE_PANTSD,PANTS_ENABLE_V2_ENGINE,PANTS_SUBPROCESSDIR",
-                    "PANTS_ENABLE_PANTSD": enable_daemon_str,
-                    "PANTS_ENABLE_V2_ENGINE": enable_daemon_str,
-                    "PANTS_SUBPROCESSDIR": subprocess_dir,
-                }
-                with environment_as(**env):
-                    try:
-                        f(self, *args, **kwargs)
-                        if enable_daemon:
-                            self.assert_success(self.run_pants(["kill-pantsd"]))
-                    except Exception:
-                        print(f"Test failed with enable-pantsd={enable_daemon}:")
-                        if enable_daemon:
-                            # If we are already raising, do not attempt to confirm that `kill-pantsd` succeeds.
-                            self.run_pants(["kill-pantsd"])
-                        else:
-                            print(
-                                "Skipping run with enable-pantsd=true because it already failed with enable-pantsd=false."
-                            )
-                        raise
+            enable_daemon_str = str(enable_daemon)
+            env = {
+                "HERMETIC_ENV": "PANTS_ENABLE_PANTSD,PANTS_ENABLE_V2_ENGINE,PANTS_SUBPROCESSDIR",
+                "PANTS_ENABLE_PANTSD": enable_daemon_str,
+            }
+            with environment_as(**env):
+                try:
+                    f(self, *args, **kwargs)
+                    if enable_daemon:
+                        self.assert_success(self.run_pants(["kill-pantsd"]))
+                except Exception:
+                    print(f"Test failed with enable-pantsd={enable_daemon}:")
+                    if enable_daemon:
+                        # If we are already raising, do not attempt to confirm that `kill-pantsd` succeeds.
+                        self.run_pants(["kill-pantsd"])
+                    else:
+                        print(
+                            "Skipping run with enable-pantsd=true because it already failed with enable-pantsd=false."
+                        )
+                    raise
 
     return wrapper
 
@@ -246,7 +243,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
                 for file_name in file_names:
                     with open(os.path.join(dir_path, file_name), "r") as f:
                         content = f.read()
-                    if BuildFile._is_buildfile_name(file_name):
+                    if _is_build_file_name(file_name):
                         content = content.replace(source_dir, target_spec_dir)
                     with open(os.path.join(clone_dir_path, file_name), "w") as f:
                         f.write(content)
@@ -627,7 +624,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
             "rust-toolchain",
             "src",
         )
-        dirs_to_copy = ("3rdparty", "contrib") + tuple(dirs_to_copy or [])
+        dirs_to_copy = ("3rdparty", *(dirs_to_copy or []))
 
         with self.temporary_workdir() as tmp_dir:
             for filename in files_to_copy:

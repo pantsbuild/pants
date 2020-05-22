@@ -161,11 +161,11 @@ class RoundEngineTest(EngineTestBase, TestBase):
             expected_execute_actions.append(self.construct_action(action))
             expected_execute_actions.append(self.execute_action(action))
 
-        expeceted_execute_actions_length = len(expected_execute_ordering) * 2
+        expected_execute_actions_length = len(expected_execute_ordering) * 2
         self.assertEqual(
-            expected_pre_execute_actions, set(self.actions[:-expeceted_execute_actions_length])
+            expected_pre_execute_actions, set(self.actions[:-expected_execute_actions_length])
         )
-        self.assertEqual(expected_execute_actions, self.actions[-expeceted_execute_actions_length:])
+        self.assertEqual(expected_execute_actions, self.actions[-expected_execute_actions_length:])
 
     def test_lifecycle_ordering(self):
         task1 = self.install_task("task1", goal="goal1", product_types=["1"])

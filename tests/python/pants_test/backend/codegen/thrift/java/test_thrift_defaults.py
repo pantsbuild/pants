@@ -19,7 +19,9 @@ class TestThriftDefaults(TestBase):
 
     @contextmanager
     def invalid_fixtures(self):
-        target = self.make_target(spec=f"not_java_thift_library_{uuid.uuid4()}", target_type=Target)
+        target = self.make_target(
+            spec=f"not_java_thrift_library_{uuid.uuid4()}", target_type=Target
+        )
         thrift_defaults = self.create_thrift_defaults()
         with self.assertRaises(ValueError):
             yield thrift_defaults, target
@@ -34,7 +36,7 @@ class TestThriftDefaults(TestBase):
 
     def create_thrift_library(self, **kwargs):
         return self.make_target(
-            spec=f"java_thift_library_{uuid.uuid4()}", target_type=JavaThriftLibrary, **kwargs
+            spec=f"java_thrift_library_{uuid.uuid4()}", target_type=JavaThriftLibrary, **kwargs
         )
 
     def test_compiler(self):

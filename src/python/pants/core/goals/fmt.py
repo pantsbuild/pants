@@ -24,6 +24,7 @@ from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Field, Target, TargetsWithOrigins
 from pants.engine.unions import UnionMembership, union
+from pants.util.strutil import strip_v2_chroot_path
 
 
 @dataclass(frozen=True)
@@ -32,20 +33,31 @@ class FmtResult:
     output: Digest
     stdout: str
     stderr: str
+    formatter_name: str
 
     @staticmethod
     def noop() -> "FmtResult":
-        return FmtResult(input=EMPTY_DIGEST, output=EMPTY_DIGEST, stdout="", stderr="")
+        return FmtResult(
+            input=EMPTY_DIGEST, output=EMPTY_DIGEST, stdout="", stderr="", formatter_name=""
+        )
 
     @staticmethod
     def from_process_result(
-        process_result: ProcessResult, *, original_digest: Digest
+        process_result: ProcessResult,
+        *,
+        original_digest: Digest,
+        formatter_name: str,
+        strip_chroot_path: bool = False,
     ) -> "FmtResult":
+        def prep_output(s: bytes) -> str:
+            return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
+
         return FmtResult(
             input=original_digest,
             output=process_result.output_digest,
-            stdout=process_result.stdout.decode(),
-            stderr=process_result.stderr.decode(),
+            stdout=prep_output(process_result.stdout),
+            stderr=prep_output(process_result.stderr),
+            formatter_name=formatter_name,
         )
 
     @property
@@ -67,7 +79,7 @@ class FmtFieldSets(Collection[FmtFieldSet]):
         self,
         field_sets: Iterable[FmtFieldSet],
         *,
-        prior_formatter_result: Optional[Snapshot] = None
+        prior_formatter_result: Optional[Snapshot] = None,
     ) -> None:
         super().__init__(field_sets)
         self.prior_formatter_result = prior_formatter_result
@@ -237,11 +249,19 @@ async def fmt(
         merged_formatted_digest = await Get[Digest](MergeDigests(changed_digests))
         workspace.materialize_directory(DirectoryToMaterialize(merged_formatted_digest))
 
-    for result in individual_results:
+    sorted_results = sorted(individual_results, key=lambda res: res.formatter_name)
+    for result in sorted_results:
+        console.print_stderr(
+            f"{console.green('✓')} {result.formatter_name} made no changes."
+            if not result.did_change
+            else f"{console.red('𐄂')} {result.formatter_name} made changes."
+        )
         if result.stdout:
-            console.print_stdout(result.stdout)
+            console.print_stderr(result.stdout)
         if result.stderr:
             console.print_stderr(result.stderr)
+        if result != sorted_results[-1]:
+            console.print_stderr("")
 
     # Since the rules to produce FmtResult should use ExecuteRequest, rather than
     # FallibleProcess, we assume that there were no failures.

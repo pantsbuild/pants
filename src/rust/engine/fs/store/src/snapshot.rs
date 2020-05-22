@@ -4,6 +4,7 @@
 use crate::Store;
 use bazel_protos;
 use boxfuture::{BoxFuture, Boxable};
+use bytes::Bytes;
 use fs::{
   Dir, File, GitignoreStyleExcludes, GlobMatching, PathStat, PosixFS, PreparedPathGlobs,
   SymlinkBehavior,
@@ -14,13 +15,13 @@ use futures01::future;
 use hashing::{Digest, EMPTY_DIGEST};
 use indexmap::{self, IndexMap};
 use itertools::Itertools;
+use log;
 use protobuf;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ffi::OsString;
 use std::fmt;
 use std::iter::Iterator;
 use std::path::{Path, PathBuf};
-use std::pin::Pin;
 use std::sync::Arc;
 
 #[derive(Eq, Hash, PartialEq)]
@@ -108,9 +109,8 @@ impl Snapshot {
       .await
   }
 
-  ///
-  /// NB: This function is recursive, and so cannot be directly marked async.
-  ///
+  // NB: This function is recursive, and so cannot be directly marked async:
+  //   https://rust-lang.github.io/async-book/07_workarounds/05_recursion.html
   fn ingest_directory_from_sorted_path_stats<
     S: StoreFileByDigest<Error> + Sized + Clone + Send + 'static,
     Error: fmt::Debug + 'static + Send,
@@ -118,7 +118,7 @@ impl Snapshot {
     store: Store,
     file_digester: S,
     path_stats: &[PathStat],
-  ) -> Pin<Box<dyn std::future::Future<Output = Result<Digest, String>> + Send>> {
+  ) -> future03::BoxFuture<Result<Digest, String>> {
     let mut file_futures = Vec::new();
     let mut dir_futures: Vec<
       future03::BoxFuture<Result<bazel_protos::remote_execution::DirectoryNode, String>>,
@@ -190,7 +190,7 @@ impl Snapshot {
       }
     }
 
-    Box::pin(async move {
+    async move {
       let (dirs, files) = future03::try_join(
         future03::try_join_all(dir_futures),
         future03::try_join_all(file_futures),
@@ -201,7 +201,8 @@ impl Snapshot {
       directory.set_directories(protobuf::RepeatedField::from_vec(dirs));
       directory.set_files(protobuf::RepeatedField::from_vec(files));
       store.record_directory(&directory, true).await
-    })
+    }
+    .boxed()
   }
 
   ///
@@ -251,13 +252,18 @@ impl Snapshot {
   /// If a file is present with the same name and contents multiple times, it will appear once.
   /// If a file is present with the same name, but different contents, an error will be returned.
   ///
-  /// NB: This function is recursive, and so cannot be directly marked async.
-  ///
-  pub fn merge_directories(
+  pub async fn merge_directories(store: Store, dir_digests: Vec<Digest>) -> Result<Digest, String> {
+    Self::merge_directories_recursive(store, PathBuf::new(), dir_digests).await
+  }
+
+  // NB: This function is recursive, and so cannot be directly marked async:
+  //   https://rust-lang.github.io/async-book/07_workarounds/05_recursion.html
+  fn merge_directories_recursive(
     store: Store,
+    parent_path: PathBuf,
     dir_digests: Vec<Digest>,
-  ) -> Pin<Box<dyn std::future::Future<Output = Result<Digest, String>> + Send + 'static>> {
-    Box::pin(async move {
+  ) -> future03::BoxFuture<'static, Result<Digest, String>> {
+    async move {
       if dir_digests.is_empty() {
         return Ok(EMPTY_DIGEST);
       } else if dir_digests.len() == 1 {
@@ -296,30 +302,11 @@ impl Snapshot {
       out_dir.set_files(protobuf::RepeatedField::from_vec(
         file_nodes.into_iter().dedup().collect(),
       ));
-      let unique_count = out_dir
-        .get_files()
-        .iter()
-        .map(bazel_protos::remote_execution::FileNode::get_name)
-        .dedup()
-        .count();
-      if unique_count != out_dir.get_files().len() {
-        let groups = out_dir
-          .get_files()
-          .iter()
-          .group_by(|f| f.get_name().to_owned());
-        for (file_name, group) in &groups {
-          if group.count() > 1 {
-            return Err(format!(
-              "Can only merge Directories with no duplicates, but found duplicate files: {}",
-              file_name
-            ));
-          }
-        }
-      }
 
       // Group and recurse for DirectoryNodes.
       let child_directory_futures = {
         let store = store.clone();
+        let parent_path = parent_path.clone();
         let mut directories_to_merge = Iterator::flatten(
           directories
             .iter_mut()
@@ -336,9 +323,11 @@ impl Snapshot {
             let digests_result = group
               .map(|d| d.get_digest().into())
               .collect::<Result<Vec<_>, String>>();
+            let child_path = parent_path.join(&child_name);
             async move {
               let digests = digests_result?;
-              let merged_digest = Self::merge_directories(store, digests).await?;
+              let merged_digest =
+                Self::merge_directories_recursive(store, child_path, digests).await?;
               let mut child_dir = bazel_protos::remote_execution::DirectoryNode::new();
               child_dir.set_name(child_name);
               child_dir.set_digest((&merged_digest).into());
@@ -352,8 +341,126 @@ impl Snapshot {
       let child_directories = future03::try_join_all(child_directory_futures).await?;
 
       out_dir.set_directories(protobuf::RepeatedField::from_vec(child_directories));
+
+      Self::error_for_collisions(&store, &parent_path, &out_dir).await?;
       store.record_directory(&out_dir, true).await
-    })
+    }
+    .boxed()
+  }
+
+  ///
+  /// Ensure merge is unique and fail with debugging info if not.
+  ///
+  async fn error_for_collisions(
+    store: &Store,
+    parent_path: &Path,
+    dir: &bazel_protos::remote_execution::Directory,
+  ) -> Result<(), String> {
+    // Attempt to cheaply check for collisions to bail out early if there aren't any.
+    let unique_count = dir
+      .get_files()
+      .iter()
+      .map(bazel_protos::remote_execution::FileNode::get_name)
+      .chain(
+        dir
+          .get_directories()
+          .iter()
+          .map(bazel_protos::remote_execution::DirectoryNode::get_name),
+      )
+      .collect::<HashSet<_>>()
+      .len();
+    if unique_count == (dir.get_files().len() + dir.get_directories().len()) {
+      return Ok(());
+    }
+
+    let file_details_by_name = dir
+      .get_files()
+      .iter()
+      .map(|file_node| async move {
+        let digest_proto = file_node.get_digest();
+        let header = format!(
+          "file digest={} size={}:\n\n",
+          digest_proto.hash, digest_proto.size_bytes
+        );
+
+        let digest_res: Result<hashing::Digest, String> = digest_proto.into();
+        let contents = store
+          .load_file_bytes_with(digest_res?, |bytes| {
+            const MAX_LENGTH: usize = 1024;
+            let content_length = bytes.len();
+            let mut bytes = Bytes::from(&bytes[0..std::cmp::min(content_length, MAX_LENGTH)]);
+            if content_length > MAX_LENGTH && !log_enabled!(log::Level::Debug) {
+              bytes.extend_from_slice(
+                format!(
+                  "\n... TRUNCATED contents from {}B to {}B \
+                  (Pass -ldebug to see full contents).",
+                  content_length, MAX_LENGTH
+                )
+                .as_bytes(),
+              );
+            }
+            String::from_utf8_lossy(bytes.to_vec().as_slice()).to_string()
+          })
+          .await?
+          .map(|(content, _metadata)| content)
+          .unwrap_or_else(|| "<could not load contents>".to_string());
+        let detail = format!("{}{}", header, contents);
+        let res: Result<_, String> = Ok((file_node.get_name(), detail));
+        res
+      })
+      .map(|f| f.boxed());
+    let dir_details_by_name = dir
+      .get_directories()
+      .iter()
+      .map(|dir_node| async move {
+        let digest_proto = dir_node.get_digest();
+        let detail = format!(
+          "dir digest={} size={}:\n\n",
+          digest_proto.hash, digest_proto.size_bytes
+        );
+        let res: Result<_, String> = Ok((dir_node.get_name(), detail));
+        res
+      })
+      .map(|f| f.boxed());
+
+    let duplicate_details = async move {
+      let details_by_name = future03::try_join_all(
+        file_details_by_name
+          .chain(dir_details_by_name)
+          .collect::<Vec<_>>(),
+      )
+      .await?
+      .into_iter()
+      .into_group_map();
+
+      let enumerated_details =
+        std::iter::Iterator::flatten(details_by_name.iter().filter_map(|(name, details)| {
+          if details.len() > 1 {
+            Some(
+              details
+                .iter()
+                .enumerate()
+                .map(move |(index, detail)| format!("`{}`: {}.) {}", name, index + 1, detail)),
+            )
+          } else {
+            None
+          }
+        }))
+        .collect();
+
+      let res: Result<Vec<String>, String> = Ok(enumerated_details);
+      res
+    }
+    .await
+    .unwrap_or_else(|err| vec![format!("Failed to load contents for comparison: {}", err)]);
+
+    Err(format!(
+      "Can only merge Directories with no duplicates, but found {} duplicate entries in {}:\
+      \n\n{}",
+      duplicate_details.len(),
+      parent_path.display(),
+      duplicate_details.join("\n\n")
+    ))
   }
 
   pub async fn add_prefix(store: Store, digest: Digest, prefix: PathBuf) -> Result<Digest, String> {

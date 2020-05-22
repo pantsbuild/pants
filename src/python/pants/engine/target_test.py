@@ -10,7 +10,7 @@ import pytest
 from typing_extensions import final
 
 from pants.base.specs import FilesystemLiteralSpec
-from pants.engine.addresses import Address
+from pants.engine.addresses import Address, Addresses
 from pants.engine.fs import EMPTY_DIGEST, FileContent, InputFilesContent, PathGlobs, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import RootRule, rule
@@ -20,6 +20,8 @@ from pants.engine.target import (
     AmbiguousImplementationsException,
     AsyncField,
     BoolField,
+    Dependencies,
+    DependenciesRequest,
     DictStringToStringField,
     DictStringToStringSequenceField,
     FieldSet,
@@ -28,6 +30,8 @@ from pants.engine.target import (
     GenerateSourcesRequest,
     HydratedSources,
     HydrateSourcesRequest,
+    InjectDependenciesRequest,
+    InjectedDependencies,
     InvalidFieldChoiceException,
     InvalidFieldException,
     InvalidFieldTypeException,
@@ -1032,3 +1036,72 @@ class TestCodegen(TestBase):
         assert "IrrelevantSources" not in str(exc)
         assert "* FortranGenerator1 -> FortranSources" in str(exc)
         assert "* SmalltalkGenerator -> SmalltalkSources" in str(exc)
+
+
+# -----------------------------------------------------------------------------------------------
+# Test Dependencies
+# -----------------------------------------------------------------------------------------------
+
+
+class FortranDependencies(Dependencies):
+    pass
+
+
+class CustomFortranDependencies(FortranDependencies):
+    pass
+
+
+class InjectFortranDependencies(InjectDependenciesRequest):
+    inject_for = FortranDependencies
+
+
+class InjectCustomFortranDependencies(InjectDependenciesRequest):
+    inject_for = CustomFortranDependencies
+
+
+@rule
+def inject_fortran_deps(_: InjectFortranDependencies) -> InjectedDependencies:
+    return InjectedDependencies([Address.parse("//:injected")])
+
+
+@rule
+def inject_custom_fortran_deps(_: InjectCustomFortranDependencies) -> InjectedDependencies:
+    return InjectedDependencies([Address.parse("//:custom_injected")])
+
+
+class TestDependencies(TestBase):
+    @classmethod
+    def rules(cls):
+        return (
+            *super().rules(),
+            RootRule(DependenciesRequest),
+            inject_fortran_deps,
+            inject_custom_fortran_deps,
+            UnionRule(InjectDependenciesRequest, InjectFortranDependencies),
+            UnionRule(InjectDependenciesRequest, InjectCustomFortranDependencies),
+        )
+
+    def test_normal_resolution(self) -> None:
+        addr = Address.parse("src/fortran:lib")
+        deps = Addresses([Address.parse("//:dep1"), Address.parse("//:dep2")])
+        deps_field = Dependencies(deps, address=addr)
+        assert self.request_single_product(Addresses, DependenciesRequest(deps_field)) == deps
+
+        # Also test that we handle no dependencies.
+        empty_deps_field = Dependencies(None, address=addr)
+        assert self.request_single_product(
+            Addresses, DependenciesRequest(empty_deps_field)
+        ) == Addresses([])
+
+    def test_dependency_injection(self) -> None:
+        def assert_injected(deps_cls: Type[Dependencies], *, injected: List[str]) -> None:
+            provided_addr = Address.parse("//:provided")
+            deps_field = deps_cls([provided_addr], address=Address.parse("//:target"))
+            result = self.request_single_product(Addresses, DependenciesRequest(deps_field))
+            assert result == Addresses(
+                sorted([provided_addr, *(Address.parse(addr) for addr in injected)])
+            )
+
+        assert_injected(Dependencies, injected=[])
+        assert_injected(FortranDependencies, injected=["//:injected"])
+        assert_injected(CustomFortranDependencies, injected=["//:custom_injected", "//:injected"])

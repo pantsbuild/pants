@@ -71,7 +71,9 @@ pub fn extra_big_file_bytes() -> Bytes {
 }
 
 pub async fn load_file_bytes(store: &Store, digest: Digest) -> Result<Option<Bytes>, String> {
-  let option = store.load_file_bytes_with(digest, |bytes| bytes).await?;
+  let option = store
+    .load_file_bytes_with(digest, |bytes| Bytes::from(bytes))
+    .await?;
   Ok(option.map(|(bytes, _metadata)| bytes))
 }
 
@@ -916,7 +918,7 @@ async fn instance_name_download() {
 
   assert_eq!(
     store_with_remote
-      .load_file_bytes_with(TestData::roland().digest(), |b| b,)
+      .load_file_bytes_with(TestData::roland().digest(), |b| Bytes::from(b))
       .await
       .unwrap()
       .unwrap()
@@ -997,7 +999,7 @@ async fn auth_download() {
 
   assert_eq!(
     store_with_remote
-      .load_file_bytes_with(TestData::roland().digest(), |b| b,)
+      .load_file_bytes_with(TestData::roland().digest(), |b| Bytes::from(b))
       .await
       .unwrap()
       .unwrap()
@@ -1014,7 +1016,7 @@ async fn materialize_missing_file() {
   let store_dir = TempDir::new().unwrap();
   let store = new_local_store(store_dir.path());
   store
-    .materialize_file(file.clone(), TestData::roland().digest(), false)
+    .materialize_file(file.clone(), TestData::roland().digest(), false, true)
     .compat()
     .await
     .expect_err("Want unknown digest error");
@@ -1034,7 +1036,7 @@ async fn materialize_file() {
     .await
     .expect("Error saving bytes");
   store
-    .materialize_file(file.clone(), testdata.digest(), false)
+    .materialize_file(file.clone(), testdata.digest(), false, true)
     .compat()
     .await
     .expect("Error materializing file");
@@ -1056,7 +1058,7 @@ async fn materialize_file_executable() {
     .await
     .expect("Error saving bytes");
   store
-    .materialize_file(file.clone(), testdata.digest(), true)
+    .materialize_file(file.clone(), testdata.digest(), true, true)
     .compat()
     .await
     .expect("Error materializing file");

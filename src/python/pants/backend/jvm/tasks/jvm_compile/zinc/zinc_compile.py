@@ -749,7 +749,7 @@ class BaseZincCompile(JvmCompile):
 
         req = Process(
             argv=tuple(argv),
-            input_files=merged_input_digest,
+            input_digest=merged_input_digest,
             output_files=(jar_file, relpath_to_analysis),
             output_directories=output_directories,
             description=f"zinc compile for {ctx.target.address.spec}",

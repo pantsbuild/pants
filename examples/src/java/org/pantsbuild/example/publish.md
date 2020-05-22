@@ -110,7 +110,7 @@ with the additional information needed to publish artifacts. Here is an example 
              login <login>
              password <password>
 
-           The realm must match the kind of repository you are publishing to. For Sonotype Nexus, use:
+           The realm must match the kind of repository you are publishing to. For Sonatype Nexus, use:
 
            realm="Sonatype Nexus Repository Manager"
 
@@ -205,7 +205,7 @@ Things can go wrong; you can recover:
     merge conflicts can happen, and folks don't always recover from them
     correctly.
 
-    In this situation, you probably want to pass `publish --overrride=<version>` to specify a
+    In this situation, you probably want to pass `publish --override=<version>` to specify a
     version to use instead of the automatically-computed already-existing version. Choose a version
     that's not already on the server. Pants records this version in the pushdb, so hopefully the
     next publisher won't have the same problem.

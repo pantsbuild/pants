@@ -32,7 +32,7 @@ class ResolveJarsTestMixin:
                             dedent(
                                 """
                                 jvm_binary(name='synthetic',
-                                  source='Main.java',
+                                  sources=['Main.java'],
                                 )
                                 """
                             )

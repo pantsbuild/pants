@@ -43,7 +43,10 @@ class PythonAwsLambdaRuntime(StringField):
 
 
 class PythonAWSLambda(Target):
-    """A self-contained Python function suitable for uploading to AWS Lambda."""
+    """A self-contained Python function suitable for uploading to AWS Lambda.
+
+    See https://pants.readme.io/docs/awslambda-python.
+    """
 
     alias = "python_awslambda"
     core_fields = (

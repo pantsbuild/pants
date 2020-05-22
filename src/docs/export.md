@@ -17,7 +17,7 @@ See the Changelog section below for differences between versions of the export f
   project.
   - "targets" : Dictionary of targets defined in BUILD files.
   - "distributions" : Information about JVM distributions.
-  - "jvm_platforms" : Information about JVM platforms(language level and additionals arguments).
+  - "jvm_platforms" : Information about JVM platforms(language level and additional arguments).
   - "python_setup" : Information about Python setup(interpreters and chroots for them).
 
 ## Version
@@ -49,7 +49,7 @@ is represented by a dictionary as follows:
 ## Targets
 
 The targets field contains all of the targets exported from pants BUILD file definitions.  The
-value for targets is represented by a dctionary of target specs mapped to a dictionary of the
+value for targets is represented by a dictionary of target specs mapped to a dictionary of the
 fields defined in the target:
 
 `{ <target_spec> : <target_field_mapping> }`

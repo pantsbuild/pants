@@ -2,19 +2,20 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import sys
-from typing import Any, Callable, Optional
+from typing import Callable, Optional, cast
 
 from colors import blue, cyan, green, magenta, red
 
 from pants.engine.internals.native import Native
+from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.rules import side_effecting
 
 
 # TODO this needs to be a file-like object/stream
 class NativeWriter:
-    def __init__(self, session: Any):
+    def __init__(self, scheduler_session: SchedulerSession):
         self._native = Native()
-        self._session = session._session
+        self.session = scheduler_session.session
 
     def write(self, payload: str):
         raise NotImplementedError
@@ -27,12 +28,12 @@ class NativeWriter:
 
 class NativeStdOut(NativeWriter):
     def write(self, payload):
-        self._native.write_stdout(self._session, payload)
+        self._native.write_stdout(self.session, payload)
 
 
 class NativeStdErr(NativeWriter):
     def write(self, payload):
-        self._native.write_stderr(self._session, payload)
+        self._native.write_stderr(self.session, payload)
 
 
 @side_effecting
@@ -42,7 +43,11 @@ class Console:
     side_effecting = True
 
     def __init__(
-        self, stdout=None, stderr=None, use_colors: bool = True, session: Optional[Any] = None
+        self,
+        stdout=None,
+        stderr=None,
+        use_colors: bool = True,
+        session: Optional[SchedulerSession] = None,
     ):
         """`stdout` and `stderr` may be explicitly provided when Console is constructed.
 
@@ -50,13 +55,17 @@ class Console:
         the system stdout/stderr. If they are not defined, the effective stdout/stderr are proxied
         to Rust engine intrinsic code if there is a scheduler session provided, or just written to
         the standard Python-provided stdout/stderr if it is None. A scheduler session is provided if
-        --v2-ui is set.
+        --dynamic-ui is set.
         """
 
         has_scheduler = session is not None
 
-        self._stdout = stdout or (NativeStdOut(session) if has_scheduler else sys.stdout)
-        self._stderr = stderr or (NativeStdErr(session) if has_scheduler else sys.stderr)
+        self._stdout = stdout or (
+            NativeStdOut(cast(SchedulerSession, session)) if has_scheduler else sys.stdout
+        )
+        self._stderr = stderr or (
+            NativeStdErr(cast(SchedulerSession, session)) if has_scheduler else sys.stderr
+        )
         self._use_colors = use_colors
 
     @property

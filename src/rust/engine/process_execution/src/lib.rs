@@ -24,12 +24,13 @@
 #![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
-#![type_length_limit = "7000100"]
+#![type_length_limit = "32187898"]
 #[macro_use]
 extern crate derivative;
 
-use boxfuture::{BoxFuture, Boxable};
+use async_trait::async_trait;
 use bytes::Bytes;
+pub use log::Level;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryFrom;
@@ -38,10 +39,7 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 use store::UploadSummary;
-use workunit_store::{with_workunit, WorkUnitStore, WorkunitMetadata};
-
-use futures::compat::Future01CompatExt;
-use futures::future::{FutureExt, TryFutureExt};
+use workunit_store::{with_workunit, WorkunitMetadata, WorkunitStore};
 
 use async_semaphore::AsyncSemaphore;
 use hashing::Digest;
@@ -278,6 +276,10 @@ impl MultiPlatformProcess {
       .next()
       .map(|(_platforms, epr)| epr.description.clone())
   }
+
+  pub fn workunit_name(&self) -> String {
+    "multi_platform_process".to_string()
+  }
 }
 
 impl From<Process> for MultiPlatformProcess {
@@ -349,12 +351,12 @@ impl AddAssign<UploadSummary> for ExecutionStats {
 
 #[derive(Clone, Default)]
 pub struct Context {
-  workunit_store: WorkUnitStore,
+  workunit_store: WorkunitStore,
   build_id: String,
 }
 
 impl Context {
-  pub fn new(workunit_store: WorkUnitStore, build_id: String) -> Context {
+  pub fn new(workunit_store: WorkunitStore, build_id: String) -> Context {
     Context {
       workunit_store,
       build_id,
@@ -362,16 +364,17 @@ impl Context {
   }
 }
 
+#[async_trait]
 pub trait CommandRunner: Send + Sync {
   ///
   /// Submit a request for execution on the underlying runtime, and return
   /// a future for it.
   ///
-  fn run(
+  async fn run(
     &self,
     req: MultiPlatformProcess,
     context: Context,
-  ) -> BoxFuture<FallibleProcessResultWithPlatform, String>;
+  ) -> Result<FallibleProcessResultWithPlatform, String>;
 
   ///
   /// Given a multi platform request which may have some platform
@@ -422,47 +425,47 @@ impl BoundedCommandRunner {
   }
 }
 
+#[async_trait]
 impl CommandRunner for BoundedCommandRunner {
   fn num_waiters(&self) -> usize {
     self.inner.1.num_waiters()
   }
 
-  fn run(
+  async fn run(
     &self,
     req: MultiPlatformProcess,
     context: Context,
-  ) -> BoxFuture<FallibleProcessResultWithPlatform, String> {
-    let inner = self.inner.clone();
-    let semaphor = self.inner.1.clone();
-    let name = req
+  ) -> Result<FallibleProcessResultWithPlatform, String> {
+    let name = format!("{}-waiting", req.workunit_name());
+    let desc = req
       .user_facing_name()
-      .unwrap_or_else(|| "Unamed node".to_string());
-    let inner_name = name.clone();
+      .unwrap_or_else(|| "<Unnamed process>".to_string());
     let outer_metadata = WorkunitMetadata {
-      desc: Some("Workunit waiting for opportunity to run".to_string()),
+      desc: Some(desc.clone()),
+      level: Level::Info,
       display: false,
       blocked: true,
     };
-    let inner_context = context.clone();
-    let bounded_fut = semaphor.with_acquired(move || {
-      let metadata = WorkunitMetadata {
-        desc: Some("Workunit executing currently".to_string()),
-        display: false,
-        blocked: false,
-      };
-      let f = inner.0.run(req, inner_context.clone()).compat();
-      with_workunit(
-        inner_context.workunit_store.clone(),
-        inner_name,
-        metadata,
-        f,
-      )
-    });
+    let bounded_fut = {
+      let inner = self.inner.clone();
+      let semaphore = self.inner.1.clone();
+      let context = context.clone();
+      let name = format!("{}-running", req.workunit_name());
 
-    with_workunit(context.workunit_store, name, outer_metadata, bounded_fut)
-      .boxed()
-      .compat()
-      .to_boxed()
+      semaphore.with_acquired(move || {
+        let metadata = WorkunitMetadata {
+          desc: Some(desc),
+          level: Level::Info,
+          display: false,
+          blocked: false,
+        };
+        with_workunit(context.workunit_store.clone(), name, metadata, async move {
+          inner.0.run(req, context).await
+        })
+      })
+    };
+
+    with_workunit(context.workunit_store, name, outer_metadata, bounded_fut).await
   }
 
   fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {

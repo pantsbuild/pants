@@ -31,7 +31,7 @@ unpacked_whls(
     './*.so*',
     './*.dylib*',
   ],
-  within_data_subdir='purelib/tensorflow',
+  within_data_subdir=True,
 )
 
 files(

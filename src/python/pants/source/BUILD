@@ -8,6 +8,7 @@ python_library(
     '3rdparty/python:dataclasses',
     '3rdparty/python:typing-extensions',
     'src/python/pants/base:build_environment',
+    'src/python/pants/base:deprecated',
     'src/python/pants/base:payload_field',
     'src/python/pants/base:project_tree',
     'src/python/pants/engine:collection',

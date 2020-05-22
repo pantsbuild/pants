@@ -3,19 +3,14 @@
 
 import logging
 import typing
-from collections import namedtuple
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any, Dict, Type, Union
 
-from pants.base.parse_context import ParseContext
-from pants.build_graph.addressable import AddressableCallProxy
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.build_graph.target_addressable import TargetAddressable
 from pants.engine.rules import RuleIndex
 from pants.engine.target import Target
 from pants.option.optionable import Optionable
-from pants.util.memo import memoized_method
 from pants.util.ordered_set import OrderedSet
 
 logger = logging.getLogger(__name__)
@@ -32,12 +27,7 @@ class BuildConfiguration:
     _optionables: OrderedSet = field(default_factory=OrderedSet)
     _rules: OrderedSet = field(default_factory=OrderedSet)
     _union_rules: Dict[Type, OrderedSet[Type]] = field(default_factory=dict)
-    _targets: OrderedSet[Type[Target]] = field(default_factory=OrderedSet)
-
-    class ParseState(namedtuple("ParseState", ["parse_context", "parse_globals"])):
-        @property
-        def objects(self):
-            return self.parse_context._storage.objects
+    _target_types: OrderedSet[Type[Target]] = field(default_factory=OrderedSet)
 
     def registered_aliases(self) -> BuildFileAliases:
         """Return the registered aliases exposed in BUILD files.
@@ -193,82 +183,25 @@ class BuildConfiguration:
     # because we pass whatever people put in their `register.py`s to this function; i.e., this is
     # an impure function that reads from the outside world. So, we use the type hint `Any` and
     # perform runtime type checking.
-    def register_targets(self, targets: Union[typing.Iterable[Type[Target]], Any]) -> None:
+    def register_target_types(
+        self, target_types: Union[typing.Iterable[Type[Target]], Any]
+    ) -> None:
         """Registers the given target types."""
-        if not isinstance(targets, Iterable):
+        if not isinstance(target_types, Iterable):
             raise TypeError(
-                f"The entrypoint `targets` must return an iterable. Given {repr(targets)}"
+                f"The entrypoint `target_types` must return an iterable. Given {repr(target_types)}"
             )
         bad_elements = [
             tgt_type
-            for tgt_type in targets
+            for tgt_type in target_types
             if not isinstance(tgt_type, type) or not issubclass(tgt_type, Target)
         ]
         if bad_elements:
             raise TypeError(
-                "Every element of the entrypoint `targets` must be a subclass of "
+                "Every element of the entrypoint `target_types` must be a subclass of "
                 f"{Target.__name__}. Bad elements: {bad_elements}."
             )
-        self._targets.update(targets)
+        self._target_types.update(target_types)
 
-    def targets(self) -> OrderedSet[Type[Target]]:
-        return self._targets
-
-    @memoized_method
-    def _get_addressable_factory(self, target_type, alias):
-        return TargetAddressable.factory(target_type=target_type, alias=alias)
-
-    def initialize_parse_state(self, build_file):
-        """Creates a fresh parse state for the given build file.
-
-        :param build_file: The BUILD file to set up a new ParseState for.
-        :type build_file: :class:`pants.base.build_file.BuildFile`
-        :returns: A fresh ParseState for parsing the given `build_file` with.
-        :rtype: :class:`BuildConfiguration.ParseState`
-        """
-        # TODO(John Sirois): Introduce a factory method to seal the BuildConfiguration and add a check
-        # there that all anonymous types are covered by context aware object factories that are
-        # Macro instances.  Without this, we could have non-Macro context aware object factories being
-        # asked to be a BuildFileTargetFactory when they are not (in SourceRoot registration context).
-        # See: https://github.com/pantsbuild/pants/issues/2125
-        type_aliases = self._exposed_object_by_alias.copy()
-        parse_context = ParseContext(rel_path=build_file.spec_path, type_aliases=type_aliases)
-
-        def create_call_proxy(tgt_type, tgt_alias=None):
-            def registration_callback(address, addressable):
-                parse_context._storage.add(addressable, name=address.target_name)
-
-            addressable_factory = self._get_addressable_factory(tgt_type, tgt_alias)
-            return AddressableCallProxy(
-                addressable_factory=addressable_factory,
-                build_file=build_file,
-                registration_callback=registration_callback,
-            )
-
-        # Expose all aliased Target types.
-        for alias, target_type in self._target_by_alias.items():
-            proxy = create_call_proxy(target_type, alias)
-            type_aliases[alias] = proxy
-
-        # Expose aliases for exposed objects and targets in the BUILD file.
-        parse_globals = type_aliases.copy()
-
-        # Now its safe to add mappings from both the directly exposed and macro-created target types to
-        # their call proxies for context awares and macros to use to manufacture targets by type
-        # instead of by alias.
-        for alias, target_type in self._target_by_alias.items():
-            proxy = type_aliases[alias]
-            type_aliases[target_type] = proxy
-
-        for target_macro_factory in self._target_macro_factory_by_alias.values():
-            for target_type in target_macro_factory.target_types:
-                proxy = create_call_proxy(target_type)
-                type_aliases[target_type] = proxy
-
-        for alias, object_factory in self._exposed_context_aware_object_factory_by_alias.items():
-            parse_globals[alias] = object_factory(parse_context)
-
-        for alias, target_macro_factory in self._target_macro_factory_by_alias.items():
-            parse_globals[alias] = target_macro_factory.target_macro(parse_context)
-
-        return self.ParseState(parse_context, parse_globals)
+    def target_types(self) -> OrderedSet[Type[Target]]:
+        return self._target_types

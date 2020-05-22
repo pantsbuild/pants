@@ -43,10 +43,14 @@ pub trait Node: Clone + Debug + Display + Eq + Hash + Send + 'static {
   /// implementations). This user-facing name is intended to provide high-level information
   /// to end users of pants about what computation pants is currently doing. Not all
   /// `Node`s need a user-facing name. For `Node`s derived from Python `@rule`s, the
-  /// user-facing name should be the same as the `name` annotation on the rule decorator.
+  /// user-facing name should be the same as the `desc` annotation on the rule decorator.
   fn user_facing_name(&self) -> Option<String> {
     None
   }
+
+  /// Provides the `name` field in workunits associated with this node. These names
+  /// should be friendly to machine-parsing (i.e. "my_node" rather than "My awesome node!").
+  fn workunit_name(&self) -> String;
 }
 
 pub trait NodeError: Clone + Debug + Eq + Send {
@@ -84,26 +88,6 @@ pub trait NodeVisualizer<N: Node> {
 }
 
 ///
-/// A trait used to visualize Nodes for the purposes of CLI-output tracing.
-///
-pub trait NodeTracer<N: Node> {
-  ///
-  /// Returns true if the given Node Result represents the "bottom" of a trace.
-  ///
-  /// A trace represents a sub-dag of the entire Graph, and a "bottom" Node result represents
-  /// a boundary that the trace stops before (ie, a bottom Node will not be rendered in the trace,
-  /// but anything that depends on a bottom Node will be).
-  ///
-  fn is_bottom(result: Option<Result<N::Item, N::Error>>) -> bool;
-
-  ///
-  /// Renders the given result for a trace. The trace will already be indented by `indent`, but
-  /// an implementer creating a multi-line output would need to indent them as well.
-  ///
-  fn state_str(indent: &str, result: Option<Result<N::Item, N::Error>>) -> String;
-}
-
-///
 /// A context passed between Nodes that also stores an EntryId to uniquely identify them.
 ///
 pub trait NodeContext: Clone + Send + Sync + 'static {
@@ -113,11 +97,11 @@ pub trait NodeContext: Clone + Send + Sync + 'static {
   type Node: Node;
 
   ///
-  /// The Session ID type for this Context. Some Node behaviours (in particular: Node::cacheable)
-  /// have Session-specific semantics. More than one context object might be associated with a
-  /// single caller "session".
+  /// The Run ID type for this Context. Some Node behaviours have Run-specific semantics. In
+  /// particular: an uncacheable (Node::cacheable) Node will execute once per Run, regardless
+  /// of other invalidation.
   ///
-  type SessionId: Clone + Debug + Eq + Send;
+  type RunId: Clone + Debug + Eq + Send;
 
   ///
   /// Creates a clone of this NodeContext to be used for a different Node.
@@ -127,10 +111,10 @@ pub trait NodeContext: Clone + Send + Sync + 'static {
   fn clone_for(&self, entry_id: EntryId) -> <Self::Node as Node>::Context;
 
   ///
-  /// Returns the SessionId for this Context, which should uniquely identify a caller's run for the
-  /// purposes of "once per Session" behaviour.
+  /// Returns the RunId for this Context, which should uniquely identify a caller's run for the
+  /// purposes of "once per Run" behaviour.
   ///
-  fn session_id(&self) -> &Self::SessionId;
+  fn run_id(&self) -> &Self::RunId;
 
   ///
   /// Returns a reference to the Graph for this Context.

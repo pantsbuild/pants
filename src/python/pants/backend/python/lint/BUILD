@@ -28,7 +28,7 @@ python_tests(
     'src/python/pants/engine:selectors',
     'src/python/pants/engine/legacy:structs',
     'src/python/pants/source',
-    'src/python/pants/testutil:test_base',
+    'src/python/pants/testutil:external_tool_test_base',
     'src/python/pants/testutil/subsystem',
   ],
   tags = {'integration'},

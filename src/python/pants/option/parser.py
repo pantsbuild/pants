@@ -3,15 +3,18 @@
 
 import copy
 import inspect
+import itertools
 import json
 import os
 import re
+import textwrap
 import traceback
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     DefaultDict,
@@ -19,7 +22,9 @@ from typing import (
     Iterable,
     List,
     Mapping,
+    NoReturn,
     Optional,
+    Sequence,
     Set,
     Tuple,
     Type,
@@ -66,6 +71,9 @@ from pants.option.option_value_container import OptionValueContainer
 from pants.option.ranked_value import Rank, RankedValue
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
 from pants.util.meta import frozen_after_init
+
+if TYPE_CHECKING:
+    from pants.option.options import Options  # noqa: F401
 
 
 class Parser:
@@ -163,7 +171,9 @@ class Parser:
     class ParseArgsRequest:
         flag_value_map: Dict
         namespace: OptionValueContainer
-        get_all_scoped_flag_names: Callable[["Parser.ParseArgsRequest"], Iterable]
+        get_all_scoped_flag_names: Callable[
+            ["Parser.ParseArgsRequest"], Sequence["Options.ScopedFlagNameForFuzzyMatching"]
+        ]
         levenshtein_max_distance: int
         # A passive option is one that doesn't affect functionality, or appear in help messages, but
         # can be provided without failing validation. This allows us to conditionally register options
@@ -176,7 +186,9 @@ class Parser:
             self,
             flags_in_scope: Iterable[str],
             namespace: OptionValueContainer,
-            get_all_scoped_flag_names: Callable[[], Iterable],
+            get_all_scoped_flag_names: Callable[
+                [], Sequence["Options.ScopedFlagNameForFuzzyMatching"]
+            ],
             levenshtein_max_distance: int,
             include_passive_options: bool = False,
         ) -> None:
@@ -315,85 +327,108 @@ class Parser:
         # See if there are any unconsumed flags remaining, and if so, raise a ParseError.
         if flag_value_map:
             self._raise_error_for_invalid_flag_names(
-                flag_value_map,
+                tuple(flag_value_map.keys()),
                 all_scoped_flag_names=get_all_scoped_flag_names(),
-                levenshtein_max_distance=levenshtein_max_distance,
+                max_edit_distance=levenshtein_max_distance,
             )
 
         return namespace
 
     def _raise_error_for_invalid_flag_names(
-        self, flag_value_map, all_scoped_flag_names, levenshtein_max_distance
-    ):
+        self,
+        flags: Sequence[str],
+        all_scoped_flag_names: Sequence["Options.ScopedFlagNameForFuzzyMatching"],
+        max_edit_distance: int,
+    ) -> NoReturn:
         """Identify similar option names to unconsumed flags and raise a ParseError with those
         names."""
-        matching_flags = {}
-        for flag_name in flag_value_map.keys():
-            # We will be matching option names without their leading hyphens, in order to capture both
-            # short and long-form options.
-            flag_normalized_unscoped_name = re.sub(r"^-+", "", flag_name)
+        matching_flags: Dict[str, List[str]] = {}
+        for flag in flags:
+            # We will be matching option names without their leading hyphens, in order to capture
+            # both short and long-form options.
+            flag_normalized_unscoped_name = re.sub(r"^-+", "", flag)
             flag_normalized_scoped_name = (
                 f"{self.scope.replace('.', '-')}-{flag_normalized_unscoped_name}"
                 if self.scope != GLOBAL_SCOPE
                 else flag_normalized_unscoped_name
             )
 
-            substring_matching_option_names = []
-            levenshtein_matching_option_names = defaultdict(list)
+            substring_matching_flags: List[str] = []
+            edit_distance_to_matching_flags: DefaultDict[int, List[str]] = defaultdict(list)
             for other_scoped_flag in all_scoped_flag_names:
                 other_complete_flag_name = other_scoped_flag.scoped_arg
                 other_normalized_scoped_name = other_scoped_flag.normalized_scoped_arg
                 other_normalized_unscoped_name = other_scoped_flag.normalized_arg
                 if flag_normalized_unscoped_name == other_normalized_unscoped_name:
                     # If the unscoped option name itself matches, but the scope doesn't, display it.
-                    substring_matching_option_names.append(other_complete_flag_name)
+                    substring_matching_flags.append(other_complete_flag_name)
                 elif other_normalized_scoped_name.startswith(flag_normalized_scoped_name):
-                    # If the invalid scoped option name is the beginning of another scoped option name,
-                    # display it. This will also suggest long-form options such as --verbose for an attempted
-                    # -v (if -v isn't defined as an option).
-                    substring_matching_option_names.append(other_complete_flag_name)
+                    # If the invalid scoped option name is the beginning of another scoped option
+                    # name, display it. This will also suggest long-form options such as --verbose
+                    # for an attempted -v (if -v isn't defined as an option).
+                    substring_matching_flags.append(other_complete_flag_name)
                 else:
-                    # If an unscoped option name is similar to the unscoped option from the command line
-                    # according to --option-name-check-distance, display the matching scoped option name. This
-                    # covers misspellings!
-                    unscoped_option_levenshtein_distance = Levenshtein.distance(
+                    # If an unscoped option name is similar to the unscoped option from the command
+                    # line according to --option-name-check-distance, display the matching scoped
+                    # option name. This covers misspellings.
+                    unscoped_option_edit_distance: int = Levenshtein.distance(
                         flag_normalized_unscoped_name, other_normalized_unscoped_name
                     )
-                    if unscoped_option_levenshtein_distance <= levenshtein_max_distance:
-                        # NB: We order the matched flags by Levenshtein distance compared to the entire option string!
-                        fully_scoped_levenshtein_distance = Levenshtein.distance(
+                    if unscoped_option_edit_distance <= max_edit_distance:
+                        # NB: We order the matched flags by Levenshtein distance compared to the
+                        # entire option string.
+                        fully_scoped_edit_distance: int = Levenshtein.distance(
                             flag_normalized_scoped_name, other_normalized_scoped_name
                         )
-                        levenshtein_matching_option_names[fully_scoped_levenshtein_distance].append(
+                        edit_distance_to_matching_flags[fully_scoped_edit_distance].append(
                             other_complete_flag_name
                         )
 
             # If any option name matched or started with the invalid flag in any scope, put that
-            # first. Then, display the option names matching in order of overall edit distance, in a deterministic way.
-            all_matching_scoped_option_names = substring_matching_option_names + [
-                flag
-                for distance in sorted(levenshtein_matching_option_names.keys())
-                for flag in sorted(levenshtein_matching_option_names[distance])
+            # first. Then, display the option names matching in order of overall edit distance.
+            # Flags with the same distance will be sorted alphabetically.
+            all_matching_scoped_flags = [
+                *substring_matching_flags,
+                *itertools.chain.from_iterable(
+                    matched_flags
+                    for _, matched_flags in sorted(edit_distance_to_matching_flags.items())
+                ),
             ]
-            if all_matching_scoped_option_names:
-                matching_flags[flag_name] = all_matching_scoped_option_names
+            if all_matching_scoped_flags:
+                matching_flags[flag] = all_matching_scoped_flags
 
-        if matching_flags:
-            suggestions_message = " Suggestions:\n{}".format(
-                "\n".join(
-                    "{}: [{}]".format(flag_name, ", ".join(matches))
-                    for flag_name, matches in matching_flags.items()
-                )
-            )
-        else:
-            suggestions_message = ""
-        raise ParseError(
-            "Unrecognized command line flags on {scope}: {flags}.{suggestions_message}".format(
-                scope=self._scope_str(),
-                flags=", ".join(flag_value_map.keys()),
-                suggestions_message=suggestions_message,
-            )
+        scope = self._scope_str()
+        help_instructions_scope = f" {self.scope}" if self.scope != GLOBAL_SCOPE else ""
+        help_instructions = (
+            f"(Run `./pants help-advanced{help_instructions_scope}` for all available options.)"
         )
+
+        if len(flags) == 1:
+            matches = list(matching_flags.values())[0] if matching_flags else []
+            message = textwrap.fill(
+                (
+                    f"Unrecognized command line flag {repr(flags[0])} on {scope}."
+                    f"{' Suggestions:' if matching_flags else ''}\n"
+                ),
+                80,
+            )
+            if matching_flags:
+                message += f"\n{', '.join(matches)}"
+            raise ParseError(f"{message}\n\n{help_instructions}")
+        message = textwrap.fill(
+            (
+                f"Unrecognized command line flags on {scope}: {', '.join(flags)}."
+                f"{' Suggestions:' if matching_flags else ''}\n"
+            ),
+            80,
+        )
+        if matching_flags:
+            suggestions = "\n".join(
+                f"{flag_name}: [{', '.join(matches)}]"
+                for flag_name, matches in matching_flags.items()
+            )
+            message += f"\n{suggestions}"
+        raise ParseError(f"{message}\n\n{help_instructions}")
 
     def option_registrations_iter(self):
         """Returns an iterator over the normalized registration arguments of each option in this

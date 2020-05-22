@@ -32,9 +32,9 @@ use hashing;
 use process_execution::{self, MultiPlatformProcess, PlatformConstraint, Process, RelativePath};
 use rule_graph;
 
-use graph::{Entry, Node, NodeError, NodeTracer, NodeVisualizer};
+use graph::{Entry, Node, NodeError, NodeVisualizer};
 use store::{self, StoreFileByDigest};
-use workunit_store::{new_span_id, scope_task_workunit_state, WorkunitMetadata};
+use workunit_store::{new_span_id, scope_task_workunit_state, Level, WorkunitMetadata};
 
 pub type NodeFuture<T> = BoxFuture<T, Failure>;
 
@@ -61,10 +61,7 @@ impl VFS<Failure> for Context {
   }
 
   fn mk_error(msg: &str) -> Failure {
-    Failure::Throw(
-      externs::create_exception(msg),
-      "<pants native internals>".to_string(),
-    )
+    throw(msg)
   }
 }
 
@@ -92,10 +89,6 @@ pub trait WrappedNode: Into<NodeKey> {
 
 ///
 /// A Node that selects a product for some Params.
-///
-/// A Select can be satisfied by multiple sources, but fails if multiple sources produce a value.
-/// The 'params' represent a series of type-keyed parameters that will be used by Nodes in the
-/// subgraph below this Select.
 ///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Select {
@@ -240,7 +233,7 @@ impl MultiPlatformExecuteProcess {
       }
     };
 
-    let digest = lift_digest(&externs::project_ignoring_type(&value, "input_files"))
+    let digest = lift_digest(&externs::project_ignoring_type(&value, "input_digest"))
       .map_err(|err| format!("Error parsing digest {}", err))?;
 
     let output_files = externs::project_multi_strs(&value, "output_files")
@@ -357,13 +350,18 @@ impl WrappedNode for MultiPlatformExecuteProcess {
       .extract_compatible_request(&request)
       .is_some()
     {
-      context
-        .core
-        .command_runner
-        .run(request, execution_context)
-        .map(ProcessResult)
-        .map_err(|e| throw(&format!("Failed to execute process: {}", e)))
-        .to_boxed()
+      Box::pin(async move {
+        let res = context
+          .core
+          .command_runner
+          .run(request, execution_context)
+          .await
+          .map_err(|e| throw(&format!("Failed to execute process: {}", e)))?;
+
+        Ok(ProcessResult(res))
+      })
+      .compat()
+      .to_boxed()
     } else {
       err(throw(&format!(
         "No compatible platform found for request: {:?}",
@@ -944,9 +942,7 @@ impl NodeVisualizer<NodeKey> for Visualizer {
     let max_colors = 12;
     match entry.peek(context) {
       None => "white".to_string(),
-      Some(Err(Failure::Throw(..))) => "4".to_string(),
-      Some(Err(Failure::Invalidated)) => "12".to_string(),
-      Some(Ok(_)) => {
+      Some(_) => {
         let viz_colors_len = self.viz_colors.len();
         self
           .viz_colors
@@ -954,41 +950,6 @@ impl NodeVisualizer<NodeKey> for Visualizer {
           .or_insert_with(|| format!("{}", viz_colors_len % max_colors + 1))
           .clone()
       }
-    }
-  }
-}
-
-pub struct Tracer;
-
-impl NodeTracer<NodeKey> for Tracer {
-  fn is_bottom(result: Option<Result<NodeResult, Failure>>) -> bool {
-    match result {
-      Some(Err(Failure::Invalidated)) => false,
-      Some(Err(Failure::Throw(..))) => false,
-      Some(Ok(_)) => true,
-      None => {
-        // A Node with no state is either still running, or effectively cancelled
-        // because a dependent failed. In either case, it's not useful to render
-        // them, as we don't know whether they would have succeeded or failed.
-        true
-      }
-    }
-  }
-
-  fn state_str(indent: &str, result: Option<Result<NodeResult, Failure>>) -> String {
-    match result {
-      None => "<None>".to_string(),
-      Some(Ok(ref x)) => format!("{:?}", x),
-      Some(Err(Failure::Throw(ref x, ref traceback))) => format!(
-        "Throw({})\n{}",
-        externs::val_to_str(x),
-        traceback
-          .split('\n')
-          .map(|l| format!("{}    {}", indent, l))
-          .collect::<Vec<_>>()
-          .join("\n")
-      ),
-      Some(Err(Failure::Invalidated)) => "Invalidated".to_string(),
     }
   }
 }
@@ -1057,24 +1018,27 @@ impl Node for NodeKey {
   fn run(self, context: Context) -> NodeFuture<NodeResult> {
     let mut workunit_state = workunit_store::expect_workunit_state();
 
-    let started_workunit_id = {
-      let display = context.session.should_handle_workunits() && self.user_facing_name().is_some();
-      let name = self.user_facing_name().unwrap_or(format!("{}", self));
+    let (started_workunit_id, user_facing_name) = {
+      let user_facing_name = self.user_facing_name();
+      let display = context.session.should_handle_workunits()
+        && (user_facing_name.is_some() || self.display_info().is_some());
+      let name = self.workunit_name();
       let span_id = new_span_id();
-      let desc = self.display_info().and_then(|di| di.desc.as_ref().cloned());
 
       // We're starting a new workunit: record our parent, and set the current parent to our span.
       let parent_id = std::mem::replace(&mut workunit_state.parent_id, Some(span_id.clone()));
       let metadata = WorkunitMetadata {
-        desc,
+        desc: user_facing_name.clone(),
+        level: Level::Info,
         display,
         blocked: false,
       };
 
-      context
+      let started_workunit_id = context
         .session
         .workunit_store()
-        .start_workunit(span_id, name, parent_id, metadata)
+        .start_workunit(span_id, name, parent_id, metadata);
+      (started_workunit_id, user_facing_name)
     };
 
     scope_task_workunit_state(Some(workunit_state), async move {
@@ -1091,7 +1055,7 @@ impl Node for NodeKey {
         Ok(())
       };
 
-      let result = match maybe_watch {
+      let mut result = match maybe_watch {
         Ok(()) => match self {
           NodeKey::DigestFile(n) => n.run(context).map(NodeResult::from).compat().await,
           NodeKey::DownloadedFile(n) => n.run(context).map(NodeResult::from).compat().await,
@@ -1106,6 +1070,9 @@ impl Node for NodeKey {
         },
         Err(e) => Err(e),
       };
+      if let Some(user_facing_name) = user_facing_name {
+        result = result.map_err(|failure| failure.with_pushed_frame(&user_facing_name));
+      }
       context2
         .session
         .workunit_store()
@@ -1138,14 +1105,33 @@ impl Node for NodeKey {
 
   fn user_facing_name(&self) -> Option<String> {
     match self {
-      NodeKey::Task(ref task) => task.task.display_info.name.as_ref().map(|s| s.to_owned()),
+      NodeKey::Task(ref task) => task.task.display_info.desc.as_ref().map(|s| s.to_owned()),
       NodeKey::Snapshot(_) => Some(format!("{}", self)),
       NodeKey::MultiPlatformExecuteProcess(mp_epr) => mp_epr.0.user_facing_name(),
-      NodeKey::DigestFile(..) => None,
+      NodeKey::DigestFile(DigestFile(File { path, .. })) => {
+        Some(format!("Fingerprinting: {}", path.display()))
+      }
       NodeKey::DownloadedFile(..) => None,
       NodeKey::ReadLink(..) => None,
-      NodeKey::Scandir(..) => None,
+      NodeKey::Scandir(Scandir(Dir(path))) => Some(format!("Reading {}", path.display())),
       NodeKey::Select(..) => None,
+    }
+  }
+
+  fn workunit_name(&self) -> String {
+    match self {
+      NodeKey::Task(_) => self
+        .display_info()
+        .and_then(|di| di.name.as_ref())
+        .map(|s| s.to_owned())
+        .unwrap_or_else(|| "<unnamed_rule>".to_string()),
+      NodeKey::MultiPlatformExecuteProcess(mp_epr) => mp_epr.0.workunit_name(),
+      NodeKey::Snapshot(..) => "snapshot".to_string(),
+      NodeKey::DigestFile(..) => "digest_file".to_string(),
+      NodeKey::DownloadedFile(..) => "downloaded_file".to_string(),
+      NodeKey::ReadLink(..) => "read_link".to_string(),
+      NodeKey::Scandir(_) => "scandir".to_string(),
+      NodeKey::Select(..) => "select".to_string(),
     }
   }
 }
@@ -1161,7 +1147,7 @@ impl Display for NodeKey {
       &NodeKey::ReadLink(ref s) => write!(f, "ReadLink({:?})", s.0),
       &NodeKey::Scandir(ref s) => write!(f, "Scandir({:?})", s.0),
       &NodeKey::Select(ref s) => write!(f, "Select({}, {})", s.params, s.product,),
-      &NodeKey::Task(ref s) => write!(f, "{:?}", s),
+      &NodeKey::Task(ref task) => write!(f, "{:?}", task),
       &NodeKey::Snapshot(ref s) => write!(f, "Snapshot({})", format!("{}", &s.0)),
     }
   }

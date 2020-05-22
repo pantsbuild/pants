@@ -25,9 +25,9 @@ from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.python.python_setup import PythonSetup
+from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.subsystem.util import init_subsystem
-from pants.testutil.test_base import TestBase
 from pants.util.strutil import create_path_env_var
 
 
@@ -154,7 +154,7 @@ def parse_requirements(requirements: Iterable[str]) -> Iterator[ExactRequirement
         yield ExactRequirement.parse(requirement)
 
 
-class PexTest(TestBase):
+class PexTest(ExternalToolTestBase):
     @classmethod
     def rules(cls):
         return (
@@ -257,7 +257,7 @@ class PexTest(TestBase):
         process = Process(
             argv=("python", "test.pex"),
             env=env,
-            input_files=pex_output["pex"].digest,
+            input_digest=pex_output["pex"].digest,
             description="Run the pex and make sure it works",
         )
         result = self.request_single_product(ProcessResult, process)
@@ -327,7 +327,7 @@ class PexTest(TestBase):
         assert pex_output["info"]["interpreter_constraints"] == []
 
     def test_additional_inputs(self) -> None:
-        # We use pex's --preamble-file option to set a custom premable from a file.
+        # We use pex's --preamble-file option to set a custom preamble from a file.
         # This verifies that the file was indeed provided as additional input to the pex call.
         preamble_file = "custom_preamble.txt"
         preamble = "#!CUSTOM PREAMBLE\n"

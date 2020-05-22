@@ -9,7 +9,7 @@ use std::os::raw;
 use std::os::unix::ffi::{OsStrExt, OsStringExt};
 use std::string::FromUtf8Error;
 
-use crate::core::{Failure, Function, Key, TypeId, Value};
+use crate::core::{native_python_traceback, Failure, Function, Key, TypeId, Value};
 use crate::handles::{DroppingHandle, Handle};
 use crate::interning::Interns;
 use itertools::Itertools;
@@ -413,13 +413,19 @@ pub type StoreBoolExtern = extern "C" fn(*const ExternContext, bool) -> Handle;
 #[repr(C)]
 pub struct PyResult {
   is_throw: bool,
-  handle: Handle,
+  result: Handle,
+  python_traceback: Handle,
+  engine_traceback: Handle,
 }
 
 impl PyResult {
-  fn failure_from(v: Value) -> Failure {
-    let traceback = project_str(&v, "_formatted_exc");
-    Failure::Throw(v, traceback)
+  fn failure_from(val: Value) -> Failure {
+    let python_traceback = project_str(&val, "_formatted_exc");
+    Failure::Throw {
+      val,
+      python_traceback,
+      engine_traceback: Vec::new(),
+    }
   }
 }
 
@@ -427,7 +433,9 @@ impl From<Value> for PyResult {
   fn from(val: Value) -> Self {
     PyResult {
       is_throw: false,
-      handle: val.into(),
+      result: val.into(),
+      python_traceback: none(),
+      engine_traceback: store_tuple(&[]).into(),
     }
   }
 }
@@ -437,13 +445,36 @@ impl From<Result<Value, Failure>> for PyResult {
     match result {
       Ok(val) => val.into(),
       Err(f) => {
-        let val = match f {
-          f @ Failure::Invalidated => create_exception(&format!("{}", f)),
-          Failure::Throw(exc, _) => exc,
+        let (val, python_traceback, engine_traceback) = match f {
+          f @ Failure::Invalidated => {
+            let msg = format!("{}", f);
+            (
+              create_exception(&msg),
+              native_python_traceback(&msg),
+              store_tuple(&[]).into(),
+            )
+          }
+          Failure::Throw {
+            val,
+            python_traceback,
+            engine_traceback,
+          } => (
+            val,
+            python_traceback,
+            store_tuple(
+              &engine_traceback
+                .into_iter()
+                .map(|s| store_utf8(&s))
+                .collect::<Vec<_>>(),
+            )
+            .into(),
+          ),
         };
         PyResult {
           is_throw: true,
-          handle: val.into(),
+          result: val.into(),
+          python_traceback: store_utf8(&python_traceback).into(),
+          engine_traceback,
         }
       }
     }
@@ -452,7 +483,7 @@ impl From<Result<Value, Failure>> for PyResult {
 
 impl From<PyResult> for Result<Value, Failure> {
   fn from(result: PyResult) -> Self {
-    let value = result.handle.into();
+    let value = result.result.into();
     if result.is_throw {
       Err(PyResult::failure_from(value))
     } else {
@@ -466,11 +497,15 @@ impl From<Result<Value, String>> for PyResult {
     match res {
       Ok(v) => PyResult {
         is_throw: false,
-        handle: v.into(),
+        result: v.into(),
+        python_traceback: none(),
+        engine_traceback: none(),
       },
       Err(msg) => PyResult {
         is_throw: true,
-        handle: create_exception(&msg).into(),
+        result: create_exception(&msg).into(),
+        python_traceback: store_utf8(&native_python_traceback(&msg)).into(),
+        engine_traceback: none(),
       },
     }
   }

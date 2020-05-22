@@ -24,10 +24,11 @@
 #![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
-// We only use unsafe pointer derefrences in our no_mangle exposed API, but it is nicer to list
+// We only use unsafe pointer dereferences in our no_mangle exposed API, but it is nicer to list
 // just the one minor call as unsafe, than to mark the whole function as unsafe which may hide
 // other unsafeness.
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
+#![type_length_limit = "42187898"]
 
 mod context;
 mod core;
@@ -42,11 +43,9 @@ mod tasks;
 mod types;
 
 pub use crate::context::Core;
-pub use crate::core::{Function, Key, Params, TypeId, Value};
+pub use crate::core::{Failure, Function, Key, Params, TypeId, Value};
 pub use crate::handles::Handle;
 pub use crate::intrinsics::Intrinsics;
-pub use crate::scheduler::{
-  ExecutionRequest, ExecutionTermination, RootResult, Scheduler, Session,
-};
+pub use crate::scheduler::{ExecutionRequest, ExecutionTermination, Scheduler, Session};
 pub use crate::tasks::{Rule, Tasks};
 pub use crate::types::Types;

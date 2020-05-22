@@ -17,7 +17,7 @@ class PythonBinaryTest(TestBase):
         # Set up and run
         self.create_file("some/path/to/python/path/to/py.py")
         self.add_to_build_file(
-            "some/path/to/python", 'python_binary(name = "binary", source = "path/to/py.py")\n',
+            "some/path/to/python", 'python_binary(name = "binary", sources = ["path/to/py.py"])\n',
         )
         target = self.target("some/path/to/python:binary")
         # Verify

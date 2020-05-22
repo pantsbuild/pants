@@ -319,7 +319,7 @@ class BaseZincCompileIntegrationTest:
         # Compile a target that we expect will raise an "Unused import" warning.
         with self.temporary_workdir() as workdir:
             with self.temporary_cachedir() as cachedir:
-                args = ['--compile-rsc-args=+["-S-Ywarn-unused:_"]', "-ldebug"] + (
+                args = ['--compile-rsc-args=+["-S-Ywarn-unused:_"]', "-ldebug", "--no-colors"] + (
                     ["--compile-rsc-use-barebones-logger"] if use_barebones_logger else []
                 )
                 pants_run = self.run_test_compile(

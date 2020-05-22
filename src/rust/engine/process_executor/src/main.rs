@@ -391,7 +391,6 @@ async fn main() {
 
   let result = runner
     .run(request.into(), Context::default())
-    .compat()
     .await
     .expect("Error executing");
 

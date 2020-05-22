@@ -246,8 +246,7 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
             )
             self.assert_failure(pants_run)
             self.assertIn(
-                "Exception message: Unrecognized command line flags on scope 'test.junit': "
-                "--invalid",
+                "Unrecognized command line flag '--invalid' on scope 'test.junit'",
                 pants_run.stderr_data,
             )
 

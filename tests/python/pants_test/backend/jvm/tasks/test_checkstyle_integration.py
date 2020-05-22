@@ -100,15 +100,7 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
             f for f in os.listdir(current_root) if f.endswith(".toml") or f.startswith("BUILD")
         )
         files_to_copy.update(
-            (
-                "pants",
-                "3rdparty",
-                "build-support",
-                "contrib",
-                "src",
-                ".isort.cfg",
-                "pyproject.toml",
-            )
+            ("pants", "3rdparty", "build-support", "src", ".isort.cfg", "pyproject.toml")
         )
         with temporary_dir() as temp_root:
             temp_root = os.path.normpath(temp_root)
@@ -166,7 +158,7 @@ class CheckstyleIntegrationTest(PantsRunIntegrationTest):
     def test_properties_file_names_does_not_invalidates_targets(self, cache_args):
         with self.temporary_workdir() as workdir:
             with temporary_dir(root_dir=get_buildroot()) as tmp:
-                suppression_names = ["one-supress.xml", "two-supress.xml"]
+                suppression_names = ["one-suppress.xml", "two-suppress.xml"]
                 suppression_data = dedent(
                     """
                     <?xml version="1.0"?>

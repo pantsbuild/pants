@@ -406,13 +406,12 @@ class TestRunnerTaskMixin:
         raise NotImplementedError
 
 
-class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
-    """A mixin for test tasks that support running tests over both individual targets and batches.
+class ChrootedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
+    """A mixin for test tasks that support running tests in chroots.
 
-    Provides support for partitioning via `--fast` (batches) and `--no-fast` (per target) options and
-    helps ensure correct caching behavior in either mode.
+    Provides support for testing (per target) options and helps ensure correct caching behavior.
 
-    It's expected that mixees implement proper chrooting (see `run_tests_in_chroot`) to support
+    It's expected that mixins implement proper chrooting (see `run_tests_in_chroot`) to support
     correct successful test result caching.
     """
 
@@ -423,23 +422,6 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
         # TODO(John Sirois): Implement sanity checks on options wrt caching:
         # https://github.com/pantsbuild/pants/issues/5073
 
-        register(
-            "--fast",
-            type=bool,
-            default=False,
-            fingerprint=True,
-            removal_version="1.28.0.dev2",
-            removal_hint=(
-                "This option is going away for better isolation of tests, which provides "
-                "better caching. This also prepares for upgrading to the V2 test implementation,"
-                "which provides even better caching and parallelism.\n\nWe recommend running a "
-                "full CI suite with `no-fast` (the default now) to see if any tests fail. If any "
-                "fail, this likely signals shared state between your test targets."
-            ),
-            help="Run all tests in a single invocation. If turned off, each test target "
-            "will run in its own invocation, which will be slower, but isolates "
-            "tests from process-wide state created by tests in other targets.",
-        )
         register(
             "--chroot",
             advanced=True,
@@ -455,6 +437,8 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
         return VersionedTargetSet.from_versioned_targets(invalidation_check.all_vts)
 
     def check_artifact_cache_for(self, invalidation_check):
+        # TODO(https://github.com/pantsbuild/pants/issues/9734): Remove this override and leverage
+        #  default target level caching support now that the --fast option is removed.
         # Tests generate artifacts, namely junit.xml and coverage reports, that cover the full target
         # set whether that is all targets in the context (`--fast`) or each target individually
         # (`--no-fast`).
@@ -501,13 +485,13 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
 
         self.context.release_lock()
 
-        per_target = not self.get_options().fast
         fail_fast = self.get_options().fail_fast
 
         results = {}
         failure = False
-        with self.partitions(per_target, all_targets, test_targets) as partitions:
-            for (partition, args) in partitions():
+        with self.tests(all_targets=all_targets, test_targets=test_targets) as tests:
+            for (test_target, args) in tests():
+                partition = (test_target,)
                 try:
                     rv = self._run_partition(fail_fast, partition, *args)
                 except ErrorWhileTesting as e:
@@ -548,6 +532,9 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
                 # A low-level test execution failure occurred before tests were run.
                 raise TaskError()
 
+    # TODO(https://github.com/pantsbuild/pants/issues/9734): Simplify this method and mixin as a
+    #  whole now that targets are always tested individually and there are no longer ever
+    #  multi-target partitions now that the --fast option is removed.
     # Some notes on invalidation vs caching as used in `run_partition` below. Here invalidation
     # refers to executing task work in `Task.invalidated` blocks against invalid targets. Caching
     # refers to storing the results of that work in the artifact cache using
@@ -645,14 +632,14 @@ class PartitionedTestRunnerTaskMixin(TestRunnerTaskMixin, Task):
         return None
 
     @abstractmethod
-    def partitions(self, per_target, all_targets, test_targets):
-        """Return a context manager that can be called to iterate of target partitions.
+    def tests(self, all_targets, test_targets):
+        """Return a context manager that can be called to iterate over tests.
 
-        The iterator should return a 2-tuple with the partitions targets in the first slot and a tuple
-        of extra arguments needed to `run_tests` and `collect_files`.
+        The iterator should return a 2-tuple with the test target in the first slot and a tuple of
+        extra arguments needed to `run_tests` and `collect_files`.
 
         :rtype: A context manager that is callable with no arguments; returning an iterator over
-                (partition, tuple(args))
+                (test target, tuple(args))
         """
 
     @abstractmethod

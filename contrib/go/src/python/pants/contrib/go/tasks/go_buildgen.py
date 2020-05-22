@@ -11,9 +11,9 @@ from pants.base.generator import Generator, TemplateData
 from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.address import Address
 from pants.build_graph.address_lookup_error import AddressLookupError
-from pants.source.source_root import SourceRootCategories
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_open
+from pants.util.memo import memoized
 
 from pants.contrib.go.subsystems.fetcher_factory import FetcherFactory
 from pants.contrib.go.targets.go_binary import GoBinary
@@ -45,14 +45,23 @@ class GoTargetGenerator:
         local_root,
         fetcher_factory,
         generate_remotes=False,
-        remote_root=None,
+        remote_root_func=None,
     ):
         self._import_oracle = import_oracle
         self._build_graph = build_graph
         self._local_source_root = local_root
         self._fetcher_factory = fetcher_factory
         self._generate_remotes = generate_remotes
-        self._remote_source_root = remote_root
+        # We invoke self._remote_source_root_func lazily to create self._remote_source_root,
+        # then set it to None so we know that there's no need to reinvoke it.
+        self._remote_source_root_func = remote_root_func
+        self._remote_source_root = None
+
+    def _get_remote_source_root(self):
+        if self._remote_source_root_func:
+            self._remote_source_root = self._remote_source_root_func()
+            self._remote_source_root_func = None
+        return self._remote_source_root
 
     def generate(self, local_go_targets):
         """Automatically generates a Go target graph for the given local go targets.
@@ -65,7 +74,10 @@ class GoTargetGenerator:
             for local_go_target in local_go_targets:
                 deps = self._list_deps(gopath, local_go_target.address)
                 self._generate_missing(gopath, local_go_target.address, deps, visited)
-        return list(visited.items())
+        # We don't want to trigger an exception if there's no remote root and we didn't need
+        # one, so we return self._remote_source_root directly, instead of calling
+        # self._get_remote_source_root().
+        return list(visited.items()), self._remote_source_root
 
     def _generate_missing(self, gopath, local_address, import_listing, visited):
         target_type = GoBinary if import_listing.pkg_name == "main" else GoLibrary
@@ -88,7 +100,9 @@ class GoTargetGenerator:
                             remote_root, import_path
                         )
                         name = remote_pkg_path or os.path.basename(import_path)
-                        address = Address(os.path.join(self._remote_source_root, remote_root), name)
+                        address = Address(
+                            os.path.join(self._get_remote_source_root(), remote_root), name
+                        )
                         try:
                             self._build_graph.inject_address_closure(address)
                         except AddressLookupError:
@@ -215,6 +229,15 @@ class GoBuildgen(GoTask):
             help="An optional extension for all materialized BUILD files (should include the .)",
         )
 
+        register(
+            "--remote-root",
+            default=None,
+            metavar="<path>",
+            advanced=True,
+            fingerprint=True,
+            help="Path to the remote golang source root, if any.",
+        )
+
     def execute(self):
         materialize = self.get_options().materialize
         if materialize:
@@ -307,14 +330,21 @@ class GoBuildgen(GoTask):
         remote = self.get_options().remote
         existing_go_buildfiles = set()
 
-        def gather_go_buildfiles(rel_path):
-            address_mapper = self.context.address_mapper
-            for build_file in address_mapper.scan_build_files(base_path=rel_path):
-                existing_go_buildfiles.add(build_file)
+        # We scan for existing BUILD files containing Go targets before we begin to materialize
+        # things, because once we have created files (possibly next to existing files), collisions
+        # between the existing definitions and the new definitions are possible.
+        def gather_go_buildfiles(rel_path, is_relevant_target):
+            for build_file in self.context.address_mapper.scan_build_files(rel_path):
+                spec_path = os.path.dirname(build_file)
+                for address in self.context.address_mapper.addresses_in_spec_path(spec_path):
+                    if is_relevant_target(self.context.build_graph.resolve_address(address)):
+                        existing_go_buildfiles.add(address.rel_path)
 
-        gather_go_buildfiles(generation_result.local_root)
+        gather_go_buildfiles(generation_result.local_root, lambda t: isinstance(t, GoLocalSource))
         if remote and generation_result.remote_root != generation_result.local_root:
-            gather_go_buildfiles(generation_result.remote_root)
+            gather_go_buildfiles(
+                generation_result.remote_root, lambda t: isinstance(t, GoRemoteLibrary)
+            )
 
         targets = set(self.context.build_graph.targets(self.is_go))
         if remote and generation_result.remote_root:
@@ -324,6 +354,7 @@ class GoBuildgen(GoTask):
             remote_root = os.path.join(get_buildroot(), generation_result.remote_root)
             targets.update(self.context.scan(remote_root).targets(self.is_remote_lib))
 
+        # Generate targets, and discard any BUILD files that were overwritten.
         failed_results = []
         for result in self.generate_build_files(targets):
             existing_go_buildfiles.discard(result.build_file_path)
@@ -331,15 +362,12 @@ class GoBuildgen(GoTask):
             if result.failed:
                 failed_results.append(result)
 
+        # Finally, unlink any BUILD files that were invalidated but not otherwise overwritten.
         if existing_go_buildfiles:
             deleted = []
             for existing_go_buildfile in existing_go_buildfiles:
-                spec_path = os.path.dirname(existing_go_buildfile)
-                for address in self.context.address_mapper.addresses_in_spec_path(spec_path):
-                    target = self.context.build_graph.resolve_address(address)
-                    if isinstance(target, GoLocalSource):
-                        os.unlink(os.path.join(get_buildroot(), existing_go_buildfile))
-                        deleted.append(existing_go_buildfile)
+                os.unlink(os.path.join(get_buildroot(), existing_go_buildfile))
+                deleted.append(existing_go_buildfile)
             if deleted:
                 self.context.log.info(
                     "Deleted the following obsolete BUILD files:\n\t{}".format(
@@ -363,14 +391,8 @@ class GoBuildgen(GoTask):
             )
             raise self.FloatingRemoteError("Un-pinned (FLOATING) Go remote libraries detected.")
 
-    class NoLocalRootsError(TaskError):
-        """Indicates the Go local source owning targets' source roots are invalid."""
-
     class InvalidLocalRootsError(TaskError):
         """Indicates the Go local source owning targets' source roots are invalid."""
-
-    class UnrootedLocalSourceError(TaskError):
-        """Indicates there are Go local source owning targets that fall outside the source root."""
 
     class InvalidRemoteRootsError(TaskError):
         """Indicates the Go remote library source roots are invalid."""
@@ -401,54 +423,41 @@ class GoBuildgen(GoTask):
         # The GOPATH's 1st element is read-write, the rest are read-only; ie: their sources build to
         # the 1st element's pkg/ and bin/ dirs.
 
-        go_roots_by_category = defaultdict(list)
-        # TODO: Add "find source roots for lang" functionality to SourceRoots and use that instead.
-        for sr in self.context.source_roots.all_roots():
-            if "go" in sr.langs:
-                go_roots_by_category[sr.category].append(sr.path)
-
-        if go_roots_by_category[SourceRootCategories.TEST]:
-            raise self.InvalidLocalRootsError("Go buildgen does not support test source roots.")
-        if go_roots_by_category[SourceRootCategories.UNKNOWN]:
-            raise self.InvalidLocalRootsError(
-                "Go buildgen does not support source roots of " "unknown category."
-            )
-
-        local_roots = go_roots_by_category[SourceRootCategories.SOURCE]
-        if not local_roots:
-            raise self.NoLocalRootsError(
-                "Can only BUILD gen if a Go local sources source root is " "defined."
-            )
-        if len(local_roots) > 1:
-            raise self.InvalidLocalRootsError(
-                "Can only BUILD gen for a single Go local sources source "
-                "root, found:\n\t{}".format("\n\t".join(sorted(local_roots)))
-            )
-        local_root = local_roots.pop()
-
-        if local_go_targets:
-            unrooted_locals = {t for t in local_go_targets if t.target_base != local_root}
-            if unrooted_locals:
-                raise self.UnrootedLocalSourceError(
-                    "Cannot BUILD gen until the following targets are "
-                    "relocated to the source root at {}:\n\t{}".format(
-                        local_root,
-                        "\n\t".join(sorted(t.address.reference() for t in unrooted_locals)),
-                    )
-                )
-        else:
-            root = os.path.join(get_buildroot(), local_root)
-            local_go_targets = self.context.scan(root=root).targets(self.is_local_src)
+        if not local_go_targets:
+            local_go_targets = self.context.scan().targets(self.is_local_src)
             if not local_go_targets:
                 return None
 
-        remote_roots = go_roots_by_category[SourceRootCategories.THIRDPARTY]
-        if len(remote_roots) > 1:
-            raise self.InvalidRemoteRootsError(
-                "Can only BUILD gen for a single Go remote library source "
-                "root, found:\n\t{}".format("\n\t".join(sorted(remote_roots)))
+        local_roots = {t.target_base for t in local_go_targets}
+        if len(local_roots) > 1:
+            raise self.InvalidLocalRootsError(
+                "BUILD gen requires a single local Go source root, but found Go targets under "
+                f"multiple build roots: {', '.join(sorted(local_roots))}"
             )
-        remote_root = remote_roots.pop() if remote_roots else None
+        local_root = local_roots.pop()
+
+        @memoized
+        def infer_remote_root():
+            inferrable_roots = ["3rdparty/go", "3rd_party/go", "thirdparty/go", "third_party/go"]
+            msg = (
+                f"You can provide an explicit remote source root by setting remote_root in the "
+                f"[{self.options_scope}] section of your config file."
+            )
+            rr = None
+            for path in inferrable_roots:
+                if os.path.isdir(path):
+                    if rr:
+                        raise self.InvalidRemoteRootsError(
+                            f"Couldn't infer a single remote root. Found {rr} and {path}. {msg}"
+                        )
+                    rr = path
+            if not rr:
+                raise self.InvalidRemoteRootsError(
+                    f"Couldn't infer remote root.  Found none of: {','.join(inferrable_roots)}. {msg}"
+                )
+            return rr
+
+        remote_root_func = lambda: self.get_options().remote_root or infer_remote_root()
 
         generator = GoTargetGenerator(
             self.import_oracle,
@@ -456,11 +465,11 @@ class GoBuildgen(GoTask):
             local_root,
             self.get_fetcher_factory(),
             generate_remotes=self.get_options().remote,
-            remote_root=remote_root,
+            remote_root_func=remote_root_func,
         )
         with self.context.new_workunit("go.buildgen", labels=[WorkUnitLabel.MULTITOOL]):
             try:
-                generated = generator.generate(local_go_targets)
+                generated, remote_root = generator.generate(local_go_targets)
                 return self.GenerationResult(
                     generated=generated, local_root=local_root, remote_root=remote_root
                 )

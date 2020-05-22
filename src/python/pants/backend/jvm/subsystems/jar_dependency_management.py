@@ -134,7 +134,7 @@ class JarDependencyManagement(Subsystem):
             )
 
         is_silent = self.get_options().suppress_conflict_warnings
-        log = logger.debug if is_silent else logger.warn
+        log = logger.debug if is_silent else logger.warning
 
         if strategy == "USE_DIRECT":
             log(message)

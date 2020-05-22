@@ -2,11 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import inspect
-from collections.abc import Mapping
 from functools import update_wrapper
 from typing import Any, Set, Tuple, Type
 
-from pants.build_graph.address import Address, BuildFileAddress
+from pants.build_graph.address import Address
 from pants.engine.internals.objects import Resolvable, Serializable
 from pants.util.objects import TypeConstraintError
 
@@ -273,81 +272,3 @@ def addressable_sequence(type_constraint):
     :type type_constraint: :class:`TypeConstraint`
     """
     return _addressable_wrapper(AddressableSequence, type_constraint)
-
-
-class AddressableDict(AddressableDescriptor):
-    def _checked_value(self, instance, value):
-        if value is None:
-            return None
-
-        if not isinstance(value, Mapping):
-            raise TypeError(
-                "The {} property of {} must be a dict, given {} of type {}".format(
-                    self._name, instance, value, type(value).__name__
-                )
-            )
-        return {
-            k: super(AddressableDict, self)._checked_value(instance, v) for k, v in value.items()
-        }
-
-    def _resolve_value(self, instance, value):
-        return (
-            {k: super(AddressableDict, self)._resolve_value(instance, v) for k, v in value.items()}
-            if value
-            else {}
-        )
-
-
-def addressable_dict(type_constraint):
-    """Marks a dicts's values as satisfying a given type constraint.
-
-    Some (or all) values in the dict may be :class:`pants.engine.objects.Resolvable` values to
-    resolve later.
-
-    See :class:`AddressableDescriptor` for more details.
-
-    :param type_constraint: The type constraint the dict's values must all satisfy.
-    :type type_constraint: :class:`TypeConstraint`
-    """
-    return _addressable_wrapper(AddressableDict, type_constraint)
-
-
-# TODO(John Sirois): Move variants into Address 1st class as part of merging the engine/exp
-# into the mainline (if they survive).
-# TODO: Variants currently require an explicit name (and thus a `:`) in order to parse correctly.
-def strip_variants(address):
-    """Return a copy of the given address with the variants (if any) stripped from the name.
-
-    :rtype: :class:`pants.build_graph.address.Address`
-    """
-    address, _ = parse_variants(address)
-    return address
-
-
-def _extract_variants(address, variants_str):
-    """Return the variants (if any) represented by the given variants_str.
-
-    :returns: The variants or else `None` if there are none.
-    :rtype: tuple of tuples (key, value) strings
-    """
-
-    def entries():
-        for entry in variants_str.split(","):
-            key, _, value = entry.partition("=")
-            if not key or not value:
-                raise ValueError("Invalid variants after the @ in: {}".format(address))
-            yield (key, value)
-
-    return tuple(entries())
-
-
-def parse_variants(address):
-    target_name, at_sign, variants_str = address.target_name.partition("@")
-    if not at_sign:
-        return address, None
-    variants = _extract_variants(address, variants_str) if variants_str else None
-    if isinstance(address, BuildFileAddress):
-        normalized_address = BuildFileAddress(rel_path=address.rel_path, target_name=target_name)
-    else:
-        normalized_address = Address(spec_path=address.spec_path, target_name=target_name)
-    return normalized_address, variants

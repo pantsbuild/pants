@@ -13,12 +13,12 @@ from pants.base.project_tree import Dir
 from pants.base.specs import AddressSpecs, SiblingAddresses, SingleAddress
 from pants.engine.addresses import Address, Addresses
 from pants.engine.fs import Digest, FileContent, FilesContent, PathGlobs, Snapshot, create_fs_rules
-from pants.engine.internals.addressable import addressable, addressable_dict
+from pants.engine.internals.addressable import addressable
 from pants.engine.internals.build_files import (
     ResolvedTypeMismatchError,
     addresses_with_origins_from_address_families,
     create_graph_rules,
-    evalute_preludes,
+    evaluate_preludes,
     parse_address_family,
     strip_address_origins,
 )
@@ -30,12 +30,11 @@ from pants.engine.internals.examples.parsers import (
 from pants.engine.internals.mapper import AddressFamily, AddressMapper
 from pants.engine.internals.nodes import Return, State, Throw
 from pants.engine.internals.parser import BuildFilePreludeSymbols, HydratedStruct, SymbolTable
-from pants.engine.internals.scheduler import SchedulerSession
+from pants.engine.internals.scheduler import ExecutionError, ExecutionRequest, SchedulerSession
 from pants.engine.internals.scheduler_test_base import SchedulerTestBase
 from pants.engine.internals.struct import Struct, StructWithDeps
 from pants.engine.legacy.structs import TargetAdaptor
 from pants.engine.rules import rule
-from pants.option.global_options import BuildFileImportsBehavior
 from pants.testutil.engine.util import MockGet, Target, run_rule
 from pants.util.frozendict import FrozenDict
 from pants.util.objects import Exactly
@@ -44,11 +43,7 @@ from pants.util.objects import Exactly
 class ParseAddressFamilyTest(unittest.TestCase):
     def test_empty(self) -> None:
         """Test that parsing an empty BUILD file results in an empty AddressFamily."""
-        address_mapper = AddressMapper(
-            parser=JsonParser(TEST_TABLE),
-            prelude_glob_patterns=(),
-            build_file_imports_behavior=BuildFileImportsBehavior.error,
-        )
+        address_mapper = AddressMapper(parser=JsonParser(TEST_TABLE), prelude_glob_patterns=())
         af = run_rule(
             parse_address_family,
             rule_args=[address_mapper, BuildFilePreludeSymbols(FrozenDict()), Dir("/dev/null")],
@@ -70,11 +65,7 @@ class ParseAddressFamilyTest(unittest.TestCase):
 
 class AddressesFromAddressFamiliesTest(unittest.TestCase):
     def _address_mapper(self) -> AddressMapper:
-        return AddressMapper(
-            JsonParser(TEST_TABLE),
-            prelude_glob_patterns=(),
-            build_file_imports_behavior=BuildFileImportsBehavior.error,
-        )
+        return AddressMapper(JsonParser(TEST_TABLE), prelude_glob_patterns=())
 
     def _snapshot(self) -> Snapshot:
         return Snapshot(Digest("xx", 2), ("root/BUILD",), ())
@@ -108,9 +99,8 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
         addresses = self._resolve_addresses(
             address_specs, address_family, snapshot, self._address_mapper()
         )
-
-        self.assertEqual(len(addresses.dependencies), 1)
-        self.assertEqual(addresses.dependencies[0].spec, "a:a")
+        assert len(addresses) == 1
+        assert addresses[0].spec == "a:a"
 
     def test_tag_filter(self) -> None:
         """Test that targets are filtered based on `tags`."""
@@ -127,9 +117,8 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
         targets = self._resolve_addresses(
             address_specs, address_family, self._snapshot(), self._address_mapper()
         )
-
-        self.assertEqual(len(targets.dependencies), 1)
-        self.assertEqual(targets.dependencies[0].spec, "root:b")
+        assert len(targets) == 1
+        assert targets[0].spec == "root:b"
 
     def test_fails_on_nonexistent_specs(self) -> None:
         """Test that address specs referring to nonexistent targets raise a ResolveError."""
@@ -168,9 +157,8 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
         targets = self._resolve_addresses(
             address_specs, address_family, self._snapshot(), self._address_mapper()
         )
-
-        self.assertEqual(len(targets.dependencies), 1)
-        self.assertEqual(targets.dependencies[0].spec, "root:not_me")
+        assert len(targets) == 1
+        assert targets[0].spec == "root:not_me"
 
     def test_exclude_pattern_with_single_address(self) -> None:
         """Test that single address targets are filtered based on exclude patterns."""
@@ -182,8 +170,7 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
         targets = self._resolve_addresses(
             address_specs, address_family, self._snapshot(), self._address_mapper()
         )
-
-        self.assertEqual(len(targets.dependencies), 0)
+        assert len(targets.dependencies) == 0
 
 
 class ApacheThriftConfiguration(StructWithDeps):
@@ -210,17 +197,12 @@ class ApacheThriftConfiguration(StructWithDeps):
 class PublishConfiguration(Struct):
     # An example of addressable and addressable_mapping field wrappers.
 
-    def __init__(self, default_repo, repos, name=None, **kwargs):
+    def __init__(self, default_repo, name=None, **kwargs):
         super().__init__(name=name, **kwargs)
         self.default_repo = default_repo
-        self.repos = repos
 
     @addressable(Exactly(Struct))
     def default_repo(self):
-        """"""
-
-    @addressable_dict(Exactly(Struct))
-    def repos(self):
         """"""
 
 
@@ -238,10 +220,7 @@ TEST_TABLE = SymbolTable(
 class GraphTestBase(unittest.TestCase, SchedulerTestBase):
     def create(self, build_patterns=None, parser=None) -> SchedulerSession:
         address_mapper = AddressMapper(
-            parser=parser,
-            prelude_glob_patterns=(),
-            build_file_imports_behavior=BuildFileImportsBehavior.error,
-            build_patterns=build_patterns,
+            parser=parser, prelude_glob_patterns=(), build_patterns=build_patterns
         )
 
         @rule
@@ -257,7 +236,7 @@ class GraphTestBase(unittest.TestCase, SchedulerTestBase):
 
     def _populate(
         self, scheduler: SchedulerSession, address: Address,
-    ) -> Tuple[HydratedStruct, State]:
+    ) -> Tuple[ExecutionRequest, State]:
         """Perform an ExecutionRequest to parse the given Address into a Struct."""
         request = scheduler.execution_request([HydratedStruct], [address])
         returns, throws = scheduler.execute(request)
@@ -302,16 +281,7 @@ class InlinedGraphTest(GraphTestBase):
         expected_java1 = Target(
             address=address("java1"),
             configurations=[
-                PublishConfiguration(
-                    type_alias="PublishConfig",
-                    default_repo=public,
-                    repos={
-                        "jake": Struct(
-                            type_alias="Struct", url="https://dl.bintray.com/pantsbuild/maven"
-                        ),
-                        "jane": public,
-                    },
-                ),
+                PublishConfiguration(type_alias="PublishConfig", default_repo=public),
                 nonstrict,
                 ApacheThriftConfiguration(
                     type_alias="ApacheThriftConfig",
@@ -361,9 +331,10 @@ class InlinedGraphTest(GraphTestBase):
         # Confirm that the root failed, and that a cycle occurred deeper in the graph.
         request, state = self._populate(scheduler, parsed_address)
         self.assertEqual(type(state), Throw)
-        trace_message = "\n".join(scheduler.trace(request))
+        with self.assertRaises(ExecutionError) as cm:
+            scheduler._raise_on_error([state])
+        trace_message = str(cm.exception)
 
-        self.assert_throws_are_leaves(trace_message, Throw.__name__)
         if expected_regex:
             print(trace_message)
             self.assertRegex(trace_message, expected_regex)
@@ -376,28 +347,6 @@ class InlinedGraphTest(GraphTestBase):
             parsed_address,
             f"(?ms)Dep graph contained a cycle:.*{cyclic_address_str}.* <-.*{cyclic_address_str}.* <-",
         )
-
-    def assert_throws_are_leaves(self, error_msg, throw_name) -> None:
-        def indent_of(s: str) -> int:
-            return len(s) - len(s.lstrip())
-
-        def assert_equal_or_more_indentation(
-            more_indented_line: str, less_indented_line: str
-        ) -> None:
-            self.assertTrue(
-                indent_of(more_indented_line) >= indent_of(less_indented_line),
-                '\n"{}"\nshould have more equal or more indentation than\n"{}"\n{}'.format(
-                    more_indented_line, less_indented_line, error_msg
-                ),
-            )
-
-        lines = error_msg.splitlines()
-        line_indices_of_throws = [i for i, v in enumerate(lines) if throw_name in v]
-        for idx in line_indices_of_throws:
-            # Make sure lines with Throw have more or equal indentation than its neighbors.
-            current_line = lines[idx]
-            line_above = lines[max(0, idx - 1)]
-            assert_equal_or_more_indentation(current_line, line_above)
 
     def test_cycle_self(self) -> None:
         self.do_test_cycle("graph_test:self_cycle", "graph_test:self_cycle")
@@ -441,10 +390,9 @@ class PreludeParsingTest(unittest.TestCase):
     def test_good_prelude(self) -> None:
         address_mapper = unittest.mock.Mock()
         address_mapper.prelude_glob_patterns = ("prelude",)
-        address_mapper.build_file_imports_behavior = BuildFileImportsBehavior.error
 
         symbols = run_rule(
-            evalute_preludes,
+            evaluate_preludes,
             rule_args=[address_mapper,],
             mock_gets=[
                 MockGet(
@@ -466,13 +414,12 @@ class PreludeParsingTest(unittest.TestCase):
     def test_syntax_error(self) -> None:
         address_mapper = unittest.mock.Mock()
         address_mapper.prelude_glob_patterns = ("prelude",)
-        address_mapper.build_file_imports_behavior = BuildFileImportsBehavior.error
 
         with self.assertRaisesRegex(
             Exception, "Error parsing prelude file /dev/null/prelude: name 'blah' is not defined"
         ):
             run_rule(
-                evalute_preludes,
+                evaluate_preludes,
                 rule_args=[address_mapper,],
                 mock_gets=[
                     MockGet(
@@ -501,13 +448,12 @@ class PreludeParsingTest(unittest.TestCase):
 
         address_mapper = unittest.mock.Mock()
         address_mapper.prelude_glob_patterns = ("prelude",)
-        address_mapper.build_file_imports_behavior = BuildFileImportsBehavior.error
 
         with self.assertRaisesRegex(
             Exception, "Import used in /dev/null/prelude at line 1\\. Import statements are banned"
         ):
             run_rule(
-                evalute_preludes,
+                evaluate_preludes,
                 rule_args=[address_mapper,],
                 mock_gets=[
                     MockGet(

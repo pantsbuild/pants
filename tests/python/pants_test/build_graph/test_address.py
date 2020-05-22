@@ -5,9 +5,7 @@ import os
 import unittest
 from contextlib import contextmanager
 
-from pants.base.build_file import BuildFile
 from pants.base.build_root import BuildRoot
-from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.build_graph.address import (
     Address,
     BuildFileAddress,
@@ -192,23 +190,7 @@ class AddressTest(BaseAddressTest):
         self.assert_address("a/b", "target", Address.parse(":target", relative_to="a/b"))
 
 
-class BuildFileAddressTest(BaseAddressTest):
-    def test_build_file_forms(self) -> None:
-        with self.workspace("a/b/c/BUILD") as root_dir:
-            build_file = BuildFile(FileSystemProjectTree(root_dir), relpath="a/b/c/BUILD")
-            self.assert_address("a/b/c", "c", BuildFileAddress(build_file=build_file))
-            self.assert_address(
-                "a/b/c", "foo", BuildFileAddress(build_file=build_file, target_name="foo")
-            )
-            self.assertEqual(
-                "a/b/c:foo", BuildFileAddress(build_file=build_file, target_name="foo").spec
-            )
-
-        with self.workspace("BUILD") as root_dir:
-            build_file = BuildFile(FileSystemProjectTree(root_dir), relpath="BUILD")
-            self.assert_address(
-                "", "foo", BuildFileAddress(build_file=build_file, target_name="foo")
-            )
-            self.assertEqual(
-                "//:foo", BuildFileAddress(build_file=build_file, target_name="foo").spec
-            )
+def test_build_file_address() -> None:
+    bfa = BuildFileAddress(rel_path="dir/BUILD", target_name="example")
+    assert bfa.spec == "dir:example"
+    assert bfa.to_address() == Address("dir", "example")

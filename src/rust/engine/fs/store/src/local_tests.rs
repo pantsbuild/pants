@@ -291,7 +291,7 @@ async fn garbage_collect_remove_file_with_leased_directory() {
   let store = new_store(dir.path());
 
   let testdir = TestDirectory::containing_roland();
-  let testdata = TestData::fourty_chars();
+  let testdata = TestData::forty_chars();
 
   store
     .store_bytes(EntryType::Directory, testdir.bytes(), true)
@@ -330,9 +330,9 @@ async fn garbage_collect_remove_file_while_leased_file() {
     .store_bytes(EntryType::Directory, testdir.bytes(), false)
     .await
     .expect("Error storing");
-  let fourty_chars = TestData::fourty_chars();
+  let forty_chars = TestData::forty_chars();
   store
-    .store_bytes(EntryType::File, fourty_chars.bytes(), true)
+    .store_bytes(EntryType::File, forty_chars.bytes(), true)
     .await
     .expect("Error storing");
 
@@ -341,8 +341,8 @@ async fn garbage_collect_remove_file_while_leased_file() {
     .expect("Error shrinking");
 
   assert_eq!(
-    load_bytes(&store, EntryType::File, fourty_chars.digest()).await,
-    Ok(Some(fourty_chars.bytes())),
+    load_bytes(&store, EntryType::File, forty_chars.digest()).await,
+    Ok(Some(forty_chars.bytes())),
     "File was missing despite lease"
   );
   assert_eq!(
@@ -358,14 +358,14 @@ async fn garbage_collect_fail_because_too_many_leases() {
   let store = new_store(dir.path());
 
   let testdir = TestDirectory::containing_roland();
-  let fourty_chars = TestData::fourty_chars();
+  let forty_chars = TestData::forty_chars();
 
   store
     .store_bytes(EntryType::Directory, testdir.bytes(), true)
     .await
     .expect("Error storing");
   store
-    .store_bytes(EntryType::File, fourty_chars.bytes(), true)
+    .store_bytes(EntryType::File, forty_chars.bytes(), true)
     .await
     .expect("Error storing");
 
@@ -377,8 +377,8 @@ async fn garbage_collect_fail_because_too_many_leases() {
   assert_eq!(store.shrink(80, ShrinkBehavior::Fast), Ok(160));
 
   assert_eq!(
-    load_bytes(&store, EntryType::File, fourty_chars.digest()).await,
-    Ok(Some(fourty_chars.bytes())),
+    load_bytes(&store, EntryType::File, forty_chars.digest()).await,
+    Ok(Some(forty_chars.bytes())),
     "Leased file should still be present"
   );
   assert_eq!(
@@ -486,7 +486,7 @@ async fn empty_file_is_known() {
   let empty_file = TestData::empty();
   assert_eq!(
     store
-      .load_bytes_with(EntryType::File, empty_file.digest(), |b| b)
+      .load_bytes_with(EntryType::File, empty_file.digest(), |b| Bytes::from(b))
       .await,
     Ok(Some(empty_file.bytes())),
   )
@@ -499,7 +499,7 @@ async fn empty_directory_is_known() {
   let empty_dir = TestDirectory::empty();
   assert_eq!(
     store
-      .load_bytes_with(EntryType::Directory, empty_dir.digest(), |b| b)
+      .load_bytes_with(EntryType::Directory, empty_dir.digest(), |b| Bytes::from(b))
       .await,
     Ok(Some(empty_dir.bytes())),
   )
@@ -533,7 +533,9 @@ pub async fn load_bytes(
   entry_type: EntryType,
   digest: Digest,
 ) -> Result<Option<Bytes>, String> {
-  store.load_bytes_with(entry_type, digest, |b| b).await
+  store
+    .load_bytes_with(entry_type, digest, |b| Bytes::from(b))
+    .await
 }
 
 async fn prime_store_with_file_bytes(store: &ByteStore, bytes: Bytes) -> Digest {

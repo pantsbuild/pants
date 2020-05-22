@@ -26,6 +26,7 @@
 #![allow(clippy::mutex_atomic)]
 
 use concrete_time::TimeSpan;
+pub use log::Level;
 use parking_lot::Mutex;
 use petgraph::graph::{DiGraph, NodeIndex};
 use rand::thread_rng;
@@ -43,26 +44,24 @@ pub type SpanId = String;
 type WorkunitGraph = DiGraph<SpanId, (), u32>;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct WorkUnit {
+pub struct Workunit {
   pub name: String,
-  pub time_span: TimeSpan,
   pub span_id: SpanId,
   pub parent_id: Option<String>,
+  pub state: WorkunitState,
   pub metadata: WorkunitMetadata,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct StartedWorkUnit {
-  pub name: String,
-  pub start_time: SystemTime,
-  pub span_id: SpanId,
-  pub parent_id: Option<String>,
-  pub metadata: WorkunitMetadata,
+pub enum WorkunitState {
+  Started { start_time: SystemTime },
+  Completed { time_span: TimeSpan },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct WorkunitMetadata {
   pub desc: Option<String>,
+  pub level: Level,
   pub display: bool,
   pub blocked: bool,
 }
@@ -71,45 +70,15 @@ impl WorkunitMetadata {
   pub fn new() -> WorkunitMetadata {
     WorkunitMetadata {
       display: true,
+      level: Level::Info,
       desc: None,
       blocked: false,
     }
   }
 }
 
-impl StartedWorkUnit {
-  fn finish(self) -> WorkUnit {
-    WorkUnit {
-      name: self.name,
-      time_span: TimeSpan::since(&self.start_time),
-      span_id: self.span_id,
-      parent_id: self.parent_id,
-      metadata: self.metadata,
-    }
-  }
-}
-
-impl WorkUnit {
-  pub fn new(name: String, time_span: TimeSpan, parent_id: Option<String>) -> WorkUnit {
-    let span_id = new_span_id();
-    WorkUnit {
-      name,
-      time_span,
-      span_id,
-      parent_id,
-      metadata: WorkunitMetadata::new(),
-    }
-  }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-enum WorkunitRecord {
-  Started(StartedWorkUnit),
-  Completed(WorkUnit),
-}
-
 #[derive(Clone, Default)]
-pub struct WorkUnitStore {
+pub struct WorkunitStore {
   inner: Arc<Mutex<WorkUnitInnerStore>>,
 }
 
@@ -117,28 +86,23 @@ pub struct WorkUnitStore {
 pub struct WorkUnitInnerStore {
   graph: WorkunitGraph,
   span_id_to_graph: HashMap<SpanId, NodeIndex<u32>>,
-  workunit_records: HashMap<SpanId, WorkunitRecord>,
+  workunit_records: HashMap<SpanId, Workunit>,
   started_ids: Vec<SpanId>,
   completed_ids: Vec<SpanId>,
   last_seen_started_idx: usize,
   last_seen_completed_idx: usize,
 }
 
-fn should_display_workunit(workunit_records: &HashMap<SpanId, WorkunitRecord>, id: &str) -> bool {
-  let record = match workunit_records.get(id) {
-    None => return false,
-    Some(record) => record,
-  };
-  let metadata = match record {
-    WorkunitRecord::Started(StartedWorkUnit { metadata, .. }) => metadata,
-    WorkunitRecord::Completed(WorkUnit { metadata, .. }) => metadata,
-  };
-  metadata.display
+fn should_display_workunit(workunit_records: &HashMap<SpanId, Workunit>, id: &str) -> bool {
+  match workunit_records.get(id) {
+    None => false,
+    Some(record) => record.metadata.display,
+  }
 }
 
-impl WorkUnitStore {
-  pub fn new() -> WorkUnitStore {
-    WorkUnitStore {
+impl WorkunitStore {
+  pub fn new() -> WorkunitStore {
+    WorkunitStore {
       inner: Arc::new(Mutex::new(WorkUnitInnerStore {
         graph: DiGraph::new(),
         span_id_to_graph: HashMap::new(),
@@ -158,7 +122,7 @@ impl WorkUnitStore {
     }))
   }
 
-  pub fn get_workunits(&self) -> Vec<WorkUnit> {
+  pub fn get_workunits(&self) -> Vec<Workunit> {
     let mut inner_guard = (*self.inner).lock();
     let inner_store: &mut WorkUnitInnerStore = &mut *inner_guard;
     let workunit_records = &inner_store.workunit_records;
@@ -166,9 +130,9 @@ impl WorkUnitStore {
       .completed_ids
       .iter()
       .flat_map(|id| workunit_records.get(id))
-      .flat_map(|record| match record {
-        WorkunitRecord::Started(_) => None,
-        WorkunitRecord::Completed(c) => Some(c.clone()),
+      .flat_map(|workunit| match workunit.state {
+        WorkunitState::Started { .. } => None,
+        WorkunitState::Completed { .. } => Some(workunit.clone()),
       })
       .collect()
   }
@@ -186,12 +150,16 @@ impl WorkUnitStore {
       edge_workunits
         .map(|entry| workunit_graph[entry].clone())
         .flat_map(|span_id: SpanId| {
-          let record = inner.workunit_records.get(&span_id);
-          match record {
-            Some(WorkunitRecord::Started(StartedWorkUnit { start_time, .. })) => now
+          let workunit: Option<&Workunit> = inner.workunit_records.get(&span_id);
+          match workunit {
+            Some(Workunit {
+              span_id,
+              state: WorkunitState::Started { start_time, .. },
+              ..
+            }) => now
               .duration_since(*start_time)
               .ok()
-              .map(|duration| (duration, span_id)),
+              .map(|duration| (duration, span_id.clone())),
             _ => None,
           }
         }),
@@ -199,21 +167,14 @@ impl WorkUnitStore {
 
     let mut res = HashMap::new();
     while let Some((dur, span_id)) = queue.pop() {
-      let record = inner.workunit_records.get(&span_id).unwrap();
-      let (name, blocked) = match record {
-        WorkunitRecord::Started(StartedWorkUnit {
-          name,
-          metadata: WorkunitMetadata { blocked, .. },
-          ..
-        }) => (name.clone(), *blocked),
-        WorkunitRecord::Completed(WorkUnit {
-          name,
-          metadata: WorkunitMetadata { blocked, .. },
-          ..
-        }) => (name.clone(), *blocked),
-      };
+      let workunit = inner.workunit_records.get(&span_id).unwrap();
+      let desc = workunit.metadata.desc.as_ref();
+      let blocked = workunit.metadata.blocked;
       let maybe_duration = if blocked { None } else { Some(dur) };
-      res.insert(name, maybe_duration);
+      if let Some(effective_name) = desc {
+        res.insert(effective_name.to_string(), maybe_duration);
+      }
+
       if res.len() >= k {
         break;
       }
@@ -228,17 +189,17 @@ impl WorkUnitStore {
     parent_id: Option<SpanId>,
     metadata: WorkunitMetadata,
   ) -> SpanId {
-    let started = StartedWorkUnit {
+    let started = Workunit {
       name,
       span_id: span_id.clone(),
       parent_id: parent_id.clone(),
-      start_time: std::time::SystemTime::now(),
+      state: WorkunitState::Started {
+        start_time: std::time::SystemTime::now(),
+      },
       metadata,
     };
     let mut inner = self.inner.lock();
-    inner
-      .workunit_records
-      .insert(span_id.clone(), WorkunitRecord::Started(started));
+    inner.workunit_records.insert(span_id.clone(), started);
     inner.started_ids.push(span_id.clone());
     let child = inner.graph.add_node(span_id.clone());
     inner
@@ -261,19 +222,20 @@ impl WorkUnitStore {
         "No previously-started workunit found for id: {}",
         span_id
       )),
-      Entry::Occupied(o) => match o.remove_entry() {
-        (span_id, WorkunitRecord::Started(started)) => {
-          let finished = started.finish();
-          inner
-            .workunit_records
-            .insert(span_id.clone(), WorkunitRecord::Completed(finished));
-          inner.completed_ids.push(span_id);
-          Ok(())
-        }
-        (span_id, WorkunitRecord::Completed(_)) => {
-          Err(format!("Workunit {} was already completed.", span_id))
-        }
-      },
+      Entry::Occupied(o) => {
+        let (span_id, mut workunit) = o.remove_entry();
+        let time_span = match workunit.state {
+          WorkunitState::Completed { .. } => {
+            return Err(format!("Workunit {} was already completed", span_id))
+          }
+          WorkunitState::Started { start_time } => TimeSpan::since(&start_time),
+        };
+        let new_state = WorkunitState::Completed { time_span };
+        workunit.state = new_state;
+        inner.workunit_records.insert(span_id.clone(), workunit);
+        inner.completed_ids.push(span_id);
+        Ok(())
+      }
     }
   }
 
@@ -286,13 +248,13 @@ impl WorkUnitStore {
   ) {
     let inner = &mut self.inner.lock();
     let span_id = new_span_id();
-    let workunit = WorkunitRecord::Completed(WorkUnit {
+    let workunit = Workunit {
       name,
-      time_span,
       span_id: span_id.clone(),
       parent_id,
+      state: WorkunitState::Completed { time_span },
       metadata,
-    });
+    };
 
     inner.workunit_records.insert(span_id.clone(), workunit);
     inner.completed_ids.push(span_id);
@@ -300,103 +262,65 @@ impl WorkUnitStore {
 
   pub fn with_latest_workunits<F, T>(&mut self, f: F) -> T
   where
-    F: FnOnce(&[StartedWorkUnit], &[WorkUnit]) -> T,
+    F: FnOnce(&[Workunit], &[Workunit]) -> T,
   {
     let mut inner_guard = (*self.inner).lock();
     let inner_store: &mut WorkUnitInnerStore = &mut *inner_guard;
-
     let workunit_records = &inner_store.workunit_records;
+
+    let compute_should_display = |workunit: Workunit| -> Workunit {
+      let mut parent_id: Option<SpanId> = workunit.parent_id;
+      loop {
+        if let Some(current_parent_id) = parent_id {
+          if should_display_workunit(workunit_records, &current_parent_id) {
+            return Workunit {
+              parent_id: Some(current_parent_id),
+              ..workunit
+            };
+          } else {
+            let new_parent_id: Option<SpanId> = workunit_records
+              .get(&current_parent_id.clone())
+              .and_then(|workunit| match &workunit.parent_id {
+                Some(id) => Some(id.clone()),
+                None => None,
+              });
+            parent_id = new_parent_id;
+          }
+        } else {
+          return Workunit {
+            parent_id: None,
+            ..workunit
+          };
+        }
+      }
+    };
 
     let cur_len = inner_store.started_ids.len();
     let latest: usize = inner_store.last_seen_started_idx;
-    let started_workunits: Vec<StartedWorkUnit> = inner_store.started_ids[latest..cur_len]
+    let started_workunits: Vec<Workunit> = inner_store.started_ids[latest..cur_len]
       .iter()
       .flat_map(|id| workunit_records.get(id))
-      .flat_map(|record| match record {
-        WorkunitRecord::Completed(_) => None,
-        WorkunitRecord::Started(StartedWorkUnit { metadata, .. }) if !metadata.display => None,
-        WorkunitRecord::Started(c) => Some(c.clone()),
+      .flat_map(|workunit| match workunit.state {
+        WorkunitState::Started { .. } if workunit.metadata.display => Some(workunit.clone()),
+        WorkunitState::Started { .. } => None,
+        WorkunitState::Completed { .. } => None,
       })
-      .map(|started: StartedWorkUnit| {
-        let mut parent_id: Option<SpanId> = started.parent_id;
-        loop {
-          if let Some(current_parent_id) = parent_id {
-            if should_display_workunit(workunit_records, &current_parent_id) {
-              return StartedWorkUnit {
-                parent_id: Some(current_parent_id),
-                ..started
-              };
-            } else {
-              let new_parent_id: Option<SpanId> = workunit_records
-                .get(&current_parent_id.clone())
-                .and_then(|record| match record {
-                  WorkunitRecord::Started(StartedWorkUnit {
-                    parent_id: Some(id),
-                    ..
-                  }) => Some(id.clone()),
-                  WorkunitRecord::Completed(WorkUnit {
-                    parent_id: Some(id),
-                    ..
-                  }) => Some(id.clone()),
-                  _ => None,
-                });
-              parent_id = new_parent_id;
-            }
-          } else {
-            return StartedWorkUnit {
-              parent_id: None,
-              ..started
-            };
-          }
-        }
-      })
+      .map(compute_should_display)
       .collect();
     inner_store.last_seen_started_idx = cur_len;
 
     let completed_ids = &inner_store.completed_ids;
     let cur_len = completed_ids.len();
     let latest: usize = inner_store.last_seen_completed_idx;
-    let completed_workunits: Vec<WorkUnit> = inner_store.completed_ids[latest..cur_len]
+    let completed_workunits: Vec<Workunit> = inner_store.completed_ids[latest..cur_len]
       .iter()
       .flat_map(|id| workunit_records.get(id))
-      .flat_map(|record| match record {
-        WorkunitRecord::Started(_) => None,
-        WorkunitRecord::Completed(WorkUnit { metadata, .. }) if !metadata.display => None,
-        WorkunitRecord::Completed(c) => Some(c.clone()),
+      .flat_map(|workunit| match workunit.state {
+        WorkunitState::Completed { .. } if workunit.metadata.display => Some(workunit.clone()),
+        WorkunitState::Completed { .. } => None,
+        WorkunitState::Started { .. } => None,
       })
-      .map(|workunit: WorkUnit| {
-        let mut parent_id: Option<SpanId> = workunit.parent_id;
-        loop {
-          if let Some(current_parent_id) = parent_id {
-            if should_display_workunit(workunit_records, &current_parent_id) {
-              return WorkUnit {
-                parent_id: Some(current_parent_id),
-                ..workunit
-              };
-            } else {
-              let new_parent_id: Option<SpanId> = workunit_records
-                .get(&current_parent_id.clone())
-                .and_then(|record| match record {
-                  WorkunitRecord::Started(StartedWorkUnit {
-                    parent_id: Some(id),
-                    ..
-                  }) => Some(id.clone()),
-                  WorkunitRecord::Completed(WorkUnit {
-                    parent_id: Some(id),
-                    ..
-                  }) => Some(id.clone()),
-                  _ => None,
-                });
-              parent_id = new_parent_id;
-            }
-          } else {
-            return WorkUnit {
-              parent_id: None,
-              ..workunit
-            };
-          }
-        }
-      })
+      .map(compute_should_display)
       .collect();
     inner_store.last_seen_completed_idx = cur_len;
 
@@ -419,7 +343,7 @@ fn hex_16_digit_string(number: u64) -> String {
 ///
 #[derive(Clone)]
 pub struct WorkUnitState {
-  pub store: WorkUnitStore,
+  pub store: WorkunitStore,
   pub parent_id: Option<String>,
 }
 
@@ -452,11 +376,11 @@ pub fn get_workunit_state() -> Option<WorkUnitState> {
 }
 
 pub fn expect_workunit_state() -> WorkUnitState {
-  get_workunit_state().expect("A WorkUnitStore has not been set for this thread.")
+  get_workunit_state().expect("A WorkunitStore has not been set for this thread.")
 }
 
 pub async fn with_workunit<F>(
-  workunit_store: WorkUnitStore,
+  workunit_store: WorkunitStore,
   name: String,
   metadata: WorkunitMetadata,
   f: F,

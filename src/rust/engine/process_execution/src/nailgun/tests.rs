@@ -54,7 +54,7 @@ async fn get_workdir_creates_directory_if_it_doesnt_exist() {
   let mock_workdir_base = unique_temp_dir(std::env::temp_dir(), None)
     .path()
     .to_owned();
-  let mock_nailgun_name = "mock_non_existing_workdir".to_string();
+  let mock_nailgun_name = "mock_nonexistent_workdir".to_string();
   let runner = mock_nailgun_runner(Some(mock_workdir_base.clone()));
 
   let target_workdir = mock_workdir_base.join(mock_nailgun_name.clone());

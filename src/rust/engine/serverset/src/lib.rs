@@ -25,16 +25,13 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use boxfuture::{BoxFuture, Boxable};
-use futures::future::{FutureExt, TryFutureExt};
-use futures01::{future, Future};
+use futures::future::{BoxFuture, FutureExt};
 use parking_lot::Mutex;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::time::delay_until;
 
-mod retry;
-pub use crate::retry::Retry;
+pub mod retry;
 
 ///
 /// A collection of resources which are observed to be healthy or unhealthy.
@@ -286,47 +283,46 @@ impl<T: Clone + Send + Sync + 'static> Serverset<T> {
   /// No efforts are currently made to avoid a thundering heard at few healthy servers (or the the
   /// first server to become healthy after all are unhealthy).
   ///
-  pub fn next(&self) -> BoxFuture<(T, HealthReportToken), String> {
-    let mut inner = self.inner.lock();
-
-    if inner.can_make_more_connections() {
-      // Find a healthy server without a connection, connect to it.
-      if let Some(ret) = inner.connect() {
-        return future::ok(ret).to_boxed();
-      }
-    }
-
-    if !inner.connections.is_empty() {
-      let next_connection = inner.next_connection;
-      inner.next_connection = inner.next_connection.wrapping_add(1);
-      let connection = &inner.connections[next_connection % inner.connections.len()];
-      return future::ok((
-        connection.connection.clone(),
-        HealthReportToken {
-          server_index: connection.server_index,
-        },
-      ))
-      .to_boxed();
-    }
-
-    // Unwrap is safe because _some_ server must have an unhealthy_info or we would've already
-    // returned it.
-    let instant = inner
-      .servers
-      .iter()
-      .filter_map(|server| server.unhealthy_info)
-      .map(|info| info.healthy_at())
-      .min()
-      .unwrap();
-
+  pub fn next(&self) -> BoxFuture<Result<(T, HealthReportToken), String>> {
     let serverset = self.clone();
-    delay_until(instant.into())
-      .unit_error()
-      .boxed()
-      .compat()
-      .map_err(|()| "Error delaying for serverset.".to_string())
-      .and_then(move |()| serverset.next())
-      .to_boxed()
+    async move {
+      let instant = {
+        let mut inner = serverset.inner.lock();
+
+        if inner.can_make_more_connections() {
+          // Find a healthy server without a connection, connect to it.
+          if let Some(ret) = inner.connect() {
+            return Ok(ret);
+          }
+        }
+
+        if !inner.connections.is_empty() {
+          let next_connection = inner.next_connection;
+          inner.next_connection = inner.next_connection.wrapping_add(1);
+          let connection = &inner.connections[next_connection % inner.connections.len()];
+          return Ok((
+            connection.connection.clone(),
+            HealthReportToken {
+              server_index: connection.server_index,
+            },
+          ));
+        }
+
+        // Unwrap is safe because _some_ server must have an unhealthy_info or we would've already
+        // returned it.
+        inner
+          .servers
+          .iter()
+          .filter_map(|server| server.unhealthy_info)
+          .map(|info| info.healthy_at())
+          .min()
+          .unwrap()
+      };
+
+      delay_until(instant.into()).await;
+      serverset.next().await
+    }
+    .boxed()
   }
 
   pub fn report_health(&self, token: HealthReportToken, health: Health) {

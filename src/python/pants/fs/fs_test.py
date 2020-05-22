@@ -94,7 +94,7 @@ class FileSystemTest(TestBase):
         output = workspace.materialize_directories((DirectoryToMaterialize(digest),))
 
         assert type(output) == MaterializeDirectoriesResult
-        materialize_result = output.dependencies[0]
+        materialize_result = output[0]
         assert type(materialize_result) == MaterializeDirectoryResult
         assert materialize_result.output_paths == tuple(
             str(Path(self.build_root, p)) for p in [path1, path2]

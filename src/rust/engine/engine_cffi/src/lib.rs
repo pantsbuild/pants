@@ -24,7 +24,7 @@
 #![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
-// We only use unsafe pointer derefrences in our no_mangle exposed API, but it is nicer to list
+// We only use unsafe pointer dereferences in our no_mangle exposed API, but it is nicer to list
 // just the one minor call as unsafe, than to mark the whole function as unsafe which may hide
 // other unsafeness.
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
@@ -34,15 +34,17 @@
 // The engine crate contains some C interop which we use, notably externs which are functions and
 // types from Python which we can read from our Rust. This particular wrapper crate is just for how
 // we expose ourselves back to Python.
-#![type_length_limit = "1744838"]
+#![type_length_limit = "2066838"]
 
 mod cffi_externs;
 
 use engine::externs::*;
 use engine::{
-  externs, nodes, Core, ExecutionRequest, ExecutionTermination, Function, Handle, Intrinsics, Key,
-  Params, RootResult, Rule, Scheduler, Session, Tasks, TypeId, Types, Value,
+  externs, nodes, Core, ExecutionRequest, ExecutionTermination, Failure, Function, Handle,
+  Intrinsics, Key, Params, Rule, Scheduler, Session, Tasks, TypeId, Types, Value,
 };
+
+use futures::future::FutureExt;
 use futures::future::{self as future03, TryFutureExt};
 use futures01::{future, Future};
 use hashing::{Digest, EMPTY_DIGEST};
@@ -57,27 +59,51 @@ use std::fs::File;
 use std::io;
 use std::mem;
 use std::os::raw;
+use std::os::unix::ffi::OsStrExt;
 use std::panic;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tempfile::TempDir;
-use workunit_store::{StartedWorkUnit, WorkUnit};
+use tokio;
+use workunit_store::{Workunit, WorkunitState};
 
 #[cfg(test)]
 mod tests;
 
+///
+/// A clone of ExecutionTermination with a "no error" case in order to handle the fact that
+/// cbindgen cannot handle Options.
+///
+#[repr(u8)]
+pub enum RawExecutionTermination {
+  KeyboardInterrupt,
+  Timeout,
+  NoError,
+}
+
+impl From<ExecutionTermination> for RawExecutionTermination {
+  fn from(et: ExecutionTermination) -> Self {
+    match et {
+      ExecutionTermination::KeyboardInterrupt => RawExecutionTermination::KeyboardInterrupt,
+      ExecutionTermination::Timeout => RawExecutionTermination::Timeout,
+    }
+  }
+}
+
 // TODO: Consider renaming and making generic for collections of PyResults.
 #[repr(C)]
 pub struct RawNodes {
+  err: RawExecutionTermination,
   nodes_ptr: *const PyResult,
   nodes_len: u64,
   nodes: Vec<PyResult>,
 }
 
 impl RawNodes {
-  fn create(node_states: Vec<RootResult>) -> Box<RawNodes> {
+  fn create(node_states: Vec<Result<Value, Failure>>) -> Box<RawNodes> {
     let nodes = node_states.into_iter().map(PyResult::from).collect();
     let mut raw_nodes = Box::new(RawNodes {
+      err: RawExecutionTermination::NoError,
       nodes_ptr: Vec::new().as_ptr(),
       nodes_len: 0,
       nodes: nodes,
@@ -86,6 +112,15 @@ impl RawNodes {
     raw_nodes.nodes_ptr = raw_nodes.nodes.as_ptr();
     raw_nodes.nodes_len = raw_nodes.nodes.len() as u64;
     raw_nodes
+  }
+
+  fn create_for_error(err: ExecutionTermination) -> Box<RawNodes> {
+    Box::new(RawNodes {
+      err: err.into(),
+      nodes_ptr: Vec::new().as_ptr(),
+      nodes_len: 0,
+      nodes: Vec::new(),
+    })
   }
 }
 
@@ -172,6 +207,104 @@ pub struct RawResult {
   raw_pointer: *const raw::c_void,
 }
 
+impl RawResult {
+  fn new<T>(res: Result<T, String>) -> RawResult {
+    match res {
+      Ok(t) => RawResult {
+        is_throw: false,
+        raw_pointer: Box::into_raw(Box::new(t)) as *const raw::c_void,
+        throw_handle: Handle(std::ptr::null()),
+      },
+      Err(err) => RawResult {
+        is_throw: true,
+        throw_handle: externs::create_exception(&err).into(),
+        raw_pointer: std::ptr::null(),
+      },
+    }
+  }
+}
+
+#[no_mangle]
+pub extern "C" fn nailgun_server_create(
+  scheduler_ptr: *mut Scheduler,
+  port: u16,
+  runner: Function,
+) -> RawResult {
+  with_scheduler(scheduler_ptr, |scheduler| {
+    let runner = externs::val_for(&runner.0);
+    let executor = scheduler.core.executor.clone();
+    let server_future =
+      nailgun::Server::new(executor, port, move |exe: nailgun::RawFdExecution| {
+        let command = externs::store_utf8(&exe.cmd.command);
+        let args = externs::store_tuple(&{
+          exe
+            .cmd
+            .args
+            .iter()
+            .map(|s| externs::store_utf8(s))
+            .collect::<Vec<_>>()
+        });
+        let env = externs::store_dict(&{
+          exe
+            .cmd
+            .env
+            .iter()
+            .map(|(k, v)| (externs::store_utf8(k), externs::store_utf8(v)))
+            .collect::<Vec<_>>()
+        });
+        let working_dir = externs::store_bytes(exe.cmd.working_dir.as_os_str().as_bytes());
+        let stdin_fd = externs::store_i64(exe.stdin_fd.into());
+        let stdout_fd = externs::store_i64(exe.stdout_fd.into());
+        let stderr_fd = externs::store_i64(exe.stderr_fd.into());
+        let runner_args = vec![
+          command,
+          args,
+          env,
+          working_dir,
+          stdin_fd,
+          stdout_fd,
+          stderr_fd,
+        ];
+        match externs::call(&runner, &runner_args) {
+          Ok(exit_code_val) => {
+            // TODO: We don't currently expose a "project_i32", but it will not be necessary with
+            // https://github.com/pantsbuild/pants/pull/9593.
+            nailgun::ExitCode(externs::val_to_str(&exit_code_val).parse().unwrap())
+          }
+          Err(e) => {
+            error!("Uncaught exception in nailgun handler: {:#?}", e);
+            nailgun::ExitCode(1)
+          }
+        }
+      });
+    RawResult::new(scheduler.core.executor.block_on(server_future))
+  })
+}
+
+#[no_mangle]
+pub extern "C" fn nailgun_server_await_bound(
+  scheduler_ptr: *mut Scheduler,
+  nailgun_server_ptr: *mut nailgun::Server,
+) -> PyResult {
+  with_scheduler(scheduler_ptr, |scheduler| {
+    with_nailgun_server(nailgun_server_ptr, |nailgun_server| {
+      scheduler
+        .core
+        .executor
+        .block_on(nailgun_server.await_bound())
+        .map(|port| externs::store_u64(port as u64))
+        .into()
+    })
+  })
+}
+
+#[no_mangle]
+pub extern "C" fn nailgun_server_destroy(nailgun_server_ptr: *mut nailgun::Server) {
+  let server = unsafe { Box::from_raw(nailgun_server_ptr) };
+  // NB: We do not wait for the server to have exited.
+  server.shutdown();
+}
+
 ///
 /// Given a set of Tasks and type information, creates a Scheduler.
 ///
@@ -184,6 +317,7 @@ pub extern "C" fn scheduler_create(
   types: Types,
   build_root_buf: Buffer,
   local_store_dir_buf: Buffer,
+  local_execution_root_dir_buf: Buffer,
   ignore_patterns_buf: BufferBuffer,
   use_gitignore: bool,
   root_type_ids: TypeIdBuffer,
@@ -208,13 +342,13 @@ pub extern "C" fn scheduler_create(
   process_execution_use_local_cache: bool,
   remote_execution_headers_buf: BufferBuffer,
   process_execution_local_enable_nailgun: bool,
-  experimental_fs_watcher: bool,
 ) -> RawResult {
-  match make_core(
+  let core_res = make_core(
     tasks_ptr,
     types,
     build_root_buf,
     local_store_dir_buf,
+    local_execution_root_dir_buf,
     ignore_patterns_buf,
     use_gitignore,
     root_type_ids,
@@ -239,19 +373,8 @@ pub extern "C" fn scheduler_create(
     process_execution_use_local_cache,
     remote_execution_headers_buf,
     process_execution_local_enable_nailgun,
-    experimental_fs_watcher,
-  ) {
-    Ok(core) => RawResult {
-      is_throw: false,
-      raw_pointer: Box::into_raw(Box::new(Scheduler::new(core))) as *const raw::c_void,
-      throw_handle: Handle(std::ptr::null()),
-    },
-    Err(err) => RawResult {
-      is_throw: true,
-      throw_handle: externs::create_exception(&err).into(),
-      raw_pointer: std::ptr::null(),
-    },
-  }
+  );
+  RawResult::new(core_res.map(Scheduler::new))
 }
 
 fn make_core(
@@ -259,6 +382,7 @@ fn make_core(
   types: Types,
   build_root_buf: Buffer,
   local_store_dir_buf: Buffer,
+  local_execution_root_dir_buf: Buffer,
   ignore_patterns_buf: BufferBuffer,
   use_gitignore: bool,
   root_type_ids: TypeIdBuffer,
@@ -283,7 +407,6 @@ fn make_core(
   process_execution_use_local_cache: bool,
   remote_execution_headers_buf: BufferBuffer,
   process_execution_local_enable_nailgun: bool,
-  experimental_fs_watcher: bool,
 ) -> Result<Core, String> {
   let root_type_ids = root_type_ids.to_vec();
   let ignore_patterns = ignore_patterns_buf
@@ -360,6 +483,7 @@ fn make_core(
     ignore_patterns,
     use_gitignore,
     PathBuf::from(local_store_dir_buf.to_os_string()),
+    PathBuf::from(local_execution_root_dir_buf.to_os_string()),
     remote_execution,
     remote_store_servers_vec,
     if remote_execution_server_string.is_empty() {
@@ -395,73 +519,16 @@ fn make_core(
     process_execution_use_local_cache,
     remote_execution_headers,
     process_execution_local_enable_nailgun,
-    experimental_fs_watcher,
   )
 }
 
-fn started_workunit_to_py_value(started_workunit: &StartedWorkUnit) -> Option<Value> {
+fn workunit_to_py_value(workunit: &Workunit) -> Option<Value> {
   use std::time::UNIX_EPOCH;
-  let duration = started_workunit
-    .start_time
-    .duration_since(UNIX_EPOCH)
-    .unwrap_or_else(|_| Duration::default());
-  let mut dict_entries = vec![
-    (
-      externs::store_utf8("name"),
-      externs::store_utf8(&started_workunit.name),
-    ),
-    (
-      externs::store_utf8("start_secs"),
-      externs::store_u64(duration.as_secs()),
-    ),
-    (
-      externs::store_utf8("start_nanos"),
-      externs::store_u64(duration.subsec_nanos() as u64),
-    ),
-    (
-      externs::store_utf8("span_id"),
-      externs::store_utf8(&started_workunit.span_id),
-    ),
-  ];
 
-  if let Some(parent_id) = &started_workunit.parent_id {
-    dict_entries.push((
-      externs::store_utf8("parent_id"),
-      externs::store_utf8(parent_id),
-    ));
-  }
-
-  if let Some(desc) = &started_workunit.metadata.desc.as_ref() {
-    dict_entries.push((
-      externs::store_utf8("description"),
-      externs::store_utf8(desc),
-    ));
-  }
-
-  Some(externs::store_dict(&dict_entries.as_slice()))
-}
-
-fn workunit_to_py_value(workunit: &WorkUnit) -> Option<Value> {
   let mut dict_entries = vec![
     (
       externs::store_utf8("name"),
       externs::store_utf8(&workunit.name),
-    ),
-    (
-      externs::store_utf8("start_secs"),
-      externs::store_u64(workunit.time_span.start.secs),
-    ),
-    (
-      externs::store_utf8("start_nanos"),
-      externs::store_u64(u64::from(workunit.time_span.start.nanos)),
-    ),
-    (
-      externs::store_utf8("duration_secs"),
-      externs::store_u64(workunit.time_span.duration.secs),
-    ),
-    (
-      externs::store_utf8("duration_nanos"),
-      externs::store_u64(u64::from(workunit.time_span.duration.nanos)),
     ),
     (
       externs::store_utf8("span_id"),
@@ -475,6 +542,44 @@ fn workunit_to_py_value(workunit: &WorkUnit) -> Option<Value> {
     ));
   }
 
+  match workunit.state {
+    WorkunitState::Started { start_time } => {
+      let duration = start_time
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_else(|_| Duration::default());
+      dict_entries.extend_from_slice(&[
+        (
+          externs::store_utf8("start_secs"),
+          externs::store_u64(duration.as_secs()),
+        ),
+        (
+          externs::store_utf8("start_nanos"),
+          externs::store_u64(duration.subsec_nanos() as u64),
+        ),
+      ])
+    }
+    WorkunitState::Completed { time_span } => {
+      dict_entries.extend_from_slice(&[
+        (
+          externs::store_utf8("start_secs"),
+          externs::store_u64(time_span.start.secs),
+        ),
+        (
+          externs::store_utf8("start_nanos"),
+          externs::store_u64(u64::from(time_span.start.nanos)),
+        ),
+        (
+          externs::store_utf8("duration_secs"),
+          externs::store_u64(time_span.duration.secs),
+        ),
+        (
+          externs::store_utf8("duration_nanos"),
+          externs::store_u64(u64::from(time_span.duration.nanos)),
+        ),
+      ]);
+    }
+  };
+
   if let Some(desc) = &workunit.metadata.desc.as_ref() {
     dict_entries.push((
       externs::store_utf8("description"),
@@ -485,18 +590,9 @@ fn workunit_to_py_value(workunit: &WorkUnit) -> Option<Value> {
   Some(externs::store_dict(&dict_entries.as_slice()))
 }
 
-fn workunits_to_py_tuple_value<'a>(workunits: impl Iterator<Item = &'a WorkUnit>) -> Value {
+fn workunits_to_py_tuple_value<'a>(workunits: impl Iterator<Item = &'a Workunit>) -> Value {
   let workunit_values = workunits
-    .flat_map(|workunit: &WorkUnit| workunit_to_py_value(workunit))
-    .collect::<Vec<_>>();
-  externs::store_tuple(&workunit_values)
-}
-
-fn started_workunits_to_py_tuple_value<'a>(
-  workunits: impl Iterator<Item = &'a StartedWorkUnit>,
-) -> Value {
-  let workunit_values = workunits
-    .flat_map(|started_workunit: &StartedWorkUnit| started_workunit_to_py_value(started_workunit))
+    .flat_map(|workunit: &Workunit| workunit_to_py_value(workunit))
     .collect::<Vec<_>>();
   externs::store_tuple(&workunit_values)
 }
@@ -512,7 +608,7 @@ pub extern "C" fn poll_session_workunits(
         .workunit_store()
         .with_latest_workunits(|started, completed| {
           let mut started_iter = started.iter();
-          let started = started_workunits_to_py_tuple_value(&mut started_iter);
+          let started = workunits_to_py_tuple_value(&mut started_iter);
 
           let mut completed_iter = completed.iter();
           let completed = workunits_to_py_tuple_value(&mut completed_iter);
@@ -564,10 +660,7 @@ pub extern "C" fn scheduler_execute(
         session.workunit_store().init_thread_state(None);
         match scheduler.execute(execution_request, session) {
           Ok(raw_results) => Box::into_raw(RawNodes::create(raw_results)),
-          //TODO: Passing a raw null pointer to Python is a less-than-ideal way
-          //of noting an error condition. When we have a better way to send complicated
-          //error-signaling values over the FFI boundary, we should revisit this.
-          Err(ExecutionTermination::KeyboardInterrupt) => std::ptr::null(),
+          Err(e) => Box::into_raw(RawNodes::create_for_error(e)),
         }
       })
     })
@@ -594,6 +687,33 @@ pub extern "C" fn execution_add_root_select(
         .and_then(|params| scheduler.add_root_select(execution_request, params, product))
         .into()
     })
+  })
+}
+
+#[no_mangle]
+pub extern "C" fn execution_set_poll(execution_request_ptr: *mut ExecutionRequest, poll: bool) {
+  with_execution_request(execution_request_ptr, |execution_request| {
+    execution_request.poll = poll;
+  })
+}
+
+#[no_mangle]
+pub extern "C" fn execution_set_poll_delay(
+  execution_request_ptr: *mut ExecutionRequest,
+  poll_delay_in_ms: u64,
+) {
+  with_execution_request(execution_request_ptr, |execution_request| {
+    execution_request.poll_delay = Some(Duration::from_millis(poll_delay_in_ms));
+  })
+}
+
+#[no_mangle]
+pub extern "C" fn execution_set_timeout(
+  execution_request_ptr: *mut ExecutionRequest,
+  timeout_in_ms: u64,
+) {
+  with_execution_request(execution_request_ptr, |execution_request| {
+    execution_request.timeout = Some(Duration::from_millis(timeout_in_ms));
   })
 }
 
@@ -674,8 +794,8 @@ pub extern "C" fn graph_invalidate_all_paths(scheduler_ptr: *mut Scheduler) -> u
 }
 
 #[no_mangle]
-pub extern "C" fn check_invalidation_watcher_liveness(scheduler_ptr: *mut Scheduler) -> bool {
-  with_scheduler(scheduler_ptr, |scheduler| scheduler.core.watcher.is_alive())
+pub extern "C" fn check_invalidation_watcher_liveness(scheduler_ptr: *mut Scheduler) -> PyResult {
+  with_scheduler(scheduler_ptr, |scheduler| scheduler.is_valid().into())
 }
 
 #[no_mangle]
@@ -730,28 +850,6 @@ pub extern "C" fn graph_visualize(
 }
 
 #[no_mangle]
-pub extern "C" fn graph_trace(
-  scheduler_ptr: *mut Scheduler,
-  session_ptr: *mut Session,
-  execution_request_ptr: *mut ExecutionRequest,
-  path_ptr: *const raw::c_char,
-) {
-  let path_str = unsafe { CStr::from_ptr(path_ptr).to_string_lossy().into_owned() };
-  let path = PathBuf::from(path_str);
-  with_scheduler(scheduler_ptr, |scheduler| {
-    with_session(session_ptr, |session| {
-      with_execution_request(execution_request_ptr, |execution_request| {
-        scheduler
-          .trace(session, execution_request, path.as_path())
-          .unwrap_or_else(|e| {
-            println!("Failed to write trace to {}: {:?}", path.display(), e);
-          });
-      });
-    });
-  });
-}
-
-#[no_mangle]
 pub extern "C" fn nodes_destroy(raw_nodes_ptr: *mut RawNodes) {
   let _ = unsafe { Box::from_raw(raw_nodes_ptr) };
 }
@@ -776,6 +874,11 @@ pub extern "C" fn session_create(
       should_report_workunits,
     )))
   })
+}
+
+#[no_mangle]
+pub extern "C" fn session_new_run_id(session_ptr: *mut Session) {
+  with_session(session_ptr, |session| session.new_run_id())
 }
 
 #[no_mangle]
@@ -1023,7 +1126,8 @@ pub extern "C" fn run_local_interactive_process(
 
   with_scheduler(scheduler_ptr, |scheduler| {
     with_session(session_ptr, |session| {
-      session.with_console_ui_disabled(|| {
+      let output: Result<Value, String> = block_in_place_and_wait(
+      session.with_console_ui_disabled(|| -> Result<Value, String> {
         let types = &scheduler.core.types;
         let construct_interactive_process_result = types.construct_interactive_process_result;
 
@@ -1041,8 +1145,8 @@ pub extern "C" fn run_local_interactive_process(
           Some(TempDir::new().map_err(|err| format!("Error creating tempdir: {}", err))?)
         };
 
-        let input_files_value = externs::project_ignoring_type(&value, "input_files");
-        let digest: Digest = nodes::lift_digest(&input_files_value)?;
+        let input_digest_value = externs::project_ignoring_type(&value, "input_digest");
+        let digest: Digest = nodes::lift_digest(&input_digest_value)?;
         if digest != EMPTY_DIGEST {
           if run_in_workspace {
             warn!("Local interactive process should not attempt to materialize files when run in workspace");
@@ -1052,10 +1156,12 @@ pub extern "C" fn run_local_interactive_process(
               None => unreachable!()
             };
 
-            scheduler.core.store().materialize_directory(
-              destination,
-              digest,
-            ).wait()?;
+            block_in_place_and_wait(
+              scheduler.core.store().materialize_directory(
+                destination,
+                digest,
+              )
+            )?;
           }
         }
 
@@ -1094,9 +1200,12 @@ pub extern "C" fn run_local_interactive_process(
         ));
         output
       })
+      .boxed_local()
+      .compat()
+      );
+      output.into()
     })
   })
-  .into()
 }
 
 #[no_mangle]
@@ -1134,54 +1243,55 @@ pub extern "C" fn materialize_directories(
       let construct_materialize_directories_results =
         types.construct_materialize_directories_results;
       let construct_materialize_directory_result = types.construct_materialize_directory_result;
-      future::join_all(
-        digests_and_path_prefixes
-          .into_iter()
-          .map(|(digest, path_prefix)| {
-            // NB: all DirectoryToMaterialize paths are validated in Python to be relative paths.
-            // Here, we join them with the build root.
-            let mut destination = PathBuf::new();
-            destination.push(scheduler.core.build_root.clone());
-            destination.push(path_prefix);
-            let metadata = scheduler
-              .core
-              .store()
-              .materialize_directory(destination.clone(), digest);
-            metadata.map(|m| (destination, m))
-          })
-          .collect::<Vec<_>>(),
+      block_in_place_and_wait(
+        future::join_all(
+          digests_and_path_prefixes
+            .into_iter()
+            .map(|(digest, path_prefix)| {
+              // NB: all DirectoryToMaterialize paths are validated in Python to be relative paths.
+              // Here, we join them with the build root.
+              let mut destination = PathBuf::new();
+              destination.push(scheduler.core.build_root.clone());
+              destination.push(path_prefix);
+              let metadata = scheduler
+                .core
+                .store()
+                .materialize_directory(destination.clone(), digest);
+              metadata.map(|m| (destination, m))
+            })
+            .collect::<Vec<_>>(),
+        )
+        .map(move |metadata_list| {
+          let entries: Vec<Value> = metadata_list
+            .iter()
+            .map(
+              |(output_dir, metadata): &(PathBuf, store::DirectoryMaterializeMetadata)| {
+                let path_list = metadata.to_path_list();
+                let path_values: Vec<Value> = path_list
+                  .into_iter()
+                  .map(|rel_path: String| {
+                    let mut path = PathBuf::new();
+                    path.push(output_dir);
+                    path.push(rel_path);
+                    externs::store_utf8(&path.to_string_lossy())
+                  })
+                  .collect();
+
+                externs::unsafe_call(
+                  &construct_materialize_directory_result,
+                  &[externs::store_tuple(&path_values)],
+                )
+              },
+            )
+            .collect();
+
+          let output: Value = externs::unsafe_call(
+            &construct_materialize_directories_results,
+            &[externs::store_tuple(&entries)],
+          );
+          output
+        }),
       )
-      .map(move |metadata_list| {
-        let entries: Vec<Value> = metadata_list
-          .iter()
-          .map(
-            |(output_dir, metadata): &(PathBuf, store::DirectoryMaterializeMetadata)| {
-              let path_list = metadata.to_path_list();
-              let path_values: Vec<Value> = path_list
-                .into_iter()
-                .map(|rel_path: String| {
-                  let mut path = PathBuf::new();
-                  path.push(output_dir);
-                  path.push(rel_path);
-                  externs::store_utf8(&path.to_string_lossy())
-                })
-                .collect();
-
-              externs::unsafe_call(
-                &construct_materialize_directory_result,
-                &[externs::store_tuple(&path_values)],
-              )
-            },
-          )
-          .collect();
-
-        let output: Value = externs::unsafe_call(
-          &construct_materialize_directories_results,
-          &[externs::store_tuple(&entries)],
-        );
-        output
-      })
-      .wait()
     })
   })
   .into()
@@ -1225,11 +1335,11 @@ pub extern "C" fn write_log(msg: *const raw::c_char, level: u64, target: *const 
 }
 
 #[no_mangle]
-pub extern "C" fn write_stdout(session_ptr: *mut Session, msg: *const raw::c_char) {
+pub extern "C" fn write_stdout(session_ptr: *mut Session, msg: *const raw::c_char) -> PyResult {
   with_session(session_ptr, |session| {
     let message_str = unsafe { CStr::from_ptr(msg).to_string_lossy() };
-    session.write_stdout(&message_str);
-  });
+    block_in_place_and_wait(session.write_stdout(&message_str).boxed_local().compat()).into()
+  })
 }
 
 #[no_mangle]
@@ -1261,8 +1371,20 @@ unsafe fn str_ptr_to_string(ptr: *const raw::c_char) -> String {
 }
 
 ///
-/// Scheduler and Session are intended to be shared between threads, and so their context
-/// methods provide immutable references. The remaining types are not intended to be shared
+/// Calling `wait()` in the context of a @goal_rule blocks a thread that is owned by the tokio
+/// runtime. To do that safely, we need to relinquish it.
+///   see https://github.com/pantsbuild/pants/issues/9476
+///
+/// TODO: The alternative to blocking the runtime would be to have the Python code `await` special
+/// methods for things like `materialize_directories` and etc.
+///
+fn block_in_place_and_wait<T, E>(f: impl Future<Item = T, Error = E>) -> Result<T, E> {
+  tokio::task::block_in_place(|| f.wait())
+}
+
+///
+/// Scheduler, Session, and nailgun::Server are intended to be shared between threads, and so their
+/// context methods provide immutable references. The remaining types are not intended to be shared
 /// between threads, so mutable access is provided.
 ///
 fn with_scheduler<F, T>(scheduler_ptr: *mut Scheduler, f: F) -> T
@@ -1285,6 +1407,19 @@ where
   let session = unsafe { Box::from_raw(session_ptr) };
   let t = f(&session);
   mem::forget(session);
+  t
+}
+
+///
+/// See `with_scheduler`.
+///
+fn with_nailgun_server<F, T>(nailgun_server_ptr: *mut nailgun::Server, f: F) -> T
+where
+  F: FnOnce(&nailgun::Server) -> T,
+{
+  let nailgun_server = unsafe { Box::from_raw(nailgun_server_ptr) };
+  let t = f(&nailgun_server);
+  mem::forget(nailgun_server);
   t
 }
 

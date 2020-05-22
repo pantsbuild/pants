@@ -57,7 +57,6 @@ from pants.engine.unions import UnionMembership
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.option.global_options import (
     DEFAULT_EXECUTION_OPTIONS,
-    BuildFileImportsBehavior,
     ExecutionOptions,
     GlobMatchErrorBehavior,
 )
@@ -179,12 +178,18 @@ class LegacyGraphScheduler:
     goal_map: Any
 
     def new_session(
-        self, zipkin_trace_v2, build_id, v2_ui=False, should_report_workunits=False
+        self,
+        zipkin_trace_v2,
+        build_id,
+        dynamic_ui: bool = False,
+        use_colors=True,
+        should_report_workunits=False,
     ) -> "LegacyGraphSession":
         session = self.scheduler.new_session(
-            zipkin_trace_v2, build_id, v2_ui, should_report_workunits
+            zipkin_trace_v2, build_id, dynamic_ui, should_report_workunits
         )
-        return LegacyGraphSession(session, self.build_file_aliases, self.goal_map)
+        console = Console(use_colors=use_colors, session=session if dynamic_ui else None,)
+        return LegacyGraphSession(session, console, self.build_file_aliases, self.goal_map)
 
 
 @dataclass(frozen=True)
@@ -192,6 +197,7 @@ class LegacyGraphSession:
     """A thin wrapper around a SchedulerSession configured with @rules for a symbol table."""
 
     scheduler_session: SchedulerSession
+    console: Console
     build_file_aliases: Any
     goal_map: Any
 
@@ -212,6 +218,8 @@ class LegacyGraphSession:
         options: Options,
         goals: Iterable[str],
         specs: Specs,
+        poll: bool = False,
+        poll_delay: Optional[float] = None,
     ) -> int:
         """Runs @goal_rules sequentially and interactively by requesting their implicit Goal
         products.
@@ -221,12 +229,6 @@ class LegacyGraphSession:
         :returns: An exit code.
         """
 
-        global_options = options.for_global_scope()
-
-        console = Console(
-            use_colors=global_options.colors,
-            session=self.scheduler_session if global_options.get("v2_ui") else None,
-        )
         workspace = Workspace(self.scheduler_session)
         interactive_runner = InteractiveRunner(self.scheduler_session)
 
@@ -242,13 +244,19 @@ class LegacyGraphSession:
             if not is_implemented:
                 continue
             params = Params(
-                specs.provided_specs, options_bootstrapper, console, workspace, interactive_runner,
+                specs.provided_specs,
+                options_bootstrapper,
+                self.console,
+                workspace,
+                interactive_runner,
             )
             logger.debug(f"requesting {goal_product} to satisfy execution of `{goal}` goal")
             try:
-                exit_code = self.scheduler_session.run_goal_rule(goal_product, params)
+                exit_code = self.scheduler_session.run_goal_rule(
+                    goal_product, params, poll=poll, poll_delay=poll_delay
+                )
             finally:
-                console.flush()
+                self.console.flush()
 
             if exit_code != PANTS_SUCCEEDED_EXIT_CODE:
                 return exit_code
@@ -307,8 +315,8 @@ class EngineInitializer:
             OptionsInitializer.compute_pants_ignore(build_root, bootstrap_options),
             use_gitignore,
             bootstrap_options.local_store_dir,
+            bootstrap_options.local_execution_root_dir,
             bootstrap_options.build_file_prelude_globs,
-            bootstrap_options.build_file_imports,
             options_bootstrapper,
             build_configuration,
             build_root=build_root,
@@ -327,9 +335,9 @@ class EngineInitializer:
     def setup_legacy_graph_extended(
         pants_ignore_patterns: List[str],
         use_gitignore: bool,
-        local_store_dir,
+        local_store_dir: str,
+        local_execution_root_dir: str,
         build_file_prelude_globs: Tuple[str, ...],
-        build_file_imports_behavior: BuildFileImportsBehavior,
         options_bootstrapper: OptionsBootstrapper,
         build_configuration: BuildConfiguration,
         build_root: Optional[str] = None,
@@ -344,9 +352,8 @@ class EngineInitializer:
         """Construct and return the components necessary for LegacyBuildGraph construction.
 
         :param local_store_dir: The directory to use for storing the engine's LMDB store in.
+        :param local_execution_root_dir: The directory to use for local execution sandboxes.
         :param build_file_prelude_globs: Globs to match files to be prepended to all BUILD files.
-        :param build_file_imports_behavior: How to behave if a BUILD file being parsed tries to use
-                                            import statements.
         :param build_root: A path to be used as the build root. If None, then default is used.
         :param native: An instance of the native-engine subsystem.
         :param options_bootstrapper: A `OptionsBootstrapper` object containing bootstrap options.
@@ -372,20 +379,17 @@ class EngineInitializer:
         build_file_aliases = build_configuration.registered_aliases()
         rules = build_configuration.rules()
 
-        registered_target_types = RegisteredTargetTypes.create(build_configuration.targets())
+        registered_target_types = RegisteredTargetTypes.create(build_configuration.target_types())
 
         symbol_table = _legacy_symbol_table(build_file_aliases, registered_target_types)
 
         execution_options = execution_options or DEFAULT_EXECUTION_OPTIONS
 
         # Register "literal" subjects required for these rules.
-        parser = LegacyPythonCallbacksParser(
-            symbol_table, build_file_aliases, build_file_imports_behavior
-        )
+        parser = LegacyPythonCallbacksParser(symbol_table, build_file_aliases)
         address_mapper = AddressMapper(
             parser=parser,
             prelude_glob_patterns=build_file_prelude_globs,
-            build_file_imports_behavior=build_file_imports_behavior,
             build_ignore_patterns=build_ignore_patterns,
             exclude_target_regexps=exclude_target_regexps,
             subproject_roots=subproject_roots,
@@ -451,6 +455,7 @@ class EngineInitializer:
             use_gitignore=use_gitignore,
             build_root=build_root,
             local_store_dir=local_store_dir,
+            local_execution_root_dir=local_execution_root_dir,
             rules=rules,
             union_rules=union_rules,
             execution_options=execution_options,

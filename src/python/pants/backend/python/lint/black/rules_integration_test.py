@@ -15,11 +15,11 @@ from pants.engine.fs import Digest, FileContent, InputFilesContent
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.engine.target import TargetWithOrigin
+from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option.util import create_options_bootstrapper
-from pants.testutil.test_base import TestBase
 
 
-class BlackIntegrationTest(TestBase):
+class BlackIntegrationTest(ExternalToolTestBase):
 
     good_source = FileContent(path="good.py", content=b'animal = "Koala"\n')
     bad_source = FileContent(path="bad.py", content=b'name=    "Anakin"\n')
@@ -57,13 +57,13 @@ class BlackIntegrationTest(TestBase):
         if passthrough_args:
             args.append(f"--black-args='{passthrough_args}'")
         if skip:
-            args.append(f"--black-skip")
+            args.append("--black-skip")
         options_bootstrapper = create_options_bootstrapper(args=args)
         field_sets = [BlackFieldSet.create(tgt) for tgt in targets]
         lint_result = self.request_single_product(
             LintResult, Params(BlackFieldSets(field_sets), options_bootstrapper)
         )
-        input_snapshot = self.request_single_product(
+        input_sources = self.request_single_product(
             SourceFiles,
             Params(
                 AllSourceFilesRequest(field_set.sources for field_set in field_sets),
@@ -73,7 +73,7 @@ class BlackIntegrationTest(TestBase):
         fmt_result = self.request_single_product(
             FmtResult,
             Params(
-                BlackFieldSets(field_sets, prior_formatter_result=input_snapshot),
+                BlackFieldSets(field_sets, prior_formatter_result=input_sources.snapshot),
                 options_bootstrapper,
             ),
         )

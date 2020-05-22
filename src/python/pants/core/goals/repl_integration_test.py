@@ -13,7 +13,7 @@ from pants.backend.python.subsystems import python_native_code, subprocess_envir
 from pants.backend.python.target_types import PythonLibrary
 from pants.core.goals.repl import Repl
 from pants.core.goals.repl import rules as repl_rules
-from pants.core.util_rules import strip_source_roots
+from pants.core.util_rules import archive, external_tool, strip_source_roots
 from pants.engine.interactive_runner import InteractiveRunner
 from pants.engine.rules import RootRule
 from pants.testutil.goal_rule_test_base import GoalRuleTestBase
@@ -30,6 +30,8 @@ class ReplTest(GoalRuleTestBase):
             *python_repl.rules(),
             *pex.rules(),
             *download_pex_bin.rules(),
+            *archive.rules(),
+            *external_tool.rules(),
             *importable_python_sources.rules(),
             *pex_from_targets.rules(),
             *python_native_code.rules(),

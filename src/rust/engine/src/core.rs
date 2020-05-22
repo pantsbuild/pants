@@ -287,25 +287,60 @@ pub enum Failure {
   /// A Node failed because a filesystem change invalidated it or its inputs.
   /// A root requestor should usually immediately retry their request.
   Invalidated,
-  /// A rule raised an exception.
-  Throw(Value, String),
+  /// An error was thrown.
+  Throw {
+    // A python exception value, which might have a python-level stacktrace
+    val: Value,
+    // A pre-formatted python exception traceback.
+    python_traceback: String,
+    // A stack of engine-side "frame" information generated from Nodes.
+    engine_traceback: Vec<String>,
+  },
+}
+
+impl Failure {
+  ///
+  /// Consumes this Failure to produce a new Failure with an additional engine_traceback entry.
+  ///
+  pub fn with_pushed_frame(self, frame: &impl fmt::Display) -> Failure {
+    match self {
+      Failure::Invalidated => Failure::Invalidated,
+      Failure::Throw {
+        val,
+        python_traceback,
+        mut engine_traceback,
+      } => {
+        engine_traceback.push(format!("{}", frame));
+        Failure::Throw {
+          val,
+          python_traceback,
+          engine_traceback,
+        }
+      }
+    }
+  }
 }
 
 impl fmt::Display for Failure {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     match self {
       Failure::Invalidated => write!(f, "Giving up on retrying due to changed files."),
-      Failure::Throw(exc, _) => write!(f, "{}", externs::val_to_str(exc)),
+      Failure::Throw { val, .. } => write!(f, "{}", externs::val_to_str(val)),
     }
   }
 }
 
-pub fn throw(msg: &str) -> Failure {
-  Failure::Throw(
-    externs::create_exception(msg),
-    format!(
-      "Traceback (no traceback):\n  <pants native internals>\nException: {}",
-      msg
-    ),
+pub fn native_python_traceback(msg: &str) -> String {
+  format!(
+    "Traceback (no traceback):\n  <pants native internals>\nException: {}",
+    msg
   )
+}
+
+pub fn throw(msg: &str) -> Failure {
+  Failure::Throw {
+    val: externs::create_exception(msg),
+    python_traceback: native_python_traceback(msg),
+    engine_traceback: Vec::new(),
+  }
 }

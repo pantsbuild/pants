@@ -7,7 +7,6 @@ from collections.abc import MutableSequence, MutableSet
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable, List, Optional, Sequence, Tuple, Union, cast
 
-from pants.base.deprecated import warn_or_error
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
 from pants.engine.fs import GlobExpansionConjunction, PathGlobs
@@ -47,37 +46,7 @@ class TargetAdaptor(StructWithDeps):
         refactor how deferred sources are implemented.
           see: https://github.com/pantsbuild/pants/issues/2997
         """
-        source = getattr(self, "source", None)
         sources = getattr(self, "sources", None)
-
-        if source is not None and sources is not None:
-            raise Target.IllegalArgument(
-                self.address.spec, "Cannot specify both source and sources attribute."
-            )
-
-        if source is not None:
-            if not isinstance(source, str):
-                raise Target.IllegalArgument(
-                    self.address.spec,
-                    f"source must be a str containing a path relative to the target, but got {source} of "
-                    f"type {type(source)}",
-                )
-            script_instructions = (
-                "curl -L -o convert_source_to_sources.py 'https://git.io/JvbN3' && chmod +x "
-                "convert_source_to_sources.py && ./convert_source_to_sources.py "
-                f"root_folder1/ root_folder2/"
-            )
-            warn_or_error(
-                deprecated_entity_description="using `source` instead of `sources` in a BUILD file",
-                removal_version="1.29.0.dev0",
-                hint=(
-                    f"Instead of `source={repr(source)}`, use `sources=[{repr(source)}]`. We "
-                    "recommend using our migration script to automate fixing your entire "
-                    f"repository by running `{script_instructions}`."
-                ),
-            )
-            sources = [source]
-
         # N.B. Here we check specifically for `sources is None`, as it's possible for sources
         # to be e.g. an explicit empty list (sources=[]).
         if sources is None:

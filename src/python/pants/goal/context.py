@@ -37,8 +37,6 @@ class Context:
     :API: public
     """
 
-    # TODO: Figure out a more structured way to construct and use context than this big flat
-    # repository of attributes?
     def __init__(
         self,
         options: Options,
@@ -47,7 +45,6 @@ class Context:
         requested_goals=None,
         target_base=None,
         build_graph=None,
-        build_file_parser=None,
         build_configuration=None,
         address_mapper=None,
         console_outstream=None,
@@ -65,7 +62,6 @@ class Context:
         self._targets_cache: Dict = dict()
         self.build_graph.add_invalidation_callback(self._clear_target_cache_handle)
 
-        self._build_file_parser = build_file_parser
         self.build_configuration = build_configuration
         self.address_mapper = address_mapper
         self.run_tracker = run_tracker
@@ -312,7 +308,6 @@ class Context:
             # method will go away entirely under the new engine. It's primarily used for injecting
             # synthetic codegen targets, and that isn't how codegen will work in the future.
         if not self.source_roots.find_by_path(rel_target_base):
-            # TODO: Set the lang and root category (source/test/thirdparty) based on the target type?
             self.source_roots.add_source_root(rel_target_base)
         if dependencies:
             dependencies = [dep.address for dep in dependencies]

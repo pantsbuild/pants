@@ -7,6 +7,7 @@ from pants.engine.addresses import Address, Addresses
 from pants.engine.rules import RootRule
 from pants.engine.target import (
     Dependencies,
+    DependenciesRequest,
     Target,
     Targets,
     TransitiveTarget,
@@ -42,8 +43,6 @@ class GraphTest(TestBase):
             address=Address.parse(":root"),
         )
 
-        # TODO: possibly figure out how to deduplicate this when developing utilities for testing
-        #  with the Target API.
         self.add_to_build_file(
             "",
             dedent(
@@ -58,9 +57,7 @@ class GraphTest(TestBase):
             ),
         )
 
-        direct_deps = self.request_single_product(
-            Targets, Addresses(root[Dependencies].value)  # type: ignore[arg-type]
-        )
+        direct_deps = self.request_single_product(Targets, DependenciesRequest(root[Dependencies]))
         assert direct_deps == Targets([d1, d2, d3])
 
         transitive_target = self.request_single_product(TransitiveTarget, WrappedTarget(root))

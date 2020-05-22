@@ -3,8 +3,6 @@ use bazel_protos::operations::Operation;
 use bazel_protos::remote_execution::ExecutedActionMetadata;
 use bytes::Bytes;
 use futures::compat::Future01CompatExt;
-use futures::future::{FutureExt, TryFutureExt};
-use futures01::{future, Future};
 use grpcio;
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use mock;
@@ -31,8 +29,8 @@ use std::ops::Sub;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tokio::runtime::Handle;
-use tokio::time::delay_for;
-use workunit_store::{WorkUnit, WorkUnitStore, WorkunitMetadata};
+use tokio::time::{delay_for, timeout};
+use workunit_store::{Workunit, WorkunitMetadata, WorkunitState, WorkunitStore};
 
 #[derive(Debug, PartialEq)]
 enum StdoutType {
@@ -795,12 +793,11 @@ async fn sends_headers() {
   )
   .unwrap();
   let context = Context {
-    workunit_store: WorkUnitStore::default(),
+    workunit_store: WorkunitStore::default(),
     build_id: String::from("marmosets"),
   };
   command_runner
     .run(execute_request, context)
-    .compat()
     .await
     .expect("Execution failed");
 
@@ -999,7 +996,6 @@ async fn ensure_inline_stdio_is_stored() {
   .unwrap();
   let result = cmd_runner
     .run(echo_roland_request(), Context::default())
-    .compat()
     .await
     .unwrap();
   assert_eq!(
@@ -1019,7 +1015,7 @@ async fn ensure_inline_stdio_is_stored() {
   {
     assert_eq!(
       local_store
-        .load_file_bytes_with(test_stdout.digest(), |v| v,)
+        .load_file_bytes_with(test_stdout.digest(), |v| Bytes::from(v))
         .await
         .unwrap()
         .unwrap()
@@ -1028,7 +1024,7 @@ async fn ensure_inline_stdio_is_stored() {
     );
     assert_eq!(
       local_store
-        .load_file_bytes_with(test_stderr.digest(), |v| v,)
+        .load_file_bytes_with(test_stderr.digest(), |v| Bytes::from(v))
         .await
         .unwrap()
         .unwrap()
@@ -1194,34 +1190,16 @@ async fn dropped_request_cancels() {
     Platform::Linux,
   );
 
-  let successful_mock_result = FallibleProcessResultWithPlatform {
-    stdout: as_bytes("foo-fast"),
-    stderr: as_bytes(""),
-    exit_code: 0,
-    output_directory: EMPTY_DIGEST,
-    execution_attempts: vec![],
-    platform: Platform::Linux,
-  };
-
+  // Give the command only 100 ms to run (although it needs a lot more than that).
   let run_future = command_runner.run(execute_request.into(), Context::default());
-  let faster_future = delay_for(Duration::from_secs(1))
-    .unit_error()
-    .compat()
-    .map_err(|()| "Error from timer.".to_string())
-    .map({
-      let successful_mock_result = successful_mock_result.clone();
-      |_| successful_mock_result
-    });
+  if let Ok(_) = timeout(Duration::from_millis(100), run_future).await {
+    panic!("Should have timed out.");
+  }
 
-  let result = run_future
-    .select(faster_future)
-    .map(|(result, _future)| result)
-    .map_err(|(err, _future)| err)
-    .compat()
-    .await
-    .unwrap();
-
-  assert_eq!(result.without_execution_attempts(), successful_mock_result);
+  // Wait a bit longer for the cancellation to have been sent to the server.
+  // TODO: Would be better to be able to await a notification from the server that "something"
+  // had happened.
+  delay_for(Duration::from_secs(3)).await;
 
   assert_cancellation_requests(&mock_server, vec![op_name.to_owned()]);
 }
@@ -1556,7 +1534,6 @@ async fn execute_missing_file_uploads_if_known() {
 
   let result = command_runner
     .run(cat_roland_request(), Context::default())
-    .compat()
     .await
     .unwrap();
   assert_eq!(
@@ -1664,7 +1641,7 @@ async fn execute_missing_file_uploads_if_known_status() {
   )
   .unwrap()
   .run(cat_roland_request(), Context::default())
-  .wait();
+  .await;
   assert_eq!(
     result,
     Ok(FallibleProcessResultWithPlatform {
@@ -1747,7 +1724,6 @@ async fn execute_missing_file_errors_if_unknown() {
 
   let error = runner
     .run(cat_roland_request(), Context::default())
-    .compat()
     .await
     .expect_err("Want error");
   assert_contains(&error, &format!("{}", missing_digest.0));
@@ -1996,7 +1972,6 @@ async fn wait_between_request_1_retry() {
     );
     command_runner
       .run(execute_request, Context::default())
-      .compat()
       .await
       .unwrap();
 
@@ -2054,7 +2029,6 @@ async fn wait_between_request_3_retry() {
     );
     command_runner
       .run(execute_request, Context::default())
-      .compat()
       .await
       .unwrap();
 
@@ -2260,11 +2234,11 @@ async fn extract_output_files_from_response_no_prefix() {
   )
 }
 
-fn workunits_with_constant_span_id(workunit_store: &mut WorkUnitStore) -> HashSet<WorkUnit> {
+fn workunits_with_constant_span_id(workunit_store: &mut WorkunitStore) -> HashSet<Workunit> {
   workunit_store.with_latest_workunits(|_, completed_workunits| {
     completed_workunits
       .iter()
-      .map(|workunit| WorkUnit {
+      .map(|workunit| Workunit {
         span_id: String::from("ignore"),
         ..workunit.clone()
       })
@@ -2274,7 +2248,7 @@ fn workunits_with_constant_span_id(workunit_store: &mut WorkUnitStore) -> HashSe
 
 #[tokio::test]
 async fn remote_workunits_are_stored() {
-  let mut workunit_store = WorkUnitStore::new();
+  let mut workunit_store = WorkunitStore::new();
   workunit_store.init_thread_state(None);
   let op_name = "gimme-foo".to_string();
   let testdata = TestData::roland();
@@ -2297,7 +2271,7 @@ async fn remote_workunits_are_stored() {
     Platform::Linux,
   );
 
-  future::lazy(move || {
+  futures01::future::lazy(move || {
     command_runner.extract_execute_response(
       OperationOrStatus::Operation(operation),
       &mut ExecutionHistory::default(),
@@ -2313,41 +2287,49 @@ async fn remote_workunits_are_stored() {
   use concrete_time::TimeSpan;
 
   let want_workunits = hashset! {
-    WorkUnit {
+    Workunit {
       name: String::from("remote execution action scheduling"),
-      time_span: TimeSpan {
+      state: WorkunitState::Completed {
+        time_span: TimeSpan {
           start: Duration::new(0, 0),
           duration: Duration::new(1, 0),
+        }
       },
       span_id: String::from("ignore"),
       parent_id: None,
       metadata: WorkunitMetadata::new(),
     },
-    WorkUnit {
+    Workunit {
       name: String::from("remote execution worker input fetching"),
-      time_span: TimeSpan {
+      state: WorkunitState::Completed {
+        time_span: TimeSpan {
           start: Duration::new(2, 0),
           duration: Duration::new(1, 0),
+        }
       },
       span_id: String::from("ignore"),
       parent_id: None,
       metadata: WorkunitMetadata::new(),
     },
-    WorkUnit {
+    Workunit {
       name: String::from("remote execution worker command executing"),
-      time_span: TimeSpan {
+      state: WorkunitState::Completed {
+        time_span: TimeSpan {
           start: Duration::new(4, 0),
           duration: Duration::new(1, 0),
+        }
       },
       span_id: String::from("ignore"),
       parent_id: None,
       metadata: WorkunitMetadata::new(),
     },
-    WorkUnit {
+    Workunit {
       name: String::from("remote execution worker output uploading"),
-      time_span: TimeSpan {
+      state: WorkunitState::Completed {
+        time_span: TimeSpan {
           start: Duration::new(6, 0),
           duration: Duration::new(1, 0),
+        }
       },
       span_id: String::from("ignore"),
       parent_id: None,
@@ -2556,10 +2538,7 @@ async fn run_command_remote(
     Duration::from_secs(0),
     Platform::Linux,
   );
-  command_runner
-    .run(request, Context::default())
-    .compat()
-    .await
+  command_runner.run(request, Context::default()).await
 }
 
 fn create_command_runner(

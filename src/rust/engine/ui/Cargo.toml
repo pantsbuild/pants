@@ -5,13 +5,15 @@ edition = "2018"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 
 [lib]
-path = "src/display.rs"
-
-[[bin]]
-name = "demo"
-path = "src/main.rs"
+path = "src/console_ui.rs"
 
 [dependencies]
-rand = "0.5.1"
-termion = "1.5.5"
-unicode-segmentation = "1.6.0"
+indicatif = "0.14.0"
+futures01 = { package = "futures", version = "0.1" }
+futures = { version = "0.3", features = ["compat"] }
+indexmap = "1.0.2"
+uuid = { version = "0.7", features = ["v4"] }
+logging = { path = "../logging" }
+task_executor = { path = "../task_executor" }
+workunit_store = { path = "../workunit_store" }
+num_cpus = "1.13.0"

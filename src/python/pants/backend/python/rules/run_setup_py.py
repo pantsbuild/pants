@@ -16,13 +16,7 @@ from pants.backend.python.rules.pex import (
     PexRequirements,
 )
 from pants.backend.python.rules.setuptools import Setuptools
-from pants.backend.python.rules.util import (
-    PackageDatum,
-    distutils_repr,
-    find_packages,
-    is_python2,
-    source_root_or_raise,
-)
+from pants.backend.python.rules.util import PackageDatum, distutils_repr, find_packages, is_python2
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.backend.python.target_types import (
     PythonEntryPoint,
@@ -62,6 +56,7 @@ from pants.engine.rules import SubsystemRule, goal_rule, named_rule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
     Dependencies,
+    DependenciesRequest,
     Sources,
     Target,
     Targets,
@@ -377,7 +372,7 @@ async def run_setup_py(
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> RunSetupPyResult:
     """Run a setup.py command on a single exported target."""
-    merged_input_files = await Get[Digest](
+    input_digest = await Get[Digest](
         MergeDigests((req.chroot.digest, setuptools_setup.requirements_pex.digest))
     )
     # The setuptools dist dir, created by it under the chroot (not to be confused with
@@ -388,7 +383,7 @@ async def run_setup_py(
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path="./setuptools.pex",
         pex_args=("setup.py", *req.args),
-        input_files=merged_input_files,
+        input_digest=input_digest,
         # setuptools commands that create dists write them to the distdir.
         # TODO: Could there be other useful files to capture?
         output_directories=(dist_dir,),
@@ -532,7 +527,7 @@ async def get_ancestor_init_py(
     source_dir_ancestors: Set[Tuple[str, str]] = set()  # Items are (src_root, path incl. src_root).
     for fp in sources.snapshot.files:
         source_dir_ancestor = os.path.dirname(fp)
-        source_root = source_root_or_raise(source_roots, fp)
+        source_root = source_roots.strict_find_by_path(fp).path
         # Do not allow the repository root to leak (i.e., '.' should not be a package in setup.py).
         while source_dir_ancestor != source_root:
             source_dir_ancestors.add((source_root, source_dir_ancestor))
@@ -592,13 +587,12 @@ async def get_requirements(
     #  true dependencies. Plus, in the specific realm of setup-py, since we must exclude indirect
     #  deps across exported target boundaries, it's not a big stretch to just insist that
     #  requirements must be direct deps.
-    direct_deps_addrs = sorted(
-        set(itertools.chain.from_iterable(tgt.get(Dependencies).value or () for tgt in owned_by_us))
+    direct_deps_tgts = await MultiGet(
+        Get[Targets](DependenciesRequest(tgt.get(Dependencies))) for tgt in owned_by_us
     )
-    direct_deps_tgts = await Get[Targets](Addresses(direct_deps_addrs))
     reqs = PexRequirements.create_from_requirement_fields(
         tgt[PythonRequirementsField]
-        for tgt in direct_deps_tgts
+        for tgt in itertools.chain.from_iterable(direct_deps_tgts)
         if tgt.has_field(PythonRequirementsField)
     )
     req_strs = list(reqs)
