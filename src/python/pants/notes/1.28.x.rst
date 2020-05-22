@@ -5,6 +5,11 @@ This document describes releases leading up to the ``1.28.x`` ``stable`` series.
 
 See https://pants.readme.io/docs/release-notes-1-28 for an overview of the changes in this release.
 
+1.28.0 (5/22/2020)
+------------------
+
+The first stable release in the ``1.28.x`` series, with no changes since the last release candidate!
+
 1.28.0rc2 (5/20/2020)
 ---------------------
 
