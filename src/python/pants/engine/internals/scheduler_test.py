@@ -319,7 +319,7 @@ class SchedulerWithNestedRaiseTest(TestBase):
         def create_cffi_exception():
             try:
                 raise Exception("test cffi exception")
-            except:  # noqa: T803
+            except Exception:
                 return Native.CFFIExternMethodRuntimeErrorInfo(*sys.exc_info()[0:3])
 
         # Test that CFFI extern method errors result in an ExecutionError, even if .execution_request()
