@@ -341,7 +341,7 @@ def linux_shard(
         setup["before_script"] = [AWS_GET_PANTS_PEX_COMMAND]
         setup["env"] = [
             f"BOOTSTRAPPED_PEX_KEY_SUFFIX=py{python_version.number}.linux",
-            "PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem",
+            "PANTS_REMOTE_CA_CERTS_PATH=/usr/share/gnupg/sks-keyservers.netCA.pem",
         ]
         setup = {**setup, **CACHE_PANTS_RUN}
         if python_version.is_py37:
