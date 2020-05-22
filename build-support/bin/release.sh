@@ -214,7 +214,7 @@ function build_pants_packages() {
   # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
   # shellcheck disable=SC2207
   packages=(
-    $(run_packages_script build_and_print "${version}")
+    $(run_packages_script build-and-print "${version}")
   ) || die "Failed to build packages at ${version}!"
   for package in "${packages[@]}"
   do

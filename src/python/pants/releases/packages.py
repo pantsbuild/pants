@@ -23,6 +23,11 @@ def banner(message: str) -> None:
     print(f"{COLOR_BLUE}[=== {message} ===]{COLOR_RESET}")
 
 
+# -----------------------------------------------------------------------------------------------
+# Pants package definitions
+# -----------------------------------------------------------------------------------------------
+
+
 @total_ordering
 class Package:
     def __init__(
@@ -82,12 +87,11 @@ def core_packages() -> Set[Package]:
     # set ext_modules, which together allows us to mark the abi tag. See https://docs.python.org/3/c-api/stable.html
     # for documentation and https://bitbucket.org/pypa/wheel/commits/1f63b534d74b00e8c2e8809f07914f6da4502490?at=default#Ldocs/index.rstT121
     # for how to mark the ABI through bdist_wheel.
-    bdist_wheel_flags = ("--py-limited-api", "cp36")
     return {
         Package(
             "pantsbuild.pants",
             "//src/python/pants:pants-packaged",
-            bdist_wheel_flags=bdist_wheel_flags,
+            bdist_wheel_flags=("--py-limited-api", "cp36"),
         ),
         Package("pantsbuild.pants.testutil", "//src/python/pants/testutil:testutil_wheel"),
     }
@@ -132,6 +136,11 @@ def contrib_packages() -> Set[Package]:
 
 def all_packages() -> Set[Package]:
     return core_packages().union(contrib_packages())
+
+
+# -----------------------------------------------------------------------------------------------
+# Script commands
+# -----------------------------------------------------------------------------------------------
 
 
 def build_and_print_packages(version: str) -> None:
@@ -221,47 +230,56 @@ def check_ownership(users, minimum_owner_count: int = 3) -> None:
         sys.exit(1)
 
 
-def _create_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser()
-    subparsers = parser.add_subparsers(dest="command")
-
-    parser_list = subparsers.add_parser("list")
-    parser_list.add_argument("--with-packages", action="store_true")
-
-    subparsers.add_parser("list-owners")
-    subparsers.add_parser("check-my-ownership")
-
-    parser_build_and_print = subparsers.add_parser("build_and_print")
-    parser_build_and_print.add_argument("version")
-    return parser
-
-
-args = _create_parser().parse_args()
-
-if args.command == "list":
-    if args.with_packages:
-        print(
-            "\n".join(
-                f"{package.name} {package.target} {' '.join(package.bdist_wheel_flags)}"
-                for package in sorted(all_packages())
-            )
+def list_packages(*, with_packages: bool) -> None:
+    entries = [
+        (
+            f"{package.name} {package.target} {' '.join(package.bdist_wheel_flags)}"
+            if with_packages
+            else package.name
         )
-    else:
-        print("\n".join(package.name for package in sorted(all_packages())))
-elif args.command == "list-owners":
+        for package in sorted(all_packages())
+    ]
+    print("\n".join(entries))
+
+
+def list_owners() -> None:
     for package in sorted(all_packages()):
         if not package.exists():
             print(
                 f"The {package.name} package is new!  There are no owners yet.", file=sys.stderr,
             )
             continue
-        print(f"Owners of {package.name}:")
-        for owner in sorted(package.owners()):
-            print(f"{owner}")
-elif args.command == "check-my-ownership":
-    me = get_pypi_config("server-login", "username")
-    check_ownership({me})
-elif args.command == "build_and_print":
-    build_and_print_packages(args.version)
-else:
-    raise argparse.ArgumentError(f"Didn't recognise arguments {args}")
+        formatted_owners = "\n".join(sorted(package.owners()))
+        print(f"Owners of {package.name}:{formatted_owners}")
+
+
+def create_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(dest="command")
+
+    subparsers.add_parser("list-owners")
+    subparsers.add_parser("check-my-ownership")
+
+    parser_list = subparsers.add_parser("list")
+    parser_list.add_argument("--with-packages", action="store_true")
+
+    parser_build_and_print = subparsers.add_parser("build-and-print")
+    parser_build_and_print.add_argument("version")
+    return parser
+
+
+def main() -> None:
+    args = create_parser().parse_args()
+    if args.command == "list":
+        list_packages(with_packages=args.with_packages)
+    if args.command == "list-owners":
+        list_owners()
+    if args.command == "check-my-ownership":
+        me = get_pypi_config("server-login", "username")
+        check_ownership({me})
+    if args.command == "build-and-print":
+        build_and_print_packages(args.version)
+
+
+if __name__ == "__main__":
+    main()
