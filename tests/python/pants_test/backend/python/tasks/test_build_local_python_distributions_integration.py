@@ -64,29 +64,15 @@ class BuildLocalPythonDistributionsIntegrationTest(PantsRunIntegrationTest):
         """Test that the current version of a python_dist() is resolved after modifying its
         sources."""
         hello_run = f"{self.hello_install_requires_dir}:main_with_no_conflict"
+        run_target = lambda: self.run_pants(command=["--quiet", "run", hello_run])
 
-        with self.mock_buildroot(
-            dirs_to_copy=[self.hello_install_requires_dir]
-        ) as buildroot, buildroot.pushd():
-            run_target = lambda: self.run_pants_with_workdir(
-                command=["--quiet", "run", hello_run],
-                workdir=os.path.join(buildroot.new_buildroot, ".pants.d"),
-                build_root=buildroot.new_buildroot,
-            )
+        unmodified_pants_run = run_target()
+        self.assert_success(unmodified_pants_run)
+        self._assert_nation_and_greeting(unmodified_pants_run.stdout_data)
 
-            unmodified_pants_run = run_target()
-            self.assert_success(unmodified_pants_run)
-            self._assert_nation_and_greeting(unmodified_pants_run.stdout_data)
-
-            # Modify one of the source files for this target so that the output is different.
-            py_source_file = os.path.join(self.hello_install_requires_dir, "hello_package/hello.py")
-            with open(py_source_file, "r") as f:
-                orig_contents = f.read()
-            # Replace hello! with hello?
-            modified_contents = re.sub("!", "?", orig_contents)
-            with open(py_source_file, "w") as f:
-                f.write(modified_contents)
-
+        # Modify one of the source files for this target so that the output is different.
+        py_source_file = os.path.join(self.hello_install_requires_dir, "hello_package/hello.py")
+        with self.with_overwritten_file_content(py_source_file, lambda c: re.sub(b"!", b"?", c)):
             modified_pants_run = run_target()
             self.assert_success(modified_pants_run)
             self._assert_nation_and_greeting(modified_pants_run.stdout_data, punctuation="?")

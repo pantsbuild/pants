@@ -1,7 +1,6 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import functools
 import glob
 import os
 import subprocess
@@ -53,31 +52,31 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
         test_pex = "dist/cache_fields.pex"
         zipsafe_target_tmpl = "python_binary(sources=['main.py'], zip_safe={})"
 
-        with self.caching_config() as config, self.mock_buildroot() as buildroot, buildroot.pushd():
-            build = functools.partial(
-                self.run_pants_with_workdir,
-                command=["binary", test_project],
-                workdir=os.path.join(buildroot.new_buildroot, ".pants.d"),
-                config=config,
-                build_root=buildroot.new_buildroot,
+        with self.caching_config() as config, self.temporary_workdir() as workdir, self.temporary_file_content(
+            test_src, b""
+        ):
+            build = lambda: self.run_pants_with_workdir(
+                command=["binary", test_project], config=config, workdir=workdir
             )
 
-            buildroot.write_file(test_src, "")
-
             # Create a pex from a simple python_binary target and assert it has zip_safe=True (default).
-            buildroot.write_file(test_build, "python_binary(sources=['main.py'])")
-            self.assert_success(build())
-            self.assert_pex_attribute(test_pex, "zip_safe", True)
+            with self.temporary_file_content(test_build, b"python_binary(sources=['main.py'])"):
+                self.assert_success(build())
+                self.assert_pex_attribute(test_pex, "zip_safe", True)
 
             # Simulate a user edit by adding zip_safe=False to the target and check the resulting pex.
-            buildroot.write_file(test_build, zipsafe_target_tmpl.format("False"))
-            self.assert_success(build())
-            self.assert_pex_attribute(test_pex, "zip_safe", False)
+            with self.temporary_file_content(
+                test_build, zipsafe_target_tmpl.format("False").encode()
+            ):
+                self.assert_success(build())
+                self.assert_pex_attribute(test_pex, "zip_safe", False)
 
             # Simulate a user edit by adding zip_safe=True to the target and check the resulting pex.
-            buildroot.write_file(test_build, zipsafe_target_tmpl.format("True"))
-            self.assert_success(build())
-            self.assert_pex_attribute(test_pex, "zip_safe", True)
+            with self.temporary_file_content(
+                test_build, zipsafe_target_tmpl.format("True").encode()
+            ):
+                self.assert_success(build())
+                self.assert_pex_attribute(test_pex, "zip_safe", True)
 
     def test_platform_defaults_to_config(self):
         self.platforms_test_impl(
@@ -133,7 +132,7 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
         def assertNotInAny(substring, collection):
             self.assertTrue(
                 all(substring not in d for d in collection),
-                f'Expected an entry matching "{substring}" in {collection}',
+                f'Expected no entries matching "{substring}" in {collection}',
             )
 
         test_project = "testprojects/src/python/cache_fields"
@@ -141,15 +140,11 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
         test_src = os.path.join(test_project, "main.py")
         test_pex = "dist/cache_fields.pex"
 
-        with self.caching_config() as config, self.mock_buildroot() as buildroot, buildroot.pushd():
+        with self.caching_config() as config, self.temporary_file_content(test_src, b""):
             config["python-setup"] = {"platforms": []}
 
-            buildroot.write_file(test_src, "")
-
-            buildroot.write_file(
-                test_build,
-                dedent(
-                    """
+            build_content = dedent(
+                """
                     python_binary(
                       sources=['main.py'],
                       dependencies=[':numpy'],
@@ -163,26 +158,22 @@ class PythonBinaryIntegrationTest(PantsRunIntegrationTest):
                     )
 
                     """.format(
-                        target_platforms="platforms = [{}],".format(
-                            ", ".join(["'{}'".format(p) for p in target_platforms])
-                        )
-                        if target_platforms is not None
-                        else "",
+                    target_platforms="platforms = [{}],".format(
+                        ", ".join(["'{}'".format(p) for p in target_platforms])
                     )
-                ),
+                    if target_platforms is not None
+                    else "",
+                )
             )
-            # When only the linux platform is requested,
-            # only linux wheels should end up in the pex.
-            if config_platforms is not None:
-                config["python-setup"]["platforms"] = config_platforms
-            result = self.run_pants_with_workdir(
-                command=["binary", test_project],
-                workdir=os.path.join(buildroot.new_buildroot, ".pants.d"),
-                config=config,
-                build_root=buildroot.new_buildroot,
-                tee_output=True,
-            )
-            self.assert_success(result)
+            with self.temporary_file_content(test_build, build_content.encode()):
+                # When only the linux platform is requested,
+                # only linux wheels should end up in the pex.
+                if config_platforms is not None:
+                    config["python-setup"]["platforms"] = config_platforms
+                result = self.run_pants(
+                    command=["binary", test_project], config=config, tee_output=True,
+                )
+                self.assert_success(result)
 
             with open_zip(test_pex) as z:
                 deps = p537_deps(z.namelist())
