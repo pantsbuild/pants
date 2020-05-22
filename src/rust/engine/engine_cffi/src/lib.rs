@@ -595,10 +595,8 @@ fn workunit_to_py_value(workunit: &Workunit) -> Option<Value> {
 
 fn workunits_to_py_tuple_value<'a>(
   workunits: impl Iterator<Item = &'a Workunit>,
-  max_log_verbosity: log::Level,
 ) -> Value {
   let workunit_values = workunits
-    .filter(|workunit| workunit.metadata.level <= max_log_verbosity)
     .flat_map(|workunit: &Workunit| workunit_to_py_value(workunit))
     .collect::<Vec<_>>();
   externs::store_tuple(&workunit_values)
@@ -626,12 +624,12 @@ pub extern "C" fn poll_session_workunits(
     with_session(session_ptr, |session| {
       let value = session
         .workunit_store()
-        .with_latest_workunits(|started, completed| {
+        .with_latest_workunits(max_log_verbosity, |started, completed| {
           let mut started_iter = started.iter();
-          let started = workunits_to_py_tuple_value(&mut started_iter, max_log_verbosity);
+          let started = workunits_to_py_tuple_value(&mut started_iter);
 
           let mut completed_iter = completed.iter();
-          let completed = workunits_to_py_tuple_value(&mut completed_iter, max_log_verbosity);
+          let completed = workunits_to_py_tuple_value(&mut completed_iter);
 
           externs::store_tuple(&[started, completed])
         });
@@ -659,7 +657,7 @@ pub extern "C" fn scheduler_metrics(
       if session.should_record_zipkin_spans() {
         let workunits = session.workunit_store().get_workunits();
         let mut iter = workunits.iter();
-        let value = workunits_to_py_tuple_value(&mut iter, log::Level::Info);
+        let value = workunits_to_py_tuple_value(&mut iter);
         values.push((externs::store_utf8("engine_workunits"), value));
       };
       externs::store_dict(values.as_slice()).into()

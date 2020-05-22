@@ -393,9 +393,8 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
         r3 = next(item for item in finished if item["name"] == "rule_three")
         r4 = next(item for item in finished if item["name"] == "rule_four")
 
-        # rule_one should have a parent ID that is not emitted because of its low log level
-        r1_parent_id = r1["parent_id"]
-        assert r1_parent_id not in {item["span_id"] for item in (r1, r2, r3, r4)}
+        # rule_one should have no parent_id because its actual parent workunit was filted based on level
+        assert r1.get("parent_id", None) is None
 
         assert r2["parent_id"] == r1["span_id"]
         assert r3["parent_id"] == r1["span_id"]
@@ -433,3 +432,6 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
         )
         assert select["name"] == "select"
         assert select["level"] == "DEBUG"
+
+        r1 = next(item for item in finished if item["name"] == "rule_one")
+        assert r1["parent_id"] == select["span_id"]

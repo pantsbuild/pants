@@ -251,13 +251,47 @@ impl WorkunitStore {
     inner.completed_ids.push(span_id);
   }
 
-  pub fn with_latest_workunits<F, T>(&mut self, f: F) -> T
+  pub fn with_latest_workunits<F, T>(&mut self, max_verbosity: log::Level, f: F) -> T
   where
     F: FnOnce(&[Workunit], &[Workunit]) -> T,
   {
+
     let mut inner_guard = (*self.inner).lock();
     let inner_store: &mut WorkUnitInnerStore = &mut *inner_guard;
     let workunit_records = &inner_store.workunit_records;
+
+    let should_emit = |workunit: &Workunit| -> bool { workunit.metadata.level <= max_verbosity };
+
+    let compute_adjusted_parent_id = |workunit: Workunit| -> Workunit {
+      let mut parent_id: Option<SpanId> = workunit.parent_id;
+      loop {
+        if let Some(current_parent_id) = parent_id {
+          let should_emit = match workunit_records.get(&current_parent_id) {
+              None => false,
+              Some(workunit) => should_emit(&workunit)
+          };
+          if should_emit {
+            return Workunit {
+              parent_id: Some(current_parent_id),
+              ..workunit
+            };
+          } else {
+            let new_parent_id: Option<SpanId> = workunit_records
+              .get(&current_parent_id.clone())
+              .and_then(|workunit| match &workunit.parent_id {
+                Some(id) => Some(id.clone()),
+                None => None,
+              });
+            parent_id = new_parent_id;
+          }
+        } else {
+          return Workunit {
+            parent_id: None,
+            ..workunit
+          };
+        }
+      }
+    };
 
     let cur_len = inner_store.started_ids.len();
     let latest: usize = inner_store.last_seen_started_idx;
@@ -265,9 +299,11 @@ impl WorkunitStore {
       .iter()
       .flat_map(|id| workunit_records.get(id))
       .flat_map(|workunit| match workunit.state {
-        WorkunitState::Started { .. } => Some(workunit.clone()),
+        WorkunitState::Started { .. } if should_emit(&workunit) => Some(workunit.clone()),
+        WorkunitState::Started { .. } => None,
         WorkunitState::Completed { .. } => None,
       })
+      .map(compute_adjusted_parent_id)
       .collect();
     inner_store.last_seen_started_idx = cur_len;
 
@@ -278,9 +314,11 @@ impl WorkunitStore {
       .iter()
       .flat_map(|id| workunit_records.get(id))
       .flat_map(|workunit| match workunit.state {
-        WorkunitState::Completed { .. } => Some(workunit.clone()),
+        WorkunitState::Completed { .. } if  should_emit(&workunit) => Some(workunit.clone()),
+        WorkunitState::Completed { .. } => None,
         WorkunitState::Started { .. } => None,
       })
+      .map(compute_adjusted_parent_id)
       .collect();
     inner_store.last_seen_completed_idx = cur_len;
 
