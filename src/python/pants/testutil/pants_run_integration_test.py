@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from operator import eq, ne
 from pathlib import Path
 from threading import Lock
-from typing import Any, Callable, List, Optional, Union
+from typing import Any, Callable, Iterator, List, Optional, Union
 
 from colors import strip_color
 
@@ -558,10 +558,12 @@ class PantsRunIntegrationTest(unittest.TestCase):
             os.rename(real_path, test_path)
 
     @contextmanager
-    def temporary_directory_literal(
-        self, path: Union[str, Path],
-    ):
-        """Temporarily create the given literal directory, which must not exist."""
+    def temporary_directory_literal(self, path: Union[str, Path],) -> Iterator[None]:
+        """Temporarily create the given literal directory under the buildroot.
+
+        The path being created must not already exist. Any parent directories will also be created
+        temporarily.
+        """
         path = os.path.realpath(path)
         assert path.startswith(
             os.path.realpath(get_buildroot())
@@ -581,7 +583,9 @@ class PantsRunIntegrationTest(unittest.TestCase):
                 os.rmdir(path)
 
     @contextmanager
-    def temporary_file_content(self, path: Union[str, Path], content, binary_mode=True):
+    def temporary_file_content(
+        self, path: Union[str, Path], content, binary_mode=True
+    ) -> Iterator[None]:
         """Temporarily write content to a file for the purpose of an integration test."""
         path = os.path.realpath(path)
         assert path.startswith(
@@ -607,7 +611,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
         self,
         file_path: Union[str, Path],
         temporary_content: Optional[Union[bytes, str, Callable[[bytes], bytes]]] = None,
-    ):
+    ) -> Iterator[None]:
         """A helper that resets a file after the method runs.
 
          It will read a file, save the content, maybe write temporary_content to it, yield, then write the
@@ -616,7 +620,6 @@ class PantsRunIntegrationTest(unittest.TestCase):
         :param file_path: Absolute path to the file to be reset after the method runs.
         :param temporary_content: Content to write to the file, or a function from current content
           to new temporary content.
-        :param :
         """
         with open(file_path, "rb") as f:
             file_original_content = f.read()

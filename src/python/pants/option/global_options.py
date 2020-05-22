@@ -490,8 +490,12 @@ class GlobalOptions(Subsystem):
             "--enable-pantsd",
             advanced=True,
             type=bool,
-            default=True,
-            help="Enables use of the pants daemon. (Beta)",
+            default=False,
+            help=(
+                "Enables use of the pants daemon (pantsd). pantsd can significantly improve "
+                "runtime performance by lowering per-run startup cost, and by caching filesystem "
+                "operations and @rule execution."
+            ),
         )
 
         # Whether or not to make necessary arrangements to have concurrent runs in pants.
