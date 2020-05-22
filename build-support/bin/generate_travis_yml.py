@@ -285,7 +285,7 @@ def _linux_before_install(
                 (
                     'wget -qO- "https://github.com/crazy-max/travis-wait-enhanced/releases/download'
                     '/v1.1.0/travis-wait-enhanced_1.1.0_linux_x86_64.tar.gz" | tar -zxvf - '
-                    'travis-wait-enhanced'
+                    "travis-wait-enhanced"
                 ),
                 "mv travis-wait-enhanced /home/travis/bin/",
             ]
