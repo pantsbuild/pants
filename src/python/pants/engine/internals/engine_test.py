@@ -395,7 +395,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
 
         # rule_one should have a parent ID that is not emitted because of its low log level
         r1_parent_id = r1["parent_id"]
-        assert r1_parent_id not in set(item["span_id"] for item in (r1, r2, r3, r4))
+        assert r1_parent_id not in {item["span_id"] for item in (r1, r2, r3, r4)}
 
         assert r2["parent_id"] == r1["span_id"]
         assert r3["parent_id"] == r1["span_id"]
@@ -403,8 +403,9 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
 
         assert r3["description"] == "Rule number 3"
         assert r4["description"] == "Rule number 4"
+        assert r4["level"] == "INFO"
 
-    def test_streaming_workunit_log_levels(self):
+    def test_streaming_workunit_log_levels(self) -> None:
         rules = [RootRule(Input), rule_one_function, rule_two, rule_three, rule_four]
         scheduler = self.mk_scheduler(
             rules, include_trace_on_error=False, should_report_workunits=True
@@ -431,3 +432,4 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
             if item["name"] not in {"rule_one", "rule_two", "rule_three", "rule_four"}
         )
         assert select["name"] == "select"
+        assert select["level"] == "DEBUG"

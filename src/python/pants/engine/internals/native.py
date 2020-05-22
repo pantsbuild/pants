@@ -827,7 +827,6 @@ class Native(metaclass=SingletonMetaclass):
             none = self.ffi.from_handle(context._handle).to_value(None)
             self.lib.externs_set(
                 context._handle,
-                logger.getEffectiveLevel(),
                 none,
                 self.ffi_lib.extern_call,
                 self.ffi_lib.extern_generator_send,

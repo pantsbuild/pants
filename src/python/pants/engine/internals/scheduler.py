@@ -308,7 +308,8 @@ class Scheduler:
     def _metrics(self, session):
         return self._from_value(self._native.lib.scheduler_metrics(self._scheduler, session))
 
-    def poll_workunits(self, session, max_verbosity: int) -> PolledWorkunits:
+    def poll_workunits(self, session, max_log_verbosity: LogLevel) -> PolledWorkunits:
+        max_verbosity = max_log_verbosity.level
         result: Tuple[Tuple[Workunit], Tuple[Workunit]] = self._from_value(
             self._native.lib.poll_session_workunits(self._scheduler, session, max_verbosity)
         )
@@ -435,8 +436,7 @@ class SchedulerSession:
         return self._session
 
     def poll_workunits(self, max_log_verbosity: LogLevel) -> PolledWorkunits:
-        max_verbosity = max_log_verbosity.level
-        return cast(PolledWorkunits, self._scheduler.poll_workunits(self._session, max_verbosity))
+        return cast(PolledWorkunits, self._scheduler.poll_workunits(self._session, max_log_verbosity))
 
     def graph_len(self):
         return self._scheduler.graph_len()

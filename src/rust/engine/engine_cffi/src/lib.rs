@@ -128,7 +128,6 @@ impl RawNodes {
 #[no_mangle]
 pub extern "C" fn externs_set(
   context: *const ExternContext,
-  log_level: u8,
   none: Handle,
   call: CallExtern,
   generator_send: GeneratorSendExtern,
@@ -158,7 +157,6 @@ pub extern "C" fn externs_set(
 ) {
   externs::set_externs(Externs {
     context,
-    log_level,
     none,
     call,
     generator_send,
@@ -535,6 +533,10 @@ fn workunit_to_py_value(workunit: &Workunit) -> Option<Value> {
       externs::store_utf8("span_id"),
       externs::store_utf8(&workunit.span_id),
     ),
+    (
+      externs::store_utf8("level"),
+      externs::store_utf8(&workunit.metadata.level.to_string()),
+    ),
   ];
   if let Some(parent_id) = &workunit.parent_id {
     dict_entries.push((
@@ -612,7 +614,7 @@ pub extern "C" fn poll_session_workunits(
   let max_log_verbosity: log::Level = match py_level {
     Ok(level) => level.into(),
     Err(e) => {
-      println!(
+      warn!(
         "Error setting streaming workunit log level: {}. Defaulting to 'Info'.",
         e
       );

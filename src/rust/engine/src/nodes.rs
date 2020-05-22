@@ -1025,7 +1025,7 @@ impl Node for NodeKey {
       let level = if higher_priority {
         Level::Info
       } else {
-        Level::Trace
+        Level::Debug
       };
       let name = self.workunit_name();
       let span_id = new_span_id();
