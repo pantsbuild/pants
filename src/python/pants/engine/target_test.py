@@ -1,9 +1,11 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import itertools
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
+from textwrap import dedent
 from typing import Any, ClassVar, Dict, Iterable, List, Optional, Tuple, Type
 
 import pytest
@@ -11,7 +13,15 @@ from typing_extensions import final
 
 from pants.base.specs import FilesystemLiteralSpec
 from pants.engine.addresses import Address, Addresses
-from pants.engine.fs import EMPTY_DIGEST, FileContent, InputFilesContent, PathGlobs, Snapshot
+from pants.engine.fs import (
+    EMPTY_DIGEST,
+    Digest,
+    FileContent,
+    FilesContent,
+    InputFilesContent,
+    PathGlobs,
+    Snapshot,
+)
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, Params
@@ -30,6 +40,8 @@ from pants.engine.target import (
     GenerateSourcesRequest,
     HydratedSources,
     HydrateSourcesRequest,
+    InferDependenciesRequest,
+    InferredDependencies,
     InjectDependenciesRequest,
     InjectedDependencies,
     InvalidFieldChoiceException,
@@ -1043,30 +1055,60 @@ class TestCodegen(TestBase):
 # -----------------------------------------------------------------------------------------------
 
 
-class FortranDependencies(Dependencies):
+class SmalltalkDependencies(Dependencies):
     pass
 
 
-class CustomFortranDependencies(FortranDependencies):
+class CustomSmalltalkDependencies(SmalltalkDependencies):
     pass
 
 
-class InjectFortranDependencies(InjectDependenciesRequest):
-    inject_for = FortranDependencies
+class InjectSmalltalkDependencies(InjectDependenciesRequest):
+    inject_for = SmalltalkDependencies
 
 
-class InjectCustomFortranDependencies(InjectDependenciesRequest):
-    inject_for = CustomFortranDependencies
+class InjectCustomSmalltalkDependencies(InjectDependenciesRequest):
+    inject_for = CustomSmalltalkDependencies
 
 
 @rule
-def inject_fortran_deps(_: InjectFortranDependencies) -> InjectedDependencies:
+def inject_smalltalk_deps(_: InjectSmalltalkDependencies) -> InjectedDependencies:
     return InjectedDependencies([Address.parse("//:injected")])
 
 
 @rule
-def inject_custom_fortran_deps(_: InjectCustomFortranDependencies) -> InjectedDependencies:
+def inject_custom_smalltalk_deps(_: InjectCustomSmalltalkDependencies) -> InjectedDependencies:
     return InjectedDependencies([Address.parse("//:custom_injected")])
+
+
+class SmalltalkSources(Sources):
+    pass
+
+
+# NB: We subclass to ensure that dependency inference works properly with subclasses.
+class SmalltalkLibrarySources(SmalltalkSources):
+    pass
+
+
+class SmalltalkLibrary(Target):
+    alias = "smalltalk"
+    core_fields = (Dependencies, SmalltalkLibrarySources)
+
+
+class InferSmalltalkDependencies(InferDependenciesRequest):
+    infer_from = SmalltalkSources
+
+
+@rule
+async def infer_smalltalk_dependencies(request: InferSmalltalkDependencies) -> InferredDependencies:
+    # To demo an inference rule, we simply treat each `sources` file to contain a list of
+    # addresses, one per line.
+    hydrated_sources = await Get[HydratedSources](HydrateSourcesRequest(request.sources_field))
+    file_contents = await Get[FilesContent](Digest, hydrated_sources.snapshot.digest)
+    all_lines = itertools.chain.from_iterable(
+        fc.content.decode().splitlines() for fc in file_contents
+    )
+    return InferredDependencies(Address.parse(line) for line in all_lines)
 
 
 class TestDependencies(TestBase):
@@ -1075,14 +1117,21 @@ class TestDependencies(TestBase):
         return (
             *super().rules(),
             RootRule(DependenciesRequest),
-            inject_fortran_deps,
-            inject_custom_fortran_deps,
-            UnionRule(InjectDependenciesRequest, InjectFortranDependencies),
-            UnionRule(InjectDependenciesRequest, InjectCustomFortranDependencies),
+            inject_smalltalk_deps,
+            inject_custom_smalltalk_deps,
+            infer_smalltalk_dependencies,
+            UnionRule(InjectDependenciesRequest, InjectSmalltalkDependencies),
+            UnionRule(InjectDependenciesRequest, InjectCustomSmalltalkDependencies),
+            UnionRule(InferDependenciesRequest, InferSmalltalkDependencies),
         )
 
+    @classmethod
+    def target_types(cls):
+        return [SmalltalkLibrary]
+
     def test_normal_resolution(self) -> None:
-        addr = Address.parse("src/fortran:lib")
+        self.add_to_build_file("src/smalltalk", "smalltalk()")
+        addr = Address.parse("src/smalltalk")
         deps = Addresses([Address.parse("//:dep1"), Address.parse("//:dep2")])
         deps_field = Dependencies(deps, address=addr)
         assert self.request_single_product(Addresses, DependenciesRequest(deps_field)) == deps
@@ -1094,6 +1143,8 @@ class TestDependencies(TestBase):
         ) == Addresses([])
 
     def test_dependency_injection(self) -> None:
+        self.add_to_build_file("", "smalltalk(name='target')")
+
         def assert_injected(deps_cls: Type[Dependencies], *, injected: List[str]) -> None:
             provided_addr = Address.parse("//:provided")
             deps_field = deps_cls([provided_addr], address=Address.parse("//:target"))
@@ -1103,5 +1154,30 @@ class TestDependencies(TestBase):
             )
 
         assert_injected(Dependencies, injected=[])
-        assert_injected(FortranDependencies, injected=["//:injected"])
-        assert_injected(CustomFortranDependencies, injected=["//:custom_injected", "//:injected"])
+        assert_injected(SmalltalkDependencies, injected=["//:injected"])
+        assert_injected(CustomSmalltalkDependencies, injected=["//:custom_injected", "//:injected"])
+
+    def test_dependency_inference(self) -> None:
+        self.add_to_build_file(
+            "",
+            dedent(
+                """\
+                smalltalk(name='inferred1')
+                smalltalk(name='inferred2')
+                smalltalk(name='inferred3')
+                smalltalk(name='provided')
+                """
+            ),
+        )
+        self.create_file("demo/f1.st", "//:inferred1\n//:inferred2\n")
+        self.create_file("demo/f2.st", "//:inferred3\n")
+        self.add_to_build_file("demo", "smalltalk(sources=['*.st'], dependencies=['//:provided'])")
+
+        deps_field = Dependencies([Address.parse("//:provided")], address=Address.parse("demo"))
+        result = self.request_single_product(Addresses, DependenciesRequest(deps_field))
+        assert result == Addresses(
+            sorted(
+                Address.parse(addr)
+                for addr in ["//:inferred1", "//:inferred2", "//:inferred3", "//:provided"]
+            )
+        )
