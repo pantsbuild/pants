@@ -146,7 +146,6 @@ class Options:
         help_request = splitter.help_request
 
         parser_hierarchy = ParserHierarchy(env, config, complete_known_scope_infos, option_tracker)
-        bootstrap_option_values = bootstrap_option_values
         known_scope_to_info = {s.scope: s for s in complete_known_scope_infos}
         return cls(
             goals=split_args.goals,
