@@ -436,7 +436,9 @@ class SchedulerSession:
         return self._session
 
     def poll_workunits(self, max_log_verbosity: LogLevel) -> PolledWorkunits:
-        return cast(PolledWorkunits, self._scheduler.poll_workunits(self._session, max_log_verbosity))
+        return cast(
+            PolledWorkunits, self._scheduler.poll_workunits(self._session, max_log_verbosity)
+        )
 
     def graph_len(self):
         return self._scheduler.graph_len()

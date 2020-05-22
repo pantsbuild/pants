@@ -593,9 +593,7 @@ fn workunit_to_py_value(workunit: &Workunit) -> Option<Value> {
   Some(externs::store_dict(&dict_entries.as_slice()))
 }
 
-fn workunits_to_py_tuple_value<'a>(
-  workunits: impl Iterator<Item = &'a Workunit>,
-) -> Value {
+fn workunits_to_py_tuple_value<'a>(workunits: impl Iterator<Item = &'a Workunit>) -> Value {
   let workunit_values = workunits
     .flat_map(|workunit: &Workunit| workunit_to_py_value(workunit))
     .collect::<Vec<_>>();
@@ -622,17 +620,18 @@ pub extern "C" fn poll_session_workunits(
 
   with_scheduler(scheduler_ptr, |_scheduler| {
     with_session(session_ptr, |session| {
-      let value = session
-        .workunit_store()
-        .with_latest_workunits(max_log_verbosity, |started, completed| {
-          let mut started_iter = started.iter();
-          let started = workunits_to_py_tuple_value(&mut started_iter);
+      let value =
+        session
+          .workunit_store()
+          .with_latest_workunits(max_log_verbosity, |started, completed| {
+            let mut started_iter = started.iter();
+            let started = workunits_to_py_tuple_value(&mut started_iter);
 
-          let mut completed_iter = completed.iter();
-          let completed = workunits_to_py_tuple_value(&mut completed_iter);
+            let mut completed_iter = completed.iter();
+            let completed = workunits_to_py_tuple_value(&mut completed_iter);
 
-          externs::store_tuple(&[started, completed])
-        });
+            externs::store_tuple(&[started, completed])
+          });
       value.into()
     })
   })

@@ -255,7 +255,6 @@ impl WorkunitStore {
   where
     F: FnOnce(&[Workunit], &[Workunit]) -> T,
   {
-
     let mut inner_guard = (*self.inner).lock();
     let inner_store: &mut WorkUnitInnerStore = &mut *inner_guard;
     let workunit_records = &inner_store.workunit_records;
@@ -267,8 +266,8 @@ impl WorkunitStore {
       loop {
         if let Some(current_parent_id) = parent_id {
           let should_emit = match workunit_records.get(&current_parent_id) {
-              None => false,
-              Some(workunit) => should_emit(&workunit)
+            None => false,
+            Some(workunit) => should_emit(&workunit),
           };
           if should_emit {
             return Workunit {
@@ -314,7 +313,7 @@ impl WorkunitStore {
       .iter()
       .flat_map(|id| workunit_records.get(id))
       .flat_map(|workunit| match workunit.state {
-        WorkunitState::Completed { .. } if  should_emit(&workunit) => Some(workunit.clone()),
+        WorkunitState::Completed { .. } if should_emit(&workunit) => Some(workunit.clone()),
         WorkunitState::Completed { .. } => None,
         WorkunitState::Started { .. } => None,
       })
