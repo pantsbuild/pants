@@ -12,7 +12,7 @@ custom plugins, or to contribute changes to Pants itself. In the following guide
 learn the workflow for making changes, get your editor set up, how to build and test Pants, and
 how to get your change committed.
 
-+ [[How to Contribute|https://pants.readme.io/docs/contribution-flow]]
++ [[How to Contribute|https://pants.readme.io/docs/contributor-overview]]
 + [[How to Ask|pants('src/docs:howto_ask')]]
 + [[Pants Developers Guide|pants('src/docs:howto_develop')]]
 + [[Developing a Task|pants('src/docs:dev_tasks')]]
