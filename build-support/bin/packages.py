@@ -9,7 +9,9 @@ import sys
 from collections import defaultdict
 from configparser import ConfigParser
 from functools import total_ordering
-from typing import Dict, Optional, Set, Tuple, cast
+from typing import Dict, List, NamedTuple, Optional, Set, Tuple, cast
+from urllib.parse import quote_plus
+from xml.etree import ElementTree
 
 import requests
 from bs4 import BeautifulSoup
@@ -130,6 +132,33 @@ def all_packages() -> Set[Package]:
 # -----------------------------------------------------------------------------------------------
 # Script utils
 # -----------------------------------------------------------------------------------------------
+
+
+class _Constants:
+    def __init__(self) -> None:
+        # self._head_sha = (
+        #     subprocess.run(
+        #         ["git", "rev-parse", "--verify", "HEAD"], stdout=subprocess.PIPE, check=True
+        #     )
+        #     .stdout.decode()
+        #     .strip()
+        # )
+        self._head_sha = "f2521cab6fb8bed3b8b12b479369280b2dee2c9f"
+
+    @property
+    def binary_base_url(self) -> str:
+        return "https://binaries.pantsbuild.org"
+
+    @property
+    def deploy_3rdparty_wheels_path(self) -> str:
+        return f"wheels/3rdparty/{self._head_sha}"
+
+    @property
+    def deploy_pants_wheel_path(self) -> str:
+        return f"wheels/pantsbuild.pants/{self._head_sha}"
+
+
+CONSTANTS = _Constants()
 
 
 def get_pypi_config(section: str, option: str) -> str:
@@ -305,6 +334,42 @@ def list_packages() -> None:
     print("\n".join(package.name for package in sorted(all_packages())))
 
 
+class PrebuiltWheel(NamedTuple):
+    path: str
+    url: str
+
+    @classmethod
+    def create(cls, path: str) -> "PrebuiltWheel":
+        return cls(path, quote_plus(path))
+
+    def format(self) -> str:
+        return f"{self.path}\t{self.url}"
+
+
+def determine_prebuilt_wheels() -> List[PrebuiltWheel]:
+    """List wheels as tab-separated tuples of filename and URL-encoded name."""
+
+    def determine_wheels(wheel_path: str) -> List[PrebuiltWheel]:
+        response = requests.get(f"{CONSTANTS.binary_base_url}/?prefix={wheel_path}")
+        xml_root = ElementTree.fromstring(response.text)
+        return [
+            PrebuiltWheel.create(key.text)  # type: ignore[arg-type]
+            for key in xml_root.findall(
+                path="s3:Contents/s3:Key",
+                namespaces={"s3": "http://s3.amazonaws.com/doc/2006-03-01/"},
+            )
+        ]
+
+    return [
+        *determine_wheels(CONSTANTS.deploy_pants_wheel_path),
+        *determine_wheels(CONSTANTS.deploy_3rdparty_wheels_path),
+    ]
+
+
+def list_prebuilt_wheels() -> None:
+    print("\n".join(wheel.format() for wheel in determine_prebuilt_wheels()))
+
+
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command")
@@ -312,6 +377,7 @@ def create_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("check-release-prereqs")
     subparsers.add_parser("list-owners")
     subparsers.add_parser("list-packages")
+    subparsers.add_parser("list-prebuilt-wheels")
 
     parser_build_and_print = subparsers.add_parser("build-and-print")
     parser_build_and_print.add_argument("version")
@@ -326,6 +392,8 @@ def main() -> None:
         list_owners()
     if args.command == "list-packages":
         list_packages()
+    if args.command == "list-prebuilt-wheels":
+        list_prebuilt_wheels()
     if args.command == "build-and-print":
         build_and_print_packages(args.version)
 
