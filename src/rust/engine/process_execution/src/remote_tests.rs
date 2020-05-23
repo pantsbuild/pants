@@ -2235,7 +2235,7 @@ async fn extract_output_files_from_response_no_prefix() {
 }
 
 fn workunits_with_constant_span_id(workunit_store: &mut WorkunitStore) -> HashSet<Workunit> {
-  workunit_store.with_latest_workunits(|_, completed_workunits| {
+  workunit_store.with_latest_workunits(log::Level::Trace, |_, completed_workunits| {
     completed_workunits
       .iter()
       .map(|workunit| Workunit {

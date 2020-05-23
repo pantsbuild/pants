@@ -134,11 +134,18 @@ REQUIREMENTS_3RDPARTY_FILES=(
 # internal backend packages and their dependencies which it doesn't have,
 # and it'll fail. To solve that problem, we load the internal backend package
 # dependencies into the pantsbuild.pants venv.
+#
+# TODO: Starting and stopping pantsd repeatedly here works fine, but because the
+# created venvs are located within the buildroot, pantsd will fingerprint them on
+# startup. Production usecases should generally not experience this cost, because
+# either pexes or venvs (as created by the `pants` script that we distribute) are
+# created outside of the buildroot.
 function execute_packaged_pants_with_internal_backends() {
   pip install --ignore-installed \
     -r pants-plugins/3rdparty/python/requirements.txt &> /dev/null && \
   pants \
     --no-verify-config \
+    --no-enable-pantsd \
     --pythonpath="['pants-plugins/src/python']" \
     --backend-packages="[\
         'pants.backend.codegen',\

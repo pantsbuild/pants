@@ -1020,8 +1020,12 @@ impl Node for NodeKey {
 
     let (started_workunit_id, user_facing_name) = {
       let user_facing_name = self.user_facing_name();
-      let display = context.session.should_handle_workunits()
-        && (user_facing_name.is_some() || self.display_info().is_some());
+      let higher_priority = context.session.should_handle_workunits() && user_facing_name.is_some();
+      let level = if higher_priority {
+        Level::Info
+      } else {
+        Level::Debug
+      };
       let name = self.workunit_name();
       let span_id = new_span_id();
 
@@ -1029,8 +1033,7 @@ impl Node for NodeKey {
       let parent_id = std::mem::replace(&mut workunit_state.parent_id, Some(span_id.clone()));
       let metadata = WorkunitMetadata {
         desc: user_facing_name.clone(),
-        level: Level::Info,
-        display,
+        level,
         blocked: false,
       };
 

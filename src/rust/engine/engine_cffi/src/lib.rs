@@ -48,12 +48,13 @@ use futures::future::FutureExt;
 use futures::future::{self as future03, TryFutureExt};
 use futures01::{future, Future};
 use hashing::{Digest, EMPTY_DIGEST};
-use log::{error, warn, Log};
+use log::{self, error, warn, Log};
 use logging::logger::LOGGER;
-use logging::{Destination, Logger};
+use logging::{Destination, Logger, PythonLogLevel};
 use rule_graph::RuleGraph;
 use std::any::Any;
 use std::borrow::Borrow;
+use std::convert::TryInto;
 use std::ffi::CStr;
 use std::fs::File;
 use std::io;
@@ -127,7 +128,6 @@ impl RawNodes {
 #[no_mangle]
 pub extern "C" fn externs_set(
   context: *const ExternContext,
-  log_level: u8,
   none: Handle,
   call: CallExtern,
   generator_send: GeneratorSendExtern,
@@ -157,7 +157,6 @@ pub extern "C" fn externs_set(
 ) {
   externs::set_externs(Externs {
     context,
-    log_level,
     none,
     call,
     generator_send,
@@ -534,6 +533,10 @@ fn workunit_to_py_value(workunit: &Workunit) -> Option<Value> {
       externs::store_utf8("span_id"),
       externs::store_utf8(&workunit.span_id),
     ),
+    (
+      externs::store_utf8("level"),
+      externs::store_utf8(&workunit.metadata.level.to_string()),
+    ),
   ];
   if let Some(parent_id) = &workunit.parent_id {
     dict_entries.push((
@@ -601,20 +604,34 @@ fn workunits_to_py_tuple_value<'a>(workunits: impl Iterator<Item = &'a Workunit>
 pub extern "C" fn poll_session_workunits(
   scheduler_ptr: *mut Scheduler,
   session_ptr: *mut Session,
+  max_log_verbosity_level: u64,
 ) -> Handle {
+  let py_level: Result<PythonLogLevel, _> = max_log_verbosity_level.try_into();
+  let max_log_verbosity: log::Level = match py_level {
+    Ok(level) => level.into(),
+    Err(e) => {
+      warn!(
+        "Error setting streaming workunit log level: {}. Defaulting to 'Info'.",
+        e
+      );
+      log::Level::Info
+    }
+  };
+
   with_scheduler(scheduler_ptr, |_scheduler| {
     with_session(session_ptr, |session| {
-      let value = session
-        .workunit_store()
-        .with_latest_workunits(|started, completed| {
-          let mut started_iter = started.iter();
-          let started = workunits_to_py_tuple_value(&mut started_iter);
+      let value =
+        session
+          .workunit_store()
+          .with_latest_workunits(max_log_verbosity, |started, completed| {
+            let mut started_iter = started.iter();
+            let started = workunits_to_py_tuple_value(&mut started_iter);
 
-          let mut completed_iter = completed.iter();
-          let completed = workunits_to_py_tuple_value(&mut completed_iter);
+            let mut completed_iter = completed.iter();
+            let completed = workunits_to_py_tuple_value(&mut completed_iter);
 
-          externs::store_tuple(&[started, completed])
-        });
+            externs::store_tuple(&[started, completed])
+          });
       value.into()
     })
   })

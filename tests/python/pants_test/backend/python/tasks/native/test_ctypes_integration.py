@@ -15,7 +15,7 @@ from pants.option.scope import GLOBAL_SCOPE_CONFIG_SECTION
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import is_executable, read_file, safe_file_dump
+from pants.util.dirutil import is_executable
 from pants.util.enums import match
 from pants_test.backend.python.tasks.util.wheel import name_and_platform
 
@@ -129,22 +129,13 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
 
     @_toolchain_variants
     def test_ctypes_native_language_interop(self, toolchain_variant):
-        # TODO: consider making this mock_buildroot/run_pants_with_workdir into a
-        # PantsRunIntegrationTest method!
-        with self.mock_buildroot(
-            dirs_to_copy=[self._binary_interop_target_dir]
-        ) as buildroot, buildroot.pushd():
-
-            # Replace strict_deps=False with nothing so we can override it (because target values for this
-            # option take precedence over subsystem options).
-            orig_wrapped_math_build = read_file(self._wrapped_math_build_file)
-            without_strict_deps_wrapped_math_build = re.sub(
-                "strict_deps=False,", "", orig_wrapped_math_build
-            )
-            safe_file_dump(self._wrapped_math_build_file, without_strict_deps_wrapped_math_build)
-
+        # Replace strict_deps=False with nothing so we can override it (because target values for this
+        # option take precedence over subsystem options).
+        with self.with_overwritten_file_content(
+            self._wrapped_math_build_file, lambda c: re.sub(b"strict_deps=False,", b"", c)
+        ):
             # This should fail because it does not turn on strict_deps for a target which requires it.
-            pants_binary_strict_deps_failure = self.run_pants_with_workdir(
+            pants_binary_strict_deps_failure = self.run_pants(
                 command=["binary", self._binary_target_with_interop],
                 # Explicitly set to True (although this is the default).
                 config={
@@ -152,7 +143,6 @@ class CTypesIntegrationTest(PantsRunIntegrationTest):
                     # TODO(#6848): don't make it possible to forget to add the toolchain_variant option!
                     "native-build-settings": {"strict_deps": True},
                 },
-                workdir=os.path.join(buildroot.new_buildroot, ".pants.d"),
             )
             self.assert_failure(pants_binary_strict_deps_failure)
             self.assertIn(
