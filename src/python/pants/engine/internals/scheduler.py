@@ -41,6 +41,7 @@ from pants.engine.unions import union
 from pants.option.global_options import ExecutionOptions
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import check_no_overlapping_paths
+from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
 if TYPE_CHECKING:
@@ -307,9 +308,10 @@ class Scheduler:
     def _metrics(self, session):
         return self._from_value(self._native.lib.scheduler_metrics(self._scheduler, session))
 
-    def poll_workunits(self, session) -> PolledWorkunits:
+    def poll_workunits(self, session, max_log_verbosity: LogLevel) -> PolledWorkunits:
+        max_verbosity = max_log_verbosity.level
         result: Tuple[Tuple[Workunit], Tuple[Workunit]] = self._from_value(
-            self._native.lib.poll_session_workunits(self._scheduler, session)
+            self._native.lib.poll_session_workunits(self._scheduler, session, max_verbosity)
         )
         return {"started": result[0], "completed": result[1]}
 
@@ -433,8 +435,10 @@ class SchedulerSession:
     def session(self):
         return self._session
 
-    def poll_workunits(self) -> PolledWorkunits:
-        return cast(PolledWorkunits, self._scheduler.poll_workunits(self._session))
+    def poll_workunits(self, max_log_verbosity: LogLevel) -> PolledWorkunits:
+        return cast(
+            PolledWorkunits, self._scheduler.poll_workunits(self._session, max_log_verbosity)
+        )
 
     def graph_len(self):
         return self._scheduler.graph_len()

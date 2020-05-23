@@ -442,8 +442,7 @@ impl CommandRunner for BoundedCommandRunner {
       .unwrap_or_else(|| "<Unnamed process>".to_string());
     let outer_metadata = WorkunitMetadata {
       desc: Some(desc.clone()),
-      level: Level::Info,
-      display: false,
+      level: Level::Debug,
       blocked: true,
     };
     let bounded_fut = {
@@ -456,7 +455,6 @@ impl CommandRunner for BoundedCommandRunner {
         let metadata = WorkunitMetadata {
           desc: Some(desc),
           level: Level::Info,
-          display: false,
           blocked: false,
         };
         with_workunit(context.workunit_store.clone(), name, metadata, async move {
