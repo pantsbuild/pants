@@ -969,6 +969,26 @@ class AmbiguousCodegenImplementationsException(Exception):
             )
 
 
+class AmbiguousDependencyInferenceException(Exception):
+    """Exception for when there are multiple dependency inference implementations and it is
+    ambiguous which to use."""
+
+    def __init__(
+        self,
+        implementations: Iterable[Type["InferDependenciesRequest"]],
+        *,
+        from_sources_type: Type["Sources"],
+    ) -> None:
+        bulleted_list_sep = "\n  * "
+        possible_implementations = sorted(impl.__name__ for impl in implementations)
+        super().__init__(
+            f"Multiple of the registered dependency inference implementations can infer "
+            f"dependencies from {from_sources_type.__name__}. It is ambiguous which "
+            "implementation to use.\n\nPossible implementations:"
+            f"{bulleted_list_sep}{bulleted_list_sep.join(possible_implementations)}"
+        )
+
+
 # -----------------------------------------------------------------------------------------------
 # Field templates
 # -----------------------------------------------------------------------------------------------
@@ -1597,11 +1617,51 @@ class InjectDependenciesRequest(ABC):
             ]
     """
 
-    field: Dependencies
+    dependencies_field: Dependencies
     inject_for: ClassVar[Type[Dependencies]]
 
 
 class InjectedDependencies(DeduplicatedCollection[Address]):
+    sort_input = True
+
+
+@union
+@dataclass(frozen=True)
+class InferDependenciesRequest:
+    """A request to infer dependencies by analyzing source files.
+
+    To set up a new inference implementation, subclass this class. Set the class property
+    `infer_from` to the type of `Sources` field you are able to infer from, such as
+    `FortranSources`. This will cause the class, and any subclass, to use your inference
+    implementation. Note that there cannot be more than one implementation for a particular
+    `Sources` class. Register this subclass with
+    `UnionRule(InferDependenciesRequest, InferFortranDependencies)`, for example.
+
+    Then, create a rule that takes the subclass as a parameter and returns `InferredDependencies`.
+
+    For example:
+
+        class InferFortranDependencies(InferDependenciesRequest):
+            from_sources = FortranSources
+
+        @rule
+        def infer_fortran_dependencies(request: InferFortranDependencies) -> InferredDependencies:
+            hydrated_sources = await Get[HydratedSources](HydrateSources(request.sources_field))
+            ...
+            return InferredDependencies(...)
+
+        def rules():
+            return [
+                infer_fortran_dependencies,
+                UnionRule(InferDependenciesRequest, InferFortranDependencies),
+            ]
+    """
+
+    sources_field: Sources
+    infer_from: ClassVar[Type[Sources]]
+
+
+class InferredDependencies(DeduplicatedCollection[Address]):
     sort_input = True
 
 
@@ -1621,7 +1681,29 @@ async def resolve_dependencies(
         if isinstance(request.field, inject_request_type.inject_for)
     )
 
-    return Addresses(sorted([*provided, *itertools.chain.from_iterable(injected)]))
+    inference_request_types = union_membership.get(InferDependenciesRequest)
+    inferred = InferredDependencies()
+    if inference_request_types:
+        # Dependency inference is solely determined by the `Sources` field for a Target, so we
+        # re-resolve the original target to inspect its `Sources` field, if any.
+        wrapped_tgt = await Get[WrappedTarget](Address, request.field.address)
+        sources_field = wrapped_tgt.target.get(Sources)
+        relevant_inference_request_types = [
+            inference_request_type
+            for inference_request_type in inference_request_types
+            if isinstance(sources_field, inference_request_type.infer_from)
+        ]
+        if relevant_inference_request_types:
+            if len(relevant_inference_request_types) > 1:
+                raise AmbiguousDependencyInferenceException(
+                    relevant_inference_request_types, from_sources_type=type(sources_field)
+                )
+            inference_request_type = relevant_inference_request_types[0]
+            inferred = await Get[InferredDependencies](
+                InferDependenciesRequest, inference_request_type(sources_field)
+            )
+
+    return Addresses(sorted([*provided, *itertools.chain.from_iterable(injected), *inferred]))
 
 
 # -----------------------------------------------------------------------------------------------
@@ -1737,4 +1819,5 @@ def rules():
         RootRule(HydrateSourcesRequest),
         RootRule(DependenciesRequest),
         RootRule(InjectDependenciesRequest),
+        RootRule(InferDependenciesRequest),
     ]
