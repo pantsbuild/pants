@@ -4,23 +4,31 @@
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 from collections import defaultdict
 from configparser import ConfigParser
 from functools import total_ordering
-from typing import Dict, Optional, Set, Tuple, cast
+from typing import Dict, NoReturn, Optional, Set, Tuple, cast
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from bs4 import BeautifulSoup
 
+# TODO: move this script to `build-support/bin` so that we can import `common.py`.
+
 COLOR_BLUE = "\x1b[34m"
+COLOR_RED = "\x1b[31m"
 COLOR_RESET = "\x1b[0m"
 
 
 def banner(message: str) -> None:
     print(f"{COLOR_BLUE}[=== {message} ===]{COLOR_RESET}")
+
+
+def die(message: str) -> NoReturn:
+    raise SystemExit(f"{COLOR_RED}{message}{COLOR_RESET}")
 
 
 # -----------------------------------------------------------------------------------------------
@@ -139,6 +147,46 @@ def all_packages() -> Set[Package]:
 
 
 # -----------------------------------------------------------------------------------------------
+# Script utils
+# -----------------------------------------------------------------------------------------------
+
+
+def get_pypi_config(section: str, option: str) -> str:
+    config = ConfigParser()
+    config.read(os.path.expanduser("~/.pypirc"))
+    if not config.has_option(section, option):
+        raise ValueError(f"Your ~/.pypirc must define a {option} option in the {section} section")
+    return config.get(section, option)
+
+
+def get_git_branch() -> str:
+    return (
+        subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"], stdout=subprocess.PIPE, check=True
+        )
+        .stdout.decode()
+        .strip()
+    )
+
+
+def get_pgp_key_id() -> str:
+    return (
+        subprocess.run(["git", "config", "--get", "user.signingkey"], stdout=subprocess.PIPE)
+        .stdout.decode()
+        .strip()
+    )
+
+
+def get_pgp_program_name() -> str:
+    configured_name = (
+        subprocess.run(["git", "config", "--get", "gpg.program"], stdout=subprocess.PIPE)
+        .stdout.decode()
+        .strip()
+    )
+    return configured_name or "gpg"
+
+
+# -----------------------------------------------------------------------------------------------
 # Script commands
 # -----------------------------------------------------------------------------------------------
 
@@ -172,13 +220,40 @@ def build_and_print_packages(version: str) -> None:
             raise
 
 
-def get_pypi_config(section: str, option: str) -> str:
-    config = ConfigParser()
-    config.read(os.path.expanduser("~/.pypirc"))
+def check_clean_git_branch() -> None:
+    banner("Checking for a clean Git branch")
+    git_status = (
+        subprocess.run(["git", "status", "--porcelain"], stdout=subprocess.PIPE, check=True)
+        .stdout.decode()
+        .strip()
+    )
+    if git_status:
+        die(
+            "Uncommitted changes detected when running `git status`. You must be on a clean branch "
+            "to release."
+        )
+    valid_branch_pattern = r"^(master)|([0-9]+\.[0-9]+\.x)$"
+    git_branch = get_git_branch()
+    if not re.match(valid_branch_pattern, git_branch):
+        die(
+            "On an invalid branch. You must either be on `master` or a release branch like "
+            f"`1.27.x`. Detected: {git_branch}"
+        )
 
-    if not config.has_option(section, option):
-        raise ValueError(f"Your ~/.pypirc must define a {option} option in the {section} section")
-    return config.get(section, option)
+
+def check_pgp() -> None:
+    banner("Checking PGP setup")
+    key = get_pgp_key_id()
+    if not key:
+        die("You must set up a PGP key. See https://pants.readme.io/docs/release-process.")
+    print("Found the following key for release signing:\n")
+    subprocess.run([get_pgp_program_name(), "-k", key])
+    key_confirmation = input("\nIs this the correct key? [Y/n]: ")
+    if key_confirmation and key_confirmation.lower() != "y":
+        die(
+            "Please configure the key you intend to use. See "
+            "https://pants.readme.io/docs/release-process."
+        )
 
 
 def check_ownership(users, minimum_owner_count: int = 3) -> None:
@@ -209,25 +284,29 @@ def check_ownership(users, minimum_owner_count: int = 3) -> None:
     for i, package in enumerate(packages):
         check_ownership(i, package)
 
-    if insufficient or unowned:
-        if unowned:
-            for user, unowned_packages in sorted(unowned.items()):
-                formatted_unowned = "\n".join(package.name for package in sorted(packages))
-                print(
-                    f"PyPI account {user} needs to be added as an owner for the following "
-                    f"packages:\n{formatted_unowned}",
-                    file=sys.stderr,
-                )
-
-        if insufficient:
-            insufficient_packages = "\n".join(package.name for package in insufficient)
+    if unowned:
+        for user, unowned_packages in sorted(unowned.items()):
+            formatted_unowned = "\n".join(package.name for package in sorted(packages))
             print(
-                f"The following packages have fewer than {minimum_owner_count} owners but should be "
-                f"setup for all releasers:\n{insufficient_packages}",
+                f"PyPI account {user} needs to be added as an owner for the following "
+                f"packages:\n{formatted_unowned}",
                 file=sys.stderr,
             )
+        raise SystemExit()
 
-        sys.exit(1)
+    if insufficient:
+        insufficient_packages = "\n".join(package.name for package in insufficient)
+        die(
+            f"The following packages have fewer than {minimum_owner_count} owners but should be "
+            f"setup for all releasers:\n{insufficient_packages}",
+        )
+
+
+def check_release_prereqs() -> None:
+    check_clean_git_branch()
+    check_pgp()
+    me = get_pypi_config("server-login", "username")
+    check_ownership({me})
 
 
 def list_packages(*, with_packages: bool) -> None:
@@ -258,7 +337,7 @@ def create_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command")
 
     subparsers.add_parser("list-owners")
-    subparsers.add_parser("check-my-ownership")
+    subparsers.add_parser("check-release-prereqs")
 
     parser_list = subparsers.add_parser("list")
     parser_list.add_argument("--with-packages", action="store_true")
@@ -274,9 +353,8 @@ def main() -> None:
         list_packages(with_packages=args.with_packages)
     if args.command == "list-owners":
         list_owners()
-    if args.command == "check-my-ownership":
-        me = get_pypi_config("server-login", "username")
-        check_ownership({me})
+    if args.command == "check-release-prereqs":
+        check_release_prereqs()
     if args.command == "build-and-print":
         build_and_print_packages(args.version)
 
