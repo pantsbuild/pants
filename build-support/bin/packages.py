@@ -141,14 +141,13 @@ def all_packages() -> Set[Package]:
 
 class _Constants:
     def __init__(self) -> None:
-        # self._head_sha = (
-        #     subprocess.run(
-        #         ["git", "rev-parse", "--verify", "HEAD"], stdout=subprocess.PIPE, check=True
-        #     )
-        #     .stdout.decode()
-        #     .strip()
-        # )
-        self._head_sha = "f2521cab6fb8bed3b8b12b479369280b2dee2c9f"
+        self._head_sha = (
+            subprocess.run(
+                ["git", "rev-parse", "--verify", "HEAD"], stdout=subprocess.PIPE, check=True
+            )
+            .stdout.decode()
+            .strip()
+        )
         self.pants_stable_version = Path("src/python/pants/VERSION").read_text().strip()
 
     @property
