@@ -395,31 +395,6 @@ function reversion_whls() {
   done
 }
 
-readonly BINARY_BASE_URL=https://binaries.pantsbuild.org
-
-function fetch_prebuilt_wheels() {
-  local -r to_dir="$1"
-
-  banner "Fetching prebuilt wheels for ${PANTS_UNSTABLE_VERSION}"
-  (
-    cd "${to_dir}"
-    run_packages_script list-prebuilt-wheels | {
-      while read -r path_tuple
-      do
-        local file_path
-        file_path=$(echo "$path_tuple" | awk -F'\t' '{print $1}')
-        local url_path
-        url_path=$(echo "$path_tuple" | awk -F'\t' '{print $2}')
-        echo "${BINARY_BASE_URL}/${url_path}:"
-        local dest="${to_dir}/${file_path}"
-        mkdir -p "$(dirname "${dest}")"
-        safe_curl --progress-bar -o "${dest}" "${BINARY_BASE_URL}/${url_path}" \
-          || die "Could not fetch ${dest}."
-      done
-    }
-  )
-}
-
 function fetch_and_check_prebuilt_wheels() {
   # Fetches wheels from S3 into subdirectories of the given directory.
   local check_dir="$1"
@@ -428,10 +403,9 @@ function fetch_and_check_prebuilt_wheels() {
     check_dir=$(mktemp -d -t pants.wheel_check.XXXXX)
     trap 'rm -rf "${check_dir}"' RETURN
   fi
+  run_packages_script fetch-prebuilt-wheels "${check_dir}"
 
   banner "Checking prebuilt wheels for ${PANTS_UNSTABLE_VERSION}"
-  fetch_prebuilt_wheels "${check_dir}"
-
   local missing=()
   # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
   # shellcheck disable=SC2207

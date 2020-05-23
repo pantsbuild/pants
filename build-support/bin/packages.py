@@ -9,6 +9,7 @@ import sys
 from collections import defaultdict
 from configparser import ConfigParser
 from functools import total_ordering
+from pathlib import Path
 from typing import Dict, List, NamedTuple, Optional, Set, Tuple, cast
 from urllib.parse import quote_plus
 from xml.etree import ElementTree
@@ -144,6 +145,7 @@ class _Constants:
         #     .strip()
         # )
         self._head_sha = "f2521cab6fb8bed3b8b12b479369280b2dee2c9f"
+        self.pants_stable_version = Path("src/python/pants/VERSION").read_text().strip()
 
     @property
     def binary_base_url(self) -> str:
@@ -156,6 +158,10 @@ class _Constants:
     @property
     def deploy_pants_wheel_path(self) -> str:
         return f"wheels/pantsbuild.pants/{self._head_sha}"
+
+    @property
+    def pants_unstable_version(self) -> str:
+        return f"{self.pants_stable_version}+git{self._head_sha[:8]}"
 
 
 CONSTANTS = _Constants()
@@ -370,6 +376,21 @@ def list_prebuilt_wheels() -> None:
     print("\n".join(wheel.format() for wheel in determine_prebuilt_wheels()))
 
 
+def fetch_prebuilt_wheels(destination_dir: str) -> None:
+    banner(f"Fetching pre-built wheels for {CONSTANTS.pants_unstable_version}")
+    print(f"Saving to {destination_dir}.\n", file=sys.stderr)
+    for wheel in determine_prebuilt_wheels():
+        full_url = f"{CONSTANTS.binary_base_url}/{wheel.url}"
+        print(f"Fetching {full_url}", file=sys.stderr)
+        response = requests.get(full_url)
+        response.raise_for_status()
+        print(file=sys.stderr)
+
+        dest = Path(destination_dir, wheel.path)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(response.content)
+
+
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command")
@@ -378,6 +399,9 @@ def create_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("list-owners")
     subparsers.add_parser("list-packages")
     subparsers.add_parser("list-prebuilt-wheels")
+
+    parser_fetch_prebuilt_wheels = subparsers.add_parser("fetch-prebuilt-wheels")
+    parser_fetch_prebuilt_wheels.add_argument("wheels_dest")
 
     parser_build_and_print = subparsers.add_parser("build-and-print")
     parser_build_and_print.add_argument("version")
@@ -396,6 +420,8 @@ def main() -> None:
         list_prebuilt_wheels()
     if args.command == "build-and-print":
         build_and_print_packages(args.version)
+    if args.command == "fetch-prebuilt-wheels":
+        fetch_prebuilt_wheels(args.wheels_dest)
 
 
 if __name__ == "__main__":
