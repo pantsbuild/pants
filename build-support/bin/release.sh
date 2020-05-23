@@ -87,7 +87,8 @@ function run_pex() {
 function run_packages_script() {
   (
     cd "${ROOT}"
-    run_pex "$(requirement beautifulsoup4)" -- "${ROOT}/src/python/pants/releases/packages.py" "$@"
+    # TODO: use V2 once we either figure out how to safely expand $@ to --run-args or we land 9835.
+    ./pants --quiet run "${ROOT}/build-support/bin/packages.py" -- "$@"
   )
 }
 
@@ -701,7 +702,8 @@ elif [[ "${test_release}" == "true" ]]; then
 else
   banner "Releasing packages to PyPI"
   (
-    check_release_prereqs && publish_packages && tag_release && publish_docs_if_master && \
+    check_release_prereqs && \
+#    check_release_prereqs && publish_packages && tag_release && publish_docs_if_master && \
       banner "Successfully released packages to PyPI"
   ) || die "Failed to release packages to PyPI."
 fi

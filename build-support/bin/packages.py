@@ -10,26 +10,12 @@ import sys
 from collections import defaultdict
 from configparser import ConfigParser
 from functools import total_ordering
-from typing import Dict, NoReturn, Optional, Set, Tuple, cast
+from typing import Dict, Optional, Set, Tuple, cast
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 from bs4 import BeautifulSoup
-
-# TODO: move this script to `build-support/bin` so that we can import `common.py`.
-
-COLOR_BLUE = "\x1b[34m"
-COLOR_RED = "\x1b[31m"
-COLOR_RESET = "\x1b[0m"
-
-
-def banner(message: str) -> None:
-    print(f"{COLOR_BLUE}[=== {message} ===]{COLOR_RESET}")
-
-
-def die(message: str) -> NoReturn:
-    raise SystemExit(f"{COLOR_RED}{message}{COLOR_RESET}")
-
+from common import banner, die
 
 # -----------------------------------------------------------------------------------------------
 # Pants package definitions
