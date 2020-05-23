@@ -670,7 +670,7 @@ while getopts ":${_OPTS}" opt; do
     n) dry_run="true" ;;
     f) build_fs_util ; exit $? ;;
     t) test_release="true" ;;
-    l) run_packages_script list ; exit $? ;;
+    l) run_packages_script list-packages ; exit $? ;;
     o) run_packages_script list-owners ; exit $? ;;
     w) list_prebuilt_wheels ; exit $? ;;
     e) fetch_and_check_prebuilt_wheels ; exit $? ;;

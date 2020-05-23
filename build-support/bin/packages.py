@@ -295,16 +295,8 @@ def check_release_prereqs() -> None:
     check_ownership({me})
 
 
-def list_packages(*, with_packages: bool) -> None:
-    entries = [
-        (
-            f"{package.name} {package.target} {' '.join(package.bdist_wheel_flags)}"
-            if with_packages
-            else package.name
-        )
-        for package in sorted(all_packages())
-    ]
-    print("\n".join(entries))
+def list_packages() -> None:
+    print("\n".join(package.name for package in sorted(all_packages())))
 
 
 def list_owners() -> None:
@@ -315,7 +307,7 @@ def list_owners() -> None:
             )
             continue
         formatted_owners = "\n".join(sorted(package.owners()))
-        print(f"Owners of {package.name}:{formatted_owners}")
+        print(f"Owners of {package.name}:\n{formatted_owners}\n")
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -323,10 +315,8 @@ def create_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command")
 
     subparsers.add_parser("list-owners")
+    subparsers.add_parser("list-packages")
     subparsers.add_parser("check-release-prereqs")
-
-    parser_list = subparsers.add_parser("list")
-    parser_list.add_argument("--with-packages", action="store_true")
 
     parser_build_and_print = subparsers.add_parser("build-and-print")
     parser_build_and_print.add_argument("version")
@@ -335,10 +325,10 @@ def create_parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = create_parser().parse_args()
-    if args.command == "list":
-        list_packages(with_packages=args.with_packages)
     if args.command == "list-owners":
         list_owners()
+    if args.command == "list-packages":
+        list_packages()
     if args.command == "check-release-prereqs":
         check_release_prereqs()
     if args.command == "build-and-print":
