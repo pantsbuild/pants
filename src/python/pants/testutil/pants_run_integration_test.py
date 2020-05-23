@@ -8,11 +8,12 @@ import shutil
 import subprocess
 import sys
 import unittest
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from operator import eq, ne
+from pathlib import Path
 from threading import Lock
-from typing import Any, Callable, List, Optional, Union
+from typing import Any, Callable, Iterator, List, Optional, Union
 
 from colors import strip_color
 
@@ -557,7 +558,34 @@ class PantsRunIntegrationTest(unittest.TestCase):
             os.rename(real_path, test_path)
 
     @contextmanager
-    def temporary_file_content(self, path, content, binary_mode=True):
+    def temporary_directory_literal(self, path: Union[str, Path],) -> Iterator[None]:
+        """Temporarily create the given literal directory under the buildroot.
+
+        The path being created must not already exist. Any parent directories will also be created
+        temporarily.
+        """
+        path = os.path.realpath(path)
+        assert path.startswith(
+            os.path.realpath(get_buildroot())
+        ), "cannot write paths outside of the buildroot!"
+        assert not os.path.exists(path), "refusing to overwrite an existing path!"
+
+        parent = os.path.dirname(path)
+        parent_ctx = (
+            suppress() if os.path.isdir(parent) else self.temporary_directory_literal(parent)
+        )
+
+        with parent_ctx:
+            try:
+                os.mkdir(path)
+                yield
+            finally:
+                os.rmdir(path)
+
+    @contextmanager
+    def temporary_file_content(
+        self, path: Union[str, Path], content, binary_mode=True
+    ) -> Iterator[None]:
         """Temporarily write content to a file for the purpose of an integration test."""
         path = os.path.realpath(path)
         assert path.startswith(
@@ -565,34 +593,51 @@ class PantsRunIntegrationTest(unittest.TestCase):
         ), "cannot write paths outside of the buildroot!"
         assert not os.path.exists(path), "refusing to overwrite an existing path!"
         mode = "wb" if binary_mode else "w"
-        with open(path, mode) as fh:
-            fh.write(content)
-        try:
-            yield
-        finally:
-            os.unlink(path)
+
+        parent = os.path.dirname(path)
+        parent_ctx = (
+            suppress() if os.path.isdir(parent) else self.temporary_directory_literal(parent)
+        )
+        with parent_ctx:
+            try:
+                with open(path, mode) as fh:
+                    fh.write(content)
+                yield
+            finally:
+                os.unlink(path)
 
     @contextmanager
-    def with_overwritten_file_content(self, file_path, temporary_content=None):
+    def with_overwritten_file_content(
+        self,
+        file_path: Union[str, Path],
+        temporary_content: Optional[Union[bytes, str, Callable[[bytes], bytes]]] = None,
+    ) -> Iterator[None]:
         """A helper that resets a file after the method runs.
 
          It will read a file, save the content, maybe write temporary_content to it, yield, then write the
          original content to the file.
 
         :param file_path: Absolute path to the file to be reset after the method runs.
-        :param temporary_content: Optional content to write into the file.
+        :param temporary_content: Content to write to the file, or a function from current content
+          to new temporary content.
         """
-        with open(file_path, "r") as f:
+        with open(file_path, "rb") as f:
             file_original_content = f.read()
 
         try:
             if temporary_content is not None:
-                with open(file_path, "w") as f:
-                    f.write(temporary_content)
+                if callable(temporary_content):
+                    content = temporary_content(file_original_content)
+                elif isinstance(temporary_content, bytes):
+                    content = temporary_content
+                else:
+                    content = temporary_content.encode()
+                with open(file_path, "wb") as f:
+                    f.write(content)
             yield
 
         finally:
-            with open(file_path, "w") as f:
+            with open(file_path, "wb") as f:
                 f.write(file_original_content)
 
     @contextmanager
