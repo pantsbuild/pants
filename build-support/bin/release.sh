@@ -319,7 +319,7 @@ function install_and_test_packages() {
   # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
   # shellcheck disable=SC2207
   packages=(
-    $(run_packages_script list | grep '.' | awk '{print $1}')
+    $(run_packages_script list-packages | grep '.' | awk '{print $1}')
   ) || die "Failed to list packages!"
 
   for package in "${packages[@]}"
@@ -462,7 +462,7 @@ function fetch_and_check_prebuilt_wheels() {
   # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
   # shellcheck disable=SC2207
   RELEASE_PACKAGES=(
-    $(run_packages_script list | grep '.' | awk '{print $1}')
+    $(run_packages_script list-packages | grep '.' | awk '{print $1}')
   ) || die "Failed to get a list of packages to release!"
   for PACKAGE in "${RELEASE_PACKAGES[@]}"; do
     # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
