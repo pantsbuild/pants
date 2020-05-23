@@ -395,59 +395,6 @@ function reversion_whls() {
   done
 }
 
-function fetch_and_check_prebuilt_wheels() {
-  # Fetches wheels from S3 into subdirectories of the given directory.
-  local check_dir="$1"
-  if [[ -z "${check_dir}" ]]
-  then
-    check_dir=$(mktemp -d -t pants.wheel_check.XXXXX)
-    trap 'rm -rf "${check_dir}"' RETURN
-  fi
-  run_packages_script fetch-prebuilt-wheels "${check_dir}"
-
-  banner "Checking prebuilt wheels for ${PANTS_UNSTABLE_VERSION}"
-  local missing=()
-  # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
-  # shellcheck disable=SC2207
-  RELEASE_PACKAGES=(
-    $(run_packages_script list-packages | grep '.' | awk '{print $1}')
-  ) || die "Failed to get a list of packages to release!"
-  for PACKAGE in "${RELEASE_PACKAGES[@]}"; do
-    # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
-    # shellcheck disable=SC2207
-    packages=($(find_pkg "${PACKAGE}" "${PANTS_UNSTABLE_VERSION}" "${check_dir}"))
-    if [ ${#packages[@]} -eq 0 ]; then
-      missing+=("${PACKAGE}")
-      continue
-    fi
-
-    # Confirm that if the package is not cross platform that we have whls for two platforms.
-    local cross_platform=""
-    for package in "${packages[@]}"; do
-      if [[ "${package}" =~ -none-any.whl ]]
-      then
-        cross_platform="true"
-      fi
-    done
-
-    # N.B. For platform-specific wheels, we expect 2 wheels: {linux,osx} * {abi3,}.
-    if [ "${cross_platform}" != "true" ] && [ ${#packages[@]} -ne 2 ]; then
-      missing+=("${PACKAGE} (expected whls for each platform: had only ${packages[@]})")
-      continue
-    fi
-  done
-
-  if (( ${#missing[@]} > 0 ))
-  then
-    echo "Failed to find prebuilt packages for:"
-    for package in "${missing[@]}"
-    do
-      echo "  ${package}"
-    done
-    die
-  fi
-}
-
 function adjust_wheel_platform() {
   # Renames wheels to adjust their tag from a src platform to a dst platform.
   local src_plat="$1"
@@ -521,7 +468,7 @@ function build_pex() {
   mkdir -p "${DEPLOY_DIR}"
 
   if [[ "${mode}" == "fetch" ]]; then
-    fetch_and_check_prebuilt_wheels "${DEPLOY_DIR}"
+    run_packages_script fetch-and-check-prebuilt-wheels --wheels-dest "${DEPLOY_DIR}"
   else
     build_pants_packages "${PANTS_UNSTABLE_VERSION}"
     build_3rdparty_packages "${PANTS_UNSTABLE_VERSION}"
@@ -559,7 +506,7 @@ function publish_packages() {
 
   # Fetch unstable wheels, rename any linux whls to manylinux, and reversion them
   # from PANTS_UNSTABLE_VERSION to PANTS_STABLE_VERSION
-  fetch_and_check_prebuilt_wheels "${DEPLOY_DIR}"
+  run_packages_script fetch-and-check-prebuilt-wheels --wheels-dest "${DEPLOY_DIR}"
   # See https://www.python.org/dev/peps/pep-0599/. We build on Centos7 so use manylinux2014.
   adjust_wheel_platform "linux_x86_64" "manylinux2014_x86_64" \
     "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}"
@@ -621,7 +568,7 @@ while getopts ":${_OPTS}" opt; do
     l) run_packages_script list-packages ; exit $? ;;
     o) run_packages_script list-owners ; exit $? ;;
     w) run_packages_script list-prebuilt-wheels ; exit $? ;;
-    e) fetch_and_check_prebuilt_wheels ; exit $? ;;
+    e) run_packages_script fetch-and-check-prebuilt-wheels ; exit $? ;;
     p) build_pex fetch ; exit $? ;;
     q) build_pex build ; exit $? ;;
     *) usage "Invalid option: -${OPTARG}" ;;

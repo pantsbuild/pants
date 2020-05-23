@@ -10,13 +10,14 @@ from collections import defaultdict
 from configparser import ConfigParser
 from functools import total_ordering
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Dict, List, NamedTuple, Optional, Set, Tuple, cast
 from urllib.parse import quote_plus
 from xml.etree import ElementTree
 
 import requests
 from bs4 import BeautifulSoup
-from common import banner, die
+from common import banner, die, green
 
 # -----------------------------------------------------------------------------------------------
 # Pants package definitions
@@ -47,7 +48,10 @@ class Package:
     def __repr__(self):
         return f"Package<name={self.name}>"
 
-    def exists(self) -> bool:  # type: ignore[return]
+    def find_locally(self, *, version: str, search_dir: str) -> List[Path]:
+        return list(Path(search_dir).rglob(f"{self.name}-{version}-*.whl"))
+
+    def exists_on_pypi(self) -> bool:  # type: ignore[return]
         response = requests.head(f"https://pypi.org/project/{self.name}/")
         if response.ok:
             return True
@@ -55,13 +59,13 @@ class Package:
             return False
         response.raise_for_status()
 
-    def latest_version(self) -> str:
+    def latest_published_version(self) -> str:
         json_data = requests.get(f"https://pypi.org/pypi/{self.name}/json").json()
         return cast(str, json_data["info"]["version"])
 
     def owners(self) -> Set[str]:
         url_content = requests.get(
-            f"https://pypi.org/project/{self.name}/{self.latest_version()}/"
+            f"https://pypi.org/project/{self.name}/{self.latest_published_version()}/"
         ).text
         parser = BeautifulSoup(url_content, "html.parser")
         owners = {
@@ -285,7 +289,7 @@ def check_ownership(users, minimum_owner_count: int = 3) -> None:
             f"[{i}/{len(packages)}] checking ownership for {package}: > {minimum_owner_count} "
             f"releasers including {', '.join(users)}"
         )
-        if not package.exists():
+        if not package.exists_on_pypi():
             print(f"The {package.name} package is new! There are no owners yet.")
             return
 
@@ -327,7 +331,7 @@ def check_release_prereqs() -> None:
 
 def list_owners() -> None:
     for package in sorted(all_packages()):
-        if not package.exists():
+        if not package.exists_on_pypi():
             print(
                 f"The {package.name} package is new!  There are no owners yet.", file=sys.stderr,
             )
@@ -376,6 +380,7 @@ def list_prebuilt_wheels() -> None:
     print("\n".join(wheel.format() for wheel in determine_prebuilt_wheels()))
 
 
+# TODO: possibly parallelize through httpx and asyncio.
 def fetch_prebuilt_wheels(destination_dir: str) -> None:
     banner(f"Fetching pre-built wheels for {CONSTANTS.pants_unstable_version}")
     print(f"Saving to {destination_dir}.\n", file=sys.stderr)
@@ -391,6 +396,34 @@ def fetch_prebuilt_wheels(destination_dir: str) -> None:
         dest.write_bytes(response.content)
 
 
+def check_prebuilt_wheels(check_dir: str) -> None:
+    banner(f"Checking prebuilt wheels for {CONSTANTS.pants_unstable_version}")
+    missing_packages = []
+    for package in sorted(all_packages()):
+        local_files = package.find_locally(
+            version=CONSTANTS.pants_unstable_version, search_dir=check_dir
+        )
+        if not local_files:
+            missing_packages.append(package.name)
+            continue
+
+        # If the package is cross platform, confirm that we have whls for two platforms.
+        is_cross_platform = not all(
+            local_file.name.endswith("-none-any.whl") for local_file in local_files
+        )
+        if is_cross_platform and len(local_files) != 2:
+            formatted_local_files = ", ".join(f.name for f in local_files)
+            missing_packages.append(
+                f"{package.name} (expected a macOS wheel and a linux wheel, but found "
+                f"{formatted_local_files})"
+            )
+
+    if missing_packages:
+        formatted_missing = "\n  ".join(missing_packages)
+        die(f"Failed to find prebuilt wheels:\n  {formatted_missing}")
+    green(f"All {len(all_packages())} pantsbuild.pants packages were fetched and are valid.")
+
+
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command")
@@ -400,8 +433,8 @@ def create_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("list-packages")
     subparsers.add_parser("list-prebuilt-wheels")
 
-    parser_fetch_prebuilt_wheels = subparsers.add_parser("fetch-prebuilt-wheels")
-    parser_fetch_prebuilt_wheels.add_argument("wheels_dest")
+    parser_fetch_prebuilt_wheels = subparsers.add_parser("fetch-and-check-prebuilt-wheels")
+    parser_fetch_prebuilt_wheels.add_argument("--wheels-dest")
 
     parser_build_and_print = subparsers.add_parser("build-and-print")
     parser_build_and_print.add_argument("version")
@@ -420,8 +453,11 @@ def main() -> None:
         list_prebuilt_wheels()
     if args.command == "build-and-print":
         build_and_print_packages(args.version)
-    if args.command == "fetch-prebuilt-wheels":
-        fetch_prebuilt_wheels(args.wheels_dest)
+    if args.command == "fetch-and-check-prebuilt-wheels":
+        with TemporaryDirectory() as tempdir:
+            dest = args.wheels_dest or tempdir
+            fetch_prebuilt_wheels(dest)
+            check_prebuilt_wheels(dest)
 
 
 if __name__ == "__main__":
