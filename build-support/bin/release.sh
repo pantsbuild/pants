@@ -221,7 +221,7 @@ function build_pants_packages() {
   # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
   # shellcheck disable=SC2207
   packages=(
-    $(run_packages_script build_and_print "${version}")
+    $(run_packages_script build-and-print "${version}")
   ) || die "Failed to build packages at ${version}!"
   for package in "${packages[@]}"
   do
@@ -348,41 +348,16 @@ function get_branch() {
   git branch | grep -E '^\* ' | cut -d' ' -f2-
 }
 
-function check_clean_branch() {
-  banner "Checking for a clean branch"
-
-  pattern="^(master)|([0-9]+\.[0-9]+\.x)$"
-  branch=$(get_branch)
-  [[ -z "$(git status --porcelain)" &&
-     $branch =~ $pattern
-  ]] || die "You are not on a clean branch."
-}
-
-function check_pgp() {
-  banner "Checking pgp setup"
-
-  msg=$(cat << EOM
-You must configure your release signing pgp key.
-
-You can configure the key by running:
-  git config --add user.signingkey [key id]
-
-Key id should be the id of the pgp key you have registered with pypi.
-EOM
-)
-  get_pgp_keyid &> /dev/null || die "${msg}"
-  echo "Found the following key for release signing:"
-  "$(get_pgp_program)" -k "$(get_pgp_keyid)"
-  read -rp "Is this the correct key? [Yn]: " answer
-  [[ "${answer:-y}" =~ [Yy]([Ee][Ss])? ]] || die "${msg}"
-}
-
 function get_pgp_keyid() {
   git config --get user.signingkey
 }
 
 function get_pgp_program() {
   git config --get gpg.program || echo "gpg"
+}
+
+function check_release_prereqs() {
+  run_packages_script check-release-prereqs
 }
 
 function tag_release() {
@@ -402,10 +377,6 @@ function publish_docs_if_master() {
   else
     echo "Skipping docsite publishing on non-master branch (${branch})."
   fi
-}
-
-function check_owners() {
-  run_packages_script check-my-ownership
 }
 
 function reversion_whls() {
@@ -730,8 +701,7 @@ elif [[ "${test_release}" == "true" ]]; then
 else
   banner "Releasing packages to PyPI"
   (
-    check_clean_branch && check_pgp && check_owners && \
-      publish_packages && tag_release && publish_docs_if_master && \
+    check_release_prereqs && publish_packages && tag_release && publish_docs_if_master && \
       banner "Successfully released packages to PyPI"
   ) || die "Failed to release packages to PyPI."
 fi
