@@ -1020,8 +1020,7 @@ impl Node for NodeKey {
 
     let (started_workunit_id, user_facing_name) = {
       let user_facing_name = self.user_facing_name();
-      let higher_priority = context.session.should_handle_workunits()
-        && (user_facing_name.is_some() || self.display_info().is_some());
+      let higher_priority = context.session.should_handle_workunits() && user_facing_name.is_some();
       let level = if higher_priority {
         Level::Info
       } else {
