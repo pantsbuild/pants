@@ -2,10 +2,6 @@
 extend-ignore:
   E203,  # whitespace before ':' (conflicts with Black)
   E231,  # Bad trailing comma (conflicts with Black)
-  E262,  # inline comment doesn't start with `#` (enable once fixed)
-  E266,  # Too many leading # for block comment (maybe enable once fixed)
-  E301,  # expected 1 blank line (enable once fixed)
-  E306,  # expected 1 blank line (enable once fixed)
   E501,  # line too long (> 79 characters)
   E731,  # Do not assign a lambda expression
   E741,  # Ambiguous variable name (enable once fixed)

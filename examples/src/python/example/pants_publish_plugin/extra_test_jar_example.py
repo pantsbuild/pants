@@ -7,14 +7,13 @@ from io import open
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jar_task import JarTask
 
+# See `Appendix A` in the 'publish' documentation:
+#
+#    http://pantsbuild.github.io/publish.html
+#
+# for tips on how to adapt this example task for your own custom publishing needs.
 
-##
-## See `Appendix A` in the 'publish' documentation:
-##
-##    http://pantsbuild.github.io/publish.html
-##
-## for tips on how to adapt this example task for your own custom publishing needs.
-##
+
 class ExtraTestJarExample(JarTask):
     """Example of a pants publish plugin.
 
