@@ -118,6 +118,7 @@ python_binary(
   dependencies = [
     ':common',
     '3rdparty/python:beautifulsoup4',
+    '3rdparty/python:requests',
   ],
   tags = {"type_checked"},
 )

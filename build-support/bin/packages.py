@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import argparse
-import json
 import os
 import re
 import subprocess
@@ -11,9 +10,8 @@ from collections import defaultdict
 from configparser import ConfigParser
 from functools import total_ordering
 from typing import Dict, Optional, Set, Tuple, cast
-from urllib.error import HTTPError
-from urllib.request import Request, urlopen
 
+import requests
 from bs4 import BeautifulSoup
 from common import banner, die
 
@@ -46,25 +44,22 @@ class Package:
     def __repr__(self):
         return f"Package<name={self.name}>"
 
-    def exists(self) -> bool:
-        req = Request(f"https://pypi.org/pypi/{self.name}")
-        req.get_method = lambda: "HEAD"  # type: ignore[assignment]
-        try:
-            urlopen(req)
+    def exists(self) -> bool:  # type: ignore[return]
+        response = requests.head(f"https://pypi.org/project/{self.name}/")
+        if response.ok:
             return True
-        except HTTPError as e:
-            if e.code == 404:
-                return False
-            raise
+        if response.status_code == 404:
+            return False
+        response.raise_for_status()
 
     def latest_version(self) -> str:
-        f = urlopen(f"https://pypi.org/pypi/{self.name}/json")
-        j = json.load(f)
-        return cast(str, j["info"]["version"])
+        json_data = requests.get(f"https://pypi.org/pypi/{self.name}/json").json()
+        return cast(str, json_data["info"]["version"])
 
     def owners(self) -> Set[str]:
-        url = f"https://pypi.org/pypi/{self.name}/{self.latest_version()}"
-        url_content = urlopen(url).read()
+        url_content = requests.get(
+            f"https://pypi.org/project/{self.name}/{self.latest_version()}/"
+        ).text
         parser = BeautifulSoup(url_content, "html.parser")
         owners = {
             span.find("a", recursive=False).get_text().strip().lower()
@@ -295,10 +290,6 @@ def check_release_prereqs() -> None:
     check_ownership({me})
 
 
-def list_packages() -> None:
-    print("\n".join(package.name for package in sorted(all_packages())))
-
-
 def list_owners() -> None:
     for package in sorted(all_packages()):
         if not package.exists():
@@ -310,13 +301,17 @@ def list_owners() -> None:
         print(f"Owners of {package.name}:\n{formatted_owners}\n")
 
 
+def list_packages() -> None:
+    print("\n".join(package.name for package in sorted(all_packages())))
+
+
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command")
 
+    subparsers.add_parser("check-release-prereqs")
     subparsers.add_parser("list-owners")
     subparsers.add_parser("list-packages")
-    subparsers.add_parser("check-release-prereqs")
 
     parser_build_and_print = subparsers.add_parser("build-and-print")
     parser_build_and_print.add_argument("version")
@@ -325,12 +320,12 @@ def create_parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = create_parser().parse_args()
+    if args.command == "check-release-prereqs":
+        check_release_prereqs()
     if args.command == "list-owners":
         list_owners()
     if args.command == "list-packages":
         list_packages()
-    if args.command == "check-release-prereqs":
-        check_release_prereqs()
     if args.command == "build-and-print":
         build_and_print_packages(args.version)
 
