@@ -87,7 +87,8 @@ function run_pex() {
 function run_packages_script() {
   (
     cd "${ROOT}"
-    run_pex "$(requirement beautifulsoup4)" -- "${ROOT}/src/python/pants/releases/packages.py" "$@"
+    # TODO: use V2 once we either figure out how to safely expand $@ to --run-args or we land 9835.
+    ./pants --quiet run "${ROOT}/build-support/bin/packages.py" -- "$@"
   )
 }
 
@@ -318,7 +319,7 @@ function install_and_test_packages() {
   # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
   # shellcheck disable=SC2207
   packages=(
-    $(run_packages_script list | grep '.' | awk '{print $1}')
+    $(run_packages_script list-packages | grep '.' | awk '{print $1}')
   ) || die "Failed to list packages!"
 
   for package in "${packages[@]}"
@@ -461,7 +462,7 @@ function fetch_and_check_prebuilt_wheels() {
   # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
   # shellcheck disable=SC2207
   RELEASE_PACKAGES=(
-    $(run_packages_script list | grep '.' | awk '{print $1}')
+    $(run_packages_script list-packages | grep '.' | awk '{print $1}')
   ) || die "Failed to get a list of packages to release!"
   for PACKAGE in "${RELEASE_PACKAGES[@]}"; do
     # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
@@ -669,7 +670,7 @@ while getopts ":${_OPTS}" opt; do
     n) dry_run="true" ;;
     f) build_fs_util ; exit $? ;;
     t) test_release="true" ;;
-    l) run_packages_script list ; exit $? ;;
+    l) run_packages_script list-packages ; exit $? ;;
     o) run_packages_script list-owners ; exit $? ;;
     w) list_prebuilt_wheels ; exit $? ;;
     e) fetch_and_check_prebuilt_wheels ; exit $? ;;

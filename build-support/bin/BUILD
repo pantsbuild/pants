@@ -11,7 +11,7 @@ files(
 # stripping the source root from the files.
 files(
   name = 'python_scripts',
-  sources = ['*.py'],
+  sources = ['common.py', 'check_header.py'],
 )
 
 python_binary(
@@ -109,4 +109,16 @@ python_binary(
     ':common',
   ],
   tags = {'type_checked'},
+)
+
+# TODO: rename this to `release.py` once done porting Bash to Python.
+python_binary(
+  name = "packages",
+  sources = ["packages.py"],
+  dependencies = [
+    ':common',
+    '3rdparty/python:beautifulsoup4',
+    '3rdparty/python:requests',
+  ],
+  tags = {"type_checked"},
 )

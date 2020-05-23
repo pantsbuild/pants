@@ -10,10 +10,3 @@ python_binary(
   ],
   tags = {"partially_type_checked"},
 )
-
-# While this is a target, it should be run with pex. See build-support/bin/release.sh.
-python_binary(
-  name = "packages",
-  sources = ["packages.py"],
-  tags = {"type_checked"},
-)

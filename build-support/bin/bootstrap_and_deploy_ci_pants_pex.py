@@ -23,7 +23,7 @@ def main() -> None:
         )
     args = create_parser().parse_args()
     pex_url = f"s3://{args.aws_bucket}/{args.pex_key}"
-    native_engine_so_local_path = f"./src/python/pants/engine/internals/native_engine.so"
+    native_engine_so_local_path = "./src/python/pants/engine/internals/native_engine.so"
 
     # NB: we must set `$PY` before calling `bootstrap()` to ensure that we use the exact same
     # Python interpreter when calculating the hash of `native_engine.so` as the one we use when
@@ -169,7 +169,7 @@ def deploy_native_engine_so(
 
 
 def deploy_pants_pex(pex_url: str) -> None:
-    _deploy(f"./pants.pex", pex_url)
+    _deploy("./pants.pex", pex_url)
 
 
 if __name__ == "__main__":
