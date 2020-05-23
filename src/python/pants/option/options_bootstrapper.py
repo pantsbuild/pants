@@ -99,7 +99,7 @@ class OptionsBootstrapper:
         )
 
         def register_global(*args, **kwargs):
-            ## Only use of Options.register?
+            # Only use of Options.register?
             bootstrap_options.register(GLOBAL_SCOPE, *args, **kwargs)
 
         GlobalOptions.register_bootstrap_options(register_global)

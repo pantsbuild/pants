@@ -365,6 +365,7 @@ class Options:
     def registration_function_for_optionable(self, optionable_class):
         """Returns a function for registering options on the given scope."""
         self._assert_not_frozen()
+
         # TODO(benjy): Make this an instance of a class that implements __call__, so we can
         # docstring it, and so it's less weird than attaching properties to a function.
         def register(*args, **kwargs):

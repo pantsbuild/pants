@@ -584,7 +584,7 @@ class RscCompile(ZincCompile, MirroredTargetOptionMixin):
             # Update the products with the latest classes.
             self.register_extra_products_from_contexts([ctx.target], compile_contexts)
 
-        ### Create Jobs for ExecutionGraph
+        # Create Jobs for ExecutionGraph
         cache_doublecheck_jobs = []
         rsc_jobs = []
         zinc_jobs = []

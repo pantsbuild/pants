@@ -129,7 +129,7 @@ class SubsystemClientMixin:
         known_scope_infos = set()
         optionables_path = (
             OrderedSet()
-        )  #  To check for cycles at the Optionable level, ignoring scope.
+        )  # To check for cycles at the Optionable level, ignoring scope.
 
         def collect_scope_infos(optionable_cls, scoped_to, removal_version=None, removal_hint=None):
             if optionable_cls in optionables_path:
