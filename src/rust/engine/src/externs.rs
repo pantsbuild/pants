@@ -344,7 +344,6 @@ pub type ExternContext = raw::c_void;
 
 pub struct Externs {
   pub context: *const ExternContext,
-  pub log_level: u8,
   pub none: Handle,
   pub call: CallExtern,
   pub generator_send: GeneratorSendExtern,

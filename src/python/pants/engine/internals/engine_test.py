@@ -18,6 +18,7 @@ from pants.testutil.engine.util import (
     fmt_rule,
     remove_locations_from_traceback,
 )
+from pants.util.logging import LogLevel
 
 
 class A:
@@ -50,7 +51,7 @@ class Fib:
     val: int
 
 
-@named_rule
+@named_rule(desc="Fibonacci")
 async def fib(n: int) -> Fib:
     if n < 2:
         return Fib(n)
@@ -97,7 +98,11 @@ class Omega:
     pass
 
 
-@named_rule(canonical_name="rule_one")
+class Epsilon:
+    pass
+
+
+@named_rule(canonical_name="rule_one", desc="Rule number 1")
 async def rule_one_function(i: Input) -> Beta:
     """This rule should be the first one executed by the engine, and thus have no parent."""
     a = Alpha()
@@ -107,7 +112,7 @@ async def rule_one_function(i: Input) -> Beta:
     return b
 
 
-@named_rule
+@named_rule(desc="Rule number 2")
 async def rule_two(a: Alpha) -> Omega:
     """This rule should be invoked in the body of `rule_one` and therefore its workunit should be a
     child of `rule_one`'s workunit."""
@@ -127,6 +132,25 @@ def rule_four(a: Alpha) -> Gamma:
     """This rule should be invoked in the body of `rule_two` and therefore its workunit should be a
     child of `rule_two`'s workunit."""
     return Gamma()
+
+
+@named_rule(desc="Rule A")
+async def rule_A(i: Input) -> Alpha:
+    o = Omega()
+    a = await Get[Alpha](Omega, o)
+    return a
+
+
+@rule
+async def rule_B(o: Omega) -> Alpha:
+    e = Epsilon()
+    a = await Get[Alpha](Epsilon, e)
+    return a
+
+
+@named_rule(desc="Rule C")
+def rule_C(e: Epsilon) -> Alpha:
+    return Alpha()
 
 
 class EngineTest(unittest.TestCase, SchedulerTestBase):
@@ -392,10 +416,95 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
         r3 = next(item for item in finished if item["name"] == "rule_three")
         r4 = next(item for item in finished if item["name"] == "rule_four")
 
+        # rule_one should have no parent_id because its actual parent workunit was filted based on level
         assert r1.get("parent_id", None) is None
+
         assert r2["parent_id"] == r1["span_id"]
         assert r3["parent_id"] == r1["span_id"]
         assert r4["parent_id"] == r2["span_id"]
 
         assert r3["description"] == "Rule number 3"
         assert r4["description"] == "Rule number 4"
+        assert r4["level"] == "INFO"
+
+    def test_streaming_workunit_log_levels(self) -> None:
+        rules = [RootRule(Input), rule_one_function, rule_two, rule_three, rule_four]
+        scheduler = self.mk_scheduler(
+            rules, include_trace_on_error=False, should_report_workunits=True
+        )
+        tracker = self.WorkunitTracker()
+        handler = StreamingWorkunitHandler(
+            scheduler,
+            callbacks=[tracker.add],
+            report_interval_seconds=0.01,
+            max_workunit_verbosity=LogLevel.TRACE,
+        )
+
+        with handler.session():
+            i = Input()
+            scheduler.product_request(Beta, subjects=[i])
+
+        assert tracker.finished
+        finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+
+        # With the max_workunit_verbosity set to TRACE, we should see the workunit corresponding to the Select node.
+        select = next(
+            item
+            for item in finished
+            if item["name"] not in {"rule_one", "rule_two", "rule_three", "rule_four"}
+        )
+        assert select["name"] == "select"
+        assert select["level"] == "DEBUG"
+
+        r1 = next(item for item in finished if item["name"] == "rule_one")
+        assert r1["parent_id"] == select["span_id"]
+
+    def test_streaming_workunit_log_level_parent_rewrite(self) -> None:
+        rules = [RootRule(Input), rule_A, rule_B, rule_C]
+        scheduler = self.mk_scheduler(
+            rules, include_trace_on_error=False, should_report_workunits=True
+        )
+        tracker = self.WorkunitTracker()
+        info_level_handler = StreamingWorkunitHandler(
+            scheduler,
+            callbacks=[tracker.add],
+            report_interval_seconds=0.01,
+            max_workunit_verbosity=LogLevel.INFO,
+        )
+
+        with info_level_handler.session():
+            i = Input()
+            scheduler.product_request(Alpha, subjects=[i])
+
+        assert tracker.finished
+        finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+
+        assert len(finished) == 2
+        r_A = next(item for item in finished if item["name"] == "rule_A")
+        r_C = next(item for item in finished if item["name"] == "rule_C")
+        assert "parent_id" not in r_A
+        assert r_C["parent_id"] == r_A["span_id"]
+
+        scheduler = self.mk_scheduler(
+            rules, include_trace_on_error=False, should_report_workunits=True
+        )
+        tracker = self.WorkunitTracker()
+        debug_level_handler = StreamingWorkunitHandler(
+            scheduler,
+            callbacks=[tracker.add],
+            report_interval_seconds=0.01,
+            max_workunit_verbosity=LogLevel.DEBUG,
+        )
+
+        with debug_level_handler.session():
+            i = Input()
+            scheduler.product_request(Alpha, subjects=[i])
+
+        assert tracker.finished
+        finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+
+        r_A = next(item for item in finished if item["name"] == "rule_A")
+        r_B = next(item for item in finished if item["name"] == "rule_B")
+        r_C = next(item for item in finished if item["name"] == "rule_C")
+        assert r_B["parent_id"] == r_A["span_id"]
+        assert r_C["parent_id"] == r_B["span_id"]

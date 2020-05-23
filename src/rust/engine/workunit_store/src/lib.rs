@@ -62,14 +62,12 @@ pub enum WorkunitState {
 pub struct WorkunitMetadata {
   pub desc: Option<String>,
   pub level: Level,
-  pub display: bool,
   pub blocked: bool,
 }
 
 impl WorkunitMetadata {
   pub fn new() -> WorkunitMetadata {
     WorkunitMetadata {
-      display: true,
       level: Level::Info,
       desc: None,
       blocked: false,
@@ -91,13 +89,6 @@ pub struct WorkUnitInnerStore {
   completed_ids: Vec<SpanId>,
   last_seen_started_idx: usize,
   last_seen_completed_idx: usize,
-}
-
-fn should_display_workunit(workunit_records: &HashMap<SpanId, Workunit>, id: &str) -> bool {
-  match workunit_records.get(id) {
-    None => false,
-    Some(record) => record.metadata.display,
-  }
 }
 
 impl WorkunitStore {
@@ -260,7 +251,7 @@ impl WorkunitStore {
     inner.completed_ids.push(span_id);
   }
 
-  pub fn with_latest_workunits<F, T>(&mut self, f: F) -> T
+  pub fn with_latest_workunits<F, T>(&mut self, max_verbosity: log::Level, f: F) -> T
   where
     F: FnOnce(&[Workunit], &[Workunit]) -> T,
   {
@@ -268,11 +259,17 @@ impl WorkunitStore {
     let inner_store: &mut WorkUnitInnerStore = &mut *inner_guard;
     let workunit_records = &inner_store.workunit_records;
 
-    let compute_should_display = |workunit: Workunit| -> Workunit {
+    let should_emit = |workunit: &Workunit| -> bool { workunit.metadata.level <= max_verbosity };
+
+    let compute_adjusted_parent_id = |workunit: Workunit| -> Workunit {
       let mut parent_id: Option<SpanId> = workunit.parent_id;
       loop {
         if let Some(current_parent_id) = parent_id {
-          if should_display_workunit(workunit_records, &current_parent_id) {
+          let should_emit = match workunit_records.get(&current_parent_id) {
+            None => false,
+            Some(workunit) => should_emit(&workunit),
+          };
+          if should_emit {
             return Workunit {
               parent_id: Some(current_parent_id),
               ..workunit
@@ -301,11 +298,11 @@ impl WorkunitStore {
       .iter()
       .flat_map(|id| workunit_records.get(id))
       .flat_map(|workunit| match workunit.state {
-        WorkunitState::Started { .. } if workunit.metadata.display => Some(workunit.clone()),
+        WorkunitState::Started { .. } if should_emit(&workunit) => Some(workunit.clone()),
         WorkunitState::Started { .. } => None,
         WorkunitState::Completed { .. } => None,
       })
-      .map(compute_should_display)
+      .map(compute_adjusted_parent_id)
       .collect();
     inner_store.last_seen_started_idx = cur_len;
 
@@ -316,11 +313,11 @@ impl WorkunitStore {
       .iter()
       .flat_map(|id| workunit_records.get(id))
       .flat_map(|workunit| match workunit.state {
-        WorkunitState::Completed { .. } if workunit.metadata.display => Some(workunit.clone()),
+        WorkunitState::Completed { .. } if should_emit(&workunit) => Some(workunit.clone()),
         WorkunitState::Completed { .. } => None,
         WorkunitState::Started { .. } => None,
       })
-      .map(compute_should_display)
+      .map(compute_adjusted_parent_id)
       .collect();
     inner_store.last_seen_completed_idx = cur_len;
 

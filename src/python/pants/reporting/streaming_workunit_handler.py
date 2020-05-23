@@ -5,6 +5,8 @@ import threading
 from contextlib import contextmanager
 from typing import Any, Callable, Iterable, Iterator, Optional
 
+from pants.util.logging import LogLevel
+
 
 class StreamingWorkunitHandler:
     """StreamingWorkunitHandler's job is to periodically call each registered callback function with
@@ -15,17 +17,22 @@ class StreamingWorkunitHandler:
     """
 
     def __init__(
-        self, scheduler: Any, callbacks: Iterable[Callable], report_interval_seconds: float
+        self,
+        scheduler: Any,
+        callbacks: Iterable[Callable],
+        report_interval_seconds: float,
+        max_workunit_verbosity: LogLevel = LogLevel.INFO,
     ):
         self.scheduler = scheduler
         self.report_interval = report_interval_seconds
         self.callbacks = callbacks
         self._thread_runner: Optional[_InnerHandler] = None
+        self.max_workunit_verbosity = max_workunit_verbosity
 
     def start(self) -> None:
         if self.callbacks:
             self._thread_runner = _InnerHandler(
-                self.scheduler, self.callbacks, self.report_interval
+                self.scheduler, self.callbacks, self.report_interval, self.max_workunit_verbosity
             )
             self._thread_runner.start()
 
@@ -35,7 +42,7 @@ class StreamingWorkunitHandler:
 
         # After stopping the thread, poll workunits one last time to make sure
         # we report any workunits that were added after the last time the thread polled.
-        workunits = self.scheduler.poll_workunits()
+        workunits = self.scheduler.poll_workunits(self.max_workunit_verbosity)
         for callback in self.callbacks:
             callback(
                 workunits=workunits["completed"],
@@ -56,16 +63,23 @@ class StreamingWorkunitHandler:
 
 
 class _InnerHandler(threading.Thread):
-    def __init__(self, scheduler: Any, callbacks: Iterable[Callable], report_interval: float):
+    def __init__(
+        self,
+        scheduler: Any,
+        callbacks: Iterable[Callable],
+        report_interval: float,
+        max_workunit_verbosity: LogLevel,
+    ):
         super().__init__(daemon=True)
         self.scheduler = scheduler
         self.stop_request = threading.Event()
         self.report_interval = report_interval
         self.callbacks = callbacks
+        self.max_workunit_verbosity = max_workunit_verbosity
 
     def run(self):
         while not self.stop_request.isSet():
-            workunits = self.scheduler.poll_workunits()
+            workunits = self.scheduler.poll_workunits(self.max_workunit_verbosity)
             for callback in self.callbacks:
                 callback(
                     workunits=workunits["completed"],
