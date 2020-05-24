@@ -6,7 +6,7 @@ from textwrap import dedent
 from typing import ClassVar, Iterable, List, Optional, Tuple, Type
 
 from pants.base.specs import SingleAddress
-from pants.core.goals.lint import Lint, LintOptions, LintRequest, LintResult, lint
+from pants.core.goals.lint import Lint, LintOptions, LintRequest, LintResult, LintResults, lint
 from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSources,
     FieldSetsWithSourcesRequest,
@@ -48,14 +48,21 @@ class MockLintRequest(LintRequest, metaclass=ABCMeta):
         pass
 
     @property
-    def lint_result(self) -> LintResult:
+    def lint_result(self) -> LintResults:
         addresses = [config.address for config in self.field_sets]
-        return LintResult(
-            self.exit_code(addresses), self.stdout(addresses), "", linter_name=self.linter_name
+        return LintResults(
+            [
+                LintResult(
+                    self.exit_code(addresses),
+                    self.stdout(addresses),
+                    "",
+                    linter_name=self.linter_name,
+                )
+            ]
         )
 
 
-class SuccessfulFieldSets(MockLintRequest):
+class SuccessfulRequest(MockLintRequest):
     linter_name = "SuccessfulLinter"
 
     @staticmethod
@@ -67,7 +74,7 @@ class SuccessfulFieldSets(MockLintRequest):
         return ", ".join(str(address) for address in addresses)
 
 
-class FailingFieldSets(MockLintRequest):
+class FailingRequest(MockLintRequest):
     linter_name = "FailingLinter"
 
     @staticmethod
@@ -79,7 +86,7 @@ class FailingFieldSets(MockLintRequest):
         return ", ".join(str(address) for address in addresses)
 
 
-class ConditionallySucceedsFieldSets(MockLintRequest):
+class ConditionallySucceedsRequest(MockLintRequest):
     linter_name = "ConditionallySucceedsLinter"
 
     @staticmethod
@@ -101,7 +108,7 @@ class InvalidFieldSet(MockLinterFieldSet):
     required_fields = (InvalidField,)
 
 
-class InvalidFieldSets(MockLintRequest):
+class InvalidRequest(MockLintRequest):
     field_set_type = InvalidFieldSet
     linter_name = "InvalidLinter"
 
@@ -144,7 +151,7 @@ class LintTest(TestBase):
             ],
             mock_gets=[
                 MockGet(
-                    product_type=LintResult,
+                    product_type=LintResults,
                     subject_type=LintRequest,
                     mock=lambda field_set_collection: field_set_collection.lint_result,
                 ),
@@ -164,7 +171,7 @@ class LintTest(TestBase):
     def test_empty_target_noops(self) -> None:
         def assert_noops(per_target_caching: bool) -> None:
             exit_code, stderr = self.run_lint_rule(
-                lint_request_types=[FailingFieldSets],
+                lint_request_types=[FailingRequest],
                 targets=[self.make_target_with_origin()],
                 per_target_caching=per_target_caching,
                 include_sources=False,
@@ -178,7 +185,7 @@ class LintTest(TestBase):
     def test_invalid_target_noops(self) -> None:
         def assert_noops(per_target_caching: bool) -> None:
             exit_code, stderr = self.run_lint_rule(
-                lint_request_types=[InvalidFieldSets],
+                lint_request_types=[InvalidRequest],
                 targets=[self.make_target_with_origin()],
                 per_target_caching=per_target_caching,
             )
@@ -194,15 +201,15 @@ class LintTest(TestBase):
 
         def assert_expected(per_target_caching: bool) -> None:
             exit_code, stderr = self.run_lint_rule(
-                lint_request_types=[FailingFieldSets],
+                lint_request_types=[FailingRequest],
                 targets=[target_with_origin],
                 per_target_caching=per_target_caching,
             )
-            assert exit_code == FailingFieldSets.exit_code([address])
+            assert exit_code == FailingRequest.exit_code([address])
             assert stderr == dedent(
                 f"""\
                 𐄂 FailingLinter failed.
-                {FailingFieldSets.stdout([address])}
+                {FailingRequest.stdout([address])}
                 """
             )
 
@@ -215,18 +222,18 @@ class LintTest(TestBase):
 
         def assert_expected(per_target_caching: bool) -> None:
             exit_code, stderr = self.run_lint_rule(
-                lint_request_types=[SuccessfulFieldSets, FailingFieldSets],
+                lint_request_types=[SuccessfulRequest, FailingRequest],
                 targets=[target_with_origin],
                 per_target_caching=per_target_caching,
             )
-            assert exit_code == FailingFieldSets.exit_code([address])
+            assert exit_code == FailingRequest.exit_code([address])
             assert stderr == dedent(
                 f"""\
                 𐄂 FailingLinter failed.
-                {FailingFieldSets.stdout([address])}
+                {FailingRequest.stdout([address])}
 
                 ✓ SuccessfulLinter succeeded.
-                {SuccessfulFieldSets.stdout([address])}
+                {SuccessfulRequest.stdout([address])}
                 """
             )
 
@@ -239,30 +246,30 @@ class LintTest(TestBase):
 
         def get_stderr(*, per_target_caching: bool) -> str:
             exit_code, stderr = self.run_lint_rule(
-                lint_request_types=[ConditionallySucceedsFieldSets],
+                lint_request_types=[ConditionallySucceedsRequest],
                 targets=[
                     self.make_target_with_origin(good_address),
                     self.make_target_with_origin(bad_address),
                 ],
                 per_target_caching=per_target_caching,
             )
-            assert exit_code == ConditionallySucceedsFieldSets.exit_code([bad_address])
+            assert exit_code == ConditionallySucceedsRequest.exit_code([bad_address])
             return stderr
 
         assert get_stderr(per_target_caching=False) == dedent(
             f"""\
             𐄂 ConditionallySucceedsLinter failed.
-            {ConditionallySucceedsFieldSets.stdout([good_address, bad_address])}
+            {ConditionallySucceedsRequest.stdout([good_address, bad_address])}
             """
         )
 
         assert get_stderr(per_target_caching=True) == dedent(
             f"""\
             ✓ ConditionallySucceedsLinter succeeded.
-            {ConditionallySucceedsFieldSets.stdout([good_address])}
+            {ConditionallySucceedsRequest.stdout([good_address])}
 
             𐄂 ConditionallySucceedsLinter failed.
-            {ConditionallySucceedsFieldSets.stdout([bad_address])}
+            {ConditionallySucceedsRequest.stdout([bad_address])}
             """
         )
 
@@ -272,38 +279,38 @@ class LintTest(TestBase):
 
         def get_stderr(*, per_target_caching: bool) -> str:
             exit_code, stderr = self.run_lint_rule(
-                lint_request_types=[ConditionallySucceedsFieldSets, SuccessfulFieldSets,],
+                lint_request_types=[ConditionallySucceedsRequest, SuccessfulRequest],
                 targets=[
                     self.make_target_with_origin(good_address),
                     self.make_target_with_origin(bad_address),
                 ],
                 per_target_caching=per_target_caching,
             )
-            assert exit_code == ConditionallySucceedsFieldSets.exit_code([bad_address])
+            assert exit_code == ConditionallySucceedsRequest.exit_code([bad_address])
             return stderr
 
         assert get_stderr(per_target_caching=False) == dedent(
             f"""\
             𐄂 ConditionallySucceedsLinter failed.
-            {ConditionallySucceedsFieldSets.stdout([good_address, bad_address])}
+            {ConditionallySucceedsRequest.stdout([good_address, bad_address])}
 
             ✓ SuccessfulLinter succeeded.
-            {SuccessfulFieldSets.stdout([good_address, bad_address])}
+            {SuccessfulRequest.stdout([good_address, bad_address])}
             """
         )
 
         assert get_stderr(per_target_caching=True) == dedent(
             f"""\
             ✓ ConditionallySucceedsLinter succeeded.
-            {ConditionallySucceedsFieldSets.stdout([good_address])}
+            {ConditionallySucceedsRequest.stdout([good_address])}
 
             𐄂 ConditionallySucceedsLinter failed.
-            {ConditionallySucceedsFieldSets.stdout([bad_address])}
+            {ConditionallySucceedsRequest.stdout([bad_address])}
 
             ✓ SuccessfulLinter succeeded.
-            {SuccessfulFieldSets.stdout([good_address])}
+            {SuccessfulRequest.stdout([good_address])}
 
             ✓ SuccessfulLinter succeeded.
-            {SuccessfulFieldSets.stdout([bad_address])}
+            {SuccessfulRequest.stdout([bad_address])}
             """
         )

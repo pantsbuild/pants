@@ -21,7 +21,7 @@ from pants.backend.python.target_types import (
     PythonRequirementsField,
     PythonSources,
 )
-from pants.core.goals.lint import LintRequest, LintResult
+from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.engine.addresses import Address, Addresses
@@ -69,9 +69,9 @@ async def pylint_lint(
     pylint: Pylint,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
-) -> LintResult:
+) -> LintResults:
     if pylint.skip:
-        return LintResult.noop()
+        return LintResults()
 
     # Pylint needs direct dependencies in the chroot to ensure that imports are valid. However, it
     # doesn't lint those direct dependencies nor does it care about transitive dependencies.
@@ -239,7 +239,7 @@ async def pylint_lint(
         description=f"Run Pylint on {pluralize(len(request.field_sets), 'target')}: {address_references}.",
     )
     result = await Get[FallibleProcessResult](Process, process)
-    return LintResult.from_fallible_process_result(result, linter_name="Pylint")
+    return LintResults([LintResult.from_fallible_process_result(result, linter_name="Pylint")])
 
 
 def rules():

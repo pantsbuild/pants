@@ -17,7 +17,7 @@ from pants.backend.python.subsystems import python_native_code, subprocess_envir
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.backend.python.target_types import PythonSources
 from pants.core.goals.fmt import FmtRequest, FmtResult
-from pants.core.goals.lint import LintRequest, LintResult
+from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.core.util_rules.determine_source_files import (
     AllSourceFilesRequest,
@@ -69,7 +69,7 @@ def generate_args(
 
 @rule
 async def setup(
-    request: SetupRequest,
+    setup_request: SetupRequest,
     docformatter: Docformatter,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
@@ -86,16 +86,16 @@ async def setup(
     )
 
     all_source_files_request = Get[SourceFiles](
-        AllSourceFilesRequest(field_set.sources for field_set in request.request.field_sets)
+        AllSourceFilesRequest(field_set.sources for field_set in setup_request.request.field_sets)
     )
     specified_source_files_request = Get[SourceFiles](
         SpecifiedSourceFilesRequest(
-            (field_set.sources, field_set.origin) for field_set in request.request.field_sets
+            (field_set.sources, field_set.origin) for field_set in setup_request.request.field_sets
         )
     )
 
     requests: List[Get] = [requirements_pex_request, specified_source_files_request]
-    if request.request.prior_formatter_result is None:
+    if setup_request.request.prior_formatter_result is None:
         requests.append(all_source_files_request)
     requirements_pex, specified_source_files, *rest = cast(
         Union[Tuple[Pex, SourceFiles], Tuple[Pex, SourceFiles, SourceFiles]],
@@ -103,8 +103,8 @@ async def setup(
     )
 
     all_source_files_snapshot = (
-        request.request.prior_formatter_result
-        if request.request.prior_formatter_result
+        setup_request.request.prior_formatter_result
+        if setup_request.request.prior_formatter_result
         else rest[0].snapshot
     )
 
@@ -113,7 +113,7 @@ async def setup(
     )
 
     address_references = ", ".join(
-        sorted(field_set.address.reference() for field_set in request.request.field_sets)
+        sorted(field_set.address.reference() for field_set in setup_request.request.field_sets)
     )
 
     process = requirements_pex.create_process(
@@ -123,12 +123,12 @@ async def setup(
         pex_args=generate_args(
             specified_source_files=specified_source_files,
             docformatter=docformatter,
-            check_only=request.check_only,
+            check_only=setup_request.check_only,
         ),
         input_digest=input_digest,
         output_files=all_source_files_snapshot.files,
         description=(
-            f"Run Docformatter on {pluralize(len(request.request.field_sets), 'target')}: "
+            f"Run Docformatter on {pluralize(len(setup_request.request.field_sets), 'target')}: "
             f"{address_references}."
         ),
     )
@@ -147,12 +147,16 @@ async def docformatter_fmt(request: DocformatterRequest, docformatter: Docformat
 
 
 @named_rule(desc="Lint Python docstrings with docformatter")
-async def docformatter_lint(request: DocformatterRequest, docformatter: Docformatter) -> LintResult:
+async def docformatter_lint(
+    request: DocformatterRequest, docformatter: Docformatter
+) -> LintResults:
     if docformatter.options.skip:
-        return LintResult.noop()
+        return LintResults()
     setup = await Get[Setup](SetupRequest(request, check_only=True))
     result = await Get[FallibleProcessResult](Process, setup.process)
-    return LintResult.from_fallible_process_result(result, linter_name="Docformatter")
+    return LintResults(
+        [LintResult.from_fallible_process_result(result, linter_name="Docformatter")]
+    )
 
 
 def rules():

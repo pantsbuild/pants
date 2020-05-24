@@ -15,7 +15,7 @@ from pants.backend.python.rules.pex import (
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonSources
-from pants.core.goals.lint import LintRequest, LintResult
+from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.core.util_rules.determine_source_files import (
     AllSourceFilesRequest,
@@ -60,9 +60,9 @@ async def bandit_lint(
     bandit: Bandit,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
-) -> LintResult:
+) -> LintResults:
     if bandit.options.skip:
-        return LintResult.noop()
+        return LintResults()
 
     # NB: Bandit output depends upon which Python interpreter version it's run with. See
     # https://github.com/PyCQA/bandit#under-which-version-of-python-should-i-install-bandit.
@@ -127,7 +127,7 @@ async def bandit_lint(
         description=f"Run Bandit on {pluralize(len(request.field_sets), 'target')}: {address_references}.",
     )
     result = await Get[FallibleProcessResult](Process, process)
-    return LintResult.from_fallible_process_result(result, linter_name="Bandit")
+    return LintResults([LintResult.from_fallible_process_result(result, linter_name="Bandit")])
 
 
 def rules():

@@ -15,7 +15,7 @@ from pants.backend.python.rules.pex import (
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonSources
-from pants.core.goals.lint import LintRequest, LintResult
+from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.core.util_rules.determine_source_files import (
     AllSourceFilesRequest,
@@ -60,9 +60,9 @@ async def flake8_lint(
     flake8: Flake8,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
-) -> LintResult:
+) -> LintResults:
     if flake8.options.skip:
-        return LintResult.noop()
+        return LintResults()
 
     # NB: Flake8 output depends upon which Python interpreter version it's run with. We ensure that
     # each target runs with its own interpreter constraints. See
@@ -125,10 +125,12 @@ async def flake8_lint(
         pex_path="./flake8.pex",
         pex_args=generate_args(specified_source_files=specified_source_files, flake8=flake8),
         input_digest=input_digest,
-        description=f"Run Flake8 on {pluralize(len(request.field_sets), 'target')}: {address_references}.",
+        description=(
+            f"Run Flake8 on {pluralize(len(request.field_sets), 'target')}: {address_references}."
+        ),
     )
     result = await Get[FallibleProcessResult](Process, process)
-    return LintResult.from_fallible_process_result(result, linter_name="Flake8")
+    return LintResults([LintResult.from_fallible_process_result(result, linter_name="Flake8")])
 
 
 def rules():
