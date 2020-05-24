@@ -40,9 +40,7 @@ from pants.util.strutil import pluralize
 class PylintFieldSet(LinterFieldSet):
     required_fields = (PythonSources,)
 
-    sources: PythonSources
     dependencies: Dependencies
-    compatibility: PythonInterpreterCompatibility
 
 
 class PylintFieldSets(LinterFieldSets):
@@ -91,7 +89,7 @@ async def pylint_lint(
     # http://pylint.pycqa.org/en/latest/faq.html#what-versions-of-python-is-pylint-supporting.
     interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
         (
-            *(field_set.compatibility for field_set in field_sets),
+            *(tgt.get(PythonInterpreterCompatibility) for tgt in targets_with_dependencies),
             *(
                 plugin_tgt[PythonInterpreterCompatibility]
                 for plugin_tgt in plugin_targets.closure
