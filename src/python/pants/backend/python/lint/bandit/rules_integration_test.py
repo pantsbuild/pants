@@ -132,7 +132,19 @@ class BanditIntegrationTest(ExternalToolTestBase):
         py3_result = self.run_bandit([py3_target])
         assert len(py3_result) == 1
         assert py3_result[0].exit_code == 0
-        assert "No issues identified." in py3_result[0].stdout.strip()
+        assert "No issues identified." in py3_result[0].stdout
+
+        # Test that we partition incompatible targets when passed in a single batch. We expect Py2
+        # to still fail, but Py3 should pass.
+        combined_result = self.run_bandit([py2_target, py3_target])
+        assert len(combined_result) == 2
+        batched_py2_result, batched_py3_result = sorted(
+            combined_result, key=lambda result: result.stderr
+        )
+        assert batched_py2_result.exit_code == 0
+        assert "py3.py (syntax error while parsing AST from file)" in batched_py2_result.stdout
+        assert batched_py3_result.exit_code == 0
+        assert "No issues identified." in batched_py3_result.stdout
 
     def test_respects_config_file(self) -> None:
         target = self.make_target_with_origin([self.bad_source])

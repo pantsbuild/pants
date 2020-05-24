@@ -123,6 +123,7 @@ class Flake8IntegrationTest(ExternalToolTestBase):
         assert len(py2_result) == 1
         assert py2_result[0].exit_code == 1
         assert "py3.py:1:8: E999 SyntaxError" in py2_result[0].stdout
+
         py3_target = self.make_target_with_origin(
             [self.py3_only_source], interpreter_constraints="CPython>=3.6"
         )
@@ -130,6 +131,18 @@ class Flake8IntegrationTest(ExternalToolTestBase):
         assert len(py3_result) == 1
         assert py3_result[0].exit_code == 0
         assert py3_result[0].stdout.strip() == ""
+
+        # Test that we partition incompatible targets when passed in a single batch. We expect Py2
+        # to still fail, but Py3 should pass.
+        combined_result = self.run_flake8([py2_target, py3_target])
+        assert len(combined_result) == 2
+        batched_py3_result, batched_py2_result = sorted(
+            combined_result, key=lambda result: result.exit_code
+        )
+        assert batched_py2_result.exit_code == 1
+        assert "py3.py:1:8: E999 SyntaxError" in batched_py2_result.stdout
+        assert batched_py3_result.exit_code == 0
+        assert batched_py3_result.stdout.strip() == ""
 
     def test_respects_config_file(self) -> None:
         target = self.make_target_with_origin([self.bad_source])

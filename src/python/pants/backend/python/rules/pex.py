@@ -5,7 +5,20 @@ import dataclasses
 import itertools
 import logging
 from dataclasses import dataclass
-from typing import FrozenSet, Iterable, Iterator, List, NamedTuple, Optional, Sequence, Set, Tuple
+from typing import (
+    FrozenSet,
+    Iterable,
+    Iterator,
+    List,
+    NamedTuple,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    TypeVar,
+)
+
+from typing_extensions import Protocol
 
 from pants.backend.python.rules.download_pex_bin import DownloadedPexBin
 from pants.backend.python.rules.hermetic_pex import HermeticPex
@@ -15,6 +28,7 @@ from pants.backend.python.subsystems.subprocess_environment import SubprocessEnc
 from pants.backend.python.target_types import PythonInterpreterCompatibility
 from pants.backend.python.target_types import PythonPlatforms as PythonPlatformsField
 from pants.backend.python.target_types import PythonRequirementsField
+from pants.engine.addresses import Address
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -33,6 +47,7 @@ from pants.engine.rules import RootRule, SubsystemRule, named_rule, rule
 from pants.engine.selectors import Get
 from pants.python.python_repos import PythonRepos
 from pants.python.python_setup import PythonSetup
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
@@ -67,6 +82,21 @@ class ParsedConstraint(NamedTuple):
             f"{op}{version}" for op, version in sorted(self.specs, key=lambda spec: spec[1])
         )
         return f"{self.interpreter}{specs}"
+
+
+# This protocol allows us to work with any arbitrary FieldSet. See
+# https://mypy.readthedocs.io/en/stable/protocols.html.
+class FieldSetWithCompatibility(Protocol):
+    @property
+    def address(self) -> Address:
+        ...
+
+    @property
+    def compatibility(self) -> PythonInterpreterCompatibility:
+        ...
+
+
+_FS = TypeVar("_FS", bound=FieldSetWithCompatibility)
 
 
 class PexInterpreterConstraints(DeduplicatedCollection[str]):
@@ -132,6 +162,21 @@ class PexInterpreterConstraints(DeduplicatedCollection[str]):
         # This will OR within each field and AND across fields.
         merged_constraints = cls.merge_constraint_sets(constraint_sets)
         return PexInterpreterConstraints(merged_constraints)
+
+    @classmethod
+    def group_field_sets_by_constraints(
+        cls, field_sets: Iterable[_FS], python_setup: PythonSetup
+    ) -> FrozenDict["PexInterpreterConstraints", Tuple[_FS, ...]]:
+        constraints_to_field_sets = {
+            constraints: tuple(sorted(fs_collection, key=lambda fs: fs.address))
+            for constraints, fs_collection in itertools.groupby(
+                field_sets,
+                key=lambda fs: cls.create_from_compatibility_fields(
+                    [fs.compatibility], python_setup
+                ),
+            )
+        }
+        return FrozenDict(sorted(constraints_to_field_sets.items()))
 
     def generate_pex_arg_list(self) -> List[str]:
         args = []

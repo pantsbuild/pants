@@ -24,7 +24,7 @@ from pants.core.util_rules.determine_source_files import (
 )
 from pants.engine.fs import Digest, MergeDigests, PathGlobs, Snapshot
 from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import SubsystemRule, named_rule
+from pants.engine.rules import SubsystemRule, named_rule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import FieldSetWithOrigin
 from pants.engine.unions import UnionRule
@@ -45,6 +45,12 @@ class BanditRequest(LintRequest):
     field_set_type = BanditFieldSet
 
 
+@dataclass(frozen=True)
+class BanditPartition:
+    field_sets: Tuple[BanditFieldSet, ...]
+    interpreter_constraints: PexInterpreterConstraints
+
+
 def generate_args(*, specified_source_files: SourceFiles, bandit: Bandit) -> Tuple[str, ...]:
     args = []
     if bandit.options.config is not None:
@@ -54,26 +60,21 @@ def generate_args(*, specified_source_files: SourceFiles, bandit: Bandit) -> Tup
     return tuple(args)
 
 
-@named_rule(desc="Lint using Bandit")
-async def bandit_lint(
-    request: BanditRequest,
+@rule
+async def bandit_lint_partition(
+    partition: BanditPartition,
     bandit: Bandit,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
-) -> LintResults:
-    if bandit.options.skip:
-        return LintResults()
-
-    # NB: Bandit output depends upon which Python interpreter version it's run with. See
-    # https://github.com/PyCQA/bandit#under-which-version-of-python-should-i-install-bandit.
-    interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
-        (field_set.compatibility for field_set in request.field_sets), python_setup=python_setup
-    ) or PexInterpreterConstraints(bandit.default_interpreter_constraints)
+) -> LintResult:
     requirements_pex_request = Get[Pex](
         PexRequest(
             output_filename="bandit.pex",
             requirements=PexRequirements(bandit.get_requirement_specs()),
-            interpreter_constraints=interpreter_constraints,
+            interpreter_constraints=(
+                partition.interpreter_constraints
+                or PexInterpreterConstraints(bandit.default_interpreter_constraints)
+            ),
             entry_point=bandit.get_entry_point(),
         )
     )
@@ -88,11 +89,11 @@ async def bandit_lint(
     )
 
     all_source_files_request = Get[SourceFiles](
-        AllSourceFilesRequest(field_set.sources for field_set in request.field_sets)
+        AllSourceFilesRequest(field_set.sources for field_set in partition.field_sets)
     )
     specified_source_files_request = Get[SourceFiles](
         SpecifiedSourceFilesRequest(
-            (field_set.sources, field_set.origin) for field_set in request.field_sets
+            (field_set.sources, field_set.origin) for field_set in partition.field_sets
         )
     )
 
@@ -115,7 +116,7 @@ async def bandit_lint(
     )
 
     address_references = ", ".join(
-        sorted(field_set.address.reference() for field_set in request.field_sets)
+        sorted(field_set.address.reference() for field_set in partition.field_sets)
     )
 
     process = requirements_pex.create_process(
@@ -124,15 +125,39 @@ async def bandit_lint(
         pex_path="./bandit.pex",
         pex_args=generate_args(specified_source_files=specified_source_files, bandit=bandit),
         input_digest=input_digest,
-        description=f"Run Bandit on {pluralize(len(request.field_sets), 'target')}: {address_references}.",
+        description=(
+            f"Run Bandit on {pluralize(len(partition.field_sets), 'target')}: {address_references}."
+        ),
     )
     result = await Get[FallibleProcessResult](Process, process)
-    return LintResults([LintResult.from_fallible_process_result(result, linter_name="Bandit")])
+    return LintResult.from_fallible_process_result(result, linter_name="Bandit")
+
+
+@named_rule(desc="Lint using Bandit")
+async def bandit_lint(
+    request: BanditRequest, bandit: Bandit, python_setup: PythonSetup
+) -> LintResults:
+    if bandit.options.skip:
+        return LintResults()
+
+    # NB: Bandit output depends upon which Python interpreter version it's run with
+    # ( https://github.com/PyCQA/bandit#under-which-version-of-python-should-i-install-bandit). We
+    # batch targets by their constraints to ensure, for example that all Python 2 targets run
+    # together and all Python 3 targets run together.
+    constraints_to_field_sets = PexInterpreterConstraints.group_field_sets_by_constraints(
+        request.field_sets, python_setup
+    )
+    partitioned_results = await MultiGet(
+        Get[LintResult](BanditPartition(partition_field_sets, partition_compatibility))
+        for partition_compatibility, partition_field_sets in constraints_to_field_sets.items()
+    )
+    return LintResults(partitioned_results)
 
 
 def rules():
     return [
         bandit_lint,
+        bandit_lint_partition,
         SubsystemRule(Bandit),
         UnionRule(LintRequest, BanditRequest),
         *download_pex_bin.rules(),
