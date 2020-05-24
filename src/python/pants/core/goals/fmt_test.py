@@ -276,7 +276,7 @@ class FmtTest(TestBase):
                 f"""\
                 𐄂 FortranFormatter made changes.
                 {FortranTargets.stdout([fortran_address])}
-    
+
                 𐄂 SmalltalkFormatter made changes.
                 {SmalltalkTargets.stdout([smalltalk_address])}
                 """

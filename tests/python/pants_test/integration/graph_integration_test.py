@@ -77,12 +77,12 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
               name='missing-rglobs',
               sources=['**/*.a'],
             )
-          
+
             resources(
               name='some-missing-some-not',
               sources=['*.txt', '*.rs'],
             )
-    
+
             resources(
               name='overlapping-globs',
               sources=['sources.txt', '*.txt'],

@@ -24,7 +24,7 @@ class DeferredSourcesMapperIntegration(PantsRunIntegrationTest):
                         platform='java8',
                       ),
                     )
-            
+
                     remote_sources(name='proto-9',
                       dest=java_protobuf_library,
                       sources_target=':external-source',
@@ -35,7 +35,7 @@ class DeferredSourcesMapperIntegration(PantsRunIntegrationTest):
                         ':proto-sources',
                       ],
                     )
-            
+
                     # A target with a separate sources_target
                     remote_sources(name='proto-other',
                       dest=java_protobuf_library,
@@ -47,31 +47,31 @@ class DeferredSourcesMapperIntegration(PantsRunIntegrationTest):
                         ':proto-sources',
                       ],
                     )
-            
+
                     remote_sources(name='proto-sources',
                       dest=resources,
                       sources_target=':external-source',
                     )
-            
+
                     unpacked_jars(name='external-source',
                       libraries=[':external-source-jars'],
                       include_patterns=[
                         'com/squareup/testing/**/*.proto',
                       ],
                     )
-            
+
                     remote_sources(name='other-proto-sources',
                       dest=resources,
                       sources_target=':other-external-source',
                     )
-            
+
                     unpacked_jars(name='other-external-source',
                       libraries=[':external-source-jars'],
                       include_patterns=[
                         'com/squareup/testing/*.proto',
                       ],
                     )
-            
+
                     jar_library(name='external-source-jars',
                       jars=[
                         jar(org='com.squareup.testing.protolib', name='protolib-external-test', rev='0.0.2'),

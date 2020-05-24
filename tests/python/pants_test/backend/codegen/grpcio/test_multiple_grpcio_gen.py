@@ -16,7 +16,7 @@ class GrpcioGenTest(GrpcioTestBase):
                 """
                 syntax = "proto3";
                 package com.foo;
-            
+
                 service FooService {
                     rpc Foo(FooRequest) returns (FooReply) {}
                 }
@@ -35,9 +35,9 @@ class GrpcioGenTest(GrpcioTestBase):
                 """
                 syntax = "proto3";
                 package com.bar;
-            
+
                 import "com/foo/foo_example.proto";
-            
+
                 service BarService {
                     rpc Bar(BarRequest) returns (BarReply) {}
                 }

@@ -226,7 +226,7 @@ class SimpleCodegenTaskTest(TaskTestBase):
                   sources=['org/pantsbuild/example/good-child.dummy'],
                   dependencies=['gen-parent'],
                 )
-        
+
                 dummy_library(name='bad',
                   sources=['org/pantsbuild/example/bad-child.dummy'],
                   dependencies=['gen-parent'],
@@ -524,7 +524,7 @@ class ExportSimpleCodegenTaskTest(TaskTestBase):
             dedent(
                 """
                 dummy_library(name='flaam', sources=[])
-        
+
                 exporting_dummy_library(name='fleem',
                   sources=['org/pantsbuild/example/fleem.dummy'],
                   dependencies=[':flaam'],
@@ -558,7 +558,7 @@ class ExportSimpleCodegenTaskTest(TaskTestBase):
             dedent(
                 """
                 dummy_library(name='flaam', sources=[])
-        
+
                 exporting_dummy_library(name='fleem',
                   sources=['org/pantsbuild/example/fleem.dummy'],
                   dependencies=[':flaam'],
@@ -627,7 +627,7 @@ class ExportSimpleCodegenTaskTest(TaskTestBase):
             dedent(
                 """
                 dummy_library(name='flaam', sources=[])
-        
+
                 exporting_dummy_library(name='fleem',
                   sources=['org/pantsbuild/example/fleem.dummy'],
                 )

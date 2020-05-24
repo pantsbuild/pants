@@ -63,8 +63,8 @@ class PythonReplTest(PythonTaskTestBase):
                 "lib.py": dedent(
                     """
                     import six
-                
-                
+
+
                     def go():
                       six.print_('go', 'go', 'go!', sep='')
                     """

@@ -280,8 +280,8 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
                           File LOCATION-INFO, in fn_raises
                             raise Exception('An exception for {{}}'.format(type(x).__name__))
                         Exception: An exception for B
-        
-        
+
+
                 Computing Select(<{__name__}..B object at 0xEEEEEEEEE>, A)
                   Computing Task(a_from_c_and_d(), <{__name__}..B object at 0xEEEEEEEEE>, A, true)
                     Computing Task(c_from_b_nested_raise(), <{__name__}..B object at 0xEEEEEEEEE>, =C, true)

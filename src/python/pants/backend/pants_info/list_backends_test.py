@@ -111,7 +111,7 @@ def test_list_backends() -> None:
                     # V1 entry-point
                     def register_goals():
                         pass
-                    
+
                     # This naively looks like a V2 entry-point, but it's not!
                     def rules(x: int):
                         pass

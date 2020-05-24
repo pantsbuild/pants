@@ -70,7 +70,7 @@ class ScalaLibraryTest(TestBase):
                     '3rdparty:hub-and-spoke',
                   ]
                 )
-        
+
                 java_library(
                   name='no_scala_dep',
                   sources=[],

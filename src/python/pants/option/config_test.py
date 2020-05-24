@@ -102,9 +102,9 @@ class File1(ConfigFile):
                     that.'''
 
                     [a]
-                    # TODO: once TOML releases its new version with support for heterogenous lists, we should be 
-                    # able to rewrite this to `[1, 2, 3, "%(answer)s"`. See 
-                    # https://github.com/toml-lang/toml/issues/665. 
+                    # TODO: once TOML releases its new version with support for heterogenous lists, we should be
+                    # able to rewrite this to `[1, 2, 3, "%(answer)s"`. See
+                    # https://github.com/toml-lang/toml/issues/665.
                     list = ["1", "2", "3", "%(answer)s"]
                     list2.add = [7, 8, 9]
                     list3.remove = ["x", "y", "z"]

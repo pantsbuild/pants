@@ -192,7 +192,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
                     name='transitive_req',
                     requirements=[python_requirement('django')],
                 )
-                
+
                 python_requirement_library(
                     name='direct_req',
                     requirements=[python_requirement('ansicolors')],
@@ -233,7 +233,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
             '''Pylint will check that variables exist and are used.'''
             from colors import green
             from direct_dep import THIS_VARIABLE_EXISTS
-            
+
             print(green(THIS_VARIABLE_EXISTS))
             """
         )
@@ -288,7 +288,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
                     name='pylint',
                     requirements=[python_requirement('pylint>=2.4.4,<2.5')],
                 )
-                
+
                 python_requirement_library(
                     name='colors',
                     requirements=[python_requirement('ansicolors')],

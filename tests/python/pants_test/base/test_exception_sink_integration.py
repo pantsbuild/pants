@@ -58,8 +58,8 @@ Exception message:.* 1 Exception encountered:
                     dedent(
                         """\
                         KeyboardInterrupt: ctrl-c interrupted execution of a cffi method!
-            
-            
+
+
                         The engine execution request raised this error, which is probably due to the errors in the
                         CFFI extern methods listed above, as CFFI externs return None upon error:
                         Traceback (most recent call last):

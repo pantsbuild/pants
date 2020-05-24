@@ -196,7 +196,7 @@ class PytestRun(ChrootedTestRunnerTaskMixin, Task):
         [run]
         branch = True
         timid = False
-    
+
         [report]
         exclude_lines =
             def __repr__
