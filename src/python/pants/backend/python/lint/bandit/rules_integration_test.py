@@ -14,6 +14,7 @@ from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.engine.target import TargetWithOrigin
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
+from pants.testutil.interpreter_selection_utils import skip_unless_python27_and_python3_present
 from pants.testutil.option.util import create_options_bootstrapper
 
 
@@ -22,6 +23,7 @@ class BanditIntegrationTest(ExternalToolTestBase):
     good_source = FileContent(path="good.py", content=b"hashlib.sha256()\n")
     # MD5 is a insecure hashing function
     bad_source = FileContent(path="bad.py", content=b"hashlib.md5()\n")
+    py3_only_source = FileContent(path="py3.py", content=b"version: str = 'Py3 > Py2'\n")
 
     @classmethod
     def rules(cls):
@@ -108,6 +110,21 @@ class BanditIntegrationTest(ExternalToolTestBase):
         result = self.run_bandit([target])
         assert result.exit_code == 0
         assert "No issues identified." in result.stdout
+
+    @skip_unless_python27_and_python3_present
+    def test_uses_correct_python_version(self) -> None:
+        py2_target = self.make_target_with_origin(
+            [self.py3_only_source], interpreter_constraints="CPython==2.7.*"
+        )
+        py2_result = self.run_bandit([py2_target])
+        assert py2_result.exit_code == 0
+        assert "py3.py (syntax error while parsing AST from file)" in py2_result.stdout
+        py3_target = self.make_target_with_origin(
+            [self.py3_only_source], interpreter_constraints="CPython>=3.6"
+        )
+        py3_result = self.run_bandit([py3_target])
+        assert py3_result.exit_code == 0
+        assert "No issues identified." in py3_result.stdout.strip()
 
     def test_respects_config_file(self) -> None:
         target = self.make_target_with_origin([self.bad_source])
