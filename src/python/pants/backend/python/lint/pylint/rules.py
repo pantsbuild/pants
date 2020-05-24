@@ -99,7 +99,7 @@ async def pylint_lint(
             ),
         ),
         python_setup,
-    )
+    ) or PexInterpreterConstraints(pylint.default_interpreter_constraints)
 
     # We build one PEX with Pylint requirements and another with all direct 3rd-party dependencies.
     # Splitting this into two PEXes gives us finer-grained caching. We then merge via `--pex-path`.

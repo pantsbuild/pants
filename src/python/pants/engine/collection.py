@@ -21,7 +21,7 @@ class Collection(Sequence[T]):
             pass
     """
 
-    def __init__(self, dependencies: Iterable[T]) -> None:
+    def __init__(self, dependencies: Iterable[T] = ()) -> None:
         # TODO: rename to `items`, `elements`, or even make this private. Python consumers should
         #  not directly access this.
         self.dependencies = tuple(dependencies)
