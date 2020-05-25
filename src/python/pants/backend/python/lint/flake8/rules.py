@@ -49,7 +49,7 @@ def generate_args(*, specified_source_files: SourceFiles, flake8: Flake8) -> Tup
     if flake8.options.config is not None:
         args.append(f"--config={flake8.options.config}")
     args.extend(flake8.options.args)
-    args.extend(sorted(specified_source_files.snapshot.files))
+    args.extend(specified_source_files.files)
     return tuple(args)
 
 

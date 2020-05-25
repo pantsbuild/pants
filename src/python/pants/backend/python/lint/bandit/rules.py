@@ -49,7 +49,7 @@ def generate_args(*, specified_source_files: SourceFiles, bandit: Bandit) -> Tup
     if bandit.options.config is not None:
         args.append(f"--config={bandit.options.config}")
     args.extend(bandit.options.args)
-    args.extend(sorted(specified_source_files.snapshot.files))
+    args.extend(specified_source_files.files)
     return tuple(args)
 
 

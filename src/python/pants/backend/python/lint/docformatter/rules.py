@@ -62,7 +62,7 @@ def generate_args(
     return (
         "--check" if check_only else "--in-place",
         *docformatter.options.args,
-        *sorted(specified_source_files.snapshot.files),
+        *specified_source_files.files,
     )
 
 

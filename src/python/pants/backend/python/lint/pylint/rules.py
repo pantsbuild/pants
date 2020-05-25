@@ -40,6 +40,7 @@ from pants.util.strutil import pluralize
 class PylintFieldSet(LinterFieldSet):
     required_fields = (PythonSources,)
 
+    sources: PythonSources
     dependencies: Dependencies
 
 
