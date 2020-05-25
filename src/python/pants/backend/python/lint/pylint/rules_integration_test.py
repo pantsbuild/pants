@@ -8,11 +8,7 @@ from typing import List, Optional
 from pants.backend.python.lint.pylint.plugin_target_type import PylintSourcePlugin
 from pants.backend.python.lint.pylint.rules import PylintFieldSet, PylintFieldSets
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
-from pants.backend.python.target_types import (
-    PythonInterpreterCompatibility,
-    PythonLibrary,
-    PythonRequirementLibrary,
-)
+from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.lint import LintResult
@@ -21,7 +17,7 @@ from pants.engine.fs import FileContent
 from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
-from pants.engine.target import Dependencies, Sources, TargetWithOrigin
+from pants.engine.target import TargetWithOrigin, WrappedTarget
 from pants.python.python_requirement import PythonRequirement
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.interpreter_selection_utils import skip_unless_python27_and_python3_present
@@ -73,16 +69,19 @@ class PylintIntegrationTest(ExternalToolTestBase):
             self.create_file(source_file.path, source_file.content.decode())
         source_globs = [PurePath(source_file.path).name for source_file in source_files]
         self.add_to_build_file(
-            self.source_root, f"python_library(name='{name}', sources={source_globs})\n"
+            self.source_root,
+            dedent(
+                f"""\
+                python_library(
+                    name={repr(name)},
+                    sources={source_globs},
+                    dependencies={[str(dep) for dep in dependencies or ()]},
+                    compatibility={repr(interpreter_constraints)},
+                )
+                """
+            ),
         )
-        target = PythonLibrary(
-            {
-                Sources.alias: source_globs,
-                Dependencies.alias: dependencies,
-                PythonInterpreterCompatibility.alias: interpreter_constraints,
-            },
-            address=Address(self.source_root, name),
-        )
+        target = self.request_single_product(WrappedTarget, Address(self.source_root, name)).target
         if origin is None:
             origin = SingleAddress(directory=self.source_root, name=name)
         return TargetWithOrigin(target, origin)
