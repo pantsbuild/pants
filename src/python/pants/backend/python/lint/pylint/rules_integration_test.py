@@ -6,7 +6,7 @@ from textwrap import dedent
 from typing import List, Optional
 
 from pants.backend.python.lint.pylint.plugin_target_type import PylintSourcePlugin
-from pants.backend.python.lint.pylint.rules import PylintFieldSet, PylintFieldSets
+from pants.backend.python.lint.pylint.rules import PylintFieldSet, PylintRequest
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
@@ -52,7 +52,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
         return (
             *super().rules(),
             *pylint_rules(),
-            RootRule(PylintFieldSets),
+            RootRule(PylintRequest),
             RootRule(HydratedTargets),
         )
 
@@ -108,7 +108,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
         return self.request_single_product(
             LintResult,
             Params(
-                PylintFieldSets(PylintFieldSet.create(tgt) for tgt in targets),
+                PylintRequest(PylintFieldSet.create(tgt) for tgt in targets),
                 create_options_bootstrapper(args=args),
             ),
         )

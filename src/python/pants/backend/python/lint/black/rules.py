@@ -7,7 +7,7 @@ from pathlib import PurePath
 from typing import List, Optional, Tuple, Union, cast
 
 from pants.backend.python.lint.black.subsystem import Black
-from pants.backend.python.lint.python_fmt import PythonFmtFieldSets
+from pants.backend.python.lint.python_fmt import PythonFmtRequest
 from pants.backend.python.rules import download_pex_bin, pex
 from pants.backend.python.rules.pex import (
     Pex,
@@ -18,8 +18,8 @@ from pants.backend.python.rules.pex import (
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.backend.python.target_types import PythonSources
-from pants.core.goals.fmt import FmtFieldSet, FmtFieldSets, FmtResult
-from pants.core.goals.lint import LinterFieldSets, LintResult
+from pants.core.goals.fmt import FmtRequest, FmtResult
+from pants.core.goals.lint import LintRequest, LintResult
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.core.util_rules.determine_source_files import (
     AllSourceFilesRequest,
@@ -30,6 +30,7 @@ from pants.engine.fs import Digest, MergeDigests, PathGlobs, Snapshot
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import SubsystemRule, named_rule, rule
 from pants.engine.selectors import Get, MultiGet
+from pants.engine.target import FieldSetWithOrigin
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
@@ -37,19 +38,19 @@ from pants.util.strutil import pluralize
 
 
 @dataclass(frozen=True)
-class BlackFieldSet(FmtFieldSet):
+class BlackFieldSet(FieldSetWithOrigin):
     required_fields = (PythonSources,)
 
     sources: PythonSources
 
 
-class BlackFieldSets(FmtFieldSets):
+class BlackRequest(FmtRequest, LintRequest):
     field_set_type = BlackFieldSet
 
 
 @dataclass(frozen=True)
 class SetupRequest:
-    field_sets: BlackFieldSets
+    request: BlackRequest
     check_only: bool
 
 
@@ -106,11 +107,11 @@ async def setup(
     )
 
     all_source_files_request = Get[SourceFiles](
-        AllSourceFilesRequest(field_set.sources for field_set in request.field_sets)
+        AllSourceFilesRequest(field_set.sources for field_set in request.request.field_sets)
     )
     specified_source_files_request = Get[SourceFiles](
         SpecifiedSourceFilesRequest(
-            (field_set.sources, field_set.origin) for field_set in request.field_sets
+            (field_set.sources, field_set.origin) for field_set in request.request.field_sets
         )
     )
 
@@ -119,7 +120,7 @@ async def setup(
         config_snapshot_request,
         specified_source_files_request,
     ]
-    if request.field_sets.prior_formatter_result is None:
+    if request.request.prior_formatter_result is None:
         requests.append(all_source_files_request)
     requirements_pex, config_snapshot, specified_source_files, *rest = cast(
         Union[Tuple[Pex, Snapshot, SourceFiles], Tuple[Pex, Snapshot, SourceFiles, SourceFiles]],
@@ -127,8 +128,8 @@ async def setup(
     )
 
     all_source_files_snapshot = (
-        request.field_sets.prior_formatter_result
-        if request.field_sets.prior_formatter_result
+        request.request.prior_formatter_result
+        if request.request.prior_formatter_result
         else rest[0].snapshot
     )
 
@@ -139,7 +140,7 @@ async def setup(
     )
 
     address_references = ", ".join(
-        sorted(field_set.address.reference() for field_set in request.field_sets)
+        sorted(field_set.address.reference() for field_set in request.request.field_sets)
     )
 
     process = requirements_pex.create_process(
@@ -154,14 +155,14 @@ async def setup(
         input_digest=input_digest,
         output_files=all_source_files_snapshot.files,
         description=(
-            f"Run Black on {pluralize(len(request.field_sets), 'target')}: {address_references}."
+            f"Run Black on {pluralize(len(request.request.field_sets), 'target')}: {address_references}."
         ),
     )
     return Setup(process, original_digest=all_source_files_snapshot.digest)
 
 
 @named_rule(desc="Format using Black")
-async def black_fmt(field_sets: BlackFieldSets, black: Black) -> FmtResult:
+async def black_fmt(field_sets: BlackRequest, black: Black) -> FmtResult:
     if black.options.skip:
         return FmtResult.noop()
     setup = await Get[Setup](SetupRequest(field_sets, check_only=False))
@@ -175,7 +176,7 @@ async def black_fmt(field_sets: BlackFieldSets, black: Black) -> FmtResult:
 
 
 @named_rule(desc="Lint using Black")
-async def black_lint(field_sets: BlackFieldSets, black: Black) -> LintResult:
+async def black_lint(field_sets: BlackRequest, black: Black) -> LintResult:
     if black.options.skip:
         return LintResult.noop()
     setup = await Get[Setup](SetupRequest(field_sets, check_only=True))
@@ -191,8 +192,8 @@ def rules():
         black_fmt,
         black_lint,
         SubsystemRule(Black),
-        UnionRule(PythonFmtFieldSets, BlackFieldSets),
-        UnionRule(LinterFieldSets, BlackFieldSets),
+        UnionRule(PythonFmtRequest, BlackRequest),
+        UnionRule(LintRequest, BlackRequest),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),
         *pex.rules(),

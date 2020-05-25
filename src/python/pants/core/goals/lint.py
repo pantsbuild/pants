@@ -1,21 +1,20 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from abc import ABCMeta
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, Type, TypeVar
+from typing import Iterable
 
+from pants.core.goals.style import StyleRequest
 from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSources,
     FieldSetsWithSourcesRequest,
 )
-from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get, MultiGet
-from pants.engine.target import FieldSetWithOrigin, Sources, TargetsWithOrigins
+from pants.engine.target import TargetsWithOrigins
 from pants.engine.unions import UnionMembership, union
 from pants.util.strutil import strip_v2_chroot_path
 
@@ -46,21 +45,9 @@ class LintResult:
         )
 
 
-class LinterFieldSet(FieldSetWithOrigin, metaclass=ABCMeta):
-    """The fields necessary for a particular linter to work with a target."""
-
-    sources: Sources
-
-
-_FS = TypeVar("_FS", bound="LinterFieldSet")
-
-
 @union
-class LinterFieldSets(Collection[_FS]):
-    """A collection of `FieldSet`s for a particular linter, e.g. a collection of
-    `Flake8FieldSet`s."""
-
-    field_set_type: ClassVar[Type[_FS]]
+class LintRequest(StyleRequest):
+    """A union for StyleRequests that should be lintable."""
 
 
 class LintOptions(GoalSubsystem):
@@ -68,7 +55,7 @@ class LintOptions(GoalSubsystem):
 
     name = "lint"
 
-    required_union_implementations = (LinterFieldSets,)
+    required_union_implementations = (LintRequest,)
 
     @classmethod
     def register_options(cls, register) -> None:
@@ -105,40 +92,37 @@ async def lint(
     options: LintOptions,
     union_membership: UnionMembership,
 ) -> Lint:
-    field_set_collection_types = union_membership[LinterFieldSets]
-    field_set_collections: Iterable[LinterFieldSets] = tuple(
-        field_set_collection_type(
-            field_set_collection_type.field_set_type.create(target_with_origin)
+    lint_request_types = union_membership[LintRequest]
+    lint_requests: Iterable[StyleRequest] = tuple(
+        lint_request_type(
+            lint_request_type.field_set_type.create(target_with_origin)
             for target_with_origin in targets_with_origins
-            if field_set_collection_type.field_set_type.is_valid(target_with_origin.target)
+            if lint_request_type.field_set_type.is_valid(target_with_origin.target)
         )
-        for field_set_collection_type in union_membership[LinterFieldSets]
+        for lint_request_type in union_membership[LintRequest]
     )
-    field_set_collections_with_sources: Iterable[FieldSetsWithSources] = await MultiGet(
-        Get[FieldSetsWithSources](FieldSetsWithSourcesRequest(field_set_collection))
-        for field_set_collection in field_set_collections
+    lint_requests_with_sources: Iterable[FieldSetsWithSources] = await MultiGet(
+        Get[FieldSetsWithSources](FieldSetsWithSourcesRequest(lint_request.field_sets))
+        for lint_request in lint_requests
     )
     # NB: We must convert back the generic FieldSetsWithSources objects back into their
-    # corresponding LinterFieldSets, e.g. back to IsortFieldSets, in order for the union rule to
+    # corresponding LintRequest, e.g. back to IsortFieldSets, in order for the union rule to
     # work.
-    valid_field_set_collections: Iterable[LinterFieldSets] = tuple(
-        field_set_collection_cls(field_set_collection)
-        for field_set_collection_cls, field_set_collection in zip(
-            field_set_collection_types, field_set_collections_with_sources
-        )
-        if field_set_collection
+    valid_lint_requests: Iterable[StyleRequest] = tuple(
+        lint_request_cls(lint_request)
+        for lint_request_cls, lint_request in zip(lint_request_types, lint_requests_with_sources)
+        if lint_request
     )
 
     if options.values.per_target_caching:
         results = await MultiGet(
-            Get[LintResult](LinterFieldSets, field_set_collection.__class__([field_set]))
-            for field_set_collection in valid_field_set_collections
-            for field_set in field_set_collection
+            Get[LintResult](LintRequest, lint_request.__class__([field_set]))
+            for lint_request in valid_lint_requests
+            for field_set in lint_request.field_sets
         )
     else:
         results = await MultiGet(
-            Get[LintResult](LinterFieldSets, field_set_collection)
-            for field_set_collection in valid_field_set_collections
+            Get[LintResult](LintRequest, lint_request) for lint_request in valid_lint_requests
         )
 
     if not results:

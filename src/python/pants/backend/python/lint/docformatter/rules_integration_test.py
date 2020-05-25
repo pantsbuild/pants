@@ -3,7 +3,7 @@
 
 from typing import List, Optional, Tuple
 
-from pants.backend.python.lint.docformatter.rules import DocformatterFieldSet, DocformatterFieldSets
+from pants.backend.python.lint.docformatter.rules import DocformatterFieldSet, DocformatterRequest
 from pants.backend.python.lint.docformatter.rules import rules as docformatter_rules
 from pants.backend.python.target_types import PythonLibrary
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
@@ -27,7 +27,7 @@ class DocformatterIntegrationTest(ExternalToolTestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *docformatter_rules(), RootRule(DocformatterFieldSets))
+        return (*super().rules(), *docformatter_rules(), RootRule(DocformatterRequest))
 
     def make_target_with_origin(
         self, source_files: List[FileContent], *, origin: Optional[OriginSpec] = None,
@@ -54,7 +54,7 @@ class DocformatterIntegrationTest(ExternalToolTestBase):
         options_bootstrapper = create_options_bootstrapper(args=args)
         field_sets = [DocformatterFieldSet.create(tgt) for tgt in targets]
         lint_result = self.request_single_product(
-            LintResult, Params(DocformatterFieldSets(field_sets), options_bootstrapper)
+            LintResult, Params(DocformatterRequest(field_sets), options_bootstrapper)
         )
         input_sources = self.request_single_product(
             SourceFiles,
@@ -66,7 +66,7 @@ class DocformatterIntegrationTest(ExternalToolTestBase):
         fmt_result = self.request_single_product(
             FmtResult,
             Params(
-                DocformatterFieldSets(field_sets, prior_formatter_result=input_sources.snapshot),
+                DocformatterRequest(field_sets, prior_formatter_result=input_sources.snapshot),
                 options_bootstrapper,
             ),
         )

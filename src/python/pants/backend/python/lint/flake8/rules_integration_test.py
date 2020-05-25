@@ -3,7 +3,7 @@
 
 from typing import List, Optional
 
-from pants.backend.python.lint.flake8.rules import Flake8FieldSet, Flake8FieldSets
+from pants.backend.python.lint.flake8.rules import Flake8FieldSet, Flake8Request
 from pants.backend.python.lint.flake8.rules import rules as flake8_rules
 from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonLibrary
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
@@ -26,7 +26,7 @@ class Flake8IntegrationTest(ExternalToolTestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *flake8_rules(), RootRule(Flake8FieldSets))
+        return (*super().rules(), *flake8_rules(), RootRule(Flake8Request))
 
     def make_target_with_origin(
         self,
@@ -67,7 +67,7 @@ class Flake8IntegrationTest(ExternalToolTestBase):
         return self.request_single_product(
             LintResult,
             Params(
-                Flake8FieldSets(Flake8FieldSet.create(tgt) for tgt in targets),
+                Flake8Request(Flake8FieldSet.create(tgt) for tgt in targets),
                 create_options_bootstrapper(args=args),
             ),
         )

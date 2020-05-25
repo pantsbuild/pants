@@ -15,7 +15,7 @@ from pants.backend.python.rules.pex import (
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonSources
-from pants.core.goals.lint import LinterFieldSet, LinterFieldSets, LintResult
+from pants.core.goals.lint import LintRequest, LintResult
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.core.util_rules.determine_source_files import (
     AllSourceFilesRequest,
@@ -26,6 +26,7 @@ from pants.engine.fs import Digest, MergeDigests, PathGlobs, Snapshot
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import SubsystemRule, named_rule
 from pants.engine.selectors import Get, MultiGet
+from pants.engine.target import FieldSetWithOrigin
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
@@ -33,14 +34,14 @@ from pants.util.strutil import pluralize
 
 
 @dataclass(frozen=True)
-class Flake8FieldSet(LinterFieldSet):
+class Flake8FieldSet(FieldSetWithOrigin):
     required_fields = (PythonSources,)
 
     sources: PythonSources
     compatibility: PythonInterpreterCompatibility
 
 
-class Flake8FieldSets(LinterFieldSets):
+class Flake8Request(LintRequest):
     field_set_type = Flake8FieldSet
 
 
@@ -55,7 +56,7 @@ def generate_args(*, specified_source_files: SourceFiles, flake8: Flake8) -> Tup
 
 @named_rule(desc="Lint using Flake8")
 async def flake8_lint(
-    field_sets: Flake8FieldSets,
+    request: Flake8Request,
     flake8: Flake8,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
@@ -67,7 +68,7 @@ async def flake8_lint(
     # each target runs with its own interpreter constraints. See
     # http://flake8.pycqa.org/en/latest/user/invocation.html.
     interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
-        (field_set.compatibility for field_set in field_sets), python_setup
+        (field_set.compatibility for field_set in request.field_sets), python_setup
     ) or PexInterpreterConstraints(flake8.default_interpreter_constraints)
     requirements_pex_request = Get[Pex](
         PexRequest(
@@ -88,11 +89,11 @@ async def flake8_lint(
     )
 
     all_source_files_request = Get[SourceFiles](
-        AllSourceFilesRequest(field_set.sources for field_set in field_sets)
+        AllSourceFilesRequest(field_set.sources for field_set in request.field_sets)
     )
     specified_source_files_request = Get[SourceFiles](
         SpecifiedSourceFilesRequest(
-            (field_set.sources, field_set.origin) for field_set in field_sets
+            (field_set.sources, field_set.origin) for field_set in request.field_sets
         )
     )
 
@@ -115,7 +116,7 @@ async def flake8_lint(
     )
 
     address_references = ", ".join(
-        sorted(field_set.address.reference() for field_set in field_sets)
+        sorted(field_set.address.reference() for field_set in request.field_sets)
     )
 
     process = requirements_pex.create_process(
@@ -124,7 +125,7 @@ async def flake8_lint(
         pex_path="./flake8.pex",
         pex_args=generate_args(specified_source_files=specified_source_files, flake8=flake8),
         input_digest=input_digest,
-        description=f"Run Flake8 on {pluralize(len(field_sets), 'target')}: {address_references}.",
+        description=f"Run Flake8 on {pluralize(len(request.field_sets), 'target')}: {address_references}.",
     )
     result = await Get[FallibleProcessResult](Process, process)
     return LintResult.from_fallible_process_result(result, linter_name="Flake8")
@@ -134,7 +135,7 @@ def rules():
     return [
         flake8_lint,
         SubsystemRule(Flake8),
-        UnionRule(LinterFieldSets, Flake8FieldSets),
+        UnionRule(LintRequest, Flake8Request),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),
         *pex.rules(),

@@ -3,7 +3,7 @@
 
 from typing import List, Optional, Tuple
 
-from pants.backend.python.lint.black.rules import BlackFieldSet, BlackFieldSets
+from pants.backend.python.lint.black.rules import BlackFieldSet, BlackRequest
 from pants.backend.python.lint.black.rules import rules as black_rules
 from pants.backend.python.target_types import PythonLibrary
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
@@ -30,7 +30,7 @@ class BlackIntegrationTest(ExternalToolTestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *black_rules(), RootRule(BlackFieldSets))
+        return (*super().rules(), *black_rules(), RootRule(BlackRequest))
 
     def make_target_with_origin(
         self, source_files: List[FileContent], *, origin: Optional[OriginSpec] = None,
@@ -61,7 +61,7 @@ class BlackIntegrationTest(ExternalToolTestBase):
         options_bootstrapper = create_options_bootstrapper(args=args)
         field_sets = [BlackFieldSet.create(tgt) for tgt in targets]
         lint_result = self.request_single_product(
-            LintResult, Params(BlackFieldSets(field_sets), options_bootstrapper)
+            LintResult, Params(BlackRequest(field_sets), options_bootstrapper)
         )
         input_sources = self.request_single_product(
             SourceFiles,
@@ -73,7 +73,7 @@ class BlackIntegrationTest(ExternalToolTestBase):
         fmt_result = self.request_single_product(
             FmtResult,
             Params(
-                BlackFieldSets(field_sets, prior_formatter_result=input_sources.snapshot),
+                BlackRequest(field_sets, prior_formatter_result=input_sources.snapshot),
                 options_bootstrapper,
             ),
         )

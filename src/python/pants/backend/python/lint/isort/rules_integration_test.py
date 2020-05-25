@@ -3,7 +3,7 @@
 
 from typing import List, Optional, Tuple
 
-from pants.backend.python.lint.isort.rules import IsortFieldSet, IsortFieldSets
+from pants.backend.python.lint.isort.rules import IsortFieldSet, IsortRequest
 from pants.backend.python.lint.isort.rules import rules as isort_rules
 from pants.backend.python.target_types import PythonLibrary
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
@@ -37,7 +37,7 @@ class IsortIntegrationTest(ExternalToolTestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *isort_rules(), RootRule(IsortFieldSets))
+        return (*super().rules(), *isort_rules(), RootRule(IsortRequest))
 
     def make_target_with_origin(
         self, source_files: List[FileContent], *, origin: Optional[OriginSpec] = None,
@@ -68,7 +68,7 @@ class IsortIntegrationTest(ExternalToolTestBase):
         options_bootstrapper = create_options_bootstrapper(args=args)
         field_sets = [IsortFieldSet.create(tgt) for tgt in targets]
         lint_result = self.request_single_product(
-            LintResult, Params(IsortFieldSets(field_sets), options_bootstrapper)
+            LintResult, Params(IsortRequest(field_sets), options_bootstrapper)
         )
         input_sources = self.request_single_product(
             SourceFiles,
@@ -80,7 +80,7 @@ class IsortIntegrationTest(ExternalToolTestBase):
         fmt_result = self.request_single_product(
             FmtResult,
             Params(
-                IsortFieldSets(field_sets, prior_formatter_result=input_sources.snapshot),
+                IsortRequest(field_sets, prior_formatter_result=input_sources.snapshot),
                 options_bootstrapper,
             ),
         )

@@ -6,20 +6,19 @@ from textwrap import dedent
 from typing import ClassVar, Iterable, List, Optional, Tuple, Type
 
 from pants.base.specs import SingleAddress
-from pants.core.goals.lint import (
-    Lint,
-    LinterFieldSet,
-    LinterFieldSets,
-    LintOptions,
-    LintResult,
-    lint,
-)
+from pants.core.goals.lint import Lint, LintOptions, LintRequest, LintResult, lint
 from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSources,
     FieldSetsWithSourcesRequest,
 )
 from pants.engine.addresses import Address
-from pants.engine.target import Sources, Target, TargetsWithOrigins, TargetWithOrigin
+from pants.engine.target import (
+    FieldSetWithOrigin,
+    Sources,
+    Target,
+    TargetsWithOrigins,
+    TargetWithOrigin,
+)
 from pants.engine.unions import UnionMembership
 from pants.testutil.engine.util import MockConsole, MockGet, create_goal_subsystem, run_rule
 from pants.testutil.test_base import TestBase
@@ -30,11 +29,11 @@ class MockTarget(Target):
     core_fields = (Sources,)
 
 
-class MockLinterFieldSet(LinterFieldSet):
+class MockLinterFieldSet(FieldSetWithOrigin):
     required_fields = (Sources,)
 
 
-class MockLinterFieldSets(LinterFieldSets, metaclass=ABCMeta):
+class MockLintRequest(LintRequest, metaclass=ABCMeta):
     field_set_type = MockLinterFieldSet
     linter_name: ClassVar[str]
 
@@ -50,13 +49,13 @@ class MockLinterFieldSets(LinterFieldSets, metaclass=ABCMeta):
 
     @property
     def lint_result(self) -> LintResult:
-        addresses = [config.address for config in self]
+        addresses = [config.address for config in self.field_sets]
         return LintResult(
             self.exit_code(addresses), self.stdout(addresses), "", linter_name=self.linter_name
         )
 
 
-class SuccessfulFieldSets(MockLinterFieldSets):
+class SuccessfulFieldSets(MockLintRequest):
     linter_name = "SuccessfulLinter"
 
     @staticmethod
@@ -68,7 +67,7 @@ class SuccessfulFieldSets(MockLinterFieldSets):
         return ", ".join(str(address) for address in addresses)
 
 
-class FailingFieldSets(MockLinterFieldSets):
+class FailingFieldSets(MockLintRequest):
     linter_name = "FailingLinter"
 
     @staticmethod
@@ -80,7 +79,7 @@ class FailingFieldSets(MockLinterFieldSets):
         return ", ".join(str(address) for address in addresses)
 
 
-class ConditionallySucceedsFieldSets(MockLinterFieldSets):
+class ConditionallySucceedsFieldSets(MockLintRequest):
     linter_name = "ConditionallySucceedsLinter"
 
     @staticmethod
@@ -102,7 +101,7 @@ class InvalidFieldSet(MockLinterFieldSet):
     required_fields = (InvalidField,)
 
 
-class InvalidFieldSets(MockLinterFieldSets):
+class InvalidFieldSets(MockLintRequest):
     field_set_type = InvalidFieldSet
     linter_name = "InvalidLinter"
 
@@ -128,13 +127,13 @@ class LintTest(TestBase):
     @staticmethod
     def run_lint_rule(
         *,
-        field_set_collection_types: List[Type[LinterFieldSets]],
+        field_set_collection_types: List[Type[LintRequest]],
         targets: List[TargetWithOrigin],
         per_target_caching: bool,
         include_sources: bool = True,
     ) -> Tuple[int, str]:
         console = MockConsole(use_colors=False)
-        union_membership = UnionMembership({LinterFieldSets: field_set_collection_types})
+        union_membership = UnionMembership({LintRequest: field_set_collection_types})
         result: Lint = run_rule(
             lint,
             rule_args=[
@@ -146,7 +145,7 @@ class LintTest(TestBase):
             mock_gets=[
                 MockGet(
                     product_type=LintResult,
-                    subject_type=LinterFieldSets,
+                    subject_type=LintRequest,
                     mock=lambda field_set_collection: field_set_collection.lint_result,
                 ),
                 MockGet(
