@@ -172,13 +172,13 @@ class JsonParserTest(unittest.TestCase):
         document = dedent(
             """
             # An example with several Bobs.
-        
+
             # One with hobbies.
             {
               "type_alias": "pants.engine.internals.parsers_test.Bob",
               "hobbies": [1, 2, 3]
             }
-        
+
             # Another that is aged.
             {
               "type_alias": "pants.engine.internals.parsers_test.Bob",
@@ -193,17 +193,17 @@ class JsonParserTest(unittest.TestCase):
         document = dedent(
             """
             # An example with several Bobs.
-        
+
             # One with hobbies.
               {
                 "type_alias": "pants.engine.internals.parsers_test.Bob",
-        
+
                 # And internal comment and blank lines.
-        
+
                 "hobbies": [1, 2, 3]} {
               # This comment is inside an empty object that started on the prior line!
             }
-        
+
             # Another that is aged.
             {"type_alias": "pants.engine.internals.parsers_test.Bob","age": 42}
             """
@@ -215,22 +215,22 @@ class JsonParserTest(unittest.TestCase):
         document = dedent(
             """
             # An example with several Bobs.
-        
+
             # One with hobbies.
               {
                 "type_alias": "pants.engine.internals.parsers_test.Bob",
-        
+
                 # And internal comment and blank lines.
-        
+
                 "hobbies": [1, 2, 3]} {
               # This comment is inside an empty object that started on the prior line!
             }
-        
+
             # Another that is imaginary aged.
             {
               "type_alias": "pants.engine.internals.parsers_test.Bob",
               "age": 42i,
-        
+
               "four": 1,
               "five": 1,
               "six": 1,
@@ -260,22 +260,22 @@ class JsonParserTest(unittest.TestCase):
                 """
                 In document at {filepath}:
                     # An example with several Bobs.
-        
+
                     # One with hobbies.
                       {{
                         "type_alias": "pants.engine.internals.parsers_test.Bob",
-        
+
                         # And internal comment and blank lines.
-        
+
                         "hobbies": [1, 2, 3]}} {{
                       # This comment is inside an empty object that started on the prior line!
                     }}
-        
+
                     # Another that is imaginary aged.
                  1: {{
                  2:   "type_alias": "pants.engine.internals.parsers_test.Bob",
                  3:   "age": 42i,
-        
+
                  4:   "four": 1,
                  5:   "five": 1,
                  6:   "six": 1,
@@ -354,7 +354,7 @@ class PythonAssignmentsParserTest(unittest.TestCase):
         document = dedent(
             """
             from pants.engine.internals.parsers_test import Bob
-        
+
             nancy = Bob(
               hobbies=[1, 2, 3]
             )

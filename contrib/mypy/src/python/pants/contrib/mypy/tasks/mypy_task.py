@@ -210,7 +210,7 @@ class MypyTask(LintTaskMixin, ResolveRequirementsTaskBase):
                                 os.path.realpath(p)
                                 for p in os.environ.get('PYTHONPATH', '').split(os.pathsep)
                             )
-                            
+
                             site.getsitepackages = lambda: [
                                 p for p in sys.path if os.path.realpath(p) not in PYTHONPATH
                             ]

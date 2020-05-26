@@ -660,7 +660,7 @@ Interrupted by user over pailgun client!
               source = 'A.py',
               {a_deps}
             )
-    
+
             python_library(
               name = 'B',
               source = 'B.py',

@@ -5,8 +5,6 @@ extend-ignore:
   E501,  # line too long (> 79 characters)
   E731,  # Do not assign a lambda expression
   E741,  # Ambiguous variable name (enable once fixed)
-  W291,  # Trailing whitespace (enable once fixed)
-  W293,  # Blank line contains whitespace (enable once fixed)
   W503,  # line break before binary operator  (conflicts with Black)
   W605,  # invalid escape sequence (enable once fixed)
   PB10,  # Bad class attribute (enable once fixed)

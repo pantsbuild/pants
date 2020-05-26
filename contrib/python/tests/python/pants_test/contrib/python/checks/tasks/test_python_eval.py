@@ -29,8 +29,8 @@ class PythonEvalTest(PythonTaskTestBase):
                 "a.py": dedent(
                     """
                     import inspect
-                
-                
+
+
                     def compile_time_check_decorator(cls):
                       if not inspect.isclass(cls):
                         raise TypeError('This decorator can only be applied to classes, given {}'.format(cls))
@@ -47,8 +47,8 @@ class PythonEvalTest(PythonTaskTestBase):
                 "b.py": dedent(
                     """
                     from a.a import compile_time_check_decorator
-                
-                
+
+
                     @compile_time_check_decorator
                     class BarB(object):
                       pass
@@ -64,8 +64,8 @@ class PythonEvalTest(PythonTaskTestBase):
                 "c.py": dedent(
                     """
                     from a.a import compile_time_check_decorator
-                
-                
+
+
                     @compile_time_check_decorator
                     {}:
                       pass
@@ -84,8 +84,8 @@ class PythonEvalTest(PythonTaskTestBase):
                 "d.py": dedent(
                     """
                     from a.a import compile_time_check_decorator
-                
-                
+
+
                     @compile_time_check_decorator
                     class BazD(object):
                       pass

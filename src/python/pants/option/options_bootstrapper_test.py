@@ -126,7 +126,7 @@ class OptionsBootstrapperTest(unittest.TestCase):
                     """
                     [foo]
                     bar: %(pants_workdir)s/baz
-            
+
                     [fruit]
                     apple: %(pants_supportdir)s/banana
                     """

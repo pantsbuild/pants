@@ -135,7 +135,7 @@ def test_list_single() -> None:
         -------------
 
         Tests for Fortran code.
-        
+
         This assumes that you use the FRUIT test framework.
 
         Valid fields:
@@ -146,7 +146,7 @@ def test_list_single() -> None:
 
             fortran_version
                 type: str | None, default: None
-            
+
             timeout
                 type: int | None, default: None
                 The number of seconds to run before timing out.

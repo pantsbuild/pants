@@ -370,13 +370,13 @@ class ZincCompileIntegrationTest(BaseCompileIT):
                 with self.with_overwritten_file_content(file_abs_path):
 
                     new_temp_test = """package org.pantsbuild.example.hello.exe
-                              
+
                               import java.io.{BufferedReader, InputStreamReader}
                               import org.pantsbuild.example.hello
                               import org.pantsbuild.example.hello.welcome
-                              
+
                               // A simple jvm binary to illustrate Scala BUILD targets
-                              
+
                               object Exe {
                                 /** Test that resources are properly namespaced. */
                                 def getWorld: String = {
@@ -390,7 +390,7 @@ class ZincCompileIntegrationTest(BaseCompileIT):
                                     is.close()
                                   }
                                 }
-                              
+
                                 def main(args: Array[String]) {
                                   println("Num args passed: " + args.size + ". Stand by for welcome...")
                                   if (args.size <= 0) {

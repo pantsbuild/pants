@@ -120,7 +120,7 @@ class GoBuildgenTest(TaskTestBase):
             contents=dedent(
                 """
                 package jane
-        
+
                 var PublicConstant = 42
                 """
             ),
@@ -172,12 +172,12 @@ class GoBuildgenTest(TaskTestBase):
             contents=dedent(
                 """
                 package main
-        
+
                 import (
                   "fmt"
                   "jane"
                 )
-        
+
                 func main() {
                         fmt.Printf("Hello %s!", jane.PublicConstant)
                 }
@@ -235,9 +235,9 @@ class GoBuildgenTest(TaskTestBase):
             contents=dedent(
                 """
                 package jane
-        
+
                 import "pantsbuild.org/fake/prod"
-        
+
                 var PublicConstant = prod.DoesNotExistButWeShouldNotCareWhenCheckingDepsAndNotInstalling
                 """
             ),
@@ -247,12 +247,12 @@ class GoBuildgenTest(TaskTestBase):
             contents=dedent(
                 """
                 package main
-        
+
                 import (
                   "fmt"
                   "jane"
                 )
-        
+
                 func main() {
                         fmt.Printf("Hello %s!", jane.PublicConstant)
                 }
@@ -342,7 +342,7 @@ class GoBuildgenTest(TaskTestBase):
             contents=dedent(
                 """
                 package jane
-        
+
                 var PublicConstant = 42
                 """
             ),
@@ -352,17 +352,17 @@ class GoBuildgenTest(TaskTestBase):
             contents=dedent(
                 """
                 package main
-        
+
                 /*
                 #include <stdlib.h>
                 */
                 import "C" // C was erroneously categorized as a remote lib in issue 2616.
-        
+
                 import (
                   "fmt"
                   "jane"
                 )
-        
+
                 func main() {
                   fmt.Printf("Hello %s!", jane.PublicConstant)
                   fmt.Printf("Random from C: %d", int(C.random()))
@@ -392,7 +392,7 @@ class GoBuildgenTest(TaskTestBase):
             contents=dedent(
                 """
                 package helper
-        
+
                 const PublicConstant = 42
                 """
             ),
@@ -403,7 +403,7 @@ class GoBuildgenTest(TaskTestBase):
             contents=dedent(
                 """
                 package lib
-        
+
                 const privateConstant = 42
                 """
             ),
@@ -414,12 +414,12 @@ class GoBuildgenTest(TaskTestBase):
             contents=dedent(
                 """
                 package lib_test
-        
+
                 import (
                   "helper"
                   "testing"
                 )
-        
+
                 func TestAdd(t *testing.T) {
                   if privateConstant != helper.PublicConstant {
                     t.Fatalf("got: %d, expected: %d", privateConstant, helper.PublicConstant)

@@ -136,7 +136,7 @@ subdir/__init__.py
                     f"""\
                     # Copyright {cur_year} Pants project contributors (see CONTRIBUTORS.md).
                     # Licensed under the MIT License, Version 3.3 (see LICENSE).
-            
+
                     """
                 ),
             )
@@ -152,7 +152,7 @@ subdir/__init__.py
                     """\
                     # Copyright YYYY Pants project contributors (see CONTRIBUTORS.md).
                     # Licensed under the Apache License, Version 2.0 (see LICENSE).
-            
+
                     """
                 ),
             )
@@ -172,7 +172,7 @@ subdir/__init__.py
                     f"""\
                     # Copyright {last_year} Pants project contributors (see CONTRIBUTORS.md).
                     # Licensed under the Apache License, Version 2.0 (see LICENSE).
-            
+
                     """
                 ),
             )

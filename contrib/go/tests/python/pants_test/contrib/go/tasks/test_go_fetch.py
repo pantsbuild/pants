@@ -190,12 +190,12 @@ class GoFetchTest(TaskTestBase):
             "src/github.com/u/a/a.go",
             contents="""
               package a
-        
+
               import (
                 "fmt"
                 "math"
                 "sync"
-        
+
                 "bitbucket.org/u/b"
               )
               """,
@@ -204,15 +204,15 @@ class GoFetchTest(TaskTestBase):
             "src/github.com/u/a/b.go",
             contents="""
               package a
-        
+
               /*
                #include <stdlib.h>
                */
               import "C" // C was erroneously categorized as a remote lib in issue 2616.
-        
+
               import (
                 "fmt"
-        
+
                 "github.com/u/c"
               )
               """,

@@ -26,7 +26,7 @@ class ChangedTargetGoalsIntegrationTest(PantsRunIntegrationTest):
                         dedent(
                             """
                             package org.pantsbuild;
-                
+
                             class Class {
                               static final int MEANING_OF_LIFE = 42;
                             }
@@ -47,10 +47,10 @@ class ChangedTargetGoalsIntegrationTest(PantsRunIntegrationTest):
                         dedent(
                             """
                             package org.pantsbuild;
-                
+
                             import org.junit.Assert;
                             import org.junit.Test;
-                
+
                             public class ClassTest {
                               @Test public void test() {
                                 Assert.assertEquals(42, Class.MEANING_OF_LIFE);
@@ -66,7 +66,7 @@ class ChangedTargetGoalsIntegrationTest(PantsRunIntegrationTest):
                         dedent(
                             f"""
                             jar_library(name='junit', jars=[jar('junit', 'junit', '4.12')])
-                
+
                             junit_tests(
                               name='pantsbuild',
                               sources=['ClassTest.java'],

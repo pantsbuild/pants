@@ -283,7 +283,7 @@ class PytestTest(PytestTestBase):
                 import unittest
 
                 import app
-    
+
                 class AppTest(unittest.TestCase):
                   def test_use_two(self):
                     self.assertEqual(2, app.use_two())
@@ -367,9 +367,9 @@ python_tests(
             dedent(
                 """
                 import unittest
-    
+
                 import core
-    
+
                 class CoreGreenTest(unittest.TestCase):
                     def test_one(self):
                         self.assertEqual(1, core.one())
@@ -382,9 +382,9 @@ python_tests(
             dedent(
                 """
                 import unittest
-    
+
                 import core
-    
+
                 class CoreGreen2Test(unittest.TestCase):
                     def test_one(self):
                         self.assertEqual(1, core.one())
@@ -397,9 +397,9 @@ python_tests(
             dedent(
                 """
                 import unittest
-    
+
                 import core
-    
+
                 class CoreGreen3Test(unittest.TestCase):
                     def test_one(self):
                         self.assertEqual(1, core.one())
@@ -412,7 +412,7 @@ python_tests(
             dedent(
                 """
                 import core
-    
+
                 def test_two():
                     assert 1 == core.two()
                 """
@@ -424,9 +424,9 @@ python_tests(
             dedent(
                 """
                 import unittest
-    
+
                 import core
-    
+
                 class CoreRedClassTest(unittest.TestCase):
                     def test_one_in_class(self):
                         self.assertEqual(1, core.two())
@@ -440,7 +440,7 @@ python_tests(
                 """
                 import core
                 import time
-    
+
                 def test_three():
                     time.sleep(10)
                     assert 1 == core.one()
@@ -464,7 +464,7 @@ python_tests(
                 """
                 def null():
                 pass
-    
+
                 assert(False)
                 """
             ),
@@ -709,9 +709,9 @@ python_tests(
             dedent(
                 """
                 import unittest
-    
+
                 from util import math
-    
+
                 class MathTest(unittest.TestCase):
                     def test_one(self):
                         self.assertEqual(1, math.one())
@@ -762,9 +762,9 @@ python_tests(
             dedent(
                 """
                 import unittest                                            # line 1
-    
+
                 from util import math                                      # line 3
-    
+
                 class MathTestInSameDirectoryAsSource(unittest.TestCase):  # line 5
                     def test_one(self):                                      # line 6
                         self.assertEqual(1, math.one())                        # line 7
@@ -840,9 +840,9 @@ python_tests(
             dedent(
                 """
                 import unittest
-    
+
                 from util import math
-    
+
                 class MathTest(unittest.TestCase):
                     def test_one(self):
                         self.assertEqual(1, math.one())

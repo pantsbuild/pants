@@ -16,7 +16,7 @@ class GrpcioMultipleGenTest(GrpcioTestBase):
                 """
                 syntax = "proto3";
                 package com.example;
-            
+
                 service FooService {
                     rpc Foo(FooRequest) returns (FooReply) {}
                 }

@@ -407,7 +407,7 @@ class TestSetupPy(SetupPyTestBase):
                     version='0.0.0',
                   )
                 )
-        
+
                 resources(
                   name='j-function',
                   sources=['j-function.res']
@@ -466,7 +466,7 @@ class TestSetupPy(SetupPyTestBase):
                     version='0.0.0',
                   )
                 )
-        
+
                 resources(
                   name='group_res',
                   sources=['group.res']
