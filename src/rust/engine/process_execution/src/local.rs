@@ -36,7 +36,7 @@ pub struct CommandRunner {
   pub store: Store,
   executor: task_executor::Executor,
   work_dir_base: PathBuf,
-  named_caches: Option<NamedCaches>,
+  named_caches: NamedCaches,
   cleanup_local_dirs: bool,
   platform: Platform,
 }
@@ -46,7 +46,7 @@ impl CommandRunner {
     store: Store,
     executor: task_executor::Executor,
     work_dir_base: PathBuf,
-    named_caches: Option<NamedCaches>,
+    named_caches: NamedCaches,
     cleanup_local_dirs: bool,
   ) -> CommandRunner {
     CommandRunner {
@@ -274,8 +274,8 @@ impl super::CommandRunner for CommandRunner {
 }
 
 impl CapturedWorkdir for CommandRunner {
-  fn named_caches(&self) -> Option<&NamedCaches> {
-    self.named_caches.as_ref()
+  fn named_caches(&self) -> &NamedCaches {
+    &self.named_caches
   }
 
   fn run_in_workdir<'a, 'b, 'c>(
@@ -284,19 +284,15 @@ impl CapturedWorkdir for CommandRunner {
     req: Process,
     _context: Context,
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String> {
-    let mut command = StreamedHermeticCommand::new(&req.argv[0]);
-    command
+    StreamedHermeticCommand::new(&req.argv[0])
       .args(&req.argv[1..])
       .current_dir(if let Some(ref working_directory) = req.working_directory {
         workdir_path.join(working_directory)
       } else {
         workdir_path.to_owned()
       })
-      .envs(&req.env);
-    if let Some(named_caches) = self.named_caches() {
-      command.envs(named_caches.local_env(&req.append_only_caches));
-    }
-    command.stream(&req)
+      .envs(&req.env)
+      .stream(&req)
   }
 }
 
@@ -343,11 +339,10 @@ pub trait CapturedWorkdir {
 
     // If named caches are configured, collect the paths to create. The environment variables that
     // will describe these locations to the process are applied in `run_in_workdir`.
-    let named_cache_paths = if let Some(named_caches) = self.named_caches() {
-      named_caches.local_paths(&req.append_only_caches).collect()
-    } else {
-      vec![]
-    };
+    let named_cache_symlinks = self
+      .named_caches()
+      .local_paths(&req.append_only_caches)
+      .collect::<Vec<_>>();
 
     // Start with async materialization of input snapshots, followed by synchronous materialization
     // of other configured inputs. Note that we don't do this in parallel, as that might cause
@@ -363,8 +358,8 @@ pub trait CapturedWorkdir {
     executor
       .spawn_blocking(move || {
         if let Some(jdk_home) = maybe_jdk_home {
-          symlink(jdk_home, workdir_path2.clone().join(".jdk"))
-            .map_err(|err| format!("Error making symlink for local execution: {:?}", err))?
+          symlink(jdk_home, workdir_path2.join(".jdk"))
+            .map_err(|err| format!("Error making JDK symlink for local execution: {:?}", err))?
         }
 
         // The bazel remote execution API specifies that the parent directories for output files and
@@ -378,9 +373,9 @@ pub trait CapturedWorkdir {
         let parent_paths_to_create: HashSet<_> = output_file_paths
           .iter()
           .chain(output_dir_paths.iter())
+          .chain(named_cache_symlinks.iter().map(|s| &s.dst))
           .filter_map(|rel_path| rel_path.parent())
           .map(|parent_relpath| workdir_path2.join(parent_relpath))
-          .chain(named_cache_paths.into_iter())
           .collect();
         for path in parent_paths_to_create {
           create_dir_all(path.clone()).map_err(|err| {
@@ -390,6 +385,20 @@ pub trait CapturedWorkdir {
             )
           })?;
         }
+
+        for named_cache_symlink in named_cache_symlinks {
+          symlink(
+            &named_cache_symlink.src,
+            workdir_path2.join(&named_cache_symlink.dst),
+          )
+          .map_err(|err| {
+            format!(
+              "Error making {:?} for local execution: {:?}",
+              named_cache_symlink, err
+            )
+          })?;
+        }
+
         let res: Result<_, String> = Ok(());
         res
       })
@@ -475,7 +484,7 @@ pub trait CapturedWorkdir {
     }
   }
 
-  fn named_caches(&self) -> Option<&NamedCaches>;
+  fn named_caches(&self) -> &NamedCaches;
 
   ///
   /// TODO: See the note on references in ASYNC.md.

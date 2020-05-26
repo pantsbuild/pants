@@ -33,7 +33,9 @@ use process_execution;
 use clap::{value_t, App, AppSettings, Arg};
 use futures::compat::Future01CompatExt;
 use hashing::{Digest, Fingerprint};
-use process_execution::{Context, Platform, PlatformConstraint, ProcessMetadata, RelativePath};
+use process_execution::{
+  Context, NamedCaches, Platform, PlatformConstraint, ProcessMetadata, RelativePath,
+};
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryFrom;
 use std::iter::{FromIterator, Iterator};
@@ -66,6 +68,12 @@ async fn main() {
         .long("local-store-path")
         .takes_value(true)
         .help("Path to lmdb directory used for local file storage"),
+    )
+    .arg(
+      Arg::with_name("named-cache-path")
+        .long("named-cache-path")
+        .takes_value(true)
+        .help("Path to a directory to be used for named caches")
     )
     .arg(
       Arg::with_name("input-digest")
@@ -252,6 +260,11 @@ async fn main() {
     .value_of("local-store-path")
     .map(PathBuf::from)
     .unwrap_or_else(Store::default_path);
+  let named_cache_path = args
+    .value_of("named-cache-path")
+    .map(PathBuf::from)
+    .or_else(|| dirs::home_dir().map(|home| home.join(".cache")))
+    .expect("Unable to locate a home directory, and no named-cache-path provided.");
   let server_arg = args.value_of("server");
   let remote_instance_arg = args.value_of("remote-instance-name").map(str::to_owned);
   let output_files = if let Some(values) = args.values_of("output-file-path") {
@@ -384,7 +397,7 @@ async fn main() {
       store.clone(),
       executor,
       work_dir_base,
-      None,
+      NamedCaches::new(named_cache_path),
       true,
     )) as Box<dyn process_execution::CommandRunner>,
   };

@@ -231,13 +231,14 @@ pub struct Process {
 
   ///
   /// Declares that this process uses the given named caches (which might have associated config
-  /// in the future). Caches are exposed to processes as environment variables named
-  /// `_APPEND_ONLY_CACHE_$name` that will refer to absolute paths in the filesystem. A @rule
-  /// wrapped process must defensively check for the presence of the relevant variable, and disable
-  /// use of that cache if it is not defined.
+  /// in the future). Cache names must contain only lowercase ascii characters or underscores.
   ///
-  /// These caches are globally shared and so must be concurrency safe: a consumer of the cache
-  /// must never assume that it has exclusive access to the provided directory.
+  /// Caches are exposed to processes within their workspaces as (symlinks to) directories at the
+  /// relative path `.cache/$name`. The symlinks will refer to absolute paths in the filesystem. A
+  /// @rule wrapped process optionally check for the existence of the relevant directory, and
+  /// disable use of that cache if it is not defined. These caches are globally shared and so must
+  /// be concurrency safe: a consumer of the cache must never assume that it has exclusive access
+  /// to the provided directory.
   ///
   pub append_only_caches: BTreeSet<NamedCache>,
 

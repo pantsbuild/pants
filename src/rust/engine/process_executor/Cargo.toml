@@ -7,6 +7,7 @@ publish = false
 
 [dependencies]
 clap = "2"
+dirs = "1"
 env_logger = "0.5.4"
 futures = { version = "0.3", features = ["compat"] }
 hashing = { path = "../hashing" }

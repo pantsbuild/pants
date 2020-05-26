@@ -1,5 +1,5 @@
 use crate::nailgun::{CommandRunner, ARGS_TO_START_NAILGUN, NAILGUN_MAIN_CLASS};
-use crate::{PlatformConstraint, Process, ProcessMetadata};
+use crate::{NamedCaches, PlatformConstraint, Process, ProcessMetadata};
 use futures::compat::Future01CompatExt;
 use hashing::EMPTY_DIGEST;
 use std::fs::read_link;
@@ -11,10 +11,16 @@ use tokio::runtime::Handle;
 
 fn mock_nailgun_runner(workdir_base: Option<PathBuf>) -> CommandRunner {
   let store_dir = TempDir::new().unwrap();
+  let named_cache_dir = TempDir::new().unwrap();
   let executor = task_executor::Executor::new(Handle::current());
   let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
-  let local_runner =
-    crate::local::CommandRunner::new(store, executor.clone(), std::env::temp_dir(), None, true);
+  let local_runner = crate::local::CommandRunner::new(
+    store,
+    executor.clone(),
+    std::env::temp_dir(),
+    NamedCaches::new(named_cache_dir.path().to_owned()),
+    true,
+  );
   let metadata = ProcessMetadata {
     instance_name: None,
     cache_key_gen_version: None,

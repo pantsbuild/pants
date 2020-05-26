@@ -1,5 +1,4 @@
 use std::collections::BTreeSet;
-use std::ffi::OsString;
 use std::path::PathBuf;
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
@@ -7,15 +6,26 @@ pub struct NamedCache(String);
 
 impl NamedCache {
   pub fn new(name: String) -> Result<NamedCache, String> {
-    if name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
-      Ok(NamedCache(name.to_lowercase()))
+    if name
+      .chars()
+      .all(|c| (c.is_ascii_alphanumeric() && c.is_ascii_lowercase()) || c == '_')
+    {
+      Ok(NamedCache(name))
     } else {
       Err(format!(
-        "Cache names may only contain alphanumeric characters and underscores: got {:?}",
+        "Cache names may only contain lowercase alphanumeric characters or underscores: got {:?}",
         name
       ))
     }
   }
+}
+
+const WORKSPACE_CACHE_BASE: &str = ".cache";
+
+#[derive(Debug)]
+pub struct NamedCacheSymlink {
+  pub src: PathBuf,
+  pub dst: PathBuf,
 }
 
 #[derive(Clone)]
@@ -32,31 +42,16 @@ impl NamedCaches {
     NamedCaches { local_base }
   }
 
+  ///
+  /// Returns symlinks to create for the given set of NamedCaches.
+  ///
   pub fn local_paths<'a>(
     &'a self,
     caches: &'a BTreeSet<NamedCache>,
-  ) -> impl Iterator<Item = PathBuf> + 'a {
-    caches
-      .iter()
-      .map(move |cache_name| self.local_base.join(&cache_name.0))
-  }
-
-  ///
-  /// Computes the environment variables that should be set in the environment of a local process
-  /// using the given named caches.
-  ///
-  pub fn local_env<'a>(
-    &'a self,
-    caches: &'a BTreeSet<NamedCache>,
-  ) -> impl Iterator<Item = (OsString, OsString)> + 'a {
-    caches
-      .iter()
-      .zip(self.local_paths(caches))
-      .map(|(cache_name, local_path)| {
-        (
-          format!("_APPEND_ONLY_CACHE_{}", cache_name.0).into(),
-          local_path.into(),
-        )
-      })
+  ) -> impl Iterator<Item = NamedCacheSymlink> + 'a {
+    caches.iter().map(move |cache_name| NamedCacheSymlink {
+      src: self.local_base.join(&cache_name.0),
+      dst: PathBuf::from(WORKSPACE_CACHE_BASE).join(&cache_name.0),
+    })
   }
 }

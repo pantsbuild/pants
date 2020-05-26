@@ -1,6 +1,6 @@
 use crate::{
-  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, Process,
-  ProcessMetadata,
+  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, NamedCaches,
+  Process, ProcessMetadata,
 };
 use sharded_lmdb::ShardedLmdb;
 use std::io::Write;
@@ -19,13 +19,14 @@ struct RoundtripResults {
 async fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
   let runtime = task_executor::Executor::new(Handle::current());
   let work_dir = TempDir::new().unwrap();
+  let named_cache_dir = TempDir::new().unwrap();
   let store_dir = TempDir::new().unwrap();
   let store = Store::local_only(runtime.clone(), store_dir.path()).unwrap();
   let local = crate::local::CommandRunner::new(
     store.clone(),
     runtime.clone(),
     work_dir.path().to_owned(),
-    None,
+    NamedCaches::new(named_cache_dir.path().to_owned()),
     true,
   );
 

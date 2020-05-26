@@ -203,7 +203,7 @@ impl super::CommandRunner for CommandRunner {
 }
 
 impl CapturedWorkdir for CommandRunner {
-  fn named_caches(&self) -> Option<&NamedCaches> {
+  fn named_caches(&self) -> &NamedCaches {
     self.inner.named_caches()
   }
 
@@ -248,26 +248,6 @@ impl CapturedWorkdir for CommandRunner {
     let build_id = context.build_id;
     let store = self.inner.store.clone();
 
-    let client_req = construct_nailgun_client_request(req2, client_main_class, client_args);
-    let mut client_env = client_req
-      .env
-      .iter()
-      .map(|(k, v)| (k.clone(), v.clone()))
-      .collect::<Vec<_>>();
-    if let Some(named_caches) = self.named_caches() {
-      let decoded_local_env = named_caches
-        .local_env(&req.append_only_caches)
-        .map(|(k, v)| match (k.to_str(), v.to_str()) {
-          (Some(k), Some(v)) => Ok((k.to_owned(), v.to_owned())),
-          _ => Err(format!(
-            "Local cache environment could not be decoded as UTF8: {:?}: {:?}",
-            k, v
-          )),
-        })
-        .collect::<Result<Vec<_>, String>>()?;
-      client_env.extend(decoded_local_env.into_iter());
-    };
-
     // Streams to read child output from
     let (stdio_write, stdio_read) = child_channel::<ChildOutput>();
     let (_stdin_write, stdin_read) = child_channel::<ChildInput>();
@@ -294,10 +274,15 @@ impl CapturedWorkdir for CommandRunner {
       .and_then(move |nailgun_port| {
         // Run the client request in the nailgun we have active.
         debug!("Got nailgun port {} for {}", nailgun_port, nailgun_name2);
+        let client_req = construct_nailgun_client_request(req2, client_main_class, client_args);
         let cmd = Command {
           command: client_req.argv[0].clone(),
           args: client_req.argv[1..].to_vec(),
-          env: client_env,
+          env: client_req
+            .env
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect(),
           working_dir: client_workdir,
         };
         trace!("Client request: {:#?}", client_req);

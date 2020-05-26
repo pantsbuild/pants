@@ -168,10 +168,8 @@ impl Core {
       platform_properties: remote_execution_extra_platform_properties,
     };
 
-    // TODO: Propagate in an optional setting for this.
-    let named_caches = Some(NamedCaches::new(
-      build_root.join(".pants.d").join("named_caches"),
-    ));
+    // TODO: Propagate in a setting for this.
+    let named_caches = NamedCaches::new(build_root.join(".pants.d").join("named_caches"));
 
     let local_command_runner = process_execution::local::CommandRunner::new(
       store.clone(),

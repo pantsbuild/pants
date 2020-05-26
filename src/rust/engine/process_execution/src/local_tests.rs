@@ -2,8 +2,8 @@ use tempfile;
 use testutil;
 
 use crate::{
-  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, Platform,
-  PlatformConstraint, Process, RelativePath,
+  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, NamedCaches,
+  Platform, PlatformConstraint, Process, RelativePath,
 };
 use hashing::EMPTY_DIGEST;
 use spectral::{assert_that, string::StrAssertions};
@@ -579,10 +579,17 @@ async fn run_command_locally_in_dir(
   executor: Option<task_executor::Executor>,
 ) -> Result<FallibleProcessResultWithPlatform, String> {
   let store_dir = TempDir::new().unwrap();
+  let named_cache_dir = TempDir::new().unwrap();
   let executor = executor.unwrap_or_else(|| task_executor::Executor::new(Handle::current()));
   let store =
     store.unwrap_or_else(|| Store::local_only(executor.clone(), store_dir.path()).unwrap());
-  let runner = crate::local::CommandRunner::new(store, executor.clone(), dir, None, cleanup);
+  let runner = crate::local::CommandRunner::new(
+    store,
+    executor.clone(),
+    dir,
+    NamedCaches::new(named_cache_dir.path().to_owned()),
+    cleanup,
+  );
   runner.run(req.into(), Context::default()).await
 }
 
