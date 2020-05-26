@@ -565,7 +565,7 @@ def _build_wheels_env(*, platform: Platform) -> List[str]:
 
 def build_wheels_linux() -> Dict:
     command = " && ".join(_build_wheels_command())
-    shard = {
+    shard: Dict = {
         **CACHE_NATIVE_ENGINE,
         **linux_shard(python_version=PythonVersion.py36, use_docker=True),
         "name": "Build Linux wheels",
@@ -576,7 +576,7 @@ def build_wheels_linux() -> Dict:
 
 
 def build_wheels_osx() -> Dict:
-    shard = {
+    shard: Dict = {
         **CACHE_NATIVE_ENGINE,
         **osx_shard(python_version=PythonVersion.py36, osx_image="xcode8"),
         "name": "Build macOS wheels",
