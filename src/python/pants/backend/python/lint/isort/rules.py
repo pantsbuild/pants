@@ -43,7 +43,7 @@ class IsortFieldSet(FieldSetWithOrigin):
     sources: PythonSources
 
 
-class IsortRequest(FmtRequest):
+class IsortRequest(FmtRequest, LintRequest):
     field_set_type = IsortFieldSet
 
 

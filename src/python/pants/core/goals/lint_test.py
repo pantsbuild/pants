@@ -127,13 +127,13 @@ class LintTest(TestBase):
     @staticmethod
     def run_lint_rule(
         *,
-        field_set_collection_types: List[Type[LintRequest]],
+        lint_request_types: List[Type[LintRequest]],
         targets: List[TargetWithOrigin],
         per_target_caching: bool,
         include_sources: bool = True,
     ) -> Tuple[int, str]:
         console = MockConsole(use_colors=False)
-        union_membership = UnionMembership({LintRequest: field_set_collection_types})
+        union_membership = UnionMembership({LintRequest: lint_request_types})
         result: Lint = run_rule(
             lint,
             rule_args=[
@@ -164,7 +164,7 @@ class LintTest(TestBase):
     def test_empty_target_noops(self) -> None:
         def assert_noops(per_target_caching: bool) -> None:
             exit_code, stderr = self.run_lint_rule(
-                field_set_collection_types=[FailingFieldSets],
+                lint_request_types=[FailingFieldSets],
                 targets=[self.make_target_with_origin()],
                 per_target_caching=per_target_caching,
                 include_sources=False,
@@ -178,7 +178,7 @@ class LintTest(TestBase):
     def test_invalid_target_noops(self) -> None:
         def assert_noops(per_target_caching: bool) -> None:
             exit_code, stderr = self.run_lint_rule(
-                field_set_collection_types=[InvalidFieldSets],
+                lint_request_types=[InvalidFieldSets],
                 targets=[self.make_target_with_origin()],
                 per_target_caching=per_target_caching,
             )
@@ -194,7 +194,7 @@ class LintTest(TestBase):
 
         def assert_expected(per_target_caching: bool) -> None:
             exit_code, stderr = self.run_lint_rule(
-                field_set_collection_types=[FailingFieldSets],
+                lint_request_types=[FailingFieldSets],
                 targets=[target_with_origin],
                 per_target_caching=per_target_caching,
             )
@@ -215,7 +215,7 @@ class LintTest(TestBase):
 
         def assert_expected(per_target_caching: bool) -> None:
             exit_code, stderr = self.run_lint_rule(
-                field_set_collection_types=[SuccessfulFieldSets, FailingFieldSets],
+                lint_request_types=[SuccessfulFieldSets, FailingFieldSets],
                 targets=[target_with_origin],
                 per_target_caching=per_target_caching,
             )
@@ -239,7 +239,7 @@ class LintTest(TestBase):
 
         def get_stderr(*, per_target_caching: bool) -> str:
             exit_code, stderr = self.run_lint_rule(
-                field_set_collection_types=[ConditionallySucceedsFieldSets],
+                lint_request_types=[ConditionallySucceedsFieldSets],
                 targets=[
                     self.make_target_with_origin(good_address),
                     self.make_target_with_origin(bad_address),
@@ -272,7 +272,7 @@ class LintTest(TestBase):
 
         def get_stderr(*, per_target_caching: bool) -> str:
             exit_code, stderr = self.run_lint_rule(
-                field_set_collection_types=[ConditionallySucceedsFieldSets, SuccessfulFieldSets,],
+                lint_request_types=[ConditionallySucceedsFieldSets, SuccessfulFieldSets,],
                 targets=[
                     self.make_target_with_origin(good_address),
                     self.make_target_with_origin(bad_address),

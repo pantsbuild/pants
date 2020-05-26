@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 from typing import Iterable
 
-from pants.core.goals.style import StyleRequest
+from pants.core.goals.style_request import StyleRequest
 from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSources,
     FieldSetsWithSourcesRequest,
@@ -47,7 +47,10 @@ class LintResult:
 
 @union
 class LintRequest(StyleRequest):
-    """A union for StyleRequests that should be lintable."""
+    """A union for StyleRequests that should be lintable.
+
+    Subclass and install a member of this type to provide a linter.
+    """
 
 
 class LintOptions(GoalSubsystem):
@@ -101,16 +104,13 @@ async def lint(
         )
         for lint_request_type in union_membership[LintRequest]
     )
-    lint_requests_with_sources: Iterable[FieldSetsWithSources] = await MultiGet(
+    field_sets_with_sources: Iterable[FieldSetsWithSources] = await MultiGet(
         Get[FieldSetsWithSources](FieldSetsWithSourcesRequest(lint_request.field_sets))
         for lint_request in lint_requests
     )
-    # NB: We must convert back the generic FieldSetsWithSources objects back into their
-    # corresponding LintRequest, e.g. back to IsortFieldSets, in order for the union rule to
-    # work.
     valid_lint_requests: Iterable[StyleRequest] = tuple(
         lint_request_cls(lint_request)
-        for lint_request_cls, lint_request in zip(lint_request_types, lint_requests_with_sources)
+        for lint_request_cls, lint_request in zip(lint_request_types, field_sets_with_sources)
         if lint_request
     )
 

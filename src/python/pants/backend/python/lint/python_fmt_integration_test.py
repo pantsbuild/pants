@@ -3,9 +3,9 @@
 
 from typing import List, Optional
 
-from pants.backend.python.lint.black.rules import BlackFieldSets
+from pants.backend.python.lint.black.rules import BlackRequest
 from pants.backend.python.lint.black.rules import rules as black_rules
-from pants.backend.python.lint.isort.rules import IsortFieldSets
+from pants.backend.python.lint.isort.rules import IsortRequest
 from pants.backend.python.lint.isort.rules import rules as isort_rules
 from pants.backend.python.lint.python_fmt import PythonFmtTargets, format_python_target
 from pants.backend.python.target_types import PythonLibrary
@@ -29,8 +29,8 @@ class PythonFmtIntegrationTest(ExternalToolTestBase):
             *black_rules(),
             *isort_rules(),
             RootRule(PythonFmtTargets),
-            RootRule(BlackFieldSets),
-            RootRule(IsortFieldSets),
+            RootRule(BlackRequest),
+            RootRule(IsortRequest),
         )
 
     def run_black_and_isort(
@@ -93,7 +93,7 @@ class PythonFmtIntegrationTest(ExternalToolTestBase):
 
     def test_no_changes(self) -> None:
         source = FileContent(
-            "test/skipped.py", content=b"from animals import dog, cat\n\nprint('hello')\n",
+            "test/target.py", content=b'from animals import cat, dog\n\nprint("hello")\n',
         )
         results = self.run_black_and_isort([source], name="different_file")
         assert results.output == self.get_digest([source])

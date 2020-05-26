@@ -18,7 +18,8 @@ _FS = TypeVar("_FS", bound=FieldSetWithOrigin)
 class StyleRequest(Generic[_FS], metaclass=ABCMeta):
     """A request to style a collection of `FieldSet`s.
 
-    Should be subclassed for a particular style engine.
+    Should be subclassed for a particular style engine in order to support autoformatting or
+    linting.
     """
 
     field_set_type: ClassVar[Type[_FS]]

@@ -5,7 +5,7 @@ import itertools
 from dataclasses import dataclass
 from typing import ClassVar, Iterable, List, Tuple, Type
 
-from pants.core.goals.style import StyleRequest
+from pants.core.goals.style_request import StyleRequest
 from pants.core.util_rules.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
 from pants.engine.console import Console
 from pants.engine.fs import EMPTY_DIGEST, Digest, DirectoryToMaterialize, MergeDigests, Workspace
@@ -58,7 +58,10 @@ class FmtResult:
 
 @union
 class FmtRequest(StyleRequest):
-    """A union for StyleRequests that should be formattable."""
+    """A union for StyleRequests that should be formattable.
+
+    Subclass and install a member of this type to provide a formatter.
+    """
 
 
 @union
