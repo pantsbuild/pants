@@ -21,7 +21,7 @@ from pants.backend.python.target_types import (
     PythonRequirementsField,
     PythonSources,
 )
-from pants.core.goals.lint import LinterFieldSet, LinterFieldSets, LintResult
+from pants.core.goals.lint import LintRequest, LintResult
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.engine.addresses import Address, Addresses
@@ -29,7 +29,13 @@ from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests, PathG
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import SubsystemRule, named_rule
 from pants.engine.selectors import Get, MultiGet
-from pants.engine.target import Dependencies, DependenciesRequest, Targets, TransitiveTargets
+from pants.engine.target import (
+    Dependencies,
+    DependenciesRequest,
+    FieldSetWithOrigin,
+    Targets,
+    TransitiveTargets,
+)
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
@@ -37,14 +43,14 @@ from pants.util.strutil import pluralize
 
 
 @dataclass(frozen=True)
-class PylintFieldSet(LinterFieldSet):
+class PylintFieldSet(FieldSetWithOrigin):
     required_fields = (PythonSources,)
 
     sources: PythonSources
     dependencies: Dependencies
 
 
-class PylintFieldSets(LinterFieldSets):
+class PylintRequest(LintRequest):
     field_set_type = PylintFieldSet
 
 
@@ -59,7 +65,7 @@ def generate_args(*, specified_source_files: SourceFiles, pylint: Pylint) -> Tup
 
 @named_rule(desc="Lint using Pylint")
 async def pylint_lint(
-    field_sets: PylintFieldSets,
+    request: PylintRequest,
     pylint: Pylint,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
@@ -70,13 +76,16 @@ async def pylint_lint(
     # Pylint needs direct dependencies in the chroot to ensure that imports are valid. However, it
     # doesn't lint those direct dependencies nor does it care about transitive dependencies.
     per_target_dependencies = await MultiGet(
-        Get[Targets](DependenciesRequest(field_set.dependencies)) for field_set in field_sets
+        Get[Targets](DependenciesRequest(field_set.dependencies))
+        for field_set in request.field_sets
     )
 
     plugin_targets_request = Get[TransitiveTargets](
         Addresses(Address.parse(plugin_addr) for plugin_addr in pylint.source_plugins)
     )
-    linted_targets_request = Get[Targets](Addresses(field_set.address for field_set in field_sets))
+    linted_targets_request = Get[Targets](
+        Addresses(field_set.address for field_set in request.field_sets)
+    )
     plugin_targets, linted_targets = cast(
         Tuple[TransitiveTargets, Targets],
         await MultiGet([plugin_targets_request, linted_targets_request]),
@@ -162,7 +171,7 @@ async def pylint_lint(
     )
     specified_source_files_request = Get[SourceFiles](
         SpecifiedSourceFilesRequest(
-            ((field_set.sources, field_set.origin) for field_set in field_sets),
+            ((field_set.sources, field_set.origin) for field_set in request.field_sets),
             strip_source_roots=True,
         )
     )
@@ -212,7 +221,7 @@ async def pylint_lint(
     )
 
     address_references = ", ".join(
-        sorted(field_set.address.reference() for field_set in field_sets)
+        sorted(field_set.address.reference() for field_set in request.field_sets)
     )
 
     process = pylint_runner_pex.create_process(
@@ -227,7 +236,7 @@ async def pylint_lint(
         env={"PYTHONPATH": "./__plugins"} if pylint.source_plugins else None,
         pex_args=generate_args(specified_source_files=specified_source_files, pylint=pylint),
         input_digest=input_digest,
-        description=f"Run Pylint on {pluralize(len(field_sets), 'target')}: {address_references}.",
+        description=f"Run Pylint on {pluralize(len(request.field_sets), 'target')}: {address_references}.",
     )
     result = await Get[FallibleProcessResult](Process, process)
     return LintResult.from_fallible_process_result(result, linter_name="Pylint")
@@ -237,7 +246,7 @@ def rules():
     return [
         pylint_lint,
         SubsystemRule(Pylint),
-        UnionRule(LinterFieldSets, PylintFieldSets),
+        UnionRule(LintRequest, PylintRequest),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),
         *pex.rules(),

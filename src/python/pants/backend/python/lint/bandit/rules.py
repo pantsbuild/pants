@@ -15,7 +15,7 @@ from pants.backend.python.rules.pex import (
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonSources
-from pants.core.goals.lint import LinterFieldSet, LinterFieldSets, LintResult
+from pants.core.goals.lint import LintRequest, LintResult
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.core.util_rules.determine_source_files import (
     AllSourceFilesRequest,
@@ -26,6 +26,7 @@ from pants.engine.fs import Digest, MergeDigests, PathGlobs, Snapshot
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import SubsystemRule, named_rule
 from pants.engine.selectors import Get, MultiGet
+from pants.engine.target import FieldSetWithOrigin
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
@@ -33,14 +34,14 @@ from pants.util.strutil import pluralize
 
 
 @dataclass(frozen=True)
-class BanditFieldSet(LinterFieldSet):
+class BanditFieldSet(FieldSetWithOrigin):
     required_fields = (PythonSources,)
 
     sources: PythonSources
     compatibility: PythonInterpreterCompatibility
 
 
-class BanditFieldSets(LinterFieldSets):
+class BanditRequest(LintRequest):
     field_set_type = BanditFieldSet
 
 
@@ -55,7 +56,7 @@ def generate_args(*, specified_source_files: SourceFiles, bandit: Bandit) -> Tup
 
 @named_rule(desc="Lint using Bandit")
 async def bandit_lint(
-    field_sets: BanditFieldSets,
+    request: BanditRequest,
     bandit: Bandit,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
@@ -66,7 +67,7 @@ async def bandit_lint(
     # NB: Bandit output depends upon which Python interpreter version it's run with. See
     # https://github.com/PyCQA/bandit#under-which-version-of-python-should-i-install-bandit.
     interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
-        (field_set.compatibility for field_set in field_sets), python_setup=python_setup
+        (field_set.compatibility for field_set in request.field_sets), python_setup=python_setup
     ) or PexInterpreterConstraints(bandit.default_interpreter_constraints)
     requirements_pex_request = Get[Pex](
         PexRequest(
@@ -87,11 +88,11 @@ async def bandit_lint(
     )
 
     all_source_files_request = Get[SourceFiles](
-        AllSourceFilesRequest(field_set.sources for field_set in field_sets)
+        AllSourceFilesRequest(field_set.sources for field_set in request.field_sets)
     )
     specified_source_files_request = Get[SourceFiles](
         SpecifiedSourceFilesRequest(
-            (field_set.sources, field_set.origin) for field_set in field_sets
+            (field_set.sources, field_set.origin) for field_set in request.field_sets
         )
     )
 
@@ -114,7 +115,7 @@ async def bandit_lint(
     )
 
     address_references = ", ".join(
-        sorted(field_set.address.reference() for field_set in field_sets)
+        sorted(field_set.address.reference() for field_set in request.field_sets)
     )
 
     process = requirements_pex.create_process(
@@ -123,7 +124,7 @@ async def bandit_lint(
         pex_path="./bandit.pex",
         pex_args=generate_args(specified_source_files=specified_source_files, bandit=bandit),
         input_digest=input_digest,
-        description=f"Run Bandit on {pluralize(len(field_sets), 'target')}: {address_references}.",
+        description=f"Run Bandit on {pluralize(len(request.field_sets), 'target')}: {address_references}.",
     )
     result = await Get[FallibleProcessResult](Process, process)
     return LintResult.from_fallible_process_result(result, linter_name="Bandit")
@@ -133,7 +134,7 @@ def rules():
     return [
         bandit_lint,
         SubsystemRule(Bandit),
-        UnionRule(LinterFieldSets, BanditFieldSets),
+        UnionRule(LintRequest, BanditRequest),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),
         *pex.rules(),

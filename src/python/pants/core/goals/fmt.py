@@ -2,22 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
-from abc import ABCMeta
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, List, Optional, Tuple, Type
+from typing import ClassVar, Iterable, List, Tuple, Type
 
-from pants.core.goals.lint import LinterFieldSet
+from pants.core.goals.style_request import StyleRequest
 from pants.core.util_rules.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
-from pants.engine.collection import Collection
 from pants.engine.console import Console
-from pants.engine.fs import (
-    EMPTY_DIGEST,
-    Digest,
-    DirectoryToMaterialize,
-    MergeDigests,
-    Snapshot,
-    Workspace,
-)
+from pants.engine.fs import EMPTY_DIGEST, Digest, DirectoryToMaterialize, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import ProcessResult
 from pants.engine.rules import goal_rule
@@ -65,24 +56,12 @@ class FmtResult:
         return self.output != self.input
 
 
-class FmtFieldSet(LinterFieldSet, metaclass=ABCMeta):
-    """The fields necessary for a particular auto-formatter to work with a target."""
+@union
+class FmtRequest(StyleRequest):
+    """A union for StyleRequests that should be formattable.
 
-
-class FmtFieldSets(Collection[FmtFieldSet]):
-    """A collection of `FieldSet`s for a particular formatter, e.g. a collection of
-    `IsortFieldSet`s."""
-
-    field_set_type: ClassVar[Type[FmtFieldSet]]
-
-    def __init__(
-        self,
-        field_sets: Iterable[FmtFieldSet],
-        *,
-        prior_formatter_result: Optional[Snapshot] = None,
-    ) -> None:
-        super().__init__(field_sets)
-        self.prior_formatter_result = prior_formatter_result
+    Subclass and install a member of this type to provide a formatter.
+    """
 
 
 @union
