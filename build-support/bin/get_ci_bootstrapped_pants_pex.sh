@@ -10,7 +10,7 @@ BOOTSTRAPPED_PEX_KEY=$2
 BOOTSTRAPPED_PEX_URL=s3://${AWS_BUCKET}/${BOOTSTRAPPED_PEX_KEY}
 
 # shellcheck source=build-support/common.sh
- source "${REPO_ROOT}/build-support/common.sh"
+source "${REPO_ROOT}/build-support/common.sh"
 
 # Note that in the aws cli --no-sign-request allows access to public S3 buckets without
 # credentials, as long as we specify the region.
