@@ -5,6 +5,150 @@ This document describes releases leading up to the ``1.29.x`` ``stable`` series.
 
 See https://pants.readme.io/docs/release-notes-1-29 for an overview of the changes in this release.
 
+1.29.0.dev1 (5/26/2020)
+-----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Bump default Flake8 version to 3.8.0 (#9859)
+  `PR #9859 <https://github.com/pantsbuild/pants/pull/9859>`_
+
+* Rename --v2-ui to --dynamic-ui (#9775)
+  `PR #9775 <https://github.com/pantsbuild/pants/pull/9775>`_
+
+* Add Python 3.8 to Pants release tags. (#9838)
+  `PR #9838 <https://github.com/pantsbuild/pants/pull/9838>`_
+
+* Prepare to enable pantsd by default (#9826)
+  `PR #9826 <https://github.com/pantsbuild/pants/pull/9826>`_
+
+* Upgrade to Pex 2.1.11. (#9830)
+  `PR #9830 <https://github.com/pantsbuild/pants/pull/9830>`_
+
+* Bump to most recent versions of JVM dependencies. (#9321)
+  `PR #9321 <https://github.com/pantsbuild/pants/pull/9321>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Support V2 linters running on Python 2 and Python 3 targets at the same time (#9870)
+  `PR #9870 <https://github.com/pantsbuild/pants/pull/9870>`_
+
+* Add support for dependency injection and use with V2 Protobuf (#9851)
+  `PR #9851 <https://github.com/pantsbuild/pants/pull/9851>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix fmt and lint re-runs under pantsd (#9869)
+  `PR #9869 <https://github.com/pantsbuild/pants/pull/9869>`_
+
+* Fix harmless error rendered when stdin is closed under pantsd (#9828)
+  `PR #9828 <https://github.com/pantsbuild/pants/pull/9828>`_
+
+* Explicitly handle conflict between --v2-ui and --dynamic-ui (#9849)
+  `PR #9849 <https://github.com/pantsbuild/pants/pull/9849>`_
+
+* Fix console UI redraw issues (#9812)
+  `PR #9812 <https://github.com/pantsbuild/pants/pull/9812>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Filter streaming workunits by LogLevel (#9854)
+  `PR #9854 <https://github.com/pantsbuild/pants/pull/9854>`_
+
+* Add log::Level to WorkunitMetadata (#9850)
+  `PR #9850 <https://github.com/pantsbuild/pants/pull/9850>`_
+
+* Add generic mechanism for dependency inference (#9857)
+  `PR #9857 <https://github.com/pantsbuild/pants/pull/9857>`_
+
+* Make the `Dependencies` field an AsyncField (#9841)
+  `PR #9841 <https://github.com/pantsbuild/pants/pull/9841>`_
+
+* Internally enable Flake8 lints for invalid whitespace (#9866)
+  `PR #9866 <https://github.com/pantsbuild/pants/pull/9866>`_
+
+* Enable more Flake8 checks internally (#9864)
+  `PR #9864 <https://github.com/pantsbuild/pants/pull/9864>`_
+
+* Internally enable flake8 checks: F723 and F821 (#9776)
+  `PR #9776 <https://github.com/pantsbuild/pants/pull/9776>`_
+
+* Fix Flake8 F541 f-string check (#9843)
+  `PR #9843 <https://github.com/pantsbuild/pants/pull/9843>`_
+
+* Add sugar to getting values from `UnionMembership` (#9856)
+  `PR #9856 <https://github.com/pantsbuild/pants/pull/9856>`_
+
+* Remove unused `@addressable_dict` mechanism (#9845)
+  `PR #9845 <https://github.com/pantsbuild/pants/pull/9845>`_
+
+* Remove unused `BuildConfiguration.initialize_parse_state()` (#9836)
+  `PR #9836 <https://github.com/pantsbuild/pants/pull/9836>`_
+
+* Remove several uses of soon-to-be-deprecated `BuildFile` (#9819)
+  `PR #9819 <https://github.com/pantsbuild/pants/pull/9819>`_
+
+* Remove `FileSystemProjectTree` from several tests (#9842)
+  `PR #9842 <https://github.com/pantsbuild/pants/pull/9842>`_
+
+* Remove unused and buggy Pantsd method (#9844)
+  `PR #9844 <https://github.com/pantsbuild/pants/pull/9844>`_
+
+* Remove two bare 'except' statements (#9847)
+  `PR #9847 <https://github.com/pantsbuild/pants/pull/9847>`_
+
+* Remove assigning variable into itself. (#9853)
+  `PR #9853 <https://github.com/pantsbuild/pants/pull/9853>`_
+
+* Modernize `fs_test.py` to use type hints and `assert` statements (#9858)
+  `PR #9858 <https://github.com/pantsbuild/pants/pull/9858>`_
+
+* Modernize `packages.py` (#9860)
+  `PR #9860 <https://github.com/pantsbuild/pants/pull/9860>`_
+
+* Move release pre-req checks to Python (#9862)
+  `PR #9862 <https://github.com/pantsbuild/pants/pull/9862>`_
+
+* Port release.sh's fetching of pre-built wheels to Python (#9865)
+  `PR #9865 <https://github.com/pantsbuild/pants/pull/9865>`_
+
+* Run `packages.py` through Pants (#9863)
+  `PR #9863 <https://github.com/pantsbuild/pants/pull/9863>`_
+
+Testing
+~~~~~~~
+
+* Test that Pylint and Bandit correctly set interpreter constraints (#9868)
+  `PR #9868 <https://github.com/pantsbuild/pants/pull/9868>`_
+
+* Remove GitHub action failing due to improper permission setup (#9832)
+  `PR #9832 <https://github.com/pantsbuild/pants/pull/9832>`_
+
+* Add a GH action to check for PR Labels. (#9821)
+  `PR #9821 <https://github.com/pantsbuild/pants/pull/9821>`_
+
+* Fix AWS S3 script breaking from a KeyError (#9840)
+  `PR #9840 <https://github.com/pantsbuild/pants/pull/9840>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Move contribution guide to new doc site (#9839)
+  `PR #9839 <https://github.com/pantsbuild/pants/pull/9839>`_
+
+* Prepare 1.28.0. (#9861)
+  `PR #9861 <https://github.com/pantsbuild/pants/pull/9861>`_
+
+* Prepare 1.28.0rc2 (#9834)
+  `PR #9834 <https://github.com/pantsbuild/pants/pull/9834>`_
+
+* Prepare 1.27.0 stable release (#9837)
+  `PR #9837 <https://github.com/pantsbuild/pants/pull/9837>`_
+
 1.29.0.dev0 (5/19/2020)
 -----------------------
 
