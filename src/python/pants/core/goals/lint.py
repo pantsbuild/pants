@@ -78,15 +78,11 @@ class LintOptions(GoalSubsystem):
             default=False,
             help=(
                 "Rather than running all targets in a single batch, run each target as a "
-                "separate process. Why do this? You'll get many more cache hits. Additionally, for "
-                "Python users, if you have some targets that only work with Python 2 and some that "
-                "only work with Python 3, `--per-target-caching` will allow you to use the right "
-                "interpreter for each target. Why not do this? Linters both have substantial "
-                "startup overhead and are cheap to add one additional file to the run. On a cold "
-                "cache, it is much faster to use `--no-per-target-caching`. We only recommend "
-                "using `--per-target-caching` if you "
-                "are using a remote cache, or if you have some Python 2-only targets and "
-                "some Python 3-only targets, or if you have benchmarked that this option will be "
+                "separate process. Why do this? You'll get many more cache hits. Why not do this? "
+                "Linters both have substantial startup overhead and are cheap to add one "
+                "additional file to the run. On a cold cache, it is much faster to use "
+                "`--no-per-target-caching`. We only recommend using `--per-target-caching` if you "
+                "are using a remote cache or if you have benchmarked that this option will be "
                 "faster than `--no-per-target-caching` for your use case."
             ),
         )
