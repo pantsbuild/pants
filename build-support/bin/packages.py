@@ -351,9 +351,6 @@ class PrebuiltWheel(NamedTuple):
     def create(cls, path: str) -> "PrebuiltWheel":
         return cls(path, quote_plus(path))
 
-    def format(self) -> str:
-        return f"{self.path}\t{self.url}"
-
 
 def determine_prebuilt_wheels() -> List[PrebuiltWheel]:
     """List wheels as tab-separated tuples of filename and URL-encoded name."""
@@ -376,7 +373,11 @@ def determine_prebuilt_wheels() -> List[PrebuiltWheel]:
 
 
 def list_prebuilt_wheels() -> None:
-    print("\n".join(wheel.format() for wheel in determine_prebuilt_wheels()))
+    print(
+        "\n".join(
+            f"{CONSTANTS.binary_base_url}/{wheel.url}" for wheel in determine_prebuilt_wheels()
+        )
+    )
 
 
 # TODO: possibly parallelize through httpx and asyncio.
