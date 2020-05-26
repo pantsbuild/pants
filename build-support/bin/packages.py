@@ -353,8 +353,6 @@ class PrebuiltWheel(NamedTuple):
 
 
 def determine_prebuilt_wheels() -> List[PrebuiltWheel]:
-    """List wheels as tab-separated tuples of filename and URL-encoded name."""
-
     def determine_wheels(wheel_path: str) -> List[PrebuiltWheel]:
         response = requests.get(f"{CONSTANTS.binary_base_url}/?prefix={wheel_path}")
         xml_root = ElementTree.fromstring(response.text)
