@@ -157,16 +157,14 @@ class PylintIntegrationTest(ExternalToolTestBase):
 
     @skip_unless_python27_and_python3_present
     def test_uses_correct_python_version(self) -> None:
+        py2_args = [
+            "--pylint-version=pylint<2",
+            "--pylint-extra-requirements=setuptools<45",
+        ]
         py2_target = self.make_target_with_origin(
             [self.py3_only_source], name="py2", interpreter_constraints="CPython==2.7.*"
         )
-        py2_result = self.run_pylint(
-            [py2_target],
-            additional_args=[
-                "--pylint-version=pylint<2",
-                "--pylint-extra-requirements=setuptools<45",
-            ],
-        )
+        py2_result = self.run_pylint([py2_target], additional_args=py2_args)
         assert len(py2_result) == 1
         assert py2_result[0].exit_code == 2
         assert "invalid syntax (<string>, line 2) (syntax-error)" in py2_result[0].stdout
@@ -178,6 +176,16 @@ class PylintIntegrationTest(ExternalToolTestBase):
         assert len(py3_result) == 1
         assert py3_result[0].exit_code == 0
         assert "Your code has been rated at 10.00/10" in py3_result[0].stdout.strip()
+
+        combined_result = self.run_pylint([py2_target, py3_target], additional_args=py2_args)
+        assert len(combined_result) == 2
+        batched_py3_result, batched_py2_result = sorted(
+            combined_result, key=lambda result: result.exit_code
+        )
+        assert batched_py2_result.exit_code == 2
+        assert "invalid syntax (<string>, line 2) (syntax-error)" in batched_py2_result.stdout
+        assert batched_py3_result.exit_code == 0
+        assert "Your code has been rated at 10.00/10" in batched_py3_result.stdout.strip()
 
     def test_respects_config_file(self) -> None:
         target = self.make_target_with_origin([self.bad_source])
