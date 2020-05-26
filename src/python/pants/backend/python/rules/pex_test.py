@@ -20,14 +20,19 @@ from pants.backend.python.rules.pex import (
 )
 from pants.backend.python.rules.pex import rules as pex_rules
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
+from pants.backend.python.target_types import PythonInterpreterCompatibility
+from pants.engine.addresses import Address
 from pants.engine.fs import Digest, DirectoryToMaterialize, FileContent, InputFilesContent
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
+from pants.engine.target import FieldSet
 from pants.python.python_setup import PythonSetup
+from pants.testutil.engine.util import create_subsystem
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.subsystem.util import init_subsystem
+from pants.util.frozendict import FrozenDict
 from pants.util.strutil import create_path_env_var
 
 
@@ -127,6 +132,35 @@ def test_merge_interpreter_constraints() -> None:
 
     # Ensure we can handle empty input.
     assert_merged(input=[], expected=[])
+
+
+@dataclass(frozen=True)
+class MockFieldSet(FieldSet):
+    compatibility: PythonInterpreterCompatibility
+
+    @classmethod
+    def create_for_test(cls, address: str, compat: Optional[str]) -> "MockFieldSet":
+        addr = Address.parse(address)
+        return cls(address=addr, compatibility=PythonInterpreterCompatibility(compat, address=addr))
+
+
+def test_group_field_sets_by_constraints() -> None:
+    py2_fs = MockFieldSet.create_for_test("//:py2", ">=2.7,<3")
+    py3_fs = [
+        MockFieldSet.create_for_test("//:py3", "==3.6.*"),
+        MockFieldSet.create_for_test("//:py3_second", "==3.6.*"),
+    ]
+    no_constraints_fs = MockFieldSet.create_for_test("//:no_constraints", None)
+    assert PexInterpreterConstraints.group_field_sets_by_constraints(
+        [py2_fs, *py3_fs, no_constraints_fs],
+        python_setup=create_subsystem(PythonSetup, interpreter_constraints=[]),
+    ) == FrozenDict(
+        {
+            PexInterpreterConstraints(): (no_constraints_fs,),
+            PexInterpreterConstraints(["CPython>=2.7,<3"]): (py2_fs,),
+            PexInterpreterConstraints(["CPython==3.6.*"]): tuple(py3_fs),
+        }
+    )
 
 
 @dataclass(frozen=True)

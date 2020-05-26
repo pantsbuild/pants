@@ -11,7 +11,7 @@ from pants.backend.python.lint.pylint.rules import rules as pylint_rules
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.core.goals.lint import LintResult
+from pants.core.goals.lint import LintResults
 from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
 from pants.engine.legacy.graph import HydratedTargets
@@ -94,7 +94,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
         passthrough_args: Optional[str] = None,
         skip: bool = False,
         additional_args: Optional[List[str]] = None,
-    ) -> LintResult:
+    ) -> LintResults:
         args = ["--backend-packages2=pants.backend.python.lint.pylint"]
         if config:
             self.create_file(relpath="pylintrc", contents=config)
@@ -106,7 +106,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
         if additional_args:
             args.extend(additional_args)
         return self.request_single_product(
-            LintResult,
+            LintResults,
             Params(
                 PylintRequest(PylintFieldSet.create(tgt) for tgt in targets),
                 create_options_bootstrapper(args=args),
@@ -116,21 +116,24 @@ class PylintIntegrationTest(ExternalToolTestBase):
     def test_passing_source(self) -> None:
         target = self.make_target_with_origin([self.good_source])
         result = self.run_pylint([target])
-        assert result.exit_code == 0
-        assert "Your code has been rated at 10.00/10" in result.stdout.strip()
+        assert len(result) == 1
+        assert result[0].exit_code == 0
+        assert "Your code has been rated at 10.00/10" in result[0].stdout.strip()
 
     def test_failing_source(self) -> None:
         target = self.make_target_with_origin([self.bad_source])
         result = self.run_pylint([target])
-        assert result.exit_code == PYLINT_FAILURE_RETURN_CODE
-        assert "bad.py:2:0: C0103" in result.stdout
+        assert len(result) == 1
+        assert result[0].exit_code == PYLINT_FAILURE_RETURN_CODE
+        assert "bad.py:2:0: C0103" in result[0].stdout
 
     def test_mixed_sources(self) -> None:
         target = self.make_target_with_origin([self.good_source, self.bad_source])
         result = self.run_pylint([target])
-        assert result.exit_code == PYLINT_FAILURE_RETURN_CODE
-        assert "good.py" not in result.stdout
-        assert "bad.py:2:0: C0103" in result.stdout
+        assert len(result) == 1
+        assert result[0].exit_code == PYLINT_FAILURE_RETURN_CODE
+        assert "good.py" not in result[0].stdout
+        assert "bad.py:2:0: C0103" in result[0].stdout
 
     def test_multiple_targets(self) -> None:
         targets = [
@@ -138,50 +141,65 @@ class PylintIntegrationTest(ExternalToolTestBase):
             self.make_target_with_origin([self.bad_source], name="t2"),
         ]
         result = self.run_pylint(targets)
-        assert result.exit_code == PYLINT_FAILURE_RETURN_CODE
-        assert "good.py" not in result.stdout
-        assert "bad.py:2:0: C0103" in result.stdout
+        assert len(result) == 1
+        assert result[0].exit_code == PYLINT_FAILURE_RETURN_CODE
+        assert "good.py" not in result[0].stdout
+        assert "bad.py:2:0: C0103" in result[0].stdout
 
     def test_precise_file_args(self) -> None:
         target = self.make_target_with_origin(
             [self.good_source, self.bad_source], origin=FilesystemLiteralSpec(self.good_source.path)
         )
         result = self.run_pylint([target])
-        assert result.exit_code == 0
-        assert "Your code has been rated at 10.00/10" in result.stdout.strip()
+        assert len(result) == 1
+        assert result[0].exit_code == 0
+        assert "Your code has been rated at 10.00/10" in result[0].stdout.strip()
 
     @skip_unless_python27_and_python3_present
     def test_uses_correct_python_version(self) -> None:
+        py2_args = [
+            "--pylint-version=pylint<2",
+            "--pylint-extra-requirements=setuptools<45",
+        ]
         py2_target = self.make_target_with_origin(
             [self.py3_only_source], name="py2", interpreter_constraints="CPython==2.7.*"
         )
-        py2_result = self.run_pylint(
-            [py2_target],
-            additional_args=[
-                "--pylint-version=pylint<2",
-                "--pylint-extra-requirements=setuptools<45",
-            ],
-        )
-        assert py2_result.exit_code == 2
-        assert "invalid syntax (<string>, line 2) (syntax-error)" in py2_result.stdout
+        py2_result = self.run_pylint([py2_target], additional_args=py2_args)
+        assert len(py2_result) == 1
+        assert py2_result[0].exit_code == 2
+        assert "invalid syntax (<string>, line 2) (syntax-error)" in py2_result[0].stdout
+
         py3_target = self.make_target_with_origin(
             [self.py3_only_source], name="py3", interpreter_constraints="CPython>=3.6"
         )
         py3_result = self.run_pylint([py3_target])
-        assert py3_result.exit_code == 0
-        assert "Your code has been rated at 10.00/10" in py3_result.stdout.strip()
+        assert len(py3_result) == 1
+        assert py3_result[0].exit_code == 0
+        assert "Your code has been rated at 10.00/10" in py3_result[0].stdout.strip()
+
+        combined_result = self.run_pylint([py2_target, py3_target], additional_args=py2_args)
+        assert len(combined_result) == 2
+        batched_py3_result, batched_py2_result = sorted(
+            combined_result, key=lambda result: result.exit_code
+        )
+        assert batched_py2_result.exit_code == 2
+        assert "invalid syntax (<string>, line 2) (syntax-error)" in batched_py2_result.stdout
+        assert batched_py3_result.exit_code == 0
+        assert "Your code has been rated at 10.00/10" in batched_py3_result.stdout.strip()
 
     def test_respects_config_file(self) -> None:
         target = self.make_target_with_origin([self.bad_source])
         result = self.run_pylint([target], config="[pylint]\ndisable = C0103\n")
-        assert result.exit_code == 0
-        assert "Your code has been rated at 10.00/10" in result.stdout.strip()
+        assert len(result) == 1
+        assert result[0].exit_code == 0
+        assert "Your code has been rated at 10.00/10" in result[0].stdout.strip()
 
     def test_respects_passthrough_args(self) -> None:
         target = self.make_target_with_origin([self.bad_source])
         result = self.run_pylint([target], passthrough_args="--disable=C0103")
-        assert result.exit_code == 0
-        assert "Your code has been rated at 10.00/10" in result.stdout.strip()
+        assert len(result) == 1
+        assert result[0].exit_code == 0
+        assert "Your code has been rated at 10.00/10" in result[0].stdout.strip()
 
     def test_includes_direct_dependencies(self) -> None:
         self.add_to_build_file(
@@ -243,13 +261,14 @@ class PylintIntegrationTest(ExternalToolTestBase):
         )
 
         result = self.run_pylint([target])
-        assert result.exit_code == 0
-        assert "Your code has been rated at 10.00/10" in result.stdout.strip()
+        assert len(result) == 1
+        assert result[0].exit_code == 0
+        assert "Your code has been rated at 10.00/10" in result[0].stdout.strip()
 
     def test_skip(self) -> None:
         target = self.make_target_with_origin([self.bad_source])
         result = self.run_pylint([target], skip=True)
-        assert result == LintResult.noop()
+        assert not result
 
     def test_3rdparty_plugin(self) -> None:
         source_content = dedent(
@@ -274,8 +293,9 @@ class PylintIntegrationTest(ExternalToolTestBase):
             additional_args=["--pylint-extra-requirements=pylint-unittest>=0.1.3,<0.2"],
             passthrough_args="--load-plugins=pylint_unittest",
         )
-        assert result.exit_code == 4
-        assert "thirdparty_plugin.py:10:8: W5301" in result.stdout
+        assert len(result) == 1
+        assert result[0].exit_code == 4
+        assert "thirdparty_plugin.py:10:8: W5301" in result[0].stdout
 
     def test_source_plugin(self) -> None:
         # NB: We make this source plugin fairly complex by having it use transitive dependencies.
@@ -365,5 +385,6 @@ class PylintIntegrationTest(ExternalToolTestBase):
             ],
             config=config_content,
         )
-        assert result.exit_code == PYLINT_FAILURE_RETURN_CODE
-        assert "source_plugin.py:2:0: C9871" in result.stdout
+        assert len(result) == 1
+        assert result[0].exit_code == PYLINT_FAILURE_RETURN_CODE
+        assert "source_plugin.py:2:0: C9871" in result[0].stdout

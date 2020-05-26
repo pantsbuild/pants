@@ -2,8 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
+from collections import defaultdict
 from dataclasses import dataclass
-from typing import Tuple, cast
+from typing import Iterable, Tuple, cast
 
 from pants.backend.python.lint.pylint.subsystem import Pylint
 from pants.backend.python.rules import download_pex_bin, importable_python_sources, pex
@@ -21,24 +22,26 @@ from pants.backend.python.target_types import (
     PythonRequirementsField,
     PythonSources,
 )
-from pants.core.goals.lint import LintRequest, LintResult
+from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.engine.addresses import Address, Addresses
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests, PathGlobs, Snapshot
 from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import SubsystemRule, named_rule
+from pants.engine.rules import SubsystemRule, named_rule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     FieldSetWithOrigin,
+    Target,
     Targets,
     TransitiveTargets,
 )
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
+from pants.util.meta import frozen_after_init
 from pants.util.strutil import pluralize
 
 
@@ -48,6 +51,36 @@ class PylintFieldSet(FieldSetWithOrigin):
 
     sources: PythonSources
     dependencies: Dependencies
+
+
+@dataclass(frozen=True)
+class PylintTargetSetup:
+    field_set: PylintFieldSet
+    target_with_dependencies: Targets
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class PylintPartition:
+    field_sets: Tuple[PylintFieldSet, ...]
+    targets_with_dependencies: Targets
+    interpreter_constraints: PexInterpreterConstraints
+    plugin_targets: Targets
+
+    def __init__(
+        self,
+        target_setups: Iterable[PylintTargetSetup],
+        interpreter_constraints: PexInterpreterConstraints,
+        plugin_targets: Iterable[Target],
+    ) -> None:
+        self.field_sets = tuple(target_setup.field_set for target_setup in target_setups)
+        self.targets_with_dependencies = Targets(
+            itertools.chain.from_iterable(
+                target_setup.target_with_dependencies for target_setup in target_setups
+            )
+        )
+        self.interpreter_constraints = interpreter_constraints
+        self.plugin_targets = Targets(plugin_targets)
 
 
 class PylintRequest(LintRequest):
@@ -63,80 +96,38 @@ def generate_args(*, specified_source_files: SourceFiles, pylint: Pylint) -> Tup
     return tuple(args)
 
 
-@named_rule(desc="Lint using Pylint")
-async def pylint_lint(
-    request: PylintRequest,
+@rule
+async def pylint_lint_partition(
+    partition: PylintPartition,
     pylint: Pylint,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> LintResult:
-    if pylint.skip:
-        return LintResult.noop()
-
-    # Pylint needs direct dependencies in the chroot to ensure that imports are valid. However, it
-    # doesn't lint those direct dependencies nor does it care about transitive dependencies.
-    per_target_dependencies = await MultiGet(
-        Get[Targets](DependenciesRequest(field_set.dependencies))
-        for field_set in request.field_sets
-    )
-
-    plugin_targets_request = Get[TransitiveTargets](
-        Addresses(Address.parse(plugin_addr) for plugin_addr in pylint.source_plugins)
-    )
-    linted_targets_request = Get[Targets](
-        Addresses(field_set.address for field_set in request.field_sets)
-    )
-    plugin_targets, linted_targets = cast(
-        Tuple[TransitiveTargets, Targets],
-        await MultiGet([plugin_targets_request, linted_targets_request]),
-    )
-
-    targets_with_dependencies = Targets(
-        [*linted_targets, *itertools.chain.from_iterable(per_target_dependencies)]
-    )
-
-    # NB: Pylint output depends upon which Python interpreter version it's run with. See
-    # http://pylint.pycqa.org/en/latest/faq.html#what-versions-of-python-is-pylint-supporting.
-    interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
-        (
-            *(tgt.get(PythonInterpreterCompatibility) for tgt in targets_with_dependencies),
-            *(
-                plugin_tgt[PythonInterpreterCompatibility]
-                for plugin_tgt in plugin_targets.closure
-                if plugin_tgt.has_field(PythonInterpreterCompatibility)
-            ),
-        ),
-        python_setup,
-    ) or PexInterpreterConstraints(pylint.default_interpreter_constraints)
-
     # We build one PEX with Pylint requirements and another with all direct 3rd-party dependencies.
     # Splitting this into two PEXes gives us finer-grained caching. We then merge via `--pex-path`.
+    plugin_requirements = PexRequirements.create_from_requirement_fields(
+        plugin_tgt[PythonRequirementsField]
+        for plugin_tgt in partition.plugin_targets
+        if plugin_tgt.has_field(PythonRequirementsField)
+    )
+    target_requirements = PexRequirements.create_from_requirement_fields(
+        tgt[PythonRequirementsField]
+        for tgt in partition.targets_with_dependencies
+        if tgt.has_field(PythonRequirementsField)
+    )
     pylint_pex_request = Get[Pex](
         PexRequest(
             output_filename="pylint.pex",
-            requirements=PexRequirements(
-                [
-                    *pylint.get_requirement_specs(),
-                    *PexRequirements.create_from_requirement_fields(
-                        plugin_tgt[PythonRequirementsField]
-                        for plugin_tgt in plugin_targets.closure
-                        if plugin_tgt.has_field(PythonRequirementsField)
-                    ),
-                ]
-            ),
-            interpreter_constraints=interpreter_constraints,
+            requirements=PexRequirements([*pylint.get_requirement_specs(), *plugin_requirements]),
+            interpreter_constraints=partition.interpreter_constraints,
             entry_point=pylint.get_entry_point(),
         )
     )
     requirements_pex_request = Get[Pex](
         PexRequest(
             output_filename="requirements.pex",
-            requirements=PexRequirements.create_from_requirement_fields(
-                tgt[PythonRequirementsField]
-                for tgt in targets_with_dependencies
-                if tgt.has_field(PythonRequirementsField)
-            ),
-            interpreter_constraints=interpreter_constraints,
+            requirements=target_requirements,
+            interpreter_constraints=partition.interpreter_constraints,
         )
     )
     # TODO(John Sirois): Support shading python binaries:
@@ -152,7 +143,7 @@ async def pylint_lint(
         PexRequest(
             output_filename="pylint_runner.pex",
             entry_point=pylint.get_entry_point(),
-            interpreter_constraints=interpreter_constraints,
+            interpreter_constraints=partition.interpreter_constraints,
             additional_args=pylint_runner_pex_args,
         )
     )
@@ -165,13 +156,13 @@ async def pylint_lint(
         )
     )
 
-    prepare_plugin_sources_request = Get[ImportablePythonSources](Targets(plugin_targets.closure))
+    prepare_plugin_sources_request = Get[ImportablePythonSources](Targets, partition.plugin_targets)
     prepare_python_sources_request = Get[ImportablePythonSources](
-        Targets, targets_with_dependencies
+        Targets, partition.targets_with_dependencies
     )
     specified_source_files_request = Get[SourceFiles](
         SpecifiedSourceFilesRequest(
-            ((field_set.sources, field_set.origin) for field_set in request.field_sets),
+            ((field_set.sources, field_set.origin) for field_set in partition.field_sets),
             strip_source_roots=True,
         )
     )
@@ -221,7 +212,7 @@ async def pylint_lint(
     )
 
     address_references = ", ".join(
-        sorted(field_set.address.reference() for field_set in request.field_sets)
+        sorted(field_set.address.reference() for field_set in partition.field_sets)
     )
 
     process = pylint_runner_pex.create_process(
@@ -236,15 +227,81 @@ async def pylint_lint(
         env={"PYTHONPATH": "./__plugins"} if pylint.source_plugins else None,
         pex_args=generate_args(specified_source_files=specified_source_files, pylint=pylint),
         input_digest=input_digest,
-        description=f"Run Pylint on {pluralize(len(request.field_sets), 'target')}: {address_references}.",
+        description=(
+            f"Run Pylint on {pluralize(len(partition.field_sets), 'target')}: {address_references}."
+        ),
     )
     result = await Get[FallibleProcessResult](Process, process)
     return LintResult.from_fallible_process_result(result, linter_name="Pylint")
 
 
+@named_rule(desc="Lint using Pylint")
+async def pylint_lint(
+    request: PylintRequest, pylint: Pylint, python_setup: PythonSetup
+) -> LintResults:
+    if pylint.skip:
+        return LintResults()
+
+    plugin_targets_request = Get[TransitiveTargets](
+        Addresses(Address.parse(plugin_addr) for plugin_addr in pylint.source_plugins)
+    )
+    linted_targets_request = Get[Targets](
+        Addresses(field_set.address for field_set in request.field_sets)
+    )
+    plugin_targets, linted_targets = cast(
+        Tuple[TransitiveTargets, Targets],
+        await MultiGet([plugin_targets_request, linted_targets_request]),
+    )
+
+    plugin_targets_compatibility_fields = tuple(
+        plugin_tgt[PythonInterpreterCompatibility]
+        for plugin_tgt in plugin_targets.closure
+        if plugin_tgt.has_field(PythonInterpreterCompatibility)
+    )
+
+    # Pylint needs direct dependencies in the chroot to ensure that imports are valid. However, it
+    # doesn't lint those direct dependencies nor does it care about transitive dependencies.
+    per_target_dependencies = await MultiGet(
+        Get[Targets](DependenciesRequest(field_set.dependencies))
+        for field_set in request.field_sets
+    )
+
+    # We batch targets by their interpreter constraints to ensure, for example, that all Python 2
+    # targets run together and all Python 3 targets run together.
+    interpreter_constraints_to_target_setup = defaultdict(set)
+    for field_set, tgt, dependencies in zip(
+        request.field_sets, linted_targets, per_target_dependencies
+    ):
+        target_setup = PylintTargetSetup(field_set, Targets([tgt, *dependencies]))
+        interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
+            (
+                *(tgt.get(PythonInterpreterCompatibility) for tgt in [tgt, *dependencies]),
+                *plugin_targets_compatibility_fields,
+            ),
+            python_setup,
+        ) or PexInterpreterConstraints(pylint.default_interpreter_constraints)
+        interpreter_constraints_to_target_setup[interpreter_constraints].add(target_setup)
+
+    partitions = (
+        PylintPartition(
+            tuple(sorted(target_setups, key=lambda target_setup: target_setup.field_set.address)),
+            interpreter_constraints,
+            Targets(plugin_targets.closure),
+        )
+        for interpreter_constraints, target_setups in sorted(
+            interpreter_constraints_to_target_setup.items()
+        )
+    )
+    partitioned_results = await MultiGet(
+        Get[LintResult](PylintPartition, partition) for partition in partitions
+    )
+    return LintResults(partitioned_results)
+
+
 def rules():
     return [
         pylint_lint,
+        pylint_lint_partition,
         SubsystemRule(Pylint),
         UnionRule(LintRequest, PylintRequest),
         *download_pex_bin.rules(),

@@ -8,7 +8,7 @@ from pants.backend.python.lint.black.rules import rules as black_rules
 from pants.backend.python.target_types import PythonLibrary
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.core.goals.fmt import FmtResult
-from pants.core.goals.lint import LintResult
+from pants.core.goals.lint import LintResults
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
 from pants.engine.addresses import Address
 from pants.engine.fs import Digest, FileContent, InputFilesContent
@@ -49,7 +49,7 @@ class BlackIntegrationTest(ExternalToolTestBase):
         config: Optional[str] = None,
         passthrough_args: Optional[str] = None,
         skip: bool = False,
-    ) -> Tuple[LintResult, FmtResult]:
+    ) -> Tuple[LintResults, FmtResult]:
         args = ["--backend-packages2=pants.backend.python.lint.black"]
         if config is not None:
             self.create_file(relpath="pyproject.toml", contents=config)
@@ -60,8 +60,8 @@ class BlackIntegrationTest(ExternalToolTestBase):
             args.append("--black-skip")
         options_bootstrapper = create_options_bootstrapper(args=args)
         field_sets = [BlackFieldSet.create(tgt) for tgt in targets]
-        lint_result = self.request_single_product(
-            LintResult, Params(BlackRequest(field_sets), options_bootstrapper)
+        lint_results = self.request_single_product(
+            LintResults, Params(BlackRequest(field_sets), options_bootstrapper)
         )
         input_sources = self.request_single_product(
             SourceFiles,
@@ -77,34 +77,39 @@ class BlackIntegrationTest(ExternalToolTestBase):
                 options_bootstrapper,
             ),
         )
-        return lint_result, fmt_result
+        return lint_results, fmt_result
 
     def get_digest(self, source_files: List[FileContent]) -> Digest:
         return self.request_single_product(Digest, InputFilesContent(source_files))
 
     def test_passing_source(self) -> None:
         target = self.make_target_with_origin([self.good_source])
-        lint_result, fmt_result = self.run_black([target])
-        assert lint_result.exit_code == 0
-        assert "1 file would be left unchanged" in lint_result.stderr
+        lint_results, fmt_result = self.run_black([target])
+        assert len(lint_results) == 1
+        assert lint_results[0].exit_code == 0
+        assert "1 file would be left unchanged" in lint_results[0].stderr
         assert "1 file left unchanged" in fmt_result.stderr
         assert fmt_result.output == self.get_digest([self.good_source])
         assert fmt_result.did_change is False
 
     def test_failing_source(self) -> None:
         target = self.make_target_with_origin([self.bad_source])
-        lint_result, fmt_result = self.run_black([target])
-        assert lint_result.exit_code == 1
-        assert "1 file would be reformatted" in lint_result.stderr
+        lint_results, fmt_result = self.run_black([target])
+        assert len(lint_results) == 1
+        assert lint_results[0].exit_code == 1
+        assert "1 file would be reformatted" in lint_results[0].stderr
         assert "1 file reformatted" in fmt_result.stderr
         assert fmt_result.output == self.get_digest([self.fixed_bad_source])
         assert fmt_result.did_change is True
 
     def test_mixed_sources(self) -> None:
         target = self.make_target_with_origin([self.good_source, self.bad_source])
-        lint_result, fmt_result = self.run_black([target])
-        assert lint_result.exit_code == 1
-        assert "1 file would be reformatted, 1 file would be left unchanged" in lint_result.stderr
+        lint_results, fmt_result = self.run_black([target])
+        assert len(lint_results) == 1
+        assert lint_results[0].exit_code == 1
+        assert (
+            "1 file would be reformatted, 1 file would be left unchanged" in lint_results[0].stderr
+        )
         assert "1 file reformatted, 1 file left unchanged", fmt_result.stderr
         assert fmt_result.output == self.get_digest([self.good_source, self.fixed_bad_source])
         assert fmt_result.did_change is True
@@ -114,9 +119,12 @@ class BlackIntegrationTest(ExternalToolTestBase):
             self.make_target_with_origin([self.good_source]),
             self.make_target_with_origin([self.bad_source]),
         ]
-        lint_result, fmt_result = self.run_black(targets)
-        assert lint_result.exit_code == 1
-        assert "1 file would be reformatted, 1 file would be left unchanged" in lint_result.stderr
+        lint_results, fmt_result = self.run_black(targets)
+        assert len(lint_results) == 1
+        assert lint_results[0].exit_code == 1
+        assert (
+            "1 file would be reformatted, 1 file would be left unchanged" in lint_results[0].stderr
+        )
         assert "1 file reformatted, 1 file left unchanged" in fmt_result.stderr
         assert fmt_result.output == self.get_digest([self.good_source, self.fixed_bad_source])
         assert fmt_result.did_change is True
@@ -125,38 +133,41 @@ class BlackIntegrationTest(ExternalToolTestBase):
         target = self.make_target_with_origin(
             [self.good_source, self.bad_source], origin=FilesystemLiteralSpec(self.good_source.path)
         )
-        lint_result, fmt_result = self.run_black([target])
-        assert lint_result.exit_code == 0
-        assert "1 file would be left unchanged" in lint_result.stderr
+        lint_results, fmt_result = self.run_black([target])
+        assert len(lint_results) == 1
+        assert lint_results[0].exit_code == 0
+        assert "1 file would be left unchanged" in lint_results[0].stderr
         assert "1 file left unchanged" in fmt_result.stderr
         assert fmt_result.output == self.get_digest([self.good_source, self.bad_source])
         assert fmt_result.did_change is False
 
     def test_respects_config_file(self) -> None:
         target = self.make_target_with_origin([self.needs_config_source])
-        lint_result, fmt_result = self.run_black(
+        lint_results, fmt_result = self.run_black(
             [target], config="[tool.black]\nskip-string-normalization = 'true'\n"
         )
-        assert lint_result.exit_code == 0
-        assert "1 file would be left unchanged" in lint_result.stderr
+        assert len(lint_results) == 1
+        assert lint_results[0].exit_code == 0
+        assert "1 file would be left unchanged" in lint_results[0].stderr
         assert "1 file left unchanged" in fmt_result.stderr
         assert fmt_result.output == self.get_digest([self.needs_config_source])
         assert fmt_result.did_change is False
 
     def test_respects_passthrough_args(self) -> None:
         target = self.make_target_with_origin([self.needs_config_source])
-        lint_result, fmt_result = self.run_black(
+        lint_results, fmt_result = self.run_black(
             [target], passthrough_args="--skip-string-normalization",
         )
-        assert lint_result.exit_code == 0
-        assert "1 file would be left unchanged" in lint_result.stderr
+        assert len(lint_results) == 1
+        assert lint_results[0].exit_code == 0
+        assert "1 file would be left unchanged" in lint_results[0].stderr
         assert "1 file left unchanged" in fmt_result.stderr
         assert fmt_result.output == self.get_digest([self.needs_config_source])
         assert fmt_result.did_change is False
 
     def test_skip(self) -> None:
         target = self.make_target_with_origin([self.bad_source])
-        lint_result, fmt_result = self.run_black([target], skip=True)
-        assert lint_result == LintResult.noop()
+        lint_results, fmt_result = self.run_black([target], skip=True)
+        assert not lint_results
         assert fmt_result == FmtResult.noop()
         assert fmt_result.did_change is False

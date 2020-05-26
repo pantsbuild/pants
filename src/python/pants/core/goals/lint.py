@@ -1,6 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import itertools
 from dataclasses import dataclass
 from typing import Iterable
 
@@ -9,6 +10,7 @@ from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSources,
     FieldSetsWithSourcesRequest,
 )
+from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult
@@ -27,10 +29,6 @@ class LintResult:
     linter_name: str
 
     @staticmethod
-    def noop() -> "LintResult":
-        return LintResult(exit_code=0, stdout="", stderr="", linter_name="")
-
-    @staticmethod
     def from_fallible_process_result(
         process_result: FallibleProcessResult, *, linter_name: str, strip_chroot_path: bool = False
     ) -> "LintResult":
@@ -43,6 +41,16 @@ class LintResult:
             stderr=prep_output(process_result.stderr),
             linter_name=linter_name,
         )
+
+
+class LintResults(Collection[LintResult]):
+    """Zero or more LintResult objects for a single linter.
+
+    Typically, linters will return one result. If they no-oped, they will return zero results.
+    However, some linters may need to partition their batch of LinterFieldSets and thus may need to
+    return multiple results. For example, many Python linters will need to group by interpreter
+    compatibility.
+    """
 
 
 @union
@@ -70,15 +78,11 @@ class LintOptions(GoalSubsystem):
             default=False,
             help=(
                 "Rather than running all targets in a single batch, run each target as a "
-                "separate process. Why do this? You'll get many more cache hits. Additionally, for "
-                "Python users, if you have some targets that only work with Python 2 and some that "
-                "only work with Python 3, `--per-target-caching` will allow you to use the right "
-                "interpreter for each target. Why not do this? Linters both have substantial "
-                "startup overhead and are cheap to add one additional file to the run. On a cold "
-                "cache, it is much faster to use `--no-per-target-caching`. We only recommend "
-                "using `--per-target-caching` if you "
-                "are using a remote cache, or if you have some Python 2-only targets and "
-                "some Python 3-only targets, or if you have benchmarked that this option will be "
+                "separate process. Why do this? You'll get many more cache hits. Why not do this? "
+                "Linters both have substantial startup overhead and are cheap to add one "
+                "additional file to the run. On a cold cache, it is much faster to use "
+                "`--no-per-target-caching`. We only recommend using `--per-target-caching` if you "
+                "are using a remote cache or if you have benchmarked that this option will be "
                 "faster than `--no-per-target-caching` for your use case."
             ),
         )
@@ -116,20 +120,20 @@ async def lint(
 
     if options.values.per_target_caching:
         results = await MultiGet(
-            Get[LintResult](LintRequest, lint_request.__class__([field_set]))
+            Get[LintResults](LintRequest, lint_request.__class__([field_set]))
             for lint_request in valid_lint_requests
             for field_set in lint_request.field_sets
         )
     else:
         results = await MultiGet(
-            Get[LintResult](LintRequest, lint_request) for lint_request in valid_lint_requests
+            Get[LintResults](LintRequest, lint_request) for lint_request in valid_lint_requests
         )
 
     if not results:
         return Lint(exit_code=0)
 
     exit_code = 0
-    sorted_results = sorted(results, key=lambda res: res.linter_name)
+    sorted_results = sorted(itertools.chain.from_iterable(results), key=lambda res: res.linter_name)
     for result in sorted_results:
         console.print_stderr(
             f"{console.green('✓')} {result.linter_name} succeeded."

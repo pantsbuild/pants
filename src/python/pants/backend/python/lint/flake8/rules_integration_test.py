@@ -7,7 +7,7 @@ from pants.backend.python.lint.flake8.rules import Flake8FieldSet, Flake8Request
 from pants.backend.python.lint.flake8.rules import rules as flake8_rules
 from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonLibrary
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
-from pants.core.goals.lint import LintResult
+from pants.core.goals.lint import LintResults
 from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
 from pants.engine.rules import RootRule
@@ -53,7 +53,7 @@ class Flake8IntegrationTest(ExternalToolTestBase):
         passthrough_args: Optional[str] = None,
         skip: bool = False,
         additional_args: Optional[List[str]] = None,
-    ) -> LintResult:
+    ) -> LintResults:
         args = ["--backend-packages2=pants.backend.python.lint.flake8"]
         if config:
             self.create_file(relpath=".flake8", contents=config)
@@ -65,7 +65,7 @@ class Flake8IntegrationTest(ExternalToolTestBase):
         if additional_args:
             args.extend(additional_args)
         return self.request_single_product(
-            LintResult,
+            LintResults,
             Params(
                 Flake8Request(Flake8FieldSet.create(tgt) for tgt in targets),
                 create_options_bootstrapper(args=args),
@@ -75,21 +75,24 @@ class Flake8IntegrationTest(ExternalToolTestBase):
     def test_passing_source(self) -> None:
         target = self.make_target_with_origin([self.good_source])
         result = self.run_flake8([target])
-        assert result.exit_code == 0
-        assert result.stdout.strip() == ""
+        assert len(result) == 1
+        assert result[0].exit_code == 0
+        assert result[0].stdout.strip() == ""
 
     def test_failing_source(self) -> None:
         target = self.make_target_with_origin([self.bad_source])
         result = self.run_flake8([target])
-        assert result.exit_code == 1
-        assert "bad.py:1:1: F401" in result.stdout
+        assert len(result) == 1
+        assert result[0].exit_code == 1
+        assert "bad.py:1:1: F401" in result[0].stdout
 
     def test_mixed_sources(self) -> None:
         target = self.make_target_with_origin([self.good_source, self.bad_source])
         result = self.run_flake8([target])
-        assert result.exit_code == 1
-        assert "good.py" not in result.stdout
-        assert "bad.py:1:1: F401" in result.stdout
+        assert len(result) == 1
+        assert result[0].exit_code == 1
+        assert "good.py" not in result[0].stdout
+        assert "bad.py:1:1: F401" in result[0].stdout
 
     def test_multiple_targets(self) -> None:
         targets = [
@@ -97,17 +100,19 @@ class Flake8IntegrationTest(ExternalToolTestBase):
             self.make_target_with_origin([self.bad_source]),
         ]
         result = self.run_flake8(targets)
-        assert result.exit_code == 1
-        assert "good.py" not in result.stdout
-        assert "bad.py:1:1: F401" in result.stdout
+        assert len(result) == 1
+        assert result[0].exit_code == 1
+        assert "good.py" not in result[0].stdout
+        assert "bad.py:1:1: F401" in result[0].stdout
 
     def test_precise_file_args(self) -> None:
         target = self.make_target_with_origin(
             [self.good_source, self.bad_source], origin=FilesystemLiteralSpec(self.good_source.path)
         )
         result = self.run_flake8([target])
-        assert result.exit_code == 0
-        assert result.stdout.strip() == ""
+        assert len(result) == 1
+        assert result[0].exit_code == 0
+        assert result[0].stdout.strip() == ""
 
     @skip_unless_python27_and_python3_present
     def test_uses_correct_python_version(self) -> None:
@@ -115,31 +120,48 @@ class Flake8IntegrationTest(ExternalToolTestBase):
             [self.py3_only_source], interpreter_constraints="CPython==2.7.*"
         )
         py2_result = self.run_flake8([py2_target])
-        assert py2_result.exit_code == 1
-        assert "py3.py:1:8: E999 SyntaxError" in py2_result.stdout
+        assert len(py2_result) == 1
+        assert py2_result[0].exit_code == 1
+        assert "py3.py:1:8: E999 SyntaxError" in py2_result[0].stdout
+
         py3_target = self.make_target_with_origin(
             [self.py3_only_source], interpreter_constraints="CPython>=3.6"
         )
         py3_result = self.run_flake8([py3_target])
-        assert py3_result.exit_code == 0
-        assert py3_result.stdout.strip() == ""
+        assert len(py3_result) == 1
+        assert py3_result[0].exit_code == 0
+        assert py3_result[0].stdout.strip() == ""
+
+        # Test that we partition incompatible targets when passed in a single batch. We expect Py2
+        # to still fail, but Py3 should pass.
+        combined_result = self.run_flake8([py2_target, py3_target])
+        assert len(combined_result) == 2
+        batched_py3_result, batched_py2_result = sorted(
+            combined_result, key=lambda result: result.exit_code
+        )
+        assert batched_py2_result.exit_code == 1
+        assert "py3.py:1:8: E999 SyntaxError" in batched_py2_result.stdout
+        assert batched_py3_result.exit_code == 0
+        assert batched_py3_result.stdout.strip() == ""
 
     def test_respects_config_file(self) -> None:
         target = self.make_target_with_origin([self.bad_source])
         result = self.run_flake8([target], config="[flake8]\nignore = F401\n")
-        assert result.exit_code == 0
-        assert result.stdout.strip() == ""
+        assert len(result) == 1
+        assert result[0].exit_code == 0
+        assert result[0].stdout.strip() == ""
 
     def test_respects_passthrough_args(self) -> None:
         target = self.make_target_with_origin([self.bad_source])
         result = self.run_flake8([target], passthrough_args="--ignore=F401")
-        assert result.exit_code == 0
-        assert result.stdout.strip() == ""
+        assert len(result) == 1
+        assert result[0].exit_code == 0
+        assert result[0].stdout.strip() == ""
 
     def test_skip(self) -> None:
         target = self.make_target_with_origin([self.bad_source])
         result = self.run_flake8([target], skip=True)
-        assert result == LintResult.noop()
+        assert not result
 
     def test_3rdparty_plugin(self) -> None:
         target = self.make_target_with_origin(
@@ -148,5 +170,6 @@ class Flake8IntegrationTest(ExternalToolTestBase):
         result = self.run_flake8(
             [target], additional_args=["--flake8-extra-requirements=flake8-pantsbuild>=2.0,<3"]
         )
-        assert result.exit_code == 1
-        assert "bad.py:1:1: PB11" in result.stdout
+        assert len(result) == 1
+        assert result[0].exit_code == 1
+        assert "bad.py:1:1: PB11" in result[0].stdout
