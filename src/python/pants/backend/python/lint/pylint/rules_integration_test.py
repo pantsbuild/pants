@@ -8,11 +8,7 @@ from typing import List, Optional
 from pants.backend.python.lint.pylint.plugin_target_type import PylintSourcePlugin
 from pants.backend.python.lint.pylint.rules import PylintFieldSet, PylintFieldSets
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
-from pants.backend.python.target_types import (
-    PythonInterpreterCompatibility,
-    PythonLibrary,
-    PythonRequirementLibrary,
-)
+from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.lint import LintResult
@@ -21,9 +17,10 @@ from pants.engine.fs import FileContent
 from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
-from pants.engine.target import Dependencies, Sources, TargetWithOrigin
+from pants.engine.target import TargetWithOrigin, WrappedTarget
 from pants.python.python_requirement import PythonRequirement
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
+from pants.testutil.interpreter_selection_utils import skip_unless_python27_and_python3_present
 from pants.testutil.option.util import create_options_bootstrapper
 
 # See http://pylint.pycqa.org/en/latest/user_guide/run.html#exit-codes for exit codes.
@@ -33,10 +30,13 @@ PYLINT_FAILURE_RETURN_CODE = 16
 class PylintIntegrationTest(ExternalToolTestBase):
     source_root = "src/python"
     good_source = FileContent(
-        path=f"{source_root}/good.py", content=b"'''docstring'''\nUPPERCASE_CONSTANT = ''\n",
+        f"{source_root}/good.py", b"'''docstring'''\nUPPERCASE_CONSTANT = ''\n",
     )
     bad_source = FileContent(
-        path=f"{source_root}/bad.py", content=b"'''docstring'''\nlowercase_constant = ''\n",
+        f"{source_root}/bad.py", b"'''docstring'''\nlowercase_constant = ''\n",
+    )
+    py3_only_source = FileContent(
+        f"{source_root}/py3.py", b"'''docstring'''\nCONSTANT: str = ''\n",
     )
 
     @classmethod
@@ -69,16 +69,19 @@ class PylintIntegrationTest(ExternalToolTestBase):
             self.create_file(source_file.path, source_file.content.decode())
         source_globs = [PurePath(source_file.path).name for source_file in source_files]
         self.add_to_build_file(
-            self.source_root, f"python_library(name='{name}', sources={source_globs})\n"
+            self.source_root,
+            dedent(
+                f"""\
+                python_library(
+                    name={repr(name)},
+                    sources={source_globs},
+                    dependencies={[str(dep) for dep in dependencies or ()]},
+                    compatibility={repr(interpreter_constraints)},
+                )
+                """
+            ),
         )
-        target = PythonLibrary(
-            {
-                Sources.alias: source_globs,
-                Dependencies.alias: dependencies,
-                PythonInterpreterCompatibility.alias: interpreter_constraints,
-            },
-            address=Address(self.source_root, name),
-        )
+        target = self.request_single_product(WrappedTarget, Address(self.source_root, name)).target
         if origin is None:
             origin = SingleAddress(directory=self.source_root, name=name)
         return TargetWithOrigin(target, origin)
@@ -146,6 +149,27 @@ class PylintIntegrationTest(ExternalToolTestBase):
         result = self.run_pylint([target])
         assert result.exit_code == 0
         assert "Your code has been rated at 10.00/10" in result.stdout.strip()
+
+    @skip_unless_python27_and_python3_present
+    def test_uses_correct_python_version(self) -> None:
+        py2_target = self.make_target_with_origin(
+            [self.py3_only_source], name="py2", interpreter_constraints="CPython==2.7.*"
+        )
+        py2_result = self.run_pylint(
+            [py2_target],
+            additional_args=[
+                "--pylint-version=pylint<2",
+                "--pylint-extra-requirements=setuptools<45",
+            ],
+        )
+        assert py2_result.exit_code == 2
+        assert "invalid syntax (<string>, line 2) (syntax-error)" in py2_result.stdout
+        py3_target = self.make_target_with_origin(
+            [self.py3_only_source], name="py3", interpreter_constraints="CPython>=3.6"
+        )
+        py3_result = self.run_pylint([py3_target])
+        assert py3_result.exit_code == 0
+        assert "Your code has been rated at 10.00/10" in py3_result.stdout.strip()
 
     def test_respects_config_file(self) -> None:
         target = self.make_target_with_origin([self.bad_source])

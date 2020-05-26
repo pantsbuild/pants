@@ -42,7 +42,6 @@ class PylintFieldSet(LinterFieldSet):
 
     sources: PythonSources
     dependencies: Dependencies
-    compatibility: PythonInterpreterCompatibility
 
 
 class PylintFieldSets(LinterFieldSets):
@@ -91,7 +90,7 @@ async def pylint_lint(
     # http://pylint.pycqa.org/en/latest/faq.html#what-versions-of-python-is-pylint-supporting.
     interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
         (
-            *(field_set.compatibility for field_set in field_sets),
+            *(tgt.get(PythonInterpreterCompatibility) for tgt in targets_with_dependencies),
             *(
                 plugin_tgt[PythonInterpreterCompatibility]
                 for plugin_tgt in plugin_targets.closure
@@ -99,7 +98,7 @@ async def pylint_lint(
             ),
         ),
         python_setup,
-    )
+    ) or PexInterpreterConstraints(pylint.default_interpreter_constraints)
 
     # We build one PEX with Pylint requirements and another with all direct 3rd-party dependencies.
     # Splitting this into two PEXes gives us finer-grained caching. We then merge via `--pex-path`.

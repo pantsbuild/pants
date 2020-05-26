@@ -73,9 +73,8 @@ def generate_args(
     # Black to run over everything recursively under the directory of our target, as Black should
     # only touch files directly specified. We can use `--include` to ensure that Black only
     # operates on the files we actually care about.
-    files = sorted(specified_source_files.snapshot.files)
-    args.extend(["--include", "|".join(re.escape(f) for f in files)])
-    args.extend(PurePath(f).parent.as_posix() for f in files)
+    args.extend(["--include", "|".join(re.escape(f) for f in specified_source_files.files)])
+    args.extend(PurePath(f).parent.as_posix() for f in specified_source_files.files)
     return tuple(args)
 
 

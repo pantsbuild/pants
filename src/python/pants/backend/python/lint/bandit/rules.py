@@ -49,7 +49,7 @@ def generate_args(*, specified_source_files: SourceFiles, bandit: Bandit) -> Tup
     if bandit.options.config is not None:
         args.append(f"--config={bandit.options.config}")
     args.extend(bandit.options.args)
-    args.extend(sorted(specified_source_files.snapshot.files))
+    args.extend(specified_source_files.files)
     return tuple(args)
 
 
@@ -67,7 +67,7 @@ async def bandit_lint(
     # https://github.com/PyCQA/bandit#under-which-version-of-python-should-i-install-bandit.
     interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
         (field_set.compatibility for field_set in field_sets), python_setup=python_setup
-    )
+    ) or PexInterpreterConstraints(bandit.default_interpreter_constraints)
     requirements_pex_request = Get[Pex](
         PexRequest(
             output_filename="bandit.pex",

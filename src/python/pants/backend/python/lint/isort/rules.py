@@ -67,7 +67,7 @@ def generate_args(
     if check_only:
         args.append("--check-only")
     args.extend(isort.options.args)
-    args.extend(sorted(specified_source_files.snapshot.files))
+    args.extend(specified_source_files.files)
     return tuple(args)
 
 

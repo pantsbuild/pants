@@ -49,7 +49,7 @@ def generate_args(*, specified_source_files: SourceFiles, flake8: Flake8) -> Tup
     if flake8.options.config is not None:
         args.append(f"--config={flake8.options.config}")
     args.extend(flake8.options.args)
-    args.extend(sorted(specified_source_files.snapshot.files))
+    args.extend(specified_source_files.files)
     return tuple(args)
 
 
@@ -68,7 +68,7 @@ async def flake8_lint(
     # http://flake8.pycqa.org/en/latest/user/invocation.html.
     interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
         (field_set.compatibility for field_set in field_sets), python_setup
-    )
+    ) or PexInterpreterConstraints(flake8.default_interpreter_constraints)
     requirements_pex_request = Get[Pex](
         PexRequest(
             output_filename="flake8.pex",
