@@ -142,7 +142,7 @@ async def bandit_lint(
 
     # NB: Bandit output depends upon which Python interpreter version it's run with
     # ( https://github.com/PyCQA/bandit#under-which-version-of-python-should-i-install-bandit). We
-    # batch targets by their constraints to ensure, for example that all Python 2 targets run
+    # batch targets by their constraints to ensure, for example, that all Python 2 targets run
     # together and all Python 3 targets run together.
     constraints_to_field_sets = PexInterpreterConstraints.group_field_sets_by_constraints(
         request.field_sets, python_setup

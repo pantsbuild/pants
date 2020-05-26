@@ -266,6 +266,8 @@ async def pylint_lint(
         for field_set in request.field_sets
     )
 
+    # We batch targets by their interpreter constraints to ensure, for example, that all Python 2
+    # targets run together and all Python 3 targets run together.
     interpreter_constraints_to_target_setup = defaultdict(set)
     for field_set, tgt, dependencies in zip(
         request.field_sets, linted_targets, per_target_dependencies
