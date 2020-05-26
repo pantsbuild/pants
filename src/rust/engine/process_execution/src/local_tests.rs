@@ -2,8 +2,8 @@ use tempfile;
 use testutil;
 
 use crate::{
-  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, NamedCaches,
-  Platform, PlatformConstraint, Process, RelativePath,
+  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, NamedCache,
+  NamedCaches, Platform, PlatformConstraint, Process, RelativePath,
 };
 use hashing::EMPTY_DIGEST;
 use spectral::{assert_that, string::StrAssertions};
@@ -322,6 +322,29 @@ async fn output_overlapping_file_and_dir() {
       stderr: as_bytes(""),
       exit_code: 0,
       output_directory: TestDirectory::nested().digest(),
+      execution_attempts: vec![],
+      platform: Platform::current().unwrap(),
+    }
+  )
+}
+
+#[tokio::test]
+async fn append_only_cache_created() {
+  let name = "geo";
+  let named_cache = NamedCache::new(name.to_owned()).unwrap();
+  let result = run_command_locally(
+    Process::new(vec!["/bin/ls".to_owned(), format!(".cache/{}", name)])
+      .append_only_caches(vec![named_cache].into_iter().collect()),
+  )
+  .await;
+
+  assert_eq!(
+    result.unwrap(),
+    FallibleProcessResultWithPlatform {
+      stdout: as_bytes(&format!(".cache/{}\n", name)),
+      stderr: as_bytes(""),
+      exit_code: 0,
+      output_directory: EMPTY_DIGEST,
       execution_attempts: vec![],
       platform: Platform::current().unwrap(),
     }

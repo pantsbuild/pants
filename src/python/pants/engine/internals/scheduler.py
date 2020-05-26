@@ -94,6 +94,7 @@ class Scheduler:
         build_root: str,
         local_store_dir: str,
         local_execution_root_dir: str,
+        named_caches_dir: str,
         rules: Tuple[Rule, ...],
         union_rules: Dict[Type, "OrderedSet[Type]"],
         execution_options: ExecutionOptions,
@@ -109,6 +110,7 @@ class Scheduler:
         :param work_dir: The pants work dir.
         :param local_store_dir: The directory to use for storing the engine's LMDB store in.
         :param local_execution_root_dir: The directory to use for local execution sandboxes.
+        :param named_caches_dir: The directory to use as the root for named mutable caches.
         :param rules: A set of Rules which is used to compute values in the graph.
         :param union_rules: A dict mapping union base types to member types so that rules can be written
                             against abstract union types without knowledge of downstream rulesets.
@@ -133,6 +135,7 @@ class Scheduler:
             build_root=build_root,
             local_store_dir=local_store_dir,
             local_execution_root_dir=local_execution_root_dir,
+            named_caches_dir=named_caches_dir,
             ignore_patterns=ignore_patterns,
             use_gitignore=use_gitignore,
             execution_options=execution_options,

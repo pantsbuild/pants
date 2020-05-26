@@ -68,6 +68,7 @@ impl Core {
     use_gitignore: bool,
     local_store_dir: PathBuf,
     local_execution_root_dir: PathBuf,
+    named_caches_dir: PathBuf,
     remote_execution: bool,
     remote_store_servers: Vec<String>,
     remote_execution_server: Option<String>,
@@ -168,14 +169,11 @@ impl Core {
       platform_properties: remote_execution_extra_platform_properties,
     };
 
-    // TODO: Propagate in a setting for this.
-    let named_caches = NamedCaches::new(build_root.join(".pants.d").join("named_caches"));
-
     let local_command_runner = process_execution::local::CommandRunner::new(
       store.clone(),
       executor.clone(),
       local_execution_root_dir.clone(),
-      named_caches,
+      NamedCaches::new(named_caches_dir),
       process_execution_cleanup_local_dirs,
     );
 

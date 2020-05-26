@@ -307,6 +307,14 @@ impl Process {
     self.output_directories = output_directories;
     self
   }
+
+  ///
+  /// Replaces the append only caches for this process.
+  ///
+  pub fn append_only_caches(mut self, append_only_caches: BTreeSet<NamedCache>) -> Process {
+    self.append_only_caches = append_only_caches;
+    self
+  }
 }
 
 impl TryFrom<MultiPlatformProcess> for Process {
