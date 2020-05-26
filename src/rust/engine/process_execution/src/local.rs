@@ -337,8 +337,7 @@ pub trait CapturedWorkdir {
       }
     };
 
-    // If named caches are configured, collect the paths to create. The environment variables that
-    // will describe these locations to the process are applied in `run_in_workdir`.
+    // If named caches are configured, collect the symlinks to create.
     let named_cache_symlinks = self
       .named_caches()
       .local_paths(&req.append_only_caches)
