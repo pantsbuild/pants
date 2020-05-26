@@ -55,6 +55,7 @@ python_tests(
   sources=['*_integration_test.py'],
   dependencies=[
     ':goals',
+    'examples/src/python/example:hello_directory',
     'src/python/pants/backend/python/rules',
     'src/python/pants/backend/python/subsystems',
     'src/python/pants/build_graph',
@@ -63,6 +64,10 @@ python_tests(
     'src/python/pants/engine:interactive_runner',
     'src/python/pants/engine:rules',
     'src/python/pants/testutil:goal_rule_test_base',
+    'src/python/pants/testutil:int-test',
+    '//:isort_cfg',
+    'examples:isort_cfg',
+    'contrib:isort_cfg',
   ],
   tags = {'integration', 'partially_type_checked'},
 )
