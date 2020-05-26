@@ -214,15 +214,14 @@ class ArgSplitter:
         if not goals and not self._help_request:
             self._help_request = NoGoalHelp()
 
-        # When we remove this deprecation, we will remove passthru "owners" entirely: all scopes
-        # which have passthrough args will receive them.
+        # When we remove this deprecation, this case will turn into an error.
         deprecated_conditional(
             lambda: bool(passthru) and len(passthru_owners) > 1,
             removal_version="1.31.0.dev0",
             entity_description="Ambiguous scopes for passthrough args",
             hint_message="In future, all scopes which accept passthrough args (arguments after --) "
-            f"will receive them, so passing multiple scopes (in this case: {passthru_owners}) "
-            "while using passthrough args is no longer recommended.",
+            f"will receive them, and passing multiple scopes (in this case: {passthru_owners}) "
+            "while using passthrough args will no longer be allowed.",
         )
 
         return SplitArgs(
