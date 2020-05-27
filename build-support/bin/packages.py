@@ -76,20 +76,9 @@ class Package:
 
 
 def core_packages() -> Set[Package]:
-    # N.B. We constrain the ABI (Application Binary Interface) to cp36 to allow pantsbuild.pants to
-    # work with any Python 3 version>= 3.6. We are able to get this future compatibility by specifying
-    # `abi3`, which signifies any version >= 3.6 must work. This is possible to set because in
-    # `src/rust/engine/src/cffi/native_engine.c` we set up `Py_LIMITED_API` and in `src/python/pants/BUILD` we
-    # set ext_modules, which together allows us to mark the abi tag. See https://docs.python.org/3/c-api/stable.html
-    # for documentation and https://bitbucket.org/pypa/wheel/commits/1f63b534d74b00e8c2e8809f07914f6da4502490?at=default#Ldocs/index.rstT121
-    # for how to mark the ABI through bdist_wheel.
     return {
-        Package(
-            "pantsbuild.pants",
-            "//src/python/pants:pants-packaged",
-            bdist_wheel_flags=("--py-limited-api", "cp36"),
-        ),
-        Package("pantsbuild.pants.testutil", "//src/python/pants/testutil:testutil_wheel"),
+        Package("pantsbuild.pants", "src/python/pants:pants-packaged"),
+        Package("pantsbuild.pants.testutil", "src/python/pants/testutil:testutil_wheel"),
     }
 
 
@@ -405,15 +394,14 @@ def check_prebuilt_wheels(check_dir: str) -> None:
             missing_packages.append(package.name)
             continue
 
-        # If the package is cross platform, confirm that we have whls for two platforms.
         is_cross_platform = not all(
             local_file.name.endswith("-none-any.whl") for local_file in local_files
         )
-        if is_cross_platform and len(local_files) != 2:
+        if is_cross_platform and len(local_files) != 6:
             formatted_local_files = ", ".join(f.name for f in local_files)
             missing_packages.append(
-                f"{package.name} (expected a macOS wheel and a linux wheel, but found "
-                f"{formatted_local_files})"
+                f"{package.name} (expected 6 wheels, {{macosx, linux}} x {{cp36m, cp37m, cp38}}, "
+                f"but found {formatted_local_files})"
             )
 
     if missing_packages:

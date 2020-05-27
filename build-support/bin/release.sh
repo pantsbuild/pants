@@ -21,15 +21,26 @@ function safe_curl() {
 # shellcheck source=build-support/common.sh
 source "${ROOT}/build-support/common.sh"
 
-# Note we allow the user to predefine this value so that they may point to a specific interpreter.
-export PY="${PY:-python3.6}"
-interpreter_constraint="CPython==3.6.*"
+# TODO: make this less hacky when porting to Python 3. Use proper `--python-version` flags, like
+#  those used by ci.py.
+if [[ "${USE_PY37:-false}" == "true" ]]; then
+  default_python=python3.7
+  interpreter_constraint="==3.7.*"
+elif [[ "${USE_PY38:-false}" == "true" ]]; then
+  default_python=python3.8
+  interpreter_constraint="==3.8.*"
+else
+  default_python=python3.6
+  interpreter_constraint="==3.6.*"
+fi
+
+export PY="${PY:-${default_python}}"
 if ! command -v "${PY}" >/dev/null; then
   die "Python interpreter ${PY} not discoverable on your PATH."
 fi
 py_major_minor=$(${PY} -c 'import sys; print(".".join(map(str, sys.version_info[0:2])))')
-if [[ "${py_major_minor}" != "3.6" ]]; then
-  die "Invalid interpreter. The release script requires Python 3.6 (you are using ${py_major_minor})."
+if [[ "${py_major_minor}" != "3.6"  && "${py_major_minor}" != "3.7" && "${py_major_minor}" != "3.8" ]]; then
+  die "Invalid interpreter. The release script requires Python 3.6, 3.7, or 3.8 (you are using ${py_major_minor})."
 fi
 
 export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['${interpreter_constraint}']"
@@ -437,26 +448,24 @@ function build_pex() {
   local linux_platform_noabi="linux_x86_64"
   local osx_platform_noabi="macosx_10.11_x86_64"
 
-  dest_suffix="py36.pex"
   case "${mode}" in
     build)
-      # NB: When building locally, we explicitly target our local Py3.
+      # NB: When building locally, we explicitly target our local Py3. This will not be compatible
+      # with platforms other than `current` nor will it be compatible with multiple Python versions.
       local distribution_target_flags=("--python=$(command -v "$PY")")
-      local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${platform}.${dest_suffix}"
-      local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.${platform}.${dest_suffix}"
+      local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${platform}.pex"
+      local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.pex"
       ;;
     fetch)
       local distribution_target_flags=()
-      # TODO: once we add Python 3.7 PEX support, which requires first building Py37 wheels,
-      # we'll want to release one big flexible Pex that works with Python 3.6+.
-      abis=("cp-36-m")
+      abis=("cp-36-m" "cp-37-m" "cp38")
       for platform in "${linux_platform_noabi}" "${osx_platform_noabi}"; do
         for abi in "${abis[@]}"; do
           distribution_target_flags=("${distribution_target_flags[@]}" "--platform=${platform}-${abi}")
         done
       done
-      local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${dest_suffix}"
-      local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.${dest_suffix}"
+      local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.pex"
+      local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.pex"
       ;;
     *)
       echo >&2 "Bad build_pex mode ${mode}"
