@@ -60,7 +60,7 @@ python_tests(
     'testprojects/src/scala/org/pantsbuild/testproject:custom_scala_platform_directory',
   ],
   tags = {'integration', 'partially_type_checked'},
-  timeout=500,
+  timeout=560,
 )
 
 python_tests(
