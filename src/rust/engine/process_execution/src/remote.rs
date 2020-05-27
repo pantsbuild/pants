@@ -869,12 +869,13 @@ pub fn make_execute_request(
   //   is done by code point, equivalently, by the UTF-8 bytes.
   //
   // Note: BuildBarn enforces this requirement.
-  command.mut_platform().mut_properties().sort_by(|x, y| {
-    match x.name.cmp(&y.name) {
+  command
+    .mut_platform()
+    .mut_properties()
+    .sort_by(|x, y| match x.name.cmp(&y.name) {
       Ordering::Equal => x.value.cmp(&y.value),
       v => v,
-    }
-  });
+    });
 
   let mut action = bazel_protos::remote_execution::Action::new();
   action.set_command_digest((&digest(&command)?).into());
