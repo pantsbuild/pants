@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os.path
-from pathlib import PurePath
 from typing import Iterable, Optional, Sequence, Tuple, Union, cast
 
 from pants.backend.python.python_artifact import PythonArtifact
