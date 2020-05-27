@@ -1409,9 +1409,9 @@ jobs:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PREPARE_DEPLOY=1
-    - CACHE_NAME=wheels.linux.py36
+    - CACHE_NAME=wheels.linux
     language: python
-    name: Build Linux wheels (Python 3.6)
+    name: Build Linux wheels
     os: linux
     python:
     - '2.7'
@@ -1422,13 +1422,17 @@ jobs:
       "TRAVIS_UID=$(id -u)" --build-arg "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id
       -g)" build-support/docker/travis_ci/
     - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
-      travis_ci:latest sh -c "./build-support/bin/check_pants_pex_abi.py abi3 cp36m
-      && RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n"
+      travis_ci:latest sh -c "rm src/python/pants/engine/internals/native_engine.so
+      && ./build-support/bin/release.sh -n"
     services:
     - docker
     stage: Test Pants
     sudo: required
-  - before_install:
+  - before_cache:
+    - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
+    - find build-support -name "*.py[co]" -delete
+    - ./build-support/bin/prune_travis_cache.sh
+    before_install:
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64
       -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
@@ -1437,6 +1441,14 @@ jobs:
     before_script:
     - ulimit -n 8192
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
+    cache:
+      directories:
+      - ${AWS_CLI_ROOT}
+      - ${PYENV_ROOT_OSX}
+      - ${HOME}/.cache/pants/rust/cargo
+      - build-support/virtualenvs
+      - src/rust/engine/target
+      timeout: 500
     env:
     - PATH="/usr/local/opt/openssl/bin:${PATH}"
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
@@ -1445,16 +1457,16 @@ jobs:
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
     - PREPARE_DEPLOY=1
-    - CACHE_NAME=wheels.osx.py36
+    - CACHE_NAME=wheels.osx
     - PY=${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin/python
-    - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==${PYENV_PY36_VERSION}']"
+    - PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['${PYENV_PY36_VERSION}']"
     language: generic
-    name: Build OSX wheels (Python 3.6)
+    name: Build macOS wheels
     os: osx
     osx_image: xcode8
     script:
-    - ./build-support/bin/check_pants_pex_abi.py abi3 cp36m
-    - RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n
+    - rm src/python/pants/engine/internals/native_engine.so
+    - ./build-support/bin/release.sh -n
     stage: Test Pants
   - before_install:
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64

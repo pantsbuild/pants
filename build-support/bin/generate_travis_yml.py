@@ -551,23 +551,24 @@ def unit_tests(python_version: PythonVersion) -> Dict:
 
 def _build_wheels_command() -> List[str]:
     return [
-        "./build-support/bin/check_pants_pex_abi.py abi3 cp36m",
-        "RUN_PANTS_FROM_PEX=1 ./build-support/bin/release.sh -n",
+        # We delete the Pex's copy of `native_engine.so` (see get_ci_bootstrapped_pants_pex.sh)
+        # because the Python version used for the Pex might be different than what we use to build
+        # the wheels.
+        "rm src/python/pants/engine/internals/native_engine.so",
+        "./build-support/bin/release.sh -n",
     ]
 
 
 def _build_wheels_env(*, platform: Platform) -> List[str]:
-    return [
-        "PREPARE_DEPLOY=1",
-        f"CACHE_NAME=wheels.{platform}.py36",
-    ]
+    return ["PREPARE_DEPLOY=1", f"CACHE_NAME=wheels.{platform}"]
 
 
 def build_wheels_linux() -> Dict:
     command = " && ".join(_build_wheels_command())
-    shard = {
+    shard: Dict = {
+        **CACHE_NATIVE_ENGINE,
         **linux_shard(python_version=PythonVersion.py36, use_docker=True),
-        "name": "Build Linux wheels (Python 3.6)",
+        "name": "Build Linux wheels",
         "script": [docker_build_travis_ci_image(), docker_run_travis_ci_image(command)],
     }
     safe_extend(shard, "env", _build_wheels_env(platform=Platform.linux))
@@ -575,9 +576,10 @@ def build_wheels_linux() -> Dict:
 
 
 def build_wheels_osx() -> Dict:
-    shard = {
+    shard: Dict = {
+        **CACHE_NATIVE_ENGINE,
         **osx_shard(python_version=PythonVersion.py36, osx_image="xcode8"),
-        "name": "Build OSX wheels (Python 3.6)",
+        "name": "Build macOS wheels",
         "script": _build_wheels_command(),
     }
     safe_extend(
@@ -585,10 +587,10 @@ def build_wheels_osx() -> Dict:
         "env",
         [
             *_build_wheels_env(platform=Platform.osx),
-            # We ensure selection of the pyenv interpreter by PY aware scripts and pants.pex with these
-            # env vars.
+            # We ensure selection of the pyenv interpreter by PY aware scripts and pants.pex with
+            # these env vars.
             "PY=${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin/python",
-            """PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['CPython==${PYENV_PY36_VERSION}']\"""",
+            """PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['${PYENV_PY36_VERSION}']\"""",
         ],
     )
     return shard

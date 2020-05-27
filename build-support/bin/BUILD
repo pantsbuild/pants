@@ -42,15 +42,6 @@ python_binary(
 )
 
 python_binary(
-  name = 'check_pants_pex_abi',
-  sources = ['check_pants_pex_abi.py'],
-  dependencies = [
-    ':common',
-  ],
-  tags = {'type_checked'},
-)
-
-python_binary(
   name = 'ci',
   sources = ['ci.py'],
   dependencies = [
