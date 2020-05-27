@@ -201,7 +201,7 @@ jobs:
       -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} {PYENV_PY36_VERSION}
+    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} ${PYENV_PY36_VERSION}
     before_script:
     - ulimit -n 8192
     cache:
@@ -242,7 +242,7 @@ jobs:
       -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} {PYENV_PY37_VERSION}
+    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} ${PYENV_PY37_VERSION}
     before_script:
     - ulimit -n 8192
     cache:
@@ -283,7 +283,7 @@ jobs:
       -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} {PYENV_PY38_VERSION}
+    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} ${PYENV_PY38_VERSION}
     before_script:
     - ulimit -n 8192
     cache:
@@ -1716,8 +1716,8 @@ jobs:
       -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh {PYENV_PY36_VERSION} {PYENV_PY37_VERSION}
-      {PYENV_PY38_VERSION}
+    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY36_VERSION} ${PYENV_PY37_VERSION}
+      ${PYENV_PY38_VERSION}
     before_script:
     - ulimit -n 8192
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -1752,7 +1752,7 @@ jobs:
       -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} {PYENV_PY36_VERSION}
+    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} ${PYENV_PY36_VERSION}
     before_script:
     - ulimit -n 8192
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -1777,7 +1777,7 @@ jobs:
       -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} {PYENV_PY37_VERSION}
+    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} ${PYENV_PY37_VERSION}
     before_script:
     - ulimit -n 8192
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -1802,7 +1802,7 @@ jobs:
       -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} {PYENV_PY38_VERSION}
+    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} ${PYENV_PY38_VERSION}
     before_script:
     - ulimit -n 8192
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -1827,7 +1827,7 @@ jobs:
       -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} {PYENV_PY36_VERSION}
+    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} ${PYENV_PY36_VERSION}
     before_script:
     - ulimit -n 8192
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -1853,7 +1853,7 @@ jobs:
       -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} {PYENV_PY37_VERSION}
+    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} ${PYENV_PY37_VERSION}
     before_script:
     - ulimit -n 8192
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -1879,7 +1879,7 @@ jobs:
       -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} {PYENV_PY38_VERSION}
+    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} ${PYENV_PY38_VERSION}
     before_script:
     - ulimit -n 8192
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -1905,7 +1905,7 @@ jobs:
       -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} {PYENV_PY36_VERSION}
+    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} ${PYENV_PY36_VERSION}
     before_script:
     - ulimit -n 8192
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -1931,7 +1931,7 @@ jobs:
       -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} {PYENV_PY37_VERSION}
+    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} ${PYENV_PY37_VERSION}
     before_script:
     - ulimit -n 8192
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
@@ -1957,7 +1957,7 @@ jobs:
       -o /usr/local/bin/jq
     - chmod 755 /usr/local/bin/jq
     - ./build-support/bin/install_aws_cli_for_ci.sh
-    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} {PYENV_PY38_VERSION}
+    - ./build-support/bin/install_python_for_ci.sh ${PYENV_PY27_VERSION} ${PYENV_PY38_VERSION}
     before_script:
     - ulimit -n 8192
     - ./build-support/bin/get_ci_bootstrapped_pants_pex.sh ${AWS_BUCKET} ${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}
