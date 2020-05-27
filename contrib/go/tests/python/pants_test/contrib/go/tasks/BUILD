@@ -34,5 +34,5 @@ python_tests(
     'src/python/pants/testutil:int-test',
   ],
   tags={'integration', 'partially_type_checked'},
-  timeout=420,
+  timeout=480,
 )

@@ -38,7 +38,7 @@ python_tests(
         "testprojects/tests/python:example_test_directory",
     ],
     tags={"integration", "partially_type_checked"},
-    timeout=180,
+    timeout=240,
 )
 
 python_tests(
