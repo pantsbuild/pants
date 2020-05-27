@@ -405,6 +405,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         global_options = options_bootstrapper.bootstrap_options.for_global_scope()
         local_store_dir = local_store_dir or global_options.local_store_dir
         local_execution_root_dir = global_options.local_execution_root_dir
+        named_caches_dir = global_options.named_caches_dir
 
         # NB: This uses the long form of initialization because it needs to directly specify
         # `cls.alias_groups` rather than having them be provided by bootstrap options.
@@ -413,6 +414,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
             use_gitignore=False,
             local_store_dir=local_store_dir,
             local_execution_root_dir=local_execution_root_dir,
+            named_caches_dir=named_caches_dir,
             build_file_prelude_globs=(),
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
             native=init_native(),

@@ -1,5 +1,4 @@
-use std::collections::btree_map::BTreeMap;
-use std::collections::btree_set::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
@@ -15,8 +14,8 @@ use tokio::net::TcpStream;
 use crate::local::CapturedWorkdir;
 use crate::nailgun::nailgun_pool::NailgunProcessName;
 use crate::{
-  Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, PlatformConstraint,
-  Process, ProcessMetadata,
+  Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, NamedCaches, Platform,
+  PlatformConstraint, Process, ProcessMetadata,
 };
 
 #[cfg(test)]
@@ -61,8 +60,7 @@ fn construct_nailgun_server_request(
     output_directories: BTreeSet::new(),
     timeout: Some(Duration::new(1000, 0)),
     description: format!("Start a nailgun server for {}", nailgun_name),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
-      hashing::EMPTY_DIGEST,
+    append_only_caches: BTreeSet::new(),
     jdk_home: Some(jdk),
     target_platform: platform_constraint,
     is_nailgunnable: true,
@@ -78,12 +76,12 @@ fn construct_nailgun_client_request(
     argv: _argv,
     input_files,
     description,
+    append_only_caches,
     env: original_request_env,
     working_directory,
     output_files,
     output_directories,
     timeout,
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule,
     jdk_home: _jdk_home,
     target_platform,
     is_nailgunnable,
@@ -93,12 +91,12 @@ fn construct_nailgun_client_request(
     argv: client_args,
     input_files,
     description,
+    append_only_caches,
     env: original_request_env,
     working_directory,
     output_files,
     output_directories,
     timeout,
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule,
     jdk_home: None,
     target_platform,
     is_nailgunnable,
@@ -134,9 +132,9 @@ impl CommandRunner {
       inner: Arc::new(runner),
       nailgun_pool: NailgunPool::new(),
       async_semaphore: AsyncSemaphore::new(1),
-      metadata: metadata,
-      workdir_base: workdir_base,
-      executor: executor,
+      metadata,
+      workdir_base,
+      executor,
     }
   }
 
@@ -205,6 +203,10 @@ impl super::CommandRunner for CommandRunner {
 }
 
 impl CapturedWorkdir for CommandRunner {
+  fn named_caches(&self) -> &NamedCaches {
+    self.inner.named_caches()
+  }
+
   fn run_in_workdir<'a, 'b, 'c>(
     &'a self,
     workdir_path: &'b Path,

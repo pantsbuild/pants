@@ -25,8 +25,8 @@ use tokio::time::timeout;
 use tokio_util::codec::{BytesCodec, FramedRead};
 
 use crate::{
-  Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, PlatformConstraint,
-  Process,
+  Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, NamedCaches, Platform,
+  PlatformConstraint, Process,
 };
 
 use bytes::{Bytes, BytesMut};
@@ -36,6 +36,7 @@ pub struct CommandRunner {
   pub store: Store,
   executor: task_executor::Executor,
   work_dir_base: PathBuf,
+  named_caches: NamedCaches,
   cleanup_local_dirs: bool,
   platform: Platform,
 }
@@ -45,12 +46,14 @@ impl CommandRunner {
     store: Store,
     executor: task_executor::Executor,
     work_dir_base: PathBuf,
+    named_caches: NamedCaches,
     cleanup_local_dirs: bool,
   ) -> CommandRunner {
     CommandRunner {
       store,
       executor,
       work_dir_base,
+      named_caches,
       cleanup_local_dirs,
       platform: Platform::current().unwrap(),
     }
@@ -271,6 +274,10 @@ impl super::CommandRunner for CommandRunner {
 }
 
 impl CapturedWorkdir for CommandRunner {
+  fn named_caches(&self) -> &NamedCaches {
+    &self.named_caches
+  }
+
   fn run_in_workdir<'a, 'b, 'c>(
     &'a self,
     workdir_path: &'b Path,
@@ -330,18 +337,17 @@ pub trait CapturedWorkdir {
       }
     };
 
+    // If named caches are configured, collect the symlinks to create.
+    let named_cache_symlinks = self
+      .named_caches()
+      .local_paths(&req.append_only_caches)
+      .collect::<Vec<_>>();
+
     // Start with async materialization of input snapshots, followed by synchronous materialization
     // of other configured inputs. Note that we don't do this in parallel, as that might cause
     // non-determinism when paths overlap.
     let _metadata = store
       .materialize_directory(workdir_path.clone(), req.input_files)
-      .compat()
-      .await?;
-    let _metadata = store
-      .materialize_directory(
-        workdir_path.clone(),
-        req.unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule,
-      )
       .compat()
       .await?;
     let workdir_path2 = workdir_path.clone();
@@ -351,8 +357,8 @@ pub trait CapturedWorkdir {
     executor
       .spawn_blocking(move || {
         if let Some(jdk_home) = maybe_jdk_home {
-          symlink(jdk_home, workdir_path2.clone().join(".jdk"))
-            .map_err(|err| format!("Error making symlink for local execution: {:?}", err))?
+          symlink(jdk_home, workdir_path2.join(".jdk"))
+            .map_err(|err| format!("Error making JDK symlink for local execution: {:?}", err))?
         }
 
         // The bazel remote execution API specifies that the parent directories for output files and
@@ -366,6 +372,7 @@ pub trait CapturedWorkdir {
         let parent_paths_to_create: HashSet<_> = output_file_paths
           .iter()
           .chain(output_dir_paths.iter())
+          .chain(named_cache_symlinks.iter().map(|s| &s.dst))
           .filter_map(|rel_path| rel_path.parent())
           .map(|parent_relpath| workdir_path2.join(parent_relpath))
           .collect();
@@ -377,6 +384,20 @@ pub trait CapturedWorkdir {
             )
           })?;
         }
+
+        for named_cache_symlink in named_cache_symlinks {
+          symlink(
+            &named_cache_symlink.src,
+            workdir_path2.join(&named_cache_symlink.dst),
+          )
+          .map_err(|err| {
+            format!(
+              "Error making {:?} for local execution: {:?}",
+              named_cache_symlink, err
+            )
+          })?;
+        }
+
         let res: Result<_, String> = Ok(());
         res
       })
@@ -461,6 +482,8 @@ pub trait CapturedWorkdir {
       }
     }
   }
+
+  fn named_caches(&self) -> &NamedCaches;
 
   ///
   /// TODO: See the note on references in ASYNC.md.

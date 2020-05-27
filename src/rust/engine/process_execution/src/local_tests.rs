@@ -2,8 +2,8 @@ use tempfile;
 use testutil;
 
 use crate::{
-  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, Platform,
-  PlatformConstraint, Process, RelativePath,
+  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, NamedCache,
+  NamedCaches, Platform, PlatformConstraint, Process, RelativePath,
 };
 use hashing::EMPTY_DIGEST;
 use spectral::{assert_that, string::StrAssertions};
@@ -21,21 +21,8 @@ use tokio::runtime::Handle;
 #[tokio::test]
 #[cfg(unix)]
 async fn stdout() {
-  let result = run_command_locally(Process {
-    argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
-    env: BTreeMap::new(),
-    working_directory: None,
-    input_files: EMPTY_DIGEST,
-    output_files: BTreeSet::new(),
-    output_directories: BTreeSet::new(),
-    timeout: one_second(),
-    description: "echo foo".to_string(),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
-    jdk_home: None,
-    target_platform: PlatformConstraint::None,
-    is_nailgunnable: false,
-  })
-  .await;
+  let result =
+    run_command_locally(Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"]))).await;
 
   assert_eq!(
     result.unwrap(),
@@ -53,20 +40,11 @@ async fn stdout() {
 #[tokio::test]
 #[cfg(unix)]
 async fn stdout_and_stderr_and_exit_code() {
-  let result = run_command_locally(Process {
-    argv: owned_string_vec(&["/bin/bash", "-c", "echo -n foo ; echo >&2 -n bar ; exit 1"]),
-    env: BTreeMap::new(),
-    working_directory: None,
-    input_files: EMPTY_DIGEST,
-    output_files: BTreeSet::new(),
-    output_directories: BTreeSet::new(),
-    timeout: one_second(),
-    description: "echo foo and fail".to_string(),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
-    jdk_home: None,
-    target_platform: PlatformConstraint::None,
-    is_nailgunnable: false,
-  })
+  let result = run_command_locally(Process::new(owned_string_vec(&[
+    "/bin/bash",
+    "-c",
+    "echo -n foo ; echo >&2 -n bar ; exit 1",
+  ])))
   .await;
 
   assert_eq!(
@@ -86,20 +64,11 @@ async fn stdout_and_stderr_and_exit_code() {
 #[cfg(unix)]
 async fn capture_exit_code_signal() {
   // Launch a process that kills itself with a signal.
-  let result = run_command_locally(Process {
-    argv: owned_string_vec(&["/bin/bash", "-c", "kill $$"]),
-    env: BTreeMap::new(),
-    working_directory: None,
-    input_files: EMPTY_DIGEST,
-    output_files: BTreeSet::new(),
-    output_directories: BTreeSet::new(),
-    timeout: one_second(),
-    description: "kill self".to_string(),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
-    jdk_home: None,
-    target_platform: PlatformConstraint::None,
-    is_nailgunnable: false,
-  })
+  let result = run_command_locally(Process::new(owned_string_vec(&[
+    "/bin/bash",
+    "-c",
+    "kill $$",
+  ])))
   .await;
 
   assert_eq!(
@@ -122,21 +91,8 @@ async fn env() {
   env.insert("FOO".to_string(), "foo".to_string());
   env.insert("BAR".to_string(), "not foo".to_string());
 
-  let result = run_command_locally(Process {
-    argv: owned_string_vec(&["/usr/bin/env"]),
-    env: env.clone(),
-    working_directory: None,
-    input_files: EMPTY_DIGEST,
-    output_files: BTreeSet::new(),
-    output_directories: BTreeSet::new(),
-    timeout: one_second(),
-    description: "run env".to_string(),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
-    jdk_home: None,
-    target_platform: PlatformConstraint::None,
-    is_nailgunnable: false,
-  })
-  .await;
+  let result =
+    run_command_locally(Process::new(owned_string_vec(&["/usr/bin/env"])).env(env.clone())).await;
 
   let stdout = String::from_utf8(result.unwrap().stdout.to_vec()).unwrap();
   let got_env: BTreeMap<String, String> = stdout
@@ -162,21 +118,7 @@ async fn env_is_deterministic() {
     let mut env = BTreeMap::new();
     env.insert("FOO".to_string(), "foo".to_string());
     env.insert("BAR".to_string(), "not foo".to_string());
-
-    Process {
-      argv: owned_string_vec(&["/usr/bin/env"]),
-      env: env,
-      working_directory: None,
-      input_files: EMPTY_DIGEST,
-      output_files: BTreeSet::new(),
-      output_directories: BTreeSet::new(),
-      timeout: one_second(),
-      description: "run env".to_string(),
-      unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
-      jdk_home: None,
-      target_platform: PlatformConstraint::None,
-      is_nailgunnable: false,
-    }
+    Process::new(owned_string_vec(&["/usr/bin/env"])).env(env)
   }
 
   let result1 = run_command_locally(make_request()).await;
@@ -187,40 +129,18 @@ async fn env_is_deterministic() {
 
 #[tokio::test]
 async fn binary_not_found() {
-  run_command_locally(Process {
-    argv: owned_string_vec(&["echo", "-n", "foo"]),
-    env: BTreeMap::new(),
-    working_directory: None,
-    input_files: EMPTY_DIGEST,
-    output_files: BTreeSet::new(),
-    output_directories: BTreeSet::new(),
-    timeout: one_second(),
-    description: "echo foo".to_string(),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
-    jdk_home: None,
-    target_platform: PlatformConstraint::None,
-    is_nailgunnable: false,
-  })
-  .await
-  .expect_err("Want Err");
+  run_command_locally(Process::new(owned_string_vec(&["echo", "-n", "foo"])))
+    .await
+    .expect_err("Want Err");
 }
 
 #[tokio::test]
 async fn output_files_none() {
-  let result = run_command_locally(Process {
-    argv: owned_string_vec(&[&find_bash(), "-c", "exit 0"]),
-    env: BTreeMap::new(),
-    working_directory: None,
-    input_files: EMPTY_DIGEST,
-    output_files: BTreeSet::new(),
-    output_directories: BTreeSet::new(),
-    timeout: one_second(),
-    description: "bash".to_string(),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
-    jdk_home: None,
-    target_platform: PlatformConstraint::None,
-    is_nailgunnable: false,
-  })
+  let result = run_command_locally(Process::new(owned_string_vec(&[
+    &find_bash(),
+    "-c",
+    "exit 0",
+  ])))
   .await;
   assert_eq!(
     result.unwrap(),
@@ -237,24 +157,14 @@ async fn output_files_none() {
 
 #[tokio::test]
 async fn output_files_one() {
-  let result = run_command_locally(Process {
-    argv: vec![
+  let result = run_command_locally(
+    Process::new(vec![
       find_bash(),
       "-c".to_owned(),
       format!("echo -n {} > {}", TestData::roland().string(), "roland"),
-    ],
-    env: BTreeMap::new(),
-    working_directory: None,
-    input_files: EMPTY_DIGEST,
-    output_files: vec![PathBuf::from("roland")].into_iter().collect(),
-    output_directories: BTreeSet::new(),
-    timeout: one_second(),
-    description: "bash".to_string(),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
-    jdk_home: None,
-    target_platform: PlatformConstraint::None,
-    is_nailgunnable: false,
-  })
+    ])
+    .output_files(vec![PathBuf::from("roland")].into_iter().collect()),
+  )
   .await;
 
   assert_eq!(
@@ -272,8 +182,8 @@ async fn output_files_one() {
 
 #[tokio::test]
 async fn output_dirs() {
-  let result = run_command_locally(Process {
-    argv: vec![
+  let result = run_command_locally(
+    Process::new(vec![
       find_bash(),
       "-c".to_owned(),
       format!(
@@ -282,19 +192,10 @@ async fn output_dirs() {
         "cats/roland",
         TestData::catnip().string()
       ),
-    ],
-    env: BTreeMap::new(),
-    working_directory: None,
-    input_files: EMPTY_DIGEST,
-    output_files: vec![PathBuf::from("treats")].into_iter().collect(),
-    output_directories: vec![PathBuf::from("cats")].into_iter().collect(),
-    timeout: one_second(),
-    description: "bash".to_string(),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
-    jdk_home: None,
-    target_platform: PlatformConstraint::None,
-    is_nailgunnable: false,
-  })
+    ])
+    .output_files(vec![PathBuf::from("treats")].into_iter().collect())
+    .output_directories(vec![PathBuf::from("cats")].into_iter().collect()),
+  )
   .await;
 
   assert_eq!(
@@ -312,8 +213,8 @@ async fn output_dirs() {
 
 #[tokio::test]
 async fn output_files_many() {
-  let result = run_command_locally(Process {
-    argv: vec![
+  let result = run_command_locally(
+    Process::new(vec![
       find_bash(),
       "-c".to_owned(),
       format!(
@@ -321,21 +222,13 @@ async fn output_files_many() {
         TestData::roland().string(),
         TestData::catnip().string()
       ),
-    ],
-    env: BTreeMap::new(),
-    working_directory: None,
-    input_files: EMPTY_DIGEST,
-    output_files: vec![PathBuf::from("cats/roland"), PathBuf::from("treats")]
-      .into_iter()
-      .collect(),
-    output_directories: BTreeSet::new(),
-    timeout: one_second(),
-    description: "treats-roland".to_string(),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
-    jdk_home: None,
-    target_platform: PlatformConstraint::None,
-    is_nailgunnable: false,
-  })
+    ])
+    .output_files(
+      vec![PathBuf::from("cats/roland"), PathBuf::from("treats")]
+        .into_iter()
+        .collect(),
+    ),
+  )
   .await;
 
   assert_eq!(
@@ -353,8 +246,8 @@ async fn output_files_many() {
 
 #[tokio::test]
 async fn output_files_execution_failure() {
-  let result = run_command_locally(Process {
-    argv: vec![
+  let result = run_command_locally(
+    Process::new(vec![
       find_bash(),
       "-c".to_owned(),
       format!(
@@ -362,19 +255,9 @@ async fn output_files_execution_failure() {
         TestData::roland().string(),
         "roland"
       ),
-    ],
-    env: BTreeMap::new(),
-    working_directory: None,
-    input_files: EMPTY_DIGEST,
-    output_files: vec![PathBuf::from("roland")].into_iter().collect(),
-    output_directories: BTreeSet::new(),
-    timeout: one_second(),
-    description: "echo foo".to_string(),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
-    jdk_home: None,
-    target_platform: PlatformConstraint::None,
-    is_nailgunnable: false,
-  })
+    ])
+    .output_files(vec![PathBuf::from("roland")].into_iter().collect()),
+  )
   .await;
 
   assert_eq!(
@@ -392,26 +275,18 @@ async fn output_files_execution_failure() {
 
 #[tokio::test]
 async fn output_files_partial_output() {
-  let result = run_command_locally(Process {
-    argv: vec![
+  let result = run_command_locally(
+    Process::new(vec![
       find_bash(),
       "-c".to_owned(),
       format!("echo -n {} > {}", TestData::roland().string(), "roland"),
-    ],
-    env: BTreeMap::new(),
-    working_directory: None,
-    input_files: EMPTY_DIGEST,
-    output_files: vec![PathBuf::from("roland"), PathBuf::from("susannah")]
-      .into_iter()
-      .collect(),
-    output_directories: BTreeSet::new(),
-    timeout: one_second(),
-    description: "echo-roland".to_string(),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
-    jdk_home: None,
-    target_platform: PlatformConstraint::None,
-    is_nailgunnable: false,
-  })
+    ])
+    .output_files(
+      vec![PathBuf::from("roland"), PathBuf::from("susannah")]
+        .into_iter()
+        .collect(),
+    ),
+  )
   .await;
 
   assert_eq!(
@@ -429,24 +304,15 @@ async fn output_files_partial_output() {
 
 #[tokio::test]
 async fn output_overlapping_file_and_dir() {
-  let result = run_command_locally(Process {
-    argv: vec![
+  let result = run_command_locally(
+    Process::new(vec![
       find_bash(),
       "-c".to_owned(),
       format!("echo -n {} > cats/roland", TestData::roland().string()),
-    ],
-    env: BTreeMap::new(),
-    working_directory: None,
-    input_files: EMPTY_DIGEST,
-    output_files: vec![PathBuf::from("cats/roland")].into_iter().collect(),
-    output_directories: vec![PathBuf::from("cats")].into_iter().collect(),
-    timeout: one_second(),
-    description: "bash".to_string(),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
-    jdk_home: None,
-    target_platform: PlatformConstraint::None,
-    is_nailgunnable: false,
-  })
+    ])
+    .output_files(vec![PathBuf::from("cats/roland")].into_iter().collect())
+    .output_directories(vec![PathBuf::from("cats")].into_iter().collect()),
+  )
   .await;
 
   assert_eq!(
@@ -456,6 +322,29 @@ async fn output_overlapping_file_and_dir() {
       stderr: as_bytes(""),
       exit_code: 0,
       output_directory: TestDirectory::nested().digest(),
+      execution_attempts: vec![],
+      platform: Platform::current().unwrap(),
+    }
+  )
+}
+
+#[tokio::test]
+async fn append_only_cache_created() {
+  let name = "geo";
+  let named_cache = NamedCache::new(name.to_owned()).unwrap();
+  let result = run_command_locally(
+    Process::new(vec!["/bin/ls".to_owned(), format!(".cache/{}", name)])
+      .append_only_caches(vec![named_cache].into_iter().collect()),
+  )
+  .await;
+
+  assert_eq!(
+    result.unwrap(),
+    FallibleProcessResultWithPlatform {
+      stdout: as_bytes(&format!(".cache/{}\n", name)),
+      stderr: as_bytes(""),
+      exit_code: 0,
+      output_directory: EMPTY_DIGEST,
       execution_attempts: vec![],
       platform: Platform::current().unwrap(),
     }
@@ -477,7 +366,7 @@ async fn jdk_symlink() {
     output_directories: BTreeSet::new(),
     timeout: one_second(),
     description: "cat roland".to_string(),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
+    append_only_caches: BTreeSet::new(),
     jdk_home: Some(preserved_work_tmpdir.path().to_path_buf()),
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
@@ -502,24 +391,12 @@ async fn test_directory_preservation() {
   let preserved_work_root = preserved_work_tmpdir.path().to_owned();
 
   let result = run_command_locally_in_dir(
-    Process {
-      argv: vec![
-        find_bash(),
-        "-c".to_owned(),
-        format!("echo -n {} > {}", TestData::roland().string(), "roland"),
-      ],
-      env: BTreeMap::new(),
-      working_directory: None,
-      input_files: EMPTY_DIGEST,
-      output_files: vec![PathBuf::from("roland")].into_iter().collect(),
-      output_directories: BTreeSet::new(),
-      timeout: one_second(),
-      description: "bash".to_string(),
-      unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
-      jdk_home: None,
-      target_platform: PlatformConstraint::None,
-      is_nailgunnable: false,
-    },
+    Process::new(vec![
+      find_bash(),
+      "-c".to_owned(),
+      format!("echo -n {} > {}", TestData::roland().string(), "roland"),
+    ])
+    .output_files(vec![PathBuf::from("roland")].into_iter().collect()),
     preserved_work_root.clone(),
     false,
     None,
@@ -548,20 +425,7 @@ async fn test_directory_preservation_error() {
   assert_eq!(testutil::file::list_dir(&preserved_work_root).len(), 0);
 
   run_command_locally_in_dir(
-    Process {
-      argv: vec!["doesnotexist".to_owned()],
-      env: BTreeMap::new(),
-      working_directory: None,
-      input_files: EMPTY_DIGEST,
-      output_files: BTreeSet::new(),
-      output_directories: BTreeSet::new(),
-      timeout: one_second(),
-      description: "failing execution".to_string(),
-      unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
-      jdk_home: None,
-      target_platform: PlatformConstraint::None,
-      is_nailgunnable: false,
-    },
+    Process::new(vec!["doesnotexist".to_owned()]),
     preserved_work_root.clone(),
     false,
     None,
@@ -577,8 +441,8 @@ async fn test_directory_preservation_error() {
 
 #[tokio::test]
 async fn all_containing_directories_for_outputs_are_created() {
-  let result = run_command_locally(Process {
-    argv: vec![
+  let result = run_command_locally(
+    Process::new(vec![
       find_bash(),
       "-c".to_owned(),
       format!(
@@ -588,19 +452,10 @@ async fn all_containing_directories_for_outputs_are_created() {
         "/bin/mkdir birds/falcons && echo -n {} > cats/roland",
         TestData::roland().string()
       ),
-    ],
-    env: BTreeMap::new(),
-    working_directory: None,
-    input_files: EMPTY_DIGEST,
-    output_files: vec![PathBuf::from("cats/roland")].into_iter().collect(),
-    output_directories: vec![PathBuf::from("birds/falcons")].into_iter().collect(),
-    timeout: one_second(),
-    description: "create nonoverlapping directories and file".to_string(),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
-    jdk_home: None,
-    target_platform: PlatformConstraint::None,
-    is_nailgunnable: false,
-  })
+    ])
+    .output_files(vec![PathBuf::from("cats/roland")].into_iter().collect())
+    .output_directories(vec![PathBuf::from("birds/falcons")].into_iter().collect()),
+  )
   .await;
 
   assert_eq!(
@@ -618,24 +473,14 @@ async fn all_containing_directories_for_outputs_are_created() {
 
 #[tokio::test]
 async fn output_empty_dir() {
-  let result = run_command_locally(Process {
-    argv: vec![
+  let result = run_command_locally(
+    Process::new(vec![
       find_bash(),
       "-c".to_owned(),
       "/bin/mkdir falcons".to_string(),
-    ],
-    env: BTreeMap::new(),
-    working_directory: None,
-    input_files: EMPTY_DIGEST,
-    output_files: BTreeSet::new(),
-    output_directories: vec![PathBuf::from("falcons")].into_iter().collect(),
-    timeout: one_second(),
-    description: "bash".to_string(),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
-    jdk_home: None,
-    target_platform: PlatformConstraint::None,
-    is_nailgunnable: false,
-  })
+    ])
+    .output_directories(vec![PathBuf::from("falcons")].into_iter().collect()),
+  )
   .await;
 
   assert_eq!(
@@ -649,63 +494,6 @@ async fn output_empty_dir() {
       platform: Platform::current().unwrap(),
     }
   )
-}
-
-/// This test attempts to make sure local only scratch files are materialized correctly by
-/// making sure that with input_files being empty, we would be able to capture the content of
-/// the local only scratch inputs as outputs.
-#[tokio::test]
-async fn local_only_scratch_files_materialized() {
-  let store_dir = TempDir::new().unwrap();
-  let executor = task_executor::Executor::new(Handle::current());
-  let store = Store::local_only(executor.clone(), store_dir.path()).unwrap();
-
-  // Prepare the store to contain roland, because the EPR needs to materialize it
-  let roland_directory_digest = TestDirectory::containing_roland().digest();
-  store
-    .record_directory(&TestDirectory::containing_roland().directory(), true)
-    .await
-    .expect("Error saving directory");
-  store
-    .store_file_bytes(TestData::roland().bytes(), false)
-    .await
-    .expect("Error saving file bytes");
-
-  let work_dir = TempDir::new().unwrap();
-  let result = run_command_locally_in_dir(
-    Process {
-      argv: vec![find_bash(), "-c".to_owned(), format!("echo -n ''")],
-      env: BTreeMap::new(),
-      working_directory: None,
-      input_files: EMPTY_DIGEST,
-      output_files: vec![PathBuf::from("roland")].into_iter().collect(),
-      output_directories: BTreeSet::new(),
-      timeout: one_second(),
-      description: "treats-roland".to_string(),
-      unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
-        roland_directory_digest,
-      jdk_home: None,
-      target_platform: PlatformConstraint::None,
-      is_nailgunnable: false,
-    },
-    work_dir.path().to_owned(),
-    true,
-    Some(store),
-    Some(executor),
-  )
-  .await;
-
-  assert_eq!(
-    result.unwrap(),
-    FallibleProcessResultWithPlatform {
-      stdout: as_bytes(""),
-      stderr: as_bytes(""),
-      exit_code: 0,
-      output_directory: roland_directory_digest,
-      execution_attempts: vec![],
-      platform: Platform::current().unwrap(),
-    }
-  );
 }
 
 #[tokio::test]
@@ -723,7 +511,7 @@ async fn timeout() {
     output_directories: BTreeSet::new(),
     timeout: Some(Duration::from_millis(100)),
     description: "sleepy-cat".to_string(),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
+    append_only_caches: BTreeSet::new(),
     jdk_home: None,
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
@@ -769,7 +557,7 @@ async fn working_directory() {
       output_directories: BTreeSet::new(),
       timeout: one_second(),
       description: "confused-cat".to_string(),
-      unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule: EMPTY_DIGEST,
+      append_only_caches: BTreeSet::new(),
       jdk_home: None,
       target_platform: PlatformConstraint::None,
       is_nailgunnable: false,
@@ -814,10 +602,17 @@ async fn run_command_locally_in_dir(
   executor: Option<task_executor::Executor>,
 ) -> Result<FallibleProcessResultWithPlatform, String> {
   let store_dir = TempDir::new().unwrap();
+  let named_cache_dir = TempDir::new().unwrap();
   let executor = executor.unwrap_or_else(|| task_executor::Executor::new(Handle::current()));
   let store =
     store.unwrap_or_else(|| Store::local_only(executor.clone(), store_dir.path()).unwrap());
-  let runner = crate::local::CommandRunner::new(store, executor.clone(), dir, cleanup);
+  let runner = crate::local::CommandRunner::new(
+    store,
+    executor.clone(),
+    dir,
+    NamedCaches::new(named_cache_dir.path().to_owned()),
+    cleanup,
+  );
   runner.run(req.into(), Context::default()).await
 }
 

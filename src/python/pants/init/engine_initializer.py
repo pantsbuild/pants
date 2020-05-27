@@ -316,6 +316,7 @@ class EngineInitializer:
             use_gitignore,
             bootstrap_options.local_store_dir,
             bootstrap_options.local_execution_root_dir,
+            bootstrap_options.named_caches_dir,
             bootstrap_options.build_file_prelude_globs,
             options_bootstrapper,
             build_configuration,
@@ -337,6 +338,7 @@ class EngineInitializer:
         use_gitignore: bool,
         local_store_dir: str,
         local_execution_root_dir: str,
+        named_caches_dir: str,
         build_file_prelude_globs: Tuple[str, ...],
         options_bootstrapper: OptionsBootstrapper,
         build_configuration: BuildConfiguration,
@@ -353,6 +355,7 @@ class EngineInitializer:
 
         :param local_store_dir: The directory to use for storing the engine's LMDB store in.
         :param local_execution_root_dir: The directory to use for local execution sandboxes.
+        :param named_caches_dir: The base directory for named cache storage.
         :param build_file_prelude_globs: Globs to match files to be prepended to all BUILD files.
         :param build_root: A path to be used as the build root. If None, then default is used.
         :param native: An instance of the native-engine subsystem.
@@ -456,6 +459,7 @@ class EngineInitializer:
             build_root=build_root,
             local_store_dir=local_store_dir,
             local_execution_root_dir=local_execution_root_dir,
+            named_caches_dir=named_caches_dir,
             rules=rules,
             union_rules=union_rules,
             execution_options=execution_options,

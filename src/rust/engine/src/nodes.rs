@@ -29,7 +29,9 @@ use fs::{
   PathGlobs, PathStat, PreparedPathGlobs, StrictGlobMatching, VFS,
 };
 use hashing;
-use process_execution::{self, MultiPlatformProcess, PlatformConstraint, Process, RelativePath};
+use process_execution::{
+  self, MultiPlatformProcess, NamedCache, PlatformConstraint, Process, RelativePath,
+};
 use rule_graph;
 
 use graph::{Entry, Node, NodeError, NodeVisualizer};
@@ -259,6 +261,11 @@ impl MultiPlatformExecuteProcess {
 
     let description = externs::project_str(&value, "description");
 
+    let append_only_caches = externs::project_multi_strs(&value, "append_only_caches")
+      .into_iter()
+      .map(NamedCache::new)
+      .collect::<Result<_, String>>()?;
+
     let jdk_home = {
       let val = externs::project_str(&value, "jdk_home");
       if val.is_empty() {
@@ -270,13 +277,6 @@ impl MultiPlatformExecuteProcess {
 
     let is_nailgunnable = externs::project_bool(&value, "is_nailgunnable");
 
-    let unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule =
-      lift_digest(&externs::project_ignoring_type(
-        &value,
-        "unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule",
-      ))
-      .map_err(|err| format!("Error parsing digest {}", err))?;
-
     Ok(process_execution::Process {
       argv: externs::project_multi_strs(&value, "argv"),
       env,
@@ -286,7 +286,7 @@ impl MultiPlatformExecuteProcess {
       output_directories,
       timeout,
       description,
-      unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule,
+      append_only_caches,
       jdk_home,
       target_platform,
       is_nailgunnable,

@@ -62,7 +62,11 @@ mod speculate_tests;
 
 pub mod nailgun;
 
+pub mod named_caches;
+
 extern crate uname;
+
+pub use crate::named_caches::{NamedCache, NamedCaches};
 
 #[derive(PartialOrd, Ord, Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum Platform {
@@ -225,13 +229,18 @@ pub struct Process {
   #[derivative(PartialEq = "ignore", Hash = "ignore")]
   pub description: String,
 
-  // This will be materialized for local Process only.
-  // Eventually we want to remove this.
-  // Context: https://github.com/pantsbuild/pants/issues/8314
-  // Think twice before using it.
-  #[derivative(PartialEq = "ignore", Hash = "ignore")]
-  pub unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
-    hashing::Digest,
+  ///
+  /// Declares that this process uses the given named caches (which might have associated config
+  /// in the future). Cache names must contain only lowercase ascii characters or underscores.
+  ///
+  /// Caches are exposed to processes within their workspaces as directories at the relative path
+  /// `.cache/$name`. A @rule wrapped process may optionally check for the existence of the relevant
+  /// directory, and disable use of that cache if it is not defined. These caches are globally
+  /// shared and so must be concurrency safe: a consumer of the cache must never assume that it has
+  /// exclusive access to the provided directory.
+  ///
+  pub append_only_caches: BTreeSet<NamedCache>,
+
   ///
   /// If present, a symlink will be created at .jdk which points to this directory for local
   /// execution, or a system-installed JDK (ignoring the value of the present Some) for remote
@@ -244,6 +253,67 @@ pub struct Process {
   pub target_platform: PlatformConstraint,
 
   pub is_nailgunnable: bool,
+}
+
+impl Process {
+  ///
+  /// Constructs a Process with default values for most fields, after which the builder pattern can
+  /// be used to set values.
+  ///
+  /// We use the more ergonomic (but possibly slightly slower) "move self for each builder method"
+  /// pattern, so this method is only enabled for test usage: production usage should construct the
+  /// Process struct wholesale. We can reconsider this if we end up with more production callsites
+  /// that require partial options.
+  ///
+  #[cfg(test)]
+  pub fn new(argv: Vec<String>) -> Process {
+    Process {
+      argv,
+      env: BTreeMap::new(),
+      working_directory: None,
+      input_files: hashing::EMPTY_DIGEST,
+      output_files: BTreeSet::new(),
+      output_directories: BTreeSet::new(),
+      timeout: None,
+      description: "".to_string(),
+      append_only_caches: BTreeSet::new(),
+      jdk_home: None,
+      target_platform: PlatformConstraint::None,
+      is_nailgunnable: false,
+    }
+  }
+
+  ///
+  /// Replaces the environment for this process.
+  ///
+  pub fn env(mut self, env: BTreeMap<String, String>) -> Process {
+    self.env = env;
+    self
+  }
+
+  ///
+  /// Replaces the output files for this process.
+  ///
+  pub fn output_files(mut self, output_files: BTreeSet<PathBuf>) -> Process {
+    self.output_files = output_files;
+    self
+  }
+
+  ///
+  /// Replaces the output directories for this process.
+  ///
+  pub fn output_directories(mut self, output_directories: BTreeSet<PathBuf>) -> Process {
+    self.output_directories = output_directories;
+    self
+  }
+
+  ///
+  /// Replaces the append only caches for this process.
+  ///
+  pub fn append_only_caches(mut self, append_only_caches: BTreeSet<NamedCache>) -> Process {
+    self.append_only_caches = append_only_caches;
+    self
+  }
 }
 
 impl TryFrom<MultiPlatformProcess> for Process {

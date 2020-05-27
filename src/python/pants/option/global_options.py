@@ -724,6 +724,13 @@ class GlobalOptions(Subsystem):
             default=tempfile.gettempdir(),
         )
         register(
+            "--named-caches-dir",
+            advanced=True,
+            help="Directory to use as the base for named global caches for processes with "
+            "trusted, concurrency-safe caches.",
+            default=os.path.join(get_pants_cachedir(), "named_caches"),
+        )
+        register(
             "--remote-execution",
             advanced=True,
             type=bool,
