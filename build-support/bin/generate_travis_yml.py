@@ -368,7 +368,6 @@ def linux_fuse_shard() -> Dict:
         "os": "linux",
         "dist": "xenial",
         "sudo": "required",
-        "python": ["2.7", "3.6", "3.7"],
         "before_install": _linux_before_install()
         + [
             "sudo apt-get install -y pkg-config fuse libfuse-dev",
@@ -672,7 +671,13 @@ def rust_tests_linux() -> Dict:
         **_RUST_TESTS_BASE,
         **linux_fuse_shard(),
         "name": "Rust tests - Linux",
-        "env": ["CACHE_NAME=rust_tests.linux"],
+        "env": [
+            "CACHE_NAME=rust_tests.linux",
+            # TODO: Despite being successfully linked at build time, the Linux rust tests
+            # shard is unable to locate `libpython3.6m.so.1.0` at runtime without this pointer:
+            # OSX appears to be fine.
+            'LD_LIBRARY_PATH="/opt/python/3.6.7/lib:${LD_LIBRARY_PATH}"',
+        ],
     }
 
 

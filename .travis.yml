@@ -528,10 +528,6 @@ jobs:
     if: commit_message !~ /\[ci skip-rust-tests\]/
     name: Clippy (Rust linter)
     os: linux
-    python:
-    - '2.7'
-    - '3.6'
-    - '3.7'
     script:
     - ./build-support/bin/ci.py --clippy
     stage: Test Pants
@@ -1597,13 +1593,10 @@ jobs:
     dist: xenial
     env:
     - CACHE_NAME=rust_tests.linux
+    - LD_LIBRARY_PATH="/opt/python/3.6.7/lib:${LD_LIBRARY_PATH}"
     if: commit_message !~ /\[ci skip-rust-tests\]/
     name: Rust tests - Linux
     os: linux
-    python:
-    - '2.7'
-    - '3.6'
-    - '3.7'
     script:
     - ./build-support/bin/ci.py --rust-tests
     stage: Test Pants
