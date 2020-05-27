@@ -5,12 +5,12 @@ import json
 import os
 import shlex
 import unittest.mock
-from contextlib import contextmanager
 from enum import Enum
 from functools import partial
 from textwrap import dedent
 from typing import Any, Dict, List, Optional, Union, cast
 
+import toml
 import yaml
 from packaging.version import Version
 
@@ -69,16 +69,10 @@ def subsystem(scope: str) -> ScopeInfo:
 
 
 class OptionsTest(TestBase):
-    @contextmanager
-    def _write_config_to_file(self, fp, config):
-        for section, options in config.items():
-            fp.write(f"[{section}]\n")
-            for key, value in options.items():
-                fp.write(f"{key}: {value}\n")
-
-    def _create_config(self, config: Optional[Dict[str, Dict[str, str]]] = None) -> Config:
-        with open(os.path.join(safe_mkdtemp(), "test_config.ini"), "w") as fp:
-            self._write_config_to_file(fp, config or {})
+    @staticmethod
+    def _create_config(config: Optional[Dict[str, Dict[str, str]]] = None) -> Config:
+        with open(os.path.join(safe_mkdtemp(), "test_config.toml"), "w") as fp:
+            toml.dump(config or {}, fp)
         return Config.load(config_paths=[fp.name])
 
     def _parse(
