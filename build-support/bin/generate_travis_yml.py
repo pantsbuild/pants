@@ -595,7 +595,7 @@ def build_wheels_linux() -> Dict:
 
 
 def build_wheels_osx() -> Dict:
-    return {
+    shard: Dict = {
         **CACHE_NATIVE_ENGINE,
         **osx_shard(osx_image="xcode8"),
         "name": "Build macOS wheels",
@@ -605,6 +605,8 @@ def build_wheels_osx() -> Dict:
             install_py27=False,
         ),
     }
+    safe_extend(shard, "env", _build_wheels_env(platform=Platform.osx))
+    return shard
 
 
 # -------------------------------------------------------------------------

@@ -1738,6 +1738,8 @@ jobs:
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
+    - PREPARE_DEPLOY=1
+    - CACHE_NAME=wheels.osx
     language: generic
     name: Build macOS wheels
     os: osx
