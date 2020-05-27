@@ -408,14 +408,8 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
   });
   want_command.mut_platform().mut_properties().push({
     let mut property = bazel_protos::remote_execution::Platform_Property::new();
-    property.set_name("Multi".to_owned());
-    property.set_value("uno".to_owned());
-    property
-  });
-  want_command.mut_platform().mut_properties().push({
-    let mut property = bazel_protos::remote_execution::Platform_Property::new();
-    property.set_name("last".to_owned());
-    property.set_value("bar".to_owned());
+    property.set_name("JDK_SYMLINK".to_owned());
+    property.set_value(".jdk".to_owned());
     property
   });
   want_command.mut_platform().mut_properties().push({
@@ -426,8 +420,14 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
   });
   want_command.mut_platform().mut_properties().push({
     let mut property = bazel_protos::remote_execution::Platform_Property::new();
-    property.set_name("JDK_SYMLINK".to_owned());
-    property.set_value(".jdk".to_owned());
+    property.set_name("Multi".to_owned());
+    property.set_value("uno".to_owned());
+    property
+  });
+  want_command.mut_platform().mut_properties().push({
+    let mut property = bazel_protos::remote_execution::Platform_Property::new();
+    property.set_name("last".to_owned());
+    property.set_value("bar".to_owned());
     property
   });
   want_command.mut_platform().mut_properties().push({
@@ -441,7 +441,7 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
   want_action.set_command_digest(
     (&Digest(
       Fingerprint::from_hex_string(
-        "6c63c44ac364729d371931a091cc8379e32d021e06df52ab5f8461118d837e78",
+        "741a33b863aaa595e2be6a316f9ae187e3c0d8cf8a8054261417eebbede0cefe",
       )
       .unwrap(),
       118,
@@ -454,7 +454,7 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
   want_execute_request.set_action_digest(
     (&Digest(
       Fingerprint::from_hex_string(
-        "5246770d23d09dc7d145e19d3a7b8233fc42316115fbc5420dfe501fb684e5e9",
+        "c3dc9c1e73f5cdfbf7e3b55dd6dead4f6fe03323dc19db87b27617fede27e9b4",
       )
       .unwrap(),
       140,
