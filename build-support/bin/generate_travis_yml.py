@@ -93,7 +93,10 @@ GLOBAL_ENV_VARS = [
     # Travis converts it back into its original decrypted value when ran in CI, per
     # https://docs.travis-ci.com/user/environment-variables#defining-encrypted-variables-in-travisyml.
     {
-        "secure": "hFVAQGLVkexzTd3f9NF+JoG1dE+CPICKqOcdvQYv8+YB2rwwqu0/J6MnqKUZSmec4AM4ZvyPUBIHnSw8aMJysYs+GZ6iG/8ZRRmdbmo2WBPbSZ+ThRZxx/F6AjmovUmf8Zt366ZAZXpc9NHKREkTUGl6UL7FFe9+ouVnb90asdw="
+        "secure": (
+            "hFVAQGLVkexzTd3f9NF+JoG1dE+CPICKqOcdvQYv8+YB2rwwqu0/J6MnqKUZSmec4AM4ZvyPUBIHnSw8aMJysY"
+            "s+GZ6iG/8ZRRmdbmo2WBPbSZ+ThRZxx/F6AjmovUmf8Zt366ZAZXpc9NHKREkTUGl6UL7FFe9+ouVnb90asdw="
+        )
     },
     'RUST_BACKTRACE="all"',
 ]
@@ -782,32 +785,26 @@ DEPLOY_SETTINGS = {
 
 
 def _deploy_base() -> Dict:
-    return {
-        "os": "linux",
-        "dist": "trusty",
-        "language": "python",
-        "python": ["3.6"],
-        "before_install": [
-            # TODO(John Sirois): Get rid of this in favor of explicitly adding pyenv versions to the PATH:
-            #   https://github.com/pantsbuild/pants/issues/7601
-            "pyenv global 3.6.3",
-        ],
-        "script": ["./build-support/bin/release.sh -p"],
-        "env": ["RUN_PANTS_FROM_PEX=1"],
-    }
+    shard = {**linux_shard(), "script": ["./build-support/bin/release.sh -p"]}
+    safe_append(shard, "env", "RUN_PANTS_FROM_PEX=1")
+    return shard
 
 
 def deploy_stable() -> Dict:
     shard = {
         **_deploy_base(),
-        "name": "Deploy stable pants.pex (Python 3.6)",
+        "name": "Deploy stable pants.pex",
         "stage": Stage.build_stable.value,
         "deploy": {
             # See https://docs.travis-ci.com/user/deployment/releases/
             "provider": "releases",
             # The pantsbuild-ci-bot OAuth token, see the pantsbuild vault for details.
             "api_key": {
-                "secure": "u0aCsiuVGOg28YxG0sQUovuUm29kKwQfFgHbNz2TT5L+cGoHxGl4aoVOCtuwWYEtbNGmYc8/3WRS3C/jOiqQj6JEgHUzWOsnfKUObEqNhisAmXbzBbKc0wPQTL8WNK+DKFh32sD3yPYcw+a5PTLO56+o7rqlI25LK7A17WesHC4="
+                "secure": (
+                    "u0aCsiuVGOg28YxG0sQUovuUm29kKwQfFgHbNz2TT5L+cGoHxGl4aoVOCtuwWYEtbNGmYc8/3WRS3C"
+                    "/jOiqQj6JEgHUzWOsnfKUObEqNhisAmXbzBbKc0wPQTL8WNK+DKFh32sD3yPYcw+a5PTLO56+o7rql"
+                    "I25LK7A17WesHC4="
+                )
             },
             "file_glob": True,
             "file": "dist/deploy/pex/*",
@@ -826,7 +823,7 @@ def deploy_stable() -> Dict:
 def deploy_unstable() -> Dict:
     shard = {
         **_deploy_base(),
-        "name": "Deploy unstable pants.pex (Python 3.6)",
+        "name": "Deploy unstable pants.pex",
         "stage": Stage.build_unstable.value,
     }
     safe_extend(
