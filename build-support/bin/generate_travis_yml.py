@@ -406,9 +406,9 @@ def _osx_env_with_pyenv() -> List[str]:
     return [
         *_osx_env(),
         'PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"',
-        'PATH="${{PYENV_ROOT}}/versions/${PYENV_PY36_VERSION}/bin:${{PATH}}"',
-        'PATH="${{PYENV_ROOT}}/versions/${PYENV_PY37_VERSION}/bin:${{PATH}}"',
-        'PATH="${{PYENV_ROOT}}/versions/${PYENV_PY38_VERSION}/bin:${{PATH}}"',
+        'PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"',
+        'PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"',
+        'PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"',
     ]
 
 

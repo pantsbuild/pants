@@ -217,9 +217,9 @@ jobs:
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY36_VERSION}/bin:${{PATH}}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY37_VERSION}/bin:${{PATH}}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY38_VERSION}/bin:${{PATH}}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"
     - CACHE_NAME=bootstrap.osx.py36
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
     language: generic
@@ -258,9 +258,9 @@ jobs:
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY36_VERSION}/bin:${{PATH}}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY37_VERSION}/bin:${{PATH}}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY38_VERSION}/bin:${{PATH}}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"
     - CACHE_NAME=bootstrap.osx.py37
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
     language: generic
@@ -299,9 +299,9 @@ jobs:
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY36_VERSION}/bin:${{PATH}}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY37_VERSION}/bin:${{PATH}}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY38_VERSION}/bin:${{PATH}}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"
     - CACHE_NAME=bootstrap.osx.py38
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py38.osx
     language: generic
@@ -1631,9 +1631,9 @@ jobs:
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY36_VERSION}/bin:${{PATH}}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY37_VERSION}/bin:${{PATH}}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY38_VERSION}/bin:${{PATH}}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"
     - CACHE_NAME=rust_tests.osx
     - PREPARE_DEPLOY=1
     if: commit_message !~ /\[ci skip-rust-tests\]/
@@ -1734,9 +1734,9 @@ jobs:
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY36_VERSION}/bin:${{PATH}}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY37_VERSION}/bin:${{PATH}}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY38_VERSION}/bin:${{PATH}}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
     language: generic
     name: Build macOS wheels
@@ -1761,9 +1761,9 @@ jobs:
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY36_VERSION}/bin:${{PATH}}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY37_VERSION}/bin:${{PATH}}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY38_VERSION}/bin:${{PATH}}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
     - CACHE_NAME=osx_platform_tests.py36
     language: generic
@@ -1786,9 +1786,9 @@ jobs:
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY36_VERSION}/bin:${{PATH}}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY37_VERSION}/bin:${{PATH}}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY38_VERSION}/bin:${{PATH}}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
     - CACHE_NAME=osx_platform_tests.py37
     language: generic
@@ -1811,9 +1811,9 @@ jobs:
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY36_VERSION}/bin:${{PATH}}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY37_VERSION}/bin:${{PATH}}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY38_VERSION}/bin:${{PATH}}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py38.osx
     - CACHE_NAME=osx_platform_tests.py38
     language: generic
@@ -1836,9 +1836,9 @@ jobs:
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY36_VERSION}/bin:${{PATH}}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY37_VERSION}/bin:${{PATH}}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY38_VERSION}/bin:${{PATH}}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
     - CACHE_NAME=osx_sanity.10_12.py36
     language: generic
@@ -1862,9 +1862,9 @@ jobs:
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY36_VERSION}/bin:${{PATH}}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY37_VERSION}/bin:${{PATH}}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY38_VERSION}/bin:${{PATH}}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
     - CACHE_NAME=osx_sanity.10_12.py37
     language: generic
@@ -1888,9 +1888,9 @@ jobs:
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY36_VERSION}/bin:${{PATH}}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY37_VERSION}/bin:${{PATH}}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY38_VERSION}/bin:${{PATH}}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py38.osx
     - CACHE_NAME=osx_sanity.10_12.py38
     language: generic
@@ -1914,9 +1914,9 @@ jobs:
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY36_VERSION}/bin:${{PATH}}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY37_VERSION}/bin:${{PATH}}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY38_VERSION}/bin:${{PATH}}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
     - CACHE_NAME=osx_sanity.10_13.py36
     language: generic
@@ -1940,9 +1940,9 @@ jobs:
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY36_VERSION}/bin:${{PATH}}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY37_VERSION}/bin:${{PATH}}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY38_VERSION}/bin:${{PATH}}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
     - CACHE_NAME=osx_sanity.10_13.py37
     language: generic
@@ -1966,9 +1966,9 @@ jobs:
     - LDFLAGS="-L/usr/local/opt/openssl/lib"
     - CPPFLAGS="-I/usr/local/opt/openssl/include"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY36_VERSION}/bin:${{PATH}}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY37_VERSION}/bin:${{PATH}}"
-    - PATH="${{PYENV_ROOT}}/versions/${PYENV_PY38_VERSION}/bin:${{PATH}}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
+    - PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py38.osx
     - CACHE_NAME=osx_sanity.10_13.py38
     language: generic
