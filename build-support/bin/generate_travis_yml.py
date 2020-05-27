@@ -382,7 +382,7 @@ def _osx_before_install(
     python_versions: Iterable[PythonVersion], *, install_py27: bool = True
 ) -> List[str]:
     versions_to_install = " ".join(
-        f'"{{PYENV_PY{python_version.number}_VERSION}}"' for python_version in python_versions
+        f"{{PYENV_PY{python_version.number}_VERSION}}" for python_version in python_versions
     )
     if install_py27:
         versions_to_install = f"${{PYENV_PY27_VERSION}} {versions_to_install}"
