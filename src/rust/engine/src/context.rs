@@ -23,7 +23,8 @@ use futures01::Future;
 use graph::{EntryId, Graph, InvalidationResult, NodeContext};
 use log::info;
 use process_execution::{
-  self, speculate::SpeculatingCommandRunner, BoundedCommandRunner, Platform, ProcessMetadata,
+  self, speculate::SpeculatingCommandRunner, BoundedCommandRunner, NamedCaches, Platform,
+  ProcessMetadata,
 };
 use rand::seq::SliceRandom;
 use reqwest;
@@ -39,10 +40,6 @@ const GIGABYTES: usize = 1024 * 1024 * 1024;
 ///
 /// The core context shared (via Arc) between the Scheduler and the Context objects of
 /// all running Nodes.
-///
-/// Over time, most usage of `ResettablePool` (which wraps use of blocking APIs) should migrate
-/// to the Tokio `Runtime`. The next candidate is likely to be migrating PosixFS to tokio-fs once
-/// https://github.com/tokio-rs/tokio/issues/369 is resolved.
 ///
 pub struct Core {
   pub graph: Arc<InvalidatableGraph>,
@@ -71,6 +68,7 @@ impl Core {
     use_gitignore: bool,
     local_store_dir: PathBuf,
     local_execution_root_dir: PathBuf,
+    named_caches_dir: PathBuf,
     remote_execution: bool,
     remote_store_servers: Vec<String>,
     remote_execution_server: Option<String>,
@@ -174,7 +172,8 @@ impl Core {
     let local_command_runner = process_execution::local::CommandRunner::new(
       store.clone(),
       executor.clone(),
-      local_execution_root_dir,
+      local_execution_root_dir.clone(),
+      NamedCaches::new(named_caches_dir),
       process_execution_cleanup_local_dirs,
     );
 
@@ -183,7 +182,7 @@ impl Core {
         Box::new(process_execution::nailgun::CommandRunner::new(
           local_command_runner,
           process_execution_metadata.clone(),
-          std::env::temp_dir(),
+          local_execution_root_dir,
           executor.clone(),
         ))
       } else {

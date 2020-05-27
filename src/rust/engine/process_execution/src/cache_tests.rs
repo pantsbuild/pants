@@ -1,14 +1,11 @@
 use crate::{
-  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform,
-  PlatformConstraint, Process, ProcessMetadata,
+  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, NamedCaches,
+  Process, ProcessMetadata,
 };
-use hashing::EMPTY_DIGEST;
 use sharded_lmdb::ShardedLmdb;
-use std::collections::{BTreeMap, BTreeSet};
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration;
 use store::Store;
 use tempfile::TempDir;
 use testutil::data::TestData;
@@ -22,12 +19,14 @@ struct RoundtripResults {
 async fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
   let runtime = task_executor::Executor::new(Handle::current());
   let work_dir = TempDir::new().unwrap();
+  let named_cache_dir = TempDir::new().unwrap();
   let store_dir = TempDir::new().unwrap();
   let store = Store::local_only(runtime.clone(), store_dir.path()).unwrap();
   let local = crate::local::CommandRunner::new(
     store.clone(),
     runtime.clone(),
     work_dir.path().to_owned(),
+    NamedCaches::new(named_cache_dir.path().to_owned()),
     true,
   );
 
@@ -44,24 +43,11 @@ async fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
     })
     .unwrap();
 
-  let request = Process {
-    argv: vec![
-      testutil::path::find_bash(),
-      format!("{}", script_path.display()),
-    ],
-    env: BTreeMap::new(),
-    working_directory: None,
-    input_files: EMPTY_DIGEST,
-    output_files: vec![PathBuf::from("roland")].into_iter().collect(),
-    output_directories: BTreeSet::new(),
-    timeout: Some(Duration::from_millis(1000)),
-    description: "bash".to_string(),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
-      hashing::EMPTY_DIGEST,
-    jdk_home: None,
-    target_platform: PlatformConstraint::None,
-    is_nailgunnable: false,
-  };
+  let request = Process::new(vec![
+    testutil::path::find_bash(),
+    format!("{}", script_path.display()),
+  ])
+  .output_files(vec![PathBuf::from("roland")].into_iter().collect());
 
   let local_result = local.run(request.clone().into(), Context::default()).await;
 

@@ -33,7 +33,9 @@ use process_execution;
 use clap::{value_t, App, AppSettings, Arg};
 use futures::compat::Future01CompatExt;
 use hashing::{Digest, Fingerprint};
-use process_execution::{Context, Platform, PlatformConstraint, ProcessMetadata, RelativePath};
+use process_execution::{
+  Context, NamedCaches, Platform, PlatformConstraint, ProcessMetadata, RelativePath,
+};
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryFrom;
 use std::iter::{FromIterator, Iterator};
@@ -66,6 +68,12 @@ async fn main() {
         .long("local-store-path")
         .takes_value(true)
         .help("Path to lmdb directory used for local file storage"),
+    )
+    .arg(
+      Arg::with_name("named-cache-path")
+        .long("named-cache-path")
+        .takes_value(true)
+        .help("Path to a directory to be used for named caches")
     )
     .arg(
       Arg::with_name("input-digest")
@@ -252,6 +260,11 @@ async fn main() {
     .value_of("local-store-path")
     .map(PathBuf::from)
     .unwrap_or_else(Store::default_path);
+  let named_cache_path = args
+    .value_of("named-cache-path")
+    .map(PathBuf::from)
+    .or_else(|| dirs::home_dir().map(|home| home.join(".cache")))
+    .expect("Unable to locate a home directory, and no named-cache-path provided.");
   let server_arg = args.value_of("server");
   let remote_instance_arg = args.value_of("remote-instance-name").map(str::to_owned);
   let output_files = if let Some(values) = args.values_of("output-file-path") {
@@ -335,8 +348,7 @@ async fn main() {
     output_directories,
     timeout: Some(Duration::new(15 * 60, 0)),
     description: "process_executor".to_string(),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
-      hashing::EMPTY_DIGEST,
+    append_only_caches: BTreeSet::new(),
     jdk_home: args.value_of("jdk").map(PathBuf::from),
     target_platform: PlatformConstraint::try_from(
       &args.value_of("target-platform").unwrap().to_string(),
@@ -385,6 +397,7 @@ async fn main() {
       store.clone(),
       executor,
       work_dir_base,
+      NamedCaches::new(named_cache_path),
       true,
     )) as Box<dyn process_execution::CommandRunner>,
   };
