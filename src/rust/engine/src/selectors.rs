@@ -5,8 +5,6 @@ use std::fmt;
 
 use crate::core::TypeId;
 
-use rule_graph;
-
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Get {
   pub product: TypeId,

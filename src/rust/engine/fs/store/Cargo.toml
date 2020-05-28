@@ -14,8 +14,8 @@ dirs = "1"
 fs = { path = ".." }
 futures01 = { package = "futures", version = "0.1" }
 futures = { version = "0.3", features = ["compat"] }
-# TODO: This is 0.5.1 + https://github.com/tikv/grpc-rs/pull/457.
-grpcio = { git = "https://github.com/pantsbuild/grpc-rs.git", rev = "d16fcfb4afbdd4c791e7c7e64e9748319ed8ad70", default_features = false, features = ["protobuf-codec", "secure"] }
+# TODO: This is 0.5.1 + https://github.com/tikv/grpc-rs/pull/457 + a workaround for https://github.com/rust-lang/cargo/issues/8258
+grpcio = { git = "https://github.com/pantsbuild/grpc-rs.git", rev = "ed3afa3c24ddf1fdd86826e836f57c00757dfc00", default_features = false, features = ["protobuf-codec", "secure"] }
 hashing = { path = "../../hashing" }
 indexmap = "1.0.2"
 itertools = "0.7.2"

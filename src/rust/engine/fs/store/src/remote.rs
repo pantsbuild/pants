@@ -7,7 +7,6 @@ use digest::{Digest as DigestTrait, FixedOutput};
 use futures::compat::Future01CompatExt;
 use futures::future::{FutureExt, TryFutureExt};
 use futures01::{future, Future, Sink, Stream};
-use grpcio;
 use hashing::{Digest, Fingerprint};
 use serverset::{retry, Serverset};
 use sha2::Sha256;
@@ -15,7 +14,6 @@ use std::cmp::min;
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
-use uuid;
 
 #[derive(Clone)]
 pub struct ByteStore {

@@ -1,5 +1,3 @@
-use hashing;
-
 impl<'a> From<&'a hashing::Digest> for crate::remote_execution::Digest {
   fn from(d: &hashing::Digest) -> Self {
     let mut digest = super::remote_execution::Digest::new();

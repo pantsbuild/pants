@@ -25,19 +25,6 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use bazel_protos;
-use clap;
-use dirs;
-
-use env_logger;
-use fuse;
-
-use libc;
-
-use serverset;
-
-use time;
-
 use futures::future::FutureExt;
 use hashing::{Digest, Fingerprint};
 use log::{debug, error, warn};
