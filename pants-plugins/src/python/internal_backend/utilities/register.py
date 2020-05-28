@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import Callable, Dict, List, Optional, cast
 
 from packaging.version import Version
@@ -17,6 +17,7 @@ from pants.backend.python.target_types import (
 from pants.backend.python.targets.python_library import PythonLibrary as PythonLibraryV1
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.target import Target
+from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem import Subsystem
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.version import PANTS_SEMVER, VERSION
@@ -120,7 +121,16 @@ def contrib_setup_py_context_aware_object_factory(parse_context) -> Callable:
         )
 
         if build_file_aliases or register_goals or global_subsystems or rules or target_types:
-            module = parse_context.rel_path.replace(os.path.sep, ".")
+            rel_path = parse_context.rel_path
+            source_root = (
+                SourceRootConfig.global_instance().get_source_roots().strict_find_by_path(rel_path)
+            )
+            module = (
+                PurePath(rel_path)
+                .relative_to(source_root.path)
+                .as_posix()
+                .replace(os.path.sep, ".")
+            )
             entry_points = []
             if build_file_aliases:
                 entry_points.append(f"build_file_aliases = {module}.register:build_file_aliases")
