@@ -12,6 +12,7 @@ from pants.backend.python.target_types import (
     PythonLibrary,
     PythonLibrarySources,
     PythonProvidesField,
+    PythonSources,
 )
 from pants.backend.python.targets.python_library import PythonLibrary as PythonLibraryV1
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -185,7 +186,7 @@ class ContribPluginV1(PythonLibraryV1):
     pass
 
 
-class ContribPluginSources(PythonLibrarySources):
+class ContribPluginSources(PythonSources):
     default = ("register.py",)
 
 
@@ -197,7 +198,7 @@ class ContribPlugin(Target):
     alias = "contrib_plugin"
     core_fields = (
         *(
-            FrozenOrderedSet(PythonLibrary.core_fields)
+            FrozenOrderedSet(PythonLibrary.core_fields)  # type: ignore[misc]
             - {PythonLibrarySources, PythonProvidesField}
         ),
         ContribPluginSources,
