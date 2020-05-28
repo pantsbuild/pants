@@ -86,7 +86,7 @@ class Console:
         print(payload, file=self.stdout, end=end)
 
     def print_stderr(self, payload, end="\n"):
-        print(payload, file=self.stderr, end=end)
+        self.stderr.write(f"{payload}{end}")
 
     def flush(self):
         self.stdout.flush()
