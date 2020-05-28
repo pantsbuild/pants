@@ -26,55 +26,6 @@ from pants.util.memo import memoized_property
 logger = logging.getLogger(__name__)
 
 
-class FileLoader(ast.NodeVisitor):
-    """A utility class that parses load() calls in BUILD files and makes the relevant symbols
-    available.
-
-    A load statement is of the form:
-    load("path/to/a:file.py", "symbol1", "symbol2"...)
-
-    This will import "symbol1", "symbol2"... from file "path/to/a:file.py".
-    """
-
-    def __init__(self):
-        self.loaded_symbols: Dict = {}
-
-    def _path_from_label(self, label):
-        if label[0:2] == "//":
-            label = f"{get_buildroot()}/{label[2:]}"
-        label = label.replace(":", "/")
-        return label
-
-    def _load_symbols_from_file(self, path, symbols):
-        with open(path, "r") as loaded_file:
-            contents = loaded_file.read()
-        exec(contents)
-        local_symbols = copy(
-            locals()
-        )  # We copy the locals so that they don't get lost in the for loop
-        for symbol in symbols:
-            self.loaded_symbols[symbol] = local_symbols[symbol]
-
-    def visit_Call(self, node):
-        if isinstance(node.func, ast.Name):
-            if node.func.id == "load":
-                strargs = [arg.s for arg in node.args]
-                source_file = self._path_from_label(strargs[0])
-                exposed_symbols = strargs[1:]
-                self._load_symbols_from_file(source_file, exposed_symbols)
-
-    @staticmethod
-    def load_symbols(python_code: str) -> Dict:
-        """Parse the python code searching for load statements, and execute them.
-
-        See class docstring for a definition of the load interface.
-        """
-        file_loader = FileLoader()
-        parsed = ast.parse(python_code)
-        file_loader.visit(parsed)
-        return file_loader.loaded_symbols
-
-
 class LegacyPythonCallbacksParser(Parser):
     """A parser that parses the given python code into a list of top-level objects.
 

@@ -39,9 +39,10 @@ def _key_func(entry):
     return key
 
 # TODO
-# - MUltiple loads
-# - No loads
-#
+# - Support Multiple loads
+# - Support No loads
+# - Support only importing certain symbols
+# - Snapshot optimizations
 
 @dataclass(frozen=True)
 class LoadStatement:
@@ -61,7 +62,12 @@ class BuildFilesWithLoads:
     map: Dict[FileContent, Collection[LoadStatementWithContent]]
 
 class LoadParser(ast.NodeVisitor):
-    """
+    """A utility class that parses load() calls in BUILD files.
+
+    A load statement is of the form:
+    load("path/to/a:file.py", "symbol1", "symbol2"...)
+
+    This will import "symbol1", "symbol2"... from file "path/to/a:file.py".
     """
 
     def __init__(self):
@@ -86,9 +92,7 @@ class LoadParser(ast.NodeVisitor):
 
     @staticmethod
     def parse_loads(python_code: str) -> Iterable[LoadStatement]:
-        """Parse the python code searching for load statements, and execute them.
-
-        See class docstring for a definition of the load interface.
+        """Parse the python code searching for load statements.
         """
         load_parser = LoadParser()
         parsed = ast.parse(python_code)
@@ -113,27 +117,6 @@ async def load_symbols(build_file_contents: FilesContent) -> BuildFilesWithLoads
         for statement in load_statements:
             loaded_files.append(statement.path)
 
-    # path_globs = PathGlobs(globs=loaded_files)
-    # snapshot_of_loaded_files = await Get[Snapshot](PathGlobs, path_globs)
-    # contents_of_loaded_files = await Get[FilesContent](Digest, snapshot_of_loaded_files.directory_digest)
-    # map_of_loaded_files = {}
-    # for loaded_file in contents_of_loaded_files:
-    #     map_of_loaded_files[loaded_file.path] = loaded_file.content
-
-    # build_files_with_loads = {}
-    # for build_file in build_file_contents:
-        # loads_with_content = []
-        # # TODO DRY
-        # load_statements = LoadParser.parse_loads(build_file.content)
-        # for statement in load_statements:
-        #     loads_with_content.append(LoadStatementWithContent(
-        #         statement.path, statement.symbols_to_expose, contents_of_loaded_files[statement.path]
-        #     ))
-        #
-        # build_files_with_loads[build_file] = loads_with_content
-
-        #
-
     build_files_with_loads = {}
     for build_file in build_file_contents:
         # load_statements_with_content = await MultiGet(
@@ -142,14 +125,32 @@ async def load_symbols(build_file_contents: FilesContent) -> BuildFilesWithLoads
         # )
         load_statements_with_content = await Get[LoadStatementWithContent](LoadStatement, load_statements[0])
 
-
-
         print(f"BL:load_statements_with_content {load_statements_with_content}")
 
         # At this point, I have a Map[build_file_path, List[LoadStatementWIthContent]]
         build_files_with_loads[build_file] = [load_statements_with_content]
 
     return BuildFilesWithLoads(build_files_with_loads)
+
+# path_globs = PathGlobs(globs=loaded_files)
+# snapshot_of_loaded_files = await Get[Snapshot](PathGlobs, path_globs)
+# contents_of_loaded_files = await Get[FilesContent](Digest, snapshot_of_loaded_files.directory_digest)
+# map_of_loaded_files = {}
+# for loaded_file in contents_of_loaded_files:
+#     map_of_loaded_files[loaded_file.path] = loaded_file.content
+
+# build_files_with_loads = {}
+# for build_file in build_file_contents:
+# loads_with_content = []
+# # TODO DRY
+# load_statements = LoadParser.parse_loads(build_file.content)
+# for statement in load_statements:
+#     loads_with_content.append(LoadStatementWithContent(
+#         statement.path, statement.symbols_to_expose, contents_of_loaded_files[statement.path]
+#     ))
+#
+# build_files_with_loads[build_file] = loads_with_content
+#
 
 
 @rule
