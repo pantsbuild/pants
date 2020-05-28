@@ -13,7 +13,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import partial
 from hashlib import sha1
-from pathlib import PurePath
+from pathlib import Path, PurePath
 from typing import Any, ClassVar, Dict, List, Mapping, Optional, Sequence, Tuple, Union, cast
 
 import toml
@@ -28,6 +28,11 @@ from pants.util.ordered_set import OrderedSet
 # A dict with optional override seed values for buildroot, pants_workdir, pants_supportdir and
 # pants_distdir.
 SeedValues = Dict[str, Value]
+
+
+# When the toml deprecation triggers, RC_LOCATIONS can be inlined back into global_options.py.
+RC_LOCATIONS = ["/etc/pants.rc.toml", "~/.pants.rc.toml"]
+DEPRECATED_RC_LOCATIONS = ["/etc/pantsrc", "~/.pants.rc"]
 
 
 class Config(ABC):
@@ -90,6 +95,10 @@ class Config(ABC):
         if not config_items:
             return _EmptyConfig()
 
+        # The DEPRECATED_RC_LOCATIONS variable should be removed (and global_options.py updated)
+        # when the toml deprecation triggers.
+        deprecated_rc_locations = {str(Path(loc).expanduser()) for loc in DEPRECATED_RC_LOCATIONS}
+
         single_file_configs = []
         for config_item in config_items:
             config_path = config_item.path if hasattr(config_item, "path") else config_item
@@ -111,6 +120,16 @@ class Config(ABC):
                     "curl -L -o migrate_to_toml_config.py 'https://git.io/Jv02R' && chmod +x "
                     f"migrate_to_toml_config.py && ./migrate_to_toml_config.py {config_path}"
                 )
+                rc_instructions = (
+                    textwrap.fill(
+                        "During migration, rc files without `.toml` suffixes should be moved to "
+                        f"one of the new default locations: {RC_LOCATIONS}.",
+                        88,
+                    )
+                    if config_path in deprecated_rc_locations
+                    else None
+                )
+
                 msg = [
                     textwrap.fill(
                         "Pants now supports TOML config files. TOML is inspired by the INI "
@@ -126,6 +145,7 @@ class Config(ABC):
                         88,
                     ),
                     "\n",
+                    *([rc_instructions, "\n"] if rc_instructions else []),
                     textwrap.fill(
                         "You must also upgrade your `./pants` script to understand pants.toml by "
                         "running `curl -L -o ./pants https://pantsbuild.github.io/setup/pants`.",
@@ -141,7 +161,7 @@ class Config(ABC):
                 ]
                 warn_or_error(
                     removal_version="1.31.0.dev0",
-                    deprecated_entity_description="INI config files (`pants.ini`)",
+                    deprecated_entity_description=f"INI config files (`{config_path}`)",
                     hint="\n".join(msg),
                 )
                 ini_parser = configparser.ConfigParser(defaults=normalized_seed_values)

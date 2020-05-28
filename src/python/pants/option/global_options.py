@@ -17,6 +17,7 @@ from pants.base.build_environment import (
     pants_version,
 )
 from pants.base.deprecated import deprecated_conditional
+from pants.option.config import DEPRECATED_RC_LOCATIONS, RC_LOCATIONS
 from pants.option.custom_types import dir_option
 from pants.option.errors import OptionsError
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
@@ -381,9 +382,11 @@ class GlobalOptions(Subsystem):
             type=list,
             metavar="<path>",
             daemon=False,
-            default=["/etc/pantsrc", "~/.pants.rc"],
-            help="Override config with values from these files. "
-            "Later files override earlier ones.",
+            default=[*DEPRECATED_RC_LOCATIONS, *RC_LOCATIONS],
+            help=(
+                "Override config with values from these files. Later files override earlier ones. "
+                f"NB: Use of the following default locations is deprecated: {DEPRECATED_RC_LOCATIONS}"
+            ),
         )
         register(
             "--pythonpath",
