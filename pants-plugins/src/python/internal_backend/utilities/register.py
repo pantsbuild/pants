@@ -3,7 +3,9 @@
 
 import os
 from pathlib import Path
-from typing import Optional, cast
+from typing import Dict, List, Optional, cast
+
+from packaging.version import Version
 
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.target_types import PythonLibrary
@@ -25,16 +27,18 @@ from pants.util.ordered_set import FrozenOrderedSet
 from pants.version import PANTS_SEMVER, VERSION
 
 
-def pants_setup_py(name, description, additional_classifiers=None, **kwargs):
-    """Creates the setup_py for a pants artifact.
+def pants_setup_py(
+    name: str, description: str, additional_classifiers: Optional[List[str]] = None, **kwargs
+) -> PythonArtifact:
+    """Creates the setup_py for a Pants artifact.
 
-    :param str name: The name of the package.
-    :param str description: A brief description of what the package provides.
-    :param list additional_classifiers: Any additional trove classifiers that apply to the package,
+    :param name: The name of the package.
+    :param description: A brief description of what the package provides.
+    :param additional_classifiers: Any additional trove classifiers that apply to the package,
                                         see: https://pypi.org/pypi?%3Aaction=list_classifiers
     :param kwargs: Any additional keyword arguments to be passed to `setuptools.setup
                    <https://pythonhosted.org/setuptools/setuptools.html>`_.
-    :returns: A setup_py suitable for building and publishing pants components.
+    :returns: A setup_py suitable for building and publishing Pants components.
     """
     if not name.startswith("pantsbuild.pants"):
         raise ValueError(
@@ -75,7 +79,9 @@ def pants_setup_py(name, description, additional_classifiers=None, **kwargs):
     )
 
 
-def contrib_setup_py(name, description, additional_classifiers=None, **kwargs):
+def contrib_setup_py(
+    name: str, description: str, additional_classifiers: Optional[List[str]] = None, **kwargs
+) -> PythonArtifact:
     """Creates the setup_py for a pants contrib plugin artifact.
 
     :param str name: The name of the package; must start with 'pantsbuild.pants.contrib.'.
@@ -115,11 +121,11 @@ class PantsReleases(Subsystem):
         )
 
     @property
-    def _branch_notes(self):
-        return self.get_options().branch_notes
+    def _branch_notes(self) -> Dict[str, str]:
+        return cast(Dict[str, str], self.options.branch_notes)
 
     @classmethod
-    def _branch_name(cls, version) -> str:
+    def _branch_name(cls, version: Version) -> str:
         """Defines a mapping between versions and branches.
 
         All releases, including dev releases, map to a particular branch page.
@@ -130,12 +136,8 @@ class PantsReleases(Subsystem):
             raise ValueError(f"Unparseable pants version number: {version}")
         return "{}.{}.x".format(*components[:2])
 
-    def notes_for_version(self, version) -> str:
-        """Given the parsed Version of pants, return its release notes.
-
-        TODO: This method should parse out the specific version from the resulting file:
-          see https://github.com/pantsbuild/pants/issues/1708
-        """
+    def notes_for_version(self, version: Version) -> str:
+        """Given the parsed Version of pants, return its release notes."""
         branch_name = self._branch_name(version)
         branch_notes_file = self._branch_notes.get(branch_name, None)
         if branch_notes_file is None:

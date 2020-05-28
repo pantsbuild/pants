@@ -17,6 +17,7 @@ python_library(
 )
 
 python_tests(
+  name="tests",
   dependencies=[
     ':plugin',
     'src/python/pants/base:revision',
