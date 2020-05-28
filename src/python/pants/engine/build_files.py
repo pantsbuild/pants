@@ -1,9 +1,10 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
+import ast
 import os.path
 from collections.abc import MutableMapping, MutableSequence
-from typing import Dict
+from dataclasses import dataclass
+from typing import Dict, Iterable
 
 from twitter.common.collections import OrderedSet
 
@@ -19,9 +20,9 @@ from pants.engine.addressable import (
     AddressWithOrigin,
     BuildFileAddresses,
 )
-from pants.engine.fs import Digest, FilesContent, PathGlobs, Snapshot
+from pants.engine.fs import Digest, FilesContent, PathGlobs, Snapshot, FileContent
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper
-from pants.engine.objects import Locatable, SerializableFactory, Validatable
+from pants.engine.objects import Locatable, SerializableFactory, Validatable, Collection
 from pants.engine.parser import HydratedStruct
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
@@ -36,6 +37,119 @@ class ResolvedTypeMismatchError(ResolveError):
 def _key_func(entry):
     key, value = entry
     return key
+
+# TODO
+# - MUltiple loads
+# - No loads
+#
+
+@dataclass(frozen=True)
+class LoadStatement:
+    path: str
+    # symbols_to_expose: Collection[str]
+
+
+@dataclass(frozen=True)
+class LoadStatementWithContent:
+    path: str
+    # symbols_to_expose: Collection[str]
+    content: FileContent
+
+
+@dataclass(frozen=True)
+class BuildFilesWithLoads:
+    map: Dict[FileContent, Collection[LoadStatementWithContent]]
+
+class LoadParser(ast.NodeVisitor):
+    """
+    """
+
+    def __init__(self):
+        self.loads: list[LoadStatement] = []
+
+    def _path_from_label(self, label):
+        if label[0:2] == "//":
+            # label = f"{get_buildroot()}/{label[2:]}"
+            label = f"{label[2:]}"
+        label = label.replace(":", "/")
+        return label
+
+    def visit_Call(self, node):
+        if isinstance(node.func, ast.Name):
+            if node.func.id == "load":
+                strargs = [arg.s for arg in node.args]
+                source_file = self._path_from_label(strargs[0])
+                exposed_symbols = strargs[1:]
+                # self.loads.append(LoadStatement(source_file, exposed_symbols))
+                self.loads.append(LoadStatement(source_file))
+
+
+    @staticmethod
+    def parse_loads(python_code: str) -> Iterable[LoadStatement]:
+        """Parse the python code searching for load statements, and execute them.
+
+        See class docstring for a definition of the load interface.
+        """
+        load_parser = LoadParser()
+        parsed = ast.parse(python_code)
+        load_parser.visit(parsed)
+        return load_parser.loads
+
+
+@rule
+async def snapshot_load_statement(statement: LoadStatement) -> LoadStatementWithContent:
+    print("BL: HOHOHOHOHOHOHOHOHHOHOHOHOHOH")
+    snapshot = await Get[Snapshot](PathGlobs(globs=(statement.path,)))
+    files_content = await Get[FilesContent](Digest, snapshot.directory_digest)
+    file_content = [fc for fc in files_content][0]
+    return LoadStatementWithContent(statement.path, file_content)
+    # return LoadStatementWithContent(statement.path, statement.symbols_to_expose, file_content)
+
+@rule
+async def load_symbols(build_file_contents: FilesContent) -> BuildFilesWithLoads:
+    loaded_files = []
+    for build_file in build_file_contents:
+        load_statements = LoadParser.parse_loads(build_file.content)
+        for statement in load_statements:
+            loaded_files.append(statement.path)
+
+    # path_globs = PathGlobs(globs=loaded_files)
+    # snapshot_of_loaded_files = await Get[Snapshot](PathGlobs, path_globs)
+    # contents_of_loaded_files = await Get[FilesContent](Digest, snapshot_of_loaded_files.directory_digest)
+    # map_of_loaded_files = {}
+    # for loaded_file in contents_of_loaded_files:
+    #     map_of_loaded_files[loaded_file.path] = loaded_file.content
+
+    # build_files_with_loads = {}
+    # for build_file in build_file_contents:
+        # loads_with_content = []
+        # # TODO DRY
+        # load_statements = LoadParser.parse_loads(build_file.content)
+        # for statement in load_statements:
+        #     loads_with_content.append(LoadStatementWithContent(
+        #         statement.path, statement.symbols_to_expose, contents_of_loaded_files[statement.path]
+        #     ))
+        #
+        # build_files_with_loads[build_file] = loads_with_content
+
+        #
+
+    build_files_with_loads = {}
+    for build_file in build_file_contents:
+        # load_statements_with_content = await MultiGet(
+        #     Get[LoadStatementWithContent](LoadStatement, load_statement)
+        #         for load_statement in load_statements
+        # )
+        load_statements_with_content = await Get[LoadStatementWithContent](LoadStatement, load_statements[0])
+
+
+
+        print(f"BL:load_statements_with_content {load_statements_with_content}")
+
+        # At this point, I have a Map[build_file_path, List[LoadStatementWIthContent]]
+        build_files_with_loads[build_file] = [load_statements_with_content]
+
+    return BuildFilesWithLoads(build_files_with_loads)
 
 
 @rule
@@ -52,16 +166,19 @@ async def parse_address_family(address_mapper: AddressMapper, directory: Dir) ->
     )
     snapshot = await Get[Snapshot](PathGlobs, path_globs)
     files_content = await Get[FilesContent](Digest, snapshot.directory_digest)
+    build_files_with_loads = await Get[BuildFilesWithLoads](FilesContent, files_content)
 
+    print(f"BL: {build_files_with_loads}")
     if not files_content:
         raise ResolveError(
             'Directory "{}" does not contain any BUILD files.'.format(directory.path)
         )
     address_maps = []
-    for filecontent_product in files_content:
+    print(f"BL: BUILDFILESWITHLOADS {build_files_with_loads}")
+    for (filecontent_product, load_statements) in build_files_with_loads.map.items():
         address_maps.append(
             AddressMap.parse(
-                filecontent_product.path, filecontent_product.content, address_mapper.parser
+                filecontent_product.path, filecontent_product.content, load_statements, address_mapper.parser
             )
         )
     return AddressFamily.create(directory.path, address_maps)
@@ -306,4 +423,8 @@ def create_graph_rules(address_mapper: AddressMapper):
         RootRule(Address),
         RootRule(AddressWithOrigin),
         RootRule(AddressSpecs),
+
+        # TESTING
+        snapshot_load_statement,
+        load_symbols,
     ]

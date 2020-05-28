@@ -8,7 +8,7 @@ import tokenize
 from copy import copy
 from io import StringIO
 from pathlib import PurePath
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Iterable
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_file_target_factory import BuildFileTargetFactory
@@ -16,6 +16,7 @@ from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import UnaddressableObjectError
 from pants.base.parse_context import ParseContext
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.engine.build_files import LoadStatementWithContent
 from pants.engine.legacy.structs import BundleAdaptor, Globs, RGlobs, TargetAdaptor, ZGlobs
 from pants.engine.objects import Serializable
 from pants.engine.parser import ParseError, Parser, SymbolTable
@@ -207,7 +208,7 @@ class LegacyPythonCallbacksParser(Parser):
                 hint=warning,
             )
 
-    def parse(self, filepath: str, filecontent: bytes):
+    def parse(self, filepath: str, filecontent: bytes, load_statements):
         python = filecontent.decode()
 
         # Mutate the parse context for the new path, then exec, and copy the resulting objects.
@@ -218,7 +219,19 @@ class LegacyPythonCallbacksParser(Parser):
         self._parse_context._storage.clear(os.path.dirname(filepath))
 
         # We separately handle loading all the symbols we need from imported files.
-        self._symbols.update(FileLoader.load_symbols(python))
+        extra_symbols = {}
+        print(f"BL: {load_statements}")
+        for statement in load_statements:
+            content = statement.content.content.decode()
+            exec(content)
+            local_symbols = copy(
+                locals()
+            )  # We copy the locals so that they don't get lost in the for loop
+            print(f"BL: Loading {statement.path}, loaded {local_symbols}, content is {content}")
+            for symbol in local_symbols.keys():
+                extra_symbols[symbol] = local_symbols[symbol]
+
+        self._symbols.update(extra_symbols)
 
         exec(python, dict(self._symbols))
 
