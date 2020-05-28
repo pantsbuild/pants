@@ -61,6 +61,7 @@ from pants.option.errors import (
     OptionNameDash,
     OptionNameDoubleDash,
     ParseError,
+    PassthroughType,
     RecursiveSubsystemOption,
     RegistrationError,
     Shadowing,
@@ -153,6 +154,10 @@ class Parser:
             self._parent_parser._register_child_parser(self)
 
     @property
+    def scope_info(self) -> ScopeInfo:
+        return self._scope_info
+
+    @property
     def scope(self) -> str:
         return self._scope
 
@@ -175,6 +180,7 @@ class Parser:
             ["Parser.ParseArgsRequest"], Sequence["Options.ScopedFlagNameForFuzzyMatching"]
         ]
         levenshtein_max_distance: int
+        passthrough_args: List[str]
         # A passive option is one that doesn't affect functionality, or appear in help messages, but
         # can be provided without failing validation. This allows us to conditionally register options
         # (e.g., v1 only or v2 only) without having to remove usages when the condition changes.
@@ -190,6 +196,7 @@ class Parser:
                 [], Sequence["Options.ScopedFlagNameForFuzzyMatching"]
             ],
             levenshtein_max_distance: int,
+            passthrough_args: List[str],
             include_passive_options: bool = False,
         ) -> None:
             """
@@ -207,6 +214,7 @@ class Parser:
             self.namespace = namespace
             self.get_all_scoped_flag_names = get_all_scoped_flag_names  # type: ignore[assignment]  # cannot assign a method
             self.levenshtein_max_distance = levenshtein_max_distance
+            self.passthrough_args = passthrough_args
             self.include_passive_options = include_passive_options
 
         @staticmethod
@@ -291,6 +299,10 @@ class Parser:
                     for v in flag_value_map[arg]:
                         add_flag_val(v)
                     del flag_value_map[arg]
+
+            # If the arg is marked passthrough, additionally apply the collected passthrough_args.
+            if kwargs.get("passthrough"):
+                flag_vals.extend(parse_args_request.passthrough_args)
 
             # Get the value for this option, falling back to defaults as needed.
             try:
@@ -567,6 +579,7 @@ class Parser:
         "mutually_exclusive_group",
         "daemon",
         "passive",
+        "passthrough",
     }
 
     _allowed_member_types = {
@@ -608,6 +621,15 @@ class Parser:
 
         if kwargs.get("member_type", str) not in self._allowed_member_types:
             error(InvalidMemberType, member_type=kwargs.get("member_type", str).__name__)
+
+        if (
+            "passthrough" in kwargs
+            and kwargs["passthrough"]
+            and (
+                kwargs.get("type") != list or kwargs.get("member_type", str) not in (shell_str, str)
+            )
+        ):
+            error(PassthroughType)
 
         for kwarg in kwargs:
             if kwarg not in self._allowed_registration_kwargs:

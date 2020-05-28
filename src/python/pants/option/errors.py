@@ -69,6 +69,10 @@ class OptionNameDoubleDash(RegistrationError):
     """Long option name must begin with a double-dash."""
 
 
+class PassthroughType(RegistrationError):
+    """Options marked passthrough must be typed as a string list."""
+
+
 class RecursiveSubsystemOption(RegistrationError):
     """Subsystem option cannot specify 'recursive'.
 

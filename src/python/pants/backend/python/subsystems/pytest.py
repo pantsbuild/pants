@@ -18,6 +18,7 @@ class PyTest(Subsystem):
             type=list,
             member_type=shell_str,
             fingerprint=True,
+            passthrough=True,
             help='Arguments to pass directly to Pytest, e.g. `--pytest-args="-k test_foo --quiet"`',
         )
         register(

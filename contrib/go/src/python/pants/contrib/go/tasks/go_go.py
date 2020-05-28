@@ -29,10 +29,11 @@ class GoInteropTask(QuietTaskMixin, GoWorkspaceTask):
         )
         args = self.get_passthru_args()
         if not go_targets or not args:
-            msg = yellow(
+            template = yellow(
                 "The pants `{goal}` goal expects at least one go target and at least one "
                 "pass-through argument to be specified, call with:\n"
-            ) + green("  ./pants {goal} {targets} -- {args}").format(
+            ) + green("  ./pants {goal} {targets} -- {args}")
+            msg = template.format(
                 goal=self.options_scope,
                 targets=(
                     green(" ".join(t.address.reference() for t in go_targets))
