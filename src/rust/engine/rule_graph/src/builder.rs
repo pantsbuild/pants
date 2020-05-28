@@ -243,7 +243,7 @@ impl<'t, R: Rule> Builder<'t, R> {
       let provided_param = dependency_key.provided_param();
       let params = if let Some(provided_param) = provided_param {
         // The dependency key provides a parameter: include it in the Params that are already in
-        // the context.
+        // the context. A candidate must consume/"use" the provided parameter to be eligible.
         let mut params = entry.params().clone();
         params.insert(provided_param);
         params
@@ -296,8 +296,14 @@ impl<'t, R: Rule> Builder<'t, R> {
               );
             }
           },
-          p @ Entry::Param(_) => {
-            fulfillable_candidates.push(vec![p]);
+          Entry::Param(param) => {
+            // We cannot consume a Param to fulfill a dependency when there is a provided Param.
+            // Even if the Param was already in scope, this dependency provides a new value for
+            // the Param which would shadow any existing value in this subgraph, and which must
+            // be consumed.
+            if provided_param.is_none() {
+              fulfillable_candidates.push(vec![Entry::Param(param)]);
+            }
           }
         };
       }

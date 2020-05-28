@@ -114,7 +114,7 @@ impl super::Rule for Rule {
 
 impl super::DisplayForGraph for Rule {
   fn fmt_for_graph(&self) -> String {
-    "???".to_string()
+    self.to_string()
   }
 }
 
