@@ -75,9 +75,10 @@ GLOBAL_ENV_VARS = [
     # mitigate risk.
     "BOOTSTRAPPED_PEX_KEY_PREFIX=daily/${TRAVIS_BUILD_NUMBER}/${TRAVIS_BUILD_ID}/pants.pex",
     "NATIVE_ENGINE_SO_KEY_PREFIX=monthly/native_engine_so",
-    "PYENV_PY27_VERSION=2.7.15",
-    "PYENV_PY36_VERSION=3.6.8",
-    "PYENV_PY37_VERSION=3.7.2",
+    "PYENV_PY27_VERSION=2.7.18",
+    "PYENV_PY36_VERSION=3.6.10",
+    "PYENV_PY37_VERSION=3.7.7",
+    "PYENV_PY38_VERSION=3.8.3",
     # NB: We must set `PYENV_ROOT` on macOS for Pyenv to work properly. However, on Linux, we must not
     # override the default value because Linux pre-installs Python via Pyenv and we must keep their
     # $PYENV_ROOT for this to still work.
