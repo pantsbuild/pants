@@ -83,7 +83,7 @@ class Console:
         self.stderr.write(payload)
 
     def print_stdout(self, payload, end="\n"):
-        print(payload, file=self.stdout, end=end)
+        self.stdout.write(f"{payload}{end}")
 
     def print_stderr(self, payload, end="\n"):
         self.stderr.write(f"{payload}{end}")
