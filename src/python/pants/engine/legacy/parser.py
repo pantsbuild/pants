@@ -1,13 +1,16 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import ast
 import logging
 import os
 import tokenize
+from copy import copy
 from io import StringIO
 from pathlib import PurePath
 from typing import Dict, Tuple
 
+from pants.base.build_environment import get_buildroot
 from pants.base.build_file_target_factory import BuildFileTargetFactory
 from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import UnaddressableObjectError
@@ -20,6 +23,55 @@ from pants.option.global_options import BuildFileImportsBehavior
 from pants.util.memo import memoized_property
 
 logger = logging.getLogger(__name__)
+
+
+class FileLoader(ast.NodeVisitor):
+    """A utility class that parses load() calls in BUILD files and makes the relevant symbols
+    available.
+
+    A load statement is of the form:
+    load("path/to/a:file.py", "symbol1", "symbol2"...)
+
+    This will import "symbol1", "symbol2"... from file "path/to/a:file.py".
+    """
+
+    def __init__(self):
+        self.loaded_symbols: Dict = {}
+
+    def _path_from_label(self, label):
+        if label[0:2] == "//":
+            label = f"{get_buildroot()}/{label[2:]}"
+        label = label.replace(":", "/")
+        return label
+
+    def _load_symbols_from_file(self, path, symbols):
+        with open(path, "r") as loaded_file:
+            contents = loaded_file.read()
+        exec(contents)
+        local_symbols = copy(
+            locals()
+        )  # We copy the locals so that they don't get lost in the for loop
+        for symbol in symbols:
+            self.loaded_symbols[symbol] = local_symbols[symbol]
+
+    def visit_Call(self, node):
+        if isinstance(node.func, ast.Name):
+            if node.func.id == "load":
+                strargs = [arg.s for arg in node.args]
+                source_file = self._path_from_label(strargs[0])
+                exposed_symbols = strargs[1:]
+                self._load_symbols_from_file(source_file, exposed_symbols)
+
+    @staticmethod
+    def load_symbols(python_code: str) -> Dict:
+        """Parse the python code searching for load statements, and execute them.
+
+        See class docstring for a definition of the load interface.
+        """
+        file_loader = FileLoader()
+        parsed = ast.parse(python_code)
+        file_loader.visit(parsed)
+        return file_loader.loaded_symbols
 
 
 class LegacyPythonCallbacksParser(Parser):
@@ -127,6 +179,9 @@ class LegacyPythonCallbacksParser(Parser):
 
         symbols["bundle"] = BundleAdaptor
 
+        # We need to handle loading seaparately, so we noop it at parse time.
+        symbols["load"] = lambda *args: None
+
         return symbols, parse_context
 
     @staticmethod
@@ -161,6 +216,10 @@ class LegacyPythonCallbacksParser(Parser):
         # _intentional_ mutation would require a deep clone, which doesn't seem worth the cost at
         # this juncture.
         self._parse_context._storage.clear(os.path.dirname(filepath))
+
+        # We separately handle loading all the symbols we need from imported files.
+        self._symbols.update(FileLoader.load_symbols(python))
+
         exec(python, dict(self._symbols))
 
         # Perform this check after successful execution, so we know the python is valid (and should
