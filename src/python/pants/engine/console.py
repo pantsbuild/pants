@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import sys
+from dataclasses import dataclass
 from typing import Callable, Optional, cast
 
 from colors import blue, cyan, green, magenta, red
@@ -11,29 +12,27 @@ from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.rules import side_effecting
 
 
-# TODO this needs to be a file-like object/stream
+@dataclass(frozen=True)
 class NativeWriter:
-    def __init__(self, scheduler_session: SchedulerSession):
-        self._native = Native()
-        self.session = scheduler_session.session
+    scheduler_session: SchedulerSession
+    native: Native = Native()
 
-    def write(self, payload: str):
+    def write(self, payload: str) -> None:
         raise NotImplementedError
 
-    # TODO It's not clear yet what this function should do, it depends on how
-    # EngineDisplay in Rust ends up handling text.
     def flush(self):
+        """flush() doesn't need to do anything for NativeWriter."""
         pass
 
 
 class NativeStdOut(NativeWriter):
-    def write(self, payload):
-        self._native.write_stdout(self.session, payload)
+    def write(self, payload: str) -> None:
+        self.native.write_stdout(self.scheduler_session.session, payload)
 
 
 class NativeStdErr(NativeWriter):
-    def write(self, payload):
-        self._native.write_stderr(self.session, payload)
+    def write(self, payload: str) -> None:
+        self.native.write_stderr(self.scheduler_session.session, payload)
 
 
 @side_effecting
@@ -76,19 +75,19 @@ class Console:
     def stderr(self):
         return self._stderr
 
-    def write_stdout(self, payload):
+    def write_stdout(self, payload: str) -> None:
         self.stdout.write(payload)
 
-    def write_stderr(self, payload):
+    def write_stderr(self, payload: str) -> None:
         self.stderr.write(payload)
 
-    def print_stdout(self, payload, end="\n"):
+    def print_stdout(self, payload: str, end: str = "\n") -> None:
         self.stdout.write(f"{payload}{end}")
 
-    def print_stderr(self, payload, end="\n"):
+    def print_stderr(self, payload: str, end: str = "\n") -> None:
         self.stderr.write(f"{payload}{end}")
 
-    def flush(self):
+    def flush(self) -> None:
         self.stdout.flush()
         self.stderr.flush()
 
