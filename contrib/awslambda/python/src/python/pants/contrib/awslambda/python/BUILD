@@ -11,11 +11,13 @@ contrib_plugin(
     'src/python/pants/goal:task_registrar',
   ],
   tags = {"partially_type_checked"},
-  distribution_name='pantsbuild.pants.contrib.awslambda_python',
-  description='Pants plugin for creating deployable AWS Lambdas out of python code.',
-  build_file_aliases=True,
-  register_goals=True,
-  target_types=True,
+  provides=contrib_setup_py(
+    name='pantsbuild.pants.contrib.awslambda_python',
+    description='Pants plugin for creating deployable AWS Lambdas out of python code.',
+    build_file_aliases=True,
+    register_goals=True,
+    target_types=True,
+  )
 )
 
 python_library(
