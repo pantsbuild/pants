@@ -869,7 +869,7 @@ class OptionsTest(TestBase):
             self.assertEqual(["bar", "fleem:tgt", "foo", "morx:tgt"], sorted_specs)
 
     def test_passthru_args_ownership(self):
-        # TODO: Ownership of passthrough args will go away in 1.31.0.dev0, and all scopes that claim
+        # TODO: Ownership of passthrough args will go away in 1.30.0.dev0, and all scopes that claim
         # passthrough args will receive them, regardless of position. This test should then shrink
         # or be deleted.
         options = self._parse(flags="compile foo -- bar --baz")

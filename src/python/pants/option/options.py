@@ -327,7 +327,7 @@ class Options:
         return scope in self._known_scope_to_info
 
     def passthru_args_for_scope(self, scope: str) -> List[str]:
-        # NB: The concept of passthru argument "ownership" will go away in 1.31.0.dev0, at which
+        # NB: The concept of passthru argument "ownership" will go away in 1.30.0.dev0, at which
         # point _all_ scopes which register passthrough args will receive them and this method can
         # go away. But because Subsystems have never been able to receive passthrough args before,
         # we can begin applying that behavior to them unambiguously before the deprecation. The

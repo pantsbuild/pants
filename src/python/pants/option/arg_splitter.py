@@ -217,7 +217,7 @@ class ArgSplitter:
         # When we remove this deprecation, this case will turn into an error.
         deprecated_conditional(
             lambda: bool(passthru) and len(passthru_owners) > 1,
-            removal_version="1.31.0.dev0",
+            removal_version="1.30.0.dev0",
             entity_description="Ambiguous scopes for passthrough args",
             hint_message="In future, all scopes which accept passthrough args (arguments after --) "
             f"will receive them, and passing multiple scopes (in this case: {passthru_owners}) "
