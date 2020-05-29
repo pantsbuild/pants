@@ -1020,7 +1020,6 @@ impl Node for NodeKey {
       let user_facing_name = self.user_facing_name();
       let level = match self {
         NodeKey::Task(_) if user_facing_name.is_some() => Level::Info,
-        NodeKey::MultiPlatformExecuteProcess(_) => Level::Info,
         NodeKey::Task(_) => Level::Debug,
         _ => Level::Debug,
       };

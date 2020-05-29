@@ -228,7 +228,6 @@ impl WorkunitStore {
       metadata,
     };
     let mut inner = self.inner.lock();
-    started.log_workunit_state();
 
     inner.workunit_records.insert(span_id.clone(), started);
     inner.started_ids.push(span_id.clone());
