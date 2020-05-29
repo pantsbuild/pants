@@ -177,7 +177,6 @@ function build_3rdparty_packages() {
   # Builds whls for 3rdparty dependencies of pants.
   local version=$1
 
-  rm -rf "${DEPLOY_3RDPARTY_WHEEL_DIR}"
   mkdir -p "${DEPLOY_3RDPARTY_WHEEL_DIR}/${version}"
 
   local req_args=()
