@@ -382,8 +382,10 @@ class GlobalOptions(Subsystem):
             metavar="<path>",
             daemon=False,
             default=["/etc/pantsrc", "~/.pants.rc"],
-            help="Override config with values from these files. "
-            "Later files override earlier ones.",
+            help=(
+                "Override config with values from these files, using syntax matching that of "
+                "`--pants-config-files`."
+            ),
         )
         register(
             "--pythonpath",
