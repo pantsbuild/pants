@@ -488,10 +488,15 @@ class SourceRootTrie:
 
 @dataclass(frozen=True)
 class SourceRootRequest:
+    """Find the source root for the given path."""
+
     path: str
 
     @classmethod
     def for_file(cls, file_path: str) -> "SourceRootRequest":
+        """Create a request for the source root for the given file."""
+        # The file itself cannot be a source root, so we may as well start the search
+        # from its enclosing directory, and save on some superfluous checking.
         return cls(str(PurePath(file_path).parent))
 
 
