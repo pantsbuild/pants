@@ -11,6 +11,7 @@ travis_parallelism = 4
 [GLOBAL]
 # Override color support detection - we want colors and Travis supports them.
 colors = true
+dynamic_ui = false
 
 # TODO: Eventually we would like pantsd enabled in CI as well, but we blanket disable it for
 # now in order to smooth off rough edges locally.

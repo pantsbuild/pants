@@ -11,7 +11,7 @@ from configparser import ConfigParser
 from functools import total_ordering
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Dict, List, NamedTuple, Optional, Set, Tuple, cast
+from typing import Dict, List, NamedTuple, Set, Tuple, cast
 from urllib.parse import quote_plus
 from xml.etree import ElementTree
 
