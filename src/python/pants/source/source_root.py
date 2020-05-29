@@ -106,9 +106,7 @@ class SourceRoots:
         """
         self._pattern_matcher = SourceRootPatternMatcher(tuple(root_patterns))
         # TODO: In 1.30.0.dev0 remove the trie entirely.
-        self._trie = (
-            None if self._pattern_matcher.get_patterns() else source_root_config.create_trie()
-        )  # type: ignore[union-attr]
+        self._trie = None if self._pattern_matcher.get_patterns() else source_root_config.create_trie()  # type: ignore[union-attr]
         self._fail_if_unmatched = fail_if_unmatched
 
     # We perform pattern matching against absolute paths, where "/" represents the repo root.
