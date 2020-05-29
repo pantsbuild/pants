@@ -62,8 +62,8 @@ class StripSnapshotRequest:
     The call site may optionally give the field `representative_path` if it is confident that all
     the files in the snapshot will only have one source root. Using `representative_path` results in
     better performance because we only need to find the SourceRoot for a single file rather than
-    every file. The `representative_path` cannot be the source root path itself, it must be
-    some proper subpath of it.
+    every file. The `representative_path` cannot be the source root path itself, it must be some
+    proper subpath of it.
     """
 
     snapshot: Snapshot
@@ -109,8 +109,9 @@ async def strip_source_roots_from_snapshot(
         return SourceRootStrippedSources(request.snapshot, FrozenDict())
 
     if request.representative_path is not None:
-        source_root_obj = await Get[SourceRoot](SourceRootRequest.for_file(
-            request.representative_path))
+        source_root_obj = await Get[SourceRoot](
+            SourceRootRequest, SourceRootRequest.for_file(request.representative_path)
+        )
         source_root = source_root_obj.path
         if source_root == ".":
             return SourceRootStrippedSources.for_single_source_root(request.snapshot, source_root)
@@ -118,7 +119,8 @@ async def strip_source_roots_from_snapshot(
         return SourceRootStrippedSources.for_single_source_root(resulting_snapshot, source_root)
 
     source_roots = await MultiGet(
-        Get[SourceRoot](SourceRootRequest.for_file(file)) for file in request.snapshot.files
+        Get[SourceRoot](SourceRootRequest, SourceRootRequest.for_file(file))
+        for file in request.snapshot.files
     )
     file_to_source_root = dict(zip(request.snapshot.files, source_roots))
     files_grouped_by_source_root = {

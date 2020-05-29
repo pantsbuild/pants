@@ -492,7 +492,7 @@ class SourceRootRequest:
 
     @classmethod
     def for_file(cls, file_path: str) -> "SourceRootRequest":
-        return cls(PurePath(file_path).parent)
+        return cls(str(PurePath(file_path).parent))
 
 
 @dataclass(frozen=True)

@@ -23,6 +23,7 @@ from pants.core.util_rules import (
     filter_empty_sources,
     strip_source_roots,
 )
+from pants.source import source_root
 
 
 def rules():
@@ -41,6 +42,7 @@ def rules():
         *strip_source_roots.rules(),
         *archive.rules(),
         *external_tool.rules(),
+        *source_root.rules(),
     ]
 
 

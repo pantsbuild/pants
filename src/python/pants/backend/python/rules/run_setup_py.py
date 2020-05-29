@@ -520,13 +520,14 @@ async def get_ancestor_init_py(targets: Targets) -> AncestorInitPyFiles:
     # Find the ancestors of all dirs containing .py files, including those dirs themselves.
     source_dir_ancestors: Set[Tuple[str, str]] = set()  # Items are (src_root, path incl. src_root).
     source_roots = await MultiGet(
-        Get[SourceRoot](SourceRootRequest, SourceRootRequest.for_file(path)) for path in sources.files
+        Get[SourceRoot](SourceRootRequest, SourceRootRequest.for_file(path))
+        for path in sources.files
     )
     for path, source_root in zip(sources.files, source_roots):
         source_dir_ancestor = os.path.dirname(path)
         # Do not allow the repository root to leak (i.e., '.' should not be a package in setup.py).
-        while source_dir_ancestor != source_root:
-            source_dir_ancestors.add((source_root, source_dir_ancestor))
+        while source_dir_ancestor != source_root.path:
+            source_dir_ancestors.add((source_root.path, source_dir_ancestor))
             source_dir_ancestor = os.path.dirname(source_dir_ancestor)
 
     source_dir_ancestors_list = list(source_dir_ancestors)  # To force a consistent order.
