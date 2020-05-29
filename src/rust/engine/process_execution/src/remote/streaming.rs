@@ -157,7 +157,7 @@ impl StreamingCommandRunner {
       // TODO: Add deadline timeout.
       match stream.next().await {
         Some(Ok(operation)) => {
-          debug!("monitor_operation_stream: got operation: {:?}", &operation);
+          debug!("wait_on_operation_stream: got operation: {:?}", &operation);
           operation_name_opt = Some(operation.get_name().to_string());
 
           // Continue monitoring if the operation is not complete.
@@ -169,12 +169,27 @@ impl StreamingCommandRunner {
           return (operation_name_opt, OperationOrStatus::Operation(operation));
         }
 
-        Some(Err(_)) => {}
+        Some(Err(err)) => {
+          debug!("wait_on_operation_stream: got error: {:?}", err);
+          match err {
+            grpcio::Error::RpcFailure(rpc_status) => {
+              let mut status = Status::new();
+              status.code = rpc_status.status.into();
+              return (None, OperationOrStatus::Status(status))
+            }
+            _ => {
+              let mut status = bazel_protos::status::Status::new();
+              status.set_code(grpcio::RpcStatusCode::INVALID_ARGUMENT.into());
+              status.set_message(format!("error: {:?}", err));
+              return (operation_name_opt, OperationOrStatus::Status(status));
+            }
+          }
+        }
 
         None => {
           // Stream disconnected unexpectedly. Return UNAVAILABLE status so that the
           // main loop will reconnect with the WaitExecution method.
-          debug!("Unexpected disconnect from RE server");
+          debug!("wait_on_operation_stream: unexpected disconnect from RE server");
           let mut status = bazel_protos::status::Status::new();
           status.set_code(grpcio::RpcStatusCode::UNAVAILABLE.into());
           status.set_message("stream disconnected unexpectedly".to_owned());
@@ -495,8 +510,6 @@ impl crate::CommandRunner for StreamingCommandRunner {
           // Save the operation name in case we need to reconnect via WaitExecution.
           if let Some(name) = operation_name_opt {
             current_operation_name = Some(name);
-          } else {
-            panic!("no operation name returned from monitor_operation_stream");
           }
 
           actionable_result
