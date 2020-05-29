@@ -27,11 +27,14 @@ from common import banner, die, green
 @total_ordering
 class Package:
     def __init__(
-        self, name: str, target: str, bdist_wheel_flags: Optional[Tuple[str, ...]] = None
+        self,
+        name: str,
+        target: str,
+        bdist_wheel_flags: Tuple[str, ...] = ("--python-tag", "py36.py37.py38"),
     ) -> None:
         self.name = name
         self.target = target
-        self.bdist_wheel_flags = bdist_wheel_flags or ("--python-tag", "py36.py37.py38")
+        self.bdist_wheel_flags = bdist_wheel_flags
 
     def __lt__(self, other):
         return self.name < other.name
@@ -77,7 +80,7 @@ class Package:
 
 def core_packages() -> Set[Package]:
     return {
-        Package("pantsbuild.pants", "src/python/pants:pants-packaged"),
+        Package("pantsbuild.pants", "src/python/pants:pants-packaged", bdist_wheel_flags=()),
         Package("pantsbuild.pants.testutil", "src/python/pants/testutil:testutil_wheel"),
     }
 
