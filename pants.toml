@@ -37,7 +37,6 @@ pythonpath = [
 backend_packages.add = [
   "pants.backend.docgen",
   "pants.contrib.buildrefactor",
-  "pants.contrib.codeanalysis",
   "pants.contrib.confluence",
   "pants.contrib.go",
   "pants.contrib.node",

@@ -10,7 +10,7 @@ contrib_plugin(
   ],
   provides=contrib_setup_py(
     name='pantsbuild.pants.contrib.codeanalysis',
-    description='Support for various code analysis tools in Pants.',
+    description='Support for various code analysis tools in Pants. (Deprecated)',
     register_goals=True,
   ),
   tags = {"partially_type_checked"},

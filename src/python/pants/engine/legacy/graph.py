@@ -8,6 +8,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, Iterator, List, Set, Tuple, Type, cast
 
+from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.parse_context import ParseContext
 from pants.base.specs import AddressSpec, AddressSpecs, SingleAddress
@@ -31,6 +32,7 @@ from pants.engine.legacy.structs import (
 )
 from pants.engine.rules import rule
 from pants.engine.selectors import Get, MultiGet
+from pants.engine.target import RegisteredTargetTypes
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper, Filespec
 from pants.util.meta import frozen_after_init
@@ -422,7 +424,9 @@ class LegacyTransitiveHydratedTargets:
 
 
 @rule
-async def transitive_hydrated_targets(addresses: Addresses) -> TransitiveHydratedTargets:
+async def transitive_hydrated_targets(
+    addresses: Addresses, registered_target_types: RegisteredTargetTypes
+) -> TransitiveHydratedTargets:
     """Given Addresses, kicks off recursion on expansion of TransitiveHydratedTargets.
 
     The TransitiveHydratedTarget struct represents a structure-shared graph, which we walk and
@@ -444,6 +448,25 @@ async def transitive_hydrated_targets(addresses: Addresses) -> TransitiveHydrate
             continue
         closure.add(tht.root)
         to_visit.extend(tht.dependencies)
+
+    no_target_api_bindings = {
+        ht.adaptor.type_alias
+        for ht in closure
+        if ht.adaptor.type_alias not in registered_target_types.aliases
+    }
+    deprecated_conditional(
+        predicate=lambda: bool(no_target_api_bindings),
+        removal_version="1.30.0.dev0",
+        entity_description="Custom V1 targets not having a Target API binding",
+        hint_message=(
+            "You have some custom target types that will soon need light-weight bindings for the "
+            "new and more powerful Target API to continue working properly with parts of Pants, "
+            "like the `list` and `filedeps` goals.\n\nSee "
+            "https://groups.google.com/forum/#!topic/pants-devel/WsRFODRLVZI for more information "
+            f"and instructions.\n\n(Could not find bindings for: {sorted(no_target_api_bindings)})"
+        ),
+        stacklevel=4,
+    )
 
     return TransitiveHydratedTargets(
         tuple(tht.root for tht in transitive_hydrated_targets), FrozenOrderedSet(closure)
