@@ -320,7 +320,7 @@ impl<'t, R: Rule> Builder<'t, R> {
           params: params.clone(),
           reason: if params.is_empty() {
             format!(
-              "No rule was available to compute {}. Maybe declare it as a RootRule({})?",
+              "No rule was available to compute {}. Maybe declare RootRule({})?",
               dependency_key, product,
             )
           } else {
