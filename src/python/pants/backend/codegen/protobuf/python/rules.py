@@ -1,8 +1,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Tuple, cast
-
 from pants.backend.codegen.protobuf.subsystems.protoc import Protoc
 from pants.backend.codegen.protobuf.target_types import ProtobufSources
 from pants.backend.python.target_types import PythonSources
@@ -58,23 +56,16 @@ async def generate_python_from_protobuf(
         AllSourceFilesRequest([request.protocol_target[ProtobufSources]], strip_source_roots=True)
     )
 
-    # TODO(#9294): make support for a heterogeneous MultiGet more ergonomic. We have this awkward
-    #  code to improve concurrency.
     (
         downloaded_protoc_binary,
         create_output_dir_result,
         all_sources,
         stripped_target_sources,
-    ) = cast(
-        Tuple[DownloadedExternalTool, ProcessResult, SourceFiles, SourceFiles],
-        await MultiGet(
-            [
-                download_protoc_request,
-                create_output_dir_request,
-                all_sources_request,
-                stripped_target_sources_request,
-            ]
-        ),
+    ) = await MultiGet(
+        download_protoc_request,
+        create_output_dir_request,
+        all_sources_request,
+        stripped_target_sources_request,
     )
 
     input_digest = await Get[Digest](

@@ -537,12 +537,12 @@ async def get_ancestor_init_py(
 
     # Note that we must MultiGet single globs instead of a a single Get for all the globs, because
     # we match each result to its originating glob (see use of zip below).
-    ancestor_init_py_snapshots = await MultiGet[Snapshot](
+    ancestor_init_py_snapshots = await MultiGet(
         Get[Snapshot](PathGlobs, PathGlobs([os.path.join(source_dir_ancestor[1], "__init__.py")]))
         for source_dir_ancestor in source_dir_ancestors_list
     )
 
-    source_root_stripped_ancestor_init_pys = await MultiGet[Digest](
+    source_root_stripped_ancestor_init_pys = await MultiGet(
         Get[Digest](RemovePrefix(snapshot.digest, source_dir_ancestor[0]))
         for snapshot, source_dir_ancestor in zip(
             ancestor_init_py_snapshots, source_dir_ancestors_list
