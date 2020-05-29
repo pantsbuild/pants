@@ -1018,11 +1018,11 @@ impl Node for NodeKey {
 
     let (started_workunit_id, user_facing_name) = {
       let user_facing_name = self.user_facing_name();
-      let higher_priority = context.session.should_handle_workunits() && user_facing_name.is_some();
-      let level = if higher_priority {
-        Level::Info
-      } else {
-        Level::Debug
+      let level = match self {
+        NodeKey::Task(_) if user_facing_name.is_some() => Level::Info,
+        NodeKey::MultiPlatformExecuteProcess(_) => Level::Info,
+        NodeKey::Task(_) => Level::Debug,
+        _ => Level::Debug,
       };
       let name = self.workunit_name();
       let span_id = new_span_id();

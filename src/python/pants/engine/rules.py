@@ -274,9 +274,11 @@ def _make_rule(
         effective_name = annotations.canonical_name
         if effective_name is None:
             effective_name = return_type.name if is_goal_cls else func.__name__
-        normalized_annotations = RuleAnnotations(
-            canonical_name=effective_name, desc=annotations.desc
-        )
+
+        effective_desc = annotations.desc
+        if effective_desc is None and is_goal_cls:
+            effective_desc = f"`{effective_name}` goal"
+        normalized_annotations = RuleAnnotations(canonical_name=effective_name, desc=effective_desc)
 
         # Set our own custom `__line_number__` dunder so that the engine may visualize the line number.
         func.__line_number__ = func.__code__.co_firstlineno
