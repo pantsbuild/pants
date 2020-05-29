@@ -94,19 +94,29 @@ class Config(ABC):
         for config_item in config_items:
             config_path = config_item.path if hasattr(config_item, "path") else config_item
             with open_ctx(config_item) as config_file:
-                content = config_file.read()
-            content_digest = sha1(content).hexdigest()
+                content_bytes = config_file.read()
+            content_digest = sha1(content_bytes).hexdigest()
+            content = content_bytes.decode()
             normalized_seed_values = cls._determine_seed_values(seed_values=seed_values)
 
             config_values: _ConfigValues
             if PurePath(config_path).suffix == ".toml":
-                toml_values = cast(Dict[str, Any], toml.loads(content.decode()))
-                toml_values["DEFAULT"] = {
-                    **normalized_seed_values,
-                    **toml_values.get("DEFAULT", {}),
-                }
-                config_values = _TomlValues(toml_values)
+                config_values = cls._meta_load_as_toml(content, normalized_seed_values)
+            elif PurePath(config_path).suffix == ".ini":
+                config_values = cls._meta_load_as_ini(content, normalized_seed_values)
             else:
+                try:
+                    config_values = cls._meta_load_as_toml(content, normalized_seed_values)
+                except Exception as toml_e:
+                    try:
+                        config_values = cls._meta_load_as_ini(content, normalized_seed_values)
+                    except Exception as ini_e:
+                        raise cls.ConfigError(
+                            f"Unsuffixed Config path {config_path} could not be parsed "
+                            f"as either TOML or INI:\n  TOML: {toml_e}\n  INI: {ini_e}"
+                        )
+
+            if isinstance(config_values, _IniValues):
                 script_instructions = (
                     "curl -L -o migrate_to_toml_config.py 'https://git.io/Jv02R' && chmod +x "
                     f"migrate_to_toml_config.py && ./migrate_to_toml_config.py {config_path}"
@@ -141,12 +151,9 @@ class Config(ABC):
                 ]
                 warn_or_error(
                     removal_version="1.31.0.dev0",
-                    deprecated_entity_description="INI config files (`pants.ini`)",
+                    deprecated_entity_description=f"INI config files (`{config_path}`)",
                     hint="\n".join(msg),
                 )
-                ini_parser = configparser.ConfigParser(defaults=normalized_seed_values)
-                ini_parser.read_string(content.decode())
-                config_values = _IniValues(ini_parser)
 
             single_file_configs.append(
                 _SingleFileConfig(
@@ -154,6 +161,27 @@ class Config(ABC):
                 ),
             )
         return _ChainedConfig(tuple(reversed(single_file_configs)))
+
+    @classmethod
+    def _meta_load_as_toml(
+        cls, config_content: str, normalized_seed_values: Dict[str, str]
+    ) -> "_TomlValues":
+        """Attempt to parse as TOML, raising an exception on failure."""
+        toml_values = cast(Dict[str, Any], toml.loads(config_content))
+        toml_values["DEFAULT"] = {
+            **normalized_seed_values,
+            **toml_values.get("DEFAULT", {}),
+        }
+        return _TomlValues(toml_values)
+
+    @classmethod
+    def _meta_load_as_ini(
+        cls, config_content: str, normalized_seed_values: Dict[str, str]
+    ) -> "_IniValues":
+        """Attempt to parse as INI, raising an exception on failure."""
+        ini_parser = configparser.ConfigParser(defaults=normalized_seed_values)
+        ini_parser.read_string(config_content)
+        return _IniValues(ini_parser)
 
     @staticmethod
     def _determine_seed_values(*, seed_values: Optional[SeedValues] = None) -> Dict[str, str]:
