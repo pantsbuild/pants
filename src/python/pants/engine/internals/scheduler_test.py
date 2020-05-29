@@ -113,8 +113,10 @@ class UnionX:
 
 @rule
 async def error_msg_test_rule(union_wrapper: UnionWrapper) -> UnionX:
-    union_x = await Get[UnionX](UnionWithNonMemberErrorMsg, union_wrapper.inner)
-    return union_x
+    # NB: We install a UnionRule to make UnionWrapper a member of this union, but then we pass the
+    # inner value, which is _not_ registered.
+    _ = await Get[A](UnionWithNonMemberErrorMsg, union_wrapper.inner)
+    raise AssertionError("The statement above this one should have failed!")
 
 
 class TypeCheckFailWrapper:
@@ -176,7 +178,7 @@ class SchedulerTest(TestBase):
             transitive_coroutine_rule,
             RootRule(UnionWrapper),
             UnionRule(UnionBase, UnionA),
-            UnionRule(UnionWithNonMemberErrorMsg, UnionX),
+            UnionRule(UnionWithNonMemberErrorMsg, UnionWrapper),
             RootRule(UnionA),
             select_union_a,
             UnionRule(union_base=UnionBase, union_member=UnionB),
