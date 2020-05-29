@@ -46,7 +46,6 @@ from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Sources, Targets, TransitiveTargets
 from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
-from pants.source.source_root import SourceRootConfig
 
 # There are many moving parts in coverage, so here is a high level view of what's going on.
 

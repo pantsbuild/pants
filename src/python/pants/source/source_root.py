@@ -75,7 +75,7 @@ class SourceRootPatternMatcher:
         # Note: This is currently O(n) where n is the number of patterns, which
         # we expect to be small.  We can optimize if it becomes necessary.
         if ".." in relpath.split(os.path.sep):
-            raise NoSourceRootError(relpath, f"`..` disallowed in source root searches. ")
+            raise NoSourceRootError(relpath, "`..` disallowed in source root searches. ")
         putative_root = _repo_root / relpath
         # TODO: Once we get rid of the trie, and all source root computation goes through this
         #  logic, we may want to delegate the check of each putative root to a rule, so that
@@ -106,7 +106,9 @@ class SourceRoots:
         """
         self._pattern_matcher = SourceRootPatternMatcher(tuple(root_patterns))
         # TODO: In 1.30.0.dev0 remove the trie entirely.
-        self._trie = None if self._pattern_matcher.get_patterns() else source_root_config.create_trie()  # type: ignore[union-attr]
+        self._trie = (
+            None if self._pattern_matcher.get_patterns() else source_root_config.create_trie()
+        )  # type: ignore[union-attr]
         self._fail_if_unmatched = fail_if_unmatched
 
     # We perform pattern matching against absolute paths, where "/" represents the repo root.
