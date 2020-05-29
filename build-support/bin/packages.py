@@ -82,6 +82,8 @@ class Package:
 
 def core_packages() -> Set[Package]:
     return {
+        # NB: This a native wheel. We expect a distinct wheel for each Python version and each
+        # platform (macOS x linux).
         Package("pantsbuild.pants", "src/python/pants:pants-packaged", bdist_wheel_flags=()),
         Package("pantsbuild.pants.testutil", "src/python/pants/testutil:testutil_wheel"),
     }
