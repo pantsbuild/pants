@@ -6,6 +6,7 @@ from typing import Iterable, Optional, Sequence, Tuple, Union, cast
 
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
+from pants.backend.python.targets.python_binary import PythonBinary as PythonBinaryV1
 from pants.core.util_rules.determine_source_files import SourceFiles
 from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
@@ -215,6 +216,7 @@ class PexZipSafe(BoolField):
 
     alias = "zip_safe"
     default = True
+    value: bool
 
 
 class PexAlwaysWriteCache(BoolField):
@@ -225,6 +227,7 @@ class PexAlwaysWriteCache(BoolField):
 
     alias = "always_write_cache"
     default = False
+    value: bool
 
 
 class PexIgnoreErrors(BoolField):
@@ -232,6 +235,7 @@ class PexIgnoreErrors(BoolField):
 
     alias = "ignore_errors"
     default = False
+    value: bool
 
 
 class PexShebang(StringField):
@@ -240,14 +244,18 @@ class PexShebang(StringField):
     alias = "shebang"
 
 
-# TODO: This option is weird. Its default is determined by `--python-binary-pex-emit-warnings`.
-#  How would that work with the Target API? Likely, make this an AsyncField and in the rule
-#  request the corresponding subsystem. For now, we ignore the option.
 class PexEmitWarnings(BoolField):
-    """Whether or not to emit PEX warnings at runtime."""
+    """Whether or not to emit PEX warnings at runtime.
+
+    The default is determined by the option `pex_runtime_warnings` in the `[python-binary]` scope.
+    """
 
     alias = "emit_warnings"
-    default = True
+
+    def value_or_global_default(self, python_binary_defaults: PythonBinaryV1.Defaults) -> bool:
+        if self.value is None:
+            return python_binary_defaults.pex_emit_warnings
+        return self.value
 
 
 class PythonBinary(Target):

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
 from textwrap import dedent
-from typing import Any, ClassVar, Dict, Iterable, List, Optional, Tuple, Type
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Type
 
 import pytest
 from typing_extensions import final
@@ -77,9 +77,9 @@ from pants.util.ordered_set import OrderedSet
 
 
 class FortranExtensions(PrimitiveField):
-    alias: ClassVar = "fortran_extensions"
+    alias = "fortran_extensions"
     value: Tuple[str, ...]
-    default: ClassVar[Tuple[str, ...]] = ()
+    default = ()
 
     def compute_value(
         self, raw_value: Optional[Iterable[str]], *, address: Address
@@ -98,12 +98,12 @@ class FortranExtensions(PrimitiveField):
 
 
 class UnrelatedField(BoolField):
-    alias: ClassVar = "unrelated"
-    default: ClassVar = False
+    alias = "unrelated"
+    default = False
 
 
 class FortranSources(AsyncField):
-    alias: ClassVar = "sources"
+    alias = "sources"
     sanitized_raw_value: Optional[Tuple[str, ...]]
     default = None
 
@@ -144,8 +144,8 @@ async def hydrate_fortran_sources(request: FortranSourcesRequest) -> FortranSour
 
 
 class FortranTarget(Target):
-    alias: ClassVar = "fortran"
-    core_fields: ClassVar = (FortranExtensions, FortranSources)
+    alias = "fortran"
+    core_fields = (FortranExtensions, FortranSources)
 
 
 def test_invalid_fields_rejected() -> None:
@@ -284,8 +284,8 @@ def test_async_field() -> None:
 
 def test_add_custom_fields() -> None:
     class CustomField(BoolField):
-        alias: ClassVar = "custom_field"
-        default: ClassVar = False
+        alias = "custom_field"
+        default = False
 
     union_membership = UnionMembership({FortranTarget.PluginField: [CustomField]})
     tgt_values = {CustomField.alias: True}
@@ -325,8 +325,8 @@ def test_override_preexisting_field_via_new_target() -> None:
     # with subclasses of the original `Field`s.
 
     class CustomFortranExtensions(FortranExtensions):
-        banned_extensions: ClassVar = ("FortranBannedExt",)
-        default_extensions: ClassVar = ("FortranCustomExt",)
+        banned_extensions = ("FortranBannedExt",)
+        default_extensions = ("FortranCustomExt",)
 
         def compute_value(
             self, raw_value: Optional[Iterable[str]], *, address: Address
@@ -346,8 +346,8 @@ def test_override_preexisting_field_via_new_target() -> None:
             return (*specified_extensions, *self.default_extensions)
 
     class CustomFortranTarget(Target):
-        alias: ClassVar = "custom_fortran"
-        core_fields: ClassVar = tuple(
+        alias = "custom_fortran"
+        core_fields = tuple(
             {*FortranTarget.core_fields, CustomFortranExtensions} - {FortranExtensions}
         )
 
