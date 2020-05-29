@@ -56,8 +56,8 @@ pub struct Workunit {
 impl Workunit {
   fn log_workunit_state(&self) {
     let state = match self.state {
-      WorkunitState::Started { .. } => "Starting",
-      WorkunitState::Completed { .. } => "Completing",
+      WorkunitState::Started { .. } => "Starting:",
+      WorkunitState::Completed { .. } => "Completed:",
     };
 
     let level = self.metadata.level;
