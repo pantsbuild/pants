@@ -1,6 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import ast as ast3
 import re
 import sys
 import warnings
@@ -11,15 +12,6 @@ from typed_ast import ast27
 
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import ensure_text
-
-# We use typed-ast to be able to parse Python 2.7 and 3.4-3.7 regardless of the interpreter Pants
-# is running with. However, the library stopped development with Python 3.8, so we use the stdlib
-# when running with Python 3.8. This means that we will fail to parse Python 3.8 source code unless
-# the user is running Pants with Python 3.8.
-if sys.version_info[:2] >= (3, 8):
-    import ast as ast3
-else:
-    from typed_ast import ast3
 
 
 class ImportParseError(ValueError):
@@ -34,13 +26,20 @@ class PythonImports:
 
 def parse_file(source_code: str, *, module_name: str):
     try:
+        # NB: The Python 3 ast is generally backwards-compatible with earlier versions. The only
+        # breaking change is `async` `await` becoming reserved keywords in Python 3.7 (deprecated
+        # in 3.6). If the std-lib fails to parse, we could use typed-ast to try parsing with a
+        # target version of Python 3.5, but we don't because Python 3.5 is almost EOL and has very
+        # low usage.
+        # We will also fail to parse Python 3.8 syntax if Pants is run with Python 3.6 or 3.7.
+        # There is no known workaround for this, beyond users changing their `./pants` script to
+        # always use >= 3.8.
         tree = ast3.parse(source_code)
         visitor_cls = _Py3AstVisitor if sys.version_info[:2] < (3, 8) else _Py38AstVisitor
         return tree, visitor_cls
     except Exception as e:
         try:
-            tree = ast27.parse(source_code)
-            return tree, _Py27AstVisitor
+            return ast27.parse(source_code), _Py27AstVisitor
         except Exception:
             raise ImportParseError(f"Failed to parse source code for {module_name}:\n{e!r}")
 

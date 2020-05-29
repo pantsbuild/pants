@@ -13,6 +13,8 @@ def test_normal_imports() -> None:
     imports = find_python_imports(
         dedent(
             """\
+            from __future__ import print_function
+
             import os
             import os.path
             from typing import TYPE_CHECKING
@@ -35,6 +37,7 @@ def test_normal_imports() -> None:
         module_name="project.app",
     )
     assert set(imports.imported) == {
+        "__future__.print_function",
         "os",
         "os.path",
         "typing.TYPE_CHECKING",
@@ -61,7 +64,9 @@ def test_relative_imports() -> None:
         module_name="project.util.test_utils",
     )
     assert set(imports.imported) == {
-        "project.util.sibling", "project.util.subdir.child.Child", "project.parent.Parent"
+        "project.util.sibling",
+        "project.util.subdir.child.Child",
+        "project.parent.Parent",
     }
     assert not imports.inferred
 
@@ -101,15 +106,15 @@ def test_imports_from_strings() -> None:
     )
     assert not imports.imported
     assert set(imports.inferred) == {
-            "a.b.d",
-            "a.b2.d",
-            "a.b.c.Foo",
-            "a.b.c.d.Foo",
-            "a.b.c.d.FooBar",
-            "a.b.c.d.e.f.g.Baz",
-            "a.b_c.d._bar",
-            "a.b2.c.D",
-        }
+        "a.b.d",
+        "a.b2.d",
+        "a.b.c.Foo",
+        "a.b.c.d.Foo",
+        "a.b.c.d.FooBar",
+        "a.b.c.d.e.f.g.Baz",
+        "a.b_c.d._bar",
+        "a.b2.c.D",
+    }
 
 
 def test_works_with_python2() -> None:
@@ -129,26 +134,6 @@ def test_works_with_python2() -> None:
     )
     assert set(imports.imported) == {"demo", "project.demo.Demo"}
     assert set(imports.inferred) == {"dep.from.bytes", "dep.from.str"}
-
-
-def test_works_with_python37() -> None:
-    """Even if Pants is run with Python 3.6, we should be able to analyze Python 3.7, thanks to
-    typed-ast."""
-    imports = find_python_imports(
-        dedent(
-            """\
-            from __future__ import annotations
-
-            import demo
-            from project.demo import Demo
-
-            importlib.import_module("dep.from.str")
-            """
-        ),
-        module_name="project.app",
-    )
-    assert set(imports.imported) == {"demo", "project.demo.Demo", "__future__.annotations"}
-    assert set(imports.inferred) == {"dep.from.str"}
 
 
 @pytest.mark.skipif(
