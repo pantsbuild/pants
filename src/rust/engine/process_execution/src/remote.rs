@@ -29,6 +29,11 @@ use crate::{
 use std::cmp::min;
 use workunit_store::WorkunitStore;
 
+// Streaming client module. Intended as an eventual repalcement for the CommandRunner in this
+// module.
+mod streaming;
+pub use streaming::StreamingCommandRunner;
+
 // Environment variable which is exclusively used for cache key invalidation.
 // This may be not specified in an Process, and may be populated only by the
 // CommandRunner.
@@ -260,6 +265,7 @@ impl super::CommandRunner for CommandRunner {
     let mut history = ExecutionHistory::default();
 
     // Upload inputs.
+    // REFACTOR: StreamingCommandRunner moves this to `ensure_action_uploaded`.
     {
       let (command_digest, action_digest) = future03::try_join(
         self.store_proto_locally(&command),
