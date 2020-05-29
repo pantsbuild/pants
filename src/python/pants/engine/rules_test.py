@@ -57,7 +57,16 @@ class RuleVisitorTest(unittest.TestCase):
         return gets[0]
 
     def test_single_get(self) -> None:
-        get = self._parse_single_get("a = await Get[A](B, 42)", A=str, B=int)
+        get = self._parse_single_get(
+            dedent(
+                """
+                async def rule():
+                    a = await Get[A](B, 42)
+                """
+            ),
+            A=str,
+            B=int,
+        )
         assert get.product_type == str
         assert get.subject_declared_type == int
 
@@ -65,9 +74,10 @@ class RuleVisitorTest(unittest.TestCase):
         gets = self._parse_rule_gets(
             dedent(
                 """
-                a = await Get[A](B, 42)
-                if len(a) > 1:
-                    c = await Get[C](A("bob"))
+                async def rule():
+                    a = await Get[A](B, 42)
+                    if len(a) > 1:
+                        c = await Get[C](A("bob"))
                 """
             ),
             A=str,
@@ -86,14 +96,28 @@ class RuleVisitorTest(unittest.TestCase):
 
     def test_multiget_homogeneous(self) -> None:
         get = self._parse_single_get(
-            "a = await MultiGet(Get[A](B(x)) for x in range(5))", A=str, B=int
+            dedent(
+                """
+                async def rule():
+                    a = await MultiGet(Get[A](B(x)) for x in range(5))
+                """
+            ),
+            A=str,
+            B=int,
         )
         assert get.product_type == str
         assert get.subject_declared_type == int
 
     def test_multiget_heterogeneous(self) -> None:
         gets = self._parse_rule_gets(
-            "a = await MultiGet([Get[A](B, 42), Get[B](A('bob'))])", A=str, B=int
+            dedent(
+                """
+                async def rule():
+                    a = await MultiGet(Get[A](B, 42), Get[B](A('bob')))
+                """
+            ),
+            A=str,
+            B=int,
         )
 
         assert len(gets) == 2
