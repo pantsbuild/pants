@@ -189,7 +189,7 @@ infer from the subject variable [1]. Likewise, the short form must use inline co
 subject in order to convey the subject type to the engine.
 
 [1] The engine needs to determine all rule and Get input and output types statically before
-executing andy rules. Since Gets are declared inside function bodies, the only way to extract this
+executing any rules. Since Gets are declared inside function bodies, the only way to extract this
 information is through a parse of the rule function. The parse analysis is rudimentary and cannot
 infer more than names and calls; so a variable name does not give enough information to infer its
 type, only a constructor call unambiguously gives this information without more in-depth parsing
