@@ -106,7 +106,7 @@ class _RuleVisitor(ast.NodeVisitor):
         #  https://github.com/pantsbuild/pants/issues/9899
         deprecated_conditional(
             predicate=lambda: False,
-            removal_version="1.31.0.dev0",
+            removal_version="1.30.0.dev0",
             entity_description="Parameterized Get[...](...) calls",
             hint_message=(
                 f"In {self._identify_source(call_node)} Use "

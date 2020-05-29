@@ -137,7 +137,7 @@ class _GetFactory:
         #  https://github.com/pantsbuild/pants/issues/9899
         deprecated_conditional(
             predicate=lambda: False,
-            removal_version="1.31.0.dev0",
+            removal_version="1.30.0.dev0",
             entity_description="Parameterized Get[...](...) calls",
             hint_message=(
                 f"Use Get({product_type.__name__}, ...) instead of "
@@ -184,21 +184,16 @@ A Get can be constructed in 2 ways with two variants each:
   a. Get(<ProductType>, <SubjectDeclaredType>(<constructor args for subject>))
   b. Get[<ProductType>](<SubjectDeclaredType>(<constructor args for subject>))
 
-The long form supports two use cases:
-1. In order to provide type information to the rule engine that it could not otherwise infer from
-   the subject variable [1].
-2. The subject is a member of a union but not a subclass of the union base. In this case
-   SubjectDeclaredType should be the union base type.
-
-The short form must use inline construction of the subject in order to convey the subject type to
-the engine (reason 2 for the long form).
+The long form supports providing type information to the rule engine that it could not otherwise
+infer from the subject variable [1]. Likewise, the short form must use inline construction of the
+subject in order to convey the subject type to the engine.
 
 [1] The engine needs to determine all rule and Get input and output types statically before
 executing andy rules. Since Gets are declared inside function bodies, the only way to extract this
 information is through a parse of the rule function. The parse analysis is rudimentary and cannot
 infer more than names and calls; so a variable name does not give enough information to infer its
-type, only a constructor call unambiguosly gives this information without more in-depth parsing that
-includes following imports and more.
+type, only a constructor call unambiguously gives this information without more in-depth parsing
+that includes following imports and more.
 """
 
 
@@ -386,7 +381,7 @@ async def MultiGet(  # noqa: F811
     Tuple[_P0, _P1],
     Tuple[_P0],
 ]:
-    """Yield a tuple of Get instances with the same subject/product type pairs all at once.
+    """Yield a tuple of Get instances all at once.
 
     The `yield`ed value `self.gets` is interpreted by the engine within
     `extern_generator_send()` in `native.py`. This class will yield a tuple of Get instances,

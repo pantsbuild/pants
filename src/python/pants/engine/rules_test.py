@@ -56,12 +56,12 @@ class RuleVisitorTest(unittest.TestCase):
         assert len(gets) == 1, f"Expected 1 Get expression, found {len(gets)}."
         return gets[0]
 
-    def test_single_get(self):
+    def test_single_get(self) -> None:
         get = self._parse_single_get("a = await Get[A](B, 42)", A=str, B=int)
         assert get.product_type == str
         assert get.subject_declared_type == int
 
-    def test_multiple_gets(self):
+    def test_multiple_gets(self) -> None:
         gets = self._parse_rule_gets(
             dedent(
                 """
@@ -84,14 +84,14 @@ class RuleVisitorTest(unittest.TestCase):
         assert get_c.product_type == bool
         assert get_c.subject_declared_type == str
 
-    def test_multiget_homogeneous(self):
+    def test_multiget_homogeneous(self) -> None:
         get = self._parse_single_get(
             "a = await MultiGet(Get[A](B(x)) for x in range(5))", A=str, B=int
         )
         assert get.product_type == str
         assert get.subject_declared_type == int
 
-    def test_multiget_heterogeneous(self):
+    def test_multiget_heterogeneous(self) -> None:
         gets = self._parse_rule_gets(
             "a = await MultiGet([Get[A](B, 42), Get[B](A('bob'))])", A=str, B=int
         )
@@ -105,11 +105,11 @@ class RuleVisitorTest(unittest.TestCase):
         assert get_b.product_type == int
         assert get_b.subject_declared_type == str
 
-    def test_get_no_index_call_no_subject_call_allowed(self):
+    def test_get_no_index_call_no_subject_call_allowed(self) -> None:
         gets = self._parse_rule_gets("get_type: type = Get")
         assert len(gets) == 0
 
-    def test_get_index_call_deprecated(self):
+    def test_get_index_call_deprecated(self) -> None:
         pytest.xfail(
             "This should fail until deprecations are switched on: "
             "https://github.com/pantsbuild/pants/issues/9899"
@@ -123,27 +123,27 @@ class RuleVisitorTest(unittest.TestCase):
         assert emitted_warning.category == DeprecationWarning
         assert str(emitted_warning.message).endswith("Use Get(A, ...) instead of Get[A](...).")
 
-    def test_valid_get_unresolvable_product_type(self):
+    def test_valid_get_unresolvable_product_type(self) -> None:
         with pytest.raises(KeyError):
             self._parse_rule_gets("Get[DNE](A(42))", A=int)
 
-    def test_valid_get_unresolvable_subject_declared_type(self):
+    def test_valid_get_unresolvable_subject_declared_type(self) -> None:
         with pytest.raises(KeyError):
             self._parse_rule_gets("Get[int](DNE, 'bob')")
 
-    def test_invalid_get_no_subject_args(self):
+    def test_invalid_get_no_subject_args(self) -> None:
         with pytest.raises(ValueError):
             self._parse_rule_gets("Get[A]()", A=int)
 
-    def test_invalid_get_too_many_subject_args(self):
+    def test_invalid_get_too_many_subject_args(self) -> None:
         with pytest.raises(ValueError):
             self._parse_rule_gets("Get[A](B, 'bob', 3)", A=int, B=str)
 
-    def test_invalid_get_invalid_subject_arg_no_constructor_call(self):
+    def test_invalid_get_invalid_subject_arg_no_constructor_call(self) -> None:
         with pytest.raises(ValueError):
             self._parse_rule_gets("Get[A]('bob')", A=int)
 
-    def test_invalid_get_invalid_product_type_not_a_type_name(self):
+    def test_invalid_get_invalid_product_type_not_a_type_name(self) -> None:
         with pytest.raises(ValueError):
             self._parse_rule_gets("Get[call()](A('bob'))", A=str)
 
