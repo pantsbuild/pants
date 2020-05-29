@@ -7,11 +7,8 @@ use std::thread::sleep;
 use std::time::Duration;
 use std::time::Instant;
 
-use bazel_protos;
 use futures01::{Future, Sink};
-use grpcio;
 use parking_lot::Mutex;
-use protobuf;
 
 ///
 /// A MockOperation to be used with MockExecution.

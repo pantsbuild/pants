@@ -1,6 +1,3 @@
-use log;
-use tempfile;
-
 use async_trait::async_trait;
 use boxfuture::{try_future, BoxFuture, Boxable};
 use fs::{self, GlobExpansionConjunction, GlobMatching, PathGlobs, StrictGlobMatching};

@@ -34,11 +34,9 @@ pub use crate::snapshot::{OneOffStoreFileByDigest, Snapshot, StoreFileByDigest};
 #[cfg(test)]
 mod snapshot_tests;
 
-use bazel_protos;
 use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
 use concrete_time::TimeSpan;
-use dirs;
 use fs::FileContent;
 use futures::compat::Future01CompatExt;
 use futures::future::{FutureExt, TryFutureExt};

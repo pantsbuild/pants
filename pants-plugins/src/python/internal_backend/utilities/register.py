@@ -2,39 +2,39 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from pathlib import Path
-from typing import Optional, cast
+from pathlib import Path, PurePath
+from typing import Callable, Dict, List, Optional, cast
+
+from packaging.version import Version
 
 from pants.backend.python.python_artifact import PythonArtifact
-from pants.backend.python.target_types import PythonLibrary
-from pants.backend.python.targets.python_library import PythonLibrary as PythonLibraryV1
-from pants.base.build_environment import get_buildroot
-from pants.base.exceptions import TargetDefinitionException
-from pants.build_graph.address import Address
-from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.engine.target import (
-    BoolField,
-    DescriptionField,
-    InvalidFieldException,
-    StringField,
-    StringSequenceField,
-    Target,
+from pants.backend.python.target_types import (
+    PythonLibrary,
+    PythonLibrarySources,
+    PythonProvidesField,
+    PythonSources,
 )
+from pants.backend.python.targets.python_library import PythonLibrary as PythonLibraryV1
+from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.engine.target import Target
+from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem import Subsystem
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.version import PANTS_SEMVER, VERSION
 
 
-def pants_setup_py(name, description, additional_classifiers=None, **kwargs):
-    """Creates the setup_py for a pants artifact.
+def pants_setup_py(
+    name: str, description: str, additional_classifiers: Optional[List[str]] = None, **kwargs
+) -> PythonArtifact:
+    """Creates the setup_py for a Pants artifact.
 
-    :param str name: The name of the package.
-    :param str description: A brief description of what the package provides.
-    :param list additional_classifiers: Any additional trove classifiers that apply to the package,
+    :param name: The name of the package.
+    :param description: A brief description of what the package provides.
+    :param additional_classifiers: Any additional trove classifiers that apply to the package,
                                         see: https://pypi.org/pypi?%3Aaction=list_classifiers
     :param kwargs: Any additional keyword arguments to be passed to `setuptools.setup
                    <https://pythonhosted.org/setuptools/setuptools.html>`_.
-    :returns: A setup_py suitable for building and publishing pants components.
+    :returns: A setup_py suitable for building and publishing Pants components.
     """
     if not name.startswith("pantsbuild.pants"):
         raise ValueError(
@@ -75,29 +75,79 @@ def pants_setup_py(name, description, additional_classifiers=None, **kwargs):
     )
 
 
-def contrib_setup_py(name, description, additional_classifiers=None, **kwargs):
-    """Creates the setup_py for a pants contrib plugin artifact.
+def contrib_setup_py_context_aware_object_factory(parse_context) -> Callable:
+    def contrib_setup_py(
+        name: str,
+        description: str,
+        build_file_aliases: bool = False,
+        global_subsystems: bool = False,
+        register_goals: bool = False,
+        rules: bool = False,
+        target_types: bool = False,
+        additional_classifiers: Optional[List[str]] = None,
+        **kwargs,
+    ) -> PythonArtifact:
+        """Creates the setup_py for a pants contrib plugin artifact.
 
-    :param str name: The name of the package; must start with 'pantsbuild.pants.contrib.'.
-    :param str description: A brief description of what the plugin provides.
-    :param list additional_classifiers: Any additional trove classifiers that apply to the plugin,
-                                        see: https://pypi.org/pypi?%3Aaction=list_classifiers
-    :param kwargs: Any additional keyword arguments to be passed to `setuptools.setup
-                   <https://pythonhosted.org/setuptools/setuptools.html>`_.
-    :returns: A setup_py suitable for building and publishing pants components.
-    """
-    if not name.startswith("pantsbuild.pants.contrib."):
-        raise ValueError(
-            f"Contrib plugin package names must start with 'pantsbuild.pants.contrib.', given {name}"
+        :param name: The name of the package; must start with 'pantsbuild.pants.contrib.'.
+        :param description: A brief description of what the plugin provides.
+        :param additional_classifiers: Any additional trove classifiers that apply to the plugin,
+                                       see: https://pypi.org/pypi?%3Aaction=list_classifiers
+        :param build_file_aliases: If `True`, register.py:build_file_aliases must be defined and
+                                   registers the 'build_file_aliases' 'pantsbuild.plugin' entrypoint.
+        :param global_subsystems: If `True`, register.py:global_subsystems must be defined and
+                                  registers the 'global_subsystems' 'pantsbuild.plugin' entrypoint.
+        :param register_goals: If `True`, register.py:register_goals must be defined and
+                               registers the 'register_goals' 'pantsbuild.plugin' entrypoint.
+        :param rules: If `True`, register.py:rules must be defined and registers the 'rules'
+                      'pantsbuild.plugin' entrypoint.
+        :param target_types: If `True`, register.py:target_types must be defined and registers
+                             the 'target_types' 'pantsbuild.plugin' entrypoint.
+        :param kwargs: Any additional keyword arguments to be passed to `setuptools.setup
+                       <https://pythonhosted.org/setuptools/setuptools.html>`_.
+        :returns: A setup_py suitable for building and publishing Pants components.
+        """
+        if not name.startswith("pantsbuild.pants.contrib."):
+            raise ValueError(
+                f"Contrib plugin package names must start with 'pantsbuild.pants.contrib.', given {name}"
+            )
+
+        setup_py = pants_setup_py(
+            name,
+            description,
+            additional_classifiers=additional_classifiers,
+            namespace_packages=["pants", "pants.contrib"],
+            **kwargs,
         )
 
-    return pants_setup_py(
-        name,
-        description,
-        additional_classifiers=additional_classifiers,
-        namespace_packages=["pants", "pants.contrib"],
-        **kwargs,
-    )
+        if build_file_aliases or register_goals or global_subsystems or rules or target_types:
+            rel_path = parse_context.rel_path
+            source_root = (
+                SourceRootConfig.global_instance().get_source_roots().strict_find_by_path(rel_path)
+            )
+            module = (
+                PurePath(rel_path)
+                .relative_to(source_root.path)
+                .as_posix()
+                .replace(os.path.sep, ".")
+            )
+            entry_points = []
+            if build_file_aliases:
+                entry_points.append(f"build_file_aliases = {module}.register:build_file_aliases")
+            if register_goals:
+                entry_points.append(f"register_goals = {module}.register:register_goals")
+            if global_subsystems:
+                entry_points.append(f"global_subsystems = {module}.register:global_subsystems")
+            if rules:
+                entry_points.append(f"rules = {module}.register:rules")
+            if target_types:
+                entry_points.append(f"target_types = {module}.register:target_types")
+
+            setup_py.setup_py_keywords["entry_points"] = {"pantsbuild.plugin": entry_points}
+
+        return setup_py
+
+    return contrib_setup_py
 
 
 class PantsReleases(Subsystem):
@@ -115,11 +165,11 @@ class PantsReleases(Subsystem):
         )
 
     @property
-    def _branch_notes(self):
-        return self.get_options().branch_notes
+    def _branch_notes(self) -> Dict[str, str]:
+        return cast(Dict[str, str], self.options.branch_notes)
 
     @classmethod
-    def _branch_name(cls, version) -> str:
+    def _branch_name(cls, version: Version) -> str:
         """Defines a mapping between versions and branches.
 
         All releases, including dev releases, map to a particular branch page.
@@ -130,12 +180,8 @@ class PantsReleases(Subsystem):
             raise ValueError(f"Unparseable pants version number: {version}")
         return "{}.{}.x".format(*components[:2])
 
-    def notes_for_version(self, version) -> str:
-        """Given the parsed Version of pants, return its release notes.
-
-        TODO: This method should parse out the specific version from the resulting file:
-          see https://github.com/pantsbuild/pants/issues/1708
-        """
+    def notes_for_version(self, version: Version) -> str:
+        """Given the parsed Version of pants, return its release notes."""
         branch_name = self._branch_name(version)
         branch_notes_file = self._branch_notes.get(branch_name, None)
         if branch_notes_file is None:
@@ -146,194 +192,28 @@ class PantsReleases(Subsystem):
         return Path(branch_notes_file).read_text()
 
 
-class PantsPluginV1(PythonLibraryV1):
-    """A pants plugin published by pantsbuild."""
-
-    @classmethod
-    def create_setup_py(cls, name, description, additional_classifiers=None):
-        return pants_setup_py(
-            name,
-            description,
-            additional_classifiers=additional_classifiers,
-            namespace_packages=["pants", "pants.backend"],
-        )
-
-    def __init__(
-        self,
-        address=None,
-        payload=None,
-        distribution_name=None,
-        description=None,
-        additional_classifiers=None,
-        build_file_aliases=False,
-        global_subsystems=False,
-        register_goals=False,
-        rules=False,
-        target_types=False,
-        **kwargs,
-    ):
-        """
-        :param str distribution_name: The name of the plugin package; must start with
-                                      'pantsbuild.pants.'.
-        :param str description: A brief description of what the plugin provides.
-        :param list additional_classifiers: Any additional trove classifiers that apply to the plugin,
-                                            see: https://pypi.org/pypi?%3Aaction=list_classifiers
-        :param bool build_file_aliases: If `True`, register.py:build_file_aliases must be defined and
-                                        registers the 'build_file_aliases' 'pantsbuild.plugin'
-                                        entrypoint.
-        :param bool global_subsystems: If `True`, register.py:global_subsystems must be defined and
-                                       registers the 'global_subsystems' 'pantsbuild.plugin' entrypoint.
-        :param bool register_goals: If `True`, register.py:register_goals must be defined and
-                                    registers the 'register_goals' 'pantsbuild.plugin' entrypoint.
-        :param bool rules: If `True`, register.py:rules must be defined and registers the 'rules'
-                           'pantsbuild.plugin' entrypoint.
-        :param bool target_types: If `True`, register.py:target_types must be defined and registers
-                                  the 'target_types' 'pantsbuild.plugin' entrypoint.
-        """
-        if not distribution_name.startswith("pantsbuild.pants."):
-            raise ValueError(
-                "Pants plugin package distribution names must start with 'pantsbuild.pants.', given "
-                f"{distribution_name}"
-            )
-
-        if not os.path.exists(os.path.join(get_buildroot(), address.spec_path, "register.py")):
-            raise TargetDefinitionException(
-                address.spec_path,
-                "A PantsPlugin target must have a register.py file in the same directory.",
-            )
-
-        setup_py = self.create_setup_py(
-            distribution_name, description, additional_classifiers=additional_classifiers
-        )
-
-        super().__init__(address, payload, provides=setup_py, **kwargs)
-
-        if build_file_aliases or register_goals or global_subsystems or rules or target_types:
-            module = os.path.relpath(address.spec_path, self.target_base).replace(os.sep, ".")
-            entry_points = []
-            if build_file_aliases:
-                entry_points.append(f"build_file_aliases = {module}.register:build_file_aliases")
-            if register_goals:
-                entry_points.append(f"register_goals = {module}.register:register_goals")
-            if global_subsystems:
-                entry_points.append(f"global_subsystems = {module}.register:global_subsystems")
-            if rules:
-                entry_points.append(f"rules = {module}.register:rules")
-            if target_types:
-                entry_points.append(f"target_types = {module}.register:target_types")
-
-            setup_py.setup_py_keywords["entry_points"] = {"pantsbuild.plugin": entry_points}
-            self.mark_invalidation_hash_dirty()  # To pickup the PythonArtifact (setup_py) changes.
+class ContribPluginV1(PythonLibraryV1):
+    pass
 
 
-class ContribPluginV1(PantsPluginV1):
-    """A contributed pants plugin published by pantsbuild."""
-
-    @classmethod
-    def create_setup_py(cls, name, description, additional_classifiers=None):
-        return contrib_setup_py(name, description, additional_classifiers=additional_classifiers)
+class ContribPluginSources(PythonSources):
+    default = ("register.py",)
 
 
-class PantsPluginDistributionName(StringField):
-    """The name of the plugin package.
-
-    This must start with 'pantsbuild.pants.'.
-    """
-
-    alias = "distribution_name"
+class ContribPluginProvidesField(PythonProvidesField):
     required = True
-    value: str
-
-    @classmethod
-    def compute_value(cls, raw_value: Optional[str], *, address: Address) -> str:
-        value = cast(str, super().compute_value(raw_value, address=address))
-        if not value.startswith("pantsbuild.pants."):
-            raise InvalidFieldException(
-                f"The {repr(cls.alias)} in target {address} must start with `pantsbuild.pants`, "
-                f"but was {value}."
-            )
-        return value
-
-
-class PantsPluginDescription(DescriptionField):
-    """A brief description of what the plugin provides."""
-
-    alias = "description"
-    required = True
-    value: str
-
-
-class PantsPluginAdditionalClassifiers(StringSequenceField):
-    """Any additional trove classifiers that apply to the plugin.
-
-    See: https://pypi.org/pypi?%3Aaction=list_classifiers.
-    """
-
-    alias = "additional_classifiers"
-
-
-class PantsPluginBuildFileAliasesToggle(BoolField):
-    """If `True`, register.py:build_file_aliases must be defined and registers the
-    'build_file_aliases' 'pantsbuild.plugin' entrypoint."""
-
-    alias = "build_file_aliases"
-    default = False
-
-
-class PantsGlobalSubsystemsToggle(BoolField):
-    """If `True`, register.py:global_subsystems must be defined and registers the
-    'global_subsystems' 'pantsbuild.plugin' entrypoint."""
-
-    alias = "global_subsystems"
-    default = False
-
-
-class PantsRegisterGoalsToggle(BoolField):
-    """If `True`, register.py:register_goals must be defined and registers the 'register_goals'
-    'pantsbuild.plugin' entrypoint."""
-
-    alias = "register_goals"
-    default = False
-
-
-class PantsRulesToggle(BoolField):
-    """If `True`, register.py:rules must be defined and registers the 'rules' 'pantsbuild.plugin'
-    entrypoint."""
-
-    alias = "rules"
-    default = False
-
-
-class PantsTargetTypesToggle(BoolField):
-    """If `True`, register.py:target_types must be defined and registers the 'target_types'
-    'pantsbuild.plugin' entrypoint."""
-
-    alias = "target_types"
-    default = False
-
-
-class PantsPlugin(Target):
-    """A Pants plugin published by pantsbuild."""
-
-    alias = "pants_plugin"
-    core_fields = (
-        *(FrozenOrderedSet(PythonLibrary.core_fields) - {DescriptionField}),  # type: ignore[misc]
-        PantsPluginDistributionName,
-        PantsPluginDescription,
-        PantsPluginAdditionalClassifiers,
-        PantsPluginBuildFileAliasesToggle,
-        PantsGlobalSubsystemsToggle,
-        PantsRegisterGoalsToggle,
-        PantsRulesToggle,
-        PantsTargetTypesToggle,
-    )
 
 
 class ContribPlugin(Target):
-    """A contributed Pants plugin published by pantsbuild."""
-
     alias = "contrib_plugin"
-    core_fields = PantsPlugin.core_fields
+    core_fields = (
+        *(
+            FrozenOrderedSet(PythonLibrary.core_fields)  # type: ignore[misc]
+            - {PythonLibrarySources, PythonProvidesField}
+        ),
+        ContribPluginSources,
+        ContribPluginProvidesField,
+    )
 
 
 def global_subsystems():
@@ -342,10 +222,13 @@ def global_subsystems():
 
 def build_file_aliases():
     return BuildFileAliases(
-        objects={"pants_setup_py": pants_setup_py, "contrib_setup_py": contrib_setup_py},
-        targets={"pants_plugin": PantsPluginV1, "contrib_plugin": ContribPluginV1},
+        context_aware_object_factories={
+            "contrib_setup_py": contrib_setup_py_context_aware_object_factory
+        },
+        objects={"pants_setup_py": pants_setup_py},
+        targets={"contrib_plugin": ContribPluginV1},
     )
 
 
 def target_types():
-    return [PantsPlugin, ContribPlugin]
+    return [ContribPlugin]

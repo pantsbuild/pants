@@ -8,8 +8,10 @@ contrib_plugin(
     'src/python/pants/build_graph',
     'src/python/pants/goal:task_registrar',
   ],
-  distribution_name='pantsbuild.pants.contrib.codeanalysis',
-  description='Support for various code analysis tools in Pants.',
-  register_goals=True,
+  provides=contrib_setup_py(
+    name='pantsbuild.pants.contrib.codeanalysis',
+    description='Support for various code analysis tools in Pants.',
+    register_goals=True,
+  ),
   tags = {"partially_type_checked"},
 )

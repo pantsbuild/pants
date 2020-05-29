@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+from typing import cast
 
 from pex.pex_info import PexInfo
 
@@ -34,7 +35,7 @@ class PythonBinary(PythonTarget):
 
         @classmethod
         def register_options(cls, register):
-            super(PythonBinary.Defaults, cls).register_options(register)
+            super().register_options(register)
             register(
                 "--pex-emit-warnings",
                 advanced=True,
@@ -45,6 +46,10 @@ class PythonBinary(PythonTarget):
                 "Can be over-ridden by specifying the `emit_warnings` parameter of individual "
                 "`{}` targets".format(PythonBinary.alias()),
             )
+
+        @property
+        def pex_emit_warnings(self) -> bool:
+            return cast(bool, self.options.pex_emit_warnings)
 
         @classmethod
         def should_emit_warnings(cls, override=None):
