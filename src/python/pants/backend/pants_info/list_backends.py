@@ -6,13 +6,14 @@ import textwrap
 from dataclasses import dataclass
 from typing import Optional, Sequence
 
+from pants.core.util_rules.strip_source_roots import SourceRootStrippedSources, StripSnapshotRequest
 from pants.engine.console import Console
 from pants.engine.fs import Digest, FileContent, FilesContent, PathGlobs, Snapshot
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get
 from pants.option.global_options import GlobalOptions
-from pants.source.source_root import SourceRootConfig, SourceRoots
+from pants.source.source_root import NoSourceRootError
 
 
 class BackendsOptions(LineOriented, GoalSubsystem):
@@ -73,10 +74,8 @@ class BackendInfo:
 
     @classmethod
     def create(
-        cls, file_content: FileContent, source_roots: SourceRoots, global_options: GlobalOptions
+        cls, file_content: FileContent, stripped_path: str, global_options: GlobalOptions
     ) -> "BackendInfo":
-        source_root = source_roots.strict_find_by_path(file_content.path)
-        stripped_path = file_content.path[len(source_root.path) + 1 :]
         module_name = os.path.dirname(stripped_path).replace(os.sep, ".")
 
         # NB: Both `build_file_aliases` and `target_types` are used by both V1 and V2.
@@ -162,17 +161,26 @@ def format_section(
 
 @goal_rule
 async def list_backends(
-    backend_options: BackendsOptions,
-    source_roots_config: SourceRootConfig,
-    global_options: GlobalOptions,
-    console: Console,
+    backend_options: BackendsOptions, global_options: GlobalOptions, console: Console,
 ) -> Backends:
-    source_roots = source_roots_config.get_source_roots()
     discovered_register_pys = await Get[Snapshot](PathGlobs(["**/*/register.py"]))
     register_pys_content = await Get[FilesContent](Digest, discovered_register_pys.digest)
 
+    source_root_stripped_sources = await Get[SourceRootStrippedSources](
+        StripSnapshotRequest(snapshot=discovered_register_pys)
+    )
+    file_to_stripped_file_mapping = source_root_stripped_sources.get_file_to_stripped_file_mapping()
+    stripped_paths = []
+    for fc in register_pys_content:
+        stripped_path = file_to_stripped_file_mapping.get(fc.path)
+        if stripped_path is None:
+            # This should never happen, but it's worth checking proactively.
+            raise NoSourceRootError(fc.path)
+        stripped_paths.append(stripped_path)
+
     backend_infos = tuple(
-        BackendInfo.create(fc, source_roots, global_options) for fc in register_pys_content
+        BackendInfo.create(fc, stripped_path, global_options)
+        for fc, stripped_path in zip(register_pys_content, stripped_paths)
     )
     v1_backends = []
     v2_backends = []

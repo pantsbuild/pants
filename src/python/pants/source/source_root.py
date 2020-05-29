@@ -9,6 +9,7 @@ from typing import Dict, Iterable, Optional, Sequence, Set, Tuple
 
 from pants.base.deprecated import deprecated_conditional
 from pants.engine.collection import Collection
+from pants.engine.rules import RootRule, SubsystemRule, rule
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method
 
@@ -20,44 +21,51 @@ class SourceRoot:
     path: str  # Relative path from the repo root.
 
 
-class InvalidSourceRootPatternError(Exception):
+class SourceRootError(Exception):
+    """An error related to SourceRoot computation."""
+
+    def __init__(self, msg: str):
+        super().__init__(
+            f"{msg}See https://pants.readme.io/docs/source-roots for how to define "
+            f"source roots."
+        )
+
+
+class InvalidSourceRootPatternError(SourceRootError):
     """Indicates an invalid pattern was provided."""
 
 
-class NoSourceRootError(Exception):
+class NoSourceRootError(SourceRootError):
     """Indicates we failed to map a source file to a source root."""
+
+    def __init__(self, path: str, extra_msg: str = ""):
+        super().__init__(f"No source root found for `{path}`. {extra_msg}")
 
 
 class AllSourceRoots(Collection[SourceRoot]):
     pass
 
 
-class SourceRootPatternMatcher:
-    # We perform pattern matching against absolute paths, where "/" represents the repo root.
-    _repo_root = PurePath(os.path.sep)
+# We perform pattern matching against absolute paths, where "/" represents the repo root.
+_repo_root = PurePath(os.path.sep)
 
-    def __init__(self, root_patterns: Iterable[str]) -> None:
-        for root_pattern in root_patterns:
+
+@dataclass(frozen=True)
+class SourceRootPatternMatcher:
+    root_patterns: Tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        for root_pattern in self.root_patterns:
             if ".." in root_pattern.split(os.path.sep):
                 raise InvalidSourceRootPatternError(
-                    f".. disallowed in source root pattern: {root_pattern}"
+                    f"`..` disallowed in source root pattern: {root_pattern}. "
                 )
-        self._root_patterns = list(root_patterns)
 
     def get_patterns(self) -> Tuple[str, ...]:
-        return tuple(self._root_patterns)
-
-    def add_source_root(self, path):
-        """Add the specified fixed source root, which must be relative to the buildroot.
-
-        Useful in a limited set of circumstances, e.g., when unpacking sources from a jar with
-        unknown structure.  Tests should prefer to use dirs that match our source root patterns
-        instead of explicitly setting source roots here.
-        """
-        self._root_patterns.append(str(self._repo_root / path))
+        return tuple(self.root_patterns)
 
     def _match_root_patterns(self, putative_root: PurePath) -> bool:
-        for pattern in self._root_patterns:
+        for pattern in self.root_patterns:
             if putative_root.match(pattern):
                 return True
         return False
@@ -67,14 +75,17 @@ class SourceRootPatternMatcher:
         # Note: This is currently O(n) where n is the number of patterns, which
         # we expect to be small.  We can optimize if it becomes necessary.
         if ".." in relpath.split(os.path.sep):
-            raise NoSourceRootError(f".. disallowed in source root searches: {relpath}")
-        putative_root = self._repo_root / relpath
-        while putative_root != self._repo_root:
+            raise NoSourceRootError(relpath, "`..` disallowed in source root searches. ")
+        putative_root = _repo_root / relpath
+        # TODO: Once we get rid of the trie, and all source root computation goes through this
+        #  logic, we may want to delegate the check of each putative root to a rule, so that
+        #  results are memoized on each ancestor instead of just on the original path.
+        while putative_root != _repo_root:
             if self._match_root_patterns(putative_root):
-                return putative_root.relative_to(self._repo_root)
+                return putative_root.relative_to(_repo_root)
             putative_root = putative_root.parent
         if self._match_root_patterns(putative_root):
-            return putative_root.relative_to(self._repo_root)
+            return putative_root.relative_to(_repo_root)
         return None
 
 
@@ -93,7 +104,7 @@ class SourceRoots:
 
         Non-test code should not instantiate directly. See SourceRootConfig.get_source_roots().
         """
-        self._pattern_matcher = SourceRootPatternMatcher(root_patterns)
+        self._pattern_matcher = SourceRootPatternMatcher(tuple(root_patterns))
         # TODO: In 1.30.0.dev0 remove the trie entirely.
         self._trie = None if self._pattern_matcher.get_patterns() else source_root_config.create_trie()  # type: ignore[union-attr]
         self._fail_if_unmatched = fail_if_unmatched
@@ -108,7 +119,9 @@ class SourceRoots:
         unknown structure.  Tests should prefer to use dirs that match our source root patterns
         instead of explicitly setting source roots here.
         """
-        self._pattern_matcher.add_source_root(path)
+        self._pattern_matcher = SourceRootPatternMatcher(
+            (*self._pattern_matcher.root_patterns, path)
+        )
 
     def strict_find_by_path(self, path: str) -> SourceRoot:
         """Find the source root for the given path.
@@ -122,10 +135,7 @@ class SourceRoots:
             matched = self._trie.find(path)
             if matched:
                 return matched
-        raise NoSourceRootError(
-            f"Could not find a source root for `{path}`. See "
-            f"https://pants.readme.io/docs/source-roots for how to define source roots."
-        )
+        raise NoSourceRootError(path)
 
     def find_by_path(self, path: str) -> Optional[SourceRoot]:
         """Find the source root for the given path, or None.
@@ -317,7 +327,7 @@ class SourceRootConfig(Subsystem):
         )
 
     @memoized_method
-    def get_source_roots(self):
+    def get_source_roots(self) -> SourceRoots:
         return SourceRoots(self.options.root_patterns, self.options.unmatched == "fail", self)
 
     def create_trie(self) -> "SourceRootTrie":
@@ -474,3 +484,53 @@ class SourceRootTrie:
                 return SourceRoot(path)
             # Otherwise, try the next value of i.
         return None
+
+
+@dataclass(frozen=True)
+class SourceRootRequest:
+    """Find the source root for the given path."""
+
+    path: str
+
+    @classmethod
+    def for_file(cls, file_path: str) -> "SourceRootRequest":
+        """Create a request for the source root for the given file."""
+        # The file itself cannot be a source root, so we may as well start the search
+        # from its enclosing directory, and save on some superfluous checking.
+        return cls(str(PurePath(file_path).parent))
+
+
+@dataclass(frozen=True)
+class OptionalSourceRoot:
+    source_root: Optional[SourceRoot]
+
+
+@rule
+def get_source_root(
+    source_root_request: SourceRootRequest, source_root_config: SourceRootConfig
+) -> OptionalSourceRoot:
+    """Rule to request a SourceRoot that may not exist."""
+    return OptionalSourceRoot(
+        source_root_config.get_source_roots().find_by_path(source_root_request.path)
+    )
+
+
+@rule
+def get_source_root_strict(
+    source_root_request: SourceRootRequest, source_root_config: SourceRootConfig
+) -> SourceRoot:
+    """Convenience rule to allow callers to request a SourceRoot directly.
+
+    That way callers don't have to unpack an OptionalSourceRoot if they know they expect a
+    SourceRoot to exist and are willing to error if it doesn't.
+    """
+    return source_root_config.get_source_roots().strict_find_by_path(source_root_request.path)
+
+
+def rules():
+    return [
+        get_source_root,
+        get_source_root_strict,
+        SubsystemRule(SourceRootConfig),
+        RootRule(SourceRootRequest),
+    ]
