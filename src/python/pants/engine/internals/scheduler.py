@@ -231,10 +231,10 @@ class Scheduler:
             if union.is_instance(the_get.subject_declared_type):
                 # If the registered subject type is a union, add Get edges to all registered union members.
                 for union_member in union_rules.get(the_get.subject_declared_type, []):
-                    add_get_edge(the_get.product, union_member)
+                    add_get_edge(the_get.product_type, union_member)
             else:
                 # Otherwise, the Get subject is a "concrete" type, so add a single Get edge.
-                add_get_edge(the_get.product, the_get.subject_declared_type)
+                add_get_edge(the_get.product_type, the_get.subject_declared_type)
 
         self._native.lib.tasks_task_end(tasks)
 

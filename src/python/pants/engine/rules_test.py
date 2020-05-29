@@ -1,12 +1,16 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import ast
 import re
 import unittest
+import warnings
 from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent
 from typing import Callable, List, Optional, Tuple, Type, Union, get_type_hints
+
+import pytest
 
 from pants.engine.console import Console
 from pants.engine.fs import create_fs_rules
@@ -20,11 +24,12 @@ from pants.engine.rules import (
     RootRule,
     RuleIndex,
     UnrecognizedRuleArgument,
+    _RuleVisitor,
     goal_rule,
     named_rule,
     rule,
 )
-from pants.engine.selectors import Get
+from pants.engine.selectors import Get, GetConstraints
 from pants.testutil.engine.util import (
     TARGET_TABLE,
     MockGet,
@@ -36,6 +41,111 @@ from pants.testutil.engine.util import (
 )
 from pants.testutil.test_base import TestBase
 from pants.util.enums import match
+
+
+class RuleVisitorTest(unittest.TestCase):
+    @staticmethod
+    def _parse_rule_gets(rule_text: str, **types: Type) -> List[GetConstraints]:
+        rule_visitor = _RuleVisitor(resolve_type=lambda name: types[name])
+        rule_visitor.visit(ast.parse(rule_text))
+        return rule_visitor.gets
+
+    @classmethod
+    def _parse_single_get(cls, rule_text: str, **types) -> GetConstraints:
+        gets = cls._parse_rule_gets(rule_text, **types)
+        assert len(gets) == 1, f"Expected 1 Get expression, found {len(gets)}."
+        return gets[0]
+
+    def test_single_get(self):
+        get = self._parse_single_get("a = await Get[A](B, 42)", A=str, B=int)
+        assert get.product_type == str
+        assert get.subject_declared_type == int
+
+    def test_multiple_gets(self):
+        gets = self._parse_rule_gets(
+            dedent(
+                """
+                a = await Get[A](B, 42)
+                if len(a) > 1:
+                    c = await Get[C](A("bob"))
+                """
+            ),
+            A=str,
+            B=int,
+            C=bool,
+        )
+
+        assert len(gets) == 2
+        get_a, get_c = gets
+
+        assert get_a.product_type == str
+        assert get_a.subject_declared_type == int
+
+        assert get_c.product_type == bool
+        assert get_c.subject_declared_type == str
+
+    def test_multiget_homogeneous(self):
+        get = self._parse_single_get(
+            "a = await MultiGet(Get[A](B(x)) for x in range(5))", A=str, B=int
+        )
+        assert get.product_type == str
+        assert get.subject_declared_type == int
+
+    def test_multiget_heterogeneous(self):
+        gets = self._parse_rule_gets(
+            "a = await MultiGet([Get[A](B, 42), Get[B](A('bob'))])", A=str, B=int
+        )
+
+        assert len(gets) == 2
+        get_a, get_b = gets
+
+        assert get_a.product_type == str
+        assert get_a.subject_declared_type == int
+
+        assert get_b.product_type == int
+        assert get_b.subject_declared_type == str
+
+    def test_get_no_index_call_no_subject_call_allowed(self):
+        gets = self._parse_rule_gets("get_type: type = Get")
+        assert len(gets) == 0
+
+    def test_get_index_call_deprecated(self):
+        pytest.xfail(
+            "This should fail until deprecations are switched on: "
+            "https://github.com/pantsbuild/pants/issues/9899"
+        )
+        with warnings.catch_warnings(record=True) as emitted_warnings:
+            self._parse_rule_gets("Get[A](B('bob'))", A=int, B=str)
+
+        assert len(emitted_warnings) == 1
+        emitted_warning = emitted_warnings[0]
+
+        assert emitted_warning.category == DeprecationWarning
+        assert str(emitted_warning.message).endswith("Use Get(A, ...) instead of Get[A](...).")
+
+    def test_valid_get_unresolvable_product_type(self):
+        with pytest.raises(KeyError):
+            self._parse_rule_gets("Get[DNE](A(42))", A=int)
+
+    def test_valid_get_unresolvable_subject_declared_type(self):
+        with pytest.raises(KeyError):
+            self._parse_rule_gets("Get[int](DNE, 'bob')")
+
+    def test_invalid_get_no_subject_args(self):
+        with pytest.raises(ValueError):
+            self._parse_rule_gets("Get[A]()", A=int)
+
+    def test_invalid_get_too_many_subject_args(self):
+        with pytest.raises(ValueError):
+            self._parse_rule_gets("Get[A](B, 'bob', 3)", A=int, B=str)
+
+    def test_invalid_get_invalid_subject_arg_no_constructor_call(self):
+        with pytest.raises(ValueError):
+            self._parse_rule_gets("Get[A]('bob')", A=int)
+
+    def test_invalid_get_invalid_product_type_not_a_type_name(self):
+        with pytest.raises(ValueError):
+            self._parse_rule_gets("Get[call()](A('bob'))", A=str)
 
 
 def fmt_graph_rule(rule: Callable, *, gets: Optional[List[Tuple[str, str]]] = None) -> str:
@@ -224,9 +334,6 @@ class SubA(A):
 
 
 _suba_root_rules = [RootRule(SubA)]
-
-
-_this_is_not_a_type = 3
 
 
 class ExampleOptions(GoalSubsystem):
@@ -1176,29 +1283,6 @@ class RuleGraphTest(TestBase):
             ).strip(),
             subgraph,
         )
-
-    def test_invalid_get_arguments(self):
-        with self.assertRaisesWithMessage(
-            ValueError,
-            "Could not resolve type `XXX` in top level of module pants.engine.rules_test",
-        ):
-
-            class XXX:
-                pass
-
-            @rule
-            async def f() -> A:
-                return await Get[A](XXX, 3)
-
-        # This fails because the argument is defined in this file's module, but it is not a type.
-        with self.assertRaisesWithMessage(
-            ValueError,
-            "Expected a `type` constructor for `_this_is_not_a_type`, but got: 3 (type `int`)",
-        ):
-
-            @rule
-            async def g() -> A:
-                return await Get(A, _this_is_not_a_type, 3)
 
     def create_full_graph(self, rules, validate=True):
         scheduler = create_scheduler(rules, validate=validate)

@@ -7,7 +7,7 @@ import re
 from abc import ABC, ABCMeta, abstractmethod
 from typing import Optional, Type
 
-from pants.engine.selectors import Get
+from pants.engine.selectors import Get, GetConstraints
 from pants.option.errors import OptionsError
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo
 from pants.util.meta import classproperty
@@ -16,7 +16,7 @@ from pants.util.objects import get_docstring_summary
 
 async def _construct_optionable(optionable_factory):
     scope = optionable_factory.options_scope
-    scoped_options = await Get(ScopedOptions, Scope(str(scope)))
+    scoped_options = await Get[ScopedOptions](Scope(str(scope)))
     return optionable_factory.optionable_cls(scope, scoped_options.options)
 
 
@@ -45,9 +45,9 @@ class OptionableFactory(ABC):
         """
         partial_construct_optionable = functools.partial(_construct_optionable, cls)
 
-        # NB: We must populate several dunder methods on the partial function because partial functions
-        # do not have these defined by default and the engine uses these values to visualize functions
-        # in error messages and the rule graph.
+        # NB: We must populate several dunder methods on the partial function because partial
+        # functions do not have these defined by default and the engine uses these values to
+        # visualize functions in error messages and the rule graph.
         snake_scope = cls.options_scope.replace("-", "_")
         partial_construct_optionable.__name__ = f"construct_scope_{snake_scope}"
         partial_construct_optionable.__module__ = cls.__module__
@@ -56,9 +56,9 @@ class OptionableFactory(ABC):
 
         return dict(
             output_type=cls.optionable_cls,
-            input_selectors=tuple(),
+            input_selectors=(),
             func=partial_construct_optionable,
-            input_gets=(Get.create_statically_for_rule_graph(ScopedOptions, Scope),),
+            input_gets=(GetConstraints(product_type=ScopedOptions, subject_declared_type=Scope),),
             dependency_optionables=(cls.optionable_cls,),
         )
 

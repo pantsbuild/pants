@@ -5,15 +5,15 @@ import ast
 import inspect
 import itertools
 import sys
-import typing
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional, Tuple, Type, get_type_hints
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Type, Union, get_type_hints
 
+from pants.base.deprecated import deprecated_conditional
 from pants.engine.goal import Goal
-from pants.engine.selectors import Get
+from pants.engine.selectors import GetConstraints
 from pants.engine.unions import UnionRule, union
-from pants.option.optionable import OptionableFactory
+from pants.option.optionable import Optionable, OptionableFactory
 from pants.util.collections import assert_single_element
 from pants.util.memo import memoized
 from pants.util.meta import decorated_type_checkable, frozen_after_init
@@ -39,33 +39,136 @@ def side_effecting(cls):
 class _RuleVisitor(ast.NodeVisitor):
     """Pull `Get` calls out of an @rule body."""
 
-    def __init__(self):
+    def __init__(
+        self, *, resolve_type: Callable[[str], Type[Any]], source_file: Optional[str] = None
+    ) -> None:
         super().__init__()
-        self._gets: List[Get] = []
+        self._source_file = source_file or "<string>"
+        self._resolve_type = resolve_type
+        self._gets: List[GetConstraints] = []
 
     @property
-    def gets(self) -> List[Get]:
+    def gets(self) -> List[GetConstraints]:
         return self._gets
 
-    def _matches_get_name(self, node: ast.AST) -> bool:
-        """Check if the node is a Name which matches 'Get'."""
-        return isinstance(node, ast.Name) and node.id == Get.__name__
+    @frozen_after_init
+    @dataclass(unsafe_hash=True)
+    class _GetDescriptor:
+        product_type_name: str
+        subject_arg_exprs: Tuple[ast.expr, ...]
 
-    def _is_get(self, node: ast.AST) -> bool:
-        """Check if the node looks like a Get(...) or Get[X](...) call."""
-        if isinstance(node, ast.Call):
-            if self._matches_get_name(node.func):
-                return True
-            if isinstance(node.func, ast.Subscript) and self._matches_get_name(node.func.value):
-                return True
-            return False
-        return False
+        def __init__(
+            self, product_type_expr: ast.expr, subject_arg_exprs: Iterable[ast.expr]
+        ) -> None:
+            if not isinstance(product_type_expr, ast.Name):
+                raise ValueError(
+                    f"Unrecognized type argument T for Get[T]: " f"{ast.dump(product_type_expr)}"
+                )
+            self.product_type_name = product_type_expr.id
+            self.subject_arg_exprs = tuple(subject_arg_exprs)
 
-    def visit_Call(self, node: ast.Call) -> None:
-        if self._is_get(node):
-            self._gets.append(Get.extract_constraints(node))
+    def _identify_source(self, node: Union[ast.expr, ast.stmt]) -> str:
+        start_pos = f"{node.lineno}:{node.col_offset}"
+
+        end_lineno, end_col_offset = [
+            getattr(node, attr, None) for attr in ("end_lineno", "end_col_offset")
+        ]
+        end_pos = f"-{end_lineno}:{end_col_offset}" if end_lineno and end_col_offset else ""
+
+        return f"{self._source_file} at {start_pos}{end_pos}"
+
+    def _extract_get_descriptor(self, call_node: ast.Call) -> Optional[_GetDescriptor]:
+        """Check if the node looks like a Get[T](...) call."""
+        if not isinstance(call_node.func, ast.Subscript):
+            if not isinstance(call_node.func, ast.Name):
+                return None
+            if call_node.func.id != "Get":
+                return None
+            return self._GetDescriptor(
+                product_type_expr=call_node.args[0], subject_arg_exprs=call_node.args[1:]
+            )
+
+        subscript_func = call_node.func
+        if not isinstance(subscript_func.slice, ast.Index):
+            return None
+        node_name = subscript_func.value
+        if not isinstance(node_name, ast.Name):
+            return None
+        if node_name.id != "Get":
+            return None
+
+        get_descriptor = self._GetDescriptor(
+            product_type_expr=subscript_func.slice.value, subject_arg_exprs=call_node.args
+        )
+
+        # TODO(John Sirois): Turn this on and update Pants own codebase to not trigger the warning
+        #  in a follow-up.
+        #  https://github.com/pantsbuild/pants/issues/9899
+        deprecated_conditional(
+            predicate=lambda: False,
+            removal_version="1.31.0.dev0",
+            entity_description="Parameterized Get[...](...) calls",
+            hint_message=(
+                f"In {self._identify_source(call_node)} Use "
+                f"Get({get_descriptor.product_type_name}, ...) instead of "
+                f"Get[{get_descriptor.product_type_name}](...)."
+            ),
+        )
+
+        return get_descriptor
+
+    def _extract_constraints(self, get_descriptor: _GetDescriptor) -> GetConstraints[Any, Any]:
+        """Parses a `Get[T](...)` call in one of its two legal forms to return its type constraints.
+
+        :param get_descriptor: An `ast.Call` node representing a call to `Get[T](...)`.
+        :return: A tuple of product type id and subject type id.
+        """
+
+        def render_args():
+            rendered_args = ", ".join(
+                # Dump the Name's id to simplify output when available, falling back to the name of
+                # the node's class.
+                getattr(subject_arg, "id", type(subject_arg).__name__)
+                for subject_arg in get_descriptor.subject_arg_exprs
+            )
+            return f"Get[{get_descriptor.product_type_name}]({rendered_args})"
+
+        if not 1 <= len(get_descriptor.subject_arg_exprs) <= 2:
+            raise ValueError(
+                f"Invalid Get. Expected either one or two args, but got: {render_args()}"
+            )
+
+        product_type = self._resolve_type(get_descriptor.product_type_name)
+
+        if len(get_descriptor.subject_arg_exprs) == 1:
+            subject_constructor = get_descriptor.subject_arg_exprs[0]
+            if not isinstance(subject_constructor, ast.Call):
+                raise ValueError(
+                    f"Expected Get[product_type](subject_type(subject)), but got: {render_args()}"
+                )
+            constructor_type_id = subject_constructor.func.id  # type: ignore[attr-defined]
+            return GetConstraints[Any, Any](
+                product_type=product_type,
+                subject_declared_type=self._resolve_type(constructor_type_id),
+            )
+
+        subject_declared_type, _ = get_descriptor.subject_arg_exprs
+        if not isinstance(subject_declared_type, ast.Name):
+            raise ValueError(
+                f"Expected Get[product_type](subject_declared_type, subject), but got: "
+                f"{render_args()}"
+            )
+        return GetConstraints[Any, Any](
+            product_type=product_type,
+            subject_declared_type=self._resolve_type(subject_declared_type.id),
+        )
+
+    def visit_Call(self, call_node: ast.Call) -> None:
+        get_descriptor = self._extract_get_descriptor(call_node)
+        if get_descriptor:
+            self._gets.append(self._extract_constraints(get_descriptor))
         # Ensure we descend into e.g. MultiGet(Get(...)...) calls.
-        self.generic_visit(node)
+        self.generic_visit(call_node)
 
 
 # NB: This violates Python naming conventions of using snake_case for functions. This is because
@@ -90,7 +193,7 @@ def _get_starting_indent(source):
 
 def _make_rule(
     return_type: Type,
-    parameter_types: typing.Iterable[Type],
+    parameter_types: Iterable[Type],
     *,
     cacheable: bool,
     annotations: RuleAnnotations,
@@ -122,6 +225,7 @@ def _make_rule(
 
         owning_module = sys.modules[func.__module__]
         source = inspect.getsource(func)
+        source_file = inspect.getsourcefile(func)
         beginning_indent = _get_starting_indent(source)
         if beginning_indent:
             source = "\n".join(line[beginning_indent:] for line in source.split("\n"))
@@ -133,12 +237,13 @@ def _make_rule(
             )
             if resolved is None:
                 raise ValueError(
-                    f"Could not resolve type `{name}` in top level of module {owning_module.__name__}"
+                    f"Could not resolve type `{name}` in top level of module "
+                    f"{owning_module.__name__} defined in {source_file}"
                 )
             elif not isinstance(resolved, type):
                 raise ValueError(
                     f"Expected a `type` constructor for `{name}`, but got: {resolved} (type "
-                    f"`{type(resolved).__name__}`)"
+                    f"`{type(resolved).__name__}`) in {source_file}"
                 )
             return resolved
 
@@ -154,13 +259,10 @@ def _make_rule(
             for child in ast.iter_child_nodes(parent):
                 parents_table[child] = parent
 
-        rule_visitor = _RuleVisitor()
+        rule_visitor = _RuleVisitor(source_file=source_file, resolve_type=resolve_type)
         rule_visitor.visit(rule_func_node)
 
-        gets = FrozenOrderedSet(
-            Get.create_statically_for_rule_graph(resolve_type(p), resolve_type(s))
-            for p, s in rule_visitor.gets
-        )
+        gets = FrozenOrderedSet(rule_visitor.gets)
 
         # Register dependencies for @goal_rule/Goal.
         dependency_rules = (SubsystemRule(return_type.subsystem_cls),) if is_goal_cls else None
@@ -180,9 +282,9 @@ def _make_rule(
 
         func.rule = TaskRule(
             return_type,
-            tuple(parameter_types),
+            parameter_types,
             func,
-            input_gets=tuple(gets),
+            input_gets=gets,
             dependency_rules=dependency_rules,
             cacheable=cacheable,
             annotations=normalized_annotations,
@@ -363,36 +465,36 @@ class TaskRule(Rule):
 
     _output_type: Type
     input_selectors: Tuple[Type, ...]
-    input_gets: Tuple
+    input_gets: Tuple[GetConstraints, ...]
     func: Callable
-    _dependency_rules: Tuple
-    _dependency_optionables: Tuple
+    _dependency_rules: Tuple["TaskRule", ...]
+    _dependency_optionables: Tuple[Type[Optionable], ...]
     cacheable: bool
     annotations: RuleAnnotations
 
     def __init__(
         self,
         output_type: Type,
-        input_selectors: Tuple[Type, ...],
+        input_selectors: Iterable[Type],
         func: Callable,
-        input_gets: Tuple,
-        dependency_rules: Optional[Tuple] = None,
-        dependency_optionables: Optional[Tuple] = None,
+        input_gets: Iterable[GetConstraints],
+        dependency_rules: Optional[Iterable["TaskRule"]] = None,
+        dependency_optionables: Optional[Iterable[Type[Optionable]]] = None,
         cacheable: bool = True,
         annotations: RuleAnnotations = DEFAULT_RULE_ANNOTATIONS,
     ):
         self._output_type = output_type
-        self.input_selectors = input_selectors
-        self.input_gets = input_gets
+        self.input_selectors = tuple(input_selectors)
+        self.input_gets = tuple(input_gets)
         self.func = func  # type: ignore[assignment] # cannot assign to a method
-        self._dependency_rules = dependency_rules or ()
-        self._dependency_optionables = dependency_optionables or ()
+        self._dependency_rules = tuple(dependency_rules or ())
+        self._dependency_optionables = tuple(dependency_optionables or ())
         self.cacheable = cacheable
         self.annotations = annotations
 
     def __str__(self):
         return "(name={}, {}, {!r}, {}, gets={}, opts={})".format(
-            self.name or "<not defined>",
+            getattr(self, "name", "<not defined>"),
             self.output_type.__name__,
             self.input_selectors,
             self.func.__name__,
