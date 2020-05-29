@@ -23,7 +23,6 @@ from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import HydratedSources, HydrateSourcesRequest
 from pants.engine.target import Sources as SourcesField
 from pants.source.source_root import SourceRoot, SourceRootRequest
-from pants.source.source_root import rules as source_root_rules
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
 
@@ -63,7 +62,8 @@ class StripSnapshotRequest:
     The call site may optionally give the field `representative_path` if it is confident that all
     the files in the snapshot will only have one source root. Using `representative_path` results in
     better performance because we only need to find the SourceRoot for a single file rather than
-    every file.
+    every file. The `representative_path` cannot be the source root path itself, it must be
+    some proper subpath of it.
     """
 
     snapshot: Snapshot
@@ -109,7 +109,8 @@ async def strip_source_roots_from_snapshot(
         return SourceRootStrippedSources(request.snapshot, FrozenDict())
 
     if request.representative_path is not None:
-        source_root_obj = await Get[SourceRoot](SourceRootRequest(request.representative_path))
+        source_root_obj = await Get[SourceRoot](SourceRootRequest.for_file(
+            request.representative_path))
         source_root = source_root_obj.path
         if source_root == ".":
             return SourceRootStrippedSources.for_single_source_root(request.snapshot, source_root)
@@ -117,7 +118,7 @@ async def strip_source_roots_from_snapshot(
         return SourceRootStrippedSources.for_single_source_root(resulting_snapshot, source_root)
 
     source_roots = await MultiGet(
-        Get[SourceRoot](SourceRootRequest(file)) for file in request.snapshot.files
+        Get[SourceRoot](SourceRootRequest.for_file(file)) for file in request.snapshot.files
     )
     file_to_source_root = dict(zip(request.snapshot.files, source_roots))
     files_grouped_by_source_root = {
@@ -183,13 +184,13 @@ async def strip_source_roots_from_sources_field(
         sources_snapshot = hydrated_sources.snapshot
 
     if not sources_snapshot.files:
-        return SourceRootStrippedSources(EMPTY_SNAPSHOT, FrozenDict({}))
+        return SourceRootStrippedSources(EMPTY_SNAPSHOT, FrozenDict())
 
     # Unlike all other `Sources` subclasses, `FilesSources` (and its subclasses) do not remove
     # their source root. This is so that filesystem APIs (e.g. Python's `open()`) may still access
     # the files as they normally would, with the full path relative to the build root.
     if isinstance(request.sources_field, FilesSources):
-        return SourceRootStrippedSources(sources_snapshot, FrozenDict({}))
+        return SourceRootStrippedSources(sources_snapshot, FrozenDict())
 
     return await Get[SourceRootStrippedSources](
         StripSnapshotRequest(
@@ -201,7 +202,6 @@ async def strip_source_roots_from_sources_field(
 
 def rules():
     return [
-        *source_root_rules(),
         strip_source_roots_from_snapshot,
         strip_source_roots_from_sources_field,
         RootRule(StripSnapshotRequest),

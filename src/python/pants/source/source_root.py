@@ -490,18 +490,22 @@ class SourceRootTrie:
 class SourceRootRequest:
     path: str
 
+    @classmethod
+    def for_file(cls, file_path: str) -> "SourceRootRequest":
+        return cls(PurePath(file_path).parent)
+
 
 @dataclass(frozen=True)
-class SourceRootResponse:
+class OptionalSourceRoot:
     source_root: Optional[SourceRoot]
 
 
 @rule
 def get_source_root(
     source_root_request: SourceRootRequest, source_root_config: SourceRootConfig
-) -> SourceRootResponse:
+) -> OptionalSourceRoot:
     """Rule to request a SourceRoot that may not exist."""
-    return SourceRootResponse(
+    return OptionalSourceRoot(
         source_root_config.get_source_roots().find_by_path(source_root_request.path)
     )
 
@@ -512,8 +516,8 @@ def get_source_root_strict(
 ) -> SourceRoot:
     """Convenience rule to allow callers to request a SourceRoot directly.
 
-    That way callers don't have to unpack a SourceRootResponse if they know they expect a SourceRoot
-    to exist and are willing to error if it doesn't.
+    That way callers don't have to unpack an OptionalSourceRoot if they know they expect a
+    SourceRoot to exist and are willing to error if it doesn't.
     """
     return source_root_config.get_source_roots().strict_find_by_path(source_root_request.path)
 

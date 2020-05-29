@@ -6,10 +6,10 @@ import json
 from pants.backend.project_info import list_roots
 from pants.engine.fs import Digest, PathGlobs, Snapshot
 from pants.source.source_root import (
+    OptionalSourceRoot,
     SourceRoot,
     SourceRootConfig,
     SourceRootRequest,
-    SourceRootResponse,
 )
 from pants.testutil.engine.util import MockGet, run_rule
 from pants.testutil.goal_rule_test_base import GoalRuleTestBase
@@ -58,8 +58,8 @@ class AllRootsTest(TestBase):
             )
             return Snapshot(Digest("abcdef", 10), (), dirs)
 
-        def source_root(req: SourceRootRequest) -> SourceRootResponse:
-            return SourceRootResponse(source_roots.find_by_path(req.path))
+        def source_root(req: SourceRootRequest) -> OptionalSourceRoot:
+            return OptionalSourceRoot(source_roots.find_by_path(req.path))
 
         output = run_rule(
             list_roots.all_roots,
@@ -67,7 +67,7 @@ class AllRootsTest(TestBase):
             mock_gets=[
                 MockGet(product_type=Snapshot, subject_type=PathGlobs, mock=provider_rule),
                 MockGet(
-                    product_type=SourceRootResponse,
+                    product_type=OptionalSourceRoot,
                     subject_type=SourceRootRequest,
                     mock=source_root,
                 ),
@@ -109,8 +109,8 @@ class AllRootsTest(TestBase):
             dirs = ("foo",)  # A python package at the buildroot.
             return Snapshot(Digest("abcdef", 10), (), dirs)
 
-        def source_root(req: SourceRootRequest) -> SourceRootResponse:
-            return SourceRootResponse(source_roots.find_by_path(req.path))
+        def source_root(req: SourceRootRequest) -> OptionalSourceRoot:
+            return OptionalSourceRoot(source_roots.find_by_path(req.path))
 
         output = run_rule(
             list_roots.all_roots,
@@ -118,7 +118,7 @@ class AllRootsTest(TestBase):
             mock_gets=[
                 MockGet(product_type=Snapshot, subject_type=PathGlobs, mock=provider_rule),
                 MockGet(
-                    product_type=SourceRootResponse,
+                    product_type=OptionalSourceRoot,
                     subject_type=SourceRootRequest,
                     mock=source_root,
                 ),

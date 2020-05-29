@@ -10,11 +10,10 @@ from pants.engine.rules import SubsystemRule, goal_rule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.source.source_root import (
     AllSourceRoots,
+    OptionalSourceRoot,
     SourceRootConfig,
     SourceRootRequest,
-    SourceRootResponse,
 )
-from pants.source.source_root import rules as source_root_rules
 
 
 class RootsOptions(LineOriented, GoalSubsystem):
@@ -52,7 +51,7 @@ async def all_roots(source_root_config: SourceRootConfig) -> AllSourceRoots:
     # For instance, `src/*/` might match 'src/rust/' as well as
     # 'src/rust/engine/process_execution/bazel_protos/src/gen'.
     # So we use find_by_path to verify every candidate source root.
-    responses = await MultiGet(Get[SourceRootResponse](SourceRootRequest(d)) for d in snapshot.dirs)
+    responses = await MultiGet(Get[OptionalSourceRoot](SourceRootRequest(d)) for d in snapshot.dirs)
     all_source_roots = {
         response.source_root for response in responses if response.source_root is not None
     }
@@ -68,4 +67,4 @@ async def list_roots(console: Console, options: RootsOptions, asr: AllSourceRoot
 
 
 def rules():
-    return [*source_root_rules(), all_roots, list_roots, SubsystemRule(SourceRootConfig)]
+    return [all_roots, list_roots, SubsystemRule(SourceRootConfig)]
