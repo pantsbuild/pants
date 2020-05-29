@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use crate::Store;
-use bazel_protos;
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
 use fs::{
@@ -15,8 +14,6 @@ use futures01::future;
 use hashing::{Digest, EMPTY_DIGEST};
 use indexmap::{self, IndexMap};
 use itertools::Itertools;
-use log;
-use protobuf;
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsString;
 use std::fmt;

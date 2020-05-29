@@ -25,14 +25,6 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use clap;
-use env_logger;
-use fs;
-
-use rand;
-
-use serde_json;
-
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
 use clap::{value_t, App, Arg, SubCommand};

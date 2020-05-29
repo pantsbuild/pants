@@ -10,7 +10,6 @@ use std::{fmt, hash};
 use crate::externs;
 use crate::handles::Handle;
 
-use rule_graph;
 use smallvec::{smallvec, SmallVec};
 
 pub type FNV = hash::BuildHasherDefault<FnvHasher>;

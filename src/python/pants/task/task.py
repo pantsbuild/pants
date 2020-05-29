@@ -131,6 +131,7 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
                 type=list,
                 advanced=True,
                 fingerprint=True,
+                passthrough=True,
                 help="Pass these options as pass-through args; ie: as if by appending "
                 "`-- <passthrough arg> ...` to the command line. Any passthrough args actually"
                 "supplied on the command line will be used as well.",
@@ -216,10 +217,7 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
         if not self.supports_passthru_args():
             raise TaskError("{} Does not support passthru args.".format(self.stable_name()))
 
-        passthru_args = []
-        passthru_args.extend(self.get_options().get("passthrough_args", default=()))
-        passthru_args.extend(self.context.options.passthru_args_for_scope(self.options_scope))
-        return passthru_args
+        return list(self.get_options().get("passthrough_args", default=()))
 
     @property
     def debug(self) -> bool:

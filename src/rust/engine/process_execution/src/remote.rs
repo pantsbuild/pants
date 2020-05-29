@@ -15,9 +15,7 @@ use fs::{self, File, PathStat};
 use futures::compat::Future01CompatExt;
 use futures::future::{self as future03, TryFutureExt};
 use futures01::{future, Future, Stream};
-use grpcio;
 use hashing::{Digest, Fingerprint};
-use libc;
 use log::{debug, trace, warn};
 use protobuf::{self, Message, ProtobufEnum};
 use sha2::Sha256;
@@ -28,7 +26,6 @@ use crate::{
   Context, ExecutionStats, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform,
   PlatformConstraint, Process, ProcessMetadata,
 };
-use std;
 use std::cmp::min;
 use workunit_store::WorkunitStore;
 

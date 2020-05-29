@@ -128,6 +128,13 @@ class HelpInfoExtracterTest(unittest.TestCase):
         self.assertEqual("do not use this", ohi.removal_hint)
         self.assertIsNotNone(ohi.deprecated_message)
 
+    def test_passthrough(self):
+        kwargs = {"passthrough": True, "type": list, "member_type": str}
+        ohi = HelpInfoExtracter("").get_option_help_info(["--thing"], kwargs)
+        assert 2 == len(ohi.display_args)
+        assert any(args.startswith("--thing") for args in ohi.display_args)
+        assert any(args.startswith("... -- ") for args in ohi.display_args)
+
     def test_choices(self) -> None:
         kwargs = {"choices": ["info", "debug"]}
         ohi = HelpInfoExtracter("").get_option_help_info([], kwargs)

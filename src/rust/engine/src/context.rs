@@ -27,7 +27,6 @@ use process_execution::{
   ProcessMetadata,
 };
 use rand::seq::SliceRandom;
-use reqwest;
 use rule_graph::RuleGraph;
 use sharded_lmdb::ShardedLmdb;
 use store::Store;

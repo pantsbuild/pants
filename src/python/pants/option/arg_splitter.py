@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
+from pants.base.deprecated import deprecated_conditional
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
 from pants.util.ordered_set import OrderedSet
 
@@ -163,7 +164,7 @@ class ArgSplitter:
 
         specs = []
         passthru = []
-        passthru_owner = None
+        passthru_owners = []
 
         self._unconsumed_args = list(reversed(sys.argv if args is None else args))
         # In regular use the first token is the binary name, so skip it. However tests may
@@ -187,7 +188,7 @@ class ArgSplitter:
             if not self._check_for_help_request(scope.lower()):
                 add_scope(scope)
                 goals.add(scope.partition(".")[0])
-                passthru_owner = scope
+                passthru_owners.append(scope)
                 for flag in flags:
                     assign_flag_to_scope(flag, scope)
             scope, flags = self._consume_scope()
@@ -213,12 +214,22 @@ class ArgSplitter:
         if not goals and not self._help_request:
             self._help_request = NoGoalHelp()
 
+        # When we remove this deprecation, this case will turn into an error.
+        deprecated_conditional(
+            lambda: bool(passthru) and len(passthru_owners) > 1,
+            removal_version="1.30.0.dev0",
+            entity_description="Ambiguous scopes for passthrough args",
+            hint_message="In future, all scopes which accept passthrough args (arguments after --) "
+            f"will receive them, and passing multiple scopes (in this case: {passthru_owners}) "
+            "while using passthrough args will no longer be allowed.",
+        )
+
         return SplitArgs(
             goals=list(goals),
             scope_to_flags=scope_to_flags,
             specs=specs,
             passthru=passthru,
-            passthru_owner=passthru_owner if passthru else None,
+            passthru_owner=passthru_owners.pop() if passthru else None,
             unknown_scopes=self._unknown_scopes,
         )
 

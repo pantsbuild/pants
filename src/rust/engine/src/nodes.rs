@@ -28,11 +28,9 @@ use fs::{
   self, Dir, DirectoryListing, File, FileContent, GlobExpansionConjunction, GlobMatching, Link,
   PathGlobs, PathStat, PreparedPathGlobs, StrictGlobMatching, VFS,
 };
-use hashing;
 use process_execution::{
   self, MultiPlatformProcess, NamedCache, PlatformConstraint, Process, RelativePath,
 };
-use rule_graph;
 
 use graph::{Entry, Node, NodeError, NodeVisualizer};
 use store::{self, StoreFileByDigest};

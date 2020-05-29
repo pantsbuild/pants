@@ -8,8 +8,10 @@ contrib_plugin(
     'contrib/confluence/src/python/pants/contrib/confluence/util',
     'src/python/pants/build_graph',
   ],
-  distribution_name='pantsbuild.pants.contrib.confluence',
-  description='Confluence pants plugin',
-  register_goals=True,
+  provides=contrib_setup_py(
+    name='pantsbuild.pants.contrib.confluence',
+    description='Confluence pants plugin',
+    register_goals=True,
+  ),
   tags = {"partially_type_checked"},
 )

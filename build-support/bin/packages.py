@@ -86,35 +86,35 @@ def contrib_packages() -> Set[Package]:
     return {
         Package(
             "pantsbuild.pants.contrib.scrooge",
-            "//contrib/scrooge/src/python/pants/contrib/scrooge:plugin",
+            "contrib/scrooge/src/python/pants/contrib/scrooge:plugin",
         ),
-        Package("pantsbuild.pants.contrib.go", "//contrib/go/src/python/pants/contrib/go:plugin",),
+        Package("pantsbuild.pants.contrib.go", "contrib/go/src/python/pants/contrib/go:plugin"),
         Package(
-            "pantsbuild.pants.contrib.node", "//contrib/node/src/python/pants/contrib/node:plugin",
+            "pantsbuild.pants.contrib.node", "contrib/node/src/python/pants/contrib/node:plugin",
         ),
         Package(
             "pantsbuild.pants.contrib.python.checks",
-            "//contrib/python/src/python/pants/contrib/python/checks:plugin",
+            "contrib/python/src/python/pants/contrib/python/checks:plugin",
         ),
         Package(
             "pantsbuild.pants.contrib.python.checks.checker",
-            "//contrib/python/src/python/pants/contrib/python/checks/checker",
+            "contrib/python/src/python/pants/contrib/python/checks/checker",
             bdist_wheel_flags=("--universal",),
         ),
         Package(
             "pantsbuild.pants.contrib.confluence",
-            "//contrib/confluence/src/python/pants/contrib/confluence:plugin",
+            "contrib/confluence/src/python/pants/contrib/confluence:plugin",
         ),
         Package(
             "pantsbuild.pants.contrib.codeanalysis",
-            "//contrib/codeanalysis/src/python/pants/contrib/codeanalysis:plugin",
+            "contrib/codeanalysis/src/python/pants/contrib/codeanalysis:plugin",
         ),
         Package(
-            "pantsbuild.pants.contrib.mypy", "//contrib/mypy/src/python/pants/contrib/mypy:plugin",
+            "pantsbuild.pants.contrib.mypy", "contrib/mypy/src/python/pants/contrib/mypy:plugin",
         ),
         Package(
             "pantsbuild.pants.contrib.awslambda_python",
-            "//contrib/awslambda/python/src/python/pants/contrib/awslambda/python:plugin",
+            "contrib/awslambda/python/src/python/pants/contrib/awslambda/python:plugin",
         ),
     }
 
@@ -207,9 +207,9 @@ def build_and_print_packages(version: str) -> None:
     for flags, packages in packages_by_flags.items():
         bdist_flags = " ".join(flags)
         args = (
-            "./pants",
-            "setup-py",
-            f"--run=bdist_wheel {bdist_flags}",
+            "./v2",
+            "setup-py2",
+            f"--args=bdist_wheel {bdist_flags}",
             *(package.target for package in packages),
         )
         try:

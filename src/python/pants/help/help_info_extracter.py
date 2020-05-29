@@ -107,13 +107,16 @@ class HelpInfoExtracter:
         return default_str
 
     @staticmethod
+    def stringify_type(t: Type) -> str:
+        if t == dict:
+            return "{'key1': val1, 'key2': val2, ...}"
+        return f"<{t.__name__}>"
+
+    @staticmethod
     def compute_metavar(kwargs):
         """Compute the metavar to display in help for an option registered with these kwargs."""
 
-        def stringify(t: Type) -> str:
-            if t == dict:
-                return "{'key1': val1, 'key2': val2, ...}"
-            return f"<{t.__name__}>"
+        stringify = lambda t: HelpInfoExtracter.stringify_type(t)
 
         metavar = kwargs.get("metavar")
         if not metavar:
@@ -202,6 +205,9 @@ class HelpInfoExtracter:
             else:
                 metavar = self.compute_metavar(kwargs)
                 display_args.append(f"{scoped_arg}={metavar}")
+                if kwargs.get("passthrough"):
+                    type_str = self.stringify_type(kwargs.get("member_type", str))
+                    display_args.append(f"... -- [{type_str} [{type_str} [...]]]")
 
         typ = kwargs.get("type", str)
         default = self.compute_default(kwargs)

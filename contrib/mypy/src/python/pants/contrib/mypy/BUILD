@@ -7,8 +7,10 @@ contrib_plugin(
     'contrib/mypy/src/python/pants/contrib/mypy/tasks',
     'src/python/pants/goal:task_registrar',
   ],
-  distribution_name='pantsbuild.pants.contrib.mypy',
-  description='MyPy static type analyzer',
-  register_goals=True,
+  provides=contrib_setup_py(
+    name='pantsbuild.pants.contrib.mypy',
+    description='MyPy static type analyzer',
+    register_goals=True,
+  ),
   tags = {"partially_type_checked"},
 )

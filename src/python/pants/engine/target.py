@@ -1033,20 +1033,21 @@ class ScalarField(Generic[T], PrimitiveField, metaclass=ABCMeta):
 class BoolField(PrimitiveField, metaclass=ABCMeta):
     """A field whose value is a boolean.
 
-    Subclasses must define the class property `default`.
+    If subclasses do not set the class property `required = True` or `default`, the value will
+    default to None. This can be useful to represent three states: unspecified, False, and True.
 
         class ZipSafe(BoolField):
             alias = "zip_safe"
             default = True
     """
 
-    value: bool
-    default: ClassVar[bool]
+    value: Optional[bool]
+    default: ClassVar[Optional[bool]] = None
 
     @classmethod
-    def compute_value(cls, raw_value: Optional[bool], *, address: Address) -> bool:
+    def compute_value(cls, raw_value: Optional[bool], *, address: Address) -> Optional[bool]:
         value_or_default = super().compute_value(raw_value, address=address)
-        if not isinstance(value_or_default, bool):
+        if value_or_default is not None and not isinstance(value_or_default, bool):
             raise InvalidFieldTypeException(
                 address, cls.alias, raw_value, expected_type="a boolean",
             )

@@ -1,5 +1,3 @@
-use bytes;
-use std;
 use std::io::Read;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;

@@ -20,10 +20,11 @@ from pants.backend.python.target_types import (
     PythonEntryPoint,
 )
 from pants.backend.python.target_types import PythonPlatforms as PythonPlatformsField
+from pants.backend.python.targets.python_binary import PythonBinary as PythonBinaryV1
 from pants.core.goals.binary import BinaryFieldSet, CreatedBinary
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
 from pants.engine.addresses import Addresses
-from pants.engine.rules import rule
+from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get
 from pants.engine.unions import UnionRule
 
@@ -43,11 +44,13 @@ class PythonBinaryFieldSet(BinaryFieldSet):
     zip_safe: PexZipSafe
     platforms: PythonPlatformsField
 
-    def generate_additional_args(self) -> Tuple[str, ...]:
+    def generate_additional_args(
+        self, python_binary_defaults: PythonBinaryV1.Defaults
+    ) -> Tuple[str, ...]:
         args = []
         if self.always_write_cache.value is True:
             args.append("--always-write-cache")
-        if self.emit_warnings.value is False:
+        if self.emit_warnings.value_or_global_default(python_binary_defaults) is False:
             args.append("--no-emit-warnings")
         if self.ignore_errors.value is True:
             args.append("--ignore-errors")
@@ -61,7 +64,9 @@ class PythonBinaryFieldSet(BinaryFieldSet):
 
 
 @rule
-async def create_python_binary(field_set: PythonBinaryFieldSet) -> CreatedBinary:
+async def create_python_binary(
+    field_set: PythonBinaryFieldSet, python_binary_defaults: PythonBinaryV1.Defaults
+) -> CreatedBinary:
     entry_point = field_set.entry_point.value
     if entry_point is None:
         source_files = await Get[SourceFiles](
@@ -77,7 +82,7 @@ async def create_python_binary(field_set: PythonBinaryFieldSet) -> CreatedBinary
                 entry_point=entry_point,
                 platforms=PexPlatforms.create_from_platforms_field(field_set.platforms),
                 output_filename=output_filename,
-                additional_args=field_set.generate_additional_args(),
+                additional_args=field_set.generate_additional_args(python_binary_defaults),
             )
         )
     )
@@ -86,4 +91,8 @@ async def create_python_binary(field_set: PythonBinaryFieldSet) -> CreatedBinary
 
 
 def rules():
-    return [create_python_binary, UnionRule(BinaryFieldSet, PythonBinaryFieldSet)]
+    return [
+        create_python_binary,
+        UnionRule(BinaryFieldSet, PythonBinaryFieldSet),
+        SubsystemRule(PythonBinaryV1.Defaults),
+    ]

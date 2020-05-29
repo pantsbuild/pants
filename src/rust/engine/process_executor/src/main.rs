@@ -25,11 +25,6 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use clap;
-use env_logger;
-
-use process_execution;
-
 use clap::{value_t, App, AppSettings, Arg};
 use futures::compat::Future01CompatExt;
 use hashing::{Digest, Fingerprint};

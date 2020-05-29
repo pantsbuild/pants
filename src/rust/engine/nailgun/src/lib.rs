@@ -44,7 +44,6 @@ use log::{debug, error, info};
 pub use nails::execution::ExitCode;
 use nails::execution::{self, send_to_io, sink_for, stream_for, ChildInput, ChildOutput};
 use nails::Nail;
-use os_pipe;
 use tokio::fs::File;
 use tokio::net::TcpListener;
 use tokio::sync::watch;
