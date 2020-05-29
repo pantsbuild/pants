@@ -4,14 +4,16 @@
 import argparse
 import os
 import re
+import shutil
 import subprocess
 import sys
 from collections import defaultdict
 from configparser import ConfigParser
+from contextlib import contextmanager
 from functools import total_ordering
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Dict, List, NamedTuple, Optional, Set, Tuple, cast
+from typing import Dict, Iterable, Iterator, List, NamedTuple, Optional, Set, Tuple, cast
 from urllib.parse import quote_plus
 from xml.etree import ElementTree
 
@@ -148,7 +150,8 @@ class _Constants:
             .stdout.decode()
             .strip()
         )
-        self.pants_stable_version = Path("src/python/pants/VERSION").read_text().strip()
+        self.pants_version_file = Path("src/python/pants/VERSION")
+        self.pants_stable_version = self.pants_version_file.read_text().strip()
 
     @property
     def binary_base_url(self) -> str:
@@ -159,8 +162,20 @@ class _Constants:
         return f"wheels/3rdparty/{self._head_sha}"
 
     @property
-    def deploy_pants_wheel_path(self) -> str:
+    def deploy_pants_wheels_path(self) -> str:
         return f"wheels/pantsbuild.pants/{self._head_sha}"
+
+    @property
+    def deploy_dir(self) -> Path:
+        return Path.cwd() / "dist" / "deploy"
+
+    @property
+    def deploy_3rdparty_wheel_dir(self) -> Path:
+        return self.deploy_dir / self.deploy_3rdparty_wheels_path
+
+    @property
+    def deploy_pants_wheel_dir(self) -> Path:
+        return self.deploy_dir / self.deploy_pants_wheels_path
 
     @property
     def pants_unstable_version(self) -> str:
@@ -205,29 +220,58 @@ def get_pgp_program_name() -> str:
     return configured_name or "gpg"
 
 
+@contextmanager
+def set_pants_version(version: str) -> Iterator[None]:
+    """Temporarily rewrite the VERSION file."""
+    original_content = CONSTANTS.pants_version_file.read_text()
+    CONSTANTS.pants_version_file.write_text(version)
+    try:
+        yield
+    finally:
+        CONSTANTS.pants_version_file.write_text(original_content)
+
+
 # -----------------------------------------------------------------------------------------------
 # Script commands
 # -----------------------------------------------------------------------------------------------
 
 
-def build_and_print_packages(version: str) -> None:
-    packages_by_flags = defaultdict(list)
-    for package in sorted(all_packages()):
-        packages_by_flags[package.bdist_wheel_flags].append(package)
+def build_pants_wheels() -> None:
+    banner("Building Pants wheels")
+    version = CONSTANTS.pants_unstable_version
 
-    for flags, packages in packages_by_flags.items():
-        bdist_flags = " ".join(flags)
+    if CONSTANTS.deploy_pants_wheel_dir.exists():
+        shutil.rmtree(CONSTANTS.deploy_pants_wheel_dir)
+    destination = CONSTANTS.deploy_pants_wheel_dir / version
+    destination.mkdir(parents=True)
+
+    def build(packages: Iterable[Package], bdist_wheel_flags: Iterable[str]) -> None:
+        formatted_flags = " ".join(bdist_wheel_flags)
         args = (
             "./v2",
+            # TODO(#7654): It's not safe to use Pantsd because we're already using Pants to run
+            #  this script.
+            "--concurrent",
             "setup-py2",
-            f"--args=bdist_wheel {bdist_flags}",
+            f"--args=bdist_wheel {formatted_flags}",
             *(package.target for package in packages),
         )
         try:
-            # We print stdout to stderr because release.sh is expecting stdout to only be package names.
-            subprocess.run(args, stdout=sys.stderr, check=True)
+            subprocess.run(args, check=True)
             for package in packages:
-                print(package.name)
+                found_wheels = sorted(Path("dist").glob(f"{package}-{version}-*.whl"))
+                # NB: For any platform-specific wheels, like pantsbuild.pants, we assume that the
+                # top-level `dist` will only have wheels built for the current platform. This
+                # should be safe because it is not possible to build native wheels for another
+                # platform.
+                if len(found_wheels) > 1:
+                    raise ValueError(
+                        f"Found multiple wheels for {package} in the `dist/` folder, but was "
+                        f"expecting only one wheel: {sorted(wheel.name for wheel in found_wheels)}."
+                    )
+                for wheel in found_wheels:
+                    # We use `copy2` to preserve metadata.
+                    shutil.copy2(wheel, destination)
         except subprocess.CalledProcessError:
             failed_packages = ",".join(package.name for package in packages)
             failed_targets = " ".join(package.target for package in packages)
@@ -237,6 +281,15 @@ def build_and_print_packages(version: str) -> None:
                 file=sys.stderr,
             )
             raise
+
+    packages_by_flags = defaultdict(list)
+    for package in sorted(all_packages()):
+        packages_by_flags[package.bdist_wheel_flags].append(package)
+
+    with set_pants_version(CONSTANTS.pants_unstable_version):
+        for flags, packages in packages_by_flags.items():
+            build(packages, flags)
+    green(f"Wrote Pants wheels to {destination}.")
 
 
 def check_clean_git_branch() -> None:
@@ -365,7 +418,7 @@ def determine_prebuilt_wheels() -> List[PrebuiltWheel]:
         ]
 
     return [
-        *determine_wheels(CONSTANTS.deploy_pants_wheel_path),
+        *determine_wheels(CONSTANTS.deploy_pants_wheels_path),
         *determine_wheels(CONSTANTS.deploy_3rdparty_wheels_path),
     ]
 
@@ -426,6 +479,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command")
 
+    subparsers.add_parser("build-pants-wheels")
     subparsers.add_parser("check-release-prereqs")
     subparsers.add_parser("list-owners")
     subparsers.add_parser("list-packages")
@@ -434,13 +488,13 @@ def create_parser() -> argparse.ArgumentParser:
     parser_fetch_prebuilt_wheels = subparsers.add_parser("fetch-and-check-prebuilt-wheels")
     parser_fetch_prebuilt_wheels.add_argument("--wheels-dest")
 
-    parser_build_and_print = subparsers.add_parser("build-and-print")
-    parser_build_and_print.add_argument("version")
     return parser
 
 
 def main() -> None:
     args = create_parser().parse_args()
+    if args.command == "build-pants-wheels":
+        build_pants_wheels()
     if args.command == "check-release-prereqs":
         check_release_prereqs()
     if args.command == "list-owners":
@@ -449,8 +503,6 @@ def main() -> None:
         list_packages()
     if args.command == "list-prebuilt-wheels":
         list_prebuilt_wheels()
-    if args.command == "build-and-print":
-        build_and_print_packages(args.version)
     if args.command == "fetch-and-check-prebuilt-wheels":
         with TemporaryDirectory() as tempdir:
             dest = args.wheels_dest or tempdir
