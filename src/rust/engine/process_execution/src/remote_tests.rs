@@ -711,7 +711,7 @@ async fn sends_headers() {
   )
   .unwrap();
   let context = Context {
-    workunit_store: WorkunitStore::default(),
+    workunit_store: WorkunitStore::new(false),
     build_id: String::from("marmosets"),
   };
   command_runner

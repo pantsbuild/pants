@@ -73,7 +73,7 @@ impl Session {
     build_id: String,
     should_report_workunits: bool,
   ) -> Session {
-    let workunit_store = WorkunitStore::new();
+    let workunit_store = WorkunitStore::new(should_render_ui);
     let display = if should_render_ui {
       Some(Mutex::new(ConsoleUI::new(workunit_store.clone())))
     } else {

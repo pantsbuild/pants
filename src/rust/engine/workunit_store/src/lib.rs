@@ -115,6 +115,7 @@ impl WorkunitMetadata {
 
 #[derive(Clone, Default)]
 pub struct WorkunitStore {
+  rendering_dynamic_ui: bool,
   inner: Arc<Mutex<WorkUnitInnerStore>>,
 }
 
@@ -130,8 +131,9 @@ pub struct WorkUnitInnerStore {
 }
 
 impl WorkunitStore {
-  pub fn new() -> WorkunitStore {
+  pub fn new(rendering_dynamic_ui: bool) -> WorkunitStore {
     WorkunitStore {
+      rendering_dynamic_ui,
       inner: Arc::new(Mutex::new(WorkUnitInnerStore {
         graph: DiGraph::new(),
         span_id_to_graph: HashMap::new(),
@@ -228,6 +230,9 @@ impl WorkunitStore {
       metadata,
     };
     let mut inner = self.inner.lock();
+    if !self.rendering_dynamic_ui {
+      started.log_workunit_state()
+    }
 
     inner.workunit_records.insert(span_id.clone(), started);
     inner.started_ids.push(span_id.clone());
