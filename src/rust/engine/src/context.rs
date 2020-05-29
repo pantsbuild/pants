@@ -192,27 +192,44 @@ impl Core {
       ));
 
     if remote_execution {
-      let remote_command_runner: Box<dyn process_execution::CommandRunner> =
+      let remote_command_runner: Box<dyn process_execution::CommandRunner> = {
+        // let command_runner = process_execution::remote::CommandRunner::new(
+        //   // No problem unwrapping here because the global options validation
+        //   // requires the remote_execution_server be present when remote_execution is set.
+        //   &remote_execution_server.unwrap(),
+        //   process_execution_metadata.clone(),
+        //   root_ca_certs,
+        //   oauth_bearer_token,
+        //   remote_execution_headers,
+        //   store.clone(),
+        //   // TODO if we ever want to configure the remote platform to be something else we
+        //   // need to take an option all the way down here and into the remote::CommandRunner struct.
+        //   Platform::Linux,
+        //   executor.clone(),
+        //   std::time::Duration::from_secs(320),
+        //   std::time::Duration::from_millis(500),
+        //   std::time::Duration::from_secs(5),
+        // )?;
+
+        let command_runner = process_execution::remote::StreamingCommandRunner::new(
+          // No problem unwrapping here because the global options validation
+          // requires the remote_execution_server be present when remote_execution is set.
+          &remote_execution_server.unwrap(),
+          process_execution_metadata.clone(),
+          root_ca_certs,
+          oauth_bearer_token,
+          remote_execution_headers,
+          store.clone(),
+          // TODO if we ever want to configure the remote platform to be something else we
+          // need to take an option all the way down here and into the remote::CommandRunner struct.
+          Platform::Linux,
+        )?;
+
         Box::new(BoundedCommandRunner::new(
-          Box::new(process_execution::remote::CommandRunner::new(
-            // No problem unwrapping here because the global options validation
-            // requires the remote_execution_server be present when remote_execution is set.
-            &remote_execution_server.unwrap(),
-            process_execution_metadata.clone(),
-            root_ca_certs,
-            oauth_bearer_token,
-            remote_execution_headers,
-            store.clone(),
-            // TODO if we ever want to configure the remote platform to be something else we
-            // need to take an option all the way down here and into the remote::CommandRunner struct.
-            Platform::Linux,
-            executor.clone(),
-            std::time::Duration::from_secs(320),
-            std::time::Duration::from_millis(500),
-            std::time::Duration::from_secs(5),
-          )?),
+          Box::new(command_runner),
           process_execution_remote_parallelism,
-        ));
+        ))
+      };
       command_runner = match process_execution_speculation_strategy.as_ref() {
         "local_first" => Box::new(SpeculatingCommandRunner::new(
           command_runner,

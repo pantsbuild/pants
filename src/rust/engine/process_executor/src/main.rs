@@ -367,26 +367,41 @@ async fn main() {
           None
         };
 
-      Box::new(
-        process_execution::remote::CommandRunner::new(
-          address,
-          ProcessMetadata {
-            instance_name: remote_instance_arg,
-            cache_key_gen_version: args.value_of("cache-key-gen-version").map(str::to_owned),
-            platform_properties,
-          },
-          root_ca_certs,
-          oauth_bearer_token,
-          headers,
-          store.clone(),
-          Platform::Linux,
-          executor,
-          std::time::Duration::from_secs(320),
-          std::time::Duration::from_millis(500),
-          std::time::Duration::from_secs(5),
-        )
-        .expect("Failed to make command runner"),
-      ) as Box<dyn process_execution::CommandRunner>
+      // let command_runner = process_execution::remote::CommandRunner::new(
+      //   address,
+      //   ProcessMetadata {
+      //     instance_name: remote_instance_arg,
+      //     cache_key_gen_version: args.value_of("cache-key-gen-version").map(str::to_owned),
+      //     platform_properties,
+      //   },
+      //   root_ca_certs,
+      //   oauth_bearer_token,
+      //   headers,
+      //   store.clone(),
+      //   Platform::Linux,
+      //   executor,
+      //   std::time::Duration::from_secs(320),
+      //   std::time::Duration::from_millis(500),
+      //   std::time::Duration::from_secs(5),
+      // )
+      // .expect("Failed to make command runner");
+
+      let command_runner = process_execution::remote::StreamingCommandRunner::new(
+        address,
+        ProcessMetadata {
+          instance_name: remote_instance_arg,
+          cache_key_gen_version: args.value_of("cache-key-gen-version").map(str::to_owned),
+          platform_properties,
+        },
+        root_ca_certs,
+        oauth_bearer_token,
+        headers,
+        store.clone(),
+        Platform::Linux,
+      )
+      .expect("Failed to make command runner");
+
+      Box::new(command_runner) as Box<dyn process_execution::CommandRunner>
     }
     None => Box::new(process_execution::local::CommandRunner::new(
       store.clone(),
