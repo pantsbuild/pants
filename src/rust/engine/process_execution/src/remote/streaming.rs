@@ -55,10 +55,55 @@ pub struct StreamingCommandRunner {
 }
 
 impl StreamingCommandRunner {
-  // /// Construct a new StreamingCommandRunner
-  // pub fn new() -> Self {
-  //
-  // }
+  /// Construct a new StreamingCommandRunner
+  pub fn new(
+    address: &str,
+    metadata: ProcessMetadata,
+    root_ca_certs: Option<Vec<u8>>,
+    oauth_bearer_token: Option<String>,
+    headers: BTreeMap<String, String>,
+    store: Store,
+    platform: Platform,
+  ) -> Result<Self, String> {
+    let env = Arc::new(grpcio::EnvBuilder::new().build());
+    let channel = {
+      let builder = grpcio::ChannelBuilder::new(env.clone());
+      if let Some(root_ca_certs) = root_ca_certs {
+        let creds = grpcio::ChannelCredentialsBuilder::new()
+          .root_cert(root_ca_certs)
+          .build();
+        builder.secure_connect(address, creds)
+      } else {
+        builder.connect(address)
+      }
+    };
+    let execution_client = Arc::new(bazel_protos::remote_execution_grpc::ExecutionClient::new(
+      channel.clone(),
+    ));
+
+    let mut headers = headers;
+    if let Some(oauth_bearer_token) = oauth_bearer_token {
+      headers.insert(
+        String::from("authorization"),
+        format!("Bearer {}", oauth_bearer_token),
+      );
+    }
+
+    // Validate that any configured static headers are valid.
+    call_option(&headers, None)?;
+
+    let command_runner = StreamingCommandRunner {
+      metadata,
+      headers,
+      channel,
+      env,
+      execution_client,
+      store,
+      platform,
+    };
+
+    Ok(command_runner)
+  }
 
   pub fn platform(&self) -> Platform {
     self.platform
