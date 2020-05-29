@@ -19,9 +19,16 @@ class ImportParseError(ValueError):
 
 
 @dataclass(frozen=True)
-class PythonImports:
-    imported: FrozenOrderedSet[str]
-    inferred: FrozenOrderedSet[str]
+class ParsedPythonImports:
+    """All the discovered imports from a Python source file.
+
+    Explicit imports are imports from `import x` and `from module import x` statements. Inferred
+    imports come from strings that look like module names, such as
+    `importlib.import_module("example.subdir.Foo")`.
+    """
+
+    explicit_imports: FrozenOrderedSet[str]
+    inferred_imports: FrozenOrderedSet[str]
 
 
 def parse_file(source_code: str, *, module_name: str):
@@ -44,7 +51,7 @@ def parse_file(source_code: str, *, module_name: str):
             raise ImportParseError(f"Failed to parse source code for {module_name}:\n{e!r}")
 
 
-def find_python_imports(source_code: str, *, module_name: str) -> PythonImports:
+def find_python_imports(source_code: str, *, module_name: str) -> ParsedPythonImports:
     tree, ast_visitor_cls = parse_file(source_code, module_name=module_name)
     ast_visitor = ast_visitor_cls(module_name)
     with warnings.catch_warnings():
@@ -54,28 +61,30 @@ def find_python_imports(source_code: str, *, module_name: str) -> PythonImports:
             "ignore", category=DeprecationWarning, message="invalid escape sequence"
         )
         ast_visitor.visit(tree)
-    return PythonImports(
-        imported=FrozenOrderedSet(sorted(ast_visitor.imported_symbols)),
-        inferred=FrozenOrderedSet(sorted(ast_visitor.inferred_symbols)),
+    return ParsedPythonImports(
+        explicit_imports=FrozenOrderedSet(sorted(ast_visitor.explicit_imports)),
+        inferred_imports=FrozenOrderedSet(sorted(ast_visitor.inferred_imports)),
     )
 
 
-_POSSIBLE_MODULE_REGEX = re.compile(r"^([a-z_][a-z_\d]*\.){2,}[a-zA-Z_]\w*$")
+# This regex is used to infer imports from strings, e.g.
+#  `importlib.import_module("example.subdir.Foo")`.
+_INFERRED_IMPORT_REGEX = re.compile(r"^([a-z_][a-z_\d]*\.){2,}[a-zA-Z_]\w*$")
 
 
 class _BaseAstVisitor:
     def __init__(self, module_name: str) -> None:
         self._module_parts = module_name.split(".")
-        self.imported_symbols: Set[str] = set()
-        self.inferred_symbols: Set[str] = set()
+        self.explicit_imports: Set[str] = set()
+        self.inferred_imports: Set[str] = set()
 
-    def maybe_add_string_import(self, s: str) -> None:
-        if _POSSIBLE_MODULE_REGEX.match(s):
-            self.inferred_symbols.add(s)
+    def maybe_add_inferred_import(self, s: str) -> None:
+        if _INFERRED_IMPORT_REGEX.match(s):
+            self.inferred_imports.add(s)
 
     def visit_Import(self, node) -> None:
         for alias in node.names:
-            self.imported_symbols.add(alias.name)
+            self.explicit_imports.add(alias.name)
 
     def visit_ImportFrom(self, node) -> None:
         rel_module = node.module
@@ -83,22 +92,22 @@ class _BaseAstVisitor:
             self._module_parts[0 : -node.level] + ([] if rel_module is None else [rel_module])
         )
         for alias in node.names:
-            self.imported_symbols.add(f"{abs_module}.{alias.name}")
+            self.explicit_imports.add(f"{abs_module}.{alias.name}")
 
 
 class _Py27AstVisitor(ast27.NodeVisitor, _BaseAstVisitor):
     def visit_Str(self, node) -> None:
         val = ensure_text(node.s)
-        self.maybe_add_string_import(val)
+        self.maybe_add_inferred_import(val)
 
 
 class _Py3AstVisitor(ast3.NodeVisitor, _BaseAstVisitor):
     def visit_Str(self, node) -> None:
-        self.maybe_add_string_import(node.s)
+        self.maybe_add_inferred_import(node.s)
 
 
 class _Py38AstVisitor(ast3.NodeVisitor, _BaseAstVisitor):
     # Python 3.8 deprecated the Str node in favor of Constant.
     def visit_Constant(self, node) -> None:
         if isinstance(node.value, str):
-            self.maybe_add_string_import(node.value)
+            self.maybe_add_inferred_import(node.value)

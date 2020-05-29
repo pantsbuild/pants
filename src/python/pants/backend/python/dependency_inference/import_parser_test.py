@@ -36,7 +36,7 @@ def test_normal_imports() -> None:
         ),
         module_name="project.app",
     )
-    assert set(imports.imported) == {
+    assert set(imports.explicit_imports) == {
         "__future__.print_function",
         "os",
         "os.path",
@@ -49,7 +49,7 @@ def test_normal_imports() -> None:
         "subprocess",
         "subprocess23",
     }
-    assert not imports.inferred
+    assert not imports.inferred_imports
 
 
 def test_relative_imports() -> None:
@@ -63,12 +63,12 @@ def test_relative_imports() -> None:
         ),
         module_name="project.util.test_utils",
     )
-    assert set(imports.imported) == {
+    assert set(imports.explicit_imports) == {
         "project.util.sibling",
         "project.util.subdir.child.Child",
         "project.parent.Parent",
     }
-    assert not imports.inferred
+    assert not imports.inferred_imports
 
 
 def test_imports_from_strings() -> None:
@@ -104,8 +104,8 @@ def test_imports_from_strings() -> None:
         ),
         module_name="project.app",
     )
-    assert not imports.imported
-    assert set(imports.inferred) == {
+    assert not imports.explicit_imports
+    assert set(imports.inferred_imports) == {
         "a.b.d",
         "a.b2.d",
         "a.b.c.Foo",
@@ -132,8 +132,8 @@ def test_works_with_python2() -> None:
         ),
         module_name="project.app",
     )
-    assert set(imports.imported) == {"demo", "project.demo.Demo"}
-    assert set(imports.inferred) == {"dep.from.bytes", "dep.from.str"}
+    assert set(imports.explicit_imports) == {"demo", "project.demo.Demo"}
+    assert set(imports.inferred_imports) == {"dep.from.bytes", "dep.from.str"}
 
 
 @pytest.mark.skipif(
@@ -156,5 +156,5 @@ def test_works_with_python38() -> None:
         ),
         module_name="project.app",
     )
-    assert set(imports.imported) == {"demo", "project.demo.Demo"}
-    assert set(imports.inferred) == {"dep.from.str"}
+    assert set(imports.explicit_imports) == {"demo", "project.demo.Demo"}
+    assert set(imports.inferred_imports) == {"dep.from.str"}
