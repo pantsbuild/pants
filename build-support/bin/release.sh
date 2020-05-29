@@ -92,13 +92,6 @@ function run_packages_script() {
   )
 }
 
-function find_pkg() {
-  local -r pkg_name=$1
-  local -r version=$2
-  local -r search_dir=$3
-  find "${search_dir}" -type f -name "${pkg_name}-${version}-*.whl"
-}
-
 function pkg_pants_install_test() {
   local version=$1
   shift
@@ -169,26 +162,6 @@ function execute_packaged_pants_with_internal_backends() {
     "$@"
 }
 
-function pants_version_reset() {
-  pushd "${ROOT}" > /dev/null
-    git checkout -- "${VERSION_FILE}"
-  popd > /dev/null
-  unset _PANTS_VERSION_OVERRIDE
-}
-
-function pants_version_set() {
-  # Set the version in the wheels we build by mutating `src/python/pants/VERSION` to temporarily
-  # override it. Sets a `trap` to restore to HEAD on exit.
-  local version=$1
-  trap pants_version_reset EXIT
-  echo "${version}" > "${VERSION_FILE}"
-  # Also set the version reported by the prebuilt pant.pex we use to build the wheels.
-  # This is so that we pass the sanity-check that verifies that the built wheels have the same
-  # version as the pants version used to build them.
-  # TODO: Do we actually need that sanity check?
-  export _PANTS_VERSION_OVERRIDE=${version}
-}
-
 function build_3rdparty_packages() {
   # Builds whls for 3rdparty dependencies of pants.
   local version=$1
@@ -208,32 +181,6 @@ function build_3rdparty_packages() {
 
   deactivate
   end_travis_section
-}
-
-function build_pants_packages() {
-  local version=$1
-
-  rm -rf "${DEPLOY_PANTS_WHEEL_DIR}"
-  mkdir -p "${DEPLOY_PANTS_WHEEL_DIR}/${version}"
-
-  pants_version_set "${version}"
-
-  start_travis_section "${NAME}" "Building packages"
-  # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
-  # shellcheck disable=SC2207
-  packages=(
-    $(run_packages_script build-and-print "${version}")
-  ) || die "Failed to build packages at ${version}!"
-  for package in "${packages[@]}"
-  do
-    (
-      wheel=$(find_pkg "${package}" "${version}" "${ROOT}/dist") && \
-      cp -p "${wheel}" "${DEPLOY_PANTS_WHEEL_DIR}/${version}"
-    ) || die "Failed to find package ${package}-${version}!"
-  done
-  end_travis_section
-
-  pants_version_reset
 }
 
 function build_fs_util() {
@@ -338,7 +285,7 @@ function install_and_test_packages() {
 function dry_run_install() {
   # Build a complete set of whls, and then ensure that we can install pants using only whls.
   local VERSION="${PANTS_UNSTABLE_VERSION}"
-  build_pants_packages "${VERSION}" && \
+  run_packages_script build-pants-wheels && \
   build_3rdparty_packages "${VERSION}" && \
   install_and_test_packages "${VERSION}" \
     --only-binary=:all: \
@@ -470,7 +417,7 @@ function build_pex() {
   if [[ "${mode}" == "fetch" ]]; then
     run_packages_script fetch-and-check-prebuilt-wheels --wheels-dest "${DEPLOY_DIR}"
   else
-    build_pants_packages "${PANTS_UNSTABLE_VERSION}"
+    run_packages_script build-pants-wheels
     build_3rdparty_packages "${PANTS_UNSTABLE_VERSION}"
   fi
 
