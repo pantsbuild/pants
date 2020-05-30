@@ -26,7 +26,7 @@
 #![allow(clippy::mutex_atomic)]
 
 use concrete_time::TimeSpan;
-use log::log;
+use log::{info, log};
 pub use log::Level;
 use parking_lot::Mutex;
 use petgraph::graph::{DiGraph, NodeIndex};
@@ -101,6 +101,8 @@ pub struct WorkunitMetadata {
   pub desc: Option<String>,
   pub level: Level,
   pub blocked: bool,
+  pub stdout: Option<hashing::Digest>,
+  pub stderr: Option<hashing::Digest>,
 }
 
 impl WorkunitMetadata {
@@ -109,6 +111,8 @@ impl WorkunitMetadata {
       level: Level::Info,
       desc: None,
       blocked: false,
+      stdout: None,
+      stderr: None,
     }
   }
 }
@@ -249,7 +253,23 @@ impl WorkunitStore {
     span_id
   }
 
+  pub fn complete_workunit_with_new_metadata(
+    &self,
+    span_id: SpanId,
+    metadata: WorkunitMetadata,
+  ) -> Result<(), String> {
+    self.complete_workunit_impl(span_id, Some(metadata))
+  }
+
   pub fn complete_workunit(&self, span_id: SpanId) -> Result<(), String> {
+    self.complete_workunit_impl(span_id, None)
+  }
+
+  fn complete_workunit_impl(
+    &self,
+    span_id: SpanId,
+    new_metadata: Option<WorkunitMetadata>,
+  ) -> Result<(), String> {
     use std::collections::hash_map::Entry;
     let inner = &mut self.inner.lock();
     match inner.workunit_records.entry(span_id.clone()) {
@@ -267,8 +287,10 @@ impl WorkunitStore {
         };
         let new_state = WorkunitState::Completed { time_span };
         workunit.state = new_state;
+        if let Some(metadata) = new_metadata {
+          workunit.metadata = metadata;
+        }
         workunit.log_workunit_state();
-
         inner.workunit_records.insert(span_id.clone(), workunit);
         inner.completed_ids.push(span_id);
         Ok(())
@@ -422,22 +444,28 @@ pub fn expect_workunit_state() -> WorkUnitState {
   get_workunit_state().expect("A WorkunitStore has not been set for this thread.")
 }
 
-pub async fn with_workunit<F>(
+pub async fn with_workunit<F, M>(
   workunit_store: WorkunitStore,
   name: String,
-  metadata: WorkunitMetadata,
+  initial_metadata: WorkunitMetadata,
   f: F,
+  final_metadata_fn: M,
 ) -> F::Output
 where
   F: Future,
+  M: for<'a> FnOnce(&'a F::Output, WorkunitMetadata) -> WorkunitMetadata,
 {
   let mut workunit_state = expect_workunit_state();
   let span_id = new_span_id();
   let parent_id = std::mem::replace(&mut workunit_state.parent_id, Some(span_id.clone()));
-  let started_id = workunit_store.start_workunit(span_id, name, parent_id, metadata);
+  let started_id =
+    workunit_store.start_workunit(span_id, name, parent_id, initial_metadata.clone());
   scope_task_workunit_state(Some(workunit_state), async move {
     let result = f.await;
-    workunit_store.complete_workunit(started_id).unwrap();
+    let final_metadata = final_metadata_fn(&result, initial_metadata);
+    if let Err(e) = workunit_store.complete_workunit_with_new_metadata(started_id, final_metadata) {
+      info!("{}", e);
+    }
     result
   })
   .await
