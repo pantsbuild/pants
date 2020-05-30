@@ -26,7 +26,7 @@ class DependencyType(Enum):
 class DependenciesOptions(LineOriented, GoalSubsystem):
     """List the dependencies of the input targets."""
 
-    name = "dependencies2"
+    name = "dependencies"
 
     @classmethod
     def register_options(cls, register):

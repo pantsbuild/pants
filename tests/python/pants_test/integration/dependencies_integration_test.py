@@ -6,8 +6,7 @@ from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 class DependenciesIntegrationTest(PantsRunIntegrationTest):
     def assert_deps(self, success, spec, *expected_deps):
-        args = ["-q", "dependencies"] + [spec]
-        pants_run = self.run_pants(args)
+        pants_run = self.run_pants(["dependencies", spec])
         if success:
             self.assert_success(pants_run)
             stdout_lines = pants_run.stdout_data.split("\n")
