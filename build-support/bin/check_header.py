@@ -25,7 +25,6 @@ CURRENT_YEAR = str(datetime.datetime.now().year)
 CURRENT_CENTURY_REGEX = re.compile(r"20\d\d")
 
 PY2_DIRECTORIES = {
-    Path("contrib/python/src/python/pants/contrib/python/checks/checker"),
     Path("src/python/pants/backend/python/tasks/coverage"),
     Path("src/python/pants/backend/python/tasks/pytest"),
 }

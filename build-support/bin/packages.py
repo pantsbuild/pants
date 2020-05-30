@@ -100,15 +100,6 @@ def contrib_packages() -> Set[Package]:
             "pantsbuild.pants.contrib.node", "contrib/node/src/python/pants/contrib/node:plugin",
         ),
         Package(
-            "pantsbuild.pants.contrib.python.checks",
-            "contrib/python/src/python/pants/contrib/python/checks:plugin",
-        ),
-        Package(
-            "pantsbuild.pants.contrib.python.checks.checker",
-            "contrib/python/src/python/pants/contrib/python/checks/checker",
-            bdist_wheel_flags=("--universal",),
-        ),
-        Package(
             "pantsbuild.pants.contrib.confluence",
             "contrib/confluence/src/python/pants/contrib/confluence:plugin",
         ),
