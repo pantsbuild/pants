@@ -3,6 +3,7 @@
 
 use std::collections::{BTreeMap, HashSet};
 use std::convert::{Into, TryInto};
+use std::future::Future;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -16,10 +17,7 @@ use crate::scheduler::Session;
 use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
 
-use boxfuture::{BoxFuture, Boxable};
 use fs::{safe_create_dir_all_ioerror, GitignoreStyleExcludes, PosixFS};
-use futures::compat::Future01CompatExt;
-use futures01::Future;
 use graph::{EntryId, Graph, InvalidationResult, NodeContext};
 use log::info;
 use process_execution::{
@@ -342,19 +340,19 @@ impl Context {
   ///
   /// Get the future value for the given Node implementation.
   ///
-  pub fn get<N: WrappedNode>(&self, node: N) -> BoxFuture<N::Item, Failure> {
+  pub async fn get<N: WrappedNode>(&self, node: N) -> Result<N::Item, Failure> {
     // TODO: Odd place for this... could do it periodically in the background?
     maybe_drop_handles();
-    self
+    let node_result = self
       .core
       .graph
       .get(self.entry_id, self, node.into())
-      .map(|node_result| {
-        node_result
-          .try_into()
-          .unwrap_or_else(|_| panic!("A Node implementation was ambiguous."))
-      })
-      .to_boxed()
+      .await?;
+    Ok(
+      node_result
+        .try_into()
+        .unwrap_or_else(|_| panic!("A Node implementation was ambiguous.")),
+    )
   }
 }
 
@@ -385,8 +383,8 @@ impl NodeContext for Context {
 
   fn spawn<F>(&self, future: F)
   where
-    F: Future<Item = (), Error = ()> + Send + 'static,
+    F: Future<Output = ()> + Send + 'static,
   {
-    let _join = self.core.executor.spawn(future.compat());
+    let _join = self.core.executor.spawn(future);
   }
 }

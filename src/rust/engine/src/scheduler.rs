@@ -8,7 +8,6 @@ use std::path::{Path, PathBuf};
 use std::sync::{mpsc, Arc};
 use std::time::{Duration, Instant};
 
-use futures::compat::Future01CompatExt;
 use futures::future;
 
 use crate::context::{Context, Core};
@@ -360,12 +359,7 @@ impl Scheduler {
         .await?;
       (result, Some(last_observed))
     } else {
-      let result = context
-        .core
-        .graph
-        .create(root.into(), &context)
-        .compat()
-        .await?;
+      let result = context.core.graph.create(root.into(), &context).await?;
       (result, None)
     };
 

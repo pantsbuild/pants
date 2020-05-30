@@ -11,10 +11,8 @@ use std::time::Duration;
 use std::{self, fmt};
 
 use async_trait::async_trait;
-use futures::compat::Future01CompatExt;
-use futures::future::{FutureExt, TryFutureExt};
+use futures::future::{self, FutureExt, TryFutureExt};
 use futures::stream::StreamExt;
-use futures01::future::{self, Future};
 use url::Url;
 
 use crate::context::{Context, Core};
@@ -22,7 +20,7 @@ use crate::core::{throw, Failure, Key, Params, TypeId, Value};
 use crate::externs;
 use crate::selectors;
 use crate::tasks::{self, Rule};
-use boxfuture::{try_future, BoxFuture, Boxable};
+use boxfuture::{BoxFuture, Boxable};
 use bytes::{self, BufMut};
 use fs::{
   self, Dir, DirectoryListing, File, FileContent, GlobExpansionConjunction, GlobMatching, Link,
@@ -36,24 +34,16 @@ use graph::{Entry, Node, NodeError, NodeVisualizer};
 use store::{self, StoreFileByDigest};
 use workunit_store::{new_span_id, scope_task_workunit_state, Level, WorkunitMetadata};
 
-pub type NodeFuture<T> = BoxFuture<T, Failure>;
-
-fn ok<O: Send + 'static>(value: O) -> NodeFuture<O> {
-  future::ok(value).to_boxed()
-}
-
-fn err<O: Send + 'static>(failure: Failure) -> NodeFuture<O> {
-  future::err(failure).to_boxed()
-}
+pub type NodeResult<T> = Result<T, Failure>;
 
 #[async_trait]
 impl VFS<Failure> for Context {
   async fn read_link(&self, link: &Link) -> Result<PathBuf, Failure> {
-    Ok(self.get(ReadLink(link.clone())).compat().await?.0)
+    Ok(self.get(ReadLink(link.clone())).await?.0)
   }
 
   async fn scandir(&self, dir: Dir) -> Result<Arc<DirectoryListing>, Failure> {
-    self.get(Scandir(dir)).compat().await
+    self.get(Scandir(dir)).await
   }
 
   fn is_ignored(&self, stat: &fs::Stat) -> bool {
@@ -67,7 +57,11 @@ impl VFS<Failure> for Context {
 
 impl StoreFileByDigest<Failure> for Context {
   fn store_by_digest(&self, file: File) -> BoxFuture<hashing::Digest, Failure> {
-    self.get(DigestFile(file))
+    let context = self.clone();
+    async move { context.get(DigestFile(file)).await }
+      .boxed()
+      .compat()
+      .to_boxed()
   }
 }
 
@@ -76,15 +70,16 @@ impl StoreFileByDigest<Failure> for Context {
 /// NodeKey's impl of graph::Node handles the rest.
 ///
 /// The Item type of a WrappedNode is bounded to values that can be stored and retrieved
-/// from the NodeResult enum. Due to the semantics of memoization, retrieving the typed result
-/// stored inside the NodeResult requires an implementation of TryFrom<NodeResult>. But the
+/// from the NodeOutput enum. Due to the semantics of memoization, retrieving the typed result
+/// stored inside the NodeOutput requires an implementation of TryFrom<NodeOutput>. But the
 /// combination of bounds at usage sites should mean that a failure to unwrap the result is
 /// exceedingly rare.
 ///
+#[async_trait]
 pub trait WrappedNode: Into<NodeKey> {
-  type Item: TryFrom<NodeResult>;
+  type Item: TryFrom<NodeOutput>;
 
-  fn run(self, context: Context) -> BoxFuture<Self::Item, Failure>;
+  async fn run(self, context: Context) -> NodeResult<Self::Item>;
 }
 
 ///
@@ -124,12 +119,12 @@ impl Select {
     Select::new(params, product, entry)
   }
 
-  fn select_product(
+  async fn select_product(
     &self,
     context: &Context,
     product: TypeId,
     caller_description: &str,
-  ) -> NodeFuture<Value> {
+  ) -> NodeResult<Value> {
     let edges = context
       .core
       .rule_graph
@@ -139,49 +134,57 @@ impl Select {
           "Tried to select product {} for {} but found no edges",
           product, caller_description
         ))
-      });
+      })?;
     let context = context.clone();
-    Select::new_from_edges(self.params.clone(), product, &try_future!(edges)).run(context)
+    Select::new_from_edges(self.params.clone(), product, &edges)
+      .run(context)
+      .await
   }
 }
 
 // TODO: This is a Node only because it is used as a root in the graph, but it should never be
 // requested using context.get
+#[async_trait]
 impl WrappedNode for Select {
   type Item = Value;
 
-  fn run(self, context: Context) -> NodeFuture<Value> {
+  async fn run(self, context: Context) -> NodeResult<Value> {
     match &self.entry {
       &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Inner(ref inner)) => {
         match inner.rule() {
-          &tasks::Rule::Task(ref task) => context.get(Task {
-            params: self.params.clone(),
-            product: self.product,
-            task: task.clone(),
-            entry: Arc::new(self.entry.clone()),
-          }),
+          &tasks::Rule::Task(ref task) => {
+            context
+              .get(Task {
+                params: self.params.clone(),
+                product: self.product,
+                task: task.clone(),
+                entry: Arc::new(self.entry.clone()),
+              })
+              .await
+          }
           &Rule::Intrinsic(ref intrinsic) => {
             let intrinsic = intrinsic.clone();
-            future::join_all(
+            let values = future::try_join_all(
               intrinsic
                 .inputs
                 .iter()
                 .map(|type_id| self.select_product(&context, *type_id, "intrinsic"))
                 .collect::<Vec<_>>(),
             )
-            .and_then(move |values| {
-              let core = context.core.clone();
-              core.intrinsics.run(intrinsic, context, values)
-            })
-            .to_boxed()
+            .await?;
+            context
+              .core
+              .intrinsics
+              .run(intrinsic, context.clone(), values)
+              .await
           }
         }
       }
       &rule_graph::Entry::Param(type_id) => {
         if let Some(key) = self.params.find(type_id) {
-          ok(externs::val_for(key))
+          Ok(externs::val_for(key))
         } else {
-          err(throw(&format!(
+          Err(throw(&format!(
             "Expected a Param of type {} to be present.",
             type_id
           )))
@@ -333,10 +336,11 @@ impl From<MultiPlatformExecuteProcess> for NodeKey {
   }
 }
 
+#[async_trait]
 impl WrappedNode for MultiPlatformExecuteProcess {
   type Item = ProcessResult;
 
-  fn run(self, context: Context) -> NodeFuture<ProcessResult> {
+  async fn run(self, context: Context) -> NodeResult<ProcessResult> {
     let request = self.0;
     let execution_context = process_execution::Context::new(
       context.session.workunit_store(),
@@ -348,20 +352,16 @@ impl WrappedNode for MultiPlatformExecuteProcess {
       .extract_compatible_request(&request)
       .is_some()
     {
-      Box::pin(async move {
-        let res = context
-          .core
-          .command_runner
-          .run(request, execution_context)
-          .await
-          .map_err(|e| throw(&format!("Failed to execute process: {}", e)))?;
+      let res = context
+        .core
+        .command_runner
+        .run(request, execution_context)
+        .await
+        .map_err(|e| throw(&format!("Failed to execute process: {}", e)))?;
 
-        Ok(ProcessResult(res))
-      })
-      .compat()
-      .to_boxed()
+      Ok(ProcessResult(res))
     } else {
-      err(throw(&format!(
+      Err(throw(&format!(
         "No compatible platform found for request: {:?}",
         request
       )))
@@ -381,22 +381,19 @@ pub struct ReadLink(Link);
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LinkDest(PathBuf);
 
+#[async_trait]
 impl WrappedNode for ReadLink {
   type Item = LinkDest;
 
-  fn run(self, context: Context) -> NodeFuture<LinkDest> {
-    Box::pin(async move {
-      let node = self;
-      let link_dest = context
-        .core
-        .vfs
-        .read_link(&node.0)
-        .await
-        .map_err(|e| throw(&format!("{}", e)))?;
-      Ok(LinkDest(link_dest))
-    })
-    .compat()
-    .to_boxed()
+  async fn run(self, context: Context) -> NodeResult<LinkDest> {
+    let node = self;
+    let link_dest = context
+      .core
+      .vfs
+      .read_link(&node.0)
+      .await
+      .map_err(|e| throw(&format!("{}", e)))?;
+    Ok(LinkDest(link_dest))
   }
 }
 
@@ -412,26 +409,23 @@ impl From<ReadLink> for NodeKey {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct DigestFile(pub File);
 
+#[async_trait]
 impl WrappedNode for DigestFile {
   type Item = hashing::Digest;
 
-  fn run(self, context: Context) -> NodeFuture<hashing::Digest> {
-    Box::pin(async move {
-      let content = context
-        .core
-        .vfs
-        .read_file(&self.0)
-        .map_err(|e| throw(&format!("{}", e)))
-        .await?;
-      context
-        .core
-        .store()
-        .store_file_bytes(content.content, true)
-        .map_err(|e| throw(&e))
-        .await
-    })
-    .compat()
-    .to_boxed()
+  async fn run(self, context: Context) -> NodeResult<hashing::Digest> {
+    let content = context
+      .core
+      .vfs
+      .read_file(&self.0)
+      .map_err(|e| throw(&format!("{}", e)))
+      .await?;
+    context
+      .core
+      .store()
+      .store_file_bytes(content.content, true)
+      .map_err(|e| throw(&e))
+      .await
   }
 }
 
@@ -448,21 +442,18 @@ impl From<DigestFile> for NodeKey {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Scandir(Dir);
 
+#[async_trait]
 impl WrappedNode for Scandir {
   type Item = Arc<DirectoryListing>;
 
-  fn run(self, context: Context) -> NodeFuture<Arc<DirectoryListing>> {
-    Box::pin(async move {
-      let directory_listing = context
-        .core
-        .vfs
-        .scandir(self.0)
-        .await
-        .map_err(|e| throw(&format!("{}", e)))?;
-      Ok(Arc::new(directory_listing))
-    })
-    .compat()
-    .to_boxed()
+  async fn run(self, context: Context) -> NodeResult<Arc<DirectoryListing>> {
+    let directory_listing = context
+      .core
+      .vfs
+      .scandir(self.0)
+      .await
+      .map_err(|e| throw(&format!("{}", e)))?;
+    Ok(Arc::new(directory_listing))
   }
 }
 
@@ -479,22 +470,17 @@ impl From<Scandir> for NodeKey {
 pub struct Snapshot(pub Key);
 
 impl Snapshot {
-  fn create(context: Context, path_globs: PreparedPathGlobs) -> NodeFuture<store::Snapshot> {
+  async fn create(context: Context, path_globs: PreparedPathGlobs) -> NodeResult<store::Snapshot> {
     // Recursively expand PathGlobs into PathStats.
     // We rely on Context::expand tracking dependencies for scandirs,
     // and store::Snapshot::from_path_stats tracking dependencies for file digests.
-
-    Box::pin(async move {
-      let path_stats = context
-        .expand(path_globs)
-        .map_err(|e| throw(&format!("{}", e)))
-        .await?;
-      store::Snapshot::from_path_stats(context.core.store(), context.clone(), path_stats)
-        .map_err(|e| throw(&format!("Snapshot failed: {}", e)))
-        .await
-    })
-    .compat()
-    .to_boxed()
+    let path_stats = context
+      .expand(path_globs)
+      .map_err(|e| throw(&format!("{}", e)))
+      .await?;
+    store::Snapshot::from_path_stats(context.core.store(), context.clone(), path_stats)
+      .map_err(|e| throw(&format!("Snapshot failed: {}", e)))
+      .await
   }
 
   pub fn lift_path_globs(item: &Value) -> Result<PreparedPathGlobs, String> {
@@ -582,16 +568,15 @@ impl Snapshot {
   }
 }
 
+#[async_trait]
 impl WrappedNode for Snapshot {
   type Item = Arc<store::Snapshot>;
 
-  fn run(self, context: Context) -> NodeFuture<Arc<store::Snapshot>> {
-    let lifted_path_globs = Self::lift_path_globs(&externs::val_for(&self.0));
-    future::result(lifted_path_globs)
-      .map_err(|e| throw(&format!("Failed to parse PathGlobs: {}", e)))
-      .and_then(move |path_globs| Self::create(context, path_globs))
-      .map(Arc::new)
-      .to_boxed()
+  async fn run(self, context: Context) -> NodeResult<Arc<store::Snapshot>> {
+    let path_globs = Self::lift_path_globs(&externs::val_for(&self.0))
+      .map_err(|e| throw(&format!("Failed to parse PathGlobs: {}", e)))?;
+    let snapshot = Self::create(context, path_globs).await?;
+    Ok(Arc::new(snapshot))
   }
 }
 
@@ -605,154 +590,135 @@ impl From<Snapshot> for NodeKey {
 pub struct DownloadedFile(pub Key);
 
 impl DownloadedFile {
-  fn load_or_download(
+  async fn load_or_download(
     &self,
     core: Arc<Core>,
     url: Url,
     digest: hashing::Digest,
-  ) -> BoxFuture<store::Snapshot, String> {
-    let file_name = try_future!(url
+  ) -> Result<store::Snapshot, String> {
+    let file_name = url
       .path_segments()
       .and_then(Iterator::last)
       .map(str::to_owned)
-      .ok_or_else(|| format!("Error getting the file name from the parsed URL: {}", url)));
+      .ok_or_else(|| format!("Error getting the file name from the parsed URL: {}", url))?;
 
-    Box::pin(async move {
-      let maybe_bytes = core.store().load_file_bytes_with(digest, |_| ()).await?;
-      if maybe_bytes.is_none() {
-        DownloadedFile::download(core.clone(), url, file_name.clone(), digest)
-          .compat()
-          .await?;
-      }
-      core
-        .store()
-        .snapshot_of_one_file(PathBuf::from(file_name), digest, true)
-        .await
-    })
-    .compat()
-    .to_boxed()
+    let maybe_bytes = core.store().load_file_bytes_with(digest, |_| ()).await?;
+    if maybe_bytes.is_none() {
+      DownloadedFile::download(core.clone(), url, file_name.clone(), digest).await?;
+    }
+    core
+      .store()
+      .snapshot_of_one_file(PathBuf::from(file_name), digest, true)
+      .await
   }
 
-  fn download(
+  async fn download(
     core: Arc<Core>,
     url: Url,
     file_name: String,
     expected_digest: hashing::Digest,
-  ) -> BoxFuture<(), String> {
+  ) -> Result<(), String> {
     // TODO: Retry failures
-    core
+    let response = core
       .http_client
       .get(url.clone())
       .send()
-      .compat()
-      .map_err(|err| format!("Error downloading file: {}", err))
-      .and_then(move |response| {
-        // Handle common HTTP errors.
-        if response.status().is_server_error() {
-          Err(format!(
-            "Server error ({}) downloading file {} from {}",
-            response.status().as_str(),
-            file_name,
-            url,
-          ))
-        } else if response.status().is_client_error() {
-          Err(format!(
-            "Client error ({}) downloading file {} from {}",
-            response.status().as_str(),
-            file_name,
-            url,
-          ))
-        } else {
-          Ok(response)
-        }
-      })
-      .and_then(move |response| {
-        struct SizeLimiter<W: std::io::Write> {
-          writer: W,
-          written: usize,
-          size_limit: usize,
-        }
+      .await
+      .map_err(|err| format!("Error downloading file: {}", err))?;
 
-        impl<W: std::io::Write> Write for SizeLimiter<W> {
-          fn write(&mut self, buf: &[u8]) -> Result<usize, std::io::Error> {
-            let new_size = self.written + buf.len();
-            if new_size > self.size_limit {
-              Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "Downloaded file was larger than expected digest",
-              ))
-            } else {
-              self.written = new_size;
-              self.writer.write_all(buf)?;
-              Ok(buf.len())
-            }
-          }
+    // Handle common HTTP errors.
+    if response.status().is_server_error() {
+      return Err(format!(
+        "Server error ({}) downloading file {} from {}",
+        response.status().as_str(),
+        file_name,
+        url,
+      ));
+    } else if response.status().is_client_error() {
+      return Err(format!(
+        "Client error ({}) downloading file {} from {}",
+        response.status().as_str(),
+        file_name,
+        url,
+      ));
+    }
 
-          fn flush(&mut self) -> Result<(), std::io::Error> {
-            self.writer.flush()
+    let (actual_digest, bytes) = {
+      struct SizeLimiter<W: std::io::Write> {
+        writer: W,
+        written: usize,
+        size_limit: usize,
+      }
+
+      impl<W: std::io::Write> Write for SizeLimiter<W> {
+        fn write(&mut self, buf: &[u8]) -> Result<usize, std::io::Error> {
+          let new_size = self.written + buf.len();
+          if new_size > self.size_limit {
+            Err(std::io::Error::new(
+              std::io::ErrorKind::InvalidData,
+              "Downloaded file was larger than expected digest",
+            ))
+          } else {
+            self.written = new_size;
+            self.writer.write_all(buf)?;
+            Ok(buf.len())
           }
         }
 
-        let digest_and_bytes = async move {
-          let mut hasher = hashing::WriterHasher::new(SizeLimiter {
-            writer: bytes::BytesMut::with_capacity(expected_digest.1).writer(),
-            written: 0,
-            size_limit: expected_digest.1,
-          });
-
-          let mut response_stream = response.bytes_stream();
-          while let Some(next_chunk) = response_stream.next().await {
-            let chunk =
-              next_chunk.map_err(|err| format!("Error reading URL fetch response: {}", err))?;
-            hasher
-              .write_all(&chunk)
-              .map_err(|err| format!("Error hashing/capturing URL fetch response: {}", err))?;
-          }
-          let (digest, bytewriter) = hasher.finish();
-          Ok((digest, bytewriter.writer.into_inner().freeze()))
-        };
-        digest_and_bytes.boxed().compat().to_boxed()
-      })
-      .and_then(move |(actual_digest, buf)| {
-        if expected_digest != actual_digest {
-          return future::err(format!(
-            "Wrong digest for downloaded file: want {:?} got {:?}",
-            expected_digest, actual_digest
-          ))
-          .to_boxed();
+        fn flush(&mut self) -> Result<(), std::io::Error> {
+          self.writer.flush()
         }
+      }
 
-        Box::pin(async move {
-          let _ = core.store().store_file_bytes(buf, true).await?;
-          Ok(())
-        })
-        .compat()
-        .to_boxed()
-      })
-      .to_boxed()
+      let mut hasher = hashing::WriterHasher::new(SizeLimiter {
+        writer: bytes::BytesMut::with_capacity(expected_digest.1).writer(),
+        written: 0,
+        size_limit: expected_digest.1,
+      });
+
+      let mut response_stream = response.bytes_stream();
+      while let Some(next_chunk) = response_stream.next().await {
+        let chunk =
+          next_chunk.map_err(|err| format!("Error reading URL fetch response: {}", err))?;
+        hasher
+          .write_all(&chunk)
+          .map_err(|err| format!("Error hashing/capturing URL fetch response: {}", err))?;
+      }
+      let (digest, bytewriter) = hasher.finish();
+      (digest, bytewriter.writer.into_inner().freeze())
+    };
+
+    if expected_digest != actual_digest {
+      return Err(format!(
+        "Wrong digest for downloaded file: want {:?} got {:?}",
+        expected_digest, actual_digest
+      ));
+    }
+
+    let _ = core.store().store_file_bytes(bytes, true).await?;
+    Ok(())
   }
 }
 
+#[async_trait]
 impl WrappedNode for DownloadedFile {
   type Item = Arc<store::Snapshot>;
 
-  fn run(self, context: Context) -> NodeFuture<Arc<store::Snapshot>> {
+  async fn run(self, context: Context) -> NodeResult<Arc<store::Snapshot>> {
     let value = externs::val_for(&self.0);
     let url_to_fetch = externs::project_str(&value, "url");
 
-    let url = try_future!(Url::parse(&url_to_fetch)
-      .map_err(|err| throw(&format!("Error parsing URL {}: {}", url_to_fetch, err))));
+    let url = Url::parse(&url_to_fetch)
+      .map_err(|err| throw(&format!("Error parsing URL {}: {}", url_to_fetch, err)))?;
 
-    let expected_digest = try_future!(lift_digest(&externs::project_ignoring_type(
-      &value, "digest"
-    ))
-    .map_err(|str| throw(&str)));
+    let expected_digest =
+      lift_digest(&externs::project_ignoring_type(&value, "digest")).map_err(|s| throw(&s))?;
 
-    self
+    let snapshot = self
       .load_or_download(context.core, url, expected_digest)
-      .map(Arc::new)
-      .map_err(|err| throw(&err))
-      .to_boxed()
+      .await
+      .map_err(|err| throw(&err))?;
+    Ok(Arc::new(snapshot))
   }
 }
 
@@ -771,12 +737,12 @@ pub struct Task {
 }
 
 impl Task {
-  fn gen_get(
+  async fn gen_get(
     context: &Context,
     params: &Params,
     entry: &Arc<rule_graph::Entry<Rule>>,
     gets: Vec<externs::Get>,
-  ) -> NodeFuture<Vec<Value>> {
+  ) -> NodeResult<Vec<Value>> {
     let get_futures = gets
       .into_iter()
       .map(|get| {
@@ -787,7 +753,7 @@ impl Task {
           product: get.product,
           subject: *get.subject.type_id(),
         });
-        let entry = context
+        let entry_res = context
           .core
           .rule_graph
           .edges_for_inner(&entry)
@@ -823,44 +789,46 @@ impl Task {
         // The subject of the get is a new parameter that replaces an existing param of the same
         // type.
         params.put(get.subject);
-        future::result(entry)
-          .and_then(move |entry| Select::new(params, get.product, entry).run(context.clone()))
+        async move {
+          let entry = entry_res?;
+          Select::new(params, get.product, entry)
+            .run(context.clone())
+            .await
+        }
       })
       .collect::<Vec<_>>();
-    future::join_all(get_futures).to_boxed()
+    future::try_join_all(get_futures).await
   }
 
   ///
   /// Given a python generator Value, loop to request the generator's dependencies until
   /// it completes with a result Value.
   ///
-  fn generate(
+  async fn generate(
     context: Context,
     params: Params,
     entry: Arc<rule_graph::Entry<Rule>>,
     generator: Value,
-  ) -> NodeFuture<Value> {
-    future::loop_fn(Value::from(externs::none()), move |input| {
+  ) -> NodeResult<Value> {
+    let mut input = Value::from(externs::none());
+    loop {
       let context = context.clone();
       let params = params.clone();
       let entry = entry.clone();
-      future::result(externs::generator_send(&generator, &input)).and_then(move |response| {
-        match response {
-          externs::GeneratorResponse::Get(get) => {
-            Self::gen_get(&context, &params, &entry, vec![get])
-              .map(|vs| future::Loop::Continue(vs.into_iter().next().unwrap()))
-              .to_boxed()
-          }
-          externs::GeneratorResponse::GetMulti(gets) => {
-            Self::gen_get(&context, &params, &entry, gets)
-              .map(|vs| future::Loop::Continue(externs::store_tuple(&vs)))
-              .to_boxed()
-          }
-          externs::GeneratorResponse::Break(val) => future::ok(future::Loop::Break(val)).to_boxed(),
+      match externs::generator_send(&generator, &input)? {
+        externs::GeneratorResponse::Get(get) => {
+          let values = Self::gen_get(&context, &params, &entry, vec![get]).await?;
+          input = values.into_iter().next().unwrap();
         }
-      })
-    })
-    .to_boxed()
+        externs::GeneratorResponse::GetMulti(gets) => {
+          let values = Self::gen_get(&context, &params, &entry, gets).await?;
+          input = externs::store_tuple(&values);
+        }
+        externs::GeneratorResponse::Break(val) => {
+          break Ok(val);
+        }
+      }
+    }
   }
 }
 
@@ -874,10 +842,11 @@ impl fmt::Debug for Task {
   }
 }
 
+#[async_trait]
 impl WrappedNode for Task {
   type Item = Value;
 
-  fn run(self, context: Context) -> NodeFuture<Value> {
+  async fn run(self, context: Context) -> NodeResult<Value> {
     let params = self.params;
     let deps = {
       let edges = &context
@@ -885,7 +854,7 @@ impl WrappedNode for Task {
         .rule_graph
         .edges_for_inner(&self.entry)
         .expect("edges for task exist.");
-      future::join_all(
+      future::try_join_all(
         self
           .task
           .clause
@@ -895,28 +864,24 @@ impl WrappedNode for Task {
           })
           .collect::<Vec<_>>(),
       )
+      .await?
     };
 
     let func = self.task.func;
     let entry = self.entry;
     let product = self.product;
-    deps
-      .then(move |deps_result| match deps_result {
-        Ok(deps) => externs::call(&externs::val_for(&func.0), &deps),
-        Err(failure) => Err(failure),
-      })
-      .then(move |task_result| match task_result {
-        Ok(val) => match externs::get_type_for(&val) {
-          t if t == context.core.types.coroutine => Self::generate(context, params, entry, val),
-          t if t == product => ok(val),
-          _ => err(throw(&format!(
-            "{:?} returned a result value that did not satisfy its constraints: {:?}",
-            func, val
-          ))),
-        },
-        Err(failure) => err(failure),
-      })
-      .to_boxed()
+
+    let result_val = externs::call(&externs::val_for(&func.0), &deps)?;
+    match externs::get_type_for(&result_val) {
+      t if t == context.core.types.coroutine => {
+        Self::generate(context, params, entry, result_val).await
+      }
+      t if t == product => Ok(result_val),
+      _ => Err(throw(&format!(
+        "{:?} returned a result value that did not satisfy its constraints: {:?}",
+        func, result_val
+      ))),
+    }
   }
 }
 
@@ -1015,13 +980,14 @@ impl NodeKey {
   }
 }
 
+#[async_trait]
 impl Node for NodeKey {
   type Context = Context;
 
-  type Item = NodeResult;
+  type Item = NodeOutput;
   type Error = Failure;
 
-  fn run(self, context: Context) -> NodeFuture<NodeResult> {
+  async fn run(self, context: Context) -> Result<NodeOutput, Failure> {
     let mut workunit_state = workunit_store::expect_workunit_state();
 
     let (started_workunit_id, user_facing_name) = {
@@ -1060,16 +1026,14 @@ impl Node for NodeKey {
 
       let mut result = match maybe_watch {
         Ok(()) => match self {
-          NodeKey::DigestFile(n) => n.run(context).map(NodeResult::from).compat().await,
-          NodeKey::DownloadedFile(n) => n.run(context).map(NodeResult::from).compat().await,
-          NodeKey::MultiPlatformExecuteProcess(n) => {
-            n.run(context).map(NodeResult::from).compat().await
-          }
-          NodeKey::ReadLink(n) => n.run(context).map(NodeResult::from).compat().await,
-          NodeKey::Scandir(n) => n.run(context).map(NodeResult::from).compat().await,
-          NodeKey::Select(n) => n.run(context).map(NodeResult::from).compat().await,
-          NodeKey::Snapshot(n) => n.run(context).map(NodeResult::from).compat().await,
-          NodeKey::Task(n) => n.run(context).map(NodeResult::from).compat().await,
+          NodeKey::DigestFile(n) => n.run(context).map_ok(NodeOutput::from).await,
+          NodeKey::DownloadedFile(n) => n.run(context).map_ok(NodeOutput::from).await,
+          NodeKey::MultiPlatformExecuteProcess(n) => n.run(context).map_ok(NodeOutput::from).await,
+          NodeKey::ReadLink(n) => n.run(context).map_ok(NodeOutput::from).await,
+          NodeKey::Scandir(n) => n.run(context).map_ok(NodeOutput::from).await,
+          NodeKey::Select(n) => n.run(context).map_ok(NodeOutput::from).await,
+          NodeKey::Snapshot(n) => n.run(context).map_ok(NodeOutput::from).await,
+          NodeKey::Task(n) => n.run(context).map_ok(NodeOutput::from).await,
         },
         Err(e) => Err(e),
       };
@@ -1083,19 +1047,17 @@ impl Node for NodeKey {
         .unwrap();
       result
     })
-    .boxed()
-    .compat()
-    .to_boxed()
+    .await
   }
 
-  fn digest(res: NodeResult) -> Option<hashing::Digest> {
+  fn digest(res: NodeOutput) -> Option<hashing::Digest> {
     match res {
-      NodeResult::Digest(d) => Some(d),
-      NodeResult::DirectoryListing(_)
-      | NodeResult::LinkDest(_)
-      | NodeResult::ProcessResult(_)
-      | NodeResult::Snapshot(_)
-      | NodeResult::Value(_) => None,
+      NodeOutput::Digest(d) => Some(d),
+      NodeOutput::DirectoryListing(_)
+      | NodeOutput::LinkDest(_)
+      | NodeOutput::ProcessResult(_)
+      | NodeOutput::Snapshot(_)
+      | NodeOutput::Value(_) => None,
     }
   }
 
@@ -1181,7 +1143,7 @@ impl NodeError for Failure {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum NodeResult {
+pub enum NodeOutput {
   Digest(hashing::Digest),
   DirectoryListing(Arc<DirectoryListing>),
   LinkDest(LinkDest),
@@ -1190,103 +1152,103 @@ pub enum NodeResult {
   Value(Value),
 }
 
-impl From<Value> for NodeResult {
+impl From<Value> for NodeOutput {
   fn from(v: Value) -> Self {
-    NodeResult::Value(v)
+    NodeOutput::Value(v)
   }
 }
 
-impl From<Arc<store::Snapshot>> for NodeResult {
+impl From<Arc<store::Snapshot>> for NodeOutput {
   fn from(v: Arc<store::Snapshot>) -> Self {
-    NodeResult::Snapshot(v)
+    NodeOutput::Snapshot(v)
   }
 }
 
-impl From<hashing::Digest> for NodeResult {
+impl From<hashing::Digest> for NodeOutput {
   fn from(v: hashing::Digest) -> Self {
-    NodeResult::Digest(v)
+    NodeOutput::Digest(v)
   }
 }
 
-impl From<ProcessResult> for NodeResult {
+impl From<ProcessResult> for NodeOutput {
   fn from(v: ProcessResult) -> Self {
-    NodeResult::ProcessResult(v)
+    NodeOutput::ProcessResult(v)
   }
 }
 
-impl From<LinkDest> for NodeResult {
+impl From<LinkDest> for NodeOutput {
   fn from(v: LinkDest) -> Self {
-    NodeResult::LinkDest(v)
+    NodeOutput::LinkDest(v)
   }
 }
 
-impl From<Arc<DirectoryListing>> for NodeResult {
+impl From<Arc<DirectoryListing>> for NodeOutput {
   fn from(v: Arc<DirectoryListing>) -> Self {
-    NodeResult::DirectoryListing(v)
+    NodeOutput::DirectoryListing(v)
   }
 }
 
-impl TryFrom<NodeResult> for Value {
+impl TryFrom<NodeOutput> for Value {
   type Error = ();
 
-  fn try_from(nr: NodeResult) -> Result<Self, ()> {
+  fn try_from(nr: NodeOutput) -> Result<Self, ()> {
     match nr {
-      NodeResult::Value(v) => Ok(v),
+      NodeOutput::Value(v) => Ok(v),
       _ => Err(()),
     }
   }
 }
 
-impl TryFrom<NodeResult> for Arc<store::Snapshot> {
+impl TryFrom<NodeOutput> for Arc<store::Snapshot> {
   type Error = ();
 
-  fn try_from(nr: NodeResult) -> Result<Self, ()> {
+  fn try_from(nr: NodeOutput) -> Result<Self, ()> {
     match nr {
-      NodeResult::Snapshot(v) => Ok(v),
+      NodeOutput::Snapshot(v) => Ok(v),
       _ => Err(()),
     }
   }
 }
 
-impl TryFrom<NodeResult> for hashing::Digest {
+impl TryFrom<NodeOutput> for hashing::Digest {
   type Error = ();
 
-  fn try_from(nr: NodeResult) -> Result<Self, ()> {
+  fn try_from(nr: NodeOutput) -> Result<Self, ()> {
     match nr {
-      NodeResult::Digest(v) => Ok(v),
+      NodeOutput::Digest(v) => Ok(v),
       _ => Err(()),
     }
   }
 }
 
-impl TryFrom<NodeResult> for ProcessResult {
+impl TryFrom<NodeOutput> for ProcessResult {
   type Error = ();
 
-  fn try_from(nr: NodeResult) -> Result<Self, ()> {
+  fn try_from(nr: NodeOutput) -> Result<Self, ()> {
     match nr {
-      NodeResult::ProcessResult(v) => Ok(v),
+      NodeOutput::ProcessResult(v) => Ok(v),
       _ => Err(()),
     }
   }
 }
 
-impl TryFrom<NodeResult> for LinkDest {
+impl TryFrom<NodeOutput> for LinkDest {
   type Error = ();
 
-  fn try_from(nr: NodeResult) -> Result<Self, ()> {
+  fn try_from(nr: NodeOutput) -> Result<Self, ()> {
     match nr {
-      NodeResult::LinkDest(v) => Ok(v),
+      NodeOutput::LinkDest(v) => Ok(v),
       _ => Err(()),
     }
   }
 }
 
-impl TryFrom<NodeResult> for Arc<DirectoryListing> {
+impl TryFrom<NodeOutput> for Arc<DirectoryListing> {
   type Error = ();
 
-  fn try_from(nr: NodeResult) -> Result<Self, ()> {
+  fn try_from(nr: NodeOutput) -> Result<Self, ()> {
     match nr {
-      NodeResult::DirectoryListing(v) => Ok(v),
+      NodeOutput::DirectoryListing(v) => Ok(v),
       _ => Err(()),
     }
   }
