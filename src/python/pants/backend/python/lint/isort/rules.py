@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import List, Optional, Tuple, Union, cast
+from typing import List, Optional, Tuple
 
 from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.lint.python_fmt import PythonFmtRequest
@@ -24,7 +24,7 @@ from pants.core.util_rules.determine_source_files import (
     SourceFiles,
     SpecifiedSourceFilesRequest,
 )
-from pants.engine.fs import Digest, MergeDigests, PathGlobs, Snapshot
+from pants.engine.fs import EMPTY_SNAPSHOT, Digest, MergeDigests, PathGlobs, Snapshot
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import SubsystemRule, named_rule, rule
 from pants.engine.selectors import Get, MultiGet
@@ -109,22 +109,20 @@ async def setup(
         )
     )
 
-    requests: List[Get] = [
+    requests = (
         requirements_pex_request,
         config_snapshot_request,
         specified_source_files_request,
-    ]
-    if setup_request.request.prior_formatter_result is None:
-        requests.append(all_source_files_request)
-    requirements_pex, config_snapshot, specified_source_files, *rest = cast(
-        Union[Tuple[Pex, Snapshot, SourceFiles], Tuple[Pex, Snapshot, SourceFiles, SourceFiles]],
-        await MultiGet(requests),
     )
-
+    all_source_files, requirements_pex, config_snapshot, specified_source_files = (
+        await MultiGet(all_source_files_request, *requests)
+        if setup_request.request.prior_formatter_result is None
+        else (SourceFiles(EMPTY_SNAPSHOT), *await MultiGet(*requests))
+    )
     all_source_files_snapshot = (
-        setup_request.request.prior_formatter_result
-        if setup_request.request.prior_formatter_result
-        else rest[0].snapshot
+        all_source_files.snapshot
+        if setup_request.request.prior_formatter_result is None
+        else setup_request.request.prior_formatter_result
     )
 
     input_digest = await Get[Digest](

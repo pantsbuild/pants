@@ -31,6 +31,7 @@ from pants.engine.target import Target
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.util import clean_global_runtime_state
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.source import source_root
 from pants.source.source_root import SourceRootConfig
 from pants.source.wrapped_globs import EagerFilesetWithSpec
 from pants.subsystem.subsystem import Subsystem
@@ -290,7 +291,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
     @classmethod
     def rules(cls):
-        return [RootRule(SourcesField)]
+        return [*source_root.rules(), RootRule(SourcesField)]
 
     @classmethod
     def target_types(cls) -> Sequence[Type[Target]]:

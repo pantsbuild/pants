@@ -139,7 +139,7 @@ async def a_typecheck_fail_test(wrapper: TypeCheckFailWrapper) -> A:
 async def c_unhashable(_: TypeCheckFailWrapper) -> C:
     # This `await` would use the `nested_raise` rule, but it won't get to the point of raising since
     # the hashability check will fail.
-    _ = await Get(A, B, list())  # noqa: F841
+    _result = await Get(A, B, list())  # noqa: F841
     return C()
 
 
@@ -152,7 +152,7 @@ class CollectionType:
 async def c_unhashable_dataclass(_: CollectionType) -> C:
     # This `await` would use the `nested_raise` rule, but it won't get to the point of raising since
     # the hashability check will fail.
-    _ = await Get(A, B, list())  # noqa: F841
+    _result = await Get(A, B, list())  # noqa: F841
     return C()
 
 

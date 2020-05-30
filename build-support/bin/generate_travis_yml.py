@@ -3,7 +3,7 @@
 
 from enum import Enum
 from textwrap import dedent
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 import yaml
 
@@ -75,9 +75,10 @@ GLOBAL_ENV_VARS = [
     # mitigate risk.
     "BOOTSTRAPPED_PEX_KEY_PREFIX=daily/${TRAVIS_BUILD_NUMBER}/${TRAVIS_BUILD_ID}/pants.pex",
     "NATIVE_ENGINE_SO_KEY_PREFIX=monthly/native_engine_so",
-    "PYENV_PY27_VERSION=2.7.15",
-    "PYENV_PY36_VERSION=3.6.8",
-    "PYENV_PY37_VERSION=3.7.2",
+    "PYENV_PY27_VERSION=2.7.18",
+    "PYENV_PY36_VERSION=3.6.10",
+    "PYENV_PY37_VERSION=3.7.7",
+    "PYENV_PY38_VERSION=3.8.3",
     # NB: We must set `PYENV_ROOT` on macOS for Pyenv to work properly. However, on Linux, we must not
     # override the default value because Linux pre-installs Python via Pyenv and we must keep their
     # $PYENV_ROOT for this to still work.
@@ -109,17 +110,18 @@ GLOBAL_ENV_VARS = [
 class PythonVersion(Enum):
     py36 = "py36"
     py37 = "py37"
+    py38 = "py38"
 
     def __str__(self) -> str:
         return str(self.value)
 
     @property
     def number(self) -> int:
-        return {self.py36: 36, self.py37: 37}[self]  # type: ignore[index]
+        return {self.py36: 36, self.py37: 37, self.py38: 38}[self]  # type: ignore[index]
 
     @property
     def decimal(self) -> float:
-        return {self.py36: 3.6, self.py37: 3.7}[self]  # type: ignore[index]
+        return {self.py36: 3.6, self.py37: 3.7, self.py38: 3.8}[self]  # type: ignore[index]
 
     @property
     def is_py36(self) -> bool:
@@ -129,10 +131,14 @@ class PythonVersion(Enum):
     def is_py37(self) -> bool:
         return self == PythonVersion.py37
 
+    @property
+    def is_py38(self) -> bool:
+        return self == PythonVersion.py38
+
     def default_stage(self, *, is_bootstrap: bool = False) -> Stage:
         if is_bootstrap:
-            return {self.py36: Stage.bootstrap, self.py37: Stage.bootstrap_cron}[self]  # type: ignore[index]
-        return {self.py36: Stage.test, self.py37: Stage.test_cron}[self]  # type: ignore[index]
+            return {self.py36: Stage.bootstrap, self.py37: Stage.bootstrap_cron, self.py38: Stage.bootstrap_cron}[self]  # type: ignore[index]
+        return {self.py36: Stage.test, self.py37: Stage.test_cron, self.py38: Stage.test_cron}[self]  # type: ignore[index]
 
 
 # ----------------------------------------------------------------------
@@ -373,6 +379,22 @@ def linux_fuse_shard() -> Dict:
     }
 
 
+def _osx_before_install(
+    python_versions: Iterable[PythonVersion], *, install_py27: bool = True
+) -> List[str]:
+    versions_to_install = " ".join(
+        f"${{PYENV_PY{python_version.number}_VERSION}}" for python_version in python_versions
+    )
+    if install_py27:
+        versions_to_install = f"${{PYENV_PY27_VERSION}} {versions_to_install}"
+    return [
+        "curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq",
+        "chmod 755 /usr/local/bin/jq",
+        "./build-support/bin/install_aws_cli_for_ci.sh",
+        f"./build-support/bin/install_python_for_ci.sh {versions_to_install}",
+    ]
+
+
 def _osx_env() -> List[str]:
     return [
         'PATH="/usr/local/opt/openssl/bin:${PATH}"',
@@ -381,11 +403,13 @@ def _osx_env() -> List[str]:
     ]
 
 
-def _osx_env_with_pyenv(python_version: PythonVersion) -> List[str]:
+def _osx_env_with_pyenv() -> List[str]:
     return [
         *_osx_env(),
         'PATH="${PYENV_ROOT}/versions/${PYENV_PY27_VERSION}/bin:${PATH}"',
-        f'PATH="${{PYENV_ROOT}}/versions/${{PYENV_PY{python_version.number}_VERSION}}/bin:${{PATH}}"',
+        'PATH="${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin:${PATH}"',
+        'PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"',
+        'PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"',
     ]
 
 
@@ -399,13 +423,8 @@ def osx_shard(
         "os": "osx",
         "language": "generic",
         "before_script": ["ulimit -n 8192"],
-        "before_install": [
-            "curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64 -o /usr/local/bin/jq",
-            "chmod 755 /usr/local/bin/jq",
-            "./build-support/bin/install_aws_cli_for_ci.sh",
-            f'./build-support/bin/install_python_for_ci.sh "${{PYENV_PY27_VERSION}}" "${{PYENV_PY{python_version.number}_VERSION}}"',
-        ],
-        "env": _osx_env_with_pyenv(python_version),
+        "before_install": _osx_before_install([python_version]),
+        "env": _osx_env_with_pyenv(),
         "stage": python_version.default_stage().value,
     }
     if osx_image is not None:
@@ -554,11 +573,9 @@ def unit_tests(python_version: PythonVersion) -> Dict:
 
 def _build_wheels_command() -> List[str]:
     return [
-        # We delete the Pex's copy of `native_engine.so` (see get_ci_bootstrapped_pants_pex.sh)
-        # because the Python version used for the Pex might be different than what we use to build
-        # the wheels.
-        "rm src/python/pants/engine/internals/native_engine.so",
         "./build-support/bin/release.sh -n",
+        "USE_PY37=true ./build-support/bin/release.sh -n",
+        "USE_PY38=true ./build-support/bin/release.sh -n",
     ]
 
 
@@ -570,7 +587,7 @@ def build_wheels_linux() -> Dict:
     command = " && ".join(_build_wheels_command())
     shard: Dict = {
         **CACHE_NATIVE_ENGINE,
-        **linux_shard(python_version=PythonVersion.py36, use_docker=True),
+        **linux_shard(use_docker=True),
         "name": "Build Linux wheels",
         "script": [docker_build_travis_ci_image(), docker_run_travis_ci_image(command)],
     }
@@ -581,21 +598,15 @@ def build_wheels_linux() -> Dict:
 def build_wheels_osx() -> Dict:
     shard: Dict = {
         **CACHE_NATIVE_ENGINE,
-        **osx_shard(python_version=PythonVersion.py36, osx_image="xcode8"),
+        **osx_shard(osx_image="xcode8"),
         "name": "Build macOS wheels",
         "script": _build_wheels_command(),
+        "before_install": _osx_before_install(
+            python_versions=[PythonVersion.py36, PythonVersion.py37, PythonVersion.py38],
+            install_py27=False,
+        ),
     }
-    safe_extend(
-        shard,
-        "env",
-        [
-            *_build_wheels_env(platform=Platform.osx),
-            # We ensure selection of the pyenv interpreter by PY aware scripts and pants.pex with
-            # these env vars.
-            "PY=${PYENV_ROOT}/versions/${PYENV_PY36_VERSION}/bin/python",
-            """PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['${PYENV_PY36_VERSION}']\"""",
-        ],
-    )
+    safe_extend(shard, "env", _build_wheels_env(platform=Platform.osx))
     return shard
 
 
@@ -690,11 +701,7 @@ def rust_tests_osx() -> Dict:
             # This is good, because `brew install openssl` would trigger the same issues as noted on why
             # we don't use the `addons` section.
         ],
-        "env": [
-            *_osx_env_with_pyenv(python_version=PythonVersion.py36),
-            "CACHE_NAME=rust_tests.osx",
-            "PREPARE_DEPLOY=1",
-        ],
+        "env": [*_osx_env_with_pyenv(), "CACHE_NAME=rust_tests.osx", "PREPARE_DEPLOY=1"],
     }
 
 

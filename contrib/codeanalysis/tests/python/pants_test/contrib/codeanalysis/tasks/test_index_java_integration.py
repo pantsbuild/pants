@@ -11,7 +11,11 @@ class TestIndexJavaIntegration(PantsRunIntegrationTest):
     def test_index_simple_java_code(self):
         # Very simple test that we can run the extractor and indexer on some
         # fairly trivial code without crashing, and that we produce something.
-        args = ["index", "examples/src/java/org/pantsbuild/example/hello::"]
+        args = [
+            "--backend-packages=pants.contrib.codeanalysis",
+            "index",
+            "examples/src/java/org/pantsbuild/example/hello::",
+        ]
         with self.temporary_workdir(cleanup=False) as workdir:
             pants_run = self.run_pants_with_workdir(args, workdir)
             self.assert_success(pants_run)

@@ -21,15 +21,26 @@ function safe_curl() {
 # shellcheck source=build-support/common.sh
 source "${ROOT}/build-support/common.sh"
 
-# Note we allow the user to predefine this value so that they may point to a specific interpreter.
-export PY="${PY:-python3.6}"
-interpreter_constraint="CPython==3.6.*"
+# TODO: make this less hacky when porting to Python 3. Use proper `--python-version` flags, like
+#  those used by ci.py.
+if [[ "${USE_PY37:-false}" == "true" ]]; then
+  default_python=python3.7
+  interpreter_constraint="==3.7.*"
+elif [[ "${USE_PY38:-false}" == "true" ]]; then
+  default_python=python3.8
+  interpreter_constraint="==3.8.*"
+else
+  default_python=python3.6
+  interpreter_constraint="==3.6.*"
+fi
+
+export PY="${PY:-${default_python}}"
 if ! command -v "${PY}" >/dev/null; then
   die "Python interpreter ${PY} not discoverable on your PATH."
 fi
 py_major_minor=$(${PY} -c 'import sys; print(".".join(map(str, sys.version_info[0:2])))')
-if [[ "${py_major_minor}" != "3.6" ]]; then
-  die "Invalid interpreter. The release script requires Python 3.6 (you are using ${py_major_minor})."
+if [[ "${py_major_minor}" != "3.6"  && "${py_major_minor}" != "3.7" && "${py_major_minor}" != "3.8" ]]; then
+  die "Invalid interpreter. The release script requires Python 3.6, 3.7, or 3.8 (you are using ${py_major_minor})."
 fi
 
 export PANTS_PYTHON_SETUP_INTERPRETER_CONSTRAINTS="['${interpreter_constraint}']"
@@ -88,15 +99,8 @@ function run_packages_script() {
   (
     cd "${ROOT}"
     # TODO: use V2 once we either figure out how to safely expand $@ to --run-args or we land 9835.
-    ./pants --quiet run "${ROOT}/build-support/bin/packages.py" -- "$@"
+    ./pants --quiet --concurrent run "${ROOT}/build-support/bin/packages.py" -- "$@"
   )
-}
-
-function find_pkg() {
-  local -r pkg_name=$1
-  local -r version=$2
-  local -r search_dir=$3
-  find "${search_dir}" -type f -name "${pkg_name}-${version}-*.whl"
 }
 
 function pkg_pants_install_test() {
@@ -169,31 +173,10 @@ function execute_packaged_pants_with_internal_backends() {
     "$@"
 }
 
-function pants_version_reset() {
-  pushd "${ROOT}" > /dev/null
-    git checkout -- "${VERSION_FILE}"
-  popd > /dev/null
-  unset _PANTS_VERSION_OVERRIDE
-}
-
-function pants_version_set() {
-  # Set the version in the wheels we build by mutating `src/python/pants/VERSION` to temporarily
-  # override it. Sets a `trap` to restore to HEAD on exit.
-  local version=$1
-  trap pants_version_reset EXIT
-  echo "${version}" > "${VERSION_FILE}"
-  # Also set the version reported by the prebuilt pant.pex we use to build the wheels.
-  # This is so that we pass the sanity-check that verifies that the built wheels have the same
-  # version as the pants version used to build them.
-  # TODO: Do we actually need that sanity check?
-  export _PANTS_VERSION_OVERRIDE=${version}
-}
-
 function build_3rdparty_packages() {
   # Builds whls for 3rdparty dependencies of pants.
   local version=$1
 
-  rm -rf "${DEPLOY_3RDPARTY_WHEEL_DIR}"
   mkdir -p "${DEPLOY_3RDPARTY_WHEEL_DIR}/${version}"
 
   local req_args=()
@@ -208,32 +191,6 @@ function build_3rdparty_packages() {
 
   deactivate
   end_travis_section
-}
-
-function build_pants_packages() {
-  local version=$1
-
-  rm -rf "${DEPLOY_PANTS_WHEEL_DIR}"
-  mkdir -p "${DEPLOY_PANTS_WHEEL_DIR}/${version}"
-
-  pants_version_set "${version}"
-
-  start_travis_section "${NAME}" "Building packages"
-  # WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
-  # shellcheck disable=SC2207
-  packages=(
-    $(run_packages_script build-and-print "${version}")
-  ) || die "Failed to build packages at ${version}!"
-  for package in "${packages[@]}"
-  do
-    (
-      wheel=$(find_pkg "${package}" "${version}" "${ROOT}/dist") && \
-      cp -p "${wheel}" "${DEPLOY_PANTS_WHEEL_DIR}/${version}"
-    ) || die "Failed to find package ${package}-${version}!"
-  done
-  end_travis_section
-
-  pants_version_reset
 }
 
 function build_fs_util() {
@@ -338,7 +295,7 @@ function install_and_test_packages() {
 function dry_run_install() {
   # Build a complete set of whls, and then ensure that we can install pants using only whls.
   local VERSION="${PANTS_UNSTABLE_VERSION}"
-  build_pants_packages "${VERSION}" && \
+  run_packages_script build-pants-wheels && \
   build_3rdparty_packages "${VERSION}" && \
   install_and_test_packages "${VERSION}" \
     --only-binary=:all: \
@@ -437,26 +394,24 @@ function build_pex() {
   local linux_platform_noabi="linux_x86_64"
   local osx_platform_noabi="macosx_10.11_x86_64"
 
-  dest_suffix="py36.pex"
   case "${mode}" in
     build)
-      # NB: When building locally, we explicitly target our local Py3.
+      # NB: When building locally, we explicitly target our local Py3. This will not be compatible
+      # with platforms other than `current` nor will it be compatible with multiple Python versions.
       local distribution_target_flags=("--python=$(command -v "$PY")")
-      local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${platform}.${dest_suffix}"
-      local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.${platform}.${dest_suffix}"
+      local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${platform}.pex"
+      local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.pex"
       ;;
     fetch)
       local distribution_target_flags=()
-      # TODO: once we add Python 3.7 PEX support, which requires first building Py37 wheels,
-      # we'll want to release one big flexible Pex that works with Python 3.6+.
-      abis=("cp-36-m")
+      abis=("cp-36-m" "cp-37-m" "cp-38-cp38")
       for platform in "${linux_platform_noabi}" "${osx_platform_noabi}"; do
         for abi in "${abis[@]}"; do
           distribution_target_flags=("${distribution_target_flags[@]}" "--platform=${platform}-${abi}")
         done
       done
-      local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.${dest_suffix}"
-      local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.${dest_suffix}"
+      local dest="${ROOT}/dist/pants.${PANTS_UNSTABLE_VERSION}.pex"
+      local stable_dest="${DEPLOY_DIR}/pex/pants.${PANTS_STABLE_VERSION}.pex"
       ;;
     *)
       echo >&2 "Bad build_pex mode ${mode}"
@@ -470,7 +425,7 @@ function build_pex() {
   if [[ "${mode}" == "fetch" ]]; then
     run_packages_script fetch-and-check-prebuilt-wheels --wheels-dest "${DEPLOY_DIR}"
   else
-    build_pants_packages "${PANTS_UNSTABLE_VERSION}"
+    run_packages_script build-pants-wheels
     build_3rdparty_packages "${PANTS_UNSTABLE_VERSION}"
   fi
 

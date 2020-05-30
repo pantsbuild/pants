@@ -14,7 +14,7 @@ from pants.core.util_rules.strip_source_roots import SourceRootStrippedSources
 from pants.engine.fs import FilesContent
 from pants.engine.target import Target
 from pants.python.python_setup import PythonSetup
-from pants.source.source_root import SourceRoots
+from pants.source.source_root import SourceRootError
 from pants.util.strutil import ensure_text
 
 # Convenient type alias for the pair (package name, data files in the package).
@@ -95,7 +95,6 @@ def distutils_repr(obj):
 
 
 def find_packages(
-    source_roots: SourceRoots,
     tgts_and_stripped_srcs: Iterable[Tuple[Target, SourceRootStrippedSources]],
     init_py_contents: FilesContent,
     py2: bool,
@@ -125,7 +124,15 @@ def find_packages(
     # Now find all package_data.
     for tgt, stripped_srcs in tgts_and_stripped_srcs:
         if tgt.has_field(ResourcesSources):
-            source_root = source_roots.strict_find_by_path(tgt.address.spec_path).path
+            source_roots = list(stripped_srcs.root_to_relfiles.keys())
+            if len(source_roots) != 1:
+                # A single target is expected to be under a single source root, so this
+                # should never happen, but we check to be sure.
+                raise SourceRootError(
+                    f"Expected a single source root for target "
+                    f"{tgt.address.spec} but found: {', '.join(source_roots)}. "
+                )
+            source_root = source_roots[0]
             resource_dir_relpath = os.path.relpath(tgt.address.spec_path, source_root)
             # Find the closest enclosing package, if any.  Resources will be loaded relative to that.
             package: str = resource_dir_relpath.replace(os.path.sep, ".")

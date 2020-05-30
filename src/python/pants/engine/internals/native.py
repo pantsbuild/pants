@@ -488,11 +488,11 @@ class _FFISpecification(object):
         try:
             res = c.from_value(func[0]).send(c.from_value(arg[0]))
 
-            if isinstance(res, Get):
+            if Get.isinstance(res):
                 # Get.
                 response.tag = self._lib.Get
                 response.get = (
-                    TypeId(c.to_id(res.product)),
+                    TypeId(c.to_id(res.product_type)),
                     c.to_value(res.subject),
                     c.identify(res.subject),
                     TypeId(c.to_id(res.subject_declared_type)),
@@ -501,7 +501,7 @@ class _FFISpecification(object):
                 # GetMulti.
                 response.tag = self._lib.GetMulti
                 response.get_multi = (
-                    c.type_ids_buf([TypeId(c.to_id(g.product)) for g in res]),
+                    c.type_ids_buf([TypeId(c.to_id(g.product_type)) for g in res]),
                     c.vals_buf([c.to_value(g.subject) for g in res]),
                     c.identities_buf([c.identify(g.subject) for g in res]),
                 )

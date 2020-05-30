@@ -192,10 +192,10 @@ def run_rule(
     while True:
         try:
             res = rule_coroutine.send(rule_input)
-            if isinstance(res, Get):
-                rule_input = get(res.product, res.subject)
+            if Get.isinstance(res):
+                rule_input = get(res.product_type, res.subject)
             elif type(res) in (tuple, list):
-                rule_input = [get(g.product, g.subject) for g in res]
+                rule_input = [get(g.product_type, g.subject) for g in res]
             else:
                 return res
         except StopIteration as e:

@@ -8,11 +8,12 @@ from pants.backend.pants_info.list_backends import (
     hackily_get_module_docstring,
     list_backends,
 )
+from pants.core.util_rules.strip_source_roots import SourceRootStrippedSources, StripSnapshotRequest
 from pants.engine.fs import EMPTY_SNAPSHOT, Digest, FileContent, FilesContent, PathGlobs, Snapshot
 from pants.option.global_options import GlobalOptions
-from pants.source.source_root import SourceRootConfig
 from pants.testutil.engine.util import MockConsole, MockGet, create_goal_subsystem, run_rule
 from pants.testutil.subsystem.util import global_subsystem_instance
+from pants.util.frozendict import FrozenDict
 
 
 def test_hackily_get_module_docstring() -> None:
@@ -149,11 +150,22 @@ def test_list_backends() -> None:
         ]
     )
     console = MockConsole(use_colors=False)
+
+    def mock_strip_source_root(_) -> SourceRootStrippedSources:
+        return SourceRootStrippedSources(
+            EMPTY_SNAPSHOT,
+            FrozenDict(
+                {
+                    "src/python": ("pants/backend/fortran/register.py", "pants/core/register.py"),
+                    "contrib/elixir/src/python": ("pants/contrib/elixir/register.py",),
+                }
+            ),
+        )
+
     run_rule(
         list_backends,
         rule_args=[
             create_goal_subsystem(BackendsOptions, sep="\\n", output_file=None),
-            global_subsystem_instance(SourceRootConfig),
             global_subsystem_instance(GlobalOptions),
             console,
         ],
@@ -161,6 +173,11 @@ def test_list_backends() -> None:
             MockGet(product_type=Snapshot, subject_type=PathGlobs, mock=lambda _: EMPTY_SNAPSHOT),
             MockGet(
                 product_type=FilesContent, subject_type=Digest, mock=lambda _: all_register_pys
+            ),
+            MockGet(
+                product_type=SourceRootStrippedSources,
+                subject_type=StripSnapshotRequest,
+                mock=mock_strip_source_root,
             ),
         ],
     )

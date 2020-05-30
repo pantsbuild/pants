@@ -1,10 +1,13 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import ast
-import unittest
+import re
+import warnings
+from typing import Any
 
-from pants.engine.selectors import Get
+import pytest
+
+from pants.engine.selectors import Get, MultiGet
 
 
 class AClass:
@@ -12,74 +15,86 @@ class AClass:
 
 
 class BClass:
-    def __eq__(self, other):
+    def __eq__(self, other: Any):
         return type(self) == type(other)
 
 
-class SubBClass(BClass):
-    pass
+def test_create() -> None:
+    get = Get[AClass](BClass, 42)
+    assert get.product_type is AClass
+    assert get.subject_declared_type is BClass
+    assert get.subject == 42
 
 
-class GetTest(unittest.TestCase):
-    def test_create(self):
-        # Test the equivalence of the 2-arg and 3-arg versions.
-        self.assertEqual(Get(AClass, BClass()), Get(AClass, BClass, BClass()))
+def test_create_abbreviated() -> None:
+    # Test the equivalence of the 1-arg and 2-arg versions.
+    assert Get[AClass](BClass()) == Get[AClass](BClass, BClass())
 
-        with self.assertRaises(TypeError) as cm:
-            Get(AClass, BClass)
-        self.assertEqual(
-            """\
-The two-argument form of Get does not accept a type as its second argument.
 
-args were: Get(({a!r}, {b!r}))
+def test_invalid_abbreviated() -> None:
+    with pytest.raises(
+        expected_exception=TypeError,
+        match=re.escape(f"The subject argument cannot be a type, given {BClass}."),
+    ):
+        Get[AClass](BClass)
 
-Get.create_statically_for_rule_graph() should be used to generate a Get() for
-the `input_gets` field of a rule. If you are using a `await Get(...)` in a rule
-and a type was intended, use the 3-argument version:
-Get({a!r}, {t!r}, {b!r})
-""".format(
-                a=AClass, t=type(BClass), b=BClass
-            ),
-            str(cm.exception),
-        )
 
-        with self.assertRaises(ValueError) as cm:
-            Get(1)
-        self.assertEqual(
-            "Expected either two or three arguments to Get; got (1,).", str(cm.exception)
-        )
+def test_invalid_subject() -> None:
+    with pytest.raises(
+        expected_exception=TypeError,
+        match=re.escape(f"The subject argument cannot be a type, given {BClass}."),
+    ):
+        Get[AClass](BClass, BClass)
 
-    def _get_call_node(self, input_string):
-        return ast.parse(input_string).body[0].value
 
-    def test_extract_constraints(self):
-        parsed_two_arg_call = self._get_call_node("Get(A, B(x))")
-        self.assertEqual(("A", "B"), Get.extract_constraints(parsed_two_arg_call))
+def test_invalid_subject_declared_type() -> None:
+    with pytest.raises(
+        expected_exception=TypeError,
+        match=re.escape(
+            f"The subject declared type argument must be a type, given {1} of type {type(1)}."
+        ),
+    ):
+        Get[AClass](1, BClass)
 
-        with self.assertRaises(ValueError) as cm:
-            Get.extract_constraints(self._get_call_node("Get(1, 2)"))
 
-        # The name of the type of a number literal AST node changed from "Num" to "Constant" between Python 3.6 and Python 3.8.
-        # This will compute the correct name for either version of Python.
-        n = ast.parse("1").body[0].value
-        num_ty = getattr(n, "id", type(n).__name__)
+def test_invalid_product_type() -> None:
+    with pytest.raises(
+        expected_exception=TypeError,
+        match=re.escape(f"The product type argument must be a type, given {1} of type {type(1)}."),
+    ):
+        Get[1]("bob")
 
-        msg = f"Two arg form of Get expected (product_type, subject_type(subject)), but got: ({num_ty}, {num_ty})"
-        assert str(cm.exception) == msg
 
-        parsed_three_arg_call = self._get_call_node("Get(A, B, C(x))")
-        self.assertEqual(("A", "B"), Get.extract_constraints(parsed_three_arg_call))
+def test_multiget_invalid_types() -> None:
+    with pytest.raises(
+        expected_exception=TypeError,
+        match=re.escape("Unexpected MultiGet argument types: Get(AClass, BClass, ...), 'bob'"),
+    ):
+        next(MultiGet(Get[AClass](BClass()), "bob").__await__())
 
-        with self.assertRaises(ValueError) as cm:
-            Get.extract_constraints(self._get_call_node("Get(A, 'asdf', C(x))"))
 
-        # The name of the type of a string literal AST node also changed between Python 3.6 and Python 3.8.
-        n = ast.parse("'test'").body[0].value
-        str_ty = getattr(n, "id", type(n).__name__)
-        msg = f"Three arg form of Get expected (product_type, subject_declared_type, subject), but got: (A, {str_ty}, Call)"
-        assert str(cm.exception) == msg
+def test_multiget_invalid_Nones() -> None:
+    with pytest.raises(
+        expected_exception=ValueError,
+        match=re.escape("Unexpected MultiGet None arguments: None, Get(AClass, BClass, ...)"),
+    ):
+        next(MultiGet(None, Get[AClass](BClass()), None, None).__await__())
 
-    def test_create_statically_for_rule_graph(self):
-        self.assertEqual(
-            Get(AClass, BClass, None), Get.create_statically_for_rule_graph(AClass, BClass)
-        )
+
+def test_depcated_indexed_form() -> None:
+    pytest.xfail(
+        "This should fail until deprecations are switched on: "
+        "https://github.com/pantsbuild/pants/issues/9899"
+    )
+    with warnings.catch_warnings(record=True) as emitted_warnings:
+        deprecated_get = Get[AClass](BClass())
+
+    assert Get(AClass, BClass()) == deprecated_get
+
+    assert len(emitted_warnings) == 1
+    emitted_warning = emitted_warnings[0]
+
+    assert emitted_warning.category == DeprecationWarning
+    assert str(emitted_warning.message).endswith(
+        "Use Get(AClass, ...) instead of Get[AClass](...)."
+    )

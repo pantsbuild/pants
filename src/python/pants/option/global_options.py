@@ -46,7 +46,7 @@ class FileNotFoundBehavior(Enum):
     def to_glob_match_error_behavior(self) -> GlobMatchErrorBehavior:
         deprecated_conditional(
             lambda: self == type(self).ignore,
-            removal_version="1.29.0.dev2",
+            removal_version="1.30.0.dev0",
             entity_description="--files-not-found-behavior=ignore",
             hint_message=(
                 "If you currently set `--files-not-found-behavior=ignore`, you will "
@@ -382,8 +382,10 @@ class GlobalOptions(Subsystem):
             metavar="<path>",
             daemon=False,
             default=["/etc/pantsrc", "~/.pants.rc"],
-            help="Override config with values from these files. "
-            "Later files override earlier ones.",
+            help=(
+                "Override config with values from these files, using syntax matching that of "
+                "`--pants-config-files`."
+            ),
         )
         register(
             "--pythonpath",
@@ -533,7 +535,7 @@ class GlobalOptions(Subsystem):
             advanced=True,
             type=bool,
             default=False,
-            removal_version="1.29.0.dev2",
+            removal_version="1.30.0.dev0",
             removal_hint="Not widely used, and will soon be rewritten to be inherent.",
             help="Create a new pantsd server, and use it, and shut it down immediately after. "
             "If pantsd is already running, it will shut it down and spawn a new instance (Beta)",
