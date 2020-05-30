@@ -999,6 +999,8 @@ impl Node for NodeKey {
         desc: user_facing_name.clone(),
         level: self.workunit_level(),
         blocked: false,
+        stdout: None,
+        stderr: None,
       };
 
       let started_workunit_id = context
@@ -1143,7 +1145,7 @@ pub enum NodeOutput {
   Digest(hashing::Digest),
   DirectoryListing(Arc<DirectoryListing>),
   LinkDest(LinkDest),
-  ProcessResult(ProcessResult),
+  ProcessResult(Box<ProcessResult>),
   Snapshot(Arc<store::Snapshot>),
   Value(Value),
 }
@@ -1168,7 +1170,7 @@ impl From<hashing::Digest> for NodeOutput {
 
 impl From<ProcessResult> for NodeOutput {
   fn from(v: ProcessResult) -> Self {
-    NodeOutput::ProcessResult(v)
+    NodeResult::ProcessResult(Box::new(v))
   }
 }
 
@@ -1222,7 +1224,7 @@ impl TryFrom<NodeOutput> for ProcessResult {
 
   fn try_from(nr: NodeOutput) -> Result<Self, ()> {
     match nr {
-      NodeOutput::ProcessResult(v) => Ok(v),
+      NodeResult::ProcessResult(v) => Ok(*v),
       _ => Err(()),
     }
   }
