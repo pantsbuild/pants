@@ -38,7 +38,7 @@ use std::fs::File;
 use std::hash::BuildHasherDefault;
 use std::io::{self, BufWriter, Write};
 use std::path::Path;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use fnv::FnvHasher;
 use futures::future;
@@ -458,17 +458,23 @@ impl<N: Node> InnerGraph<N> {
 ///
 pub struct Graph<N: Node> {
   inner: Mutex<InnerGraph<N>>,
+  invalidation_timeout: Duration,
 }
 
 impl<N: Node> Graph<N> {
   pub fn new() -> Graph<N> {
+    Self::new_with_invalidation_timeout(Duration::from_secs(60))
+  }
+
+  pub fn new_with_invalidation_timeout(invalidation_timeout: Duration) -> Graph<N> {
     let inner = InnerGraph {
-      draining: false,
       nodes: HashMap::default(),
       pg: DiGraph::new(),
+      draining: false,
     };
     Graph {
       inner: Mutex::new(inner),
+      invalidation_timeout,
     }
   }
 
@@ -534,16 +540,19 @@ impl<N: Node> Graph<N> {
     if dst_retry {
       // Retry the dst a number of times to handle Node invalidation.
       let context = context.clone();
-      let mut counter: usize = 8;
+      let deadline = Instant::now() + self.invalidation_timeout;
+      let mut interval = Duration::from_millis(100);
       loop {
-        counter -= 1;
-        if counter == 0 {
-          break Err(N::Error::exhausted());
-        }
-        let dep_res = entry.get(&context, entry_id).await;
-        match dep_res {
+        match entry.get(&context, entry_id).await {
           Ok(r) => break Ok(r),
-          Err(err) if err == N::Error::invalidated() => continue,
+          Err(err) if err == N::Error::invalidated() => {
+            if deadline < Instant::now() {
+              break Err(N::Error::exhausted());
+            }
+            delay_for(interval).await;
+            interval *= 2;
+            continue;
+          }
           Err(other_err) => break Err(other_err),
         }
       }
@@ -558,6 +567,9 @@ impl<N: Node> Graph<N> {
   ///
   /// If there is no src Node, or the src Node is not cacheable, this method will retry for
   /// invalidation until the Node completes.
+  ///
+  /// Invalidation events in the graph (generally, filesystem changes) will cause cacheable Nodes
+  /// to be retried here for up to `invalidation_timeout`.
   ///
   pub async fn get(
     &self,

@@ -4,7 +4,7 @@ use std::future::Future;
 use std::hash::{Hash, Hasher};
 use std::sync::{mpsc, Arc};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 use hashing::Digest;
@@ -355,9 +355,43 @@ async fn uncachable_node_only_runs_once() {
 }
 
 #[tokio::test]
+async fn retries() {
+  let _logger = env_logger::try_init();
+  let graph = Arc::new(Graph::new_with_invalidation_timeout(Duration::from_secs(
+    10,
+  )));
+
+  let context = {
+    let delay_for_root = Duration::from_millis(100);
+    let mut delays = HashMap::new();
+    delays.insert(TNode::new(0), delay_for_root);
+    TContext::new(graph.clone()).with_delays(delays)
+  };
+
+  // Spawn a thread that will invalidate in a loop for one second (much less than our timeout).
+  let sleep_per_invalidation = Duration::from_millis(10);
+  let invalidation_deadline = Instant::now() + Duration::from_secs(1);
+  let graph2 = graph.clone();
+  let join_handle = thread::spawn(move || loop {
+    thread::sleep(sleep_per_invalidation);
+    graph2.invalidate_from_roots(|&TNode(n, _)| n == 0);
+    if Instant::now() > invalidation_deadline {
+      break;
+    }
+  });
+
+  // Should succeed anyway.
+  assert_eq!(
+    graph.create(TNode::new(2), &context).await,
+    Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
+  );
+  join_handle.join().unwrap();
+}
+
+#[tokio::test]
 async fn exhaust_uncacheable_retries() {
   let _logger = env_logger::try_init();
-  let graph = Arc::new(Graph::new());
+  let graph = Arc::new(Graph::new_with_invalidation_timeout(Duration::from_secs(2)));
 
   let context = {
     let mut uncacheable = HashSet::new();
