@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
-import logging
 from abc import ABC, ABCMeta
 from dataclasses import dataclass
 from enum import Enum
@@ -31,9 +30,6 @@ from pants.engine.target import (
     TargetsToValidFieldSetsRequest,
 )
 from pants.engine.unions import UnionMembership, union
-
-# TODO(#6004): use proper Logging singleton, rather than static logger.
-logger = logging.getLogger(__name__)
 
 
 class Status(Enum):
@@ -311,16 +307,7 @@ async def run_tests(
 @rule
 async def coordinator_of_tests(wrapped_field_set: WrappedTestFieldSet) -> AddressAndTestResult:
     field_set = wrapped_field_set.field_set
-
-    # TODO(#6004): when streaming to live TTY, rely on V2 UI for this information. When not a
-    # live TTY, periodically dump heavy hitters to stderr. See
-    # https://github.com/pantsbuild/pants/issues/6004#issuecomment-492699898.
-    logger.info(f"Starting tests: {field_set.address.reference()}")
     result = await Get[TestResult](TestFieldSet, field_set)
-    logger.info(
-        f"Tests {'succeeded' if result.status == Status.SUCCESS else 'failed'}: "
-        f"{field_set.address.reference()}"
-    )
     return AddressAndTestResult(field_set.address, result)
 
 
