@@ -153,7 +153,9 @@ fn make_delayed_command_runner(
   } else {
     Ok(FallibleProcessResultWithPlatform {
       stdout: msg.into(),
+      stdout_digest: EMPTY_DIGEST,
       stderr: "".into(),
+      stderr_digest: EMPTY_DIGEST,
       exit_code: 0,
       output_directory: EMPTY_DIGEST,
       execution_attempts: vec![],
