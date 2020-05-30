@@ -301,39 +301,12 @@ function dry_run_install() {
     -f "${DEPLOY_3RDPARTY_WHEEL_DIR}/${VERSION}" -f "${DEPLOY_PANTS_WHEEL_DIR}/${VERSION}"
 }
 
-function get_branch() {
-  git branch | grep -E '^\* ' | cut -d' ' -f2-
-}
-
 function get_pgp_keyid() {
   git config --get user.signingkey
 }
 
 function get_pgp_program() {
   git config --get gpg.program || echo "gpg"
-}
-
-function check_release_prereqs() {
-  run_packages_script check-release-prereqs
-}
-
-function tag_release() {
-  release_version="${PANTS_STABLE_VERSION}" && \
-  tag_name="release_${release_version}" && \
-  git tag -f \
-    "--local-user=$(get_pgp_keyid)" \
-    -m "pantsbuild.pants release ${release_version}" \
-    "${tag_name}" && \
-  git push -f git@github.com:pantsbuild/pants.git "${tag_name}"
-}
-
-function publish_docs_if_master() {
-  branch=$(get_branch)
-  if [[ "${branch}" == "master" ]]; then
-    "${ROOT}/build-support/bin/publish_docs.sh" -p -y
-  else
-    echo "Skipping docsite publishing on non-master branch (${branch})."
-  fi
 }
 
 function reversion_whls() {
@@ -551,7 +524,7 @@ elif [[ "${test_release}" == "true" ]]; then
 else
   banner "Releasing packages to PyPI"
   (
-    check_release_prereqs && publish_packages && tag_release && publish_docs_if_master && \
-      banner "Successfully released packages to PyPI"
+    run_packages_script check-release-prereqs && publish_packages && \
+    run_packages_script post-publish && banner "Successfully released packages to PyPI"
   ) || die "Failed to release packages to PyPI."
 fi

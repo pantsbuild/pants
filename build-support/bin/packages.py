@@ -451,6 +451,37 @@ def check_prebuilt_wheels(check_dir: str) -> None:
     green(f"All {len(all_packages())} pantsbuild.pants packages were fetched and are valid.")
 
 
+def tag_release() -> None:
+    tag_name = f"release_{CONSTANTS.pants_stable_version}"
+    subprocess.run(
+        [
+            "git",
+            "tag",
+            "-f",
+            f"--local-user={get_pgp_key_id()}",
+            "-m",
+            f"pantsbuild.pants release {CONSTANTS.pants_stable_version}",
+            tag_name,
+        ],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "push", "-f", "git@github.com:pantsbuild/pants.git", tag_name], check=True
+    )
+
+
+def publish_docs_if_master_branch() -> None:
+    branch = get_git_branch()
+    if branch != "master":
+        print(
+            f"Skipping publish of pantsbuild.org because you are not on master ({branch}).\n\nTo "
+            "manually publish, first check out the `master` branch, then run "
+            "`build-support/bin/publish_docs.sh -p -y`."
+        )
+        return
+    subprocess.run(["build-support/bin/publish_docs.sh", "-p", "-y"], check=True)
+
+
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command")
@@ -460,6 +491,8 @@ def create_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("list-owners")
     subparsers.add_parser("list-packages")
     subparsers.add_parser("list-prebuilt-wheels")
+    # TODO: replace this with `publish-packages` once release.sh is ported.
+    subparsers.add_parser("post-publish")
 
     parser_fetch_prebuilt_wheels = subparsers.add_parser("fetch-and-check-prebuilt-wheels")
     parser_fetch_prebuilt_wheels.add_argument("--wheels-dest")
@@ -479,6 +512,9 @@ def main() -> None:
         list_packages()
     if args.command == "list-prebuilt-wheels":
         list_prebuilt_wheels()
+    if args.command == "post-publish":
+        tag_release()
+        publish_docs_if_master_branch()
     if args.command == "fetch-and-check-prebuilt-wheels":
         with TemporaryDirectory() as tempdir:
             dest = args.wheels_dest or tempdir
