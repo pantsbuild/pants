@@ -6,7 +6,6 @@ target(
   dependencies = [
     'contrib/awslambda/python/src/python/pants/contrib/awslambda/python:plugin',
     'contrib/buildrefactor/src/python/pants/contrib/buildrefactor:plugin',
-    'contrib/codeanalysis/src/python/pants/contrib/codeanalysis:plugin',
     'contrib/confluence/src/python/pants/contrib/confluence:plugin',
     'contrib/go/src/python/pants/contrib/go:plugin',
     'contrib/mypy/src/python/pants/contrib/mypy:plugin',
