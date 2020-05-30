@@ -711,7 +711,7 @@ async fn sends_headers() {
   )
   .unwrap();
   let context = Context {
-    workunit_store: WorkunitStore::default(),
+    workunit_store: WorkunitStore::new(false),
     build_id: String::from("marmosets"),
   };
   command_runner
@@ -2164,7 +2164,7 @@ fn workunits_with_constant_span_id(workunit_store: &mut WorkunitStore) -> HashSe
 
 #[tokio::test]
 async fn remote_workunits_are_stored() {
-  let mut workunit_store = WorkunitStore::new();
+  let mut workunit_store = WorkunitStore::new(false);
   workunit_store.init_thread_state(None);
   let op_name = "gimme-foo".to_string();
   let testdata = TestData::roland();

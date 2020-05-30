@@ -26,6 +26,7 @@
 #![allow(clippy::mutex_atomic)]
 
 use concrete_time::TimeSpan;
+use log::log;
 pub use log::Level;
 use parking_lot::Mutex;
 use petgraph::graph::{DiGraph, NodeIndex};
@@ -50,6 +51,43 @@ pub struct Workunit {
   pub parent_id: Option<String>,
   pub state: WorkunitState,
   pub metadata: WorkunitMetadata,
+}
+
+impl Workunit {
+  fn log_workunit_state(&self) {
+    let state = match self.state {
+      WorkunitState::Started { .. } => "Starting:",
+      WorkunitState::Completed { .. } => "Completed:",
+    };
+
+    let level = self.metadata.level;
+    let identifier = if let Some(ref s) = self.metadata.desc {
+      s.as_str()
+    } else {
+      self.name.as_str()
+    };
+
+    /* This length calculation doesn't treat multi-byte unicode charcters identically
+     * to single-byte ones for the purpose of figuring out where to truncate the string. But that's
+     * ok, since we just want to truncate the log string if it's roughly "too long", we don't care
+     * exactly what the max_len is or whether it effectively changes slightly if there are
+     * multibyte unicode characters in the string
+     */
+    let max_len = 200;
+    if identifier.len() > max_len {
+      let truncated_identifier: String = identifier.chars().take(max_len).collect();
+      let trunc = identifier.len() - max_len;
+      log!(
+        level,
+        "{} {}... ({} characters truncated)",
+        state,
+        truncated_identifier,
+        trunc
+      );
+    } else {
+      log!(level, "{} {}", state, identifier);
+    }
+  }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -77,6 +115,7 @@ impl WorkunitMetadata {
 
 #[derive(Clone, Default)]
 pub struct WorkunitStore {
+  rendering_dynamic_ui: bool,
   inner: Arc<Mutex<WorkUnitInnerStore>>,
 }
 
@@ -92,8 +131,9 @@ pub struct WorkUnitInnerStore {
 }
 
 impl WorkunitStore {
-  pub fn new() -> WorkunitStore {
+  pub fn new(rendering_dynamic_ui: bool) -> WorkunitStore {
     WorkunitStore {
+      rendering_dynamic_ui,
       inner: Arc::new(Mutex::new(WorkUnitInnerStore {
         graph: DiGraph::new(),
         span_id_to_graph: HashMap::new(),
@@ -190,6 +230,10 @@ impl WorkunitStore {
       metadata,
     };
     let mut inner = self.inner.lock();
+    if !self.rendering_dynamic_ui {
+      started.log_workunit_state()
+    }
+
     inner.workunit_records.insert(span_id.clone(), started);
     inner.started_ids.push(span_id.clone());
     let child = inner.graph.add_node(span_id.clone());
@@ -223,6 +267,8 @@ impl WorkunitStore {
         };
         let new_state = WorkunitState::Completed { time_span };
         workunit.state = new_state;
+        workunit.log_workunit_state();
+
         inner.workunit_records.insert(span_id.clone(), workunit);
         inner.completed_ids.push(span_id);
         Ok(())
