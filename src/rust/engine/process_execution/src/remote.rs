@@ -387,7 +387,9 @@ impl super::CommandRunner for CommandRunner {
                     "Exceeded timeout of {:?} ({:?} for the process and {:?} for remoting buffer time) with {:?} for operation {}, {}",
                     total_timeout, timeout, self.queue_buffer_time, elapsed, operation_name, description
                   )),
+                  stdout_digest: hashing::EMPTY_DIGEST,
                   stderr: Bytes::new(),
+                  stderr_digest: hashing::EMPTY_DIGEST,
                   exit_code: -libc::SIGTERM,
                   output_directory: hashing::EMPTY_DIGEST,
                   execution_attempts: history.attempts,
@@ -758,8 +760,6 @@ fn maybe_add_workunit(
   parent_id: Option<String>,
   workunit_store: &WorkunitStore,
 ) {
-  //  TODO: workunits for scheduling, fetching, executing and uploading should be recorded
-  //   only if '--reporting-zipkin-trace-v2' is set
   if !result_cached {
     let metadata = workunit_store::WorkunitMetadata::new();
     workunit_store.add_completed_workunit(name.to_string(), time_span, parent_id, metadata);
@@ -896,22 +896,26 @@ pub fn populate_fallible_execution_result(
   extract_stdout(&store, &execute_response)
     .join(extract_stderr(&store, &execute_response))
     .join(extract_output_files(store, &execute_response))
-    .and_then(move |((stdout, stderr), output_directory)| {
-      Ok(FallibleProcessResultWithPlatform {
-        stdout: stdout,
-        stderr: stderr,
-        exit_code: execute_response.get_result().get_exit_code(),
-        output_directory: output_directory,
-        execution_attempts: execution_attempts,
-        platform,
-      })
-    })
+    .and_then(
+      move |(((stdout, stdout_digest), (stderr, stderr_digest)), output_directory)| {
+        Ok(FallibleProcessResultWithPlatform {
+          stdout,
+          stdout_digest,
+          stderr,
+          stderr_digest,
+          exit_code: execute_response.get_result().get_exit_code(),
+          output_directory: output_directory,
+          execution_attempts: execution_attempts,
+          platform,
+        })
+      },
+    )
 }
 
 fn extract_stdout(
   store: &Store,
   execute_response: &bazel_protos::remote_execution::ExecuteResponse,
-) -> BoxFuture<Bytes, String> {
+) -> BoxFuture<(Bytes, Digest), String> {
   if execute_response.get_result().has_stdout_digest() {
     let store = store.clone();
     let stdout_digest_result: Result<Digest, String> =
@@ -934,7 +938,7 @@ fn extract_stdout(
             stdout_digest
           )
         })?;
-      Ok(bytes)
+      Ok((bytes, stdout_digest))
     })
     .compat()
     .to_boxed()
@@ -943,11 +947,11 @@ fn extract_stdout(
     let stdout_raw = Bytes::from(execute_response.get_result().get_stdout_raw());
     let stdout_copy = stdout_raw.clone();
     Box::pin(async move {
-      store
+      let digest = store
         .store_file_bytes(stdout_raw, true)
         .map_err(move |error| format!("Error storing raw stdout: {:?}", error))
         .await?;
-      Ok(stdout_copy)
+      Ok((stdout_copy, digest))
     })
     .compat()
     .to_boxed()
@@ -957,7 +961,7 @@ fn extract_stdout(
 fn extract_stderr(
   store: &Store,
   execute_response: &bazel_protos::remote_execution::ExecuteResponse,
-) -> BoxFuture<Bytes, String> {
+) -> BoxFuture<(Bytes, Digest), String> {
   if execute_response.get_result().has_stderr_digest() {
     let store = store.clone();
     let stderr_digest_result: Result<Digest, String> =
@@ -981,7 +985,7 @@ fn extract_stderr(
             stderr_digest
           )
         })?;
-      Ok(bytes)
+      Ok((bytes, stderr_digest))
     })
     .compat()
     .to_boxed()
@@ -990,11 +994,11 @@ fn extract_stderr(
     let stderr_raw = Bytes::from(execute_response.get_result().get_stderr_raw());
     let stderr_copy = stderr_raw.clone();
     Box::pin(async move {
-      store
+      let digest = store
         .store_file_bytes(stderr_raw, true)
         .map_err(move |error| format!("Error storing raw stderr: {:?}", error))
         .await?;
-      Ok(stderr_copy)
+      Ok((stderr_copy, digest))
     })
     .compat()
     .to_boxed()

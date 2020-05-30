@@ -438,7 +438,7 @@ pub trait CapturedWorkdir {
         })?,
       );
       CommandRunner::construct_output_snapshot(
-        store,
+        store.clone(),
         posix_fs,
         req.output_files,
         req.output_directories,
@@ -452,22 +452,37 @@ pub trait CapturedWorkdir {
     }
 
     match child_results_result {
-      Ok(child_results) => Ok(FallibleProcessResultWithPlatform {
-        stdout: child_results.stdout,
-        stderr: child_results.stderr,
-        exit_code: child_results.exit_code,
-        output_directory: output_snapshot.digest,
-        execution_attempts: vec![],
-        platform,
-      }),
+      Ok(child_results) => {
+        let stdout = child_results.stdout;
+        let stdout_digest = store.store_file_bytes(stdout.clone(), true).await?;
+
+        let stderr = child_results.stderr;
+        let stderr_digest = store.store_file_bytes(stderr.clone(), true).await?;
+
+        Ok(FallibleProcessResultWithPlatform {
+          stdout,
+          stdout_digest,
+          stderr,
+          stderr_digest,
+          exit_code: child_results.exit_code,
+          output_directory: output_snapshot.digest,
+          execution_attempts: vec![],
+          platform,
+        })
+      }
       Err(msg) => {
         if msg == "deadline has elapsed" {
+          let stdout = Bytes::from(format!(
+            "Exceeded timeout of {:?} for local process execution, {}",
+            req.timeout, req.description
+          ));
+          let stdout_digest = store.store_file_bytes(stdout.clone(), true).await?;
+
           Ok(FallibleProcessResultWithPlatform {
-            stdout: Bytes::from(format!(
-              "Exceeded timeout of {:?} for local process execution, {}",
-              req.timeout, req.description
-            )),
+            stdout,
+            stdout_digest,
             stderr: Bytes::new(),
+            stderr_digest: hashing::EMPTY_DIGEST,
             exit_code: -libc::SIGTERM,
             output_directory: hashing::EMPTY_DIGEST,
             execution_attempts: vec![],
