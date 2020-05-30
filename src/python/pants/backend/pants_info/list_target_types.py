@@ -17,6 +17,7 @@ from pants.engine.target import (
     FloatField,
     IntField,
     PrimitiveField,
+    RegisteredPluginFields,
     RegisteredTargetTypes,
     ScalarField,
     SequenceField,
@@ -25,7 +26,6 @@ from pants.engine.target import (
     StringSequenceField,
     Target,
 )
-from pants.engine.unions import UnionMembership
 from pants.option.global_options import GlobalOptions
 from pants.util.objects import get_docstring, get_docstring_summary, pretty_print_type_hint
 
@@ -177,14 +177,14 @@ class VerboseTargetInfo:
 
     @classmethod
     def create(
-        cls, target_type: Type[Target], *, union_membership: UnionMembership
+        cls, target_type: Type[Target], *, registered_plugin_fields: RegisteredPluginFields
     ) -> "VerboseTargetInfo":
         return cls(
             alias=target_type.alias,
             description=get_docstring(target_type),
             fields=[
                 FieldInfo.create(field)
-                for field in target_type.class_field_types(union_membership=union_membership)
+                for field in target_type.class_field_types(plugin_fields=registered_plugin_fields)
             ],
         )
 
@@ -208,7 +208,7 @@ class VerboseTargetInfo:
 @goal_rule
 def list_target_types(
     registered_target_types: RegisteredTargetTypes,
-    union_membership: UnionMembership,
+    registered_plugin_fields: RegisteredPluginFields,
     target_types_options: TargetTypesOptions,
     global_options: GlobalOptions,
     console: Console,
@@ -224,7 +224,7 @@ def list_target_types(
                     f"target types: {list(registered_target_types.aliases)}"
                 )
             verbose_target_info = VerboseTargetInfo.create(
-                target_type, union_membership=union_membership
+                target_type, registered_plugin_fields=registered_plugin_fields
             )
             print_stdout("")
             print_stdout(verbose_target_info.format_for_cli(console, v1_disabled=v1_disabled))

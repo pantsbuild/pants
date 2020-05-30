@@ -3,13 +3,15 @@
 
 import logging
 import typing
-from collections.abc import Iterable
+from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import Any, Dict, Type, Union
+from types import FunctionType
+from typing import Any, Callable, DefaultDict, Dict, Iterable, Type, Union
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.engine.rules import RuleIndex
-from pants.engine.target import Target
+from pants.engine.rules import Rule, RuleIndex
+from pants.engine.target import PluginField, Target
+from pants.engine.unions import UnionRule
 from pants.option.optionable import Optionable
 from pants.util.ordered_set import OrderedSet
 
@@ -26,7 +28,10 @@ class BuildConfiguration:
     _exposed_context_aware_object_factory_by_alias: Dict[Any, Any] = field(default_factory=dict)
     _optionables: OrderedSet = field(default_factory=OrderedSet)
     _rules: OrderedSet = field(default_factory=OrderedSet)
-    _union_rules: Dict[Type, OrderedSet[Type]] = field(default_factory=dict)
+    _union_rules: DefaultDict[Type, OrderedSet[Type]] = field(
+        default_factory=lambda: defaultdict(OrderedSet)
+    )
+    _plugin_fields: OrderedSet[PluginField] = field(default_factory=OrderedSet)
     _target_types: OrderedSet[Type[Target]] = field(default_factory=OrderedSet)
 
     def registered_aliases(self) -> BuildFileAliases:
@@ -136,29 +141,29 @@ class BuildConfiguration:
         """
         return self._optionables
 
-    def register_rules(self, rules):
-        """Registers the given rules.
-
-        param rules: The rules to register.
-        :type rules: :class:`collections.Iterable` containing
-                     :class:`pants.engine.rules.Rule` instances.
-        """
+    def register_rules(
+        self, rules: Iterable[Union[Callable, Rule, UnionRule, PluginField]]
+    ) -> None:
         if not isinstance(rules, Iterable):
             raise TypeError("The rules must be an iterable, given {!r}".format(rules))
 
+        actual_rules: OrderedSet[Union[Callable[..., Any], Rule]] = OrderedSet()
+        for rule in rules:
+            if isinstance(rule, (FunctionType, Rule)):
+                actual_rules.add(rule)
+            elif isinstance(rule, PluginField):
+                self._plugin_fields.add(rule)
+            elif isinstance(rule, UnionRule):
+                self._union_rules[rule.union_base].add(rule.union_member)
+            else:
+                raise TypeError(f"Unexpected rule {rule} of type {type(rule)}")
+
         # "Index" the rules to normalize them and expand their dependencies.
-        normalized_rules = RuleIndex.create(rules).normalized_rules()
+        normalized_rules = RuleIndex.create(actual_rules).normalized_rules()
         indexed_rules = normalized_rules.rules
-        union_rules = normalized_rules.union_rules
 
         # Store the rules and record their dependency Optionables.
         self._rules.update(indexed_rules)
-        for union_base, new_members in union_rules.items():
-            existing_members = self._union_rules.get(union_base, None)
-            if existing_members is None:
-                self._union_rules[union_base] = new_members
-            else:
-                existing_members.update(new_members)
         dependency_optionables = {
             do
             for rule in indexed_rules
@@ -175,9 +180,10 @@ class BuildConfiguration:
         return list(self._rules)
 
     def union_rules(self) -> Dict[Type, OrderedSet[Type]]:
-        """Returns a mapping of registered union base types -> [OrderedSet of union member
-        types]."""
         return self._union_rules
+
+    def plugin_fields(self) -> Iterable[PluginField]:
+        return self._plugin_fields
 
     # NB: We expect the parameter to be Iterable[Type[Target]], but we can't be confident in this
     # because we pass whatever people put in their `register.py`s to this function; i.e., this is

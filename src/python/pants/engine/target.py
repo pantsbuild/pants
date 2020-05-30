@@ -4,6 +4,7 @@
 import dataclasses
 import itertools
 from abc import ABC, ABCMeta, abstractmethod
+from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
@@ -22,7 +23,7 @@ from typing import (
     cast,
 )
 
-from typing_extensions import final
+from typing_extensions import DefaultDict, final
 
 from pants.base.specs import OriginSpec
 from pants.build_graph.app_base import Bundle
@@ -44,7 +45,7 @@ from pants.util.collections import ensure_list, ensure_str_list
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
-from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import pluralize
 
 # -----------------------------------------------------------------------------------------------
@@ -267,9 +268,9 @@ class Target(ABC):
     # Subclasses may define these
     v1_only: ClassVar[bool] = False
 
-    # These get calculated in the constructor
     address: Address
     plugin_fields: Tuple[Type[Field], ...]
+    # These get calculated in the constructor
     field_values: FrozenDict[Type[Field], Field]
 
     @final
@@ -281,10 +282,10 @@ class Target(ABC):
         # NB: `union_membership` is only optional to facilitate tests. In production, we should
         # always provide this parameter. This should be safe to do because production code should
         # rarely directly instantiate Targets and should instead use the engine to request them.
-        union_membership: Optional[UnionMembership] = None,
+        plugin_fields: Tuple[Type[Field], ...] = (),
     ) -> None:
         self.address = address
-        self.plugin_fields = self._find_plugin_fields(union_membership or UnionMembership({}))
+        self.plugin_fields = plugin_fields
 
         field_values = {}
         aliases_to_field_types = {field_type.alias: field_type for field_type in self.field_types}
@@ -306,17 +307,6 @@ class Target(ABC):
     def field_types(self) -> Tuple[Type[Field], ...]:
         return (*self.core_fields, *self.plugin_fields)
 
-    @union
-    @final
-    class PluginField:
-        """A sentinel class to allow plugin authors to add additional fields to this target type.
-
-        Plugin authors may add additional fields by simply registering UnionRules between the
-        `Target.PluginField` and the custom field, e.g. `UnionRule(PythonLibrary.PluginField,
-        TypeChecked)`. The `Target` will then treat `TypeChecked` as a first-class citizen and
-        plugins can use that Field like any other Field.
-        """
-
     def __repr__(self) -> str:
         fields = ", ".join(str(field) for field in self.field_values.values())
         return (
@@ -330,13 +320,6 @@ class Target(ABC):
         fields = ", ".join(str(field) for field in self.field_values.values())
         address = f"address=\"{self.address}\"{', ' if fields else ''}"
         return f"{self.alias}({address}{fields})"
-
-    @final
-    @classmethod
-    def _find_plugin_fields(cls, union_membership: UnionMembership) -> Tuple[Type[Field], ...]:
-        return cast(
-            Tuple[Type[Field], ...], tuple(union_membership.union_rules.get(cls.PluginField, ()))
-        )
 
     @final
     @classmethod
@@ -455,30 +438,32 @@ class Target(ABC):
 
     @final
     @classmethod
-    def class_field_types(cls, union_membership: UnionMembership) -> Tuple[Type[Field], ...]:
+    def class_field_types(cls, plugin_fields: "RegisteredPluginFields") -> Tuple[Type[Field], ...]:
         """Return all registered Fields belonging to this target type.
 
         You can also use the instance property `tgt.field_types` to avoid having to pass the
-        parameter UnionMembership.
+        RegisteredPluginFields parameter.
         """
-        return (*cls.core_fields, *cls._find_plugin_fields(union_membership))
+        return (*cls.core_fields, *plugin_fields.get(cls))
 
     @final
     @classmethod
-    def class_has_field(cls, field: Type[Field], *, union_membership: UnionMembership) -> bool:
+    def class_has_field(
+        cls, field: Type[Field], *, plugin_fields: "RegisteredPluginFields"
+    ) -> bool:
         """Behaves like `Target.has_field()`, but works as a classmethod rather than an instance
         method."""
-        return cls.class_has_fields([field], union_membership=union_membership)
+        return cls.class_has_fields([field], plugin_fields=plugin_fields)
 
     @final
     @classmethod
     def class_has_fields(
-        cls, fields: Iterable[Type[Field]], *, union_membership: UnionMembership
+        cls, fields: Iterable[Type[Field]], *, plugin_fields: "RegisteredPluginFields"
     ) -> bool:
         """Behaves like `Target.has_fields()`, but works as a classmethod rather than an instance
         method."""
         return cls._has_fields(
-            fields, registered_fields=cls.class_field_types(union_membership=union_membership)
+            fields, registered_fields=cls.class_field_types(plugin_fields=plugin_fields)
         )
 
 
@@ -578,6 +563,46 @@ class RegisteredTargetTypes:
         return tuple(self.aliases_to_types.values())
 
 
+@dataclass(frozen=True)
+class PluginField:
+    """A rule to allow plugin authors to add additional fields to a target type.
+
+    Plugin authors may add additional fields by simply registering PluginField rules associating the
+    target type and the custom field, e.g. `PluginField(PythonLibrary, TypeChecked)`. The
+    `PythonLibrary` target will then treat `TypeChecked` as a first-class citizen and plugins can
+    use that field like any other field.
+    """
+
+    target_type: Type[Target]
+    field_type: Type[Field]
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class RegisteredPluginFields:
+    targets_to_plugin_fields: FrozenDict[Type[Target], Tuple[Type[Field], ...]]
+
+    def __init__(
+        self, targets_to_plugin_fields: Mapping[Type[Target], Iterable[Type[Field]]]
+    ) -> None:
+        self.targets_to_plugin_fields = FrozenDict(
+            (target_type, tuple(plugin_fields))
+            for target_type, plugin_fields in targets_to_plugin_fields.items()
+        )
+
+    @classmethod
+    def create(cls, plugin_fields: Iterable[PluginField]) -> "RegisteredPluginFields":
+        targets_to_plugin_fields: DefaultDict[Type[Target], OrderedSet[Type[Field]]] = defaultdict(
+            OrderedSet
+        )
+        for plugin_field in plugin_fields:
+            targets_to_plugin_fields[plugin_field.target_type].add(plugin_field.field_type)
+        return cls(targets_to_plugin_fields)
+
+    def get(self, target_type: Type[Target]) -> Tuple[Type[Field], ...]:
+        return self.targets_to_plugin_fields.get(target_type, ())
+
+
 # -----------------------------------------------------------------------------------------------
 # FieldSet
 # -----------------------------------------------------------------------------------------------
@@ -597,12 +622,12 @@ class _AbstractFieldSet(ABC):
     @final
     @classmethod
     def valid_target_types(
-        cls, target_types: Iterable[Type[Target]], *, union_membership: UnionMembership
+        cls, target_types: Iterable[Type[Target]], *, plugin_fields: RegisteredPluginFields
     ) -> Tuple[Type[Target], ...]:
         return tuple(
             target_type
             for target_type in target_types
-            if target_type.class_has_fields(cls.required_fields, union_membership=union_membership)
+            if target_type.class_has_fields(cls.required_fields, plugin_fields=plugin_fields)
         )
 
 
@@ -748,6 +773,7 @@ def find_valid_field_sets(
     targets_with_origins: TargetsWithOrigins,
     union_membership: UnionMembership,
     registered_target_types: RegisteredTargetTypes,
+    registered_plugin_fields: RegisteredPluginFields,
 ) -> TargetsToValidFieldSets:
     field_set_types: Iterable[
         Union[Type[FieldSet], Type[FieldSetWithOrigin]]
@@ -770,7 +796,7 @@ def find_valid_field_sets(
             targets_with_origins,
             field_set_types=field_set_types,
             goal_description=request.goal_description,
-            union_membership=union_membership,
+            registered_plugin_fields=registered_plugin_fields,
             registered_target_types=registered_target_types,
         )
     result = TargetsToValidFieldSets(targets_to_valid_field_sets)
@@ -879,14 +905,14 @@ class NoValidTargetsException(Exception):
         *,
         field_set_types: Iterable[Type[_AbstractFieldSet]],
         goal_description: str,
-        union_membership: UnionMembership,
+        registered_plugin_fields: RegisteredPluginFields,
         registered_target_types: RegisteredTargetTypes,
     ) -> "NoValidTargetsException":
         valid_target_types = {
             target_type
             for field_set_type in field_set_types
             for target_type in field_set_type.valid_target_types(
-                registered_target_types.types, union_membership=union_membership
+                registered_target_types.types, plugin_fields=registered_plugin_fields
             )
         }
         return cls(

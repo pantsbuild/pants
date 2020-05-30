@@ -3,7 +3,7 @@
 
 from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
 from pants.backend.python.target_types import PythonInterpreterCompatibility
-from pants.engine.unions import UnionRule
+from pants.engine.target import PluginField
 
 
 class ProtobufPythonInterpreterCompatibility(PythonInterpreterCompatibility):
@@ -11,4 +11,4 @@ class ProtobufPythonInterpreterCompatibility(PythonInterpreterCompatibility):
 
 
 def rules():
-    return [UnionRule(ProtobufLibrary.PluginField, ProtobufPythonInterpreterCompatibility)]
+    return [PluginField(ProtobufLibrary, ProtobufPythonInterpreterCompatibility)]

@@ -48,7 +48,9 @@ from pants.engine.target import (
     InvalidFieldException,
     InvalidFieldTypeException,
     NoValidTargetsException,
+    PluginField,
     PrimitiveField,
+    RegisteredPluginFields,
     RequiredFieldMissingException,
     ScalarField,
     SequenceField,
@@ -198,44 +200,39 @@ def test_primitive_field_hydration_is_eager() -> None:
 
 
 def test_has_fields() -> None:
-    empty_union_membership = UnionMembership({})
+    empty_plugin_fields = RegisteredPluginFields({})
     tgt = FortranTarget({}, address=Address.parse(":lib"))
 
     assert tgt.field_types == (FortranExtensions, FortranSources)
-    assert tgt.class_field_types(union_membership=empty_union_membership) == (
+    assert tgt.class_field_types(plugin_fields=empty_plugin_fields) == (
         FortranExtensions,
         FortranSources,
     )
 
     assert tgt.has_fields([]) is True
-    assert FortranTarget.class_has_fields([], union_membership=empty_union_membership) is True
+    assert FortranTarget.class_has_fields([], plugin_fields=empty_plugin_fields) is True
 
     assert tgt.has_fields([FortranExtensions]) is True
     assert tgt.has_field(FortranExtensions) is True
     assert (
-        FortranTarget.class_has_fields([FortranExtensions], union_membership=empty_union_membership)
+        FortranTarget.class_has_fields([FortranExtensions], plugin_fields=empty_plugin_fields)
         is True
     )
     assert (
-        FortranTarget.class_has_field(FortranExtensions, union_membership=empty_union_membership)
-        is True
+        FortranTarget.class_has_field(FortranExtensions, plugin_fields=empty_plugin_fields) is True
     )
 
     assert tgt.has_fields([UnrelatedField]) is False
     assert tgt.has_field(UnrelatedField) is False
     assert (
-        FortranTarget.class_has_fields([UnrelatedField], union_membership=empty_union_membership)
-        is False
+        FortranTarget.class_has_fields([UnrelatedField], plugin_fields=empty_plugin_fields) is False
     )
-    assert (
-        FortranTarget.class_has_field(UnrelatedField, union_membership=empty_union_membership)
-        is False
-    )
+    assert FortranTarget.class_has_field(UnrelatedField, plugin_fields=empty_plugin_fields) is False
 
     assert tgt.has_fields([FortranExtensions, UnrelatedField]) is False
     assert (
         FortranTarget.class_has_fields(
-            [FortranExtensions, UnrelatedField], union_membership=empty_union_membership
+            [FortranExtensions, UnrelatedField], plugin_fields=empty_plugin_fields
         )
         is False
     )
@@ -282,15 +279,55 @@ def test_async_field() -> None:
     assert "//:lib" in str(exc)
 
 
+class RustTarget(Target):
+    alias = "rust"
+    core_fields = (Dependencies, Sources)
+
+
+class RustEditionCustomField(StringField):
+    alias = "rust_edition"
+    required = True
+
+
+class FortranCustomField(BoolField):
+    alias = "custom_field"
+    default = False
+
+
+def assert_fortran_target_fields(plugin_fields: RegisteredPluginFields) -> None:
+    assert {FortranExtensions, FortranSources, FortranCustomField} == set(
+        FortranTarget.class_field_types(plugin_fields)
+    )
+
+
+def test_add_custom_fields_bug_last_wins() -> None:
+    plugin_fields = RegisteredPluginFields(
+        {FortranTarget: [FortranCustomField], RustTarget: [RustEditionCustomField],}
+    )
+    assert_fortran_target_fields(plugin_fields)
+
+
+def test_add_custom_fields_bug_full_union() -> None:
+    plugin_fields = RegisteredPluginFields.create(
+        [
+            PluginField(FortranTarget, FortranCustomField),
+            PluginField(RustTarget, RustEditionCustomField),
+        ]
+    )
+    assert_fortran_target_fields(plugin_fields)
+
+
 def test_add_custom_fields() -> None:
     class CustomField(BoolField):
         alias = "custom_field"
         default = False
 
-    union_membership = UnionMembership({FortranTarget.PluginField: [CustomField]})
+    plugin_fields = RegisteredPluginFields({FortranTarget: [CustomField]})
+
     tgt_values = {CustomField.alias: True}
+    fortran_plugin_fields = plugin_fields.get(FortranTarget)
     tgt = FortranTarget(
-        tgt_values, address=Address.parse(":lib"), union_membership=union_membership
+        tgt_values, address=Address.parse(":lib"), plugin_fields=fortran_plugin_fields
     )
 
     assert tgt.field_types == (FortranExtensions, FortranSources, CustomField)
@@ -298,17 +335,17 @@ def test_add_custom_fields() -> None:
     assert tgt.plugin_fields == (CustomField,)
     assert tgt.has_field(CustomField) is True
 
-    assert FortranTarget.class_field_types(union_membership=union_membership) == (
+    assert FortranTarget.class_field_types(plugin_fields=plugin_fields) == (
         FortranExtensions,
         FortranSources,
         CustomField,
     )
-    assert FortranTarget.class_has_field(CustomField, union_membership=union_membership) is True
+    assert FortranTarget.class_has_field(CustomField, plugin_fields=plugin_fields) is True
 
     assert tgt[CustomField].value is True
 
     default_tgt = FortranTarget(
-        {}, address=Address.parse(":default"), union_membership=union_membership
+        {}, address=Address.parse(":default"), plugin_fields=fortran_plugin_fields
     )
     assert default_tgt[CustomField].value is False
 

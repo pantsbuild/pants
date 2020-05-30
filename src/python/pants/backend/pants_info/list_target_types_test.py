@@ -6,8 +6,14 @@ from textwrap import dedent
 from typing import Optional, cast
 
 from pants.backend.pants_info.list_target_types import TargetTypesOptions, list_target_types
-from pants.engine.target import BoolField, IntField, RegisteredTargetTypes, StringField, Target
-from pants.engine.unions import UnionMembership
+from pants.engine.target import (
+    BoolField,
+    IntField,
+    RegisteredPluginFields,
+    RegisteredTargetTypes,
+    StringField,
+    Target,
+)
 from pants.option.global_options import GlobalOptions
 from pants.testutil.engine.util import (
     MockConsole,
@@ -75,14 +81,14 @@ class FortranBinary(Target):
 
 
 def run_goal(
-    *, union_membership: Optional[UnionMembership] = None, details_target: Optional[str] = None
+    *, plugin_fields: Optional[RegisteredPluginFields] = None, details_target: Optional[str] = None
 ) -> str:
     console = MockConsole(use_colors=False)
     run_rule(
         list_target_types,
         rule_args=[
             RegisteredTargetTypes.create([FortranBinary, FortranLibrary, FortranTests]),
-            union_membership or UnionMembership({}),
+            plugin_fields or RegisteredPluginFields({}),
             create_goal_subsystem(
                 TargetTypesOptions, sep="\\n", output_file=None, details=details_target
             ),
@@ -125,7 +131,7 @@ def test_list_single() -> None:
         required = True
 
     tests_target_stdout = run_goal(
-        union_membership=UnionMembership({FortranTests.PluginField: [CustomField]}),
+        plugin_fields=RegisteredPluginFields({FortranTests: [CustomField]}),
         details_target=FortranTests.alias,
     )
     assert tests_target_stdout == dedent(

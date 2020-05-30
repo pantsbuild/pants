@@ -33,6 +33,7 @@ from pants.engine.target import (
     DependenciesRequest,
     HydratedSources,
     HydrateSourcesRequest,
+    RegisteredPluginFields,
     RegisteredTargetTypes,
     Sources,
     Target,
@@ -44,7 +45,6 @@ from pants.engine.target import (
     UnrecognizedTargetTypeException,
     WrappedTarget,
 )
-from pants.engine.unions import UnionMembership
 from pants.option.global_options import GlobalOptions, OwnersNotFoundBehavior
 from pants.source.filespec import any_matches_filespec
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
@@ -60,7 +60,7 @@ logger = logging.getLogger(__name__)
 async def resolve_target(
     hydrated_struct: HydratedStruct,
     registered_target_types: RegisteredTargetTypes,
-    union_membership: UnionMembership,
+    registered_plugin_fields: RegisteredPluginFields,
 ) -> WrappedTarget:
     kwargs = hydrated_struct.value.kwargs().copy()
     type_alias = kwargs.pop("type_alias")
@@ -82,11 +82,12 @@ async def resolve_target(
     # error. But, we also need to be careful to error if the user did explicitly specify
     # `dependencies` in the BUILD file.
     if kwargs["dependencies"] is None and not target_type.class_has_field(
-        Dependencies, union_membership=union_membership
+        Dependencies, plugin_fields=registered_plugin_fields
     ):
         kwargs.pop("dependencies")
 
-    return WrappedTarget(target_type(kwargs, address=address))
+    plugin_fields = registered_plugin_fields.get(target_type)
+    return WrappedTarget(target_type(kwargs, address=address, plugin_fields=plugin_fields))
 
 
 @rule

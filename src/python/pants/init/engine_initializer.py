@@ -52,7 +52,7 @@ from pants.engine.legacy.structs import rules as structs_rules
 from pants.engine.platform import create_platform_rules
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Params
-from pants.engine.target import RegisteredTargetTypes
+from pants.engine.target import RegisteredPluginFields, RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.option.global_options import (
@@ -383,7 +383,6 @@ class EngineInitializer:
         rules = build_configuration.rules()
 
         registered_target_types = RegisteredTargetTypes.create(build_configuration.target_types())
-
         symbol_table = _legacy_symbol_table(build_file_aliases, registered_target_types)
 
         execution_options = execution_options or DEFAULT_EXECUTION_OPTIONS
@@ -415,6 +414,10 @@ class EngineInitializer:
             return registered_target_types
 
         @rule
+        def registered_plugin_fields_singleton() -> RegisteredPluginFields:
+            return RegisteredPluginFields.create(build_configuration.plugin_fields())
+
+        @rule
         def union_membership_singleton() -> UnionMembership:
             return UnionMembership(build_configuration.union_rules())
 
@@ -430,6 +433,7 @@ class EngineInitializer:
             build_configuration_singleton,
             symbol_table_singleton,
             registered_target_types_singleton,
+            registered_plugin_fields_singleton,
             union_membership_singleton,
             build_root_singleton,
             *interactive_runner.rules(),

@@ -39,6 +39,18 @@ python_tests(
   ],
 )
 
+python_tests(
+  name='integration',
+  sources=['*_integration_test.py'],
+  dependencies=[
+    ':selectors',
+    ':target',
+    'src/python/pants/build_graph',
+    'src/python/pants/testutil:test_base',
+  ],
+  tags = {'integration', 'partially_type_checked'},
+)
+
 python_library(
   name='addresses',
   sources=['addresses.py'],
