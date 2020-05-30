@@ -66,10 +66,6 @@ type Nodes<N> = HashMap<N, EntryId>;
 struct InnerGraph<N: Node> {
   nodes: Nodes<N>,
   pg: PGraph<N>,
-  /// A Graph that is marked `draining:True` will not allow the creation of new `Nodes`. But
-  /// while draining, any Nodes that exist in the Graph will continue to run until/unless they
-  /// attempt to get/create new Nodes.
-  draining: bool,
 }
 
 impl<N: Node> InnerGraph<N> {
@@ -470,7 +466,6 @@ impl<N: Node> Graph<N> {
     let inner = InnerGraph {
       nodes: HashMap::default(),
       pg: DiGraph::new(),
-      draining: false,
     };
     Graph {
       inner: Mutex::new(inner),
@@ -493,9 +488,6 @@ impl<N: Node> Graph<N> {
     let (dst_retry, mut entry, entry_id) = {
       // Get or create the destination, and then insert the dep and return its state.
       let mut inner = self.inner.lock();
-      if inner.draining {
-        return Err(N::Error::invalidated());
-      }
 
       // TODO: doing cycle detection under the lock... unfortunate, but probably unavoidable
       // without a much more complicated algorithm.
@@ -864,25 +856,6 @@ impl<N: Node> Graph<N> {
   {
     let _inner = self.inner.lock();
     f()
-  }
-
-  ///
-  /// Marks this Graph with the given draining status. If the Graph already has a matching
-  /// draining status, then the operation will return an Err.
-  ///
-  /// This is an independent operation from acquiring exclusive access to the Graph
-  /// (`with_exclusive`), because once exclusive access has been acquired, threads attempting to
-  /// access the Graph would wait to acquire the lock, rather than acquiring and then failing fast
-  /// as we'd like them to while `draining:True`.
-  ///
-  pub fn mark_draining(&self, draining: bool) -> Result<(), ()> {
-    let mut inner = self.inner.lock();
-    if inner.draining == draining {
-      Err(())
-    } else {
-      inner.draining = draining;
-      Ok(())
-    }
   }
 }
 

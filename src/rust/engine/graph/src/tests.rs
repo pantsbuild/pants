@@ -429,50 +429,6 @@ async fn exhaust_uncacheable_retries() {
 }
 
 #[tokio::test]
-async fn drain_and_resume() {
-  // Confirms that after draining a Graph that has running work, we are able to resume the work
-  // and have it complete successfully.
-  let graph = Arc::new(Graph::new());
-
-  let delay_before_drain = Duration::from_millis(100);
-  let delay_in_task = delay_before_drain * 10;
-
-  // Create a context that will sleep long enough at TNode(1) to be interrupted before
-  // requesting TNode(0).
-  let context = {
-    let mut delays = HashMap::new();
-    delays.insert(TNode::new(1), delay_in_task);
-    TContext::new(graph.clone()).with_delays(delays)
-  };
-
-  // Spawn a background thread that will mark the Graph draining after a short delay.
-  let graph2 = graph.clone();
-  let _join = thread::spawn(move || {
-    thread::sleep(delay_before_drain);
-    graph2
-      .mark_draining(true)
-      .expect("Should not already be draining.");
-  });
-
-  // Request a TNode(1) in the "delayed" context, and expect it to be interrupted by the
-  // drain.
-  assert_eq!(
-    graph.create(TNode::new(2), &context).await,
-    Err(TError::Exhausted),
-  );
-
-  // Unmark the Graph draining, and try again: we expect the `Invalidated` result we saw before
-  // due to the draining to not have been persisted.
-  graph
-    .mark_draining(false)
-    .expect("Should already be draining.");
-  assert_eq!(
-    graph.create(TNode::new(2), &context).await,
-    Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
-  );
-}
-
-#[tokio::test]
 async fn cyclic_failure() {
   // Confirms that an attempt to create a cycle fails.
   let graph = Arc::new(Graph::new());
