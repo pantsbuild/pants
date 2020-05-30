@@ -19,7 +19,7 @@ from xml.etree import ElementTree
 
 import requests
 from bs4 import BeautifulSoup
-from common import banner, die, green
+from common import banner, die, green, travis_section
 
 # -----------------------------------------------------------------------------------------------
 # Pants package definitions
@@ -274,6 +274,39 @@ def build_pants_wheels() -> None:
     green(f"Wrote Pants wheels to {destination}.")
 
 
+def build_fs_util() -> None:
+    # See https://pants.readme.io/docs/contributions-rust for a description of fs_util. We include
+    # it in our releases because it can be a useful standalone tool.
+    with travis_section("fs_util", "Building fs_util"):
+        subprocess.run(
+            [
+                "build-support/bin/native/cargo",
+                "build",
+                "--release",
+                "--manifest-path=src/rust/engine/Cargo.toml",
+                "-p",
+                "fs_util",
+            ],
+            check=True,
+            env={**os.environ, "RUST_BACKTRACE": "1"},
+        )
+        current_os = (
+            subprocess.run(["build-support/bin/get_os.sh"], stdout=subprocess.PIPE, check=True)
+            .stdout.decode()
+            .strip()
+        )
+        dest_dir = (
+            Path(CONSTANTS.deploy_dir)
+            / "bin"
+            / "fs_util"
+            / current_os
+            / CONSTANTS.pants_unstable_version
+        )
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy("src/rust/engine/target/release/fs_util", dest_dir)
+        green(f"Built fs_util at {dest_dir / 'fs_util'}.")
+
+
 def check_clean_git_branch() -> None:
     banner("Checking for a clean Git branch")
     git_status = (
@@ -487,6 +520,7 @@ def create_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command")
 
     subparsers.add_parser("build-pants-wheels")
+    subparsers.add_parser("build-fs-util")
     subparsers.add_parser("check-release-prereqs")
     subparsers.add_parser("list-owners")
     subparsers.add_parser("list-packages")
@@ -504,6 +538,8 @@ def main() -> None:
     args = create_parser().parse_args()
     if args.command == "build-pants-wheels":
         build_pants_wheels()
+    if args.command == "build-fs-util":
+        build_fs_util()
     if args.command == "check-release-prereqs":
         check_release_prereqs()
     if args.command == "list-owners":
