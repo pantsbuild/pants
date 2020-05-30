@@ -404,7 +404,7 @@ function build_pex() {
       ;;
     fetch)
       local distribution_target_flags=()
-      abis=("cp-36-m" "cp-37-m" "cp38")
+      abis=("cp-36-m" "cp-37-m" "cp-38-cp38")
       for platform in "${linux_platform_noabi}" "${osx_platform_noabi}"; do
         for abi in "${abis[@]}"; do
           distribution_target_flags=("${distribution_target_flags[@]}" "--platform=${platform}-${abi}")
