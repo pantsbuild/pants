@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Optional, Tuple, cast
+from typing import Optional, Tuple
 
 from pants.backend.python.lint.flake8.subsystem import Flake8
 from pants.backend.python.rules import download_pex_bin, pex
@@ -97,16 +97,11 @@ async def flake8_lint_partition(
         )
     )
 
-    requirements_pex, config_snapshot, all_source_files, specified_source_files = cast(
-        Tuple[Pex, Snapshot, SourceFiles, SourceFiles],
-        await MultiGet(
-            [
-                requirements_pex_request,
-                config_snapshot_request,
-                all_source_files_request,
-                specified_source_files_request,
-            ]
-        ),
+    requirements_pex, config_snapshot, all_source_files, specified_source_files = await MultiGet(
+        requirements_pex_request,
+        config_snapshot_request,
+        all_source_files_request,
+        specified_source_files_request,
     )
 
     input_digest = await Get[Digest](

@@ -3,7 +3,7 @@
 
 import functools
 from dataclasses import dataclass
-from typing import List, Optional, Tuple, Union, cast
+from typing import Optional, Tuple
 
 from pants.backend.python.rules.importable_python_sources import ImportablePythonSources
 from pants.backend.python.rules.pex import (
@@ -32,6 +32,7 @@ from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestOptions, T
 from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.engine.addresses import Addresses
 from pants.engine.fs import (
+    EMPTY_DIGEST,
     AddPrefix,
     Digest,
     InputFilesContent,
@@ -114,88 +115,94 @@ async def setup_pytest_for_target(
         await Get[Digest](InputFilesContent, COVERAGE_PLUGIN_INPUT) if use_coverage else None
     )
 
-    pytest_pex_request = pex_request(
-        output_filename="pytest.pex",
-        requirements=PexRequirements(pytest.get_requirement_strings()),
-        additional_args=additional_args_for_pytest,
-        sources=plugin_file_digest,
+    pytest_pex_request = Get[Pex](
+        PexRequest,
+        pex_request(
+            output_filename="pytest.pex",
+            requirements=PexRequirements(pytest.get_requirement_strings()),
+            additional_args=additional_args_for_pytest,
+            sources=plugin_file_digest,
+        ),
     )
 
-    requirements_pex_request = PexFromTargetsRequest(
-        addresses=test_addresses,
-        output_filename="requirements.pex",
-        include_source_files=False,
-        additional_args=additional_args_for_pytest,
+    requirements_pex_request = Get[Pex](
+        PexFromTargetsRequest(
+            addresses=test_addresses,
+            output_filename="requirements.pex",
+            include_source_files=False,
+            additional_args=additional_args_for_pytest,
+        )
     )
 
-    test_runner_pex_request = pex_request(
-        output_filename="test_runner.pex",
-        entry_point="pytest:main",
-        interpreter_constraints=interpreter_constraints,
-        additional_args=(
-            "--pex-path",
-            # TODO(John Sirois): Support shading python binaries:
-            #   https://github.com/pantsbuild/pants/issues/9206
-            # Right now any pytest transitive requirements will shadow corresponding user
-            # requirements which will lead to problems when APIs that are used by either
-            # `pytest:main` or the tests themselves break between the two versions.
-            ":".join(
-                (pytest_pex_request.output_filename, requirements_pex_request.output_filename)
+    test_runner_pex_request = Get[Pex](
+        PexRequest,
+        pex_request(
+            output_filename="test_runner.pex",
+            entry_point="pytest:main",
+            interpreter_constraints=interpreter_constraints,
+            additional_args=(
+                "--pex-path",
+                # TODO(John Sirois): Support shading python binaries:
+                #   https://github.com/pantsbuild/pants/issues/9206
+                # Right now any pytest transitive requirements will shadow corresponding user
+                # requirements which will lead to problems when APIs that are used by either
+                # `pytest:main` or the tests themselves break between the two versions.
+                ":".join(
+                    (
+                        pytest_pex_request.subject.output_filename,
+                        requirements_pex_request.subject.output_filename,
+                    )
+                ),
             ),
         ),
     )
 
+    prepared_sources_request = Get[ImportablePythonSources](Targets(all_targets))
+
     # Get the file names for the test_target so that we can specify to Pytest precisely which files
     # to test, rather than using auto-discovery.
-    specified_source_files_request = SpecifiedSourceFilesRequest(
-        [(field_set.sources, field_set.origin)], strip_source_roots=True
+    specified_source_files_request = Get[SourceFiles](
+        SpecifiedSourceFilesRequest(
+            [(field_set.sources, field_set.origin)], strip_source_roots=True
+        )
     )
 
-    # TODO(John Sirois): Support exploiting concurrency better:
-    #   https://github.com/pantsbuild/pants/issues/9294
-    # Some awkward code follows in order to execute 5-6 items concurrently given the current state
-    # of MultiGet typing / API. Improve this since we should encourage full concurrency in general.
-    requests: List[Get] = [
-        Get[Pex](PexRequest, pytest_pex_request),
-        Get[Pex](PexFromTargetsRequest, requirements_pex_request),
-        Get[Pex](PexRequest, test_runner_pex_request),
-        Get[ImportablePythonSources](Targets(all_targets)),
-        Get[SourceFiles](SpecifiedSourceFilesRequest, specified_source_files_request),
-    ]
-    if use_coverage:
-        requests.append(
-            Get[CoverageConfig](
-                CoverageConfigRequest(
-                    Targets((tgt for tgt in all_targets if tgt.has_field(PythonSources))),
-                    is_test_time=True,
-                )
-            ),
-        )
-
+    requests = (
+        pytest_pex_request,
+        requirements_pex_request,
+        test_runner_pex_request,
+        prepared_sources_request,
+        specified_source_files_request,
+    )
     (
+        coverage_config,
         pytest_pex,
         requirements_pex,
         test_runner_pex,
         prepared_sources,
         specified_source_files,
-        *rest,
-    ) = cast(
-        Union[
-            Tuple[Pex, Pex, Pex, ImportablePythonSources, SourceFiles],
-            Tuple[Pex, Pex, Pex, ImportablePythonSources, SourceFiles, CoverageConfig],
-        ],
-        await MultiGet(requests),
+    ) = (
+        await MultiGet(
+            Get(
+                CoverageConfig,
+                CoverageConfigRequest(
+                    Targets((tgt for tgt in all_targets if tgt.has_field(PythonSources))),
+                    is_test_time=True,
+                ),
+            ),
+            *requests,
+        )
+        if use_coverage
+        else (CoverageConfig(EMPTY_DIGEST), *await MultiGet(*requests))
     )
 
     digests_to_merge = [
+        coverage_config.digest,
         prepared_sources.snapshot.digest,
         requirements_pex.digest,
         pytest_pex.digest,
         test_runner_pex.digest,
     ]
-    if use_coverage:
-        coverage_config = rest[0]
-        digests_to_merge.append(coverage_config.digest)
     input_digest = await Get[Digest](MergeDigests(digests_to_merge))
 
     coverage_args = []

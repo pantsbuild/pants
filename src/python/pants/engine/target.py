@@ -688,18 +688,21 @@ class FieldSetWithOrigin(_AbstractFieldSet, metaclass=ABCMeta):
         )
 
 
+_AFS = TypeVar("_AFS", bound=_AbstractFieldSet)
+
+
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class TargetsToValidFieldSets:
-    mapping: FrozenDict[TargetWithOrigin, Tuple[_AbstractFieldSet, ...]]
+class TargetsToValidFieldSets(Generic[_AFS]):
+    mapping: FrozenDict[TargetWithOrigin, Tuple[_AFS, ...]]
 
-    def __init__(self, mapping: Mapping[TargetWithOrigin, Iterable[_AbstractFieldSet]]) -> None:
+    def __init__(self, mapping: Mapping[TargetWithOrigin, Iterable[_AFS]]) -> None:
         self.mapping = FrozenDict(
             {tgt_with_origin: tuple(field_sets) for tgt_with_origin, field_sets in mapping.items()}
         )
 
     @memoized_property
-    def field_sets(self) -> Tuple[_AbstractFieldSet, ...]:
+    def field_sets(self) -> Tuple[_AFS, ...]:
         return tuple(
             itertools.chain.from_iterable(
                 field_sets_per_target for field_sets_per_target in self.mapping.values()
@@ -717,8 +720,8 @@ class TargetsToValidFieldSets:
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class TargetsToValidFieldSetsRequest:
-    field_set_superclass: Type[_AbstractFieldSet]
+class TargetsToValidFieldSetsRequest(Generic[_AFS]):
+    field_set_superclass: Type[_AFS]
     goal_description: str
     error_if_no_valid_targets: bool
     expect_single_field_set: bool
@@ -727,7 +730,7 @@ class TargetsToValidFieldSetsRequest:
 
     def __init__(
         self,
-        field_set_superclass: Type[_AbstractFieldSet],
+        field_set_superclass: Type[_AFS],
         *,
         goal_description: str,
         error_if_no_valid_targets: bool,

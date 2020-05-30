@@ -4,7 +4,7 @@
 import itertools
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Iterable, Tuple, cast
+from typing import Iterable, Tuple
 
 from pants.backend.python.lint.pylint.subsystem import Pylint
 from pants.backend.python.rules import download_pex_bin, importable_python_sources, pex
@@ -175,21 +175,14 @@ async def pylint_lint_partition(
         prepared_plugin_sources,
         prepared_python_sources,
         specified_source_files,
-    ) = cast(
-        Tuple[
-            Pex, Pex, Pex, Snapshot, ImportablePythonSources, ImportablePythonSources, SourceFiles
-        ],
-        await MultiGet(
-            [
-                pylint_pex_request,
-                requirements_pex_request,
-                pylint_runner_pex_request,
-                config_snapshot_request,
-                prepare_plugin_sources_request,
-                prepare_python_sources_request,
-                specified_source_files_request,
-            ]
-        ),
+    ) = await MultiGet(
+        pylint_pex_request,
+        requirements_pex_request,
+        pylint_runner_pex_request,
+        config_snapshot_request,
+        prepare_plugin_sources_request,
+        prepare_python_sources_request,
+        specified_source_files_request,
     )
 
     prefixed_plugin_sources = (
@@ -248,10 +241,7 @@ async def pylint_lint(
     linted_targets_request = Get[Targets](
         Addresses(field_set.address for field_set in request.field_sets)
     )
-    plugin_targets, linted_targets = cast(
-        Tuple[TransitiveTargets, Targets],
-        await MultiGet([plugin_targets_request, linted_targets_request]),
-    )
+    plugin_targets, linted_targets = await MultiGet(plugin_targets_request, linted_targets_request)
 
     plugin_targets_compatibility_fields = tuple(
         plugin_tgt[PythonInterpreterCompatibility]
