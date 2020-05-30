@@ -3,7 +3,88 @@
 
 This document describes releases leading up to the ``1.29.x`` ``stable`` series.
 
-See https://pants.readme.io/docs/release-notes-1-29 for an overview of the changes in this release.
+See https://pants.readme.io/v1.29/docs/release-notes-1-29 for an overview of the changes in this release.
+
+1.29.0rc0 (5/29/2020)
+---------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Build pantsbuild.pants as cp36m, cp37m, and cp38 wheels (rather than abi3) (#9881)
+  `PR #9881 <https://github.com/pantsbuild/pants/pull/9881>`_
+
+* `BoolField` can  leave off a default to represent tri-states (#9893)
+  `PR #9893 <https://github.com/pantsbuild/pants/pull/9893>`_
+
+* Deprecate plugin targets not having Target API bindings (#9896)
+  `PR #9896 <https://github.com/pantsbuild/pants/pull/9896>`_
+
+* Deprecate `pants.ini` in favor of `pants.toml` (#9879)
+  `PR #9879 <https://github.com/pantsbuild/pants/pull/9879>`_
+
+* Deprecate the `codeanalysis` plugin due to low usage (#9891)
+  `PR #9891 <https://github.com/pantsbuild/pants/pull/9891>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Add support for passthrough options for v2 (#9835)
+  `PR #9835 <https://github.com/pantsbuild/pants/pull/9835>`_
+
+Bugfixes
+~~~~~~~~
+
+* A Param should never be directly used to satisfy a Get (#9890)
+  `PR #9890 <https://github.com/pantsbuild/pants/pull/9890>`_
+
+* Fix extraneous blank lines (#9882)
+  `PR #9882 <https://github.com/pantsbuild/pants/pull/9882>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Add support for mutable, global, append only caches (#9852)
+  `PR #9852 <https://github.com/pantsbuild/pants/pull/9852>`_
+
+* Compute source roots in a rule. (#9888)
+  `PR #9888 <https://github.com/pantsbuild/pants/pull/9888>`_
+
+* Support Tuple-style MultiGet. (#9903)
+  `PR #9903 <https://github.com/pantsbuild/pants/pull/9903>`_
+
+* Attempt to parse as TOML, and fall back to INI. (#9901)
+  `PR #9901 <https://github.com/pantsbuild/pants/pull/9901>`_
+
+* Use V2 `setup-py` to build Pants wheels (#9892)
+  `PR #9892 <https://github.com/pantsbuild/pants/pull/9892>`_
+
+* Rework internal `contrib_plugin` to work with the Target API (#9889)
+  `PR #9889 <https://github.com/pantsbuild/pants/pull/9889>`_
+
+* Move remaining Pants wheel building logic to Python (#9898)
+  `PR #9898 <https://github.com/pantsbuild/pants/pull/9898>`_
+
+* Decouple wheel building jobs from CI's `pants.pex` (#9871)
+  `PR #9871 <https://github.com/pantsbuild/pants/pull/9871>`_
+
+* Fix deploy shards failing due to missing pants.pex (#9873)
+  `PR #9873 <https://github.com/pantsbuild/pants/pull/9873>`_
+
+* Add some type annotations, dataclasses, etc. to Console (#9884)
+  `PR #9884 <https://github.com/pantsbuild/pants/pull/9884>`_
+
+* upgrade Rust to 1.43.1 (#9681)
+  `PR #9681 <https://github.com/pantsbuild/pants/pull/9681>`_
+
+* Remote execution: sort platform properties (#9875)
+  `PR #9875 <https://github.com/pantsbuild/pants/pull/9875>`_
+
+Testing
+~~~~~~~
+
+* Bump several test timeouts (#9877)
+  `PR #9877 <https://github.com/pantsbuild/pants/pull/9877>`_
 
 1.29.0.dev1 (5/26/2020)
 -----------------------
