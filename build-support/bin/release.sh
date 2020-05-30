@@ -130,7 +130,6 @@ function pkg_testutil_install_test() {
 REQUIREMENTS_3RDPARTY_FILES=(
   "3rdparty/python/requirements.txt"
   "3rdparty/python/twitter/commons/requirements.txt"
-  "contrib/python/src/python/pants/contrib/python/checks/checker/3rdparty/requirements.txt"
 )
 
 # When we do (dry-run) testing, we need to run the packaged pants.

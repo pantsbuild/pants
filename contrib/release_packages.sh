@@ -30,23 +30,6 @@ function pkg_node_install_test() {
       --explain test | grep "NodeTest_test_node" &> /dev/null
 }
 
-function pkg_checks_install_test() {
-  local version=$1
-  execute_packaged_pants_with_internal_backends \
-    --plugins="['pantsbuild.pants.contrib.python.checks==${version}']" \
-    --explain lint | grep "python-eval" &> /dev/null && \
-  execute_packaged_pants_with_internal_backends \
-    --plugins="['pantsbuild.pants.contrib.python.checks==${version}']" \
-    --explain lint | grep "pythonstyle" &> /dev/null
-}
-
-function pkg_checker_install_test() {
-  local version=$1
-  execute_pex --pypi \
-    "pantsbuild.pants.contrib.python.checks.checker==${version}" \
-    -c checker -- --help
-}
-
 function pkg_confluence_install_test() {
   local version=$1
   execute_packaged_pants_with_internal_backends \
