@@ -18,13 +18,13 @@ def test_normal_imports() -> None:
             import os
             import os.path
             from typing import TYPE_CHECKING
-    
+
             import requests
 
             import demo
             from project.demo import Demo
             from project.demo import OriginalName as Renamed
-            
+
             if TYPE_CHECKING:
                 from project.circular_dep import CircularDep
 
