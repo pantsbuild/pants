@@ -3,7 +3,7 @@
 
 import importlib
 import traceback
-from textwrap import fill, indent
+from textwrap import fill
 from typing import Dict, List
 
 from pkg_resources import Requirement, WorkingSet
@@ -43,64 +43,6 @@ def load_backends_and_plugins(
     :param backends2: v2 backends to load.
     :param build_configuration: The BuildConfiguration (for adding aliases).
     """
-    if "pants.backend.python.lint.isort" in backends1:
-        reasons = [
-            indent(fill(reason, 78), "  ")
-            for reason in [
-                "1) Avoids unnecessary prework. This new implementation should be faster to run.",
-                (
-                    "2) Has less verbose output. Pants will now only show what isort itself outputs. "
-                    "(Use `--dynamic-ui` if you want to see the work Pants is doing behind-the-scenes.)"
-                ),
-                (
-                    "3) Works with `./pants lint` automatically. When you run `./pants lint`, Pants "
-                    "will run isort in check-only mode."
-                ),
-                (
-                    "4) Works with precise file arguments. If you say `./pants fmt f1.py`, Pants "
-                    "will only run over the file `f1.py`, whereas the old implementation would run "
-                    "over every file belonging to the target that owns `f1.py`."
-                ),
-            ]
-        ]
-        msg_lines = [
-            fill(
-                (
-                    "The original isort implementation is being replaced by an improved "
-                    "implementation made possible by the V2 engine. This new implementation "
-                    "brings these benefits:"
-                ),
-                80,
-            ),
-            "",
-            *(f"{reason}\n" for reason in reasons),
-            "",
-            fill(
-                (
-                    "To prepare for this change, add to the `GLOBAL` section in your `pants.toml` "
-                    "the line `backend_packages.remove = ['pants.backend.python.lint.isort']` "
-                    "(or `backend_packages = -['pants.backend.python.lint.isort']` to your "
-                    "`pants.ini`)."
-                ),
-                80,
-            ),
-            "",
-            fill(
-                (
-                    "If you still want to use isort, add `backend_packages2.add = "
-                    "['pants.backend.python.lint.isort']` to `pants.toml` or `backend_packages2 = "
-                    "+['pants.backend.python.lint.isort']` to your `pants.ini`. Ensure that you "
-                    "have `--v2` enabled (the default value)."
-                ),
-                80,
-            ),
-        ]
-        warn_or_error(
-            deprecated_entity_description="The V1 isort implementation",
-            removal_version="1.30.0.dev0",
-            hint="\n".join(msg_lines),
-        )
-
     if "pants.contrib.awslambda.python" in backends1:
         msg_lines = [
             fill(
