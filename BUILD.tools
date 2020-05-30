@@ -34,30 +34,3 @@ jar_library(
     jar(org='com.twitter', name='scrooge-linter_2.11', rev=SCROOGE_REV),
   ],
 )
-
-# Google doesn't publish Kythe jars (yet?).  So we publish them to a custom repo
-# (https://github.com/toolchainlabs/binhost) for now.  See build-support/ivy/ivysettings.xml
-# for more info.
-jar_library(
-  name='kythe-java-extractor',
-  jars = [
-    jar(org='kythe', name='javac_extractor', rev='v0.0.30-toolchain001-26a6b03b-000'),
-  ],
-)
-
-jar_library(
-  name='kythe-java-indexer',
-  jars = [
-    jar(org='kythe', name='java_indexer', rev='v0.0.30-toolchain001-26a6b03b-000'),
-  ],
-)
-
-# Running Kythe on JDK8 requires a standalone javac 9 on the bootclasspath.
-# This jar is published to the same custom repo as the Kythe jars.
-jar_library(
-  name='javac9',
-  jars = [
-    jar(org='java', name='javac', rev='9+181-r4173-1',
-        url='https://raw.githubusercontent.com/toolchainlabs/binhost/master/java/javac/9+181-r4173-1/javac-9+181-r4173-1.jar'),
-  ],
-)

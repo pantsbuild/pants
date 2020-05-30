@@ -104,10 +104,6 @@ def contrib_packages() -> Set[Package]:
             "contrib/confluence/src/python/pants/contrib/confluence:plugin",
         ),
         Package(
-            "pantsbuild.pants.contrib.codeanalysis",
-            "contrib/codeanalysis/src/python/pants/contrib/codeanalysis:plugin",
-        ),
-        Package(
             "pantsbuild.pants.contrib.mypy", "contrib/mypy/src/python/pants/contrib/mypy:plugin",
         ),
     }

@@ -25,7 +25,6 @@ enable_pantsd = true
 # Enable our own custom loose-source plugins as well as contribs.
 pythonpath = [
   "%(buildroot)s/contrib/buildrefactor/src/python",
-  "%(buildroot)s/contrib/codeanalysis/src/python",
   "%(buildroot)s/contrib/confluence/src/python",
   "%(buildroot)s/contrib/go/src/python",
   "%(buildroot)s/contrib/mypy/src/python",
