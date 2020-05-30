@@ -3,12 +3,10 @@
 
 import importlib
 import traceback
-from textwrap import fill
 from typing import Dict, List
 
 from pkg_resources import Requirement, WorkingSet
 
-from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import BackendConfigurationError
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.util.ordered_set import FrozenOrderedSet
@@ -43,36 +41,6 @@ def load_backends_and_plugins(
     :param backends2: v2 backends to load.
     :param build_configuration: The BuildConfiguration (for adding aliases).
     """
-    if "pants.contrib.awslambda.python" in backends1:
-        msg_lines = [
-            fill(
-                (
-                    "The original awslambda implementation is being replaced by an improved "
-                    "implementation made possible by the V2 engine."
-                ),
-                80,
-            ),
-            "",
-            fill(
-                (
-                    "To prepare for this change, remove 'pants.contrib.awslambda.python' from the "
-                    "`backend_packages` entry in the `GLOBAL` section in your `pants.toml` "
-                    "(or `pants.ini`). Then add `pants.backend.awslambda.python` to the "
-                    "`backend_packages2` entry. Ensure that you have `--v2` enabled (the default). "
-                    "Then modify your BUILD files to remove the intermediate `python_binary` "
-                    "target and the `binary=` setting on the `python_awslambda` target. "
-                    "Finally, use the `awslambda` goal instead of the `bundle` goal."
-                ),
-                80,
-            ),
-        ]
-        warn_or_error(
-            deprecated_entity_description="The V1 awslambda implementation",
-            removal_version="1.30.0.dev0",
-            deprecation_start_version="1.28.0.dev0",
-            hint="\n".join(msg_lines),
-        )
-
     load_build_configuration_from_source(build_configuration, backends1, backends2)
     load_plugins(build_configuration, plugins1, working_set, is_v1_plugin=True)
     load_plugins(build_configuration, plugins2, working_set, is_v1_plugin=False)
