@@ -110,10 +110,6 @@ def contrib_packages() -> Set[Package]:
         Package(
             "pantsbuild.pants.contrib.mypy", "contrib/mypy/src/python/pants/contrib/mypy:plugin",
         ),
-        Package(
-            "pantsbuild.pants.contrib.awslambda_python",
-            "contrib/awslambda/python/src/python/pants/contrib/awslambda/python:plugin",
-        ),
     }
 
 
