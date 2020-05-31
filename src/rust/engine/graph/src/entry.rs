@@ -3,12 +3,10 @@ use std::sync::Arc;
 
 use crate::node::{EntryId, Node, NodeContext, NodeError};
 
-use futures01::future::{self, Future};
-use futures01::sync::oneshot;
+use futures::channel::oneshot;
+use futures::future::{self, BoxFuture, FutureExt};
 use log::{self, trace};
 use parking_lot::Mutex;
-
-use boxfuture::{BoxFuture, Boxable};
 
 ///
 /// A token that uniquely identifies one run of a Node in the Graph. Each run of a Node (via
@@ -230,39 +228,37 @@ impl<N: Node> Entry<N> {
   }
 
   ///
-  /// If this Node is currently complete and clean with the given Generation, then return a Future
-  /// that will be satisfied when it is changed in any way. If the node is not clean, or the
-  /// generation mismatches, returns immediately.
+  /// If this Node is currently complete and clean with the given Generation, then waits for it to
+  /// be changed in any way. If the node is not clean, or the generation mismatches, returns
+  /// immediately.
   ///
-  /// NB: The returned Future is infallible.
-  ///
-  pub fn poll(&self, context: &N::Context, last_seen_generation: Generation) -> BoxFuture<(), ()> {
-    let mut state = self.state.lock();
-    match *state {
-      EntryState::Completed {
-        ref result,
-        generation,
-        ref mut pollers,
-        ..
-      } => {
-        if generation == last_seen_generation && result.poll_should_wait(context) {
+  pub async fn poll(&self, context: &N::Context, last_seen_generation: Generation) {
+    let recv = {
+      let mut state = self.state.lock();
+      match *state {
+        EntryState::Completed {
+          ref result,
+          generation,
+          ref mut pollers,
+          ..
+        } if generation == last_seen_generation && result.poll_should_wait(context) => {
           // The Node is currently clean with the observed generation: add a poller on the
           // Completed node that will be notified when it is dirtied or dropped. If the Node moves
           // to another state, the received will be notified that the sender was dropped, and it
           // will be converted into a successful result.
           let (send, recv) = oneshot::channel();
           pollers.push(send);
-          recv.then(|_| Ok(())).to_boxed()
-        } else {
-          // The Node is not clean, or the generation has changed.
-          future::ok(()).to_boxed()
+          recv
+        }
+        _ => {
+          // The generation didn't match or the Node wasn't Completed. It should be requested
+          // without waiting.
+          return;
         }
       }
-      _ => {
-        // The Node is not Completed, and should be requested.
-        future::ok(()).to_boxed()
-      }
-    }
+    };
+    // Wait outside of the lock.
+    let _ = recv.await;
   }
 
   ///
@@ -294,56 +290,42 @@ impl<N: Node> Entry<N> {
     let context = context_factory.clone_for(entry_id);
     let node = node.clone();
 
-    context_factory.spawn(future::lazy(move || {
+    context_factory.spawn(async move {
       // If we have previous result generations, compare them to all current dependency
       // generations (which, if they are dirty, will cause recursive cleaning). If they
       // match, we can consider the previous result value to be clean for reuse.
       let was_clean = if let Some(previous_dep_generations) = previous_dep_generations {
-        let context2 = context.clone();
-        context
-          .graph()
-          .dep_generations(entry_id, &context)
-          .then(move |generation_res| match generation_res {
-            Ok(ref dep_generations) if dep_generations == &previous_dep_generations => {
-              // Dependencies have not changed: Node is clean.
-              Ok(true)
-            }
-            _ => {
-              // If dependency generations mismatched or failed to fetch, clear its
-              // dependencies and indicate that it should re-run.
-              context2.graph().clear_deps(entry_id, run_token);
-              Ok(false)
-            }
-          })
-          .to_boxed()
+        match context.graph().dep_generations(entry_id, &context).await {
+          Ok(ref dep_generations) if dep_generations == &previous_dep_generations => {
+            // Dependencies have not changed: Node is clean.
+            true
+          }
+          _ => {
+            // If dependency generations mismatched or failed to fetch, clear its
+            // dependencies and indicate that it should re-run.
+            context.graph().clear_deps(entry_id, run_token);
+            false
+          }
+        }
       } else {
-        future::ok(false).to_boxed()
+        false
       };
 
       // If the Node was clean, complete it. Otherwise, re-run.
-      was_clean.and_then(move |was_clean| {
-        if was_clean {
-          // No dependencies have changed: we can complete the Node without changing its
-          // previous_result or generation.
-          context
-            .graph()
-            .complete(&context, entry_id, run_token, None);
-          future::ok(()).to_boxed()
-        } else {
-          // The Node needs to (re-)run!
-          let context2 = context.clone();
-          node
-            .run(context)
-            .then(move |res| {
-              context2
-                .graph()
-                .complete(&context2, entry_id, run_token, Some(res));
-              Ok(())
-            })
-            .to_boxed()
-        }
-      })
-    }));
+      if was_clean {
+        // No dependencies have changed: we can complete the Node without changing its
+        // previous_result or generation.
+        context
+          .graph()
+          .complete(&context, entry_id, run_token, None);
+      } else {
+        // The Node needs to (re-)run!
+        let res = node.run(context.clone()).await;
+        context
+          .graph()
+          .complete(&context, entry_id, run_token, Some(res));
+      }
+    });
 
     EntryState::Running {
       waiters: Vec::new(),
@@ -362,11 +344,12 @@ impl<N: Node> Entry<N> {
   /// need to consume the state (which avoids cloning some of the values held there), so we take it
   /// by value.
   ///
+  #[allow(clippy::type_complexity)] // This return type is not particularly complex.
   pub(crate) fn get(
     &mut self,
     context: &N::Context,
     entry_id: EntryId,
-  ) -> BoxFuture<(N::Item, Generation), N::Error> {
+  ) -> BoxFuture<Result<(N::Item, Generation), N::Error>> {
     {
       let mut state = self.state.lock();
 
@@ -378,19 +361,14 @@ impl<N: Node> Entry<N> {
         } => {
           let (send, recv) = oneshot::channel();
           waiters.push(send);
-          return recv
-            .map_err(|_| N::Error::invalidated())
-            .flatten()
-            .to_boxed();
+          return async move { recv.await.map_err(|_| N::Error::invalidated())? }.boxed();
         }
         &mut EntryState::Completed {
           ref result,
           generation,
           ..
         } if result.is_clean(context) => {
-          return future::result(Ok(result.as_ref().clone()))
-            .map(move |res| (res, generation))
-            .to_boxed();
+          return future::ready(Ok((result.as_ref().clone(), generation))).boxed();
         }
         _ => {
           // Fall through to the second match.

@@ -41,10 +41,7 @@ use std::path::Path;
 use std::time::Duration;
 
 use fnv::FnvHasher;
-
-use futures::compat::Future01CompatExt;
-use futures::future::{FutureExt, TryFutureExt};
-use futures01::future::{self, Future};
+use futures::future;
 use log::{debug, trace, warn};
 use parking_lot::Mutex;
 use petgraph::graph::DiGraph;
@@ -53,7 +50,6 @@ use petgraph::Direction;
 use tokio::time::delay_for;
 
 pub use crate::node::{EntryId, Node, NodeContext, NodeError, NodeVisualizer};
-use boxfuture::{BoxFuture, Boxable};
 
 type FNV = BuildHasherDefault<FnvHasher>;
 
@@ -84,10 +80,6 @@ impl<N: Node> InnerGraph<N> {
   // TODO: Now that we never delete Entries, we should consider making this infallible.
   fn entry_for_id(&self, id: EntryId) -> Option<&Entry<N>> {
     self.pg.node_weight(id)
-  }
-
-  fn entry_for_id_mut(&mut self, id: EntryId) -> Option<&mut Entry<N>> {
-    self.pg.node_weight_mut(id)
   }
 
   fn unsafe_entry_for_id(&self, id: EntryId) -> &Entry<N> {
@@ -485,18 +477,18 @@ impl<N: Node> Graph<N> {
     inner.nodes.len()
   }
 
-  fn get_inner(
+  async fn get_inner(
     &self,
     src_id: Option<EntryId>,
     context: &N::Context,
     dst_node: N,
-  ) -> BoxFuture<(N::Item, Generation), N::Error> {
+  ) -> Result<(N::Item, Generation), N::Error> {
     // Compute information about the dst under the Graph lock, and then release it.
     let (dst_retry, mut entry, entry_id) = {
       // Get or create the destination, and then insert the dep and return its state.
       let mut inner = self.inner.lock();
       if inner.draining {
-        return future::err(N::Error::invalidated()).to_boxed();
+        return Err(N::Error::invalidated());
       }
 
       // TODO: doing cycle detection under the lock... unfortunate, but probably unavoidable
@@ -509,7 +501,7 @@ impl<N: Node> Graph<N> {
             .into_iter()
             .map(|e| e.node().to_string())
             .collect();
-          return future::err(N::Error::cyclic(path_strs)).to_boxed();
+          return Err(N::Error::cyclic(path_strs));
         }
 
         // Valid dependency.
@@ -542,25 +534,22 @@ impl<N: Node> Graph<N> {
     if dst_retry {
       // Retry the dst a number of times to handle Node invalidation.
       let context = context.clone();
-      let uncached_node = async move {
-        let mut counter: usize = 8;
-        loop {
-          counter -= 1;
-          if counter == 0 {
-            break Err(N::Error::exhausted());
-          }
-          let dep_res = entry.get(&context, entry_id).compat().await;
-          match dep_res {
-            Ok(r) => break Ok(r),
-            Err(err) if err == N::Error::invalidated() => continue,
-            Err(other_err) => break Err(other_err),
-          }
+      let mut counter: usize = 8;
+      loop {
+        counter -= 1;
+        if counter == 0 {
+          break Err(N::Error::exhausted());
         }
-      };
-      uncached_node.boxed().compat().to_boxed()
+        let dep_res = entry.get(&context, entry_id).await;
+        match dep_res {
+          Ok(r) => break Ok(r),
+          Err(err) if err == N::Error::invalidated() => continue,
+          Err(other_err) => break Err(other_err),
+        }
+      }
     } else {
       // Not retriable.
-      entry.get(context, entry_id)
+      entry.get(context, entry_id).await
     }
   }
 
@@ -570,23 +559,21 @@ impl<N: Node> Graph<N> {
   /// If there is no src Node, or the src Node is not cacheable, this method will retry for
   /// invalidation until the Node completes.
   ///
-  pub fn get(
+  pub async fn get(
     &self,
     src_id: Option<EntryId>,
     context: &N::Context,
     dst_node: N,
-  ) -> BoxFuture<N::Item, N::Error> {
-    self
-      .get_inner(src_id, context, dst_node)
-      .map(|(res, _generation)| res)
-      .to_boxed()
+  ) -> Result<N::Item, N::Error> {
+    let (res, _generation) = self.get_inner(src_id, context, dst_node).await?;
+    Ok(res)
   }
 
   ///
   /// Return the value of the given Node. Shorthand for `self.get(None, context, node)`.
   ///
-  pub fn create(&self, node: N, context: &N::Context) -> BoxFuture<N::Item, N::Error> {
-    self.get(None, context, node)
+  pub async fn create(&self, node: N, context: &N::Context) -> Result<N::Item, N::Error> {
+    self.get(None, context, node).await
   }
 
   ///
@@ -608,18 +595,14 @@ impl<N: Node> Graph<N> {
         let entry_id = inner.ensure_entry(node.clone());
         inner.unsafe_entry_for_id(entry_id).clone()
       };
-      entry
-        .poll(context, generation)
-        .compat()
-        .await
-        .expect("Polling is infallible");
+      entry.poll(context, generation).await;
       if let Some(delay) = delay {
         delay_for(delay).await;
       }
     };
 
     // Re-request the Node.
-    let (res, generation) = self.get_inner(None, context, node).compat().await?;
+    let (res, generation) = self.get_inner(None, context, node).await?;
     Ok((res, LastObserved(generation)))
   }
 
@@ -693,32 +676,33 @@ impl<N: Node> Graph<N> {
   /// Gets the generations of the dependencies of the given EntryId, (re)computing or cleaning
   /// them first if necessary.
   ///
-  fn dep_generations(
+  async fn dep_generations(
     &self,
     entry_id: EntryId,
     context: &N::Context,
-  ) -> BoxFuture<Vec<Generation>, N::Error> {
-    let mut inner = self.inner.lock();
-    let dep_ids = inner
-      .pg
-      .neighbors_directed(entry_id, Direction::Outgoing)
-      .collect::<Vec<_>>();
+  ) -> Result<Vec<Generation>, N::Error> {
+    let generations = {
+      let inner = self.inner.lock();
+      let dep_ids = inner
+        .pg
+        .neighbors_directed(entry_id, Direction::Outgoing)
+        .collect::<Vec<_>>();
 
-    future::join_all(
       dep_ids
         .into_iter()
         .map(|dep_id| {
-          let entry = inner
-            .entry_for_id_mut(dep_id)
-            .unwrap_or_else(|| panic!("Dependency not present in Graph."));
-          entry
-            .get(context, dep_id)
-            .map(|(_, generation)| generation)
-            .to_boxed()
+          let mut entry = inner
+            .entry_for_id(dep_id)
+            .unwrap_or_else(|| panic!("Dependency not present in Graph."))
+            .clone();
+          async move {
+            let (_, generation) = entry.get(context, dep_id).await?;
+            Ok(generation)
+          }
         })
-        .collect::<Vec<_>>(),
-    )
-    .to_boxed()
+        .collect::<Vec<_>>()
+    };
+    future::try_join_all(generations).await
   }
 
   ///

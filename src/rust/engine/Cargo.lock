@@ -1253,10 +1253,9 @@ dependencies = [
 name = "graph"
 version = "0.0.1"
 dependencies = [
- "boxfuture 0.0.1",
+ "async-trait 0.1.26 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.5.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
- "futures 0.1.29 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "hashing 0.0.1",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
