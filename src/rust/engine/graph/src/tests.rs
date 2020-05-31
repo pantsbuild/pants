@@ -4,7 +4,7 @@ use std::future::Future;
 use std::hash::{Hash, Hasher};
 use std::sync::{mpsc, Arc};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 use hashing::Digest;
@@ -355,9 +355,43 @@ async fn uncachable_node_only_runs_once() {
 }
 
 #[tokio::test]
+async fn retries() {
+  let _logger = env_logger::try_init();
+  let graph = Arc::new(Graph::new_with_invalidation_timeout(Duration::from_secs(
+    10,
+  )));
+
+  let context = {
+    let delay_for_root = Duration::from_millis(100);
+    let mut delays = HashMap::new();
+    delays.insert(TNode::new(0), delay_for_root);
+    TContext::new(graph.clone()).with_delays(delays)
+  };
+
+  // Spawn a thread that will invalidate in a loop for one second (much less than our timeout).
+  let sleep_per_invalidation = Duration::from_millis(10);
+  let invalidation_deadline = Instant::now() + Duration::from_secs(1);
+  let graph2 = graph.clone();
+  let join_handle = thread::spawn(move || loop {
+    thread::sleep(sleep_per_invalidation);
+    graph2.invalidate_from_roots(|&TNode(n, _)| n == 0);
+    if Instant::now() > invalidation_deadline {
+      break;
+    }
+  });
+
+  // Should succeed anyway.
+  assert_eq!(
+    graph.create(TNode::new(2), &context).await,
+    Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
+  );
+  join_handle.join().unwrap();
+}
+
+#[tokio::test]
 async fn exhaust_uncacheable_retries() {
   let _logger = env_logger::try_init();
-  let graph = Arc::new(Graph::new());
+  let graph = Arc::new(Graph::new_with_invalidation_timeout(Duration::from_secs(2)));
 
   let context = {
     let mut uncacheable = HashSet::new();
@@ -391,50 +425,6 @@ async fn exhaust_uncacheable_retries() {
     "expected {:?} found {:?}",
     Err::<(), TError>(TError::Exhausted),
     subject
-  );
-}
-
-#[tokio::test]
-async fn drain_and_resume() {
-  // Confirms that after draining a Graph that has running work, we are able to resume the work
-  // and have it complete successfully.
-  let graph = Arc::new(Graph::new());
-
-  let delay_before_drain = Duration::from_millis(100);
-  let delay_in_task = delay_before_drain * 10;
-
-  // Create a context that will sleep long enough at TNode(1) to be interrupted before
-  // requesting TNode(0).
-  let context = {
-    let mut delays = HashMap::new();
-    delays.insert(TNode::new(1), delay_in_task);
-    TContext::new(graph.clone()).with_delays(delays)
-  };
-
-  // Spawn a background thread that will mark the Graph draining after a short delay.
-  let graph2 = graph.clone();
-  let _join = thread::spawn(move || {
-    thread::sleep(delay_before_drain);
-    graph2
-      .mark_draining(true)
-      .expect("Should not already be draining.");
-  });
-
-  // Request a TNode(1) in the "delayed" context, and expect it to be interrupted by the
-  // drain.
-  assert_eq!(
-    graph.create(TNode::new(2), &context).await,
-    Err(TError::Exhausted),
-  );
-
-  // Unmark the Graph draining, and try again: we expect the `Invalidated` result we saw before
-  // due to the draining to not have been persisted.
-  graph
-    .mark_draining(false)
-    .expect("Should already be draining.");
-  assert_eq!(
-    graph.create(TNode::new(2), &context).await,
-    Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
   );
 }
 
