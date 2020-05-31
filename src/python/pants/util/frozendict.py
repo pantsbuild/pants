@@ -1,7 +1,19 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Any, Dict, Iterable, Iterator, Mapping, Optional, Tuple, TypeVar, Union
+from typing import (
+    Any,
+    Dict,
+    Iterable,
+    Iterator,
+    Mapping,
+    Optional,
+    Tuple,
+    TypeVar,
+    Union,
+    cast,
+    overload,
+)
 
 K = TypeVar("K")
 V = TypeVar("V")
@@ -15,13 +27,32 @@ class FrozenDict(Mapping[K, V]):
     are not safe to use.
     """
 
-    def __init__(self, item: Optional[Union[Mapping[K, V], Iterable[Tuple[K, V]]]] = None) -> None:
-        """Creates a `FrozenDict` from a mapping object or a sequence of tuples representing
-        entries.
+    @overload
+    def __init__(self, __items: Iterable[Tuple[K, V]], **kwargs: V) -> None:
+        ...
 
-        These values must be hashable, which we proactively validate.
-        """
-        self._data: Dict[K, V] = dict(item) if item else dict()
+    @overload
+    def __init__(self, __other: Mapping[K, V], **kwargs: V) -> None:
+        ...
+
+    @overload
+    def __init__(self, **kwargs: V) -> None:
+        ...
+
+    def __init__(
+        self, *item: Optional[Union[Mapping[K, V], Iterable[Tuple[K, V]]]], **kwargs: V
+    ) -> None:
+        """Creates a `FrozenDict` with arguments accepted by `dict` that also must be hashable."""
+        if len(item) > 1:
+            raise ValueError(
+                f"FrozenDict was called with {len(item)} positional arguments but it expects one"
+            )
+
+        self._data: Dict[K, V] = dict(
+            cast(Union[Mapping[K, V], Iterable[Tuple[K, V]]], item[0])
+        ) if item else dict()
+        self._data.update(**kwargs)
+
         # NB: We eagerly compute the hash to validate that the values are hashable and to avoid
         # performing the calculation multiple times. This can be revisited if it's found to be a
         # performance bottleneck.
