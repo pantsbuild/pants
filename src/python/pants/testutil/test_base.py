@@ -299,11 +299,11 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
     @classmethod
     def build_config(cls):
-        build_config = BuildConfiguration()
+        build_config = BuildConfiguration.Builder()
         build_config.register_aliases(cls.alias_groups())
         build_config.register_rules(cls.rules())
         build_config.register_target_types(cls.target_types())
-        return build_config
+        return build_config.create()
 
     def setUp(self):
         """

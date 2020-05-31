@@ -3,7 +3,7 @@
 
 import importlib
 import traceback
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from pkg_resources import Requirement, WorkingSet
 
@@ -30,7 +30,7 @@ def load_backends_and_plugins(
     working_set: WorkingSet,
     backends1: List[str],
     backends2: List[str],
-    build_configuration: BuildConfiguration,
+    bc_builder: Optional[BuildConfiguration.Builder] = None,
 ) -> BuildConfiguration:
     """Load named plugins and source backends.
 
@@ -39,16 +39,17 @@ def load_backends_and_plugins(
     :param working_set: A pkg_resources.WorkingSet to load plugins from.
     :param backends1: v1 backends to load.
     :param backends2: v2 backends to load.
-    :param build_configuration: The BuildConfiguration (for adding aliases).
+    :param bc_builder: The BuildConfiguration (for adding aliases).
     """
-    load_build_configuration_from_source(build_configuration, backends1, backends2)
-    load_plugins(build_configuration, plugins1, working_set, is_v1_plugin=True)
-    load_plugins(build_configuration, plugins2, working_set, is_v1_plugin=False)
-    return build_configuration
+    bc_builder = bc_builder or BuildConfiguration.Builder()
+    load_build_configuration_from_source(bc_builder, backends1, backends2)
+    load_plugins(bc_builder, plugins1, working_set, is_v1_plugin=True)
+    load_plugins(bc_builder, plugins2, working_set, is_v1_plugin=False)
+    return bc_builder.create()
 
 
 def load_plugins(
-    build_configuration: BuildConfiguration,
+    build_configuration: BuildConfiguration.Builder,
     plugins: List[str],
     working_set: WorkingSet,
     is_v1_plugin: bool,
@@ -121,7 +122,7 @@ def load_plugins(
 
 
 def load_build_configuration_from_source(
-    build_configuration: BuildConfiguration, backends1: List[str], backends2: List[str]
+    build_configuration: BuildConfiguration.Builder, backends1: List[str], backends2: List[str]
 ) -> None:
     """Installs pants backend packages to provide BUILD file symbols and cli goals.
 
@@ -144,7 +145,7 @@ def load_build_configuration_from_source(
 
 
 def load_backend(
-    build_configuration: BuildConfiguration, backend_package: str, is_v1_backend: bool
+    build_configuration: BuildConfiguration.Builder, backend_package: str, is_v1_backend: bool
 ) -> None:
     """Installs the given backend package into the build configuration.
 

@@ -5,19 +5,7 @@ import logging
 import os
 import time
 from dataclasses import dataclass
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Dict,
-    List,
-    NoReturn,
-    Optional,
-    Sequence,
-    Tuple,
-    Type,
-    Union,
-    cast,
-)
+from typing import Any, Dict, List, NoReturn, Optional, Sequence, Tuple, Type, Union, cast
 
 from typing_extensions import TypedDict
 
@@ -30,6 +18,7 @@ from pants.engine.fs import (
     MaterializeDirectoryResult,
     PathGlobsAndRoot,
 )
+from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveProcessResult
 from pants.engine.internals.native import RawFdRunner
 from pants.engine.internals.nodes import Return, Throw
 from pants.engine.rules import Rule, RuleIndex, TaskRule
@@ -38,13 +27,10 @@ from pants.engine.unions import union
 from pants.option.global_options import ExecutionOptions
 from pants.util.contextutil import temporary_file_path
 from pants.util.dirutil import check_no_overlapping_paths
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import pluralize
-
-if TYPE_CHECKING:
-    from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveProcessResult
-    from pants.util.ordered_set import OrderedSet  # noqa
-
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +79,7 @@ class Scheduler:
         local_execution_root_dir: str,
         named_caches_dir: str,
         rules: Tuple[Rule, ...],
-        union_rules: Dict[Type, "OrderedSet[Type]"],
+        union_rules: FrozenDict[Type, FrozenOrderedSet[Type]],
         execution_options: ExecutionOptions,
         include_trace_on_error: bool = True,
         visualize_to_dir: Optional[str] = None,
@@ -175,7 +161,7 @@ class Scheduler:
         return tasks
 
     def _register_task(
-        self, tasks, output_type, rule: TaskRule, union_rules: Dict[Type, "OrderedSet[Type]"]
+        self, tasks, output_type, rule: TaskRule, union_rules: Dict[Type, OrderedSet[Type]]
     ) -> None:
         """Register the given TaskRule with the native scheduler."""
         self._native.lib.tasks_task_begin(tasks, rule.func, output_type, rule.cacheable)
