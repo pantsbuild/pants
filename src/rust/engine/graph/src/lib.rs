@@ -76,10 +76,6 @@ type Nodes<N> = HashMap<N, EntryId>;
 struct InnerGraph<N: Node> {
   nodes: Nodes<N>,
   pg: PGraph<N>,
-  /// A Graph that is marked `draining:True` will not allow the creation of new `Nodes`. But
-  /// while draining, any Nodes that exist in the Graph will continue to run until/unless they
-  /// attempt to get/create new Nodes.
-  draining: bool,
 }
 
 impl<N: Node> InnerGraph<N> {
@@ -654,17 +650,22 @@ impl<N: Node> InnerGraph<N> {
 ///
 pub struct Graph<N: Node> {
   inner: Mutex<InnerGraph<N>>,
+  invalidation_timeout: Duration,
 }
 
 impl<N: Node> Graph<N> {
   pub fn new() -> Graph<N> {
+    Self::new_with_invalidation_timeout(Duration::from_secs(60))
+  }
+
+  pub fn new_with_invalidation_timeout(invalidation_timeout: Duration) -> Graph<N> {
     let inner = InnerGraph {
-      draining: false,
       nodes: HashMap::default(),
       pg: DiGraph::new(),
     };
     Graph {
       inner: Mutex::new(inner),
+      invalidation_timeout,
     }
   }
 
@@ -683,9 +684,6 @@ impl<N: Node> Graph<N> {
     let (dst_retry, mut entry, entry_id) = {
       // Get or create the destination, and then insert the dep and return its state.
       let mut inner = self.inner.lock();
-      if inner.draining {
-        return future::err(N::Error::invalidated()).to_boxed();
-      }
 
       // TODO: doing cycle detection under the lock... unfortunate, but probably unavoidable
       // without a much more complicated algorithm.
@@ -730,17 +728,21 @@ impl<N: Node> Graph<N> {
     if dst_retry {
       // Retry the dst a number of times to handle Node invalidation.
       let context = context.clone();
+      let invalidation_timeout = self.invalidation_timeout.clone();
       let uncached_node = async move {
-        let mut counter: usize = 8;
+        let deadline = Instant::now() + invalidation_timeout;
+        let mut interval = Duration::from_millis(100);
         loop {
-          counter -= 1;
-          if counter == 0 {
-            break Err(N::Error::exhausted());
-          }
-          let dep_res = entry.get(&context, entry_id).compat().await;
-          match dep_res {
+          match entry.get(&context, entry_id).compat().await {
             Ok(r) => break Ok(r),
-            Err(err) if err == N::Error::invalidated() => continue,
+            Err(err) if err == N::Error::invalidated() => {
+              if deadline < Instant::now() {
+                break Err(N::Error::exhausted());
+              }
+              delay_for(interval).await;
+              interval *= 2;
+              continue;
+            }
             Err(other_err) => break Err(other_err),
           }
         }
@@ -757,6 +759,9 @@ impl<N: Node> Graph<N> {
   ///
   /// If there is no src Node, or the src Node is not cacheable, this method will retry for
   /// invalidation until the Node completes.
+  ///
+  /// Invalidation events in the graph (generally, filesystem changes) will cause cacheable Nodes
+  /// to be retried here for up to `invalidation_timeout`.
   ///
   pub fn get(
     &self,
@@ -1071,25 +1076,6 @@ impl<N: Node> Graph<N> {
   {
     let _inner = self.inner.lock();
     f()
-  }
-
-  ///
-  /// Marks this Graph with the given draining status. If the Graph already has a matching
-  /// draining status, then the operation will return an Err.
-  ///
-  /// This is an independent operation from acquiring exclusive access to the Graph
-  /// (`with_exclusive`), because once exclusive access has been acquired, threads attempting to
-  /// access the Graph would wait to acquire the lock, rather than acquiring and then failing fast
-  /// as we'd like them to while `draining:True`.
-  ///
-  pub fn mark_draining(&self, draining: bool) -> Result<(), ()> {
-    let mut inner = self.inner.lock();
-    if inner.draining == draining {
-      Err(())
-    } else {
-      inner.draining = draining;
-      Ok(())
-    }
   }
 }
 

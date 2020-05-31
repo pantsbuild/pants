@@ -6,12 +6,14 @@ use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::sync::{mpsc, Arc};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use boxfuture::{BoxFuture, Boxable};
+use futures::compat::Future01CompatExt;
 use futures01::future::{self, Future};
 use hashing::Digest;
 use parking_lot::Mutex;
+use tokio::runtime::Runtime;
 use tokio::time::{timeout, Elapsed};
 
 use rand::Rng;
@@ -319,6 +321,7 @@ fn dirty_dependents_of_uncacheable_node() {
 fn uncachable_node_only_runs_once() {
   let _logger = env_logger::try_init();
   let graph = Arc::new(Graph::new());
+  let mut rt = Runtime::new().unwrap();
 
   let context = {
     let mut uncacheable = HashSet::new();
@@ -341,7 +344,7 @@ fn uncachable_node_only_runs_once() {
 
   send.send(()).unwrap();
   assert_eq!(
-    graph.create(TNode::new(2), &context).wait(),
+    rt.block_on(graph.create(TNode::new(2), &context).compat()),
     Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
   );
   // TNode(0) and TNode(2) are cleared and dirtied (respectively) before completing, and
@@ -359,9 +362,45 @@ fn uncachable_node_only_runs_once() {
 }
 
 #[test]
+fn retries() {
+  let _logger = env_logger::try_init();
+  let graph = Arc::new(Graph::new_with_invalidation_timeout(Duration::from_secs(
+    10,
+  )));
+  let mut rt = Runtime::new().unwrap();
+
+  let context = {
+    let delay_for_root = Duration::from_millis(100);
+    let mut delays = HashMap::new();
+    delays.insert(TNode::new(0), delay_for_root);
+    TContext::new(graph.clone()).with_delays(delays)
+  };
+
+  // Spawn a thread that will invalidate in a loop for one second (much less than our timeout).
+  let sleep_per_invalidation = Duration::from_millis(10);
+  let invalidation_deadline = Instant::now() + Duration::from_secs(1);
+  let graph2 = graph.clone();
+  let join_handle = thread::spawn(move || loop {
+    thread::sleep(sleep_per_invalidation);
+    graph2.invalidate_from_roots(|&TNode(n, _)| n == 0);
+    if Instant::now() > invalidation_deadline {
+      break;
+    }
+  });
+
+  // Should succeed anyway.
+  assert_eq!(
+    rt.block_on(graph.create(TNode::new(2), &context).compat()),
+    Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
+  );
+  join_handle.join().unwrap();
+}
+
+#[test]
 fn exhaust_uncacheable_retries() {
   let _logger = env_logger::try_init();
-  let graph = Arc::new(Graph::new());
+  let graph = Arc::new(Graph::new_with_invalidation_timeout(Duration::from_secs(2)));
+  let mut rt = Runtime::new().unwrap();
 
   let context = {
     let mut uncacheable = HashSet::new();
@@ -384,7 +423,7 @@ fn exhaust_uncacheable_retries() {
     thread::sleep(sleep_per_invalidation);
     graph2.invalidate_from_roots(|&TNode(n, _)| n == 0);
   });
-  let (assertion, subject) = match graph.create(TNode::new(2), &context).wait() {
+  let (assertion, subject) = match rt.block_on(graph.create(TNode::new(2), &context).compat()) {
     Err(TError::Exhausted) => (true, None),
     Err(e) => (false, Some(Err(e))),
     other => (false, Some(other)),
@@ -399,50 +438,6 @@ fn exhaust_uncacheable_retries() {
 }
 
 #[test]
-fn drain_and_resume() {
-  // Confirms that after draining a Graph that has running work, we are able to resume the work
-  // and have it complete successfully.
-  let graph = Arc::new(Graph::new());
-
-  let delay_before_drain = Duration::from_millis(100);
-  let delay_in_task = delay_before_drain * 10;
-
-  // Create a context that will sleep long enough at TNode(1) to be interrupted before
-  // requesting TNode(0).
-  let context = {
-    let mut delays = HashMap::new();
-    delays.insert(TNode::new(1), delay_in_task);
-    TContext::new(graph.clone()).with_delays(delays)
-  };
-
-  // Spawn a background thread that will mark the Graph draining after a short delay.
-  let graph2 = graph.clone();
-  let _join = thread::spawn(move || {
-    thread::sleep(delay_before_drain);
-    graph2
-      .mark_draining(true)
-      .expect("Should not already be draining.");
-  });
-
-  // Request a TNode(1) in the "delayed" context, and expect it to be interrupted by the
-  // drain.
-  assert_eq!(
-    graph.create(TNode::new(2), &context).wait(),
-    Err(TError::Exhausted),
-  );
-
-  // Unmark the Graph draining, and try again: we expect the `Invalidated` result we saw before
-  // due to the draining to not have been persisted.
-  graph
-    .mark_draining(false)
-    .expect("Should already be draining.");
-  assert_eq!(
-    graph.create(TNode::new(2), &context).wait(),
-    Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
-  );
-}
-
-#[test]
 fn cyclic_failure() {
   // Confirms that an attempt to create a cycle fails.
   let graph = Arc::new(Graph::new());
@@ -451,9 +446,10 @@ fn cyclic_failure() {
     // Request creation of a cycle by sending the bottom most node to the top.
     vec![(TNode::new(0), Some(top))].into_iter().collect(),
   );
+  let mut rt = Runtime::new().unwrap();
 
   assert_eq!(
-    graph.create(TNode::new(2), &context).wait(),
+    rt.block_on(graph.create(TNode::new(2), &context).compat()),
     Err(TError::Cyclic)
   );
 }
@@ -755,7 +751,8 @@ impl NodeContext for TContext {
   {
     // Avoids introducing a dependency on a threadpool.
     thread::spawn(move || {
-      future.wait().unwrap();
+      let mut rt = Runtime::new().unwrap();
+      rt.block_on(future.compat()).unwrap();
     });
   }
 }
