@@ -57,6 +57,13 @@ MESSAGE
 }
 
 function activate_pants_venv() {
+  # Allow for multiple calls to `activate_pants_venv`.
+  if [ -n "$VENV_ACTIVATED_FOR_PANTS" ]; then
+    return
+  else
+    export VENV_ACTIVATED_FOR_PANTS="true"
+  fi
+
   fingerprint=""
   for req in "${REQUIREMENTS[@]}"; do
     fingerprint="${fingerprint}$(fingerprint_data < "${req}")"

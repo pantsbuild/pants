@@ -1,8 +1,8 @@
+// Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
+// Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 use crate::core::{Function, TypeId};
 
-/// Handles to Python types the engine needs to be aware of. This corresponds on a field-by-field
-/// basis to the Python `EngineTypes` structure defined in `src/python/pants/engine/internals/native.py`.
-#[repr(C)]
 pub struct Types {
   pub construct_directory_digest: Function,
   pub directory_digest: TypeId,
@@ -24,7 +24,7 @@ pub struct Types {
   pub file: TypeId,
   pub link: TypeId,
   pub platform: TypeId,
-  pub multi_platform_process_request: TypeId,
+  pub multi_platform_process: TypeId,
   pub process_result: TypeId,
   pub coroutine: TypeId,
   pub url_to_fetch: TypeId,

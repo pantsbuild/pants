@@ -345,7 +345,7 @@ async def create_pex(
     argv.extend(pex_debug.iter_pex_args())
 
     if python_setup.resolver_jobs:
-        argv.extend(["--jobs", python_setup.resolver_jobs])
+        argv.extend(["--jobs", str(python_setup.resolver_jobs)])
 
     if python_setup.manylinux:
         argv.extend(["--manylinux", python_setup.manylinux])

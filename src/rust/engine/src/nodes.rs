@@ -205,13 +205,10 @@ impl From<Select> for NodeKey {
 
 pub fn lift_digest(digest: &Value) -> Result<hashing::Digest, String> {
   let fingerprint = externs::project_str(&digest, "fingerprint");
-  let digest_length = externs::project_str(&digest, "serialized_bytes_length");
-  let digest_length_as_usize = digest_length
-    .parse::<usize>()
-    .map_err(|err| format!("Length was not a usize: {:?}", err))?;
+  let digest_length = externs::project_u64(&digest, "serialized_bytes_length") as usize;
   Ok(hashing::Digest(
     hashing::Fingerprint::from_hex_string(&fingerprint)?,
-    digest_length_as_usize,
+    digest_length,
   ))
 }
 
@@ -249,10 +246,7 @@ impl MultiPlatformExecuteProcess {
       .map(PathBuf::from)
       .collect();
 
-    let timeout_str = externs::project_str(&value, "timeout_seconds");
-    let timeout_in_seconds = timeout_str
-      .parse::<f64>()
-      .map_err(|err| format!("Timeout was not a float: {:?}", err))?;
+    let timeout_in_seconds = externs::project_f64(&value, "timeout_seconds");
 
     let timeout = if timeout_in_seconds < 0.0 {
       None
@@ -518,53 +512,57 @@ impl Snapshot {
     )
   }
 
-  pub fn store_snapshot(core: &Arc<Core>, item: &store::Snapshot) -> Value {
+  pub fn store_snapshot(core: &Arc<Core>, item: &store::Snapshot) -> Result<Value, String> {
     let mut files = Vec::new();
     let mut dirs = Vec::new();
     for ps in &item.path_stats {
       match ps {
         &PathStat::File { ref path, .. } => {
-          files.push(Self::store_path(path));
+          files.push(Self::store_path(path)?);
         }
         &PathStat::Dir { ref path, .. } => {
-          dirs.push(Self::store_path(path));
+          dirs.push(Self::store_path(path)?);
         }
       }
     }
-    externs::unsafe_call(
+    Ok(externs::unsafe_call(
       &core.types.construct_snapshot,
       &[
         Self::store_directory(core, &item.digest),
-        externs::store_tuple(&files),
-        externs::store_tuple(&dirs),
+        externs::store_tuple(files),
+        externs::store_tuple(dirs),
       ],
-    )
+    ))
   }
 
-  fn store_path(item: &Path) -> Value {
-    externs::store_utf8_osstr(item.as_os_str())
+  fn store_path(item: &Path) -> Result<Value, String> {
+    if let Some(p) = item.as_os_str().to_str() {
+      Ok(externs::store_utf8(p))
+    } else {
+      Err(format!("Could not decode path `{:?}` as UTF8.", item))
+    }
   }
 
-  fn store_file_content(context: &Context, item: &FileContent) -> Value {
-    externs::unsafe_call(
+  fn store_file_content(context: &Context, item: &FileContent) -> Result<Value, String> {
+    Ok(externs::unsafe_call(
       &context.core.types.construct_file_content,
       &[
-        Self::store_path(&item.path),
+        Self::store_path(&item.path)?,
         externs::store_bytes(&item.content),
         externs::store_bool(item.is_executable),
       ],
-    )
+    ))
   }
 
-  pub fn store_files_content(context: &Context, item: &[FileContent]) -> Value {
-    let entries: Vec<_> = item
+  pub fn store_files_content(context: &Context, item: &[FileContent]) -> Result<Value, String> {
+    let entries = item
       .iter()
       .map(|e| Self::store_file_content(context, e))
-      .collect();
-    externs::unsafe_call(
+      .collect::<Result<Vec<_>, _>>()?;
+    Ok(externs::unsafe_call(
       &context.core.types.construct_files_content,
-      &[externs::store_tuple(&entries)],
-    )
+      &[externs::store_tuple(entries)],
+    ))
   }
 }
 
@@ -822,7 +820,7 @@ impl Task {
         }
         externs::GeneratorResponse::GetMulti(gets) => {
           let values = Self::gen_get(&context, &params, &entry, gets).await?;
-          input = externs::store_tuple(&values);
+          input = externs::store_tuple(values);
         }
         externs::GeneratorResponse::Break(val) => {
           break Ok(val);
