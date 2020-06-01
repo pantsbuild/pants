@@ -3,9 +3,8 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Dict, Type, Iterable
+from typing import Dict, Type
 
-# from pants.engine.build_files import LoadStatementWithContent
 from pants.engine.struct import Struct
 
 

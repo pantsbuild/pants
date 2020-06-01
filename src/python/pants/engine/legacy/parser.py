@@ -1,16 +1,14 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import ast
 import logging
 import os
 import tokenize
 from copy import copy
 from io import StringIO
 from pathlib import PurePath
-from typing import Dict, Tuple, Iterable
+from typing import Dict, Iterable, Tuple
 
-from pants.base.build_environment import get_buildroot
 from pants.base.build_file_target_factory import BuildFileTargetFactory
 from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import UnaddressableObjectError
@@ -159,7 +157,47 @@ class LegacyPythonCallbacksParser(Parser):
                 hint=warning,
             )
 
-    def parse(self, filepath: str, filecontent: bytes, load_statements: Iterable[LoadStatementWithContent]):
+    @staticmethod
+    def _expose_symbols_from_loaded_files(
+        load_statements: Iterable[LoadStatementWithContent], filepath: str
+    ) -> Dict:
+        """Expose symbols from loaded files.
+
+        To achieve that, we exec() the contents of the imported file, which puts all defined symbols
+        in `locals()`. We then copy `locals()` and filter it by the symbols the build file
+        explicitly imports. `locals()` will be emptied at the end of each iteration of the outer
+        `for` loop, so there is no chance of contamination.
+        """
+        extra_symbols: Dict = {}
+        for statement in load_statements:
+            content = statement.content.content.decode()
+            symbols_to_expose = statement.symbols_to_expose
+            exec(content)
+            local_symbols = copy(
+                locals()
+            )  # We copy the locals so that they don't get lost in the for loop
+            for symbol in symbols_to_expose:
+                if symbol in local_symbols:
+                    if symbol not in extra_symbols:
+                        extra_symbols[symbol] = local_symbols[symbol]
+                    else:
+                        raise ParseError(
+                            f"Trying to import symbol {symbol} from file {statement.path} into BUILD file {filepath}: ",
+                            f"Which has already been loaded from another file.",
+                        )
+                else:
+                    raise ParseError(
+                        f"Trying to import symbol {symbol} from file {statement.path} into BUILD file {filepath}: ",
+                        f"Symbol is not exported by loaded file.",
+                    )
+            logger.debug(
+                f"Loaded symbols {symbols_to_expose} from {statement.path} into file {filepath}"
+            )
+        return extra_symbols
+
+    def parse(
+        self, filepath: str, filecontent: bytes, load_statements: Iterable[LoadStatementWithContent]
+    ):
         python = filecontent.decode()
 
         # Mutate the parse context for the new path, then exec, and copy the resulting objects.
@@ -169,20 +207,11 @@ class LegacyPythonCallbacksParser(Parser):
         # this juncture.
         self._parse_context._storage.clear(os.path.dirname(filepath))
 
-        # We separately handle loading all the symbols we need from imported files.
-        extra_symbols = {}
-        for statement in load_statements:
-            content = statement.content.content.decode()
-            symbols_to_expose = statement.symbols_to_expose
-            exec(content)
-            local_symbols = copy(
-                locals()
-            )  # We copy the locals so that they don't get lost in the for loop
-            for symbol in symbols_to_expose:
-                extra_symbols[symbol] = local_symbols[symbol]
-            logger.debug(f"Loaded symbols {symbols_to_expose} from {statement.path} into file {filepath}")
+        symbols_loaded_from_files = LegacyPythonCallbacksParser._expose_symbols_from_loaded_files(
+            load_statements, filepath
+        )
 
-        self._symbols.update(extra_symbols)
+        self._symbols.update(symbols_loaded_from_files)
 
         exec(python, dict(self._symbols))
 
