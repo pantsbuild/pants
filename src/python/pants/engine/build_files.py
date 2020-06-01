@@ -38,119 +38,93 @@ def _key_func(entry):
     key, value = entry
     return key
 
-# TODO
-# - Support Multiple loads
-# - Support No loads
-# - Support only importing certain symbols
-# - Snapshot optimizations
+class LoadedSymbolsToExpose(Collection[str]):
+    pass
 
 @dataclass(frozen=True)
 class LoadStatement:
     path: str
-    # symbols_to_expose: Collection[str]
+    symbols_to_expose: LoadedSymbolsToExpose
 
+class LoadStatements(Collection[LoadStatement]):
+    pass
 
 @dataclass(frozen=True)
 class LoadStatementWithContent:
     path: str
-    # symbols_to_expose: Collection[str]
     content: FileContent
-
+    symbols_to_expose: LoadedSymbolsToExpose
 
 @dataclass(frozen=True)
 class BuildFilesWithLoads:
     map: Dict[FileContent, Collection[LoadStatementWithContent]]
 
-class LoadParser(ast.NodeVisitor):
-    """A utility class that parses load() calls in BUILD files.
-
-    A load statement is of the form:
-    load("path/to/a:file.py", "symbol1", "symbol2"...)
-
-    This will import "symbol1", "symbol2"... from file "path/to/a:file.py".
-    """
-
-    def __init__(self):
-        self.loads: list[LoadStatement] = []
-
-    def _path_from_label(self, label):
-        if label[0:2] == "//":
-            # label = f"{get_buildroot()}/{label[2:]}"
-            label = f"{label[2:]}"
-        label = label.replace(":", "/")
-        return label
-
-    def visit_Call(self, node):
-        if isinstance(node.func, ast.Name):
-            if node.func.id == "load":
-                strargs = [arg.s for arg in node.args]
-                source_file = self._path_from_label(strargs[0])
-                exposed_symbols = strargs[1:]
-                # self.loads.append(LoadStatement(source_file, exposed_symbols))
-                self.loads.append(LoadStatement(source_file))
-
-
-    @staticmethod
-    def parse_loads(python_code: str) -> Iterable[LoadStatement]:
-        """Parse the python code searching for load statements.
-        """
-        load_parser = LoadParser()
-        parsed = ast.parse(python_code)
-        load_parser.visit(parsed)
-        return load_parser.loads
-
 
 @rule
 async def snapshot_load_statement(statement: LoadStatement) -> LoadStatementWithContent:
-    print("BL: HOHOHOHOHOHOHOHOHHOHOHOHOHOH")
     snapshot = await Get[Snapshot](PathGlobs(globs=(statement.path,)))
     files_content = await Get[FilesContent](Digest, snapshot.directory_digest)
     file_content = [fc for fc in files_content][0]
-    return LoadStatementWithContent(statement.path, file_content)
-    # return LoadStatementWithContent(statement.path, statement.symbols_to_expose, file_content)
+    return LoadStatementWithContent(
+        path=statement.path,
+        content=file_content,
+        symbols_to_expose=statement.symbols_to_expose
+    )
+
+@rule
+async def parse_build_file_for_load_statements(content: FileContent) -> LoadStatements:
+    class LoadParser(ast.NodeVisitor):
+        """A utility class that parses load() calls in BUILD files.
+
+        A load statement is of the form:
+        load("path/to/a:file.py", "symbol1", "symbol2"...)
+
+        This will import "symbol1", "symbol2"... from file "path/to/a:file.py".
+        """
+
+        def __init__(self):
+            self.loads: list[LoadStatement] = []
+
+        def _path_from_label(self, label):
+            if label[0:2] == "//":
+                label = f"{label[2:]}"
+            label = label.replace(":", "/")
+            return label
+
+        def visit_Call(self, node):
+            if isinstance(node.func, ast.Name):
+                if node.func.id == "load":
+                    strargs = [arg.s for arg in node.args]
+                    source_file = self._path_from_label(strargs[0])
+                    exposed_symbols = strargs[1:]
+                    self.loads.append(LoadStatement(source_file, LoadedSymbolsToExpose(exposed_symbols)))
+
+
+        @staticmethod
+        def parse_loads(python_code: str) -> Iterable[LoadStatement]:
+            """Parse the python code searching for load statements.
+            """
+            load_parser = LoadParser()
+            parsed = ast.parse(python_code)
+            load_parser.visit(parsed)
+            return load_parser.loads
+    return LoadStatements(LoadParser.parse_loads(content.content.decode()))
 
 @rule
 async def load_symbols(build_file_contents: FilesContent) -> BuildFilesWithLoads:
-    loaded_files = []
-    for build_file in build_file_contents:
-        load_statements = LoadParser.parse_loads(build_file.content)
-        for statement in load_statements:
-            loaded_files.append(statement.path)
-
     build_files_with_loads = {}
     for build_file in build_file_contents:
-        # load_statements_with_content = await MultiGet(
-        #     Get[LoadStatementWithContent](LoadStatement, load_statement)
-        #         for load_statement in load_statements
-        # )
-        load_statements_with_content = await Get[LoadStatementWithContent](LoadStatement, load_statements[0])
-
+        load_statements = await Get[LoadStatements](FileContent, build_file)
+        load_statements_with_content = await MultiGet(
+            Get[LoadStatementWithContent](LoadStatement, load_statement)
+                for load_statement in load_statements
+        )
         print(f"BL:load_statements_with_content {load_statements_with_content}")
 
         # At this point, I have a Map[build_file_path, List[LoadStatementWIthContent]]
-        build_files_with_loads[build_file] = [load_statements_with_content]
+        build_files_with_loads[build_file] = load_statements_with_content
 
     return BuildFilesWithLoads(build_files_with_loads)
-
-# path_globs = PathGlobs(globs=loaded_files)
-# snapshot_of_loaded_files = await Get[Snapshot](PathGlobs, path_globs)
-# contents_of_loaded_files = await Get[FilesContent](Digest, snapshot_of_loaded_files.directory_digest)
-# map_of_loaded_files = {}
-# for loaded_file in contents_of_loaded_files:
-#     map_of_loaded_files[loaded_file.path] = loaded_file.content
-
-# build_files_with_loads = {}
-# for build_file in build_file_contents:
-# loads_with_content = []
-# # TODO DRY
-# load_statements = LoadParser.parse_loads(build_file.content)
-# for statement in load_statements:
-#     loads_with_content.append(LoadStatementWithContent(
-#         statement.path, statement.symbols_to_expose, contents_of_loaded_files[statement.path]
-#     ))
-#
-# build_files_with_loads[build_file] = loads_with_content
-#
 
 
 @rule
@@ -428,4 +402,5 @@ def create_graph_rules(address_mapper: AddressMapper):
         # TESTING
         snapshot_load_statement,
         load_symbols,
+        parse_build_file_for_load_statements,
     ]
