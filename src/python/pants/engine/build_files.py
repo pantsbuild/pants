@@ -48,6 +48,17 @@ class LoadedSymbolsToExpose(Collection[str]):
 
 @dataclass(frozen=True)
 class LoadStatement:
+    """A load statement is of the form: load("path/to/a:file.py", "symbol1", "symbol2"...)
+
+    This will import "symbol1", "symbol2"... from file "path/to/a:file.py".
+
+    Note: The syntax is inspired by Bazel's load statements:
+        https://docs.bazel.build/versions/master/build-ref.html#load
+
+    Note: Load statements are always evaluated before anything else in the file,
+        so imported symbols can be reassigned.
+    """
+
     path: str
     symbols_to_expose: LoadedSymbolsToExpose
 
@@ -84,13 +95,7 @@ async def snapshot_load_statement(statement: LoadStatement) -> LoadStatementWith
 @rule
 async def parse_build_file_for_load_statements(content: FileContent) -> LoadStatements:
     class LoadParser(ast.NodeVisitor):
-        """A utility class that parses load() calls in BUILD files.
-
-        A load statement is of the form:
-        load("path/to/a:file.py", "symbol1", "symbol2"...)
-
-        This will import "symbol1", "symbol2"... from file "path/to/a:file.py".
-        """
+        """A utility class that parses load() calls in BUILD files."""
 
         def __init__(self):
             self.loads: list[LoadStatement] = []
@@ -132,7 +137,6 @@ async def load_symbols(build_file_contents: FilesContent) -> BuildFilesWithLoads
             for load_statement in load_statements
         )
 
-        # At this point, I have a Map[build_file_path, List[LoadStatementWIthContent]]
         build_files_with_loads[build_file] = Collection(load_statements_with_content)
 
     return BuildFilesWithLoads(build_files_with_loads)

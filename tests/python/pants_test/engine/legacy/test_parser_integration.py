@@ -7,7 +7,7 @@ from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
 from pants.util.contextutil import temporary_dir
-from pants.util.dirutil import safe_file_dump
+from pants.util.dirutil import fast_relpath, safe_file_dump
 from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
 
 
@@ -125,11 +125,13 @@ class LoadStatementsIntegrationTests(PantsDaemonIntegrationTestBase):
 
             macro_file_path = os.path.join(tmpdir, "BUILD_MACRO")
 
+            rel_macro_file_path = fast_relpath(macro_file_path, get_buildroot())
+
             safe_file_dump(
                 os.path.join(tmpdir, "BUILD"),
                 dedent(
                     f"""
-                load("{macro_file_path}", "my_name")
+                load("{rel_macro_file_path}", "my_name")
                 target(name=my_name())
                 """
                 ),
