@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, List, Optional, Union, cast
 from pants.base.payload_field import PayloadField
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.source.filespec import matches_filespec
+from pants.source.source_root import SourceRootConfig
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetWithSpec, Filespec
 from pants.util.memo import memoized_property
 
@@ -33,6 +34,13 @@ class SourcesField(PayloadField):
         """
         self._sources = self._validate_sources(sources)
         self._ref_address = ref_address
+
+    @property
+    def source_root(self):
+        """:returns: the source root for these sources, or None if they're not under a source root."""
+        # TODO: It's a shame that we have to access the singleton directly here, instead of getting
+        # the SourceRoots instance from context, as tasks do.
+        return SourceRootConfig.global_instance().get_source_roots().find_by_path(self.rel_path)
 
     def matches(self, path: str) -> bool:
         return self.sources.matches(path) or matches_filespec(path, self.filespec)

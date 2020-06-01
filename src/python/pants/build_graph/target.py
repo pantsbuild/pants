@@ -20,7 +20,6 @@ from pants.build_graph.target_addressable import TargetAddressable
 from pants.build_graph.target_scopes import Scope
 from pants.fs.fs import safe_filename
 from pants.source.payload_fields import SourcesField
-from pants.source.source_root import SourceRootConfig
 from pants.source.wrapped_globs import FilesetWithSpec
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
@@ -191,14 +190,10 @@ class Target(AbstractTarget):
 
         :returns: the source root path for this target.
         """
-        source_root_path = (
-            SourceRootConfig.global_instance()
-            .get_pattern_matcher()
-            .find_root(self._sources_field.rel_path)
-        )
-        if not source_root_path:
+        source_root = self._sources_field.source_root
+        if not source_root:
             raise TargetDefinitionException(self, "Not under any configured source root.")
-        return str(source_root_path)
+        return source_root.path
 
     @classmethod
     def identify(cls, targets):
