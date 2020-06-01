@@ -600,15 +600,6 @@ class GlobalOptions(Subsystem):
 
         # Pants Daemon options.
         register(
-            "--pantsd-pailgun-host",
-            advanced=True,
-            default="127.0.0.1",
-            removal_version="1.30.0.dev0",
-            removal_hint="The nailgun protocol is not authenticated, and so only binds to "
-            "127.0.0.1.",
-            help="The host to bind the pants nailgun server to.",
-        )
-        register(
             "--pantsd-pailgun-port",
             advanced=True,
             type=int,
