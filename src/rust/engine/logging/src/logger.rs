@@ -157,7 +157,7 @@ impl Log for Logger {
     let destination = get_destination();
     match destination {
       Destination::Stderr => {
-        let cur_time = chrono::Utc::now().format(TIME_FORMAT_STR);
+        let cur_time = chrono::Local::now().format(TIME_FORMAT_STR);
         let level = record.level();
         let log_string: String = format!("{} [{}] {}", cur_time, level, record.args());
 
