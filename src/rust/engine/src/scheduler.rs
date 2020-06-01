@@ -305,7 +305,7 @@ impl Scheduler {
   /// Invalidate the invalidation roots represented by the given Paths.
   ///
   pub fn invalidate(&self, paths: &HashSet<PathBuf>) -> usize {
-    self.core.graph.invalidate(paths, "watchman")
+    self.core.graph.invalidate(paths, "external")
   }
 
   ///

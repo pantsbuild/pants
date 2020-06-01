@@ -22,11 +22,9 @@ from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.pants_daemon_core import PantsDaemonCore
 from pants.pantsd.process_manager import PantsDaemonProcessManager
-from pants.pantsd.service.fs_event_service import FSEventService
 from pants.pantsd.service.pants_service import PantsServices
 from pants.pantsd.service.scheduler_service import SchedulerService
 from pants.pantsd.service.store_gc_service import StoreGCService
-from pants.pantsd.watchman_launcher import WatchmanLauncher
 from pants.util.contextutil import stdio_as
 from pants.util.logging import LogLevel
 from pants.util.strutil import ensure_text
@@ -129,18 +127,6 @@ class PantsDaemon(PantsDaemonProcessManager):
         """
         build_root = get_buildroot()
 
-        # TODO: https://github.com/pantsbuild/pants/issues/3479
-        watchman_launcher = WatchmanLauncher.create(bootstrap_options)
-        watchman_launcher.maybe_launch()
-        watchman = watchman_launcher.watchman
-        fs_event_service = (
-            FSEventService(
-                watchman, scheduler=legacy_graph_scheduler.scheduler, build_root=build_root
-            )
-            if bootstrap_options.watchman_enable
-            else None
-        )
-
         invalidation_globs = OptionsInitializer.compute_pantsd_invalidation_globs(
             build_root,
             bootstrap_options,
@@ -148,7 +134,6 @@ class PantsDaemon(PantsDaemonProcessManager):
         )
 
         scheduler_service = SchedulerService(
-            fs_event_service=fs_event_service,
             legacy_graph_scheduler=legacy_graph_scheduler,
             build_root=build_root,
             invalidation_globs=invalidation_globs,
@@ -157,14 +142,7 @@ class PantsDaemon(PantsDaemonProcessManager):
         )
 
         store_gc_service = StoreGCService(legacy_graph_scheduler.scheduler)
-
-        return PantsServices(
-            services=tuple(
-                service
-                for service in (fs_event_service, scheduler_service, store_gc_service,)
-                if service is not None
-            ),
-        )
+        return PantsServices(services=(scheduler_service, store_gc_service))
 
     def __init__(
         self,
