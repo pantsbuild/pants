@@ -491,7 +491,7 @@ class GlobalOptions(Subsystem):
             "--enable-pantsd",
             advanced=True,
             type=bool,
-            default=False,
+            default=True,
             help=(
                 "Enables use of the pants daemon (pantsd). pantsd can significantly improve "
                 "runtime performance by lowering per-run startup cost, and by caching filesystem "
@@ -524,20 +524,6 @@ class GlobalOptions(Subsystem):
             advanced=True,
             default=None,
             help="The build ID of the other pants run which spawned this one, if any.",
-        )
-
-        # Shutdown pantsd after the current run.
-        # This needs to be accessed at the same time as enable_pantsd,
-        # so we register it at bootstrap time.
-        register(
-            "--shutdown-pantsd-after-run",
-            advanced=True,
-            type=bool,
-            default=False,
-            removal_version="1.30.0.dev0",
-            removal_hint="Not widely used, and will soon be rewritten to be inherent.",
-            help="Create a new pantsd server, and use it, and shut it down immediately after. "
-            "If pantsd is already running, it will shut it down and spawn a new instance (Beta)",
         )
 
         # NB: We really don't want this option to invalidate the daemon, because different clients might have
@@ -614,15 +600,6 @@ class GlobalOptions(Subsystem):
 
         # Pants Daemon options.
         register(
-            "--pantsd-pailgun-host",
-            advanced=True,
-            default="127.0.0.1",
-            removal_version="1.30.0.dev0",
-            removal_hint="The nailgun protocol is not authenticated, and so only binds to "
-            "127.0.0.1.",
-            help="The host to bind the pants nailgun server to.",
-        )
-        register(
             "--pantsd-pailgun-port",
             advanced=True,
             type=int,
@@ -659,18 +636,34 @@ class GlobalOptions(Subsystem):
             type=bool,
             advanced=True,
             default=False,
-            removal_version="1.30.0.dev0",
-            removal_hint="The native watcher is now sufficient to monitor for filesystem changes.",
+            removal_version="1.31.0.dev0",
+            removal_hint=(
+                "The native watcher is now sufficient to monitor for filesystem "
+                "changes, so watchman is being removed."
+            ),
             help="Use the watchman daemon filesystem event watcher to watch for changes "
             "in the buildroot in addition to the built in watcher.",
         )
         register(
-            "--watchman-version", advanced=True, default="4.9.0-pants1", help="Watchman version."
+            "--watchman-version",
+            advanced=True,
+            default="4.9.0-pants1",
+            removal_version="1.31.0.dev0",
+            removal_hint=(
+                "The native watcher is now sufficient to monitor for filesystem "
+                "changes, so watchman is being removed."
+            ),
+            help="Watchman version.",
         )
         register(
             "--watchman-supportdir",
             advanced=True,
             default="bin/watchman",
+            removal_version="1.31.0.dev0",
+            removal_hint=(
+                "The native watcher is now sufficient to monitor for filesystem "
+                "changes, so watchman is being removed."
+            ),
             help="Find watchman binaries under this dir. Used as part of the path to lookup "
             "the binary with --binaries-baseurls and --pants-bootstrapdir.",
         )
@@ -679,6 +672,11 @@ class GlobalOptions(Subsystem):
             type=float,
             advanced=True,
             default=60.0,
+            removal_version="1.31.0.dev0",
+            removal_hint=(
+                "The native watcher is now sufficient to monitor for filesystem "
+                "changes, so watchman is being removed."
+            ),
             help="The watchman socket timeout (in seconds) for the initial `watch-project` command. "
             "This may need to be set higher for larger repos due to watchman startup cost.",
         )
@@ -687,6 +685,11 @@ class GlobalOptions(Subsystem):
             type=float,
             advanced=True,
             default=0.1,
+            removal_version="1.31.0.dev0",
+            removal_hint=(
+                "The native watcher is now sufficient to monitor for filesystem "
+                "changes, so watchman is being removed."
+            ),
             help="The watchman client socket timeout in seconds. Setting this to too high a "
             "value can negatively impact the latency of runs forked by pantsd.",
         )
@@ -695,6 +698,11 @@ class GlobalOptions(Subsystem):
             type=str,
             advanced=True,
             default=None,
+            removal_version="1.31.0.dev0",
+            removal_hint=(
+                "The native watcher is now sufficient to monitor for filesystem "
+                "changes, so watchman is being removed."
+            ),
             help="The path to the watchman UNIX socket. This can be overridden if the default "
             "absolute path length exceeds the maximum allowed by the OS.",
         )
@@ -887,16 +895,6 @@ class GlobalOptions(Subsystem):
             default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_enable_nailgun,
             help="Whether or not to use nailgun to run the requests that are marked as nailgunnable.",
             advanced=True,
-        )
-        register(
-            "--experimental-fs-watcher",
-            type=bool,
-            default=True,
-            advanced=True,
-            removal_version="1.30.0.dev0",
-            removal_hint="Enabled by default: flag is disabled.",
-            help="Whether to use the engine filesystem watcher which registers the workspace"
-            " for kernel file change events",
         )
 
     @classmethod

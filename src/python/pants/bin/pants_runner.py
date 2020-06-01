@@ -6,7 +6,6 @@ import os
 from dataclasses import dataclass
 from typing import List, Mapping
 
-from pants.base.deprecated import deprecated_conditional
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import ExitCode
 from pants.bin.remote_pants_runner import RemotePantsRunner
@@ -80,18 +79,6 @@ class PantsRunner:
 
         ExceptionSink.reset_should_print_backtrace_to_terminal(
             global_bootstrap_options.print_exception_stacktrace
-        )
-
-        # TODO: When we remove this deprecation, we'll change the default for the option to true.
-        deprecated_conditional(
-            lambda: global_bootstrap_options.is_default("enable_pantsd"),
-            removal_version="1.30.0.dev0",
-            entity_description="--enable-pantsd defaulting to False",
-            hint_message=(
-                "Pantsd improves runtime performance and will be enabled by default in the 1.30.x "
-                "stable releases. To prepare for that change, we recommend setting the "
-                "`[GLOBAL] enable_pantsd` setting to `True` in your pants.toml or pants.ini file."
-            ),
         )
 
         if self._should_run_with_pantsd(global_bootstrap_options):

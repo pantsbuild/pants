@@ -54,7 +54,7 @@ To understand what the process is for spinning up and closing down pantsd, here 
 
 If we run the command `./pants --enable-pantsd list src/scala::`, the following happens:
 
-1. `PantsRunner::run()` is called, which will prompt parsing of bootstrap options. `--enable-pantsd` and `--shutdown-pantsd-after-run` are both bootstrap options.
+1. `PantsRunner::run()` is called, which will prompt parsing of bootstrap options. `--enable-pantsd` is a bootstrap option.
   * In that function, we determine whether we need to run in pantsd mode or local mode.
     If we choose local mode, an instance of `LocalPantsRunner` is created and the run will continue as if pantsd didn't exist.
 
