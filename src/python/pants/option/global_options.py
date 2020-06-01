@@ -491,7 +491,7 @@ class GlobalOptions(Subsystem):
             "--enable-pantsd",
             advanced=True,
             type=bool,
-            default=False,
+            default=True,
             help=(
                 "Enables use of the pants daemon (pantsd). pantsd can significantly improve "
                 "runtime performance by lowering per-run startup cost, and by caching filesystem "

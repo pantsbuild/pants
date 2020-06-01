@@ -20,7 +20,6 @@ local_artifact_cache = "%(pants_bootstrapdir)s/artifact_cache"
 [GLOBAL]
 print_exception_stacktrace = true
 v2 = false
-enable_pantsd = true
 
 # Enable our own custom loose-source plugins as well as contribs.
 pythonpath = [
