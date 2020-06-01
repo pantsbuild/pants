@@ -46,25 +46,16 @@ Exception message:.* 1 Exception encountered:
 
         return (pid_specific_log_file, shared_log_file)
 
-    def test_fails_ctrl_c_cffi_extern(self):
+    def test_fails_ctrl_c_ffi_extern(self):
         with temporary_dir() as tmpdir:
-            with environment_as(_RAISE_KEYBOARDINTERRUPT_IN_CFFI_IDENTIFY="True"):
+            with environment_as(_RAISE_KEYBOARDINTERRUPT_IN_EXTERNS="True"):
                 pants_run = self.run_pants_with_workdir(
                     self._lifecycle_stub_cmdline(), workdir=tmpdir
                 )
                 self.assert_failure(pants_run)
 
                 self.assertIn(
-                    dedent(
-                        """\
-                        KeyboardInterrupt: ctrl-c interrupted execution of a cffi method!
-
-
-                        The engine execution request raised this error, which is probably due to the errors in the
-                        CFFI extern methods listed above, as CFFI externs return None upon error:
-                        Traceback (most recent call last):
-                        """
-                    ),
+                    "KeyboardInterrupt: ctrl-c interrupted execution of a ffi method!",
                     pants_run.stderr_data,
                 )
 
@@ -73,11 +64,11 @@ Exception message:.* 1 Exception encountered:
                 )
 
                 self.assertIn(
-                    "KeyboardInterrupt: ctrl-c interrupted execution of a cffi method!",
+                    "KeyboardInterrupt: ctrl-c interrupted execution of a ffi method!",
                     read_file(pid_specific_log_file),
                 )
                 self.assertIn(
-                    "KeyboardInterrupt: ctrl-c interrupted execution of a cffi method!",
+                    "KeyboardInterrupt: ctrl-c interrupted execution of a ffi method!",
                     read_file(shared_log_file),
                 )
 

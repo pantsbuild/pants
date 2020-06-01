@@ -73,32 +73,6 @@ python_tests(
 )
 
 python_tests(
-    name="isort_run",
-    sources=["test_isort_run.py"],
-    dependencies=[
-        "src/python/pants/backend/python/tasks",
-        "src/python/pants/base:exceptions",
-        "src/python/pants/util:contextutil",
-        "src/python/pants/testutil:interpreter_selection_utils",
-        ":python_task_test_base",
-    ],
-    tags={"partially_type_checked"},
-)
-
-python_tests(
-    name="isort_run_integration",
-    sources=["test_isort_run_integration.py"],
-    dependencies=[
-        "contrib:isort_cfg",
-        "examples:isort_cfg",
-        "src/python/pants/backend/python/tasks",
-        "src/python/pants/testutil:int-test",
-        "testprojects/tests/java/org/pantsbuild/testproject:dummies_directory",
-    ],
-    tags={"integration", "partially_type_checked"},
-)
-
-python_tests(
     name="pytest_run",
     sources=["test_pytest_run.py"],
     dependencies=[

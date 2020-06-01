@@ -14,6 +14,18 @@ def test_flexible_constructor() -> None:
     assert FrozenDict(OrderedDict({"a": 0, "b": 1})) == expected
     assert FrozenDict([("a", 0), ("b", 1)]) == expected
     assert FrozenDict((("a", 0), ("b", 1))) == expected
+    assert FrozenDict(a=0, b=1) == expected
+    assert FrozenDict({"a": 0}, b=1) == expected
+    assert FrozenDict([("a", 0)], b=1) == expected
+
+
+def test_empty_construction() -> None:
+    assert FrozenDict() == FrozenDict({})
+
+
+def test_invalid_arguments() -> None:
+    with pytest.raises(ValueError):
+        FrozenDict({}, {})  # type: ignore[call-overload]
 
 
 def test_unhashable_items_rejected() -> None:
@@ -31,7 +43,7 @@ def test_original_data_gets_copied() -> None:
 
 
 def test_len() -> None:
-    assert len(FrozenDict({})) == 0
+    assert len(FrozenDict()) == 0
     assert len(FrozenDict({"a": 0, "b": 1})) == 2
 
 

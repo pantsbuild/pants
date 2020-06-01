@@ -30,23 +30,6 @@ function pkg_node_install_test() {
       --explain test | grep "NodeTest_test_node" &> /dev/null
 }
 
-function pkg_checks_install_test() {
-  local version=$1
-  execute_packaged_pants_with_internal_backends \
-    --plugins="['pantsbuild.pants.contrib.python.checks==${version}']" \
-    --explain lint | grep "python-eval" &> /dev/null && \
-  execute_packaged_pants_with_internal_backends \
-    --plugins="['pantsbuild.pants.contrib.python.checks==${version}']" \
-    --explain lint | grep "pythonstyle" &> /dev/null
-}
-
-function pkg_checker_install_test() {
-  local version=$1
-  execute_pex --pypi \
-    "pantsbuild.pants.contrib.python.checks.checker==${version}" \
-    -c checker -- --help
-}
-
 function pkg_confluence_install_test() {
   local version=$1
   execute_packaged_pants_with_internal_backends \
@@ -54,24 +37,9 @@ function pkg_confluence_install_test() {
       --explain confluence | grep "ConfluencePublish_confluence" &> /dev/null
 }
 
-function pkg_codeanalysis_install_test() {
-  local version=$1
-  execute_packaged_pants_with_internal_backends \
-      --plugins="['pantsbuild.pants.contrib.codeanalysis==${version}']" \
-      --explain index | grep "kythe" &> /dev/null
-}
-
 function pkg_mypy_install_test() {
   local version=$1
   execute_packaged_pants_with_internal_backends \
     --plugins="['pantsbuild.pants.contrib.mypy==${version}']" \
     --explain lint | grep "mypy" &> /dev/null
-}
-
-function pkg_awslambda_python_install_test() {
-  local version=$1
-  execute_packaged_pants_with_internal_backends \
-    --plugins="['pantsbuild.pants.contrib.awslambda_python==${version}']" \
-    --backend-packages2="-['pants.backend.awslambda.python']" \
-    --explain bundle | grep "lambdex" &> /dev/null
 }

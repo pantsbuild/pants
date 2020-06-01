@@ -528,10 +528,6 @@ jobs:
     if: commit_message !~ /\[ci skip-rust-tests\]/
     name: Clippy (Rust linter)
     os: linux
-    python:
-    - '2.7'
-    - '3.6'
-    - '3.7'
     script:
     - ./build-support/bin/ci.py --clippy
     stage: Test Pants
@@ -1597,17 +1593,12 @@ jobs:
     dist: xenial
     env:
     - CACHE_NAME=rust_tests.linux
-    - PREPARE_DEPLOY=1
+    - LD_LIBRARY_PATH="/opt/python/3.6.7/lib:${LD_LIBRARY_PATH}"
     if: commit_message !~ /\[ci skip-rust-tests\]/
     name: Rust tests - Linux
     os: linux
-    python:
-    - '2.7'
-    - '3.6'
-    - '3.7'
     script:
     - ./build-support/bin/ci.py --rust-tests
-    - ./build-support/bin/release.sh -f
     stage: Test Pants
     sudo: required
   - before_cache:
@@ -1636,14 +1627,12 @@ jobs:
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"
     - CACHE_NAME=rust_tests.osx
-    - PREPARE_DEPLOY=1
     if: commit_message !~ /\[ci skip-rust-tests\]/
     name: Rust tests - OSX
     os: osx
     osx_image: xcode8
     script:
     - ./build-support/bin/ci.py --rust-tests
-    - ./build-support/bin/release.sh -f
     stage: Test Pants
   - addons:
       apt:
@@ -1691,7 +1680,7 @@ jobs:
     - PREPARE_DEPLOY=1
     - CACHE_NAME=wheels.linux
     language: python
-    name: Build Linux wheels
+    name: Build Linux wheels and fs_util
     os: linux
     python:
     - '2.7'
@@ -1703,7 +1692,8 @@ jobs:
       -g)" build-support/docker/travis_ci/
     - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
       travis_ci:latest sh -c "./build-support/bin/release.sh -n && USE_PY37=true ./build-support/bin/release.sh
-      -n && USE_PY38=true ./build-support/bin/release.sh -n"
+      -n && USE_PY38=true ./build-support/bin/release.sh -n && ./build-support/bin/release.sh
+      -f"
     services:
     - docker
     stage: Test Pants
@@ -1742,13 +1732,14 @@ jobs:
     - PREPARE_DEPLOY=1
     - CACHE_NAME=wheels.osx
     language: generic
-    name: Build macOS wheels
+    name: Build macOS wheels and fs_util
     os: osx
     osx_image: xcode8
     script:
     - ./build-support/bin/release.sh -n
     - USE_PY37=true ./build-support/bin/release.sh -n
     - USE_PY38=true ./build-support/bin/release.sh -n
+    - ./build-support/bin/release.sh -f
     stage: Test Pants
   - before_install:
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64

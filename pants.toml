@@ -24,9 +24,7 @@ enable_pantsd = true
 
 # Enable our own custom loose-source plugins as well as contribs.
 pythonpath = [
-  "%(buildroot)s/contrib/awslambda/python/src/python",
   "%(buildroot)s/contrib/buildrefactor/src/python",
-  "%(buildroot)s/contrib/codeanalysis/src/python",
   "%(buildroot)s/contrib/confluence/src/python",
   "%(buildroot)s/contrib/go/src/python",
   "%(buildroot)s/contrib/mypy/src/python",
@@ -44,10 +42,6 @@ backend_packages.add = [
   "internal_backend.repositories",
   "internal_backend.sitegen",
   "internal_backend.utilities",
-]
-backend_packages.remove = [
-  # We use the V2 isort implementation.
-  "pants.backend.python.lint.isort",
 ]
 backend_packages2.add = [
   "pants.backend.awslambda.python",
@@ -233,7 +227,10 @@ ignore = "%(pants_supportdir)s/eslint/.eslintignore"
 
 [flake8]
 config = "build-support/flake8/.flake8"
-extra_requirements.add = ["flake8-pantsbuild>=2.0,<3"]
+extra_requirements.add = [
+  "flake8-pantsbuild>=2.0,<3",
+  "flake8-2020>=1.6.0,<1.7.0"
+]
 
 [isort]
 config = [".isort.cfg", "contrib/.isort.cfg", "examples/.isort.cfg"]

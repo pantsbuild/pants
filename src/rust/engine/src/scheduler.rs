@@ -8,7 +8,6 @@ use std::path::{Path, PathBuf};
 use std::sync::{mpsc, Arc};
 use std::time::{Duration, Instant};
 
-use futures::compat::Future01CompatExt;
 use futures::future;
 
 use crate::context::{Context, Core};
@@ -73,7 +72,7 @@ impl Session {
     build_id: String,
     should_report_workunits: bool,
   ) -> Session {
-    let workunit_store = WorkunitStore::new();
+    let workunit_store = WorkunitStore::new(should_render_ui);
     let display = if should_render_ui {
       Some(Mutex::new(ConsoleUI::new(workunit_store.clone())))
     } else {
@@ -360,12 +359,7 @@ impl Scheduler {
         .await?;
       (result, Some(last_observed))
     } else {
-      let result = context
-        .core
-        .graph
-        .create(root.into(), &context)
-        .compat()
-        .await?;
+      let result = context.core.graph.create(root.into(), &context).await?;
       (result, None)
     };
 

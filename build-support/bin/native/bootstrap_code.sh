@@ -43,11 +43,12 @@ function _build_native_code() {
     # Change into $REPO_ROOT in a subshell. This is necessary so that we're in a child of a
     # directory containing the rust-toolchain file, so that rustup knows which version of rust we
     # should be using.
+    # NB: See Cargo.toml with regard to the `extension-module` feature.
     cd "${REPO_ROOT}"
-    "${REPO_ROOT}/build-support/bin/native/cargo" build ${MODE_FLAG} \
-      --manifest-path "${NATIVE_ROOT}/Cargo.toml" -p engine_cffi
+    "${REPO_ROOT}/build-support/bin/native/cargo" build --features=extension-module ${MODE_FLAG} \
+      --manifest-path "${NATIVE_ROOT}/Cargo.toml" -p engine
   ) || die
-  echo "${NATIVE_ROOT}/target/${MODE}/libengine_cffi.${LIB_EXTENSION}"
+  echo "${NATIVE_ROOT}/target/${MODE}/libengine.${LIB_EXTENSION}"
 }
 
 function bootstrap_native_code() {

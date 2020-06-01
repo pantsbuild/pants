@@ -7,29 +7,31 @@ from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.build_graph.target import Target
 from pants.engine.unions import UnionRule, union
+from pants.util.frozendict import FrozenDict
+from pants.util.ordered_set import FrozenOrderedSet
 
 
 class BuildConfigurationTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.build_configuration = BuildConfiguration()
+        self.bc_builder = BuildConfiguration.Builder()
 
     def _register_aliases(self, **kwargs) -> None:
-        self.build_configuration.register_aliases(BuildFileAliases(**kwargs))
+        self.bc_builder.register_aliases(BuildFileAliases(**kwargs))
 
     def test_register_bad(self) -> None:
         with self.assertRaises(TypeError):
-            self.build_configuration.register_aliases(42)
+            self.bc_builder.register_aliases(42)
 
     def test_register_target_alias(self) -> None:
         class Fred(Target):
             pass
 
         self._register_aliases(targets={"fred": Fred})
-        aliases = self.build_configuration.registered_aliases()
-        self.assertEqual({}, aliases.target_macro_factories)
-        self.assertEqual({}, aliases.objects)
-        self.assertEqual({}, aliases.context_aware_object_factories)
-        self.assertEqual(dict(fred=Fred), aliases.target_types)
+        aliases = self.bc_builder.create().registered_aliases()
+        self.assertEqual(FrozenDict(), aliases.target_macro_factories)
+        self.assertEqual(FrozenDict(), aliases.objects)
+        self.assertEqual(FrozenDict(), aliases.context_aware_object_factories)
+        self.assertEqual(FrozenDict(fred=Fred), aliases.target_types)
 
     def test_register_target_macro_factory(self) -> None:
         class Fred(Target):
@@ -55,19 +57,19 @@ class BuildConfigurationTest(unittest.TestCase):
         factory = FredFactory()
 
         self._register_aliases(targets={"fred": factory})
-        aliases = self.build_configuration.registered_aliases()
-        self.assertEqual({}, aliases.target_types)
-        self.assertEqual({}, aliases.objects)
-        self.assertEqual({}, aliases.context_aware_object_factories)
-        self.assertEqual(dict(fred=factory), aliases.target_macro_factories)
+        aliases = self.bc_builder.create().registered_aliases()
+        self.assertEqual(FrozenDict(), aliases.target_types)
+        self.assertEqual(FrozenDict(), aliases.objects)
+        self.assertEqual(FrozenDict(), aliases.context_aware_object_factories)
+        self.assertEqual(FrozenDict(fred=factory), aliases.target_macro_factories)
 
     def test_register_exposed_object(self):
         self._register_aliases(objects={"jane": 42})
-        aliases = self.build_configuration.registered_aliases()
-        self.assertEqual({}, aliases.target_types)
-        self.assertEqual({}, aliases.target_macro_factories)
-        self.assertEqual({}, aliases.context_aware_object_factories)
-        self.assertEqual(dict(jane=42), aliases.objects)
+        aliases = self.bc_builder.create().registered_aliases()
+        self.assertEqual(FrozenDict(), aliases.target_types)
+        self.assertEqual(FrozenDict(), aliases.target_macro_factories)
+        self.assertEqual(FrozenDict(), aliases.context_aware_object_factories)
+        self.assertEqual(FrozenDict(jane=42), aliases.objects)
 
     def test_register_exposed_context_aware_object_factory(self):
         def caof_function(parse_context):
@@ -83,12 +85,13 @@ class BuildConfigurationTest(unittest.TestCase):
         self._register_aliases(
             context_aware_object_factories={"func": caof_function, "cls": CaofClass}
         )
-        aliases = self.build_configuration.registered_aliases()
-        self.assertEqual({}, aliases.target_types)
-        self.assertEqual({}, aliases.objects)
-        self.assertEqual({}, aliases.target_macro_factories)
+        aliases = self.bc_builder.create().registered_aliases()
+        self.assertEqual(FrozenDict(), aliases.target_types)
+        self.assertEqual(FrozenDict(), aliases.objects)
+        self.assertEqual(FrozenDict(), aliases.target_macro_factories)
         self.assertEqual(
-            {"func": caof_function, "cls": CaofClass}, aliases.context_aware_object_factories
+            FrozenDict({"func": caof_function, "cls": CaofClass}),
+            aliases.context_aware_object_factories,
         )
 
     def test_register_union_rules(self) -> None:
@@ -103,6 +106,6 @@ class BuildConfigurationTest(unittest.TestCase):
         class B:
             pass
 
-        self.build_configuration.register_rules([UnionRule(Base, A)])
-        self.build_configuration.register_rules([UnionRule(Base, B)])
-        self.assertEqual(set(self.build_configuration.union_rules()[Base]), {A, B})
+        self.bc_builder.register_rules([UnionRule(Base, A)])
+        self.bc_builder.register_rules([UnionRule(Base, B)])
+        self.assertEqual(self.bc_builder.create().union_rules()[Base], FrozenOrderedSet([A, B]))

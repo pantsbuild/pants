@@ -32,11 +32,10 @@
 
 mod context;
 mod core;
-pub mod externs;
-mod handles;
+mod externs;
 mod interning;
 mod intrinsics;
-pub mod nodes;
+mod nodes;
 mod scheduler;
 mod selectors;
 mod tasks;
@@ -44,7 +43,6 @@ mod types;
 
 pub use crate::context::Core;
 pub use crate::core::{Failure, Function, Key, Params, TypeId, Value};
-pub use crate::handles::Handle;
 pub use crate::intrinsics::Intrinsics;
 pub use crate::scheduler::{ExecutionRequest, ExecutionTermination, Scheduler, Session};
 pub use crate::tasks::{Rule, Tasks};

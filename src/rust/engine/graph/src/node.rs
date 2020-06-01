@@ -2,12 +2,12 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::fmt::{Debug, Display};
+use std::future::Future;
 use std::hash::Hash;
 
-use boxfuture::BoxFuture;
+use async_trait::async_trait;
 use hashing::Digest;
 
-use futures01::future::Future;
 use petgraph::stable_graph;
 
 use crate::entry::Entry;
@@ -21,13 +21,14 @@ pub type EntryId = stable_graph::NodeIndex<u32>;
 ///
 /// Note that it is assumed that Nodes are very cheap to clone.
 ///
+#[async_trait]
 pub trait Node: Clone + Debug + Display + Eq + Hash + Send + 'static {
   type Context: NodeContext<Node = Self>;
 
   type Item: Clone + Debug + Eq + Send + 'static;
   type Error: NodeError;
 
-  fn run(self, context: Self::Context) -> BoxFuture<Self::Item, Self::Error>;
+  async fn run(self, context: Self::Context) -> Result<Self::Item, Self::Error>;
 
   ///
   /// If the given Node output represents an FS operation, returns its Digest.
@@ -129,5 +130,5 @@ pub trait NodeContext: Clone + Send + Sync + 'static {
   ///
   fn spawn<F>(&self, future: F)
   where
-    F: Future<Item = (), Error = ()> + Send + 'static;
+    F: Future<Output = ()> + Send + 'static;
 }

@@ -11,7 +11,6 @@ REQUIREMENTS=(
   "${REPO_ROOT}/3rdparty/python/requirements.txt"
   "${REPO_ROOT}/3rdparty/python/twitter/commons/requirements.txt"
   "${REPO_ROOT}/pants-plugins/3rdparty/python/requirements.txt"
-  "${REPO_ROOT}/contrib/python/src/python/pants/contrib/python/checks/checker/3rdparty/requirements.txt"
 )
 
 venv_dir_prefix="${REPO_ROOT}/build-support/virtualenvs/$(uname)/pants_dev_deps"
@@ -58,6 +57,13 @@ MESSAGE
 }
 
 function activate_pants_venv() {
+  # Allow for multiple calls to `activate_pants_venv`.
+  if [ -n "$VENV_ACTIVATED_FOR_PANTS" ]; then
+    return
+  else
+    export VENV_ACTIVATED_FOR_PANTS="true"
+  fi
+
   fingerprint=""
   for req in "${REQUIREMENTS[@]}"; do
     fingerprint="${fingerprint}$(fingerprint_data < "${req}")"

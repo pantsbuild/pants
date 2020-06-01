@@ -160,12 +160,19 @@ class TestProcessMetadataManager(TestBase):
         with temporary_dir() as td:
             test_filename = os.path.join(td, "test.out")
             safe_file_dump(test_filename, "test")
-            self.pmm._wait_for_file(test_filename, timeout=0.1)
+            self.pmm._wait_for_file(
+                test_filename, "file to be created", "file was created", timeout=0.1
+            )
 
     def test_wait_for_file_timeout(self):
         with temporary_dir() as td:
             with self.assertRaises(ProcessMetadataManager.Timeout):
-                self.pmm._wait_for_file(os.path.join(td, "non_existent_file"), timeout=0.1)
+                self.pmm._wait_for_file(
+                    os.path.join(td, "non_existent_file"),
+                    "file to be created",
+                    "file was created",
+                    timeout=0.1,
+                )
 
     def test_await_metadata_by_name(self):
         with temporary_dir() as tmpdir, unittest.mock.patch(
@@ -174,7 +181,10 @@ class TestProcessMetadataManager(TestBase):
             self.pmm.write_metadata_by_name(self.NAME, self.TEST_KEY, self.TEST_VALUE)
 
             self.assertEqual(
-                self.pmm.await_metadata_by_name(self.NAME, self.TEST_KEY, 0.1), self.TEST_VALUE
+                self.pmm.await_metadata_by_name(
+                    self.NAME, self.TEST_KEY, "metadata to be created", "metadata was created", 0.1
+                ),
+                self.TEST_VALUE,
             )
 
     def test_purge_metadata(self):
@@ -258,12 +268,21 @@ class TestProcessManager(TestBase):
     def test_await_pid(self):
         with unittest.mock.patch.object(ProcessManager, "await_metadata_by_name") as mock_await:
             self.pm.await_pid(5)
-        mock_await.assert_called_once_with(self.pm.name, "pid", 5, unittest.mock.ANY)
+        mock_await.assert_called_once_with(
+            self.pm.name, "pid", "test to start", "test started", 5, caster=unittest.mock.ANY
+        )
 
     def test_await_socket(self):
         with unittest.mock.patch.object(ProcessManager, "await_metadata_by_name") as mock_await:
             self.pm.await_socket(5)
-        mock_await.assert_called_once_with(self.pm.name, "socket", 5, unittest.mock.ANY)
+        mock_await.assert_called_once_with(
+            self.pm.name,
+            "socket",
+            "test socket to be opened",
+            "test socket opened",
+            5,
+            caster=unittest.mock.ANY,
+        )
 
     def test_write_pid(self):
         with unittest.mock.patch.object(ProcessManager, "write_metadata_by_name") as mock_write:

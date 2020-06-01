@@ -115,8 +115,6 @@ class TarballArtifact(Artifact):
         # Note(yic): unlike the python implementation before, now we do not update self._relpath
         # after the extraction.
         try:
-            self.NATIVE_BINARY.decompress_tarball(
-                self._tarfile.encode(), self.artifact_extraction_root.encode()
-            )
+            self.NATIVE_BINARY.decompress_tarball(self._tarfile, self.artifact_extraction_root)
         except Exception as e:
             raise ArtifactError("Extracting artifact failed:\n{}".format(e))

@@ -22,7 +22,6 @@ members = [
   "async_semaphore",
   "boxfuture",
   "concrete_time",
-  "engine_cffi",
   "fs",
   "fs/brfs",
   "fs/fs_util",
@@ -60,7 +59,6 @@ default-members = [
   "async_semaphore",
   "boxfuture",
   "concrete_time",
-  "engine_cffi",
   "fs",
   "fs/fs_util",
   "fs/store",
@@ -84,12 +82,26 @@ default-members = [
   "workunit_store"
 ]
 
+[lib]
+crate-type = ["cdylib"]
+
+[features]
+# NB: To actually load this crate from python, the `extension-module` feature must be enabled. But
+# unfortunately, enabling `extension-module` causes tests linked against `cpython` to fail. We
+# define a feature to enable that, but we do not enable it by default: someone building this module
+# in order to extract `libengine.so` should pass `cargo build .. --features=extension-module`.
+#  see https://github.com/PyO3/pyo3/issues/340
+extension-module = ["cpython/extension-module"]
+default = []
+
 [dependencies]
 async_semaphore = { path = "async_semaphore" }
 async-trait = "0.1"
 boxfuture = { path = "boxfuture" }
 bytes = "0.4.5"
 concrete_time = { path = "concrete_time" }
+cpython = "0.5"
+crossbeam-channel = "0.3"
 fnv = "1.0.5"
 fs = { path = "fs" }
 futures01 = { package = "futures", version = "0.1" }
@@ -112,6 +124,7 @@ rule_graph = { path = "rule_graph" }
 sharded_lmdb = { path = "sharded_lmdb" }
 smallvec = "0.6"
 store = { path = "fs/store" }
+tar_api = { path = "tar_api" }
 task_executor = { path = "task_executor" }
 tempfile = "3"
 time = "0.1.40"

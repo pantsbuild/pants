@@ -299,11 +299,11 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
     @classmethod
     def build_config(cls):
-        build_config = BuildConfiguration()
+        build_config = BuildConfiguration.Builder()
         build_config.register_aliases(cls.alias_groups())
         build_config.register_rules(cls.rules())
         build_config.register_target_types(cls.target_types())
-        return build_config
+        return build_config.create()
 
     def setUp(self):
         """
@@ -501,7 +501,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
                     "You must set a scope on your subsystem type before using it in tests."
                 )
 
-        optionables = {SourceRootConfig} | self._build_configuration.optionables() | for_subsystems
+        optionables = {SourceRootConfig, *self._build_configuration.optionables(), *for_subsystems}
 
         for_task_types = for_task_types or ()
         for task_type in for_task_types:

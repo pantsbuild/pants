@@ -43,7 +43,7 @@ from pants.engine.fs import (
 )
 from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.process import MultiPlatformProcess, ProcessResult
-from pants.engine.rules import RootRule, SubsystemRule, named_rule, rule
+from pants.engine.rules import RootRule, SubsystemRule, rule
 from pants.engine.selectors import Get
 from pants.python.python_repos import PythonRepos
 from pants.python.python_setup import PythonSetup
@@ -304,7 +304,7 @@ class PexDebug:
         self.log_level.log(logger, *args, **kwargs)
 
 
-@named_rule(desc="Create PEX")
+@rule
 async def create_pex(
     request: PexRequest,
     pex_bin: DownloadedPexBin,
@@ -345,7 +345,7 @@ async def create_pex(
     argv.extend(pex_debug.iter_pex_args())
 
     if python_setup.resolver_jobs:
-        argv.extend(["--jobs", python_setup.resolver_jobs])
+        argv.extend(["--jobs", str(python_setup.resolver_jobs)])
 
     if python_setup.manylinux:
         argv.extend(["--manylinux", python_setup.manylinux])

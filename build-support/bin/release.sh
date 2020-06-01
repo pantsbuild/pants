@@ -130,7 +130,6 @@ function pkg_testutil_install_test() {
 REQUIREMENTS_3RDPARTY_FILES=(
   "3rdparty/python/requirements.txt"
   "3rdparty/python/twitter/commons/requirements.txt"
-  "contrib/python/src/python/pants/contrib/python/checks/checker/3rdparty/requirements.txt"
 )
 
 # When we do (dry-run) testing, we need to run the packaged pants.
@@ -190,25 +189,6 @@ function build_3rdparty_packages() {
   pip wheel --wheel-dir="${DEPLOY_3RDPARTY_WHEEL_DIR}/${version}" "${req_args[@]}"
 
   deactivate
-  end_travis_section
-}
-
-function build_fs_util() {
-  start_travis_section "fs_util" "Building fs_util binary"
-  # fs_util is a standalone tool which can be used to inspect and manipulate
-  # Pants's engine's file store, and interact with content addressable storage
-  # services which implement the Bazel remote execution API.
-  # It is a useful standalone tool which people may want to consume, for
-  # instance when debugging pants issues, or if they're implementing a remote
-  # execution API. Accordingly, we include it in our releases.
-  (
-    set -e
-    RUST_BACKTRACE=1 "${ROOT}/build-support/bin/native/cargo" build --release \
-      --manifest-path="${ROOT}/src/rust/engine/Cargo.toml" -p fs_util
-    dst_dir="${DEPLOY_DIR}/bin/fs_util/$("${ROOT}/build-support/bin/get_os.sh")/${PANTS_UNSTABLE_VERSION}"
-    mkdir -p "${dst_dir}"
-    cp "${ROOT}/src/rust/engine/target/release/fs_util" "${dst_dir}/"
-  ) || die "Failed to build fs_util"
   end_travis_section
 }
 
@@ -302,39 +282,12 @@ function dry_run_install() {
     -f "${DEPLOY_3RDPARTY_WHEEL_DIR}/${VERSION}" -f "${DEPLOY_PANTS_WHEEL_DIR}/${VERSION}"
 }
 
-function get_branch() {
-  git branch | grep -E '^\* ' | cut -d' ' -f2-
-}
-
 function get_pgp_keyid() {
   git config --get user.signingkey
 }
 
 function get_pgp_program() {
   git config --get gpg.program || echo "gpg"
-}
-
-function check_release_prereqs() {
-  run_packages_script check-release-prereqs
-}
-
-function tag_release() {
-  release_version="${PANTS_STABLE_VERSION}" && \
-  tag_name="release_${release_version}" && \
-  git tag -f \
-    "--local-user=$(get_pgp_keyid)" \
-    -m "pantsbuild.pants release ${release_version}" \
-    "${tag_name}" && \
-  git push -f git@github.com:pantsbuild/pants.git "${tag_name}"
-}
-
-function publish_docs_if_master() {
-  branch=$(get_branch)
-  if [[ "${branch}" == "master" ]]; then
-    "${ROOT}/build-support/bin/publish_docs.sh" -p -y
-  else
-    echo "Skipping docsite publishing on non-master branch (${branch})."
-  fi
 }
 
 function reversion_whls() {
@@ -518,7 +471,7 @@ while getopts ":${_OPTS}" opt; do
     h) usage ;;
     d) debug="true" ;;
     n) dry_run="true" ;;
-    f) build_fs_util ; exit $? ;;
+    f) run_packages_script build-fs-util ; exit $? ;;
     t) test_release="true" ;;
     l) run_packages_script list-packages ; exit $? ;;
     o) run_packages_script list-owners ; exit $? ;;
@@ -552,7 +505,7 @@ elif [[ "${test_release}" == "true" ]]; then
 else
   banner "Releasing packages to PyPI"
   (
-    check_release_prereqs && publish_packages && tag_release && publish_docs_if_master && \
-      banner "Successfully released packages to PyPI"
+    run_packages_script check-release-prereqs && publish_packages && \
+    run_packages_script post-publish && banner "Successfully released packages to PyPI"
   ) || die "Failed to release packages to PyPI."
 fi

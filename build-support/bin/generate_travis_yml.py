@@ -368,7 +368,6 @@ def linux_fuse_shard() -> Dict:
         "os": "linux",
         "dist": "xenial",
         "sudo": "required",
-        "python": ["2.7", "3.6", "3.7"],
         "before_install": _linux_before_install()
         + [
             "sudo apt-get install -y pkg-config fuse libfuse-dev",
@@ -576,6 +575,8 @@ def _build_wheels_command() -> List[str]:
         "./build-support/bin/release.sh -n",
         "USE_PY37=true ./build-support/bin/release.sh -n",
         "USE_PY38=true ./build-support/bin/release.sh -n",
+        # NB: We also build `fs_util` in this shard to leverage having had compiled the engine.
+        "./build-support/bin/release.sh -f",
     ]
 
 
@@ -588,7 +589,7 @@ def build_wheels_linux() -> Dict:
     shard: Dict = {
         **CACHE_NATIVE_ENGINE,
         **linux_shard(use_docker=True),
-        "name": "Build Linux wheels",
+        "name": "Build Linux wheels and fs_util",
         "script": [docker_build_travis_ci_image(), docker_run_travis_ci_image(command)],
     }
     safe_extend(shard, "env", _build_wheels_env(platform=Platform.linux))
@@ -599,7 +600,7 @@ def build_wheels_osx() -> Dict:
     shard: Dict = {
         **CACHE_NATIVE_ENGINE,
         **osx_shard(osx_image="xcode8"),
-        "name": "Build macOS wheels",
+        "name": "Build macOS wheels and fs_util",
         "script": _build_wheels_command(),
         "before_install": _osx_before_install(
             python_versions=[PythonVersion.py36, PythonVersion.py37, PythonVersion.py38],
@@ -660,9 +661,7 @@ _RUST_TESTS_BASE: Dict = {
     **CACHE_NATIVE_ENGINE,
     "stage": Stage.test.value,
     "before_script": ["ulimit -n 8192"],
-    # NB: We also build `fs_util` in this shard to leverage having had compiled the engine. This
-    # requires setting PREPARE_DEPLOY=1.
-    "script": ["./build-support/bin/ci.py --rust-tests", "./build-support/bin/release.sh -f"],
+    "script": ["./build-support/bin/ci.py --rust-tests"],
     "if": SKIP_RUST_CONDITION,
 }
 
@@ -672,7 +671,13 @@ def rust_tests_linux() -> Dict:
         **_RUST_TESTS_BASE,
         **linux_fuse_shard(),
         "name": "Rust tests - Linux",
-        "env": ["CACHE_NAME=rust_tests.linux", "PREPARE_DEPLOY=1"],
+        "env": [
+            "CACHE_NAME=rust_tests.linux",
+            # TODO: Despite being successfully linked at build time, the Linux rust tests
+            # shard is unable to locate `libpython3.6m.so.1.0` at runtime without this pointer:
+            # OSX appears to be fine.
+            'LD_LIBRARY_PATH="/opt/python/3.6.7/lib:${LD_LIBRARY_PATH}"',
+        ],
     }
 
 
@@ -701,7 +706,7 @@ def rust_tests_osx() -> Dict:
             # This is good, because `brew install openssl` would trigger the same issues as noted on why
             # we don't use the `addons` section.
         ],
-        "env": [*_osx_env_with_pyenv(), "CACHE_NAME=rust_tests.osx", "PREPARE_DEPLOY=1"],
+        "env": [*_osx_env_with_pyenv(), "CACHE_NAME=rust_tests.osx"],
     }
 
 
