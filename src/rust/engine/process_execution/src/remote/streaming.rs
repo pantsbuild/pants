@@ -1,12 +1,16 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
-// use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use async_trait::async_trait;
+use bazel_protos::call_option;
+use bazel_protos::error_details::PreconditionFailure;
 use bazel_protos::remote_execution::{
-  Action, Command, ExecuteResponse, ExecutedActionMetadata, WaitExecutionRequest,
+  Action, Command, ExecuteRequest, ExecuteResponse, ExecutedActionMetadata, WaitExecutionRequest,
 };
+use bazel_protos::status::Status;
 use bytes::Bytes;
+use concrete_time::TimeSpan;
 use futures::compat::{Future01CompatExt, Stream01CompatExt};
 use futures::future::{self as future03};
 use futures::{Stream, StreamExt};
@@ -23,10 +27,6 @@ use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, PlatformConstraint,
   Process, ProcessMetadata,
 };
-use bazel_protos::call_option;
-use bazel_protos::error_details::PreconditionFailure;
-use bazel_protos::status::Status;
-use concrete_time::TimeSpan;
 
 /// Implementation of CommandRunner that runs a command via the Bazel Remote Execution API
 /// (https://docs.google.com/document/d/1AaGk7fOPByEvpAbqeXIyE8HX_A3_axxNnvroblTZ_6s/edit).
@@ -175,7 +175,7 @@ impl StreamingCommandRunner {
             grpcio::Error::RpcFailure(rpc_status) => {
               let mut status = Status::new();
               status.code = rpc_status.status.into();
-              return (None, OperationOrStatus::Status(status))
+              return (None, OperationOrStatus::Status(status));
             }
             _ => {
               let mut status = bazel_protos::status::Status::new();
@@ -429,50 +429,20 @@ impl StreamingCommandRunner {
       },
     }
   }
-}
 
-#[async_trait]
-impl crate::CommandRunner for StreamingCommandRunner {
-  /// Run the given MultiPlatformProcess via the Remote Execution API.
-  async fn run(
+  // Main loop: This function connects to the RE server and submits the given remote execution
+  // request via the REv2 Execute method. It then monitors the operation stream until the
+  // request completes. It will reconnect using the REv2 WaitExecution method if the connection
+  // is dropped.
+  //
+  // The `run` method on CommandRunner uses this function to implement the bulk of the
+  // processing for remote execution requests. The `run` method wraps the call with the method
+  // with an overall deadline timeout.
+  async fn run_execute_request(
     &self,
-    request: MultiPlatformProcess,
+    execute_request: ExecuteRequest,
     context: Context,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
-    // Construct the REv2 ExecuteRequest and related data for this execution request.
-    let compatible_underlying_request = self.extract_compatible_request(&request).unwrap();
-    let store = self.store.clone();
-    let (action, command, execute_request) =
-      super::make_execute_request(&compatible_underlying_request, self.metadata.clone())?;
-    let Process {
-      description,
-      // timeout,
-      input_files,
-      ..
-    } = compatible_underlying_request;
-
-    debug!("Remote execution: {}", description);
-
-    // Record the time that we started to process this request, then compute the ultimate
-    // deadline for execution of this request.
-    // let request_start_time = Instant::now();
-    // let request_deadline_duration = timeout.unwrap_or(Duration::from_secs(5 * 60)); // TODO: Make this configurable.
-    // let equestDeadlineTime = requestStartTime
-    //   .checked_add(requestDeadlineDuration)
-    //   .unwrap();
-
-    // Upload the action (and related data, i.e. the embedded command and input files).
-    self
-      .ensure_action_uploaded(&store, &command, &action, input_files)
-      .await?;
-
-    // Main loop: This loop connects to the RE server and either (1) submits the request using
-    // the REv2 Execute method; or (2) reconnects to the server via the REv2 WaitExecution
-    // method if the request is already in-flight. That status is tracked in the
-    // operation_name variable.
-    //
-    // It then processes the resulting errors and status updates until either the
-    // request completes (whether success or error), or the overall deadline occurs.
     let mut current_operation_name: Option<String> = None;
 
     loop {
@@ -521,7 +491,7 @@ impl crate::CommandRunner for StreamingCommandRunner {
             OperationOrStatus::Status(status)
           }
           _ => {
-            return Err(format!("total failure dude: {}", err));
+            return Err(format!("gRPC error: {}", err));
           }
         },
       };
@@ -532,7 +502,7 @@ impl crate::CommandRunner for StreamingCommandRunner {
           ExecutionError::Fatal(e) => return Err(e),
           ExecutionError::Retryable(e) => {
             // do nothing, will retry
-            debug!("retryable error: {}", e);
+            trace!("retryable error: {}", e);
           }
           ExecutionError::MissingDigests(missing_digests) => {
             trace!(
@@ -540,7 +510,8 @@ impl crate::CommandRunner for StreamingCommandRunner {
               missing_digests,
             );
 
-            let _ = store
+            let _ = self
+              .store
               .ensure_remote_has_recursive(missing_digests)
               .compat()
               .await?;
@@ -549,6 +520,51 @@ impl crate::CommandRunner for StreamingCommandRunner {
         },
       }
     }
+  }
+}
+
+#[async_trait]
+impl crate::CommandRunner for StreamingCommandRunner {
+  /// Run the given MultiPlatformProcess via the Remote Execution API.
+  async fn run(
+    &self,
+    request: MultiPlatformProcess,
+    context: Context,
+  ) -> Result<FallibleProcessResultWithPlatform, String> {
+    // Construct the REv2 ExecuteRequest and related data for this execution request.
+    let compatible_underlying_request = self.extract_compatible_request(&request).unwrap();
+    let store = self.store.clone();
+    let (action, command, execute_request) =
+      super::make_execute_request(&compatible_underlying_request, self.metadata.clone())?;
+    let Process {
+      description,
+      timeout,
+      input_files,
+      ..
+    } = compatible_underlying_request;
+
+    debug!("Remote execution: {}", description);
+
+    // Record the time that we started to process this request, then compute the ultimate
+    // deadline for execution of this request.
+    let deadline_duration = timeout.unwrap_or(Duration::from_secs(5 * 60)); // TODO: Make this configurable.
+
+    // Upload the action (and related data, i.e. the embedded command and input files).
+    self
+      .ensure_action_uploaded(&store, &command, &action, input_files)
+      .await?;
+
+    let result_fut = self.run_execute_request(execute_request, context);
+    let timeout_fut = tokio::time::timeout(deadline_duration, result_fut);
+    let result = match timeout_fut.await {
+      Ok(r) => r,
+      Err(_) => {
+        trace!("remote execution timed out after {:?}", deadline_duration);
+        Err("remote execution request timed out".to_owned())
+      }
+    };
+
+    result
   }
 
   // TODO: This is a copy of the same method on crate::remote::CommandRunner.
