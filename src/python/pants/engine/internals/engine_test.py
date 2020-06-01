@@ -543,8 +543,8 @@ class StreamingWorkunitProcessTests(TestBase):
             item for item in finished if item["name"] == "multi_platform_process-running"
         )
         assert process_workunit is not None
-        stdout_digest = process_workunit["stdout_digest"]
-        stderr_digest = process_workunit["stderr_digest"]
+        stdout_digest = process_workunit["artifacts"]["stdout_digest"]
+        stderr_digest = process_workunit["artifacts"]["stderr_digest"]
 
         assert result.stdout == b"stdout output\n"
         assert stderr_digest == EMPTY_DIGEST
@@ -572,8 +572,8 @@ class StreamingWorkunitProcessTests(TestBase):
         )
 
         assert process_workunit is not None
-        stdout_digest = process_workunit["stdout_digest"]
-        stderr_digest = process_workunit["stderr_digest"]
+        stdout_digest = process_workunit["artifacts"]["stdout_digest"]
+        stderr_digest = process_workunit["artifacts"]["stderr_digest"]
 
         assert result.stderr == b"stderr output\n"
         assert stdout_digest == EMPTY_DIGEST

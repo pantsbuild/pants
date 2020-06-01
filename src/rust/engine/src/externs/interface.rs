@@ -65,6 +65,7 @@ use std::io;
 use std::os::unix::ffi::OsStrExt;
 use std::panic;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::Duration;
 
 use tempfile::TempDir;
@@ -727,7 +728,7 @@ fn scheduler_create(
   )
 }
 
-fn workunit_to_py_value(workunit: &Workunit) -> CPyResult<Value> {
+fn workunit_to_py_value(workunit: &Workunit, core: &Arc<Core>) -> CPyResult<Value> {
   use std::time::UNIX_EPOCH;
 
   let mut dict_entries = vec![
@@ -796,14 +797,36 @@ fn workunit_to_py_value(workunit: &Workunit) -> CPyResult<Value> {
     ));
   }
 
+  let mut artifact_entries = Vec::new();
+
+  if let Some(stdout_digest) = &workunit.metadata.stdout.as_ref() {
+    artifact_entries.push((
+      externs::store_utf8("stdout_digest"),
+      crate::nodes::Snapshot::store_directory(core, stdout_digest),
+    ));
+  }
+
+  if let Some(stderr_digest) = &workunit.metadata.stderr.as_ref() {
+    artifact_entries.push((
+      externs::store_utf8("stderr_digest"),
+      crate::nodes::Snapshot::store_directory(core, stderr_digest),
+    ));
+  }
+
+  dict_entries.push((
+    externs::store_utf8("artifacts"),
+    externs::store_dict(artifact_entries)?,
+  ));
+
   externs::store_dict(dict_entries)
 }
 
 fn workunits_to_py_tuple_value<'a>(
   workunits: impl Iterator<Item = &'a Workunit>,
+  core: &Arc<Core>,
 ) -> CPyResult<Value> {
   let workunit_values = workunits
-    .map(|workunit: &Workunit| workunit_to_py_value(workunit))
+    .map(|workunit: &Workunit| workunit_to_py_value(workunit, core))
     .collect::<Result<Vec<_>, _>>()?;
   Ok(externs::store_tuple(workunit_values))
 }
@@ -825,16 +848,16 @@ fn poll_session_workunits(
       log::Level::Info
     }
   };
-  with_scheduler(py, scheduler_ptr, |_scheduler| {
+  with_scheduler(py, scheduler_ptr, |scheduler| {
     with_session(py, session_ptr, |session| {
       session
         .workunit_store()
         .with_latest_workunits(max_log_verbosity, |started, completed| {
           let mut started_iter = started.iter();
-          let started = workunits_to_py_tuple_value(&mut started_iter)?;
+          let started = workunits_to_py_tuple_value(&mut started_iter, &scheduler.core)?;
 
           let mut completed_iter = completed.iter();
-          let completed = workunits_to_py_tuple_value(&mut completed_iter)?;
+          let completed = workunits_to_py_tuple_value(&mut completed_iter, &scheduler.core)?;
 
           Ok(externs::store_tuple(vec![started, completed]).into())
         })
@@ -857,7 +880,7 @@ fn scheduler_metrics(
       if session.should_record_zipkin_spans() {
         let workunits = session.workunit_store().get_workunits();
         let mut iter = workunits.iter();
-        let value = workunits_to_py_tuple_value(&mut iter)?;
+        let value = workunits_to_py_tuple_value(&mut iter, &scheduler.core)?;
         values.push((externs::store_utf8("engine_workunits"), value));
       };
       externs::store_dict(values).map(|d| d.consume_into_py_object(py))

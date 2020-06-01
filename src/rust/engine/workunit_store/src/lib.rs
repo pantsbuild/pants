@@ -26,8 +26,8 @@
 #![allow(clippy::mutex_atomic)]
 
 use concrete_time::TimeSpan;
-use log::{info, log};
 pub use log::Level;
+use log::{info, log};
 use parking_lot::Mutex;
 use petgraph::graph::{DiGraph, NodeIndex};
 use rand::thread_rng;

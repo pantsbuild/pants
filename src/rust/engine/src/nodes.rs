@@ -1170,7 +1170,7 @@ impl From<hashing::Digest> for NodeOutput {
 
 impl From<ProcessResult> for NodeOutput {
   fn from(v: ProcessResult) -> Self {
-    NodeResult::ProcessResult(Box::new(v))
+    NodeOutput::ProcessResult(Box::new(v))
   }
 }
 
@@ -1224,7 +1224,7 @@ impl TryFrom<NodeOutput> for ProcessResult {
 
   fn try_from(nr: NodeOutput) -> Result<Self, ()> {
     match nr {
-      NodeResult::ProcessResult(v) => Ok(*v),
+      NodeOutput::ProcessResult(v) => Ok(*v),
       _ => Err(()),
     }
   }
