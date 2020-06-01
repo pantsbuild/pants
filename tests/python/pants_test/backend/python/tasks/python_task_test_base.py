@@ -7,6 +7,7 @@ from textwrap import dedent
 from pants.backend.python.register import build_file_aliases as register_python
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.build_graph.address import Address
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.resources import Resources
 from pants.testutil.subsystem.util import init_subsystem
 from pants.testutil.task_test_base import TaskTestBase
@@ -22,9 +23,7 @@ class PythonTaskTestBase(TaskTestBase):
         """
         :API: public
         """
-        aliases = register_python()
-        aliases.target_types["resources"] = Resources
-        return aliases
+        return register_python().merge(BuildFileAliases(targets={"resources": Resources}))
 
     def setUp(self):
         super().setUp()

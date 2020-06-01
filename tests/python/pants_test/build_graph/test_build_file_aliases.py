@@ -9,6 +9,7 @@ from pants.build_graph.build_file_aliases import BuildFileAliases, TargetMacro
 from pants.build_graph.target import Target
 from pants.engine.legacy.graph import LegacyBuildGraph
 from pants.testutil.subsystem.util import init_subsystem
+from pants.util.frozendict import FrozenDict
 
 
 class BuildFileAliasesTest(unittest.TestCase):
@@ -109,7 +110,7 @@ class BuildFileAliasesTest(unittest.TestCase):
             # nothing to merge
             targets={"a": Target, "b": self.target_macro_factory},
             # second overrides first
-            objects={"c": 1, "d": 42},
+            objects={"d": 42, "c": 1},
             # combine
             context_aware_object_factories={"e": e_factory, "f": f_factory},
         )
@@ -117,14 +118,15 @@ class BuildFileAliasesTest(unittest.TestCase):
 
     def test_target_types(self):
         aliases = BuildFileAliases(targets={"jake": Target, "jill": self.target_macro_factory})
-        self.assertEqual({"jake": Target}, aliases.target_types)
+        self.assertEqual(FrozenDict(jake=Target), aliases.target_types)
 
     def test_target_macro_factories(self):
         aliases = BuildFileAliases(targets={"jake": Target, "jill": self.target_macro_factory})
-        self.assertEqual({"jill": self.target_macro_factory}, aliases.target_macro_factories)
+        self.assertEqual(FrozenDict(jill=self.target_macro_factory), aliases.target_macro_factories)
 
     def test_target_types_by_alias(self):
         aliases = BuildFileAliases(targets={"jake": Target, "jill": self.target_macro_factory})
         self.assertEqual(
-            {"jake": {Target}, "jill": {self.BlueTarget}}, aliases.target_types_by_alias
+            FrozenDict(jake=frozenset([Target]), jill=frozenset([self.BlueTarget])),
+            aliases.target_types_by_alias,
         )
