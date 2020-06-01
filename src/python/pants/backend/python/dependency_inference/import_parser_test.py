@@ -117,6 +117,12 @@ def test_imports_from_strings() -> None:
     }
 
 
+def test_gracefully_handle_syntax_errors() -> None:
+    imports = find_python_imports("x =", module_name="project.app")
+    assert not imports.explicit_imports
+    assert not imports.inferred_imports
+
+
 def test_works_with_python2() -> None:
     imports = find_python_imports(
         dedent(

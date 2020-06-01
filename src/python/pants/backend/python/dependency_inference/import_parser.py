@@ -4,9 +4,8 @@
 import ast as ast3
 import re
 import sys
-import warnings
 from dataclasses import dataclass
-from typing import Set
+from typing import Optional, Set, Tuple
 
 from typed_ast import ast27
 
@@ -31,7 +30,7 @@ class ParsedPythonImports:
     inferred_imports: FrozenOrderedSet[str]
 
 
-def parse_file(source_code: str, *, module_name: str):
+def parse_file(source_code: str) -> Optional[Tuple]:
     try:
         # NB: The Python 3 ast is generally backwards-compatible with earlier versions. The only
         # breaking change is `async` `await` becoming reserved keywords in Python 3.7 (deprecated
@@ -44,23 +43,23 @@ def parse_file(source_code: str, *, module_name: str):
         tree = ast3.parse(source_code)
         visitor_cls = _Py3AstVisitor if sys.version_info[:2] < (3, 8) else _Py38AstVisitor
         return tree, visitor_cls
-    except Exception as e:
+    except SyntaxError:
         try:
             return ast27.parse(source_code), _Py27AstVisitor
-        except Exception:
-            raise ImportParseError(f"Failed to parse source code for {module_name}:\n{e!r}")
+        except SyntaxError:
+            return None
 
 
 def find_python_imports(source_code: str, *, module_name: str) -> ParsedPythonImports:
-    tree, ast_visitor_cls = parse_file(source_code, module_name=module_name)
+    parse_result = parse_file(source_code)
+    # If there were syntax errors, gracefully early return. This is more user friendly than
+    # propagating the exception. Dependency inference simply won't be used for that file, and
+    # it'll be up to the tool actually being run (e.g. Pytest or Flake8) to error.
+    if parse_result is None:
+        return ParsedPythonImports(FrozenOrderedSet(), FrozenOrderedSet())
+    tree, ast_visitor_cls = parse_result
     ast_visitor = ast_visitor_cls(module_name)
-    with warnings.catch_warnings():
-        # We often encounter this deprecation warning when parsing files. It's noisy for us to
-        # display.
-        warnings.filterwarnings(
-            "ignore", category=DeprecationWarning, message="invalid escape sequence"
-        )
-        ast_visitor.visit(tree)
+    ast_visitor.visit(tree)
     return ParsedPythonImports(
         explicit_imports=FrozenOrderedSet(sorted(ast_visitor.explicit_imports)),
         inferred_imports=FrozenOrderedSet(sorted(ast_visitor.inferred_imports)),
