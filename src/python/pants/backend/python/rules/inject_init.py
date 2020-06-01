@@ -12,7 +12,8 @@ from pants.python.pex_build_util import identify_missing_init_files
 # NB: Needed due to graph ambiguity.
 @dataclass(frozen=True)
 class InjectInitRequest:
-    snapshot: Snapshot
+    # NB: This must contain sources already stripped of their source roots.
+    stripped_sources_snapshot: Snapshot
 
 
 @dataclass(frozen=True)
@@ -26,7 +27,7 @@ async def inject_missing_init_files(request: InjectInitRequest) -> InitInjectedS
 
     This will preserve any `__init__.py` files already in the input snapshot.
     """
-    snapshot = request.snapshot
+    snapshot = request.stripped_sources_snapshot
     missing_init_files = sorted(identify_missing_init_files(snapshot.files))
     if not missing_init_files:
         return InitInjectedSnapshot(snapshot)

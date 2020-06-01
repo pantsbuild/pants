@@ -141,18 +141,25 @@ class CoverageConfig:
 @rule
 async def create_coverage_config(coverage_config_request: CoverageConfigRequest) -> CoverageConfig:
     sources = await Get[SourceFiles](
-        AllSourceFilesRequest((tgt.get(Sources) for tgt in coverage_config_request.targets))
+        AllSourceFilesRequest(
+            (
+                tgt.get(PythonSources)
+                for tgt in coverage_config_request.targets
+                if tgt.has_field(PythonSources)
+            )
+        )
     )
-    init_injected = await Get[InitInjectedSnapshot](InjectInitRequest(sources.snapshot))
 
     source_root_stripped_sources = await Get[SourceRootStrippedSources](
-        StripSnapshotRequest(snapshot=init_injected.snapshot)
+        StripSnapshotRequest(snapshot=sources.snapshot)
     )
 
     # Generate a map from source root stripped source to its source root. eg:
     #  {'pants/testutil/subsystem/util.py': 'src/python'}. This is so that coverage reports
     #  referencing /chroot/path/pants/testutil/subsystem/util.py can be mapped back to the actual
     #  sources they reference when generating coverage reports.
+    # Note that this map doesn't contain injected __init__.py files, but we tell coverage
+    # to ignore those using the -i flag (see below).
     stripped_files_to_source_roots = {}
     for source_root, files in source_root_stripped_sources.root_to_relfiles.items():
         for file in files:
@@ -321,9 +328,8 @@ async def generate_coverage_report(
     """Takes all Python test results and generates a single coverage report."""
     requirements_pex = coverage_setup.requirements_pex
 
-    python_targets = [tgt for tgt in transitive_targets.closure if tgt.has_field(PythonSources)]
     coverage_config = await Get[CoverageConfig](
-        CoverageConfigRequest(Targets(python_targets), is_test_time=False)
+        CoverageConfigRequest(Targets(transitive_targets.closure), is_test_time=False)
     )
 
     sources = await Get[SourceFiles](
@@ -347,7 +353,10 @@ async def generate_coverage_report(
     )
 
     report_type = coverage_subsystem.options.report
-    coverage_args = [report_type.report_name]
+    # The -i flag causes coverage to ignore files it doesn't have sources for.
+    # Specifically, it will ignore the injected __init__.py files, which is what we want since
+    # those are empty and don't correspond to a real source file the user is aware of.
+    coverage_args = [report_type.report_name, "-i"]
 
     process = requirements_pex.create_process(
         pex_path=f"./{coverage_setup.requirements_pex.output_filename}",
