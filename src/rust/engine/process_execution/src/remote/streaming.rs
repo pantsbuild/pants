@@ -385,7 +385,7 @@ impl StreamingCommandRunner {
           [details] => details,
           _ => {
             return Err(ExecutionError::Fatal(format!(
-            "Received multiple details in FailedPrecondition ExecuteResponse's status field: {:?}",
+            "Received multiple failure details in ExecuteResponse's status field: {:?}",
             status.get_details())))
           }
         };
@@ -408,7 +408,7 @@ impl StreamingCommandRunner {
           .merge_from_bytes(details.get_value())
           .map_err(|e| {
             ExecutionError::Fatal(format!(
-              "Error deserializing FailedPrecondition proto: {:?}",
+              "Error deserializing PreconditionFailure proto: {:?}",
               e
             ))
           })?;
