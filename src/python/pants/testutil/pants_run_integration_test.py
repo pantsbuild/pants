@@ -323,7 +323,6 @@ class PantsRunIntegrationTest(unittest.TestCase):
 
         if self.use_pantsd_env_var():
             args.append("--enable-pantsd=True")
-            args.append("--no-shutdown-pantsd-after-run")
 
         if config:
             toml_file_name = os.path.join(workdir, "pants.toml")

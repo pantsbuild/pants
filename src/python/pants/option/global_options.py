@@ -526,20 +526,6 @@ class GlobalOptions(Subsystem):
             help="The build ID of the other pants run which spawned this one, if any.",
         )
 
-        # Shutdown pantsd after the current run.
-        # This needs to be accessed at the same time as enable_pantsd,
-        # so we register it at bootstrap time.
-        register(
-            "--shutdown-pantsd-after-run",
-            advanced=True,
-            type=bool,
-            default=False,
-            removal_version="1.30.0.dev0",
-            removal_hint="Not widely used, and will soon be rewritten to be inherent.",
-            help="Create a new pantsd server, and use it, and shut it down immediately after. "
-            "If pantsd is already running, it will shut it down and spawn a new instance (Beta)",
-        )
-
         # NB: We really don't want this option to invalidate the daemon, because different clients might have
         # different needs. For instance, an IDE might have a very long timeout because it only wants to refresh
         # a project in the background, while a user might want a shorter timeout for interactivity.
