@@ -171,23 +171,23 @@ impl StreamingCommandRunner {
 
         Some(Err(err)) => {
           debug!("wait_on_operation_stream: got error: {:?}", err);
-          match err {
-            grpcio::Error::RpcFailure(rpc_status) => {
-              let mut status = Status::new();
-              status.code = rpc_status.status.into();
-              return (None, OperationOrStatus::Status(status));
-            }
-            _ => {
+          match super::rpcerror_to_status_or_string(&err) {
+            Ok(status) => return (None, OperationOrStatus::Status(status)),
+            Err(message) => {
+              let code = match err {
+                grpcio::Error::RpcFailure(rpc_status) => rpc_status.status,
+                _ => grpcio::RpcStatusCode::UNKNOWN,
+              };
               let mut status = bazel_protos::status::Status::new();
-              status.set_code(grpcio::RpcStatusCode::INVALID_ARGUMENT.into());
-              status.set_message(format!("error: {:?}", err));
+              status.set_code(code.into());
+              status.set_message(format!("gRPC error: {}", message));
               return (operation_name_opt, OperationOrStatus::Status(status));
             }
           }
         }
 
         None => {
-          // Stream disconnected unexpectedly. Return UNAVAILABLE status so that the
+          // Stream disconnected unexpectedly. Return a synthetic UNAVAILABLE status so that the
           // main loop will reconnect with the WaitExecution method.
           debug!("wait_on_operation_stream: unexpected disconnect from RE server");
           let mut status = bazel_protos::status::Status::new();
@@ -380,13 +380,16 @@ impl StreamingCommandRunner {
       grpcio::RpcStatusCode::OK => unreachable!(),
 
       grpcio::RpcStatusCode::FAILED_PRECONDITION => {
-        if status.get_details().len() != 1 {
-          return Err(ExecutionError::Fatal(format!(
+        let details = match status.get_details() {
+          [] => return Err(ExecutionError::Fatal(status.get_message().to_owned())),
+          [details] => details,
+          _ => {
+            return Err(ExecutionError::Fatal(format!(
             "Received multiple details in FailedPrecondition ExecuteResponse's status field: {:?}",
-            status.get_details()
-          )));
-        }
-        let details = status.get_details().get(0).unwrap();
+            status.get_details())))
+          }
+        };
+
         let mut precondition_failure = PreconditionFailure::new();
         let full_name = format!(
           "type.googleapis.com/{}",

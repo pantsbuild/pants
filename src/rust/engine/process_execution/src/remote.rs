@@ -202,7 +202,7 @@ impl CommandRunner {
       Ok(None) => {
         Err("Didn't get proper stream response from server during remote execution".to_owned())
       }
-      Err(err) => rpcerror_to_status_or_string(err).map(OperationOrStatus::Status),
+      Err(err) => rpcerror_to_status_or_string(&err).map(OperationOrStatus::Status),
     }
   }
 }
@@ -1157,7 +1157,7 @@ fn rpcerror_recover_cancelled(
 }
 
 fn rpcerror_to_status_or_string(
-  error: grpcio::Error,
+  error: &grpcio::Error,
 ) -> Result<bazel_protos::status::Status, String> {
   match error {
     grpcio::Error::RpcFailure(grpcio::RpcStatus {
@@ -1173,7 +1173,10 @@ fn rpcerror_to_status_or_string(
     }) => Err(format!(
       "{:?}: {:?}",
       status,
-      details.unwrap_or_else(|| "[no message]".to_string())
+      details
+        .as_ref()
+        .map(|s| s.as_str())
+        .unwrap_or_else(|| "[no message]")
     )),
     err => Err(format!("{:?}", err)),
   }
