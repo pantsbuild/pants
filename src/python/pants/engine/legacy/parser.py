@@ -159,7 +159,7 @@ class LegacyPythonCallbacksParser(Parser):
                 hint=warning,
             )
 
-    def parse(self, filepath: str, filecontent: bytes, load_statements):
+    def parse(self, filepath: str, filecontent: bytes, load_statements: Iterable[LoadStatementWithContent]):
         python = filecontent.decode()
 
         # Mutate the parse context for the new path, then exec, and copy the resulting objects.
@@ -171,16 +171,16 @@ class LegacyPythonCallbacksParser(Parser):
 
         # We separately handle loading all the symbols we need from imported files.
         extra_symbols = {}
-        print(f"BL: {load_statements}")
         for statement in load_statements:
             content = statement.content.content.decode()
+            symbols_to_expose = statement.symbols_to_expose
             exec(content)
             local_symbols = copy(
                 locals()
             )  # We copy the locals so that they don't get lost in the for loop
-            print(f"BL: Loading {statement.path}, loaded {local_symbols}, content is {content}")
-            for symbol in local_symbols.keys():
+            for symbol in symbols_to_expose:
                 extra_symbols[symbol] = local_symbols[symbol]
+            logger.debug(f"Loaded symbols {symbols_to_expose} from {statement.path} into file {filepath}")
 
         self._symbols.update(extra_symbols)
 

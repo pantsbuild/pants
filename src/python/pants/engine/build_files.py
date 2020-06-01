@@ -39,7 +39,8 @@ def _key_func(entry):
     return key
 
 class LoadedSymbolsToExpose(Collection[str]):
-    pass
+    def __str__(self):
+        return str([i for i in self])
 
 @dataclass(frozen=True)
 class LoadStatement:
@@ -119,7 +120,6 @@ async def load_symbols(build_file_contents: FilesContent) -> BuildFilesWithLoads
             Get[LoadStatementWithContent](LoadStatement, load_statement)
                 for load_statement in load_statements
         )
-        print(f"BL:load_statements_with_content {load_statements_with_content}")
 
         # At this point, I have a Map[build_file_path, List[LoadStatementWIthContent]]
         build_files_with_loads[build_file] = load_statements_with_content
@@ -143,13 +143,11 @@ async def parse_address_family(address_mapper: AddressMapper, directory: Dir) ->
     files_content = await Get[FilesContent](Digest, snapshot.directory_digest)
     build_files_with_loads = await Get[BuildFilesWithLoads](FilesContent, files_content)
 
-    print(f"BL: {build_files_with_loads}")
     if not files_content:
         raise ResolveError(
             'Directory "{}" does not contain any BUILD files.'.format(directory.path)
         )
     address_maps = []
-    print(f"BL: BUILDFILESWITHLOADS {build_files_with_loads}")
     for (filecontent_product, load_statements) in build_files_with_loads.map.items():
         address_maps.append(
             AddressMap.parse(
