@@ -865,16 +865,6 @@ class GlobalOptions(Subsystem):
             help="Whether or not to use nailgun to run the requests that are marked as nailgunnable.",
             advanced=True,
         )
-        register(
-            "--experimental-fs-watcher",
-            type=bool,
-            default=True,
-            advanced=True,
-            removal_version="1.30.0.dev0",
-            removal_hint="Enabled by default: flag is disabled.",
-            help="Whether to use the engine filesystem watcher which registers the workspace"
-            " for kernel file change events",
-        )
 
     @classmethod
     def register_options(cls, register):
