@@ -636,18 +636,34 @@ class GlobalOptions(Subsystem):
             type=bool,
             advanced=True,
             default=False,
-            removal_version="1.30.0.dev0",
-            removal_hint="The native watcher is now sufficient to monitor for filesystem changes.",
+            removal_version="1.31.0.dev0",
+            removal_hint=(
+                "The native watcher is now sufficient to monitor for filesystem "
+                "changes, so watchman is being removed."
+            ),
             help="Use the watchman daemon filesystem event watcher to watch for changes "
             "in the buildroot in addition to the built in watcher.",
         )
         register(
-            "--watchman-version", advanced=True, default="4.9.0-pants1", help="Watchman version."
+            "--watchman-version",
+            advanced=True,
+            default="4.9.0-pants1",
+            removal_version="1.31.0.dev0",
+            removal_hint=(
+                "The native watcher is now sufficient to monitor for filesystem "
+                "changes, so watchman is being removed."
+            ),
+            help="Watchman version.",
         )
         register(
             "--watchman-supportdir",
             advanced=True,
             default="bin/watchman",
+            removal_version="1.31.0.dev0",
+            removal_hint=(
+                "The native watcher is now sufficient to monitor for filesystem "
+                "changes, so watchman is being removed."
+            ),
             help="Find watchman binaries under this dir. Used as part of the path to lookup "
             "the binary with --binaries-baseurls and --pants-bootstrapdir.",
         )
@@ -656,6 +672,11 @@ class GlobalOptions(Subsystem):
             type=float,
             advanced=True,
             default=60.0,
+            removal_version="1.31.0.dev0",
+            removal_hint=(
+                "The native watcher is now sufficient to monitor for filesystem "
+                "changes, so watchman is being removed."
+            ),
             help="The watchman socket timeout (in seconds) for the initial `watch-project` command. "
             "This may need to be set higher for larger repos due to watchman startup cost.",
         )
@@ -664,6 +685,11 @@ class GlobalOptions(Subsystem):
             type=float,
             advanced=True,
             default=0.1,
+            removal_version="1.31.0.dev0",
+            removal_hint=(
+                "The native watcher is now sufficient to monitor for filesystem "
+                "changes, so watchman is being removed."
+            ),
             help="The watchman client socket timeout in seconds. Setting this to too high a "
             "value can negatively impact the latency of runs forked by pantsd.",
         )
@@ -672,6 +698,11 @@ class GlobalOptions(Subsystem):
             type=str,
             advanced=True,
             default=None,
+            removal_version="1.31.0.dev0",
+            removal_hint=(
+                "The native watcher is now sufficient to monitor for filesystem "
+                "changes, so watchman is being removed."
+            ),
             help="The path to the watchman UNIX socket. This can be overridden if the default "
             "absolute path length exceeds the maximum allowed by the OS.",
         )
