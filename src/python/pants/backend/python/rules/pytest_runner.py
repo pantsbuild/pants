@@ -226,7 +226,7 @@ async def setup_pytest_for_target(
     )
 
 
-@named_rule(desc="Run pytest")
+@rule
 async def run_python_test(
     field_set: PythonTestFieldSet,
     test_setup: TestTargetSetup,
