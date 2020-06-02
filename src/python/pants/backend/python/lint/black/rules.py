@@ -28,7 +28,7 @@ from pants.core.util_rules.determine_source_files import (
 )
 from pants.engine.fs import EMPTY_SNAPSHOT, Digest, MergeDigests, PathGlobs, Snapshot
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
-from pants.engine.rules import SubsystemRule, named_rule, rule
+from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import FieldSetWithOrigin
 from pants.engine.unions import UnionRule
@@ -155,7 +155,7 @@ async def setup(
     return Setup(process, original_digest=all_source_files_snapshot.digest)
 
 
-@named_rule(desc="Format using Black")
+@rule(desc="Format using Black")
 async def black_fmt(field_sets: BlackRequest, black: Black) -> FmtResult:
     if black.options.skip:
         return FmtResult.noop()
@@ -169,7 +169,7 @@ async def black_fmt(field_sets: BlackRequest, black: Black) -> FmtResult:
     )
 
 
-@named_rule(desc="Lint using Black")
+@rule(desc="Lint using Black")
 async def black_lint(field_sets: BlackRequest, black: Black) -> LintResults:
     if black.options.skip:
         return LintResults()

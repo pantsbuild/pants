@@ -41,7 +41,7 @@ from pants.engine.fs import (
     MergeDigests,
 )
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import RootRule, SubsystemRule, named_rule, rule
+from pants.engine.rules import RootRule, SubsystemRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Sources, Targets, TransitiveTargets
 from pants.engine.unions import UnionRule
@@ -266,7 +266,7 @@ class MergedCoverageData:
     coverage_data: Digest
 
 
-@named_rule(desc="Merge Pytest coverage reports")
+@rule(desc="Merge Pytest coverage reports")
 async def merge_coverage_data(
     data_collection: PytestCoverageDataCollection,
     coverage_setup: CoverageSetup,
@@ -316,7 +316,7 @@ async def merge_coverage_data(
     return MergedCoverageData(coverage_data=result.output_digest)
 
 
-@named_rule(desc="Generate Pytest coverage report")
+@rule(desc="Generate Pytest coverage report")
 async def generate_coverage_report(
     merged_coverage_data: MergedCoverageData,
     coverage_setup: CoverageSetup,

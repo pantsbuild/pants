@@ -631,10 +631,6 @@ impl Node for TNode {
   fn cacheable(&self) -> bool {
     self.1
   }
-
-  fn workunit_name(&self) -> String {
-    format!("{}", self)
-  }
 }
 
 impl std::fmt::Display for TNode {

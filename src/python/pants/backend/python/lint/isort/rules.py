@@ -26,7 +26,7 @@ from pants.core.util_rules.determine_source_files import (
 )
 from pants.engine.fs import EMPTY_SNAPSHOT, Digest, MergeDigests, PathGlobs, Snapshot
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
-from pants.engine.rules import SubsystemRule, named_rule, rule
+from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import FieldSetWithOrigin
 from pants.engine.unions import UnionRule
@@ -153,7 +153,7 @@ async def setup(
     return Setup(process, original_digest=all_source_files_snapshot.digest)
 
 
-@named_rule(desc="Format using isort")
+@rule(desc="Format using isort")
 async def isort_fmt(request: IsortRequest, isort: Isort) -> FmtResult:
     if isort.options.skip:
         return FmtResult.noop()
@@ -167,7 +167,7 @@ async def isort_fmt(request: IsortRequest, isort: Isort) -> FmtResult:
     )
 
 
-@named_rule(desc="Lint using isort")
+@rule(desc="Lint using isort")
 async def isort_lint(request: IsortRequest, isort: Isort) -> LintResults:
     if isort.options.skip:
         return LintResults()

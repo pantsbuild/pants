@@ -24,7 +24,7 @@ from pants.core.util_rules.determine_source_files import (
 )
 from pants.engine.fs import Digest, MergeDigests, PathGlobs, Snapshot
 from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import SubsystemRule, named_rule, rule
+from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import FieldSetWithOrigin
 from pants.engine.unions import UnionRule
@@ -128,7 +128,7 @@ async def flake8_lint_partition(
     return LintResult.from_fallible_process_result(result, linter_name="Flake8")
 
 
-@named_rule(desc="Lint using Flake8")
+@rule(desc="Lint using Flake8")
 async def flake8_lint(
     request: Flake8Request, flake8: Flake8, python_setup: PythonSetup
 ) -> LintResults:

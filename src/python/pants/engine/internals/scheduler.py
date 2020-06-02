@@ -164,15 +164,17 @@ class Scheduler:
         self, tasks, output_type, rule: TaskRule, union_rules: Dict[Type, OrderedSet[Type]]
     ) -> None:
         """Register the given TaskRule with the native scheduler."""
-        self._native.lib.tasks_task_begin(tasks, rule.func, output_type, rule.cacheable)
+        self._native.lib.tasks_task_begin(
+            tasks,
+            rule.func,
+            output_type,
+            rule.cacheable,
+            rule.canonical_name,
+            rule.desc or "",
+            rule.level.level,
+        )
         for selector in rule.input_selectors:
             self._native.lib.tasks_add_select(tasks, selector)
-
-        anno = rule.annotations
-        if anno.canonical_name:
-            name = anno.canonical_name
-            desc = anno.desc if anno.desc else ""
-            self._native.lib.tasks_add_display_info(tasks, name, desc)
 
         def add_get_edge(product, subject):
             self._native.lib.tasks_add_get(tasks, product, subject)

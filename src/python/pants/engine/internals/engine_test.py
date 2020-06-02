@@ -12,7 +12,7 @@ from pants.engine.fs import EMPTY_DIGEST
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.scheduler_test_base import SchedulerTestBase
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import RootRule, named_rule, rule
+from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.reporting.streaming_workunit_handler import StreamingWorkunitHandler
 from pants.testutil.engine.util import (
@@ -54,7 +54,7 @@ class Fib:
     val: int
 
 
-@named_rule(desc="Fibonacci")
+@rule(desc="Fibonacci", level=LogLevel.INFO)
 async def fib(n: int) -> Fib:
     if n < 2:
         return Fib(n)
@@ -105,7 +105,7 @@ class Epsilon:
     pass
 
 
-@named_rule(canonical_name="rule_one", desc="Rule number 1")
+@rule(canonical_name="rule_one", desc="Rule number 1", level=LogLevel.INFO)
 async def rule_one_function(i: Input) -> Beta:
     """This rule should be the first one executed by the engine, and thus have no parent."""
     a = Alpha()
@@ -115,7 +115,7 @@ async def rule_one_function(i: Input) -> Beta:
     return b
 
 
-@named_rule(desc="Rule number 2")
+@rule(desc="Rule number 2", level=LogLevel.INFO)
 async def rule_two(a: Alpha) -> Omega:
     """This rule should be invoked in the body of `rule_one` and therefore its workunit should be a
     child of `rule_one`'s workunit."""
@@ -123,21 +123,21 @@ async def rule_two(a: Alpha) -> Omega:
     return Omega()
 
 
-@named_rule(desc="Rule number 3")
+@rule(desc="Rule number 3", level=LogLevel.INFO)
 async def rule_three(o: Omega) -> Beta:
     """This rule should be invoked in the body of `rule_one` and therefore its workunit should be a
     child of `rule_one`'s workunit."""
     return Beta()
 
 
-@named_rule(desc="Rule number 4")
+@rule(desc="Rule number 4", level=LogLevel.INFO)
 def rule_four(a: Alpha) -> Gamma:
     """This rule should be invoked in the body of `rule_two` and therefore its workunit should be a
     child of `rule_two`'s workunit."""
     return Gamma()
 
 
-@named_rule(desc="Rule A")
+@rule(desc="Rule A", level=LogLevel.INFO)
 async def rule_A(i: Input) -> Alpha:
     o = Omega()
     a = await Get[Alpha](Omega, o)
@@ -151,7 +151,7 @@ async def rule_B(o: Omega) -> Alpha:
     return a
 
 
-@named_rule(desc="Rule C")
+@rule(desc="Rule C", level=LogLevel.INFO)
 def rule_C(e: Epsilon) -> Alpha:
     return Alpha()
 

@@ -278,7 +278,15 @@ py_module_initializer!(native_engine, |py, m| {
     "tasks_task_begin",
     py_fn!(
       py,
-      tasks_task_begin(a: PyTasks, b: PyObject, c: PyType, d: bool)
+      tasks_task_begin(
+        a: PyTasks,
+        b: PyObject,
+        c: PyType,
+        d: bool,
+        e: String,
+        f: String,
+        g: u64
+      )
     ),
   )?;
   m.add(
@@ -290,11 +298,6 @@ py_module_initializer!(native_engine, |py, m| {
     py,
     "tasks_add_select",
     py_fn!(py, tasks_add_select(a: PyTasks, b: PyType)),
-  )?;
-  m.add(
-    py,
-    "tasks_add_display_info",
-    py_fn!(py, tasks_add_display_info(a: PyTasks, b: String, c: String)),
   )?;
   m.add(py, "tasks_task_end", py_fn!(py, tasks_task_end(a: PyTasks)))?;
 
@@ -837,22 +840,14 @@ fn poll_session_workunits(
   session_ptr: PySession,
   max_log_verbosity_level: u64,
 ) -> CPyResult<PyObject> {
-  let py_level: Result<PythonLogLevel, _> = max_log_verbosity_level.try_into();
-  let max_log_verbosity: log::Level = match py_level {
-    Ok(level) => level.into(),
-    Err(e) => {
-      warn!(
-        "Error setting streaming workunit log level: {}. Defaulting to 'Info'.",
-        e
-      );
-      log::Level::Info
-    }
-  };
+  let py_level: PythonLogLevel = max_log_verbosity_level
+    .try_into()
+    .map_err(|e| PyErr::new::<exc::Exception, _>(py, (format!("{}", e),)))?;
   with_scheduler(py, scheduler_ptr, |scheduler| {
     with_session(py, session_ptr, |session| {
       session
         .workunit_store()
-        .with_latest_workunits(max_log_verbosity, |started, completed| {
+        .with_latest_workunits(py_level.into(), |started, completed| {
           let mut started_iter = started.iter();
           let started = workunits_to_py_tuple_value(&mut started_iter, &scheduler.core)?;
 
@@ -979,11 +974,24 @@ fn tasks_task_begin(
   func: PyObject,
   output_type: PyType,
   cacheable: bool,
+  name: String,
+  desc: String,
+  level: u64,
 ) -> PyUnitResult {
+  let py_level: PythonLogLevel = level
+    .try_into()
+    .map_err(|e| PyErr::new::<exc::Exception, _>(py, (format!("{}", e),)))?;
   with_tasks(py, tasks_ptr, |tasks| {
     let func = Function(externs::key_for(func.into())?);
     let output_type = externs::type_for(output_type);
-    tasks.task_begin(func, output_type, cacheable);
+    tasks.task_begin(
+      func,
+      output_type,
+      cacheable,
+      name,
+      if desc.is_empty() { None } else { Some(desc) },
+      py_level.into(),
+    );
     Ok(None)
   })
 }
@@ -1001,18 +1009,6 @@ fn tasks_add_select(py: Python, tasks_ptr: PyTasks, product: PyType) -> PyUnitRe
   with_tasks(py, tasks_ptr, |tasks| {
     let product = externs::type_for(product);
     tasks.add_select(product);
-    Ok(None)
-  })
-}
-
-fn tasks_add_display_info(
-  py: Python,
-  tasks_ptr: PyTasks,
-  name: String,
-  desc: String,
-) -> PyUnitResult {
-  with_tasks(py, tasks_ptr, |tasks| {
-    tasks.add_display_info(name, desc);
     Ok(None)
   })
 }
