@@ -20,8 +20,10 @@ from pants.engine.build_files import (
 )
 from pants.engine.fs import Digest, FileContent, FilesContent, PathGlobs, Snapshot, create_fs_rules
 from pants.engine.legacy.structs import TargetAdaptor
+from pants.engine.load_statements import BuildFilesWithLoads
 from pants.engine.mapper import AddressFamily, AddressMapper
 from pants.engine.nodes import Return, State, Throw
+from pants.engine.objects import Collection
 from pants.engine.parser import HydratedStruct, SymbolTable
 from pants.engine.rules import rule
 from pants.engine.scheduler import ExecutionRequest, SchedulerSession
@@ -40,6 +42,7 @@ class ParseAddressFamilyTest(unittest.TestCase):
     def test_empty(self) -> None:
         """Test that parsing an empty BUILD file results in an empty AddressFamily."""
         address_mapper = AddressMapper(JsonParser(TEST_TABLE))
+        build_file_content = FileContent(path="/dev/null/BUILD", content=b"")
         af = run_rule(
             parse_address_family,
             rule_args=[address_mapper, Dir("/dev/null")],
@@ -52,7 +55,12 @@ class ParseAddressFamilyTest(unittest.TestCase):
                 MockGet(
                     product_type=FilesContent,
                     subject_type=Digest,
-                    mock=lambda _: FilesContent([FileContent(path="/dev/null/BUILD", content=b"")]),
+                    mock=lambda _: FilesContent([build_file_content]),
+                ),
+                MockGet(
+                    product_type=BuildFilesWithLoads,
+                    subject_type=FilesContent,
+                    mock=lambda _: BuildFilesWithLoads({build_file_content: Collection([])}),
                 ),
             ],
         )

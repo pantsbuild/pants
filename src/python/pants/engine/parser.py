@@ -3,8 +3,9 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Dict, Type
+from typing import Dict, Iterable, Type
 
+from pants.engine.load_statements import LoadStatementWithContent
 from pants.engine.struct import Struct
 
 
@@ -33,7 +34,9 @@ class HydratedStruct:
 
 class Parser(ABC):
     @abstractmethod
-    def parse(self, filepath: str, filecontent: bytes):
+    def parse(
+        self, filepath: str, filecontent: bytes, load_statements: Iterable[LoadStatementWithContent]
+    ):
         """
         :param filepath: The name of the file being parsed. The parser should not assume that the path
                          is accessible, and should consume the filecontent.

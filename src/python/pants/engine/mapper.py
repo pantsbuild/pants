@@ -7,6 +7,7 @@ from typing import Any, Dict, Iterable, Optional, Tuple, Union
 
 from pants.base.exceptions import DuplicateNameError, MappingError, UnaddressableObjectError
 from pants.build_graph.address import BuildFileAddress
+from pants.engine.load_statements import LoadStatementWithContent
 from pants.engine.objects import Serializable
 from pants.engine.parser import Parser
 from pants.util.memo import memoized_property
@@ -29,7 +30,13 @@ class AddressMap:
     objects_by_name: Dict[str, ThinAddressableObject]
 
     @classmethod
-    def parse(cls, filepath: str, filecontent: bytes, parser: Parser) -> "AddressMap":
+    def parse(
+        cls,
+        filepath: str,
+        filecontent: bytes,
+        load_statements: Iterable[LoadStatementWithContent],
+        parser: Parser,
+    ) -> "AddressMap":
         """Parses a source for addressable Serializable objects.
 
         No matter the parser used, the parsed and mapped addressable objects are all 'thin'; ie: any
@@ -41,7 +48,7 @@ class AddressMap:
         :param parser: The parser cls to use.
         """
         try:
-            objects = parser.parse(filepath, filecontent)
+            objects = parser.parse(filepath, filecontent, load_statements)
         except Exception as e:
             raise MappingError(f"Failed to parse {filepath}:\n{e!r}")
         objects_by_name: Dict[str, ThinAddressableObject] = {}

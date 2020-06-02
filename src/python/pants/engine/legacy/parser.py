@@ -4,9 +4,10 @@
 import logging
 import os
 import tokenize
+from copy import copy
 from io import StringIO
 from pathlib import PurePath
-from typing import Dict, Tuple
+from typing import Dict, Iterable, Tuple
 
 from pants.base.build_file_target_factory import BuildFileTargetFactory
 from pants.base.deprecated import warn_or_error
@@ -14,6 +15,7 @@ from pants.base.exceptions import UnaddressableObjectError
 from pants.base.parse_context import ParseContext
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.legacy.structs import BundleAdaptor, Globs, RGlobs, TargetAdaptor, ZGlobs
+from pants.engine.load_statements import LoadStatementWithContent
 from pants.engine.objects import Serializable
 from pants.engine.parser import ParseError, Parser, SymbolTable
 from pants.option.global_options import BuildFileImportsBehavior
@@ -127,6 +129,9 @@ class LegacyPythonCallbacksParser(Parser):
 
         symbols["bundle"] = BundleAdaptor
 
+        # We need to handle loading seaparately, so we noop it at parse time.
+        symbols["load"] = lambda *args: None
+
         return symbols, parse_context
 
     @staticmethod
@@ -152,7 +157,47 @@ class LegacyPythonCallbacksParser(Parser):
                 hint=warning,
             )
 
-    def parse(self, filepath: str, filecontent: bytes):
+    @staticmethod
+    def _expose_symbols_from_loaded_files(
+        load_statements: Iterable[LoadStatementWithContent], filepath: str
+    ) -> Dict:
+        """Expose symbols from loaded files.
+
+        To achieve that, we exec() the contents of the imported file, which puts all defined symbols
+        in `locals()`. We then copy `locals()` and filter it by the symbols the build file
+        explicitly imports. `locals()` will be emptied at the end of each iteration of the outer
+        `for` loop, so there is no chance of contamination.
+        """
+        extra_symbols: Dict = {}
+        for statement in load_statements:
+            content = statement.content.content.decode()
+            symbols_to_expose = statement.symbols_to_expose
+            exec(content)
+            local_symbols = copy(
+                locals()
+            )  # We copy the locals so that they don't get lost in the for loop
+            for symbol in symbols_to_expose:
+                if symbol in local_symbols:
+                    if symbol not in extra_symbols:
+                        extra_symbols[symbol] = local_symbols[symbol]
+                    else:
+                        raise ParseError(
+                            f"Trying to import symbol {symbol} from file {statement.path} into BUILD file {filepath}: ",
+                            f"Which has already been loaded from another file.",
+                        )
+                else:
+                    raise ParseError(
+                        f"Trying to import symbol {symbol} from file {statement.path} into BUILD file {filepath}: ",
+                        f"Symbol is not exported by loaded file.",
+                    )
+            logger.debug(
+                f"Loaded symbols {symbols_to_expose} from {statement.path} into file {filepath}"
+            )
+        return extra_symbols
+
+    def parse(
+        self, filepath: str, filecontent: bytes, load_statements: Iterable[LoadStatementWithContent]
+    ):
         python = filecontent.decode()
 
         # Mutate the parse context for the new path, then exec, and copy the resulting objects.
@@ -161,6 +206,13 @@ class LegacyPythonCallbacksParser(Parser):
         # _intentional_ mutation would require a deep clone, which doesn't seem worth the cost at
         # this juncture.
         self._parse_context._storage.clear(os.path.dirname(filepath))
+
+        symbols_loaded_from_files = LegacyPythonCallbacksParser._expose_symbols_from_loaded_files(
+            load_statements, filepath
+        )
+
+        self._symbols.update(symbols_loaded_from_files)
+
         exec(python, dict(self._symbols))
 
         # Perform this check after successful execution, so we know the python is valid (and should
