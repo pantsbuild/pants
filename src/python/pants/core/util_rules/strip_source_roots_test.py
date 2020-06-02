@@ -35,6 +35,10 @@ class StripSourceRootsTest(TestBase):
         *,
         args: Optional[List[str]] = None,
     ) -> StrippedResponseData:
+        args = args or []
+        args.append("--source-root-patterns=src/python")
+        args.append("--source-root-patterns=src/java")
+        args.append("--source-root-patterns=tests/python")
         result = self.request_single_product(
             SourceRootStrippedSources, Params(request, create_options_bootstrapper(args=args)),
         )
@@ -156,6 +160,9 @@ class StripSourceRootsTest(TestBase):
         def get_stripped_file_mapping(
             paths: List[str], args: Optional[List[str]] = None
         ) -> Dict[str, str]:
+            args = args or []
+            args.append("--source-root-patterns=src/python")
+            args.append("--source-root-patterns=src/java")
             request = StripSnapshotRequest(self.make_snapshot_of_empty_files(paths))
             result = self.request_single_product(
                 SourceRootStrippedSources, Params(request, create_options_bootstrapper(args=args)),

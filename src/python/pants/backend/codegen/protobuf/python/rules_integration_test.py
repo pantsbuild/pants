@@ -115,7 +115,12 @@ class ProtobufPythonIntegrationTest(TestBase):
                 GeneratedSources,
                 Params(
                     GeneratePythonFromProtobufRequest(protocol_sources.snapshot, tgt),
-                    create_options_bootstrapper(),
+                    create_options_bootstrapper(
+                        args=[
+                            "--source-root-patterns=src/protobuf",
+                            "--source-root-patterns=tests/protobuf",
+                        ]
+                    ),
                 ),
             )
             assert set(generated_sources.snapshot.files) == set(expected_files)

@@ -82,7 +82,17 @@ class DetermineSourceFilesTest(TestBase):
             strip_source_roots=strip_source_roots,
         )
         result = self.request_single_product(
-            SourceFiles, Params(request, create_options_bootstrapper())
+            SourceFiles,
+            Params(
+                request,
+                create_options_bootstrapper(
+                    args=[
+                        "--source-root-patterns=src/python",
+                        "--source-root-patterns=src/java",
+                        "--source-root-patterns=tests/python",
+                    ]
+                ),
+            ),
         )
         return sorted(result.snapshot.files)
 
@@ -96,7 +106,17 @@ class DetermineSourceFilesTest(TestBase):
             sources_fields_with_origins, strip_source_roots=strip_source_roots,
         )
         result = self.request_single_product(
-            SourceFiles, Params(request, create_options_bootstrapper())
+            SourceFiles,
+            Params(
+                request,
+                create_options_bootstrapper(
+                    args=[
+                        "--source-root-patterns=src/python",
+                        "--source-root-patterns=src/java",
+                        "--source-root-patterns=tests/python",
+                    ]
+                ),
+            ),
         )
         return sorted(result.snapshot.files)
 

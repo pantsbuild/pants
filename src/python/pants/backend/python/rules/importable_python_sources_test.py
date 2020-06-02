@@ -54,7 +54,7 @@ class ImportablePythonSourcesTest(TestBase):
             ImportablePythonSources,
             Params(
                 Targets([target_with_init, target_without_init, files_target]),
-                create_options_bootstrapper(),
+                create_options_bootstrapper(args=["--source-root-patterns=src/python"]),
             ),
         )
         assert sorted(result.snapshot.files) == sorted(
@@ -82,6 +82,10 @@ class ImportablePythonSourcesTest(TestBase):
             ),
         ]
         result = self.request_single_product(
-            ImportablePythonSources, Params(Targets(targets), create_options_bootstrapper()),
+            ImportablePythonSources,
+            Params(
+                Targets(targets),
+                create_options_bootstrapper(args=["--source-root-patterns=src/python"]),
+            ),
         )
         assert sorted(result.snapshot.files) == sorted(["p.py", "src/python/f.txt", "r.txt"])

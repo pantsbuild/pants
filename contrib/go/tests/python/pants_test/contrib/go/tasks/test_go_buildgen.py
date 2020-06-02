@@ -5,7 +5,7 @@ import types
 from textwrap import dedent
 
 from pants.build_graph.target import Target
-from pants.testutil.task_test_base import TaskTestBase
+from pants_test.contrib.go.tasks.go_task_test_base import GoTaskTestBase
 
 from pants.contrib.go import register
 from pants.contrib.go.subsystems.fetcher import Fetcher
@@ -28,7 +28,7 @@ class FakeFetcherFactory:
         return FakeFetcher(import_path)
 
 
-class GoBuildgenTest(TaskTestBase):
+class GoBuildgenTest(GoTaskTestBase):
     @classmethod
     def task_type(cls):
         return GoBuildgen
