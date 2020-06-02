@@ -7,8 +7,31 @@ use std::thread::sleep;
 use std::time::Duration;
 use std::time::Instant;
 
-use futures01::{Future, Sink};
+use futures::future::{FutureExt, TryFutureExt};
+use futures::sink::SinkExt;
+use futures::compat::{Sink01CompatExt};
 use parking_lot::Mutex;
+use grpcio::RpcStatus;
+
+///
+/// Represents an expected API call from the REv2 client. The data carried by each enum
+/// variant are the parameters to verify and the results to return to the client.
+///
+#[derive(Clone, Debug)]
+pub enum ExpectedAPICall {
+  Execute {
+    execute_request: bazel_protos::remote_execution::ExecuteRequest,
+    stream_responses: Result<Vec<MockOperation>, grpcio::RpcStatus>,
+  },
+  WaitExecution {
+    operation_name: String,
+    stream_responses: Result<Vec<MockOperation>, grpcio::RpcStatus>,
+  },
+  GetOperation {
+    operation_name: String,
+    operation: MockOperation,
+  },
+}
 
 ///
 /// A MockOperation to be used with MockExecution.
@@ -34,9 +57,7 @@ impl MockOperation {
 
 #[derive(Clone, Debug)]
 pub struct MockExecution {
-  name: String,
-  execute_request: bazel_protos::remote_execution::ExecuteRequest,
-  operation_responses: Arc<Mutex<VecDeque<MockOperation>>>,
+  expected_api_calls: Arc<Mutex<VecDeque<ExpectedAPICall>>>,
 }
 
 impl MockExecution {
@@ -44,26 +65,21 @@ impl MockExecution {
   /// # Arguments:
   ///  * `name` - The name of the operation. It is assumed that all operation_responses use this
   ///             name.
-  ///  * `execute_request` - The expected ExecuteRequest.
-  ///  * `operation_responses` - Vec of Operation response for Execution or GetOperation requests.
-  ///                            Will be returned in order.
+  ///  * `expected_api_calls` - Vec of ExpectedAPICall instances representing the API calls
+  ///                            to expect from the client. Will be returned in order.
   ///
   pub fn new(
-    name: String,
-    execute_request: bazel_protos::remote_execution::ExecuteRequest,
-    operation_responses: Vec<MockOperation>,
+    expected_api_calls: Vec<ExpectedAPICall>,
   ) -> MockExecution {
     MockExecution {
-      name: name,
-      execute_request: execute_request,
-      operation_responses: Arc::new(Mutex::new(VecDeque::from(operation_responses))),
+      expected_api_calls: Arc::new(Mutex::new(VecDeque::from(expected_api_calls))),
     }
   }
 }
 
 ///
-/// A server which will answer ExecuteRequest and GetOperation gRPC requests with pre-canned
-/// responses.
+/// A server which will answer Execute/WaitExecution and GetOperation/CancelOperation gRPC
+/// requests with pre-canned responses.
 ///
 pub struct TestServer {
   pub mock_responder: MockResponder,
@@ -117,7 +133,7 @@ impl Drop for TestServer {
     let remaining_expected_responses = self
       .mock_responder
       .mock_execution
-      .operation_responses
+      .expected_api_calls
       .lock()
       .len();
     if remaining_expected_responses != 0 {
@@ -128,7 +144,7 @@ impl Drop for TestServer {
           self
             .mock_responder
             .mock_execution
-            .operation_responses
+            .expected_api_calls
             .lock()
             .clone(),
         )),
@@ -172,10 +188,10 @@ impl MockResponder {
 
   fn log<T: protobuf::Message + Sized>(&self, ctx: &grpcio::RpcContext, message: T) {
     let headers = ctx
-      .request_headers()
-      .iter()
-      .map(|(name, value)| (name.to_string(), value.to_vec()))
-      .collect();
+        .request_headers()
+        .iter()
+        .map(|(name, value)| (name.to_string(), value.to_vec()))
+        .collect();
     self.received_messages.lock().push(ReceivedMessage {
       message_type: message.descriptor().name().to_string(),
       message: Box::new(message),
@@ -186,80 +202,59 @@ impl MockResponder {
 
   fn display_all<D: Debug>(items: &[D]) -> String {
     items
-      .iter()
-      .map(|i| format!("{:?}\n", i))
-      .collect::<Vec<_>>()
-      .concat()
+        .iter()
+        .map(|i| format!("{:?}\n", i))
+        .collect::<Vec<_>>()
+        .concat()
   }
 
-  fn send_next_operation_unary(
-    &self,
-    sink: grpcio::UnarySink<bazel_protos::operations::Operation>,
-  ) {
-    if let Some(MockOperation { op, duration }) =
-      self.mock_execution.operation_responses.lock().pop_front()
-    {
-      if let Some(d) = duration {
-        sleep(d);
-      }
-      if let Ok(Some(op)) = op {
-        // Complete the channel with the op.
-        sink.success(op);
-      } else if let Err(status) = op {
-        sink.fail(status);
-      } else {
-        // Cancel the request by dropping the sink.
-        drop(sink);
-      }
-    } else {
-      sink.fail(grpcio::RpcStatus::new(
-        grpcio::RpcStatusCode::INVALID_ARGUMENT,
-        Some("Did not expect further requests from client.".to_string()),
-      ));
-    }
-  }
+  // async fn send_operation_stream_tail(
+  //   &self,
+  //   ctx: grpcio::RpcContext<'_>,
+  //   sink: grpcio::ServerStreamingSink<bazel_protos::operations::Operation>,
+  //   mut operations: VecDeque<MockOperation>,
+  // ) {
+  //   let operation_opt = operations.pop_front();
+  //   if let Some(operation) = operation_opt {
+  //   }
+  // }
 
-  fn send_next_operation_stream(
+  fn spawn_send_to_operation_stream(
     &self,
-    ctx: &grpcio::RpcContext<'_>,
+    ctx: grpcio::RpcContext<'_>,
     sink: grpcio::ServerStreamingSink<bazel_protos::operations::Operation>,
+    operations: Vec<MockOperation>,
   ) {
-    match self.mock_execution.operation_responses.lock().pop_front() {
-      Some(MockOperation { op, duration }) => {
-        if let Some(d) = duration {
-          sleep(d);
+    let mut sink = sink.sink_compat();
+
+    let fut = async move {
+      let mut error_to_send: Option<RpcStatus> = None;
+      for op in operations {
+        if let Some(d) = op.duration {
+          tokio::time::delay_for(d).await;
         }
-        if let Ok(Some(op)) = op {
-          ctx.spawn(
-            sink
-              .send((op, grpcio::WriteFlags::default()))
-              .map(|mut stream| stream.close())
-              .map(|_| ())
-              .map_err(|_| ()),
-          )
-        } else if let Err(status) = op {
-          ctx.spawn(sink.fail(status).then(|_| Ok(())));
+
+        if let Ok(Some(op)) = op.op {
+          let _ = sink.send((op, grpcio::WriteFlags::default())).await;
+        } else if let Err(status) = op.op {
+          error_to_send = Some(status);
+          break;
         } else {
-          // Cancel the request by dropping the sink.
-          drop(sink)
+          break;
         }
       }
-      None => ctx.spawn(
-        sink
-          .fail(grpcio::RpcStatus::new(
-            grpcio::RpcStatusCode::INVALID_ARGUMENT,
-            Some("Did not expect further requests from client.".to_string()),
-          ))
-          .map(|_| ())
-          .map_err(|_| ()),
-      ),
-    }
+
+      if let Some(err) = error_to_send {
+        let _ = sink.into_inner().fail(err);
+      }
+
+      Ok(())
+    };
+    ctx.spawn(fut.boxed().compat());
   }
 }
 
 impl bazel_protos::remote_execution_grpc::Execution for MockResponder {
-  // We currently only support the one-shot "stream and disconnect" client behavior.
-  // If we start supporting the "stream updates" variant, we will need to do so here.
   fn execute(
     &self,
     ctx: grpcio::RpcContext<'_>,
@@ -268,31 +263,108 @@ impl bazel_protos::remote_execution_grpc::Execution for MockResponder {
   ) {
     self.log(&ctx, req.clone());
 
-    if self.mock_execution.execute_request != req {
-      ctx.spawn(
-        sink
-          .fail(grpcio::RpcStatus::new(
+    let expected_api_call = self.mock_execution.expected_api_calls.lock().pop_front();
+    let error_to_send: Option<RpcStatus>;
+    match expected_api_call {
+      Some(ExpectedAPICall::Execute { execute_request, stream_responses}) => {
+        if req != execute_request {
+          error_to_send = Some(grpcio::RpcStatus::new(
             grpcio::RpcStatusCode::INVALID_ARGUMENT,
             Some(format!(
               "Did not expect this request. Expected: {:?}, Got: {:?}",
-              self.mock_execution.execute_request, req
-            )),
-          ))
-          .map_err(|_| ()),
-      );
-      return;
+              execute_request, req
+            ))));
+        } else {
+          match stream_responses {
+            Ok(operations) => {
+              self.spawn_send_to_operation_stream(ctx, sink, operations);
+              return;
+            },
+            Err(rpc_status) => {
+              error_to_send = Some(rpc_status);
+            },
+          }
+        }
+      },
+
+      Some(api_call) => {
+        error_to_send = Some(grpcio::RpcStatus::new(
+          grpcio::RpcStatusCode::INVALID_ARGUMENT,
+          Some(format!(
+            "Execute endpoint called. Expected: {:?}",
+            api_call,
+          )),
+        ));
+      },
+
+      None => {
+        error_to_send = Some(grpcio::RpcStatus::new(
+          grpcio::RpcStatusCode::INVALID_ARGUMENT,
+          Some("Execute endpoint called. Did not expect this call.".to_owned()),
+        ));
+      },
     }
 
-    self.send_next_operation_stream(&ctx, sink);
+    if let Some(status) = error_to_send {
+      let _ = sink.fail(status);
+    }
   }
 
   fn wait_execution(
     &self,
-    _ctx: grpcio::RpcContext<'_>,
-    _req: bazel_protos::remote_execution::WaitExecutionRequest,
-    _sink: grpcio::ServerStreamingSink<bazel_protos::operations::Operation>,
+    ctx: grpcio::RpcContext<'_>,
+    req: bazel_protos::remote_execution::WaitExecutionRequest,
+    sink: grpcio::ServerStreamingSink<bazel_protos::operations::Operation>,
   ) {
-    unimplemented!()
+    self.log(&ctx, req.clone());
+
+    let expected_api_call = self.mock_execution.expected_api_calls.lock().pop_front();
+    let error_to_send: Option<RpcStatus>;
+    match expected_api_call {
+      Some(ExpectedAPICall::WaitExecution { operation_name, stream_responses}) => {
+        if req.name != operation_name {
+          error_to_send = Some(grpcio::RpcStatus::new(
+            grpcio::RpcStatusCode::INVALID_ARGUMENT,
+            Some(format!(
+              "Did not expect WaitExecution for this operation. Expected: {:?}, Got: {:?}",
+              operation_name, req.name
+            )),
+          ));
+        } else {
+          match stream_responses {
+            Ok(operations) => {
+              self.spawn_send_to_operation_stream(ctx, sink, operations);
+              return;
+            },
+            Err(rpc_status) => {
+              error_to_send = Some(rpc_status);
+            },
+          }
+        }
+      },
+
+      Some(api_call) => {
+        error_to_send = Some(grpcio::RpcStatus::new(
+          grpcio::RpcStatusCode::INVALID_ARGUMENT,
+          Some(format!(
+            "WaitExecution endpoint called. Expected: {:?}",
+            api_call,
+          )),
+        ));
+      },
+
+      None => {
+        error_to_send = Some(grpcio::RpcStatus::new(
+          grpcio::RpcStatusCode::INVALID_ARGUMENT,
+          Some("WaitExecution endpoint called. Did not expect this call.".to_owned(),
+          ),
+        ));
+      },
+    }
+
+    if let Some(status) = error_to_send {
+      let _ = sink.fail(status);
+    }
   }
 }
 
@@ -303,9 +375,55 @@ impl bazel_protos::operations_grpc::Operations for MockResponder {
     req: bazel_protos::operations::GetOperationRequest,
     sink: grpcio::UnarySink<bazel_protos::operations::Operation>,
   ) {
-    self.log(&ctx, req);
+    self.log(&ctx, req.clone());
 
-    self.send_next_operation_unary(sink)
+    let expected_api_call = self.mock_execution.expected_api_calls.lock().pop_front();
+    let error_to_send: Option<RpcStatus>;
+    match expected_api_call {
+      Some(ExpectedAPICall::GetOperation { operation_name, operation}) => {
+        if req.name != operation_name {
+          error_to_send = Some(grpcio::RpcStatus::new(
+            grpcio::RpcStatusCode::INVALID_ARGUMENT,
+            Some(format!(
+              "Did not expect GetOperation for this operation. Expected: {:?}, Got: {:?}",
+              operation_name, req.name
+            )),
+          ));
+        } else {
+          if let Some(d) = operation.duration {
+            sleep(d);
+          }
+          if let Ok(Some(op)) = operation.op {
+            // Complete the channel with the op.
+            sink.success(op);
+          } else if let Err(status) = operation.op {
+            sink.fail(status);
+          }
+          return;
+        }
+      },
+
+      Some(api_call) => {
+        error_to_send = Some(grpcio::RpcStatus::new(
+          grpcio::RpcStatusCode::INVALID_ARGUMENT,
+          Some(format!(
+            "GetOperation endpoint called. Expected: {:?}",
+            api_call,
+          )),
+        ));
+      },
+
+      None => {
+        error_to_send = Some(grpcio::RpcStatus::new(
+          grpcio::RpcStatusCode::INVALID_ARGUMENT,
+          Some("GetOperation endpoint called. Did not expect this call.".to_owned()),
+        ));
+      },
+    }
+
+    if let Some(status) = error_to_send {
+      let _ = sink.fail(status);
+    }
   }
 
   fn list_operations(

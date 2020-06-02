@@ -385,8 +385,9 @@ impl StreamingCommandRunner {
           [details] => details,
           _ => {
             return Err(ExecutionError::Fatal(format!(
-            "Received multiple failure details in ExecuteResponse's status field: {:?}",
-            status.get_details())))
+              "Received multiple failure details in ExecuteResponse's status field: {:?}",
+              status.get_details()
+            )))
           }
         };
 
