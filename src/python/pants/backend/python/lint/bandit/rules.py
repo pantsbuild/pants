@@ -24,7 +24,7 @@ from pants.core.util_rules.determine_source_files import (
 )
 from pants.engine.fs import Digest, MergeDigests, PathGlobs, Snapshot
 from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import SubsystemRule, named_rule, rule
+from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import FieldSetWithOrigin
 from pants.engine.unions import UnionRule
@@ -128,7 +128,7 @@ async def bandit_lint_partition(
     return LintResult.from_fallible_process_result(result, linter_name="Bandit")
 
 
-@named_rule(desc="Lint using Bandit")
+@rule(desc="Lint using Bandit")
 async def bandit_lint(
     request: BanditRequest, bandit: Bandit, python_setup: PythonSetup
 ) -> LintResults:

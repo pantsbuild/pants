@@ -8,7 +8,7 @@ from textwrap import dedent
 from typing import Any
 
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.rules import RootRule, named_rule, rule
+from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, Params
 from pants.engine.unions import UnionRule, union
 from pants.testutil.engine.util import assert_equal_with_printing, remove_locations_from_traceback
@@ -29,7 +29,7 @@ def fn_raises(x):
     raise Exception(f"An exception for {type(x).__name__}")
 
 
-@named_rule(desc="Nested raise")
+@rule(desc="Nested raise")
 def nested_raise(x: B) -> A:  # type: ignore[return]
     fn_raises(x)
 

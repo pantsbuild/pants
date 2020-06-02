@@ -317,7 +317,7 @@ PUBLIC_RULE_DECORATOR_ARGUMENTS = {"canonical_name", "desc", "level"}
 # We don't want @rule-writers to use 'cacheable' as a kwarg directly, but rather
 # set it implicitly based on whether the rule annotation is @rule or @goal_rule.
 # So we leave it out of PUBLIC_RULE_DECORATOR_ARGUMENTS.
-IMPLICIT_PRIVATE_RULE_DECORATOR_ARGUMENTS = {"cacheable", "named_rule"}
+IMPLICIT_PRIVATE_RULE_DECORATOR_ARGUMENTS = {"cacheable"}
 
 
 def rule_decorator(func, **kwargs) -> Callable:
@@ -333,7 +333,7 @@ def rule_decorator(func, **kwargs) -> Callable:
         != 0
     ):
         raise UnrecognizedRuleArgument(
-            f"`@named_rule`s and `@goal_rule`s only accept the following keyword arguments: {PUBLIC_RULE_DECORATOR_ARGUMENTS}"
+            f"`@rule`s and `@goal_rule`s only accept the following keyword arguments: {PUBLIC_RULE_DECORATOR_ARGUMENTS}"
         )
 
     cacheable: bool = kwargs["cacheable"]
@@ -412,11 +412,6 @@ def rule(*args, **kwargs) -> Callable:
 
 def goal_rule(*args, **kwargs) -> Callable:
     return inner_rule(*args, **kwargs, cacheable=False)
-
-
-def named_rule(*args, **kwargs) -> Callable:
-    # TODO: Remove this type.
-    return inner_rule(*args, **kwargs, cacheable=True)
 
 
 class Rule(ABC):

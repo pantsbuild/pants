@@ -26,7 +26,6 @@ from pants.engine.rules import (
     UnrecognizedRuleArgument,
     _RuleVisitor,
     goal_rule,
-    named_rule,
     rule,
 )
 from pants.engine.selectors import Get, GetConstraints
@@ -41,6 +40,7 @@ from pants.testutil.engine.util import (
 )
 from pants.testutil.test_base import TestBase
 from pants.util.enums import match
+from pants.util.logging import LogLevel
 
 
 class RuleVisitorTest(unittest.TestCase):
@@ -418,48 +418,37 @@ class RuleIndexTest(TestBase):
 
 class RuleArgumentAnnotationTest(unittest.TestCase):
     def test_annotations_kwargs(self):
-        @named_rule
+        @rule(level=LogLevel.INFO)
         def a_named_rule(a: int, b: str) -> bool:
             return False
 
         self.assertIsNotNone(a_named_rule.rule)
-        annotations = a_named_rule.rule.annotations
-        self.assertEqual(annotations.canonical_name, "a_named_rule")
-        self.assertEqual(annotations.desc, None)
+        self.assertEqual(a_named_rule.rule.canonical_name, "a_named_rule")
+        self.assertEqual(a_named_rule.rule.desc, None)
+        self.assertEqual(a_named_rule.rule.level, LogLevel.INFO)
 
-        @named_rule(canonical_name="something_different", desc="Human readable desc")
+        @rule(canonical_name="something_different", desc="Human readable desc")
         def another_named_rule(a: int, b: str) -> bool:
             return False
 
         self.assertIsNotNone(a_named_rule.rule)
-        annotations = another_named_rule.rule.annotations
-        self.assertEqual(annotations.canonical_name, "something_different")
-        self.assertEqual(annotations.desc, "Human readable desc")
+        self.assertEqual(another_named_rule.rule.canonical_name, "something_different")
+        self.assertEqual(another_named_rule.rule.desc, "Human readable desc")
+        self.assertEqual(another_named_rule.rule.level, LogLevel.DEBUG)
 
     def test_bogus_rules(self):
         with self.assertRaises(UnrecognizedRuleArgument):
 
-            @named_rule(bogus_kwarg="TOTALLY BOGUS!!!!!!")
+            @rule(bogus_kwarg="TOTALLY BOGUS!!!!!!")
             def a_named_rule(a: int, b: str) -> bool:
                 return False
-
-        with self.assertRaises(UnrecognizedRuleArgument) as e:
-
-            @rule(desc="Some description")
-            def a_named_rule_2(a: int, b: str) -> bool:
-                return False
-
-        assert (
-            e.exception.args[0]
-            == "@rules that are not @named_rules or @goal_rules do not accept keyword arguments"
-        )
 
     def test_goal_rule_automatically_gets_name_from_goal(self):
         @goal_rule
         def some_goal_rule() -> Example:
             return Example(exit_code=0)
 
-        name = some_goal_rule.rule.annotations.canonical_name
+        name = some_goal_rule.rule.canonical_name
         self.assertEqual(name, "example")
 
     def test_can_override_goal_rule_name(self):
@@ -467,7 +456,7 @@ class RuleArgumentAnnotationTest(unittest.TestCase):
         def some_goal_rule() -> Example:
             return Example(exit_code=0)
 
-        name = some_goal_rule.rule.annotations.canonical_name
+        name = some_goal_rule.rule.canonical_name
         self.assertEqual(name, "some_other_name")
 
 
