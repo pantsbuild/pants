@@ -7,6 +7,7 @@ from typing import Any, Dict, Iterable, Optional, Tuple, Union
 
 from pants.base.exceptions import DuplicateNameError, MappingError, UnaddressableObjectError
 from pants.build_graph.address import BuildFileAddress
+from pants.engine.load_statements import LoadStatementWithContent
 from pants.engine.objects import Serializable
 from pants.engine.parser import Parser
 from pants.util.memo import memoized_property
@@ -30,7 +31,11 @@ class AddressMap:
 
     @classmethod
     def parse(
-        cls, filepath: str, filecontent: bytes, load_statements, parser: Parser
+        cls,
+        filepath: str,
+        filecontent: bytes,
+        load_statements: Iterable[LoadStatementWithContent],
+        parser: Parser,
     ) -> "AddressMap":
         """Parses a source for addressable Serializable objects.
 

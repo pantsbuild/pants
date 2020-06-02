@@ -110,6 +110,7 @@ python_tests(
     ':scheduler_test_base',
     'src/python/pants/build_graph',
     'src/python/pants/engine:build_files',
+    'src/python/pants/engine:load_statements',
     'src/python/pants/engine/legacy:structs',
     'src/python/pants/engine:mapper',
     'src/python/pants/engine:parser',

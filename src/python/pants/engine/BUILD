@@ -94,6 +94,7 @@ python_library(
     ':objects',
     ':selectors',
     ':struct',
+    ':load_statements',
     'src/python/pants/base:project_tree',
     'src/python/pants/build_graph',
     'src/python/pants/util:collections',
@@ -111,6 +112,7 @@ python_library(
     '3rdparty/python:dataclasses',
     ':objects',
     ':parser',
+    ':load_statements',
     'src/python/pants/build_graph',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
@@ -144,6 +146,16 @@ python_library(
 )
 
 python_library(
+    name='load_statements',
+    sources=['load_statements.py'],
+    dependencies=[
+        ':fs',
+        ':objects',
+        ':selectors',
+    ]
+)
+
+python_library(
   name='nodes',
   sources=['nodes.py'],
   dependencies=[
@@ -170,6 +182,7 @@ python_library(
   dependencies=[
     '3rdparty/python:dataclasses',
     ':struct',
+    ':load_statements',
   ],
   tags = {"partially_type_checked"},
 )

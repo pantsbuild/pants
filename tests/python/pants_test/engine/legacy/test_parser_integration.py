@@ -123,15 +123,15 @@ class LoadStatementsIntegrationTests(PantsDaemonIntegrationTestBase):
             root_dir=get_buildroot()
         ) as tmpdir:
 
-            macro_file_path = os.path.join(tmpdir, "BUILD_MACRO")
+            rel_tmpdir = fast_relpath(tmpdir, get_buildroot())
 
-            rel_macro_file_path = fast_relpath(macro_file_path, get_buildroot())
+            macro_file_path = os.path.join(rel_tmpdir, "BUILD_MACRO")
 
             safe_file_dump(
                 os.path.join(tmpdir, "BUILD"),
                 dedent(
                     f"""
-                load("{rel_macro_file_path}", "my_name")
+                load("{macro_file_path}", "my_name")
                 target(name=my_name())
                 """
                 ),
@@ -140,11 +140,12 @@ class LoadStatementsIntegrationTests(PantsDaemonIntegrationTestBase):
             def change_name_macro_and_run_list(name):
                 safe_file_dump(macro_file_path, f"def my_name(): return '{name}'")
 
-                daemon_run = pantsd_run(["list", f"{tmpdir}::"])
+                daemon_run = pantsd_run(["list", f"{rel_tmpdir}::"])
                 checker.assert_running()
 
-                assert f"{tmpdir}:{name}" in daemon_run.stdout_data
+                assert f"{rel_tmpdir}:{name}" in daemon_run.stdout_data
 
             # Replace the BUILD file content twice.
             change_name_macro_and_run_list("name_one")
+            checker.assert_running()
             change_name_macro_and_run_list("name_two")
