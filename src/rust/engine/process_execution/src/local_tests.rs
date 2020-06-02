@@ -18,6 +18,13 @@ use testutil::owned_string_vec;
 use testutil::path::find_bash;
 use tokio::runtime::Handle;
 
+#[derive(PartialEq, Debug)]
+struct LocalTestResult {
+  original: FallibleProcessResultWithPlatform,
+  stdout_bytes: Vec<u8>,
+  stderr_bytes: Vec<u8>,
+}
+
 #[tokio::test]
 #[cfg(unix)]
 async fn stdout() {
@@ -25,11 +32,11 @@ async fn stdout() {
     .await
     .unwrap();
 
-  assert_eq!(result.stdout, "foo".as_bytes());
-  assert_eq!(result.stderr, "".as_bytes());
-  assert_eq!(result.exit_code, 0);
-  assert_eq!(result.output_directory, EMPTY_DIGEST);
-  assert_eq!(result.execution_attempts, vec![]);
+  assert_eq!(result.stdout_bytes, "foo".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.execution_attempts, vec![]);
 }
 
 #[tokio::test]
@@ -43,11 +50,11 @@ async fn stdout_and_stderr_and_exit_code() {
   .await
   .unwrap();
 
-  assert_eq!(result.stdout, "foo".as_bytes());
-  assert_eq!(result.stderr, "bar".as_bytes());
-  assert_eq!(result.exit_code, 1);
-  assert_eq!(result.output_directory, EMPTY_DIGEST);
-  assert_eq!(result.execution_attempts, vec![]);
+  assert_eq!(result.stdout_bytes, "foo".as_bytes());
+  assert_eq!(result.stderr_bytes, "bar".as_bytes());
+  assert_eq!(result.original.exit_code, 1);
+  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.execution_attempts, vec![]);
 }
 
 #[tokio::test]
@@ -62,11 +69,11 @@ async fn capture_exit_code_signal() {
   .await
   .unwrap();
 
-  assert_eq!(result.stdout, "".as_bytes());
-  assert_eq!(result.stderr, "".as_bytes());
-  assert_eq!(result.exit_code, -15);
-  assert_eq!(result.output_directory, EMPTY_DIGEST);
-  assert_eq!(result.platform, Platform::current().unwrap());
+  assert_eq!(result.stdout_bytes, "".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, -15);
+  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -77,9 +84,11 @@ async fn env() {
   env.insert("BAR".to_string(), "not foo".to_string());
 
   let result =
-    run_command_locally(Process::new(owned_string_vec(&["/usr/bin/env"])).env(env.clone())).await;
+    run_command_locally(Process::new(owned_string_vec(&["/usr/bin/env"])).env(env.clone()))
+      .await
+      .unwrap();
 
-  let stdout = String::from_utf8(result.unwrap().stdout.to_vec()).unwrap();
+  let stdout = String::from_utf8(result.stdout_bytes.to_vec()).unwrap();
   let got_env: BTreeMap<String, String> = stdout
     .split("\n")
     .filter(|line| !line.is_empty())
@@ -129,11 +138,11 @@ async fn output_files_none() {
   .await
   .unwrap();
 
-  assert_eq!(result.stdout, "".as_bytes());
-  assert_eq!(result.stderr, "".as_bytes());
-  assert_eq!(result.exit_code, 0);
-  assert_eq!(result.output_directory, EMPTY_DIGEST);
-  assert_eq!(result.execution_attempts, vec![]);
+  assert_eq!(result.stdout_bytes, "".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.execution_attempts, vec![]);
 }
 
 #[tokio::test]
@@ -149,14 +158,14 @@ async fn output_files_one() {
   .await
   .unwrap();
 
-  assert_eq!(result.stdout, "".as_bytes());
-  assert_eq!(result.stderr, "".as_bytes());
-  assert_eq!(result.exit_code, 0);
+  assert_eq!(result.stdout_bytes, "".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
   assert_eq!(
-    result.output_directory,
+    result.original.output_directory,
     TestDirectory::containing_roland().digest()
   );
-  assert_eq!(result.platform, Platform::current().unwrap());
+  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -178,11 +187,14 @@ async fn output_dirs() {
   .await
   .unwrap();
 
-  assert_eq!(result.stdout, "".as_bytes());
-  assert_eq!(result.stderr, "".as_bytes());
-  assert_eq!(result.exit_code, 0);
-  assert_eq!(result.output_directory, TestDirectory::recursive().digest());
-  assert_eq!(result.platform, Platform::current().unwrap());
+  assert_eq!(result.stdout_bytes, "".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(
+    result.original.output_directory,
+    TestDirectory::recursive().digest()
+  );
+  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -206,11 +218,14 @@ async fn output_files_many() {
   .await
   .unwrap();
 
-  assert_eq!(result.stdout, "".as_bytes());
-  assert_eq!(result.stderr, "".as_bytes());
-  assert_eq!(result.exit_code, 0);
-  assert_eq!(result.output_directory, TestDirectory::recursive().digest());
-  assert_eq!(result.platform, Platform::current().unwrap());
+  assert_eq!(result.stdout_bytes, "".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(
+    result.original.output_directory,
+    TestDirectory::recursive().digest()
+  );
+  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -230,14 +245,14 @@ async fn output_files_execution_failure() {
   .await
   .unwrap();
 
-  assert_eq!(result.stdout, "".as_bytes());
-  assert_eq!(result.stderr, "".as_bytes());
-  assert_eq!(result.exit_code, 1);
+  assert_eq!(result.stdout_bytes, "".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 1);
   assert_eq!(
-    result.output_directory,
+    result.original.output_directory,
     TestDirectory::containing_roland().digest()
   );
-  assert_eq!(result.platform, Platform::current().unwrap());
+  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -257,14 +272,14 @@ async fn output_files_partial_output() {
   .await
   .unwrap();
 
-  assert_eq!(result.stdout, "".as_bytes());
-  assert_eq!(result.stderr, "".as_bytes());
-  assert_eq!(result.exit_code, 0);
+  assert_eq!(result.stdout_bytes, "".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
   assert_eq!(
-    result.output_directory,
+    result.original.output_directory,
     TestDirectory::containing_roland().digest()
   );
-  assert_eq!(result.platform, Platform::current().unwrap());
+  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -281,11 +296,14 @@ async fn output_overlapping_file_and_dir() {
   .await
   .unwrap();
 
-  assert_eq!(result.stdout, "".as_bytes());
-  assert_eq!(result.stderr, "".as_bytes());
-  assert_eq!(result.exit_code, 0);
-  assert_eq!(result.output_directory, TestDirectory::nested().digest());
-  assert_eq!(result.platform, Platform::current().unwrap());
+  assert_eq!(result.stdout_bytes, "".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(
+    result.original.output_directory,
+    TestDirectory::nested().digest()
+  );
+  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -299,11 +317,11 @@ async fn append_only_cache_created() {
   .await
   .unwrap();
 
-  assert_eq!(result.stdout, format!(".cache/{}\n", name).as_bytes());
-  assert_eq!(result.stderr, "".as_bytes());
-  assert_eq!(result.exit_code, 0);
-  assert_eq!(result.output_directory, EMPTY_DIGEST);
-  assert_eq!(result.platform, Platform::current().unwrap());
+  assert_eq!(result.stdout_bytes, format!(".cache/{}\n", name).as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -329,11 +347,11 @@ async fn jdk_symlink() {
   .await
   .unwrap();
 
-  assert_eq!(result.stdout, roland);
-  assert_eq!(result.stderr, "".as_bytes());
-  assert_eq!(result.exit_code, 0);
-  assert_eq!(result.output_directory, EMPTY_DIGEST);
-  assert_eq!(result.platform, Platform::current().unwrap());
+  assert_eq!(result.stdout_bytes, roland);
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -410,14 +428,14 @@ async fn all_containing_directories_for_outputs_are_created() {
   .await
   .unwrap();
 
-  assert_eq!(result.stdout, "".as_bytes());
-  assert_eq!(result.stderr, "".as_bytes());
-  assert_eq!(result.exit_code, 0);
+  assert_eq!(result.stdout_bytes, "".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
   assert_eq!(
-    result.output_directory,
+    result.original.output_directory,
     TestDirectory::nested_dir_and_file().digest()
   );
-  assert_eq!(result.platform, Platform::current().unwrap());
+  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -433,14 +451,14 @@ async fn output_empty_dir() {
   .await
   .unwrap();
 
-  assert_eq!(result.stdout, "".as_bytes());
-  assert_eq!(result.stderr, "".as_bytes());
-  assert_eq!(result.exit_code, 0);
+  assert_eq!(result.stdout_bytes, "".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
   assert_eq!(
-    result.output_directory,
+    result.original.output_directory,
     TestDirectory::containing_falcons_dir().digest()
   );
-  assert_eq!(result.platform, Platform::current().unwrap());
+  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -466,8 +484,8 @@ async fn timeout() {
   .await
   .unwrap();
 
-  assert_eq!(result.exit_code, -15);
-  let error_msg = String::from_utf8(result.stdout.to_vec()).unwrap();
+  assert_eq!(result.original.exit_code, -15);
+  let error_msg = String::from_utf8(result.stdout_bytes.to_vec()).unwrap();
   assert_that(&error_msg).contains("Exceeded timeout");
   assert_that(&error_msg).contains("sleepy-cat");
 }
@@ -517,23 +535,17 @@ async fn working_directory() {
   .await
   .unwrap();
 
-  assert_eq!(result.stdout, "roland\n".as_bytes());
-  assert_eq!(result.stderr, "".as_bytes());
-  assert_eq!(result.exit_code, 0);
-  assert_eq!(result.output_directory, EMPTY_DIGEST);
-  assert_eq!(result.platform, Platform::current().unwrap());
+  assert_eq!(result.stdout_bytes, "roland\n".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
-async fn run_command_locally(req: Process) -> Result<FallibleProcessResultWithPlatform, String> {
+async fn run_command_locally(req: Process) -> Result<LocalTestResult, String> {
   let work_dir = TempDir::new().unwrap();
-  run_command_locally_in_dir_with_cleanup(req, work_dir.path().to_owned()).await
-}
-
-async fn run_command_locally_in_dir_with_cleanup(
-  req: Process,
-  dir: PathBuf,
-) -> Result<FallibleProcessResultWithPlatform, String> {
-  run_command_locally_in_dir(req, dir, true, None, None).await
+  let work_dir_path = work_dir.path().to_owned();
+  run_command_locally_in_dir(req, work_dir_path, true, None, None).await
 }
 
 async fn run_command_locally_in_dir(
@@ -542,20 +554,35 @@ async fn run_command_locally_in_dir(
   cleanup: bool,
   store: Option<Store>,
   executor: Option<task_executor::Executor>,
-) -> Result<FallibleProcessResultWithPlatform, String> {
+) -> Result<LocalTestResult, String> {
   let store_dir = TempDir::new().unwrap();
   let named_cache_dir = TempDir::new().unwrap();
   let executor = executor.unwrap_or_else(|| task_executor::Executor::new(Handle::current()));
   let store =
     store.unwrap_or_else(|| Store::local_only(executor.clone(), store_dir.path()).unwrap());
   let runner = crate::local::CommandRunner::new(
-    store,
+    store.clone(),
     executor.clone(),
     dir,
     NamedCaches::new(named_cache_dir.path().to_owned()),
     cleanup,
   );
-  runner.run(req.into(), Context::default()).await
+  let original = runner.run(req.into(), Context::default()).await?;
+  let stdout_bytes: Vec<u8> = store
+    .load_file_bytes_with(original.stdout_digest, |bytes| bytes.into())
+    .await?
+    .unwrap()
+    .0;
+  let stderr_bytes: Vec<u8> = store
+    .load_file_bytes_with(original.stderr_digest, |bytes| bytes.into())
+    .await?
+    .unwrap()
+    .0;
+  Ok(LocalTestResult {
+    original,
+    stdout_bytes,
+    stderr_bytes,
+  })
 }
 
 fn one_second() -> Option<Duration> {
