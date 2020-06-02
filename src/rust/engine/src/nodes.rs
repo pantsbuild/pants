@@ -962,18 +962,50 @@ impl NodeKey {
     }
   }
 
-  pub fn display_info(&self) -> Option<&tasks::DisplayInfo> {
-    match self {
-      NodeKey::Task(ref task) => Some(&task.task.display_info),
-      _ => None,
-    }
-  }
-
   fn workunit_level(&self) -> Level {
     match self {
       NodeKey::Task(_) if self.user_facing_name().is_some() => Level::Info,
       NodeKey::Task(_) => Level::Debug,
       _ => Level::Debug,
+    }
+  }
+
+  ///
+  /// Provides the `name` field in workunits associated with this node. These names
+  /// should be friendly to machine-parsing (i.e. "my_node" rather than "My awesome node!").
+  ///
+  fn workunit_name(&self) -> String {
+    match self {
+      NodeKey::Task(ref task) => task.task.display_info.name.clone(),
+      NodeKey::MultiPlatformExecuteProcess(mp_epr) => mp_epr.0.workunit_name(),
+      NodeKey::Snapshot(..) => "snapshot".to_string(),
+      NodeKey::DigestFile(..) => "digest_file".to_string(),
+      NodeKey::DownloadedFile(..) => "downloaded_file".to_string(),
+      NodeKey::ReadLink(..) => "read_link".to_string(),
+      NodeKey::Scandir(_) => "scandir".to_string(),
+      NodeKey::Select(..) => "select".to_string(),
+    }
+  }
+
+  ///
+  /// Nodes optionally have a user-facing name (distinct from their Debug and Display
+  /// implementations). This user-facing name is intended to provide high-level information
+  /// to end users of pants about what computation pants is currently doing. Not all
+  /// `Node`s need a user-facing name. For `Node`s derived from Python `@rule`s, the
+  /// user-facing name should be the same as the `desc` annotation on the rule decorator.
+  ///
+  fn user_facing_name(&self) -> Option<String> {
+    match self {
+      NodeKey::Task(ref task) => task.task.display_info.desc.as_ref().map(|s| s.to_owned()),
+      NodeKey::Snapshot(_) => Some(format!("{}", self)),
+      NodeKey::MultiPlatformExecuteProcess(mp_epr) => mp_epr.0.user_facing_name(),
+      NodeKey::DigestFile(DigestFile(File { path, .. })) => {
+        Some(format!("Fingerprinting: {}", path.display()))
+      }
+      NodeKey::DownloadedFile(..) => None,
+      NodeKey::ReadLink(..) => None,
+      NodeKey::Scandir(Scandir(Dir(path))) => Some(format!("Reading {}", path.display())),
+      NodeKey::Select(..) => None,
     }
   }
 }
@@ -1065,38 +1097,6 @@ impl Node for NodeKey {
     match self {
       &NodeKey::Task(ref s) => s.task.cacheable,
       _ => true,
-    }
-  }
-
-  fn user_facing_name(&self) -> Option<String> {
-    match self {
-      NodeKey::Task(ref task) => task.task.display_info.desc.as_ref().map(|s| s.to_owned()),
-      NodeKey::Snapshot(_) => Some(format!("{}", self)),
-      NodeKey::MultiPlatformExecuteProcess(mp_epr) => mp_epr.0.user_facing_name(),
-      NodeKey::DigestFile(DigestFile(File { path, .. })) => {
-        Some(format!("Fingerprinting: {}", path.display()))
-      }
-      NodeKey::DownloadedFile(..) => None,
-      NodeKey::ReadLink(..) => None,
-      NodeKey::Scandir(Scandir(Dir(path))) => Some(format!("Reading {}", path.display())),
-      NodeKey::Select(..) => None,
-    }
-  }
-
-  fn workunit_name(&self) -> String {
-    match self {
-      NodeKey::Task(_) => self
-        .display_info()
-        .and_then(|di| di.name.as_ref())
-        .map(|s| s.to_owned())
-        .unwrap_or_else(|| "<unnamed_rule>".to_string()),
-      NodeKey::MultiPlatformExecuteProcess(mp_epr) => mp_epr.0.workunit_name(),
-      NodeKey::Snapshot(..) => "snapshot".to_string(),
-      NodeKey::DigestFile(..) => "digest_file".to_string(),
-      NodeKey::DownloadedFile(..) => "downloaded_file".to_string(),
-      NodeKey::ReadLink(..) => "read_link".to_string(),
-      NodeKey::Scandir(_) => "scandir".to_string(),
-      NodeKey::Select(..) => "select".to_string(),
     }
   }
 }
