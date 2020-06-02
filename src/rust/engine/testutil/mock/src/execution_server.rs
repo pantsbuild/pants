@@ -156,7 +156,7 @@ impl Drop for TestServer {
           message
         );
       } else {
-        // assert_eq!(remaining_expected_responses, 0, "{}", message,);
+        assert_eq!(remaining_expected_responses, 0, "{}", message,);
       }
     }
   }
