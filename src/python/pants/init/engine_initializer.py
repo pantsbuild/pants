@@ -342,6 +342,7 @@ class EngineInitializer:
         build_file_prelude_globs: Tuple[str, ...],
         options_bootstrapper: OptionsBootstrapper,
         build_configuration: BuildConfiguration,
+        execution_options: ExecutionOptions,
         build_root: Optional[str] = None,
         native: Optional[Native] = None,
         glob_match_error_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.warn,
@@ -349,7 +350,6 @@ class EngineInitializer:
         exclude_target_regexps=None,
         subproject_roots=None,
         include_trace_on_error: bool = True,
-        execution_options: Optional[ExecutionOptions] = None,
     ) -> LegacyGraphScheduler:
         """Construct and return the components necessary for LegacyBuildGraph construction.
 

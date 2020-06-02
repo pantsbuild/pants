@@ -24,7 +24,7 @@
 #![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
-#![type_length_limit = "32187898"]
+#![type_length_limit = "35811178"]
 #[macro_use]
 extern crate derivative;
 
@@ -380,7 +380,9 @@ pub struct ProcessMetadata {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FallibleProcessResultWithPlatform {
   pub stdout: Bytes,
+  pub stdout_digest: Digest,
   pub stderr: Bytes,
+  pub stderr_digest: Digest,
   pub exit_code: i32,
   pub platform: Platform,
 
@@ -389,14 +391,6 @@ pub struct FallibleProcessResultWithPlatform {
   pub output_directory: hashing::Digest,
 
   pub execution_attempts: Vec<ExecutionStats>,
-}
-
-#[cfg(test)]
-impl FallibleProcessResultWithPlatform {
-  pub fn without_execution_attempts(mut self) -> Self {
-    self.execution_attempts = vec![];
-    self
-  }
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -514,6 +508,8 @@ impl CommandRunner for BoundedCommandRunner {
       desc: Some(desc.clone()),
       level: Level::Debug,
       blocked: true,
+      stdout: None,
+      stderr: None,
     };
     let bounded_fut = {
       let inner = self.inner.clone();
@@ -526,14 +522,42 @@ impl CommandRunner for BoundedCommandRunner {
           desc: Some(desc),
           level: Level::Info,
           blocked: false,
+          stdout: None,
+          stderr: None,
         };
-        with_workunit(context.workunit_store.clone(), name, metadata, async move {
-          inner.0.run(req, context).await
-        })
+
+        let metadata_updater = |result: &Result<FallibleProcessResultWithPlatform, String>,
+                                old_metadata| match result {
+          Err(_) => old_metadata,
+          Ok(FallibleProcessResultWithPlatform {
+            stdout_digest,
+            stderr_digest,
+            ..
+          }) => WorkunitMetadata {
+            stdout: Some(*stdout_digest),
+            stderr: Some(*stderr_digest),
+            ..old_metadata
+          },
+        };
+
+        with_workunit(
+          context.workunit_store.clone(),
+          name,
+          metadata,
+          async move { inner.0.run(req, context).await },
+          metadata_updater,
+        )
       })
     };
 
-    with_workunit(context.workunit_store, name, outer_metadata, bounded_fut).await
+    with_workunit(
+      context.workunit_store,
+      name,
+      outer_metadata,
+      bounded_fut,
+      |_, metadata| metadata,
+    )
+    .await
   }
 
   fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {

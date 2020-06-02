@@ -30,6 +30,7 @@ from pants.engine.selectors import Params
 from pants.engine.target import Target
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.util import clean_global_runtime_state
+from pants.option.global_options import ExecutionOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source import source_root
 from pants.source.source_root import SourceRootConfig
@@ -91,6 +92,8 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
     :API: public
     """
+
+    additional_options: List[str] = []
 
     _scheduler: Optional[SchedulerSession] = None
     _build_graph = None
@@ -402,7 +405,9 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         if self._scheduler is not None:
             return
 
-        options_bootstrapper = OptionsBootstrapper.create(args=["--pants-config-files=[]"])
+        options_bootstrapper = OptionsBootstrapper.create(
+            args=["--pants-config-files=[]", *self.additional_options]
+        )
         global_options = options_bootstrapper.bootstrap_options.for_global_scope()
         local_store_dir = local_store_dir or global_options.local_store_dir
         local_execution_root_dir = global_options.local_execution_root_dir
@@ -423,7 +428,10 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
             build_root=self.build_root,
             build_configuration=self.build_config(),
             build_ignore_patterns=None,
-        ).new_session(zipkin_trace_v2=False, build_id="buildid_for_test")
+            execution_options=ExecutionOptions.from_bootstrap_options(global_options),
+        ).new_session(
+            zipkin_trace_v2=False, build_id="buildid_for_test", should_report_workunits=True
+        )
         self._scheduler = graph_session.scheduler_session
         self._build_graph, self._address_mapper = graph_session.create_build_graph(
             Specs(address_specs=AddressSpecs([]), filesystem_specs=FilesystemSpecs([])),
