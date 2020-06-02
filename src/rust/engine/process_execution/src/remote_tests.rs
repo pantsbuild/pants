@@ -541,18 +541,10 @@ async fn successful_execution_after_one_getoperation() {
     .await
     .unwrap();
 
-  assert_eq!(
-    result.without_execution_attempts(),
-    FallibleProcessResultWithPlatform {
-      stdout: as_bytes("foo"),
-      stderr: as_bytes(""),
-      exit_code: 0,
-      output_directory: EMPTY_DIGEST,
-      execution_attempts: vec![],
-      platform: Platform::Linux,
-    }
-  );
-
+  assert_eq!(result.stdout, "foo".as_bytes());
+  assert_eq!(result.stderr, "".as_bytes());
+  assert_eq!(result.exit_code, 0);
+  assert_eq!(result.output_directory, EMPTY_DIGEST);
   assert_cancellation_requests(&mock_server, vec![]);
 }
 
@@ -604,17 +596,11 @@ async fn retries_retriable_errors() {
     .await
     .unwrap();
 
-  assert_eq!(
-    result.without_execution_attempts(),
-    FallibleProcessResultWithPlatform {
-      stdout: as_bytes("foo"),
-      stderr: as_bytes(""),
-      exit_code: 0,
-      output_directory: EMPTY_DIGEST,
-      execution_attempts: vec![],
-      platform: Platform::Linux,
-    }
-  );
+  assert_eq!(result.stdout, "foo".as_bytes());
+  assert_eq!(result.stderr, "".as_bytes());
+  assert_eq!(result.exit_code, 0);
+  assert_eq!(result.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.platform, Platform::Linux);
 
   assert_cancellation_requests(&mock_server, vec![]);
 }
@@ -819,31 +805,26 @@ async fn extract_response_with_digest_stdout() {
   let op_name = "gimme-foo".to_string();
   let testdata = TestData::roland();
   let testdata_empty = TestData::empty();
-  assert_eq!(
-    extract_execute_response(
-      make_successful_operation(
-        &op_name,
-        StdoutType::Digest(testdata.digest()),
-        StderrType::Raw(testdata_empty.string()),
-        0,
-      )
-      .op
-      .unwrap()
-      .unwrap(),
-      Platform::Linux,
+  let result = extract_execute_response(
+    make_successful_operation(
+      &op_name,
+      StdoutType::Digest(testdata.digest()),
+      StderrType::Raw(testdata_empty.string()),
+      0,
     )
-    .await
+    .op
     .unwrap()
-    .without_execution_attempts(),
-    FallibleProcessResultWithPlatform {
-      stdout: testdata.bytes(),
-      stderr: testdata_empty.bytes(),
-      exit_code: 0,
-      output_directory: EMPTY_DIGEST,
-      execution_attempts: vec![],
-      platform: Platform::Linux,
-    }
-  );
+    .unwrap(),
+    Platform::Linux,
+  )
+  .await
+  .unwrap();
+
+  assert_eq!(result.stdout, testdata.bytes());
+  assert_eq!(result.stderr, testdata_empty.bytes());
+  assert_eq!(result.exit_code, 0);
+  assert_eq!(result.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.platform, Platform::Linux);
 }
 
 #[tokio::test]
@@ -851,31 +832,26 @@ async fn extract_response_with_digest_stderr() {
   let op_name = "gimme-foo".to_string();
   let testdata = TestData::roland();
   let testdata_empty = TestData::empty();
-  assert_eq!(
-    extract_execute_response(
-      make_successful_operation(
-        &op_name,
-        StdoutType::Raw(testdata_empty.string()),
-        StderrType::Digest(testdata.digest()),
-        0,
-      )
-      .op
-      .unwrap()
-      .unwrap(),
-      Platform::Linux,
+  let result = extract_execute_response(
+    make_successful_operation(
+      &op_name,
+      StdoutType::Raw(testdata_empty.string()),
+      StderrType::Digest(testdata.digest()),
+      0,
     )
-    .await
+    .op
     .unwrap()
-    .without_execution_attempts(),
-    FallibleProcessResultWithPlatform {
-      stdout: testdata_empty.bytes(),
-      stderr: testdata.bytes(),
-      exit_code: 0,
-      output_directory: EMPTY_DIGEST,
-      execution_attempts: vec![],
-      platform: Platform::Linux,
-    }
-  );
+    .unwrap(),
+    Platform::Linux,
+  )
+  .await
+  .unwrap();
+
+  assert_eq!(result.stdout, testdata_empty.bytes());
+  assert_eq!(result.stderr, testdata.bytes());
+  assert_eq!(result.exit_code, 0);
+  assert_eq!(result.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.platform, Platform::Linux);
 }
 
 #[tokio::test]
@@ -883,31 +859,26 @@ async fn extract_response_with_digest_stdout_osx_remote() {
   let op_name = "gimme-foo".to_string();
   let testdata = TestData::roland();
   let testdata_empty = TestData::empty();
-  assert_eq!(
-    extract_execute_response(
-      make_successful_operation(
-        &op_name,
-        StdoutType::Digest(testdata.digest()),
-        StderrType::Raw(testdata_empty.string()),
-        0,
-      )
-      .op
-      .unwrap()
-      .unwrap(),
-      Platform::Darwin
+  let result = extract_execute_response(
+    make_successful_operation(
+      &op_name,
+      StdoutType::Digest(testdata.digest()),
+      StderrType::Raw(testdata_empty.string()),
+      0,
     )
-    .await
+    .op
     .unwrap()
-    .without_execution_attempts(),
-    FallibleProcessResultWithPlatform {
-      stdout: testdata.bytes(),
-      stderr: testdata_empty.bytes(),
-      exit_code: 0,
-      output_directory: EMPTY_DIGEST,
-      execution_attempts: vec![],
-      platform: Platform::Darwin,
-    }
-  );
+    .unwrap(),
+    Platform::Darwin,
+  )
+  .await
+  .unwrap();
+
+  assert_eq!(result.stdout, testdata.bytes());
+  assert_eq!(result.stderr, testdata_empty.bytes());
+  assert_eq!(result.exit_code, 0);
+  assert_eq!(result.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.platform, Platform::Darwin);
 }
 
 #[tokio::test]
@@ -983,17 +954,11 @@ async fn ensure_inline_stdio_is_stored() {
     .run(echo_roland_request(), Context::default())
     .await
     .unwrap();
-  assert_eq!(
-    result.without_execution_attempts(),
-    FallibleProcessResultWithPlatform {
-      stdout: test_stdout.bytes(),
-      stderr: test_stderr.bytes(),
-      exit_code: 0,
-      output_directory: EMPTY_DIGEST,
-      execution_attempts: vec![],
-      platform: Platform::Linux,
-    }
-  );
+
+  assert_eq!(result.stdout, test_stdout.bytes());
+  assert_eq!(result.stderr, test_stderr.bytes());
+  assert_eq!(result.exit_code, 0);
+  assert_eq!(result.platform, Platform::Linux);
 
   let local_store =
     Store::local_only(runtime.clone(), &store_dir_path).expect("Error creating local store");
@@ -1071,17 +1036,11 @@ async fn successful_execution_after_four_getoperations() {
     .await
     .unwrap();
 
-  assert_eq!(
-    result.without_execution_attempts(),
-    FallibleProcessResultWithPlatform {
-      stdout: as_bytes("foo"),
-      stderr: as_bytes(""),
-      exit_code: 0,
-      output_directory: EMPTY_DIGEST,
-      execution_attempts: vec![],
-      platform: Platform::Linux,
-    }
-  );
+  assert_eq!(result.stdout, "foo".as_bytes());
+  assert_eq!(result.stderr, "".as_bytes());
+  assert_eq!(result.exit_code, 0);
+  assert_eq!(result.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.platform, Platform::Linux);
 }
 
 #[tokio::test]
@@ -1255,17 +1214,11 @@ async fn retry_for_cancelled_channel() {
     .await
     .unwrap();
 
-  assert_eq!(
-    result.without_execution_attempts(),
-    FallibleProcessResultWithPlatform {
-      stdout: as_bytes("foo"),
-      stderr: as_bytes(""),
-      exit_code: 0,
-      output_directory: EMPTY_DIGEST,
-      execution_attempts: vec![],
-      platform: Platform::Linux,
-    }
-  );
+  assert_eq!(result.stdout, "foo".as_bytes());
+  assert_eq!(result.stderr, "".as_bytes());
+  assert_eq!(result.exit_code, 0);
+  assert_eq!(result.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.platform, Platform::Linux);
 }
 
 #[tokio::test]
@@ -1569,17 +1522,12 @@ async fn execute_missing_file_uploads_if_known() {
     .run(cat_roland_request(), Context::default())
     .await
     .unwrap();
-  assert_eq!(
-    result.without_execution_attempts(),
-    FallibleProcessResultWithPlatform {
-      stdout: roland.bytes(),
-      stderr: Bytes::from(""),
-      exit_code: 0,
-      output_directory: EMPTY_DIGEST,
-      execution_attempts: vec![],
-      platform: Platform::Linux,
-    }
-  );
+
+  assert_eq!(result.stdout, roland.bytes());
+  assert_eq!(result.stderr, "".as_bytes());
+  assert_eq!(result.exit_code, 0);
+  assert_eq!(result.platform, Platform::Linux);
+
   {
     let blobs = cas.blobs.lock();
     assert_eq!(blobs.get(&roland.fingerprint()), Some(&roland.bytes()));
@@ -1678,18 +1626,13 @@ async fn execute_missing_file_uploads_if_known_status() {
   )
   .unwrap()
   .run(cat_roland_request(), Context::default())
-  .await;
-  assert_eq!(
-    result,
-    Ok(FallibleProcessResultWithPlatform {
-      stdout: roland.bytes(),
-      stderr: Bytes::from(""),
-      exit_code: 0,
-      output_directory: EMPTY_DIGEST,
-      execution_attempts: vec![],
-      platform: Platform::Linux,
-    })
-  );
+  .await
+  .unwrap();
+
+  assert_eq!(result.stdout, roland.bytes());
+  assert_eq!(result.stderr, "".as_bytes());
+  assert_eq!(result.exit_code, 0);
+  assert_eq!(result.platform, Platform::Linux);
   {
     let blobs = cas.blobs.lock();
     assert_eq!(blobs.get(&roland.fingerprint()), Some(&roland.bytes()));
