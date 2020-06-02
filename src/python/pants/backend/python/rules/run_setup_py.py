@@ -67,6 +67,7 @@ from pants.engine.unions import UnionMembership
 from pants.option.custom_types import shell_str
 from pants.python.python_setup import PythonSetup
 from pants.source.source_root import SourceRoot, SourceRootRequest
+from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)
@@ -603,7 +604,7 @@ async def get_requirements(
     return ExportedTargetRequirements(req_strs)
 
 
-@named_rule(desc="Find all code to be published in the distribution")
+@named_rule(desc="Find all code to be published in the distribution", level=LogLevel.INFO)
 async def get_owned_dependencies(
     dependency_owner: DependencyOwner, union_membership: UnionMembership
 ) -> OwnedDependencies:

@@ -964,8 +964,7 @@ impl NodeKey {
 
   fn workunit_level(&self) -> Level {
     match self {
-      NodeKey::Task(_) if self.user_facing_name().is_some() => Level::Info,
-      NodeKey::Task(_) => Level::Debug,
+      NodeKey::Task(ref task) => task.task.display_info.level,
       _ => Level::Debug,
     }
   }
