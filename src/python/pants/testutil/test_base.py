@@ -543,6 +543,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
             # We set those defaults here so we don't have to modify many dozens of call sites.
             source_options["root_patterns"] = [
                 "src/*",
+                "src/main/*",
             ]
             options["source"] = source_options
 
