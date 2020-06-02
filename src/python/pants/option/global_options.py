@@ -847,7 +847,7 @@ class GlobalOptions(Subsystem):
             type=bool,
             default=False,
             advanced=True,
-            help="Enable the streaming remote execution client (alpha quality).",
+            help="Enable the streaming remote execution client (experimental).",
         )
         register(
             "--process-execution-local-parallelism",
