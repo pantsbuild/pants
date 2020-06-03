@@ -426,7 +426,7 @@ class PytestRun(ChrootedTestRunnerTaskMixin, Task):
                 with self._maybe_run_in_chroot():
                     # On failures or timeouts, the .coverage file won't be written.
                     if not os.path.exists(".coverage"):
-                        self.context.log.warn(
+                        self.context.log.warning(
                             "No .coverage file was found! Skipping coverage reporting."
                         )
                     else:
