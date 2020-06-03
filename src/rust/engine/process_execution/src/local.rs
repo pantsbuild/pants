@@ -460,9 +460,7 @@ pub trait CapturedWorkdir {
         let stderr_digest = store.store_file_bytes(stderr.clone(), true).await?;
 
         Ok(FallibleProcessResultWithPlatform {
-          stdout,
           stdout_digest,
-          stderr,
           stderr_digest,
           exit_code: child_results.exit_code,
           output_directory: output_snapshot.digest,
@@ -479,9 +477,7 @@ pub trait CapturedWorkdir {
           let stdout_digest = store.store_file_bytes(stdout.clone(), true).await?;
 
           Ok(FallibleProcessResultWithPlatform {
-            stdout,
             stdout_digest,
-            stderr: Bytes::new(),
             stderr_digest: hashing::EMPTY_DIGEST,
             exit_code: -libc::SIGTERM,
             output_directory: hashing::EMPTY_DIGEST,

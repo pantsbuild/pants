@@ -395,9 +395,7 @@ impl super::CommandRunner for CommandRunner {
                 let stdout_digest = store.store_file_bytes(stdout.clone(), true).await?;
 
                 break FallibleProcessResultWithPlatform {
-                  stdout,
                   stdout_digest,
-                  stderr: Bytes::new(),
                   stderr_digest: hashing::EMPTY_DIGEST,
                   exit_code: -libc::SIGTERM,
                   output_directory: hashing::EMPTY_DIGEST,
@@ -914,9 +912,7 @@ pub fn populate_fallible_execution_result(
     .and_then(
       move |(((stdout, stdout_digest), (stderr, stderr_digest)), output_directory)| {
         Ok(FallibleProcessResultWithPlatform {
-          stdout,
           stdout_digest,
-          stderr,
           stderr_digest,
           exit_code: execute_response.get_result().get_exit_code(),
           output_directory: output_directory,
