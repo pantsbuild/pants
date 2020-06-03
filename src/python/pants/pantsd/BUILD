@@ -2,10 +2,21 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
+  name = 'pants_daemon_client',
+  sources = ['pants_daemon_client.py'],
+  dependencies = [
+    '3rdparty/python:dataclasses',
+    ':pants_daemon',
+    ':process_manager',
+    'src/python/pants/option',
+  ],
+  tags = {'partially_type_checked'},
+)
+
+python_library(
   name = 'pants_daemon',
   sources = ['pants_daemon.py'],
   dependencies = [
-    '3rdparty/python:dataclasses',
     '3rdparty/python:setproctitle',
     ':process_manager',
     ':watchman_launcher',
@@ -24,7 +35,6 @@ python_library(
     'src/python/pants/pantsd/service:store_gc_service',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:logging',
-    'src/python/pants/util:memo',
   ],
   tags = {'partially_type_checked'},
 )

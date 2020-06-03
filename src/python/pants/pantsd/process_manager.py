@@ -6,14 +6,19 @@ import logging
 import os
 import signal
 import subprocess
+import sys
 import time
 import traceback
+from abc import ABCMeta
 from contextlib import contextmanager
 from typing import Callable, Optional
 
 import psutil
 
 from pants.base.build_environment import get_buildroot
+from pants.option.options import Options
+from pants.option.options_fingerprinter import OptionsFingerprinter
+from pants.option.scope import GLOBAL_SCOPE
 from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.process.subprocess import Subprocess
 from pants.util.dirutil import read_file, rm_rf, safe_file_dump, safe_mkdir
@@ -688,3 +693,55 @@ class FingerprintedProcessManager(ProcessManager):
         :rtype: bool
         """
         return self.is_dead() or not self.has_current_fingerprint(fingerprint)
+
+
+class PantsDaemonProcessManager(FingerprintedProcessManager, metaclass=ABCMeta):
+    """An ABC for classes that interact with pantsd's metadata.
+
+    This is extended by both a pantsd client handle, and by the server: the client reads process
+    metadata, and the server writes it.
+    """
+
+    def __init__(self, bootstrap_options: Options, daemon_entrypoint: str):
+        super().__init__(
+            name="pantsd",
+            metadata_base_dir=bootstrap_options.for_global_scope().pants_subprocessdir,
+        )
+        self._bootstrap_options = bootstrap_options
+        self._daemon_entrypoint = daemon_entrypoint
+
+    @property
+    def options_fingerprint(self):
+        return OptionsFingerprinter.combined_options_fingerprint_for_scope(
+            GLOBAL_SCOPE, self._bootstrap_options, fingerprint_key="daemon", invert=True
+        )
+
+    def needs_restart(self, option_fingerprint):
+        """Overrides ProcessManager.needs_restart, to account for the case where pantsd is running
+        but we want to shutdown after this run.
+
+        :param option_fingerprint: A fingerprint of the global bootstrap options.
+        :return: True if the daemon needs to restart.
+        """
+        return super().needs_restart(option_fingerprint)
+
+    def post_fork_child(self):
+        """Post-fork() child callback for ProcessManager.daemon_spawn()."""
+        spawn_control_env = dict(
+            PANTS_ENTRYPOINT=f"{self._daemon_entrypoint}:launch",
+            # The daemon should run under the same sys.path as us; so we ensure
+            # this. NB: It will scrub PYTHONPATH once started to avoid infecting
+            # its own unrelated subprocesses.
+            PYTHONPATH=os.pathsep.join(sys.path),
+        )
+        exec_env = {**os.environ, **spawn_control_env}
+
+        # Pass all of sys.argv so that we can proxy arg flags e.g. `-ldebug`.
+        cmd = [sys.executable] + sys.argv
+
+        spawn_control_env_vars = " ".join(f"{k}={v}" for k, v in spawn_control_env.items())
+        cmd_line = " ".join(cmd)
+        self._logger.debug(f"cmd is: {spawn_control_env_vars} {cmd_line}")
+
+        # TODO: Improve error handling on launch failures.
+        os.spawnve(os.P_NOWAIT, sys.executable, cmd, env=exec_env)
