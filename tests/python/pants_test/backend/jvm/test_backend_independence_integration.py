@@ -23,7 +23,8 @@ class BackendIndependenceTest(PantsRunIntegrationTest):
                     # We need the internal backend for the repo specifications in the example BUILD files.
                     # TODO: Don't use the real pants repos in example code, which are ideally self-contained.
                     "backend_packages": ["pants.backend.jvm", "internal_backend.repositories"],
-                }
+                },
+                "source": {"root_patterns": ["tests/java"]},
             },
         )
         self.assert_success(pants_run)

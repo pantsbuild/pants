@@ -19,6 +19,7 @@ class ScroogeGenTest(PantsRunIntegrationTest):
                     "pants.contrib.scrooge",
                 ],
             },
+            "source": {"root_patterns": ["src/*", "tests/*"]},
             "scala": {"version": "2.11"},
             "gen.scrooge": {
                 "service_deps": {

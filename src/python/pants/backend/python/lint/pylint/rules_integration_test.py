@@ -95,7 +95,10 @@ class PylintIntegrationTest(ExternalToolTestBase):
         skip: bool = False,
         additional_args: Optional[List[str]] = None,
     ) -> LintResults:
-        args = ["--backend-packages2=pants.backend.python.lint.pylint"]
+        args = [
+            "--backend-packages2=pants.backend.python.lint.pylint",
+            "--source-root-patterns=src/python",
+        ]
         if config:
             self.create_file(relpath="pylintrc", contents=config)
             args.append("--pylint-config=pylintrc")

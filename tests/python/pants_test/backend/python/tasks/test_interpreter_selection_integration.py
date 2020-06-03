@@ -44,7 +44,10 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
 
     def _echo_version(self, version):
         with temporary_dir() as distdir:
-            config = {"GLOBAL": {"pants_distdir": distdir}}
+            config = {
+                "GLOBAL": {"pants_distdir": distdir},
+                "source": {"root_patterns": ["src/python"]},
+            }
             binary_name = f"echo_interpreter_version_{version}"
             binary_target = f"{self.testproject}:{binary_name}"
             pants_run = self._build_pex(binary_target, config, version=version)
@@ -106,7 +109,10 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
         # test that it ends up with the version we request (and not the lower version specified on its
         # dependency).
         with temporary_dir() as distdir:
-            config = {"GLOBAL": {"pants_distdir": distdir}}
+            config = {
+                "GLOBAL": {"pants_distdir": distdir},
+                "source": {"root_patterns": ["src/python"]},
+            }
             args = [
                 '--python-setup-interpreter-constraints=["CPython>=3.6"]',
             ]
@@ -128,7 +134,10 @@ class InterpreterSelectionIntegrationTest(PantsRunIntegrationTest):
 
     def test_stale_interpreter_purge_integration(self):
         target = f"{self.testproject}:{'echo_interpreter_version'}"
-        config = {"python-setup": {"interpreter_constraints": ["CPython>=2.7,<4"]}}
+        config = {
+            "python-setup": {"interpreter_constraints": ["CPython>=2.7,<4"]},
+            "source": {"root_patterns": ["src/python"]},
+        }
         with self.temporary_workdir() as workdir:
             pants_run = self.run_pants_with_workdir(["run", target], workdir=workdir, config=config)
             self.assert_success(pants_run)

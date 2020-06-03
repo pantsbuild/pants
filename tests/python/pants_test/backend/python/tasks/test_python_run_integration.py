@@ -13,7 +13,11 @@ from pants.testutil.interpreter_selection_utils import (
     skip_unless_python27_and_python3_present,
     skip_unless_python27_present,
 )
-from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
+from pants.testutil.pants_run_integration_test import (
+    PantsResult,
+    PantsRunIntegrationTest,
+    ensure_daemon,
+)
 from pants.testutil.pexrc_util import setup_pexrc_with_pex_python_path
 from pants.util.contextutil import temporary_dir
 
@@ -26,6 +30,15 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     @classmethod
     def hermetic(cls):
         return True
+
+    def run_pants(
+        self, command, config=None, stdin_data=None, extra_env=None, cleanup_workdir=True, **kwargs
+    ) -> PantsResult:
+        config = config or {}
+        source = config.get("source", {})
+        config["source"] = source
+        source["root_patterns"] = ["src/python"]
+        return super().run_pants(command, config, stdin_data, extra_env, cleanup_workdir, **kwargs)
 
     @skip_unless_python3_present
     @ensure_daemon

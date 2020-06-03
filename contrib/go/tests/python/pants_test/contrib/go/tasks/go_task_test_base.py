@@ -16,3 +16,4 @@ class GoTaskTestBase(TaskTestBase):
                 "src/main/go/src",
                 "3rdparty/go",
             ]
+        return super().context(for_task_types, **kwargs)
