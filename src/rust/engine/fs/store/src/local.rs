@@ -4,13 +4,14 @@ use bytes::Bytes;
 use digest::{Digest as DigestTrait, FixedOutput};
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use lmdb::Error::NotFound;
-use lmdb::{self, Cursor, Database, RwTransaction, Transaction, WriteFlags};
+use lmdb::{self, Cursor, Transaction};
+use log::debug;
 use sha2::Sha256;
-use sharded_lmdb::{ShardedLmdb, VersionedFingerprint};
+use sharded_lmdb::{ShardedLmdb, VersionedFingerprint, DEFAULT_LEASE_TIME};
 use std::collections::BinaryHeap;
 use std::path::Path;
 use std::sync::Arc;
-use std::time;
+use std::time::{self, Duration};
 
 #[derive(Clone)]
 pub struct ByteStore {
@@ -31,6 +32,14 @@ impl ByteStore {
     executor: task_executor::Executor,
     path: P,
   ) -> Result<ByteStore, String> {
+    Self::new_with_lease_time(executor, path, DEFAULT_LEASE_TIME)
+  }
+
+  pub fn new_with_lease_time<P: AsRef<Path>>(
+    executor: task_executor::Executor,
+    path: P,
+    lease_time: Duration,
+  ) -> Result<ByteStore, String> {
     let root = path.as_ref();
     let files_root = root.join("files");
     let directories_root = root.join("directories");
@@ -45,9 +54,15 @@ impl ByteStore {
         // travis fail because they can't allocate virtual memory, if there are multiple Stores
         // in memory at the same time. We don't know why they're not efficiently garbage collected
         // by python, but they're not, so...
-        file_dbs: ShardedLmdb::new(files_root, 100 * GIGABYTES, executor.clone()).map(Arc::new),
-        directory_dbs: ShardedLmdb::new(directories_root, 5 * GIGABYTES, executor.clone())
+        file_dbs: ShardedLmdb::new(files_root, 100 * GIGABYTES, executor.clone(), lease_time)
           .map(Arc::new),
+        directory_dbs: ShardedLmdb::new(
+          directories_root,
+          5 * GIGABYTES,
+          executor.clone(),
+          lease_time,
+        )
+        .map(Arc::new),
         executor: executor,
       }),
     })
@@ -98,38 +113,29 @@ impl ByteStore {
     Ok(None)
   }
 
-  pub fn lease_all<'a, Ds: Iterator<Item = &'a Digest>>(&self, digests: Ds) -> Result<(), String> {
-    let until = Self::default_lease_until_secs_since_epoch();
+  pub async fn lease_all<'a, Ds: Iterator<Item = &'a Digest>>(
+    &self,
+    digests: Ds,
+  ) -> Result<(), String> {
+    // NB: Lease extension happens periodically in the background, so this code needn't be parallel.
     for digest in digests {
-      let (env, _, lease_database) = self.inner.file_dbs.clone()?.get(&digest.0);
-      env
-        .begin_rw_txn()
-        .and_then(|mut txn| self.lease(lease_database, &digest.0, until, &mut txn))
+      let dbs = match self.entry_type(&digest.0)? {
+        Some(EntryType::File) => self.inner.file_dbs.clone(),
+        Some(EntryType::Directory) => self.inner.directory_dbs.clone(),
+        None => {
+          debug!(
+            "Attempted to extend lease on missing digest {:?}. Skipping.",
+            digest
+          );
+          continue;
+        }
+      };
+      dbs?
+        .lease(digest.0)
+        .await
         .map_err(|err| format!("Error leasing digest {:?}: {}", digest, err))?;
     }
     Ok(())
-  }
-
-  fn default_lease_until_secs_since_epoch() -> u64 {
-    let now_since_epoch = time::SystemTime::now()
-      .duration_since(time::UNIX_EPOCH)
-      .expect("Surely you're not before the unix epoch?");
-    (now_since_epoch + time::Duration::from_secs(2 * 60 * 60)).as_secs()
-  }
-
-  fn lease(
-    &self,
-    database: Database,
-    fingerprint: &Fingerprint,
-    until_secs_since_epoch: u64,
-    txn: &mut RwTransaction<'_>,
-  ) -> Result<(), lmdb::Error> {
-    txn.put(
-      database,
-      &fingerprint.as_ref(),
-      &until_secs_since_epoch.to_le_bytes(),
-      WriteFlags::empty(),
-    )
   }
 
   ///
@@ -137,8 +143,6 @@ impl ByteStore {
   /// (excluding lmdb overhead).
   ///
   /// Returns the size it was shrunk to, which may be larger than target_bytes.
-  ///
-  /// Ignores directories. TODO: Shrink directories.
   ///
   /// TODO: Use LMDB database statistics when lmdb-rs exposes them.
   ///
@@ -240,7 +244,7 @@ impl ByteStore {
             e => panic!("Error reading lease, probable lmdb corruption: {:?}", e),
           });
 
-        let leased_until = time::UNIX_EPOCH + time::Duration::from_secs(lease_until_unix_timestamp);
+        let leased_until = time::UNIX_EPOCH + Duration::from_secs(lease_until_unix_timestamp);
 
         let expired_seconds_ago = time::SystemTime::now()
           .duration_since(leased_until)
@@ -306,7 +310,7 @@ impl ByteStore {
       // snapshots) to work without needing to first store the empty snapshot.
       //
       // To maintain the guarantee that the given function is called in a blocking context, we
-      // spawn the task..
+      // spawn it as a task.
       return Ok(Some(self.executor().spawn_blocking(move || f(&[])).await));
     }
 

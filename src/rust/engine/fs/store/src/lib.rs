@@ -609,8 +609,11 @@ impl Store {
       .to_boxed()
   }
 
-  pub fn lease_all<'a, Ds: Iterator<Item = &'a Digest>>(&self, digests: Ds) -> Result<(), String> {
-    self.local.lease_all(digests)
+  pub async fn lease_all<'a, Ds: Iterator<Item = &'a Digest>>(
+    &self,
+    digests: Ds,
+  ) -> Result<(), String> {
+    self.local.lease_all(digests).await
   }
 
   pub fn garbage_collect(
