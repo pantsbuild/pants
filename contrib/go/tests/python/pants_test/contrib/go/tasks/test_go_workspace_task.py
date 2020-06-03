@@ -65,7 +65,9 @@ class GoWorkspaceTaskTest(GoTaskTestBase):
             self.add_to_build_file(spec, "go_library()")
 
             go_lib = self.target(spec)
-            ws_task = self.create_task(self.context())
+            ws_task = self.create_task(
+                self.context(options={"source": {"root_patterns": ["src/main/go"]}})
+            )
             gopath = ws_task.get_gopath(go_lib)
 
             def assert_is_linked(src):

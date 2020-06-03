@@ -228,11 +228,12 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
     @skip_unless_python3_present
     def test_target_constraints_with_no_sources(self):
         with temporary_dir() as interpreters_cache:
-            pants_ini_config = {
+            pants_config = {
                 "python-setup": {
                     "interpreter_cache_dir": interpreters_cache,
                     "interpreter_constraints": ["CPython>3"],
-                }
+                },
+                "source": {"root_patterns": ["src/python"]},
             }
             # Run task.
             pants_run = self.run_pants(
@@ -242,7 +243,7 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
                         os.path.join(self.testproject, "test_target_with_no_sources")
                     ),
                 ],
-                config=pants_ini_config,
+                config=pants_config,
             )
             self.assert_success(pants_run)
             self.assertIn("python3", pants_run.stdout_data)
@@ -255,7 +256,7 @@ class PythonRunIntegrationTest(PantsRunIntegrationTest):
                         os.path.join(self.testproject, "test_target_with_no_sources")
                     ),
                 ],
-                config=pants_ini_config,
+                config=pants_config,
             )
             self.assert_success(pants_run)
 
