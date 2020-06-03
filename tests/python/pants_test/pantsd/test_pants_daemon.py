@@ -6,6 +6,7 @@ import sys
 import unittest.mock
 
 from pants.pantsd.pants_daemon import PantsDaemon, _LoggerStream
+from pants.pantsd.process_manager import PantsDaemonProcessManager
 from pants.pantsd.service.pants_service import PantsService, PantsServices
 from pants.testutil.test_base import TestBase
 from pants.util.contextutil import stdio_as
@@ -42,7 +43,10 @@ class PantsDaemonTest(TestBase):
     def setUp(self):
         super().setUp()
         mock_options = unittest.mock.Mock()
-        mock_options.pants_subprocessdir = "non_existent_dir"
+        mock_options_values = unittest.mock.Mock()
+        mock_options.for_global_scope.return_value = mock_options_values
+        mock_options_values.pants_subprocessdir = "non_existent_dir"
+
         self.pantsd = PantsDaemon(
             None,
             "test_buildroot",
@@ -92,7 +96,10 @@ class PantsDaemonTest(TestBase):
     @unittest.mock.patch("threading.Thread", **PATCH_OPTS)
     @unittest.mock.patch.object(PantsDaemon, "shutdown", spec_set=True)
     @unittest.mock.patch.object(
-        PantsDaemon, "options_fingerprint", spec_set=True, new_callable=unittest.mock.PropertyMock
+        PantsDaemonProcessManager,
+        "options_fingerprint",
+        spec_set=True,
+        new_callable=unittest.mock.PropertyMock,
     )
     def test_run_services_runtimefailure(self, mock_fp, mock_shutdown, mock_thread):
         self.mock_killswitch.is_set.side_effect = [False, False, True]

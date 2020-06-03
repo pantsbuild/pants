@@ -33,7 +33,7 @@ python_library(
     'src/python/pants/help',
     'src/python/pants/init',
     'src/python/pants/option',
-    'src/python/pants/pantsd:pants_daemon',
+    'src/python/pants/pantsd:pants_daemon_client',
     'src/python/pants/reporting',
     'src/python/pants/scm/subsystems:changed',
     'src/python/pants/subsystem',
