@@ -137,20 +137,15 @@ class OptionsInitializer:
         invalidation_globs provided by users.
         """
         invalidation_globs = OrderedSet()
-        globs = [
+
+        # Globs calculated from the sys.path and other file-like configuration need to be sanitized
+        # to relative globs (where possible).
+        potentially_absolute_globs = (
             *sys.path,
             *bootstrap_options.pythonpath,
             *bootstrap_options.pants_config_files,
-            "!*.pyc",
-            "!__pycache__/",
-            *bootstrap_options.pantsd_invalidation_globs,
-        ]
-
-        for glob in globs:
-            if glob.startswith("!"):
-                invalidation_globs.add(glob)
-                continue
-
+        )
+        for glob in potentially_absolute_globs:
             glob_relpath = fast_relpath_optional(glob, buildroot) if os.path.isabs(glob) else glob
             if glob_relpath:
                 invalidation_globs.update([glob_relpath, glob_relpath + "/**"])
@@ -158,6 +153,19 @@ class OptionsInitializer:
                 logger.debug(
                     f"Changes to {glob}, outside of the buildroot, will not be invalidated."
                 )
+
+        # Explicitly specified globs are already relative, and are added verbatim.
+        invalidation_globs.update(
+            (
+                "!*.pyc",
+                "!__pycache__/",
+                # TODO: This is a bandaid for https://github.com/pantsbuild/pants/issues/7022:
+                # macros should be adapted to allow this dependency to be automatically detected.
+                "requirements.txt",
+                "3rdparty/**/requirements.txt",
+                *bootstrap_options.pantsd_invalidation_globs,
+            )
+        )
 
         return list(invalidation_globs)
 
