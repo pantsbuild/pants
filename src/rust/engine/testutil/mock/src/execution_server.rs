@@ -259,15 +259,7 @@ impl bazel_protos::remote_execution_grpc::Execution for MockResponder {
         execute_request,
         stream_responses,
       }) => {
-        if req != execute_request {
-          error_to_send = Some(grpcio::RpcStatus::new(
-            grpcio::RpcStatusCode::INVALID_ARGUMENT,
-            Some(format!(
-              "Did not expect this request. Expected: {:?}, Got: {:?}",
-              execute_request, req
-            )),
-          ));
-        } else {
+        if req == execute_request {
           match stream_responses {
             Ok(operations) => {
               self.spawn_send_to_operation_stream(ctx, sink, operations);
@@ -277,6 +269,14 @@ impl bazel_protos::remote_execution_grpc::Execution for MockResponder {
               error_to_send = Some(rpc_status);
             }
           }
+        } else {
+          error_to_send = Some(grpcio::RpcStatus::new(
+            grpcio::RpcStatusCode::INVALID_ARGUMENT,
+            Some(format!(
+              "Did not expect this request. Expected: {:?}, Got: {:?}",
+              execute_request, req
+            )),
+          ));
         }
       }
 
@@ -315,15 +315,7 @@ impl bazel_protos::remote_execution_grpc::Execution for MockResponder {
         operation_name,
         stream_responses,
       }) => {
-        if req.name != operation_name {
-          error_to_send = Some(grpcio::RpcStatus::new(
-            grpcio::RpcStatusCode::INVALID_ARGUMENT,
-            Some(format!(
-              "Did not expect WaitExecution for this operation. Expected: {:?}, Got: {:?}",
-              operation_name, req.name
-            )),
-          ));
-        } else {
+        if req.name == operation_name {
           match stream_responses {
             Ok(operations) => {
               self.spawn_send_to_operation_stream(ctx, sink, operations);
@@ -333,6 +325,14 @@ impl bazel_protos::remote_execution_grpc::Execution for MockResponder {
               error_to_send = Some(rpc_status);
             }
           }
+        } else {
+          error_to_send = Some(grpcio::RpcStatus::new(
+            grpcio::RpcStatusCode::INVALID_ARGUMENT,
+            Some(format!(
+              "Did not expect WaitExecution for this operation. Expected: {:?}, Got: {:?}",
+              operation_name, req.name
+            )),
+          ));
         }
       }
 
@@ -376,15 +376,7 @@ impl bazel_protos::operations_grpc::Operations for MockResponder {
         operation_name,
         operation,
       }) => {
-        if req.name != operation_name {
-          error_to_send = Some(grpcio::RpcStatus::new(
-            grpcio::RpcStatusCode::INVALID_ARGUMENT,
-            Some(format!(
-              "Did not expect GetOperation for this operation. Expected: {:?}, Got: {:?}",
-              operation_name, req.name
-            )),
-          ));
-        } else {
+        if req.name == operation_name {
           if let Some(d) = operation.duration {
             sleep(d);
           }
@@ -395,6 +387,14 @@ impl bazel_protos::operations_grpc::Operations for MockResponder {
             sink.fail(status);
           }
           return;
+        } else {
+          error_to_send = Some(grpcio::RpcStatus::new(
+            grpcio::RpcStatusCode::INVALID_ARGUMENT,
+            Some(format!(
+              "Did not expect GetOperation for this operation. Expected: {:?}, Got: {:?}",
+              operation_name, req.name
+            )),
+          ));
         }
       }
 

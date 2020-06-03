@@ -414,7 +414,7 @@ impl StreamingCommandRunner {
             ))
           })?;
 
-        return Err(self.extract_missing_digests(&precondition_failure));
+        Err(self.extract_missing_digests(&precondition_failure))
       }
 
       code => match code {
@@ -560,15 +560,13 @@ impl crate::CommandRunner for StreamingCommandRunner {
 
     let result_fut = self.run_execute_request(execute_request, context);
     let timeout_fut = tokio::time::timeout(deadline_duration, result_fut);
-    let result = match timeout_fut.await {
+    match timeout_fut.await {
       Ok(r) => r,
       Err(_) => {
         trace!("remote execution timed out after {:?}", deadline_duration);
         Err("remote execution request timed out".to_owned())
       }
-    };
-
-    result
+    }
   }
 
   // TODO: This is a copy of the same method on crate::remote::CommandRunner.
