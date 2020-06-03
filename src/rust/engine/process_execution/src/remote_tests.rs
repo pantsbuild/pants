@@ -33,6 +33,13 @@ use tokio::time::{delay_for, timeout};
 use workunit_store::{Workunit, WorkunitMetadata, WorkunitState, WorkunitStore};
 
 #[derive(Debug, PartialEq)]
+struct RemoteTestResult {
+  original: FallibleProcessResultWithPlatform,
+  stdout_bytes: Vec<u8>,
+  stderr_bytes: Vec<u8>,
+}
+
+#[derive(Debug, PartialEq)]
 enum StdoutType {
   Raw(String),
   Digest(Digest),
@@ -500,7 +507,7 @@ async fn server_rejecting_execute_request_gives_error() {
     )
   };
 
-  let error = run_command_remote(mock_server.address(), execute_request)
+  let error = run_command_remote2(mock_server.address(), execute_request)
     .await
     .expect_err("Want Err");
   assert_that(&error).contains("INVALID_ARGUMENT");
@@ -536,14 +543,14 @@ async fn successful_execution_after_one_getoperation() {
     )
   };
 
-  let result = run_command_remote(mock_server.address(), execute_request)
+  let result = run_command_remote2(mock_server.address(), execute_request)
     .await
     .unwrap();
 
-  assert_eq!(result.stdout, "foo".as_bytes());
-  assert_eq!(result.stderr, "".as_bytes());
-  assert_eq!(result.exit_code, 0);
-  assert_eq!(result.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.stdout_bytes, "foo".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
   assert_cancellation_requests(&mock_server, vec![]);
 }
 
@@ -578,15 +585,15 @@ async fn retries_retriable_errors() {
     )
   };
 
-  let result = run_command_remote(mock_server.address(), execute_request)
+  let result = run_command_remote2(mock_server.address(), execute_request)
     .await
     .unwrap();
 
-  assert_eq!(result.stdout, "foo".as_bytes());
-  assert_eq!(result.stderr, "".as_bytes());
-  assert_eq!(result.exit_code, 0);
-  assert_eq!(result.output_directory, EMPTY_DIGEST);
-  assert_eq!(result.platform, Platform::Linux);
+  assert_eq!(result.stdout_bytes, "foo".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.platform, Platform::Linux);
 
   assert_cancellation_requests(&mock_server, vec![]);
 }
@@ -623,7 +630,7 @@ async fn gives_up_after_many_retriable_errors() {
     )
   };
 
-  let err = run_command_remote(mock_server.address(), execute_request)
+  let err = run_command_remote2(mock_server.address(), execute_request)
     .await
     .unwrap_err();
 
@@ -758,11 +765,11 @@ async fn extract_response_with_digest_stdout() {
   .await
   .unwrap();
 
-  assert_eq!(result.stdout, testdata.bytes());
-  assert_eq!(result.stderr, testdata_empty.bytes());
-  assert_eq!(result.exit_code, 0);
-  assert_eq!(result.output_directory, EMPTY_DIGEST);
-  assert_eq!(result.platform, Platform::Linux);
+  assert_eq!(result.stdout_bytes, testdata.bytes());
+  assert_eq!(result.stderr_bytes, testdata_empty.bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.platform, Platform::Linux);
 }
 
 #[tokio::test]
@@ -785,11 +792,11 @@ async fn extract_response_with_digest_stderr() {
   .await
   .unwrap();
 
-  assert_eq!(result.stdout, testdata_empty.bytes());
-  assert_eq!(result.stderr, testdata.bytes());
-  assert_eq!(result.exit_code, 0);
-  assert_eq!(result.output_directory, EMPTY_DIGEST);
-  assert_eq!(result.platform, Platform::Linux);
+  assert_eq!(result.stdout_bytes, testdata_empty.bytes());
+  assert_eq!(result.stderr_bytes, testdata.bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.platform, Platform::Linux);
 }
 
 #[tokio::test]
@@ -812,11 +819,11 @@ async fn extract_response_with_digest_stdout_osx_remote() {
   .await
   .unwrap();
 
-  assert_eq!(result.stdout, testdata.bytes());
-  assert_eq!(result.stderr, testdata_empty.bytes());
-  assert_eq!(result.exit_code, 0);
-  assert_eq!(result.output_directory, EMPTY_DIGEST);
-  assert_eq!(result.platform, Platform::Darwin);
+  assert_eq!(result.stdout_bytes, testdata.bytes());
+  assert_eq!(result.stderr_bytes, testdata_empty.bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.platform, Platform::Darwin);
 }
 
 #[tokio::test]
@@ -948,15 +955,15 @@ async fn successful_execution_after_four_getoperations() {
     )
   };
 
-  let result = run_command_remote(mock_server.address(), execute_request)
+  let result = run_command_remote2(mock_server.address(), execute_request)
     .await
     .unwrap();
 
-  assert_eq!(result.stdout, "foo".as_bytes());
-  assert_eq!(result.stderr, "".as_bytes());
-  assert_eq!(result.exit_code, 0);
-  assert_eq!(result.output_directory, EMPTY_DIGEST);
-  assert_eq!(result.platform, Platform::Linux);
+  assert_eq!(result.stdout_bytes, "foo".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.platform, Platform::Linux);
 }
 
 #[tokio::test]
@@ -999,15 +1006,15 @@ async fn timeout_after_sufficiently_delayed_getoperations() {
     )
   };
 
-  let result = run_command_remote(mock_server.address(), execute_request.into())
+  let result = run_command_remote2(mock_server.address(), execute_request.into())
     .await
     .unwrap();
-  assert_eq!(result.exit_code, -15);
-  let error_msg = String::from_utf8(result.stdout.to_vec()).unwrap();
+  assert_eq!(result.original.exit_code, -15);
+  let error_msg = String::from_utf8(result.stdout_bytes.to_vec()).unwrap();
   assert_that(&error_msg).contains("Exceeded timeout");
   assert_that(&error_msg).contains("echo-a-foo");
-  assert_eq!(result.execution_attempts.len(), 1);
-  let maybe_execution_duration = result.execution_attempts[0].remote_execution;
+  assert_eq!(result.original.execution_attempts.len(), 1);
+  let maybe_execution_duration = result.original.execution_attempts[0].remote_execution;
   assert!(maybe_execution_duration.is_some());
   assert_that(&maybe_execution_duration.unwrap()).is_greater_than_or_equal_to(request_timeout);
 
@@ -1057,7 +1064,7 @@ async fn dropped_request_cancels() {
     .file(&TestData::roland())
     .directory(&TestDirectory::containing_roland())
     .build();
-  let command_runner = create_command_runner(
+  let (command_runner, _store) = create_command_runner(
     mock_server.address(),
     &cas,
     Duration::from_millis(0),
@@ -1111,15 +1118,15 @@ async fn retry_for_cancelled_channel() {
     )
   };
 
-  let result = run_command_remote(mock_server.address(), execute_request)
+  let result = run_command_remote2(mock_server.address(), execute_request)
     .await
     .unwrap();
 
-  assert_eq!(result.stdout, "foo".as_bytes());
-  assert_eq!(result.stderr, "".as_bytes());
-  assert_eq!(result.exit_code, 0);
-  assert_eq!(result.output_directory, EMPTY_DIGEST);
-  assert_eq!(result.platform, Platform::Linux);
+  assert_eq!(result.stdout_bytes, "foo".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.platform, Platform::Linux);
 }
 
 #[tokio::test]
@@ -1163,7 +1170,7 @@ async fn bad_result_bytes() {
     )
   };
 
-  run_command_remote(mock_server.address(), execute_request)
+  run_command_remote2(mock_server.address(), execute_request)
     .await
     .expect_err("Want Err");
 }
@@ -1201,7 +1208,7 @@ async fn initial_response_error() {
     )
   };
 
-  let result = run_command_remote(mock_server.address(), execute_request)
+  let result = run_command_remote2(mock_server.address(), execute_request)
     .await
     .expect_err("Want Err");
 
@@ -1244,7 +1251,7 @@ async fn getoperation_response_error() {
     )
   };
 
-  let result = run_command_remote(mock_server.address(), execute_request)
+  let result = run_command_remote2(mock_server.address(), execute_request)
     .await
     .expect_err("Want Err");
 
@@ -1280,7 +1287,7 @@ async fn initial_response_missing_response_and_error() {
     )
   };
 
-  let result = run_command_remote(mock_server.address(), execute_request)
+  let result = run_command_remote2(mock_server.address(), execute_request)
     .await
     .expect_err("Want Err");
 
@@ -1317,7 +1324,7 @@ async fn getoperation_missing_response_and_error() {
     )
   };
 
-  let result = run_command_remote(mock_server.address(), execute_request)
+  let result = run_command_remote2(mock_server.address(), execute_request)
     .await
     .expect_err("Want Err");
 
@@ -1643,11 +1650,14 @@ async fn extract_execute_response_success() {
     .await
     .unwrap();
 
-  assert_eq!(result.stdout, wanted_stdout);
-  assert_eq!(result.stderr, wanted_stderr);
-  assert_eq!(result.exit_code, wanted_exit_code);
-  assert_eq!(result.output_directory, TestDirectory::nested().digest());
-  assert_eq!(result.platform, Platform::Linux);
+  assert_eq!(result.stdout_bytes, wanted_stdout);
+  assert_eq!(result.stderr_bytes, wanted_stderr);
+  assert_eq!(result.original.exit_code, wanted_exit_code);
+  assert_eq!(
+    result.original.output_directory,
+    TestDirectory::nested().digest()
+  );
+  assert_eq!(result.original.platform, Platform::Linux);
 }
 
 #[tokio::test]
@@ -1819,7 +1829,7 @@ async fn wait_between_request_1_retry() {
       )
     };
     let cas = mock::StubCAS::empty();
-    let command_runner = create_command_runner(
+    let (command_runner, _store) = create_command_runner(
       mock_server.address(),
       &cas,
       Duration::from_millis(100),
@@ -1876,7 +1886,7 @@ async fn wait_between_request_3_retry() {
       )
     };
     let cas = mock::StubCAS::empty();
-    let command_runner = create_command_runner(
+    let (command_runner, _store) = create_command_runner(
       mock_server.address(),
       &cas,
       Duration::from_millis(50),
@@ -2119,7 +2129,7 @@ async fn remote_workunits_are_stored() {
     .file(&TestData::roland())
     .directory(&TestDirectory::containing_roland())
     .build();
-  let command_runner = create_command_runner(
+  let (command_runner, _store) = create_command_runner(
     "".to_owned(),
     &cas,
     std::time::Duration::from_millis(0),
@@ -2378,22 +2388,38 @@ fn make_precondition_failure_status(
   status
 }
 
-async fn run_command_remote(
+async fn run_command_remote2(
   address: String,
   request: MultiPlatformProcess,
-) -> Result<FallibleProcessResultWithPlatform, String> {
+) -> Result<RemoteTestResult, String> {
   let cas = mock::StubCAS::builder()
     .file(&TestData::roland())
     .directory(&TestDirectory::containing_roland())
     .build();
-  let command_runner = create_command_runner(
+  let (command_runner, store) = create_command_runner(
     address,
     &cas,
     Duration::from_millis(0),
     Duration::from_secs(0),
     Platform::Linux,
   );
-  command_runner.run(request, Context::default()).await
+  let original = command_runner.run(request, Context::default()).await?;
+
+  let stdout_bytes: Vec<u8> = store
+    .load_file_bytes_with(original.stdout_digest, |bytes| bytes.into())
+    .await?
+    .unwrap()
+    .0;
+  let stderr_bytes: Vec<u8> = store
+    .load_file_bytes_with(original.stderr_digest, |bytes| bytes.into())
+    .await?
+    .unwrap()
+    .0;
+  Ok(RemoteTestResult {
+    original,
+    stdout_bytes,
+    stderr_bytes,
+  })
 }
 
 fn create_command_runner(
@@ -2402,24 +2428,25 @@ fn create_command_runner(
   backoff_incremental_wait: Duration,
   backoff_max_wait: Duration,
   platform: Platform,
-) -> CommandRunner {
+) -> (CommandRunner, Store) {
   let runtime = task_executor::Executor::new(Handle::current());
   let store_dir = TempDir::new().unwrap();
   let store = make_store(store_dir.path(), cas, runtime.clone());
-  CommandRunner::new(
+  let command_runner = CommandRunner::new(
     &address,
     empty_request_metadata(),
     None,
     None,
     BTreeMap::new(),
-    store,
+    store.clone(),
     platform,
     runtime,
     Duration::from_secs(1), // We use a low queue_buffer_time to ensure that tests do not take too long.
     backoff_incremental_wait,
     backoff_max_wait,
   )
-  .expect("Failed to make command runner")
+  .expect("Failed to make command runner");
+  (command_runner, store)
 }
 
 fn make_store(store_dir: &Path, cas: &mock::StubCAS, executor: task_executor::Executor) -> Store {
@@ -2443,12 +2470,12 @@ fn make_store(store_dir: &Path, cas: &mock::StubCAS, executor: task_executor::Ex
 async fn extract_execute_response(
   operation: bazel_protos::operations::Operation,
   remote_platform: Platform,
-) -> Result<FallibleProcessResultWithPlatform, ExecutionError> {
+) -> Result<RemoteTestResult, ExecutionError> {
   let cas = mock::StubCAS::builder()
     .file(&TestData::roland())
     .directory(&TestDirectory::containing_roland())
     .build();
-  let command_runner = create_command_runner(
+  let (command_runner, store) = create_command_runner(
     "".to_owned(),
     &cas,
     Duration::from_millis(0),
@@ -2456,13 +2483,33 @@ async fn extract_execute_response(
     remote_platform,
   );
 
-  command_runner
+  let original = command_runner
     .extract_execute_response(
       OperationOrStatus::Operation(operation),
       &mut ExecutionHistory::default(),
     )
     .compat()
+    .await?;
+
+  let stdout_bytes: Vec<u8> = store
+    .load_file_bytes_with(original.stdout_digest, |bytes| bytes.into())
     .await
+    .unwrap()
+    .unwrap()
+    .0;
+
+  let stderr_bytes: Vec<u8> = store
+    .load_file_bytes_with(original.stderr_digest, |bytes| bytes.into())
+    .await
+    .unwrap()
+    .unwrap()
+    .0;
+
+  Ok(RemoteTestResult {
+    original,
+    stdout_bytes,
+    stderr_bytes,
+  })
 }
 
 async fn extract_output_files_from_response(
