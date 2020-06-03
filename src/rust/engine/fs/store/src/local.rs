@@ -1,17 +1,19 @@
 use super::{EntryType, ShrinkBehavior, GIGABYTES};
 
+use std::collections::BinaryHeap;
+use std::path::Path;
+use std::sync::Arc;
+use std::time::{self, Duration};
+
 use bytes::Bytes;
 use digest::{Digest as DigestTrait, FixedOutput};
+use futures::future;
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use lmdb::Error::NotFound;
 use lmdb::{self, Cursor, Transaction};
 use log::debug;
 use sha2::Sha256;
 use sharded_lmdb::{ShardedLmdb, VersionedFingerprint, DEFAULT_LEASE_TIME};
-use std::collections::BinaryHeap;
-use std::path::Path;
-use std::sync::Arc;
-use std::time::{self, Duration};
 
 #[derive(Clone)]
 pub struct ByteStore {
@@ -72,45 +74,26 @@ impl ByteStore {
     &self.inner.executor
   }
 
-  // Note: This performs IO on the calling thread. Hopefully the IO is small enough not to matter.
-  pub fn entry_type(&self, fingerprint: &Fingerprint) -> Result<Option<EntryType>, String> {
-    if *fingerprint == EMPTY_DIGEST.0 {
+  pub async fn entry_type(&self, fingerprint: Fingerprint) -> Result<Option<EntryType>, String> {
+    if fingerprint == EMPTY_DIGEST.0 {
       // Technically this is valid as both; choose Directory in case a caller is checking whether
       // it _can_ be a Directory.
       return Ok(Some(EntryType::Directory));
     }
-    let effective_key = VersionedFingerprint::new(*fingerprint, ShardedLmdb::schema_version());
-    {
-      let (env, directory_database, _) = self.inner.directory_dbs.clone()?.get(fingerprint);
-      let txn = env
-        .begin_ro_txn()
-        .map_err(|err| format!("Failed to begin read transaction: {:?}", err))?;
-      match txn.get(directory_database, &effective_key) {
-        Ok(_) => return Ok(Some(EntryType::Directory)),
-        Err(NotFound) => {}
-        Err(err) => {
-          return Err(format!(
-            "Error reading from store when determining type of fingerprint {}: {}",
-            fingerprint, err
-          ));
-        }
-      };
+
+    // In parallel, check for the given fingerprint in both databases.
+    let d_dbs = self.inner.directory_dbs.clone()?;
+    let is_dir = d_dbs.exists(fingerprint);
+    let f_dbs = self.inner.file_dbs.clone()?;
+    let is_file = f_dbs.exists(fingerprint);
+
+    // TODO: Could technically use select to return slightly more quickly with the first
+    // affirmative answer, but this is simpler.
+    match future::try_join(is_dir, is_file).await? {
+      (true, _) => Ok(Some(EntryType::Directory)),
+      (_, true) => Ok(Some(EntryType::File)),
+      (false, false) => Ok(None),
     }
-    let (env, file_database, _) = self.inner.file_dbs.clone()?.get(fingerprint);
-    let txn = env
-      .begin_ro_txn()
-      .map_err(|err| format!("Failed to begin read transaction: {}", err))?;
-    match txn.get(file_database, &effective_key) {
-      Ok(_) => return Ok(Some(EntryType::File)),
-      Err(NotFound) => {}
-      Err(err) => {
-        return Err(format!(
-          "Error reading from store when determining type of fingerprint {}: {}",
-          fingerprint, err
-        ));
-      }
-    };
-    Ok(None)
   }
 
   pub async fn lease_all<'a, Ds: Iterator<Item = &'a Digest>>(
@@ -119,7 +102,7 @@ impl ByteStore {
   ) -> Result<(), String> {
     // NB: Lease extension happens periodically in the background, so this code needn't be parallel.
     for digest in digests {
-      let dbs = match self.entry_type(&digest.0)? {
+      let dbs = match self.entry_type(digest.0).await? {
         Some(EntryType::File) => self.inner.file_dbs.clone(),
         Some(EntryType::Directory) => self.inner.directory_dbs.clone(),
         None => {

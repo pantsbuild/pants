@@ -240,6 +240,29 @@ impl ShardedLmdb {
     self.lmdbs.values().cloned().collect()
   }
 
+  pub async fn exists(&self, fingerprint: Fingerprint) -> Result<bool, String> {
+    let store = self.clone();
+    let effective_key = VersionedFingerprint::new(fingerprint, ShardedLmdb::schema_version());
+    self
+      .executor
+      .spawn_blocking(move || {
+        let fingerprint = effective_key.get_fingerprint();
+        let (env, db, _) = store.get(&fingerprint);
+        let txn = env
+          .begin_ro_txn()
+          .map_err(|err| format!("Failed to begin read transaction: {:?}", err))?;
+        match txn.get(db, &effective_key) {
+          Ok(_) => Ok(true),
+          Err(lmdb::Error::NotFound) => Ok(false),
+          Err(err) => Err(format!(
+            "Error reading from store when checking existence of {}: {}",
+            fingerprint, err
+          )),
+        }
+      })
+      .await
+  }
+
   pub async fn store_bytes(
     &self,
     fingerprint: Fingerprint,

@@ -485,7 +485,7 @@ async fn entry_type_for_file() {
     .expect("Error storing");
   prime_store_with_file_bytes(&store, testdata.bytes()).await;
   assert_eq!(
-    store.entry_type(&testdata.fingerprint()),
+    store.entry_type(testdata.fingerprint()).await,
     Ok(Some(EntryType::File))
   )
 }
@@ -502,7 +502,7 @@ async fn entry_type_for_directory() {
     .expect("Error storing");
   prime_store_with_file_bytes(&store, testdata.bytes()).await;
   assert_eq!(
-    store.entry_type(&testdir.fingerprint()),
+    store.entry_type(testdir.fingerprint()).await,
     Ok(Some(EntryType::Directory))
   )
 }
@@ -519,7 +519,9 @@ async fn entry_type_for_missing() {
     .expect("Error storing");
   prime_store_with_file_bytes(&store, testdata.bytes()).await;
   assert_eq!(
-    store.entry_type(&TestDirectory::recursive().fingerprint()),
+    store
+      .entry_type(TestDirectory::recursive().fingerprint())
+      .await,
     Ok(None)
   )
 }
