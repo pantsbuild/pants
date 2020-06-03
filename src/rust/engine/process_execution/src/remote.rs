@@ -855,7 +855,13 @@ pub fn make_execute_request(
     // well-known path in the docker container you specify in which to run.
     platform_properties.push(("JDK_SYMLINK".to_owned(), ".jdk".to_owned()));
   }
-  platform_properties.push(("target_platform".to_owned(), req.target_platform.into()));
+
+  if !platform_properties
+    .iter()
+    .any(|(k, _)| k == "target_platform")
+  {
+    platform_properties.push(("target_platform".to_owned(), req.target_platform.into()));
+  }
 
   for (name, value) in platform_properties {
     command.mut_platform().mut_properties().push({
