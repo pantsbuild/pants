@@ -45,7 +45,7 @@ pub struct Core {
   pub intrinsics: Intrinsics,
   pub runtime: Runtime,
   pub executor: task_executor::Executor,
-  store: Store,
+  pub store: Store,
   pub command_runner: Box<dyn process_execution::CommandRunner>,
   pub http_client: reqwest::Client,
   pub vfs: PosixFS,
