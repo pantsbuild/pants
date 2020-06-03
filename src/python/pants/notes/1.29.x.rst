@@ -5,6 +5,36 @@ This document describes releases leading up to the ``1.29.x`` ``stable`` series.
 
 See https://pants.readme.io/v1.29/docs/release-notes-1-29 for an overview of the changes in this release.
 
+1.29.0rc1 (6/02/2020)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Default to invalidating for `requirements.txt` to ameliorate #7022. (#9946)
+  `PR #9946 <https://github.com/pantsbuild/pants/pull/9946>`_
+
+* Silence failures to close pantsd stdio handles. (#9943)
+  `PR #9943 <https://github.com/pantsbuild/pants/pull/9943>`_
+
+* Fix a bug in pyest coverage report computation. (#9933)
+  `PR #9933 <https://github.com/pantsbuild/pants/pull/9933>`_
+
+* Graph::get backs off on filesystem invalidation (#9920)
+  `PR #9920 <https://github.com/pantsbuild/pants/pull/9920>`_
+
+* Fix ABI string when building pants.pex (#9908)
+  `PR #9908 <https://github.com/pantsbuild/pants/pull/9908>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Port the graph crate and dependent code in engine to async/await. (#9910)
+  `PR #9910 <https://github.com/pantsbuild/pants/pull/9910>`_
+
+* Improve pantsd waiting messages. (#9923)
+  `PR #9923 <https://github.com/pantsbuild/pants/pull/9923>`_
+
 1.29.0rc0 (5/29/2020)
 ---------------------
 
