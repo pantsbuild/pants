@@ -1861,13 +1861,16 @@ name = "mock"
 version = "0.0.1"
 dependencies = [
  "bazel_protos 0.0.1",
+ "boxfuture 0.0.1",
  "bytes 0.4.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.29 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "grpcio 0.5.1 (git+https://github.com/pantsbuild/grpc-rs.git?rev=ed3afa3c24ddf1fdd86826e836f57c00757dfc00)",
  "hashing 0.0.1",
  "parking_lot 0.6.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "protobuf 2.0.6 (git+https://github.com/pantsbuild/rust-protobuf?rev=171611c33ec92f07e1b7107327f6d0139a7afebf)",
  "testutil 0.0.1",
+ "tokio 0.2.20 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

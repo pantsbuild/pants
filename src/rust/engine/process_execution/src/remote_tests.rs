@@ -20,11 +20,10 @@ use crate::{
   MultiPlatformProcess, Platform, PlatformConstraint, Process, ProcessMetadata,
 };
 use maplit::{btreemap, hashset};
-use mock::execution_server::MockOperation;
+use mock::execution_server::{ExpectedAPICall, MockOperation};
 use protobuf::well_known_types::Timestamp;
 use spectral::prelude::*;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
-use std::iter::{self, FromIterator};
 use std::ops::Sub;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -484,21 +483,21 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
 async fn server_rejecting_execute_request_gives_error() {
   let execute_request = echo_foo_request();
 
-  let mock_server = {
-    mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(
-        "wrong-command".to_string(),
-        crate::remote::make_execute_request(
-          &Process::new(owned_string_vec(&["/bin/echo", "-n", "bar"])),
-          empty_request_metadata(),
-        )
-        .unwrap()
-        .2,
-        vec![],
-      ),
-      None,
-    )
-  };
+  let mock_server = mock::execution_server::TestServer::new(
+    mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
+      execute_request: crate::remote::make_execute_request(
+        &Process::new(owned_string_vec(&["/bin/echo", "-n", "bar"])),
+        empty_request_metadata(),
+      )
+      .map(|x| x.2)
+      .unwrap(),
+      stream_responses: Err(grpcio::RpcStatus::new(
+        grpcio::RpcStatusCode::INVALID_ARGUMENT,
+        None,
+      )),
+    }]),
+    None,
+  );
 
   let error = run_command_remote(mock_server.address(), execute_request)
     .await
@@ -514,24 +513,26 @@ async fn successful_execution_after_one_getoperation() {
 
   let mock_server = {
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        crate::remote::make_execute_request(
-          &execute_request.clone().try_into().unwrap(),
-          empty_request_metadata(),
-        )
-        .unwrap()
-        .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          make_successful_operation(
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &execute_request.clone().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_successful_operation(
             &op_name,
             StdoutType::Raw("foo".to_owned()),
             StderrType::Raw("".to_owned()),
             0,
           ),
-        ],
-      ),
+        },
+      ]),
       None,
     )
   };
@@ -554,26 +555,39 @@ async fn retries_retriable_errors() {
 
   let mock_server = {
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        crate::remote::make_execute_request(
-          &execute_request.clone().try_into().unwrap(),
-          empty_request_metadata(),
-        )
-        .unwrap()
-        .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          make_retryable_operation_failure(),
-          make_incomplete_operation(&op_name),
-          make_successful_operation(
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &execute_request.clone().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_retryable_operation_failure(),
+        },
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &execute_request.clone().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_successful_operation(
             &op_name,
             StdoutType::Raw("foo".to_owned()),
             StderrType::Raw("".to_owned()),
             0,
           ),
-        ],
-      ),
+        },
+      ]),
       None,
     )
   };
@@ -598,27 +612,73 @@ async fn gives_up_after_many_retriable_errors() {
 
   let mock_server = {
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        crate::remote::make_execute_request(
-          &execute_request.clone().try_into().unwrap(),
-          empty_request_metadata(),
-        )
-        .unwrap()
-        .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          make_retryable_operation_failure(),
-          make_incomplete_operation(&op_name),
-          make_retryable_operation_failure(),
-          make_incomplete_operation(&op_name),
-          make_retryable_operation_failure(),
-          make_incomplete_operation(&op_name),
-          make_retryable_operation_failure(),
-          make_incomplete_operation(&op_name),
-          make_retryable_operation_failure(),
-        ],
-      ),
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &execute_request.clone().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_retryable_operation_failure(),
+        },
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &execute_request.clone().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_retryable_operation_failure(),
+        },
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &execute_request.clone().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_retryable_operation_failure(),
+        },
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &execute_request.clone().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_retryable_operation_failure(),
+        },
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &execute_request.clone().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_retryable_operation_failure(),
+        },
+      ]),
       None,
     )
   };
@@ -640,24 +700,26 @@ async fn sends_headers() {
 
   let mock_server = {
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        crate::remote::make_execute_request(
-          &execute_request.clone().try_into().unwrap(),
-          empty_request_metadata(),
-        )
-        .unwrap()
-        .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          make_successful_operation(
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &execute_request.clone().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_successful_operation(
             &op_name,
             StdoutType::Raw("foo".to_owned()),
             StderrType::Raw("".to_owned()),
             0,
           ),
-        ],
-      ),
+        },
+      ]),
       None,
     )
   };
@@ -697,7 +759,7 @@ async fn sends_headers() {
   )
   .unwrap();
   let context = Context {
-    workunit_store: WorkunitStore::new(false),
+    workunit_store: WorkunitStore::default(),
     build_id: String::from("marmosets"),
   };
   command_runner
@@ -830,21 +892,26 @@ async fn ensure_inline_stdio_is_stored() {
     let op_name = "cat".to_owned();
 
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        crate::remote::make_execute_request(
-          &echo_roland_request().try_into().unwrap(),
-          empty_request_metadata(),
-        )
-        .unwrap()
-        .2,
-        vec![make_successful_operation(
-          &op_name.clone(),
-          StdoutType::Raw(test_stdout.string()),
-          StderrType::Raw(test_stderr.string()),
-          0,
-        )],
-      ),
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &echo_roland_request().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_successful_operation(
+            &op_name.clone(),
+            StdoutType::Raw(test_stdout.string()),
+            StderrType::Raw(test_stderr.string()),
+            0,
+          ),
+        },
+      ]),
       None,
     )
   };
@@ -925,25 +992,42 @@ async fn successful_execution_after_four_getoperations() {
     let op_name = "gimme-foo".to_string();
 
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        crate::remote::make_execute_request(
-          &execute_request.clone().try_into().unwrap(),
-          empty_request_metadata(),
-        )
-        .unwrap()
-        .2,
-        Vec::from_iter(
-          iter::repeat(make_incomplete_operation(&op_name))
-            .take(4)
-            .chain(iter::once(make_successful_operation(
-              &op_name,
-              StdoutType::Raw("foo".to_owned()),
-              StderrType::Raw("".to_owned()),
-              0,
-            ))),
-        ),
-      ),
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &execute_request.clone().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_incomplete_operation(&op_name),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_incomplete_operation(&op_name),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_incomplete_operation(&op_name),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_incomplete_operation(&op_name),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_successful_operation(
+            &op_name,
+            StdoutType::Raw("foo".to_owned()),
+            StderrType::Raw("".to_owned()),
+            0,
+          ),
+        },
+      ]),
       None,
     )
   };
@@ -985,16 +1069,21 @@ async fn timeout_after_sufficiently_delayed_getoperations() {
 
   let mock_server = {
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        crate::remote::make_execute_request(&execute_request, empty_request_metadata())
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &execute_request,
+            empty_request_metadata(),
+          )
           .unwrap()
           .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          make_delayed_incomplete_operation(&op_name, delayed_operation_time),
-        ],
-      ),
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_delayed_incomplete_operation(&op_name, delayed_operation_time),
+        },
+      ]),
       None,
     )
   };
@@ -1039,16 +1128,21 @@ async fn dropped_request_cancels() {
 
   let mock_server = {
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        crate::remote::make_execute_request(&execute_request, empty_request_metadata())
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &execute_request,
+            empty_request_metadata(),
+          )
           .unwrap()
           .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          make_delayed_incomplete_operation(&op_name, delayed_operation_time),
-        ],
-      ),
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_delayed_incomplete_operation(&op_name, delayed_operation_time),
+        },
+      ]),
       None,
     )
   };
@@ -1088,25 +1182,30 @@ async fn retry_for_cancelled_channel() {
     let op_name = "gimme-foo".to_string();
 
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        crate::remote::make_execute_request(
-          &execute_request.clone().try_into().unwrap(),
-          empty_request_metadata(),
-        )
-        .unwrap()
-        .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          make_canceled_operation(Some(Duration::from_millis(100))),
-          make_successful_operation(
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &execute_request.clone().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_canceled_operation(Some(Duration::from_millis(100))),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_successful_operation(
             &op_name,
             StdoutType::Raw("foo".to_owned()),
             StderrType::Raw("".to_owned()),
             0,
           ),
-        ],
-      ),
+        },
+      ]),
       None,
     )
   };
@@ -1130,17 +1229,19 @@ async fn bad_result_bytes() {
     let op_name = "gimme-foo".to_string();
 
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        crate::remote::make_execute_request(
-          &execute_request.clone().try_into().unwrap(),
-          empty_request_metadata(),
-        )
-        .unwrap()
-        .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          MockOperation::new({
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &execute_request.clone().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: MockOperation::new({
             let mut op = bazel_protos::operations::Operation::new();
             op.set_name(op_name.clone());
             op.set_done(true);
@@ -1157,8 +1258,8 @@ async fn bad_result_bytes() {
             });
             op
           }),
-        ],
-      ),
+        },
+      ]),
       None,
     )
   };
@@ -1176,15 +1277,14 @@ async fn initial_response_error() {
     let op_name = "gimme-foo".to_string();
 
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        crate::remote::make_execute_request(
+      mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
+        execute_request: crate::remote::make_execute_request(
           &execute_request.clone().try_into().unwrap(),
           empty_request_metadata(),
         )
         .unwrap()
         .2,
-        vec![MockOperation::new({
+        stream_responses: Ok(vec![MockOperation::new({
           let mut op = bazel_protos::operations::Operation::new();
           op.set_name(op_name.to_string());
           op.set_done(true);
@@ -1195,8 +1295,8 @@ async fn initial_response_error() {
             error
           });
           op
-        })],
-      ),
+        })]),
+      }]),
       None,
     )
   };
@@ -1216,17 +1316,19 @@ async fn getoperation_response_error() {
     let op_name = "gimme-foo".to_string();
 
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        crate::remote::make_execute_request(
-          &execute_request.clone().try_into().unwrap(),
-          empty_request_metadata(),
-        )
-        .unwrap()
-        .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          MockOperation::new({
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &execute_request.clone().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: MockOperation::new({
             let mut op = bazel_protos::operations::Operation::new();
             op.set_name(op_name.to_string());
             op.set_done(true);
@@ -1238,8 +1340,8 @@ async fn getoperation_response_error() {
             });
             op
           }),
-        ],
-      ),
+        },
+      ]),
       None,
     )
   };
@@ -1261,21 +1363,20 @@ async fn initial_response_missing_response_and_error() {
     let op_name = "gimme-foo".to_string();
 
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        crate::remote::make_execute_request(
+      mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
+        execute_request: crate::remote::make_execute_request(
           &execute_request.clone().try_into().unwrap(),
           empty_request_metadata(),
         )
         .unwrap()
         .2,
-        vec![MockOperation::new({
+        stream_responses: Ok(vec![MockOperation::new({
           let mut op = bazel_protos::operations::Operation::new();
           op.set_name(op_name.to_string());
           op.set_done(true);
           op
-        })],
-      ),
+        })]),
+      }]),
       None,
     )
   };
@@ -1295,24 +1396,26 @@ async fn getoperation_missing_response_and_error() {
     let op_name = "gimme-foo".to_string();
 
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        crate::remote::make_execute_request(
-          &execute_request.clone().try_into().unwrap(),
-          empty_request_metadata(),
-        )
-        .unwrap()
-        .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          MockOperation::new({
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &execute_request.clone().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: MockOperation::new({
             let mut op = bazel_protos::operations::Operation::new();
             op.set_name(op_name.to_string());
             op.set_done(true);
             op
           }),
-        ],
-      ),
+        },
+      ]),
       None,
     )
   };
@@ -1334,27 +1437,41 @@ async fn execute_missing_file_uploads_if_known() {
     let op_name = "cat".to_owned();
 
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        crate::remote::make_execute_request(
-          &cat_roland_request().try_into().unwrap(),
-          empty_request_metadata(),
-        )
-        .unwrap()
-        .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          make_precondition_failure_operation(vec![missing_preconditionfailure_violation(
-            &roland.digest(),
-          )]),
-          make_successful_operation(
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &cat_roland_request().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_precondition_failure_operation(vec![
+            missing_preconditionfailure_violation(&roland.digest()),
+          ]),
+        },
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &cat_roland_request().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_successful_operation(
             "cat2",
             StdoutType::Raw(roland.string()),
             StderrType::Raw("".to_owned()),
             0,
           ),
-        ],
-      ),
+        },
+      ]),
       None,
     )
   };
@@ -1418,7 +1535,7 @@ async fn execute_missing_file_uploads_if_known() {
 }
 
 #[tokio::test]
-//// TODO: Unignore this test when the server can actually fail with status protos.
+// TODO: Unignore this test when the server can actually fail with status protos.
 #[ignore] // https://github.com/pantsbuild/pants/issues/6597
 async fn execute_missing_file_uploads_if_known_status() {
   let roland = TestData::roland();
@@ -1439,28 +1556,32 @@ async fn execute_missing_file_uploads_if_known_status() {
     };
 
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        crate::remote::make_execute_request(
-          &cat_roland_request().try_into().unwrap(),
-          empty_request_metadata(),
-        )
-        .unwrap()
-        .2,
-        vec![
-          //make_incomplete_operation(&op_name),
-          MockOperation {
-            op: Err(status),
-            duration: None,
-          },
-          make_successful_operation(
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &cat_roland_request().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![
+            //make_incomplete_operation(&op_name),
+            MockOperation {
+              op: Err(status),
+              duration: None,
+            },
+          ]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_successful_operation(
             "cat2",
             StdoutType::Raw(roland.string()),
             StderrType::Raw("".to_owned()),
             0,
           ),
-        ],
-      ),
+        },
+      ]),
       None,
     )
   };
@@ -1525,21 +1646,8 @@ async fn execute_missing_file_errors_if_unknown() {
   let missing_digest = TestDirectory::containing_roland().digest();
 
   let mock_server = {
-    let op_name = "cat".to_owned();
-
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        crate::remote::make_execute_request(
-          &cat_roland_request().try_into().unwrap(),
-          empty_request_metadata(),
-        )
-        .unwrap()
-        .2,
-        // We won't get as far as trying to run the operation, so don't expect any requests whose
-        // responses we would need to stub.
-        vec![],
-      ),
+      mock::execution_server::MockExecution::new(vec![]),
       None,
     )
   };
@@ -1797,24 +1905,26 @@ async fn wait_between_request_1_retry() {
     let mock_server = {
       let op_name = "gimme-foo".to_string();
       mock::execution_server::TestServer::new(
-        mock::execution_server::MockExecution::new(
-          op_name.clone(),
-          crate::remote::make_execute_request(
-            &execute_request.clone().try_into().unwrap(),
-            empty_request_metadata(),
-          )
-          .unwrap()
-          .2,
-          vec![
-            make_incomplete_operation(&op_name),
-            make_successful_operation(
+        mock::execution_server::MockExecution::new(vec![
+          ExpectedAPICall::Execute {
+            execute_request: crate::remote::make_execute_request(
+              &execute_request.clone().try_into().unwrap(),
+              empty_request_metadata(),
+            )
+            .unwrap()
+            .2,
+            stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+          },
+          ExpectedAPICall::GetOperation {
+            operation_name: op_name.clone(),
+            operation: make_successful_operation(
               &op_name,
               StdoutType::Raw("foo".to_owned()),
               StderrType::Raw("".to_owned()),
               0,
             ),
-          ],
-        ),
+          },
+        ]),
         None,
       )
     };
@@ -1852,26 +1962,34 @@ async fn wait_between_request_3_retry() {
     let mock_server = {
       let op_name = "gimme-foo".to_string();
       mock::execution_server::TestServer::new(
-        mock::execution_server::MockExecution::new(
-          op_name.clone(),
-          crate::remote::make_execute_request(
-            &execute_request.clone().try_into().unwrap(),
-            empty_request_metadata(),
-          )
-          .unwrap()
-          .2,
-          vec![
-            make_incomplete_operation(&op_name),
-            make_incomplete_operation(&op_name),
-            make_incomplete_operation(&op_name),
-            make_successful_operation(
+        mock::execution_server::MockExecution::new(vec![
+          ExpectedAPICall::Execute {
+            execute_request: crate::remote::make_execute_request(
+              &execute_request.clone().try_into().unwrap(),
+              empty_request_metadata(),
+            )
+            .unwrap()
+            .2,
+            stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+          },
+          ExpectedAPICall::GetOperation {
+            operation_name: op_name.clone(),
+            operation: make_incomplete_operation(&op_name),
+          },
+          ExpectedAPICall::GetOperation {
+            operation_name: op_name.clone(),
+            operation: make_incomplete_operation(&op_name),
+          },
+          ExpectedAPICall::GetOperation {
+            operation_name: op_name.clone(),
+            operation: make_successful_operation(
               &op_name,
               StdoutType::Raw("foo".to_owned()),
               StderrType::Raw("".to_owned()),
               0,
             ),
-          ],
-        ),
+          },
+        ]),
         None,
       )
     };

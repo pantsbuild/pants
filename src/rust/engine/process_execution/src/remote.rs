@@ -29,6 +29,11 @@ use crate::{
 use std::cmp::min;
 use workunit_store::WorkunitStore;
 
+// Streaming client module. Intended as an eventual repalcement for the CommandRunner in this
+// module.
+mod streaming;
+pub use streaming::StreamingCommandRunner;
+
 // Environment variable which is exclusively used for cache key invalidation.
 // This may be not specified in an Process, and may be populated only by the
 // CommandRunner.
@@ -197,7 +202,7 @@ impl CommandRunner {
       Ok(None) => {
         Err("Didn't get proper stream response from server during remote execution".to_owned())
       }
-      Err(err) => rpcerror_to_status_or_string(err).map(OperationOrStatus::Status),
+      Err(err) => rpcerror_to_status_or_string(&err).map(OperationOrStatus::Status),
     }
   }
 }
@@ -260,6 +265,7 @@ impl super::CommandRunner for CommandRunner {
     let mut history = ExecutionHistory::default();
 
     // Upload inputs.
+    // REFACTOR: StreamingCommandRunner moves this to `ensure_action_uploaded`.
     {
       let (command_digest, action_digest) = future03::try_join(
         self.store_proto_locally(&command),
@@ -1151,7 +1157,7 @@ fn rpcerror_recover_cancelled(
 }
 
 fn rpcerror_to_status_or_string(
-  error: grpcio::Error,
+  error: &grpcio::Error,
 ) -> Result<bazel_protos::status::Status, String> {
   match error {
     grpcio::Error::RpcFailure(grpcio::RpcStatus {
@@ -1167,7 +1173,10 @@ fn rpcerror_to_status_or_string(
     }) => Err(format!(
       "{:?}: {:?}",
       status,
-      details.unwrap_or_else(|| "[no message]".to_string())
+      details
+        .as_ref()
+        .map(|s| s.as_str())
+        .unwrap_or_else(|| "[no message]")
     )),
     err => Err(format!("{:?}", err)),
   }

@@ -194,7 +194,15 @@ async fn main() {
               .help("Whether or not to enable running the process through a Nailgun server.\
                         This will likely start a new Nailgun server as a side effect.")
       )
-    .setting(AppSettings::TrailingVarArg)
+      .arg(
+        Arg::with_name("enable-streaming-client")
+            .long("enable-streaming-client")
+            .takes_value(false)
+            .required(false)
+            .default_value("false")
+            .help("Enable the experimental streaming remote execution client.")
+      )
+      .setting(AppSettings::TrailingVarArg)
     .arg(
       Arg::with_name("argv")
         .multiple(true)
@@ -276,6 +284,7 @@ async fn main() {
     .values_of("headers")
     .map(collection_from_keyvalues::<_, BTreeMap<_, _>>)
     .unwrap_or_default();
+  let enable_streaming_client = args.is_present("enable-streaming-client");
 
   let executor = task_executor::Executor::new(Handle::current());
 
@@ -367,26 +376,48 @@ async fn main() {
           None
         };
 
-      Box::new(
-        process_execution::remote::CommandRunner::new(
-          address,
-          ProcessMetadata {
-            instance_name: remote_instance_arg,
-            cache_key_gen_version: args.value_of("cache-key-gen-version").map(str::to_owned),
-            platform_properties,
-          },
-          root_ca_certs,
-          oauth_bearer_token,
-          headers,
-          store.clone(),
-          Platform::Linux,
-          executor,
-          std::time::Duration::from_secs(320),
-          std::time::Duration::from_millis(500),
-          std::time::Duration::from_secs(5),
+      let command_runner_box: Box<dyn process_execution::CommandRunner> = if enable_streaming_client
+      {
+        Box::new(
+          process_execution::remote::StreamingCommandRunner::new(
+            address,
+            ProcessMetadata {
+              instance_name: remote_instance_arg,
+              cache_key_gen_version: args.value_of("cache-key-gen-version").map(str::to_owned),
+              platform_properties,
+            },
+            root_ca_certs,
+            oauth_bearer_token,
+            headers,
+            store.clone(),
+            Platform::Linux,
+          )
+          .expect("Failed to make command runner"),
         )
-        .expect("Failed to make command runner"),
-      ) as Box<dyn process_execution::CommandRunner>
+      } else {
+        Box::new(
+          process_execution::remote::CommandRunner::new(
+            address,
+            ProcessMetadata {
+              instance_name: remote_instance_arg,
+              cache_key_gen_version: args.value_of("cache-key-gen-version").map(str::to_owned),
+              platform_properties,
+            },
+            root_ca_certs,
+            oauth_bearer_token,
+            headers,
+            store.clone(),
+            Platform::Linux,
+            executor,
+            std::time::Duration::from_secs(320),
+            std::time::Duration::from_millis(500),
+            std::time::Duration::from_secs(5),
+          )
+          .expect("Failed to make command runner"),
+        )
+      };
+
+      command_runner_box
     }
     None => Box::new(process_execution::local::CommandRunner::new(
       store.clone(),

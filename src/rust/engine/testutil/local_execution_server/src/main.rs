@@ -29,7 +29,7 @@ use bazel_protos::{
   operations::Operation,
   remote_execution::{Digest, ExecuteRequest},
 };
-use mock::execution_server::{MockExecution, MockOperation, TestServer};
+use mock::execution_server::{ExpectedAPICall, MockExecution, MockOperation, TestServer};
 use std::io::Read;
 
 use structopt::StructOpt;
@@ -70,7 +70,10 @@ fn main() {
   digest.set_size_bytes(options.request_size);
   request.set_action_digest(digest);
 
-  let execution = MockExecution::new("Mock execution".to_string(), request, vec![operation]);
+  let execution = MockExecution::new(vec![ExpectedAPICall::Execute {
+    execute_request: request,
+    stream_responses: Ok(vec![operation]),
+  }]);
 
   // Start the server
   let server = TestServer::new(execution, options.port);

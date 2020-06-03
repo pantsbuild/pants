@@ -349,6 +349,7 @@ py_module_initializer!(native_engine, |py, m| {
         process_execution_speculation_strategy_buf: String,
         process_execution_use_local_cache: bool,
         remote_execution_headers: Vec<(String, String)>,
+        remote_execution_enable_streaming: bool,
         process_execution_local_enable_nailgun: bool
       )
     ),
@@ -677,6 +678,7 @@ fn scheduler_create(
   process_execution_speculation_strategy: String,
   process_execution_use_local_cache: bool,
   remote_execution_headers: Vec<(String, String)>,
+  remote_execution_enable_streaming: bool,
   process_execution_local_enable_nailgun: bool,
 ) -> CPyResult<PyScheduler> {
   let core: Result<Core, String> = Ok(()).and_then(move |()| {
@@ -722,6 +724,7 @@ fn scheduler_create(
       process_execution_speculation_strategy,
       process_execution_use_local_cache,
       remote_execution_headers.into_iter().collect(),
+      remote_execution_enable_streaming,
       process_execution_local_enable_nailgun,
     )
   });
