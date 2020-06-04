@@ -909,7 +909,8 @@ fn scheduler_execute(
             ExecutionTermination::KeyboardInterrupt => {
               PyErr::new::<exc::KeyboardInterrupt, _>(py, NoArgs)
             }
-            ExecutionTermination::Timeout => PyErr::new::<PollTimeout, _>(py, NoArgs),
+            ExecutionTermination::PollTimeout => PyErr::new::<PollTimeout, _>(py, NoArgs),
+            ExecutionTermination::Fatal(msg) => PyErr::new::<exc::Exception, _>(py, (msg,)),
           })
       })
     })
