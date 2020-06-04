@@ -16,7 +16,7 @@ class BackendIndependenceTest(PantsRunIntegrationTest):
             command=["test", "examples/tests/python/example_test/hello/greet"],
             config={
                 "GLOBAL": {"pythonpath": [], "backend_packages": ["pants.backend.python"],},
-                "source": {"root_patterns": ["tests/python"]},
+                "source": {"root_patterns": ["src/python", "tests/python"]},
             },
         )
         self.assert_success(pants_run)
