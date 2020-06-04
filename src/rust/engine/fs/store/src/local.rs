@@ -1,16 +1,18 @@
 use super::{EntryType, ShrinkBehavior, GIGABYTES};
 
-use bytes::Bytes;
-use digest::{Digest as DigestTrait, FixedOutput};
-use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
-use lmdb::Error::NotFound;
-use lmdb::{self, Cursor, Database, RwTransaction, Transaction, WriteFlags};
-use sha2::Sha256;
-use sharded_lmdb::{ShardedLmdb, VersionedFingerprint};
 use std::collections::BinaryHeap;
 use std::path::Path;
 use std::sync::Arc;
-use std::time;
+use std::time::{self, Duration};
+
+use bytes::Bytes;
+use digest::{Digest as DigestTrait, FixedOutput};
+use futures::future;
+use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
+use lmdb::Error::NotFound;
+use lmdb::{self, Cursor, Transaction};
+use sha2::Sha256;
+use sharded_lmdb::{ShardedLmdb, VersionedFingerprint, DEFAULT_LEASE_TIME};
 
 #[derive(Clone)]
 pub struct ByteStore {
@@ -31,6 +33,14 @@ impl ByteStore {
     executor: task_executor::Executor,
     path: P,
   ) -> Result<ByteStore, String> {
+    Self::new_with_lease_time(executor, path, DEFAULT_LEASE_TIME)
+  }
+
+  pub fn new_with_lease_time<P: AsRef<Path>>(
+    executor: task_executor::Executor,
+    path: P,
+    lease_time: Duration,
+  ) -> Result<ByteStore, String> {
     let root = path.as_ref();
     let files_root = root.join("files");
     let directories_root = root.join("directories");
@@ -45,9 +55,15 @@ impl ByteStore {
         // travis fail because they can't allocate virtual memory, if there are multiple Stores
         // in memory at the same time. We don't know why they're not efficiently garbage collected
         // by python, but they're not, so...
-        file_dbs: ShardedLmdb::new(files_root, 100 * GIGABYTES, executor.clone()).map(Arc::new),
-        directory_dbs: ShardedLmdb::new(directories_root, 5 * GIGABYTES, executor.clone())
+        file_dbs: ShardedLmdb::new(files_root, 100 * GIGABYTES, executor.clone(), lease_time)
           .map(Arc::new),
+        directory_dbs: ShardedLmdb::new(
+          directories_root,
+          5 * GIGABYTES,
+          executor.clone(),
+          lease_time,
+        )
+        .map(Arc::new),
         executor: executor,
       }),
     })
@@ -57,79 +73,44 @@ impl ByteStore {
     &self.inner.executor
   }
 
-  // Note: This performs IO on the calling thread. Hopefully the IO is small enough not to matter.
-  pub fn entry_type(&self, fingerprint: &Fingerprint) -> Result<Option<EntryType>, String> {
-    if *fingerprint == EMPTY_DIGEST.0 {
+  pub async fn entry_type(&self, fingerprint: Fingerprint) -> Result<Option<EntryType>, String> {
+    if fingerprint == EMPTY_DIGEST.0 {
       // Technically this is valid as both; choose Directory in case a caller is checking whether
       // it _can_ be a Directory.
       return Ok(Some(EntryType::Directory));
     }
-    let effective_key = VersionedFingerprint::new(*fingerprint, ShardedLmdb::schema_version());
-    {
-      let (env, directory_database, _) = self.inner.directory_dbs.clone()?.get(fingerprint);
-      let txn = env
-        .begin_ro_txn()
-        .map_err(|err| format!("Failed to begin read transaction: {:?}", err))?;
-      match txn.get(directory_database, &effective_key) {
-        Ok(_) => return Ok(Some(EntryType::Directory)),
-        Err(NotFound) => {}
-        Err(err) => {
-          return Err(format!(
-            "Error reading from store when determining type of fingerprint {}: {}",
-            fingerprint, err
-          ));
-        }
-      };
+
+    // In parallel, check for the given fingerprint in both databases.
+    let d_dbs = self.inner.directory_dbs.clone()?;
+    let is_dir = d_dbs.exists(fingerprint);
+    let f_dbs = self.inner.file_dbs.clone()?;
+    let is_file = f_dbs.exists(fingerprint);
+
+    // TODO: Could technically use select to return slightly more quickly with the first
+    // affirmative answer, but this is simpler.
+    match future::try_join(is_dir, is_file).await? {
+      (true, _) => Ok(Some(EntryType::Directory)),
+      (_, true) => Ok(Some(EntryType::File)),
+      (false, false) => Ok(None),
     }
-    let (env, file_database, _) = self.inner.file_dbs.clone()?.get(fingerprint);
-    let txn = env
-      .begin_ro_txn()
-      .map_err(|err| format!("Failed to begin read transaction: {}", err))?;
-    match txn.get(file_database, &effective_key) {
-      Ok(_) => return Ok(Some(EntryType::File)),
-      Err(NotFound) => {}
-      Err(err) => {
-        return Err(format!(
-          "Error reading from store when determining type of fingerprint {}: {}",
-          fingerprint, err
-        ));
-      }
-    };
-    Ok(None)
   }
 
-  pub fn lease_all<'a, Ds: Iterator<Item = &'a Digest>>(&self, digests: Ds) -> Result<(), String> {
-    let until = Self::default_lease_until_secs_since_epoch();
-    for digest in digests {
-      let (env, _, lease_database) = self.inner.file_dbs.clone()?.get(&digest.0);
-      env
-        .begin_rw_txn()
-        .and_then(|mut txn| self.lease(lease_database, &digest.0, until, &mut txn))
+  pub async fn lease_all(
+    &self,
+    digests: impl Iterator<Item = (Digest, EntryType)>,
+  ) -> Result<(), String> {
+    // NB: Lease extension happens periodically in the background, so this code needn't be parallel.
+    for (digest, entry_type) in digests {
+      let dbs = match entry_type {
+        EntryType::File => self.inner.file_dbs.clone(),
+        EntryType::Directory => self.inner.directory_dbs.clone(),
+      };
+      dbs?
+        .lease(digest.0)
+        .await
         .map_err(|err| format!("Error leasing digest {:?}: {}", digest, err))?;
     }
     Ok(())
-  }
-
-  fn default_lease_until_secs_since_epoch() -> u64 {
-    let now_since_epoch = time::SystemTime::now()
-      .duration_since(time::UNIX_EPOCH)
-      .expect("Surely you're not before the unix epoch?");
-    (now_since_epoch + time::Duration::from_secs(2 * 60 * 60)).as_secs()
-  }
-
-  fn lease(
-    &self,
-    database: Database,
-    fingerprint: &Fingerprint,
-    until_secs_since_epoch: u64,
-    txn: &mut RwTransaction<'_>,
-  ) -> Result<(), lmdb::Error> {
-    txn.put(
-      database,
-      &fingerprint.as_ref(),
-      &until_secs_since_epoch.to_le_bytes(),
-      WriteFlags::empty(),
-    )
   }
 
   ///
@@ -137,8 +118,6 @@ impl ByteStore {
   /// (excluding lmdb overhead).
   ///
   /// Returns the size it was shrunk to, which may be larger than target_bytes.
-  ///
-  /// Ignores directories. TODO: Shrink directories.
   ///
   /// TODO: Use LMDB database statistics when lmdb-rs exposes them.
   ///
@@ -240,7 +219,7 @@ impl ByteStore {
             e => panic!("Error reading lease, probable lmdb corruption: {:?}", e),
           });
 
-        let leased_until = time::UNIX_EPOCH + time::Duration::from_secs(lease_until_unix_timestamp);
+        let leased_until = time::UNIX_EPOCH + Duration::from_secs(lease_until_unix_timestamp);
 
         let expired_seconds_ago = time::SystemTime::now()
           .duration_since(leased_until)
@@ -306,7 +285,7 @@ impl ByteStore {
       // snapshots) to work without needing to first store the empty snapshot.
       //
       // To maintain the guarantee that the given function is called in a blocking context, we
-      // spawn the task..
+      // spawn it as a task.
       return Ok(Some(self.executor().spawn_blocking(move || f(&[])).await));
     }
 

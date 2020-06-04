@@ -39,7 +39,7 @@ use bytes::Bytes;
 use concrete_time::TimeSpan;
 use fs::FileContent;
 use futures::compat::Future01CompatExt;
-use futures::future::{FutureExt, TryFutureExt};
+use futures::future::{self as future03, Either, FutureExt, TryFutureExt};
 use futures01::{future, Future};
 use hashing::Digest;
 use protobuf::Message;
@@ -216,6 +216,19 @@ impl Store {
       local: local::ByteStore::new(executor, path)?,
       remote: None,
     })
+  }
+
+  ///
+  /// Converts this (copy of) a Store to local only by dropping the remote half.
+  ///
+  /// Because both underlying stores are reference counted, this is cheap, and has no effect on
+  /// other clones of the Store.
+  ///
+  fn into_local_only(self) -> Store {
+    Store {
+      local: self.local,
+      remote: None,
+    }
   }
 
   ///
@@ -468,93 +481,58 @@ impl Store {
       return future::err("Cannot ensure remote has blobs without a remote".to_owned()).to_boxed();
     };
 
-    let mut expanding_futures = Vec::new();
-
-    let mut expanded_digests = HashMap::new();
-    for digest in digests {
-      match self.local.entry_type(&digest.0) {
-        Ok(Some(EntryType::File)) => {
-          expanded_digests.insert(digest, EntryType::File);
-        }
-        Ok(Some(EntryType::Directory)) => {
-          expanding_futures.push(self.expand_directory(digest));
-        }
-        Ok(None) => {
-          return future::err(format!("Failed to upload digest {:?}: Not found", digest))
-            .to_boxed();
-        }
-        Err(err) => {
-          return future::err(format!("Failed to upload digest {:?}: {:?}", digest, err))
-            .to_boxed();
-        }
-      };
-    }
-
-    let local = self.local.clone();
+    let store = self.clone();
     let remote = remote.clone();
-    let remote2 = remote.clone();
-    future::join_all(expanding_futures)
-      .map(move |futures| {
-        for mut digests in futures {
-          for (digest, entry_type) in digests.drain() {
-            expanded_digests.insert(digest, entry_type);
-          }
-        }
-        expanded_digests
-      })
-      .and_then(move |ingested_digests| {
+    async move {
+      let ingested_digests = store.expand_local_digests(digests.iter(), false).await?;
+      let digests_to_upload =
         if Store::upload_is_faster_than_checking_whether_to_upload(&ingested_digests) {
-          return future::ok((ingested_digests.keys().cloned().collect(), ingested_digests))
-            .to_boxed();
-        }
-        let request = remote.find_missing_blobs_request(ingested_digests.keys());
-        let f = remote.list_missing_digests(request);
-        f.map(move |digests_to_upload| (digests_to_upload, ingested_digests))
-          .to_boxed()
-      })
-      .and_then(move |(digests_to_upload, ingested_digests)| {
-        future::join_all(
-          digests_to_upload
-            .into_iter()
-            .map(|digest| {
-              let entry_type = ingested_digests[&digest];
-              let local = local.clone();
-              let remote = remote2.clone();
+          ingested_digests.keys().cloned().collect()
+        } else {
+          let request = remote.find_missing_blobs_request(ingested_digests.keys());
+          remote.list_missing_digests(request).compat().await?
+        };
 
-              Box::pin(async move {
-                let executor = local.executor().clone();
-                let maybe_upload = local
-                  .load_bytes_with(entry_type, digest, move |bytes| {
-                    // NB: `load_bytes_with` runs on a spawned thread which we can safely block.
-                    executor.block_on(remote.store_bytes(bytes))
-                  })
-                  .await?;
-                match maybe_upload {
-                  Some(future) => Ok(future),
-                  None => Err(format!("Failed to upload digest {:?}: Not found", digest)),
-                }
-              })
-              .compat()
-              .to_boxed()
-            })
-            .collect::<Vec<_>>(),
-        )
-        .and_then(future::join_all)
-        .map(|uploaded_digests| (uploaded_digests, ingested_digests))
-      })
-      .map(move |(uploaded_digests, ingested_digests)| {
-        let ingested_file_sizes = ingested_digests.iter().map(|(digest, _)| digest.1);
-        let uploaded_file_sizes = uploaded_digests.iter().map(|digest| digest.1);
+      let uploaded_digests = future03::try_join_all(
+        digests_to_upload
+          .into_iter()
+          .map(|digest| {
+            let entry_type = ingested_digests[&digest];
+            let local = store.local.clone();
+            let remote = remote.clone();
 
-        UploadSummary {
-          ingested_file_count: ingested_file_sizes.len(),
-          ingested_file_bytes: ingested_file_sizes.sum(),
-          uploaded_file_count: uploaded_file_sizes.len(),
-          uploaded_file_bytes: uploaded_file_sizes.sum(),
-          upload_wall_time: start_time.elapsed(),
-        }
+            async move {
+              let executor = local.executor().clone();
+              let maybe_upload = local
+                .load_bytes_with(entry_type, digest, move |bytes| {
+                  // NB: `load_bytes_with` runs on a spawned thread which we can safely block.
+                  executor.block_on(remote.store_bytes(bytes))
+                })
+                .await?;
+              match maybe_upload {
+                Some(res) => res,
+                None => Err(format!("Failed to upload digest {:?}: Not found", digest)),
+              }
+            }
+          })
+          .collect::<Vec<_>>(),
+      )
+      .await?;
+
+      let ingested_file_sizes = ingested_digests.iter().map(|(digest, _)| digest.1);
+      let uploaded_file_sizes = uploaded_digests.iter().map(|digest| digest.1);
+
+      Ok(UploadSummary {
+        ingested_file_count: ingested_file_sizes.len(),
+        ingested_file_bytes: ingested_file_sizes.sum(),
+        uploaded_file_count: uploaded_file_sizes.len(),
+        uploaded_file_bytes: uploaded_file_sizes.sum(),
+        upload_wall_time: start_time.elapsed(),
       })
-      .to_boxed()
+    }
+    .boxed()
+    .compat()
+    .to_boxed()
   }
 
   ///
@@ -609,8 +587,15 @@ impl Store {
       .to_boxed()
   }
 
-  pub fn lease_all<'a, Ds: Iterator<Item = &'a Digest>>(&self, digests: Ds) -> Result<(), String> {
-    self.local.lease_all(digests)
+  pub async fn lease_all_recursively<'a, Ds: Iterator<Item = &'a Digest>>(
+    &self,
+    digests: Ds,
+  ) -> Result<(), String> {
+    let reachable_digests_and_types = self.expand_local_digests(digests, true).await?;
+    self
+      .local
+      .lease_all(reachable_digests_and_types.into_iter())
+      .await
   }
 
   pub fn garbage_collect(
@@ -651,6 +636,64 @@ impl Store {
     } else {
       false
     }
+  }
+
+  ///
+  /// Return all Digests reachable locally from the given root Digests (which may represent either
+  /// Files or Directories).
+  ///
+  /// If `allow_missing`, root digests which do not exist locally will be ignored.
+  ///
+  pub async fn expand_local_digests<'a, Ds: Iterator<Item = &'a Digest>>(
+    &self,
+    digests: Ds,
+    allow_missing: bool,
+  ) -> Result<HashMap<Digest, EntryType>, String> {
+    // Expand each digest into either a single file digest, or a collection of recursive digests
+    // below a directory.
+    let expanded_digests = future03::try_join_all(
+      digests
+        .map(|digest| {
+          let store = self.clone();
+          async move {
+            match store.local.entry_type(digest.0).await {
+              Ok(Some(EntryType::File)) => Ok(Either::Left(*digest)),
+              Ok(Some(EntryType::Directory)) => {
+                // Locally expand the directory.
+                let reachable = store
+                  .into_local_only()
+                  .expand_directory(*digest)
+                  .compat()
+                  .await?;
+                Ok(Either::Right(reachable))
+              }
+              Ok(None) => {
+                if allow_missing {
+                  Ok(Either::Right(HashMap::new()))
+                } else {
+                  Err(format!("Failed to expand digest {:?}: Not found", digest))
+                }
+              }
+              Err(err) => Err(format!("Failed to expand digest {:?}: {:?}", digest, err)),
+            }
+          }
+        })
+        .collect::<Vec<_>>(),
+    )
+    .await?;
+
+    let mut result: HashMap<Digest, EntryType> = HashMap::new();
+    for e in expanded_digests {
+      match e {
+        Either::Left(digest) => {
+          result.insert(digest, EntryType::File);
+        }
+        Either::Right(reachable_digests) => {
+          result.extend(reachable_digests);
+        }
+      }
+    }
+    Ok(result)
   }
 
   pub fn expand_directory(&self, digest: Digest) -> BoxFuture<HashMap<Digest, EntryType>, String> {

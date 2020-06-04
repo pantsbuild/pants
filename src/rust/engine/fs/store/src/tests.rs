@@ -787,7 +787,7 @@ async fn upload_missing_files() {
     .expect_err("Want error");
   assert_eq!(
     error,
-    format!("Failed to upload digest {:?}: Not found", testdata.digest())
+    format!("Failed to expand digest {:?}: Not found", testdata.digest())
   );
 }
 

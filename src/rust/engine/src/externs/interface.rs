@@ -1204,9 +1204,14 @@ fn lease_files_in_graph(
   with_scheduler(py, scheduler_ptr, |scheduler| {
     with_session(py, session_ptr, |session| {
       let digests = scheduler.all_digests(session);
-      py.allow_threads(|| scheduler.core.store().lease_all(digests.iter()))
-        .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))
-        .map(|()| None)
+      py.allow_threads(|| {
+        scheduler
+          .core
+          .executor
+          .block_on(scheduler.core.store().lease_all_recursively(digests.iter()))
+      })
+      .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))
+      .map(|()| None)
     })
   })
 }

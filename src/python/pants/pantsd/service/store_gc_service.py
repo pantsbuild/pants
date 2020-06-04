@@ -44,17 +44,17 @@ class StoreGCService(PantsService):
     def _maybe_extend_lease(self):
         if time.time() < self._next_lease_extension:
             return
-        self._logger.debug("Extending leases")
+        self._logger.info("Extending leases")
         self._scheduler_session.lease_files_in_graph()
-        self._logger.debug("Done extending leases")
+        self._logger.info("Done extending leases")
         self._set_next_lease_extension()
 
     def _maybe_garbage_collect(self):
         if time.time() < self._next_gc:
             return
-        self._logger.debug("Garbage collecting store")
+        self._logger.info("Garbage collecting store")
         self._scheduler_session.garbage_collect_store()
-        self._logger.debug("Done garbage collecting store")
+        self._logger.info("Done garbage collecting store")
         self._set_next_gc()
 
     def run(self):
