@@ -309,13 +309,18 @@ impl Scheduler {
   pub fn metrics(&self, session: &Session) -> HashMap<&str, i64> {
     let context = Context::new(self.core.clone(), session.clone());
     let mut m = HashMap::new();
-    m.insert(
-      "affected_file_count",
+    m.insert("affected_file_count", {
+      let mut count = 0;
       self
         .core
         .graph
-        .reachable_digest_count(&session.root_nodes(), &context) as i64,
-    );
+        .visit_live_reachable(&session.root_nodes(), &context, |n, _| {
+          if n.fs_subject().is_some() {
+            count += 1;
+          }
+        });
+      count
+    });
     m.insert(
       "preceding_graph_size",
       session.preceding_graph_size() as i64,
@@ -339,9 +344,14 @@ impl Scheduler {
   ///
   /// Return all Digests currently in memory in this Scheduler.
   ///
-  pub fn all_digests(&self, session: &Session) -> Vec<hashing::Digest> {
+  pub fn all_digests(&self, session: &Session) -> HashSet<hashing::Digest> {
     let context = Context::new(self.core.clone(), session.clone());
-    self.core.graph.all_digests(&context)
+    let mut digests = HashSet::new();
+    self
+      .core
+      .graph
+      .visit_live(&context, |_, v| digests.extend(v.digests()));
+    digests
   }
 
   async fn poll_or_create(

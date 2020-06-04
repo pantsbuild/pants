@@ -1081,17 +1081,6 @@ impl Node for NodeKey {
     .await
   }
 
-  fn digest(res: NodeOutput) -> Option<hashing::Digest> {
-    match res {
-      NodeOutput::Digest(d) => Some(d),
-      NodeOutput::DirectoryListing(_)
-      | NodeOutput::LinkDest(_)
-      | NodeOutput::ProcessResult(_)
-      | NodeOutput::Snapshot(_)
-      | NodeOutput::Value(_) => None,
-    }
-  }
-
   fn cacheable(&self) -> bool {
     match self {
       &NodeKey::Task(ref s) => s.task.cacheable,
@@ -1147,6 +1136,19 @@ pub enum NodeOutput {
   ProcessResult(Box<ProcessResult>),
   Snapshot(Arc<store::Snapshot>),
   Value(Value),
+}
+
+impl NodeOutput {
+  pub fn digests(&self) -> Vec<hashing::Digest> {
+    match self {
+      NodeOutput::Digest(d) => vec![*d],
+      NodeOutput::Snapshot(s) => vec![s.digest],
+      NodeOutput::ProcessResult(p) => {
+        vec![p.0.stdout_digest, p.0.stderr_digest, p.0.output_directory]
+      }
+      NodeOutput::DirectoryListing(_) | NodeOutput::LinkDest(_) | NodeOutput::Value(_) => vec![],
+    }
+  }
 }
 
 impl From<Value> for NodeOutput {
