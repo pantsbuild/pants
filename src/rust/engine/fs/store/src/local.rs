@@ -11,7 +11,6 @@ use futures::future;
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use lmdb::Error::NotFound;
 use lmdb::{self, Cursor, Transaction};
-use log::debug;
 use sha2::Sha256;
 use sharded_lmdb::{ShardedLmdb, VersionedFingerprint, DEFAULT_LEASE_TIME};
 
@@ -96,22 +95,15 @@ impl ByteStore {
     }
   }
 
-  pub async fn lease_all<'a, Ds: Iterator<Item = &'a Digest>>(
+  pub async fn lease_all(
     &self,
-    digests: Ds,
+    digests: impl Iterator<Item = (Digest, EntryType)>,
   ) -> Result<(), String> {
     // NB: Lease extension happens periodically in the background, so this code needn't be parallel.
-    for digest in digests {
-      let dbs = match self.entry_type(digest.0).await? {
-        Some(EntryType::File) => self.inner.file_dbs.clone(),
-        Some(EntryType::Directory) => self.inner.directory_dbs.clone(),
-        None => {
-          debug!(
-            "Attempted to extend lease on missing digest {:?}. Skipping.",
-            digest
-          );
-          continue;
-        }
+    for (digest, entry_type) in digests {
+      let dbs = match entry_type {
+        EntryType::File => self.inner.file_dbs.clone(),
+        EntryType::Directory => self.inner.directory_dbs.clone(),
       };
       dbs?
         .lease(digest.0)

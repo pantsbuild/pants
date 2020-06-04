@@ -153,7 +153,7 @@ async fn garbage_collect_nothing_to_do_with_lease() {
   .unwrap();
   let file_digest = Digest(file_fingerprint, 10);
   store
-    .lease_all(vec![file_digest].iter())
+    .lease_all(vec![(file_digest, EntryType::File)].into_iter())
     .await
     .expect("Error leasing");
   store

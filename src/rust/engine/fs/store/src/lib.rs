@@ -587,11 +587,15 @@ impl Store {
       .to_boxed()
   }
 
-  pub async fn lease_all<'a, Ds: Iterator<Item = &'a Digest>>(
+  pub async fn lease_all_recursively<'a, Ds: Iterator<Item = &'a Digest>>(
     &self,
     digests: Ds,
   ) -> Result<(), String> {
-    self.local.lease_all(digests).await
+    let reachable_digests_and_types = self.expand_local_digests(digests, true).await?;
+    self
+      .local
+      .lease_all(reachable_digests_and_types.into_iter())
+      .await
   }
 
   pub fn garbage_collect(

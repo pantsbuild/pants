@@ -1204,7 +1204,7 @@ fn lease_files_in_graph(
         scheduler
           .core
           .executor
-          .block_on(scheduler.core.store().lease_all(digests.iter()))
+          .block_on(scheduler.core.store().lease_all_recursively(digests.iter()))
       })
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))
       .map(|()| None)
