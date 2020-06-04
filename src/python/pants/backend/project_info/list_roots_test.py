@@ -10,6 +10,7 @@ from pants.source.source_root import (
     SourceRoot,
     SourceRootConfig,
     SourceRootRequest,
+    get_source_root,
 )
 from pants.testutil.engine.util import MockGet, run_rule
 from pants.testutil.goal_rule_test_base import GoalRuleTestBase
@@ -21,13 +22,14 @@ class AllRootsTest(TestBase):
 
         options = {
             "pants_ignore": [],
-            "source_root_patterns": ["src/*", "src/example/*"],
-            "source_roots": {
-                # Fixed roots should trump patterns which would detect contrib/go/examples/src/go here.
-                "contrib/go/examples/src/go/src": ["go"],
+            "root_patterns": [
+                "src/*",
+                "src/example/*",
+                "contrib/go/examples/src/go/src",
                 # Dir does not exist, should not be listed as a root.
-                "java": ["java"],
-            },
+                "java",
+                "fixed/root/jvm",
+            ],
         }
         options.update(self.options[""])  # We need inherited values for pants_workdir etc.
 
@@ -36,30 +38,21 @@ class AllRootsTest(TestBase):
         )
 
         source_root_config = SourceRootConfig.global_instance()
-        source_roots = source_root_config.get_source_roots()
 
-        # Ensure that we see any manually added roots.
-        source_roots.add_source_root("fixed/root/jvm")
-
-        # This function mocks out reading real directories off the file system
+        # This function mocks out reading real directories off the file system.
         def provider_rule(path_globs: PathGlobs) -> Snapshot:
             dirs = (
-                "contrib/go/examples/3rdparty/go",
                 "contrib/go/examples/src/go/src",
                 "src/java",
                 "src/python",
+                "src/python/subdir/src/python",  # We allow source roots under source roots.
                 "src/kotlin",
                 "my/project/src/java",
                 "src/example/java",
                 "src/example/python",
                 "fixed/root/jvm",
-                # subdirectories of source roots should not show up in final output
-                "src/kotlin/additional/directories/that/might/get/matched/src/foo",
             )
             return Snapshot(Digest("abcdef", 10), (), dirs)
-
-        def source_root(req: SourceRootRequest) -> OptionalSourceRoot:
-            return OptionalSourceRoot(source_roots.find_by_path(req.path))
 
         output = run_rule(
             list_roots.all_roots,
@@ -69,17 +62,17 @@ class AllRootsTest(TestBase):
                 MockGet(
                     product_type=OptionalSourceRoot,
                     subject_type=SourceRootRequest,
-                    mock=source_root,
+                    mock=lambda req: get_source_root(req, source_root_config),
                 ),
             ],
         )
 
         self.assertEqual(
             {
-                SourceRoot("contrib/go/examples/3rdparty/go"),
                 SourceRoot("contrib/go/examples/src/go/src"),
                 SourceRoot("src/java"),
                 SourceRoot("src/python"),
+                SourceRoot("src/python/subdir/src/python"),
                 SourceRoot("src/kotlin"),
                 SourceRoot("src/example/java"),
                 SourceRoot("src/example/python"),
@@ -92,8 +85,7 @@ class AllRootsTest(TestBase):
     def test_all_roots_with_root_at_buildroot(self):
         options = {
             "pants_ignore": [],
-            "source_root_patterns": [],
-            "source_roots": {"": ["python"],},
+            "root_patterns": ["/"],
         }
         options.update(self.options[""])  # We need inherited values for pants_workdir etc.
 
@@ -102,15 +94,11 @@ class AllRootsTest(TestBase):
         )
 
         source_root_config = SourceRootConfig.global_instance()
-        source_roots = source_root_config.get_source_roots()
 
         # This function mocks out reading real directories off the file system
         def provider_rule(path_globs: PathGlobs) -> Snapshot:
             dirs = ("foo",)  # A python package at the buildroot.
             return Snapshot(Digest("abcdef", 10), (), dirs)
-
-        def source_root(req: SourceRootRequest) -> OptionalSourceRoot:
-            return OptionalSourceRoot(source_roots.find_by_path(req.path))
 
         output = run_rule(
             list_roots.all_roots,
@@ -120,12 +108,12 @@ class AllRootsTest(TestBase):
                 MockGet(
                     product_type=OptionalSourceRoot,
                     subject_type=SourceRootRequest,
-                    mock=source_root,
+                    mock=lambda req: get_source_root(req, source_root_config),
                 ),
             ],
         )
 
-        self.assertEqual({SourceRoot("")}, set(output))
+        self.assertEqual({SourceRoot(".")}, set(output))
 
 
 class RootsTest(GoalRuleTestBase):
@@ -134,25 +122,6 @@ class RootsTest(GoalRuleTestBase):
     @classmethod
     def rules(cls):
         return [*super().rules(), *list_roots.rules()]
-
-    # Delete these *_deprecated tests in 1.30.0.dev0.
-    def test_no_langs_deprecated(self):
-        source_roots = json.dumps({"fakeroot": tuple()})
-        self.create_dir("fakeroot")
-        self.assert_console_output("fakeroot", args=[f"--source-source-roots={source_roots}"])
-
-    def test_single_source_root_deprecated(self):
-        source_roots = json.dumps({"fakeroot": ("lang1", "lang2")})
-        self.create_dir("fakeroot")
-        self.assert_console_output("fakeroot", args=[f"--source-source-roots={source_roots}"])
-
-    def test_multiple_source_roots_deprecated(self):
-        source_roots = json.dumps({"fakerootA": ("lang1",), "fakerootB": ("lang2",)})
-        self.create_dir("fakerootA")
-        self.create_dir("fakerootB")
-        self.assert_console_output(
-            "fakerootA", "fakerootB", args=[f"--source-source-roots={source_roots}"]
-        )
 
     def test_single_source_root(self):
         source_roots = json.dumps(["fakeroot"])

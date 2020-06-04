@@ -6,15 +6,15 @@ import shutil
 from collections import defaultdict
 
 from pants.build_graph.address import Address
-from pants.testutil.task_test_base import TaskTestBase
 from pants.util.contextutil import temporary_dir
+from pants_test.contrib.go.tasks.go_task_test_base import GoTaskTestBase
 
 from pants.contrib.go.subsystems.fetcher import ArchiveFetcher
 from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
 from pants.contrib.go.tasks.go_fetch import GoFetch
 
 
-class GoFetchTest(TaskTestBase):
+class GoFetchTest(GoTaskTestBase):
 
     address = Address.parse
 

@@ -39,8 +39,7 @@ class SourcesField(PayloadField):
     def source_root(self):
         """:returns: the source root for these sources, or None if they're not under a source root."""
         # TODO: It's a shame that we have to access the singleton directly here, instead of getting
-        # the SourceRoots instance from context, as tasks do.  In the new engine we could inject
-        # this into the target, rather than have it reach out for global singletons.
+        # the SourceRoots instance from context, as tasks do.
         return SourceRootConfig.global_instance().get_source_roots().find_by_path(self.rel_path)
 
     def matches(self, path: str) -> bool:

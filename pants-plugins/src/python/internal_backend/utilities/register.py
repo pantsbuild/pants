@@ -1,7 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import os
 from pathlib import Path, PurePath
 from typing import Callable, Dict, List, Optional, cast
 
@@ -17,7 +16,6 @@ from pants.backend.python.target_types import (
 from pants.backend.python.targets.python_library import PythonLibrary as PythonLibraryV1
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.target import Target
-from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem import Subsystem
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.version import PANTS_SEMVER, VERSION
@@ -122,14 +120,21 @@ def contrib_setup_py_context_aware_object_factory(parse_context) -> Callable:
 
         if build_file_aliases or register_goals or global_subsystems or rules or target_types:
             rel_path = parse_context.rel_path
-            source_root = (
-                SourceRootConfig.global_instance().get_source_roots().strict_find_by_path(rel_path)
-            )
+            # NB: We don't have proper access to SourceRoot computation here, but
+            #
+            #  we happen to know that:
+            #  A) All existing contribs have their contrib_setup_py() invocation in a BUILD file
+            #    exactly three path segments under the source root (i.e., they all have a source
+            #    root of src/<name>src/python/, and are defined in pants/contrib/<name>/BUILD under
+            #    that.)
+            #  B) We are not adding any new contribs in the future, as this idiom is going away.
+            #
+            # So we can semi-hackily compute the register module using this knowledge.
             module = (
                 PurePath(rel_path)
-                .relative_to(source_root.path)
+                .relative_to(PurePath(rel_path).parent.parent.parent)
                 .as_posix()
-                .replace(os.path.sep, ".")
+                .replace("/", ".")
             )
             entry_points = []
             if build_file_aliases:

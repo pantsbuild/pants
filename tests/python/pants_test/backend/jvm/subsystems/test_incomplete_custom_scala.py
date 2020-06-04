@@ -64,7 +64,12 @@ class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
     def test_working_210(self):
         with self.tmp_scalastyle_config() as scalastyle_config_option:
             pants_run = self.pants_run(
-                options=["-ldebug", "--scala-version=2.10", scalastyle_config_option]
+                options=[
+                    "-ldebug",
+                    "--source-root-patterns=src/scala",
+                    "--scala-version=2.10",
+                    scalastyle_config_option,
+                ]
             )
             self.assert_success(pants_run)
             assert re.search(
@@ -74,7 +79,12 @@ class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
     def test_working_211(self):
         with self.tmp_scalastyle_config() as scalastyle_config_option:
             pants_run = self.pants_run(
-                options=["-ldebug", "--scala-version=2.11", scalastyle_config_option]
+                options=[
+                    "-ldebug",
+                    "--source-root-patterns=src/scala",
+                    "--scala-version=2.11",
+                    scalastyle_config_option,
+                ]
             )
             self.assert_success(pants_run)
             assert re.search(
@@ -84,7 +94,12 @@ class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
     def test_working_212(self):
         with self.tmp_scalastyle_config() as scalastyle_config_option:
             pants_run = self.pants_run(
-                options=["-ldebug", "--scala-version=2.12", scalastyle_config_option]
+                options=[
+                    "-ldebug",
+                    "--source-root-patterns=src/scala",
+                    "--scala-version=2.12",
+                    scalastyle_config_option,
+                ]
             )
             self.assert_success(pants_run)
             assert re.search(
@@ -102,6 +117,7 @@ class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
                     """
                 ),
                 options=[
+                    "--source-root-patterns=src/scala",
                     "--scala-version=custom",
                     "--scala-suffix-version=2.11",
                     scalastyle_config_option,
@@ -117,6 +133,7 @@ class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
             pants_run = self.pants_run(
                 options=[
                     "-ldebug",
+                    "--source-root-patterns=src/scala",
                     "--scala-version=custom",
                     "--scala-suffix-version=2.11",
                     scalastyle_config_option,
@@ -131,6 +148,7 @@ class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
             pants_run = self.pants_run(
                 options=[
                     "-ldebug",
+                    "--source-root-patterns=src/scala",
                     "--scala-version=custom",
                     "--scala-suffix-version=2.12",
                     scalastyle_config_option,
@@ -144,6 +162,7 @@ class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
         with self.tmp_custom_scala("custom_211_missing_compiler.build") as scalastyle_config_option:
             pants_run = self.pants_run(
                 options=[
+                    "--source-root-patterns=src/scala",
                     "--scala-version=custom",
                     "--scala-suffix-version=2.11",
                     scalastyle_config_option,
@@ -156,6 +175,7 @@ class IncompleteCustomScalaIntegrationTest(PantsRunIntegrationTest):
         with self.tmp_custom_scala("custom_211_missing_runtime.build") as scalastyle_config_option:
             pants_run = self.pants_run(
                 options=[
+                    "--source-root-patterns=src/scala",
                     "--scala-version=custom",
                     "--scala-suffix-version=2.11",
                     scalastyle_config_option,

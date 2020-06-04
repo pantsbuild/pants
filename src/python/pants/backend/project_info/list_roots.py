@@ -28,29 +28,20 @@ class Roots(Goal):
 
 @rule
 async def all_roots(source_root_config: SourceRootConfig) -> AllSourceRoots:
-    source_roots = source_root_config.get_source_roots()
+    source_root_pattern_matcher = source_root_config.get_pattern_matcher()
 
+    # Create globs corresponding to all source root patterns.
     all_paths: Set[str] = set()
-    for path in source_roots.get_patterns():
-        # Remove these first two branches in 1.30.0.dev0, after the trie implementation is deleted.
-        if path == "^":
-            all_paths.add("**")
-        elif path.startswith("^/"):
-            all_paths.add(f"{path[2:]}/")
-
-        elif path == "/":
+    for path in source_root_pattern_matcher.get_patterns():
+        if path == "/":
             all_paths.add("**")
         elif path.startswith("/"):
             all_paths.add(f"{path[1:]}/")
         else:
             all_paths.add(f"**/{path}/")
 
+    # Match the patterns against actual files, to find the roots that actually exist.
     snapshot = await Get[Snapshot](PathGlobs(globs=sorted(all_paths)))
-
-    # The globs above can match on subdirectories of the source roots.
-    # For instance, `src/*/` might match 'src/rust/' as well as
-    # 'src/rust/engine/process_execution/bazel_protos/src/gen'.
-    # So we use find_by_path to verify every candidate source root.
     responses = await MultiGet(Get[OptionalSourceRoot](SourceRootRequest(d)) for d in snapshot.dirs)
     all_source_roots = {
         response.source_root for response in responses if response.source_root is not None

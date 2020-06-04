@@ -545,6 +545,16 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
             scoped_opts = options.setdefault(s, {})
             scoped_opts.update(opts)
 
+        source_options = options.get("source", {})
+        if "root_patterns" not in source_options:
+            # We have many tests that relied on old defaults that we've since changed.
+            # We set those defaults here so we don't have to modify many dozens of call sites.
+            source_options["root_patterns"] = [
+                "src/*",
+                "src/main/*",
+            ]
+            options["source"] = source_options
+
         fake_options = create_options_for_optionables(all_optionables, options=options, **kwargs)
 
         Subsystem.reset(reset_options=True)

@@ -7,9 +7,9 @@ from collections import defaultdict
 from itertools import chain
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.testutil.task_test_base import TaskTestBase
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import safe_mkdir, touch
+from pants_test.contrib.go.tasks.go_task_test_base import GoTaskTestBase
 
 from pants.contrib.go.targets.go_library import GoLibrary
 from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
@@ -23,7 +23,7 @@ class MockGoWorkspaceTask(GoWorkspaceTask):
         pass
 
 
-class GoWorkspaceTaskTest(TaskTestBase):
+class GoWorkspaceTaskTest(GoTaskTestBase):
     @classmethod
     def task_type(cls):
         return MockGoWorkspaceTask
@@ -65,7 +65,9 @@ class GoWorkspaceTaskTest(TaskTestBase):
             self.add_to_build_file(spec, "go_library()")
 
             go_lib = self.target(spec)
-            ws_task = self.create_task(self.context())
+            ws_task = self.create_task(
+                self.context(options={"source": {"root_patterns": ["src/main/go"]}})
+            )
             gopath = ws_task.get_gopath(go_lib)
 
             def assert_is_linked(src):

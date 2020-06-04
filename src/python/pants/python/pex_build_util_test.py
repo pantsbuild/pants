@@ -47,7 +47,7 @@ class TestPexBuilderWrapper(TestBase):
             yield pathlib.Path(chroot)
 
     def test(self):
-        init_subsystem(SourceRootConfig)
+        init_subsystem(SourceRootConfig, {"source": {"root_patterns": ["src/python"]}})
         self.create_file("src/python/package/module.py")
         implicit_package_target = self.make_target(
             spec="src/python/package", target_type=PythonLibrary, sources=["module.py"]

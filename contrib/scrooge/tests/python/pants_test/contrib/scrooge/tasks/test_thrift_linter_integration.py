@@ -52,6 +52,7 @@ class ThriftLinterTest(PantsRunIntegrationTest):
                     "pants.contrib.scrooge",
                 ],
             },
+            "source": {"root_patterns": ["tests/*", "src/*"]},
         }
         if config:
             for scope, scoped_cfgs in config.items():

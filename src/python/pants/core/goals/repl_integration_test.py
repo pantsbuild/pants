@@ -51,7 +51,10 @@ class ReplTest(GoalRuleTestBase):
     def test_repl_with_targets(self) -> None:
         self.setup_python_library()
         self.execute_rule(
-            global_args=["--backend-packages2=pants.backend.python"],
+            global_args=[
+                "--backend-packages2=pants.backend.python",
+                "--source-root-patterns=src/python",
+            ],
             args=["src/python/lib.py"],
             additional_params=[InteractiveRunner(self.scheduler)],
         )
@@ -59,7 +62,10 @@ class ReplTest(GoalRuleTestBase):
     def test_repl_ipython(self) -> None:
         self.setup_python_library()
         self.execute_rule(
-            global_args=["--backend-packages2=pants.backend.python"],
+            global_args=[
+                "--backend-packages2=pants.backend.python",
+                "--source-root-patterns=src/python",
+            ],
             args=["--shell=ipython", "src/python/lib.py"],
             additional_params=[InteractiveRunner(self.scheduler)],
         )
@@ -67,7 +73,10 @@ class ReplTest(GoalRuleTestBase):
     def test_repl_bogus_repl_name(self) -> None:
         self.setup_python_library()
         result = self.execute_rule(
-            global_args=["--backend-packages2=pants.backend.python"],
+            global_args=[
+                "--backend-packages2=pants.backend.python",
+                "--source-root-patterns=src/python",
+            ],
             args=["--shell=bogus-repl", "src/python/lib.py"],
             additional_params=[InteractiveRunner(self.scheduler)],
             exit_code=-1,

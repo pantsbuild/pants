@@ -47,6 +47,7 @@ class ScalaFixIntegrationTest(PantsRunIntegrationTest):
 
         rules = {"rules": "RemoveUnused", "semantic": True}
         options = {
+            "source": {"root_patterns": ["src/*", "tests/*"]},
             "scala": {
                 "scalac_plugin_dep": f"{TEST_DIR}/rsc_compat:semanticdb-scalac",
                 "scalac_plugins": '+["semanticdb"]',
