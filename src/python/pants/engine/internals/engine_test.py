@@ -550,6 +550,8 @@ class StreamingWorkunitProcessTests(TestBase):
         assert stderr_digest == EMPTY_DIGEST
         assert stdout_digest.serialized_bytes_length == len(result.stdout)
 
+        stdout_bytes = self._scheduler.digest_to_bytes(stdout_digest)
+
         tracker = WorkunitTracker()
         handler = StreamingWorkunitHandler(
             self._scheduler,
@@ -578,3 +580,9 @@ class StreamingWorkunitProcessTests(TestBase):
         assert result.stderr == b"stderr output\n"
         assert stdout_digest == EMPTY_DIGEST
         assert stderr_digest.serialized_bytes_length == len(result.stderr)
+
+        stdout_bytes = self._scheduler.digest_to_bytes(stdout_digest)
+        stderr_bytes = self._scheduler.digest_to_bytes(stderr_digest)
+        assert stdout_bytes == result.stdout
+        assert stderr_bytes == result.stderr
+

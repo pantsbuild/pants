@@ -42,8 +42,9 @@
 /// how we expose ourselves back to Python.
 ///
 use cpython::{
-  exc, py_class, py_exception, py_fn, py_module_initializer, NoArgs, PyClone, PyErr, PyList,
-  PyObject, PyResult as CPyResult, PyString, PyTuple, PyType, Python, PythonObject, ToPyObject,
+  exc, py_class, py_exception, py_fn, py_module_initializer, NoArgs, PyBytes, PyClone, PyErr,
+  PyList, PyObject, PyResult as CPyResult, PyString, PyTuple, PyType, Python, PythonObject,
+  ToPyObject,
 };
 
 use crate::{
@@ -356,6 +357,12 @@ py_module_initializer!(native_engine, |py, m| {
         process_execution_local_enable_nailgun: bool
       )
     ),
+  )?;
+
+  m.add(
+    py,
+    "digest_to_bytes",
+    py_fn!(py, digest_to_bytes(a: PyScheduler, b: PyObject)),
   )?;
 
   m.add_class::<PyTasks>(py)?;
@@ -1322,6 +1329,37 @@ fn merge_directories(
       })
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))
     })
+  })
+}
+
+fn digest_to_bytes(
+  py: Python,
+  scheduler_ptr: PyScheduler,
+  py_digest: PyObject,
+) -> CPyResult<PyBytes> {
+  with_scheduler(py, scheduler_ptr, |scheduler| {
+    let core = scheduler.core.clone();
+    let store = core.store().clone();
+
+    let digest = crate::nodes::lift_digest(&py_digest.into())
+      .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
+
+    let bytes: Vec<u8> = py
+      .allow_threads(|| {
+        core.executor.block_on(async move {
+          store
+            .load_file_bytes_with(digest, |bytes| bytes.into()) //TODO see if this can be done no-copy
+            .await
+            .and_then(|maybe_bytes: Option<(Vec<u8>, _)>| {
+              maybe_bytes
+                .map(|bytes_tuple| bytes_tuple.0)
+                .ok_or_else(|| format!("Error loading bytes from digest: {:?}", digest))
+            })
+        })
+      })
+      .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
+
+    Ok(PyBytes::new(py, &bytes))
   })
 }
 
