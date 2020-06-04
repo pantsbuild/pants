@@ -906,18 +906,10 @@ pub fn populate_fallible_execution_result(
   execution_attempts: Vec<ExecutionStats>,
   platform: Platform,
 ) -> impl Future<Item = FallibleProcessResultWithPlatform, Error = String> {
-  let stdout_digest_result: Result<Digest, String> =
-    execute_response.get_result().get_stdout_digest().into();
-  let stdout_digest =
-    try_future!(stdout_digest_result.map_err(|err| format!("Error extracting stdout: {}", err)));
-
-  let stderr_digest_result: Result<Digest, String> =
-    execute_response.get_result().get_stderr_digest().into();
-  let stderr_digest =
-    try_future!(stderr_digest_result.map_err(|err| format!("Error extracting stderr: {}", err)));
-
-  extract_output_files(store, &execute_response)
-    .and_then(move |output_directory| {
+  extract_stdout(&store, &execute_response)
+    .join(extract_stderr(&store, &execute_response))
+    .join(extract_output_files(store, &execute_response))
+    .and_then(move |((stdout_digest, stderr_digest), output_directory)| {
       Ok(FallibleProcessResultWithPlatform {
         stdout_digest,
         stderr_digest,
@@ -928,6 +920,60 @@ pub fn populate_fallible_execution_result(
       })
     })
     .to_boxed()
+}
+
+fn extract_stdout(
+  store: &Store,
+  execute_response: &bazel_protos::remote_execution::ExecuteResponse,
+) -> BoxFuture<Digest, String> {
+  if execute_response.get_result().has_stdout_digest() {
+    let stdout_digest_result: Result<Digest, String> =
+      execute_response.get_result().get_stdout_digest().into();
+    let stdout_digest =
+      try_future!(stdout_digest_result.map_err(|err| format!("Error extracting stdout: {}", err)));
+    Box::pin(async move { Ok(stdout_digest) })
+      .compat()
+      .to_boxed()
+  } else {
+    let store = store.clone();
+    let stdout_raw = Bytes::from(execute_response.get_result().get_stdout_raw());
+    Box::pin(async move {
+      let digest = store
+        .store_file_bytes(stdout_raw, true)
+        .map_err(move |error| format!("Error storing raw stdout: {:?}", error))
+        .await?;
+      Ok(digest)
+    })
+    .compat()
+    .to_boxed()
+  }
+}
+
+fn extract_stderr(
+  store: &Store,
+  execute_response: &bazel_protos::remote_execution::ExecuteResponse,
+) -> BoxFuture<Digest, String> {
+  if execute_response.get_result().has_stderr_digest() {
+    let stderr_digest_result: Result<Digest, String> =
+      execute_response.get_result().get_stderr_digest().into();
+    let stderr_digest =
+      try_future!(stderr_digest_result.map_err(|err| format!("Error extracting stderr: {}", err)));
+    Box::pin(async move { Ok(stderr_digest) })
+      .compat()
+      .to_boxed()
+  } else {
+    let store = store.clone();
+    let stderr_raw = Bytes::from(execute_response.get_result().get_stderr_raw());
+    Box::pin(async move {
+      let digest = store
+        .store_file_bytes(stderr_raw, true)
+        .map_err(move |error| format!("Error storing raw stderr: {:?}", error))
+        .await?;
+      Ok(digest)
+    })
+    .compat()
+    .to_boxed()
+  }
 }
 
 pub fn extract_output_files(
