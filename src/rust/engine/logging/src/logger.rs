@@ -22,7 +22,7 @@ use uuid::Uuid;
 
 const TIME_FORMAT_STR: &str = "%H:%M:%S:%3f";
 
-pub type StdioHandler = Box<dyn Fn(&str) -> () + Send>;
+pub type StdioHandler = Box<dyn Fn(&str) -> Result<(), ()> + Send>;
 
 lazy_static! {
   pub static ref LOGGER: Logger = Logger::new();
@@ -162,13 +162,17 @@ impl Log for Logger {
         let log_string: String = format!("{} [{}] {}", cur_time, level, record.args());
 
         {
+          // If there are no handlers, or sending to any of the handlers failed, send to stderr
+          // directly.
           let handlers_map = self.stderr_handlers.lock();
-          if handlers_map.len() == 0 {
-            self.stderr_log.lock().log(record);
-          } else {
-            for callback in handlers_map.values() {
-              callback(&log_string);
+          let mut any_handler_failed = false;
+          for callback in handlers_map.values() {
+            if callback(&log_string).is_err() {
+              any_handler_failed = true;
             }
+          }
+          if handlers_map.len() == 0 || any_handler_failed {
+            self.stderr_log.lock().log(record);
           }
         }
       }

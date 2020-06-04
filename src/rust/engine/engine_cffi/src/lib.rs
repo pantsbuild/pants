@@ -85,7 +85,10 @@ impl From<ExecutionTermination> for RawExecutionTermination {
   fn from(et: ExecutionTermination) -> Self {
     match et {
       ExecutionTermination::KeyboardInterrupt => RawExecutionTermination::KeyboardInterrupt,
-      ExecutionTermination::Timeout => RawExecutionTermination::Timeout,
+      ExecutionTermination::PollTimeout => RawExecutionTermination::Timeout,
+      // NB: 1.29.x does not make it easy to expose an accurate exception here, but this case
+      // should be "effectively impossible".
+      ExecutionTermination::Fatal(_) => RawExecutionTermination::Timeout,
     }
   }
 }
