@@ -168,7 +168,8 @@ impl StreamingCommandRunner {
             build_id,
             &operation
           );
-          operation_name_opt = Some(operation.get_name().to_string());
+          operation_name_opt =
+            Some(operation.get_name().to_string()).filter(|s| s.trim().len() > 0);
 
           // Continue monitoring if the operation is not complete.
           if !operation.get_done() {
