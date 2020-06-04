@@ -410,7 +410,11 @@ impl<N: Node> InnerGraph<N> {
     Ok(())
   }
 
-  fn reachable_digest_count(&self, roots: &[N], context: &N::Context) -> usize {
+  fn live_reachable<'g>(
+    &'g self,
+    roots: &[N],
+    context: &N::Context,
+  ) -> impl Iterator<Item = (&N, N::Item)> + 'g {
     // TODO: This is a surprisingly expensive method, because it will clone all reachable values by
     // calling `peek` on them.
     let root_ids = roots
@@ -418,34 +422,27 @@ impl<N: Node> InnerGraph<N> {
       .filter_map(|node| self.entry_id(node))
       .cloned()
       .collect();
-    self
-      .digests_internal(
-        self
-          .walk(root_ids, Direction::Outgoing, |_| false)
-          .collect(),
-        context.clone(),
-      )
-      .count()
+    self.live_internal(
+      self
+        .walk(root_ids, Direction::Outgoing, |_| false)
+        .collect(),
+      context.clone(),
+    )
   }
 
-  fn all_digests(&self, context: &N::Context) -> Vec<hashing::Digest> {
-    self
-      .digests_internal(self.pg.node_indices().collect(), context.clone())
-      .collect()
+  fn live<'g>(&'g self, context: &N::Context) -> impl Iterator<Item = (&N, N::Item)> + 'g {
+    self.live_internal(self.pg.node_indices().collect(), context.clone())
   }
 
-  fn digests_internal<'g>(
+  fn live_internal<'g>(
     &'g self,
     entryids: Vec<EntryId>,
     context: N::Context,
-  ) -> impl Iterator<Item = hashing::Digest> + 'g {
+  ) -> impl Iterator<Item = (&N, N::Item)> + 'g {
     entryids
       .into_iter()
       .filter_map(move |eid| self.entry_for_id(eid))
-      .filter_map(move |entry| match entry.peek(&context) {
-        Some(item) => N::digest(item),
-        _ => None,
-      })
+      .filter_map(move |entry| entry.peek(&context).map(|i| (entry.node(), i)))
   }
 }
 
@@ -836,14 +833,23 @@ impl<N: Node> Graph<N> {
     inner.visualize(visualizer, roots, path, context)
   }
 
-  pub fn reachable_digest_count(&self, roots: &[N], context: &N::Context) -> usize {
+  pub fn visit_live_reachable(
+    &self,
+    roots: &[N],
+    context: &N::Context,
+    mut f: impl FnMut(&N, N::Item) -> (),
+  ) {
     let inner = self.inner.lock();
-    inner.reachable_digest_count(roots, context)
+    for (n, v) in inner.live_reachable(roots, context) {
+      f(n, v);
+    }
   }
 
-  pub fn all_digests(&self, context: &N::Context) -> Vec<hashing::Digest> {
+  pub fn visit_live(&self, context: &N::Context, mut f: impl FnMut(&N, N::Item) -> ()) {
     let inner = self.inner.lock();
-    inner.all_digests(context)
+    for (n, v) in inner.live(context) {
+      f(n, v);
+    }
   }
 
   ///

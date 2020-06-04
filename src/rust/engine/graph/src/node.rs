@@ -6,7 +6,6 @@ use std::future::Future;
 use std::hash::Hash;
 
 use async_trait::async_trait;
-use hashing::Digest;
 
 use petgraph::stable_graph;
 
@@ -29,11 +28,6 @@ pub trait Node: Clone + Debug + Display + Eq + Hash + Send + 'static {
   type Error: NodeError;
 
   async fn run(self, context: Self::Context) -> Result<Self::Item, Self::Error>;
-
-  ///
-  /// If the given Node output represents an FS operation, returns its Digest.
-  ///
-  fn digest(result: Self::Item) -> Option<Digest>;
 
   ///
   /// If the node result is cacheable, return true.

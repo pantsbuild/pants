@@ -7,7 +7,6 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
-use hashing::Digest;
 use parking_lot::Mutex;
 use rand::{self, Rng};
 use tokio::time::{timeout, Elapsed};
@@ -622,10 +621,6 @@ impl Node for TNode {
     } else {
       Ok(vec![token])
     }
-  }
-
-  fn digest(_result: Self::Item) -> Option<Digest> {
-    None
   }
 
   fn cacheable(&self) -> bool {

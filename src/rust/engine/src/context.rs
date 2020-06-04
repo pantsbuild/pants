@@ -26,7 +26,7 @@ use process_execution::{
 };
 use rand::seq::SliceRandom;
 use rule_graph::RuleGraph;
-use sharded_lmdb::ShardedLmdb;
+use sharded_lmdb::{ShardedLmdb, DEFAULT_LEASE_TIME};
 use store::Store;
 use tokio::runtime::{Builder, Runtime};
 use uuid::Uuid;
@@ -235,6 +235,7 @@ impl Core {
         local_store_dir2.join("processes"),
         5 * GIGABYTES,
         executor.clone(),
+        DEFAULT_LEASE_TIME,
       )
       .map_err(|err| format!("Could not initialize store for process cache: {:?}", err))?;
       command_runner = Box::new(process_execution::cache::CommandRunner::new(

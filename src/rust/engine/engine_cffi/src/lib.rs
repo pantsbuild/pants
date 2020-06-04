@@ -1014,7 +1014,11 @@ pub extern "C" fn lease_files_in_graph(scheduler_ptr: *mut Scheduler, session_pt
   with_scheduler(scheduler_ptr, |scheduler| {
     with_session(session_ptr, |session| {
       let digests = scheduler.all_digests(session);
-      match scheduler.core.store().lease_all(digests.iter()) {
+      let res = scheduler
+        .core
+        .executor
+        .block_on(scheduler.core.store().lease_all_recursively(digests.iter()));
+      match res {
         Ok(_) => {}
         Err(err) => error!("{}", &err),
       }
