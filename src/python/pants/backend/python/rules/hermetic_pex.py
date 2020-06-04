@@ -52,7 +52,6 @@ class HermeticPex:
         hermetic_env = dict(
             PATH=create_path_env_var(python_setup.interpreter_search_paths),
             PEX_ROOT=".cache/pex_root",
-            RUNTIME_PEX_ROOT=".cache/pex_root",
             PEX_INHERIT_PATH="false",
             PEX_IGNORE_RCFILES="true",
             **subprocess_encoding_environment.invocation_environment_dict,
