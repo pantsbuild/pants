@@ -32,20 +32,20 @@ use tokio::time::{delay_for, timeout};
 use workunit_store::{Workunit, WorkunitMetadata, WorkunitState, WorkunitStore};
 
 #[derive(Debug, PartialEq)]
-struct RemoteTestResult {
-  original: FallibleProcessResultWithPlatform,
-  stdout_bytes: Vec<u8>,
-  stderr_bytes: Vec<u8>,
+pub(crate) struct RemoteTestResult {
+  pub(crate) original: FallibleProcessResultWithPlatform,
+  pub(crate) stdout_bytes: Vec<u8>,
+  pub(crate) stderr_bytes: Vec<u8>,
 }
 
 #[derive(Debug, PartialEq)]
-enum StdoutType {
+pub(crate) enum StdoutType {
   Raw(String),
   Digest(Digest),
 }
 
 #[derive(Debug, PartialEq)]
-enum StderrType {
+pub(crate) enum StderrType {
   Raw(String),
   Digest(Digest),
 }
@@ -2349,14 +2349,14 @@ fn make_canceled_operation(duration: Option<Duration>) -> MockOperation {
   }
 }
 
-fn make_incomplete_operation(operation_name: &str) -> MockOperation {
+pub(crate) fn make_incomplete_operation(operation_name: &str) -> MockOperation {
   let mut op = bazel_protos::operations::Operation::new();
   op.set_name(operation_name.to_string());
   op.set_done(false);
   MockOperation::new(op)
 }
 
-fn make_retryable_operation_failure() -> MockOperation {
+pub(crate) fn make_retryable_operation_failure() -> MockOperation {
   let mut status = bazel_protos::status::Status::new();
   status.set_code(grpcio::RpcStatusCode::ABORTED.into());
   status.set_message(String::from("the bot running the task appears to be lost"));
@@ -2434,7 +2434,7 @@ fn make_successful_operation_with_maybe_metadata(
   op
 }
 
-fn make_successful_operation(
+pub(crate) fn make_successful_operation(
   operation_name: &str,
   stdout: StdoutType,
   stderr: StderrType,
@@ -2590,7 +2590,11 @@ fn create_command_runner(
   (command_runner, store)
 }
 
-fn make_store(store_dir: &Path, cas: &mock::StubCAS, executor: task_executor::Executor) -> Store {
+pub(crate) fn make_store(
+  store_dir: &Path,
+  cas: &mock::StubCAS,
+  executor: task_executor::Executor,
+) -> Store {
   Store::with_remote(
     executor,
     store_dir,
@@ -2734,7 +2738,7 @@ fn echo_roland_request() -> MultiPlatformProcess {
   req.into()
 }
 
-fn empty_request_metadata() -> ProcessMetadata {
+pub(crate) fn empty_request_metadata() -> ProcessMetadata {
   ProcessMetadata {
     instance_name: None,
     cache_key_gen_version: None,
@@ -2742,7 +2746,7 @@ fn empty_request_metadata() -> ProcessMetadata {
   }
 }
 
-fn assert_cancellation_requests(
+pub(crate) fn assert_cancellation_requests(
   mock_server: &mock::execution_server::TestServer,
   expected: Vec<String>,
 ) {

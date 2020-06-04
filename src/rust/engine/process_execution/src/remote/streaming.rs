@@ -568,11 +568,12 @@ impl crate::CommandRunner for StreamingCommandRunner {
       input_files,
       ..
     } = compatible_underlying_request;
+    let build_id = context.build_id.clone();
 
     debug!("Remote execution: {}", description);
     trace!(
       "built REv2 request (build_id={}): action={:?}; command={:?}; execute_request={:?}",
-      context.build_id,
+      &build_id,
       action,
       command,
       execute_request
@@ -594,7 +595,7 @@ impl crate::CommandRunner for StreamingCommandRunner {
       Err(_) => {
         debug!(
           "remote execution for build_id={} timed out after {:?}",
-          context.build_id, deadline_duration
+          &build_id, deadline_duration
         );
         Err(format!(
           "remote execution timed out after {:?}",

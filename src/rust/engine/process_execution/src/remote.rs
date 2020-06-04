@@ -33,6 +33,8 @@ use workunit_store::WorkunitStore;
 // module.
 mod streaming;
 pub use streaming::StreamingCommandRunner;
+#[cfg(test)]
+mod streaming_tests;
 
 // Environment variable which is exclusively used for cache key invalidation.
 // This may be not specified in an Process, and may be populated only by the
