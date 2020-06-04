@@ -395,9 +395,7 @@ impl super::CommandRunner for CommandRunner {
                 let stdout_digest = store.store_file_bytes(stdout.clone(), true).await?;
 
                 break FallibleProcessResultWithPlatform {
-                  stdout,
                   stdout_digest,
-                  stderr: Bytes::new(),
                   stderr_digest: hashing::EMPTY_DIGEST,
                   exit_code: -libc::SIGTERM,
                   output_directory: hashing::EMPTY_DIGEST,
@@ -911,62 +909,40 @@ pub fn populate_fallible_execution_result(
   extract_stdout(&store, &execute_response)
     .join(extract_stderr(&store, &execute_response))
     .join(extract_output_files(store, &execute_response))
-    .and_then(
-      move |(((stdout, stdout_digest), (stderr, stderr_digest)), output_directory)| {
-        Ok(FallibleProcessResultWithPlatform {
-          stdout,
-          stdout_digest,
-          stderr,
-          stderr_digest,
-          exit_code: execute_response.get_result().get_exit_code(),
-          output_directory: output_directory,
-          execution_attempts: execution_attempts,
-          platform,
-        })
-      },
-    )
+    .and_then(move |((stdout_digest, stderr_digest), output_directory)| {
+      Ok(FallibleProcessResultWithPlatform {
+        stdout_digest,
+        stderr_digest,
+        exit_code: execute_response.get_result().get_exit_code(),
+        output_directory: output_directory,
+        execution_attempts: execution_attempts,
+        platform,
+      })
+    })
+    .to_boxed()
 }
 
 fn extract_stdout(
   store: &Store,
   execute_response: &bazel_protos::remote_execution::ExecuteResponse,
-) -> BoxFuture<(Bytes, Digest), String> {
+) -> BoxFuture<Digest, String> {
   if execute_response.get_result().has_stdout_digest() {
-    let store = store.clone();
     let stdout_digest_result: Result<Digest, String> =
       execute_response.get_result().get_stdout_digest().into();
     let stdout_digest =
       try_future!(stdout_digest_result.map_err(|err| format!("Error extracting stdout: {}", err)));
-    Box::pin(async move {
-      let (bytes, _metadata) = store
-        .load_file_bytes_with(stdout_digest, |v| v.into())
-        .map_err(move |error| {
-          format!(
-            "Error fetching stdout digest ({:?}): {:?}",
-            stdout_digest, error
-          )
-        })
-        .await?
-        .ok_or_else(|| {
-          format!(
-            "Couldn't find stdout digest ({:?}), when fetching.",
-            stdout_digest
-          )
-        })?;
-      Ok((bytes, stdout_digest))
-    })
-    .compat()
-    .to_boxed()
+    Box::pin(async move { Ok(stdout_digest) })
+      .compat()
+      .to_boxed()
   } else {
     let store = store.clone();
     let stdout_raw = Bytes::from(execute_response.get_result().get_stdout_raw());
-    let stdout_copy = stdout_raw.clone();
     Box::pin(async move {
       let digest = store
         .store_file_bytes(stdout_raw, true)
         .map_err(move |error| format!("Error storing raw stdout: {:?}", error))
         .await?;
-      Ok((stdout_copy, digest))
+      Ok(digest)
     })
     .compat()
     .to_boxed()
@@ -976,44 +952,24 @@ fn extract_stdout(
 fn extract_stderr(
   store: &Store,
   execute_response: &bazel_protos::remote_execution::ExecuteResponse,
-) -> BoxFuture<(Bytes, Digest), String> {
+) -> BoxFuture<Digest, String> {
   if execute_response.get_result().has_stderr_digest() {
-    let store = store.clone();
     let stderr_digest_result: Result<Digest, String> =
       execute_response.get_result().get_stderr_digest().into();
     let stderr_digest =
       try_future!(stderr_digest_result.map_err(|err| format!("Error extracting stderr: {}", err)));
-
-    Box::pin(async move {
-      let (bytes, _metadata) = store
-        .load_file_bytes_with(stderr_digest, |v| v.into())
-        .map_err(move |error| {
-          format!(
-            "Error fetching stderr digest ({:?}): {:?}",
-            stderr_digest, error
-          )
-        })
-        .await?
-        .ok_or_else(|| {
-          format!(
-            "Couldn't find stderr digest ({:?}), when fetching.",
-            stderr_digest
-          )
-        })?;
-      Ok((bytes, stderr_digest))
-    })
-    .compat()
-    .to_boxed()
+    Box::pin(async move { Ok(stderr_digest) })
+      .compat()
+      .to_boxed()
   } else {
     let store = store.clone();
     let stderr_raw = Bytes::from(execute_response.get_result().get_stderr_raw());
-    let stderr_copy = stderr_raw.clone();
     Box::pin(async move {
       let digest = store
         .store_file_bytes(stderr_raw, true)
         .map_err(move |error| format!("Error storing raw stderr: {:?}", error))
         .await?;
-      Ok((stderr_copy, digest))
+      Ok(digest)
     })
     .compat()
     .to_boxed()

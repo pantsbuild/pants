@@ -7,7 +7,6 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use bytes::Bytes;
 use futures::compat::Future01CompatExt;
-use futures::future;
 use futures01::Future;
 use log::{debug, warn};
 use protobuf::Message;
@@ -149,15 +148,8 @@ impl CommandRunner {
     // (This isn't super urgent because we don't ever actually GC this store. So also...)
     // TODO: GC the local process execution cache.
 
-    let (stdout_digest, stderr_digest) = future::try_join(
-      self
-        .file_store
-        .store_file_bytes(result.stdout.clone(), true),
-      self
-        .file_store
-        .store_file_bytes(result.stderr.clone(), true),
-    )
-    .await?;
+    let stdout_digest = result.stdout_digest;
+    let stderr_digest = result.stderr_digest;
 
     let action_result = execute_response.mut_result();
     action_result.set_stdout_digest((&stdout_digest).into());

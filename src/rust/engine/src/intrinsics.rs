@@ -118,6 +118,7 @@ fn multi_platform_process_request_to_process_result(
   args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
   let core = context.core.clone();
+  let store = context.core.store();
   async move {
     let process_val = &args[0];
     // TODO: The platform will be used in a followup.
@@ -129,15 +130,44 @@ fn multi_platform_process_request_to_process_result(
         str
       ))
     })?;
-    let result = context.get(process_request).await?;
-    let platform_name: String = result.0.platform.into();
+    let result = context.get(process_request).await?.0;
+
+    let maybe_stdout = store
+      .load_file_bytes_with(result.stdout_digest, |bytes: &[u8]| bytes.to_owned())
+      .await
+      .map_err(|s| throw(&s))?;
+
+    let maybe_stderr = store
+      .load_file_bytes_with(result.stderr_digest, |bytes: &[u8]| bytes.to_owned())
+      .await
+      .map_err(|s| throw(&s))?;
+
+    let stdout_bytes = maybe_stdout
+      .map(|(bytes, _load_metadata)| bytes)
+      .ok_or_else(|| {
+        throw(&format!(
+          "Bytes from stdout Digest {:?} not found in store",
+          result.stdout_digest
+        ))
+      })?;
+
+    let stderr_bytes = maybe_stderr
+      .map(|(bytes, _load_metadata)| bytes)
+      .ok_or_else(|| {
+        throw(&format!(
+          "Bytes from stderr Digest {:?} not found in store",
+          result.stderr_digest
+        ))
+      })?;
+
+    let platform_name: String = result.platform.into();
     Ok(externs::unsafe_call(
       &core.types.construct_process_result,
       &[
-        externs::store_bytes(&result.0.stdout),
-        externs::store_bytes(&result.0.stderr),
-        externs::store_i64(result.0.exit_code.into()),
-        Snapshot::store_directory(&core, &result.0.output_directory),
+        externs::store_bytes(&stdout_bytes),
+        externs::store_bytes(&stderr_bytes),
+        externs::store_i64(result.exit_code.into()),
+        Snapshot::store_directory(&core, &result.output_directory),
         externs::unsafe_call(
           &core.types.construct_platform,
           &[externs::store_utf8(&platform_name)],

@@ -441,8 +441,22 @@ async fn main() {
       .unwrap();
   }
 
-  print!("{}", String::from_utf8(result.stdout.to_vec()).unwrap());
-  eprint!("{}", String::from_utf8(result.stderr.to_vec()).unwrap());
+  let stdout: Vec<u8> = store
+    .load_file_bytes_with(result.stdout_digest, |bytes| bytes.to_vec())
+    .await
+    .unwrap()
+    .unwrap()
+    .0;
+
+  let stderr: Vec<u8> = store
+    .load_file_bytes_with(result.stderr_digest, |bytes| bytes.to_vec())
+    .await
+    .unwrap()
+    .unwrap()
+    .0;
+
+  print!("{}", String::from_utf8(stdout).unwrap());
+  eprint!("{}", String::from_utf8(stderr).unwrap());
   exit(result.exit_code);
 }
 

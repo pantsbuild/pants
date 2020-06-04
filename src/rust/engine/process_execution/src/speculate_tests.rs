@@ -192,9 +192,7 @@ async fn make_delayed_command_runner(
     Err(msg.into())
   } else {
     Ok(FallibleProcessResultWithPlatform {
-      stdout: msg.into(),
       stdout_digest,
-      stderr: "".into(),
       stderr_digest: EMPTY_DIGEST,
       exit_code: 0,
       output_directory: EMPTY_DIGEST,

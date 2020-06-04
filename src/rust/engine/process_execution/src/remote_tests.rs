@@ -949,7 +949,7 @@ async fn ensure_inline_stdio_is_stored() {
     None,
     None,
     BTreeMap::new(),
-    store,
+    store.clone(),
     Platform::Linux,
     runtime.clone(),
     Duration::from_secs(0),
@@ -957,15 +957,15 @@ async fn ensure_inline_stdio_is_stored() {
     Duration::from_secs(0),
   )
   .unwrap();
-  let result = cmd_runner
-    .run(echo_roland_request(), Context::default())
+
+  let result = run_cmd_runner(echo_roland_request(), cmd_runner, store)
     .await
     .unwrap();
 
-  assert_eq!(result.stdout, test_stdout.bytes());
-  assert_eq!(result.stderr, test_stderr.bytes());
-  assert_eq!(result.exit_code, 0);
-  assert_eq!(result.platform, Platform::Linux);
+  assert_eq!(result.stdout_bytes, test_stdout.bytes());
+  assert_eq!(result.stderr_bytes, test_stderr.bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(result.original.platform, Platform::Linux);
 
   let local_store =
     Store::local_only(runtime.clone(), &store_dir_path).expect("Error creating local store");
@@ -1516,7 +1516,7 @@ async fn execute_missing_file_uploads_if_known() {
     None,
     None,
     BTreeMap::new(),
-    store,
+    store.clone(),
     Platform::Linux,
     runtime.clone(),
     Duration::from_secs(0),
@@ -1525,15 +1525,14 @@ async fn execute_missing_file_uploads_if_known() {
   )
   .unwrap();
 
-  let result = command_runner
-    .run(cat_roland_request(), Context::default())
+  let result = run_cmd_runner(cat_roland_request(), command_runner, store)
     .await
     .unwrap();
 
-  assert_eq!(result.stdout, roland.bytes());
-  assert_eq!(result.stderr, "".as_bytes());
-  assert_eq!(result.exit_code, 0);
-  assert_eq!(result.platform, Platform::Linux);
+  assert_eq!(result.stdout_bytes, roland.bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(result.original.platform, Platform::Linux);
 
   {
     let blobs = cas.blobs.lock();
@@ -1618,28 +1617,29 @@ async fn execute_missing_file_uploads_if_known_status() {
     .await
     .expect("Saving file bytes to store");
 
-  let result = CommandRunner::new(
+  let command_runner = CommandRunner::new(
     &mock_server.address(),
     empty_request_metadata(),
     None,
     None,
     BTreeMap::new(),
-    store,
+    store.clone(),
     Platform::Linux,
     runtime.clone(),
     Duration::from_secs(0),
     Duration::from_millis(0),
     Duration::from_secs(0),
   )
-  .unwrap()
-  .run(cat_roland_request(), Context::default())
-  .await
   .unwrap();
 
-  assert_eq!(result.stdout, roland.bytes());
-  assert_eq!(result.stderr, "".as_bytes());
-  assert_eq!(result.exit_code, 0);
-  assert_eq!(result.platform, Platform::Linux);
+  let result = run_cmd_runner(cat_roland_request(), command_runner, store)
+    .await
+    .unwrap();
+
+  assert_eq!(result.stdout_bytes, roland.bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(result.original.platform, Platform::Linux);
   {
     let blobs = cas.blobs.lock();
     assert_eq!(blobs.get(&roland.fingerprint()), Some(&roland.bytes()));
@@ -2504,6 +2504,29 @@ fn make_precondition_failure_status(
     precondition_failure
   }));
   status
+}
+
+async fn run_cmd_runner(
+  request: MultiPlatformProcess,
+  command_runner: CommandRunner,
+  store: Store,
+) -> Result<RemoteTestResult, String> {
+  let original = command_runner.run(request, Context::default()).await?;
+  let stdout_bytes: Vec<u8> = store
+    .load_file_bytes_with(original.stdout_digest, |bytes| bytes.into())
+    .await?
+    .unwrap()
+    .0;
+  let stderr_bytes: Vec<u8> = store
+    .load_file_bytes_with(original.stderr_digest, |bytes| bytes.into())
+    .await?
+    .unwrap()
+    .0;
+  Ok(RemoteTestResult {
+    original,
+    stdout_bytes,
+    stderr_bytes,
+  })
 }
 
 async fn run_command_remote2(
