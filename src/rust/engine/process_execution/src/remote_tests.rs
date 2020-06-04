@@ -181,7 +181,7 @@ async fn make_execute_request_with_instance_name() {
   want_command.mut_platform().mut_properties().push({
     let mut property = bazel_protos::remote_execution::Platform_Property::new();
     property.set_name("target_platform".to_owned());
-    property.set_value("none".to_owned());
+    property.set_value("apple-2e".to_owned()); // overridden by metadata, see below
     property
   });
 
@@ -189,10 +189,10 @@ async fn make_execute_request_with_instance_name() {
   want_action.set_command_digest(
     (&Digest(
       Fingerprint::from_hex_string(
-        "6cfe2081e40c7542a8b369b669618fe7c6e690e274183e406ed75dc3959dc82f",
+        "12111c5c43433f428dfd53ba1f44dfdcad1ae88ecf4560930eeb8eec54551c99",
       )
       .unwrap(),
-      99,
+      103,
     ))
       .into(),
   );
@@ -203,7 +203,7 @@ async fn make_execute_request_with_instance_name() {
   want_execute_request.set_action_digest(
     (&Digest(
       Fingerprint::from_hex_string(
-        "1b52d1997da65c69c5fe2f8717caa6e538dabc13f90f16332454d95b1f8949a4",
+        "f850dad74061fb0919212274da8137d647dde16ec1623c13f0f8eafa4d83a823",
       )
       .unwrap(),
       140,
@@ -217,7 +217,7 @@ async fn make_execute_request_with_instance_name() {
       ProcessMetadata {
         instance_name: Some("dark-tower".to_owned()),
         cache_key_gen_version: None,
-        platform_properties: vec![],
+        platform_properties: vec![("target_platform".to_owned(), "apple-2e".to_owned())],
       }
     ),
     Ok((want_action, want_command, want_execute_request))
