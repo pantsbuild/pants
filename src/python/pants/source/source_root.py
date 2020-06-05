@@ -180,9 +180,10 @@ class SourceRootConfig(Subsystem):
         )
 
         register(
-            "--marker-filename",
+            "--marker-filenames",
             metavar="filename",
-            type=str,
+            type=list,
+            member_type=str,
             fingerprint=True,
             default=None,
             advanced=True,
@@ -243,16 +244,18 @@ async def get_source_root(
         return OptionalSourceRoot(SourceRoot(str(relpath)))
 
     # B) Does it contain a marker file?
-    marker_filename = source_root_config.options.marker_filename
-    if marker_filename:
-        if (
-            os.path.basename(marker_filename) != marker_filename
-            or "*" in marker_filename
-            or "!" in marker_filename
-        ):
-            raise InvalidMarkerFileError(f"Marker filename must be a base name: {marker_filename}")
+    marker_filenames = source_root_config.options.marker_filenames
+    if marker_filenames:
+        for marker_filename in marker_filenames:
+            if (
+                os.path.basename(marker_filename) != marker_filename
+                or "*" in marker_filename
+                or "!" in marker_filename
+            ):
+                raise InvalidMarkerFileError(
+                    f"Marker filename must be a base name: {marker_filename}")
         # TODO: An intrinsic to check file existence at a fixed path?
-        snapshot = await Get[Snapshot](PathGlobs([str(relpath / marker_filename)]))
+        snapshot = await Get[Snapshot](PathGlobs([str(relpath / mf) for mf in marker_filenames]))
         if len(snapshot.files) > 0:
             return OptionalSourceRoot(SourceRoot(str(relpath)))
 

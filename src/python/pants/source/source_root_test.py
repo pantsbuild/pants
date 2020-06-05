@@ -20,25 +20,26 @@ from pants.testutil.engine.util import MockGet, create_subsystem, run_rule
 def _find_root(
     path: str,
     patterns: Iterable[str],
-    marker_filename: str = None,
+    marker_filenames: Iterable[str] = None,
     existing_marker_files: Iterable[str] = None,
 ) -> Optional[str]:
+    source_root_config = create_subsystem(
+        SourceRootConfig,
+        root_patterns=list(patterns),
+        marker_filenames=marker_filenames
+    )
     # This inner function is passed as the callable to the mock, to allow recursion in the rule.
     def _mock_fs_check(pathglobs: PathGlobs) -> Snapshot:
-        if pathglobs.globs[0] in existing_marker_files:
-            d, f = os.path.split(pathglobs.globs[0])
-            return Snapshot(digest=Digest("111", 111), files=(f,), dirs=(d,))
+        for glob in pathglobs.globs:
+            if glob in existing_marker_files:
+                d, f = os.path.split(pathglobs.globs[0])
+                return Snapshot(digest=Digest("111", 111), files=(f,), dirs=(d,))
         return Snapshot(digest=Digest("000", 000), files=tuple(), dirs=tuple())
 
     def _do_find_root(src_root_req: SourceRootRequest) -> OptionalSourceRoot:
         return run_rule(
             get_source_root,
-            rule_args=[
-                src_root_req,
-                create_subsystem(
-                    SourceRootConfig, root_patterns=list(patterns), marker_filename=marker_filename
-                ),
-            ],
+            rule_args=[src_root_req, source_root_config],
             mock_gets=[
                 MockGet(
                     product_type=OptionalSourceRoot,
@@ -98,7 +99,7 @@ def test_source_root_patterns() -> None:
 def test_marker_file() -> None:
     def find_root(path):
         return _find_root(
-            path, tuple(), "SOURCE_ROOT", ("project1/SOURCE_ROOT", "project2/src/SOURCE_ROOT",)
+            path, tuple(), ("SOURCE_ROOT",), ("project1/SOURCE_ROOT", "project2/src/SOURCE_ROOT",)
         )
 
     assert "project1" == find_root("project1/foo/bar.py")
@@ -119,7 +120,7 @@ def test_marker_file() -> None:
 def test_marker_file_nested_source_roots() -> None:
     def find_root(path):
         return _find_root(
-            path, tuple(), "SOURCE_ROOT", ("SOURCE_ROOT", "project1/src/SOURCE_ROOT",)
+            path, tuple(), ("SOURCE_ROOT",), ("SOURCE_ROOT", "project1/src/SOURCE_ROOT",)
         )
 
     assert "project1/src" == find_root("project1/src/foo/bar.py")
@@ -132,9 +133,20 @@ def test_marker_file_nested_source_roots() -> None:
     assert "." == find_root("")
 
 
+def test_multiple_marker_filenames() -> None:
+    def find_root(path):
+        return _find_root(
+            path, tuple(), ("SOURCE_ROOT", "setup.py"),
+            ("project1/javasrc/SOURCE_ROOT", "project2/setup.py",)
+        )
+
+    assert "project1/javasrc" == find_root("project1/javasrc/foo/bar.java")
+    assert "project2" == find_root("project2/foo/bar.py")
+
+
 def test_marker_file_and_patterns() -> None:
     def find_root(path):
-        return _find_root(path, ("src/python",), "setup.py", ("project1/setup.py",))
+        return _find_root(path, ("src/python",), ("setup.py",), ("project1/setup.py",))
 
     assert "project1" == find_root("project1/foo/bar.py")
     assert "project2/src/python" == find_root("project2/src/python/baz/qux.py")
