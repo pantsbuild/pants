@@ -376,9 +376,9 @@ async def generate_coverage_report(
     report_dir = PurePath(coverage_subsystem.options.report_output_path)
 
     report_file: Optional[PurePath] = None
-    if coverage_subsystem.options.report == ReportType.HTML:
+    if report_type == ReportType.HTML:
         report_file = report_dir / "htmlcov" / "index.html"
-    elif coverage_subsystem.options.report == ReportType.XML:
+    elif report_type == ReportType.XML:
         report_file = report_dir / "coverage.xml"
 
     return FilesystemCoverageReport(
