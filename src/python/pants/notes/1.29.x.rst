@@ -34,7 +34,7 @@ Bugfixes
 * Silence failures to close pantsd stdio handles. (#9943)
   `PR #9943 <https://github.com/pantsbuild/pants/pull/9943>`_
 
-* Fix a bug in pyest coverage report computation. (#9933)
+* Fix a bug in pytest coverage report computation. (#9933)
   `PR #9933 <https://github.com/pantsbuild/pants/pull/9933>`_
 
 * Graph::get backs off on filesystem invalidation (#9920)
