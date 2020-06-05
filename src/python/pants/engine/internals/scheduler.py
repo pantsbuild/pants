@@ -580,7 +580,9 @@ class SchedulerSession:
 
     def digests_to_bytes(self, digests: List[Digest]) -> List[bytes]:
         sched_pointer = self._scheduler._scheduler
-        return self._scheduler._native.lib.digests_to_bytes(sched_pointer, digests)
+        return cast(
+            List[bytes], self._scheduler._native.lib.digests_to_bytes(sched_pointer, digests)
+        )
 
     def run_local_interactive_process(
         self, request: "InteractiveProcessRequest"

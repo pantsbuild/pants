@@ -579,8 +579,6 @@ class StreamingWorkunitProcessTests(TestBase):
         assert stdout_digest == EMPTY_DIGEST
         assert stderr_digest.serialized_bytes_length == len(result.stderr)
 
-        stdout_bytes = self._scheduler.digests_to_bytes([stdout_digest])
-        stderr_bytes = self._scheduler.digests_to_bytes([stderr_digest])
-        assert stdout_bytes[0] == result.stdout
-        assert stderr_bytes[0] == result.stderr
-
+        byte_outputs = self._scheduler.digests_to_bytes([stdout_digest, stderr_digest])
+        assert byte_outputs[0] == result.stdout
+        assert byte_outputs[1] == result.stderr

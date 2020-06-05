@@ -42,9 +42,8 @@
 /// how we expose ourselves back to Python.
 ///
 use cpython::{
-  exc, py_class, py_exception, py_fn, py_module_initializer, NoArgs, PyClone, PyErr,
-  PyList, PyObject, PyResult as CPyResult, PyString, PyTuple, PyType, Python, PythonObject,
-  ToPyObject,
+  exc, py_class, py_exception, py_fn, py_module_initializer, NoArgs, PyClone, PyErr, PyList,
+  PyObject, PyResult as CPyResult, PyString, PyTuple, PyType, Python, PythonObject, ToPyObject,
 };
 
 use crate::{
@@ -1339,29 +1338,37 @@ fn digests_to_bytes(
 ) -> CPyResult<PyList> {
   with_scheduler(py, scheduler_ptr, |scheduler| {
     let core = scheduler.core.clone();
-    let store = core.store().clone();
 
-    let item = py_digests.get_item(py, 0);
-
-    let digest = crate::nodes::lift_digest(&item.into())
+    let digests: Vec<Digest> = py_digests
+      .iter(py)
+      .map(|item| crate::nodes::lift_digest(&item.into()))
+      .collect::<Result<Vec<Digest>, _>>()
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
 
-    let bytes: Value = py
+    let digest_futures = digests.into_iter().map(|digest| {
+      let store = core.store();
+      async move {
+        store
+          .load_file_bytes_with(digest, externs::store_bytes)
+          .await
+          .and_then(|maybe_bytes: Option<(Value, _)>| {
+            maybe_bytes
+              .map(|bytes_tuple| bytes_tuple.0)
+              .ok_or_else(|| format!("Error loading bytes from digest: {:?}", digest))
+          })
+      }
+    });
+
+    let bytes_values: Vec<PyObject> = py
       .allow_threads(|| {
-        core.executor.block_on(async move {
-          store
-            .load_file_bytes_with(digest, externs::store_bytes)
-            .await
-            .and_then(|maybe_bytes: Option<(Value, _)>| {
-              maybe_bytes
-                .map(|bytes_tuple| bytes_tuple.0)
-                .ok_or_else(|| format!("Error loading bytes from digest: {:?}", digest))
-            })
-        })
+        core.executor.block_on(
+          future03::try_join_all(digest_futures)
+            .map_ok(|values: Vec<Value>| values.into_iter().map(|val| val.into()).collect()),
+        )
       })
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
 
-    let output_list = PyList::new(py, &[bytes.into()]);
+    let output_list = PyList::new(py, &bytes_values);
     Ok(output_list)
   })
 }
