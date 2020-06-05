@@ -103,6 +103,7 @@ class OptionsTest(TestBase):
         intermediate("stale"),
         intermediate("test"),
         task("test.junit"),
+        subsystem("passconsumer"),
         task("simple"),
         task("simple-dashed"),
         task("scoped.a.bit"),
@@ -240,6 +241,14 @@ class OptionsTest(TestBase):
         # For task identity test
         options.register("compile.scala", "--modifycompile", fingerprint=True)
         options.register("compile.scala", "--modifylogs")
+        options.register(
+            "compile.scala",
+            "--modifypassthrough",
+            fingerprint=True,
+            passthrough=True,
+            type=list,
+            member_type=str,
+        )
 
         # For scoped env vars test
         options.register("simple", "--spam")
@@ -862,34 +871,33 @@ class OptionsTest(TestBase):
             sorted_specs = sorted(options.specs)
             self.assertEqual(["bar", "fleem:tgt", "foo", "morx:tgt"], sorted_specs)
 
-    def test_passthru_args_ownership(self):
-        # TODO: Ownership of passthrough args will go away in 1.30.0.dev0, and all scopes that claim
-        # passthrough args will receive them, regardless of position. This test should then shrink
-        # or be deleted.
-        options = self._parse(flags="compile foo -- bar --baz")
-
-        self.assertEqual(["bar", "--baz"], options.passthru_args_for_scope("compile"))
-        self.assertEqual(["bar", "--baz"], options.passthru_args_for_scope("compile.java"))
-        self.assertEqual(["bar", "--baz"], options.passthru_args_for_scope("compile.scala"))
-        self.assertEqual([], options.passthru_args_for_scope("test"))
-        self.assertEqual([], options.passthru_args_for_scope(""))
-        self.assertEqual([], options.passthru_args_for_scope(None))
-
     def test_passthru_args_subsystems_and_goals(self):
-        # Test that subsystems and goals receive passthrough args regardless of position.
+        # Test that passthrough args are applied.
         options = self._parse(flags="")
         options = Options.create(
             env={},
-            config={},
-            known_scope_infos=[global_scope(), task("test"), subsystem("foo")],
+            config=self._create_config(),
+            known_scope_infos=[global_scope(), task("test"), subsystem("passconsumer")],
             args=["./pants", "test", "target", "--", "bar", "--baz"],
         )
+        options.register(
+            "passconsumer", "--passthing", passthrough=True, type=list, member_type=str
+        )
 
-        # All subsystems and goals, and (for now, only) the last v1 goal/task on the CLI should
-        # receive passthrough args. See the TODO in `test_passthru_args_ownership` for more info.
-        self.assertEqual(["bar", "--baz"], options.passthru_args_for_scope("foo"))
-        self.assertEqual(["bar", "--baz"], options.passthru_args_for_scope("test"))
-        self.assertEqual([], options.passthru_args_for_scope(""))
+        self.assertEqual(["bar", "--baz"], options.for_scope("passconsumer").passthing)
+
+    def test_at_most_one_goal_with_passthru_args(self):
+        with self.assertRaisesWithMessageContaining(
+            Options.AmbiguousPassthroughError,
+            """Specifying multiple goals (in this case: ['test', 'fmt']) """
+            """along with passthrough args (args after `--`) is ambiguous.""",
+        ):
+            _ = Options.create(
+                env={},
+                config={},
+                known_scope_infos=[global_scope(), task("test"), task("fmt")],
+                args=["./pants", "test", "fmt", "target", "--", "bar", "--baz"],
+            )
 
     def test_global_scope_env_vars(self):
         def check_pants_foo(expected_val, env):
@@ -1234,25 +1242,17 @@ class OptionsTest(TestBase):
             set(Options.complete_scopes({task("foo.bar.baz"), task("qux.quux")})),
         )
 
-    def test_get_fingerprintable_for_scope_ignore_passthru(self) -> None:
+    def test_get_fingerprintable_for_scope(self) -> None:
         # Note: tests handling recursive and non-recursive options from enclosing scopes correctly.
         options = self._parse(
             flags='--store-true-flag --num=88 compile.scala --num=77 --modifycompile="blah blah blah" '
             '--modifylogs="durrrr" -- -d -v'
         )
 
+        # NB: Passthrough args end up on our `--modifypassthrough` arg.
         pairs = options.get_fingerprintable_for_scope("compile.scala")
-        self.assertEqual([(str, "blah blah blah"), (bool, True), (int, 77)], pairs)
-
-    def test_get_fingerprintable_for_scope_include_passthru(self) -> None:
-        options = self._parse(
-            flags='--store-true-flag --num=88 compile.scala --num=77 --modifycompile="blah blah blah" '
-            '--modifylogs="durrrr" -- -d -v'
-        )
-
-        pairs = options.get_fingerprintable_for_scope("compile.scala", include_passthru=True)
         self.assertEqual(
-            [(str, "-d"), (str, "-v"), (str, "blah blah blah"), (bool, True), (int, 77)], pairs
+            [(str, "blah blah blah"), (bool, True), (int, 77), (str, ["-d", "-v"])], pairs
         )
 
     def test_fingerprintable(self) -> None:
