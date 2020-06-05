@@ -4,8 +4,8 @@ use std::convert::TryInto;
 use bytes::Bytes;
 use hashing::EMPTY_DIGEST;
 use maplit::btreemap;
-use mock::execution_server::ExpectedAPICall;
-use protobuf::Message;
+use mock::execution_server::{ExpectedAPICall, MockOperation};
+use protobuf::{Message, ProtobufEnum};
 use spectral::assert_that;
 use spectral::hashmap::HashMapAssertions;
 use spectral::string::StrAssertions;
@@ -547,4 +547,88 @@ async fn ensure_inline_stdio_is_stored() {
       test_stderr.bytes()
     );
   }
+}
+
+#[tokio::test]
+async fn bad_result_bytes() {
+  let execute_request = echo_foo_request();
+
+  let mock_server = {
+    let op_name = "gimme-foo".to_string();
+
+    mock::execution_server::TestServer::new(
+      mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
+        execute_request: crate::remote::make_execute_request(
+          &execute_request.clone().try_into().unwrap(),
+          empty_request_metadata(),
+        )
+        .unwrap()
+        .2,
+        stream_responses: Ok(vec![
+          make_incomplete_operation(&op_name),
+          MockOperation::new({
+            let mut op = bazel_protos::operations::Operation::new();
+            op.set_name(op_name.clone());
+            op.set_done(true);
+            op.set_response({
+              let mut response_wrapper = protobuf::well_known_types::Any::new();
+              response_wrapper.set_type_url(format!(
+                "type.googleapis.com/{}",
+                bazel_protos::remote_execution::ExecuteResponse::new()
+                  .descriptor()
+                  .full_name()
+              ));
+              response_wrapper.set_value(vec![0x00, 0x00, 0x00]);
+              response_wrapper
+            });
+            op
+          }),
+        ]),
+      }]),
+      None,
+    )
+  };
+
+  run_command_remote(mock_server.address(), execute_request)
+    .await
+    .expect_err("Want Err");
+}
+
+#[tokio::test]
+async fn initial_response_error() {
+  let execute_request = echo_foo_request();
+
+  let mock_server = {
+    let op_name = "gimme-foo".to_string();
+
+    mock::execution_server::TestServer::new(
+      mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
+        execute_request: crate::remote::make_execute_request(
+          &execute_request.clone().try_into().unwrap(),
+          empty_request_metadata(),
+        )
+        .unwrap()
+        .2,
+        stream_responses: Ok(vec![MockOperation::new({
+          let mut op = bazel_protos::operations::Operation::new();
+          op.set_name(op_name.to_string());
+          op.set_done(true);
+          op.set_error({
+            let mut error = bazel_protos::status::Status::new();
+            error.set_code(bazel_protos::code::Code::INTERNAL.value());
+            error.set_message("Something went wrong".to_string());
+            error
+          });
+          op
+        })]),
+      }]),
+      None,
+    )
+  };
+
+  let result = run_command_remote(mock_server.address(), execute_request)
+    .await
+    .expect_err("Want Err");
+
+  assert_eq!(result, "INTERNAL: Something went wrong");
 }
