@@ -168,6 +168,7 @@ function execute_packaged_pants_with_internal_backends() {
         'pants.backend.awslambda.python',\
         'pants.backend.python',\
         'pants.backend.project_info',\
+        'pants.backend.rust',\
       ]" \
     "$@"
 }

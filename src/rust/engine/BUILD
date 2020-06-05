@@ -8,3 +8,12 @@ files(
     'src/rust/engine/process_execution/bazel_protos'
   ]
 )
+
+cargo_project(
+  name='engine-cargo-project',
+  sources=[
+    '**/*.toml',
+    '*.lock',
+    '**/*.rs',
+  ],
+)
