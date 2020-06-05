@@ -18,9 +18,10 @@ use tokio::runtime::Handle;
 
 use crate::remote::{ExecutionError, OperationOrStatus, StreamingCommandRunner};
 use crate::remote_tests::{
-  assert_cancellation_requests, echo_foo_request, echo_roland_request, empty_request_metadata,
-  make_incomplete_operation, make_retryable_operation_failure, make_store,
-  make_successful_operation, run_cmd_runner, RemoteTestResult, StderrType, StdoutType,
+  assert_cancellation_requests, cat_roland_request, echo_foo_request, echo_roland_request,
+  empty_request_metadata, make_incomplete_operation, make_precondition_failure_operation,
+  make_retryable_operation_failure, make_store, make_successful_operation,
+  missing_preconditionfailure_violation, run_cmd_runner, RemoteTestResult, StderrType, StdoutType,
 };
 use crate::{CommandRunner, Context, MultiPlatformProcess, Platform, Process};
 use std::time::Duration;
@@ -631,4 +632,137 @@ async fn initial_response_error() {
     .expect_err("Want Err");
 
   assert_eq!(result, "INTERNAL: Something went wrong");
+}
+
+#[tokio::test]
+async fn initial_response_missing_response_and_error() {
+  let execute_request = echo_foo_request();
+
+  let mock_server = {
+    let op_name = "gimme-foo".to_string();
+
+    mock::execution_server::TestServer::new(
+      mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
+        execute_request: crate::remote::make_execute_request(
+          &execute_request.clone().try_into().unwrap(),
+          empty_request_metadata(),
+        )
+        .unwrap()
+        .2,
+        stream_responses: Ok(vec![MockOperation::new({
+          let mut op = bazel_protos::operations::Operation::new();
+          op.set_name(op_name.to_string());
+          op.set_done(true);
+          op
+        })]),
+      }]),
+      None,
+    )
+  };
+
+  let result = run_command_remote(mock_server.address(), execute_request)
+    .await
+    .expect_err("Want Err");
+
+  assert_eq!(result, "Operation finished but no response supplied");
+}
+
+#[tokio::test]
+async fn execute_missing_file_uploads_if_known() {
+  let runtime = task_executor::Executor::new(Handle::current());
+
+  let roland = TestData::roland();
+
+  let mock_server = {
+    let op_name = "cat".to_owned();
+
+    mock::execution_server::TestServer::new(
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &cat_roland_request().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![
+            make_incomplete_operation(&op_name),
+            make_precondition_failure_operation(vec![missing_preconditionfailure_violation(
+              &roland.digest(),
+            )]),
+          ]),
+        },
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &cat_roland_request().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![
+            make_incomplete_operation(&op_name),
+            make_successful_operation(
+              "cat2",
+              StdoutType::Raw(roland.string()),
+              StderrType::Raw("".to_owned()),
+              0,
+            ),
+          ]),
+        },
+      ]),
+      None,
+    )
+  };
+
+  let store_dir = TempDir::new().unwrap();
+  let cas = mock::StubCAS::builder()
+    .directory(&TestDirectory::containing_roland())
+    .build();
+  let store = Store::with_remote(
+    runtime.clone(),
+    store_dir,
+    vec![cas.address()],
+    None,
+    None,
+    None,
+    1,
+    10 * 1024 * 1024,
+    Duration::from_secs(1),
+    store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+    1,
+    1,
+  )
+  .expect("Failed to make store");
+  store
+    .store_file_bytes(roland.bytes(), false)
+    .await
+    .expect("Saving file bytes to store");
+  store
+    .record_directory(&TestDirectory::containing_roland().directory(), false)
+    .await
+    .expect("Saving directory bytes to store");
+  let command_runner = StreamingCommandRunner::new(
+    &mock_server.address(),
+    empty_request_metadata(),
+    None,
+    None,
+    BTreeMap::new(),
+    store.clone(),
+    Platform::Linux,
+  )
+  .unwrap();
+
+  let result = run_cmd_runner(cat_roland_request(), command_runner, store)
+    .await
+    .unwrap();
+
+  assert_eq!(result.stdout_bytes, roland.bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(result.original.platform, Platform::Linux);
+
+  {
+    let blobs = cas.blobs.lock();
+    assert_eq!(blobs.get(&roland.fingerprint()), Some(&roland.bytes()));
+  }
 }

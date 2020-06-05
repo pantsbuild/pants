@@ -2477,7 +2477,7 @@ fn timestamp_only_secs(v: i64) -> Timestamp {
   dummy_timestamp
 }
 
-fn make_precondition_failure_operation(
+pub(crate) fn make_precondition_failure_operation(
   violations: Vec<bazel_protos::error_details::PreconditionFailure_Violation>,
 ) -> MockOperation {
   let mut operation = bazel_protos::operations::Operation::new();
@@ -2682,7 +2682,7 @@ fn make_any_proto(message: &dyn Message) -> protobuf::well_known_types::Any {
   any
 }
 
-fn missing_preconditionfailure_violation(
+pub(crate) fn missing_preconditionfailure_violation(
   digest: &Digest,
 ) -> bazel_protos::error_details::PreconditionFailure_Violation {
   {
@@ -2702,7 +2702,7 @@ fn assert_contains(haystack: &str, needle: &str) {
   )
 }
 
-fn cat_roland_request() -> MultiPlatformProcess {
+pub(crate) fn cat_roland_request() -> MultiPlatformProcess {
   let req = Process {
     argv: owned_string_vec(&["/bin/cat", "roland"]),
     env: BTreeMap::new(),
