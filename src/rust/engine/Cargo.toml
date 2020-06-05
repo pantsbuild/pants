@@ -21,6 +21,7 @@ members = [
   ".",
   "async_semaphore",
   "boxfuture",
+  "cargo_util",
   "concrete_time",
   "fs",
   "fs/brfs",
@@ -58,6 +59,7 @@ default-members = [
   ".",
   "async_semaphore",
   "boxfuture",
+  "cargo_util",
   "concrete_time",
   "fs",
   "fs/fs_util",
@@ -141,6 +143,9 @@ fs = { path = "./fs" }
 env_logger = "0.5.4"
 
 [patch.crates-io]
+# TODO: Remove patch when we can upgrade to an official released version of cargo-fetcher with a fix.
+# See: https://github.com/pantsbuild/pants/issues/9974 for context.
+cargo-fetcher = { git = "https://github.com/cosmicexplorer/cargo-fetcher", rev = "442b801abfefac420ef922aec97f5fba8cba63ba", version = "0.7.0" }
 # TODO: Remove patch when we can upgrade to an official released version of protobuf with a fix.
 # See: https://github.com/pantsbuild/pants/issues/7760 for context.
 protobuf = { git="https://github.com/pantsbuild/rust-protobuf", rev="171611c33ec92f07e1b7107327f6d0139a7afebf", version="2.0.6", features = ["with-bytes"] }

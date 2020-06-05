@@ -1,0 +1,30 @@
+[package]
+name = "cargo_util"
+version = "0.1.0"
+authors = [ "Pants Build <pantsbuild@gmail.com>" ]
+edition = "2018"
+publish = false
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+async-trait = "0.1"
+anyhow = "1.0.26"
+boxfuture = { path = "../boxfuture" }
+cargo-fetcher = "0.7.0"
+chrono = "0.4.10"
+clap = "2"
+env_logger = "0.5.4"
+fs = { path = "../fs" }
+futures01 = { package = "futures", version = "0.1" }
+futures = { version = "0.3", features = ["compat"] }
+hashing = { path = "../hashing" }
+serde_json = "1.0"
+store = { path = "../fs/store" }
+sharded_lmdb = { path = "../sharded_lmdb" }
+task_executor = { path = "../task_executor" }
+tokio = { version = "0.2", features = ["rt-threaded"] }
+
+[dev-dependencies]
+tempfile = "3"
+testutil = { path = "../testutil" }

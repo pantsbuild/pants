@@ -25,10 +25,10 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use bytes::Bytes;
+pub use bytes::Bytes;
 use hashing::{Fingerprint, FINGERPRINT_SIZE};
 use lmdb::{
-  self, Database, DatabaseFlags, Environment, EnvironmentCopyFlags, EnvironmentFlags,
+  self, Cursor, Database, DatabaseFlags, Environment, EnvironmentCopyFlags, EnvironmentFlags,
   RwTransaction, Transaction, WriteFlags,
 };
 use log::trace;
@@ -233,6 +233,9 @@ impl ShardedLmdb {
 
   // First Database is content, second is leases.
   pub fn get(&self, fingerprint: &Fingerprint) -> (Arc<Environment>, Database, Database) {
+    /* FIXME: there appear to be 10 lmdb shards (search 0x10), and this line appears to be taking
+     * some modulus or something of the fingerprint's first char to squeeze it into a shard. That
+     * mostly makes sense, but should be much more heavily documented. */
     self.lmdbs[&(fingerprint.0[0] & 0xF0)].clone()
   }
 
@@ -257,6 +260,72 @@ impl ShardedLmdb {
           Err(err) => Err(format!(
             "Error reading from store when checking existence of {}: {}",
             fingerprint, err
+          )),
+        }
+      })
+      .await
+  }
+
+  pub async fn all_entry_keys(&self) -> Result<Vec<&[u8]>, String> {
+    let envs_and_stores: Vec<_> = self
+      .lmdbs
+      .iter()
+      .map(|(_shard, (env, store, _lease_db))| (env, store))
+      .collect();
+    let all_fingerprint_requests: Vec<Result<Vec<&[u8]>, String>> = envs_and_stores
+      .into_iter()
+      .map(|(env, store)| {
+        env
+          .begin_ro_txn()
+          .and_then(|txn| {
+            txn.open_ro_cursor(*store).map(|mut cursor| {
+              cursor
+                .iter_start()
+                .map(|(key, _data)| key)
+                .collect::<Vec<_>>()
+            })
+          })
+          .map_err(|e| format!("{:?}", e))
+      })
+      .collect();
+    let unflattened_fingerprints: Result<Vec<Vec<&[u8]>>, String> =
+      all_fingerprint_requests.into_iter().collect();
+    Ok(unflattened_fingerprints?.into_iter().flatten().collect())
+  }
+
+  ///
+  /// HACK: use the lease database to store the last updated time so it can be used for the
+  /// updated() method of cargo_fetcher::Backend!
+  ///
+  pub async fn store_bytes_with_updated_time(
+    &self,
+    fingerprint: Fingerprint,
+    bytes: Bytes,
+  ) -> Result<(), String> {
+    let store = self.clone();
+    self
+      .executor
+      .spawn_blocking(move || {
+        let effective_key = VersionedFingerprint::new(fingerprint, ShardedLmdb::schema_version());
+        let (env, db, lease_database) = store.get(&fingerprint);
+        let put_res = env.begin_rw_txn().and_then(|mut txn| {
+          txn.put(db, &effective_key, &bytes, WriteFlags::NO_OVERWRITE)?;
+          store.lease_inner(
+            lease_database,
+            &effective_key,
+            Self::now().as_secs(),
+            &mut txn,
+          )?;
+          txn.commit()
+        });
+
+        match put_res {
+          Ok(()) => Ok(()),
+          Err(lmdb::Error::KeyExist) => Ok(()),
+          Err(err) => Err(format!(
+            "Error storing versioned key {:?}: {}",
+            effective_key.to_hex(),
+            err
           )),
         }
       })
@@ -341,6 +410,39 @@ impl ShardedLmdb {
       .duration_since(time::UNIX_EPOCH)
       .expect("Surely you're not before the unix epoch?");
     (now_since_epoch + self.lease_time).as_secs()
+  }
+
+  ///
+  /// Extract the timestamp registered in the lease database. This may be consumed by application
+  /// code to know when to invalidate something, but when using .store_bytes_with_updated_time(),
+  /// this method will instead return the timestamp when the object was stored into the database.
+  ///
+  /// TODO: the above is super complex!!! break out separate structs that use leases in these
+  /// separate ways!
+  ///
+  pub fn get_lease_time(&self, fingerprint: Fingerprint) -> Result<Option<u64>, String> {
+    let effective_key = VersionedFingerprint::new(fingerprint, Self::schema_version());
+    let (env, _db, lease_database) = self.get(&fingerprint);
+    let txn = env.begin_ro_txn().map_err(|e| format!("{:?}", e))?;
+    match txn.get(lease_database, &effective_key) {
+      Ok(bytes) => {
+        let mut first_bytes: [u8; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
+        first_bytes.copy_from_slice(bytes);
+        Ok(Some(u64::from_le_bytes(first_bytes)))
+      }
+      Err(lmdb::Error::NotFound) => Ok(None),
+      Err(err) => Err(format!(
+        "error loading lease time {:?}: {}",
+        effective_key.to_hex(),
+        err
+      )),
+    }
+  }
+
+  fn now() -> time::Duration {
+    time::SystemTime::now()
+      .duration_since(time::UNIX_EPOCH)
+      .expect("Surely you're not before the unix epoch?")
   }
 
   pub async fn load_bytes_with<
