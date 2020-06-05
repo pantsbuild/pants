@@ -430,7 +430,11 @@ class PantsDaemon(FingerprintedProcessManager):
         )
 
         # Add the pidfile to watching via the scheduler.
-        pidfile_absolute = self._metadata_file_path("pantsd", "pid")
+        # We take the realpath here because if the metadata file path is a symlink, which it
+        # is for VCFS, pants will not agree to watch the absolute symilnk. Taking the realpath
+        # means we find out before trying to add the path as an invalidation glob if it points
+        # somewhere outside the workspace.
+        pidfile_absolute = os.path.realpath(self._metadata_file_path("pantsd", "pid"))
         if pidfile_absolute.startswith(self._build_root):
             scheduler_service = next(
                 s for s in self._services.services if isinstance(s, SchedulerService)
