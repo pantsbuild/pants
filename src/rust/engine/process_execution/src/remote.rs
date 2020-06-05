@@ -132,6 +132,7 @@ pub enum ExecutionError {
   // Digests are Files and Directories which have been reported to be missing. May be incomplete.
   MissingDigests(Vec<Digest>),
   // String is the operation name which can be used to poll the GetOperation gRPC API.
+  // Note: Unused by the streaming client.
   NotFinished(String),
   // String is the error message.
   Retryable(String),

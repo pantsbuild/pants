@@ -18,10 +18,11 @@ use tokio::runtime::Handle;
 
 use crate::remote::{ExecutionError, OperationOrStatus, StreamingCommandRunner};
 use crate::remote_tests::{
-  assert_cancellation_requests, cat_roland_request, echo_foo_request, echo_roland_request,
-  empty_request_metadata, make_incomplete_operation, make_precondition_failure_operation,
-  make_retryable_operation_failure, make_store, make_successful_operation,
-  missing_preconditionfailure_violation, run_cmd_runner, RemoteTestResult, StderrType, StdoutType,
+  assert_cancellation_requests, assert_contains, cat_roland_request, echo_foo_request,
+  echo_roland_request, empty_request_metadata, make_any_proto, make_incomplete_operation,
+  make_precondition_failure_operation, make_retryable_operation_failure, make_store,
+  make_successful_operation, missing_preconditionfailure_violation, run_cmd_runner,
+  RemoteTestResult, StderrType, StdoutType,
 };
 use crate::{CommandRunner, Context, MultiPlatformProcess, Platform, Process};
 use std::time::Duration;
@@ -765,4 +766,199 @@ async fn execute_missing_file_uploads_if_known() {
     let blobs = cas.blobs.lock();
     assert_eq!(blobs.get(&roland.fingerprint()), Some(&roland.bytes()));
   }
+}
+
+#[tokio::test]
+async fn execute_missing_file_errors_if_unknown() {
+  let missing_digest = TestDirectory::containing_roland().digest();
+
+  let mock_server = {
+    mock::execution_server::TestServer::new(
+      mock::execution_server::MockExecution::new(vec![]),
+      None,
+    )
+  };
+
+  let store_dir = TempDir::new().unwrap();
+  let cas = mock::StubCAS::builder()
+    .file(&TestData::roland())
+    .directory(&TestDirectory::containing_roland())
+    .build();
+  let runtime = task_executor::Executor::new(Handle::current());
+  let store = Store::with_remote(
+    runtime.clone(),
+    store_dir,
+    vec![cas.address()],
+    None,
+    None,
+    None,
+    1,
+    10 * 1024 * 1024,
+    Duration::from_secs(1),
+    store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+    1,
+    1,
+  )
+  .expect("Failed to make store");
+
+  let runner = StreamingCommandRunner::new(
+    &mock_server.address(),
+    empty_request_metadata(),
+    None,
+    None,
+    BTreeMap::new(),
+    store,
+    Platform::Linux,
+  )
+  .unwrap();
+
+  let error = runner
+    .run(cat_roland_request(), Context::default())
+    .await
+    .expect_err("Want error");
+  assert_contains(&error, &format!("{}", missing_digest.0));
+}
+
+#[tokio::test]
+async fn extract_execute_response_success() {
+  let wanted_exit_code = 17;
+  let wanted_stdout = Bytes::from("roland".as_bytes());
+  let wanted_stderr = Bytes::from("simba".as_bytes());
+
+  let mut output_file = bazel_protos::remote_execution::OutputFile::new();
+  output_file.set_path("cats/roland".into());
+  output_file.set_digest((&TestData::roland().digest()).into());
+  output_file.set_is_executable(false);
+  let mut output_files = protobuf::RepeatedField::new();
+  output_files.push(output_file);
+
+  let mut operation = bazel_protos::operations::Operation::new();
+  operation.set_name("cat".to_owned());
+  operation.set_done(true);
+  operation.set_response(make_any_proto(&{
+    let mut response = bazel_protos::remote_execution::ExecuteResponse::new();
+    response.set_result({
+      let mut result = bazel_protos::remote_execution::ActionResult::new();
+      result.set_exit_code(wanted_exit_code);
+      result.set_stdout_raw(Bytes::from(wanted_stdout.clone()));
+      result.set_stderr_raw(Bytes::from(wanted_stderr.clone()));
+      result.set_output_files(output_files);
+      result
+    });
+    response
+  }));
+
+  let result = extract_execute_response(operation, Platform::Linux)
+    .await
+    .unwrap();
+
+  assert_eq!(result.stdout_bytes, wanted_stdout);
+  assert_eq!(result.stderr_bytes, wanted_stderr);
+  assert_eq!(result.original.exit_code, wanted_exit_code);
+  assert_eq!(
+    result.original.output_directory,
+    TestDirectory::nested().digest()
+  );
+  assert_eq!(result.original.platform, Platform::Linux);
+}
+
+#[tokio::test]
+async fn extract_execute_response_missing_digests() {
+  let missing_files = vec![
+    TestData::roland().digest(),
+    TestDirectory::containing_roland().digest(),
+  ];
+
+  let missing = missing_files
+    .iter()
+    .map(missing_preconditionfailure_violation)
+    .collect();
+
+  let operation = make_precondition_failure_operation(missing)
+    .op
+    .unwrap()
+    .unwrap();
+
+  assert_eq!(
+    extract_execute_response(operation, Platform::Linux).await,
+    Err(ExecutionError::MissingDigests(missing_files))
+  );
+}
+
+#[tokio::test]
+async fn extract_execute_response_missing_other_things() {
+  let missing = vec![
+    missing_preconditionfailure_violation(&TestData::roland().digest()),
+    {
+      let mut violation = bazel_protos::error_details::PreconditionFailure_Violation::new();
+      violation.set_field_type("MISSING".to_owned());
+      violation.set_subject("monkeys".to_owned());
+      violation
+    },
+  ];
+
+  let operation = make_precondition_failure_operation(missing)
+    .op
+    .unwrap()
+    .unwrap();
+
+  match extract_execute_response(operation, Platform::Linux).await {
+    Err(ExecutionError::Fatal(err)) => assert_contains(&err, "monkeys"),
+    other => assert!(false, "Want fatal error, got {:?}", other),
+  };
+}
+
+#[tokio::test]
+async fn extract_execute_response_other_failed_precondition() {
+  let missing = vec![{
+    let mut violation = bazel_protos::error_details::PreconditionFailure_Violation::new();
+    violation.set_field_type("OUT_OF_CAPACITY".to_owned());
+    violation
+  }];
+
+  let operation = make_precondition_failure_operation(missing)
+    .op
+    .unwrap()
+    .unwrap();
+
+  match extract_execute_response(operation, Platform::Linux).await {
+    Err(ExecutionError::Fatal(err)) => assert_contains(&err, "OUT_OF_CAPACITY"),
+    other => assert!(false, "Want fatal error, got {:?}", other),
+  };
+}
+
+#[tokio::test]
+async fn extract_execute_response_missing_without_list() {
+  let missing = vec![];
+
+  let operation = make_precondition_failure_operation(missing)
+    .op
+    .unwrap()
+    .unwrap();
+
+  match extract_execute_response(operation, Platform::Linux).await {
+    Err(ExecutionError::Fatal(err)) => assert_contains(&err.to_lowercase(), "precondition"),
+    other => assert!(false, "Want fatal error, got {:?}", other),
+  };
+}
+
+#[tokio::test]
+async fn extract_execute_response_other_status() {
+  let mut operation = bazel_protos::operations::Operation::new();
+  operation.set_name("cat".to_owned());
+  operation.set_done(true);
+  operation.set_response(make_any_proto(&{
+    let mut response = bazel_protos::remote_execution::ExecuteResponse::new();
+    response.set_status({
+      let mut status = bazel_protos::status::Status::new();
+      status.set_code(grpcio::RpcStatusCode::PERMISSION_DENIED.into());
+      status
+    });
+    response
+  }));
+
+  match extract_execute_response(operation, Platform::Linux).await {
+    Err(ExecutionError::Fatal(err)) => assert_contains(&err, "PERMISSION_DENIED"),
+    other => assert!(false, "Want fatal error, got {:?}", other),
+  };
 }

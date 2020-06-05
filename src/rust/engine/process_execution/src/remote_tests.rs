@@ -2672,7 +2672,7 @@ async fn extract_output_files_from_response(
     .await
 }
 
-fn make_any_proto(message: &dyn Message) -> protobuf::well_known_types::Any {
+pub(crate) fn make_any_proto(message: &dyn Message) -> protobuf::well_known_types::Any {
   let mut any = protobuf::well_known_types::Any::new();
   any.set_type_url(format!(
     "type.googleapis.com/{}",
@@ -2693,7 +2693,7 @@ pub(crate) fn missing_preconditionfailure_violation(
   }
 }
 
-fn assert_contains(haystack: &str, needle: &str) {
+pub(crate) fn assert_contains(haystack: &str, needle: &str) {
   assert!(
     haystack.contains(needle),
     "{:?} should contain {:?}",
