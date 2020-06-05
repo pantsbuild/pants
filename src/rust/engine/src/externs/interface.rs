@@ -42,7 +42,7 @@
 /// how we expose ourselves back to Python.
 ///
 use cpython::{
-  exc, py_class, py_exception, py_fn, py_module_initializer, NoArgs, PyBytes, PyClone, PyErr,
+  exc, py_class, py_exception, py_fn, py_module_initializer, NoArgs, PyClone, PyErr,
   PyList, PyObject, PyResult as CPyResult, PyString, PyTuple, PyType, Python, PythonObject,
   ToPyObject,
 };
@@ -1336,7 +1336,7 @@ fn digest_to_bytes(
   py: Python,
   scheduler_ptr: PyScheduler,
   py_digest: PyObject,
-) -> CPyResult<PyBytes> {
+) -> CPyResult<PyObject> {
   with_scheduler(py, scheduler_ptr, |scheduler| {
     let core = scheduler.core.clone();
     let store = core.store().clone();
@@ -1344,13 +1344,13 @@ fn digest_to_bytes(
     let digest = crate::nodes::lift_digest(&py_digest.into())
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
 
-    let bytes: Vec<u8> = py
+    let bytes: Value = py
       .allow_threads(|| {
         core.executor.block_on(async move {
           store
-            .load_file_bytes_with(digest, |bytes| bytes.into()) //TODO see if this can be done no-copy
+            .load_file_bytes_with(digest, externs::store_bytes)
             .await
-            .and_then(|maybe_bytes: Option<(Vec<u8>, _)>| {
+            .and_then(|maybe_bytes: Option<(Value, _)>| {
               maybe_bytes
                 .map(|bytes_tuple| bytes_tuple.0)
                 .ok_or_else(|| format!("Error loading bytes from digest: {:?}", digest))
@@ -1358,8 +1358,7 @@ fn digest_to_bytes(
         })
       })
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
-
-    Ok(PyBytes::new(py, &bytes))
+    Ok(bytes.into())
   })
 }
 
