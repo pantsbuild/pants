@@ -12,7 +12,7 @@ import time
 import uuid
 from collections import OrderedDict
 from contextlib import contextmanager
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 import requests
 
@@ -146,7 +146,7 @@ class RunTracker(Subsystem):
         self._run_timestamp = time.time()
         self._cmd_line = " ".join(["pants"] + sys.argv[1:])
         self._sorted_goal_infos = tuple()
-        self._v2_goal_rule_names = tuple()
+        self._v2_goal_rule_names: Tuple[str, ...] = tuple()
 
         self.run_uuid = uuid.uuid4().hex
         # Select a globally unique ID for the run, that sorts by time.
@@ -218,8 +218,12 @@ class RunTracker(Subsystem):
     def set_sorted_goal_infos(self, sorted_goal_infos):
         self._sorted_goal_infos = sorted_goal_infos
 
-    def set_v2_goal_rule_names(self, v2_goal_rule_names):
+    def set_v2_goal_rule_names(self, v2_goal_rule_names: Tuple[str, ...]) -> None:
         self._v2_goal_rule_names = v2_goal_rule_names
+
+    @property
+    def v2_goals_rule_names(self) -> Tuple[str, ...]:
+        return self._v2_goal_rule_names
 
     def register_thread(self, parent_workunit):
         """Register the parent workunit for all work in the calling thread.
