@@ -168,6 +168,10 @@ impl StreamingCommandRunner {
             build_id,
             &operation
           );
+
+          // Extract the operation name.
+          // Note: protobuf can return empty string for an empty field so convert empty strings
+          // to None.
           operation_name_opt =
             Some(operation.get_name().to_string()).filter(|s| !s.trim().is_empty());
 
