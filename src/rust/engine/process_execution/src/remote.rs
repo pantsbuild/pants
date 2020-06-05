@@ -31,7 +31,7 @@ use workunit_store::WorkunitStore;
 
 // Streaming client module. Intended as an eventual repalcement for the CommandRunner in this
 // module.
-mod streaming;
+pub(crate) mod streaming;
 pub use streaming::StreamingCommandRunner;
 #[cfg(test)]
 mod streaming_tests;

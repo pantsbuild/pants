@@ -339,7 +339,8 @@ impl StreamingCommandRunner {
     ExecutionError::MissingDigests(missing_digests)
   }
 
-  async fn extract_execute_response(
+  // pub(crate) for testing
+  pub(crate) async fn extract_execute_response(
     &self,
     operation_or_status: OperationOrStatus,
   ) -> Result<FallibleProcessResultWithPlatform, ExecutionError> {
