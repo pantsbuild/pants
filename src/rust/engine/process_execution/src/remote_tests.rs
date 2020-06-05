@@ -2218,7 +2218,9 @@ async fn extract_output_files_from_response_no_prefix() {
   )
 }
 
-fn workunits_with_constant_span_id(workunit_store: &mut WorkunitStore) -> HashSet<Workunit> {
+pub(crate) fn workunits_with_constant_span_id(
+  workunit_store: &mut WorkunitStore,
+) -> HashSet<Workunit> {
   workunit_store.with_latest_workunits(log::Level::Trace, |_, completed_workunits| {
     completed_workunits
       .iter()
@@ -2445,7 +2447,7 @@ pub(crate) fn make_successful_operation(
   MockOperation::new(op)
 }
 
-fn make_successful_operation_with_metadata(
+pub(crate) fn make_successful_operation_with_metadata(
   operation_name: &str,
   stdout: StdoutType,
   stderr: StderrType,

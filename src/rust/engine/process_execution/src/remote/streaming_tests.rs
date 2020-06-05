@@ -1,9 +1,10 @@
 use std::collections::BTreeMap;
 use std::convert::TryInto;
+use std::time::Duration;
 
 use bytes::Bytes;
 use hashing::EMPTY_DIGEST;
-use maplit::btreemap;
+use maplit::{btreemap, hashset};
 use mock::execution_server::{ExpectedAPICall, MockOperation};
 use protobuf::{Message, ProtobufEnum};
 use spectral::assert_that;
@@ -15,18 +16,18 @@ use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory};
 use testutil::owned_string_vec;
 use tokio::runtime::Handle;
+use workunit_store::{Workunit, WorkunitMetadata, WorkunitState, WorkunitStore};
 
 use crate::remote::{ExecutionError, OperationOrStatus, StreamingCommandRunner};
 use crate::remote_tests::{
   assert_cancellation_requests, assert_contains, cat_roland_request, echo_foo_request,
   echo_roland_request, empty_request_metadata, make_any_proto, make_incomplete_operation,
   make_precondition_failure_operation, make_retryable_operation_failure, make_store,
-  make_successful_operation, missing_preconditionfailure_violation, run_cmd_runner,
+  make_successful_operation, make_successful_operation_with_metadata,
+  missing_preconditionfailure_violation, run_cmd_runner, workunits_with_constant_span_id,
   RemoteTestResult, StderrType, StdoutType,
 };
 use crate::{CommandRunner, Context, MultiPlatformProcess, Platform, Process};
-use std::time::Duration;
-use workunit_store::WorkunitStore;
 
 fn create_command_runner(
   address: String,
@@ -961,4 +962,87 @@ async fn extract_execute_response_other_status() {
     Err(ExecutionError::Fatal(err)) => assert_contains(&err, "PERMISSION_DENIED"),
     other => assert!(false, "Want fatal error, got {:?}", other),
   };
+}
+
+#[tokio::test]
+async fn remote_workunits_are_stored() {
+  let mut workunit_store = WorkunitStore::new(false);
+  workunit_store.init_thread_state(None);
+  let op_name = "gimme-foo".to_string();
+  let testdata = TestData::roland();
+  let testdata_empty = TestData::empty();
+  let operation = make_successful_operation_with_metadata(
+    &op_name,
+    StdoutType::Digest(testdata.digest()),
+    StderrType::Raw(testdata_empty.string()),
+    0,
+  );
+  let cas = mock::StubCAS::builder()
+    .file(&TestData::roland())
+    .directory(&TestDirectory::containing_roland())
+    .build();
+  let (command_runner, _store) = create_command_runner("".to_owned(), &cas, Platform::Linux);
+
+  command_runner
+    .extract_execute_response(OperationOrStatus::Operation(operation))
+    .await
+    .unwrap();
+
+  let got_workunits = workunits_with_constant_span_id(&mut workunit_store);
+
+  use concrete_time::Duration;
+  use concrete_time::TimeSpan;
+
+  let want_workunits = hashset! {
+    Workunit {
+      name: String::from("remote execution action scheduling"),
+      state: WorkunitState::Completed {
+        time_span: TimeSpan {
+          start: Duration::new(0, 0),
+          duration: Duration::new(1, 0),
+        }
+      },
+      span_id: String::from("ignore"),
+      parent_id: None,
+      metadata: WorkunitMetadata::new(),
+    },
+    Workunit {
+      name: String::from("remote execution worker input fetching"),
+      state: WorkunitState::Completed {
+        time_span: TimeSpan {
+          start: Duration::new(2, 0),
+          duration: Duration::new(1, 0),
+        }
+      },
+      span_id: String::from("ignore"),
+      parent_id: None,
+      metadata: WorkunitMetadata::new(),
+    },
+    Workunit {
+      name: String::from("remote execution worker command executing"),
+      state: WorkunitState::Completed {
+        time_span: TimeSpan {
+          start: Duration::new(4, 0),
+          duration: Duration::new(1, 0),
+        }
+      },
+      span_id: String::from("ignore"),
+      parent_id: None,
+      metadata: WorkunitMetadata::new(),
+    },
+    Workunit {
+      name: String::from("remote execution worker output uploading"),
+      state: WorkunitState::Completed {
+        time_span: TimeSpan {
+          start: Duration::new(6, 0),
+          duration: Duration::new(1, 0),
+        }
+      },
+      span_id: String::from("ignore"),
+      parent_id: None,
+      metadata: WorkunitMetadata::new(),
+    }
+  };
+
+  assert!(got_workunits.is_superset(&want_workunits));
 }
