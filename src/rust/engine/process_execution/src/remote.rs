@@ -916,8 +916,8 @@ pub fn populate_fallible_execution_result(
         stdout_digest,
         stderr_digest,
         exit_code: execute_response.get_result().get_exit_code(),
-        output_directory: output_directory,
-        execution_attempts: execution_attempts,
+        output_directory,
+        execution_attempts,
         platform,
       })
     })

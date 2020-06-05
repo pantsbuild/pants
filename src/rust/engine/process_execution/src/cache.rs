@@ -99,7 +99,7 @@ impl CommandRunner {
 
     let maybe_execute_response: Option<(ExecuteResponse, Platform)> = self
       .process_execution_store
-      .load_bytes_with(fingerprint.clone(), move |bytes| {
+      .load_bytes_with(fingerprint, move |bytes| {
         let decoded: PlatformAndResponseBytes = bincode::deserialize(&bytes[..])
           .map_err(|err| format!("Could not deserialize platform and response: {}", err))?;
 

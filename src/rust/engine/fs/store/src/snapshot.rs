@@ -238,7 +238,7 @@ impl Snapshot {
       Self::merge_directories(store, snapshots.iter().map(|s| s.digest).collect()).await?;
     Ok(Snapshot {
       digest: root_digest,
-      path_stats: path_stats,
+      path_stats,
     })
   }
 
@@ -735,11 +735,11 @@ fn paths_of_child_dir(paths: Vec<PathStat>) -> Vec<PathStat> {
       Some(match s {
         PathStat::File { path, stat } => PathStat::File {
           path: path.iter().skip(1).collect(),
-          stat: stat,
+          stat,
         },
         PathStat::Dir { path, stat } => PathStat::Dir {
           path: path.iter().skip(1).collect(),
-          stat: stat,
+          stat,
         },
       })
     })

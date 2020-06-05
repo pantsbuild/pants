@@ -218,7 +218,7 @@ impl<N: Node> Entry<N> {
   ///
   pub(crate) fn new(node: N) -> Entry<N> {
     Entry {
-      node: node,
+      node,
       state: Arc::new(Mutex::new(EntryState::initial())),
     }
   }

@@ -134,10 +134,10 @@ impl StubCAS {
     let write_message_sizes = Arc::new(Mutex::new(Vec::new()));
     let blobs = Arc::new(Mutex::new(blobs));
     let responder = StubCASResponder {
-      chunk_size_bytes: chunk_size_bytes,
-      instance_name: instance_name,
+      chunk_size_bytes,
+      instance_name,
       blobs: blobs.clone(),
-      always_errors: always_errors,
+      always_errors,
       read_request_count: read_request_count.clone(),
       write_message_sizes: write_message_sizes.clone(),
       required_auth_header: required_auth_token.map(|t| format!("Bearer {}", t)),

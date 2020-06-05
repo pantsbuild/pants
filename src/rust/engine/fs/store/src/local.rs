@@ -64,7 +64,7 @@ impl ByteStore {
           lease_time,
         )
         .map(Arc::new),
-        executor: executor,
+        executor,
       }),
     })
   }
@@ -230,10 +230,10 @@ impl ByteStore {
         let v = VersionedFingerprint::from_bytes_unsafe(key);
         let fingerprint = v.get_fingerprint();
         fingerprints_by_expired_ago.push(AgedFingerprint {
-          expired_seconds_ago: expired_seconds_ago,
+          expired_seconds_ago,
           fingerprint,
           size_bytes: bytes.len(),
-          entry_type: entry_type,
+          entry_type,
         });
       }
     }
