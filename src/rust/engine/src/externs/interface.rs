@@ -848,17 +848,19 @@ fn poll_session_workunits(
     .map_err(|e| PyErr::new::<exc::Exception, _>(py, (format!("{}", e),)))?;
   with_scheduler(py, scheduler_ptr, |scheduler| {
     with_session(py, session_ptr, |session| {
-      session
-        .workunit_store()
-        .with_latest_workunits(py_level.into(), |started, completed| {
-          let mut started_iter = started.iter();
-          let started = workunits_to_py_tuple_value(&mut started_iter, &scheduler.core)?;
+      py.allow_threads(|| {
+        session
+          .workunit_store()
+          .with_latest_workunits(py_level.into(), |started, completed| {
+            let mut started_iter = started.iter();
+            let started = workunits_to_py_tuple_value(&mut started_iter, &scheduler.core)?;
 
-          let mut completed_iter = completed.iter();
-          let completed = workunits_to_py_tuple_value(&mut completed_iter, &scheduler.core)?;
+            let mut completed_iter = completed.iter();
+            let completed = workunits_to_py_tuple_value(&mut completed_iter, &scheduler.core)?;
 
-          Ok(externs::store_tuple(vec![started, completed]).into())
-        })
+            Ok(externs::store_tuple(vec![started, completed]).into())
+          })
+      })
     })
   })
 }
