@@ -1,4 +1,5 @@
 use std::convert::TryInto;
+use std::fs::create_dir_all;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -8,10 +9,10 @@ use tempfile;
 use testutil::data::TestDirectory;
 use testutil::make_file;
 
-use crate::{OneOffStoreFileByDigest, RelativePath, Snapshot, SnapshotOps, Store};
+use crate::{MergeBehavior, OneOffStoreFileByDigest, Snapshot, SnapshotOps, RelativePath, Store, SubsetParams};
 use fs::{
   Dir, File, GitignoreStyleExcludes, GlobExpansionConjunction, GlobMatching, PathGlobs, PathStat,
-  PosixFS, StrictGlobMatching,
+  PosixFS, PreparedPathGlobs, StrictGlobMatching,
 };
 
 pub const STR: &str = "European Burmese";
@@ -165,7 +166,10 @@ async fn merge_directories_two_files() {
     .expect("Storing treats directory");
 
   let result = store
-    .merge(vec![containing_treats.digest(), containing_roland.digest()])
+    .merge(
+      vec![containing_treats.digest(), containing_roland.digest()],
+      MergeBehavior::NoDuplicates,
+    )
     .await;
 
   assert_eq!(
@@ -191,10 +195,10 @@ async fn merge_directories_clashing_files() {
     .expect("Storing wrong roland directory");
 
   let err = store
-    .merge(vec![
-      containing_roland.digest(),
-      containing_wrong_roland.digest(),
-    ])
+    .merge(
+      vec![containing_roland.digest(), containing_wrong_roland.digest()],
+      MergeBehavior::NoDuplicates,
+    )
     .await
     .expect_err("Want error merging");
 
@@ -222,10 +226,13 @@ async fn merge_directories_same_files() {
     .expect("Storing treats directory");
 
   let result = store
-    .merge(vec![
-      containing_roland.digest(),
-      containing_roland_and_treats.digest(),
-    ])
+    .merge(
+      vec![
+        containing_roland.digest(),
+        containing_roland_and_treats.digest(),
+      ],
+      MergeBehavior::NoDuplicates,
+    )
     .await;
 
   assert_eq!(
@@ -269,7 +276,10 @@ async fn snapshot_merge_two_files() {
       .unwrap();
 
   let merged = store
-    .merge(vec![snapshot1.digest, snapshot2.digest])
+    .merge(
+      vec![snapshot1.digest, snapshot2.digest],
+      MergeBehavior::NoDuplicates,
+    )
     .await
     .unwrap();
   let merged_root_directory = store.load_directory(merged).await.unwrap().unwrap().0;
@@ -318,7 +328,10 @@ async fn snapshot_merge_same_file() {
     .unwrap();
 
   let merged_res = store
-    .merge(vec![snapshot1.digest, snapshot1_cloned.digest])
+    .merge(
+      vec![snapshot1.digest, snapshot1_cloned.digest],
+      MergeBehavior::NoDuplicates,
+    )
     .await;
 
   assert_eq!(merged_res, Ok(snapshot1.digest));
@@ -342,11 +355,16 @@ async fn snapshot_merge_colliding() {
     .await
     .unwrap();
 
-  let merged_res = store.merge(vec![snapshot1.digest, snapshot2.digest]).await;
+  let merged_res = store
+    .merge(
+      vec![snapshot1.digest, snapshot2.digest],
+      MergeBehavior::NoDuplicates,
+    )
+    .await;
 
   match merged_res {
     Err(ref msg)
-      if format!("{:?}", msg).contains("found 2 duplicate entries")
+      if format!("{:?}", msg).contains("got more than one unique file")
         && format!("{:?}", msg).contains("roland") =>
     {
       ()
@@ -356,6 +374,54 @@ async fn snapshot_merge_colliding() {
       x
     ),
   }
+}
+
+#[tokio::test]
+async fn snapshot_merge_allowed_collisions_with_globs() {
+  let (store, tempdir, posix_fs, digester) = setup();
+
+  create_dir_all(tempdir.path().join("subdir")).unwrap();
+  make_file(&tempdir.path().join("subdir/roland"), STR.as_bytes(), 0o600);
+  let path_stats1 = expand_all_sorted(posix_fs).await;
+  let snapshot1 = Snapshot::from_path_stats(store.clone(), digester.clone(), path_stats1)
+    .await
+    .unwrap();
+
+  // When the file is *not* the same, we would normally error out, but we add a **/* "allowed
+  // collision" glob, so the *first* of snapshots takes precedence on colliding file paths.
+  let (_store2, tempdir2, posix_fs2, digester2) = setup();
+  create_dir_all(tempdir2.path().join("subdir")).unwrap();
+  make_file(
+    &tempdir2.path().join("subdir/roland"),
+    STR2.as_bytes(),
+    0o600,
+  );
+  let path_stats2 = expand_all_sorted(posix_fs2).await;
+  let snapshot2 = Snapshot::from_path_stats(store.clone(), digester2, path_stats2)
+    .await
+    .unwrap();
+
+  let globs = PreparedPathGlobs::create(
+    vec!["**/*".to_string()],
+    StrictGlobMatching::Ignore,
+    GlobExpansionConjunction::AllMatch,
+  )
+  .unwrap();
+  let subset_params = SubsetParams { globs };
+  let merge_behavior = MergeBehavior::LinearCompose(subset_params);
+
+  let first_1 = store
+    .merge(
+      vec![snapshot1.digest, snapshot2.digest],
+      merge_behavior.clone(),
+    )
+    .await;
+  assert_eq!(first_1, Ok(snapshot1.digest));
+
+  let first_2 = store
+    .merge(vec![snapshot2.digest, snapshot1.digest], merge_behavior)
+    .await;
+  assert_eq!(first_2, Ok(snapshot2.digest));
 }
 
 #[tokio::test]

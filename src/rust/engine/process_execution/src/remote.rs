@@ -28,6 +28,10 @@ use protobuf::{self, Message, ProtobufEnum};
 use rand::{thread_rng, Rng};
 use store::{Snapshot, SnapshotOps, Store, StoreFileByDigest};
 use workunit_store::{with_workunit, Metric, SpanId, WorkunitMetadata, WorkunitStore};
+use workunit_store::{with_workunit, SpanId, WorkunitMetadata, WorkunitStore};
+use sha2::Sha256;
+use store::{MergeBehavior, Snapshot, SnapshotOps, Store, StoreFileByDigest};
+use tokio::time::delay_for;
 
 use crate::{
   Context, ExecutionStats, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform,
@@ -1231,7 +1235,7 @@ pub fn extract_output_files(
     directory_digests.push(files_digest);
 
     store
-      .merge(directory_digests)
+      .merge(directory_digests, MergeBehavior::NoDuplicates)
       .map_err(|err| format!("Error when merging output files and directories: {:?}", err))
       .await
   })

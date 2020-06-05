@@ -5,20 +5,20 @@ use crate::{snapshot::osstring_as_utf8, Snapshot};
 
 use async_trait::async_trait;
 use bazel_protos::remote_execution as remexec;
-use bytes::Bytes;
+use boxfuture::{BoxFuture, Boxable};
 use fs::{
   ExpandablePathGlobs, GitignoreStyleExcludes, PathGlob, PreparedPathGlobs, RelativePath,
   DOUBLE_STAR_GLOB, SINGLE_STAR_GLOB,
 };
-use futures::future::{self as future03, FutureExt, TryFutureExt};
+use futures::compat::Future01CompatExt;
+use futures::future::{self as future03, TryFutureExt};
+use futures01::future::{self, Future};
 use glob::Pattern;
-use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
-use indexmap::{self, IndexMap};
-use itertools::Itertools;
-use log::log_enabled;
+use hashing::{Digest, Fingerprint};
+use indexmap::{self, IndexMap, IndexSet};
 
-use std::collections::HashSet;
 use std::convert::From;
+use std::fmt;
 use std::iter::Iterator;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -45,11 +45,42 @@ pub struct SubsetParams {
 }
 
 ///
+/// Determine how to handle colliding file paths when merging multiple snapshots.
+///
+#[derive(Clone)]
+pub enum MergeBehavior {
+  ///
+  /// Error out if any duplicate files are detected. Duplicate files with the same contents are
+  /// still allowed.
+  ///
+  NoDuplicates,
+  ///
+  /// Any colliding file paths from separate snapshots that match the SubsetParams will be allowed
+  /// without error. In that case, the first snapshot in the list to merge which contains the file
+  /// will take precedence in the merged snapshot.
+  ///
+  /// Collisions in file paths that do *not* match the SubsetParams will still cause an error when
+  /// merged. In the case when a file in one snapshot has the same path as a directory in another
+  /// snapshot to be merged, an error will be raised regardless of of the SubsetParams.
+  ///
+  LinearCompose(SubsetParams),
+}
+
+impl MergeBehavior {
+  pub fn is_allowed_duplicate(&self, path: &Path) -> bool {
+    match self {
+      MergeBehavior::NoDuplicates => false,
+      MergeBehavior::LinearCompose(ref params) => params.globs.matches(path),
+    }
+  }
+}
+
+///
 /// A trait that encapsulates some of the features of a Store, with nicer type signatures. This is
 /// used to implement the `SnapshotOps` trait.
 ///
 #[async_trait]
-pub trait StoreWrapper: Clone + Send + Sync {
+pub trait StoreWrapper: fmt::Debug + Clone + Send + Sync {
   async fn load_file_bytes_with<T: Send + 'static, F: Fn(&[u8]) -> T + Send + Sync + 'static>(
     &self,
     digest: Digest,
@@ -60,223 +91,6 @@ pub trait StoreWrapper: Clone + Send + Sync {
   async fn load_directory_or_err(&self, digest: Digest) -> Result<remexec::Directory, String>;
 
   async fn record_directory(&self, directory: &remexec::Directory) -> Result<Digest, String>;
-}
-
-///
-/// Given Digest(s) representing Directory instances, merge them recursively into a single
-/// output Directory Digest.
-///
-/// If a file is present with the same name and contents multiple times, it will appear once.
-/// If a file is present with the same name, but different contents, an error will be returned.
-///
-async fn merge_directories<T: StoreWrapper + 'static>(
-  store_wrapper: T,
-  dir_digests: Vec<Digest>,
-) -> Result<Digest, String> {
-  merge_directories_recursive(store_wrapper, PathBuf::new(), dir_digests).await
-}
-
-// NB: This function is recursive, and so cannot be directly marked async:
-//   https://rust-lang.github.io/async-book/07_workarounds/05_recursion.html
-fn merge_directories_recursive<T: StoreWrapper + 'static>(
-  store_wrapper: T,
-  parent_path: PathBuf,
-  dir_digests: Vec<Digest>,
-) -> future03::BoxFuture<'static, Result<Digest, String>> {
-  async move {
-    if dir_digests.is_empty() {
-      return Ok(EMPTY_DIGEST);
-    } else if dir_digests.len() == 1 {
-      let mut dir_digests = dir_digests;
-      return Ok(dir_digests.pop().unwrap());
-    }
-
-    let mut directories = future03::try_join_all(
-      dir_digests
-        .into_iter()
-        .map(|digest| {
-          store_wrapper
-            .load_directory(digest)
-            .and_then(move |maybe_directory| {
-              future03::ready(
-                maybe_directory
-                  .ok_or_else(|| format!("Digest {:?} did not exist in the Store.", digest)),
-              )
-            })
-        })
-        .collect::<Vec<_>>(),
-    )
-    .await?;
-
-    let mut out_dir = remexec::Directory::new();
-
-    // Merge FileNodes.
-    let file_nodes = Iterator::flatten(
-      directories
-        .iter_mut()
-        .map(|directory| directory.take_files().into_iter()),
-    )
-    .sorted_by(|a, b| a.name.cmp(&b.name));
-
-    out_dir.set_files(protobuf::RepeatedField::from_vec(
-      file_nodes.into_iter().dedup().collect(),
-    ));
-
-    // Group and recurse for DirectoryNodes.
-    let child_directory_futures = {
-      let store = store_wrapper.clone();
-      let parent_path = parent_path.clone();
-      let mut directories_to_merge = Iterator::flatten(
-        directories
-          .iter_mut()
-          .map(|directory| directory.take_directories().into_iter()),
-      )
-      .collect::<Vec<_>>();
-      directories_to_merge.sort_by(|a, b| a.name.cmp(&b.name));
-      directories_to_merge
-        .into_iter()
-        .group_by(|d| d.name.clone())
-        .into_iter()
-        .map(move |(child_name, group)| {
-          let store = store.clone();
-          let digests: Vec<Digest> = group
-            .map(|d| to_pants_digest(d.get_digest().clone()))
-            .collect();
-          let child_path = parent_path.join(&child_name);
-          async move {
-            let merged_digest = merge_directories_recursive(store, child_path, digests).await?;
-            let mut child_dir = remexec::DirectoryNode::new();
-            child_dir.set_name(child_name);
-            child_dir.set_digest((&merged_digest).into());
-            let res: Result<_, String> = Ok(child_dir);
-            res
-          }
-        })
-        .collect::<Vec<_>>()
-    };
-
-    let child_directories = future03::try_join_all(child_directory_futures).await?;
-
-    out_dir.set_directories(protobuf::RepeatedField::from_vec(child_directories));
-
-    error_for_collisions(&store_wrapper, &parent_path, &out_dir).await?;
-    store_wrapper.record_directory(&out_dir).await
-  }
-  .boxed()
-}
-
-///
-/// Ensure merge is unique and fail with debugging info if not.
-///
-async fn error_for_collisions<T: StoreWrapper + 'static>(
-  store_wrapper: &T,
-  parent_path: &Path,
-  dir: &remexec::Directory,
-) -> Result<(), String> {
-  // Attempt to cheaply check for collisions to bail out early if there aren't any.
-  let unique_count = dir
-    .get_files()
-    .iter()
-    .map(remexec::FileNode::get_name)
-    .chain(
-      dir
-        .get_directories()
-        .iter()
-        .map(remexec::DirectoryNode::get_name),
-    )
-    .collect::<HashSet<_>>()
-    .len();
-  if unique_count == (dir.get_files().len() + dir.get_directories().len()) {
-    return Ok(());
-  }
-
-  let file_details_by_name = dir
-    .get_files()
-    .iter()
-    .map(|file_node| async move {
-      let digest_proto = file_node.get_digest();
-      let header = format!(
-        "file digest={} size={}:\n\n",
-        digest_proto.hash, digest_proto.size_bytes
-      );
-
-      let digest = to_pants_digest(digest_proto.clone());
-      let contents = store_wrapper
-        .load_file_bytes_with(digest, |bytes| {
-          const MAX_LENGTH: usize = 1024;
-          let content_length = bytes.len();
-          let mut bytes = Bytes::from(&bytes[0..std::cmp::min(content_length, MAX_LENGTH)]);
-          if content_length > MAX_LENGTH && !log_enabled!(log::Level::Debug) {
-            bytes.extend_from_slice(
-              format!(
-                "\n... TRUNCATED contents from {}B to {}B \
-                  (Pass -ldebug to see full contents).",
-                content_length, MAX_LENGTH
-              )
-              .as_bytes(),
-            );
-          }
-          String::from_utf8_lossy(bytes.to_vec().as_slice()).to_string()
-        })
-        .await?
-        .unwrap_or_else(|| "<could not load contents>".to_string());
-      let detail = format!("{}{}", header, contents);
-      let res: Result<_, String> = Ok((file_node.get_name(), detail));
-      res
-    })
-    .map(|f| f.boxed());
-  let dir_details_by_name = dir
-    .get_directories()
-    .iter()
-    .map(|dir_node| async move {
-      let digest_proto = dir_node.get_digest();
-      let detail = format!(
-        "dir digest={} size={}:\n\n",
-        digest_proto.hash, digest_proto.size_bytes
-      );
-      let res: Result<_, String> = Ok((dir_node.get_name(), detail));
-      res
-    })
-    .map(|f| f.boxed());
-
-  let duplicate_details = async move {
-    let details_by_name = future03::try_join_all(
-      file_details_by_name
-        .chain(dir_details_by_name)
-        .collect::<Vec<_>>(),
-    )
-    .await?
-    .into_iter()
-    .into_group_map();
-
-    let enumerated_details =
-      std::iter::Iterator::flatten(details_by_name.iter().filter_map(|(name, details)| {
-        if details.len() > 1 {
-          Some(
-            details
-              .iter()
-              .enumerate()
-              .map(move |(index, detail)| format!("`{}`: {}.) {}", name, index + 1, detail)),
-          )
-        } else {
-          None
-        }
-      }))
-      .collect();
-
-    let res: Result<Vec<String>, String> = Ok(enumerated_details);
-    res
-  }
-  .await
-  .unwrap_or_else(|err| vec![format!("Failed to load contents for comparison: {}", err)]);
-
-  Err(format!(
-    "Can only merge Directories with no duplicates, but found {} duplicate entries in {}:\
-      \n\n{}",
-    duplicate_details.len(),
-    parent_path.display(),
-    duplicate_details.join("\n\n")
-  ))
 }
 
 ///
@@ -643,6 +457,268 @@ async fn snapshot_glob_match<T: StoreWrapper>(
 }
 
 ///
+/// When we perform a merge() operation, we have to perform some relatively complex logic to
+/// efficiently check for duplicates. This struct encapsulates that complexity, and will recursively
+/// perform the duplicate checking with `.merge_colliding_files_and_directories()`. This struct can
+/// be constructed with `DigestMergeContext::from_digests()`.
+///
+#[derive(Debug)]
+struct DigestMergeContext<T: StoreWrapper + 'static> {
+  non_clashing_files: Vec<remexec::FileNode>,
+  non_clashing_directories: Vec<remexec::DirectoryNode>,
+  clashing_files: IndexMap<PathBuf, Vec<remexec::FileNode>>,
+  clashing_directories: IndexMap<PathBuf, Vec<remexec::DirectoryNode>>,
+  store: T,
+}
+
+impl<T: StoreWrapper + 'static> DigestMergeContext<T> {
+  // Fetch digest contents from the store in parallel.
+  async fn from_digests(digests: Vec<Digest>, store: T) -> Result<Self, SnapshotOpsError> {
+    let top_level_directories: Vec<remexec::Directory> = future03::try_join_all(
+      digests
+        .into_iter()
+        .map(|digest| store.load_directory(digest)),
+    )
+    .await?
+    .into_iter()
+    .map(|result| {
+      result
+        .ok_or_else(|| "could not locate digest in DigestMergeContext::from_digests()".to_string())
+    })
+    .collect::<Result<Vec<remexec::Directory>, String>>()?;
+    Ok(Self::from_directories(top_level_directories, store))
+  }
+
+  // Flatten file and directory nodes.
+  fn from_directories(top_level_directories: Vec<remexec::Directory>, store: T) -> Self {
+    let (all_file_nodes, all_directory_nodes): (
+      Vec<remexec::FileNode>,
+      Vec<remexec::DirectoryNode>,
+    ) = top_level_directories.into_iter().fold(
+      (vec![], vec![]),
+      |(mut all_files, mut all_directories),
+       remexec::Directory {
+         files, directories, ..
+       }| {
+        all_files.extend(files.to_vec());
+        all_directories.extend(directories.to_vec());
+        (all_files, all_directories)
+      },
+    );
+    Self::from_flattened_nodes(all_file_nodes, all_directory_nodes, store)
+  }
+
+  // Determine any clashing file or directory nodes.
+  fn from_flattened_nodes(
+    all_file_nodes: Vec<remexec::FileNode>,
+    all_directory_nodes: Vec<remexec::DirectoryNode>,
+    store: T,
+  ) -> Self {
+    let mut files: IndexMap<PathBuf, Vec<remexec::FileNode>> = IndexMap::new();
+    for file_node in all_file_nodes.into_iter() {
+      let entry = files
+        .entry(PathBuf::from(file_node.get_name()))
+        .or_insert_with(Vec::new);
+      entry.push(file_node);
+    }
+
+    let mut non_clashing_files: Vec<remexec::FileNode> = vec![];
+    let mut clashing_files: IndexMap<PathBuf, Vec<remexec::FileNode>> = IndexMap::new();
+    for (prefix, mut cur_clashing_files) in files.into_iter() {
+      if cur_clashing_files.len() == 1 {
+        non_clashing_files.push(cur_clashing_files.pop().unwrap());
+      } else {
+        assert!(cur_clashing_files.len() > 1);
+        clashing_files.insert(prefix, cur_clashing_files);
+      }
+    }
+
+    let mut directories: IndexMap<PathBuf, Vec<remexec::DirectoryNode>> = IndexMap::new();
+    for directory_node in all_directory_nodes.into_iter() {
+      let entry = directories
+        .entry(PathBuf::from(directory_node.get_name()))
+        .or_insert_with(Vec::new);
+      entry.push(directory_node);
+    }
+
+    let mut non_clashing_directories: Vec<remexec::DirectoryNode> = vec![];
+    let mut clashing_directories: IndexMap<PathBuf, Vec<remexec::DirectoryNode>> = IndexMap::new();
+    for (prefix, mut cur_clashing_directories) in directories.into_iter() {
+      if cur_clashing_directories.len() == 1 {
+        non_clashing_directories.push(cur_clashing_directories.pop().unwrap());
+      } else {
+        assert!(cur_clashing_directories.len() > 1);
+        clashing_directories.insert(prefix, cur_clashing_directories);
+      }
+    }
+
+    DigestMergeContext {
+      non_clashing_files,
+      non_clashing_directories,
+      clashing_files,
+      clashing_directories,
+      store,
+    }
+  }
+
+  ///
+  /// Generate a Directory proto which contains all files and directories in the union of all of the
+  /// Digests used to create it. `behavior` dictates how colliding files will be dealt with.
+  ///
+  /// Note on performance: This method will recurse into any subdirectories with the same path in
+  /// both digests in order to reconcile all colliding files, so it will take time proportional to
+  /// the number of colliding files. A subset() operation on one of the snapshots to remove
+  /// colliding files with a recursive glob before merging snapshots is cheap and will reduce the
+  /// time taken for the subsequent merge operation.
+  ///
+  /// TODO: do the above subsetting-before-merging automatically somehow!
+  ///
+  async fn merge_colliding_files_and_directories(
+    self,
+    behavior: Arc<MergeBehavior>,
+  ) -> Result<Digest, SnapshotOpsError> {
+    self
+      .merge_remaining_colliding_files_and_directories_recursive(behavior, PathBuf::new())
+      .compat()
+      .await
+  }
+
+  // NB: This function is recursive, and so cannot be directly marked async:
+  //   https://rust-lang.github.io/async-book/07_workarounds/05_recursion.html
+  fn merge_remaining_colliding_files_and_directories_recursive(
+    self,
+    behavior: Arc<MergeBehavior>,
+    root: PathBuf,
+  ) -> BoxFuture<Digest, SnapshotOpsError> {
+    let DigestMergeContext {
+      mut non_clashing_files,
+      mut non_clashing_directories,
+      clashing_files,
+      clashing_directories,
+      store,
+    } = self;
+
+    // Get distinct files, and error out if there is a conflict.
+    for (prefix, cur_clashing_files) in clashing_files.into_iter() {
+      let distinct_files: IndexMap<Digest, remexec::FileNode> = cur_clashing_files
+        .into_iter()
+        .map(|file_node| {
+          let bazel_digest = file_node.get_digest();
+          let fp = Fingerprint::from_hex_string(bazel_digest.get_hash()).unwrap();
+          let digest = Digest(fp, bazel_digest.get_size_bytes() as usize);
+          (digest, file_node)
+        })
+        .collect();
+      if distinct_files.len() > 1 {
+        let full_file_path = root.join(&prefix);
+        if !behavior.is_allowed_duplicate(&full_file_path) {
+          return future::err(SnapshotOpsError::DigestMergeFailure(format!(
+            "got more than one unique file {:?} at path {:?}",
+            distinct_files, full_file_path
+          )))
+          .to_boxed();
+        }
+      }
+      let distinct_files: Vec<_> = distinct_files
+        .into_iter()
+        .map(|(_, file_node)| file_node)
+        .collect();
+      non_clashing_files.push(distinct_files.get(0).unwrap().clone());
+    }
+
+    let store2 = store.clone();
+    // Get distinct directories, and recurse when there is a conflict.
+    let merged_directory_nodes: BoxFuture<Vec<remexec::DirectoryNode>, SnapshotOpsError> =
+      future::join_all(clashing_directories.into_iter().map(
+        move |(prefix, cur_clashing_directories)| {
+          let mut distinct_directories: IndexSet<Digest> = cur_clashing_directories
+            .into_iter()
+            .map(|directory_node| {
+              let bazel_digest = directory_node.get_digest();
+              let fp = Fingerprint::from_hex_string(bazel_digest.get_hash()).unwrap();
+              Digest(fp, bazel_digest.get_size_bytes() as usize)
+            })
+            .collect();
+
+          let merged_directory_digest: BoxFuture<Digest, _> = if distinct_directories.len() == 1 {
+            future::ok(distinct_directories.pop().unwrap()).to_boxed()
+          } else {
+            assert!(distinct_directories.len() > 1);
+            let digests: Vec<Digest> = distinct_directories.into_iter().collect();
+            let store = store.clone();
+            let sub_context = Box::pin(async move { Self::from_digests(digests, store).await })
+              .compat()
+              .to_boxed();
+            let behavior = behavior.clone();
+            let subdir_root = root.join(&prefix);
+            sub_context
+              .and_then(move |sub_context| {
+                sub_context
+                  .merge_remaining_colliding_files_and_directories_recursive(behavior, subdir_root)
+              })
+              .to_boxed()
+          };
+
+          let mut fixed_directory_node = remexec::DirectoryNode::new();
+          fixed_directory_node.set_name(format!("{}", prefix.display()));
+
+          merged_directory_digest
+            .map(|merged_directory_digest| {
+              let bazel_digest = to_bazel_digest(merged_directory_digest);
+              fixed_directory_node.set_digest(bazel_digest);
+              fixed_directory_node
+            })
+            .to_boxed()
+        },
+      ))
+      .to_boxed();
+
+    merged_directory_nodes
+      .and_then(|merged_directory_nodes| {
+        Box::pin(async move {
+          // Add the newly merged directory nodes to the non-clashing nodes.
+          non_clashing_directories.extend(merged_directory_nodes);
+
+          // Sort the files and directories by path.
+          non_clashing_files.sort_by_key(|file_node| file_node.get_name().to_string());
+          non_clashing_directories
+            .sort_by_key(|directory_node| directory_node.get_name().to_string());
+
+          // Validate that no "non-clashing" file clashes with any "non-clashing" directory.
+          let clashing_file_directory_names: IndexMap<&str, &remexec::FileNode> =
+            non_clashing_files
+              .iter()
+              .map(|file_node| (file_node.get_name(), file_node))
+              .collect();
+          for non_clashing_directory_node in non_clashing_directories.iter() {
+            if let Some(file_node) =
+              clashing_file_directory_names.get(non_clashing_directory_node.get_name())
+            {
+              return Err(SnapshotOpsError::DigestMergeFailure(format!(
+                "file name {} for node {:?} clashes with directory node {:?}",
+                non_clashing_directory_node.get_name(),
+                file_node,
+                non_clashing_directory_node
+              )));
+            }
+          }
+
+          // Create the new protobuf with the merged nodes.
+          let mut final_directory = remexec::Directory::new();
+          final_directory.set_files(protobuf::RepeatedField::from_vec(non_clashing_files));
+          final_directory
+            .set_directories(protobuf::RepeatedField::from_vec(non_clashing_directories));
+          let digest = store2.record_directory(&final_directory).await?;
+          Ok(digest)
+        })
+        .compat()
+        .to_boxed()
+      })
+      .to_boxed()
+  }
+}
+
+///
 /// High-level operations to manipulate and merge `Digest`s.
 ///
 /// These methods take care to avoid redundant work when traversing Directory protos. Prefer to use
@@ -653,10 +729,15 @@ pub trait SnapshotOps: StoreWrapper + 'static {
   ///
   /// Given N Snapshots, returns a new Snapshot that merges them.
   ///
-  async fn merge(&self, digests: Vec<Digest>) -> Result<Digest, SnapshotOpsError> {
-    merge_directories(self.clone(), digests)
+  async fn merge(
+    &self,
+    digests: Vec<Digest>,
+    behavior: MergeBehavior,
+  ) -> Result<Digest, SnapshotOpsError> {
+    let merge_context = DigestMergeContext::from_digests(digests, self.clone()).await?;
+    merge_context
+      .merge_colliding_files_and_directories(Arc::new(behavior))
       .await
-      .map_err(|e| e.into())
   }
 
   async fn add_prefix(

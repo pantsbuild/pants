@@ -66,6 +66,7 @@ use logging::logger::PANTS_LOGGER;
 use logging::{Destination, Logger, PythonLogLevel};
 use rule_graph::{self, RuleGraph};
 use std::collections::hash_map::HashMap;
+use store::{MergeBehavior, SnapshotOps};
 use task_executor::Executor;
 use tempfile::TempDir;
 use workunit_store::{UserMetadataItem, Workunit, WorkunitState};
@@ -1478,6 +1479,40 @@ fn capture_snapshots(
           future03::try_join_all(snapshot_futures)
             .map_ok(|values| externs::store_tuple(values).into()),
         )
+      })
+      .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))
+    })
+  })
+}
+
+fn merge_directories(
+  py: Python,
+  scheduler_ptr: PyScheduler,
+  session_ptr: PySession,
+  directories_value: PyObject,
+) -> CPyResult<PyObject> {
+  let digests = externs::project_multi(&directories_value.into(), "dependencies")
+    .iter()
+    .map(|v| nodes::lift_digest(v))
+    .collect::<Result<Vec<_>, _>>()
+    .map_err(|e| PyErr::new::<exc::ValueError, _>(py, (e,)))?;
+
+  with_scheduler(py, scheduler_ptr, |scheduler| {
+    with_session(py, session_ptr, |session| {
+      // TODO: A parent_id should be an explicit argument.
+      session.workunit_store().init_thread_state(None);
+      py.allow_threads(|| {
+        scheduler
+          .core
+          .executor
+          .block_on(
+            scheduler
+              .core
+              .store()
+              .merge(digests, MergeBehavior::NoDuplicates),
+          )
+          .map(|dir| nodes::Snapshot::store_directory(&scheduler.core, &dir).into())
+          .map_err(|e| format!("{:?}", e))
       })
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))
     })

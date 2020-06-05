@@ -47,8 +47,10 @@ use task_executor::Executor;
 use tempfile::TempDir;
 use tokio::runtime::Runtime;
 
-use store::{SnapshotOps, Store, SubsetParams};
+use store::{MergeBehavior, SnapshotOps, Store, SubsetParams};
 
+// TODO: This benchmark is so noisy (at least on an OSX laptop) that +/-50% swings are possible on
+// runs with the same code! This cannot yet be used to validate performance regressions!
 pub fn criterion_benchmark_materialize(c: &mut Criterion) {
   // Create an executor, store containing the stuff to materialize, and a digest for the stuff.
   // To avoid benchmarking the deleting of things, we create a parent temporary directory (which
@@ -76,6 +78,8 @@ pub fn criterion_benchmark_materialize(c: &mut Criterion) {
     });
 }
 
+// TODO: this benchmark will report +/-10% on subsequent runs without code changes. Increasing the
+// size may help.
 pub fn criterion_benchmark_subset_wildcard(c: &mut Criterion) {
   let executor = Executor::new_owned();
   // NB: We use a much larger snapshot size compared to the materialize benchmark!
@@ -162,16 +166,102 @@ pub fn criterion_benchmark_merge(c: &mut Criterion) {
     .bench_function("snapshot_merge", |b| {
       b.iter(|| {
         // Merge the old and the new snapshot together, allowing any file to be duplicated.
-        let old_first: Digest = executor
-          .block_on(store.merge(vec![removed_digest, modified_digest]))
+        let modified_first: Digest = executor
+          .block_on(store.merge(
+            vec![modified_digest, removed_digest],
+            MergeBehavior::NoDuplicates,
+          ))
           .unwrap();
 
         // Test the performance of either ordering of snapshots.
-        let new_first: Digest = executor
-          .block_on(store.merge(vec![modified_digest, removed_digest]))
+        let removed_first: Digest = executor
+          .block_on(store.merge(
+            vec![removed_digest, modified_digest],
+            MergeBehavior::NoDuplicates,
+          ))
           .unwrap();
 
-        assert_eq!(old_first, new_first);
+        assert_eq!(modified_first, removed_first);
+      })
+    });
+}
+
+pub fn criterion_benchmark_merge_overlapping_subset(c: &mut Criterion) {
+  let rt = Runtime::new().unwrap();
+  let executor = Executor::new(rt.handle().clone());
+  let num_files: usize = 4000;
+  let (store, _tempdir, digest) = large_snapshot(&executor, num_files);
+
+  let (directory, _metadata) = executor
+    .block_on(store.load_directory(digest))
+    .unwrap()
+    .unwrap();
+  // Modify half of the files in the top-level directory by setting them to have the empty
+  // fingerprint (zero content).
+  let mut all_file_nodes = directory.get_files().to_vec();
+  let mut file_nodes_to_modify = all_file_nodes.split_off(all_file_nodes.len() / 2);
+  for file_node in file_nodes_to_modify.iter_mut() {
+    let mut empty_bazel_digest = remexec::Digest::new();
+    empty_bazel_digest.set_hash(EMPTY_DIGEST.0.to_hex());
+    empty_bazel_digest.set_size_bytes(0);
+    file_node.set_digest(empty_bazel_digest);
+  }
+
+  let mut bazel_directory = remexec::Directory::new();
+  bazel_directory.set_files(protobuf::RepeatedField::from_vec(
+    all_file_nodes
+      .into_iter()
+      .chain(file_nodes_to_modify.into_iter())
+      .collect(),
+  ));
+  bazel_directory.set_directories(directory.directories.clone());
+
+  let new_digest = executor
+    .block_on(store.record_directory(&bazel_directory, true))
+    .unwrap();
+
+  let mut cgroup = c.benchmark_group("snapshot_merge");
+
+  cgroup
+    .sample_size(10)
+    .measurement_time(Duration::from_secs(80))
+    .bench_function("snapshot_merge_overlapping_subset", |b| {
+      b.iter(|| {
+        // Merge the old and the new snapshot together, allowing any file to be duplicated.
+        let old_first: Digest = executor
+          .block_on(
+            store.merge(
+              vec![digest, new_digest],
+              MergeBehavior::LinearCompose(SubsetParams {
+                globs: PreparedPathGlobs::create(
+                  vec!["**/*".to_string()],
+                  StrictGlobMatching::Ignore,
+                  GlobExpansionConjunction::AllMatch,
+                )
+                .unwrap(),
+              }),
+            ),
+          )
+          .unwrap();
+        assert_eq!(old_first, digest);
+
+        // Test the performance of either ordering of snapshots.
+        let new_first: Digest = executor
+          .block_on(
+            store.merge(
+              vec![new_digest, digest],
+              MergeBehavior::LinearCompose(SubsetParams {
+                globs: PreparedPathGlobs::create(
+                  vec!["**/*".to_string()],
+                  StrictGlobMatching::Ignore,
+                  GlobExpansionConjunction::AllMatch,
+                )
+                .unwrap(),
+              }),
+            ),
+          )
+          .unwrap();
+        assert_eq!(new_first, new_digest);
       })
     });
 }
@@ -180,7 +270,8 @@ criterion_group!(
   benches,
   criterion_benchmark_materialize,
   criterion_benchmark_subset_wildcard,
-  criterion_benchmark_merge
+  criterion_benchmark_merge,
+  criterion_benchmark_merge_overlapping_subset
 );
 criterion_main!(benches);
 
@@ -256,7 +347,7 @@ pub fn large_snapshot(executor: &Executor, max_files: usize) -> (Store, TempDir,
     .block_on({
       async move {
         let digests = future::try_join_all(digests).await?;
-        store2.merge(digests).await
+        store2.merge(digests, MergeBehavior::NoDuplicates).await
       }
     })
     .unwrap();

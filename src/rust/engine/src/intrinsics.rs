@@ -13,7 +13,7 @@ use fs::RelativePath;
 use futures::compat::Future01CompatExt;
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use indexmap::IndexMap;
-use store::{SnapshotOps, SubsetParams};
+use store::{MergeBehavior, SnapshotOps, SubsetParams};
 
 use std::path::PathBuf;
 
@@ -290,7 +290,7 @@ fn merge_digests_request_to_digest(
       .collect();
   async move {
     let digest = store
-      .merge(digests.map_err(|e| throw(&e))?)
+      .merge(digests?, MergeBehavior::NoDuplicates)
       .await
       .map_err(|e| throw(&format!("{:?}", e)))?;
     Snapshot::store_directory_digest(&digest).map_err(|s| throw(&s))
@@ -378,12 +378,13 @@ fn create_digest_to_digest(
 
   let store = context.core.store();
   async move {
-    let digests = future::try_join_all(digests).await.map_err(|e| throw(&e))?;
+    let digests = future::try_join_all(digests).await?;
     let digest = store
-      .merge(digests)
+      .merge(digests, MergeBehavior::NoDuplicates)
       .await
-      .map_err(|e| throw(&format!("{:?}", e)))?;
-    Snapshot::store_directory_digest(&digest).map_err(|s| throw(&s))
+      .map_err(|e| format!("{:?}", e))?;
+    let res: Result<_, String> = Ok(Snapshot::store_directory(&context.core, &digest));
+    res
   }
   .boxed()
 }

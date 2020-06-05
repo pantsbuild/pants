@@ -5,7 +5,7 @@ use testutil::make_file;
 use crate::{
   snapshot_ops::StoreWrapper,
   snapshot_tests::{expand_all_sorted, setup, STR, STR2},
-  OneOffStoreFileByDigest, RelativePath, Snapshot, SnapshotOps, Store, SubsetParams,
+  MergeBehavior, OneOffStoreFileByDigest, RelativePath, Snapshot, SnapshotOps, Store, SubsetParams,
 };
 use bazel_protos::remote_execution as remexec;
 use fs::{GlobExpansionConjunction, PosixFS, PreparedPathGlobs, StrictGlobMatching};
@@ -44,7 +44,10 @@ async fn get_duplicate_rolands<T: StoreWrapper + 'static>(
     .unwrap();
 
   let merged_digest = store_wrapper
-    .merge(vec![snapshot1.digest, snapshot2.digest])
+    .merge(
+      vec![snapshot1.digest, snapshot2.digest],
+      MergeBehavior::NoDuplicates,
+    )
     .await
     .unwrap();
 
@@ -122,7 +125,7 @@ async fn subset_recursive_wildcard() {
   assert_eq!(merged_digest, subset_roland2);
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct LoadTrackingStore {
   store: Store,
   load_counts: Arc<Mutex<HashMap<Digest, usize>>>,
@@ -219,4 +222,72 @@ async fn subset_tracking_load_counts() {
   assert_eq!(merged_digest, subset_result);
   let num_loads: HashMap<Digest, usize> = load_tracking_store.load_counts.lock().clone();
   assert_eq!(num_subdir_loads, *num_loads.get(&subdir_digest).unwrap());
+}
+
+#[tokio::test]
+async fn duplicate_checking_correctly_handles_files_and_directories_without_globs() {
+  let (store, tempdir, posix_fs, digester) = setup();
+  let base_path = tempdir.path();
+
+  create_dir_all(base_path.join("subdir1")).unwrap();
+  make_file(&base_path.join("subdir1/roland1"), STR.as_bytes(), 0o600);
+  make_file(&base_path.join("subdir1/roland2"), STR2.as_bytes(), 0o600);
+
+  create_dir_all(base_path.join("subdir2")).unwrap();
+  make_file(&base_path.join("subdir2/roland1"), STR.as_bytes(), 0o600);
+  make_file(&base_path.join("subdir2/roland2"), STR2.as_bytes(), 0o600);
+
+  let path_stats1 = expand_all_sorted(posix_fs).await;
+  let snapshot1 = Snapshot::from_path_stats(store.clone(), digester.clone(), path_stats1)
+    .await
+    .unwrap();
+
+  // Create another snapshot, with file contents in reverse order as the first snapshot, so every
+  // file conflicts!
+  let (_, tempdir2, posix_fs2, digester2) = setup();
+  let base_path2 = tempdir2.path();
+
+  create_dir_all(base_path2.join("subdir1")).unwrap();
+  make_file(&base_path2.join("subdir1/roland1"), STR2.as_bytes(), 0o600);
+  make_file(&base_path2.join("subdir1/roland2"), STR.as_bytes(), 0o600);
+
+  create_dir_all(base_path2.join("subdir2")).unwrap();
+  make_file(&base_path2.join("subdir2/roland1"), STR2.as_bytes(), 0o600);
+  make_file(&base_path2.join("subdir2/roland2"), STR.as_bytes(), 0o600);
+
+  let path_stats2 = expand_all_sorted(posix_fs2).await;
+  let snapshot2 = Snapshot::from_path_stats(store.clone(), digester2.clone(), path_stats2)
+    .await
+    .unwrap();
+
+  // Check that globbing single files and single directories works as expected with LinearCompose.
+  match store
+    .merge(
+      vec![snapshot1.digest, snapshot2.digest],
+      MergeBehavior::LinearCompose(SubsetParams {
+        globs: PreparedPathGlobs::create(
+          vec!["subdir1/roland1".to_string(), "subdir2".to_string()],
+          // TODO(#9967): This parameter is unused by SnapshotOps!
+          StrictGlobMatching::Ignore,
+          // TODO(#9967): This parameter is unused by SnapshotOps!
+          GlobExpansionConjunction::AllMatch,
+        )
+        .unwrap(),
+      }),
+    )
+    .await
+  {
+    Err(ref e)
+      if format!("{:?}", e).contains("got more than one unique file")
+        && format!("{:?}", e).contains("subdir1/roland2")
+        && !format!("{:?}", e).contains("subdir1/roland1")
+        && !format!("{:?}", e).contains("subdir2") =>
+    {
+      ()
+    }
+    x => unreachable!(
+      "merge should only have errored on subdir1/roland2! got: {:?}",
+      x
+    ),
+  }
 }

@@ -35,7 +35,9 @@ mod snapshot_ops;
 mod snapshot_ops_tests;
 #[cfg(test)]
 mod snapshot_tests;
-pub use crate::snapshot_ops::{SnapshotOps, SnapshotOpsError, StoreWrapper, SubsetParams};
+pub use crate::snapshot_ops::{
+  MergeBehavior, SnapshotOps, SnapshotOps, SnapshotOpsError, StoreWrapper, SubsetParams,
+};
 
 use async_trait::async_trait;
 use bazel_protos::remote_execution as remexec;
