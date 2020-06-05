@@ -112,7 +112,7 @@ impl TestServer {
     server_transport.start();
 
     TestServer {
-      mock_responder: mock_responder,
+      mock_responder,
       server_transport,
     }
   }
@@ -178,7 +178,7 @@ pub struct MockResponder {
 impl MockResponder {
   fn new(mock_execution: MockExecution) -> MockResponder {
     MockResponder {
-      mock_execution: mock_execution,
+      mock_execution,
       received_messages: Arc::new(Mutex::new(vec![])),
       cancelation_requests: Arc::new(Mutex::new(vec![])),
     }

@@ -283,11 +283,11 @@ impl Tasks {
     );
 
     self.preparing = Some(Task {
-      cacheable: cacheable,
-      product: product,
+      cacheable,
+      product,
       clause: Vec::new(),
       gets: Vec::new(),
-      func: func,
+      func,
       display_info: DisplayInfo { name, desc, level },
     });
   }
@@ -298,10 +298,7 @@ impl Tasks {
       .as_mut()
       .expect("Must `begin()` a task creation before adding gets!")
       .gets
-      .push(Get {
-        product: product,
-        subject: subject,
-      });
+      .push(Get { product, subject });
   }
 
   pub fn add_select(&mut self, product: TypeId) {

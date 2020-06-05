@@ -58,9 +58,9 @@ pub(crate) struct PathGlobIncludeEntry {
 impl PathGlob {
   fn wildcard(canonical_dir: Dir, symbolic_path: PathBuf, wildcard: Pattern) -> PathGlob {
     PathGlob::Wildcard {
-      canonical_dir: canonical_dir,
-      symbolic_path: symbolic_path,
-      wildcard: wildcard,
+      canonical_dir,
+      symbolic_path,
+      wildcard,
     }
   }
 
@@ -71,10 +71,10 @@ impl PathGlob {
     remainder: Vec<Pattern>,
   ) -> PathGlob {
     PathGlob::DirWildcard {
-      canonical_dir: canonical_dir,
-      symbolic_path: symbolic_path,
-      wildcard: wildcard,
-      remainder: remainder,
+      canonical_dir,
+      symbolic_path,
+      wildcard,
+      remainder,
     }
   }
 
@@ -623,7 +623,7 @@ trait GlobMatchingImplementation<E: Display + Send + Sync + 'static>: VFS<E> {
         // Escape any globs in the parsed dest, which should guarantee one output PathGlob.
         PathGlob::create(vec![Pattern::escape(dest_str)]).ok()
       })
-      .unwrap_or_else(|| vec![]);
+      .unwrap_or_else(Vec::new);
 
     let path_globs =
       PreparedPathGlobs::from_globs(link_globs).map_err(|e| Self::mk_error(e.as_str()))?;

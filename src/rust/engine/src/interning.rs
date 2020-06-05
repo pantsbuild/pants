@@ -56,8 +56,8 @@ impl Interns {
       let id = self.id_generator;
       self.id_generator += 1;
       let key = Key::new(id, self.type_insert(py, v.get_type(py)));
-      self.forward_keys.insert(intern_key, key.clone());
-      self.reverse_keys.insert(key.clone(), v);
+      self.forward_keys.insert(intern_key, key);
+      self.reverse_keys.insert(key, v);
       key
     };
     Ok(key)
@@ -79,8 +79,8 @@ impl Interns {
       let id = self.id_generator;
       self.id_generator += 1;
       let type_id = TypeId(id);
-      self.forward_types.insert(intern_type, type_id.clone());
-      self.reverse_types.insert(type_id.clone(), v);
+      self.forward_types.insert(intern_type, type_id);
+      self.reverse_types.insert(type_id, v);
       type_id
     }
   }

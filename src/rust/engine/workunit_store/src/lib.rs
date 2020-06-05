@@ -10,7 +10,9 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  clippy::used_underscore_binding
+  // TODO: Falsely triggers for async/await:
+  //   see https://github.com/rust-lang/rust-clippy/issues/5360
+  // clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -241,9 +243,7 @@ impl WorkunitStore {
     inner.workunit_records.insert(span_id.clone(), started);
     inner.started_ids.push(span_id.clone());
     let child = inner.graph.add_node(span_id.clone());
-    inner
-      .span_id_to_graph
-      .insert(span_id.clone(), child.clone());
+    inner.span_id_to_graph.insert(span_id.clone(), child);
     if let Some(parent_id) = parent_id {
       if let Some(parent) = inner.span_id_to_graph.get(&parent_id).cloned() {
         inner.graph.add_edge(parent, child, ());

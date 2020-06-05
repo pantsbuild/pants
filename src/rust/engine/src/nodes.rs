@@ -316,7 +316,7 @@ impl MultiPlatformExecuteProcess {
     for (constraint_key, execute_process) in constraint_key_pairs.iter().zip(processes.iter()) {
       let underlying_req =
         MultiPlatformExecuteProcess::lift_execute_process(execute_process, constraint_key.1)?;
-      request_by_constraint.insert(constraint_key.clone(), underlying_req.clone());
+      request_by_constraint.insert(*constraint_key, underlying_req.clone());
     }
     Ok(MultiPlatformExecuteProcess(MultiPlatformProcess(
       request_by_constraint,

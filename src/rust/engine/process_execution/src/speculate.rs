@@ -25,7 +25,7 @@ impl SpeculatingCommandRunner {
     SpeculatingCommandRunner {
       primary: primary.into(),
       secondary: secondary.into(),
-      speculation_timeout: speculation_timeout,
+      speculation_timeout,
     }
   }
 

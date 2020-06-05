@@ -11,7 +11,9 @@
   clippy::needless_continue,
   clippy::single_match_else,
   clippy::unseparated_literal_suffix,
-  clippy::used_underscore_binding
+// TODO: Falsely triggers for async/await:
+//   see https://github.com/rust-lang/rust-clippy/issues/5360
+// clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -458,7 +460,7 @@ impl<'t, R: Rule> Builder<'t, R> {
         Ok(Some(inputs)) => {
           let mut rule_edges = RuleEdges::default();
           for (key, input) in inputs {
-            rule_edges.add_edge(key.clone(), input.clone());
+            rule_edges.add_edge(*key, input.clone());
           }
           combinations.insert(entry.simplified(available_params), rule_edges);
         }
