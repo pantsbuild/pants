@@ -2506,9 +2506,9 @@ fn make_precondition_failure_status(
   status
 }
 
-async fn run_cmd_runner(
+pub(crate) async fn run_cmd_runner<R: crate::CommandRunner>(
   request: MultiPlatformProcess,
-  command_runner: CommandRunner,
+  command_runner: R,
   store: Store,
 ) -> Result<RemoteTestResult, String> {
   let original = command_runner.run(request, Context::default()).await?;
@@ -2720,7 +2720,7 @@ fn cat_roland_request() -> MultiPlatformProcess {
   req.into()
 }
 
-fn echo_roland_request() -> MultiPlatformProcess {
+pub(crate) fn echo_roland_request() -> MultiPlatformProcess {
   let req = Process {
     argv: owned_string_vec(&["/bin/echo", "meoooow"]),
     env: BTreeMap::new(),

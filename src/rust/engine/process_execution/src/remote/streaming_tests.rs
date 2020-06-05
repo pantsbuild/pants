@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::convert::TryInto;
 
+use bytes::Bytes;
 use hashing::EMPTY_DIGEST;
 use maplit::btreemap;
 use mock::execution_server::ExpectedAPICall;
@@ -17,9 +18,9 @@ use tokio::runtime::Handle;
 
 use crate::remote::{ExecutionError, OperationOrStatus, StreamingCommandRunner};
 use crate::remote_tests::{
-  assert_cancellation_requests, echo_foo_request, empty_request_metadata,
+  assert_cancellation_requests, echo_foo_request, echo_roland_request, empty_request_metadata,
   make_incomplete_operation, make_retryable_operation_failure, make_store,
-  make_successful_operation, RemoteTestResult, StderrType, StdoutType,
+  make_successful_operation, run_cmd_runner, RemoteTestResult, StderrType, StdoutType,
 };
 use crate::{CommandRunner, Context, MultiPlatformProcess, Platform, Process};
 use std::time::Duration;
@@ -423,4 +424,127 @@ async fn extract_response_with_digest_stderr() {
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(result.original.output_directory, EMPTY_DIGEST);
   assert_eq!(result.original.platform, Platform::Linux);
+}
+
+#[tokio::test]
+async fn extract_response_with_digest_stdout_osx_remote() {
+  let op_name = "gimme-foo".to_string();
+  let testdata = TestData::roland();
+  let testdata_empty = TestData::empty();
+  let result = extract_execute_response(
+    make_successful_operation(
+      &op_name,
+      StdoutType::Digest(testdata.digest()),
+      StderrType::Raw(testdata_empty.string()),
+      0,
+    )
+    .op
+    .unwrap()
+    .unwrap(),
+    Platform::Darwin,
+  )
+  .await
+  .unwrap();
+
+  assert_eq!(result.stdout_bytes, testdata.bytes());
+  assert_eq!(result.stderr_bytes, testdata_empty.bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.platform, Platform::Darwin);
+}
+
+#[tokio::test]
+async fn ensure_inline_stdio_is_stored() {
+  let runtime = task_executor::Executor::new(Handle::current());
+
+  let test_stdout = TestData::roland();
+  let test_stderr = TestData::catnip();
+
+  let mock_server = {
+    let op_name = "cat".to_owned();
+
+    mock::execution_server::TestServer::new(
+      mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
+        execute_request: crate::remote::make_execute_request(
+          &echo_roland_request().try_into().unwrap(),
+          empty_request_metadata(),
+        )
+        .unwrap()
+        .2,
+        stream_responses: Ok(vec![
+          make_incomplete_operation(&op_name),
+          make_successful_operation(
+            &op_name.clone(),
+            StdoutType::Raw(test_stdout.string()),
+            StderrType::Raw(test_stderr.string()),
+            0,
+          ),
+        ]),
+      }]),
+      None,
+    )
+  };
+
+  let store_dir = TempDir::new().unwrap();
+  let store_dir_path = store_dir.path();
+
+  let cas = mock::StubCAS::empty();
+  let store = Store::with_remote(
+    runtime.clone(),
+    &store_dir_path,
+    vec![cas.address()],
+    None,
+    None,
+    None,
+    1,
+    10 * 1024 * 1024,
+    Duration::from_secs(1),
+    store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10)).unwrap(),
+    1,
+    1,
+  )
+  .expect("Failed to make store");
+
+  let cmd_runner = StreamingCommandRunner::new(
+    &mock_server.address(),
+    empty_request_metadata(),
+    None,
+    None,
+    BTreeMap::new(),
+    store.clone(),
+    Platform::Linux,
+  )
+  .unwrap();
+
+  let result = run_cmd_runner(echo_roland_request(), cmd_runner, store)
+    .await
+    .unwrap();
+
+  assert_eq!(result.stdout_bytes, test_stdout.bytes());
+  assert_eq!(result.stderr_bytes, test_stderr.bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(result.original.platform, Platform::Linux);
+
+  let local_store =
+    Store::local_only(runtime.clone(), &store_dir_path).expect("Error creating local store");
+  {
+    assert_eq!(
+      local_store
+        .load_file_bytes_with(test_stdout.digest(), |v| Bytes::from(v))
+        .await
+        .unwrap()
+        .unwrap()
+        .0,
+      test_stdout.bytes()
+    );
+    assert_eq!(
+      local_store
+        .load_file_bytes_with(test_stderr.digest(), |v| Bytes::from(v))
+        .await
+        .unwrap()
+        .unwrap()
+        .0,
+      test_stderr.bytes()
+    );
+  }
 }
