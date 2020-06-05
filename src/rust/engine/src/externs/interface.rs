@@ -361,8 +361,8 @@ py_module_initializer!(native_engine, |py, m| {
 
   m.add(
     py,
-    "digest_to_bytes",
-    py_fn!(py, digest_to_bytes(a: PyScheduler, b: PyObject)),
+    "digests_to_bytes",
+    py_fn!(py, digests_to_bytes(a: PyScheduler, b: PyList)),
   )?;
 
   m.add_class::<PyTasks>(py)?;
@@ -1332,16 +1332,18 @@ fn merge_directories(
   })
 }
 
-fn digest_to_bytes(
+fn digests_to_bytes(
   py: Python,
   scheduler_ptr: PyScheduler,
-  py_digest: PyObject,
-) -> CPyResult<PyObject> {
+  py_digests: PyList,
+) -> CPyResult<PyList> {
   with_scheduler(py, scheduler_ptr, |scheduler| {
     let core = scheduler.core.clone();
     let store = core.store().clone();
 
-    let digest = crate::nodes::lift_digest(&py_digest.into())
+    let item = py_digests.get_item(py, 0);
+
+    let digest = crate::nodes::lift_digest(&item.into())
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
 
     let bytes: Value = py
@@ -1358,7 +1360,9 @@ fn digest_to_bytes(
         })
       })
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
-    Ok(bytes.into())
+
+    let output_list = PyList::new(py, &[bytes.into()]);
+    Ok(output_list)
   })
 }
 
