@@ -24,9 +24,7 @@ def _find_root(
     existing_marker_files: Iterable[str] = None,
 ) -> Optional[str]:
     source_root_config = create_subsystem(
-        SourceRootConfig,
-        root_patterns=list(patterns),
-        marker_filenames=marker_filenames
+        SourceRootConfig, root_patterns=list(patterns), marker_filenames=marker_filenames
     )
     # This inner function is passed as the callable to the mock, to allow recursion in the rule.
     def _mock_fs_check(pathglobs: PathGlobs) -> Snapshot:
@@ -61,7 +59,7 @@ def test_source_root_at_buildroot() -> None:
     assert "." == find_root("foo/bar.py")
     assert "." == find_root("foo/")
     assert "." == find_root("foo")
-    with pytest.raises(NoSourceRootError):
+    with pytest.raises(ValueError):
         find_root("../foo/bar.py")
 
 
@@ -136,8 +134,10 @@ def test_marker_file_nested_source_roots() -> None:
 def test_multiple_marker_filenames() -> None:
     def find_root(path):
         return _find_root(
-            path, tuple(), ("SOURCE_ROOT", "setup.py"),
-            ("project1/javasrc/SOURCE_ROOT", "project2/setup.py",)
+            path,
+            tuple(),
+            ("SOURCE_ROOT", "setup.py"),
+            ("project1/javasrc/SOURCE_ROOT", "project2/setup.py",),
         )
 
     assert "project1/javasrc" == find_root("project1/javasrc/foo/bar.java")

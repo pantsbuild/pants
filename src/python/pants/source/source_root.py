@@ -209,6 +209,12 @@ class SourceRootRequest:
 
     path: PurePath
 
+    def __post_init__(self) -> None:
+        if ".." in str(self.path).split(os.path.sep):
+            raise ValueError(f"SourceRootRequest cannot contain `..` segment: {self.path}")
+        if self.path.is_absolute():
+            raise ValueError(f"SourceRootRequest path must be relative: {self.path}")
+
     @classmethod
     def for_file(cls, file_path: str) -> "SourceRootRequest":
         """Create a request for the source root for the given file."""
@@ -227,21 +233,14 @@ async def get_source_root(
     source_root_request: SourceRootRequest, source_root_config: SourceRootConfig
 ) -> OptionalSourceRoot:
     """Rule to request a SourceRoot that may not exist."""
-    if ".." in str(source_root_request):
-        raise NoSourceRootError(
-            str(source_root_request), "`..` disallowed in source root searches. "
-        )
-
     pattern_matcher = source_root_config.get_pattern_matcher()
-    # Ensure a relpath.
     path = source_root_request.path
-    relpath = path.relative_to(_repo_root) if path.is_absolute() else path
 
     # Check if the requested path itself is a source root.
 
     # A) Does it match a pattern?
-    if pattern_matcher.matches_root_patterns(relpath):
-        return OptionalSourceRoot(SourceRoot(str(relpath)))
+    if pattern_matcher.matches_root_patterns(path):
+        return OptionalSourceRoot(SourceRoot(str(path)))
 
     # B) Does it contain a marker file?
     marker_filenames = source_root_config.options.marker_filenames
@@ -253,15 +252,16 @@ async def get_source_root(
                 or "!" in marker_filename
             ):
                 raise InvalidMarkerFileError(
-                    f"Marker filename must be a base name: {marker_filename}")
+                    f"Marker filename must be a base name: {marker_filename}"
+                )
         # TODO: An intrinsic to check file existence at a fixed path?
-        snapshot = await Get[Snapshot](PathGlobs([str(relpath / mf) for mf in marker_filenames]))
+        snapshot = await Get[Snapshot](PathGlobs([str(path / mf) for mf in marker_filenames]))
         if len(snapshot.files) > 0:
-            return OptionalSourceRoot(SourceRoot(str(relpath)))
+            return OptionalSourceRoot(SourceRoot(str(path)))
 
     # The requested path itself is not a source root, but maybe its parent is.
-    if str(relpath) != ".":
-        return await Get[OptionalSourceRoot](SourceRootRequest(relpath.parent))
+    if str(path) != ".":
+        return await Get[OptionalSourceRoot](SourceRootRequest(path.parent))
 
     # The requested path is not under a source root.
     return OptionalSourceRoot(None)
