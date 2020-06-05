@@ -145,20 +145,35 @@ impl StreamingCommandRunner {
   // Outputs progress reported by the server and returns the next actionable operation
   // or gRPC status back to the main loop (plus the operation name so the main loop can
   // reconnect).
-  async fn wait_on_operation_stream<S>(&self, mut stream: S) -> (Option<String>, OperationOrStatus)
+  async fn wait_on_operation_stream<S>(
+    &self,
+    mut stream: S,
+    build_id: &str,
+  ) -> (Option<String>, OperationOrStatus)
   where
     S: Stream<Item = Result<bazel_protos::operations::Operation, grpcio::Error>> + Unpin,
   {
     let mut operation_name_opt: Option<String> = None;
 
-    debug!("monitor_operation_stream: monitoring stream");
+    trace!(
+      "wait_on_operation_stream (build_id={}): monitoring stream",
+      build_id
+    );
 
     loop {
-      // TODO: Add deadline timeout.
       match stream.next().await {
         Some(Ok(operation)) => {
-          debug!("wait_on_operation_stream: got operation: {:?}", &operation);
-          operation_name_opt = Some(operation.get_name().to_string());
+          trace!(
+            "wait_on_operation_stream (build_id={}): got operation: {:?}",
+            build_id,
+            &operation
+          );
+
+          // Extract the operation name.
+          // Note: protobuf can return empty string for an empty field so convert empty strings
+          // to None.
+          operation_name_opt =
+            Some(operation.get_name().to_string()).filter(|s| !s.trim().is_empty());
 
           // Continue monitoring if the operation is not complete.
           if !operation.get_done() {
@@ -455,6 +470,11 @@ impl StreamingCommandRunner {
         None => {
           // The request has not been submitted yet. Submit the request using the REv2
           // Execute method.
+          trace!(
+            "no current operation: submitting execute request: build_id={}; execute_request={:?}",
+            context.build_id,
+            execute_request
+          );
           self
             .execution_client
             .execute_opt(&execute_request, call_opt)
@@ -463,6 +483,11 @@ impl StreamingCommandRunner {
         Some(ref operation_name) => {
           // The request has been submitted already. Reconnect to the status stream
           // using the REv2 WaitExecution method.
+          trace!(
+            "existing operation: reconnecting to operation stream: build_id={}; operation_name={}",
+            context.build_id,
+            operation_name
+          );
           let mut wait_execution_request = WaitExecutionRequest::new();
           wait_execution_request.set_name(operation_name.to_owned());
           self
@@ -478,8 +503,10 @@ impl StreamingCommandRunner {
           // Monitor the operation stream until there is an actionable operation
           // or status to interpret.
           let compat_stream = operation_stream.compat();
-          let (operation_name_opt, actionable_result) =
-            self.wait_on_operation_stream(compat_stream).await;
+          let (operation_name_opt, actionable_result) = self
+            .wait_on_operation_stream(compat_stream, &context.build_id)
+            .await;
+          trace!("wait_on_operation_stream (build_id={}) returned: operation_name_opt={:?}; actionable_result={:?}", context.build_id, operation_name_opt, actionable_result);
 
           // Save the operation name in case we need to reconnect via WaitExecution.
           if let Some(name) = operation_name_opt {
@@ -546,8 +573,16 @@ impl crate::CommandRunner for StreamingCommandRunner {
       input_files,
       ..
     } = compatible_underlying_request;
+    let build_id = context.build_id.clone();
 
     debug!("Remote execution: {}", description);
+    trace!(
+      "built REv2 request (build_id={}): action={:?}; command={:?}; execute_request={:?}",
+      &build_id,
+      action,
+      command,
+      execute_request
+    );
 
     // Record the time that we started to process this request, then compute the ultimate
     // deadline for execution of this request.
@@ -563,8 +598,14 @@ impl crate::CommandRunner for StreamingCommandRunner {
     match timeout_fut.await {
       Ok(r) => r,
       Err(_) => {
-        trace!("remote execution timed out after {:?}", deadline_duration);
-        Err("remote execution request timed out".to_owned())
+        debug!(
+          "remote execution for build_id={} timed out after {:?}",
+          &build_id, deadline_duration
+        );
+        Err(format!(
+          "remote execution timed out after {:?}",
+          deadline_duration
+        ))
       }
     }
   }
