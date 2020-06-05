@@ -47,7 +47,7 @@ use task_executor::Executor;
 use tempfile::TempDir;
 use tokio::runtime::Runtime;
 
-use store::{Snapshot, Store};
+use store::{SnapshotOps, Store, SubsetParams};
 
 pub fn criterion_benchmark_materialize(c: &mut Criterion) {
   // Create an executor, store containing the stuff to materialize, and a digest for the stuff.
@@ -90,15 +90,16 @@ pub fn criterion_benchmark_subset_wildcard(c: &mut Criterion) {
     .measurement_time(Duration::from_secs(80))
     .bench_function("wildcard", |b| {
       b.iter(|| {
-        let get_subset = Snapshot::get_snapshot_subset(
-          store.clone(),
+        let get_subset = store.subset(
           digest,
-          PreparedPathGlobs::create(
-            vec!["**/*".to_string()],
-            StrictGlobMatching::Ignore,
-            GlobExpansionConjunction::AllMatch,
-          )
-          .unwrap(),
+          SubsetParams {
+            globs: PreparedPathGlobs::create(
+              vec!["**/*".to_string()],
+              StrictGlobMatching::Ignore,
+              GlobExpansionConjunction::AllMatch,
+            )
+            .unwrap(),
+          },
         );
         let _ = executor.block_on(get_subset).unwrap();
       })
@@ -115,7 +116,8 @@ pub fn criterion_benchmark_merge(c: &mut Criterion) {
     .block_on(store.load_directory(digest))
     .unwrap()
     .unwrap();
-  // Modify half of the files by setting them to have the empty fingerprint (zero content).
+  // Modify half of the files in the top-level directory by setting them to have the empty
+  // fingerprint (zero content).
   let mut all_file_nodes = directory.get_files().to_vec();
   let mut file_nodes_to_modify = all_file_nodes.split_off(all_file_nodes.len() / 2);
   for file_node in file_nodes_to_modify.iter_mut() {
@@ -164,18 +166,12 @@ pub fn criterion_benchmark_merge(c: &mut Criterion) {
       b.iter(|| {
         // Merge the old and the new snapshot together, allowing any file to be duplicated.
         let old_first: Digest = executor
-          .block_on(Snapshot::merge_directories(
-            store.clone(),
-            vec![removed_digest, modified_digest],
-          ))
+          .block_on(store.merge(vec![removed_digest, modified_digest]))
           .unwrap();
 
         // Test the performance of either ordering of snapshots.
         let new_first: Digest = executor
-          .block_on(Snapshot::merge_directories(
-            store.clone(),
-            vec![modified_digest, removed_digest],
-          ))
+          .block_on(store.merge(vec![modified_digest, removed_digest]))
           .unwrap();
 
         assert_eq!(old_first, new_first);
@@ -241,9 +237,10 @@ pub fn large_snapshot(executor: &Executor, max_files: usize) -> (Store, TempDir,
   let storedir = TempDir::new().unwrap();
   let store = Store::local_only(executor.clone(), storedir.path()).unwrap();
 
+  let store2 = store.clone();
   let digests = henries_paths
     .map(|mut path| {
-      let store = store.clone();
+      let store = store2.clone();
       async move {
         // We use the path as the content as well: would be interesting to make this tunable.
         let content = Bytes::from(path.as_os_str().as_bytes());
@@ -258,12 +255,11 @@ pub fn large_snapshot(executor: &Executor, max_files: usize) -> (Store, TempDir,
     })
     .collect::<Vec<_>>();
 
-  let store2 = store.clone();
   let digest = executor
     .block_on({
       async move {
         let digests = future::try_join_all(digests).await?;
-        Snapshot::merge_directories(store2, digests).await
+        store2.merge(digests).await
       }
     })
     .unwrap();
