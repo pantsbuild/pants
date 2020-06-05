@@ -25,9 +25,9 @@ function cargo_bin() {
 function bootstrap_rust() {
   RUST_TOOLCHAIN="$(cat "${REPO_ROOT}/rust-toolchain")"
   RUST_COMPONENTS=(
-    "rustfmt-preview"
+    "rustfmt"
     "rust-src"
-    "clippy-preview"
+    "clippy"
   )
 
   # Control a pants-specific rust toolchain.

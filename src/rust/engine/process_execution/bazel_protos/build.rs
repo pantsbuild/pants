@@ -14,13 +14,11 @@ fn main() {
   let grpcio_output_dir = PathBuf::from("src/gen");
   replace_if_changed(&grpcio_output_dir, |path| {
     generate_for_grpcio(&thirdpartyprotobuf, path);
-    format(path);
   });
 
   let tower_output_dir = PathBuf::from("src/gen_for_tower");
   replace_if_changed(&tower_output_dir, |path| {
     generate_for_tower(&thirdpartyprotobuf, path);
-    format(path);
   });
 
   // Re-gen if, say, someone does a git clean on the gen dir but not the target dir. This ensures
@@ -146,12 +144,20 @@ fn disable_clippy_in_generated_code(dir: &Path) -> Result<(), String> {
 }
 
 fn generate_mod_rs(dir: &Path) -> Result<(), String> {
+  // TODO: The ignore option in `rustfmt.toml` will stabilize in 1.45.0. Until then, we include
+  // a rustfmt::skip directive.
+  //   see https://github.com/rust-lang/rustfmt/issues/3243
   let listing = dir.read_dir().unwrap();
   let mut pub_mod_stmts = listing
     .filter_map(|d| d.ok())
     .map(|d| d.file_name().to_string_lossy().into_owned())
     .filter(|name| name != "mod.rs" && name != ".gitignore")
-    .map(|name| format!("pub mod {};", name.trim_end_matches(".rs")))
+    .map(|name| {
+      format!(
+        "#[rustfmt::skip]\npub mod {};",
+        name.trim_end_matches(".rs")
+      )
+    })
     .collect::<Vec<_>>();
   pub_mod_stmts.sort();
   let contents = format!(
@@ -236,34 +242,4 @@ fn replace_if_changed<F: FnOnce(&Path)>(path: &Path, f: F) {
   }
   std::fs::create_dir_all(path.parent().unwrap()).unwrap();
   copy_dir::copy_dir(tempdir.path(), path).unwrap();
-}
-
-fn format(path: &Path) {
-  let mut rustfmt = PathBuf::from(env!("CARGO"));
-  rustfmt.pop();
-  rustfmt.push("rustfmt");
-  let mut rustfmt_config = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-  rustfmt_config.pop(); // bazel_protos
-  rustfmt_config.pop(); // process_execution
-  rustfmt_config.push("rustfmt.toml");
-
-  if !rustfmt_config.exists() {
-    panic!("Couldn't find file {}", rustfmt_config.display());
-  }
-
-  for file in walkdir::WalkDir::new(path) {
-    let file = file.unwrap();
-    if file.file_type().is_file() {
-      let success = std::process::Command::new(&rustfmt)
-        .arg(file.path())
-        .arg("--config-path")
-        .arg(&rustfmt_config)
-        .status()
-        .unwrap()
-        .success();
-      if !success {
-        panic!("Cargo formatting failed for generated protos. Output should be above.");
-      }
-    }
-  }
 }
