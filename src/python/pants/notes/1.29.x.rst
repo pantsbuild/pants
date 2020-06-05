@@ -5,6 +5,23 @@ This document describes releases leading up to the ``1.29.x`` ``stable`` series.
 
 See https://pants.readme.io/v1.29/docs/release-notes-1-29 for an overview of the changes in this release.
 
+1.29.0rc2 (6/04/2020)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Set the pex_root cache only at build time (#9958)
+  `Issue #984 <https://github.com/pantsbuild/pex/issues/984>`_
+  `PR #9958 <https://github.com/pantsbuild/pants/pull/9958>`_
+
+* Fix lease extension, and make it recursive (#9956)
+  `PR #9956 <https://github.com/pantsbuild/pants/pull/9956>`_
+
+* Fix deadlock between Session and WorkunitStore. (#9959)
+  `PR #9959 <https://github.com/pantsbuild/pants/pull/9959>`_
+
+
 1.29.0rc1 (6/02/2020)
 ---------------------
 
