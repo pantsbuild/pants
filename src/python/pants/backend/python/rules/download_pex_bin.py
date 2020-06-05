@@ -77,6 +77,9 @@ class DownloadedPexBin(HermeticPex):
 
         env = dict(env) if env else {}
         env.update(**pex_build_environment.invocation_environment_dict,)
+        if "--pex-root" in pex_args:
+            raise ValueError("--pex-root flag not allowed. We set its value for you.")
+        pex_args = ("--pex-root", ".cache/pex_root") + tuple(pex_args)
 
         return super().create_process(
             python_setup=python_setup,
@@ -86,6 +89,7 @@ class DownloadedPexBin(HermeticPex):
             description=description,
             input_digest=input_digest or self.digest,
             env=env,
+            append_only_caches={"pex_root"},
             **kwargs,
         )
 
