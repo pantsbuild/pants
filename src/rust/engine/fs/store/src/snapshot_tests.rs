@@ -1,3 +1,7 @@
+use std::convert::TryInto;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
 use hashing::{Digest, Fingerprint};
 use tempfile;
 use testutil::data::TestDirectory;
@@ -9,10 +13,6 @@ use fs::{
   Dir, File, GitignoreStyleExcludes, GlobExpansionConjunction, GlobMatching, PathGlobs, PathStat,
   PosixFS, StrictGlobMatching,
 };
-
-use std;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 const STR: &str = "European Burmese";
 
@@ -286,7 +286,7 @@ async fn snapshot_merge_two_files() {
 
   let merged_child_dirnode = merged_root_directory.directories[0].clone();
   let merged_child_dirnode_digest: Result<Digest, String> =
-    merged_child_dirnode.get_digest().into();
+    merged_child_dirnode.get_digest().try_into();
   let merged_child_directory = store
     .load_directory(merged_child_dirnode_digest.unwrap())
     .await

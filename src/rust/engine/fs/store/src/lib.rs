@@ -48,6 +48,7 @@ use protobuf::Message;
 use serde_derive::Serialize;
 pub use serverset::BackoffConfig;
 use std::collections::{BTreeMap, HashMap};
+use std::convert::TryInto;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::os::unix::fs::OpenOptionsExt;
@@ -561,7 +562,7 @@ impl Store {
           .get_files()
           .iter()
           .map(|file_node| {
-            let file_digest = try_future!(file_node.get_digest().into());
+            let file_digest = try_future!(file_node.get_digest().try_into());
             let store = store.clone();
             Box::pin(async move {
               store
@@ -578,7 +579,7 @@ impl Store {
           .get_directories()
           .iter()
           .map(move |child_dir| {
-            let child_digest = try_future!(child_dir.get_digest().into());
+            let child_digest = try_future!(child_dir.get_digest().try_into());
             store.ensure_local_has_recursive_directory(child_digest)
           })
           .collect::<Vec<_>>();
@@ -704,7 +705,7 @@ impl Store {
         let mut digest_types = Vec::new();
         digest_types.push((digest, EntryType::Directory));
         for file in directory.get_files() {
-          digest_types.push((try_future!(file.get_digest().into()), EntryType::File));
+          digest_types.push((try_future!(file.get_digest().try_into()), EntryType::File));
         }
         future::ok(digest_types).to_boxed()
       })
@@ -817,7 +818,7 @@ impl Store {
         .map(|file_node| {
           let store = store.clone();
           let path = destination.join(file_node.get_name());
-          let digest = try_future!(file_node.get_digest().into());
+          let digest = try_future!(file_node.get_digest().try_into());
           let child_files = child_files.clone();
           let name = file_node.get_name().to_owned();
           store
@@ -832,7 +833,7 @@ impl Store {
         .map(|directory_node| {
           let store = store.clone();
           let path = destination.join(directory_node.get_name());
-          let digest = try_future!(directory_node.get_digest().into());
+          let digest = try_future!(directory_node.get_digest().try_into());
 
           let builder = RootOrParentMetadataBuilder::Parent((
             directory_node.get_name().to_owned(),
@@ -915,7 +916,7 @@ impl Store {
             .map(|file_node| {
               let path = path_so_far.join(file_node.get_name());
               let is_executable = file_node.is_executable;
-              let file_node_digest: Result<_, _> = file_node.get_digest().into();
+              let file_node_digest: Result<_, _> = file_node.get_digest().try_into();
               let store = store.clone();
               let res = async move {
                 let maybe_bytes = store
@@ -1013,7 +1014,7 @@ impl Store {
               .get_directories()
               .iter()
               .map(move |dir_node| {
-                let subdir_digest = try_future!(dir_node.get_digest().into());
+                let subdir_digest = try_future!(dir_node.get_digest().try_into());
                 let path = path_so_far.join(dir_node.get_name());
                 store.walk_helper(subdir_digest, path, f.clone(), accumulator.clone())
               })

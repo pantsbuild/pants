@@ -1,5 +1,6 @@
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
+use std::convert::TryInto;
 use std::mem::drop;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -944,7 +945,7 @@ fn extract_stdout(
 ) -> BoxFuture<Digest, String> {
   if execute_response.get_result().has_stdout_digest() {
     let stdout_digest_result: Result<Digest, String> =
-      execute_response.get_result().get_stdout_digest().into();
+      execute_response.get_result().get_stdout_digest().try_into();
     let stdout_digest =
       try_future!(stdout_digest_result.map_err(|err| format!("Error extracting stdout: {}", err)));
     Box::pin(async move { Ok(stdout_digest) })
@@ -971,7 +972,7 @@ fn extract_stderr(
 ) -> BoxFuture<Digest, String> {
   if execute_response.get_result().has_stderr_digest() {
     let stderr_digest_result: Result<Digest, String> =
-      execute_response.get_result().get_stderr_digest().into();
+      execute_response.get_result().get_stderr_digest().try_into();
     let stderr_digest =
       try_future!(stderr_digest_result.map_err(|err| format!("Error extracting stderr: {}", err)));
     Box::pin(async move { Ok(stderr_digest) })
@@ -1009,7 +1010,7 @@ pub fn extract_output_files(
     let store = store.clone();
     directory_digests.push(
       (async move {
-        let digest_result: Result<Digest, String> = dir.get_tree_digest().into();
+        let digest_result: Result<Digest, String> = dir.get_tree_digest().try_into();
         let mut digest = digest_result?;
         if !dir.get_path().is_empty() {
           for component in dir.get_path().rsplit('/') {
@@ -1039,7 +1040,7 @@ pub fn extract_output_files(
     .iter()
     .map(|output_file| {
       let output_file_path_buf = PathBuf::from(output_file.get_path());
-      let digest: Result<Digest, String> = output_file.get_digest().into();
+      let digest: Result<Digest, String> = output_file.get_digest().try_into();
       path_map.insert(output_file_path_buf.clone(), digest?);
       Ok(PathStat::file(
         output_file_path_buf.clone(),

@@ -1,6 +1,14 @@
 // Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+use std::collections::{HashMap, HashSet};
+use std::convert::TryInto;
+use std::ffi::OsString;
+use std::fmt;
+use std::iter::Iterator;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
 use crate::Store;
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
@@ -14,12 +22,6 @@ use futures01::future;
 use hashing::{Digest, EMPTY_DIGEST};
 use indexmap::{self, IndexMap};
 use itertools::Itertools;
-use std::collections::{HashMap, HashSet};
-use std::ffi::OsString;
-use std::fmt;
-use std::iter::Iterator;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 #[derive(Eq, Hash, PartialEq)]
 pub struct Snapshot {
@@ -318,7 +320,7 @@ impl Snapshot {
           .map(move |(child_name, group)| {
             let store = store.clone();
             let digests_result = group
-              .map(|d| d.get_digest().into())
+              .map(|d| d.get_digest().try_into())
               .collect::<Result<Vec<_>, String>>();
             let child_path = parent_path.join(&child_name);
             async move {
@@ -380,7 +382,7 @@ impl Snapshot {
           digest_proto.hash, digest_proto.size_bytes
         );
 
-        let digest_res: Result<hashing::Digest, String> = digest_proto.into();
+        let digest_res: Result<hashing::Digest, String> = digest_proto.try_into();
         let contents = store
           .load_file_bytes_with(digest_res?, |bytes| {
             const MAX_LENGTH: usize = 1024;
@@ -539,7 +541,7 @@ impl Snapshot {
             // Must be 0th index, because we've checked that we saw a matching directory, and no others.
             let maybe_digest: Result<Digest, String> = dir.get_directories()[0]
                 .get_digest()
-                .into();
+                .try_into();
             already_stripped = already_stripped.join(component_to_strip);
             dir = Self::get_directory_or_err(store.clone(), maybe_digest?).await?;
             prefix = remaining_prefix;
@@ -668,7 +670,7 @@ impl Snapshot {
         .map(|node: &FileNode| {
           (
             path_so_far.join(node.get_name()),
-            node.get_digest().into(),
+            node.get_digest().try_into(),
             node.is_executable,
           )
         })
