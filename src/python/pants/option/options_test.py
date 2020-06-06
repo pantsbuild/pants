@@ -1252,7 +1252,7 @@ class OptionsTest(TestBase):
         # NB: Passthrough args end up on our `--modifypassthrough` arg.
         pairs = options.get_fingerprintable_for_scope("compile.scala")
         self.assertEqual(
-            [(str, "blah blah blah"), (bool, True), (int, 77), (str, ["-d", "-v"])], pairs
+            [(str, "blah blah blah"), (str, ["-d", "-v"]), (bool, True), (int, 77)], pairs
         )
 
     def test_fingerprintable(self) -> None:
@@ -1410,6 +1410,8 @@ class OptionsTest(TestBase):
         self.assertEqual(4, options.for_scope("compile.java").c)
 
     def test_invalid_option_errors(self) -> None:
+        self.maxDiff = None
+
         def parse_joined_command_line(*args):
             bootstrap_options = create_options(
                 {
@@ -1452,7 +1454,7 @@ class OptionsTest(TestBase):
                 Suggestions:
                 -v: [--v2, --verbose, --a, --b, --y, -n, -z, --compile-c]
                 --config-overridden: [--config-override]
-                --c: [--compile-c, --compile-scala-modifycompile, --compile-scala-modifylogs, --config-override, --a, --b, --y, -n, -z, --v2]
+                --c: [--compile-c, --compile-scala-modifycompile, --compile-scala-modifylogs, --compile-scala-modifypassthrough, --config-override, --a, --b, --y, -n, -z, --v2]
 
                 (Run `./pants help-advanced` for all available options.)"""
             ),
