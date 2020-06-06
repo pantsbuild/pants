@@ -28,6 +28,7 @@ def _find_root(
         root_patterns=list(patterns),
         marker_filenames=list(marker_filenames or []),
     )
+
     # This inner function is passed as the callable to the mock, to allow recursion in the rule.
     def _mock_fs_check(pathglobs: PathGlobs) -> Snapshot:
         for glob in pathglobs.globs:
