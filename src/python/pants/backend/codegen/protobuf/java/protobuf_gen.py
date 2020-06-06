@@ -10,8 +10,6 @@ from pants.backend.codegen.protobuf.java.java_protobuf_library import JavaProtob
 from pants.backend.codegen.protobuf.subsystems.protoc import Protoc
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.jvm.tasks.jar_import_products import JarImportProducts
-from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TaskError
 from pants.base.workunit import WorkUnitLabel
 from pants.fs.archive import ZIP
@@ -109,7 +107,6 @@ class ProtobufGen(SimpleCodegenTask):
         if self.get_options().import_from_root:
             bases.add(".")
         bases.update(sources_by_base.keys())
-        bases.update(self._proto_path_imports([target]))
 
         gen_flag = "--java_out"
 
@@ -165,26 +162,6 @@ class ProtobufGen(SimpleCodegenTask):
             sources_by_base[base].update(target.sources_relative_to_buildroot())
         return sources_by_base
 
-    def _jars_to_directories(self, target):
-        """Extracts and maps jars to directories containing their contents.
-
-        :returns: a set of filepaths to directories containing the contents of jar.
-        """
-        files = set()
-        jar_import_products = self.context.products.get_data(JarImportProducts)
-        imports = jar_import_products.imports(target)
-        for coordinate, jar in imports:
-            files.add(self._extract_jar(coordinate, jar))
-        if files:
-            deprecated_conditional(
-                lambda: True,
-                removal_version="1.30.0.dev0",
-                entity_description="Importing from .protos embedded in remote JAR files.",
-                hint_message="Contact the Pants team on Slack or pants-devel@googlegroups.com "
-                "if you need this functionality.",
-            )
-        return files
-
     def _extract_jar(self, coordinate, jar_path):
         """Extracts the jar to a subfolder of workdir/extracted and returns the path to it."""
         with open(jar_path, "rb") as f:
@@ -202,8 +179,3 @@ class ProtobufGen(SimpleCodegenTask):
                 )
             )
         return outdir
-
-    def _proto_path_imports(self, proto_targets):
-        for target in proto_targets:
-            for path in self._jars_to_directories(target):
-                yield os.path.relpath(path, get_buildroot())
