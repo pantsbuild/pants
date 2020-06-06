@@ -12,7 +12,7 @@ from pants.core.goals.test import (
     ConsoleCoverageReport,
     CoverageData,
     CoverageDataCollection,
-    CoverageReport,
+    CoverageReports,
     Status,
     Test,
     TestDebugRequest,
@@ -173,11 +173,12 @@ class TestTest(TestBase):
 
         def mock_coverage_report_generation(
             coverage_data_collection: MockCoverageDataCollection,
-        ) -> CoverageReport:
+        ) -> CoverageReports:
             addresses = ", ".join(
                 coverage_data.address.spec for coverage_data in coverage_data_collection
             )
-            return ConsoleCoverageReport(f"Ran coverage on {addresses}")
+            console_report = ConsoleCoverageReport(f"Ran coverage on {addresses}")
+            return CoverageReports(reports=(console_report,))
 
         result: Test = run_rule(
             run_tests,
@@ -206,7 +207,7 @@ class TestTest(TestBase):
                     ),
                 ),
                 MockGet(
-                    product_type=CoverageReport,
+                    product_type=CoverageReports,
                     subject_type=CoverageDataCollection,
                     mock=mock_coverage_report_generation,
                 ),

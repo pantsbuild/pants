@@ -26,7 +26,7 @@ from pants.core.goals.test import (
     ConsoleCoverageReport,
     CoverageData,
     CoverageDataCollection,
-    CoverageReport,
+    CoverageReports,
     FilesystemCoverageReport,
 )
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
@@ -324,7 +324,7 @@ async def generate_coverage_report(
     transitive_targets: TransitiveTargets,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
-) -> CoverageReport:
+) -> CoverageReports:
     """Takes all Python test results and generates a single coverage report."""
     requirements_pex = coverage_setup.requirements_pex
 
@@ -371,7 +371,7 @@ async def generate_coverage_report(
     result = await Get[ProcessResult](Process, process)
 
     if report_type == ReportType.CONSOLE:
-        return ConsoleCoverageReport(result.stdout.decode())
+        return CoverageReports(reports=(ConsoleCoverageReport(result.stdout.decode()),))
 
     report_dir = PurePath(coverage_subsystem.options.report_output_path)
 
@@ -380,12 +380,12 @@ async def generate_coverage_report(
         report_file = report_dir / "htmlcov" / "index.html"
     elif report_type == ReportType.XML:
         report_file = report_dir / "coverage.xml"
-
-    return FilesystemCoverageReport(
+    fs_report = FilesystemCoverageReport(
         result_digest=result.output_digest,
         directory_to_materialize_to=report_dir,
         report_file=report_file,
     )
+    return CoverageReports(reports=(fs_report,))
 
 
 def rules():
