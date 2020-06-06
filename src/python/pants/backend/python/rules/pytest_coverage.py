@@ -4,7 +4,6 @@
 import configparser
 import json
 from dataclasses import dataclass
-from enum import Enum
 from io import StringIO
 from pathlib import PurePath
 from textwrap import dedent
@@ -27,6 +26,7 @@ from pants.core.goals.test import (
     CoverageData,
     CoverageDataCollection,
     CoverageReports,
+    CoverageReportType,
     FilesystemCoverageReport,
 )
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
@@ -197,24 +197,6 @@ async def create_coverage_config(coverage_config_request: CoverageConfigRequest)
     return CoverageConfig(digest)
 
 
-class ReportType(Enum):
-    CONSOLE = ("console", "report")
-    XML = ("xml", None)
-    HTML = ("html", None)
-
-    _report_name: str
-
-    def __new__(cls, value: str, report_name: Optional[str] = None) -> "ReportType":
-        member: "ReportType" = object.__new__(cls)
-        member._value_ = value
-        member._report_name = report_name if report_name is not None else value
-        return member
-
-    @property
-    def report_name(self) -> str:
-        return self._report_name
-
-
 class PytestCoverage(PythonToolBase):
     options_scope = "pytest-coverage"
     default_version = "coverage>=5.0.3,<5.1"
@@ -232,8 +214,8 @@ class PytestCoverage(PythonToolBase):
         )
         register(
             "--report",
-            type=ReportType,
-            default=ReportType.CONSOLE,
+            type=CoverageReportType,
+            default=CoverageReportType.CONSOLE,
             help="Which coverage report type to emit.",
         )
 
@@ -370,15 +352,15 @@ async def generate_coverage_report(
     )
     result = await Get[ProcessResult](Process, process)
 
-    if report_type == ReportType.CONSOLE:
+    if report_type == CoverageReportType.CONSOLE:
         return CoverageReports(reports=(ConsoleCoverageReport(result.stdout.decode()),))
 
     report_dir = PurePath(coverage_subsystem.options.report_output_path)
 
     report_file: Optional[PurePath] = None
-    if report_type == ReportType.HTML:
+    if report_type == CoverageReportType.HTML:
         report_file = report_dir / "htmlcov" / "index.html"
-    elif report_type == ReportType.XML:
+    elif report_type == CoverageReportType.XML:
         report_file = report_dir / "coverage.xml"
     fs_report = FilesystemCoverageReport(
         result_digest=result.output_digest,

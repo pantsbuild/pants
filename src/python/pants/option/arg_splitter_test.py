@@ -50,7 +50,6 @@ class ArgSplitterTest(unittest.TestCase):
         expected_scope_to_flags: Dict[str, List[str]],
         expected_specs: List[str],
         expected_passthru: Optional[List[str]] = None,
-        expected_passthru_owner: Optional[str] = None,
         expected_is_help: bool = False,
         expected_help_advanced: bool = False,
         expected_help_all: bool = False,
@@ -65,7 +64,6 @@ class ArgSplitterTest(unittest.TestCase):
         assert expected_scope_to_flags == split_args.scope_to_flags
         assert expected_specs == split_args.specs
         assert expected_passthru == split_args.passthru
-        assert expected_passthru_owner == split_args.passthru_owner
         assert expected_is_help == (splitter.help_request is not None)
         assert expected_help_advanced == (
             isinstance(splitter.help_request, OptionsHelp) and splitter.help_request.advanced
@@ -237,7 +235,6 @@ class ArgSplitterTest(unittest.TestCase):
             expected_scope_to_flags={"": [], "test": []},
             expected_specs=["foo/bar"],
             expected_passthru=["-t", "arg"],
-            expected_passthru_owner="test",
         )
         self.assert_valid_split(
             "./pants -farg --fff=arg compile --gg-gg=arg-arg -g test.junit --iii "
@@ -252,7 +249,6 @@ class ArgSplitterTest(unittest.TestCase):
             },
             expected_specs=["src/java/org/pantsbuild/foo", "src/java/org/pantsbuild/bar:baz"],
             expected_passthru=["passthru1", "passthru2"],
-            expected_passthru_owner="test.junit",
         )
 
     def test_subsystem_flags(self) -> None:
@@ -299,10 +295,7 @@ class ArgSplitterTest(unittest.TestCase):
 
     def test_help_detection(self) -> None:
         assert_help = partial(
-            self.assert_valid_split,
-            expected_passthru=None,
-            expected_passthru_owner=None,
-            expected_is_help=True,
+            self.assert_valid_split, expected_passthru=None, expected_is_help=True,
         )
         assert_help_no_arguments = partial(
             assert_help, expected_goals=[], expected_scope_to_flags={"": []}, expected_specs=[],
