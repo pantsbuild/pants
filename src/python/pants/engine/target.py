@@ -843,7 +843,10 @@ class UnrecognizedTargetTypeException(Exception):
         for_address = f"for address {address}" if address else ""
         super().__init__(
             f"Target type {repr(target_type)} is not registered{for_address}.\n\nAll valid target "
-            f"types: {sorted(registered_target_types.aliases)}"
+            f"types: {sorted(registered_target_types.aliases)}\n\n(If {repr(target_type)} is a "
+            "custom target type, refer to "
+            "https://groups.google.com/forum/#!topic/pants-devel/WsRFODRLVZI for instructions on "
+            "writing a light-weight Target API binding.)"
         )
 
 
