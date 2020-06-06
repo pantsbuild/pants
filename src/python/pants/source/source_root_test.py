@@ -64,7 +64,7 @@ def test_source_root_at_buildroot() -> None:
     assert "." == find_root("foo/bar.py")
     assert "." == find_root("foo/")
     assert "." == find_root("foo")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="cannot contain `..` segment: ../foo/bar.py"):
         find_root("../foo/bar.py")
 
 
