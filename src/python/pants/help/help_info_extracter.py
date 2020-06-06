@@ -86,10 +86,10 @@ class HelpInfoExtracter:
             member_typ = kwargs.get("member_type", str)
 
             def member_str(val):
-                return f"'{val}'" if member_typ == str else f"{val}"
+                return f"'{val}'" if member_typ == str else str(val)
 
             default_str = (
-                f"\"[{', '.join([member_str(val) for val in default])}]\"" if default else "[]"
+                f"\"[{', '.join(member_str(val) for val in default)}]\"" if default else "[]"
             )
         elif is_dict_option(kwargs):
             if default:
