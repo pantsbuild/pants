@@ -54,6 +54,11 @@ pub struct StreamingCommandRunner {
   execution_client: Arc<bazel_protos::remote_execution_grpc::ExecutionClient>,
 }
 
+enum StreamOutcome {
+  Complete(OperationOrStatus),
+  StreamClosed(Option<String>),
+}
+
 impl StreamingCommandRunner {
   /// Construct a new StreamingCommandRunner
   pub fn new(
@@ -145,11 +150,7 @@ impl StreamingCommandRunner {
   // Outputs progress reported by the server and returns the next actionable operation
   // or gRPC status back to the main loop (plus the operation name so the main loop can
   // reconnect).
-  async fn wait_on_operation_stream<S>(
-    &self,
-    mut stream: S,
-    build_id: &str,
-  ) -> (Option<String>, OperationOrStatus)
+  async fn wait_on_operation_stream<S>(&self, mut stream: S, build_id: &str) -> StreamOutcome
   where
     S: Stream<Item = Result<bazel_protos::operations::Operation, grpcio::Error>> + Unpin,
   {
@@ -181,13 +182,13 @@ impl StreamingCommandRunner {
           }
 
           // Otherwise, return to the main loop with the operation as the result.
-          return (operation_name_opt, OperationOrStatus::Operation(operation));
+          return StreamOutcome::Complete(OperationOrStatus::Operation(operation));
         }
 
         Some(Err(err)) => {
           debug!("wait_on_operation_stream: got error: {:?}", err);
           match super::rpcerror_to_status_or_string(&err) {
-            Ok(status) => return (None, OperationOrStatus::Status(status)),
+            Ok(status) => return StreamOutcome::Complete(OperationOrStatus::Status(status)),
             Err(message) => {
               let code = match err {
                 grpcio::Error::RpcFailure(rpc_status) => rpc_status.status,
@@ -196,19 +197,15 @@ impl StreamingCommandRunner {
               let mut status = bazel_protos::status::Status::new();
               status.set_code(code.into());
               status.set_message(format!("gRPC error: {}", message));
-              return (operation_name_opt, OperationOrStatus::Status(status));
+              return StreamOutcome::Complete(OperationOrStatus::Status(status));
             }
           }
         }
 
         None => {
-          // Stream disconnected unexpectedly. Return a synthetic UNAVAILABLE status so that the
-          // main loop will reconnect with the WaitExecution method.
+          // Stream disconnected unexpectedly.
           debug!("wait_on_operation_stream: unexpected disconnect from RE server");
-          let mut status = bazel_protos::status::Status::new();
-          status.set_code(grpcio::RpcStatusCode::UNAVAILABLE.into());
-          status.set_message("stream disconnected unexpectedly".to_owned());
-          return (operation_name_opt, OperationOrStatus::Status(status));
+          return StreamOutcome::StreamClosed(operation_name_opt);
         }
       }
     }
@@ -339,7 +336,8 @@ impl StreamingCommandRunner {
     ExecutionError::MissingDigests(missing_digests)
   }
 
-  async fn extract_execute_response(
+  // pub(crate) for testing
+  pub(crate) async fn extract_execute_response(
     &self,
     operation_or_status: OperationOrStatus,
   ) -> Result<FallibleProcessResultWithPlatform, ExecutionError> {
@@ -503,17 +501,25 @@ impl StreamingCommandRunner {
           // Monitor the operation stream until there is an actionable operation
           // or status to interpret.
           let compat_stream = operation_stream.compat();
-          let (operation_name_opt, actionable_result) = self
+          let stream_outcome = self
             .wait_on_operation_stream(compat_stream, &context.build_id)
             .await;
-          trace!("wait_on_operation_stream (build_id={}) returned: operation_name_opt={:?}; actionable_result={:?}", context.build_id, operation_name_opt, actionable_result);
 
-          // Save the operation name in case we need to reconnect via WaitExecution.
-          if let Some(name) = operation_name_opt {
-            current_operation_name = Some(name);
+          match stream_outcome {
+            StreamOutcome::Complete(status) => {
+              trace!(
+                "wait_on_operation_stream (build_id={}) returned completion={:?}",
+                context.build_id,
+                status
+              );
+              status
+            }
+            StreamOutcome::StreamClosed(operation_name_opt) => {
+              trace!("wait_on_operation_stream (build_id={}) returned stream close, will retry operation_name={:?}", context.build_id, operation_name_opt);
+              current_operation_name = operation_name_opt;
+              continue;
+            }
           }
-
-          actionable_result
         }
         Err(err) => match err {
           grpcio::Error::RpcFailure(rpc_status) => {
