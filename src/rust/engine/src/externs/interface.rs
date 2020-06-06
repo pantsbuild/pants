@@ -51,6 +51,7 @@ use crate::{
   Params, Rule, Scheduler, Session, Tasks, Types, Value,
 };
 
+use futures::compat::Future01CompatExt;
 use futures::future::FutureExt;
 use futures::future::{self as future03, TryFutureExt};
 use futures01::{future, Future};
@@ -362,6 +363,12 @@ py_module_initializer!(native_engine, |py, m| {
     py,
     "digests_to_bytes",
     py_fn!(py, digests_to_bytes(a: PyScheduler, b: PyList)),
+  )?;
+
+  m.add(
+    py,
+    "ensure_remote_has_recursive",
+    py_fn!(py, ensure_remote_has_recursive(a: PyScheduler, b: PyList)),
   )?;
 
   m.add_class::<PyTasks>(py)?;
@@ -1328,6 +1335,29 @@ fn merge_directories(
       })
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))
     })
+  })
+}
+
+fn ensure_remote_has_recursive(
+  py: Python,
+  scheduler_ptr: PyScheduler,
+  py_digests: PyList,
+) -> PyUnitResult {
+  with_scheduler(py, scheduler_ptr, |scheduler| {
+    let core = scheduler.core.clone();
+    let store = core.store();
+
+    let digests: Vec<Digest> = py_digests
+      .iter(py)
+      .map(|item| crate::nodes::lift_digest(&item.into()))
+      .collect::<Result<Vec<Digest>, _>>()
+      .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
+
+    let _upload_summary = py.allow_threads(|| {
+      core.executor.block_on(store.ensure_remote_has_recursive(digests).compat())
+    })
+    .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
+    Ok(None)
   })
 }
 
