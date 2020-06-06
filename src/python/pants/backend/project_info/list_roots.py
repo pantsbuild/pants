@@ -1,6 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from pathlib import PurePath
 from typing import Set
 
 from pants.engine.console import Console
@@ -42,7 +43,9 @@ async def all_roots(source_root_config: SourceRootConfig) -> AllSourceRoots:
 
     # Match the patterns against actual files, to find the roots that actually exist.
     snapshot = await Get[Snapshot](PathGlobs(globs=sorted(all_paths)))
-    responses = await MultiGet(Get[OptionalSourceRoot](SourceRootRequest(d)) for d in snapshot.dirs)
+    responses = await MultiGet(
+        Get[OptionalSourceRoot](SourceRootRequest(PurePath(d))) for d in snapshot.dirs
+    )
     all_source_roots = {
         response.source_root for response in responses if response.source_root is not None
     }

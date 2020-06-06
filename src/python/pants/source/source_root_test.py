@@ -1,14 +1,14 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 import os
 from pathlib import PurePath
-from typing import Iterable, Optional
+from typing import Iterable, Optional, cast
 
 import pytest
 
 from pants.engine.fs import Digest, PathGlobs, Snapshot
 from pants.source.source_root import (
-    NoSourceRootError,
     OptionalSourceRoot,
     SourceRootConfig,
     SourceRootRequest,
@@ -20,32 +20,37 @@ from pants.testutil.engine.util import MockGet, create_subsystem, run_rule
 def _find_root(
     path: str,
     patterns: Iterable[str],
-    marker_filenames: Iterable[str] = None,
-    existing_marker_files: Iterable[str] = None,
+    marker_filenames: Optional[Iterable[str]] = None,
+    existing_marker_files: Optional[Iterable[str]] = None,
 ) -> Optional[str]:
     source_root_config = create_subsystem(
-        SourceRootConfig, root_patterns=list(patterns), marker_filenames=marker_filenames
+        SourceRootConfig,
+        root_patterns=list(patterns),
+        marker_filenames=list(marker_filenames or []),
     )
     # This inner function is passed as the callable to the mock, to allow recursion in the rule.
     def _mock_fs_check(pathglobs: PathGlobs) -> Snapshot:
         for glob in pathglobs.globs:
-            if glob in existing_marker_files:
+            if glob in (existing_marker_files or []):
                 d, f = os.path.split(pathglobs.globs[0])
                 return Snapshot(digest=Digest("111", 111), files=(f,), dirs=(d,))
         return Snapshot(digest=Digest("000", 000), files=tuple(), dirs=tuple())
 
     def _do_find_root(src_root_req: SourceRootRequest) -> OptionalSourceRoot:
-        return run_rule(
-            get_source_root,
-            rule_args=[src_root_req, source_root_config],
-            mock_gets=[
-                MockGet(
-                    product_type=OptionalSourceRoot,
-                    subject_type=SourceRootRequest,
-                    mock=_do_find_root,
-                ),
-                MockGet(product_type=Snapshot, subject_type=PathGlobs, mock=_mock_fs_check),
-            ],
+        return cast(
+            OptionalSourceRoot,
+            run_rule(
+                get_source_root,
+                rule_args=[src_root_req, source_root_config],
+                mock_gets=[
+                    MockGet(
+                        product_type=OptionalSourceRoot,
+                        subject_type=SourceRootRequest,
+                        mock=_do_find_root,
+                    ),
+                    MockGet(product_type=Snapshot, subject_type=PathGlobs, mock=_mock_fs_check),
+                ],
+            ),
         )
 
     source_root = _do_find_root(SourceRootRequest(PurePath(path))).source_root
