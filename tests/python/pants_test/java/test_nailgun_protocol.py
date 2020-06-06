@@ -26,7 +26,7 @@ class TestNailgunProtocol(unittest.TestCase):
     EMPTY_PAYLOAD = ""
     TEST_COMMAND = "test"
     TEST_OUTPUT = "t e s t"
-    TEST_UNICODE_PAYLOAD = u"([\d０-９]{1,4}\s?[年月日])".encode()
+    TEST_UNICODE_PAYLOAD = r"([\d０-９]{1,4}\s?[年月日])".encode()
     TEST_WORKING_DIR = "/path/to/a/repo"
     TEST_ARGUMENTS = ["t", "e", "s", "t"]
     TEST_ENVIRON = dict(TEST_VAR="success")

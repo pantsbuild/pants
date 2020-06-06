@@ -111,7 +111,7 @@ class GoFetchTest(GoTaskTestBase):
     def _create_fetch_context(self, zipdir):
         """Given a directory of zipfiles, creates a context for GoFetch."""
         matcher = ArchiveFetcher.UrlInfo(
-            url_format=os.path.join(zipdir, "\g<zip>.zip"), default_rev="HEAD", strip_level=0
+            url_format=os.path.join(zipdir, r"\g<zip>.zip"), default_rev="HEAD", strip_level=0
         )
         self.set_options_for_scope("go-fetchers", matchers={r"localzip/(?P<zip>[^/]+)": matcher})
         context = self.context()
