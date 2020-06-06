@@ -26,12 +26,12 @@ use hashing::{Digest, Fingerprint};
 use log::{debug, trace, warn, Level};
 use protobuf::{self, Message, ProtobufEnum};
 use rand::{thread_rng, Rng};
-use store::{Snapshot, SnapshotOps, Store, StoreFileByDigest};
-use workunit_store::{with_workunit, Metric, SpanId, WorkunitMetadata, WorkunitStore};
-use workunit_store::{with_workunit, SpanId, WorkunitMetadata, WorkunitStore};
 use sha2::Sha256;
 use store::{MergeBehavior, Snapshot, SnapshotOps, Store, StoreFileByDigest};
+use store::{Snapshot, SnapshotOps, Store, StoreFileByDigest};
 use tokio::time::delay_for;
+use workunit_store::{with_workunit, Metric, SpanId, WorkunitMetadata, WorkunitStore};
+use workunit_store::{with_workunit, SpanId, WorkunitMetadata, WorkunitStore};
 
 use crate::{
   Context, ExecutionStats, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform,

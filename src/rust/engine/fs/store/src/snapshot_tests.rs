@@ -9,7 +9,9 @@ use tempfile;
 use testutil::data::TestDirectory;
 use testutil::make_file;
 
-use crate::{MergeBehavior, OneOffStoreFileByDigest, Snapshot, SnapshotOps, RelativePath, Store, SubsetParams};
+use crate::{
+  MergeBehavior, OneOffStoreFileByDigest, RelativePath, Snapshot, SnapshotOps, Store, SubsetParams,
+};
 use fs::{
   Dir, File, GitignoreStyleExcludes, GlobExpansionConjunction, GlobMatching, PathGlobs, PathStat,
   PosixFS, PreparedPathGlobs, StrictGlobMatching,

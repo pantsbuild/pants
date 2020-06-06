@@ -14,7 +14,7 @@ use futures::compat::Future01CompatExt;
 use futures::future::{self as future03, TryFutureExt};
 use futures01::future::{self, Future};
 use glob::Pattern;
-use hashing::{Digest, Fingerprint};
+use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use indexmap::{self, IndexMap, IndexSet};
 
 use std::convert::From;

@@ -3,6 +3,7 @@
 
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 from typing import TYPE_CHECKING, Iterable, Optional, Tuple, Union
 
 from pants.engine.collection import Collection
@@ -200,21 +201,54 @@ class DigestSubset:
     globs: PathGlobs
 
 
+class MergeBehavior(Enum):
+    NoDuplicates = "no-duplicates"
+    LinearCompose = "linear-compose"
+
+
+# NB: This object is interpreted by a Rust intrinsic, so that code has to be updated if the fields
+# of this python dataclass are changed!
 @dataclass(unsafe_hash=True)
 class MergeDigests:
     digests: Tuple[Digest, ...]
+    behavior: MergeBehavior
+    globs: Optional[PathGlobs]
 
-    def __init__(self, digests: Iterable[Digest]) -> None:
+    def __init__(
+        self,
+        digests: Iterable[Digest],
+        behavior: MergeBehavior = MergeBehavior.NoDuplicates,
+        globs: Optional[PathGlobs] = None,
+    ) -> None:
         """A request to merge several digests into one single digest.
-
-        This will fail if there are any conflicting changes, such as two digests having the same
-        file but with different content.
 
         Example:
 
             result = await Get(Digest, MergeDigests([digest1, digest2])
+
+        If `behavior == MergeBehavior.NoDuplicates`: this will fail if there are any conflicting
+        changes, such as two digests having the same file but with different content.
+
+        If `behavior == MergeBehavior.LinearCompose`, then `globs` must be non-None. `globs` is used
+        to specify file paths which are allowed to experience collisions. The first digest in
+        `digests` containing a file path which is shared among the other digests will win out -- so
+        the input `digests` can be permuted to get different results!
         """
         self.digests = tuple(digests)
+        self.behavior = behavior
+        self.globs = globs
+
+    def __post_init__(self) -> None:
+        non_digests = [v for v in self.digests if not isinstance(v, Digest)]  # type: ignore[unreachable]
+        if non_digests:
+            formatted_non_digests = "\n".join(f"* {v}" for v in non_digests)
+            raise TypeError(f"Not all arguments are digests:\n\n{formatted_non_digests}")
+        if not isinstance(self.behavior, MergeBehavior):
+            raise TypeError(f"behavior was not a MergeBehavior: was {self.behavior}")
+        if self.behavior == MergeBehavior.LinearCompose and self.globs is None:
+            raise TypeError("if behavior is LinearCompose, globs must be non-None!")
+        if self.globs is not None and not isinstance(self.globs, PathGlobs):
+            raise TypeError(f"globs was not a PathGlobs: was {self.globs}")
 
 
 @dataclass(frozen=True)

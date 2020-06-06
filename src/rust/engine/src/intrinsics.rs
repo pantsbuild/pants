@@ -286,11 +286,24 @@ fn merge_digests_request_to_digest(
     externs::getattr::<Vec<Value>>(&args[0], "digests")
       .unwrap()
       .into_iter()
-      .map(|val: Value| lift_directory_digest(&core.types, &val))
+      .map(|val| lift_directory_digest(&core.types, &val))
       .collect();
+  let behavior: Result<MergeBehavior, String> =
+    match externs::project_str(&args[0], "behavior").as_ref() {
+      "MergeBehavior.NoDuplicates" => Ok(MergeBehavior::NoDuplicates),
+      "MergeBehavior.LinearCompose" => {
+        let globs = externs::project_ignoring_type(&args[0], "globs");
+        Snapshot::lift_path_globs(&globs)
+          .map(|globs| MergeBehavior::LinearCompose(SubsetParams { globs }))
+      }
+      x => Err(format!(
+        "unrecognized merge behavior python-level enum object {}",
+        x
+      )),
+    };
   async move {
     let digest = store
-      .merge(digests?, MergeBehavior::NoDuplicates)
+      .merge(digests?, behavior?)
       .await
       .map_err(|e| throw(&format!("{:?}", e)))?;
     Snapshot::store_directory_digest(&digest).map_err(|s| throw(&s))

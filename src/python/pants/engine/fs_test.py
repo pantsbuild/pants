@@ -33,6 +33,9 @@ from pants.engine.fs import (
     FileContent,
     FileDigest,
     GlobMatchErrorBehavior,
+    FilesContent,
+    InputFilesContent,
+    MergeBehavior,
     MergeDigests,
     PathGlobs,
     PathGlobsAndRoot,
@@ -392,7 +395,46 @@ class FSTest(FSTestBase):
             )
             assert both_snapshot.digest == both_merged
 
-    def test_write_digest(self) -> None:
+    def test_merge_behavior(self) -> None:
+        with temporary_dir() as temp_dir:
+            Path(temp_dir, "roland").write_text("text 1")
+            (snapshot1,) = self.scheduler.capture_snapshots(
+                (PathGlobsAndRoot(PathGlobs(["*"]), temp_dir),)
+            )
+            Path(temp_dir, "roland").write_text("text 2")
+            (snapshot2,) = self.scheduler.capture_snapshots(
+                (PathGlobsAndRoot(PathGlobs(["*"]), temp_dir),)
+            )
+
+            with self.assertRaisesWithMessageContaining(Exception, "got more than one unique file"):
+                self.request_single_product(
+                    Digest,
+                    MergeDigests(
+                        (snapshot1.digest, snapshot2.digest), behavior=MergeBehavior.NoDuplicates
+                    ),
+                )
+
+            roland1_globs_merged = self.request_single_product(
+                Digest,
+                MergeDigests(
+                    (snapshot1.digest, snapshot2.digest),
+                    behavior=MergeBehavior.LinearCompose,
+                    globs=PathGlobs(["roland"]),
+                ),
+            )
+            assert roland1_globs_merged == snapshot1.digest
+
+            roland2_globs_merged = self.request_single_product(
+                Digest,
+                MergeDigests(
+                    (snapshot2.digest, snapshot1.digest),
+                    behavior=MergeBehavior.LinearCompose,
+                    globs=PathGlobs(["roland"]),
+                ),
+            )
+            assert roland2_globs_merged == snapshot2.digest
+
+    def test_materialize_directories(self) -> None:
         self.prime_store_with_roland_digest()
         digest = Digest("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16", 80)
         self.scheduler.write_digest(digest, path_prefix="test/")
