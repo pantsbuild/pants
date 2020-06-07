@@ -117,6 +117,7 @@ impl StreamedHermeticCommand {
   fn new<S: AsRef<OsStr>>(program: S) -> StreamedHermeticCommand {
     let mut inner = Command::new(program);
     inner
+      .kill_on_drop(true)
       .env_clear()
       // It would be really nice not to have to manually set PATH but this is sadly the only way
       // to stop automatic PATH searching.
