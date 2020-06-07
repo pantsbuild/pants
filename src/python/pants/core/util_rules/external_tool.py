@@ -90,30 +90,6 @@ class ExternalTool(Subsystem):
         return cls.__name__.lower()
 
     @classmethod
-    def get_default_versions_and_digests(cls):
-        """Converts default_known_versions to the old-style default_versions_and_digests.
-
-        Delete this method after --version-digest-mapping below is removed.
-        """
-        # The logic here is a little wonky, because the old default_versions_and_digests format
-        # was itself a little wonky. It could only contain one version+digest per platform,
-        # and the version was presumed to match default_version.
-        # The new default_known_versions can contain digest info for multiple versions, so we
-        # ignore any that don't match default_version.
-        ret = {}
-        for known_version in cls.default_known_versions:
-            try:
-                ver, plat, sha256, length_str = (x.strip() for x in known_version.split("|"))
-            except ValueError:
-                raise ExternalToolError(
-                    f"Bad value for --known-versions (see ./pants "
-                    f"help-advanced {cls.options_scope}): {known_version}"
-                )
-            if ver == cls.default_version:
-                ret[plat] = (ver, sha256, int(length_str))
-        return ret
-
-    @classmethod
     def register_options(cls, register):
         super().register_options(register)
         register(
@@ -140,25 +116,6 @@ class ExternalTool(Subsystem):
             f"Values are space-stripped, so pipes can be indented for readability if necessary."
             f"You can compute the length and sha256 easily with:  "
             f"curl -L $URL | tee >(wc -c) >(shasum -a 256) >/dev/null",
-        )
-        # For backwards compatibility with BinaryToolBase.  Subclasses of BinaryToolBase can
-        # instead subclass this class, and need only switch their --version-digest-mapping to
-        # --known-versions to get rid of the deprecation warning.
-        # Note: After removing this, also remove get_default_versions_and_digests() above.
-        register(
-            "--version-digest-mapping",
-            removal_version="1.30.0.dev0",
-            removal_hint="Use --known-versions instead.",
-            type=dict,
-            default=cls.get_default_versions_and_digests(),
-            fingerprint=True,
-            help="A dict mapping <platform constraint> -> (<version>, <fingerprint>, <size_bytes>)."
-            f'A "platform constraint" is any of {[c.value for c in PlatformConstraint]}, and '
-            "is the platform to fetch the tool for. A platform-independent tool should "
-            f"use {PlatformConstraint.none.value}, while a platform-dependent tool should specify "
-            'all environments it needs to be used for. The "fingerprint" and "size_bytes" '
-            "arguments are the result printed when running `sha256sum` and `wc -c` on "
-            "the downloaded file, respectively.",
         )
 
     @abstractmethod
