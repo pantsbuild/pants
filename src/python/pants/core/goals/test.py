@@ -42,6 +42,24 @@ class Status(Enum):
     FAILURE = "FAILURE"
 
 
+class CoverageReportType(Enum):
+    CONSOLE = ("console", "report")
+    XML = ("xml", None)
+    HTML = ("html", None)
+
+    _report_name: str
+
+    def __new__(cls, value: str, report_name: Optional[str] = None) -> "CoverageReportType":
+        member: "CoverageReportType" = object.__new__(cls)
+        member._value_ = value
+        member._report_name = report_name if report_name is not None else value
+        return member
+
+    @property
+    def report_name(self) -> str:
+        return self._report_name
+
+
 @dataclass(frozen=True)
 class TestResult:
     status: Status
