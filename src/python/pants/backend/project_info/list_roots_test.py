@@ -10,7 +10,6 @@ from pants.source.source_root import (
     SourceRoot,
     SourceRootConfig,
     SourceRootRequest,
-    get_source_root,
 )
 from pants.testutil.engine.util import MockGet, run_rule
 from pants.testutil.goal_rule_test_base import GoalRuleTestBase
@@ -19,6 +18,18 @@ from pants.testutil.test_base import TestBase
 
 class AllRootsTest(TestBase):
     def test_all_roots(self):
+
+        dirs = (
+            "contrib/go/examples/src/go/src",
+            "src/java",
+            "src/python",
+            "src/python/subdir/src/python",  # We allow source roots under source roots.
+            "src/kotlin",
+            "my/project/src/java",
+            "src/example/java",
+            "src/example/python",
+            "fixed/root/jvm",
+        )
 
         options = {
             "pants_ignore": [],
@@ -41,18 +52,13 @@ class AllRootsTest(TestBase):
 
         # This function mocks out reading real directories off the file system.
         def provider_rule(path_globs: PathGlobs) -> Snapshot:
-            dirs = (
-                "contrib/go/examples/src/go/src",
-                "src/java",
-                "src/python",
-                "src/python/subdir/src/python",  # We allow source roots under source roots.
-                "src/kotlin",
-                "my/project/src/java",
-                "src/example/java",
-                "src/example/python",
-                "fixed/root/jvm",
-            )
             return Snapshot(Digest("abcdef", 10), (), dirs)
+
+        def source_root_mock_rule(req: SourceRootRequest) -> OptionalSourceRoot:
+            for d in dirs:
+                if str(req.path).startswith(d):
+                    return OptionalSourceRoot(SourceRoot(str(req.path)))
+            return OptionalSourceRoot(None)
 
         output = run_rule(
             list_roots.all_roots,
@@ -62,7 +68,7 @@ class AllRootsTest(TestBase):
                 MockGet(
                     product_type=OptionalSourceRoot,
                     subject_type=SourceRootRequest,
-                    mock=lambda req: get_source_root(req, source_root_config),
+                    mock=source_root_mock_rule,
                 ),
             ],
         )
@@ -108,7 +114,7 @@ class AllRootsTest(TestBase):
                 MockGet(
                     product_type=OptionalSourceRoot,
                     subject_type=SourceRootRequest,
-                    mock=lambda req: get_source_root(req, source_root_config),
+                    mock=lambda req: OptionalSourceRoot(SourceRoot(".")),
                 ),
             ],
         )
