@@ -1353,10 +1353,13 @@ fn ensure_remote_has_recursive(
       .collect::<Result<Vec<Digest>, _>>()
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
 
-    let _upload_summary = py.allow_threads(|| {
-      core.executor.block_on(store.ensure_remote_has_recursive(digests).compat())
-    })
-    .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
+    let _upload_summary = py
+      .allow_threads(|| {
+        core
+          .executor
+          .block_on(store.ensure_remote_has_recursive(digests).compat())
+      })
+      .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
     Ok(None)
   })
 }
