@@ -178,7 +178,7 @@ class ProtobufGen(SimpleCodegenTask):
         if files:
             deprecated_conditional(
                 lambda: True,
-                removal_version="1.30.1.dev0",
+                removal_version="1.31.0.dev0",
                 entity_description="Importing from .protos embedded in remote JAR files.",
                 hint_message="Contact the Pants team on Slack or pants-devel@googlegroups.com "
                 "if you need this functionality.",
