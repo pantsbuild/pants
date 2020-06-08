@@ -578,3 +578,14 @@ class StreamingWorkunitProcessTests(TestBase):
         assert result.stderr == b"stderr output\n"
         assert stdout_digest == EMPTY_DIGEST
         assert stderr_digest.serialized_bytes_length == len(result.stderr)
+
+        try:
+            self._scheduler.ensure_remote_has_recursive([stdout_digest, stderr_digest])
+        except Exception as e:
+            # This is the exception message we should expect from invoking ensure_remote_has_recursive()
+            # in rust.
+            assert str(e) == "Cannot ensure remote has blobs without a remote"
+
+        byte_outputs = self._scheduler.digests_to_bytes([stdout_digest, stderr_digest])
+        assert byte_outputs[0] == result.stdout
+        assert byte_outputs[1] == result.stderr
