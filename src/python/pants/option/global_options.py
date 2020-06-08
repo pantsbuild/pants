@@ -85,6 +85,7 @@ class ExecutionOptions:
     remote_execution_extra_platform_properties: Any
     remote_execution_headers: Any
     remote_execution_enable_streaming: bool
+    remote_execution_overall_deadline_secs: int
     process_execution_local_enable_nailgun: bool
 
     @classmethod
@@ -111,6 +112,7 @@ class ExecutionOptions:
             remote_execution_extra_platform_properties=bootstrap_options.remote_execution_extra_platform_properties,
             remote_execution_headers=bootstrap_options.remote_execution_headers,
             remote_execution_enable_streaming=bootstrap_options.remote_execution_enable_streaming,
+            remote_execution_overall_deadline_secs=bootstrap_options.remote_execution_overall_deadline_secs,
             process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
         )
 
@@ -137,6 +139,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_execution_extra_platform_properties=[],
     remote_execution_headers={},
     remote_execution_enable_streaming=False,
+    remote_execution_overall_deadline_secs=10 * 60,
     process_execution_local_enable_nailgun=False,
 )
 
@@ -835,6 +838,13 @@ class GlobalOptions(Subsystem):
             default=False,
             advanced=True,
             help="Enable the streaming remote execution client (experimental).",
+        )
+        register(
+            "--remote-execution-overall-deadline-secs",
+            type=int,
+            default=DEFAULT_EXECUTION_OPTIONS.remote_execution_overall_deadline_secs,
+            advanced=True,
+            help="Overall timeout in seconds for each remote execution request from time of submission",
         )
         register(
             "--process-execution-local-parallelism",

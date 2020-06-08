@@ -86,6 +86,7 @@ impl Core {
     process_execution_use_local_cache: bool,
     remote_execution_headers: BTreeMap<String, String>,
     remote_execution_enable_streaming: bool,
+    remote_execution_overall_deadline_secs: u64,
     process_execution_local_enable_nailgun: bool,
   ) -> Result<Core, String> {
     // Randomize CAS address order to avoid thundering herds from common config.
@@ -207,6 +208,7 @@ impl Core {
             // TODO if we ever want to configure the remote platform to be something else we
             // need to take an option all the way down here and into the remote::CommandRunner struct.
             Platform::Linux,
+            remote_execution_overall_deadline_secs,
           )?)
         } else {
           Box::new(process_execution::remote::CommandRunner::new(

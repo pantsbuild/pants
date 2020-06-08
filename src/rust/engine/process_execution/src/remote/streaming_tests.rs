@@ -29,6 +29,8 @@ use crate::remote_tests::{
 };
 use crate::{CommandRunner, Context, MultiPlatformProcess, Platform, Process};
 
+const OVERALL_DEADLINE_SECS: u64 = 10 * 60;
+
 fn create_command_runner(
   address: String,
   cas: &mock::StubCAS,
@@ -45,6 +47,7 @@ fn create_command_runner(
     BTreeMap::new(),
     store.clone(),
     platform,
+    OVERALL_DEADLINE_SECS,
   )
   .expect("Failed to make command runner");
   (command_runner, store)
@@ -331,6 +334,7 @@ async fn sends_headers() {
     },
     store,
     Platform::Linux,
+    OVERALL_DEADLINE_SECS,
   )
   .unwrap();
   let context = Context {
@@ -516,6 +520,7 @@ async fn ensure_inline_stdio_is_stored() {
     BTreeMap::new(),
     store.clone(),
     Platform::Linux,
+    OVERALL_DEADLINE_SECS,
   )
   .unwrap();
 
@@ -751,6 +756,7 @@ async fn execute_missing_file_uploads_if_known() {
     BTreeMap::new(),
     store.clone(),
     Platform::Linux,
+    OVERALL_DEADLINE_SECS,
   )
   .unwrap();
 
@@ -810,6 +816,7 @@ async fn execute_missing_file_errors_if_unknown() {
     BTreeMap::new(),
     store,
     Platform::Linux,
+    OVERALL_DEADLINE_SECS,
   )
   .unwrap();
 

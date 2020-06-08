@@ -52,6 +52,7 @@ pub struct StreamingCommandRunner {
   channel: grpcio::Channel,
   env: Arc<grpcio::Environment>,
   execution_client: Arc<bazel_protos::remote_execution_grpc::ExecutionClient>,
+  overall_deadline_secs: u64,
 }
 
 enum StreamOutcome {
@@ -69,6 +70,7 @@ impl StreamingCommandRunner {
     headers: BTreeMap<String, String>,
     store: Store,
     platform: Platform,
+    overall_deadline_secs: u64,
   ) -> Result<Self, String> {
     let env = Arc::new(grpcio::EnvBuilder::new().build());
     let channel = {
@@ -105,6 +107,7 @@ impl StreamingCommandRunner {
       execution_client,
       store,
       platform,
+      overall_deadline_secs,
     };
 
     Ok(command_runner)
@@ -575,7 +578,6 @@ impl crate::CommandRunner for StreamingCommandRunner {
       super::make_execute_request(&compatible_underlying_request, self.metadata.clone())?;
     let Process {
       description,
-      timeout,
       input_files,
       ..
     } = compatible_underlying_request;
@@ -592,7 +594,7 @@ impl crate::CommandRunner for StreamingCommandRunner {
 
     // Record the time that we started to process this request, then compute the ultimate
     // deadline for execution of this request.
-    let deadline_duration = timeout.unwrap_or(Duration::from_secs(5 * 60)); // TODO: Make this configurable.
+    let deadline_duration = Duration::from_secs(self.overall_deadline_secs);
 
     // Upload the action (and related data, i.e. the embedded command and input files).
     self
