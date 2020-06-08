@@ -381,17 +381,17 @@ class PantsDaemon(PantsDaemonProcessManager):
         self.write_metadata_by_name(
             "pantsd", self.FINGERPRINT_KEY, ensure_text(self.options_fingerprint)
         )
-        scheduler_service = next(
-            s for s in self._services.services if isinstance(s, SchedulerService)
-        )
-        scheduler_service.begin_monitoring_memory_usage(pid)
+        scheduler_services = [s for s in self._services.services if isinstance(s, SchedulerService)]
+        for scheduler_service in scheduler_services:
+            scheduler_service.begin_monitoring_memory_usage(pid)
 
         # If we can, add the pidfile to watching via the scheduler.
         pidfile_absolute = self._metadata_file_path("pantsd", "pid")
         if pidfile_absolute.startswith(self._build_root):
-            scheduler_service.add_invalidation_glob(
-                os.path.relpath(pidfile_absolute, self._build_root)
-            )
+            for scheduler_service in scheduler_services:
+                scheduler_service.add_invalidation_glob(
+                    os.path.relpath(pidfile_absolute, self._build_root)
+                )
         else:
             logging.getLogger(__name__).warning(
                 "Not watching pantsd pidfile because subprocessdir is outside of buildroot. Having "
