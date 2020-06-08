@@ -4,6 +4,8 @@
 import logging
 from typing import List, Optional, Tuple, cast
 
+import psutil
+
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.internals.scheduler import ExecutionTimeoutError
 from pants.engine.unions import UnionMembership
@@ -31,6 +33,7 @@ class SchedulerService(PantsService):
         build_root: str,
         invalidation_globs: List[str],
         union_membership: UnionMembership,
+        max_memory_usage_in_bytes: int,
     ) -> None:
         """
         :param fs_event_service: An unstarted FSEventService instance for setting up filesystem event handlers.
@@ -38,6 +41,8 @@ class SchedulerService(PantsService):
         :param build_root: The current build root.
         :param invalidation_globs: A list of `globs` that when encountered in filesystem event
                                    subscriptions will tear down the daemon.
+        :param max_memory_usage_in_bytes: The maximum memory usage of the process, which is
+                                          monitored after startup.
         """
         super().__init__()
         self._fs_event_service = fs_event_service
@@ -59,6 +64,9 @@ class SchedulerService(PantsService):
             tuple(invalidation_globs),
             None,
         )
+
+        self._max_memory_usage_in_bytes = max_memory_usage_in_bytes
+        self._monitored_pantsd_pid: Optional[int] = None
 
     def _get_snapshot(self, globs: Tuple[str, ...], poll: bool) -> Optional[Snapshot]:
         """Returns a Snapshot of the input globs.
@@ -86,6 +94,10 @@ class SchedulerService(PantsService):
         globs, _ = self._invalidation_globs_and_snapshot
         self._invalidation_globs_and_snapshot = (globs, self._get_snapshot(globs, poll=False))
         self._logger.info("watching invalidation patterns: {}".format(globs))
+
+    def begin_monitoring_memory_usage(self, pantsd_pid: int):
+        """After pantsd has started, we monitor its memory usage relative to a configured value."""
+        self._monitored_pantsd_pid = pantsd_pid
 
     def add_invalidation_glob(self, glob: str):
         """Add an invalidation glob to monitoring after startup.
@@ -129,6 +141,23 @@ class SchedulerService(PantsService):
         )
         self.terminate()
 
+    def _check_memory_usage(self):
+        if self._monitored_pantsd_pid is None:
+            return
+
+        try:
+            memory_usage_in_bytes = psutil.Process(self._monitored_pantsd_pid).memory_info()[0]
+            if memory_usage_in_bytes > self._max_memory_usage_in_bytes:
+                raise Exception(
+                    f"pantsd process {self._monitored_pantsd_pid} was using "
+                    f"{memory_usage_in_bytes} bytes of memory (above the limit of "
+                    f"{self._max_memory_usage_in_bytes} bytes)."
+                )
+        except Exception as e:
+            # Watcher failed for some reason
+            self._logger.critical(f"The scheduler was invalidated: {e!r}")
+            self.terminate()
+
     def _check_invalidation_watcher_liveness(self):
         try:
             self._scheduler.check_invalidation_watcher_liveness()
@@ -152,5 +181,6 @@ class SchedulerService(PantsService):
         while not self._state.is_terminating:
             self._state.maybe_pause()
             self._check_invalidation_watcher_liveness()
+            self._check_memory_usage()
             # NB: This is a long poll that will keep us from looping too quickly here.
             self._check_invalidation_globs(poll=True)

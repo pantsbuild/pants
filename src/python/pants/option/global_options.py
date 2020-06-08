@@ -531,6 +531,16 @@ class GlobalOptions(Subsystem):
             "any prior running Pants command must be finished for the current one to start. "
             "To never timeout, use the value -1.",
         )
+        register(
+            "--pantsd-max-memory-usage",
+            advanced=True,
+            type=int,
+            default=2 ** 32,
+            help=(
+                "The maximum memory usage of a pantsd process (in bytes). There is at most one "
+                "pantsd process per workspace."
+            ),
+        )
 
         # These facilitate configuring the native engine.
         register(
