@@ -9,7 +9,7 @@ from typing import List
 from pants.base.build_environment import get_buildroot
 from pants.core.util_rules.archive import ExtractedDigest, MaybeExtractable
 from pants.engine.fs import Digest, DirectoryToMaterialize, Snapshot, UrlToFetch
-from pants.engine.platform import Platform, PlatformConstraint
+from pants.engine.platform import Platform
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
 from pants.subsystem.subsystem import Subsystem
