@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::ops::Add;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -579,6 +580,7 @@ impl crate::CommandRunner for StreamingCommandRunner {
     let Process {
       description,
       input_files,
+      timeout,
       ..
     } = compatible_underlying_request;
     let build_id = context.build_id.clone();
@@ -594,7 +596,8 @@ impl crate::CommandRunner for StreamingCommandRunner {
 
     // Record the time that we started to process this request, then compute the ultimate
     // deadline for execution of this request.
-    let deadline_duration = Duration::from_secs(self.overall_deadline_secs);
+    let deadline_duration =
+      Duration::from_secs(self.overall_deadline_secs).add(timeout.unwrap_or(Duration::default()));
 
     // Upload the action (and related data, i.e. the embedded command and input files).
     self
