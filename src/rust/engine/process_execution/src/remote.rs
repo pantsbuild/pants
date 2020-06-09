@@ -23,8 +23,8 @@ use store::{Snapshot, Store, StoreFileByDigest};
 use tokio::time::delay_for;
 
 use crate::{
-  Context, ExecutionStats, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform,
-  PlatformConstraint, Process, ProcessMetadata,
+  Context, ExecutionStats, FallibleProcessResultWithPlatform, MultiPlatformProcess, NamedCaches,
+  Platform, PlatformConstraint, Process, ProcessMetadata,
 };
 use std::cmp::min;
 use workunit_store::WorkunitStore;
@@ -807,6 +807,13 @@ pub fn make_execute_request(
     cache_key_gen_version,
     mut platform_properties,
   } = metadata;
+
+  if !req.append_only_caches.is_empty() {
+    platform_properties.extend(NamedCaches::platform_properties(
+      &req.append_only_caches,
+      &cache_key_gen_version,
+    ));
+  }
 
   if let Some(cache_key_gen_version) = cache_key_gen_version {
     let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();

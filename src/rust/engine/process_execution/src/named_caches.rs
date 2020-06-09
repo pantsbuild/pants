@@ -21,17 +21,17 @@ impl CacheName {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct CacheDest(PathBuf);
+pub struct CacheDest(String);
 
 impl CacheDest {
   pub fn new(dest: String) -> Result<CacheDest, String> {
-    let dest = PathBuf::from(dest);
-    if dest.is_relative() && dest.components().next().is_some() {
+    let dest_path = PathBuf::from(&dest);
+    if dest_path.is_relative() && dest_path.components().next().is_some() {
       Ok(CacheDest(dest))
     } else {
       Err(format!(
         "Cache paths must be relative and non-empty: got: {}",
-        dest.display()
+        dest
       ))
     }
   }
@@ -68,7 +68,28 @@ impl NamedCaches {
       .iter()
       .map(move |(cache_name, cache_dest)| NamedCacheSymlink {
         src: self.local_base.join(&cache_name.0),
-        dst: cache_dest.0.clone(),
+        dst: PathBuf::from(&cache_dest.0),
       })
+  }
+
+  ///
+  /// An iterator over platform properties that should be added for the given named caches, and the
+  /// given named cache namespace value.
+  ///
+  /// See https://docs.google.com/document/d/1n_MVVGjrkTKTPKHqRPlyfFzQyx2QioclMG_Q3DMUgYk/edit#.
+  ///
+  pub fn platform_properties<'a>(
+    caches: &'a BTreeMap<CacheName, CacheDest>,
+    namespace: &'a Option<String>,
+  ) -> impl Iterator<Item = (String, String)> + 'a {
+    namespace
+      .iter()
+      .map(|ns| ("x_append_only_cache_namespace".to_owned(), ns.to_owned()))
+      .chain(caches.iter().map(move |(cache_name, cache_dest)| {
+        (
+          format!("x_append_only_cache:{}", cache_name.0),
+          cache_dest.0.clone(),
+        )
+      }))
   }
 }
