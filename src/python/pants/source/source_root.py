@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Iterable, Optional, Set, Tuple
 
-from pants.engine.collection import Collection
+from pants.engine.collection import DeduplicatedCollection
 from pants.engine.rules import RootRule, SubsystemRule, rule
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method
@@ -40,8 +40,8 @@ class NoSourceRootError(SourceRootError):
         super().__init__(f"No source root found for `{path}`. {extra_msg}")
 
 
-class AllSourceRoots(Collection[SourceRoot]):
-    pass
+class AllSourceRoots(DeduplicatedCollection[SourceRoot]):
+    sort_input = True
 
 
 # We perform pattern matching against absolute paths, where "/" represents the repo root.

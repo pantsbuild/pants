@@ -33,10 +33,10 @@ class PythonModule:
     def address_spec(self, *, source_root: str) -> AscendantAddresses:
         """The spec for all candidate targets which could feasibly own the module.
 
-        This uses AscendantAddresses because targets can own files in subdirs (e.g. rglobs), but not
-        parents. We also use the package path, e.g. `helloworld/util/__init__.py`, rather than the
-        module path to ensure that we capture all possible targets. It is okay if this directory
-        does not actually exist.
+        This uses AscendantAddresses because targets can own files in subdirs (e.g. rglobs). We
+        also use the package path, e.g. `helloworld/util/__init__.py`, rather than the module path
+        to ensure that we capture all possible targets. It is okay if this directory does not
+        actually exist.
         """
         module_name_with_slashes = self.module.replace(".", "/")
         return AscendantAddresses(
@@ -46,7 +46,8 @@ class PythonModule:
     def possible_stripped_paths(self) -> Tuple[PurePath, ...]:
         """Given a module like `helloworld.util`, convert it back to its possible paths.
 
-        Each module has either 2 or 4 possible paths. For example, given the module `helloworld.util`:
+        Each module has either 2 or 4 possible paths. For example, given the module
+        `helloworld.util`:
 
         - helloworld/util.py
         - helloworld/util/__init__.py
@@ -76,11 +77,10 @@ class PythonModuleOwners(DeduplicatedCollection[Address]):
 
 @rule
 async def map_python_module_to_targets(
-    module: PythonModule, all_source_roots: AllSourceRoots
+    module: PythonModule, source_roots: AllSourceRoots
 ) -> PythonModuleOwners:
-    src_roots = sorted(src_root.path for src_root in all_source_roots)
     unfiltered_candidate_targets = await Get[Targets](
-        AddressSpecs(module.address_spec(source_root=src_root) for src_root in src_roots)
+        AddressSpecs(module.address_spec(source_root=src_root.path) for src_root in source_roots)
     )
     candidate_targets = tuple(
         tgt for tgt in unfiltered_candidate_targets if tgt.has_field(PythonSources)
