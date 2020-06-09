@@ -295,7 +295,7 @@ async fn main() {
     .map(collection_from_keyvalues::<_, BTreeMap<_, _>>)
     .unwrap_or_default();
   let enable_streaming_client = args.is_present("enable-streaming-client");
-  let overall_deadline_secs = value_t!(args.value_of("overall-deadline-secs"), u64).unwrap_or(600);
+  let overall_deadline_secs = value_t!(args.value_of("overall-deadline-secs"), u64).unwrap_or(3600);
 
   let executor = task_executor::Executor::new(Handle::current());
 

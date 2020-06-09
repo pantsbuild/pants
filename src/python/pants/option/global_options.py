@@ -139,7 +139,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_execution_extra_platform_properties=[],
     remote_execution_headers={},
     remote_execution_enable_streaming=False,
-    remote_execution_overall_deadline_secs=10 * 60,
+    remote_execution_overall_deadline_secs=60 * 60,  # one hour
     process_execution_local_enable_nailgun=False,
 )
 
