@@ -558,24 +558,18 @@ class RuleIndex:
         serializable_roots: OrderedSet = OrderedSet()
         union_rules = dict(union_rules or ())
 
-        def add_task(product_type, rule):
-            # TODO(#7311): make a defaultdict-like wrapper for OrderedDict if more widely used.
-            if product_type not in serializable_rules:
-                serializable_rules[product_type] = OrderedSet()
-            serializable_rules[product_type].add(rule)
-
-        def add_root_rule(root_rule):
-            serializable_roots.add(root_rule)
-
-        def add_rule(rule):
+        def add_rule(rule: Rule) -> None:
             if isinstance(rule, RootRule):
-                add_root_rule(rule)
+                serializable_roots.add(rule)
             else:
-                add_task(rule.output_type, rule)
+                output_type = rule.output_type
+                if output_type not in serializable_rules:
+                    serializable_rules[output_type] = OrderedSet()
+                serializable_rules[output_type].add(rule)
             for dep_rule in rule.dependency_rules:
                 add_rule(dep_rule)
 
-        def add_type_transition_rule(union_rule):
+        def add_type_transition_rule(union_rule: UnionRule) -> None:
             # NB: This does not require that union bases be supplied to `def rules():`, as the union type
             # is never instantiated!
             union_base = union_rule.union_base
@@ -606,7 +600,11 @@ functions decorated with @rule.""".format(
                     )
                 )
 
-        return cls(serializable_rules, FrozenOrderedSet(serializable_roots), union_rules)
+        return RuleIndex(
+            rules=serializable_rules,
+            roots=FrozenOrderedSet(serializable_roots),
+            union_rules=union_rules,
+        )
 
     def normalized_rules(self) -> NormalizedRules:
         rules = FrozenOrderedSet(
