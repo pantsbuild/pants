@@ -38,16 +38,16 @@ def test_create_module_from_path(stripped_path: PurePath, expected: str) -> None
 
 
 def test_module_possible_paths() -> None:
-    assert PythonModule("typing").possible_stripped_paths() == (
+    assert set(PythonModule("typing").possible_stripped_paths()) == {
         PurePath("typing.py"),
         PurePath("typing") / "__init__.py",
-    )
-    assert PythonModule("typing.List").possible_stripped_paths() == (
+    }
+    assert set(PythonModule("typing.List").possible_stripped_paths()) == {
         PurePath("typing") / "List.py",
         PurePath("typing") / "List" / "__init__.py",
         PurePath("typing.py"),
         PurePath("typing") / "__init__.py",
-    )
+    }
 
 
 def test_module_address_spec() -> None:

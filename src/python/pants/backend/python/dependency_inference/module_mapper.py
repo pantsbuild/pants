@@ -3,7 +3,7 @@
 
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Tuple
+from typing import Iterator
 
 from pants.backend.python.target_types import PythonSources
 from pants.base.specs import AddressSpecs, AscendantAddresses
@@ -30,6 +30,10 @@ class PythonModule:
         )
         return cls(module_name_with_slashes.as_posix().replace("/", "."))
 
+    @property
+    def name_as_path(self) -> PurePath:
+        return PurePath(self.module.replace(".", "/"))
+
     def address_spec(self, *, source_root: str) -> AscendantAddresses:
         """The spec for all candidate targets which could feasibly own the module.
 
@@ -38,12 +42,9 @@ class PythonModule:
         ensure that we capture all possible targets. It is okay if this directory does not actually
         exist.
         """
-        module_name_with_slashes = self.module.replace(".", "/")
-        return AscendantAddresses(
-            directory=PurePath(source_root, module_name_with_slashes).as_posix()
-        )
+        return AscendantAddresses(directory=str(PurePath(source_root) / self.name_as_path))
 
-    def possible_stripped_paths(self) -> Tuple[PurePath, ...]:
+    def possible_stripped_paths(self) -> Iterator[PurePath]:
         """Given a module like `helloworld.util`, convert it back to its possible paths.
 
         Each module has either 2 or 4 possible paths. For example, given the module
@@ -59,14 +60,12 @@ class PythonModule:
         with `from typing import List`, we only care about `typing`.
         """
         module_name_with_slashes = PurePath(self.module.replace(".", "/"))
-        possible_paths = [
-            module_name_with_slashes.with_suffix(".py"),
-            module_name_with_slashes / "__init__.py",
-        ]
+        yield self.name_as_path.with_suffix(".py")
+        yield self.name_as_path / "__init__.py"
         parent = module_name_with_slashes.parent
         if str(parent) != ".":
-            possible_paths.extend([parent.with_suffix(".py"), parent / "__init__.py"])
-        return tuple(possible_paths)
+            yield parent.with_suffix(".py")
+            yield parent / "__init__.py"
 
 
 class PythonModuleOwners(DeduplicatedCollection[Address]):
