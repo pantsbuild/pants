@@ -5,6 +5,15 @@ This document describes releases leading up to the ``1.29.x`` ``stable`` series.
 
 See https://pants.readme.io/v1.29/docs/release-notes-1-29 for an overview of the changes in this release.
 
+1.29.0rc3 (6/09/2020)
+---------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Add `--` style passthrough args to V2 `run` and `setup-py` goals (#9911)
+  `PR #9911 <https://github.com/pantsbuild/pants/pull/9911>`_
+
 1.29.0rc2 (6/04/2020)
 ---------------------
 
