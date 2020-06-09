@@ -103,7 +103,7 @@ python_library(
     'src/python/pants/engine:target',
     'src/python/pants/engine:unions',
     'src/python/pants/option',
-    'src/python/pants/source',
+    'src/python/pants/source:filespec',
     'src/python/pants/util:meta',
     'src/python/pants/util:ordered_set',
   ],
