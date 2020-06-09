@@ -39,6 +39,7 @@ from pants.engine.legacy.structs import BundleAdaptor
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.unions import UnionMembership, union
+from pants.option.global_options import GlobalOptions
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper, Filespec
 from pants.util.collections import ensure_list, ensure_str_list
 from pants.util.frozendict import FrozenDict
@@ -1676,7 +1677,7 @@ class InferredDependencies(DeduplicatedCollection[Address]):
 
 @rule
 async def resolve_dependencies(
-    request: DependenciesRequest, union_membership: UnionMembership
+    request: DependenciesRequest, union_membership: UnionMembership, global_options: GlobalOptions
 ) -> Addresses:
     provided = request.field.sanitized_raw_value or ()
 
@@ -1692,7 +1693,7 @@ async def resolve_dependencies(
 
     inference_request_types = union_membership.get(InferDependenciesRequest)
     inferred = InferredDependencies()
-    if inference_request_types:
+    if global_options.options.dependency_inference and inference_request_types:
         # Dependency inference is solely determined by the `Sources` field for a Target, so we
         # re-resolve the original target to inspect its `Sources` field, if any.
         wrapped_tgt = await Get[WrappedTarget](Address, request.field.address)

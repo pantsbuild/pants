@@ -89,6 +89,7 @@ python_library(
   sources=["target_types.py"],
   dependencies = [
     ':python_artifact',
+    'src/python/pants/backend/python/subsystems',
     'src/python/pants/backend/python/targets',
     'src/python/pants/core',
     'src/python/pants/core/util_rules',

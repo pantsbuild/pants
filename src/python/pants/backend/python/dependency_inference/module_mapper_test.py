@@ -2,11 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pathlib import PurePath
-from typing import Optional
 
 import pytest
 
-from pants.backend.python.dependency_inference.module_mapper import determine_module
+from pants.backend.python.dependency_inference.module_mapper import PythonModule
+from pants.base.specs import AscendantAddresses
 
 
 @pytest.mark.parametrize(
@@ -19,9 +19,29 @@ from pants.backend.python.dependency_inference.module_mapper import determine_mo
             PurePath("src", "python", "project", "not_stripped.py"),
             "src.python.project.not_stripped",
         ),
-        (PurePath("not_python.java"), None),
-        (PurePath("bytecode.pyc"), None),
     ],
 )
-def test_determine_module(stripped_path: PurePath, expected: Optional[str]) -> None:
-    assert determine_module(stripped_path) == expected
+def test_create_module_from_path(stripped_path: PurePath, expected: str) -> None:
+    assert PythonModule.create_from_stripped_path(stripped_path) == PythonModule(expected)
+
+
+def test_module_possible_paths() -> None:
+    assert PythonModule("typing").possible_stripped_paths() == (
+        PurePath("typing.py"),
+        PurePath("typing") / "__init__.py",
+    )
+    assert PythonModule("typing.List").possible_stripped_paths() == (
+        PurePath("typing") / "List.py",
+        PurePath("typing") / "List" / "__init__.py",
+        PurePath("typing.py"),
+        PurePath("typing") / "__init__.py",
+    )
+
+
+def test_module_address_spec() -> None:
+    assert PythonModule("helloworld.app").address_spec(source_root=".") == AscendantAddresses(
+        directory="helloworld/app"
+    )
+    assert PythonModule("helloworld.app").address_spec(
+        source_root="src/python"
+    ) == AscendantAddresses(directory="src/python/helloworld/app")
