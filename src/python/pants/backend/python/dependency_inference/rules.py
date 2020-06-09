@@ -43,7 +43,11 @@ async def infer_python_dependencies(request: InferPythonDependencies) -> Inferre
     )
     # We conservatively only use dep inference if there is exactly one owner for an import.
     return InferredDependencies(
-        itertools.chain.from_iterable(owners for owners in owners_per_import if len(owners) == 1)
+        itertools.chain.from_iterable(
+            owners
+            for owners in owners_per_import
+            if len(owners) == 1 and tuple(owners)[0] != request.sources_field.address
+        )
     )
 
 

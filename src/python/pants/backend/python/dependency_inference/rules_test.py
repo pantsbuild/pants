@@ -54,7 +54,16 @@ class PythonDependencyInferenceTest(TestBase):
                 """
             ),
         )
-        self.create_file("src/python/f2.py", "import typing")
+        self.create_file(
+            "src/python/f2.py",
+            dedent(
+                """\
+                import typing
+                # Import from another file in the same target.
+                from app import main
+                """
+            ),
+        )
         self.add_to_build_file("src/python", "python_library()")
 
         tgt = self.request_single_product(WrappedTarget, Address.parse("src/python")).target
