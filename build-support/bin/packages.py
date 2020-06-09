@@ -242,15 +242,16 @@ def build_pants_wheels() -> None:
     destination.mkdir(parents=True, exist_ok=True)
 
     def build(packages: Iterable[Package], bdist_wheel_flags: Iterable[str]) -> None:
-        formatted_flags = " ".join(bdist_wheel_flags)
         args = (
             "./v2",
             # TODO(#7654): It's not safe to use Pantsd because we're already using Pants to run
             #  this script.
             "--concurrent",
             "setup-py2",
-            f"--args=bdist_wheel {formatted_flags}",
             *(package.target for package in packages),
+            "--",
+            "bdist_wheel",
+            *bdist_wheel_flags,
         )
         try:
             subprocess.run(args, check=True)

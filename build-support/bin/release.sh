@@ -98,8 +98,7 @@ function run_pex() {
 function run_packages_script() {
   (
     cd "${ROOT}"
-    # TODO: use V2 once we either figure out how to safely expand $@ to --run-args or we land 9835.
-    ./pants --quiet --concurrent run "${ROOT}/build-support/bin/packages.py" -- "$@"
+    ./v2 --concurrent run "${ROOT}/build-support/bin/packages.py" -- "$@"
   )
 }
 
