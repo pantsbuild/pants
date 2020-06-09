@@ -40,6 +40,12 @@ class PantsDaemonMonitor(ProcessManager):
     def _log(self):
         print(magenta(f"PantsDaemonMonitor: pid is {self._pid} is_alive={self.is_alive()}"))
 
+    def assert_started_and_stopped(self, timeout: int = 30) -> None:
+        """Asserts that pantsd was alive (it wrote a pid file), but that it stops afterward."""
+        self._process = None
+        self._pid = self.await_pid(timeout)
+        self.assert_stopped()
+
     def assert_started(self, timeout=30):
         self._process = None
         self._pid = self.await_pid(timeout)

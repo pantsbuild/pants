@@ -7,7 +7,7 @@ from pants.option.custom_types import file_option, shell_str
 
 class MyPy(PythonToolBase):
     options_scope = "mypy"
-    default_version = "mypy==0.770"
+    default_version = "mypy==0.780"
     default_entry_point = "mypy"
     default_interpreter_constraints = ["CPython>=3.5"]
 

@@ -312,9 +312,9 @@ class BuildGraphTest(TestBase):
         )
         with self.assertRaisesRegex(
             AddressLookupError,
-            "^.*/non-existent-path does not contain any BUILD files."
-            "\s+when translating spec non-existent-path:b"
-            "\s+referenced from //:a$",
+            r"^.*/non-existent-path does not contain any BUILD files."
+            r"\s+when translating spec non-existent-path:b"
+            r"\s+referenced from //:a$",
         ):
             self.inject_address_closure("//:a")
 
@@ -326,10 +326,10 @@ class BuildGraphTest(TestBase):
         )
         with self.assertRaisesRegex(
             BuildGraph.TransitiveLookupError,
-            "^.*/non-existent-path does not contain any BUILD files."
-            "\s+when translating spec non-existent-path:c"
-            "\s+referenced from goodpath:b"
-            "\s+referenced from //:a$",
+            r"^.*/non-existent-path does not contain any BUILD files."
+            r"\s+when translating spec non-existent-path:c"
+            r"\s+referenced from goodpath:b"
+            r"\s+referenced from //:a$",
         ):
             self.inject_address_closure("//:a")
 
@@ -356,11 +356,11 @@ class BuildGraphTest(TestBase):
         )
         with self.assertRaisesRegex(
             BuildGraph.TransitiveLookupError,
-            "^.*/non-existent-path does not contain any BUILD files."
-            "\s+when translating spec non-existent-path:d"
-            "\s+referenced from goodpath:c"
-            "\s+referenced from goodpath:b"
-            "\s+referenced from //:a$",
+            r"^.*/non-existent-path does not contain any BUILD files."
+            r"\s+when translating spec non-existent-path:d"
+            r"\s+referenced from goodpath:c"
+            r"\s+referenced from goodpath:b"
+            r"\s+referenced from //:a$",
         ):
             self.inject_address_closure("//:a")
 

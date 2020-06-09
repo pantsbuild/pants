@@ -2218,7 +2218,9 @@ async fn extract_output_files_from_response_no_prefix() {
   )
 }
 
-fn workunits_with_constant_span_id(workunit_store: &mut WorkunitStore) -> HashSet<Workunit> {
+pub(crate) fn workunits_with_constant_span_id(
+  workunit_store: &mut WorkunitStore,
+) -> HashSet<Workunit> {
   workunit_store.with_latest_workunits(log::Level::Trace, |_, completed_workunits| {
     completed_workunits
       .iter()
@@ -2445,7 +2447,7 @@ pub(crate) fn make_successful_operation(
   MockOperation::new(op)
 }
 
-fn make_successful_operation_with_metadata(
+pub(crate) fn make_successful_operation_with_metadata(
   operation_name: &str,
   stdout: StdoutType,
   stderr: StderrType,
@@ -2477,7 +2479,7 @@ fn timestamp_only_secs(v: i64) -> Timestamp {
   dummy_timestamp
 }
 
-fn make_precondition_failure_operation(
+pub(crate) fn make_precondition_failure_operation(
   violations: Vec<bazel_protos::error_details::PreconditionFailure_Violation>,
 ) -> MockOperation {
   let mut operation = bazel_protos::operations::Operation::new();
@@ -2506,9 +2508,9 @@ fn make_precondition_failure_status(
   status
 }
 
-async fn run_cmd_runner(
+pub(crate) async fn run_cmd_runner<R: crate::CommandRunner>(
   request: MultiPlatformProcess,
-  command_runner: CommandRunner,
+  command_runner: R,
   store: Store,
 ) -> Result<RemoteTestResult, String> {
   let original = command_runner.run(request, Context::default()).await?;
@@ -2672,7 +2674,7 @@ async fn extract_output_files_from_response(
     .await
 }
 
-fn make_any_proto(message: &dyn Message) -> protobuf::well_known_types::Any {
+pub(crate) fn make_any_proto(message: &dyn Message) -> protobuf::well_known_types::Any {
   let mut any = protobuf::well_known_types::Any::new();
   any.set_type_url(format!(
     "type.googleapis.com/{}",
@@ -2682,7 +2684,7 @@ fn make_any_proto(message: &dyn Message) -> protobuf::well_known_types::Any {
   any
 }
 
-fn missing_preconditionfailure_violation(
+pub(crate) fn missing_preconditionfailure_violation(
   digest: &Digest,
 ) -> bazel_protos::error_details::PreconditionFailure_Violation {
   {
@@ -2693,7 +2695,7 @@ fn missing_preconditionfailure_violation(
   }
 }
 
-fn assert_contains(haystack: &str, needle: &str) {
+pub(crate) fn assert_contains(haystack: &str, needle: &str) {
   assert!(
     haystack.contains(needle),
     "{:?} should contain {:?}",
@@ -2702,7 +2704,7 @@ fn assert_contains(haystack: &str, needle: &str) {
   )
 }
 
-fn cat_roland_request() -> MultiPlatformProcess {
+pub(crate) fn cat_roland_request() -> MultiPlatformProcess {
   let req = Process {
     argv: owned_string_vec(&["/bin/cat", "roland"]),
     env: BTreeMap::new(),
@@ -2720,7 +2722,7 @@ fn cat_roland_request() -> MultiPlatformProcess {
   req.into()
 }
 
-fn echo_roland_request() -> MultiPlatformProcess {
+pub(crate) fn echo_roland_request() -> MultiPlatformProcess {
   let req = Process {
     argv: owned_string_vec(&["/bin/echo", "meoooow"]),
     env: BTreeMap::new(),

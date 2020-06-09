@@ -133,7 +133,7 @@ class TestConsolidateClasspath(JvmBinaryTaskTestBase):
 
     @staticmethod
     def find_consolidate_classpath_jar(files: List[str]) -> str:
-        matching = [f for f in files if re.match("output-[0-9a-f]{6}\.jar", f)]
+        matching = [f for f in files if re.match(r"output-[0-9a-f]{6}\.jar", f)]
         if len(matching) == 1:
             return matching[0]
         raise ValueError(f"Could not find single consolidate classpath jar in {files}.")

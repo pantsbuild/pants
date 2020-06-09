@@ -5,10 +5,12 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, Optional, Set, Tuple
+from typing import Iterable, Optional, Set, Tuple, Union
 
 from pants.engine.collection import DeduplicatedCollection
+from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.rules import RootRule, SubsystemRule, rule
+from pants.engine.selectors import Get
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method
 
@@ -33,10 +35,14 @@ class InvalidSourceRootPatternError(SourceRootError):
     """Indicates an invalid pattern was provided."""
 
 
+class InvalidMarkerFileError(SourceRootError):
+    """Indicates an invalid marker file was provided."""
+
+
 class NoSourceRootError(SourceRootError):
     """Indicates we failed to map a source file to a source root."""
 
-    def __init__(self, path: str, extra_msg: str = ""):
+    def __init__(self, path: Union[str, PurePath], extra_msg: str = ""):
         super().__init__(f"No source root found for `{path}`. {extra_msg}")
 
 
@@ -62,26 +68,15 @@ class SourceRootPatternMatcher:
     def get_patterns(self) -> Tuple[str, ...]:
         return tuple(self.root_patterns)
 
-    def _match_root_patterns(self, putative_root: PurePath) -> bool:
+    def matches_root_patterns(self, relpath: PurePath) -> bool:
+        """Does this putative root match a pattern?"""
+        # Note: This is currently O(n) where n is the number of patterns, which
+        # we expect to be small.  We can optimize if it becomes necessary.
+        putative_root = _repo_root / relpath
         for pattern in self.root_patterns:
             if putative_root.match(pattern):
                 return True
         return False
-
-    def find_root(self, relpath: str) -> Optional[PurePath]:
-        """Return the source root for the given path, relative to the repo root."""
-        # Note: This is currently O(n) where n is the number of patterns, which
-        # we expect to be small.  We can optimize if it becomes necessary.
-        if ".." in relpath.split(os.path.sep):
-            raise NoSourceRootError(relpath, "`..` disallowed in source root searches. ")
-        putative_root = _repo_root / relpath
-        while putative_root != _repo_root:
-            if self._match_root_patterns(putative_root):
-                return putative_root.relative_to(_repo_root)
-            putative_root = putative_root.parent
-        if self._match_root_patterns(putative_root):
-            return putative_root.relative_to(_repo_root)
-        return None
 
 
 class SourceRoots:
@@ -121,13 +116,25 @@ class SourceRoots:
         :return: A SourceRoot instance, or None if the path is not located under a source root
                  and `unmatched == fail`.
         """
-        matched_path = self._pattern_matcher.find_root(path)
+        matched_path = self._find_root(PurePath(path))
         if matched_path:
             return SourceRoot(path=str(matched_path))
         if self._fail_if_unmatched:
             return None
         # If no source root is found, use the path directly.
         return SourceRoot(path)
+
+    def _find_root(self, relpath: PurePath) -> Optional[PurePath]:
+        """Return the source root for the given path, relative to the repo root."""
+
+        putative_root = _repo_root / relpath
+        while putative_root != _repo_root:
+            if self._pattern_matcher.matches_root_patterns(putative_root):
+                return putative_root.relative_to(_repo_root)
+            putative_root = putative_root.parent
+        if self._pattern_matcher.matches_root_patterns(putative_root):
+            return putative_root.relative_to(_repo_root)
+        return None
 
     def get_patterns(self) -> Set[str]:
         return set(self._pattern_matcher.get_patterns())
@@ -172,6 +179,20 @@ class SourceRootConfig(Subsystem):
             "See https://pants.readme.io/docs/source-roots.",
         )
 
+        register(
+            "--marker-filenames",
+            metavar="filename",
+            type=list,
+            member_type=str,
+            fingerprint=True,
+            default=None,
+            advanced=True,
+            help="The presence of a file of this name in a directory indicates that the directory "
+            "is a source root.  The content of the file doesn't matter, and may be empty. "
+            "Useful when you can't or don't wish to centrally enumerate source roots via "
+            "--root-patterns.",
+        )
+
     @memoized_method
     def get_pattern_matcher(self) -> SourceRootPatternMatcher:
         return SourceRootPatternMatcher(self.options.root_patterns)
@@ -186,14 +207,20 @@ class SourceRootConfig(Subsystem):
 class SourceRootRequest:
     """Find the source root for the given path."""
 
-    path: str
+    path: PurePath
+
+    def __post_init__(self) -> None:
+        if ".." in str(self.path).split(os.path.sep):
+            raise ValueError(f"SourceRootRequest cannot contain `..` segment: {self.path}")
+        if self.path.is_absolute():
+            raise ValueError(f"SourceRootRequest path must be relative: {self.path}")
 
     @classmethod
     def for_file(cls, file_path: str) -> "SourceRootRequest":
         """Create a request for the source root for the given file."""
         # The file itself cannot be a source root, so we may as well start the search
         # from its enclosing directory, and save on some superfluous checking.
-        return cls(str(PurePath(file_path).parent))
+        return cls(PurePath(file_path).parent)
 
 
 @dataclass(frozen=True)
@@ -202,31 +229,55 @@ class OptionalSourceRoot:
 
 
 @rule
-def get_source_root(
+async def get_source_root(
     source_root_request: SourceRootRequest, source_root_config: SourceRootConfig
 ) -> OptionalSourceRoot:
     """Rule to request a SourceRoot that may not exist."""
-    matched_path = source_root_config.get_pattern_matcher().find_root(source_root_request.path)
-    if matched_path:
-        return OptionalSourceRoot(SourceRoot(path=str(matched_path)))
-    else:
-        return OptionalSourceRoot(None)
+    pattern_matcher = source_root_config.get_pattern_matcher()
+    path = source_root_request.path
+
+    # Check if the requested path itself is a source root.
+
+    # A) Does it match a pattern?
+    if pattern_matcher.matches_root_patterns(path):
+        return OptionalSourceRoot(SourceRoot(str(path)))
+
+    # B) Does it contain a marker file?
+    marker_filenames = source_root_config.options.marker_filenames
+    if marker_filenames:
+        for marker_filename in marker_filenames:
+            if (
+                os.path.basename(marker_filename) != marker_filename
+                or "*" in marker_filename
+                or "!" in marker_filename
+            ):
+                raise InvalidMarkerFileError(
+                    f"Marker filename must be a base name: {marker_filename}"
+                )
+        # TODO: An intrinsic to check file existence at a fixed path?
+        snapshot = await Get[Snapshot](PathGlobs([str(path / mf) for mf in marker_filenames]))
+        if len(snapshot.files) > 0:
+            return OptionalSourceRoot(SourceRoot(str(path)))
+
+    # The requested path itself is not a source root, but maybe its parent is.
+    if str(path) != ".":
+        return await Get[OptionalSourceRoot](SourceRootRequest(path.parent))
+
+    # The requested path is not under a source root.
+    return OptionalSourceRoot(None)
 
 
 @rule
-def get_source_root_strict(
-    source_root_request: SourceRootRequest, source_root_config: SourceRootConfig
-) -> SourceRoot:
+async def get_source_root_strict(source_root_request: SourceRootRequest) -> SourceRoot:
     """Convenience rule to allow callers to request a SourceRoot directly.
 
     That way callers don't have to unpack an OptionalSourceRoot if they know they expect a
     SourceRoot to exist and are willing to error if it doesn't.
     """
-    matched_path = source_root_config.get_pattern_matcher().find_root(source_root_request.path)
-    if matched_path:
-        return SourceRoot(path=str(matched_path))
-    else:
+    optional_source_root = await Get[OptionalSourceRoot](SourceRootRequest, source_root_request)
+    if optional_source_root.source_root is None:
         raise NoSourceRootError(source_root_request.path)
+    return optional_source_root.source_root
 
 
 def rules():

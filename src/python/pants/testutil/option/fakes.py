@@ -98,6 +98,10 @@ def create_options(options, passthru_args=None, fingerprintable_options=None):
                 options_for_this_scope = options_for_this_scope.option_values
 
             if passthru_args:
+                # TODO: This is _very_ partial support for passthrough args: this should be
+                # inspecting the kwargs of option registrations to decide which arguments to
+                # extend: this explicit `passthrough_args` argument is only passthrough because
+                # it is marked as such.
                 pa = options_for_this_scope.get("passthrough_args", [])
                 if isinstance(pa, RankedValue):
                     pa = pa.value
@@ -112,9 +116,6 @@ def create_options(options, passthru_args=None, fingerprintable_options=None):
         def for_global_scope(self):
             return self.for_scope(GLOBAL_SCOPE)
 
-        def passthru_args_for_scope(self, scope):
-            return passthru_args or []
-
         def items(self):
             return list(options.items())
 
@@ -122,7 +123,7 @@ def create_options(options, passthru_args=None, fingerprintable_options=None):
         def scope_to_flags(self):
             return {}
 
-        def get_fingerprintable_for_scope(self, bottom_scope, include_passthru=False):
+        def get_fingerprintable_for_scope(self, bottom_scope):
             """Returns a list of fingerprintable (option type, option value) pairs for the given
             scope.
 
@@ -130,14 +131,8 @@ def create_options(options, passthru_args=None, fingerprintable_options=None):
             all enclosing scopes as in the Options class!
 
             :param str bottom_scope: The scope to gather fingerprintable options for.
-            :param bool include_passthru: Whether to include passthru args captured by `bottom_scope` in the
-                                          fingerprintable options.
             """
             pairs = []
-            if include_passthru:
-                pu_args = self.passthru_args_for_scope(bottom_scope)
-                pairs.extend((str, arg) for arg in pu_args)
-
             option_values = self.for_scope(bottom_scope)
             for option_name, option_type in fingerprintable[bottom_scope].items():
                 pairs.append((option_type, option_values[option_name]))

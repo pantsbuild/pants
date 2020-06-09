@@ -16,7 +16,6 @@ from pants.base.build_environment import (
     get_pants_configdir,
     pants_version,
 )
-from pants.base.deprecated import deprecated_conditional
 from pants.option.custom_types import dir_option
 from pants.option.errors import OptionsError
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
@@ -39,22 +38,10 @@ class GlobMatchErrorBehavior(Enum):
 class FileNotFoundBehavior(Enum):
     """What to do when globs do not match in BUILD files."""
 
-    ignore = "ignore"
     warn = "warn"
     error = "error"
 
     def to_glob_match_error_behavior(self) -> GlobMatchErrorBehavior:
-        deprecated_conditional(
-            lambda: self == type(self).ignore,
-            removal_version="1.30.0.dev0",
-            entity_description="--files-not-found-behavior=ignore",
-            hint_message=(
-                "If you currently set `--files-not-found-behavior=ignore`, you will "
-                "need to instead either set `--files-not-found-behavior=warn` (the "
-                "default) or `--files-not-found-behavior=error`. Ignoring when files are "
-                "not found often results in subtle bugs, so we are removing the option."
-            ),
-        )
         return GlobMatchErrorBehavior(self.value)
 
 
@@ -543,6 +530,16 @@ class GlobalOptions(Subsystem):
             "Because pantsd currently does not support parallel runs, "
             "any prior running Pants command must be finished for the current one to start. "
             "To never timeout, use the value -1.",
+        )
+        register(
+            "--pantsd-max-memory-usage",
+            advanced=True,
+            type=int,
+            default=2 ** 32,
+            help=(
+                "The maximum memory usage of a pantsd process (in bytes). There is at most one "
+                "pantsd process per workspace."
+            ),
         )
 
         # These facilitate configuring the native engine.

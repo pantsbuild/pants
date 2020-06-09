@@ -6,6 +6,5 @@ extend-ignore:
   E731,  # Do not assign a lambda expression
   E741,  # Ambiguous variable name (enable once fixed)
   W503,  # line break before binary operator  (conflicts with Black)
-  W605,  # invalid escape sequence (enable once fixed)
   PB10,  # Bad class attribute (enable once fixed)
   PB13,  # `open()` not within a context manager (possibly enable once fixed)

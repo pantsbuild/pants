@@ -94,7 +94,7 @@ class ScalastyleTest(NailgunTaskTestBase):
 
     def test_excludes_parsed_loaded_correctly(self):
         excludes_text = dedent(
-            """
+            r"""
             # ignore C++
             .*\.cpp
 

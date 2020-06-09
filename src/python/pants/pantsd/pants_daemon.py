@@ -15,9 +15,10 @@ from pants.base.exception_sink import ExceptionSink, SignalHandler
 from pants.bin.daemon_pants_runner import DaemonPantsRunner
 from pants.engine.internals.native import Native
 from pants.engine.unions import UnionMembership
-from pants.init.engine_initializer import EngineInitializer
+from pants.init.engine_initializer import EngineInitializer, LegacyGraphScheduler
 from pants.init.logging import clear_logging_handlers, init_rust_logger, setup_logging_to_file
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
+from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.process_manager import PantsDaemonProcessManager
@@ -26,6 +27,7 @@ from pants.pantsd.service.pailgun_service import PailgunService
 from pants.pantsd.service.pants_service import PantsServices
 from pants.pantsd.service.scheduler_service import SchedulerService
 from pants.pantsd.service.store_gc_service import StoreGCService
+from pants.pantsd.watchman import Watchman
 from pants.pantsd.watchman_launcher import WatchmanLauncher
 from pants.util.contextutil import stdio_as
 from pants.util.logging import LogLevel
@@ -140,11 +142,11 @@ class PantsDaemon(PantsDaemonProcessManager):
 
     @staticmethod
     def _setup_services(
-        build_root,
-        bootstrap_options,
-        legacy_graph_scheduler,
-        native,
-        watchman,
+        build_root: str,
+        bootstrap_options: OptionValueContainer,
+        legacy_graph_scheduler: LegacyGraphScheduler,
+        native: Native,
+        watchman: Watchman,
         union_membership: UnionMembership,
     ):
         """Initialize pantsd services.
@@ -170,6 +172,7 @@ class PantsDaemon(PantsDaemonProcessManager):
             build_root=build_root,
             invalidation_globs=invalidation_globs,
             union_membership=union_membership,
+            max_memory_usage_in_bytes=bootstrap_options.pantsd_max_memory_usage,
         )
 
         pailgun_service = PailgunService(
@@ -373,20 +376,22 @@ class PantsDaemon(PantsDaemonProcessManager):
         """
 
         # Write the pidfile.
-        self.write_pid()
+        pid = os.getpid()
+        self.write_pid(pid=pid)
         self.write_metadata_by_name(
             "pantsd", self.FINGERPRINT_KEY, ensure_text(self.options_fingerprint)
         )
+        scheduler_services = [s for s in self._services.services if isinstance(s, SchedulerService)]
+        for scheduler_service in scheduler_services:
+            scheduler_service.begin_monitoring_memory_usage(pid)
 
-        # Add the pidfile to watching via the scheduler.
+        # If we can, add the pidfile to watching via the scheduler.
         pidfile_absolute = self._metadata_file_path("pantsd", "pid")
         if pidfile_absolute.startswith(self._build_root):
-            scheduler_service = next(
-                s for s in self._services.services if isinstance(s, SchedulerService)
-            )
-            scheduler_service.add_invalidation_glob(
-                os.path.relpath(pidfile_absolute, self._build_root)
-            )
+            for scheduler_service in scheduler_services:
+                scheduler_service.add_invalidation_glob(
+                    os.path.relpath(pidfile_absolute, self._build_root)
+                )
         else:
             logging.getLogger(__name__).warning(
                 "Not watching pantsd pidfile because subprocessdir is outside of buildroot. Having "

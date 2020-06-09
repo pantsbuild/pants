@@ -8,7 +8,7 @@ import sys
 from dataclasses import dataclass
 from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
-from pants.base.deprecated import warn_or_error
+from pants.base.deprecated import deprecated_conditional, warn_or_error
 from pants.option.arg_splitter import ArgSplitter, HelpRequest
 from pants.option.config import Config
 from pants.option.option_tracker import OptionTracker
@@ -75,6 +75,9 @@ class Options:
     class DuplicateScopeError(Exception):
         """More than one registration occurred for the same scope."""
 
+    class AmbiguousPassthroughError(Exception):
+        """More than one goal was passed along with passthrough args."""
+
     @classmethod
     def complete_scopes(cls, scope_infos: Iterable[ScopeInfo]) -> FrozenOrderedSet[ScopeInfo]:
         """Expand a set of scopes to include all enclosing scopes.
@@ -132,6 +135,14 @@ class Options:
         args = sys.argv if args is None else args
         split_args = splitter.split_args(args)
 
+        if split_args.passthru and len(split_args.goals) > 1:
+            raise cls.AmbiguousPassthroughError(
+                f"Specifying multiple goals (in this case: {split_args.goals}) "
+                "along with passthrough args (args after `--`) is ambiguous.\n"
+                "Try either specifying only a single goal, or passing the passthrough args "
+                "directly to the relevant consumer via its associated flags."
+            )
+
         option_tracker = OptionTracker()
 
         if bootstrap_option_values:
@@ -152,7 +163,6 @@ class Options:
             scope_to_flags=split_args.scope_to_flags,
             specs=split_args.specs,
             passthru=split_args.passthru,
-            passthru_owner=split_args.passthru_owner,
             help_request=help_request,
             parser_hierarchy=parser_hierarchy,
             bootstrap_option_values=bootstrap_option_values,
@@ -167,7 +177,6 @@ class Options:
         scope_to_flags: Dict[str, List[str]],
         specs: List[str],
         passthru: List[str],
-        passthru_owner: Optional[str],
         help_request: Optional[HelpRequest],
         parser_hierarchy: ParserHierarchy,
         bootstrap_option_values: Optional[OptionValueContainer],
@@ -183,7 +192,6 @@ class Options:
         self._scope_to_flags = scope_to_flags
         self._specs = specs
         self._passthru = passthru
-        self._passthru_owner = passthru_owner
         self._help_request = help_request
         self._parser_hierarchy = parser_hierarchy
         self._bootstrap_option_values = bootstrap_option_values
@@ -310,7 +318,6 @@ class Options:
             scope_to_flags=no_flags,
             specs=self._specs,
             passthru=self._passthru,
-            passthru_owner=self._passthru_owner,
             help_request=self._help_request,
             parser_hierarchy=self._parser_hierarchy,
             bootstrap_option_values=self._bootstrap_option_values,
@@ -325,26 +332,6 @@ class Options:
         :API: public
         """
         return scope in self._known_scope_to_info
-
-    def passthru_args_for_scope(self, scope: str) -> List[str]:
-        # NB: The concept of passthru argument "ownership" will go away in 1.30.0.dev0, at which
-        # point _all_ scopes which register passthrough args will receive them and this method can
-        # go away. But because Subsystems have never been able to receive passthrough args before,
-        # we can begin applying that behavior to them unambiguously before the deprecation. The
-        # only way a Subsystem or v2 Goal will actually receive a passthrough arg is if they
-        # register an option as `passthrough=True`.
-        if not scope:
-            return []
-        if (
-            self._passthru_owner
-            and scope.startswith(self._passthru_owner)
-            and (len(scope) == len(self._passthru_owner) or scope[len(self._passthru_owner)] == ".")
-        ) or self._parser_hierarchy.get_parser_by_scope(scope).scope_info.category in (
-            ScopeInfo.SUBSYSTEM,
-            ScopeInfo.GOAL,
-        ):
-            return self._passthru
-        return []
 
     def _assert_not_frozen(self) -> None:
         if self._frozen:
@@ -507,7 +494,7 @@ class Options:
             namespace=namespace,
             get_all_scoped_flag_names=lambda: self._all_scoped_flag_names_for_fuzzy_matching,
             levenshtein_max_distance=levenshtein_max_distance,
-            passthrough_args=self.passthru_args_for_scope(scope),
+            passthrough_args=self._passthru,
             include_passive_options=include_passive_options,
         )
 
@@ -547,7 +534,7 @@ class Options:
         return values
 
     def get_fingerprintable_for_scope(
-        self, bottom_scope, include_passthru=False, fingerprint_key=None, invert=False
+        self, bottom_scope, include_passthru=None, fingerprint_key=None, invert=False
     ):
         """Returns a list of fingerprintable (option type, option value) pairs for the given scope.
 
@@ -565,15 +552,19 @@ class Options:
 
         :API: public
         """
+
+        deprecated_conditional(
+            predicate=lambda: include_passthru is not None,
+            removal_version="1.31.0.dev0",
+            entity_description="get_fingerprintable_for_scope `include_passthru` arg",
+            hint_message=(
+                "passthru arguments are fingerprinted if their associated option value is."
+            ),
+        )
+
         fingerprint_key = fingerprint_key or "fingerprint"
         fingerprint_default = bool(invert)
         pairs = []
-
-        if include_passthru:
-            # Passthru args can only be sent to outermost scopes so we gather them once here up-front.
-            passthru_args = self.passthru_args_for_scope(bottom_scope)
-            # NB: We can't sort passthru args, the underlying consumer may be order-sensitive.
-            pairs.extend((str, pass_arg) for pass_arg in passthru_args)
 
         # Note that we iterate over options registered at `bottom_scope` and at all
         # enclosing scopes, since option-using code can read those values indirectly

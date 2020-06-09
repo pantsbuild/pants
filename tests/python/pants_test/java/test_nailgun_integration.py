@@ -35,5 +35,5 @@ class TestNailgunIntegration(PantsRunIntegrationTest):
         )
         self.assert_failure(pants_run)
         self.assertRegex(
-            pants_run.stdout_data, """\<no nailgun connection>.* Failed to read nailgun output"""
+            pants_run.stdout_data, r"""\<no nailgun connection>.* Failed to read nailgun output"""
         )

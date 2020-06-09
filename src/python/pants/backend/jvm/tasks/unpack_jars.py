@@ -50,7 +50,7 @@ class UnpackJars(UnpackRemoteSourcesBase):
     def unpack_target(self, unpacked_jars, unpack_dir):
         deprecated_conditional(
             lambda: True,
-            removal_version="1.30.0.dev0",
+            removal_version="1.31.0.dev0",
             entity_description="The `unpack-jars` goal",
             hint_message="Contact the Pants team on Slack or pants-devel@googlegroups.com "
             "if you need this functionality.",

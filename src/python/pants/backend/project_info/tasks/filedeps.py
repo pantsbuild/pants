@@ -6,7 +6,6 @@ import os
 from pants.backend.jvm.targets.jvm_app import JvmApp
 from pants.backend.jvm.targets.scala_library import ScalaLibrary
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated_conditional
 from pants.task.console_task import ConsoleTask
 
 
@@ -28,7 +27,7 @@ class FileDeps(ConsoleTask):
         register(
             "--absolute",
             type=bool,
-            default=True,
+            default=False,
             help="If True output with absolute path, else output with path relative to the build root",
         )
 
@@ -36,16 +35,6 @@ class FileDeps(ConsoleTask):
         return os.path.join(get_buildroot(), path) if self.get_options().absolute else path
 
     def console_output(self, targets):
-        deprecated_conditional(
-            lambda: self.get_options().is_default("absolute"),
-            entity_description="defaulting to `--filedeps-absolute`",
-            removal_version="1.30.0.dev0",
-            hint_message=(
-                "`filedeps` will soon default to `--no-filedeps-absolute`. If you want to "
-                "permanently configure absolute paths, set this in your `pants.toml`:\n\n"
-                "[filedeps]\nabsolute = true\n"
-            ),
-        )
         concrete_targets = set()
         for target in targets:
             concrete_target = target.concrete_derived_from

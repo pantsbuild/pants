@@ -86,16 +86,15 @@ class HelpInfoExtracter:
             member_typ = kwargs.get("member_type", str)
 
             def member_str(val):
-                return f"'{val}'" if member_typ == str else f"{val}"
+                return f"'{val}'" if member_typ == str else str(val)
 
             default_str = (
-                f"\"[{', '.join([member_str(val) for val in default])}]\"" if default else "[]"
+                f"\"[{', '.join(member_str(val) for val in default)}]\"" if default else "[]"
             )
         elif is_dict_option(kwargs):
             if default:
-                default_str = "{{ {} }}".format(
-                    ", ".join(["'{}': {}".format(k, v) for k, v in default.items()])
-                )
+                items_str = ", ".join(f"'{k}': {v}" for k, v in default.items())
+                default_str = f"{{ {items_str} }}"
             else:
                 default_str = "{}"
         elif typ == str:
@@ -190,7 +189,7 @@ class HelpInfoExtracter:
             is_short_arg = len(arg) == 2
             unscoped_cmd_line_args.append(arg)
             if self._scope_prefix:
-                scoped_arg = "--{}-{}".format(self._scope_prefix, arg.lstrip("-"))
+                scoped_arg = f"--{self._scope_prefix}-{arg.lstrip('-')}"
             else:
                 scoped_arg = arg
             scoped_cmd_line_args.append(scoped_arg)
@@ -199,9 +198,10 @@ class HelpInfoExtracter:
                 if is_short_arg:
                     display_args.append(scoped_arg)
                 else:
-                    unscoped_cmd_line_args.append("--no-{}".format(arg[2:]))
-                    scoped_cmd_line_args.append("--no-{}".format(scoped_arg[2:]))
-                    display_args.append("--[no-]{}".format(scoped_arg[2:]))
+                    unscoped_cmd_line_args.append(f"--no-{arg[2:]}")
+                    sa_2 = scoped_arg[2:]
+                    scoped_cmd_line_args.append(f"--no-{sa_2}")
+                    display_args.append(f"--[no-]{sa_2}")
             else:
                 metavar = self.compute_metavar(kwargs)
                 display_args.append(f"{scoped_arg}={metavar}")
@@ -216,8 +216,8 @@ class HelpInfoExtracter:
         deprecated_message = None
         if removal_version:
             deprecated_tense = deprecated.get_deprecated_tense(removal_version)
-            deprecated_message = "DEPRECATED. {} removed in version: {}".format(
-                deprecated_tense, removal_version
+            deprecated_message = (
+                f"DEPRECATED. {deprecated_tense} removed in version: {removal_version}"
             )
         removal_hint = kwargs.get("removal_hint")
         choices = self.compute_choices(kwargs)
