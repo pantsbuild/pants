@@ -402,7 +402,7 @@ async fn main() {
             headers,
             store.clone(),
             Platform::Linux,
-            overall_deadline_secs,
+            Duration::from_secs(overall_deadline_secs),
           )
           .expect("Failed to make command runner"),
         )

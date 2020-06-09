@@ -29,7 +29,7 @@ use crate::remote_tests::{
 };
 use crate::{CommandRunner, Context, MultiPlatformProcess, Platform, Process};
 
-const OVERALL_DEADLINE_SECS: u64 = 10 * 60;
+const OVERALL_DEADLINE_SECS: Duration = Duration::from_secs(10 * 60);
 
 fn create_command_runner(
   address: String,

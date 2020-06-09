@@ -1,5 +1,4 @@
 use std::collections::BTreeMap;
-use std::ops::Add;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -53,7 +52,7 @@ pub struct StreamingCommandRunner {
   channel: grpcio::Channel,
   env: Arc<grpcio::Environment>,
   execution_client: Arc<bazel_protos::remote_execution_grpc::ExecutionClient>,
-  overall_deadline_secs: u64,
+  overall_deadline: Duration,
 }
 
 enum StreamOutcome {
@@ -71,7 +70,7 @@ impl StreamingCommandRunner {
     headers: BTreeMap<String, String>,
     store: Store,
     platform: Platform,
-    overall_deadline_secs: u64,
+    overall_deadline: Duration,
   ) -> Result<Self, String> {
     let env = Arc::new(grpcio::EnvBuilder::new().build());
     let channel = {
@@ -108,7 +107,7 @@ impl StreamingCommandRunner {
       execution_client,
       store,
       platform,
-      overall_deadline_secs,
+      overall_deadline,
     };
 
     Ok(command_runner)
@@ -596,8 +595,7 @@ impl crate::CommandRunner for StreamingCommandRunner {
 
     // Record the time that we started to process this request, then compute the ultimate
     // deadline for execution of this request.
-    let deadline_duration =
-      Duration::from_secs(self.overall_deadline_secs).add(timeout.unwrap_or(Duration::default()));
+    let deadline_duration = self.overall_deadline + timeout.unwrap_or_default();
 
     // Upload the action (and related data, i.e. the embedded command and input files).
     self

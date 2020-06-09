@@ -208,7 +208,7 @@ impl Core {
             // TODO if we ever want to configure the remote platform to be something else we
             // need to take an option all the way down here and into the remote::CommandRunner struct.
             Platform::Linux,
-            remote_execution_overall_deadline_secs,
+            Duration::from_secs(remote_execution_overall_deadline_secs),
           )?)
         } else {
           Box::new(process_execution::remote::CommandRunner::new(
