@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+use crate::RelativePath;
+
 #[derive(Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct CacheName(String);
 
@@ -25,15 +27,10 @@ pub struct CacheDest(String);
 
 impl CacheDest {
   pub fn new(dest: String) -> Result<CacheDest, String> {
-    let dest_path = PathBuf::from(&dest);
-    if dest_path.is_relative() && dest_path.components().next().is_some() {
-      Ok(CacheDest(dest))
-    } else {
-      Err(format!(
-        "Cache paths must be relative and non-empty: got: {}",
-        dest
-      ))
-    }
+    // We validate as RelativePath, but store as a String to avoid needing to assert later that
+    // path is valid unicode.
+    let _ = RelativePath::new(&dest)?;
+    Ok(CacheDest(dest))
   }
 }
 
