@@ -15,7 +15,7 @@ from pants.util.memo import memoized_method
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, order=True)
 class SourceRoot:
     path: str  # Relative path from the repo root.
 

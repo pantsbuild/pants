@@ -33,10 +33,10 @@ class PythonModule:
     def address_spec(self, *, source_root: str) -> AscendantAddresses:
         """The spec for all candidate targets which could feasibly own the module.
 
-        This uses AscendantAddresses because targets can own files in subdirs (e.g. rglobs). We
-        also use the package path, e.g. `helloworld/util/__init__.py`, rather than the module path
-        to ensure that we capture all possible targets. It is okay if this directory does not
-        actually exist.
+        This uses AscendantAddresses because targets can own files in subdirs (e.g. rglobs). We also
+        use the package path, e.g. `helloworld/util/__init__.py`, rather than the module path to
+        ensure that we capture all possible targets. It is okay if this directory does not actually
+        exist.
         """
         module_name_with_slashes = self.module.replace(".", "/")
         return AscendantAddresses(

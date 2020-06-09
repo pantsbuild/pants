@@ -26,6 +26,8 @@ python_tests(
   name="tests",
   dependencies=[
     ":dependency_inference",
+    "src/python/pants/backend/project_info",
+    "src/python/pants/testutil:test_base",
   ],
   tags = {"type_checked"},
 )
