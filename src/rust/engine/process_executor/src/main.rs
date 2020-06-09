@@ -354,7 +354,7 @@ async fn main() {
     output_directories,
     timeout: Some(Duration::new(15 * 60, 0)),
     description: "process_executor".to_string(),
-    append_only_caches: BTreeSet::new(),
+    append_only_caches: BTreeMap::new(),
     jdk_home: args.value_of("jdk").map(PathBuf::from),
     target_platform: PlatformConstraint::try_from(
       &args.value_of("target-platform").unwrap().to_string(),

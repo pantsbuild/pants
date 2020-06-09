@@ -1,16 +1,16 @@
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
-pub struct NamedCache(String);
+pub struct CacheName(String);
 
-impl NamedCache {
-  pub fn new(name: String) -> Result<NamedCache, String> {
+impl CacheName {
+  pub fn new(name: String) -> Result<CacheName, String> {
     if name
       .chars()
       .all(|c| (c.is_ascii_alphanumeric() && c.is_ascii_lowercase()) || c == '_')
     {
-      Ok(NamedCache(name))
+      Ok(CacheName(name))
     } else {
       Err(format!(
         "Cache names may only contain lowercase alphanumeric characters or underscores: got {:?}",
@@ -20,7 +20,22 @@ impl NamedCache {
   }
 }
 
-const WORKSPACE_CACHE_BASE: &str = ".cache";
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
+pub struct CacheDest(PathBuf);
+
+impl CacheDest {
+  pub fn new(dest: String) -> Result<CacheDest, String> {
+    let dest = PathBuf::from(dest);
+    if dest.is_relative() && dest.components().next().is_some() {
+      Ok(CacheDest(dest))
+    } else {
+      Err(format!(
+        "Cache paths must be relative and non-empty: got: {}",
+        dest.display()
+      ))
+    }
+  }
+}
 
 #[derive(Debug)]
 pub struct NamedCacheSymlink {
@@ -47,11 +62,13 @@ impl NamedCaches {
   ///
   pub fn local_paths<'a>(
     &'a self,
-    caches: &'a BTreeSet<NamedCache>,
+    caches: &'a BTreeMap<CacheName, CacheDest>,
   ) -> impl Iterator<Item = NamedCacheSymlink> + 'a {
-    caches.iter().map(move |cache_name| NamedCacheSymlink {
-      src: self.local_base.join(&cache_name.0),
-      dst: PathBuf::from(WORKSPACE_CACHE_BASE).join(&cache_name.0),
-    })
+    caches
+      .iter()
+      .map(move |(cache_name, cache_dest)| NamedCacheSymlink {
+        src: self.local_base.join(&cache_name.0),
+        dst: cache_dest.0.clone(),
+      })
   }
 }

@@ -67,7 +67,7 @@ pub mod named_caches;
 
 extern crate uname;
 
-pub use crate::named_caches::{NamedCache, NamedCaches};
+pub use crate::named_caches::{CacheDest, CacheName, NamedCaches};
 
 #[derive(PartialOrd, Ord, Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum Platform {
@@ -232,15 +232,18 @@ pub struct Process {
 
   ///
   /// Declares that this process uses the given named caches (which might have associated config
-  /// in the future). Cache names must contain only lowercase ascii characters or underscores.
+  /// in the future) at the associated relative paths within its workspace. Cache names must
+  /// contain only lowercase ascii characters or underscores.
   ///
-  /// Caches are exposed to processes within their workspaces as directories at the relative path
-  /// `.cache/$name`. A @rule wrapped process may optionally check for the existence of the relevant
-  /// directory, and disable use of that cache if it is not defined. These caches are globally
-  /// shared and so must be concurrency safe: a consumer of the cache must never assume that it has
-  /// exclusive access to the provided directory.
+  /// Caches are exposed to processes within their workspaces at the relative paths represented
+  /// by the values of the dict. A process may optionally check for the existence of the relevant
+  /// directory, and disable use of that cache if it has not been created by the executor
+  /// (indicating a lack of support for this feature).
   ///
-  pub append_only_caches: BTreeSet<NamedCache>,
+  /// These caches are globally shared and so must be concurrency safe: a consumer of the cache
+  /// must never assume that it has exclusive access to the provided directory.
+  ///
+  pub append_only_caches: BTreeMap<CacheName, CacheDest>,
 
   ///
   /// If present, a symlink will be created at .jdk which points to this directory for local
@@ -277,7 +280,7 @@ impl Process {
       output_directories: BTreeSet::new(),
       timeout: None,
       description: "".to_string(),
-      append_only_caches: BTreeSet::new(),
+      append_only_caches: BTreeMap::new(),
       jdk_home: None,
       target_platform: PlatformConstraint::None,
       is_nailgunnable: false,
@@ -311,7 +314,10 @@ impl Process {
   ///
   /// Replaces the append only caches for this process.
   ///
-  pub fn append_only_caches(mut self, append_only_caches: BTreeSet<NamedCache>) -> Process {
+  pub fn append_only_caches(
+    mut self,
+    append_only_caches: BTreeMap<CacheName, CacheDest>,
+  ) -> Process {
     self.append_only_caches = append_only_caches;
     self
   }
