@@ -41,7 +41,7 @@ async def infer_python_dependencies(request: InferPythonDependencies) -> Inferre
         for file_imports in imports_per_file
         for imported_module in file_imports.all_imports
     )
-    # We conservatively only use dep inference if there is exactly one owner for a target.
+    # We conservatively only use dep inference if there is exactly one owner for an import.
     return InferredDependencies(
         itertools.chain.from_iterable(owners for owners in owners_per_import if len(owners) == 1)
     )

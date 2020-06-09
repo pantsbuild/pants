@@ -54,7 +54,7 @@ class PythonModule:
         - helloworld.py
         - helloworld/__init__.py
 
-        The last two possible paths look at the parent module, if any. This is to accamodate `from`
+        The last two possible paths look at the parent module, if any. This is to accommodate `from`
         imports, where we don't care about the specific symbol, but only the module. For example,
         with `from typing import List`, we only care about `typing`.
         """
