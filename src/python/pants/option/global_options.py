@@ -947,6 +947,19 @@ class GlobalOptions(Subsystem):
             help="Whether to show v2 engine execution progress.",
         )
 
+        register(
+            "--dependency-inference",
+            default=False,
+            type=bool,
+            advanced=True,
+            help=(
+                "Enable dependency inference, meaning that Pants will read your source code to "
+                "infer the `dependencies` field for you in BUILD files. You can check what Pants "
+                "inferred by running `./pants dependencies` on your target. You may still need to "
+                "explicitly provide some `dependencies` that cannot be inferred."
+            ),
+        )
+
         loop_flag = "--loop"
         loop_passive = register.bootstrap.v1 or not register.bootstrap.v2
         register(

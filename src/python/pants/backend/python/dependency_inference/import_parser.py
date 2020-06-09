@@ -9,6 +9,7 @@ from typing import Optional, Set, Tuple
 
 from typed_ast import ast27
 
+from pants.util.memo import memoized_property
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import ensure_text
 
@@ -28,6 +29,10 @@ class ParsedPythonImports:
 
     explicit_imports: FrozenOrderedSet[str]
     inferred_imports: FrozenOrderedSet[str]
+
+    @memoized_property
+    def all_imports(self) -> FrozenOrderedSet[str]:
+        return FrozenOrderedSet(sorted([*self.explicit_imports, *self.inferred_imports]))
 
 
 def parse_file(source_code: str) -> Optional[Tuple]:

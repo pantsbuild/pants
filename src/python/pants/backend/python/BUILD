@@ -9,6 +9,7 @@ python_library(
     ':python_artifact',
     ':python_requirements',
     ':target_types',
+    'src/python/pants/backend/python/dependency_inference',
     'src/python/pants/backend/python/rules',
     'src/python/pants/backend/python/targets',
     'src/python/pants/backend/python/tasks',
@@ -89,6 +90,7 @@ python_library(
   sources=["target_types.py"],
   dependencies = [
     ':python_artifact',
+    'src/python/pants/backend/python/subsystems',
     'src/python/pants/backend/python/targets',
     'src/python/pants/core',
     'src/python/pants/core/util_rules',

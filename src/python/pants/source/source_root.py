@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Iterable, Optional, Set, Tuple, Union
 
-from pants.engine.collection import Collection
+from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.rules import RootRule, SubsystemRule, rule
 from pants.engine.selectors import Get
@@ -17,7 +17,7 @@ from pants.util.memo import memoized_method
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, order=True)
 class SourceRoot:
     path: str  # Relative path from the repo root.
 
@@ -46,8 +46,8 @@ class NoSourceRootError(SourceRootError):
         super().__init__(f"No source root found for `{path}`. {extra_msg}")
 
 
-class AllSourceRoots(Collection[SourceRoot]):
-    pass
+class AllSourceRoots(DeduplicatedCollection[SourceRoot]):
+    sort_input = True
 
 
 # We perform pattern matching against absolute paths, where "/" represents the repo root.

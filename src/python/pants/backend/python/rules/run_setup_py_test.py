@@ -44,6 +44,7 @@ from pants.engine.selectors import Params
 from pants.engine.target import Target, Targets, WrappedTarget
 from pants.python.python_requirement import PythonRequirement
 from pants.source.source_root import SourceRootConfig
+from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.subsystem.util import init_subsystem
 from pants.testutil.test_base import TestBase
 
@@ -80,7 +81,6 @@ class TestGenerateChroot(TestSetupPyBase):
             get_owned_dependencies,
             get_exporting_owner,
             RootRule(SetupPyChrootRequest),
-            RootRule(SourceRootConfig),
             *determine_source_files_rules(),
             *strip_source_roots_rules(),
         ]
@@ -90,7 +90,7 @@ class TestGenerateChroot(TestSetupPyBase):
             SetupPyChroot,
             Params(
                 SetupPyChrootRequest(ExportedTarget(self.tgt(addr)), py2=False),
-                SourceRootConfig.global_instance(),
+                create_options_bootstrapper(args=["--source-root-patterns=src/python"]),
             ),
         )
         snapshot = self.request_single_product(Snapshot, Params(chroot.digest))
@@ -104,7 +104,7 @@ class TestGenerateChroot(TestSetupPyBase):
                 SetupPyChroot,
                 Params(
                     SetupPyChrootRequest(ExportedTarget(self.tgt(addr)), py2=False),
-                    SourceRootConfig.global_instance(),
+                    create_options_bootstrapper(args=["--source-root-patterns=src/python"]),
                 ),
             )
         ex = excinfo.value
@@ -333,7 +333,8 @@ class TestGetRequirements(TestSetupPyBase):
 
     def assert_requirements(self, expected_req_strs, addr):
         reqs = self.request_single_product(
-            ExportedTargetRequirements, Params(DependencyOwner(ExportedTarget(self.tgt(addr))))
+            ExportedTargetRequirements,
+            Params(DependencyOwner(ExportedTarget(self.tgt(addr))), create_options_bootstrapper()),
         )
         assert sorted(expected_req_strs) == list(reqs)
 
@@ -476,7 +477,11 @@ class TestGetOwnedDependencies(TestSetupPyBase):
         assert sorted(owned) == sorted(
             od.target.address.reference()
             for od in self.request_single_product(
-                OwnedDependencies, Params(DependencyOwner(ExportedTarget(self.tgt(exported))))
+                OwnedDependencies,
+                Params(
+                    DependencyOwner(ExportedTarget(self.tgt(exported))),
+                    create_options_bootstrapper(),
+                ),
             )
         )
 
@@ -549,13 +554,17 @@ class TestGetExportingOwner(TestSetupPyBase):
         assert (
             owner
             == self.request_single_product(
-                ExportedTarget, Params(OwnedDependency(self.tgt(owned)))
+                ExportedTarget,
+                Params(OwnedDependency(self.tgt(owned)), create_options_bootstrapper()),
             ).target.address.reference()
         )
 
     def assert_error(self, owned: str, exc_cls: Type[Exception]):
         with pytest.raises(ExecutionError) as excinfo:
-            self.request_single_product(ExportedTarget, Params(OwnedDependency(self.tgt(owned))))
+            self.request_single_product(
+                ExportedTarget,
+                Params(OwnedDependency(self.tgt(owned)), create_options_bootstrapper()),
+            )
         ex = excinfo.value
         assert len(ex.wrapped_exceptions) == 1
         assert type(ex.wrapped_exceptions[0]) == exc_cls
