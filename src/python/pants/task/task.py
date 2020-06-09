@@ -123,18 +123,33 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
         return False
 
     @classmethod
+    def passthru_args_kwargs(cls):
+        """Subclasses may override to include additional kwargs in their passthru arg registration.
+
+        This can be used to deprecate passthru args.
+
+        :API: public
+        """
+        return {}
+
+    @classmethod
     def register_options(cls, register):
         super().register_options(register)
         if cls.supports_passthru_args():
-            register(
-                "--passthrough-args",
+            kwargs = dict(
                 type=list,
                 advanced=True,
                 fingerprint=True,
                 passthrough=True,
-                help="Pass these options as pass-through args; ie: as if by appending "
-                "`-- <passthrough arg> ...` to the command line. Any passthrough args actually"
-                "supplied on the command line will be used as well.",
+                help=(
+                    "Pass these options as pass-through args; ie: as if by appending "
+                    "`-- <passthrough arg> ...` to the command line. Any passthrough args actually"
+                    "supplied on the command line will be used as well."
+                ),
+            )
+            kwargs.update(cls.passthru_args_kwargs())
+            register(
+                "--passthrough-args", **kwargs,
             )
 
     @classmethod

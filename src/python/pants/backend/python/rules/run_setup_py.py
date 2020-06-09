@@ -231,6 +231,7 @@ class SetupPyOptions(GoalSubsystem):
             "--args",
             type=list,
             member_type=shell_str,
+            passthrough=True,
             help="Arguments to pass directly to setup.py, e.g. "
             '`--setup-py2-args="bdist_wheel --python-tag py36.py37"`. If unspecified, we just '
             "dump the setup.py chroot.",
