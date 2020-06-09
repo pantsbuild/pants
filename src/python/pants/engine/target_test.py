@@ -66,6 +66,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.testutil.engine.util import MockGet, run_rule
+from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 from pants.util.collections import ensure_str_list
 from pants.util.frozendict import FrozenDict
@@ -1134,12 +1135,17 @@ class TestDependencies(TestBase):
         addr = Address.parse("src/smalltalk")
         deps = Addresses([Address.parse("//:dep1"), Address.parse("//:dep2")])
         deps_field = Dependencies(deps, address=addr)
-        assert self.request_single_product(Addresses, DependenciesRequest(deps_field)) == deps
+        assert (
+            self.request_single_product(
+                Addresses, Params(DependenciesRequest(deps_field), create_options_bootstrapper())
+            )
+            == deps
+        )
 
         # Also test that we handle no dependencies.
         empty_deps_field = Dependencies(None, address=addr)
         assert self.request_single_product(
-            Addresses, DependenciesRequest(empty_deps_field)
+            Addresses, Params(DependenciesRequest(empty_deps_field), create_options_bootstrapper())
         ) == Addresses([])
 
     def test_dependency_injection(self) -> None:
@@ -1148,7 +1154,9 @@ class TestDependencies(TestBase):
         def assert_injected(deps_cls: Type[Dependencies], *, injected: List[str]) -> None:
             provided_addr = Address.parse("//:provided")
             deps_field = deps_cls([provided_addr], address=Address.parse("//:target"))
-            result = self.request_single_product(Addresses, DependenciesRequest(deps_field))
+            result = self.request_single_product(
+                Addresses, Params(DependenciesRequest(deps_field), create_options_bootstrapper())
+            )
             assert result == Addresses(
                 sorted([provided_addr, *(Address.parse(addr) for addr in injected)])
             )
@@ -1174,7 +1182,13 @@ class TestDependencies(TestBase):
         self.add_to_build_file("demo", "smalltalk(sources=['*.st'], dependencies=['//:provided'])")
 
         deps_field = Dependencies([Address.parse("//:provided")], address=Address.parse("demo"))
-        result = self.request_single_product(Addresses, DependenciesRequest(deps_field))
+        result = self.request_single_product(
+            Addresses,
+            Params(
+                DependenciesRequest(deps_field),
+                create_options_bootstrapper(args=["--dependency-inference"]),
+            ),
+        )
         assert result == Addresses(
             sorted(
                 Address.parse(addr)

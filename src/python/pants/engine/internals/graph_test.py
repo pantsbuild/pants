@@ -5,6 +5,7 @@ from textwrap import dedent
 
 from pants.engine.addresses import Address, Addresses
 from pants.engine.rules import RootRule
+from pants.engine.selectors import Params
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
@@ -14,6 +15,7 @@ from pants.engine.target import (
     TransitiveTargets,
     WrappedTarget,
 )
+from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -57,17 +59,22 @@ class GraphTest(TestBase):
             ),
         )
 
-        direct_deps = self.request_single_product(Targets, DependenciesRequest(root[Dependencies]))
+        direct_deps = self.request_single_product(
+            Targets, Params(DependenciesRequest(root[Dependencies]), create_options_bootstrapper())
+        )
         assert direct_deps == Targets([d1, d2, d3])
 
-        transitive_target = self.request_single_product(TransitiveTarget, WrappedTarget(root))
+        transitive_target = self.request_single_product(
+            TransitiveTarget, Params(WrappedTarget(root), create_options_bootstrapper())
+        )
         assert transitive_target.root == root
         assert {
             dep_transitive_target.root for dep_transitive_target in transitive_target.dependencies
         } == {d1, d2, d3}
 
         transitive_targets = self.request_single_product(
-            TransitiveTargets, Addresses([root.address, d2.address])
+            TransitiveTargets,
+            Params(Addresses([root.address, d2.address]), create_options_bootstrapper()),
         )
         assert transitive_targets.roots == (root, d2)
         assert transitive_targets.closure == FrozenOrderedSet([root, d2, d1, d3, t2, t1])
