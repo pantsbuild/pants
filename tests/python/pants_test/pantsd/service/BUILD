@@ -22,14 +22,3 @@ python_tests(
   ],
   tags = {"partially_type_checked"},
 )
-
-python_tests(
-  name = 'pailgun_service',
-  sources = ['test_pailgun_service.py'],
-  coverage = ['pants.pantsd.service.pailgun_service'],
-  dependencies = [
-    'tests/python/pants_test/pantsd:test_deps',
-    'src/python/pants/pantsd/service:pailgun_service'
-  ],
-  tags = {"partially_type_checked"},
-)

@@ -37,7 +37,7 @@ class PantsDaemonClient(PantsDaemonProcessManager):
                 # We're already launched.
                 return PantsDaemonClient.Handle(
                     self.await_pid(10),
-                    self.read_named_socket("pailgun", int),
+                    self.read_named_socket(self.NAILGUN_SOCKET_NAME, int),
                     self._metadata_base_dir,
                 )
 

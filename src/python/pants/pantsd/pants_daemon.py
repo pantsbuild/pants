@@ -6,7 +6,7 @@ import os
 import sys
 import threading
 from contextlib import contextmanager
-from typing import IO, Iterator
+from typing import IO, Any, Iterator
 
 from setproctitle import setproctitle as set_process_title
 
@@ -21,9 +21,9 @@ from pants.init.options_initializer import BuildConfigInitializer, OptionsInitia
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.pantsd.pants_daemon_core import PantsDaemonCore
 from pants.pantsd.process_manager import PantsDaemonProcessManager
 from pants.pantsd.service.fs_event_service import FSEventService
-from pants.pantsd.service.pailgun_service import PailgunService
 from pants.pantsd.service.pants_service import PantsServices
 from pants.pantsd.service.scheduler_service import SchedulerService
 from pants.pantsd.service.store_gc_service import StoreGCService
@@ -117,6 +117,7 @@ class PantsDaemon(PantsDaemonProcessManager):
         legacy_graph_scheduler = EngineInitializer.setup_legacy_graph(
             native, options_bootstrapper, build_config
         )
+
         # TODO: https://github.com/pantsbuild/pants/issues/3479
         watchman_launcher = WatchmanLauncher.create(bootstrap_options_values)
         watchman_launcher.maybe_launch()
@@ -130,12 +131,19 @@ class PantsDaemon(PantsDaemonProcessManager):
             union_membership=UnionMembership(build_config.union_rules()),
         )
 
+        core = PantsDaemonCore(legacy_graph_scheduler, services)
+
+        server = native.new_nailgun_server(
+            bootstrap_options_values.pantsd_pailgun_port, DaemonPantsRunner(core),
+        )
+
         return PantsDaemon(
             native=native,
             build_root=build_root,
             work_dir=bootstrap_options_values.pants_workdir,
             log_level=bootstrap_options_values.level,
-            services=services,
+            server=server,
+            core=core,
             metadata_base_dir=bootstrap_options_values.pants_subprocessdir,
             bootstrap_options=bootstrap_options,
         )
@@ -175,26 +183,14 @@ class PantsDaemon(PantsDaemonProcessManager):
             max_memory_usage_in_bytes=bootstrap_options.pantsd_max_memory_usage,
         )
 
-        pailgun_service = PailgunService(
-            bootstrap_options.pantsd_pailgun_port,
-            DaemonPantsRunner(scheduler_service),
-            scheduler_service,
-        )
-
         store_gc_service = StoreGCService(legacy_graph_scheduler.scheduler)
 
         return PantsServices(
             services=tuple(
                 service
-                for service in (
-                    fs_event_service,
-                    scheduler_service,
-                    pailgun_service,
-                    store_gc_service,
-                )
+                for service in (fs_event_service, scheduler_service, store_gc_service,)
                 if service is not None
             ),
-            port_map=dict(pailgun=pailgun_service.pailgun_port()),
         )
 
     def __init__(
@@ -203,7 +199,8 @@ class PantsDaemon(PantsDaemonProcessManager):
         build_root: str,
         work_dir: str,
         log_level: LogLevel,
-        services: PantsServices,
+        server: Any,
+        core: PantsDaemonCore,
         metadata_base_dir: str,
         bootstrap_options: Options,
     ):
@@ -214,7 +211,8 @@ class PantsDaemon(PantsDaemonProcessManager):
         :param build_root: The pants build root.
         :param work_dir: The pants work directory.
         :param log_level: The log level to use for daemon logging.
-        :param services: A registry of services to use in this run.
+        :param server: A native PyNailgunServer instance (not currently a nameable type).
+        :param core: A PantsDaemonCore.
         :param metadata_base_dir: The ProcessManager metadata base dir.
         :param bootstrap_options: The bootstrap options.
         """
@@ -223,7 +221,8 @@ class PantsDaemon(PantsDaemonProcessManager):
         self._build_root = build_root
         self._work_dir = work_dir
         self._log_level = log_level
-        self._services = services
+        self._server = server
+        self._core = core
         self._bootstrap_options = bootstrap_options
         self._log_show_rust_3rdparty = (
             bootstrap_options.for_global_scope().log_show_rust_3rdparty
@@ -241,7 +240,7 @@ class PantsDaemon(PantsDaemonProcessManager):
 
     def shutdown(self, service_thread_map):
         """Gracefully terminate all services and kill the main PantsDaemon loop."""
-        with self._services.lifecycle_lock:
+        with self._core._services.lifecycle_lock:
             for service, service_thread in service_thread_map.items():
                 self._logger.info(f"terminating pantsd service: {service}")
                 service.terminate()
@@ -328,7 +327,7 @@ class PantsDaemon(PantsDaemonProcessManager):
 
         for service in pants_services.services:
             self._logger.info(f"setting up service {service}")
-            service.setup(self._services)
+            service.setup(self._core._services)
 
         service_thread_map = {
             service: self._make_thread(service) for service in pants_services.services
@@ -361,10 +360,12 @@ class PantsDaemon(PantsDaemonProcessManager):
                     # Avoid excessive CPU utilization.
                     service_thread.join(self.JOIN_TIMEOUT_SECONDS)
 
-    def _write_named_sockets(self, socket_map):
-        """Write multiple named sockets using a socket mapping."""
-        for socket_name, socket_info in socket_map.items():
-            self.write_named_socket(socket_name, socket_info)
+    def _write_nailgun_port(self):
+        """Write the nailgun port to a well known file."""
+        self.write_named_socket(
+            self.NAILGUN_SOCKET_NAME,
+            self._native.nailgun_server_await_bound(self._server),
+        )
 
     def _initialize_pid(self):
         """Writes out our pid and metadata, and begin watching it for validity.
@@ -381,7 +382,9 @@ class PantsDaemon(PantsDaemonProcessManager):
         self.write_metadata_by_name(
             "pantsd", self.FINGERPRINT_KEY, ensure_text(self.options_fingerprint)
         )
-        scheduler_services = [s for s in self._services.services if isinstance(s, SchedulerService)]
+        scheduler_services = [
+            s for s in self._core._services.services if isinstance(s, SchedulerService)
+        ]
         for scheduler_service in scheduler_services:
             scheduler_service.begin_monitoring_memory_usage(pid)
 
@@ -440,11 +443,11 @@ class PantsDaemon(PantsDaemonProcessManager):
             # Set the process name in ps output to 'pantsd' vs './pants compile src/etc:: -ldebug'.
             set_process_title(f"pantsd [{self._build_root}]")
 
-            # Write service socket information to .pids.
-            self._write_named_sockets(self._services.port_map)
+            # Write the server's port to .pids.
+            self._write_nailgun_port()
 
             # Enter the main service runner loop.
-            self._run_services(self._services)
+            self._run_services(self._core._services)
 
 
 def launch():

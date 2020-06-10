@@ -20,7 +20,7 @@ from pants.init.logging import (
 )
 from pants.init.util import clean_global_runtime_state
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.pantsd.service.scheduler_service import SchedulerService
+from pants.pantsd.pants_daemon_core import PantsDaemonCore
 from pants.util.contextutil import argv_as, hermetic_environment_as, stdio_as
 
 logger = logging.getLogger(__name__)
@@ -33,9 +33,9 @@ class ExclusiveRequestTimeout(Exception):
 class DaemonPantsRunner(RawFdRunner):
     """A RawFdRunner (callable) that will be called for each client request to Pantsd."""
 
-    def __init__(self, scheduler_service: SchedulerService) -> None:
+    def __init__(self, core: PantsDaemonCore) -> None:
         super().__init__()
-        self._scheduler_service = scheduler_service
+        self._core = core
         self._run_lock = Lock()
 
     @staticmethod
@@ -139,7 +139,7 @@ class DaemonPantsRunner(RawFdRunner):
         # Run using the pre-warmed Session.
         with self._stderr_logging(global_bootstrap_options):
             try:
-                scheduler = self._scheduler_service.prepare()
+                scheduler = self._core.prepare_scheduler()
                 runner = LocalPantsRunner.create(
                     os.environ, options_bootstrapper, scheduler=scheduler
                 )

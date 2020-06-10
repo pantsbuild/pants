@@ -702,6 +702,8 @@ class PantsDaemonProcessManager(FingerprintedProcessManager, metaclass=ABCMeta):
     metadata, and the server writes it.
     """
 
+    NAILGUN_SOCKET_NAME = "pailgun"
+
     def __init__(self, bootstrap_options: Options, daemon_entrypoint: str):
         super().__init__(
             name="pantsd",

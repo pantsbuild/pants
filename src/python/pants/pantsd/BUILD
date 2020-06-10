@@ -14,10 +14,20 @@ python_library(
 )
 
 python_library(
+  name = 'pants_daemon_core',
+  sources = ['pants_daemon_core.py'],
+  dependencies = [
+    'src/python/pants/init',
+  ],
+  tags = {'partially_type_checked'},
+)
+
+python_library(
   name = 'pants_daemon',
   sources = ['pants_daemon.py'],
   dependencies = [
     '3rdparty/python:setproctitle',
+    ':pants_daemon_core',
     ':process_manager',
     ':watchman_launcher',
     'src/python/pants/base:build_environment',
@@ -30,7 +40,6 @@ python_library(
     'src/python/pants/init',
     'src/python/pants/option',
     'src/python/pants/pantsd/service:fs_event_service',
-    'src/python/pants/pantsd/service:pailgun_service',
     'src/python/pants/pantsd/service:scheduler_service',
     'src/python/pants/pantsd/service:store_gc_service',
     'src/python/pants/util:contextutil',

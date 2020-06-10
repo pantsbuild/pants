@@ -22,15 +22,6 @@ python_library(
 )
 
 python_library(
-  name = 'pailgun_service',
-  sources = ['pailgun_service.py'],
-  dependencies = [
-    ':pants_service',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_library(
   name = 'scheduler_service',
   sources = ['scheduler_service.py'],
   dependencies = [

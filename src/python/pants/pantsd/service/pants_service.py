@@ -5,7 +5,7 @@ import threading
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Optional, Tuple
 
 from pants.util.meta import frozen_after_init
 
@@ -203,17 +203,12 @@ class PantsServices:
     """A registry of PantsServices instances."""
 
     services: Tuple[PantsService, ...]
-    port_map: Dict
     lifecycle_lock: Any
 
     def __init__(
-        self,
-        services: Optional[Tuple[PantsService, ...]] = None,
-        port_map: Optional[Dict] = None,
-        lifecycle_lock=None,
+        self, services: Optional[Tuple[PantsService, ...]] = None, lifecycle_lock=None,
     ) -> None:
         """
-        :param port_map: A dict of (port_name -> port_info) for named ports hosted by the services.
         :param lifecycle_lock: A lock to guard lifecycle changes for the services. This can be used by
                                individual services to safeguard daemon-synchronous sections that should
                                be protected from abrupt teardown. Notably, this lock is currently
@@ -222,5 +217,4 @@ class PantsServices:
                                a native function, rather than an actual type.
         """
         self.services = services or tuple()
-        self.port_map = port_map or dict()
         self.lifecycle_lock = lifecycle_lock or threading.RLock()
