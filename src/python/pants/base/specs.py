@@ -189,6 +189,7 @@ class DescendantAddresses(AddressSpec):
     """An AddressSpec representing all addresses located recursively under the given directory."""
 
     directory: str
+    error_if_no_matches: bool = True
 
     def to_spec_string(self) -> str:
         return f"{self.directory}::"
@@ -205,7 +206,12 @@ class DescendantAddresses(AddressSpec):
     def address_target_pairs_from_address_families(
         self, address_families: Sequence["AddressFamily"]
     ):
-        return self.all_address_target_pairs(address_families)
+        addr_tgt_pairs = self.all_address_target_pairs(address_families)
+        if self.error_if_no_matches and len(addr_tgt_pairs) == 0:
+            raise self.AddressResolutionError(
+                f"Address spec {repr(self.to_spec_string())} does not match any targets."
+            )
+        return addr_tgt_pairs
 
     def make_glob_patterns(self, address_mapper: "AddressMapper") -> List[str]:
         return [os.path.join(self.directory, "**", pat) for pat in address_mapper.build_patterns]
