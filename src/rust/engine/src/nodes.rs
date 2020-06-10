@@ -27,7 +27,7 @@ use fs::{
   PathGlobs, PathStat, PreparedPathGlobs, StrictGlobMatching, VFS,
 };
 use process_execution::{
-  self, MultiPlatformProcess, NamedCache, PlatformConstraint, Process, RelativePath,
+  self, CacheDest, CacheName, MultiPlatformProcess, PlatformConstraint, Process, RelativePath,
 };
 
 use graph::{Entry, Node, NodeError, NodeVisualizer};
@@ -256,9 +256,9 @@ impl MultiPlatformExecuteProcess {
 
     let description = externs::project_str(&value, "description");
 
-    let append_only_caches = externs::project_multi_strs(&value, "append_only_caches")
+    let append_only_caches = externs::project_tuple_encoded_map(&value, "append_only_caches")?
       .into_iter()
-      .map(NamedCache::new)
+      .map(|(name, dest)| Ok((CacheName::new(name)?, CacheDest::new(dest)?)))
       .collect::<Result<_, String>>()?;
 
     let jdk_home = {

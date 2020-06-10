@@ -2,8 +2,9 @@ use tempfile;
 use testutil;
 
 use crate::{
-  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, NamedCache,
-  NamedCaches, Platform, PlatformConstraint, Process, RelativePath,
+  CacheDest, CacheName, CommandRunner as CommandRunnerTrait, Context,
+  FallibleProcessResultWithPlatform, NamedCaches, Platform, PlatformConstraint, Process,
+  RelativePath,
 };
 use hashing::EMPTY_DIGEST;
 use spectral::{assert_that, string::StrAssertions};
@@ -309,15 +310,17 @@ async fn output_overlapping_file_and_dir() {
 #[tokio::test]
 async fn append_only_cache_created() {
   let name = "geo";
-  let named_cache = NamedCache::new(name.to_owned()).unwrap();
+  let dest = format!(".cache/{}", name);
+  let cache_name = CacheName::new(name.to_owned()).unwrap();
+  let cache_dest = CacheDest::new(dest.clone()).unwrap();
   let result = run_command_locally(
-    Process::new(vec!["/bin/ls".to_owned(), format!(".cache/{}", name)])
-      .append_only_caches(vec![named_cache].into_iter().collect()),
+    Process::new(vec!["/bin/ls".to_owned(), dest.clone()])
+      .append_only_caches(vec![(cache_name, cache_dest)].into_iter().collect()),
   )
   .await
   .unwrap();
 
-  assert_eq!(result.stdout_bytes, format!(".cache/{}\n", name).as_bytes());
+  assert_eq!(result.stdout_bytes, format!("{}\n", dest).as_bytes());
   assert_eq!(result.stderr_bytes, "".as_bytes());
   assert_eq!(result.original.exit_code, 0);
   assert_eq!(result.original.output_directory, EMPTY_DIGEST);
@@ -339,7 +342,7 @@ async fn jdk_symlink() {
     output_directories: BTreeSet::new(),
     timeout: one_second(),
     description: "cat roland".to_string(),
-    append_only_caches: BTreeSet::new(),
+    append_only_caches: BTreeMap::new(),
     jdk_home: Some(preserved_work_tmpdir.path().to_path_buf()),
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
@@ -476,7 +479,7 @@ async fn timeout() {
     output_directories: BTreeSet::new(),
     timeout: Some(Duration::from_millis(100)),
     description: "sleepy-cat".to_string(),
-    append_only_caches: BTreeSet::new(),
+    append_only_caches: BTreeMap::new(),
     jdk_home: None,
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
@@ -522,7 +525,7 @@ async fn working_directory() {
       output_directories: BTreeSet::new(),
       timeout: one_second(),
       description: "confused-cat".to_string(),
-      append_only_caches: BTreeSet::new(),
+      append_only_caches: BTreeMap::new(),
       jdk_home: None,
       target_platform: PlatformConstraint::None,
       is_nailgunnable: false,
