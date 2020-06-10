@@ -81,7 +81,7 @@ impl StoreFileByDigest<Failure> for Context {
 ///
 #[async_trait]
 pub trait WrappedNode: Into<NodeKey> {
-  type Item: TryFrom<NodeOutput>;
+  type Item;
 
   async fn run_wrapped_node(self, context: Context) -> NodeResult<Self::Item>;
 }
@@ -1180,61 +1180,6 @@ impl TryFrom<NodeOutput> for Value {
   fn try_from(nr: NodeOutput) -> Result<Self, ()> {
     match nr {
       NodeOutput::Value(v) => Ok(v),
-      _ => Err(()),
-    }
-  }
-}
-
-impl TryFrom<NodeOutput> for Arc<store::Snapshot> {
-  type Error = ();
-
-  fn try_from(nr: NodeOutput) -> Result<Self, ()> {
-    match nr {
-      NodeOutput::Snapshot(v) => Ok(v),
-      _ => Err(()),
-    }
-  }
-}
-
-impl TryFrom<NodeOutput> for hashing::Digest {
-  type Error = ();
-
-  fn try_from(nr: NodeOutput) -> Result<Self, ()> {
-    match nr {
-      NodeOutput::Digest(v) => Ok(v),
-      _ => Err(()),
-    }
-  }
-}
-
-impl TryFrom<NodeOutput> for ProcessResult {
-  type Error = ();
-
-  fn try_from(nr: NodeOutput) -> Result<Self, ()> {
-    match nr {
-      NodeOutput::ProcessResult(v) => Ok(*v),
-      _ => Err(()),
-    }
-  }
-}
-
-impl TryFrom<NodeOutput> for LinkDest {
-  type Error = ();
-
-  fn try_from(nr: NodeOutput) -> Result<Self, ()> {
-    match nr {
-      NodeOutput::LinkDest(v) => Ok(v),
-      _ => Err(()),
-    }
-  }
-}
-
-impl TryFrom<NodeOutput> for Arc<DirectoryListing> {
-  type Error = ();
-
-  fn try_from(nr: NodeOutput) -> Result<Self, ()> {
-    match nr {
-      NodeOutput::DirectoryListing(v) => Ok(v),
       _ => Err(()),
     }
   }
