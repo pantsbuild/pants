@@ -1057,14 +1057,18 @@ impl Node for NodeKey {
 
       let mut result = match maybe_watch {
         Ok(()) => match self {
-          NodeKey::DigestFile(n) => n.run(context).map_ok(NodeOutput::from).await,
-          NodeKey::DownloadedFile(n) => n.run(context).map_ok(NodeOutput::from).await,
-          NodeKey::MultiPlatformExecuteProcess(n) => n.run(context).map_ok(NodeOutput::from).await,
-          NodeKey::ReadLink(n) => n.run(context).map_ok(NodeOutput::from).await,
-          NodeKey::Scandir(n) => n.run(context).map_ok(NodeOutput::from).await,
-          NodeKey::Select(n) => n.run(context).map_ok(NodeOutput::from).await,
-          NodeKey::Snapshot(n) => n.run(context).map_ok(NodeOutput::from).await,
-          NodeKey::Task(n) => n.run(context).map_ok(NodeOutput::from).await,
+          NodeKey::DigestFile(n) => n.run(context).map_ok(NodeOutput::Digest).await,
+          NodeKey::DownloadedFile(n) => n.run(context).map_ok(NodeOutput::Snapshot).await,
+          NodeKey::MultiPlatformExecuteProcess(n) => {
+            n.run(context)
+              .map_ok(|r| NodeOutput::ProcessResult(Box::new(r)))
+              .await
+          }
+          NodeKey::ReadLink(n) => n.run(context).map_ok(NodeOutput::LinkDest).await,
+          NodeKey::Scandir(n) => n.run(context).map_ok(NodeOutput::DirectoryListing).await,
+          NodeKey::Select(n) => n.run(context).map_ok(NodeOutput::Value).await,
+          NodeKey::Snapshot(n) => n.run(context).map_ok(NodeOutput::Snapshot).await,
+          NodeKey::Task(n) => n.run(context).map_ok(NodeOutput::Value).await,
         },
         Err(e) => Err(e),
       };
@@ -1148,42 +1152,6 @@ impl NodeOutput {
       }
       NodeOutput::DirectoryListing(_) | NodeOutput::LinkDest(_) | NodeOutput::Value(_) => vec![],
     }
-  }
-}
-
-impl From<Value> for NodeOutput {
-  fn from(v: Value) -> Self {
-    NodeOutput::Value(v)
-  }
-}
-
-impl From<Arc<store::Snapshot>> for NodeOutput {
-  fn from(v: Arc<store::Snapshot>) -> Self {
-    NodeOutput::Snapshot(v)
-  }
-}
-
-impl From<hashing::Digest> for NodeOutput {
-  fn from(v: hashing::Digest) -> Self {
-    NodeOutput::Digest(v)
-  }
-}
-
-impl From<ProcessResult> for NodeOutput {
-  fn from(v: ProcessResult) -> Self {
-    NodeOutput::ProcessResult(Box::new(v))
-  }
-}
-
-impl From<LinkDest> for NodeOutput {
-  fn from(v: LinkDest) -> Self {
-    NodeOutput::LinkDest(v)
-  }
-}
-
-impl From<Arc<DirectoryListing>> for NodeOutput {
-  fn from(v: Arc<DirectoryListing>) -> Self {
-    NodeOutput::DirectoryListing(v)
   }
 }
 
