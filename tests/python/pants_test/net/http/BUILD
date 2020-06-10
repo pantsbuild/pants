@@ -4,7 +4,6 @@
 python_tests(
   dependencies = [
     '3rdparty/python:requests',
-    '3rdparty/python:pyopenssl',
     'src/python/pants/net',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
