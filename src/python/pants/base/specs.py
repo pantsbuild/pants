@@ -205,12 +205,7 @@ class DescendantAddresses(AddressSpec):
     def address_target_pairs_from_address_families(
         self, address_families: Sequence["AddressFamily"]
     ):
-        addr_tgt_pairs = self.all_address_target_pairs(address_families)
-        if len(addr_tgt_pairs) == 0:
-            raise self.AddressResolutionError(
-                "AddressSpec {} does not match any targets.".format(self)
-            )
-        return addr_tgt_pairs
+        return self.all_address_target_pairs(address_families)
 
     def make_glob_patterns(self, address_mapper: "AddressMapper") -> List[str]:
         return [os.path.join(self.directory, "**", pat) for pat in address_mapper.build_patterns]
