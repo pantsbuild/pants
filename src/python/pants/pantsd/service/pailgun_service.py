@@ -4,7 +4,7 @@
 import logging
 import time
 
-from pants.engine.internals.native import RawFdRunner
+from pants.engine.internals.native import Native, RawFdRunner
 from pants.pantsd.service.pants_service import PantsService
 from pants.pantsd.service.scheduler_service import SchedulerService
 
@@ -30,10 +30,10 @@ class PailgunService(PantsService):
         self._server = self._setup_server(port_requested, runner)
 
     def _setup_server(self, port_requested, runner):
-        return self._scheduler.new_nailgun_server(port_requested, runner)
+        return Native().new_nailgun_server(port_requested, runner)
 
     def pailgun_port(self):
-        return self._scheduler.nailgun_server_await_bound(self._server)
+        return Native().nailgun_server_await_bound(self._server)
 
     def run(self):
         """Main service entrypoint.

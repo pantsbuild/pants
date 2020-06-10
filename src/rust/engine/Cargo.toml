@@ -114,7 +114,6 @@ lazy_static = "1"
 log = "0.4"
 logging = { path = "logging" }
 nailgun = { path = "nailgun" }
-num_cpus = "1"
 num_enum = "0.4"
 parking_lot = "0.6"
 process_execution = { path = "process_execution" }
