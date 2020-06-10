@@ -298,6 +298,7 @@ class Native(metaclass=SingletonMetaclass):
             execution_options.process_execution_use_local_cache,
             tuple((k, v) for (k, v) in execution_options.remote_execution_headers.items()),
             execution_options.remote_execution_enable_streaming,
+            execution_options.remote_execution_overall_deadline_secs,
             execution_options.process_execution_local_enable_nailgun,
         )
 
