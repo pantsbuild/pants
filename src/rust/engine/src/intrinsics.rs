@@ -2,7 +2,7 @@ use crate::context::Context;
 use crate::core::{throw, Value};
 use crate::externs;
 use crate::nodes::MultiPlatformExecuteProcess;
-use crate::nodes::{lift_digest, DownloadedFile, NodeResult, Snapshot};
+use crate::nodes::{lift_digest, DownloadedFile, NodeResult, Snapshot, WrappedNode};
 use crate::tasks::Intrinsic;
 use crate::types::Types;
 
@@ -130,7 +130,7 @@ fn multi_platform_process_request_to_process_result(
         str
       ))
     })?;
-    let result = context.get(process_request).await?.0;
+    let result = process_request.run_wrapped_node(context).await?.0;
 
     let maybe_stdout = store
       .load_file_bytes_with(result.stdout_digest, |bytes: &[u8]| bytes.to_owned())
@@ -268,11 +268,8 @@ fn url_to_fetch_to_snapshot(
 ) -> BoxFuture<'static, NodeResult<Value>> {
   let core = context.core.clone();
   async move {
-    let snapshot = context
-      .get(DownloadedFile(externs::acquire_key_for(
-        args.pop().unwrap(),
-      )?))
-      .await?;
+    let downloaded_file = DownloadedFile(externs::acquire_key_for(args.pop().unwrap())?);
+    let snapshot = downloaded_file.run_wrapped_node(context).await?;
     Ok(Snapshot::store_snapshot(&core, &snapshot).map_err(|err| throw(&err))?)
   }
   .boxed()
@@ -284,9 +281,8 @@ fn path_globs_to_snapshot(
 ) -> BoxFuture<'static, NodeResult<Value>> {
   let core = context.core.clone();
   async move {
-    let snapshot = context
-      .get(Snapshot(externs::acquire_key_for(args.pop().unwrap())?))
-      .await?;
+    let snapshot_node = Snapshot(externs::acquire_key_for(args.pop().unwrap())?);
+    let snapshot = snapshot_node.run_wrapped_node(context).await?;
     Ok(Snapshot::store_snapshot(&core, &snapshot).map_err(|err| throw(&err))?)
   }
   .boxed()

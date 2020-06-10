@@ -39,11 +39,14 @@ pub type NodeResult<T> = Result<T, Failure>;
 #[async_trait]
 impl VFS<Failure> for Context {
   async fn read_link(&self, link: &Link) -> Result<PathBuf, Failure> {
-    Ok(self.get(ReadLink(link.clone())).await?.0)
+    let read_link = ReadLink(link.clone());
+    let output = read_link.run_wrapped_node(self.clone()).await?.0;
+    Ok(output)
   }
 
   async fn scandir(&self, dir: Dir) -> Result<Arc<DirectoryListing>, Failure> {
-    self.get(Scandir(dir)).await
+    let scandir = Scandir(dir);
+    scandir.run_wrapped_node(self.clone()).await
   }
 
   fn is_ignored(&self, stat: &fs::Stat) -> bool {
@@ -58,7 +61,8 @@ impl VFS<Failure> for Context {
 impl StoreFileByDigest<Failure> for Context {
   fn store_by_digest(&self, file: File) -> BoxFuture<hashing::Digest, Failure> {
     let context = self.clone();
-    async move { context.get(DigestFile(file)).await }
+    let digest_file = DigestFile(file);
+    async move { digest_file.run_wrapped_node(context).await }
       .boxed()
       .compat()
       .to_boxed()
@@ -153,14 +157,13 @@ impl WrappedNode for Select {
       &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Inner(ref inner)) => {
         match inner.rule() {
           &tasks::Rule::Task(ref task) => {
-            context
-              .get(Task {
-                params: self.params.clone(),
-                product: self.product,
-                task: task.clone(),
-                entry: Arc::new(self.entry.clone()),
-              })
-              .await
+            let task = Task {
+              params: self.params.clone(),
+              product: self.product,
+              task: task.clone(),
+              entry: Arc::new(self.entry.clone()),
+            };
+            task.run_wrapped_node(context).await
           }
           &Rule::Intrinsic(ref intrinsic) => {
             let intrinsic = intrinsic.clone();

@@ -2,16 +2,16 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::collections::{BTreeMap, HashSet};
-use std::convert::{Into, TryInto};
+use std::convert::Into;
 use std::future::Future;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::core::{Failure, TypeId};
+use crate::core::TypeId;
 use crate::intrinsics::Intrinsics;
-use crate::nodes::{NodeKey, WrappedNode};
+use crate::nodes::NodeKey;
 use crate::scheduler::Session;
 use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
@@ -357,22 +357,6 @@ impl Context {
       session,
       run_id,
     }
-  }
-
-  ///
-  /// Get the future value for the given Node implementation.
-  ///
-  pub async fn get<N: WrappedNode>(&self, node: N) -> Result<N::Item, Failure> {
-    let node_result = self
-      .core
-      .graph
-      .get(self.entry_id, self, node.into())
-      .await?;
-    Ok(
-      node_result
-        .try_into()
-        .unwrap_or_else(|_| panic!("A Node implementation was ambiguous.")),
-    )
   }
 }
 
