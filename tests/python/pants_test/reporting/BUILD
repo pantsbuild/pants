@@ -15,8 +15,7 @@ python_tests(
   name = 'reporting_integration',
   sources = ['test_reporting_integration.py'],
   dependencies = [
-    '3rdparty/python:parameterized',
-    '3rdparty/python:py-zipkin',
+    '3rdparty/python:psutil',
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil:int-test',
     'examples/src/java/org/pantsbuild/example:hello_directory',
