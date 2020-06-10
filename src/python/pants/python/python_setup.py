@@ -12,6 +12,7 @@ from pex.variables import Variables
 from pants.base.build_environment import get_buildroot
 from pants.option.custom_types import UnsetBool, file_option
 from pants.subsystem.subsystem import Subsystem
+from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_property
 
 logger = logging.getLogger(__name__)
@@ -115,6 +116,17 @@ class PythonSetup(Subsystem):
             fingerprint=True,
             help="The maximum number of concurrent jobs to resolve wheels with.",
         )
+        register(
+            "--thirdparty-modules-mapping",
+            type=dict,
+            advanced=True,
+            fromfile=True,
+            help=(
+                "A mapping of your third party requirements to a list of the modules they expose. "
+                "For example, {'ansicolors': ['colors']}. This is used for dependency inference so "
+                "that Pants can understand your import statements."
+            ),
+        )
 
     @property
     def interpreter_constraints(self) -> Tuple[str, ...]:
@@ -159,6 +171,15 @@ class PythonSetup(Subsystem):
     @property
     def resolver_jobs(self):
         return self.get_options().resolver_jobs
+
+    @memoized_property
+    def thirdparty_modules_mapping(self) -> FrozenDict[str, Tuple[str, ...]]:
+        return FrozenDict(
+            {
+                req: tuple(modules)
+                for req, modules in self.options.thirdparty_modules_mapping.items()
+            }
+        )
 
     @property
     def scratch_dir(self):
