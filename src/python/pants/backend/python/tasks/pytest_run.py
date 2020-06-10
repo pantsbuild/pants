@@ -137,7 +137,7 @@ class PytestRun(ChrootedTestRunnerTaskMixin, Task):
         register(
             "--coverage-reports",
             fingerprint=True,
-            choices=("xml", "html"),
+            choices=("xml", "html", "console"),
             type=list,
             member_type=str,
             default=("xml", "html"),
@@ -432,6 +432,8 @@ class PytestRun(ChrootedTestRunnerTaskMixin, Task):
                     else:
                         coverage_workdir = workdirs.coverage_path
                         coverage_reports = self.get_options().coverage_reports
+                        if "console" in coverage_reports:
+                            coverage_run("report", ["-i", "--rcfile", coverage_rc])
                         if "html" in coverage_reports:
                             coverage_run(
                                 "html", ["-i", "--rcfile", coverage_rc, "-d", coverage_workdir]
