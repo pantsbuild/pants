@@ -79,7 +79,7 @@ impl StoreFileByDigest<Failure> for Context {
 pub trait WrappedNode: Into<NodeKey> {
   type Item: TryFrom<NodeOutput>;
 
-  async fn run(self, context: Context) -> NodeResult<Self::Item>;
+  async fn run_wrapped_node(self, context: Context) -> NodeResult<Self::Item>;
 }
 
 ///
@@ -137,7 +137,7 @@ impl Select {
       })?;
     let context = context.clone();
     Select::new_from_edges(self.params.clone(), product, &edges)
-      .run(context)
+      .run_wrapped_node(context)
       .await
   }
 }
@@ -148,7 +148,7 @@ impl Select {
 impl WrappedNode for Select {
   type Item = Value;
 
-  async fn run(self, context: Context) -> NodeResult<Value> {
+  async fn run_wrapped_node(self, context: Context) -> NodeResult<Value> {
     match &self.entry {
       &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Inner(ref inner)) => {
         match inner.rule() {
@@ -334,7 +334,7 @@ impl From<MultiPlatformExecuteProcess> for NodeKey {
 impl WrappedNode for MultiPlatformExecuteProcess {
   type Item = ProcessResult;
 
-  async fn run(self, context: Context) -> NodeResult<ProcessResult> {
+  async fn run_wrapped_node(self, context: Context) -> NodeResult<ProcessResult> {
     let request = self.0;
     let execution_context = process_execution::Context::new(
       context.session.workunit_store(),
@@ -379,7 +379,7 @@ pub struct LinkDest(PathBuf);
 impl WrappedNode for ReadLink {
   type Item = LinkDest;
 
-  async fn run(self, context: Context) -> NodeResult<LinkDest> {
+  async fn run_wrapped_node(self, context: Context) -> NodeResult<LinkDest> {
     let node = self;
     let link_dest = context
       .core
@@ -407,7 +407,7 @@ pub struct DigestFile(pub File);
 impl WrappedNode for DigestFile {
   type Item = hashing::Digest;
 
-  async fn run(self, context: Context) -> NodeResult<hashing::Digest> {
+  async fn run_wrapped_node(self, context: Context) -> NodeResult<hashing::Digest> {
     let content = context
       .core
       .vfs
@@ -440,7 +440,7 @@ pub struct Scandir(Dir);
 impl WrappedNode for Scandir {
   type Item = Arc<DirectoryListing>;
 
-  async fn run(self, context: Context) -> NodeResult<Arc<DirectoryListing>> {
+  async fn run_wrapped_node(self, context: Context) -> NodeResult<Arc<DirectoryListing>> {
     let directory_listing = context
       .core
       .vfs
@@ -570,7 +570,7 @@ impl Snapshot {
 impl WrappedNode for Snapshot {
   type Item = Arc<store::Snapshot>;
 
-  async fn run(self, context: Context) -> NodeResult<Arc<store::Snapshot>> {
+  async fn run_wrapped_node(self, context: Context) -> NodeResult<Arc<store::Snapshot>> {
     let path_globs = Self::lift_path_globs(&externs::val_for(&self.0))
       .map_err(|e| throw(&format!("Failed to parse PathGlobs: {}", e)))?;
     let snapshot = Self::create(context, path_globs).await?;
@@ -702,7 +702,7 @@ impl DownloadedFile {
 impl WrappedNode for DownloadedFile {
   type Item = Arc<store::Snapshot>;
 
-  async fn run(self, context: Context) -> NodeResult<Arc<store::Snapshot>> {
+  async fn run_wrapped_node(self, context: Context) -> NodeResult<Arc<store::Snapshot>> {
     let value = externs::val_for(&self.0);
     let url_to_fetch = externs::project_str(&value, "url");
 
@@ -790,7 +790,7 @@ impl Task {
         async move {
           let entry = entry_res?;
           Select::new(params, get.product, entry)
-            .run(context.clone())
+            .run_wrapped_node(context.clone())
             .await
         }
       })
@@ -844,7 +844,7 @@ impl fmt::Debug for Task {
 impl WrappedNode for Task {
   type Item = Value;
 
-  async fn run(self, context: Context) -> NodeResult<Value> {
+  async fn run_wrapped_node(self, context: Context) -> NodeResult<Value> {
     let params = self.params;
     let deps = {
       let edges = &context
@@ -858,7 +858,7 @@ impl WrappedNode for Task {
           .clause
           .into_iter()
           .map(|type_id| {
-            Select::new_from_edges(params.clone(), type_id, edges).run(context.clone())
+            Select::new_from_edges(params.clone(), type_id, edges).run_wrapped_node(context.clone())
           })
           .collect::<Vec<_>>(),
       )
@@ -1057,18 +1057,34 @@ impl Node for NodeKey {
 
       let mut result = match maybe_watch {
         Ok(()) => match self {
-          NodeKey::DigestFile(n) => n.run(context).map_ok(NodeOutput::Digest).await,
-          NodeKey::DownloadedFile(n) => n.run(context).map_ok(NodeOutput::Snapshot).await,
+          NodeKey::DigestFile(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Digest).await,
+          NodeKey::DownloadedFile(n) => {
+            n.run_wrapped_node(context)
+              .map_ok(NodeOutput::Snapshot)
+              .await
+          }
           NodeKey::MultiPlatformExecuteProcess(n) => {
-            n.run(context)
+            n.run_wrapped_node(context)
               .map_ok(|r| NodeOutput::ProcessResult(Box::new(r)))
               .await
           }
-          NodeKey::ReadLink(n) => n.run(context).map_ok(NodeOutput::LinkDest).await,
-          NodeKey::Scandir(n) => n.run(context).map_ok(NodeOutput::DirectoryListing).await,
-          NodeKey::Select(n) => n.run(context).map_ok(NodeOutput::Value).await,
-          NodeKey::Snapshot(n) => n.run(context).map_ok(NodeOutput::Snapshot).await,
-          NodeKey::Task(n) => n.run(context).map_ok(NodeOutput::Value).await,
+          NodeKey::ReadLink(n) => {
+            n.run_wrapped_node(context)
+              .map_ok(NodeOutput::LinkDest)
+              .await
+          }
+          NodeKey::Scandir(n) => {
+            n.run_wrapped_node(context)
+              .map_ok(NodeOutput::DirectoryListing)
+              .await
+          }
+          NodeKey::Select(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Value).await,
+          NodeKey::Snapshot(n) => {
+            n.run_wrapped_node(context)
+              .map_ok(NodeOutput::Snapshot)
+              .await
+          }
+          NodeKey::Task(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Value).await,
         },
         Err(e) => Err(e),
       };
