@@ -3,13 +3,12 @@
 
 import os
 import shutil
-import unittest
 from abc import ABCMeta, abstractmethod
 from contextlib import contextmanager
 from pathlib import Path
 from textwrap import dedent
 
-from parameterized import parameterized
+import pytest
 from pex.interpreter import PythonInterpreter
 from pex.resolver import Unsatisfiable
 from pkg_resources import Requirement, WorkingSet
@@ -57,164 +56,167 @@ class WheelInstaller(Installer):
 
 INSTALLERS = [("sdist", SdistInstaller), ("whl", WheelInstaller)]
 
-
-class PluginResolverTest(unittest.TestCase):
-
-    DEFAULT_VERSION = "0.0.0"
-
-    @classmethod
-    def create_plugin(cls, distribution_repo_dir, plugin, version=None, packager_cls=None):
-        distribution_repo_dir = Path(distribution_repo_dir)
-
-        source_dir = distribution_repo_dir.joinpath(plugin)
-        source_dir.mkdir(parents=True)
-        source_dir.joinpath("setup.py").write_text(
-            dedent(
-                f"""
-                from setuptools import setup
+DEFAULT_VERSION = "0.0.0"
 
 
-                setup(name="{plugin}", version="{version or cls.DEFAULT_VERSION}")
-                """
-            )
+def create_plugin(distribution_repo_dir, plugin, version=None, packager_cls=None):
+    distribution_repo_dir = Path(distribution_repo_dir)
+    source_dir = distribution_repo_dir.joinpath(plugin)
+    source_dir.mkdir(parents=True)
+    source_dir.joinpath("setup.py").write_text(
+        dedent(
+            f"""
+            from setuptools import setup
+
+
+            setup(name="{plugin}", version="{version or DEFAULT_VERSION}")
+            """
         )
-        packager_cls = packager_cls or SdistInstaller
-        packager = packager_cls(source_dir=source_dir, install_dir=distribution_repo_dir)
-        packager.run()
+    )
+    packager_cls = packager_cls or SdistInstaller
+    packager = packager_cls(source_dir=source_dir, install_dir=distribution_repo_dir)
+    packager.run()
 
+
+@contextmanager
+def plugin_resolution(*, interpreter=None, chroot=None, plugins=None, packager_cls=None):
     @contextmanager
-    def plugin_resolution(self, *, interpreter=None, chroot=None, plugins=None, packager_cls=None):
-        @contextmanager
-        def provide_chroot(existing):
-            if existing:
-                yield existing, False
-            else:
-                with temporary_dir() as new_chroot:
-                    yield new_chroot, True
+    def provide_chroot(existing):
+        if existing:
+            yield existing, False
+        else:
+            with temporary_dir() as new_chroot:
+                yield new_chroot, True
 
-        with provide_chroot(chroot) as (root_dir, create_artifacts):
-            env = {}
-            repo_dir = None
-            if plugins:
-                repo_dir = os.path.join(root_dir, "repo")
-                env.update(
-                    PANTS_PYTHON_REPOS_REPOS=f"[{repo_dir!r}]",
-                    PANTS_PYTHON_REPOS_INDEXES="[]",
-                    PANTS_PYTHON_SETUP_RESOLVER_CACHE_TTL="1",
+    with provide_chroot(chroot) as (root_dir, create_artifacts):
+        env = {}
+        repo_dir = None
+        if plugins:
+            repo_dir = os.path.join(root_dir, "repo")
+            env.update(
+                PANTS_PYTHON_REPOS_REPOS=f"[{repo_dir!r}]",
+                PANTS_PYTHON_REPOS_INDEXES="[]",
+                PANTS_PYTHON_SETUP_RESOLVER_CACHE_TTL="1",
+            )
+            plugin_list = []
+            for plugin in plugins:
+                version = None
+                if isinstance(plugin, tuple):
+                    plugin, version = plugin
+                plugin_list.append(f"{plugin}=={version}" if version else plugin)
+                if create_artifacts:
+                    create_plugin(repo_dir, plugin, version, packager_cls=packager_cls)
+            env["PANTS_PLUGINS"] = f"[{','.join(map(repr, plugin_list))}]"
+            env["PANTS_PLUGIN_CACHE_DIR"] = os.path.join(root_dir, "plugin-cache")
+
+        configpath = os.path.join(root_dir, "pants.toml")
+        if create_artifacts:
+            touch(configpath)
+        args = [f"--pants-config-files=['{configpath}']"]
+
+        options_bootstrapper = OptionsBootstrapper.create(env=env, args=args)
+        plugin_resolver = PluginResolver(options_bootstrapper, interpreter=interpreter)
+        cache_dir = plugin_resolver.plugin_cache_dir
+
+        working_set = plugin_resolver.resolve(WorkingSet(entries=[]))
+        for dist in working_set:
+            assert Path(cache_dir) in Path(dist.location).parents
+
+        yield working_set, root_dir, repo_dir, cache_dir
+
+
+def test_no_plugins():
+    with plugin_resolution() as (working_set, _, _, _):
+        assert [] == list(working_set)
+
+
+@pytest.mark.parametrize("unused_test_name,packager_cls", INSTALLERS)
+def test_plugins(unused_test_name, packager_cls):
+    with plugin_resolution(plugins=[("jake", "1.2.3"), "jane"], packager_cls=packager_cls) as (
+        working_set,
+        _,
+        _,
+        cache_dir,
+    ):
+
+        def assert_dist_version(name, expected_version):
+            dist = working_set.find(req(name))
+            assert expected_version == dist.version
+
+        assert 2 == len(working_set.entries)
+
+        assert_dist_version(name="jake", expected_version="1.2.3")
+        assert_dist_version(name="jane", expected_version=DEFAULT_VERSION)
+
+
+@pytest.mark.parametrize("unused_test_name,packager_cls", INSTALLERS)
+def test_exact_requirements(unused_test_name, packager_cls):
+    with plugin_resolution(
+        plugins=[("jake", "1.2.3"), ("jane", "3.4.5")], packager_cls=packager_cls
+    ) as results:
+        working_set, chroot, repo_dir, cache_dir = results
+
+        # Kill the repo source dir and re-resolve.  If the PluginResolver truly detects exact
+        # requirements it should skip any resolves and load directly from the still in-tact cache.
+        safe_rmtree(repo_dir)
+
+        with plugin_resolution(
+            chroot=chroot, plugins=[("jake", "1.2.3"), ("jane", "3.4.5")]
+        ) as results2:
+
+            working_set2, _, _, _ = results2
+
+            assert list(working_set) == list(working_set2)
+
+
+@pytest.mark.parametrize("unused_test_name,packager_cls", INSTALLERS)
+@skip_unless_python36_and_python37_present
+def test_exact_requirements_interpreter_change(unused_test_name, packager_cls):
+    python36 = PythonInterpreter.from_binary(python_interpreter_path(PY_36))
+    python37 = PythonInterpreter.from_binary(python_interpreter_path(PY_37))
+
+    with plugin_resolution(
+        interpreter=python36,
+        plugins=[("jake", "1.2.3"), ("jane", "3.4.5")],
+        packager_cls=packager_cls,
+    ) as results:
+
+        working_set, chroot, repo_dir, cache_dir = results
+
+        safe_rmtree(repo_dir)
+        with pytest.raises(Unsatisfiable):
+            with plugin_resolution(
+                interpreter=python37, chroot=chroot, plugins=[("jake", "1.2.3"), ("jane", "3.4.5")],
+            ):
+                pytest.fail(
+                    "Plugin re-resolution is expected for an incompatible interpreter and it is "
+                    "expected to fail since we removed the dist `repo_dir` above."
                 )
-                plugin_list = []
-                for plugin in plugins:
-                    version = None
-                    if isinstance(plugin, tuple):
-                        plugin, version = plugin
-                    plugin_list.append(f"{plugin}=={version}" if version else plugin)
-                    if create_artifacts:
-                        self.create_plugin(repo_dir, plugin, version, packager_cls=packager_cls)
-                env["PANTS_PLUGINS"] = f"[{','.join(map(repr, plugin_list))}]"
-                env["PANTS_PLUGIN_CACHE_DIR"] = os.path.join(root_dir, "plugin-cache")
 
-            configpath = os.path.join(root_dir, "pants.toml")
-            if create_artifacts:
-                touch(configpath)
-            args = [f"--pants-config-files=['{configpath}']"]
+        # But for a compatible interpreter the exact resolve results should be re-used and load
+        # directly from the still in-tact cache.
+        with plugin_resolution(
+            interpreter=python36, chroot=chroot, plugins=[("jake", "1.2.3"), ("jane", "3.4.5")]
+        ) as results2:
 
-            options_bootstrapper = OptionsBootstrapper.create(env=env, args=args)
-            plugin_resolver = PluginResolver(options_bootstrapper, interpreter=interpreter)
-            cache_dir = plugin_resolver.plugin_cache_dir
+            working_set2, _, _, _ = results2
+            assert list(working_set) == list(working_set2)
 
-            working_set = plugin_resolver.resolve(WorkingSet(entries=[]))
-            for dist in working_set:
-                self.assertIn(Path(cache_dir), Path(dist.location).parents)
 
-            yield working_set, root_dir, repo_dir, cache_dir
+@pytest.mark.parametrize("unused_test_name,packager_cls", INSTALLERS)
+def test_inexact_requirements(unused_test_name, packager_cls):
+    with plugin_resolution(
+        plugins=[("jake", "1.2.3"), "jane"], packager_cls=packager_cls
+    ) as results:
 
-    def test_no_plugins(self):
-        with self.plugin_resolution() as (working_set, _, _, _):
-            self.assertEqual([], list(working_set))
+        working_set, chroot, repo_dir, cache_dir = results
 
-    @parameterized.expand(INSTALLERS)
-    def test_plugins(self, unused_test_name, packager_cls):
-        with self.plugin_resolution(
-            plugins=[("jake", "1.2.3"), "jane"], packager_cls=packager_cls
-        ) as (working_set, _, _, cache_dir):
+        # Kill the cache and the repo source dir and wait past our 1s test TTL, if the PluginResolver
+        # truly detects inexact plugin requirements it should skip perma-caching and fall through to
+        # a pex resolve and then fail.
+        safe_rmtree(repo_dir)
+        safe_rmtree(cache_dir)
 
-            def assert_dist_version(name, expected_version):
-                dist = working_set.find(req(name))
-                self.assertEqual(expected_version, dist.version)
-
-            self.assertEqual(2, len(working_set.entries))
-
-            assert_dist_version(name="jake", expected_version="1.2.3")
-            assert_dist_version(name="jane", expected_version=self.DEFAULT_VERSION)
-
-    @parameterized.expand(INSTALLERS)
-    def test_exact_requirements(self, unused_test_name, packager_cls):
-        with self.plugin_resolution(
-            plugins=[("jake", "1.2.3"), ("jane", "3.4.5")], packager_cls=packager_cls
-        ) as results:
-            working_set, chroot, repo_dir, cache_dir = results
-
-            # Kill the repo source dir and re-resolve.  If the PluginResolver truly detects exact
-            # requirements it should skip any resolves and load directly from the still in-tact cache.
-            safe_rmtree(repo_dir)
-
-            with self.plugin_resolution(
-                chroot=chroot, plugins=[("jake", "1.2.3"), ("jane", "3.4.5")]
-            ) as results2:
-
-                working_set2, _, _, _ = results2
-
-                self.assertEqual(list(working_set), list(working_set2))
-
-    @parameterized.expand(INSTALLERS)
-    @skip_unless_python36_and_python37_present
-    def test_exact_requirements_interpreter_change(self, unused_test_name, packager_cls):
-        python36 = PythonInterpreter.from_binary(python_interpreter_path(PY_36))
-        python37 = PythonInterpreter.from_binary(python_interpreter_path(PY_37))
-
-        with self.plugin_resolution(
-            interpreter=python36,
-            plugins=[("jake", "1.2.3"), ("jane", "3.4.5")],
-            packager_cls=packager_cls,
-        ) as results:
-
-            working_set, chroot, repo_dir, cache_dir = results
-
-            safe_rmtree(repo_dir)
-            with self.assertRaises(Unsatisfiable):
-                with self.plugin_resolution(
-                    interpreter=python37,
-                    chroot=chroot,
-                    plugins=[("jake", "1.2.3"), ("jane", "3.4.5")],
-                ):
-                    self.fail(
-                        "Plugin re-resolution is expected for an incompatible interpreter and it is "
-                        "expected to fail since we removed the dist `repo_dir` above."
-                    )
-
-            # But for a compatible interpreter the exact resolve results should be re-used and load
-            # directly from the still in-tact cache.
-            with self.plugin_resolution(
-                interpreter=python36, chroot=chroot, plugins=[("jake", "1.2.3"), ("jane", "3.4.5")]
-            ) as results2:
-
-                working_set2, _, _, _ = results2
-                self.assertEqual(list(working_set), list(working_set2))
-
-    @parameterized.expand(INSTALLERS)
-    def test_inexact_requirements(self, unused_test_name, packager_cls):
-        with self.plugin_resolution(
-            plugins=[("jake", "1.2.3"), "jane"], packager_cls=packager_cls
-        ) as results:
-
-            working_set, chroot, repo_dir, cache_dir = results
-
-            # Kill the cache and the repo source dir and wait past our 1s test TTL, if the PluginResolver
-            # truly detects inexact plugin requirements it should skip perma-caching and fall through to
-            # a pex resolve and then fail.
-            safe_rmtree(repo_dir)
-            safe_rmtree(cache_dir)
-
-            with self.assertRaises(Unsatisfiable):
-                with self.plugin_resolution(chroot=chroot, plugins=[("jake", "1.2.3"), "jane"]):
-                    self.fail("Should not reach here, should raise first.")
+        with pytest.raises(Unsatisfiable):
+            with plugin_resolution(chroot=chroot, plugins=[("jake", "1.2.3"), "jane"]):
+                pytest.fail("Should not reach here, should raise first.")
