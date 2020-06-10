@@ -6,6 +6,7 @@ from pathlib import PurePath
 
 from pants.backend.python.dependency_inference.import_parser import find_python_imports
 from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwners
+from pants.backend.python.dependency_inference.python_stdlib.combined import combined_stdlib
 from pants.backend.python.target_types import PythonSources
 from pants.core.util_rules.strip_source_roots import (
     SourceRootStrippedSources,
@@ -40,6 +41,7 @@ async def infer_python_dependencies(request: InferPythonDependencies) -> Inferre
         Get[PythonModuleOwners](PythonModule(imported_module))
         for file_imports in imports_per_file
         for imported_module in file_imports.all_imports
+        if imported_module not in combined_stdlib
     )
     # We conservatively only use dep inference if there is exactly one owner for an import.
     return InferredDependencies(

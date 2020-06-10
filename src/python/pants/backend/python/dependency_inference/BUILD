@@ -5,6 +5,7 @@ python_library(
   dependencies=[
     "3rdparty/python:dataclasses",
     "3rdparty/python:typed-ast",
+    "src/python/pants/backend/python/dependency_inference/python_stdlib",
     "src/python/pants/backend/python:target_types",
     "src/python/pants/base:specs",
     "src/python/pants/core/util_rules",
