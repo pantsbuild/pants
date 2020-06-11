@@ -345,7 +345,7 @@ class InlinedGraphTest(GraphTestBase):
         self.do_test_trace_message(
             scheduler,
             parsed_address,
-            f"(?ms)Dep graph contained a cycle:.*{cyclic_address_str}.* <-.*{cyclic_address_str}.* <-",
+            f"(?ms)Dependency graph contained a cycle:.*{cyclic_address_str}.* <-.*{cyclic_address_str}.* <-",
         )
 
     def test_cycle_self(self) -> None:

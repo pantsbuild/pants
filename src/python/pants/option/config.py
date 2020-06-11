@@ -574,6 +574,9 @@ class _EmptyConfig(Config):
     def get_source_for_option(self, section: str, option: str) -> None:
         return None
 
+    def __repr__(self) -> str:
+        return "EmptyConfig()"
+
 
 @dataclass(frozen=True, eq=False)
 class _SingleFileConfig(Config):
@@ -605,6 +608,9 @@ class _SingleFileConfig(Config):
         if self.has_option(section, option):
             return self.sources()[0]
         return None
+
+    def __repr__(self) -> str:
+        return f"SingleFileConfig({self.config_path})"
 
     def __eq__(self, other: Any) -> bool:
         if not isinstance(other, _SingleFileConfig):
@@ -669,6 +675,9 @@ class _ChainedConfig(Config):
             if cfg.has_option(section, option):
                 return cfg.get_source_for_option(section, option)
         return None
+
+    def __repr__(self) -> str:
+        return f"ChainedConfig({self.sources()})"
 
 
 @dataclass(frozen=True)
