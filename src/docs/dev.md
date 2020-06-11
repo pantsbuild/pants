@@ -24,7 +24,7 @@ how to get your change committed.
 + [[Pants Style Guide|https://pants.readme.io/docs/style-guide]]
 + Releasing Pants
     + [[Release Process|https://pants.readme.io/docs/release-process]]
-    + [[Release Strategy|https://pants.readme.io/docs/releases-strategy]]
+    + [[Release Strategy|https://pants.readme.io/docs/release-strategy]]
     + [[Deprecation Policy|https://pants.readme.io/docs/deprecation-policy]]
 + [[Updating the Docs|pants('src/docs:docs')]]
 + [[Pants Committers|https://pants.readme.io/docs/committers]]
