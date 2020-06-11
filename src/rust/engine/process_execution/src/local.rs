@@ -34,6 +34,8 @@ use crate::{
 
 use bytes::{Bytes, BytesMut};
 
+pub const USER_EXECUTABLE_MODE: u32 = 0o100755;
+
 #[derive(Clone)]
 pub struct CommandRunner {
   pub store: Store,
@@ -502,7 +504,7 @@ pub trait CapturedWorkdir {
         ::std::fs::OpenOptions::new()
           .create_new(true)
           .write(true)
-          .mode(0o755) // Executable for user, read-only for others.
+          .mode(USER_EXECUTABLE_MODE) // Executable for user, read-only for others.
           .open(&full_file_path)
           .map_err(|e| format!("{:?}", e))?
           .write_all(full_script.as_bytes())
