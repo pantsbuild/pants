@@ -8,11 +8,11 @@ from pkg_resources import Requirement
 
 
 class PythonRequirements:
-    """Translates a Pip requirements file into an equivalent set of `python_requirement_library`
+    """Translates a pip requirements file into an equivalent set of `python_requirement_library`
     targets.
 
     If the `requirements.txt` file has lines `foo>=3.14` and `bar>=2.7`,
-    then then will translate to:
+    then this will translate to:
 
       python_requirement_library(
         name="foo",
