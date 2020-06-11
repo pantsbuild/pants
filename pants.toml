@@ -351,7 +351,6 @@ restrict_push_urls = [
 verify_commit = false
 
 [python-setup]
-thirdparty_modules_mapping = "@3rdparty/python/thirdparty_modules_mapping.json"
 interpreter_cache_dir = "%(pants_bootstrapdir)s/python_cache/interpreters"
 resolver_cache_dir = "%(pants_bootstrapdir)s/python_cache/requirements"
 

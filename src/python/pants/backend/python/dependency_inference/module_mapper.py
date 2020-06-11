@@ -13,10 +13,9 @@ from pants.core.util_rules.strip_source_roots import (
 )
 from pants.engine.addresses import Address
 from pants.engine.collection import DeduplicatedCollection
-from pants.engine.rules import SubsystemRule, rule
+from pants.engine.rules import rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Targets
-from pants.python.python_setup import PythonSetup
 from pants.source.source_root import AllSourceRoots
 from pants.util.frozendict import FrozenDict
 
@@ -87,32 +86,21 @@ class ThirdPartyModuleToAddressMapping:
 
 
 @rule
-async def map_third_party_modules_to_addresses(
-    python_setup: PythonSetup,
-) -> ThirdPartyModuleToAddressMapping:
+async def map_third_party_modules_to_addresses() -> ThirdPartyModuleToAddressMapping:
     all_targets = await Get[Targets](AddressSpecs([DescendantAddresses("")]))
-    # NB: If >1 targets have the same distribution, we do not record the distribution. This is to
-    # avoid ambiguity.
-    requirements_to_addresses: Dict[str, Address] = {}
+    modules_to_addresses: Dict[str, Address] = {}
     for tgt in all_targets:
         if not tgt.has_field(PythonRequirementsField):
             continue
         for python_req in tgt[PythonRequirementsField].value:
-            req_name = python_req.project_name
-            if req_name in requirements_to_addresses:
-                requirements_to_addresses.pop(req_name)
-            else:
-                requirements_to_addresses[req_name] = tgt.address
-    return ThirdPartyModuleToAddressMapping(
-        FrozenDict(
-            {
-                module: requirements_to_addresses[requirement]
-                for requirement, modules in python_setup.thirdparty_modules_mapping.items()
-                for module in modules
-                if requirement in requirements_to_addresses
-            }
-        )
-    )
+            for module in python_req.modules:
+                # NB: If >1 targets have the same module, we do not record the module. This is to
+                # avoid ambiguity.
+                if module in modules_to_addresses:
+                    modules_to_addresses.pop(module)
+                else:
+                    modules_to_addresses[module] = tgt.address
+    return ThirdPartyModuleToAddressMapping(FrozenDict(modules_to_addresses))
 
 
 class PythonModuleOwners(DeduplicatedCollection[Address]):
@@ -149,8 +137,4 @@ async def map_python_module_to_targets(
 
 
 def rules():
-    return [
-        map_python_module_to_targets,
-        map_third_party_modules_to_addresses,
-        SubsystemRule(PythonSetup),
-    ]
+    return [map_python_module_to_targets, map_third_party_modules_to_addresses]

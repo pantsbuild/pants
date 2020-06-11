@@ -98,54 +98,45 @@ class ModuleMapperTest(TestBase):
         return [PythonLibrary, PythonRequirementLibrary]
 
     def test_map_third_party_modules_to_targets(self) -> None:
-        mapping = (
-            "{'ansicolors': ['colors'], 'req1': ['mod1', 'mod2'], 'unused_req': ['unused'], "
-            "'two_owners': ['two_owners']}"
-        )
-        options_bootstrapper = create_options_bootstrapper(
-            args=[f"--python-setup-thirdparty-modules-mapping={mapping}"]
-        )
         self.add_to_build_file(
             "3rdparty/python",
             dedent(
                 """\
                 python_requirement_library(
                   name='ansicolors',
-                  requirements=[python_requirement('ansicolors==1.21')],
+                  requirements=[python_requirement('ansicolors==1.21', modules=['colors'])],
                 )
 
                 python_requirement_library(
                   name='req1',
-                  requirements=[python_requirement('req1'), python_requirement('two_owners')],
+                  requirements=[
+                    python_requirement('req1'),
+                    python_requirement('two_owners'),
+                  ],
                 )
 
                 python_requirement_library(
-                  name='unknown_req',
+                  name='un_normalized',
                   requirements=[
-                    python_requirement('unknown_req>3'),
+                    python_requirement('Un-Normalized-Project>3'),
                     python_requirement('two_owners'),
                   ],
                 )
                 """
             ),
         )
-        result = self.request_single_product(
-            ThirdPartyModuleToAddressMapping, options_bootstrapper
-        ).mapping
-        assert result == FrozenDict(
+        result = self.request_single_product(ThirdPartyModuleToAddressMapping, Params())
+        assert result.mapping == FrozenDict(
             {
                 "colors": Address.parse("3rdparty/python:ansicolors"),
-                "mod1": Address.parse("3rdparty/python:req1"),
-                "mod2": Address.parse("3rdparty/python:req1"),
+                "req1": Address.parse("3rdparty/python:req1"),
+                "un_normalized_project": Address.parse("3rdparty/python:un_normalized"),
             }
         )
 
     def test_map_module_to_targets(self) -> None:
         options_bootstrapper = create_options_bootstrapper(
-            args=[
-                "--source-root-patterns=['source_root1', 'source_root2', '/']",
-                "--python-setup-thirdparty-modules-mapping={'ansicolors': ['colors']}",
-            ]
+            args=["--source-root-patterns=['source_root1', 'source_root2', '/']"]
         )
         # First check that we can map 3rd-party modules.
         self.add_to_build_file(
@@ -154,7 +145,7 @@ class ModuleMapperTest(TestBase):
                 """\
                 python_requirement_library(
                   name='ansicolors',
-                  requirements=[python_requirement('ansicolors==1.21')],
+                  requirements=[python_requirement('ansicolors==1.21', modules=['colors'])],
                 )
                 """
             ),

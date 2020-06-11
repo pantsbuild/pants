@@ -43,18 +43,15 @@ class PythonDependencyInferenceTest(TestBase):
 
     def test_infer_python_dependencies(self) -> None:
         options_bootstrapper = create_options_bootstrapper(
-            args=[
-                "--source-root-patterns=src/python",
-                "--python-setup-thirdparty-modules-mapping={'ansicolors': ['colors']}",
-            ]
+            args=["--source-root-patterns=src/python"]
         )
         self.add_to_build_file(
             "3rdparty/python",
             dedent(
                 """\
                 python_requirement_library(
-                  name='ansicolors',
-                  requirements=[python_requirement('ansicolors==1.21')],
+                  name='Django',
+                  requirements=[python_requirement('Django==1.21')],
                 )
                 """
             ),
@@ -70,7 +67,7 @@ class PythonDependencyInferenceTest(TestBase):
             "src/python/app.py",
             dedent(
                 """\
-                from colors import red
+                import django
 
                 from util.dep import Demo
                 from util import dep
@@ -95,5 +92,5 @@ class PythonDependencyInferenceTest(TestBase):
             Params(InferPythonDependencies(tgt[PythonSources]), options_bootstrapper),
         )
         assert result == InferredDependencies(
-            [Address.parse("3rdparty/python:ansicolors"), Address.parse("src/python/util")]
+            [Address.parse("3rdparty/python:Django"), Address.parse("src/python/util")]
         )

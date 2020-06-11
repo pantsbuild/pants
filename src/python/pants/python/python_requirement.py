@@ -1,6 +1,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from typing import Iterable, Optional, Tuple, Union
 
 from pkg_resources import Requirement
 
@@ -22,20 +23,41 @@ class PythonRequirement:
     To let other Targets depend on this `python_requirement`, put it in a
     `python_requirement_library`.
 
+    You may specify which modules the requirement provides through the `modules` parameter. If
+    unspecified, it will default to the name of the requirement, normalized to comply with Python
+    module names. This setting is important for Pants to know how to convert your import
+    statements back into your dependencies. For example:
+
+        python_requirement('ansicolors==1.0.0', modules=['colors'])
+        python_requirement('Django>2.0')  # Defaults to `modules=['django']`.
+
     :API: public
     """
 
     def __init__(
-        self, requirement: str, name=None, repository=None, use_2to3=False, compatibility=None
+        self,
+        requirement: Union[str, Requirement],
+        name=None,
+        repository=None,
+        use_2to3=False,
+        compatibility=None,
+        *,
+        modules: Optional[Iterable[str]] = None,
     ) -> None:
         # TODO(wickman) Allow PythonRequirements to be specified using pip-style vcs or url
         # identifiers, e.g. git+https or just http://...
-        self._requirement = Requirement.parse(requirement)
+        self._requirement = (
+            requirement if isinstance(requirement, Requirement) else Requirement.parse(requirement)
+        )
         self._repository = repository
         self._name = name or self._requirement.project_name
         self._use_2to3 = use_2to3
-        # TODO(wickman) Unify this with PythonTarget .compatibility
         self.compatibility = compatibility or [""]
+        self._modules = (
+            tuple(modules)
+            if modules
+            else (self._requirement.project_name.lower().replace("-", "_"),)
+        )
 
     def should_build(self, python, platform):
         """
@@ -56,6 +78,16 @@ class PythonRequirement:
         :API: public
         """
         return self._repository
+
+    @property
+    def modules(self) -> Tuple[str, ...]:
+        """The top-level modules that this requirement provides.
+
+        For example, `ansicolors` provides the `colors` module.
+
+        :API: public
+        """
+        return self._modules
 
     # duck-typing Requirement interface for Resolver, since Requirement cannot be
     # subclassed (curses!)
@@ -81,7 +113,7 @@ class PythonRequirement:
         return self._requirement.specs
 
     @property
-    def project_name(self):
+    def project_name(self) -> str:
         """
         :API: public
         """
@@ -104,4 +136,4 @@ class PythonRequirement:
         return str(self._requirement)
 
     def __repr__(self):
-        return "PythonRequirement({})".format(self._requirement)
+        return f"PythonRequirement({self._requirement})"
