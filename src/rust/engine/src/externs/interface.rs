@@ -192,10 +192,10 @@ py_module_initializer!(native_engine, |py, m| {
   )?;
   m.add(
     py,
-    "nailgun_server_await_bound",
+    "nailgun_server_await_shutdown",
     py_fn!(
       py,
-      nailgun_server_await_bound(a: PyExecutor, b: PyNailgunServer)
+      nailgun_server_await_shutdown(a: PyExecutor, b: PyNailgunServer)
     ),
   )?;
 
@@ -504,7 +504,15 @@ py_class!(class PySession |py| {
 });
 
 py_class!(class PyNailgunServer |py| {
-    data server: nailgun::Server;
+    data server: RefCell<Option<nailgun::Server>>;
+
+    def port(&self) -> CPyResult<u16> {
+        let borrowed_server = self.server(py).borrow();
+        let server = borrowed_server.as_ref().ok_or_else(|| {
+          PyErr::new::<exc::Exception, _>(py, ("Cannot get the port of a server that has already shut down.",))
+        })?;
+        Ok(server.port())
+    }
 });
 
 py_class!(class PyExecutionRequest |py| {
@@ -647,20 +655,23 @@ fn nailgun_server_create(
     let server = executor
       .block_on(server_future)
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
-    PyNailgunServer::create_instance(py, server)
+    PyNailgunServer::create_instance(py, RefCell::new(Some(server)))
   })
 }
 
-fn nailgun_server_await_bound(
+fn nailgun_server_await_shutdown(
   py: Python,
   executor_ptr: PyExecutor,
   nailgun_server_ptr: PyNailgunServer,
-) -> CPyResult<u16> {
+) -> PyUnitResult {
   with_executor(py, executor_ptr, |executor| {
     with_nailgun_server(py, nailgun_server_ptr, |nailgun_server| {
-      executor
-        .block_on(nailgun_server.await_bound())
-        .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))
+      if let Some(server) = nailgun_server.borrow_mut().take() {
+        executor
+          .block_on(server.shutdown())
+          .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
+      }
+      Ok(None)
     })
   })
 }
@@ -1716,7 +1727,7 @@ where
 ///
 fn with_nailgun_server<F, T>(py: Python, nailgun_server_ptr: PyNailgunServer, f: F) -> T
 where
-  F: FnOnce(&nailgun::Server) -> T,
+  F: FnOnce(&RefCell<Option<nailgun::Server>>) -> T,
 {
   let nailgun_server = nailgun_server_ptr.server(py);
   f(&nailgun_server)

@@ -189,13 +189,12 @@ class Native(metaclass=SingletonMetaclass):
     def match_path_globs(self, path_globs: PathGlobs, paths: Iterable[str]) -> bool:
         return cast(bool, self.lib.match_path_globs(path_globs, tuple(paths)))
 
-    def nailgun_server_await_bound(self, nailgun_server) -> int:
-        """Blocks until the server has bound a port, and then returns the port.
+    def nailgun_server_await_shutdown(self, nailgun_server) -> None:
+        """Blocks until the server has shut down.
 
-        Returns the actual port the server has successfully bound to, or raises an exception if the
-        server has exited.
+        Raises an exception if the server exited abnormally
         """
-        return cast(int, self.lib.nailgun_server_await_bound(self._executor, nailgun_server))
+        self.lib.nailgun_server_await_shutdown(self._executor, nailgun_server)
 
     def new_nailgun_server(self, port: int, runner: RawFdRunner):
         """Creates a nailgun server with a requested port.

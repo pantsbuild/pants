@@ -14,7 +14,8 @@ async fn spawn_and_bind() {
     .await
     .unwrap();
   // Should have bound a random port.
-  assert!(0 != server.await_bound().await.unwrap());
+  assert!(0 != server.port());
+  server.shutdown().await.unwrap();
 }
 
 #[tokio::test]
@@ -23,7 +24,6 @@ async fn accept() {
   let server = Server::new(Executor::new(Handle::current()), 0, move |_| exit_code)
     .await
     .unwrap();
-  let server_port = server.await_bound().await.unwrap();
 
   // And connect with a client. This Nail will ignore the content of the command, so we're
   // only validating the exit code.
@@ -35,11 +35,12 @@ async fn accept() {
   };
   let (stdio_write, _stdio_read) = child_channel::<ChildOutput>();
   let (_stdin_write, stdin_read) = child_channel::<ChildInput>();
-  let stream = TcpStream::connect(("127.0.0.1", server_port))
+  let stream = TcpStream::connect(("127.0.0.1", server.port()))
     .await
     .unwrap();
   let actual_exit_code = client_handle_connection(stream, cmd, stdio_write, stdin_read)
     .await
     .unwrap();
   assert_eq!(exit_code, actual_exit_code);
+  server.shutdown().await.unwrap();
 }
