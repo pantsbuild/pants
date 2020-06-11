@@ -259,5 +259,5 @@ class PantsServices:
         for service, service_thread in self._service_threads.items():
             service.terminate()
         for service, service_thread in self._service_threads.items():
-            logger.info(f"terminating pantsd service: {service}")
+            logger.debug(f"terminating pantsd service: {service}")
             service_thread.join(self.JOIN_TIMEOUT_SECONDS)

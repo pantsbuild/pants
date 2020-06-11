@@ -60,12 +60,12 @@ class PantsDaemonCore:
         bootstrap_options = options_bootstrapper.bootstrap_options
         bootstrap_options_values = bootstrap_options.for_global_scope()
 
-        # Compute the fingerprint of the given options. This only takes account of options marked
-        # `daemon=True`, which are the options consumed by the Scheduler.
-        #
-        # TODO: Rename the `daemon` kwarg to `scheduler`, or similar.
+        # Compute the fingerprint of the bootstrap options. Note that unlike
+        # PantsDaemonProcessManager (which fingerprints only `daemon=True` options), this
+        # fingerprints all fingerprintable options in the bootstrap options, which are
+        # all used to construct a Scheduler.
         options_fingerprint = OptionsFingerprinter.combined_options_fingerprint_for_scope(
-            GLOBAL_SCOPE, bootstrap_options, fingerprint_key="daemon", invert=True
+            GLOBAL_SCOPE, bootstrap_options, invert=True,
         )
 
         with self._lifecycle_lock:

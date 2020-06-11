@@ -710,12 +710,12 @@ class PantsDaemonProcessManager(FingerprintedProcessManager, metaclass=ABCMeta):
         known as the "micro-bootstrap" options. These options are marked `daemon=True` in the global
         options.
 
-        The `daemon=True` options are a much smaller than the `scheduler=True` options, which are
-        used by the PantsDaemonCore class to identify when Scheduler needs need to be
-        re-initialized.
+        The `daemon=True` options are a small subset of the bootstrap options. Independently, the
+        PantsDaemonCore fingerprints the entire set of bootstrap options to identify when the
+        Scheduler needs need to be re-initialized.
         """
         return OptionsFingerprinter.combined_options_fingerprint_for_scope(
-            GLOBAL_SCOPE, self._bootstrap_options, fingerprint_key="daemon", invert=True
+            GLOBAL_SCOPE, self._bootstrap_options, fingerprint_key="daemon"
         )
 
     def needs_restart(self, option_fingerprint):
