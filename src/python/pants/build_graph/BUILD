@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  sources=["*.py", "!address.py", "!bundle.py", "!*_test.py"],
+  sources=["*.py", "!address.py", "!bundle.py", "!bundle_mixin.py", "!*_test.py"],
   dependencies = [
     ':address',
     ':bundle',
@@ -24,9 +24,7 @@ python_library(
     'src/python/pants/source',
     'src/python/pants/source:payload_fields',
     'src/python/pants/subsystem',
-    # 'src/python/pants/task',  # dep cycle
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:fileutil',
     'src/python/pants/util:frozendict',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
@@ -58,6 +56,21 @@ python_library(
     'src/python/pants/util:collections',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
+  ],
+  tags = {"partially_type_checked"},
+)
+
+python_library(
+  name="bundle_mixin",
+  sources=["bundle_mixin.py"],
+  dependencies=[
+    ':build_graph',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/fs',
+    'src/python/pants/task',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:fileutil',
   ],
   tags = {"partially_type_checked"},
 )
