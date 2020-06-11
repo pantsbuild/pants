@@ -8,7 +8,6 @@ import psutil
 
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.internals.scheduler import ExecutionTimeoutError
-from pants.engine.unions import UnionMembership
 from pants.init.engine_initializer import LegacyGraphScheduler
 from pants.pantsd.service.fs_event_service import FSEventService
 from pants.pantsd.service.pants_service import PantsService
@@ -32,7 +31,7 @@ class SchedulerService(PantsService):
         legacy_graph_scheduler: LegacyGraphScheduler,
         build_root: str,
         invalidation_globs: List[str],
-        union_membership: UnionMembership,
+        max_memory_usage_pid: int,
         max_memory_usage_in_bytes: int,
     ) -> None:
         """
@@ -41,14 +40,14 @@ class SchedulerService(PantsService):
         :param build_root: The current build root.
         :param invalidation_globs: A list of `globs` that when encountered in filesystem event
                                    subscriptions will tear down the daemon.
-        :param max_memory_usage_in_bytes: The maximum memory usage of the process, which is
-                                          monitored after startup.
+        :param max_memory_usage_pid: A pid to monitor the memory usage of (generally our own!).
+        :param max_memory_usage_in_bytes: The maximum memory usage of the process: the service will
+                                          shut down if it observes more than this amount in use.
         """
         super().__init__()
         self._fs_event_service = fs_event_service
         self._graph_helper = legacy_graph_scheduler
         self._build_root = build_root
-        self._union_membership = union_membership
 
         self._scheduler = legacy_graph_scheduler.scheduler
         # This session is only used for checking whether any invalidation globs have been invalidated.
@@ -58,15 +57,14 @@ class SchedulerService(PantsService):
         )
         self._logger = logging.getLogger(__name__)
 
-        # NB: We declare these as a single field so that they can be changed atomically
-        # by add_invalidation_glob.
+        # NB: We declare these as a single field so that they can be changed atomically.
         self._invalidation_globs_and_snapshot: Tuple[Tuple[str, ...], Optional[Snapshot]] = (
             tuple(invalidation_globs),
             None,
         )
 
+        self._max_memory_usage_pid = max_memory_usage_pid
         self._max_memory_usage_in_bytes = max_memory_usage_in_bytes
-        self._monitored_pantsd_pid: Optional[int] = None
 
     def _get_snapshot(self, globs: Tuple[str, ...], poll: bool) -> Optional[Snapshot]:
         """Returns a Snapshot of the input globs.
@@ -85,44 +83,10 @@ class SchedulerService(PantsService):
                 return None
             raise
 
-    def setup(self, services):
-        """Service setup."""
-        super().setup(services)
-
-        # N.B. We compute the invalidating fileset eagerly at launch with an assumption that files
-        # that exist at startup are the only ones that can affect the running daemon.
-        globs, _ = self._invalidation_globs_and_snapshot
-        self._invalidation_globs_and_snapshot = (globs, self._get_snapshot(globs, poll=False))
-        self._logger.info("watching invalidation patterns: {}".format(globs))
-
-    def begin_monitoring_memory_usage(self, pantsd_pid: int):
-        """After pantsd has started, we monitor its memory usage relative to a configured value."""
-        self._monitored_pantsd_pid = pantsd_pid
-
-    def add_invalidation_glob(self, glob: str):
-        """Add an invalidation glob to monitoring after startup.
-
-        NB: This exists effectively entirely because pantsd needs to be fully started before writing
-        its pid file: all other globs should be passed via the constructor.
-        """
-        self._logger.info("adding invalidation pattern: {}".format(glob))
-
-        # Check one more time synchronously with our current set of globs.
-        self._check_invalidation_globs(poll=False)
-
-        # Synchronously invalidate the path on disk to prevent races with async invalidation, which
-        # might otherwise take time to notice that the file had been created.
-        self._scheduler.invalidate_files([glob])
-
-        # Swap out the globs and snapshot.
-        globs, _ = self._invalidation_globs_and_snapshot
-        globs = globs + (glob,)
-        self._invalidation_globs_and_snapshot = (globs, self._get_snapshot(globs, poll=False))
-
     def _check_invalidation_globs(self, poll: bool):
         """Check the digest of our invalidation Snapshot and exit if it has changed."""
         globs, invalidation_snapshot = self._invalidation_globs_and_snapshot
-        assert invalidation_snapshot is not None, "Service.setup was not called."
+        assert invalidation_snapshot is not None, "Should have been eagerly initialized in run."
 
         snapshot = self._get_snapshot(globs, poll=poll)
         if snapshot is None or snapshot.digest == invalidation_snapshot.digest:
@@ -142,14 +106,11 @@ class SchedulerService(PantsService):
         self.terminate()
 
     def _check_memory_usage(self):
-        if self._monitored_pantsd_pid is None:
-            return
-
         try:
-            memory_usage_in_bytes = psutil.Process(self._monitored_pantsd_pid).memory_info()[0]
+            memory_usage_in_bytes = psutil.Process(self._max_memory_usage_pid).memory_info()[0]
             if memory_usage_in_bytes > self._max_memory_usage_in_bytes:
                 raise Exception(
-                    f"pantsd process {self._monitored_pantsd_pid} was using "
+                    f"pantsd process {self._max_memory_usage_pid} was using "
                     f"{memory_usage_in_bytes} bytes of memory (above the limit of "
                     f"{self._max_memory_usage_in_bytes} bytes)."
                 )
@@ -168,6 +129,12 @@ class SchedulerService(PantsService):
 
     def run(self):
         """Main service entrypoint."""
+        # N.B. We compute the invalidating fileset eagerly at launch with an assumption that files
+        # that exist at startup are the only ones that can affect the running daemon.
+        globs, _ = self._invalidation_globs_and_snapshot
+        self._invalidation_globs_and_snapshot = (globs, self._get_snapshot(globs, poll=False))
+        self._logger.debug("watching invalidation patterns: {}".format(globs))
+
         while not self._state.is_terminating:
             self._state.maybe_pause()
             self._check_invalidation_watcher_liveness()

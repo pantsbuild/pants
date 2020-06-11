@@ -36,9 +36,7 @@ class PantsDaemonClient(PantsDaemonProcessManager):
             else:
                 # We're already launched.
                 return PantsDaemonClient.Handle(
-                    self.await_pid(10),
-                    self.read_named_socket(self.NAILGUN_SOCKET_NAME, int),
-                    self._metadata_base_dir,
+                    self.await_pid(10), self.await_socket(10), self._metadata_base_dir,
                 )
 
     def restart(self) -> "PantsDaemonClient.Handle":
@@ -55,8 +53,8 @@ class PantsDaemonClient(PantsDaemonProcessManager):
         self.terminate()
         self._logger.debug("launching pantsd")
         self.daemon_spawn()
-        # Wait up to 60 seconds for pantsd to write its pidfile.
+        # Wait up to 60 seconds each for pantsd to write its pidfile and open its socket.
         pantsd_pid = self.await_pid(60)
-        listening_port = self.read_named_socket("pailgun", int)
+        listening_port = self.await_socket(60)
         self._logger.debug(f"pantsd is running at pid {self.pid}, pailgun port is {listening_port}")
         return self.Handle(pantsd_pid, listening_port, self._metadata_base_dir)

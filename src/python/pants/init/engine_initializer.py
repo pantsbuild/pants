@@ -302,11 +302,10 @@ class EngineInitializer:
 
     @staticmethod
     def setup_legacy_graph(
-        native: Native,
-        options_bootstrapper: OptionsBootstrapper,
-        build_configuration: BuildConfiguration,
+        options_bootstrapper: OptionsBootstrapper, build_configuration: BuildConfiguration,
     ) -> LegacyGraphScheduler:
         """Construct and return the components necessary for LegacyBuildGraph construction."""
+        native = Native()
         build_root = get_buildroot()
         bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
         use_gitignore = bootstrap_options.pants_ignore_use_gitignore

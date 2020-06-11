@@ -139,7 +139,7 @@ class DaemonPantsRunner(RawFdRunner):
         # Run using the pre-warmed Session.
         with self._stderr_logging(global_bootstrap_options):
             try:
-                scheduler = self._core.prepare_scheduler()
+                scheduler = self._core.prepare_scheduler(options_bootstrapper)
                 runner = LocalPantsRunner.create(
                     os.environ, options_bootstrapper, scheduler=scheduler
                 )

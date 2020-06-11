@@ -83,7 +83,7 @@ class LocalPantsRunner:
         native = Native()
         native.set_panic_handler()
         graph_scheduler_helper = scheduler or EngineInitializer.setup_legacy_graph(
-            native, options_bootstrapper, build_config
+            options_bootstrapper, build_config
         )
 
         global_scope = options.for_global_scope()
