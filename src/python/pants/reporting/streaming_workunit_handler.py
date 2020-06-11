@@ -16,9 +16,13 @@ class StreamingWorkunitContext:
     _scheduler: SchedulerSession
 
     def digests_to_bytes(self, digests: List[Digest]) -> List[bytes]:
+        """Given a list of Digest objects, return a list of the bytes corresponding to each of those
+        Digests in sequence."""
         return self._scheduler.digests_to_bytes(digests)
 
     def ensure_remote_has_recursive(self, digests: List[Digest]) -> None:
+        """Invoke the internal ensure_remote_has_recursive function, which ensures that a remote
+        ByteStore, if it exists, has a copy of the files fingerprinted by each Digest."""
         return self._scheduler.ensure_remote_has_recursive(digests)
 
 
