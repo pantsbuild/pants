@@ -298,6 +298,11 @@ def open_zip(path_or_file: Union[str, Any], *args, **kwargs) -> Iterator[zipfile
         raise InvalidZipPath(f"Invalid zip location: {path_or_file}")
     if "allowZip64" not in kwargs:
         kwargs["allowZip64"] = True
+    # When using pants bundle and zinc incremental compilation, zip file may have a modification
+    # timestamp at 0. Zip doesn't allow timestamp < 1980, using strict_timestamp = False will
+    # force timestamp to 1980-01-01 if modification time is before 1980.
+    if "strict_timestamps" not in kwargs:
+        kwargs["strict_timestamps"] = False
     try:
         zf = zipfile.ZipFile(path_or_file, *args, **kwargs)
     except zipfile.BadZipfile as bze:
