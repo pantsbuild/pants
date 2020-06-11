@@ -522,11 +522,11 @@ class StreamingWorkunitProcessTests(TestBase):
     additional_options = ["--no-process-execution-use-local-cache"]
 
     def test_process_digests_on_workunits(self):
-        self._init_engine()  # need to call this so that self._scheduler is not None when we pass it to StreamingWorkunitHandler
+        scheduler = self.scheduler
 
         tracker = WorkunitTracker()
         handler = StreamingWorkunitHandler(
-            self._scheduler,
+            scheduler,
             callbacks=[tracker.add],
             report_interval_seconds=0.01,
             max_workunit_verbosity=LogLevel.INFO,
@@ -594,7 +594,7 @@ class StreamingWorkunitProcessTests(TestBase):
         assert byte_outputs[1] == result.stderr
 
     def test_context_object(self):
-        self._init_engine()  # need to call this so that self._scheduler is not None when we pass it to StreamingWorkunitHandler
+        scheduler = self.scheduler
 
         def callback(workunits, **kwargs) -> None:
             context = kwargs["context"]
@@ -607,7 +607,7 @@ class StreamingWorkunitProcessTests(TestBase):
                     assert output == [b"stdout output\n"]
 
         handler = StreamingWorkunitHandler(
-            self._scheduler,
+            scheduler,
             callbacks=[callback],
             report_interval_seconds=0.01,
             max_workunit_verbosity=LogLevel.INFO,
