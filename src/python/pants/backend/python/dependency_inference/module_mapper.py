@@ -3,7 +3,7 @@
 
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Dict, Optional
+from typing import Dict, Optional, Set
 
 from pants.backend.python.target_types import PythonRequirementsField, PythonSources
 from pants.base.specs import AddressSpecs, DescendantAddresses
@@ -57,15 +57,17 @@ async def map_first_party_modules_to_addresses() -> FirstPartyModuleToAddressMap
         for tgt in candidate_targets
     )
     modules_to_addresses: Dict[str, Address] = {}
+    modules_with_multiple_owners: Set[str] = set()
     for tgt, sources in zip(candidate_targets, sources_per_target):
         for f in sources.snapshot.files:
             module = PythonModule.create_from_stripped_path(PurePath(f)).module
-            # NB: If >1 targets have the same module, we do not record the module. This is to
-            # avoid ambiguity.
             if module in modules_to_addresses:
-                modules_to_addresses.pop(module)
+                modules_with_multiple_owners.add(module)
             else:
                 modules_to_addresses[module] = tgt.address
+    # Remove modules with ambiguous owners.
+    for module in modules_with_multiple_owners:
+        modules_to_addresses.pop(module)
     return FirstPartyModuleToAddressMapping(FrozenDict(sorted(modules_to_addresses.items())))
 
 
@@ -89,17 +91,19 @@ class ThirdPartyModuleToAddressMapping:
 async def map_third_party_modules_to_addresses() -> ThirdPartyModuleToAddressMapping:
     all_targets = await Get[Targets](AddressSpecs([DescendantAddresses("")]))
     modules_to_addresses: Dict[str, Address] = {}
+    modules_with_multiple_owners: Set[str] = set()
     for tgt in all_targets:
         if not tgt.has_field(PythonRequirementsField):
             continue
         for python_req in tgt[PythonRequirementsField].value:
             for module in python_req.modules:
-                # NB: If >1 targets have the same module, we do not record the module. This is to
-                # avoid ambiguity.
                 if module in modules_to_addresses:
-                    modules_to_addresses.pop(module)
+                    modules_with_multiple_owners.add(module)
                 else:
                     modules_to_addresses[module] = tgt.address
+    # Remove modules with ambiguous owners.
+    for module in modules_with_multiple_owners:
+        modules_to_addresses.pop(module)
     return ThirdPartyModuleToAddressMapping(FrozenDict(sorted(modules_to_addresses.items())))
 
 
