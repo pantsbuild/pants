@@ -12,7 +12,6 @@ from pants.core.util_rules.strip_source_roots import (
     StripSourcesFieldRequest,
 )
 from pants.engine.addresses import Address
-from pants.engine.collection import DeduplicatedCollection
 from pants.engine.rules import rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Targets
@@ -67,7 +66,7 @@ async def map_first_party_modules_to_addresses() -> FirstPartyModuleToAddressMap
                 modules_to_addresses.pop(module)
             else:
                 modules_to_addresses[module] = tgt.address
-    return FirstPartyModuleToAddressMapping(FrozenDict(modules_to_addresses))
+    return FirstPartyModuleToAddressMapping(FrozenDict(sorted(modules_to_addresses.items())))
 
 
 @dataclass(frozen=True)
@@ -101,33 +100,38 @@ async def map_third_party_modules_to_addresses() -> ThirdPartyModuleToAddressMap
                     modules_to_addresses.pop(module)
                 else:
                     modules_to_addresses[module] = tgt.address
-    return ThirdPartyModuleToAddressMapping(FrozenDict(modules_to_addresses))
+    return ThirdPartyModuleToAddressMapping(FrozenDict(sorted(modules_to_addresses.items())))
 
 
-class PythonModuleOwners(DeduplicatedCollection[Address]):
-    """The targets that own a Python module."""
+@dataclass(frozen=True)
+class PythonModuleOwner:
+    """The target that owns a Python module.
 
-    sort_input = True
+    If >1 target own the same module, the `address` field should be set to `None` to avoid
+    ambiguity.
+    """
+
+    address: Optional[Address]
 
 
 @rule
-async def map_module_to_addresses(
+async def map_module_to_address(
     module: PythonModule,
     first_party_mapping: FirstPartyModuleToAddressMapping,
     third_party_mapping: ThirdPartyModuleToAddressMapping,
-) -> PythonModuleOwners:
+) -> PythonModuleOwner:
     third_party_address = third_party_mapping.address_for_module(module.module)
     if third_party_address:
-        return PythonModuleOwners([third_party_address])
+        return PythonModuleOwner(third_party_address)
     first_party_address = first_party_mapping.address_for_module(module.module)
     if first_party_address:
-        return PythonModuleOwners([first_party_address])
-    return PythonModuleOwners()
+        return PythonModuleOwner(first_party_address)
+    return PythonModuleOwner(address=None)
 
 
 def rules():
     return [
         map_first_party_modules_to_addresses,
         map_third_party_modules_to_addresses,
-        map_module_to_addresses,
+        map_module_to_address,
     ]

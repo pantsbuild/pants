@@ -3,14 +3,14 @@
 
 from pathlib import PurePath
 from textwrap import dedent
-from typing import List
+from typing import Optional
 
 import pytest
 
 from pants.backend.python.dependency_inference.module_mapper import (
     FirstPartyModuleToAddressMapping,
     PythonModule,
-    PythonModuleOwners,
+    PythonModuleOwner,
     ThirdPartyModuleToAddressMapping,
 )
 from pants.backend.python.dependency_inference.module_mapper import rules as module_mapper_rules
@@ -151,17 +151,15 @@ class ModuleMapperTest(TestBase):
             }
         )
 
-    def test_map_module_to_addresses(self) -> None:
+    def test_map_module_to_address(self) -> None:
         options_bootstrapper = create_options_bootstrapper(
             args=["--source-root-patterns=['source_root1', 'source_root2', '/']"]
         )
 
-        def get_owner(module: str) -> List[Address]:
-            return list(
-                self.request_single_product(
-                    PythonModuleOwners, Params(PythonModule(module), options_bootstrapper)
-                )
-            )
+        def get_owner(module: str) -> Optional[Address]:
+            return self.request_single_product(
+                PythonModuleOwner, Params(PythonModule(module), options_bootstrapper)
+            ).address
 
         # First check that we can map 3rd-party modules.
         self.add_to_build_file(
@@ -175,24 +173,24 @@ class ModuleMapperTest(TestBase):
                 """
             ),
         )
-        assert get_owner("colors.red") == [Address.parse("3rdparty/python:ansicolors")]
+        assert get_owner("colors.red") == Address.parse("3rdparty/python:ansicolors")
 
         # Check a first party module using a module path.
         self.create_file("source_root1/project/app.py")
         self.add_to_build_file("source_root1/project", "python_library()")
-        assert get_owner("project.app") == [Address.parse("source_root1/project")]
+        assert get_owner("project.app") == Address.parse("source_root1/project")
 
         # Check a package path
         self.create_file("source_root2/project/subdir/__init__.py")
         self.add_to_build_file("source_root2/project/subdir", "python_library()")
-        assert get_owner("project.subdir") == [Address.parse("source_root2/project/subdir")]
+        assert get_owner("project.subdir") == Address.parse("source_root2/project/subdir")
 
         # Test a module with no owner (stdlib). This also sanity checks that we can handle when
         # there is no parent module.
-        assert not get_owner("typing")
+        assert get_owner("typing") is None
 
         # Test a module with a single owner with a top-level source root of ".". Also confirm we
         # can handle when the module includes a symbol (like a class name) at the end.
         self.create_file("script.py")
         self.add_to_build_file("", "python_library(name='script')")
-        assert get_owner("script.Demo") == [Address.parse("//:script")]
+        assert get_owner("script.Demo") == Address.parse("//:script")
