@@ -6,14 +6,20 @@ use futures::future::{FutureExt, TryFutureExt};
 use futures::stream::{BoxStream, StreamExt, TryStreamExt};
 use log::{debug, info};
 use nails::execution::{ChildOutput, ExitCode};
+use shell_quote::bash;
 
 use std::collections::{BTreeSet, HashSet};
 use std::ffi::OsStr;
 use std::fs::create_dir_all;
+use std::io::Write;
 use std::ops::Neg;
-use std::os::unix::{fs::symlink, process::ExitStatusExt};
+use std::os::unix::{
+  fs::{symlink, OpenOptionsExt},
+  process::ExitStatusExt,
+};
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
+use std::str;
 use std::sync::Arc;
 use store::{OneOffStoreFileByDigest, Snapshot, Store};
 
@@ -432,7 +438,7 @@ pub trait CapturedWorkdir {
       // Use no ignore patterns, because we are looking for explicitly listed paths.
       let posix_fs = Arc::new(
         fs::PosixFS::new(
-          workdir_path,
+          workdir_path.clone(),
           fs::GitignoreStyleExcludes::empty(),
           executor.clone(),
         )
@@ -452,9 +458,56 @@ pub trait CapturedWorkdir {
       .compat()
       .await?
     };
-    if let Some(workdir) = maybe_workdir {
-      // Dropping the temporary directory will likely involve a lot of IO: do it in the background.
-      let _background_cleanup = executor.spawn_blocking(|| std::mem::drop(workdir));
+
+    match maybe_workdir {
+      Some(workdir) => {
+        // Dropping the temporary directory will likely involve a lot of IO: do it in the
+        // background.
+        let _background_cleanup = executor.spawn_blocking(|| std::mem::drop(workdir));
+      }
+      None => {
+        // If we don't cleanup the workdir, we materialize a file named `__run.sh` into the output
+        // directory with command-line arguments and environment variables.
+        let mut env_var_strings: Vec<String> = vec![];
+        for (key, value) in req.env.iter() {
+          let quoted_arg = bash::escape(&value);
+          let arg_str = str::from_utf8(&quoted_arg)
+            .map_err(|e| format!("{:?}", e))?
+            .to_string();
+          let formatted_assignment = format!("{}={}", key, arg_str);
+          env_var_strings.push(formatted_assignment);
+        }
+
+        // Shell-quote every command-line argument, as necessary.
+        let mut full_command_line: Vec<String> = env_var_strings;
+        for arg in req.argv.iter() {
+          let quoted_arg = bash::escape(&arg);
+          let arg_str = str::from_utf8(&quoted_arg)
+            .map_err(|e| format!("{:?}", e))?
+            .to_string();
+          full_command_line.push(arg_str);
+        }
+
+        let stringified_command_line: String = full_command_line.join(" ");
+        let full_script = format!(
+          "#!/bin/bash
+# This command line should execute the same process as pants did internally.
+{}
+",
+          stringified_command_line,
+        );
+
+        let full_file_path = workdir_path.join("__run.sh");
+
+        ::std::fs::OpenOptions::new()
+          .create_new(true)
+          .write(true)
+          .mode(0o755) // Executable for user, read-only for others.
+          .open(&full_file_path)
+          .map_err(|e| format!("{:?}", e))?
+          .write_all(full_script.as_bytes())
+          .map_err(|e| format!("{:?}", e))?;
+      }
     }
 
     match child_results_result {
