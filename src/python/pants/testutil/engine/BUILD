@@ -26,6 +26,7 @@ python_library(
     'src/python/pants/engine:rules',
     'src/python/pants/engine:unions',
     'src/python/pants/option',
+    'src/python/pants/option:global_options',
     'src/python/pants/subsystem',
     'src/python/pants/util:objects',
   ],

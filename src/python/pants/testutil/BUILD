@@ -74,6 +74,8 @@ python_library(
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'src/python/pants/init',
+    'src/python/pants/option:global_options',
+    'src/python/pants/option:options_bootstrapper',
     'src/python/pants/source',
     'src/python/pants/subsystem',
     'src/python/pants/task',

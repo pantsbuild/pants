@@ -10,7 +10,7 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/engine:unions',
     'src/python/pants/goal',
-    'src/python/pants/option',
+    'src/python/pants/option:global_options',
     'src/python/pants/subsystem',
     'src/python/pants/util:memo',
   ],
