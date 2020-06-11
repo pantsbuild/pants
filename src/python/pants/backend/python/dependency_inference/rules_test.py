@@ -4,41 +4,59 @@
 from textwrap import dedent
 
 from pants.backend.project_info.list_roots import all_roots
-from pants.backend.python.dependency_inference.module_mapper import map_python_module_to_targets
+from pants.backend.python.dependency_inference.module_mapper import rules as module_mapper_rules
 from pants.backend.python.dependency_inference.rules import (
     InferPythonDependencies,
     infer_python_dependencies,
 )
-from pants.backend.python.target_types import PythonLibrary, PythonSources
+from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary, PythonSources
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.util_rules import strip_source_roots
 from pants.engine.addresses import Address
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.engine.target import InferredDependencies, WrappedTarget
+from pants.python.python_requirement import PythonRequirement
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
 
 class PythonDependencyInferenceTest(TestBase):
     @classmethod
+    def alias_groups(cls) -> BuildFileAliases:
+        return BuildFileAliases(objects={"python_requirement": PythonRequirement})
+
+    @classmethod
     def rules(cls):
         return (
             *super().rules(),
             *strip_source_roots.rules(),
             infer_python_dependencies,
-            map_python_module_to_targets,
+            *module_mapper_rules(),
             all_roots,
             RootRule(InferPythonDependencies),
         )
 
     @classmethod
     def target_types(cls):
-        return [PythonLibrary]
+        return [PythonLibrary, PythonRequirementLibrary]
 
-    def test_map_module_to_targets(self) -> None:
+    def test_infer_python_dependencies(self) -> None:
         options_bootstrapper = create_options_bootstrapper(
             args=["--source-root-patterns=src/python"]
         )
+        self.add_to_build_file(
+            "3rdparty/python",
+            dedent(
+                """\
+                python_requirement_library(
+                  name='Django',
+                  requirements=[python_requirement('Django==1.21')],
+                )
+                """
+            ),
+        )
+
         self.create_file("src/python/no_owner/f.py")
         self.add_to_build_file("src/python/no_owner", "python_library()")
 
@@ -49,6 +67,8 @@ class PythonDependencyInferenceTest(TestBase):
             "src/python/app.py",
             dedent(
                 """\
+                import django
+
                 from util.dep import Demo
                 from util import dep
                 """
@@ -71,4 +91,6 @@ class PythonDependencyInferenceTest(TestBase):
             InferredDependencies,
             Params(InferPythonDependencies(tgt[PythonSources]), options_bootstrapper),
         )
-        assert result == InferredDependencies([Address.parse("src/python/util")])
+        assert result == InferredDependencies(
+            [Address.parse("3rdparty/python:Django"), Address.parse("src/python/util")]
+        )

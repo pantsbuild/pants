@@ -3,10 +3,10 @@
 
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterator
+from typing import Dict, Iterator, Optional
 
-from pants.backend.python.target_types import PythonSources
-from pants.base.specs import AddressSpecs, AscendantAddresses
+from pants.backend.python.target_types import PythonRequirementsField, PythonSources
+from pants.base.specs import AddressSpecs, AscendantAddresses, DescendantAddresses
 from pants.core.util_rules.strip_source_roots import (
     SourceRootStrippedSources,
     StripSourcesFieldRequest,
@@ -17,6 +17,7 @@ from pants.engine.rules import rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Targets
 from pants.source.source_root import AllSourceRoots
+from pants.util.frozendict import FrozenDict
 
 
 @dataclass(frozen=True)
@@ -68,6 +69,40 @@ class PythonModule:
             yield parent / "__init__.py"
 
 
+@dataclass(frozen=True)
+class ThirdPartyModuleToAddressMapping:
+    mapping: FrozenDict[str, Address]
+
+    def address_for_module(self, module: str) -> Optional[Address]:
+        target = self.mapping.get(module)
+        if target is not None:
+            return target
+        # If the module is not found, try the parent module, if any. For example,
+        # pants.task.task.Task -> pants.task.task -> pants.task -> pants
+        if "." not in module:
+            return None
+        parent_module = module.rsplit(".", maxsplit=1)[0]
+        return self.address_for_module(parent_module)
+
+
+@rule
+async def map_third_party_modules_to_addresses() -> ThirdPartyModuleToAddressMapping:
+    all_targets = await Get[Targets](AddressSpecs([DescendantAddresses("")]))
+    modules_to_addresses: Dict[str, Address] = {}
+    for tgt in all_targets:
+        if not tgt.has_field(PythonRequirementsField):
+            continue
+        for python_req in tgt[PythonRequirementsField].value:
+            for module in python_req.modules:
+                # NB: If >1 targets have the same module, we do not record the module. This is to
+                # avoid ambiguity.
+                if module in modules_to_addresses:
+                    modules_to_addresses.pop(module)
+                else:
+                    modules_to_addresses[module] = tgt.address
+    return ThirdPartyModuleToAddressMapping(FrozenDict(modules_to_addresses))
+
+
 class PythonModuleOwners(DeduplicatedCollection[Address]):
     """The targets that own a Python module."""
 
@@ -76,8 +111,13 @@ class PythonModuleOwners(DeduplicatedCollection[Address]):
 
 @rule
 async def map_python_module_to_targets(
-    module: PythonModule, source_roots: AllSourceRoots
+    module: PythonModule,
+    source_roots: AllSourceRoots,
+    third_party_mapping: ThirdPartyModuleToAddressMapping,
 ) -> PythonModuleOwners:
+    third_party_address = third_party_mapping.address_for_module(module.module)
+    if third_party_address:
+        return PythonModuleOwners([third_party_address])
     unfiltered_candidate_targets = await Get[Targets](
         AddressSpecs(module.address_spec(source_root=src_root.path) for src_root in source_roots)
     )
@@ -97,4 +137,4 @@ async def map_python_module_to_targets(
 
 
 def rules():
-    return [map_python_module_to_targets]
+    return [map_python_module_to_targets, map_third_party_modules_to_addresses]
