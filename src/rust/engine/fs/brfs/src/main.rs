@@ -27,16 +27,18 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use futures::future::FutureExt;
-use hashing::{Digest, Fingerprint};
-use log::{debug, error, warn};
-use parking_lot::Mutex;
 use std::collections::hash_map::Entry::{Occupied, Vacant};
 use std::collections::HashMap;
+use std::convert::TryInto;
 use std::ffi::{OsStr, OsString};
 use std::path::Path;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::Arc;
+
+use futures::future::FutureExt;
+use hashing::{Digest, Fingerprint};
+use log::{debug, error, warn};
+use parking_lot::Mutex;
 use store::Store;
 use tokio::runtime::Handle;
 use tokio::signal::unix::{signal, SignalKind};
@@ -360,8 +362,7 @@ impl BuildResultFS {
               });
 
               for (digest, name, filetype, is_executable) in directories.chain(files) {
-                let child_digest_result: Result<Digest, String> = digest.into();
-                let child_digest = child_digest_result.map_err(|err| {
+                let child_digest = digest.try_into().map_err(|err| {
                   error!("Error parsing digest: {:?}", err);
                   libc::ENOENT
                 })?;
@@ -479,16 +480,14 @@ impl fuse::Filesystem for BuildResultFS {
             })
             .and_then(|node| match node {
               Node::Directory(directory_node) => {
-                let digest_result: Result<Digest, String> = directory_node.get_digest().into();
-                let digest = digest_result.map_err(|err| {
+                let digest = directory_node.get_digest().try_into().map_err(|err| {
                   error!("Error parsing digest: {:?}", err);
                   libc::ENOENT
                 })?;
                 self.dir_attr_for(digest)
               }
               Node::File(file_node) => {
-                let digest_result: Result<Digest, String> = file_node.get_digest().into();
-                let digest = digest_result.map_err(|err| {
+                let digest = file_node.get_digest().try_into().map_err(|err| {
                   error!("Error parsing digest: {:?}", err);
                   libc::ENOENT
                 })?;
