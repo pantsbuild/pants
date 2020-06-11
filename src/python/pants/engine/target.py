@@ -25,7 +25,7 @@ from typing import (
 from typing_extensions import final
 
 from pants.base.specs import OriginSpec
-from pants.build_graph.app_base import Bundle
+from pants.build_graph.bundle import Bundle
 from pants.engine.addresses import Address, Addresses, assert_single_address
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.fs import (

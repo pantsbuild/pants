@@ -62,7 +62,7 @@ python_library(
   dependencies=[
     '3rdparty/python:dataclasses',
     'src/python/pants/base:exceptions',
-    'src/python/pants/build_graph',
+    'src/python/pants/build_graph:address',
     'src/python/pants/util:frozendict',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',

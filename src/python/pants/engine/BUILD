@@ -43,7 +43,7 @@ python_library(
     ':collection',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:specs',
-    'src/python/pants/build_graph',
+    'src/python/pants/build_graph:address',
   ],
   tags = {"type_checked"},
 )
@@ -89,7 +89,7 @@ python_library(
     '3rdparty/python:dataclasses',
     ':collection',
     ':rules',
-    'src/python/pants/engine/internals:scheduler',
+    # 'src/python/pants/engine/internals:scheduler',  # dep cycle
     'src/python/pants/option',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:meta',
@@ -118,7 +118,7 @@ python_library(
     ':fs',
     ':rules',
     'src/python/pants/base:exception_sink',
-    'src/python/pants/engine/internals:scheduler',
+    # 'src/python/pants/engine/internals:scheduler',  # dep cycle
   ],
   tags = {"partially_type_checked"},
 )
@@ -188,7 +188,7 @@ python_library(
     ':unions',
     '3rdparty/python:typing-extensions',
     'src/python/pants/base:specs',
-    'src/python/pants/build_graph',
+    'src/python/pants/build_graph:bundle',
     'src/python/pants/option',
     'src/python/pants/source',
     'src/python/pants/util:collections',

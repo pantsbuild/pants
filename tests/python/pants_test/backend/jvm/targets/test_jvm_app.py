@@ -9,7 +9,8 @@ from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.parse_context import ParseContext
 from pants.build_graph.address import Address
-from pants.build_graph.app_base import Bundle, DirectoryReMapper
+from pants.build_graph.app_base import DirectoryReMapper
+from pants.build_graph.bundle import Bundle
 from pants.testutil.test_base import TestBase
 
 
