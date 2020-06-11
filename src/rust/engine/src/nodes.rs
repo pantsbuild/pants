@@ -1122,7 +1122,7 @@ impl NodeError for Failure {
       path[path_len - 1] += " <-"
     }
     throw(&format!(
-      "Dep graph contained a cycle:\n  {}",
+      "Dependency graph contained a cycle:\n  {}",
       path.join("\n  ")
     ))
   }
