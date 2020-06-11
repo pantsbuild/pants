@@ -3,9 +3,23 @@
 
 import threading
 from contextlib import contextmanager
-from typing import Any, Callable, Iterable, Iterator, Optional
+from dataclasses import dataclass
+from typing import Any, Callable, Iterable, Iterator, List, Optional
 
+from pants.engine.fs import Digest
+from pants.engine.internals.scheduler import SchedulerSession
 from pants.util.logging import LogLevel
+
+
+@dataclass(frozen=True)
+class StreamingWorkunitContext:
+    _scheduler: SchedulerSession
+
+    def digests_to_bytes(self, digests: List[Digest]) -> List[bytes]:
+        return self._scheduler.digests_to_bytes(digests)
+
+    def ensure_remote_has_recursive(self, digests: List[Digest]) -> None:
+        return self._scheduler.ensure_remote_has_recursive(digests)
 
 
 class StreamingWorkunitHandler:
@@ -48,6 +62,7 @@ class StreamingWorkunitHandler:
                 workunits=workunits["completed"],
                 started_workunits=workunits["started"],
                 finished=True,
+                context=StreamingWorkunitContext(_scheduler=self.scheduler),
             )
 
     @contextmanager
