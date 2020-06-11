@@ -598,7 +598,7 @@ class StreamingWorkunitProcessTests(TestBase):
 
         def callback(workunits, **kwargs) -> None:
             context = kwargs["context"]
-            assert type(context) == StreamingWorkunitContext
+            assert isinstance(context, StreamingWorkunitContext)
 
             for workunit in workunits:
                 if "artifacts" in workunit and "stdout_digest" in workunit["artifacts"]:
