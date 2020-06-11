@@ -3,18 +3,18 @@
 
 from pathlib import PurePath
 from textwrap import dedent
+from typing import List
 
 import pytest
 
-from pants.backend.project_info.list_roots import all_roots
 from pants.backend.python.dependency_inference.module_mapper import (
+    FirstPartyModuleToAddressMapping,
     PythonModule,
     PythonModuleOwners,
     ThirdPartyModuleToAddressMapping,
 )
 from pants.backend.python.dependency_inference.module_mapper import rules as module_mapper_rules
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
-from pants.base.specs import AscendantAddresses
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.util_rules import strip_source_roots
 from pants.engine.addresses import Address
@@ -42,26 +42,20 @@ def test_create_module_from_path(stripped_path: PurePath, expected: str) -> None
     assert PythonModule.create_from_stripped_path(stripped_path) == PythonModule(expected)
 
 
-def test_module_possible_paths() -> None:
-    assert set(PythonModule("typing").possible_stripped_paths()) == {
-        PurePath("typing.py"),
-        PurePath("typing") / "__init__.py",
-    }
-    assert set(PythonModule("typing.List").possible_stripped_paths()) == {
-        PurePath("typing") / "List.py",
-        PurePath("typing") / "List" / "__init__.py",
-        PurePath("typing.py"),
-        PurePath("typing") / "__init__.py",
-    }
-
-
-def test_module_address_spec() -> None:
-    assert PythonModule("helloworld.app").address_spec(source_root=".") == AscendantAddresses(
-        directory="helloworld/app"
+def test_first_party_modules_mapping() -> None:
+    util_addr = Address.parse("src/python/util:strutil")
+    test_addr = Address.parse("tests/python/project_test:test")
+    mapping = FirstPartyModuleToAddressMapping(
+        FrozenDict({"util.strutil": util_addr, "project_test.test": test_addr})
     )
-    assert PythonModule("helloworld.app").address_spec(
-        source_root="src/python"
-    ) == AscendantAddresses(directory="src/python/helloworld/app")
+    assert mapping.address_for_module("util.strutil") == util_addr
+    assert mapping.address_for_module("util.strutil.ensure_text") == util_addr
+    assert mapping.address_for_module("util") is None
+    assert mapping.address_for_module("project_test.test") == test_addr
+    assert mapping.address_for_module("project_test.test.TestDemo") == test_addr
+    assert mapping.address_for_module("project_test.test.TestDemo.method") is None
+    assert mapping.address_for_module("project_test") is None
+    assert mapping.address_for_module("project.test") is None
 
 
 def test_third_party_modules_mapping() -> None:
@@ -89,7 +83,6 @@ class ModuleMapperTest(TestBase):
             *super().rules(),
             *strip_source_roots.rules(),
             *module_mapper_rules(),
-            all_roots,
             RootRule(PythonModule),
         )
 
@@ -97,7 +90,31 @@ class ModuleMapperTest(TestBase):
     def target_types(cls):
         return [PythonLibrary, PythonRequirementLibrary]
 
-    def test_map_third_party_modules_to_targets(self) -> None:
+    def test_map_first_party_modules_to_addresses(self) -> None:
+        options_bootstrapper = create_options_bootstrapper(
+            args=["--source-root-patterns=['src/python', 'tests/python', 'build-support']"]
+        )
+        util_addr = Address.parse("src/python/project/util")
+        self.create_files("src/python/project/util", ["dirutil.py", "tarutil.py"])
+        self.add_to_build_file("src/python/project/util", "python_library()")
+        # A module with two owners should not be resolved.
+        self.create_file("src/python/two_owners.py")
+        self.add_to_build_file("src/python", "python_library()")
+        self.create_file("build-support/two_owners.py")
+        self.add_to_build_file("build-support", "python_library()")
+        # A package module
+        self.create_file("tests/python/project_test/demo_test/__init__.py")
+        self.add_to_build_file("tests/python/project_test/demo_test", "python_library()")
+        result = self.request_single_product(FirstPartyModuleToAddressMapping, options_bootstrapper)
+        assert result.mapping == FrozenDict(
+            {
+                "project.util.dirutil": util_addr,
+                "project.util.tarutil": util_addr,
+                "project_test.demo_test": Address.parse("tests/python/project_test/demo_test"),
+            }
+        )
+
+    def test_map_third_party_modules_to_addresses(self) -> None:
         self.add_to_build_file(
             "3rdparty/python",
             dedent(
@@ -134,10 +151,18 @@ class ModuleMapperTest(TestBase):
             }
         )
 
-    def test_map_module_to_targets(self) -> None:
+    def test_map_module_to_addresses(self) -> None:
         options_bootstrapper = create_options_bootstrapper(
             args=["--source-root-patterns=['source_root1', 'source_root2', '/']"]
         )
+
+        def get_owner(module: str) -> List[Address]:
+            return list(
+                self.request_single_product(
+                    PythonModuleOwners, Params(PythonModule(module), options_bootstrapper)
+                )
+            )
+
         # First check that we can map 3rd-party modules.
         self.add_to_build_file(
             "3rdparty/python",
@@ -150,36 +175,24 @@ class ModuleMapperTest(TestBase):
                 """
             ),
         )
-        result = self.request_single_product(
-            PythonModuleOwners, Params(PythonModule("colors.red"), options_bootstrapper)
-        )
-        assert result == PythonModuleOwners([Address.parse("3rdparty/python:ansicolors")])
+        assert get_owner("colors.red") == [Address.parse("3rdparty/python:ansicolors")]
 
-        # We set up the same module in two source roots to confirm we properly handle source roots.
-        # The first example uses a normal module path, whereas the second uses a package path.
+        # Check a first party module using a module path.
         self.create_file("source_root1/project/app.py")
         self.add_to_build_file("source_root1/project", "python_library()")
-        self.create_file("source_root2/project/app/__init__.py")
-        self.add_to_build_file("source_root2/project/app", "python_library()")
-        result = self.request_single_product(
-            PythonModuleOwners, Params(PythonModule("project.app"), options_bootstrapper)
-        )
-        assert result == PythonModuleOwners(
-            [Address.parse("source_root1/project"), Address.parse("source_root2/project/app")]
-        )
+        assert get_owner("project.app") == [Address.parse("source_root1/project")]
+
+        # Check a package path
+        self.create_file("source_root2/project/subdir/__init__.py")
+        self.add_to_build_file("source_root2/project/subdir", "python_library()")
+        assert get_owner("project.subdir") == [Address.parse("source_root2/project/subdir")]
 
         # Test a module with no owner (stdlib). This also sanity checks that we can handle when
         # there is no parent module.
-        result = self.request_single_product(
-            PythonModuleOwners, Params(PythonModule("typing"), options_bootstrapper)
-        )
-        assert not result
+        assert not get_owner("typing")
 
         # Test a module with a single owner with a top-level source root of ".". Also confirm we
         # can handle when the module includes a symbol (like a class name) at the end.
         self.create_file("script.py")
         self.add_to_build_file("", "python_library(name='script')")
-        result = self.request_single_product(
-            PythonModuleOwners, Params(PythonModule("script.Demo"), options_bootstrapper)
-        )
-        assert result == PythonModuleOwners([Address.parse("//:script")])
+        assert get_owner("script.Demo") == [Address.parse("//:script")]
