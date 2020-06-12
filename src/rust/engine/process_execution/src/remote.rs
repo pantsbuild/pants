@@ -897,6 +897,12 @@ pub fn make_execute_request(
       v => v,
     });
 
+  // Sort the environment variables. REv2 spec requires sorting by name for same reasons that
+  // platform properties are sorted, i.e. consistent hashing.
+  command
+    .mut_environment_variables()
+    .sort_by(|x, y| x.name.cmp(&y.name));
+
   let mut action = bazel_protos::remote_execution::Action::new();
   action.set_command_digest((&digest(&command)?).into());
   action.set_input_root_digest((&req.input_files).into());
