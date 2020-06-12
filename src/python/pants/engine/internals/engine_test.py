@@ -604,7 +604,7 @@ class StreamingWorkunitProcessTests(TestBase):
                 if "artifacts" in workunit and "stdout_digest" in workunit["artifacts"]:
                     digest = workunit["artifacts"]["stdout_digest"]
                     output = context.digests_to_bytes([digest])
-                    assert output == [b"stdout output\n"]
+                    assert output == (b"stdout output\n",)
 
         handler = StreamingWorkunitHandler(
             scheduler,
