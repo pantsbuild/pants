@@ -1,11 +1,10 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import itertools
 from pathlib import PurePath
 
 from pants.backend.python.dependency_inference.import_parser import find_python_imports
-from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwners
+from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwner
 from pants.backend.python.dependency_inference.python_stdlib.combined import combined_stdlib
 from pants.backend.python.target_types import PythonSources
 from pants.core.util_rules.strip_source_roots import (
@@ -37,19 +36,16 @@ async def infer_python_dependencies(request: InferPythonDependencies) -> Inferre
         find_python_imports(fc.content.decode(), module_name=module.module)
         for fc, module in zip(files_content, modules)
     )
-    owners_per_import = await MultiGet(
-        Get[PythonModuleOwners](PythonModule(imported_module))
+    owner_per_import = await MultiGet(
+        Get[PythonModuleOwner](PythonModule(imported_module))
         for file_imports in imports_per_file
         for imported_module in file_imports.all_imports
         if imported_module not in combined_stdlib
     )
-    # We conservatively only use dep inference if there is exactly one owner for an import.
     return InferredDependencies(
-        itertools.chain.from_iterable(
-            owners
-            for owners in owners_per_import
-            if len(owners) == 1 and tuple(owners)[0] != request.sources_field.address
-        )
+        owner.address
+        for owner in owner_per_import
+        if owner.address and owner.address != request.sources_field.address
     )
 
 
