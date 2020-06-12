@@ -14,7 +14,10 @@ from pants.engine.internals.scheduler_test_base import SchedulerTestBase
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
-from pants.reporting.streaming_workunit_handler import StreamingWorkunitHandler
+from pants.reporting.streaming_workunit_handler import (
+    StreamingWorkunitContext,
+    StreamingWorkunitHandler,
+)
 from pants.testutil.engine.util import (
     assert_equal_with_printing,
     fmt_rule,
@@ -519,11 +522,11 @@ class StreamingWorkunitProcessTests(TestBase):
     additional_options = ["--no-process-execution-use-local-cache"]
 
     def test_process_digests_on_workunits(self):
-        self._init_engine()  # need to call this so that self._scheduler is not None when we pass it to StreamingWorkunitHandler
+        scheduler = self.scheduler
 
         tracker = WorkunitTracker()
         handler = StreamingWorkunitHandler(
-            self._scheduler,
+            scheduler,
             callbacks=[tracker.add],
             report_interval_seconds=0.01,
             max_workunit_verbosity=LogLevel.INFO,
@@ -589,3 +592,30 @@ class StreamingWorkunitProcessTests(TestBase):
         byte_outputs = self._scheduler.digests_to_bytes([stdout_digest, stderr_digest])
         assert byte_outputs[0] == result.stdout
         assert byte_outputs[1] == result.stderr
+
+    def test_context_object(self):
+        scheduler = self.scheduler
+
+        def callback(workunits, **kwargs) -> None:
+            context = kwargs["context"]
+            assert isinstance(context, StreamingWorkunitContext)
+
+            for workunit in workunits:
+                if "artifacts" in workunit and "stdout_digest" in workunit["artifacts"]:
+                    digest = workunit["artifacts"]["stdout_digest"]
+                    output = context.digests_to_bytes([digest])
+                    assert output == (b"stdout output\n",)
+
+        handler = StreamingWorkunitHandler(
+            scheduler,
+            callbacks=[callback],
+            report_interval_seconds=0.01,
+            max_workunit_verbosity=LogLevel.INFO,
+        )
+
+        stdout_process = Process(
+            argv=("/bin/bash", "-c", "/bin/echo 'stdout output'"), description="Stdout process"
+        )
+
+        with handler.session():
+            self.request_single_product(ProcessResult, stdout_process)

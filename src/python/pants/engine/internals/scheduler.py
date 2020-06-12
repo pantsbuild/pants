@@ -578,15 +578,16 @@ class SchedulerSession:
             self._scheduler._scheduler, self._session, _DirectoryDigests(digests)
         )
 
-    def digests_to_bytes(self, digests: List[Digest]) -> List[bytes]:
+    def digests_to_bytes(self, digests: Sequence[Digest]) -> Tuple[bytes]:
         sched_pointer = self._scheduler._scheduler
         return cast(
-            List[bytes], self._scheduler._native.lib.digests_to_bytes(sched_pointer, digests)
+            Tuple[bytes],
+            tuple(self._scheduler._native.lib.digests_to_bytes(sched_pointer, list(digests))),
         )
 
-    def ensure_remote_has_recursive(self, digests: List[Digest]) -> None:
+    def ensure_remote_has_recursive(self, digests: Sequence[Digest]) -> None:
         sched_pointer = self._scheduler._scheduler
-        self._scheduler._native.lib.ensure_remote_has_recursive(sched_pointer, digests)
+        self._scheduler._native.lib.ensure_remote_has_recursive(sched_pointer, list(digests))
 
     def run_local_interactive_process(
         self, request: "InteractiveProcessRequest"
