@@ -5,6 +5,72 @@ This document describes releases leading up to the ``1.30.x`` ``stable`` series.
 
 See https://pants.readme.io/v1.30/docs/release-notes-1-30 for an overview of the changes in this release.
 
+1.30.0.dev1 (6/12/2020)
+-----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Change the default MyPy version from 0.770 to 0.780 (#10001)
+  `PR #10001 <https://github.com/pantsbuild/pants/pull/10001>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Add Python dependency inference for first-party imports (#10007)
+  `PR #10007 <https://github.com/pantsbuild/pants/pull/10007>`_
+
+* Add third party modules to Python dependency inference (#10025)
+  `PR #10025 <https://github.com/pantsbuild/pants/pull/10025>`_
+
+* Apply named caches to remote execution platform properties (#10009)
+  `PR #10009 <https://github.com/pantsbuild/pants/pull/10009>`_
+
+* remoting: add --remote-execution-overall-deadline-secs option (#10002)
+  `PR #10002 <https://github.com/pantsbuild/pants/pull/10002>`_
+
+* Add `--` style passthrough args to V2 `run` and `setup-py` goals (#9911)
+  `PR #9911 <https://github.com/pantsbuild/pants/pull/9911>`_
+
+* Add a configurable cap on total pantsd memory usage. (#10003)
+  `PR #10003 <https://github.com/pantsbuild/pants/pull/10003>`_
+
+Bugfixes
+~~~~~~~~
+
+* remoting: sort environment variables as per REv2 spec (#10038)
+  `PR #10038 <https://github.com/pantsbuild/pants/pull/10038>`_
+
+* Restore pytest coverage console report. (#10013)
+  `PR #10013 <https://github.com/pantsbuild/pants/pull/10013>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Improve performance of Python dependency inference (#10031)
+  `PR #10031 <https://github.com/pantsbuild/pants/pull/10031>`_
+
+* Use f-strings. (#10039)
+  `PR #10039 <https://github.com/pantsbuild/pants/pull/10039>`_
+
+* Fix pants.toml contents appearing in engine error messages (#10033)
+  `PR #10033 <https://github.com/pantsbuild/pants/pull/10033>`_
+
+* Tweak `DescendantAddresses` so that call sites can no-op when no matches (#10012)
+  `PR #10012 <https://github.com/pantsbuild/pants/pull/10012>`_
+
+* Remove `pyopenssl`, `parametrized`, and `wheel` dependencies (#10023)
+  `PR #10023 <https://github.com/pantsbuild/pants/pull/10023>`_
+
+* Skip stdlib imports with dependency inference (#10011)
+  `PR #10011 <https://github.com/pantsbuild/pants/pull/10011>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Fix release-strategy link (#10028)
+  `PR #10028 <https://github.com/pantsbuild/pants/pull/10028>`_
+
 1.30.0.dev0 (6/05/2020)
 -----------------------
 
