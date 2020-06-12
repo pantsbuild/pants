@@ -267,6 +267,9 @@ async fn make_execute_request_with_cache_key_gen_version() {
     env
   });
   want_command
+    .mut_environment_variables()
+    .sort_by(|x, y| x.name.cmp(&y.name));
+  want_command
     .mut_output_files()
     .push("other/file".to_owned());
   want_command
@@ -286,7 +289,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
   want_action.set_command_digest(
     (&Digest(
       Fingerprint::from_hex_string(
-        "c803d479ce49fc85fe5dfe55177594d9957713192b011459cbd3532982c388f5",
+        "0b560be42712036a85ae33f1570eb12918c0763515517fb9511008dd5615e9d7",
       )
       .unwrap(),
       136,
@@ -299,7 +302,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
   want_execute_request.set_action_digest(
     (&Digest(
       Fingerprint::from_hex_string(
-        "a56e51451c48a993ba7b0e5051f53618562f2b25be93e06171d819b9104cc96c",
+        "c07f61ace0d3aa8182f4f9248b15dc7ee0a873b5d1f74ac50b70e0c8cbda0122",
       )
       .unwrap(),
       141,
