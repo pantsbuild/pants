@@ -21,6 +21,14 @@ from pants.util.meta import decorated_type_checkable, frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 
+class CanModifyWorkunit:
+    """This is a marker class used to indicate that an `@rule` can modify its own workunit.
+
+    If a rule's return type is a subclass of CanModifyWorkunit, then the level of that workunit will
+    be set to the level of the attribute `_level`, if it exists.
+    """
+
+
 @decorated_type_checkable
 def side_effecting(cls):
     """Annotates a class to indicate that it is a side-effecting type, which needs to be handled

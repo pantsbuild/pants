@@ -20,7 +20,7 @@ from pants.engine.fs import (
 )
 from pants.engine.interactive_process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.internals.nodes import Return, Throw
-from pants.engine.rules import Rule, RuleIndex, TaskRule
+from pants.engine.rules import CanModifyWorkunit, Rule, RuleIndex, TaskRule
 from pants.engine.selectors import Params
 from pants.engine.unions import union
 from pants.option.global_options import ExecutionOptions
@@ -160,13 +160,14 @@ class Scheduler:
         return tasks
 
     def _register_task(
-        self, tasks, output_type, rule: TaskRule, union_rules: Dict[Type, OrderedSet[Type]]
+        self, tasks, output_type: Type, rule: TaskRule, union_rules: Dict[Type, OrderedSet[Type]]
     ) -> None:
         """Register the given TaskRule with the native scheduler."""
         self._native.lib.tasks_task_begin(
             tasks,
             rule.func,
             output_type,
+            issubclass(output_type, CanModifyWorkunit),
             rule.cacheable,
             rule.canonical_name,
             rule.desc or "",

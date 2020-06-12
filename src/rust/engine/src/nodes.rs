@@ -13,6 +13,7 @@ use std::{self, fmt};
 use async_trait::async_trait;
 use futures::future::{self, FutureExt, TryFutureExt};
 use futures::stream::StreamExt;
+use std::convert::TryInto;
 use url::Url;
 
 use crate::context::{Context, Core};
@@ -26,6 +27,7 @@ use fs::{
   self, Dir, DirectoryListing, File, FileContent, GlobExpansionConjunction, GlobMatching, Link,
   PathGlobs, PathStat, PreparedPathGlobs, StrictGlobMatching, VFS,
 };
+use logging::PythonLogLevel;
 use process_execution::{
   self, CacheDest, CacheName, MultiPlatformProcess, PlatformConstraint, Process, RelativePath,
 };
@@ -152,16 +154,15 @@ impl WrappedNode for Select {
     match &self.entry {
       &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Inner(ref inner)) => {
         match inner.rule() {
-          &tasks::Rule::Task(ref task) => {
-            context
-              .get(Task {
-                params: self.params.clone(),
-                product: self.product,
-                task: task.clone(),
-                entry: Arc::new(self.entry.clone()),
-              })
-              .await
-          }
+          &tasks::Rule::Task(ref task) => context
+            .get(Task {
+              params: self.params.clone(),
+              product: self.product,
+              task: task.clone(),
+              entry: Arc::new(self.entry.clone()),
+            })
+            .await
+            .map(|(v, _)| v),
           &Rule::Intrinsic(ref intrinsic) => {
             let intrinsic = intrinsic.clone();
             let values = future::try_join_all(
@@ -842,9 +843,9 @@ impl fmt::Debug for Task {
 
 #[async_trait]
 impl WrappedNode for Task {
-  type Item = Value;
+  type Item = (Value, Option<log::Level>);
 
-  async fn run_wrapped_node(self, context: Context) -> NodeResult<Value> {
+  async fn run_wrapped_node(self, context: Context) -> NodeResult<(Value, Option<log::Level>)> {
     let params = self.params;
     let deps = {
       let edges = &context
@@ -868,13 +869,27 @@ impl WrappedNode for Task {
     let func = self.task.func;
     let entry = self.entry;
     let product = self.product;
+    let can_modify_workunit = self.task.can_modify_workunit;
 
     let result_val = externs::call(&externs::val_for(&func.0), &deps)?;
     match externs::get_type_for(&result_val) {
-      t if t == context.core.types.coroutine => {
-        Self::generate(context, params, entry, result_val).await
+      t if t == context.core.types.coroutine => Self::generate(context, params, entry, result_val)
+        .await
+        .map(|v| (v, None)),
+      t if t == product => {
+        if !can_modify_workunit {
+          return Ok((result_val, None));
+        }
+        let new_level_value: Value = match externs::getattr(&result_val, "_level") {
+          Ok(v) => v,
+          Err(_) => return Ok((result_val, None)),
+        };
+
+        let level_num: u64 = externs::project_u64(&new_level_value, "_level");
+        let py_log_level: PythonLogLevel = level_num.try_into().unwrap();
+        let level: log::Level = py_log_level.into();
+        Ok((result_val, Some(level)))
       }
-      t if t == product => Ok(result_val),
       _ => Err(throw(&format!(
         "{:?} returned a result value that did not satisfy its constraints: {:?}",
         func, result_val
@@ -1019,7 +1034,7 @@ impl Node for NodeKey {
   async fn run(self, context: Context) -> Result<NodeOutput, Failure> {
     let mut workunit_state = workunit_store::expect_workunit_state();
 
-    let (started_workunit_id, user_facing_name) = {
+    let (started_workunit_id, user_facing_name, metadata) = {
       let user_facing_name = self.user_facing_name();
       let name = self.workunit_name();
       let span_id = new_span_id();
@@ -1034,11 +1049,12 @@ impl Node for NodeKey {
         stderr: None,
       };
 
-      let started_workunit_id = context
-        .session
-        .workunit_store()
-        .start_workunit(span_id, name, parent_id, metadata);
-      (started_workunit_id, user_facing_name)
+      let started_workunit_id =
+        context
+          .session
+          .workunit_store()
+          .start_workunit(span_id, name, parent_id, metadata.clone());
+      (started_workunit_id, user_facing_name, metadata)
     };
 
     scope_task_workunit_state(Some(workunit_state), async move {
@@ -1061,41 +1077,62 @@ impl Node for NodeKey {
       }
 
       let result = match self {
-        NodeKey::DigestFile(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Digest).await,
+        NodeKey::DigestFile(n) => {
+          n.run_wrapped_node(context)
+            .map_ok(|v| (NodeOutput::Digest(v), None))
+            .await
+        }
         NodeKey::DownloadedFile(n) => {
           n.run_wrapped_node(context)
-            .map_ok(NodeOutput::Snapshot)
+            .map_ok(|v| (NodeOutput::Snapshot(v), None))
             .await
         }
         NodeKey::MultiPlatformExecuteProcess(n) => {
           n.run_wrapped_node(context)
-            .map_ok(|r| NodeOutput::ProcessResult(Box::new(r)))
+            .map_ok(|r| (NodeOutput::ProcessResult(Box::new(r)), None))
             .await
         }
         NodeKey::ReadLink(n) => {
           n.run_wrapped_node(context)
-            .map_ok(NodeOutput::LinkDest)
+            .map_ok(|v| (NodeOutput::LinkDest(v), None))
             .await
         }
         NodeKey::Scandir(n) => {
           n.run_wrapped_node(context)
-            .map_ok(NodeOutput::DirectoryListing)
+            .map_ok(|v| (NodeOutput::DirectoryListing(v), None))
             .await
         }
-        NodeKey::Select(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Value).await,
+        NodeKey::Select(n) => {
+          n.run_wrapped_node(context)
+            .map_ok(|v| (NodeOutput::Value(v), None))
+            .await
+        }
         NodeKey::Snapshot(n) => {
           n.run_wrapped_node(context)
-            .map_ok(NodeOutput::Snapshot)
+            .map_ok(|v| (NodeOutput::Snapshot(v), None))
             .await
         }
-        NodeKey::Task(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Value).await,
+        NodeKey::Task(n) => {
+          n.run_wrapped_node(context)
+            .map_ok(|(v, wk)| (NodeOutput::Value(v), wk))
+            .await
+        }
+      };
+      let new_level = match result {
+        Ok((_, None)) => metadata.level,
+        Ok((_, Some(new_level))) => new_level,
+        _ => metadata.level,
+      };
+      let final_metadata = WorkunitMetadata {
+        level: new_level,
+        ..metadata
       };
       context2
         .session
         .workunit_store()
-        .complete_workunit(started_workunit_id)
+        .complete_workunit_with_new_metadata(started_workunit_id, final_metadata)
         .unwrap();
-      result
+      result.map(|(v, _wk)| v)
     })
     .await
   }
@@ -1166,6 +1203,17 @@ impl NodeOutput {
         vec![p.0.stdout_digest, p.0.stderr_digest, p.0.output_directory]
       }
       NodeOutput::DirectoryListing(_) | NodeOutput::LinkDest(_) | NodeOutput::Value(_) => vec![],
+    }
+  }
+}
+
+impl TryFrom<NodeOutput> for (Value, Option<log::Level>) {
+  type Error = ();
+
+  fn try_from(nr: NodeOutput) -> Result<Self, ()> {
+    match nr {
+      NodeOutput::Value(v) => Ok((v, None)),
+      _ => Err(()),
     }
   }
 }

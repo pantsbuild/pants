@@ -12,7 +12,7 @@ from pants.engine.fs import EMPTY_DIGEST
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.scheduler_test_base import SchedulerTestBase
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import RootRule, rule
+from pants.engine.rules import CanModifyWorkunit, RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.reporting.streaming_workunit_handler import (
     StreamingWorkunitContext,
@@ -515,6 +515,66 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         r_C = next(item for item in finished if item["name"] == "rule_C")
         assert r_B["parent_id"] == r_A["span_id"]
         assert r_C["parent_id"] == r_B["span_id"]
+
+    def test_can_modify_workunit(self):
+        @dataclass(frozen=True)
+        class ModifiedOutput(CanModifyWorkunit):
+            _level: LogLevel
+            val: int
+
+        @rule(desc="a_rule")
+        def a_rule(n: int) -> ModifiedOutput:
+            return ModifiedOutput(val=n, _level=LogLevel.ERROR)
+
+        rules = [a_rule, RootRule(int)]
+        scheduler = self.mk_scheduler(
+            rules, include_trace_on_error=False, should_report_workunits=True
+        )
+
+        tracker = WorkunitTracker()
+        handler = StreamingWorkunitHandler(
+            scheduler,
+            callbacks=[tracker.add],
+            report_interval_seconds=0.01,
+            max_workunit_verbosity=LogLevel.DEBUG,
+        )
+        with handler.session():
+            scheduler.product_request(ModifiedOutput, subjects=[0])
+
+        finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+        workunit = next(item for item in finished if item["name"] == "a_rule")
+        assert workunit["level"] == "ERROR"
+
+    def test_no_can_modify_workunit(self):
+        @dataclass(frozen=True)
+        # Without the CanModifyWorkunit class, the engine shouldn't try to interpret
+        # _level as a LogLevel at all.
+        class ModifiedOutput:
+            _level: str
+            val: int
+
+        @rule(desc="a_rule")
+        def a_rule(n: int) -> ModifiedOutput:
+            return ModifiedOutput(val=n, _level="some bogus string")
+
+        rules = [a_rule, RootRule(int)]
+        scheduler = self.mk_scheduler(
+            rules, include_trace_on_error=False, should_report_workunits=True
+        )
+
+        tracker = WorkunitTracker()
+        handler = StreamingWorkunitHandler(
+            scheduler,
+            callbacks=[tracker.add],
+            report_interval_seconds=0.01,
+            max_workunit_verbosity=LogLevel.DEBUG,
+        )
+        with handler.session():
+            scheduler.product_request(ModifiedOutput, subjects=[0])
+
+        finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+        workunit = next(item for item in finished if item["name"] == "a_rule")
+        assert workunit["level"] != "ERROR"
 
 
 class StreamingWorkunitProcessTests(TestBase):
