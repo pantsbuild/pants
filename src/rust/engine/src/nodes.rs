@@ -1043,54 +1043,53 @@ impl Node for NodeKey {
 
     scope_task_workunit_state(Some(workunit_state), async move {
       let context2 = context.clone();
-      let maybe_watch = if let Some(path) = self.fs_subject() {
+      if let Some(path) = self.fs_subject() {
         let abs_path = context.core.build_root.join(path);
-        context
+        let _ = context
           .core
           .watcher
           .watch(abs_path)
           .map_err(|e| Context::mk_error(&format!("{:?}", e)))
-          .await
-      } else {
-        Ok(())
-      };
-
-      let mut result = match maybe_watch {
-        Ok(()) => match self {
-          NodeKey::DigestFile(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Digest).await,
-          NodeKey::DownloadedFile(n) => {
-            n.run_wrapped_node(context)
-              .map_ok(NodeOutput::Snapshot)
-              .await
-          }
-          NodeKey::MultiPlatformExecuteProcess(n) => {
-            n.run_wrapped_node(context)
-              .map_ok(|r| NodeOutput::ProcessResult(Box::new(r)))
-              .await
-          }
-          NodeKey::ReadLink(n) => {
-            n.run_wrapped_node(context)
-              .map_ok(NodeOutput::LinkDest)
-              .await
-          }
-          NodeKey::Scandir(n) => {
-            n.run_wrapped_node(context)
-              .map_ok(NodeOutput::DirectoryListing)
-              .await
-          }
-          NodeKey::Select(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Value).await,
-          NodeKey::Snapshot(n) => {
-            n.run_wrapped_node(context)
-              .map_ok(NodeOutput::Snapshot)
-              .await
-          }
-          NodeKey::Task(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Value).await,
-        },
-        Err(e) => Err(e),
-      };
-      if let Some(user_facing_name) = user_facing_name {
-        result = result.map_err(|failure| failure.with_pushed_frame(&user_facing_name));
+          .map_err(|failure| {
+            if let Some(user_facing_name) = user_facing_name {
+              failure.with_pushed_frame(&user_facing_name)
+            } else {
+              failure
+            }
+          })
+          .await?;
       }
+
+      let result = match self {
+        NodeKey::DigestFile(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Digest).await,
+        NodeKey::DownloadedFile(n) => {
+          n.run_wrapped_node(context)
+            .map_ok(NodeOutput::Snapshot)
+            .await
+        }
+        NodeKey::MultiPlatformExecuteProcess(n) => {
+          n.run_wrapped_node(context)
+            .map_ok(|r| NodeOutput::ProcessResult(Box::new(r)))
+            .await
+        }
+        NodeKey::ReadLink(n) => {
+          n.run_wrapped_node(context)
+            .map_ok(NodeOutput::LinkDest)
+            .await
+        }
+        NodeKey::Scandir(n) => {
+          n.run_wrapped_node(context)
+            .map_ok(NodeOutput::DirectoryListing)
+            .await
+        }
+        NodeKey::Select(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Value).await,
+        NodeKey::Snapshot(n) => {
+          n.run_wrapped_node(context)
+            .map_ok(NodeOutput::Snapshot)
+            .await
+        }
+        NodeKey::Task(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Value).await,
+      };
       context2
         .session
         .workunit_store()
