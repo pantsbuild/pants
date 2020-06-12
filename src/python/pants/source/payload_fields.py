@@ -2,17 +2,15 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from hashlib import sha1
-from typing import TYPE_CHECKING, Any, List, Optional, Union, cast
+from typing import Any, List, Optional, Union, cast
 
 from pants.base.payload_field import PayloadField
 from pants.engine.fs import PathGlobs, Snapshot
+from pants.engine.internals.scheduler import SchedulerSession
 from pants.source.filespec import matches_filespec
 from pants.source.source_root import SourceRootConfig
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetWithSpec, Filespec
 from pants.util.memo import memoized_property
-
-if TYPE_CHECKING:
-    from pants.engine.internals.scheduler import SchedulerSession  # noqa: F401
 
 
 class SourcesField(PayloadField):
@@ -66,7 +64,7 @@ class SourcesField(PayloadField):
         """Returns the address this sources field refers to (used by some derived classes)"""
         return self._ref_address
 
-    def snapshot(self, scheduler: Optional["SchedulerSession"] = None) -> Snapshot:
+    def snapshot(self, scheduler: Optional[SchedulerSession] = None) -> Snapshot:
         """Returns a Snapshot containing the sources, relative to the build root.
 
         This API is experimental, and subject to change.

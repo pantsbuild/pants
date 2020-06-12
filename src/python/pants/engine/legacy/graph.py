@@ -13,9 +13,10 @@ from pants.base.parse_context import ParseContext
 from pants.base.specs import AddressSpec, AddressSpecs, SingleAddress
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
-from pants.build_graph.app_base import AppBase, Bundle
+from pants.build_graph.app_base import AppBase
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.build_graph import BuildGraph
+from pants.build_graph.bundle import Bundle
 from pants.build_graph.remote_sources import RemoteSources
 from pants.build_graph.target import Target as TargetV1
 from pants.engine.addresses import Addresses

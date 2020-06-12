@@ -99,8 +99,9 @@ from pants.backend.jvm.tasks.scalafmt_task import ScalaFmtCheckFormat, ScalaFmtF
 from pants.backend.jvm.tasks.scalastyle_task import ScalastyleTask
 from pants.backend.jvm.tasks.unpack_jars import UnpackJars
 from pants.backend.project_info.tasks.export_dep_as_jar import ExportDepAsJar
-from pants.build_graph.app_base import Bundle, DirectoryReMapper
+from pants.build_graph.app_base import DirectoryReMapper
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.build_graph.bundle import Bundle
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar as task
 from pants.java.jar.exclude import Exclude

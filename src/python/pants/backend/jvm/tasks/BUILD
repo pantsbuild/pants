@@ -131,6 +131,7 @@ python_library(
     'src/python/pants/base:deprecated',
     'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
+    'src/python/pants/build_graph:bundle_mixin',
     'src/python/pants/fs',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:fileutil',

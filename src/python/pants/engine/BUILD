@@ -6,9 +6,6 @@ page(
   sources=['README.md'],
 )
 
-# TODO: Get rid of all these microtargets. The entire package should be one target,
-# or be split into multiple packages.
-
 python_tests(
   name = 'tests',
   dependencies = [
@@ -46,7 +43,7 @@ python_library(
     ':collection',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:specs',
-    'src/python/pants/build_graph',
+    'src/python/pants/build_graph:address',
   ],
   tags = {"type_checked"},
 )
@@ -54,6 +51,9 @@ python_library(
 python_library(
   name='collection',
   sources=['collection.py'],
+  dependencies=[
+    'src/python/pants/util:ordered_set',
+  ],
   tags = {'type_checked'},
 )
 
@@ -64,6 +64,7 @@ python_library(
     '3rdparty/python:ansicolors',
     ':rules',
     'src/python/pants/engine/internals:native',
+    'src/python/pants/engine/internals:scheduler',
   ],
   tags = {'partially_type_checked'},
 )
@@ -88,7 +89,9 @@ python_library(
     '3rdparty/python:dataclasses',
     ':collection',
     ':rules',
+    # 'src/python/pants/engine/internals:scheduler',  # dep cycle
     'src/python/pants/option',
+    'src/python/pants/option:global_options',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:meta',
   ],
@@ -102,6 +105,7 @@ python_library(
     '3rdparty/python:dataclasses',
     'src/python/pants/cache',
     'src/python/pants/option',
+    'src/python/pants/option:options_bootstrapper',
     'src/python/pants/subsystem',
     'src/python/pants/util:meta',
   ],
@@ -113,9 +117,10 @@ python_library(
   sources=['interactive_runner.py'],
   dependencies=[
     '3rdparty/python:dataclasses',
-    'src/python/pants/base:exception_sink',
     ':fs',
     ':rules',
+    'src/python/pants/base:exception_sink',
+    # 'src/python/pants/engine/internals:scheduler',  # dep cycle
   ],
   tags = {"partially_type_checked"},
 )
@@ -151,8 +156,10 @@ python_library(
     ':goal',
     ':selectors',
     ':unions',
+    'src/python/pants/base:deprecated',
     'src/python/pants/option',
     'src/python/pants/util:collections',
+    'src/python/pants/util:logging',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
     'src/python/pants/util:ordered_set',
@@ -165,8 +172,8 @@ python_library(
   sources=['selectors.py'],
   dependencies=[
     '3rdparty/python:dataclasses',
+    'src/python/pants/base:deprecated',
     'src/python/pants/util:meta',
-    'src/python/pants/util:objects',
   ],
   tags = {'partially_type_checked'},
 )
@@ -175,14 +182,23 @@ python_library(
   name='target',
   sources=['target.py'],
   dependencies=[
+    ':addresses',
     ':collection',
+    ':fs',
     ':rules',
+    ':selectors',
     ':unions',
     '3rdparty/python:typing-extensions',
+    'src/python/pants/base:specs',
+    'src/python/pants/build_graph:bundle',
+    'src/python/pants/option:global_options',
+    'src/python/pants/source',
     'src/python/pants/util:collections',
     'src/python/pants/util:frozendict',
+    'src/python/pants/util:memo',
     'src/python/pants/util:meta',
     'src/python/pants/util:ordered_set',
+    'src/python/pants/util:strutil',
   ],
   tags = {'type_checked'},
 )
