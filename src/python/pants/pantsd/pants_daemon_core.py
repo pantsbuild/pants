@@ -36,6 +36,8 @@ class PantsDaemonCore:
     def __init__(self, services_constructor: PantsServicesConstructor):
         self._services_constructor = services_constructor
         self._lifecycle_lock = threading.RLock()
+        # N.B. This Event is used as nothing more than an atomic flag - nothing waits on it.
+        self._kill_switch = threading.Event()
 
         self._scheduler: Optional[LegacyGraphScheduler] = None
         self._services: Optional[PantsServices] = None
@@ -47,44 +49,59 @@ class PantsDaemonCore:
         This mostly means confirming that if any services have been started, that they are still
         alive.
         """
+        if self._kill_switch.is_set():
+            logger.error("Client failed to create a Scheduler: shutting down.")
+            return False
         with self._lifecycle_lock:
             if self._services is None:
                 return True
             return self._services.are_all_alive()
+
+    def _init_scheduler(
+        self, options_fingerprint: str, options_bootstrapper: OptionsBootstrapper
+    ) -> None:
+        """(Re-)Initialize the scheduler.
+
+        Must be called under the lifecycle lock.
+        """
+        try:
+            if self._scheduler:
+                logger.info("initialization options changed: reinitializing pantsd...")
+            else:
+                logger.info("initializing pantsd...")
+            if self._services:
+                self._services.shutdown()
+            build_config = BuildConfigInitializer.get(options_bootstrapper)
+            self._scheduler = EngineInitializer.setup_legacy_graph(
+                options_bootstrapper, build_config
+            )
+            bootstrap_options_values = options_bootstrapper.bootstrap_options.for_global_scope()
+            self._services = self._services_constructor(bootstrap_options_values, self._scheduler)
+            self._fingerprint = options_fingerprint
+            logger.info("pantsd initialized.")
+        except Exception as e:
+            self._kill_switch.set()
+            self._scheduler = None
+            raise e
 
     def prepare_scheduler(self, options_bootstrapper: OptionsBootstrapper) -> LegacyGraphScheduler:
         """Get a scheduler for the given options_bootstrapper.
 
         Runs in a client context (generally in DaemonPantsRunner) so logging is sent to the client.
         """
-        bootstrap_options = options_bootstrapper.bootstrap_options
-        bootstrap_options_values = bootstrap_options.for_global_scope()
 
         # Compute the fingerprint of the bootstrap options. Note that unlike
         # PantsDaemonProcessManager (which fingerprints only `daemon=True` options), this
         # fingerprints all fingerprintable options in the bootstrap options, which are
         # all used to construct a Scheduler.
         options_fingerprint = OptionsFingerprinter.combined_options_fingerprint_for_scope(
-            GLOBAL_SCOPE, bootstrap_options, invert=True,
+            GLOBAL_SCOPE, options_bootstrapper.bootstrap_options, invert=True,
         )
 
         with self._lifecycle_lock:
             if self._scheduler is None or options_fingerprint != self._fingerprint:
-                if self._scheduler:
-                    logger.info("initialization options changed: reinitializing pantsd...")
-                else:
-                    logger.info("initializing pantsd...")
                 # The fingerprint mismatches, either because this is the first run (and there is no
                 # fingerprint) or because relevant options have changed. Create a new scheduler and services.
-                if self._services:
-                    self._services.shutdown()
-                build_config = BuildConfigInitializer.get(options_bootstrapper)
-                self._scheduler = EngineInitializer.setup_legacy_graph(
-                    options_bootstrapper, build_config
-                )
-                self._services = self._services_constructor(
-                    bootstrap_options_values, self._scheduler
-                )
-                self._fingerprint = options_fingerprint
-                logger.info("pantsd initialized.")
+                self._init_scheduler(options_fingerprint, options_bootstrapper)
+                assert self._scheduler is not None
             return self._scheduler

@@ -130,6 +130,20 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                         self.assertEqual(last_pid, next_pid)
                     last_pid = next_pid
 
+    def test_pantsd_lifecycle_shutdown_for_broken_scheduler(self):
+        with self.pantsd_test_context() as (workdir, config, checker):
+            # Run with valid options.
+            self.assert_success(self.run_pants_with_workdir(["help"], workdir, config))
+            checker.assert_started()
+
+            # And again with invalid scheduler-fingerprinted options that trigger a re-init.
+            self.assert_failure(
+                self.run_pants_with_workdir(
+                    ["--backend-packages=nonsensical", "help"], workdir, config
+                )
+            )
+            checker.assert_stopped()
+
     def test_pantsd_aligned_output(self) -> None:
         # Set for pytest output display.
         self.maxDiff = None
