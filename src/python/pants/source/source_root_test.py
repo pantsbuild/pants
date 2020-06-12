@@ -100,6 +100,18 @@ def test_source_root_patterns() -> None:
     assert find_root("prefix/project/python/foo/bar.py") is None
 
 
+def test_source_root_default_patterns() -> None:
+    # Test that the default root patterns behave as expected.
+    def find_root(path):
+        return _find_root(path, tuple(SourceRootConfig.DEFAULT_ROOT_PATTERNS))
+
+    assert "src/python" == find_root("src/python/foo/bar.py")
+    assert "src" == find_root("src/baz/qux.py")
+    assert "project1/src/python" == find_root("project1/src/python/foo/bar.py")
+    assert "project2/src" == find_root("project2/src/baz/qux.py")
+    assert "." == find_root("corge/grault.py")
+
+
 def test_marker_file() -> None:
     def find_root(path):
         return _find_root(

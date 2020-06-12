@@ -145,6 +145,8 @@ class SourceRootConfig(Subsystem):
 
     options_scope = "source"
 
+    DEFAULT_ROOT_PATTERNS = ["/", "src", "src/python", "src/py"]
+
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
@@ -164,10 +166,7 @@ class SourceRootConfig(Subsystem):
             metavar='["pattern1", "pattern2", ...]',
             type=list,
             fingerprint=True,
-            # For Python a good default might be the repo root, but that would be a bad default
-            # for other languages, so best to have no default for now, and force users to be
-            # explicit about this when integrating Pants.  It's a fairly trivial thing to do.
-            default=[],
+            default=cls.DEFAULT_ROOT_PATTERNS,
             advanced=True,
             help="A list of source root suffixes. A directory with this suffix will be considered "
             "a potential source root. E.g., `src/python` will match `<buildroot>/src/python`, "
