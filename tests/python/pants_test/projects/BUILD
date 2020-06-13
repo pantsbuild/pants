@@ -49,7 +49,7 @@ python_tests(
         "testprojects/src/protobuf/org/pantsbuild/testproject:all_directories",
     ],
     tags={"integration", "partially_type_checked"},
-    timeout=200,
+    timeout=300,
 )
 
 python_tests(
@@ -68,7 +68,7 @@ python_tests(
     sources=["test_python_testprojects_src_integration.py"],
     dependencies=[":projects_test_base", "testprojects/src/python:all_directories",],
     tags={"integration", "partially_type_checked"},
-    timeout=150,
+    timeout=300,
 )
 
 python_tests(
@@ -76,7 +76,7 @@ python_tests(
     sources=["test_python_testprojects_tests_integration.py"],
     dependencies=[":projects_test_base", "testprojects/tests/python:all_directories",],
     tags={"integration", "partially_type_checked"},
-    timeout=120,
+    timeout=180,
 )
 
 python_tests(

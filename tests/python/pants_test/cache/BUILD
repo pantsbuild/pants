@@ -114,5 +114,5 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:unicode_directory',
   ],
   tags = {'integration', 'partially_type_checked'},
-  timeout = 600,
+  timeout = 720,
 )

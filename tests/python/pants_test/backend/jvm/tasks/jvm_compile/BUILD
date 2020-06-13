@@ -47,7 +47,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:missingjardepswhitelist_directory',
   ],
   tags={'integration', 'partially_type_checked'},
-  timeout=570,
+  timeout=720,
 )
 
 python_tests(
@@ -62,7 +62,7 @@ python_tests(
     'testprojects/src/thrift/org/pantsbuild:thrift_exports_directory',
   ],
   tags={'integration', 'partially_type_checked'},
-  timeout=600,
+  timeout=720,
 )
 
 python_tests(
@@ -84,5 +84,5 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:missingjardepswhitelist_directory',
   ],
   tags={'integration', 'partially_type_checked'},
-  timeout = 240,
+  timeout = 360,
 )

@@ -88,7 +88,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:deployexcludes_directory',
     'testprojects/src/java/org/pantsbuild/testproject:manifest_directory',
   ],
-  timeout=420,
+  timeout=600,
   tags = {'integration', 'partially_type_checked'},
 )
 
@@ -150,7 +150,7 @@ python_tests(
     'testprojects/3rdparty:checkstyle_directory',
   ],
   tags = {'integration', 'partially_type_checked'},
-  timeout = 240,
+  timeout = 360,
 )
 
 python_tests(
@@ -417,7 +417,7 @@ python_tests(
     'src/python/pants/testutil:task_test_base',
   ],
   tags = {'partially_type_checked'},
-  timeout = 150,
+  timeout = 300,
 )
 
 python_tests(
@@ -574,7 +574,7 @@ python_tests(
     'testprojects/src/java/org/pantsbuild/testproject:jvmprepcommand_directory',
   ],
   tags = {'integration', 'partially_type_checked'},
-  timeout = 250,
+  timeout = 480,
 )
 
 python_tests(
@@ -714,7 +714,7 @@ python_tests(
     'testprojects/src/scala/org/pantsbuild/testproject:procedure_syntax_directory',
     'testprojects/src/scala/org/pantsbuild/testproject:rsc_compat_directory',
   ],
-  timeout=370,
+  timeout=480,
   tags = {'integration', 'partially_type_checked'},
 )
 
@@ -768,7 +768,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'testprojects/src/java/org/pantsbuild/testproject:runtime_directory',
   ],
-  timeout=600,
+  timeout=900,
   tags = {'integration', 'partially_type_checked'},
 )
 

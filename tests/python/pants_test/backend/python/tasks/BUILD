@@ -107,7 +107,7 @@ python_tests(
         "testprojects/tests/python/pants:timeout_directory",
     ],
     tags={"integration", "partially_type_checked"},
-    timeout=240,
+    timeout=420,
 )
 
 python_tests(
@@ -151,7 +151,7 @@ python_tests(
         "testprojects/src/python:python_distribution_directory",
     ],
     tags={"integration", "partially_type_checked"},
-    timeout=420,
+    timeout=600,
 )
 
 python_tests(
@@ -176,7 +176,7 @@ python_tests(
         "testprojects/src/python:interpreter_selection_directory",
     ],
     tags={"integration", "partially_type_checked"},
-    timeout=120,
+    timeout=240,
 )
 
 python_tests(
@@ -192,7 +192,7 @@ python_tests(
         "testprojects/src/python:print_env_directory",
     ],
     tags={"integration", "partially_type_checked"},
-    timeout=240,
+    timeout=360,
 )
 
 python_tests(
