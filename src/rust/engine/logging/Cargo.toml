@@ -16,4 +16,4 @@ tokio = { version = "0.2", features = ["rt-util"] }
 uuid = { version = "0.7", features = ["v4"] }
 
 [build-dependencies]
-cargo = "0.34"
+cargo_metadata = "0.10"
