@@ -871,6 +871,25 @@ async fn extract_execute_response_success() {
 }
 
 #[tokio::test]
+async fn extract_execute_response_timeout() {
+  let mut operation = bazel_protos::operations::Operation::new();
+  operation.set_name("cat".to_owned());
+  operation.set_done(true);
+  operation.set_response(make_any_proto(&{
+    let mut response = bazel_protos::remote_execution::ExecuteResponse::new();
+    let mut status = bazel_protos::status::Status::new();
+    status.set_code(grpcio::RpcStatusCode::DEADLINE_EXCEEDED.into());
+    response.set_status(status);
+    response
+  }));
+
+  match extract_execute_response(operation, Platform::Linux).await {
+    Err(ExecutionError::Timeout) => (),
+    other => assert!(false, "Want timeout error, got {:?}", other),
+  };
+}
+
+#[tokio::test]
 async fn extract_execute_response_missing_digests() {
   let missing_files = vec![
     TestData::roland().digest(),

@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 use bazel_protos::call_option;
@@ -20,8 +20,8 @@ use protobuf::Message;
 use store::Store;
 
 use super::{
-  format_error, maybe_add_workunit, populate_fallible_execution_result, ExecutionError,
-  OperationOrStatus,
+  format_error, maybe_add_workunit, populate_fallible_execution_result,
+  populate_fallible_execution_result_for_timeout, ExecutionError, OperationOrStatus,
 };
 use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, PlatformConstraint,
@@ -395,6 +395,8 @@ impl StreamingCommandRunner {
     match grpcio::RpcStatusCode::from(status.get_code()) {
       grpcio::RpcStatusCode::OK => unreachable!(),
 
+      grpcio::RpcStatusCode::DEADLINE_EXCEEDED => Err(ExecutionError::Timeout),
+
       grpcio::RpcStatusCode::FAILED_PRECONDITION => {
         let details = match status.get_details() {
           [] => return Err(ExecutionError::Fatal(status.get_message().to_owned())),
@@ -433,20 +435,18 @@ impl StreamingCommandRunner {
         Err(self.extract_missing_digests(&precondition_failure))
       }
 
-      code => match code {
-        grpcio::RpcStatusCode::ABORTED
-        | grpcio::RpcStatusCode::INTERNAL
-        | grpcio::RpcStatusCode::RESOURCE_EXHAUSTED
-        | grpcio::RpcStatusCode::UNAVAILABLE
-        | grpcio::RpcStatusCode::UNKNOWN => {
-          Err(ExecutionError::Retryable(status.get_message().to_owned()))
-        }
-        _ => Err(ExecutionError::Fatal(format!(
-          "Error from remote execution: {:?}: {:?}",
-          code,
-          status.get_message()
-        ))),
-      },
+      grpcio::RpcStatusCode::ABORTED
+      | grpcio::RpcStatusCode::INTERNAL
+      | grpcio::RpcStatusCode::RESOURCE_EXHAUSTED
+      | grpcio::RpcStatusCode::UNAVAILABLE
+      | grpcio::RpcStatusCode::UNKNOWN => {
+        Err(ExecutionError::Retryable(status.get_message().to_owned()))
+      }
+      code => Err(ExecutionError::Fatal(format!(
+        "Error from remote execution: {:?}: {:?}",
+        code,
+        status.get_message()
+      ))),
     }
   }
 
@@ -461,8 +461,10 @@ impl StreamingCommandRunner {
   async fn run_execute_request(
     &self,
     execute_request: ExecuteRequest,
+    process: Process,
     context: Context,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
+    let start_time = Instant::now();
     let mut current_operation_name: Option<String> = None;
 
     loop {
@@ -557,6 +559,17 @@ impl StreamingCommandRunner {
               .await?;
           }
           ExecutionError::NotFinished(_) => unreachable!(),
+          ExecutionError::Timeout => {
+            return populate_fallible_execution_result_for_timeout(
+              &self.store,
+              &process.description,
+              process.timeout,
+              start_time.elapsed(),
+              Vec::new(),
+              self.platform,
+            )
+            .await
+          }
         },
       }
     }
@@ -572,19 +585,13 @@ impl crate::CommandRunner for StreamingCommandRunner {
     context: Context,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     // Construct the REv2 ExecuteRequest and related data for this execution request.
-    let compatible_underlying_request = self.extract_compatible_request(&request).unwrap();
+    let request = self.extract_compatible_request(&request).unwrap();
     let store = self.store.clone();
     let (action, command, execute_request) =
-      super::make_execute_request(&compatible_underlying_request, self.metadata.clone())?;
-    let Process {
-      description,
-      input_files,
-      timeout,
-      ..
-    } = compatible_underlying_request;
+      super::make_execute_request(&request, self.metadata.clone())?;
     let build_id = context.build_id.clone();
 
-    debug!("Remote execution: {}", description);
+    debug!("Remote execution: {}", request.description);
     trace!(
       "built REv2 request (build_id={}): action={:?}; command={:?}; execute_request={:?}",
       &build_id,
@@ -595,14 +602,14 @@ impl crate::CommandRunner for StreamingCommandRunner {
 
     // Record the time that we started to process this request, then compute the ultimate
     // deadline for execution of this request.
-    let deadline_duration = self.overall_deadline + timeout.unwrap_or_default();
+    let deadline_duration = self.overall_deadline + request.timeout.unwrap_or_default();
 
     // Upload the action (and related data, i.e. the embedded command and input files).
     self
-      .ensure_action_uploaded(&store, &command, &action, input_files)
+      .ensure_action_uploaded(&store, &command, &action, request.input_files)
       .await?;
 
-    let result_fut = self.run_execute_request(execute_request, context);
+    let result_fut = self.run_execute_request(execute_request, request, context);
     let timeout_fut = tokio::time::timeout(deadline_duration, result_fut);
     match timeout_fut.await {
       Ok(r) => r,

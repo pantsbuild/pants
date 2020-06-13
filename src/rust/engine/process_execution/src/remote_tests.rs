@@ -510,8 +510,7 @@ async fn make_execute_request_with_timeout() {
       .collect(),
     timeout: one_second(),
     description: "some description".to_owned(),
-    unsafe_local_only_files_because_we_favor_speed_over_correctness_for_this_rule:
-      hashing::EMPTY_DIGEST,
+    append_only_caches: BTreeMap::new(),
     jdk_home: None,
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
@@ -913,6 +912,7 @@ async fn extract_response_with_digest_stdout() {
     .op
     .unwrap()
     .unwrap(),
+    false,
     Platform::Linux,
   )
   .await
@@ -940,6 +940,7 @@ async fn extract_response_with_digest_stderr() {
     .op
     .unwrap()
     .unwrap(),
+    false,
     Platform::Linux,
   )
   .await
@@ -967,6 +968,7 @@ async fn extract_response_with_digest_stdout_osx_remote() {
     .op
     .unwrap()
     .unwrap(),
+    false,
     Platform::Darwin,
   )
   .await
@@ -1191,7 +1193,7 @@ async fn timeout_after_sufficiently_delayed_getoperations() {
     .unwrap();
   assert_eq!(result.original.exit_code, -15);
   let error_msg = String::from_utf8(result.stdout_bytes.to_vec()).unwrap();
-  assert_that(&error_msg).contains("Exceeded timeout");
+  assert_that(&error_msg).contains("Exceeded user timeout");
   assert_that(&error_msg).contains("echo-a-foo");
   assert_eq!(result.original.execution_attempts.len(), 1);
   let maybe_execution_duration = result.original.execution_attempts[0].remote_execution;
@@ -1845,7 +1847,7 @@ async fn extract_execute_response_success() {
     response
   }));
 
-  let result = extract_execute_response(operation, Platform::Linux)
+  let result = extract_execute_response(operation, false, Platform::Linux)
     .await
     .unwrap();
 
@@ -1867,7 +1869,7 @@ async fn extract_execute_response_pending() {
   operation.set_done(false);
 
   assert_eq!(
-    extract_execute_response(operation, Platform::Linux).await,
+    extract_execute_response(operation, false, Platform::Linux).await,
     Err(ExecutionError::NotFinished(operation_name))
   );
 }
@@ -1890,7 +1892,7 @@ async fn extract_execute_response_missing_digests() {
     .unwrap();
 
   assert_eq!(
-    extract_execute_response(operation, Platform::Linux).await,
+    extract_execute_response(operation, false, Platform::Linux).await,
     Err(ExecutionError::MissingDigests(missing_files))
   );
 }
@@ -1912,7 +1914,7 @@ async fn extract_execute_response_missing_other_things() {
     .unwrap()
     .unwrap();
 
-  match extract_execute_response(operation, Platform::Linux).await {
+  match extract_execute_response(operation, false, Platform::Linux).await {
     Err(ExecutionError::Fatal(err)) => assert_contains(&err, "monkeys"),
     other => assert!(false, "Want fatal error, got {:?}", other),
   };
@@ -1931,7 +1933,7 @@ async fn extract_execute_response_other_failed_precondition() {
     .unwrap()
     .unwrap();
 
-  match extract_execute_response(operation, Platform::Linux).await {
+  match extract_execute_response(operation, false, Platform::Linux).await {
     Err(ExecutionError::Fatal(err)) => assert_contains(&err, "OUT_OF_CAPACITY"),
     other => assert!(false, "Want fatal error, got {:?}", other),
   };
@@ -1946,7 +1948,7 @@ async fn extract_execute_response_missing_without_list() {
     .unwrap()
     .unwrap();
 
-  match extract_execute_response(operation, Platform::Linux).await {
+  match extract_execute_response(operation, false, Platform::Linux).await {
     Err(ExecutionError::Fatal(err)) => assert_contains(&err.to_lowercase(), "precondition"),
     other => assert!(false, "Want fatal error, got {:?}", other),
   };
@@ -1967,10 +1969,24 @@ async fn extract_execute_response_other_status() {
     response
   }));
 
-  match extract_execute_response(operation, Platform::Linux).await {
+  match extract_execute_response(operation, false, Platform::Linux).await {
     Err(ExecutionError::Fatal(err)) => assert_contains(&err, "PERMISSION_DENIED"),
     other => assert!(false, "Want fatal error, got {:?}", other),
   };
+}
+
+#[tokio::test]
+async fn extract_execute_response_timeout() {
+  let operation_name = "cat".to_owned();
+  let mut operation = bazel_protos::operations::Operation::new();
+  operation.set_name(operation_name.clone());
+  operation.set_done(false);
+
+  assert_eq!(
+    // The response would be NotFinished, but we pass `timeout_has_elapsed: true`.
+    extract_execute_response(operation, true, Platform::Linux).await,
+    Err(ExecutionError::Timeout)
+  );
 }
 
 #[tokio::test]
@@ -2351,6 +2367,7 @@ async fn remote_workunits_are_stored() {
   futures01::future::lazy(move || {
     command_runner.extract_execute_response(
       OperationOrStatus::Operation(operation),
+      false,
       &mut ExecutionHistory::default(),
     )
   })
@@ -2707,6 +2724,7 @@ pub(crate) fn make_store(
 
 async fn extract_execute_response(
   operation: bazel_protos::operations::Operation,
+  timeout_has_elapsed: bool,
   remote_platform: Platform,
 ) -> Result<RemoteTestResult, ExecutionError> {
   let cas = mock::StubCAS::builder()
@@ -2724,6 +2742,7 @@ async fn extract_execute_response(
   let original = command_runner
     .extract_execute_response(
       OperationOrStatus::Operation(operation),
+      timeout_has_elapsed,
       &mut ExecutionHistory::default(),
     )
     .compat()
