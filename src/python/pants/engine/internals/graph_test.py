@@ -11,7 +11,6 @@ from pants.engine.target import (
     DependenciesRequest,
     Target,
     Targets,
-    TransitiveTarget,
     TransitiveTargets,
     WrappedTarget,
 )
@@ -63,14 +62,6 @@ class GraphTest(TestBase):
             Targets, Params(DependenciesRequest(root[Dependencies]), create_options_bootstrapper())
         )
         assert direct_deps == Targets([d1, d2, d3])
-
-        transitive_target = self.request_single_product(
-            TransitiveTarget, Params(WrappedTarget(root), create_options_bootstrapper())
-        )
-        assert transitive_target.root == root
-        assert {
-            dep_transitive_target.root for dep_transitive_target in transitive_target.dependencies
-        } == {d1, d2, d3}
 
         transitive_targets = self.request_single_product(
             TransitiveTargets,

@@ -1,9 +1,10 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import itertools
 import logging
 import os.path
-from collections import defaultdict, deque
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import DefaultDict, List, Tuple, Union, cast
@@ -39,7 +40,6 @@ from pants.engine.target import (
     Targets,
     TargetsWithOrigins,
     TargetWithOrigin,
-    TransitiveTarget,
     TransitiveTargets,
     UnrecognizedTargetTypeException,
     WrappedTarget,
@@ -123,37 +123,25 @@ async def resolve_targets_with_origins(
 
 
 @rule
-async def transitive_target(wrapped_root: WrappedTarget) -> TransitiveTarget:
-    root = wrapped_root.target
-    if not root.has_field(Dependencies):
-        return TransitiveTarget(root, ())
-    dependency_addresses = await Get[Addresses](DependenciesRequest(root[Dependencies]))
-    dependencies = await MultiGet(Get[TransitiveTarget](Address, d) for d in dependency_addresses)
-    return TransitiveTarget(root, dependencies)
+async def transitive_targets(targets: Targets) -> TransitiveTargets:
+    """Find all the targets transitively depended upon by the target roots.
 
-
-@rule
-async def transitive_targets(addresses: Addresses) -> TransitiveTargets:
-    """Given Addresses, kicks off recursion on expansion of TransitiveTargets.
-
-    The TransitiveTarget dataclass represents a structure-shared graph, which we walk and flatten
-    here. The engine memoizes the computation of TransitiveTarget, so when multiple
-    TransitiveTargets objects are being constructed for multiple roots, their structure will be
-    shared.
+    This uses iteration, rather than recursion, so that we can tolerate dependency cycles. Unlike a
+    traditional BFS algorithm, we batch each round of traversals via `MultiGet` for improved
+    performance / concurrency.
     """
-    transitive_targets = await MultiGet(Get[TransitiveTarget](Address, a) for a in addresses)
-
-    closure: OrderedSet[Target] = OrderedSet()
-    to_visit = deque(transitive_targets)
-
-    while to_visit:
-        tt = to_visit.popleft()
-        if tt.root in closure:
-            continue
-        closure.add(tt.root)
-        to_visit.extend(tt.dependencies)
-
-    return TransitiveTargets(tuple(tt.root for tt in transitive_targets), FrozenOrderedSet(closure))
+    visited: OrderedSet[Target] = OrderedSet()
+    queued = FrozenOrderedSet(targets)
+    while queued:
+        visited.update(queued)
+        direct_dependencies = await MultiGet(
+            Get[Targets](DependenciesRequest(tgt.get(Dependencies)))
+            for tgt in queued
+        )
+        queued = (
+            FrozenOrderedSet(itertools.chain.from_iterable(direct_dependencies)).difference(visited)
+        )
+    return TransitiveTargets(tuple(targets), FrozenOrderedSet(visited))
 
 
 # -----------------------------------------------------------------------------------------------
@@ -313,7 +301,6 @@ def rules():
         resolve_targets,
         resolve_target_with_origin,
         resolve_targets_with_origins,
-        transitive_target,
         transitive_targets,
         find_owners,
         addresses_with_origins_from_filesystem_specs,
