@@ -43,6 +43,11 @@ class GraphTest(TestBase):
             {Dependencies.alias: [d1.address, d2.address, d3.address]},
             address=Address.parse(":root"),
         )
+        cycle1_addr = Address.parse(":cycle1")
+        cycle2_addr = Address.parse(":cycle2")
+        cycle1 = MockTarget({Dependencies.alias: [cycle2_addr]}, address=cycle1_addr)
+        # Also include a dependency on itself (self-cycle)
+        cycle2 = MockTarget({Dependencies.alias: [cycle1_addr, cycle2_addr]}, address=cycle2_addr)
 
         self.add_to_build_file(
             "",
@@ -54,6 +59,8 @@ class GraphTest(TestBase):
                 target(name='d2', dependencies=[':t2'])
                 target(name='d3')
                 target(name='root', dependencies=[':d1', ':d2', ':d3'])
+                target(name='cycle1', dependencies=[':cycle2'])
+                target(name='cycle2', dependencies=[':cycle1', ':cycle2'])
                 """
             ),
         )
@@ -65,7 +72,11 @@ class GraphTest(TestBase):
 
         transitive_targets = self.request_single_product(
             TransitiveTargets,
-            Params(Addresses([root.address, d2.address]), create_options_bootstrapper()),
+            Params(
+                Addresses([root.address, d2.address, cycle2_addr]), create_options_bootstrapper()
+            ),
         )
-        assert transitive_targets.roots == (root, d2)
-        assert transitive_targets.closure == FrozenOrderedSet([root, d2, d1, d3, t2, t1])
+        assert transitive_targets.roots == (root, d2, cycle2)
+        assert transitive_targets.closure == FrozenOrderedSet(
+            [root, d2, cycle2, d1, d3, t2, cycle1, t1]
+        )
