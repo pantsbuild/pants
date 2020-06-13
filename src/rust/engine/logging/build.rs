@@ -26,6 +26,7 @@
 #![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
+use cargo_metadata::MetadataCommand;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
@@ -36,12 +37,20 @@ fn main() {
     .unwrap()
     .join("Cargo.toml");
   println!("cargo:rerun-if-changed={}", manifest_path.display());
-  let config = cargo::util::config::Config::default().unwrap();
-  let workspace = cargo::core::Workspace::new(&manifest_path, &config).unwrap();
-  let packages: Vec<_> = workspace
-    .members()
-    .map(|package| package.name().to_string())
+
+  let metadata = MetadataCommand::new()
+    .manifest_path(manifest_path)
+    .no_deps()
+    .exec()
+    .expect("Error accessing cargo metadata");
+
+  let mut packages: Vec<_> = metadata
+    .workspace_members
+    .iter()
+    .map(|package_id| metadata[package_id].name.clone())
     .collect();
+  packages.sort();
+
   let mut out_file =
     File::create(PathBuf::from(std::env::var("OUT_DIR").unwrap()).join("packages.rs")).unwrap();
   writeln!(out_file, "pub const PANTS_PACKAGE_NAMES: &[&str] = &[").unwrap();
