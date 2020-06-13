@@ -36,9 +36,14 @@ class StripSourceRootsTest(TestBase):
         args: Optional[List[str]] = None,
     ) -> StrippedResponseData:
         args = args or []
-        args.append("--source-root-patterns=src/python")
-        args.append("--source-root-patterns=src/java")
-        args.append("--source-root-patterns=tests/python")
+        has_source_root_patterns = False
+        for arg in args:
+            if arg.startswith("--source-root-patterns"):
+                has_source_root_patterns = True
+                break
+        if not has_source_root_patterns:
+            source_root_patterns = ["src/python", "src/java", "tests/python"]
+            args.append(f"--source-root-patterns={json.dumps(source_root_patterns)}")
         result = self.request_single_product(
             SourceRootStrippedSources, Params(request, create_options_bootstrapper(args=args)),
         )
