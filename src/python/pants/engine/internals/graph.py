@@ -135,11 +135,10 @@ async def transitive_targets(targets: Targets) -> TransitiveTargets:
     while queued:
         visited.update(queued)
         direct_dependencies = await MultiGet(
-            Get[Targets](DependenciesRequest(tgt.get(Dependencies)))
-            for tgt in queued
+            Get[Targets](DependenciesRequest(tgt.get(Dependencies))) for tgt in queued
         )
-        queued = (
-            FrozenOrderedSet(itertools.chain.from_iterable(direct_dependencies)).difference(visited)
+        queued = FrozenOrderedSet(itertools.chain.from_iterable(direct_dependencies)).difference(
+            visited
         )
     return TransitiveTargets(tuple(targets), FrozenOrderedSet(visited))
 
