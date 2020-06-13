@@ -688,11 +688,12 @@ class Parser:
 
         The source of the default value is chosen according to the ranking in Rank.
         """
+        type_arg = kwargs.get("type", str)
+        member_type = kwargs.get("member_type", str)
         # Helper function to convert a string to a value of the option's type.
         def to_value_type(val_str):
             if val_str is None:
                 return None
-            type_arg = kwargs.get("type", str)
             if type_arg == bool:
                 return self._ensure_bool(val_str)
             try:
@@ -837,7 +838,6 @@ class Parser:
             if val is None:
                 return
             choices = kwargs.get("choices")
-            type_arg = kwargs.get("type")
             if choices is None and "type" in kwargs:
                 if inspect.isclass(type_arg) and issubclass(type_arg, Enum):
                     choices = list(type_arg)
@@ -879,7 +879,6 @@ class Parser:
             merged_val = ListValueComponent.merge(
                 [rv.value for rv in ranked_vals if rv.value is not None]
             ).val
-            member_type = kwargs.get("member_type", str)
             merged_val = [self._convert_member_type(member_type, val) for val in merged_val]
             if member_type == shell_str:
                 merged_val = flatten_shlexed_list(merged_val)

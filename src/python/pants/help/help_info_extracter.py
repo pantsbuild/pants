@@ -83,10 +83,10 @@ class HelpInfoExtracter:
             return "None"
 
         if is_list_option(kwargs):
-            member_typ = kwargs.get("member_type", str)
+            member_type = kwargs.get("member_type", str)
 
             def member_str(val):
-                return f"'{val}'" if member_typ == str else str(val)
+                return f"'{val}'" if member_type == str else str(val)
 
             default_str = (
                 f"\"[{', '.join(member_str(val) for val in default)}]\"" if default else "[]"
