@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import dataclasses
-import itertools
 import logging
 from collections import defaultdict, deque
 from contextlib import contextmanager
@@ -33,6 +32,7 @@ from pants.engine.legacy.structs import (
 )
 from pants.engine.rules import rule
 from pants.engine.selectors import Get, MultiGet
+from pants.engine.target import RegisteredTargetTypes
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper, Filespec
 from pants.util.meta import frozen_after_init
@@ -389,6 +389,22 @@ class HydratedTargets(Collection[HydratedTarget]):
 
 
 @dataclass(frozen=True)
+class TransitiveHydratedTarget:
+    """A recursive structure wrapping a HydratedTarget root and TransitiveHydratedTarget deps."""
+
+    root: HydratedTarget
+    dependencies: Tuple["TransitiveHydratedTarget", ...]
+
+
+@dataclass(frozen=True)
+class TransitiveHydratedTargets:
+    """A set of HydratedTarget roots, and their transitive, flattened, de-duped closure."""
+
+    roots: Tuple[HydratedTarget, ...]
+    closure: FrozenOrderedSet[HydratedTarget]
+
+
+@dataclass(frozen=True)
 class LegacyHydratedTarget:
     """A rip on HydratedTarget for the purpose of V1, which must use BuildFileAddress rather than
     Address."""
@@ -408,31 +424,63 @@ class LegacyTransitiveHydratedTargets:
 
 
 @rule
-async def legacy_transitive_hydrated_targets(
-    targets: HydratedTargets,
-) -> LegacyTransitiveHydratedTargets:
-    roots_bfas = await MultiGet(Get[BuildFileAddress](Address, ht._address) for ht in targets)
-    roots = tuple(
-        LegacyHydratedTarget.from_hydrated_target(ht, bfa) for ht, bfa in zip(targets, roots_bfas)
+async def transitive_hydrated_targets(
+    addresses: Addresses, registered_target_types: RegisteredTargetTypes
+) -> TransitiveHydratedTargets:
+    """Given Addresses, kicks off recursion on expansion of TransitiveHydratedTargets.
+
+    The TransitiveHydratedTarget struct represents a structure-shared graph, which we walk and
+    flatten here. The engine memoizes the computation of TransitiveHydratedTarget, so when multiple
+    TransitiveHydratedTarget objects are being constructed for multiple roots, their structure will
+    be shared.
+    """
+
+    transitive_hydrated_targets = await MultiGet(
+        Get[TransitiveHydratedTarget](Address, a) for a in addresses
     )
 
-    visited: OrderedSet[LegacyHydratedTarget] = OrderedSet()
-    queued = FrozenOrderedSet(roots)
-    while queued:
-        visited.update(queued)
-        direct_deps_addresses = FrozenOrderedSet(
-            itertools.chain.from_iterable(ht.adaptor.dependencies for ht in queued)
-        )
-        direct_deps_hts = await Get[HydratedTargets](Addresses(direct_deps_addresses))
-        direct_deps_bfas = await MultiGet(
-            Get[BuildFileAddress](Address, ht._address) for ht in direct_deps_hts
-        )
-        direct_deps = FrozenOrderedSet(
+    closure: OrderedSet[HydratedTarget] = OrderedSet()
+    to_visit = deque(transitive_hydrated_targets)
+
+    while to_visit:
+        tht = to_visit.popleft()
+        if tht.root in closure:
+            continue
+        closure.add(tht.root)
+        to_visit.extend(tht.dependencies)
+
+    return TransitiveHydratedTargets(
+        tuple(tht.root for tht in transitive_hydrated_targets), FrozenOrderedSet(closure)
+    )
+
+
+@rule
+async def legacy_transitive_hydrated_targets(
+    addresses: Addresses,
+) -> LegacyTransitiveHydratedTargets:
+    thts = await Get[TransitiveHydratedTargets](Addresses, addresses)
+    roots_bfas = await MultiGet(Get[BuildFileAddress](Address, ht._address) for ht in thts.roots)
+    closure_bfas = await MultiGet(
+        Get[BuildFileAddress](Address, ht._address) for ht in thts.closure
+    )
+    return LegacyTransitiveHydratedTargets(
+        roots=tuple(
             LegacyHydratedTarget.from_hydrated_target(ht, bfa)
-            for ht, bfa in zip(direct_deps_hts, direct_deps_bfas)
-        )
-        queued = direct_deps.difference(visited)
-    return LegacyTransitiveHydratedTargets(roots, FrozenOrderedSet(visited))
+            for ht, bfa in zip(thts.roots, roots_bfas)
+        ),
+        closure=FrozenOrderedSet(
+            LegacyHydratedTarget.from_hydrated_target(ht, bfa)
+            for ht, bfa in zip(thts.closure, closure_bfas)
+        ),
+    )
+
+
+@rule
+async def transitive_hydrated_target(root: HydratedTarget) -> TransitiveHydratedTarget:
+    dependencies = await MultiGet(
+        Get[TransitiveHydratedTarget](Address, d) for d in root.adaptor.dependencies
+    )
+    return TransitiveHydratedTarget(root, dependencies)
 
 
 @dataclass(frozen=True)
@@ -551,6 +599,8 @@ async def hydrate_bundles(
 def create_legacy_graph_tasks():
     """Create tasks to recursively parse the legacy graph."""
     return [
+        transitive_hydrated_target,
+        transitive_hydrated_targets,
         legacy_transitive_hydrated_targets,
         hydrate_target,
         hydrated_targets,
