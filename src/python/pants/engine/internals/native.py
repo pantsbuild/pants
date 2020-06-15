@@ -30,7 +30,7 @@ from pants.engine.fs import (
     SnapshotSubset,
     UrlToFetch,
 )
-from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveProcessResult
+from pants.engine.interactive_process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResultWithPlatform, MultiPlatformProcess
 from pants.engine.selectors import Get
@@ -266,7 +266,7 @@ class Native(metaclass=SingletonMetaclass):
             string=str,
             bytes=bytes,
             construct_interactive_process_result=InteractiveProcessResult,
-            interactive_process_request=InteractiveProcessRequest,
+            interactive_process=InteractiveProcess,
             interactive_process_result=InteractiveProcessResult,
             snapshot_subset=SnapshotSubset,
             construct_platform=Platform,

@@ -7,7 +7,7 @@ from pathlib import PurePath
 from typing import ClassVar, Iterable, Iterator
 
 from pants.engine.console import Console
-from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
+from pants.engine.interactive_process import InteractiveProcess, InteractiveRunner
 from pants.util.osutil import get_os_name
 from pants.util.strutil import safe_shlex_join
 
@@ -19,7 +19,7 @@ class _Opener(ABC):
 
     program: ClassVar[str]
 
-    def _iter_openers(self, files: Iterable[PurePath]) -> Iterator[InteractiveProcessRequest]:
+    def _iter_openers(self, files: Iterable[PurePath]) -> Iterator[InteractiveProcess]:
         # N.B.: We cannot mark this method @abc.abstractmethod due to:
         #   https://github.com/python/mypy/issues/5374
         raise NotImplementedError()
@@ -28,11 +28,11 @@ class _Opener(ABC):
         for request in self._iter_openers(files):
             open_command = safe_shlex_join(request.argv)
             try:
-                result = self.runner.run_local_interactive_process(request)
-                if result.process_exit_code != 0:
+                result = self.runner.run_process(request)
+                if result.exit_code != 0:
                     self.console.print_stderr(
                         f"Failed to open files for viewing using `{open_command}` - received exit "
-                        f"code {result.process_exit_code}."
+                        f"code {result.exit_code}."
                     )
             except Exception as e:
                 self.console.print_stderr(
@@ -46,8 +46,8 @@ class _Opener(ABC):
 class _DarwinOpener(_Opener):
     program = "open"
 
-    def _iter_openers(self, files: Iterable[PurePath]) -> Iterator[InteractiveProcessRequest]:
-        yield InteractiveProcessRequest(
+    def _iter_openers(self, files: Iterable[PurePath]) -> Iterator[InteractiveProcess]:
+        yield InteractiveProcess(
             argv=(self.program, *(str(f) for f in files)), run_in_workspace=True
         )
 
@@ -55,9 +55,9 @@ class _DarwinOpener(_Opener):
 class _LinuxOpener(_Opener):
     program = "xdg-open"
 
-    def _iter_openers(self, files: Iterable[PurePath]) -> Iterator[InteractiveProcessRequest]:
+    def _iter_openers(self, files: Iterable[PurePath]) -> Iterator[InteractiveProcess]:
         for f in files:
-            yield InteractiveProcessRequest(argv=(self.program, str(f)), run_in_workspace=True)
+            yield InteractiveProcess(argv=(self.program, str(f)), run_in_workspace=True)
 
 
 _OPENERS_BY_OSNAME = {"darwin": _DarwinOpener, "linux": _LinuxOpener}

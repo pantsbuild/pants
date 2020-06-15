@@ -5,7 +5,7 @@ import itertools
 import logging
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import Dict, Iterable, Optional, Tuple, Union
+from typing import Dict, Iterable, Mapping, Optional, Tuple, Union
 
 from pants.engine.fs import EMPTY_DIGEST, Digest
 from pants.engine.platform import Platform, PlatformConstraint
@@ -42,8 +42,8 @@ class Process:
         description: str,
         input_digest: Digest = EMPTY_DIGEST,
         working_directory: Optional[str] = None,
-        env: Optional[Dict[str, str]] = None,
-        append_only_caches: Optional[Dict[str, str]] = None,
+        env: Optional[Mapping[str, str]] = None,
+        append_only_caches: Optional[Mapping[str, str]] = None,
         output_files: Optional[Iterable[str]] = None,
         output_directories: Optional[Iterable[str]] = None,
         timeout_seconds: Optional[Union[int, float]] = None,

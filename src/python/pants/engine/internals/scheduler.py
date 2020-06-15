@@ -18,7 +18,7 @@ from pants.engine.fs import (
     MaterializeDirectoryResult,
     PathGlobsAndRoot,
 )
-from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveProcessResult
+from pants.engine.interactive_process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.internals.nodes import Return, Throw
 from pants.engine.rules import Rule, RuleIndex, TaskRule
 from pants.engine.selectors import Params
@@ -574,7 +574,7 @@ class SchedulerSession:
         self._scheduler._native.lib.ensure_remote_has_recursive(sched_pointer, list(digests))
 
     def run_local_interactive_process(
-        self, request: "InteractiveProcessRequest"
+        self, request: "InteractiveProcess"
     ) -> "InteractiveProcessResult":
         sched_pointer = self._scheduler._scheduler
         session_pointer = self._session

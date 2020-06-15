@@ -3,15 +3,13 @@
 
 from typing import cast
 
-import pytest
-
 from pants.base.build_root import BuildRoot
 from pants.base.specs import SingleAddress
 from pants.core.goals.binary import BinaryFieldSet, CreatedBinary
 from pants.core.goals.run import Run, RunOptions, run
 from pants.engine.addresses import Address
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Workspace
-from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
+from pants.engine.interactive_process import InteractiveProcess, InteractiveRunner
 from pants.engine.target import (
     Target,
     TargetsToValidFieldSets,
@@ -94,19 +92,11 @@ class RunTest(TestBase):
         program_text = b'#!/usr/bin/python\nprint("hello")'
         binary = self.create_mock_binary(program_text)
         interactive_runner = InteractiveRunner(self.scheduler)
-        request = InteractiveProcessRequest(
+        process = InteractiveProcess(
             argv=("./program.py",), run_in_workspace=False, input_digest=binary.digest,
         )
-        result = interactive_runner.run_local_interactive_process(request)
-        assert result.process_exit_code == 0
-
-    def test_no_input_files_in_workspace(self) -> None:
-        program_text = b'#!/usr/bin/python\nprint("hello")'
-        binary = self.create_mock_binary(program_text)
-        with pytest.raises(ValueError):
-            InteractiveProcessRequest(
-                argv=("/usr/bin/python",), run_in_workspace=True, input_digest=binary.digest
-            )
+        result = interactive_runner.run_process(process)
+        assert result.exit_code == 0
 
     def test_failed_run(self) -> None:
         console = MockConsole(use_colors=False)

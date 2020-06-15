@@ -28,7 +28,7 @@ from pants.core.util_rules.filter_empty_sources import (
 )
 from pants.engine.addresses import Address
 from pants.engine.fs import Digest, FileContent, InputFilesContent, Workspace
-from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
+from pants.engine.interactive_process import InteractiveProcess, InteractiveRunner
 from pants.engine.target import (
     Sources,
     Target,
@@ -115,14 +115,12 @@ class ConditionallySucceedsFieldSet(MockTestFieldSet):
 
 
 class TestTest(TestBase):
-    def make_ipr(self) -> InteractiveProcessRequest:
+    def make_interactive_process(self) -> InteractiveProcess:
         input_files_content = InputFilesContent(
             (FileContent(path="program.py", content=b"def test(): pass"),)
         )
         digest = self.request_single_product(Digest, input_files_content)
-        return InteractiveProcessRequest(
-            argv=("/usr/bin/python", "program.py",), run_in_workspace=False, input_digest=digest,
-        )
+        return InteractiveProcess(["/usr/bin/python", "program.py"], input_digest=digest)
 
     @staticmethod
     def make_target_with_origin(address: Optional[Address] = None) -> TargetWithOrigin:
@@ -197,7 +195,7 @@ class TestTest(TestBase):
                 MockGet(
                     product_type=TestDebugRequest,
                     subject_type=TestFieldSet,
-                    mock=lambda _: TestDebugRequest(self.make_ipr()),
+                    mock=lambda _: TestDebugRequest(self.make_interactive_process()),
                 ),
                 MockGet(
                     product_type=FieldSetsWithSources,

@@ -10,7 +10,7 @@ from pants.base.build_root import BuildRoot
 from pants.engine.console import Console
 from pants.engine.fs import Digest, DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
+from pants.engine.interactive_process import InteractiveProcess, InteractiveRunner
 from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get
 from pants.engine.target import Field, Target, Targets, TransitiveTargets
@@ -67,7 +67,7 @@ class ReplBinary:
 async def run_repl(
     console: Console,
     workspace: Workspace,
-    runner: InteractiveRunner,
+    interactive_runner: InteractiveRunner,
     options: ReplOptions,
     transitive_targets: TransitiveTargets,
     build_root: BuildRoot,
@@ -103,10 +103,10 @@ async def run_repl(
         )
 
         full_path = PurePath(tmpdir, repl_binary.binary_name).as_posix()
-        run_request = InteractiveProcessRequest(argv=(full_path,), run_in_workspace=True,)
+        process = InteractiveProcess(argv=[full_path], run_in_workspace=True)
 
-    result = runner.run_local_interactive_process(run_request)
-    return Repl(result.process_exit_code)
+    result = interactive_runner.run_process(process)
+    return Repl(result.exit_code)
 
 
 def rules():
