@@ -23,7 +23,7 @@ class DependeesOutputFormat(Enum):
 class DependeesOptions(LineOriented, GoalSubsystem):
     """List all targets that depend on any of the input targets."""
 
-    name = "dependees"
+    name = "dependees2"
 
     @classmethod
     def register_options(cls, register):

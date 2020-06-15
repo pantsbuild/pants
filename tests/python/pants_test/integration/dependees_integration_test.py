@@ -11,7 +11,7 @@ class DependeesIntegrationTest(PantsRunIntegrationTest):
     TARGET = "examples/src/scala/org/pantsbuild/example/hello/welcome"
 
     def run_dependees(self, *dependees_options):
-        args = ["dependees", self.TARGET]
+        args = ["-q", "dependees", self.TARGET]
         args.extend(dependees_options)
 
         pants_run = self.run_pants(args)
