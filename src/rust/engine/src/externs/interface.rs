@@ -427,7 +427,7 @@ py_class!(class PyTypes |py| {
       string: PyType,
       bytes: PyType,
       construct_interactive_process_result: PyObject,
-      interactive_process_request: PyType,
+      interactive_process: PyType,
       interactive_process_result: PyType,
       snapshot_subset: PyType,
       construct_platform: PyObject
@@ -462,7 +462,7 @@ py_class!(class PyTypes |py| {
         string: externs::type_for(string),
         bytes: externs::type_for(bytes),
         construct_interactive_process_result: Function(externs::key_for(construct_interactive_process_result.into())?),
-        interactive_process_request: externs::type_for(interactive_process_request),
+        interactive_process: externs::type_for(interactive_process),
         interactive_process_result: externs::type_for(interactive_process_result),
         snapshot_subset: externs::type_for(snapshot_subset),
         construct_platform: Function(externs::key_for(construct_platform.into())?),

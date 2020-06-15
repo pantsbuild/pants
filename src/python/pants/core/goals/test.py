@@ -20,7 +20,7 @@ from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.fs import Digest, DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
+from pants.engine.interactive_process import InteractiveProcess, InteractiveRunner
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import goal_rule, rule
 from pants.engine.selectors import Get, MultiGet
@@ -89,7 +89,7 @@ class TestResult:
 
 @dataclass(frozen=True)
 class TestDebugRequest:
-    ipr: InteractiveProcessRequest
+    process: InteractiveProcess
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
@@ -253,8 +253,8 @@ async def run_tests(
         )
         field_set = targets_to_valid_field_sets.field_sets[0]
         request = await Get[TestDebugRequest](TestFieldSet, field_set)
-        debug_result = interactive_runner.run_local_interactive_process(request.ipr)
-        return Test(debug_result.process_exit_code)
+        debug_result = interactive_runner.run_process(request.process)
+        return Test(debug_result.exit_code)
 
     targets_to_valid_field_sets = await Get[TargetsToValidFieldSets](
         TargetsToValidFieldSetsRequest(

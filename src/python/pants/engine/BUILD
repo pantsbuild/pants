@@ -75,7 +75,7 @@ python_library(
   dependencies=[
     '3rdparty/python:dataclasses',
     ':console',
-    ':interactive_runner',
+    ':interactive_process',
     'src/python/pants/util:osutil',
     'src/python/pants/util:strutil',
   ],
@@ -113,8 +113,8 @@ python_library(
 )
 
 python_library(
-  name='interactive_runner',
-  sources=['interactive_runner.py'],
+  name='interactive_process',
+  sources=['interactive_process.py'],
   dependencies=[
     '3rdparty/python:dataclasses',
     ':fs',

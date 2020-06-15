@@ -8,7 +8,7 @@ from pants.core.goals.binary import BinaryFieldSet, CreatedBinary
 from pants.engine.console import Console
 from pants.engine.fs import DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveRunner
+from pants.engine.interactive_process import InteractiveProcess, InteractiveRunner
 from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get
 from pants.engine.target import TargetsToValidFieldSets, TargetsToValidFieldSetsRequest
@@ -52,7 +52,7 @@ async def run(
     options: RunOptions,
     global_options: GlobalOptions,
     console: Console,
-    runner: InteractiveRunner,
+    interactive_runner: InteractiveRunner,
     workspace: Workspace,
     build_root: BuildRoot,
 ) -> Run:
@@ -75,13 +75,10 @@ async def run(
         )
 
         full_path = PurePath(tmpdir, binary.binary_name).as_posix()
-        run_request = InteractiveProcessRequest(
-            argv=(full_path, *options.values.args), run_in_workspace=True,
-        )
-
+        process = InteractiveProcess(argv=(full_path, *options.values.args), run_in_workspace=True)
         try:
-            result = runner.run_local_interactive_process(run_request)
-            exit_code = result.process_exit_code
+            result = interactive_runner.run_process(process)
+            exit_code = result.exit_code
         except Exception as e:
             console.print_stderr(f"Exception when attempting to run {field_set.address}: {e!r}")
             exit_code = -1

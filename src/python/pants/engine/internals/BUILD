@@ -124,7 +124,7 @@ python_library(
     'src/python/pants/base:project_tree',
     'src/python/pants/engine:addresses',
     'src/python/pants/engine:fs',
-    'src/python/pants/engine:interactive_runner',
+    'src/python/pants/engine:interactive_process',
     'src/python/pants/engine:platform',
     'src/python/pants/engine:process',
     'src/python/pants/engine:selectors',

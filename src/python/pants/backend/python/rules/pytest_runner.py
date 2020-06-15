@@ -41,7 +41,7 @@ from pants.engine.fs import (
     Snapshot,
     SnapshotSubset,
 )
-from pants.engine.interactive_runner import InteractiveProcessRequest
+from pants.engine.interactive_process import InteractiveProcess
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get, MultiGet
@@ -284,12 +284,11 @@ async def run_python_test(
 
 @rule(desc="Run pytest in an interactive process")
 async def debug_python_test(test_setup: TestTargetSetup) -> TestDebugRequest:
-    run_request = InteractiveProcessRequest(
+    process = InteractiveProcess(
         argv=(test_setup.test_runner_pex.output_filename, *test_setup.args),
-        run_in_workspace=False,
         input_digest=test_setup.input_digest,
     )
-    return TestDebugRequest(run_request)
+    return TestDebugRequest(process)
 
 
 def rules():
