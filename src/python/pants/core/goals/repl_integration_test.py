@@ -14,7 +14,7 @@ from pants.backend.python.target_types import PythonLibrary
 from pants.core.goals.repl import Repl
 from pants.core.goals.repl import rules as repl_rules
 from pants.core.util_rules import archive, external_tool, strip_source_roots
-from pants.engine.interactive_runner import InteractiveRunner
+from pants.engine.interactive_process import InteractiveRunner
 from pants.engine.rules import RootRule
 from pants.testutil.goal_rule_test_base import GoalRuleTestBase
 
