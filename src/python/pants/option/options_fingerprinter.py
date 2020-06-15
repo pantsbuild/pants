@@ -34,7 +34,9 @@ class OptionsFingerprinter:
     """
 
     @classmethod
-    def combined_options_fingerprint_for_scope(cls, scope, options, build_graph=None, **kwargs):
+    def combined_options_fingerprint_for_scope(
+        cls, scope, options, build_graph=None, **kwargs
+    ) -> str:
         """Given options and a scope, compute a combined fingerprint for the scope.
 
         :param string scope: The scope to fingerprint.

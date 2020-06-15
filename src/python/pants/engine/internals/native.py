@@ -30,7 +30,7 @@ from pants.engine.fs import (
     SnapshotSubset,
     UrlToFetch,
 )
-from pants.engine.interactive_runner import InteractiveProcessRequest, InteractiveProcessResult
+from pants.engine.interactive_process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResultWithPlatform, MultiPlatformProcess
 from pants.engine.selectors import Get
@@ -122,6 +122,7 @@ class Native(metaclass=SingletonMetaclass):
     def __init__(self):
         self.externs = Externs(self.lib)
         self.lib.externs_set(self.externs)
+        self._executor = self.lib.PyExecutor()
 
     class BinaryLocationError(Exception):
         pass
@@ -188,11 +189,20 @@ class Native(metaclass=SingletonMetaclass):
     def match_path_globs(self, path_globs: PathGlobs, paths: Iterable[str]) -> bool:
         return cast(bool, self.lib.match_path_globs(path_globs, tuple(paths)))
 
-    def nailgun_server_await_bound(self, scheduler, nailgun_server) -> int:
-        return cast(int, self.lib.nailgun_server_await_bound(scheduler, nailgun_server))
+    def nailgun_server_await_bound(self, nailgun_server) -> int:
+        """Blocks until the server has bound a port, and then returns the port.
 
-    def new_nailgun_server(self, scheduler, port: int, runner: RawFdRunner):
-        return self.lib.nailgun_server_create(scheduler, port, runner)
+        Returns the actual port the server has successfully bound to, or raises an exception if the
+        server has exited.
+        """
+        return cast(int, self.lib.nailgun_server_await_bound(self._executor, nailgun_server))
+
+    def new_nailgun_server(self, port: int, runner: RawFdRunner):
+        """Creates a nailgun server with a requested port.
+
+        Returns the server and the actual port it bound to.
+        """
+        return self.lib.nailgun_server_create(self._executor, port, runner)
 
     def new_tasks(self):
         return self.lib.PyTasks()
@@ -256,13 +266,14 @@ class Native(metaclass=SingletonMetaclass):
             string=str,
             bytes=bytes,
             construct_interactive_process_result=InteractiveProcessResult,
-            interactive_process_request=InteractiveProcessRequest,
+            interactive_process=InteractiveProcess,
             interactive_process_result=InteractiveProcessResult,
             snapshot_subset=SnapshotSubset,
             construct_platform=Platform,
         )
 
         return self.lib.scheduler_create(
+            self._executor,
             tasks,
             engine_types,
             # Project tree.

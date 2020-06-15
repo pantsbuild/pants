@@ -60,6 +60,9 @@ use log::{self, error, warn, Log};
 use logging::logger::LOGGER;
 use logging::{Destination, Logger, PythonLogLevel};
 use rule_graph::{self, RuleGraph};
+use task_executor::Executor;
+use tempfile::TempDir;
+use workunit_store::{Workunit, WorkunitState};
 
 use std::any::Any;
 use std::cell::RefCell;
@@ -71,9 +74,6 @@ use std::panic;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
-
-use tempfile::TempDir;
-use workunit_store::{Workunit, WorkunitState};
 
 py_exception!(native_engine, PollTimeout);
 
@@ -187,7 +187,7 @@ py_module_initializer!(native_engine, |py, m| {
     "nailgun_server_create",
     py_fn!(
       py,
-      nailgun_server_create(a: PyScheduler, b: u16, c: PyObject)
+      nailgun_server_create(a: PyExecutor, b: u16, c: PyObject)
     ),
   )?;
   m.add(
@@ -195,7 +195,7 @@ py_module_initializer!(native_engine, |py, m| {
     "nailgun_server_await_bound",
     py_fn!(
       py,
-      nailgun_server_await_bound(a: PyScheduler, b: PyNailgunServer)
+      nailgun_server_await_bound(a: PyExecutor, b: PyNailgunServer)
     ),
   )?;
 
@@ -324,6 +324,7 @@ py_module_initializer!(native_engine, |py, m| {
     py_fn!(
       py,
       scheduler_create(
+        executor_ptr: PyExecutor,
         tasks_ptr: PyTasks,
         types_ptr: PyTypes,
         build_root_buf: String,
@@ -372,12 +373,13 @@ py_module_initializer!(native_engine, |py, m| {
     py_fn!(py, ensure_remote_has_recursive(a: PyScheduler, b: PyList)),
   )?;
 
-  m.add_class::<PyTasks>(py)?;
-  m.add_class::<PyTypes>(py)?;
+  m.add_class::<PyExecutionRequest>(py)?;
+  m.add_class::<PyExecutor>(py)?;
+  m.add_class::<PyResult>(py)?;
   m.add_class::<PyScheduler>(py)?;
   m.add_class::<PySession>(py)?;
-  m.add_class::<PyExecutionRequest>(py)?;
-  m.add_class::<PyResult>(py)?;
+  m.add_class::<PyTasks>(py)?;
+  m.add_class::<PyTypes>(py)?;
 
   m.add_class::<externs::PyGeneratorResponseBreak>(py)?;
   m.add_class::<externs::PyGeneratorResponseGet>(py)?;
@@ -425,7 +427,7 @@ py_class!(class PyTypes |py| {
       string: PyType,
       bytes: PyType,
       construct_interactive_process_result: PyObject,
-      interactive_process_request: PyType,
+      interactive_process: PyType,
       interactive_process_result: PyType,
       snapshot_subset: PyType,
       construct_platform: PyObject
@@ -460,13 +462,21 @@ py_class!(class PyTypes |py| {
         string: externs::type_for(string),
         bytes: externs::type_for(bytes),
         construct_interactive_process_result: Function(externs::key_for(construct_interactive_process_result.into())?),
-        interactive_process_request: externs::type_for(interactive_process_request),
+        interactive_process: externs::type_for(interactive_process),
         interactive_process_result: externs::type_for(interactive_process_result),
         snapshot_subset: externs::type_for(snapshot_subset),
         construct_platform: Function(externs::key_for(construct_platform.into())?),
     })),
     )
   }
+});
+
+py_class!(class PyExecutor |py| {
+    data executor: Executor;
+    def __new__(_cls) -> CPyResult<Self> {
+      let executor = Executor::new_owned().map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
+      Self::create_instance(py, executor)
+    }
 });
 
 py_class!(class PyScheduler |py| {
@@ -580,14 +590,14 @@ fn externs_set(_: Python, externs: PyObject) -> PyUnitResult {
 
 fn nailgun_server_create(
   py: Python,
-  scheduler_ptr: PyScheduler,
+  executor_ptr: PyExecutor,
   port: u16,
   runner: PyObject,
 ) -> CPyResult<PyNailgunServer> {
-  with_scheduler(py, scheduler_ptr, |scheduler| {
-    let runner: Value = runner.into();
-    let executor = scheduler.core.executor.clone();
-    let server_future =
+  with_executor(py, executor_ptr, |executor| {
+    let server_future = {
+      let runner: Value = runner.into();
+      let executor = executor.clone();
       nailgun::Server::new(executor, port, move |exe: nailgun::RawFdExecution| {
         let command = externs::store_utf8(&exe.cmd.command);
         let args = externs::store_tuple(
@@ -631,11 +641,10 @@ fn nailgun_server_create(
             nailgun::ExitCode(1)
           }
         }
-      });
+      })
+    };
 
-    let server = scheduler
-      .core
-      .executor
+    let server = executor
       .block_on(server_future)
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
     PyNailgunServer::create_instance(py, server)
@@ -644,14 +653,12 @@ fn nailgun_server_create(
 
 fn nailgun_server_await_bound(
   py: Python,
-  scheduler_ptr: PyScheduler,
+  executor_ptr: PyExecutor,
   nailgun_server_ptr: PyNailgunServer,
 ) -> CPyResult<u16> {
-  with_scheduler(py, scheduler_ptr, |scheduler| {
+  with_executor(py, executor_ptr, |executor| {
     with_nailgun_server(py, nailgun_server_ptr, |nailgun_server| {
-      scheduler
-        .core
-        .executor
+      executor
         .block_on(nailgun_server.await_bound())
         .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))
     })
@@ -666,6 +673,7 @@ fn nailgun_server_await_bound(
 ///
 fn scheduler_create(
   py: Python,
+  executor_ptr: PyExecutor,
   tasks_ptr: PyTasks,
   types_ptr: PyTypes,
   build_root_buf: String,
@@ -699,7 +707,7 @@ fn scheduler_create(
   remote_execution_overall_deadline_secs: u64,
   process_execution_local_enable_nailgun: bool,
 ) -> CPyResult<PyScheduler> {
-  let core: Result<Core, String> = Ok(()).and_then(move |()| {
+  let core: Result<Core, String> = with_executor(py, executor_ptr, |executor| {
     let types = types_ptr
       .types(py)
       .borrow_mut()
@@ -710,6 +718,7 @@ fn scheduler_create(
     tasks.intrinsics_set(&intrinsics);
 
     Core::new(
+      executor.clone(),
       root_type_ids.into_iter().map(externs::type_for).collect(),
       tasks,
       types,
@@ -1677,7 +1686,18 @@ where
   F: FnOnce(&Scheduler) -> T,
 {
   let scheduler = scheduler_ptr.scheduler(py);
-  scheduler.core.runtime.enter(|| f(scheduler))
+  scheduler.core.executor.enter(|| f(scheduler))
+}
+
+///
+/// See `with_scheduler`.
+///
+fn with_executor<F, T>(py: Python, executor_ptr: PyExecutor, f: F) -> T
+where
+  F: FnOnce(&Executor) -> T,
+{
+  let executor = executor_ptr.executor(py);
+  f(&executor)
 }
 
 ///

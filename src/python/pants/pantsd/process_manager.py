@@ -416,14 +416,6 @@ class ProcessManager(ProcessMetadataManager):
         """Write the local processes socket information (TCP port or UNIX socket)."""
         self.write_metadata_by_name(self._name, "socket", str(socket_info))
 
-    def write_named_socket(self, socket_name, socket_info):
-        """A multi-tenant, named alternative to ProcessManager.write_socket()."""
-        self.write_metadata_by_name(self._name, "socket_{}".format(socket_name), str(socket_info))
-
-    def read_named_socket(self, socket_name, socket_type):
-        """A multi-tenant, named alternative to ProcessManager.socket."""
-        return self.read_metadata_by_name(self._name, "socket_{}".format(socket_name), socket_type)
-
     def _as_process(self):
         """Returns a psutil `Process` object wrapping our pid.
 
@@ -712,8 +704,18 @@ class PantsDaemonProcessManager(FingerprintedProcessManager, metaclass=ABCMeta):
 
     @property
     def options_fingerprint(self):
+        """Returns the options fingerprint for the pantsd process.
+
+        This should cover all options consumed by the pantsd process itself in order to start: also
+        known as the "micro-bootstrap" options. These options are marked `daemon=True` in the global
+        options.
+
+        The `daemon=True` options are a small subset of the bootstrap options. Independently, the
+        PantsDaemonCore fingerprints the entire set of bootstrap options to identify when the
+        Scheduler needs need to be re-initialized.
+        """
         return OptionsFingerprinter.combined_options_fingerprint_for_scope(
-            GLOBAL_SCOPE, self._bootstrap_options, fingerprint_key="daemon", invert=True
+            GLOBAL_SCOPE, self._bootstrap_options, fingerprint_key="daemon"
         )
 
     def needs_restart(self, option_fingerprint):

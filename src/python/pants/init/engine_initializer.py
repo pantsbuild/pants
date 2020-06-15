@@ -22,11 +22,11 @@ from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.remote_sources import RemoteSources
 from pants.build_graph.target import Target as TargetV1
-from pants.engine import interactive_runner, process, target
+from pants.engine import interactive_process, process, target
 from pants.engine.console import Console
 from pants.engine.fs import Workspace, create_fs_rules
 from pants.engine.goal import Goal
-from pants.engine.interactive_runner import InteractiveRunner
+from pants.engine.interactive_process import InteractiveRunner
 from pants.engine.internals import graph, options_parsing
 from pants.engine.internals.build_files import create_graph_rules
 from pants.engine.internals.mapper import AddressMapper
@@ -302,11 +302,10 @@ class EngineInitializer:
 
     @staticmethod
     def setup_legacy_graph(
-        native: Native,
-        options_bootstrapper: OptionsBootstrapper,
-        build_configuration: BuildConfiguration,
+        options_bootstrapper: OptionsBootstrapper, build_configuration: BuildConfiguration,
     ) -> LegacyGraphScheduler:
         """Construct and return the components necessary for LegacyBuildGraph construction."""
+        native = Native()
         build_root = get_buildroot()
         bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
         use_gitignore = bootstrap_options.pants_ignore_use_gitignore
@@ -432,7 +431,7 @@ class EngineInitializer:
             registered_target_types_singleton,
             union_membership_singleton,
             build_root_singleton,
-            *interactive_runner.rules(),
+            *interactive_process.rules(),
             *graph.rules(),
             *options_parsing.rules(),
             *process.rules(),

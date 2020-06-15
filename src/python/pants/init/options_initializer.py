@@ -130,7 +130,7 @@ class OptionsInitializer:
         return pants_ignore
 
     @staticmethod
-    def compute_pantsd_invalidation_globs(buildroot, bootstrap_options):
+    def compute_pantsd_invalidation_globs(buildroot, bootstrap_options, absolute_pidfile):
         """Computes the merged value of the `--pantsd-invalidation-globs` option.
 
         Combines --pythonpath and --pants-config-files files that are in {buildroot} dir with those
@@ -141,6 +141,7 @@ class OptionsInitializer:
         # Globs calculated from the sys.path and other file-like configuration need to be sanitized
         # to relative globs (where possible).
         potentially_absolute_globs = (
+            absolute_pidfile,
             *sys.path,
             *bootstrap_options.pythonpath,
             *bootstrap_options.pants_config_files,

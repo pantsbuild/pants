@@ -16,4 +16,4 @@ uuid = { version = "0.7", features = ["v4"] }
 logging = { path = "../logging" }
 task_executor = { path = "../task_executor" }
 workunit_store = { path = "../workunit_store" }
-num_cpus = "1.13.0"
+num_cpus = "1"

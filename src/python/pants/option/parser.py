@@ -879,7 +879,6 @@ class Parser:
             merged_val = ListValueComponent.merge(
                 [rv.value for rv in ranked_vals if rv.value is not None]
             ).val
-            # TODO: run `check()` for all elements of a list option too!!!
             member_type = kwargs.get("member_type", str)
             merged_val = [self._convert_member_type(member_type, val) for val in merged_val]
             if member_type == shell_str:

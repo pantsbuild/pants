@@ -294,11 +294,6 @@ class TestProcessManager(TestBase):
             self.pm.write_socket("/path/to/unix/socket")
         mock_write.assert_called_once_with(self.pm.name, "socket", "/path/to/unix/socket")
 
-    def test_write_named_socket(self):
-        with unittest.mock.patch.object(ProcessManager, "write_metadata_by_name") as mock_write:
-            self.pm.write_named_socket("pailgun", "31337")
-        mock_write.assert_called_once_with(self.pm.name, "socket_pailgun", "31337")
-
     def test_as_process(self):
         sentinel = 3333
         with unittest.mock.patch("psutil.Process", **PATCH_OPTS) as mock_proc:
