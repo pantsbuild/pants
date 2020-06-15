@@ -47,6 +47,7 @@ use nails::execution::{self, send_to_io, sink_for, stream_for, ChildInput, Child
 use nails::Nail;
 use tokio::fs::File;
 use tokio::net::TcpListener;
+use tokio::sync::{Notify, RwLock};
 
 use task_executor::Executor;
 
@@ -124,7 +125,11 @@ impl Server {
     mut should_exit: oneshot::Receiver<()>,
     mut listener: TcpListener,
   ) -> Result<(), String> {
-    loop {
+    // While connections are ongoing, they acquire `read`: before shutting down, the server
+    // acquires `write`.
+    let ongoing_connections = Arc::new(RwLock::new(()));
+
+    let result = loop {
       let tcp_stream = match future::select(listener.accept().boxed(), should_exit).await {
         future::Either::Left((Ok((tcp_stream, _addr)), s_e)) => {
           // Got a connection.
@@ -140,8 +145,34 @@ impl Server {
       };
 
       debug!("Accepted connection: {:?}", tcp_stream);
-      let _join = executor.spawn(nails::server_handle_connection(config.clone(), tcp_stream));
-    }
+
+      // There is a slightly delicate dance here: we wait for a connection to have acquired the
+      // ongoing connections lock before proceeding to the next iteration of the loop. This
+      // prevents us from observing an empty lock and exiting before the connection has actually
+      // acquired it. Unfortunately we cannot acquire the lock in this thread and then send the
+      // guard to the other thread due to its lifetime bounds.
+      let connection_started = Arc::new(Notify::new());
+      let _join = executor.spawn({
+        let config = config.clone();
+        let connection_started = connection_started.clone();
+        let ongoing_connections = ongoing_connections.clone();
+        async move {
+          let ongoing_connection_guard = ongoing_connections.read().await;
+          connection_started.notify();
+          let result = nails::server_handle_connection(config.clone(), tcp_stream).await;
+          std::mem::drop(ongoing_connection_guard);
+          result
+        }
+      });
+      connection_started.notified().await;
+    };
+
+    // Before exiting, acquire write access on the ongoing_connections lock to prove that all
+    // connections have completed.
+    debug!("Server waiting for connections to complete...");
+    let _ = ongoing_connections.write().await;
+    debug!("All connections completed.");
+    result
   }
 
   ///
@@ -152,7 +183,9 @@ impl Server {
   }
 
   ///
-  /// Returns a Future that will wait for the server to have shut down.
+  /// Returns a Future that will shut down the server by:
+  /// 1. stopping accepting new connections
+  /// 2. waiting for all ongoing connections to have completed
   ///
   pub async fn shutdown(self) -> Result<(), String> {
     // If we fail to send the exit signal, it's because the task is already shut down.

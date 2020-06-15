@@ -666,11 +666,12 @@ fn nailgun_server_await_shutdown(
 ) -> PyUnitResult {
   with_executor(py, executor_ptr, |executor| {
     with_nailgun_server(py, nailgun_server_ptr, |nailgun_server| {
-      if let Some(server) = nailgun_server.borrow_mut().take() {
-        executor
-          .block_on(server.shutdown())
-          .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
-      }
+      let shutdown_result = if let Some(server) = nailgun_server.borrow_mut().take() {
+        py.allow_threads(|| executor.block_on(server.shutdown()))
+      } else {
+        Ok(())
+      };
+      shutdown_result.map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))?;
       Ok(None)
     })
   })
