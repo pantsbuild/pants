@@ -152,9 +152,8 @@ class GlobalOptions(Subsystem):
     def register_bootstrap_options(cls, register):
         """Register bootstrap options.
 
-        "Bootstrap options" are a small set of options whose values are useful when registering other
-        options. Therefore we must bootstrap them early, before other options are registered, let
-        alone parsed.
+        "Bootstrap options" are the set of options necessary to create a Scheduler. If an option is
+        not consumed during creation of a Scheduler, it should be in `register_options` instead.
 
         Bootstrap option values can be interpolated into the config file, and can be referenced
         programmatically in registration code, e.g., as register.bootstrap.pants_workdir.
@@ -223,6 +222,7 @@ class GlobalOptions(Subsystem):
             "--pants-version",
             advanced=True,
             default=pants_version(),
+            daemon=True,
             help="Use this pants version. Note Pants code only uses this to verify that you are "
             "using the requested version, as Pants cannot dynamically change the version it "
             "is using once the program is already running. This option is useful to set in "
@@ -323,6 +323,7 @@ class GlobalOptions(Subsystem):
             advanced=True,
             metavar="<dir>",
             default=os.path.join(buildroot, ".pants.d"),
+            daemon=True,
             help="Write intermediate output files to this dir.",
         )
         register(
@@ -330,6 +331,7 @@ class GlobalOptions(Subsystem):
             advanced=True,
             metavar="<dir>",
             default=None,
+            daemon=True,
             help="When set, a base directory in which to store `--pants-workdir` contents. "
             "If this option is a set, the workdir will be created as symlink into a "
             "per-workspace subdirectory.",
@@ -352,6 +354,7 @@ class GlobalOptions(Subsystem):
             "--pants-subprocessdir",
             advanced=True,
             default=os.path.join(buildroot, ".pids"),
+            daemon=True,
             help="The directory to use for tracking subprocess metadata, if any. This should "
             "live outside of the dir used by `--pants-workdir` to allow for tracking "
             "subprocesses that outlive the workdir data (e.g. `./pants server`).",
@@ -360,19 +363,30 @@ class GlobalOptions(Subsystem):
             "--pants-config-files",
             advanced=True,
             type=list,
-            daemon=False,
+            # NB: We don't fingerprint the list of config files, because the content of the config
+            # files independently affects fingerprints.
+            fingerprint=False,
             default=[get_default_pants_config_file()],
             help="Paths to Pants config files.",
         )
         # TODO: Deprecate the --pantsrc/--pantsrc-files options?  This would require being able
         # to set extra config file locations in an initial bootstrap config file.
-        register("--pantsrc", advanced=True, type=bool, default=True, help="Use pantsrc files.")
+        register(
+            "--pantsrc",
+            advanced=True,
+            type=bool,
+            default=True,
+            # NB: See `--pants-config-files`.
+            fingerprint=False,
+            help="Use pantsrc files.",
+        )
         register(
             "--pantsrc-files",
             advanced=True,
             type=list,
             metavar="<path>",
-            daemon=False,
+            # NB: See `--pants-config-files`.
+            fingerprint=False,
             default=["/etc/pantsrc", "~/.pants.rc"],
             help=(
                 "Override config with values from these files, using syntax matching that of "
@@ -389,7 +403,8 @@ class GlobalOptions(Subsystem):
             "--spec-file",
             type=list,
             dest="spec_files",
-            daemon=False,
+            # NB: See `--pants-config-files`.
+            fingerprint=False,
             help="Read additional specs from this file (e.g. target addresses or file names). "
             "Each spec should be one per line.",
         )
@@ -397,7 +412,6 @@ class GlobalOptions(Subsystem):
             "--verify-config",
             type=bool,
             default=True,
-            daemon=False,
             advanced=True,
             help="Verify that all config file values correspond to known options.",
         )
@@ -457,7 +471,6 @@ class GlobalOptions(Subsystem):
             advanced=True,
             type=list,
             default=[],
-            daemon=False,
             metavar="<regexp>",
             help="Exclude target roots that match these regexes.",
         )
@@ -477,6 +490,7 @@ class GlobalOptions(Subsystem):
             "--logdir",
             advanced=True,
             metavar="<dir>",
+            daemon=True,
             help="Write logs to files under this directory.",
         )
 
@@ -485,6 +499,7 @@ class GlobalOptions(Subsystem):
             advanced=True,
             type=bool,
             default=True,
+            daemon=True,
             help=(
                 "Enables use of the pants daemon (pantsd). pantsd can significantly improve "
                 "runtime performance by lowering per-run startup cost, and by caching filesystem "
@@ -500,7 +515,6 @@ class GlobalOptions(Subsystem):
             advanced=True,
             type=bool,
             default=False,
-            daemon=False,
             help="Enable concurrent runs of pants. Without this enabled, pants will "
             "start up all concurrent invocations (e.g. in other terminals) without pantsd. "
             "Enabling this option requires parallel pants invocations to block on the first",
@@ -527,7 +541,6 @@ class GlobalOptions(Subsystem):
             advanced=True,
             type=float,
             default=60.0,
-            daemon=False,
             help="The maximum amount of time to wait for the invocation to start until "
             "raising a timeout exception. "
             "Because pantsd currently does not support parallel runs, "
@@ -551,7 +564,6 @@ class GlobalOptions(Subsystem):
             advanced=True,
             default=None,
             type=dir_option,
-            daemon=False,
             help="A directory to write execution and rule graphs to as `dot` files. The contents "
             "of the directory will be overwritten if any filenames collide.",
         )
@@ -559,6 +571,7 @@ class GlobalOptions(Subsystem):
             "--print-exception-stacktrace",
             advanced=True,
             type=bool,
+            fingerprint=False,
             help="Print to console the full exception stack trace if encountered.",
         )
 
@@ -576,7 +589,6 @@ class GlobalOptions(Subsystem):
             type=int,
             default=30,
             advanced=True,
-            daemon=False,
             help="Timeout in seconds for URL reads when fetching binary tools from the "
             "repos specified by --baseurls.",
         )
@@ -607,6 +619,7 @@ class GlobalOptions(Subsystem):
             advanced=True,
             type=int,
             default=0,
+            daemon=True,
             help="The port to bind the pants nailgun server to. Defaults to a random port.",
         )
         # TODO(#7514): Make this default to 1.0 seconds if stdin is a tty!
@@ -622,6 +635,7 @@ class GlobalOptions(Subsystem):
             "--pantsd-log-dir",
             advanced=True,
             default=None,
+            daemon=True,
             help="The directory to log pantsd output to.",
         )
         register(
@@ -629,6 +643,7 @@ class GlobalOptions(Subsystem):
             advanced=True,
             type=list,
             default=[],
+            daemon=True,
             help="Filesystem events matching any of these globs will trigger a daemon restart. "
             "Pants' own code, plugins, and `--pants-config-files` are inherently invalidated.",
         )
@@ -927,7 +942,6 @@ class GlobalOptions(Subsystem):
             type=bool,
             default=sys.stdout.isatty(),
             recursive=True,
-            daemon=False,
             help="Set whether log messages are displayed in color.",
         )
 
@@ -943,7 +957,6 @@ class GlobalOptions(Subsystem):
             "--dynamic-ui",
             type=bool,
             default=sys.stderr.isatty(),
-            daemon=False,
             help="Display a dynamically-updating console UI as pants runs.",
         )
 
@@ -951,7 +964,6 @@ class GlobalOptions(Subsystem):
             "--v2-ui",
             default=False,
             type=bool,
-            daemon=False,
             removal_version="1.31.0.dev0",
             removal_hint="Use --dynamic-ui instead.",
             help="Whether to show v2 engine execution progress.",
@@ -1003,7 +1015,6 @@ class GlobalOptions(Subsystem):
             "--quiet",
             type=bool,
             recursive=True,
-            daemon=False,
             passive=no_v1,
             help="Squelches most console output. NOTE: Some tasks default to behaving quietly: "
             "inverting this option supports making them noisier than they would be otherwise.",

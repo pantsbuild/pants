@@ -28,18 +28,56 @@
 #![allow(clippy::mutex_atomic)]
 
 use std::future::Future;
+use std::sync::Arc;
 
 use futures::future::FutureExt;
-use tokio::runtime::Handle;
+use tokio::runtime::{Builder, Handle, Runtime};
 
 #[derive(Clone)]
 pub struct Executor {
+  runtime: Option<Arc<Runtime>>,
   handle: Handle,
 }
 
 impl Executor {
+  ///
+  /// Creates an Executor for an existing tokio::Runtime (generally provided by tokio's macros).
+  ///
+  /// The returned Executor will have a lifecycle independent of the Runtime, meaning that dropping
+  /// all clones of the Executor will not cause the Runtime to be shut down. Likewise, the owner of
+  /// the Runtime must ensure that it is kept alive longer than all Executor instances, because
+  /// existence of a Handle does not prevent a Runtime from shutting down. This is guaranteed by
+  /// the scope of the tokio::{test, main} macros.
+  ///
   pub fn new(handle: Handle) -> Executor {
-    Executor { handle }
+    Executor {
+      runtime: None,
+      handle,
+    }
+  }
+
+  ///
+  /// Creates an Executor with an owned tokio::Runtime.
+  ///
+  /// Dropping all clones of the Executor will cause the Runtime to shut down.
+  ///
+  pub fn new_owned() -> Result<Executor, String> {
+    let runtime = Builder::new()
+      // This use of Builder (rather than just Runtime::new()) is to allow us to lower the
+      // max_threads setting. As of tokio `0.2.13`, the core threads default to num_cpus, and
+      // the max threads default to a fixed value of 512. In practice, it appears to be slower
+      // to allow 512 threads (although we should re-evaluate that periodically).
+      .core_threads(num_cpus::get())
+      .max_threads(num_cpus::get() * 4)
+      .threaded_scheduler()
+      .enable_all()
+      .build()
+      .map_err(|e| format!("Failed to start the runtime: {}", e))?;
+    let handle = runtime.handle().clone();
+    Ok(Executor {
+      runtime: Some(Arc::new(runtime)),
+      handle,
+    })
   }
 
   ///

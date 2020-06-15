@@ -534,7 +534,11 @@ class Options:
         return values
 
     def get_fingerprintable_for_scope(
-        self, bottom_scope, include_passthru=None, fingerprint_key=None, invert=False
+        self,
+        bottom_scope: str,
+        include_passthru: Optional[bool] = None,
+        fingerprint_key: str = "fingerprint",
+        invert: bool = False,
     ):
         """Returns a list of fingerprintable (option type, option value) pairs for the given scope.
 
@@ -544,11 +548,11 @@ class Options:
         This method also searches enclosing options scopes of `bottom_scope` to determine the set of
         fingerprintable pairs.
 
-        :param str bottom_scope: The scope to gather fingerprintable options for.
-        :param bool include_passthru: Whether to include passthru args captured by `bottom_scope` in the
-                                      fingerprintable options.
-        :param string fingerprint_key: The option kwarg to match against (defaults to 'fingerprint').
-        :param bool invert: Whether or not to invert the boolean check for the fingerprint_key value.
+        :param bottom_scope: The scope to gather fingerprintable options for.
+        :param include_passthru: Whether to include passthru args captured by `bottom_scope` in the
+                                 fingerprintable options.
+        :param fingerprint_key: The option kwarg to match against (defaults to 'fingerprint').
+        :param invert: Whether or not to invert the boolean check for the fingerprint_key value.
 
         :API: public
         """
@@ -562,7 +566,6 @@ class Options:
             ),
         )
 
-        fingerprint_key = fingerprint_key or "fingerprint"
         fingerprint_default = bool(invert)
         pairs = []
 
@@ -575,7 +578,7 @@ class Options:
             for (_, kwargs) in sorted(parser.option_registrations_iter()):
                 if kwargs.get("recursive", False) and not kwargs.get("recursive_root", False):
                     continue  # We only need to fprint recursive options once.
-                if kwargs.get(fingerprint_key, fingerprint_default) is not True:
+                if not kwargs.get(fingerprint_key, fingerprint_default):
                     continue
                 # Note that we read the value from scope, even if the registration was on an enclosing
                 # scope, to get the right value for recursive options (and because this mirrors what

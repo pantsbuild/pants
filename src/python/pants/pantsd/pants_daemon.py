@@ -4,30 +4,28 @@
 import logging
 import os
 import sys
-import threading
+import time
 from contextlib import contextmanager
-from typing import IO, Iterator
+from typing import IO, Any, Iterator
 
 from setproctitle import setproctitle as set_process_title
 
 from pants.base.build_environment import get_buildroot
-from pants.base.exception_sink import ExceptionSink, SignalHandler
+from pants.base.exception_sink import ExceptionSink
 from pants.bin.daemon_pants_runner import DaemonPantsRunner
 from pants.engine.internals.native import Native
-from pants.engine.unions import UnionMembership
-from pants.init.engine_initializer import EngineInitializer, LegacyGraphScheduler
+from pants.init.engine_initializer import LegacyGraphScheduler
 from pants.init.logging import clear_logging_handlers, init_rust_logger, setup_logging_to_file
-from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
+from pants.init.options_initializer import OptionsInitializer
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.pantsd.pants_daemon_core import PantsDaemonCore
 from pants.pantsd.process_manager import PantsDaemonProcessManager
 from pants.pantsd.service.fs_event_service import FSEventService
-from pants.pantsd.service.pailgun_service import PailgunService
 from pants.pantsd.service.pants_service import PantsServices
 from pants.pantsd.service.scheduler_service import SchedulerService
 from pants.pantsd.service.store_gc_service import StoreGCService
-from pants.pantsd.watchman import Watchman
 from pants.pantsd.watchman_launcher import WatchmanLauncher
 from pants.util.contextutil import stdio_as
 from pants.util.logging import LogLevel
@@ -77,15 +75,6 @@ class _LoggerStream(object):
         return self
 
 
-class PantsDaemonSignalHandler(SignalHandler):
-    def __init__(self, daemon):
-        super().__init__()
-        self._daemon = daemon
-
-    def handle_sigint(self, signum, _frame):
-        self._daemon.terminate(include_watchman=False)
-
-
 class PantsDaemon(PantsDaemonProcessManager):
     """A daemon that manages PantsService instances."""
 
@@ -108,52 +97,42 @@ class PantsDaemon(PantsDaemonProcessManager):
                                 initialize the engine). See the impl of `maybe_launch` for an example
                                 of the intended usage.
         """
+        native = Native()
+        native.override_thread_logging_destination_to_just_pantsd()
+
         bootstrap_options = options_bootstrapper.bootstrap_options
         bootstrap_options_values = bootstrap_options.for_global_scope()
 
-        build_root = get_buildroot()
-        native = Native()
-        build_config = BuildConfigInitializer.get(options_bootstrapper)
-        legacy_graph_scheduler = EngineInitializer.setup_legacy_graph(
-            native, options_bootstrapper, build_config
-        )
-        # TODO: https://github.com/pantsbuild/pants/issues/3479
-        watchman_launcher = WatchmanLauncher.create(bootstrap_options_values)
-        watchman_launcher.maybe_launch()
-        watchman = watchman_launcher.watchman
-        services = cls._setup_services(
-            build_root,
-            bootstrap_options_values,
-            legacy_graph_scheduler,
-            native,
-            watchman,
-            union_membership=UnionMembership(build_config.union_rules()),
+        core = PantsDaemonCore(cls._setup_services)
+
+        server = native.new_nailgun_server(
+            bootstrap_options_values.pantsd_pailgun_port, DaemonPantsRunner(core),
         )
 
         return PantsDaemon(
             native=native,
-            build_root=build_root,
             work_dir=bootstrap_options_values.pants_workdir,
             log_level=bootstrap_options_values.level,
-            services=services,
+            server=server,
+            core=core,
             metadata_base_dir=bootstrap_options_values.pants_subprocessdir,
             bootstrap_options=bootstrap_options,
         )
 
     @staticmethod
     def _setup_services(
-        build_root: str,
-        bootstrap_options: OptionValueContainer,
-        legacy_graph_scheduler: LegacyGraphScheduler,
-        native: Native,
-        watchman: Watchman,
-        union_membership: UnionMembership,
+        bootstrap_options: OptionValueContainer, legacy_graph_scheduler: LegacyGraphScheduler,
     ):
         """Initialize pantsd services.
 
         :returns: A PantsServices instance.
         """
-        native.override_thread_logging_destination_to_just_pantsd()
+        build_root = get_buildroot()
+
+        # TODO: https://github.com/pantsbuild/pants/issues/3479
+        watchman_launcher = WatchmanLauncher.create(bootstrap_options)
+        watchman_launcher.maybe_launch()
+        watchman = watchman_launcher.watchman
         fs_event_service = (
             FSEventService(
                 watchman, scheduler=legacy_graph_scheduler.scheduler, build_root=build_root
@@ -163,7 +142,9 @@ class PantsDaemon(PantsDaemonProcessManager):
         )
 
         invalidation_globs = OptionsInitializer.compute_pantsd_invalidation_globs(
-            build_root, bootstrap_options
+            build_root,
+            bootstrap_options,
+            PantsDaemon.metadata_file_path("pantsd", "pid", bootstrap_options.pants_subprocessdir),
         )
 
         scheduler_service = SchedulerService(
@@ -171,14 +152,8 @@ class PantsDaemon(PantsDaemonProcessManager):
             legacy_graph_scheduler=legacy_graph_scheduler,
             build_root=build_root,
             invalidation_globs=invalidation_globs,
-            union_membership=union_membership,
+            max_memory_usage_pid=os.getpid(),
             max_memory_usage_in_bytes=bootstrap_options.pantsd_max_memory_usage,
-        )
-
-        pailgun_service = PailgunService(
-            bootstrap_options.pantsd_pailgun_port,
-            DaemonPantsRunner(scheduler_service),
-            scheduler_service,
         )
 
         store_gc_service = StoreGCService(legacy_graph_scheduler.scheduler)
@@ -186,24 +161,18 @@ class PantsDaemon(PantsDaemonProcessManager):
         return PantsServices(
             services=tuple(
                 service
-                for service in (
-                    fs_event_service,
-                    scheduler_service,
-                    pailgun_service,
-                    store_gc_service,
-                )
+                for service in (fs_event_service, scheduler_service, store_gc_service,)
                 if service is not None
             ),
-            port_map=dict(pailgun=pailgun_service.pailgun_port()),
         )
 
     def __init__(
         self,
         native: Native,
-        build_root: str,
         work_dir: str,
         log_level: LogLevel,
-        services: PantsServices,
+        server: Any,
+        core: PantsDaemonCore,
         metadata_base_dir: str,
         bootstrap_options: Options,
     ):
@@ -211,19 +180,20 @@ class PantsDaemon(PantsDaemonProcessManager):
         NB: A PantsDaemon instance is generally instantiated via `create`.
 
         :param native: A `Native` instance.
-        :param build_root: The pants build root.
         :param work_dir: The pants work directory.
         :param log_level: The log level to use for daemon logging.
-        :param services: A registry of services to use in this run.
+        :param server: A native PyNailgunServer instance (not currently a nameable type).
+        :param core: A PantsDaemonCore.
         :param metadata_base_dir: The ProcessManager metadata base dir.
         :param bootstrap_options: The bootstrap options.
         """
         super().__init__(bootstrap_options, daemon_entrypoint=__name__)
         self._native = native
-        self._build_root = build_root
+        self._build_root = get_buildroot()
         self._work_dir = work_dir
         self._log_level = log_level
-        self._services = services
+        self._server = server
+        self._core = core
         self._bootstrap_options = bootstrap_options
         self._log_show_rust_3rdparty = (
             bootstrap_options.for_global_scope().log_show_rust_3rdparty
@@ -232,31 +202,6 @@ class PantsDaemon(PantsDaemonProcessManager):
         )
 
         self._logger = logging.getLogger(__name__)
-        # N.B. This Event is used as nothing more than a convenient atomic flag - nothing waits on it.
-        self._kill_switch = threading.Event()
-
-    @property
-    def is_killed(self):
-        return self._kill_switch.is_set()
-
-    def shutdown(self, service_thread_map):
-        """Gracefully terminate all services and kill the main PantsDaemon loop."""
-        with self._services.lifecycle_lock:
-            for service, service_thread in service_thread_map.items():
-                self._logger.info(f"terminating pantsd service: {service}")
-                service.terminate()
-                service_thread.join(self.JOIN_TIMEOUT_SECONDS)
-            self._logger.info("terminating pantsd")
-            self._kill_switch.set()
-
-    def terminate(self, include_watchman=True):
-        """Terminates pantsd and watchman.
-
-        N.B. This should always be called under care of the `lifecycle_lock`.
-        """
-        super().terminate()
-        if include_watchman:
-            self.watchman_launcher.terminate()
 
     @staticmethod
     def _close_stdio():
@@ -308,71 +253,15 @@ class PantsDaemon(PantsDaemonProcessManager):
             self._logger.debug("logging initialized")
             yield log_handler.stream
 
-    @staticmethod
-    def _make_thread(service):
-        name = f"{service.__class__.__name__}Thread"
-
-        def target():
-            Native().override_thread_logging_destination_to_just_pantsd()
-            service.run()
-
-        t = threading.Thread(target=target, name=name)
-        t.daemon = True
-        return t
-
-    def _run_services(self, pants_services):
-        """Service runner main loop."""
-        if not pants_services.services:
-            self._logger.critical("no services to run, bailing!")
-            return
-
-        for service in pants_services.services:
-            self._logger.info(f"setting up service {service}")
-            service.setup(self._services)
-
-        service_thread_map = {
-            service: self._make_thread(service) for service in pants_services.services
-        }
-
-        # Start services.
-        for service, service_thread in service_thread_map.items():
-            self._logger.info(f"starting service {service}")
-            try:
-                service_thread.start()
-            except (RuntimeError, FSEventService.ServiceError):
-                self.shutdown(service_thread_map)
-                raise PantsDaemon.StartupFailure(
-                    f"service {service} failed to start, shutting down!"
-                )
-
-        # Once all services are started, write our pid and notify the SchedulerService to start
-        # watching it.
-        self._initialize_pid()
-
-        # Monitor services.
-        while not self.is_killed:
-            for service, service_thread in service_thread_map.items():
-                if not service_thread.is_alive():
-                    self.shutdown(service_thread_map)
-                    raise PantsDaemon.RuntimeFailure(
-                        f"service failure for {service}, shutting down!"
-                    )
-                else:
-                    # Avoid excessive CPU utilization.
-                    service_thread.join(self.JOIN_TIMEOUT_SECONDS)
-
-    def _write_named_sockets(self, socket_map):
-        """Write multiple named sockets using a socket mapping."""
-        for socket_name, socket_info in socket_map.items():
-            self.write_named_socket(socket_name, socket_info)
+    def _write_nailgun_port(self):
+        """Write the nailgun port to a well known file."""
+        self.write_socket(self._native.nailgun_server_await_bound(self._server))
 
     def _initialize_pid(self):
-        """Writes out our pid and metadata, and begin watching it for validity.
+        """Writes out our pid and metadata.
 
-        Once written and watched, does a one-time read of the pid to confirm that we haven't raced
-        another process starting.
-
-        All services must already have been initialized before this is called.
+        Once written, does a one-time read of the pid to confirm that we haven't raced another
+        process starting.
         """
 
         # Write the pidfile.
@@ -381,23 +270,7 @@ class PantsDaemon(PantsDaemonProcessManager):
         self.write_metadata_by_name(
             "pantsd", self.FINGERPRINT_KEY, ensure_text(self.options_fingerprint)
         )
-        scheduler_services = [s for s in self._services.services if isinstance(s, SchedulerService)]
-        for scheduler_service in scheduler_services:
-            scheduler_service.begin_monitoring_memory_usage(pid)
-
-        # If we can, add the pidfile to watching via the scheduler.
         pidfile_absolute = self._metadata_file_path("pantsd", "pid")
-        if pidfile_absolute.startswith(self._build_root):
-            for scheduler_service in scheduler_services:
-                scheduler_service.add_invalidation_glob(
-                    os.path.relpath(pidfile_absolute, self._build_root)
-                )
-        else:
-            logging.getLogger(__name__).warning(
-                "Not watching pantsd pidfile because subprocessdir is outside of buildroot. Having "
-                "subprocessdir be a child of buildroot (as it is by default) may help avoid stray "
-                "pantsd processes."
-            )
 
         # Finally, once watched, confirm that we didn't race another process.
         try:
@@ -440,11 +313,19 @@ class PantsDaemon(PantsDaemonProcessManager):
             # Set the process name in ps output to 'pantsd' vs './pants compile src/etc:: -ldebug'.
             set_process_title(f"pantsd [{self._build_root}]")
 
-            # Write service socket information to .pids.
-            self._write_named_sockets(self._services.port_map)
+            # Write our pid and the server's port to .pids. Order matters a bit here, because
+            # technically all that is necessary to connect is the port, and Services are lazily
+            # initialized by the core when a connection is established. Our pid needs to be on
+            # disk before that happens.
+            self._initialize_pid()
+            self._write_nailgun_port()
 
-            # Enter the main service runner loop.
-            self._run_services(self._services)
+            # Check periodically whether the core is valid, and exit if it is not.
+            while self._core.is_valid():
+                time.sleep(self.JOIN_TIMEOUT_SECONDS)
+
+            # We're exiting: join the server to avoid interrupting ongoing runs.
+            # TODO: This will happen via #8200.
 
 
 def launch():

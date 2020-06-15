@@ -27,7 +27,7 @@ use rand::seq::SliceRandom;
 use rule_graph::RuleGraph;
 use sharded_lmdb::{ShardedLmdb, DEFAULT_LEASE_TIME};
 use store::Store;
-use tokio::runtime::{Builder, Runtime};
+use task_executor::Executor;
 use uuid::Uuid;
 use watch::{Invalidatable, InvalidationWatcher};
 
@@ -43,8 +43,7 @@ pub struct Core {
   pub rule_graph: RuleGraph<Rule>,
   pub types: Types,
   pub intrinsics: Intrinsics,
-  pub runtime: Runtime,
-  pub executor: task_executor::Executor,
+  pub executor: Executor,
   store: Store,
   pub command_runner: Box<dyn process_execution::CommandRunner>,
   pub http_client: reqwest::Client,
@@ -55,6 +54,7 @@ pub struct Core {
 
 impl Core {
   pub fn new(
+    executor: Executor,
     root_subject_types: Vec<TypeId>,
     tasks: Tasks,
     types: Types,
@@ -92,19 +92,6 @@ impl Core {
     // Randomize CAS address order to avoid thundering herds from common config.
     let mut remote_store_servers = remote_store_servers;
     remote_store_servers.shuffle(&mut rand::thread_rng());
-
-    let runtime = Builder::new()
-      // This use of Builder (rather than just Runtime::new()) is to allow us to lower the
-      // max_threads setting. As of tokio `0.2.13`, the core threads default to num_cpus, and
-      // the max threads default to a fixed value of 512. In practice, it appears to be slower
-      // to allow 512 threads, and with the default stack size, 512 threads would use 1GB of RAM.
-      .core_threads(num_cpus::get())
-      .max_threads(num_cpus::get() * 4)
-      .threaded_scheduler()
-      .enable_all()
-      .build()
-      .map_err(|e| format!("Failed to start the runtime: {}", e))?;
-    let executor = task_executor::Executor::new(runtime.handle().clone());
 
     // We re-use these certs for both the execution and store service; they're generally tied together.
     let root_ca_certs = if let Some(path) = remote_root_ca_certs_path {
@@ -294,7 +281,6 @@ impl Core {
       rule_graph,
       types,
       intrinsics,
-      runtime,
       executor: executor.clone(),
       store,
       command_runner,
