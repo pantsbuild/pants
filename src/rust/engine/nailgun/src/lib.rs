@@ -125,7 +125,7 @@ impl Server {
     mut should_exit: oneshot::Receiver<()>,
     mut listener: TcpListener,
   ) -> Result<(), String> {
-    // While connections are ongoing, they acquire `read`: before shutting down, the server
+    // While connections are ongoing, they acquire `read`; before shutting down, the server
     // acquires `write`.
     let ongoing_connections = Arc::new(RwLock::new(()));
 
