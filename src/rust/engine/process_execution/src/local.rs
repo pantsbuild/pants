@@ -479,9 +479,10 @@ pub trait CapturedWorkdir {
           let formatted_assignment = format!("{}={}", key, arg_str);
           env_var_strings.push(formatted_assignment);
         }
+        let stringified_env_vars: String = env_var_strings.join(" ");
 
         // Shell-quote every command-line argument, as necessary.
-        let mut full_command_line: Vec<String> = env_var_strings;
+        let mut full_command_line: Vec<String> = vec![];
         for arg in req.argv.iter() {
           let quoted_arg = bash::escape(&arg);
           let arg_str = str::from_utf8(&quoted_arg)
@@ -494,9 +495,11 @@ pub trait CapturedWorkdir {
         let full_script = format!(
           "#!/bin/bash
 # This command line should execute the same process as pants did internally.
+export {}
+
 {}
 ",
-          stringified_command_line,
+          stringified_env_vars, stringified_command_line,
         );
 
         let full_file_path = workdir_path.join("__run.sh");
