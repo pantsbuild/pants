@@ -859,6 +859,7 @@ class NoAliasDumper(yaml.SafeDumper):
 
 
 def main() -> None:
+    supported_python_versions = [PythonVersion.py36, PythonVersion.py37]
     generated_yaml = yaml.dump(
         {
             # Conditions are documented here: https://docs.travis-ci.com/user/conditions-v1
@@ -868,24 +869,24 @@ def main() -> None:
             "deploy": DEPLOY_SETTINGS,
             "jobs": {
                 "include": [
-                    *[bootstrap_linux(v) for v in PythonVersion],
-                    *[bootstrap_osx(v) for v in PythonVersion],
-                    *[lint(v) for v in PythonVersion],
+                    *[bootstrap_linux(v) for v in supported_python_versions],
+                    *[bootstrap_osx(v) for v in supported_python_versions],
+                    *[lint(v) for v in supported_python_versions],
                     clippy(),
                     # TODO: fix Cargo audit. Run `build-support/bin/ci.py --cargo-audit` locally.
                     # cargo_audit(),
-                    *[unit_tests(v) for v in PythonVersion],
-                    *[integration_tests_v2(v) for v in PythonVersion],
+                    *[unit_tests(v) for v in supported_python_versions],
+                    *[integration_tests_v2(v) for v in supported_python_versions],
                     *integration_tests_v1(PythonVersion.py36),
                     *integration_tests_v1(PythonVersion.py37),
                     rust_tests_linux(),
                     rust_tests_osx(),
                     build_wheels_linux(),
                     build_wheels_osx(),
-                    *[osx_platform_tests(v) for v in PythonVersion],
-                    *[osx_10_12_sanity_check(v) for v in PythonVersion],
-                    *[osx_10_13_sanity_check(v) for v in PythonVersion],
-                    *[jvm_tests(v) for v in PythonVersion],
+                    *[osx_platform_tests(v) for v in supported_python_versions],
+                    *[osx_10_12_sanity_check(v) for v in supported_python_versions],
+                    *[osx_10_13_sanity_check(v) for v in supported_python_versions],
+                    *[jvm_tests(v) for v in supported_python_versions],
                     deploy_stable(),
                     deploy_unstable(),
                 ]
