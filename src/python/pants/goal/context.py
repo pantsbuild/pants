@@ -8,6 +8,7 @@ from contextlib import contextmanager
 from typing import Dict
 
 from pants.base.build_environment import get_buildroot, get_scm
+from pants.base.deprecated import deprecated_conditional
 from pants.base.worker_pool import SubprocPool
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.target import Target
@@ -112,6 +113,13 @@ class Context:
 
         :API: public
         """
+        deprecated_conditional(
+            lambda: True,
+            removal_version="1.31.0.dev0",
+            entity_description="the source_roots property",
+            hint_message="Contact us (https://pants.readme.io/docs/community) if you need this "
+            "functionality.",
+        )
         return self._source_roots
 
     @property
@@ -307,8 +315,8 @@ class Context:
             # TODO: Adding source roots on the fly like this is yucky, but hopefully this
             # method will go away entirely under the new engine. It's primarily used for injecting
             # synthetic codegen targets, and that isn't how codegen will work in the future.
-        if not self.source_roots.find_by_path(rel_target_base):
-            self.source_roots.add_source_root(rel_target_base)
+        if not self._source_roots.find_by_path(rel_target_base):
+            self._source_roots.add_source_root(rel_target_base)
         if dependencies:
             dependencies = [dep.address for dep in dependencies]
 

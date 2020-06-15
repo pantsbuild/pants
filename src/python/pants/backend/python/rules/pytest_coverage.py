@@ -4,7 +4,6 @@
 import configparser
 import json
 from dataclasses import dataclass
-from enum import Enum
 from io import StringIO
 from pathlib import PurePath
 from textwrap import dedent
@@ -26,7 +25,8 @@ from pants.core.goals.test import (
     ConsoleCoverageReport,
     CoverageData,
     CoverageDataCollection,
-    CoverageReport,
+    CoverageReports,
+    CoverageReportType,
     FilesystemCoverageReport,
 )
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
@@ -41,7 +41,7 @@ from pants.engine.fs import (
     MergeDigests,
 )
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import RootRule, SubsystemRule, named_rule, rule
+from pants.engine.rules import RootRule, SubsystemRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Sources, Targets, TransitiveTargets
 from pants.engine.unions import UnionRule
@@ -141,18 +141,25 @@ class CoverageConfig:
 @rule
 async def create_coverage_config(coverage_config_request: CoverageConfigRequest) -> CoverageConfig:
     sources = await Get[SourceFiles](
-        AllSourceFilesRequest((tgt.get(Sources) for tgt in coverage_config_request.targets))
+        AllSourceFilesRequest(
+            (
+                tgt.get(PythonSources)
+                for tgt in coverage_config_request.targets
+                if tgt.has_field(PythonSources)
+            )
+        )
     )
-    init_injected = await Get[InitInjectedSnapshot](InjectInitRequest(sources.snapshot))
 
     source_root_stripped_sources = await Get[SourceRootStrippedSources](
-        StripSnapshotRequest(snapshot=init_injected.snapshot)
+        StripSnapshotRequest(snapshot=sources.snapshot)
     )
 
     # Generate a map from source root stripped source to its source root. eg:
     #  {'pants/testutil/subsystem/util.py': 'src/python'}. This is so that coverage reports
     #  referencing /chroot/path/pants/testutil/subsystem/util.py can be mapped back to the actual
     #  sources they reference when generating coverage reports.
+    # Note that this map doesn't contain injected __init__.py files, but we tell coverage
+    # to ignore those using the -i flag (see below).
     stripped_files_to_source_roots = {}
     for source_root, files in source_root_stripped_sources.root_to_relfiles.items():
         for file in files:
@@ -190,24 +197,6 @@ async def create_coverage_config(coverage_config_request: CoverageConfigRequest)
     return CoverageConfig(digest)
 
 
-class ReportType(Enum):
-    CONSOLE = ("console", "report")
-    XML = ("xml", None)
-    HTML = ("html", None)
-
-    _report_name: str
-
-    def __new__(cls, value: str, report_name: Optional[str] = None) -> "ReportType":
-        member: "ReportType" = object.__new__(cls)
-        member._value_ = value
-        member._report_name = report_name if report_name is not None else value
-        return member
-
-    @property
-    def report_name(self) -> str:
-        return self._report_name
-
-
 class PytestCoverage(PythonToolBase):
     options_scope = "pytest-coverage"
     default_version = "coverage>=5.0.3,<5.1"
@@ -225,8 +214,8 @@ class PytestCoverage(PythonToolBase):
         )
         register(
             "--report",
-            type=ReportType,
-            default=ReportType.CONSOLE,
+            type=CoverageReportType,
+            default=CoverageReportType.CONSOLE,
             help="Which coverage report type to emit.",
         )
 
@@ -259,7 +248,7 @@ class MergedCoverageData:
     coverage_data: Digest
 
 
-@named_rule(desc="Merge Pytest coverage reports")
+@rule(desc="Merge Pytest coverage reports")
 async def merge_coverage_data(
     data_collection: PytestCoverageDataCollection,
     coverage_setup: CoverageSetup,
@@ -309,7 +298,7 @@ async def merge_coverage_data(
     return MergedCoverageData(coverage_data=result.output_digest)
 
 
-@named_rule(desc="Generate Pytest coverage report")
+@rule(desc="Generate Pytest coverage report")
 async def generate_coverage_report(
     merged_coverage_data: MergedCoverageData,
     coverage_setup: CoverageSetup,
@@ -317,13 +306,12 @@ async def generate_coverage_report(
     transitive_targets: TransitiveTargets,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
-) -> CoverageReport:
+) -> CoverageReports:
     """Takes all Python test results and generates a single coverage report."""
     requirements_pex = coverage_setup.requirements_pex
 
-    python_targets = [tgt for tgt in transitive_targets.closure if tgt.has_field(PythonSources)]
     coverage_config = await Get[CoverageConfig](
-        CoverageConfigRequest(Targets(python_targets), is_test_time=False)
+        CoverageConfigRequest(Targets(transitive_targets.closure), is_test_time=False)
     )
 
     sources = await Get[SourceFiles](
@@ -347,7 +335,10 @@ async def generate_coverage_report(
     )
 
     report_type = coverage_subsystem.options.report
-    coverage_args = [report_type.report_name]
+    # The -i flag causes coverage to ignore files it doesn't have sources for.
+    # Specifically, it will ignore the injected __init__.py files, which is what we want since
+    # those are empty and don't correspond to a real source file the user is aware of.
+    coverage_args = [report_type.report_name, "-i"]
 
     process = requirements_pex.create_process(
         pex_path=f"./{coverage_setup.requirements_pex.output_filename}",
@@ -361,22 +352,22 @@ async def generate_coverage_report(
     )
     result = await Get[ProcessResult](Process, process)
 
-    if report_type == ReportType.CONSOLE:
-        return ConsoleCoverageReport(result.stdout.decode())
+    if report_type == CoverageReportType.CONSOLE:
+        return CoverageReports(reports=(ConsoleCoverageReport(result.stdout.decode()),))
 
     report_dir = PurePath(coverage_subsystem.options.report_output_path)
 
     report_file: Optional[PurePath] = None
-    if coverage_subsystem.options.report == ReportType.HTML:
+    if report_type == CoverageReportType.HTML:
         report_file = report_dir / "htmlcov" / "index.html"
-    elif coverage_subsystem.options.report == ReportType.XML:
+    elif report_type == CoverageReportType.XML:
         report_file = report_dir / "coverage.xml"
-
-    return FilesystemCoverageReport(
+    fs_report = FilesystemCoverageReport(
         result_digest=result.output_digest,
         directory_to_materialize_to=report_dir,
         report_file=report_file,
     )
+    return CoverageReports(reports=(fs_report,))
 
 
 def rules():

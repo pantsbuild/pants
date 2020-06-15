@@ -4,6 +4,7 @@
 import logging
 import os
 import sys
+from typing import Optional
 
 import pkg_resources
 
@@ -15,6 +16,7 @@ from pants.init.extension_loader import load_backends_and_plugins
 from pants.init.global_subsystems import GlobalSubsystems
 from pants.init.plugin_resolver import PluginResolver
 from pants.option.global_options import GlobalOptions
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import fast_relpath_optional
 from pants.util.ordered_set import OrderedSet
@@ -30,7 +32,7 @@ class BuildConfigInitializer:
     plugin loading, which can be expensive and cause issues (double task registration, etc).
     """
 
-    _cached_build_config = None
+    _cached_build_config: Optional[BuildConfiguration] = None
 
     @classmethod
     def get(cls, options_bootstrapper):
@@ -39,15 +41,15 @@ class BuildConfigInitializer:
         return cls._cached_build_config
 
     @classmethod
-    def reset(cls):
+    def reset(cls) -> None:
         cls._cached_build_config = None
 
-    def __init__(self, options_bootstrapper):
+    def __init__(self, options_bootstrapper: OptionsBootstrapper) -> None:
         self._options_bootstrapper = options_bootstrapper
         self._bootstrap_options = options_bootstrapper.get_bootstrap_options().for_global_scope()
         self._working_set = PluginResolver(self._options_bootstrapper).resolve()
 
-    def _load_plugins(self):
+    def _load_plugins(self) -> BuildConfiguration:
         # Add any extra paths to python path (e.g., for loading extra source backends).
         for path in self._bootstrap_options.pythonpath:
             if path not in sys.path:
@@ -61,10 +63,9 @@ class BuildConfigInitializer:
             self._working_set,
             self._bootstrap_options.backend_packages,
             self._bootstrap_options.backend_packages2,
-            BuildConfiguration(),
         )
 
-    def setup(self):
+    def setup(self) -> BuildConfiguration:
         """Load backends and plugins.
 
         :returns: A `BuildConfiguration` object constructed during backend/plugin loading.
@@ -136,20 +137,15 @@ class OptionsInitializer:
         invalidation_globs provided by users.
         """
         invalidation_globs = OrderedSet()
-        globs = [
+
+        # Globs calculated from the sys.path and other file-like configuration need to be sanitized
+        # to relative globs (where possible).
+        potentially_absolute_globs = (
             *sys.path,
             *bootstrap_options.pythonpath,
             *bootstrap_options.pants_config_files,
-            "!*.pyc",
-            "!__pycache__/",
-            *bootstrap_options.pantsd_invalidation_globs,
-        ]
-
-        for glob in globs:
-            if glob.startswith("!"):
-                invalidation_globs.add(glob)
-                continue
-
+        )
+        for glob in potentially_absolute_globs:
             glob_relpath = fast_relpath_optional(glob, buildroot) if os.path.isabs(glob) else glob
             if glob_relpath:
                 invalidation_globs.update([glob_relpath, glob_relpath + "/**"])
@@ -157,6 +153,19 @@ class OptionsInitializer:
                 logger.debug(
                     f"Changes to {glob}, outside of the buildroot, will not be invalidated."
                 )
+
+        # Explicitly specified globs are already relative, and are added verbatim.
+        invalidation_globs.update(
+            (
+                "!*.pyc",
+                "!__pycache__/",
+                # TODO: This is a bandaid for https://github.com/pantsbuild/pants/issues/7022:
+                # macros should be adapted to allow this dependency to be automatically detected.
+                "requirements.txt",
+                "3rdparty/**/requirements.txt",
+                *bootstrap_options.pantsd_invalidation_globs,
+            )
+        )
 
         return list(invalidation_globs)
 

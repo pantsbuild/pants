@@ -23,11 +23,18 @@ use store::{Snapshot, Store, StoreFileByDigest};
 use tokio::time::delay_for;
 
 use crate::{
-  Context, ExecutionStats, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform,
-  PlatformConstraint, Process, ProcessMetadata,
+  Context, ExecutionStats, FallibleProcessResultWithPlatform, MultiPlatformProcess, NamedCaches,
+  Platform, PlatformConstraint, Process, ProcessMetadata,
 };
 use std::cmp::min;
 use workunit_store::WorkunitStore;
+
+// Streaming client module. Intended as an eventual repalcement for the CommandRunner in this
+// module.
+pub(crate) mod streaming;
+pub use streaming::StreamingCommandRunner;
+#[cfg(test)]
+mod streaming_tests;
 
 // Environment variable which is exclusively used for cache key invalidation.
 // This may be not specified in an Process, and may be populated only by the
@@ -125,6 +132,7 @@ pub enum ExecutionError {
   // Digests are Files and Directories which have been reported to be missing. May be incomplete.
   MissingDigests(Vec<Digest>),
   // String is the operation name which can be used to poll the GetOperation gRPC API.
+  // Note: Unused by the streaming client.
   NotFinished(String),
   // String is the error message.
   Retryable(String),
@@ -197,7 +205,7 @@ impl CommandRunner {
       Ok(None) => {
         Err("Didn't get proper stream response from server during remote execution".to_owned())
       }
-      Err(err) => rpcerror_to_status_or_string(err).map(OperationOrStatus::Status),
+      Err(err) => rpcerror_to_status_or_string(&err).map(OperationOrStatus::Status),
     }
   }
 }
@@ -260,6 +268,7 @@ impl super::CommandRunner for CommandRunner {
     let mut history = ExecutionHistory::default();
 
     // Upload inputs.
+    // REFACTOR: StreamingCommandRunner moves this to `ensure_action_uploaded`.
     {
       let (command_digest, action_digest) = future03::try_join(
         self.store_proto_locally(&command),
@@ -382,12 +391,15 @@ impl super::CommandRunner for CommandRunner {
                 history.current_attempt.remote_execution = Some(elapsed);
                 history.complete_attempt();
 
-                break FallibleProcessResultWithPlatform {
-                  stdout: Bytes::from(format!(
+                let stdout = Bytes::from(format!(
                     "Exceeded timeout of {:?} ({:?} for the process and {:?} for remoting buffer time) with {:?} for operation {}, {}",
                     total_timeout, timeout, self.queue_buffer_time, elapsed, operation_name, description
-                  )),
-                  stderr: Bytes::new(),
+                ));
+                let stdout_digest = store.store_file_bytes(stdout.clone(), true).await?;
+
+                break FallibleProcessResultWithPlatform {
+                  stdout_digest,
+                  stderr_digest: hashing::EMPTY_DIGEST,
                   exit_code: -libc::SIGTERM,
                   output_directory: hashing::EMPTY_DIGEST,
                   execution_attempts: history.attempts,
@@ -758,8 +770,6 @@ fn maybe_add_workunit(
   parent_id: Option<String>,
   workunit_store: &WorkunitStore,
 ) {
-  //  TODO: workunits for scheduling, fetching, executing and uploading should be recorded
-  //   only if '--reporting-zipkin-trace-v2' is set
   if !result_cached {
     let metadata = workunit_store::WorkunitMetadata::new();
     workunit_store.add_completed_workunit(name.to_string(), time_span, parent_id, metadata);
@@ -797,6 +807,13 @@ pub fn make_execute_request(
     cache_key_gen_version,
     mut platform_properties,
   } = metadata;
+
+  if !req.append_only_caches.is_empty() {
+    platform_properties.extend(NamedCaches::platform_properties(
+      &req.append_only_caches,
+      &cache_key_gen_version,
+    ));
+  }
 
   if let Some(cache_key_gen_version) = cache_key_gen_version {
     let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
@@ -846,7 +863,13 @@ pub fn make_execute_request(
     // well-known path in the docker container you specify in which to run.
     platform_properties.push(("JDK_SYMLINK".to_owned(), ".jdk".to_owned()));
   }
-  platform_properties.push(("target_platform".to_owned(), req.target_platform.into()));
+
+  if !platform_properties
+    .iter()
+    .any(|(k, _)| k == "target_platform")
+  {
+    platform_properties.push(("target_platform".to_owned(), req.target_platform.into()));
+  }
 
   for (name, value) in platform_properties {
     command.mut_platform().mut_properties().push({
@@ -874,6 +897,12 @@ pub fn make_execute_request(
       v => v,
     });
 
+  // Sort the environment variables. REv2 spec requires sorting by name for same reasons that
+  // platform properties are sorted, i.e. consistent hashing.
+  command
+    .mut_environment_variables()
+    .sort_by(|x, y| x.name.cmp(&y.name));
+
   let mut action = bazel_protos::remote_execution::Action::new();
   action.set_command_digest((&digest(&command)?).into());
   action.set_input_root_digest((&req.input_files).into());
@@ -896,58 +925,40 @@ pub fn populate_fallible_execution_result(
   extract_stdout(&store, &execute_response)
     .join(extract_stderr(&store, &execute_response))
     .join(extract_output_files(store, &execute_response))
-    .and_then(move |((stdout, stderr), output_directory)| {
+    .and_then(move |((stdout_digest, stderr_digest), output_directory)| {
       Ok(FallibleProcessResultWithPlatform {
-        stdout: stdout,
-        stderr: stderr,
+        stdout_digest,
+        stderr_digest,
         exit_code: execute_response.get_result().get_exit_code(),
-        output_directory: output_directory,
-        execution_attempts: execution_attempts,
+        output_directory,
+        execution_attempts,
         platform,
       })
     })
+    .to_boxed()
 }
 
 fn extract_stdout(
   store: &Store,
   execute_response: &bazel_protos::remote_execution::ExecuteResponse,
-) -> BoxFuture<Bytes, String> {
+) -> BoxFuture<Digest, String> {
   if execute_response.get_result().has_stdout_digest() {
-    let store = store.clone();
     let stdout_digest_result: Result<Digest, String> =
       execute_response.get_result().get_stdout_digest().into();
     let stdout_digest =
       try_future!(stdout_digest_result.map_err(|err| format!("Error extracting stdout: {}", err)));
-    Box::pin(async move {
-      let (bytes, _metadata) = store
-        .load_file_bytes_with(stdout_digest, |v| v.into())
-        .map_err(move |error| {
-          format!(
-            "Error fetching stdout digest ({:?}): {:?}",
-            stdout_digest, error
-          )
-        })
-        .await?
-        .ok_or_else(|| {
-          format!(
-            "Couldn't find stdout digest ({:?}), when fetching.",
-            stdout_digest
-          )
-        })?;
-      Ok(bytes)
-    })
-    .compat()
-    .to_boxed()
+    Box::pin(async move { Ok(stdout_digest) })
+      .compat()
+      .to_boxed()
   } else {
     let store = store.clone();
     let stdout_raw = Bytes::from(execute_response.get_result().get_stdout_raw());
-    let stdout_copy = stdout_raw.clone();
     Box::pin(async move {
-      store
+      let digest = store
         .store_file_bytes(stdout_raw, true)
         .map_err(move |error| format!("Error storing raw stdout: {:?}", error))
         .await?;
-      Ok(stdout_copy)
+      Ok(digest)
     })
     .compat()
     .to_boxed()
@@ -957,44 +968,24 @@ fn extract_stdout(
 fn extract_stderr(
   store: &Store,
   execute_response: &bazel_protos::remote_execution::ExecuteResponse,
-) -> BoxFuture<Bytes, String> {
+) -> BoxFuture<Digest, String> {
   if execute_response.get_result().has_stderr_digest() {
-    let store = store.clone();
     let stderr_digest_result: Result<Digest, String> =
       execute_response.get_result().get_stderr_digest().into();
     let stderr_digest =
       try_future!(stderr_digest_result.map_err(|err| format!("Error extracting stderr: {}", err)));
-
-    Box::pin(async move {
-      let (bytes, _metadata) = store
-        .load_file_bytes_with(stderr_digest, |v| v.into())
-        .map_err(move |error| {
-          format!(
-            "Error fetching stderr digest ({:?}): {:?}",
-            stderr_digest, error
-          )
-        })
-        .await?
-        .ok_or_else(|| {
-          format!(
-            "Couldn't find stderr digest ({:?}), when fetching.",
-            stderr_digest
-          )
-        })?;
-      Ok(bytes)
-    })
-    .compat()
-    .to_boxed()
+    Box::pin(async move { Ok(stderr_digest) })
+      .compat()
+      .to_boxed()
   } else {
     let store = store.clone();
     let stderr_raw = Bytes::from(execute_response.get_result().get_stderr_raw());
-    let stderr_copy = stderr_raw.clone();
     Box::pin(async move {
-      store
+      let digest = store
         .store_file_bytes(stderr_raw, true)
         .map_err(move |error| format!("Error storing raw stderr: {:?}", error))
         .await?;
-      Ok(stderr_copy)
+      Ok(digest)
     })
     .compat()
     .to_boxed()
@@ -1144,7 +1135,7 @@ fn rpcerror_recover_cancelled(
 }
 
 fn rpcerror_to_status_or_string(
-  error: grpcio::Error,
+  error: &grpcio::Error,
 ) -> Result<bazel_protos::status::Status, String> {
   match error {
     grpcio::Error::RpcFailure(grpcio::RpcStatus {
@@ -1160,7 +1151,10 @@ fn rpcerror_to_status_or_string(
     }) => Err(format!(
       "{:?}: {:?}",
       status,
-      details.unwrap_or_else(|| "[no message]".to_string())
+      details
+        .as_ref()
+        .map(|s| s.as_str())
+        .unwrap_or_else(|| "[no message]")
     )),
     err => Err(format!("{:?}", err)),
   }

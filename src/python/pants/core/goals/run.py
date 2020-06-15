@@ -37,6 +37,7 @@ class RunOptions(GoalSubsystem):
             type=list,
             member_type=shell_str,
             fingerprint=True,
+            passthrough=True,
             help="Arguments to pass directly to the executed target, e.g. "
             '`--run-args="val1 val2 --debug"`',
         )

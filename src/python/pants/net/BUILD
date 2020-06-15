@@ -5,7 +5,6 @@ python_library(
   sources = ['**/*.py'],
   dependencies = [
     '3rdparty/python:requests',
-    '3rdparty/python:pyopenssl',
     'src/python/pants/util:dirutil',
   ],
   tags = {"partially_type_checked"},

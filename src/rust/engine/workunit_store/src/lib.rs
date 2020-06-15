@@ -10,7 +10,9 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  clippy::used_underscore_binding
+  // TODO: Falsely triggers for async/await:
+  //   see https://github.com/rust-lang/rust-clippy/issues/5360
+  // clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -27,6 +29,7 @@
 
 use concrete_time::TimeSpan;
 pub use log::Level;
+use log::{info, log};
 use parking_lot::Mutex;
 use petgraph::graph::{DiGraph, NodeIndex};
 use rand::thread_rng;
@@ -52,6 +55,43 @@ pub struct Workunit {
   pub metadata: WorkunitMetadata,
 }
 
+impl Workunit {
+  fn log_workunit_state(&self) {
+    let state = match self.state {
+      WorkunitState::Started { .. } => "Starting:",
+      WorkunitState::Completed { .. } => "Completed:",
+    };
+
+    let level = self.metadata.level;
+    let identifier = if let Some(ref s) = self.metadata.desc {
+      s.as_str()
+    } else {
+      self.name.as_str()
+    };
+
+    /* This length calculation doesn't treat multi-byte unicode charcters identically
+     * to single-byte ones for the purpose of figuring out where to truncate the string. But that's
+     * ok, since we just want to truncate the log string if it's roughly "too long", we don't care
+     * exactly what the max_len is or whether it effectively changes slightly if there are
+     * multibyte unicode characters in the string
+     */
+    let max_len = 200;
+    if identifier.len() > max_len {
+      let truncated_identifier: String = identifier.chars().take(max_len).collect();
+      let trunc = identifier.len() - max_len;
+      log!(
+        level,
+        "{} {}... ({} characters truncated)",
+        state,
+        truncated_identifier,
+        trunc
+      );
+    } else {
+      log!(level, "{} {}", state, identifier);
+    }
+  }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum WorkunitState {
   Started { start_time: SystemTime },
@@ -63,6 +103,8 @@ pub struct WorkunitMetadata {
   pub desc: Option<String>,
   pub level: Level,
   pub blocked: bool,
+  pub stdout: Option<hashing::Digest>,
+  pub stderr: Option<hashing::Digest>,
 }
 
 impl WorkunitMetadata {
@@ -71,12 +113,15 @@ impl WorkunitMetadata {
       level: Level::Info,
       desc: None,
       blocked: false,
+      stdout: None,
+      stderr: None,
     }
   }
 }
 
 #[derive(Clone, Default)]
 pub struct WorkunitStore {
+  rendering_dynamic_ui: bool,
   inner: Arc<Mutex<WorkUnitInnerStore>>,
 }
 
@@ -92,8 +137,9 @@ pub struct WorkUnitInnerStore {
 }
 
 impl WorkunitStore {
-  pub fn new() -> WorkunitStore {
+  pub fn new(rendering_dynamic_ui: bool) -> WorkunitStore {
     WorkunitStore {
+      rendering_dynamic_ui,
       inner: Arc::new(Mutex::new(WorkUnitInnerStore {
         graph: DiGraph::new(),
         span_id_to_graph: HashMap::new(),
@@ -190,12 +236,14 @@ impl WorkunitStore {
       metadata,
     };
     let mut inner = self.inner.lock();
+    if !self.rendering_dynamic_ui {
+      started.log_workunit_state()
+    }
+
     inner.workunit_records.insert(span_id.clone(), started);
     inner.started_ids.push(span_id.clone());
     let child = inner.graph.add_node(span_id.clone());
-    inner
-      .span_id_to_graph
-      .insert(span_id.clone(), child.clone());
+    inner.span_id_to_graph.insert(span_id.clone(), child);
     if let Some(parent_id) = parent_id {
       if let Some(parent) = inner.span_id_to_graph.get(&parent_id).cloned() {
         inner.graph.add_edge(parent, child, ());
@@ -205,7 +253,23 @@ impl WorkunitStore {
     span_id
   }
 
+  pub fn complete_workunit_with_new_metadata(
+    &self,
+    span_id: SpanId,
+    metadata: WorkunitMetadata,
+  ) -> Result<(), String> {
+    self.complete_workunit_impl(span_id, Some(metadata))
+  }
+
   pub fn complete_workunit(&self, span_id: SpanId) -> Result<(), String> {
+    self.complete_workunit_impl(span_id, None)
+  }
+
+  fn complete_workunit_impl(
+    &self,
+    span_id: SpanId,
+    new_metadata: Option<WorkunitMetadata>,
+  ) -> Result<(), String> {
     use std::collections::hash_map::Entry;
     let inner = &mut self.inner.lock();
     match inner.workunit_records.entry(span_id.clone()) {
@@ -223,6 +287,10 @@ impl WorkunitStore {
         };
         let new_state = WorkunitState::Completed { time_span };
         workunit.state = new_state;
+        if let Some(metadata) = new_metadata {
+          workunit.metadata = metadata;
+        }
+        workunit.log_workunit_state();
         inner.workunit_records.insert(span_id.clone(), workunit);
         inner.completed_ids.push(span_id);
         Ok(())
@@ -376,22 +444,28 @@ pub fn expect_workunit_state() -> WorkUnitState {
   get_workunit_state().expect("A WorkunitStore has not been set for this thread.")
 }
 
-pub async fn with_workunit<F>(
+pub async fn with_workunit<F, M>(
   workunit_store: WorkunitStore,
   name: String,
-  metadata: WorkunitMetadata,
+  initial_metadata: WorkunitMetadata,
   f: F,
+  final_metadata_fn: M,
 ) -> F::Output
 where
   F: Future,
+  M: for<'a> FnOnce(&'a F::Output, WorkunitMetadata) -> WorkunitMetadata,
 {
   let mut workunit_state = expect_workunit_state();
   let span_id = new_span_id();
   let parent_id = std::mem::replace(&mut workunit_state.parent_id, Some(span_id.clone()));
-  let started_id = workunit_store.start_workunit(span_id, name, parent_id, metadata);
+  let started_id =
+    workunit_store.start_workunit(span_id, name, parent_id, initial_metadata.clone());
   scope_task_workunit_state(Some(workunit_state), async move {
     let result = f.await;
-    workunit_store.complete_workunit(started_id).unwrap();
+    let final_metadata = final_metadata_fn(&result, initial_metadata);
+    if let Err(e) = workunit_store.complete_workunit_with_new_metadata(started_id, final_metadata) {
+      info!("{}", e);
+    }
     result
   })
   .await

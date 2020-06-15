@@ -41,7 +41,7 @@ class PropertiesTest(unittest.TestCase):
             g
             h=
             i :
-            """,
+            """,  # noqa: W605
             {
                 "a": "b",
                 "c": "d=",

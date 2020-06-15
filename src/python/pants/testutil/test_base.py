@@ -30,6 +30,7 @@ from pants.engine.selectors import Params
 from pants.engine.target import Target
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.util import clean_global_runtime_state
+from pants.option.global_options import ExecutionOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source import source_root
 from pants.source.source_root import SourceRootConfig
@@ -91,6 +92,8 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
     :API: public
     """
+
+    additional_options: List[str] = []
 
     _scheduler: Optional[SchedulerSession] = None
     _build_graph = None
@@ -299,11 +302,11 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
     @classmethod
     def build_config(cls):
-        build_config = BuildConfiguration()
+        build_config = BuildConfiguration.Builder()
         build_config.register_aliases(cls.alias_groups())
         build_config.register_rules(cls.rules())
         build_config.register_target_types(cls.target_types())
-        return build_config
+        return build_config.create()
 
     def setUp(self):
         """
@@ -402,7 +405,9 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         if self._scheduler is not None:
             return
 
-        options_bootstrapper = OptionsBootstrapper.create(args=["--pants-config-files=[]"])
+        options_bootstrapper = OptionsBootstrapper.create(
+            args=["--pants-config-files=[]", *self.additional_options]
+        )
         global_options = options_bootstrapper.bootstrap_options.for_global_scope()
         local_store_dir = local_store_dir or global_options.local_store_dir
         local_execution_root_dir = global_options.local_execution_root_dir
@@ -423,7 +428,10 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
             build_root=self.build_root,
             build_configuration=self.build_config(),
             build_ignore_patterns=None,
-        ).new_session(zipkin_trace_v2=False, build_id="buildid_for_test")
+            execution_options=ExecutionOptions.from_bootstrap_options(global_options),
+        ).new_session(
+            zipkin_trace_v2=False, build_id="buildid_for_test", should_report_workunits=True
+        )
         self._scheduler = graph_session.scheduler_session
         self._build_graph, self._address_mapper = graph_session.create_build_graph(
             Specs(address_specs=AddressSpecs([]), filesystem_specs=FilesystemSpecs([])),
@@ -501,7 +509,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
                     "You must set a scope on your subsystem type before using it in tests."
                 )
 
-        optionables = {SourceRootConfig} | self._build_configuration.optionables() | for_subsystems
+        optionables = {SourceRootConfig, *self._build_configuration.optionables(), *for_subsystems}
 
         for_task_types = for_task_types or ()
         for task_type in for_task_types:
@@ -536,6 +544,16 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         for s, opts in self.options.items():
             scoped_opts = options.setdefault(s, {})
             scoped_opts.update(opts)
+
+        source_options = options.get("source", {})
+        if "root_patterns" not in source_options:
+            # We have many tests that relied on old defaults that we've since changed.
+            # We set those defaults here so we don't have to modify many dozens of call sites.
+            source_options["root_patterns"] = [
+                "src/*",
+                "src/main/*",
+            ]
+            options["source"] = source_options
 
         fake_options = create_options_for_optionables(all_optionables, options=options, **kwargs)
 

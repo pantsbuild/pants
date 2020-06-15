@@ -2,17 +2,15 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from hashlib import sha1
-from typing import TYPE_CHECKING, Any, List, Optional, Union, cast
+from typing import Any, List, Optional, Union, cast
 
 from pants.base.payload_field import PayloadField
 from pants.engine.fs import PathGlobs, Snapshot
+from pants.engine.internals.scheduler import SchedulerSession
 from pants.source.filespec import matches_filespec
 from pants.source.source_root import SourceRootConfig
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetWithSpec, Filespec
 from pants.util.memo import memoized_property
-
-if TYPE_CHECKING:
-    from pants.engine.internals.scheduler import SchedulerSession  # noqa: F401
 
 
 class SourcesField(PayloadField):
@@ -39,8 +37,7 @@ class SourcesField(PayloadField):
     def source_root(self):
         """:returns: the source root for these sources, or None if they're not under a source root."""
         # TODO: It's a shame that we have to access the singleton directly here, instead of getting
-        # the SourceRoots instance from context, as tasks do.  In the new engine we could inject
-        # this into the target, rather than have it reach out for global singletons.
+        # the SourceRoots instance from context, as tasks do.
         return SourceRootConfig.global_instance().get_source_roots().find_by_path(self.rel_path)
 
     def matches(self, path: str) -> bool:
@@ -67,7 +64,7 @@ class SourcesField(PayloadField):
         """Returns the address this sources field refers to (used by some derived classes)"""
         return self._ref_address
 
-    def snapshot(self, scheduler: Optional["SchedulerSession"] = None) -> Snapshot:
+    def snapshot(self, scheduler: Optional[SchedulerSession] = None) -> Snapshot:
         """Returns a Snapshot containing the sources, relative to the build root.
 
         This API is experimental, and subject to change.

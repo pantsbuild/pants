@@ -171,6 +171,7 @@ Created by running `./build-support/bin/contributors.sh`.
 + Peter Seibel
 + Pierre Chevalier
 + Qicheng Ma
++ Raúl Cuza
 + Robert Stapenhurst
 + Roger Jiang
 + Roman Andriadi

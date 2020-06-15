@@ -27,7 +27,12 @@ class DepExportsIntegrationTest(PantsRunIntegrationTest):
             target_dir, target_name = target.rsplit(":", 1)
             shutil.copytree(target_dir, src_dir)
             with self.temporary_workdir() as workdir:
-                cmd = ["compile", "--scalafmt-skip", f"{src_dir}:{target_name}"]
+                cmd = [
+                    "compile",
+                    "--source-root-patterns=tests/*",
+                    "--scalafmt-skip",
+                    f"{src_dir}:{target_name}",
+                ]
                 pants_run = self.run_pants_with_workdir(command=cmd, workdir=workdir)
                 self.assert_success(pants_run)
 
@@ -49,6 +54,7 @@ class DepExportsIntegrationTest(PantsRunIntegrationTest):
         pants_run = self.run_pants(
             [
                 "compile",
+                "--source-root-patterns=tests/scala",
                 "--scalafmt-skip",
                 "testprojects/tests/scala/org/pantsbuild/testproject/non_exports:C",
             ]

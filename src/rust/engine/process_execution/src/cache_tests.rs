@@ -2,10 +2,11 @@ use crate::{
   CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, NamedCaches,
   Process, ProcessMetadata,
 };
-use sharded_lmdb::ShardedLmdb;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
+
+use sharded_lmdb::{ShardedLmdb, DEFAULT_LEASE_TIME};
 use store::Store;
 use tempfile::TempDir;
 use testutil::data::TestData;
@@ -54,8 +55,13 @@ async fn run_roundtrip(script_exit_code: i8) -> RoundtripResults {
   let cache_dir = TempDir::new().unwrap();
   let max_lmdb_size = 50 * 1024 * 1024; //50 MB - I didn't pick that number but it seems reasonable.
 
-  let process_execution_store =
-    ShardedLmdb::new(cache_dir.path().to_owned(), max_lmdb_size, runtime.clone()).unwrap();
+  let process_execution_store = ShardedLmdb::new(
+    cache_dir.path().to_owned(),
+    max_lmdb_size,
+    runtime.clone(),
+    DEFAULT_LEASE_TIME,
+  )
+  .unwrap();
 
   let metadata = ProcessMetadata {
     instance_name: None,

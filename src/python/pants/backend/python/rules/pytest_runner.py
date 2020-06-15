@@ -43,7 +43,7 @@ from pants.engine.fs import (
 )
 from pants.engine.interactive_runner import InteractiveProcessRequest
 from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import SubsystemRule, named_rule, rule
+from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Targets, TransitiveTargets
 from pants.engine.unions import UnionRule
@@ -226,7 +226,7 @@ async def setup_pytest_for_target(
     )
 
 
-@named_rule(desc="Run pytest")
+@rule
 async def run_python_test(
     field_set: PythonTestFieldSet,
     test_setup: TestTargetSetup,
@@ -282,7 +282,7 @@ async def run_python_test(
     )
 
 
-@named_rule(desc="Run pytest in an interactive process")
+@rule(desc="Run pytest in an interactive process")
 async def debug_python_test(test_setup: TestTargetSetup) -> TestDebugRequest:
     run_request = InteractiveProcessRequest(
         argv=(test_setup.test_runner_pex.output_filename, *test_setup.args),

@@ -8,15 +8,15 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, Iterator, List, Set, Tuple, Type, cast
 
-from pants.base.deprecated import deprecated_conditional
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.parse_context import ParseContext
 from pants.base.specs import AddressSpec, AddressSpecs, SingleAddress
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
-from pants.build_graph.app_base import AppBase, Bundle
+from pants.build_graph.app_base import AppBase
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.build_graph import BuildGraph
+from pants.build_graph.bundle import Bundle
 from pants.build_graph.remote_sources import RemoteSources
 from pants.build_graph.target import Target as TargetV1
 from pants.engine.addresses import Addresses
@@ -448,25 +448,6 @@ async def transitive_hydrated_targets(
             continue
         closure.add(tht.root)
         to_visit.extend(tht.dependencies)
-
-    no_target_api_bindings = {
-        ht.adaptor.type_alias
-        for ht in closure
-        if ht.adaptor.type_alias not in registered_target_types.aliases
-    }
-    deprecated_conditional(
-        predicate=lambda: bool(no_target_api_bindings),
-        removal_version="1.30.0.dev0",
-        entity_description="Custom V1 targets not having a Target API binding",
-        hint_message=(
-            "You have some custom target types that will soon need light-weight bindings for the "
-            "new and more powerful Target API to continue working properly with parts of Pants, "
-            "like the `list` and `filedeps` goals.\n\nSee "
-            "https://groups.google.com/forum/#!topic/pants-devel/WsRFODRLVZI for more information "
-            f"and instructions.\n\n(Could not find bindings for: {sorted(no_target_api_bindings)})"
-        ),
-        stacklevel=4,
-    )
 
     return TransitiveHydratedTargets(
         tuple(tht.root for tht in transitive_hydrated_targets), FrozenOrderedSet(closure)

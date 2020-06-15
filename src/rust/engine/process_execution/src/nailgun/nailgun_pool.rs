@@ -57,7 +57,7 @@ impl NailgunPool {
     // TODO(#8481) This materializes the input files in the client req, which is a superset of the files we need (we only need the classpath, not the input files)
     store.materialize_directory(workdir_for_server.clone(), input_files)
     .and_then(move |_metadata| {
-      let jdk_home_in_workdir = &workdir_for_server.clone().join(".jdk");
+      let jdk_home_in_workdir = &workdir_for_server.join(".jdk");
       let jdk_home_in_workdir2 = jdk_home_in_workdir.clone();
       let jdk_home_in_workdir3 = jdk_home_in_workdir.clone();
       if jdk_home_in_workdir.exists() {
@@ -324,11 +324,11 @@ impl NailgunProcess {
           port
         );
         Ok(NailgunProcess {
-          port: port,
+          port,
           fingerprint: nailgun_server_fingerprint,
-          name: name,
+          name,
           handle: Arc::new(Mutex::new(child)),
-          build_id: build_id,
+          build_id,
         })
       })
   }

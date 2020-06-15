@@ -50,6 +50,13 @@ class OptionsBootstrapper:
     args: Tuple[str, ...]
     config: Config
 
+    def __repr__(self) -> str:
+        env = {pair[0]: pair[1] for pair in self.env_tuples}
+        # Bootstrap args are included in `args`. We also drop the first argument, which is the path
+        # to `pants_loader.py`.
+        args = list(self.args[1:])
+        return f"OptionsBootstrapper(args={args}, env={env}, config={self.config})"
+
     @staticmethod
     def get_config_file_paths(env, args) -> List[str]:
         """Get the location of the config files.

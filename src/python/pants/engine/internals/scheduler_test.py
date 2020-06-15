@@ -2,16 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import re
-import sys
-import unittest.mock
 from contextlib import contextmanager
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import List
+from typing import Any
 
-from pants.engine.internals.native import Native
-from pants.engine.internals.scheduler import ExecutionError, SchedulerSession
-from pants.engine.rules import RootRule, named_rule, rule
+from pants.engine.internals.scheduler import ExecutionError
+from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, Params
 from pants.engine.unions import UnionRule, union
 from pants.testutil.engine.util import assert_equal_with_printing, remove_locations_from_traceback
@@ -32,7 +29,7 @@ def fn_raises(x):
     raise Exception(f"An exception for {type(x).__name__}")
 
 
-@named_rule(desc="Nested raise")
+@rule(desc="Nested raise")
 def nested_raise(x: B) -> A:  # type: ignore[return]
     fn_raises(x)
 
@@ -135,21 +132,15 @@ async def a_typecheck_fail_test(wrapper: TypeCheckFailWrapper) -> A:
     return A()
 
 
-@rule
-async def c_unhashable(_: TypeCheckFailWrapper) -> C:
-    # This `await` would use the `nested_raise` rule, but it won't get to the point of raising since
-    # the hashability check will fail.
-    _result = await Get(A, B, list())  # noqa: F841
-    return C()
-
-
 @dataclass(frozen=True)
 class CollectionType:
-    items: List[int]
+    # NB: We pass an unhashable type when we want this to fail at the root, and a hashable type
+    # when we'd like it to succeed.
+    items: Any
 
 
 @rule
-async def c_unhashable_dataclass(_: CollectionType) -> C:
+async def c_unhashable(_: CollectionType) -> C:
     # This `await` would use the `nested_raise` rule, but it won't get to the point of raising since
     # the hashability check will fail.
     _result = await Get(A, B, list())  # noqa: F841
@@ -247,7 +238,6 @@ class SchedulerWithNestedRaiseTest(TestBase):
             RootRule(CollectionType),
             a_typecheck_fail_test,
             c_unhashable,
-            c_unhashable_dataclass,
             nested_raise,
         ]
 
@@ -262,96 +252,17 @@ class SchedulerWithNestedRaiseTest(TestBase):
         expected_regex = "WithDeps.*did not declare a dependency on JustGet"
         self.assertRegex(str(cm.exception), expected_regex)
 
-    def test_unhashable_failure(self):
-        """Test that unhashable Get(...) params result in a structured error."""
-
-        def assert_has_cffi_extern_traceback_header(exception: str) -> None:
-            assert exception.startswith(
-                dedent(
-                    """\
-                    1 Exception raised in CFFI extern methods:
-                    Traceback (most recent call last):
-                    """
-                )
-            )
-
-        def assert_has_end_of_cffi_extern_error_traceback(exception: str) -> None:
-            assert "TypeError: unhashable type: 'list'" in exception
-            canonical_exception_text = dedent(
-                """\
-                    The above exception was the direct cause of the following exception:
-
-                    Traceback (most recent call last):
-                      File LOCATION-INFO, in extern_identify
-                        return c.identify(obj)
-                      File LOCATION-INFO, in identify
-                        raise TypeError(f"failed to hash object {obj}: {e}") from e
-                    TypeError: failed to hash object CollectionType(items=[1, 2, 3]): unhashable type: 'list'
-                    """
-            )
-
-            assert canonical_exception_text in exception
-
-        resulting_engine_error = dedent(
-            """\
-            Exception: Types that will be passed as Params at the root of a graph need to be registered via RootRule:
-              Any\n\n\n"""
-        )
-
-        # Test that the error contains the full traceback from within the CFFI context as well
-        # (mentioning which specific extern method ended up raising the exception).
-        with self.assertRaises(ExecutionError) as cm:
+    def test_unhashable_root_params_failure(self):
+        """Test that unhashable root params result in a structured error."""
+        # This will fail at the rust boundary, before even entering the engine.
+        with self.assertRaisesRegex(TypeError, "unhashable type: 'list'"):
             self.request_single_product(C, Params(CollectionType([1, 2, 3])))
-        exc_str = remove_locations_from_traceback(str(cm.exception))
-        assert_has_cffi_extern_traceback_header(exc_str)
-        assert_has_end_of_cffi_extern_error_traceback(exc_str)
-        self.assertIn(
-            dedent(
-                """\
-                The engine execution request raised this error, which is probably due to the errors in the
-                CFFI extern methods listed above, as CFFI externs return None upon error:
-                """
-            ),
-            exc_str,
-        )
-        self.assertTrue(exc_str.endswith(resulting_engine_error), f"exc_str was: {exc_str}")
 
-        PATCH_OPTS = dict(autospec=True, spec_set=True)
-
-        def create_cffi_exception():
-            try:
-                raise Exception("test cffi exception")
-            except Exception:
-                return Native.CFFIExternMethodRuntimeErrorInfo(*sys.exc_info()[0:3])
-
-        # Test that CFFI extern method errors result in an ExecutionError, even if .execution_request()
-        # succeeds.
-        with self.assertRaises(ExecutionError) as cm:
-            with unittest.mock.patch.object(
-                SchedulerSession, "execution_request", **PATCH_OPTS
-            ) as mock_exe_request:
-                with unittest.mock.patch.object(
-                    Native, "_peek_cffi_extern_method_runtime_exceptions", **PATCH_OPTS
-                ) as mock_cffi_exceptions:
-                    mock_exe_request.return_value = None
-                    mock_cffi_exceptions.return_value = [create_cffi_exception()]
-                    self.request_single_product(C, Params(CollectionType([1, 2, 3])))
-        exc_str = remove_locations_from_traceback(str(cm.exception))
-        assert_has_cffi_extern_traceback_header(exc_str)
-        self.assertIn("Exception: test cffi exception", exc_str)
-        self.assertNotIn(resulting_engine_error, exc_str)
-
-        # Test that an error in the .execution_request() method is propagated directly, even if there
-        # are no CFFI extern methods.
-        class TestError(Exception):
-            pass
-
-        with self.assertRaisesWithMessage(TestError, "non-CFFI error"):
-            with unittest.mock.patch.object(
-                SchedulerSession, "execution_request", **PATCH_OPTS
-            ) as mock_exe_request:
-                mock_exe_request.side_effect = TestError("non-CFFI error")
-                self.request_single_product(C, Params(CollectionType([1, 2, 3])))
+    def test_unhashable_get_params_failure(self):
+        """Test that unhashable Get(...) params result in a structured error."""
+        # This will fail inside of `c_unhashable_dataclass`.
+        with self.assertRaisesRegex(ExecutionError, "unhashable type: 'list'"):
+            self.request_single_product(C, Params(CollectionType(tuple())))
 
     def test_trace_includes_rule_exception_traceback(self):
         # Execute a request that will trigger the nested raise, and then directly inspect its trace.
@@ -371,8 +282,6 @@ class SchedulerWithNestedRaiseTest(TestBase):
                  Engine traceback:
                    in Nested raise
                  Traceback (most recent call last):
-                   File LOCATION-INFO, in call
-                     val = func(*args)
                    File LOCATION-INFO, in nested_raise
                      fn_raises(x)
                    File LOCATION-INFO, in fn_raises

@@ -17,6 +17,16 @@ class PythonRun(PythonExecutionTaskBase):
     def supports_passthru_args(cls):
         return True
 
+    @classmethod
+    def passthru_args_kwargs(cls):
+        return dict(
+            passthrough=False,
+            removal_version="1.31.0.dev0",
+            removal_hint=(
+                "This task now receives passthrough arguments via the `--run-args` option."
+            ),
+        )
+
     def execute(self):
         binary = self.require_single_root_target()
         if isinstance(binary, PythonBinary):

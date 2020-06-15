@@ -24,7 +24,7 @@ pub struct Select {
 
 impl Select {
   pub fn new(product: TypeId) -> Select {
-    Select { product: product }
+    Select { product }
   }
 }
 

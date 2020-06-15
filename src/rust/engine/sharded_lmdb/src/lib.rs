@@ -10,7 +10,9 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  clippy::used_underscore_binding
+  // TODO: Falsely triggers for async/await:
+  //   see https://github.com/rust-lang/rust-clippy/issues/5360
+  // clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -36,8 +38,18 @@ use std::collections::HashMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time;
+use std::time::{self, Duration};
 use tempfile::TempDir;
+
+///
+/// The lease time is relatively short, because we in general would like things to be
+/// garbage collectible. Leases are set on creation, and extended by pantsd for things that
+/// are held in memory (since accessing the `Graph` will not extend leases on its own).
+///
+/// NB: This should align with the lease extension timeouts configured in the pantsd
+/// StoreGCService.
+///
+pub const DEFAULT_LEASE_TIME: Duration = Duration::from_secs(2 * 60 * 60);
 
 const VERSIONED_FINGERPRINT_SIZE: usize = FINGERPRINT_SIZE + 1;
 
@@ -98,6 +110,7 @@ pub struct ShardedLmdb {
   root_path: PathBuf,
   max_size: usize,
   executor: task_executor::Executor,
+  lease_time: Duration,
 }
 
 impl ShardedLmdb {
@@ -120,6 +133,7 @@ impl ShardedLmdb {
     root_path: PathBuf,
     max_size: usize,
     executor: task_executor::Executor,
+    lease_time: Duration,
   ) -> Result<ShardedLmdb, String> {
     trace!("Initializing ShardedLmdb at root {:?}", root_path);
     let mut lmdbs = HashMap::new();
@@ -156,6 +170,7 @@ impl ShardedLmdb {
       root_path,
       max_size,
       executor,
+      lease_time,
     })
   }
 
@@ -227,6 +242,29 @@ impl ShardedLmdb {
     self.lmdbs.values().cloned().collect()
   }
 
+  pub async fn exists(&self, fingerprint: Fingerprint) -> Result<bool, String> {
+    let store = self.clone();
+    let effective_key = VersionedFingerprint::new(fingerprint, ShardedLmdb::schema_version());
+    self
+      .executor
+      .spawn_blocking(move || {
+        let fingerprint = effective_key.get_fingerprint();
+        let (env, db, _) = store.get(&fingerprint);
+        let txn = env
+          .begin_ro_txn()
+          .map_err(|err| format!("Failed to begin read transaction: {:?}", err))?;
+        match txn.get(db, &effective_key) {
+          Ok(_) => Ok(true),
+          Err(lmdb::Error::NotFound) => Ok(false),
+          Err(err) => Err(format!(
+            "Error reading from store when checking existence of {}: {}",
+            fingerprint, err
+          )),
+        }
+      })
+      .await
+  }
+
   pub async fn store_bytes(
     &self,
     fingerprint: Fingerprint,
@@ -242,10 +280,10 @@ impl ShardedLmdb {
         let put_res = env.begin_rw_txn().and_then(|mut txn| {
           txn.put(db, &effective_key, &bytes, WriteFlags::NO_OVERWRITE)?;
           if initial_lease {
-            store.lease(
+            store.lease_inner(
               lease_database,
               &effective_key,
-              Self::default_lease_until_secs_since_epoch(),
+              store.lease_until_secs_since_epoch(),
               &mut txn,
             )?;
           }
@@ -265,7 +303,27 @@ impl ShardedLmdb {
       .await
   }
 
-  fn lease(
+  pub async fn lease(&self, fingerprint: Fingerprint) -> Result<(), lmdb::Error> {
+    let store = self.clone();
+    self
+      .executor
+      .spawn_blocking(move || {
+        let until_secs_since_epoch: u64 = store.lease_until_secs_since_epoch();
+        let (env, _, lease_database) = store.get(&fingerprint);
+        env.begin_rw_txn().and_then(|mut txn| {
+          store.lease_inner(
+            lease_database,
+            &VersionedFingerprint::new(fingerprint, ShardedLmdb::schema_version()),
+            until_secs_since_epoch,
+            &mut txn,
+          )?;
+          txn.commit()
+        })
+      })
+      .await
+  }
+
+  fn lease_inner(
     &self,
     database: Database,
     versioned_fingerprint: &VersionedFingerprint,
@@ -280,11 +338,11 @@ impl ShardedLmdb {
     )
   }
 
-  fn default_lease_until_secs_since_epoch() -> u64 {
+  fn lease_until_secs_since_epoch(&self) -> u64 {
     let now_since_epoch = time::SystemTime::now()
       .duration_since(time::UNIX_EPOCH)
       .expect("Surely you're not before the unix epoch?");
-    (now_since_epoch + time::Duration::from_secs(2 * 60 * 60)).as_secs()
+    (now_since_epoch + self.lease_time).as_secs()
   }
 
   pub async fn load_bytes_with<

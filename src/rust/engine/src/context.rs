@@ -3,32 +3,29 @@
 
 use std::collections::{BTreeMap, HashSet};
 use std::convert::{Into, TryInto};
+use std::future::Future;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
 use crate::core::{Failure, TypeId};
-use crate::handles::maybe_drop_handles;
 use crate::intrinsics::Intrinsics;
 use crate::nodes::{NodeKey, WrappedNode};
 use crate::scheduler::Session;
 use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
 
-use boxfuture::{BoxFuture, Boxable};
 use fs::{safe_create_dir_all_ioerror, GitignoreStyleExcludes, PosixFS};
-use futures::compat::Future01CompatExt;
-use futures01::Future;
 use graph::{EntryId, Graph, InvalidationResult, NodeContext};
 use log::info;
 use process_execution::{
-  self, speculate::SpeculatingCommandRunner, BoundedCommandRunner, NamedCaches, Platform,
-  ProcessMetadata,
+  self, speculate::SpeculatingCommandRunner, BoundedCommandRunner, CommandRunner, NamedCaches,
+  Platform, ProcessMetadata,
 };
 use rand::seq::SliceRandom;
 use rule_graph::RuleGraph;
-use sharded_lmdb::ShardedLmdb;
+use sharded_lmdb::{ShardedLmdb, DEFAULT_LEASE_TIME};
 use store::Store;
 use tokio::runtime::{Builder, Runtime};
 use uuid::Uuid;
@@ -88,6 +85,8 @@ impl Core {
     process_execution_speculation_strategy: String,
     process_execution_use_local_cache: bool,
     remote_execution_headers: BTreeMap<String, String>,
+    remote_execution_enable_streaming: bool,
+    remote_execution_overall_deadline_secs: u64,
     process_execution_local_enable_nailgun: bool,
   ) -> Result<Core, String> {
     // Randomize CAS address order to avoid thundering herds from common config.
@@ -195,8 +194,23 @@ impl Core {
       ));
 
     if remote_execution {
-      let remote_command_runner: Box<dyn process_execution::CommandRunner> =
-        Box::new(BoundedCommandRunner::new(
+      let remote_command_runner: Box<dyn process_execution::CommandRunner> = {
+        let command_runner: Box<dyn CommandRunner> = if remote_execution_enable_streaming {
+          Box::new(process_execution::remote::StreamingCommandRunner::new(
+            // No problem unwrapping here because the global options validation
+            // requires the remote_execution_server be present when remote_execution is set.
+            &remote_execution_server.unwrap(),
+            process_execution_metadata.clone(),
+            root_ca_certs,
+            oauth_bearer_token,
+            remote_execution_headers,
+            store.clone(),
+            // TODO if we ever want to configure the remote platform to be something else we
+            // need to take an option all the way down here and into the remote::CommandRunner struct.
+            Platform::Linux,
+            Duration::from_secs(remote_execution_overall_deadline_secs),
+          )?)
+        } else {
           Box::new(process_execution::remote::CommandRunner::new(
             // No problem unwrapping here because the global options validation
             // requires the remote_execution_server be present when remote_execution is set.
@@ -213,9 +227,14 @@ impl Core {
             std::time::Duration::from_secs(320),
             std::time::Duration::from_millis(500),
             std::time::Duration::from_secs(5),
-          )?),
+          )?)
+        };
+
+        Box::new(BoundedCommandRunner::new(
+          command_runner,
           process_execution_remote_parallelism,
-        ));
+        ))
+      };
       command_runner = match process_execution_speculation_strategy.as_ref() {
         "local_first" => Box::new(SpeculatingCommandRunner::new(
           command_runner,
@@ -237,6 +256,7 @@ impl Core {
         local_store_dir2.join("processes"),
         5 * GIGABYTES,
         executor.clone(),
+        DEFAULT_LEASE_TIME,
       )
       .map_err(|err| format!("Could not initialize store for process cache: {:?}", err))?;
       command_runner = Box::new(process_execution::cache::CommandRunner::new(
@@ -342,19 +362,17 @@ impl Context {
   ///
   /// Get the future value for the given Node implementation.
   ///
-  pub fn get<N: WrappedNode>(&self, node: N) -> BoxFuture<N::Item, Failure> {
-    // TODO: Odd place for this... could do it periodically in the background?
-    maybe_drop_handles();
-    self
+  pub async fn get<N: WrappedNode>(&self, node: N) -> Result<N::Item, Failure> {
+    let node_result = self
       .core
       .graph
       .get(self.entry_id, self, node.into())
-      .map(|node_result| {
-        node_result
-          .try_into()
-          .unwrap_or_else(|_| panic!("A Node implementation was ambiguous."))
-      })
-      .to_boxed()
+      .await?;
+    Ok(
+      node_result
+        .try_into()
+        .unwrap_or_else(|_| panic!("A Node implementation was ambiguous.")),
+    )
   }
 }
 
@@ -385,8 +403,8 @@ impl NodeContext for Context {
 
   fn spawn<F>(&self, future: F)
   where
-    F: Future<Item = (), Error = ()> + Send + 'static,
+    F: Future<Output = ()> + Send + 'static,
   {
-    let _join = self.core.executor.spawn(future.compat());
+    let _join = self.core.executor.spawn(future);
   }
 }

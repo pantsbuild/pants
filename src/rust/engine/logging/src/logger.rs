@@ -5,7 +5,7 @@ use crate::PythonLogLevel;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::future::Future;
@@ -20,9 +20,9 @@ use simplelog::{ConfigBuilder, LevelPadding, WriteLogger};
 use tokio::task_local;
 use uuid::Uuid;
 
-const TIME_FORMAT_STR: &str = "%H:%M:%S:%3f";
+const TIME_FORMAT_STR: &str = "%H:%M:%S";
 
-pub type StdioHandler = Box<dyn Fn(&str) -> () + Send>;
+pub type StdioHandler = Box<dyn Fn(&str) -> Result<(), ()> + Send>;
 
 lazy_static! {
   pub static ref LOGGER: Logger = Logger::new();
@@ -154,21 +154,31 @@ impl Log for Logger {
   }
 
   fn log(&self, record: &Record) {
+    use chrono::Timelike;
     let destination = get_destination();
     match destination {
       Destination::Stderr => {
-        let cur_time = chrono::Utc::now().format(TIME_FORMAT_STR);
+        let cur_date = chrono::Local::now();
+        let time_str = format!(
+          "{}.{:02}",
+          cur_date.format(TIME_FORMAT_STR),
+          cur_date.time().nanosecond() / 10_000_000 // two decimal places of precision
+        );
         let level = record.level();
-        let log_string: String = format!("{} [{}] {}", cur_time, level, record.args());
+        let log_string: String = format!("{} [{}] {}", time_str, level, record.args());
 
         {
+          // If there are no handlers, or sending to any of the handlers failed, send to stderr
+          // directly.
           let handlers_map = self.stderr_handlers.lock();
-          if handlers_map.len() == 0 {
-            self.stderr_log.lock().log(record);
-          } else {
-            for callback in handlers_map.values() {
-              callback(&log_string);
+          let mut any_handler_failed = false;
+          for callback in handlers_map.values() {
+            if callback(&log_string).is_err() {
+              any_handler_failed = true;
             }
+          }
+          if handlers_map.len() == 0 || any_handler_failed {
+            self.stderr_log.lock().log(record);
           }
         }
       }
@@ -270,6 +280,17 @@ impl<W: Write + Send + 'static> Log for MaybeWriteLogger<W> {
 pub enum Destination {
   Pantsd,
   Stderr,
+}
+
+impl TryFrom<&str> for Destination {
+  type Error = String;
+  fn try_from(dest: &str) -> Result<Self, Self::Error> {
+    match dest {
+      "pantsd" => Ok(Destination::Pantsd),
+      "stderr" => Ok(Destination::Stderr),
+      other => Err(format!("Unknown log destination: {:?}", other)),
+    }
+  }
 }
 
 thread_local! {

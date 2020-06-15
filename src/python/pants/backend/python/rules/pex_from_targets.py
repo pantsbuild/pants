@@ -19,7 +19,7 @@ from pants.backend.python.target_types import (
 )
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, MergeDigests
-from pants.engine.rules import RootRule, named_rule, rule
+from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
 from pants.engine.target import Targets, TransitiveTargets
 from pants.python.python_setup import PythonSetup
@@ -85,7 +85,7 @@ class TwoStepPexFromTargetsRequest:
     pex_from_targets_request: PexFromTargetsRequest
 
 
-@named_rule(desc="Create a PEX from targets")
+@rule
 async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonSetup) -> PexRequest:
     transitive_targets = await Get[TransitiveTargets](Addresses, request.addresses)
     all_targets = transitive_targets.closure

@@ -12,7 +12,7 @@ use std::convert::TryInto;
 use store::Store;
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory};
-use testutil::{as_bytes, owned_string_vec};
+use testutil::owned_string_vec;
 
 use crate::remote::{CommandRunner, ExecutionError, ExecutionHistory, OperationOrStatus};
 use crate::{
@@ -20,11 +20,10 @@ use crate::{
   MultiPlatformProcess, Platform, PlatformConstraint, Process, ProcessMetadata,
 };
 use maplit::{btreemap, hashset};
-use mock::execution_server::MockOperation;
+use mock::execution_server::{ExpectedAPICall, MockOperation};
 use protobuf::well_known_types::Timestamp;
 use spectral::prelude::*;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
-use std::iter::{self, FromIterator};
 use std::ops::Sub;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -33,13 +32,20 @@ use tokio::time::{delay_for, timeout};
 use workunit_store::{Workunit, WorkunitMetadata, WorkunitState, WorkunitStore};
 
 #[derive(Debug, PartialEq)]
-enum StdoutType {
+pub(crate) struct RemoteTestResult {
+  pub(crate) original: FallibleProcessResultWithPlatform,
+  pub(crate) stdout_bytes: Vec<u8>,
+  pub(crate) stderr_bytes: Vec<u8>,
+}
+
+#[derive(Debug, PartialEq)]
+pub(crate) enum StdoutType {
   Raw(String),
   Digest(Digest),
 }
 
 #[derive(Debug, PartialEq)]
-enum StderrType {
+pub(crate) enum StderrType {
   Raw(String),
   Digest(Digest),
 }
@@ -65,7 +71,7 @@ async fn make_execute_request() {
       .collect(),
     timeout: one_second(),
     description: "some description".to_owned(),
-    append_only_caches: BTreeSet::new(),
+    append_only_caches: BTreeMap::new(),
     jdk_home: None,
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
@@ -148,7 +154,7 @@ async fn make_execute_request_with_instance_name() {
       .collect(),
     timeout: one_second(),
     description: "some description".to_owned(),
-    append_only_caches: BTreeSet::new(),
+    append_only_caches: BTreeMap::new(),
     jdk_home: None,
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
@@ -175,7 +181,7 @@ async fn make_execute_request_with_instance_name() {
   want_command.mut_platform().mut_properties().push({
     let mut property = bazel_protos::remote_execution::Platform_Property::new();
     property.set_name("target_platform".to_owned());
-    property.set_value("none".to_owned());
+    property.set_value("apple-2e".to_owned()); // overridden by metadata, see below
     property
   });
 
@@ -183,10 +189,10 @@ async fn make_execute_request_with_instance_name() {
   want_action.set_command_digest(
     (&Digest(
       Fingerprint::from_hex_string(
-        "6cfe2081e40c7542a8b369b669618fe7c6e690e274183e406ed75dc3959dc82f",
+        "12111c5c43433f428dfd53ba1f44dfdcad1ae88ecf4560930eeb8eec54551c99",
       )
       .unwrap(),
-      99,
+      103,
     ))
       .into(),
   );
@@ -197,7 +203,7 @@ async fn make_execute_request_with_instance_name() {
   want_execute_request.set_action_digest(
     (&Digest(
       Fingerprint::from_hex_string(
-        "1b52d1997da65c69c5fe2f8717caa6e538dabc13f90f16332454d95b1f8949a4",
+        "f850dad74061fb0919212274da8137d647dde16ec1623c13f0f8eafa4d83a823",
       )
       .unwrap(),
       140,
@@ -211,7 +217,7 @@ async fn make_execute_request_with_instance_name() {
       ProcessMetadata {
         instance_name: Some("dark-tower".to_owned()),
         cache_key_gen_version: None,
-        platform_properties: vec![],
+        platform_properties: vec![("target_platform".to_owned(), "apple-2e".to_owned())],
       }
     ),
     Ok((want_action, want_command, want_execute_request))
@@ -239,7 +245,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
       .collect(),
     timeout: one_second(),
     description: "some description".to_owned(),
-    append_only_caches: BTreeSet::new(),
+    append_only_caches: BTreeMap::new(),
     jdk_home: None,
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
@@ -261,6 +267,9 @@ async fn make_execute_request_with_cache_key_gen_version() {
     env
   });
   want_command
+    .mut_environment_variables()
+    .sort_by(|x, y| x.name.cmp(&y.name));
+  want_command
     .mut_output_files()
     .push("other/file".to_owned());
   want_command
@@ -280,7 +289,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
   want_action.set_command_digest(
     (&Digest(
       Fingerprint::from_hex_string(
-        "c803d479ce49fc85fe5dfe55177594d9957713192b011459cbd3532982c388f5",
+        "0b560be42712036a85ae33f1570eb12918c0763515517fb9511008dd5615e9d7",
       )
       .unwrap(),
       136,
@@ -293,7 +302,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
   want_execute_request.set_action_digest(
     (&Digest(
       Fingerprint::from_hex_string(
-        "a56e51451c48a993ba7b0e5051f53618562f2b25be93e06171d819b9104cc96c",
+        "c07f61ace0d3aa8182f4f9248b15dc7ee0a873b5d1f74ac50b70e0c8cbda0122",
       )
       .unwrap(),
       141,
@@ -326,7 +335,7 @@ async fn make_execute_request_with_jdk() {
     output_directories: BTreeSet::new(),
     timeout: one_second(),
     description: "some description".to_owned(),
-    append_only_caches: BTreeSet::new(),
+    append_only_caches: BTreeMap::new(),
     jdk_home: Some(PathBuf::from("/tmp")),
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
@@ -391,7 +400,7 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
     output_directories: BTreeSet::new(),
     timeout: one_second(),
     description: "some description".to_owned(),
-    append_only_caches: BTreeSet::new(),
+    append_only_caches: BTreeMap::new(),
     jdk_home: Some(PathBuf::from("/tmp")),
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
@@ -484,23 +493,23 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
 async fn server_rejecting_execute_request_gives_error() {
   let execute_request = echo_foo_request();
 
-  let mock_server = {
-    mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(
-        "wrong-command".to_string(),
-        crate::remote::make_execute_request(
-          &Process::new(owned_string_vec(&["/bin/echo", "-n", "bar"])),
-          empty_request_metadata(),
-        )
-        .unwrap()
-        .2,
-        vec![],
-      ),
-      None,
-    )
-  };
+  let mock_server = mock::execution_server::TestServer::new(
+    mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
+      execute_request: crate::remote::make_execute_request(
+        &Process::new(owned_string_vec(&["/bin/echo", "-n", "bar"])),
+        empty_request_metadata(),
+      )
+      .map(|x| x.2)
+      .unwrap(),
+      stream_responses: Err(grpcio::RpcStatus::new(
+        grpcio::RpcStatusCode::INVALID_ARGUMENT,
+        None,
+      )),
+    }]),
+    None,
+  );
 
-  let error = run_command_remote(mock_server.address(), execute_request)
+  let error = run_command_remote2(mock_server.address(), execute_request)
     .await
     .expect_err("Want Err");
   assert_that(&error).contains("INVALID_ARGUMENT");
@@ -514,44 +523,38 @@ async fn successful_execution_after_one_getoperation() {
 
   let mock_server = {
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        crate::remote::make_execute_request(
-          &execute_request.clone().try_into().unwrap(),
-          empty_request_metadata(),
-        )
-        .unwrap()
-        .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          make_successful_operation(
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &execute_request.clone().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_successful_operation(
             &op_name,
             StdoutType::Raw("foo".to_owned()),
             StderrType::Raw("".to_owned()),
             0,
           ),
-        ],
-      ),
+        },
+      ]),
       None,
     )
   };
 
-  let result = run_command_remote(mock_server.address(), execute_request)
+  let result = run_command_remote2(mock_server.address(), execute_request)
     .await
     .unwrap();
 
-  assert_eq!(
-    result.without_execution_attempts(),
-    FallibleProcessResultWithPlatform {
-      stdout: as_bytes("foo"),
-      stderr: as_bytes(""),
-      exit_code: 0,
-      output_directory: EMPTY_DIGEST,
-      execution_attempts: vec![],
-      platform: Platform::Linux,
-    }
-  );
-
+  assert_eq!(result.stdout_bytes, "foo".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
   assert_cancellation_requests(&mock_server, vec![]);
 }
 
@@ -562,45 +565,52 @@ async fn retries_retriable_errors() {
 
   let mock_server = {
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        crate::remote::make_execute_request(
-          &execute_request.clone().try_into().unwrap(),
-          empty_request_metadata(),
-        )
-        .unwrap()
-        .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          make_retryable_operation_failure(),
-          make_incomplete_operation(&op_name),
-          make_successful_operation(
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &execute_request.clone().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_retryable_operation_failure(),
+        },
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &execute_request.clone().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_successful_operation(
             &op_name,
             StdoutType::Raw("foo".to_owned()),
             StderrType::Raw("".to_owned()),
             0,
           ),
-        ],
-      ),
+        },
+      ]),
       None,
     )
   };
 
-  let result = run_command_remote(mock_server.address(), execute_request)
+  let result = run_command_remote2(mock_server.address(), execute_request)
     .await
     .unwrap();
 
-  assert_eq!(
-    result.without_execution_attempts(),
-    FallibleProcessResultWithPlatform {
-      stdout: as_bytes("foo"),
-      stderr: as_bytes(""),
-      exit_code: 0,
-      output_directory: EMPTY_DIGEST,
-      execution_attempts: vec![],
-      platform: Platform::Linux,
-    }
-  );
+  assert_eq!(result.stdout_bytes, "foo".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.platform, Platform::Linux);
 
   assert_cancellation_requests(&mock_server, vec![]);
 }
@@ -612,32 +622,78 @@ async fn gives_up_after_many_retriable_errors() {
 
   let mock_server = {
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        crate::remote::make_execute_request(
-          &execute_request.clone().try_into().unwrap(),
-          empty_request_metadata(),
-        )
-        .unwrap()
-        .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          make_retryable_operation_failure(),
-          make_incomplete_operation(&op_name),
-          make_retryable_operation_failure(),
-          make_incomplete_operation(&op_name),
-          make_retryable_operation_failure(),
-          make_incomplete_operation(&op_name),
-          make_retryable_operation_failure(),
-          make_incomplete_operation(&op_name),
-          make_retryable_operation_failure(),
-        ],
-      ),
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &execute_request.clone().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_retryable_operation_failure(),
+        },
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &execute_request.clone().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_retryable_operation_failure(),
+        },
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &execute_request.clone().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_retryable_operation_failure(),
+        },
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &execute_request.clone().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_retryable_operation_failure(),
+        },
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &execute_request.clone().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_retryable_operation_failure(),
+        },
+      ]),
       None,
     )
   };
 
-  let err = run_command_remote(mock_server.address(), execute_request)
+  let err = run_command_remote2(mock_server.address(), execute_request)
     .await
     .unwrap_err();
 
@@ -654,24 +710,26 @@ async fn sends_headers() {
 
   let mock_server = {
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        crate::remote::make_execute_request(
-          &execute_request.clone().try_into().unwrap(),
-          empty_request_metadata(),
-        )
-        .unwrap()
-        .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          make_successful_operation(
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &execute_request.clone().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_successful_operation(
             &op_name,
             StdoutType::Raw("foo".to_owned()),
             StderrType::Raw("".to_owned()),
             0,
           ),
-        ],
-      ),
+        },
+      ]),
       None,
     )
   };
@@ -757,31 +815,26 @@ async fn extract_response_with_digest_stdout() {
   let op_name = "gimme-foo".to_string();
   let testdata = TestData::roland();
   let testdata_empty = TestData::empty();
-  assert_eq!(
-    extract_execute_response(
-      make_successful_operation(
-        &op_name,
-        StdoutType::Digest(testdata.digest()),
-        StderrType::Raw(testdata_empty.string()),
-        0,
-      )
-      .op
-      .unwrap()
-      .unwrap(),
-      Platform::Linux,
+  let result = extract_execute_response(
+    make_successful_operation(
+      &op_name,
+      StdoutType::Digest(testdata.digest()),
+      StderrType::Raw(testdata_empty.string()),
+      0,
     )
-    .await
+    .op
     .unwrap()
-    .without_execution_attempts(),
-    FallibleProcessResultWithPlatform {
-      stdout: testdata.bytes(),
-      stderr: testdata_empty.bytes(),
-      exit_code: 0,
-      output_directory: EMPTY_DIGEST,
-      execution_attempts: vec![],
-      platform: Platform::Linux,
-    }
-  );
+    .unwrap(),
+    Platform::Linux,
+  )
+  .await
+  .unwrap();
+
+  assert_eq!(result.stdout_bytes, testdata.bytes());
+  assert_eq!(result.stderr_bytes, testdata_empty.bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.platform, Platform::Linux);
 }
 
 #[tokio::test]
@@ -789,31 +842,26 @@ async fn extract_response_with_digest_stderr() {
   let op_name = "gimme-foo".to_string();
   let testdata = TestData::roland();
   let testdata_empty = TestData::empty();
-  assert_eq!(
-    extract_execute_response(
-      make_successful_operation(
-        &op_name,
-        StdoutType::Raw(testdata_empty.string()),
-        StderrType::Digest(testdata.digest()),
-        0,
-      )
-      .op
-      .unwrap()
-      .unwrap(),
-      Platform::Linux,
+  let result = extract_execute_response(
+    make_successful_operation(
+      &op_name,
+      StdoutType::Raw(testdata_empty.string()),
+      StderrType::Digest(testdata.digest()),
+      0,
     )
-    .await
+    .op
     .unwrap()
-    .without_execution_attempts(),
-    FallibleProcessResultWithPlatform {
-      stdout: testdata_empty.bytes(),
-      stderr: testdata.bytes(),
-      exit_code: 0,
-      output_directory: EMPTY_DIGEST,
-      execution_attempts: vec![],
-      platform: Platform::Linux,
-    }
-  );
+    .unwrap(),
+    Platform::Linux,
+  )
+  .await
+  .unwrap();
+
+  assert_eq!(result.stdout_bytes, testdata_empty.bytes());
+  assert_eq!(result.stderr_bytes, testdata.bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.platform, Platform::Linux);
 }
 
 #[tokio::test]
@@ -821,31 +869,26 @@ async fn extract_response_with_digest_stdout_osx_remote() {
   let op_name = "gimme-foo".to_string();
   let testdata = TestData::roland();
   let testdata_empty = TestData::empty();
-  assert_eq!(
-    extract_execute_response(
-      make_successful_operation(
-        &op_name,
-        StdoutType::Digest(testdata.digest()),
-        StderrType::Raw(testdata_empty.string()),
-        0,
-      )
-      .op
-      .unwrap()
-      .unwrap(),
-      Platform::Darwin
+  let result = extract_execute_response(
+    make_successful_operation(
+      &op_name,
+      StdoutType::Digest(testdata.digest()),
+      StderrType::Raw(testdata_empty.string()),
+      0,
     )
-    .await
+    .op
     .unwrap()
-    .without_execution_attempts(),
-    FallibleProcessResultWithPlatform {
-      stdout: testdata.bytes(),
-      stderr: testdata_empty.bytes(),
-      exit_code: 0,
-      output_directory: EMPTY_DIGEST,
-      execution_attempts: vec![],
-      platform: Platform::Darwin,
-    }
-  );
+    .unwrap(),
+    Platform::Darwin,
+  )
+  .await
+  .unwrap();
+
+  assert_eq!(result.stdout_bytes, testdata.bytes());
+  assert_eq!(result.stderr_bytes, testdata_empty.bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.platform, Platform::Darwin);
 }
 
 #[tokio::test]
@@ -859,21 +902,26 @@ async fn ensure_inline_stdio_is_stored() {
     let op_name = "cat".to_owned();
 
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        crate::remote::make_execute_request(
-          &echo_roland_request().try_into().unwrap(),
-          empty_request_metadata(),
-        )
-        .unwrap()
-        .2,
-        vec![make_successful_operation(
-          &op_name.clone(),
-          StdoutType::Raw(test_stdout.string()),
-          StderrType::Raw(test_stderr.string()),
-          0,
-        )],
-      ),
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &echo_roland_request().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_successful_operation(
+            &op_name.clone(),
+            StdoutType::Raw(test_stdout.string()),
+            StderrType::Raw(test_stderr.string()),
+            0,
+          ),
+        },
+      ]),
       None,
     )
   };
@@ -904,7 +952,7 @@ async fn ensure_inline_stdio_is_stored() {
     None,
     None,
     BTreeMap::new(),
-    store,
+    store.clone(),
     Platform::Linux,
     runtime.clone(),
     Duration::from_secs(0),
@@ -912,21 +960,15 @@ async fn ensure_inline_stdio_is_stored() {
     Duration::from_secs(0),
   )
   .unwrap();
-  let result = cmd_runner
-    .run(echo_roland_request(), Context::default())
+
+  let result = run_cmd_runner(echo_roland_request(), cmd_runner, store)
     .await
     .unwrap();
-  assert_eq!(
-    result.without_execution_attempts(),
-    FallibleProcessResultWithPlatform {
-      stdout: test_stdout.bytes(),
-      stderr: test_stderr.bytes(),
-      exit_code: 0,
-      output_directory: EMPTY_DIGEST,
-      execution_attempts: vec![],
-      platform: Platform::Linux,
-    }
-  );
+
+  assert_eq!(result.stdout_bytes, test_stdout.bytes());
+  assert_eq!(result.stderr_bytes, test_stderr.bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(result.original.platform, Platform::Linux);
 
   let local_store =
     Store::local_only(runtime.clone(), &store_dir_path).expect("Error creating local store");
@@ -960,44 +1002,55 @@ async fn successful_execution_after_four_getoperations() {
     let op_name = "gimme-foo".to_string();
 
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        crate::remote::make_execute_request(
-          &execute_request.clone().try_into().unwrap(),
-          empty_request_metadata(),
-        )
-        .unwrap()
-        .2,
-        Vec::from_iter(
-          iter::repeat(make_incomplete_operation(&op_name))
-            .take(4)
-            .chain(iter::once(make_successful_operation(
-              &op_name,
-              StdoutType::Raw("foo".to_owned()),
-              StderrType::Raw("".to_owned()),
-              0,
-            ))),
-        ),
-      ),
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &execute_request.clone().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_incomplete_operation(&op_name),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_incomplete_operation(&op_name),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_incomplete_operation(&op_name),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_incomplete_operation(&op_name),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_successful_operation(
+            &op_name,
+            StdoutType::Raw("foo".to_owned()),
+            StderrType::Raw("".to_owned()),
+            0,
+          ),
+        },
+      ]),
       None,
     )
   };
 
-  let result = run_command_remote(mock_server.address(), execute_request)
+  let result = run_command_remote2(mock_server.address(), execute_request)
     .await
     .unwrap();
 
-  assert_eq!(
-    result.without_execution_attempts(),
-    FallibleProcessResultWithPlatform {
-      stdout: as_bytes("foo"),
-      stderr: as_bytes(""),
-      exit_code: 0,
-      output_directory: EMPTY_DIGEST,
-      execution_attempts: vec![],
-      platform: Platform::Linux,
-    }
-  );
+  assert_eq!(result.stdout_bytes, "foo".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.platform, Platform::Linux);
 }
 
 #[tokio::test]
@@ -1016,7 +1069,7 @@ async fn timeout_after_sufficiently_delayed_getoperations() {
     output_directories: BTreeSet::new(),
     timeout: Some(request_timeout),
     description: "echo-a-foo".to_string(),
-    append_only_caches: BTreeSet::new(),
+    append_only_caches: BTreeMap::new(),
     jdk_home: None,
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
@@ -1026,29 +1079,34 @@ async fn timeout_after_sufficiently_delayed_getoperations() {
 
   let mock_server = {
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        crate::remote::make_execute_request(&execute_request, empty_request_metadata())
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &execute_request,
+            empty_request_metadata(),
+          )
           .unwrap()
           .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          make_delayed_incomplete_operation(&op_name, delayed_operation_time),
-        ],
-      ),
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_delayed_incomplete_operation(&op_name, delayed_operation_time),
+        },
+      ]),
       None,
     )
   };
 
-  let result = run_command_remote(mock_server.address(), execute_request.into())
+  let result = run_command_remote2(mock_server.address(), execute_request.into())
     .await
     .unwrap();
-  assert_eq!(result.exit_code, -15);
-  let error_msg = String::from_utf8(result.stdout.to_vec()).unwrap();
+  assert_eq!(result.original.exit_code, -15);
+  let error_msg = String::from_utf8(result.stdout_bytes.to_vec()).unwrap();
   assert_that(&error_msg).contains("Exceeded timeout");
   assert_that(&error_msg).contains("echo-a-foo");
-  assert_eq!(result.execution_attempts.len(), 1);
-  let maybe_execution_duration = result.execution_attempts[0].remote_execution;
+  assert_eq!(result.original.execution_attempts.len(), 1);
+  let maybe_execution_duration = result.original.execution_attempts[0].remote_execution;
   assert!(maybe_execution_duration.is_some());
   assert_that(&maybe_execution_duration.unwrap()).is_greater_than_or_equal_to(request_timeout);
 
@@ -1070,7 +1128,7 @@ async fn dropped_request_cancels() {
     output_directories: BTreeSet::new(),
     timeout: Some(request_timeout),
     description: "echo-a-foo".to_string(),
-    append_only_caches: BTreeSet::new(),
+    append_only_caches: BTreeMap::new(),
     jdk_home: None,
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
@@ -1080,16 +1138,21 @@ async fn dropped_request_cancels() {
 
   let mock_server = {
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        crate::remote::make_execute_request(&execute_request, empty_request_metadata())
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &execute_request,
+            empty_request_metadata(),
+          )
           .unwrap()
           .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          make_delayed_incomplete_operation(&op_name, delayed_operation_time),
-        ],
-      ),
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_delayed_incomplete_operation(&op_name, delayed_operation_time),
+        },
+      ]),
       None,
     )
   };
@@ -1098,7 +1161,7 @@ async fn dropped_request_cancels() {
     .file(&TestData::roland())
     .directory(&TestDirectory::containing_roland())
     .build();
-  let command_runner = create_command_runner(
+  let (command_runner, _store) = create_command_runner(
     mock_server.address(),
     &cas,
     Duration::from_millis(0),
@@ -1129,44 +1192,43 @@ async fn retry_for_cancelled_channel() {
     let op_name = "gimme-foo".to_string();
 
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        crate::remote::make_execute_request(
-          &execute_request.clone().try_into().unwrap(),
-          empty_request_metadata(),
-        )
-        .unwrap()
-        .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          make_canceled_operation(Some(Duration::from_millis(100))),
-          make_successful_operation(
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &execute_request.clone().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_canceled_operation(Some(Duration::from_millis(100))),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_successful_operation(
             &op_name,
             StdoutType::Raw("foo".to_owned()),
             StderrType::Raw("".to_owned()),
             0,
           ),
-        ],
-      ),
+        },
+      ]),
       None,
     )
   };
 
-  let result = run_command_remote(mock_server.address(), execute_request)
+  let result = run_command_remote2(mock_server.address(), execute_request)
     .await
     .unwrap();
 
-  assert_eq!(
-    result.without_execution_attempts(),
-    FallibleProcessResultWithPlatform {
-      stdout: as_bytes("foo"),
-      stderr: as_bytes(""),
-      exit_code: 0,
-      output_directory: EMPTY_DIGEST,
-      execution_attempts: vec![],
-      platform: Platform::Linux,
-    }
-  );
+  assert_eq!(result.stdout_bytes, "foo".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.platform, Platform::Linux);
 }
 
 #[tokio::test]
@@ -1177,17 +1239,19 @@ async fn bad_result_bytes() {
     let op_name = "gimme-foo".to_string();
 
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        crate::remote::make_execute_request(
-          &execute_request.clone().try_into().unwrap(),
-          empty_request_metadata(),
-        )
-        .unwrap()
-        .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          MockOperation::new({
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &execute_request.clone().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: MockOperation::new({
             let mut op = bazel_protos::operations::Operation::new();
             op.set_name(op_name.clone());
             op.set_done(true);
@@ -1204,13 +1268,13 @@ async fn bad_result_bytes() {
             });
             op
           }),
-        ],
-      ),
+        },
+      ]),
       None,
     )
   };
 
-  run_command_remote(mock_server.address(), execute_request)
+  run_command_remote2(mock_server.address(), execute_request)
     .await
     .expect_err("Want Err");
 }
@@ -1223,15 +1287,14 @@ async fn initial_response_error() {
     let op_name = "gimme-foo".to_string();
 
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        crate::remote::make_execute_request(
+      mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
+        execute_request: crate::remote::make_execute_request(
           &execute_request.clone().try_into().unwrap(),
           empty_request_metadata(),
         )
         .unwrap()
         .2,
-        vec![MockOperation::new({
+        stream_responses: Ok(vec![MockOperation::new({
           let mut op = bazel_protos::operations::Operation::new();
           op.set_name(op_name.to_string());
           op.set_done(true);
@@ -1242,13 +1305,13 @@ async fn initial_response_error() {
             error
           });
           op
-        })],
-      ),
+        })]),
+      }]),
       None,
     )
   };
 
-  let result = run_command_remote(mock_server.address(), execute_request)
+  let result = run_command_remote2(mock_server.address(), execute_request)
     .await
     .expect_err("Want Err");
 
@@ -1263,17 +1326,19 @@ async fn getoperation_response_error() {
     let op_name = "gimme-foo".to_string();
 
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        crate::remote::make_execute_request(
-          &execute_request.clone().try_into().unwrap(),
-          empty_request_metadata(),
-        )
-        .unwrap()
-        .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          MockOperation::new({
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &execute_request.clone().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: MockOperation::new({
             let mut op = bazel_protos::operations::Operation::new();
             op.set_name(op_name.to_string());
             op.set_done(true);
@@ -1285,13 +1350,13 @@ async fn getoperation_response_error() {
             });
             op
           }),
-        ],
-      ),
+        },
+      ]),
       None,
     )
   };
 
-  let result = run_command_remote(mock_server.address(), execute_request)
+  let result = run_command_remote2(mock_server.address(), execute_request)
     .await
     .expect_err("Want Err");
 
@@ -1308,26 +1373,25 @@ async fn initial_response_missing_response_and_error() {
     let op_name = "gimme-foo".to_string();
 
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        crate::remote::make_execute_request(
+      mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
+        execute_request: crate::remote::make_execute_request(
           &execute_request.clone().try_into().unwrap(),
           empty_request_metadata(),
         )
         .unwrap()
         .2,
-        vec![MockOperation::new({
+        stream_responses: Ok(vec![MockOperation::new({
           let mut op = bazel_protos::operations::Operation::new();
           op.set_name(op_name.to_string());
           op.set_done(true);
           op
-        })],
-      ),
+        })]),
+      }]),
       None,
     )
   };
 
-  let result = run_command_remote(mock_server.address(), execute_request)
+  let result = run_command_remote2(mock_server.address(), execute_request)
     .await
     .expect_err("Want Err");
 
@@ -1342,29 +1406,31 @@ async fn getoperation_missing_response_and_error() {
     let op_name = "gimme-foo".to_string();
 
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        crate::remote::make_execute_request(
-          &execute_request.clone().try_into().unwrap(),
-          empty_request_metadata(),
-        )
-        .unwrap()
-        .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          MockOperation::new({
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &execute_request.clone().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: MockOperation::new({
             let mut op = bazel_protos::operations::Operation::new();
             op.set_name(op_name.to_string());
             op.set_done(true);
             op
           }),
-        ],
-      ),
+        },
+      ]),
       None,
     )
   };
 
-  let result = run_command_remote(mock_server.address(), execute_request)
+  let result = run_command_remote2(mock_server.address(), execute_request)
     .await
     .expect_err("Want Err");
 
@@ -1381,27 +1447,41 @@ async fn execute_missing_file_uploads_if_known() {
     let op_name = "cat".to_owned();
 
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        crate::remote::make_execute_request(
-          &cat_roland_request().try_into().unwrap(),
-          empty_request_metadata(),
-        )
-        .unwrap()
-        .2,
-        vec![
-          make_incomplete_operation(&op_name),
-          make_precondition_failure_operation(vec![missing_preconditionfailure_violation(
-            &roland.digest(),
-          )]),
-          make_successful_operation(
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &cat_roland_request().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_precondition_failure_operation(vec![
+            missing_preconditionfailure_violation(&roland.digest()),
+          ]),
+        },
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &cat_roland_request().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_successful_operation(
             "cat2",
             StdoutType::Raw(roland.string()),
             StderrType::Raw("".to_owned()),
             0,
           ),
-        ],
-      ),
+        },
+      ]),
       None,
     )
   };
@@ -1439,7 +1519,7 @@ async fn execute_missing_file_uploads_if_known() {
     None,
     None,
     BTreeMap::new(),
-    store,
+    store.clone(),
     Platform::Linux,
     runtime.clone(),
     Duration::from_secs(0),
@@ -1448,21 +1528,15 @@ async fn execute_missing_file_uploads_if_known() {
   )
   .unwrap();
 
-  let result = command_runner
-    .run(cat_roland_request(), Context::default())
+  let result = run_cmd_runner(cat_roland_request(), command_runner, store)
     .await
     .unwrap();
-  assert_eq!(
-    result.without_execution_attempts(),
-    FallibleProcessResultWithPlatform {
-      stdout: roland.bytes(),
-      stderr: Bytes::from(""),
-      exit_code: 0,
-      output_directory: EMPTY_DIGEST,
-      execution_attempts: vec![],
-      platform: Platform::Linux,
-    }
-  );
+
+  assert_eq!(result.stdout_bytes, roland.bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(result.original.platform, Platform::Linux);
+
   {
     let blobs = cas.blobs.lock();
     assert_eq!(blobs.get(&roland.fingerprint()), Some(&roland.bytes()));
@@ -1470,7 +1544,7 @@ async fn execute_missing_file_uploads_if_known() {
 }
 
 #[tokio::test]
-//// TODO: Unignore this test when the server can actually fail with status protos.
+// TODO: Unignore this test when the server can actually fail with status protos.
 #[ignore] // https://github.com/pantsbuild/pants/issues/6597
 async fn execute_missing_file_uploads_if_known_status() {
   let roland = TestData::roland();
@@ -1491,28 +1565,32 @@ async fn execute_missing_file_uploads_if_known_status() {
     };
 
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        crate::remote::make_execute_request(
-          &cat_roland_request().try_into().unwrap(),
-          empty_request_metadata(),
-        )
-        .unwrap()
-        .2,
-        vec![
-          //make_incomplete_operation(&op_name),
-          MockOperation {
-            op: Err(status),
-            duration: None,
-          },
-          make_successful_operation(
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::Execute {
+          execute_request: crate::remote::make_execute_request(
+            &cat_roland_request().try_into().unwrap(),
+            empty_request_metadata(),
+          )
+          .unwrap()
+          .2,
+          stream_responses: Ok(vec![
+            //make_incomplete_operation(&op_name),
+            MockOperation {
+              op: Err(status),
+              duration: None,
+            },
+          ]),
+        },
+        ExpectedAPICall::GetOperation {
+          operation_name: op_name.clone(),
+          operation: make_successful_operation(
             "cat2",
             StdoutType::Raw(roland.string()),
             StderrType::Raw("".to_owned()),
             0,
           ),
-        ],
-      ),
+        },
+      ]),
       None,
     )
   };
@@ -1542,33 +1620,29 @@ async fn execute_missing_file_uploads_if_known_status() {
     .await
     .expect("Saving file bytes to store");
 
-  let result = CommandRunner::new(
+  let command_runner = CommandRunner::new(
     &mock_server.address(),
     empty_request_metadata(),
     None,
     None,
     BTreeMap::new(),
-    store,
+    store.clone(),
     Platform::Linux,
     runtime.clone(),
     Duration::from_secs(0),
     Duration::from_millis(0),
     Duration::from_secs(0),
   )
-  .unwrap()
-  .run(cat_roland_request(), Context::default())
-  .await;
-  assert_eq!(
-    result,
-    Ok(FallibleProcessResultWithPlatform {
-      stdout: roland.bytes(),
-      stderr: Bytes::from(""),
-      exit_code: 0,
-      output_directory: EMPTY_DIGEST,
-      execution_attempts: vec![],
-      platform: Platform::Linux,
-    })
-  );
+  .unwrap();
+
+  let result = run_cmd_runner(cat_roland_request(), command_runner, store)
+    .await
+    .unwrap();
+
+  assert_eq!(result.stdout_bytes, roland.bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(result.original.platform, Platform::Linux);
   {
     let blobs = cas.blobs.lock();
     assert_eq!(blobs.get(&roland.fingerprint()), Some(&roland.bytes()));
@@ -1582,21 +1656,8 @@ async fn execute_missing_file_errors_if_unknown() {
   let missing_digest = TestDirectory::containing_roland().digest();
 
   let mock_server = {
-    let op_name = "cat".to_owned();
-
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(
-        op_name.clone(),
-        crate::remote::make_execute_request(
-          &cat_roland_request().try_into().unwrap(),
-          empty_request_metadata(),
-        )
-        .unwrap()
-        .2,
-        // We won't get as far as trying to run the operation, so don't expect any requests whose
-        // responses we would need to stub.
-        vec![],
-      ),
+      mock::execution_server::MockExecution::new(vec![]),
       None,
     )
   };
@@ -1669,14 +1730,9 @@ async fn extract_execute_response_unknown_code() {
 
 #[tokio::test]
 async fn extract_execute_response_success() {
-  let want_result = FallibleProcessResultWithPlatform {
-    stdout: as_bytes("roland"),
-    stderr: Bytes::from("simba"),
-    exit_code: 17,
-    output_directory: TestDirectory::nested().digest(),
-    execution_attempts: vec![],
-    platform: Platform::Linux,
-  };
+  let wanted_exit_code = 17;
+  let wanted_stdout = Bytes::from("roland".as_bytes());
+  let wanted_stderr = Bytes::from("simba".as_bytes());
 
   let mut output_file = bazel_protos::remote_execution::OutputFile::new();
   output_file.set_path("cats/roland".into());
@@ -1692,22 +1748,27 @@ async fn extract_execute_response_success() {
     let mut response = bazel_protos::remote_execution::ExecuteResponse::new();
     response.set_result({
       let mut result = bazel_protos::remote_execution::ActionResult::new();
-      result.set_exit_code(want_result.exit_code);
-      result.set_stdout_raw(Bytes::from(want_result.stdout.clone()));
-      result.set_stderr_raw(Bytes::from(want_result.stderr.clone()));
+      result.set_exit_code(wanted_exit_code);
+      result.set_stdout_raw(Bytes::from(wanted_stdout.clone()));
+      result.set_stderr_raw(Bytes::from(wanted_stderr.clone()));
       result.set_output_files(output_files);
       result
     });
     response
   }));
 
+  let result = extract_execute_response(operation, Platform::Linux)
+    .await
+    .unwrap();
+
+  assert_eq!(result.stdout_bytes, wanted_stdout);
+  assert_eq!(result.stderr_bytes, wanted_stderr);
+  assert_eq!(result.original.exit_code, wanted_exit_code);
   assert_eq!(
-    extract_execute_response(operation, Platform::Linux)
-      .await
-      .unwrap()
-      .without_execution_attempts(),
-    want_result
+    result.original.output_directory,
+    TestDirectory::nested().digest()
   );
+  assert_eq!(result.original.platform, Platform::Linux);
 }
 
 #[tokio::test]
@@ -1857,29 +1918,31 @@ async fn wait_between_request_1_retry() {
     let mock_server = {
       let op_name = "gimme-foo".to_string();
       mock::execution_server::TestServer::new(
-        mock::execution_server::MockExecution::new(
-          op_name.clone(),
-          crate::remote::make_execute_request(
-            &execute_request.clone().try_into().unwrap(),
-            empty_request_metadata(),
-          )
-          .unwrap()
-          .2,
-          vec![
-            make_incomplete_operation(&op_name),
-            make_successful_operation(
+        mock::execution_server::MockExecution::new(vec![
+          ExpectedAPICall::Execute {
+            execute_request: crate::remote::make_execute_request(
+              &execute_request.clone().try_into().unwrap(),
+              empty_request_metadata(),
+            )
+            .unwrap()
+            .2,
+            stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+          },
+          ExpectedAPICall::GetOperation {
+            operation_name: op_name.clone(),
+            operation: make_successful_operation(
               &op_name,
               StdoutType::Raw("foo".to_owned()),
               StderrType::Raw("".to_owned()),
               0,
             ),
-          ],
-        ),
+          },
+        ]),
         None,
       )
     };
     let cas = mock::StubCAS::empty();
-    let command_runner = create_command_runner(
+    let (command_runner, _store) = create_command_runner(
       mock_server.address(),
       &cas,
       Duration::from_millis(100),
@@ -1912,31 +1975,39 @@ async fn wait_between_request_3_retry() {
     let mock_server = {
       let op_name = "gimme-foo".to_string();
       mock::execution_server::TestServer::new(
-        mock::execution_server::MockExecution::new(
-          op_name.clone(),
-          crate::remote::make_execute_request(
-            &execute_request.clone().try_into().unwrap(),
-            empty_request_metadata(),
-          )
-          .unwrap()
-          .2,
-          vec![
-            make_incomplete_operation(&op_name),
-            make_incomplete_operation(&op_name),
-            make_incomplete_operation(&op_name),
-            make_successful_operation(
+        mock::execution_server::MockExecution::new(vec![
+          ExpectedAPICall::Execute {
+            execute_request: crate::remote::make_execute_request(
+              &execute_request.clone().try_into().unwrap(),
+              empty_request_metadata(),
+            )
+            .unwrap()
+            .2,
+            stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+          },
+          ExpectedAPICall::GetOperation {
+            operation_name: op_name.clone(),
+            operation: make_incomplete_operation(&op_name),
+          },
+          ExpectedAPICall::GetOperation {
+            operation_name: op_name.clone(),
+            operation: make_incomplete_operation(&op_name),
+          },
+          ExpectedAPICall::GetOperation {
+            operation_name: op_name.clone(),
+            operation: make_successful_operation(
               &op_name,
               StdoutType::Raw("foo".to_owned()),
               StderrType::Raw("".to_owned()),
               0,
             ),
-          ],
-        ),
+          },
+        ]),
         None,
       )
     };
     let cas = mock::StubCAS::empty();
-    let command_runner = create_command_runner(
+    let (command_runner, _store) = create_command_runner(
       mock_server.address(),
       &cas,
       Duration::from_millis(50),
@@ -2150,7 +2221,9 @@ async fn extract_output_files_from_response_no_prefix() {
   )
 }
 
-fn workunits_with_constant_span_id(workunit_store: &mut WorkunitStore) -> HashSet<Workunit> {
+pub(crate) fn workunits_with_constant_span_id(
+  workunit_store: &mut WorkunitStore,
+) -> HashSet<Workunit> {
   workunit_store.with_latest_workunits(log::Level::Trace, |_, completed_workunits| {
     completed_workunits
       .iter()
@@ -2164,7 +2237,7 @@ fn workunits_with_constant_span_id(workunit_store: &mut WorkunitStore) -> HashSe
 
 #[tokio::test]
 async fn remote_workunits_are_stored() {
-  let mut workunit_store = WorkunitStore::new();
+  let mut workunit_store = WorkunitStore::new(false);
   workunit_store.init_thread_state(None);
   let op_name = "gimme-foo".to_string();
   let testdata = TestData::roland();
@@ -2179,7 +2252,7 @@ async fn remote_workunits_are_stored() {
     .file(&TestData::roland())
     .directory(&TestDirectory::containing_roland())
     .build();
-  let command_runner = create_command_runner(
+  let (command_runner, _store) = create_command_runner(
     "".to_owned(),
     &cas,
     std::time::Duration::from_millis(0),
@@ -2266,7 +2339,7 @@ pub fn echo_foo_request() -> MultiPlatformProcess {
     output_directories: BTreeSet::new(),
     timeout: Some(Duration::from_millis(5000)),
     description: "echo a foo".to_string(),
-    append_only_caches: BTreeSet::new(),
+    append_only_caches: BTreeMap::new(),
     jdk_home: None,
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
@@ -2281,14 +2354,14 @@ fn make_canceled_operation(duration: Option<Duration>) -> MockOperation {
   }
 }
 
-fn make_incomplete_operation(operation_name: &str) -> MockOperation {
+pub(crate) fn make_incomplete_operation(operation_name: &str) -> MockOperation {
   let mut op = bazel_protos::operations::Operation::new();
   op.set_name(operation_name.to_string());
   op.set_done(false);
   MockOperation::new(op)
 }
 
-fn make_retryable_operation_failure() -> MockOperation {
+pub(crate) fn make_retryable_operation_failure() -> MockOperation {
   let mut status = bazel_protos::status::Status::new();
   status.set_code(grpcio::RpcStatusCode::ABORTED.into());
   status.set_message(String::from("the bot running the task appears to be lost"));
@@ -2366,7 +2439,7 @@ fn make_successful_operation_with_maybe_metadata(
   op
 }
 
-fn make_successful_operation(
+pub(crate) fn make_successful_operation(
   operation_name: &str,
   stdout: StdoutType,
   stderr: StderrType,
@@ -2377,7 +2450,7 @@ fn make_successful_operation(
   MockOperation::new(op)
 }
 
-fn make_successful_operation_with_metadata(
+pub(crate) fn make_successful_operation_with_metadata(
   operation_name: &str,
   stdout: StdoutType,
   stderr: StderrType,
@@ -2409,7 +2482,7 @@ fn timestamp_only_secs(v: i64) -> Timestamp {
   dummy_timestamp
 }
 
-fn make_precondition_failure_operation(
+pub(crate) fn make_precondition_failure_operation(
   violations: Vec<bazel_protos::error_details::PreconditionFailure_Violation>,
 ) -> MockOperation {
   let mut operation = bazel_protos::operations::Operation::new();
@@ -2438,22 +2511,61 @@ fn make_precondition_failure_status(
   status
 }
 
-async fn run_command_remote(
+pub(crate) async fn run_cmd_runner<R: crate::CommandRunner>(
+  request: MultiPlatformProcess,
+  command_runner: R,
+  store: Store,
+) -> Result<RemoteTestResult, String> {
+  let original = command_runner.run(request, Context::default()).await?;
+  let stdout_bytes: Vec<u8> = store
+    .load_file_bytes_with(original.stdout_digest, |bytes| bytes.into())
+    .await?
+    .unwrap()
+    .0;
+  let stderr_bytes: Vec<u8> = store
+    .load_file_bytes_with(original.stderr_digest, |bytes| bytes.into())
+    .await?
+    .unwrap()
+    .0;
+  Ok(RemoteTestResult {
+    original,
+    stdout_bytes,
+    stderr_bytes,
+  })
+}
+
+async fn run_command_remote2(
   address: String,
   request: MultiPlatformProcess,
-) -> Result<FallibleProcessResultWithPlatform, String> {
+) -> Result<RemoteTestResult, String> {
   let cas = mock::StubCAS::builder()
     .file(&TestData::roland())
     .directory(&TestDirectory::containing_roland())
     .build();
-  let command_runner = create_command_runner(
+  let (command_runner, store) = create_command_runner(
     address,
     &cas,
     Duration::from_millis(0),
     Duration::from_secs(0),
     Platform::Linux,
   );
-  command_runner.run(request, Context::default()).await
+  let original = command_runner.run(request, Context::default()).await?;
+
+  let stdout_bytes: Vec<u8> = store
+    .load_file_bytes_with(original.stdout_digest, |bytes| bytes.into())
+    .await?
+    .unwrap()
+    .0;
+  let stderr_bytes: Vec<u8> = store
+    .load_file_bytes_with(original.stderr_digest, |bytes| bytes.into())
+    .await?
+    .unwrap()
+    .0;
+  Ok(RemoteTestResult {
+    original,
+    stdout_bytes,
+    stderr_bytes,
+  })
 }
 
 fn create_command_runner(
@@ -2462,27 +2574,32 @@ fn create_command_runner(
   backoff_incremental_wait: Duration,
   backoff_max_wait: Duration,
   platform: Platform,
-) -> CommandRunner {
+) -> (CommandRunner, Store) {
   let runtime = task_executor::Executor::new(Handle::current());
   let store_dir = TempDir::new().unwrap();
   let store = make_store(store_dir.path(), cas, runtime.clone());
-  CommandRunner::new(
+  let command_runner = CommandRunner::new(
     &address,
     empty_request_metadata(),
     None,
     None,
     BTreeMap::new(),
-    store,
+    store.clone(),
     platform,
     runtime,
     Duration::from_secs(1), // We use a low queue_buffer_time to ensure that tests do not take too long.
     backoff_incremental_wait,
     backoff_max_wait,
   )
-  .expect("Failed to make command runner")
+  .expect("Failed to make command runner");
+  (command_runner, store)
 }
 
-fn make_store(store_dir: &Path, cas: &mock::StubCAS, executor: task_executor::Executor) -> Store {
+pub(crate) fn make_store(
+  store_dir: &Path,
+  cas: &mock::StubCAS,
+  executor: task_executor::Executor,
+) -> Store {
   Store::with_remote(
     executor,
     store_dir,
@@ -2503,12 +2620,12 @@ fn make_store(store_dir: &Path, cas: &mock::StubCAS, executor: task_executor::Ex
 async fn extract_execute_response(
   operation: bazel_protos::operations::Operation,
   remote_platform: Platform,
-) -> Result<FallibleProcessResultWithPlatform, ExecutionError> {
+) -> Result<RemoteTestResult, ExecutionError> {
   let cas = mock::StubCAS::builder()
     .file(&TestData::roland())
     .directory(&TestDirectory::containing_roland())
     .build();
-  let command_runner = create_command_runner(
+  let (command_runner, store) = create_command_runner(
     "".to_owned(),
     &cas,
     Duration::from_millis(0),
@@ -2516,13 +2633,33 @@ async fn extract_execute_response(
     remote_platform,
   );
 
-  command_runner
+  let original = command_runner
     .extract_execute_response(
       OperationOrStatus::Operation(operation),
       &mut ExecutionHistory::default(),
     )
     .compat()
+    .await?;
+
+  let stdout_bytes: Vec<u8> = store
+    .load_file_bytes_with(original.stdout_digest, |bytes| bytes.into())
     .await
+    .unwrap()
+    .unwrap()
+    .0;
+
+  let stderr_bytes: Vec<u8> = store
+    .load_file_bytes_with(original.stderr_digest, |bytes| bytes.into())
+    .await
+    .unwrap()
+    .unwrap()
+    .0;
+
+  Ok(RemoteTestResult {
+    original,
+    stdout_bytes,
+    stderr_bytes,
+  })
 }
 
 async fn extract_output_files_from_response(
@@ -2540,7 +2677,7 @@ async fn extract_output_files_from_response(
     .await
 }
 
-fn make_any_proto(message: &dyn Message) -> protobuf::well_known_types::Any {
+pub(crate) fn make_any_proto(message: &dyn Message) -> protobuf::well_known_types::Any {
   let mut any = protobuf::well_known_types::Any::new();
   any.set_type_url(format!(
     "type.googleapis.com/{}",
@@ -2550,7 +2687,7 @@ fn make_any_proto(message: &dyn Message) -> protobuf::well_known_types::Any {
   any
 }
 
-fn missing_preconditionfailure_violation(
+pub(crate) fn missing_preconditionfailure_violation(
   digest: &Digest,
 ) -> bazel_protos::error_details::PreconditionFailure_Violation {
   {
@@ -2561,7 +2698,7 @@ fn missing_preconditionfailure_violation(
   }
 }
 
-fn assert_contains(haystack: &str, needle: &str) {
+pub(crate) fn assert_contains(haystack: &str, needle: &str) {
   assert!(
     haystack.contains(needle),
     "{:?} should contain {:?}",
@@ -2570,7 +2707,7 @@ fn assert_contains(haystack: &str, needle: &str) {
   )
 }
 
-fn cat_roland_request() -> MultiPlatformProcess {
+pub(crate) fn cat_roland_request() -> MultiPlatformProcess {
   let req = Process {
     argv: owned_string_vec(&["/bin/cat", "roland"]),
     env: BTreeMap::new(),
@@ -2580,7 +2717,7 @@ fn cat_roland_request() -> MultiPlatformProcess {
     output_directories: BTreeSet::new(),
     timeout: one_second(),
     description: "cat a roland".to_string(),
-    append_only_caches: BTreeSet::new(),
+    append_only_caches: BTreeMap::new(),
     jdk_home: None,
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
@@ -2588,7 +2725,7 @@ fn cat_roland_request() -> MultiPlatformProcess {
   req.into()
 }
 
-fn echo_roland_request() -> MultiPlatformProcess {
+pub(crate) fn echo_roland_request() -> MultiPlatformProcess {
   let req = Process {
     argv: owned_string_vec(&["/bin/echo", "meoooow"]),
     env: BTreeMap::new(),
@@ -2598,7 +2735,7 @@ fn echo_roland_request() -> MultiPlatformProcess {
     output_directories: BTreeSet::new(),
     timeout: one_second(),
     description: "unleash a roaring meow".to_string(),
-    append_only_caches: BTreeSet::new(),
+    append_only_caches: BTreeMap::new(),
     jdk_home: None,
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
@@ -2606,7 +2743,7 @@ fn echo_roland_request() -> MultiPlatformProcess {
   req.into()
 }
 
-fn empty_request_metadata() -> ProcessMetadata {
+pub(crate) fn empty_request_metadata() -> ProcessMetadata {
   ProcessMetadata {
     instance_name: None,
     cache_key_gen_version: None,
@@ -2614,7 +2751,7 @@ fn empty_request_metadata() -> ProcessMetadata {
   }
 }
 
-fn assert_cancellation_requests(
+pub(crate) fn assert_cancellation_requests(
   mock_server: &mock::execution_server::TestServer,
   expected: Vec<String>,
 ) {

@@ -159,7 +159,7 @@ class NodeBinExecutables(PrimitiveField):
 
     def normalized_value(self, *, package_name: NodePackageName) -> FrozenDict[str, str]:
         if self.value is None:
-            return FrozenDict({})
+            return FrozenDict()
         if isinstance(self.value, str):
             return FrozenDict({package_name.value: self.value})
         return self.value

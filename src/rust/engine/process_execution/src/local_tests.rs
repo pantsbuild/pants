@@ -2,8 +2,9 @@ use tempfile;
 use testutil;
 
 use crate::{
-  CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform, NamedCache,
-  NamedCaches, Platform, PlatformConstraint, Process, RelativePath,
+  CacheDest, CacheName, CommandRunner as CommandRunnerTrait, Context,
+  FallibleProcessResultWithPlatform, NamedCaches, Platform, PlatformConstraint, Process,
+  RelativePath,
 };
 use hashing::EMPTY_DIGEST;
 use spectral::{assert_that, string::StrAssertions};
@@ -14,27 +15,29 @@ use std::time::Duration;
 use store::Store;
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory};
+use testutil::owned_string_vec;
 use testutil::path::find_bash;
-use testutil::{as_bytes, owned_string_vec};
 use tokio::runtime::Handle;
+
+#[derive(PartialEq, Debug)]
+struct LocalTestResult {
+  original: FallibleProcessResultWithPlatform,
+  stdout_bytes: Vec<u8>,
+  stderr_bytes: Vec<u8>,
+}
 
 #[tokio::test]
 #[cfg(unix)]
 async fn stdout() {
-  let result =
-    run_command_locally(Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"]))).await;
+  let result = run_command_locally(Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"])))
+    .await
+    .unwrap();
 
-  assert_eq!(
-    result.unwrap(),
-    FallibleProcessResultWithPlatform {
-      stdout: as_bytes("foo"),
-      stderr: as_bytes(""),
-      exit_code: 0,
-      output_directory: EMPTY_DIGEST,
-      execution_attempts: vec![],
-      platform: Platform::current().unwrap(),
-    }
-  )
+  assert_eq!(result.stdout_bytes, "foo".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.execution_attempts, vec![]);
 }
 
 #[tokio::test]
@@ -45,19 +48,14 @@ async fn stdout_and_stderr_and_exit_code() {
     "-c",
     "echo -n foo ; echo >&2 -n bar ; exit 1",
   ])))
-  .await;
+  .await
+  .unwrap();
 
-  assert_eq!(
-    result.unwrap(),
-    FallibleProcessResultWithPlatform {
-      stdout: as_bytes("foo"),
-      stderr: as_bytes("bar"),
-      exit_code: 1,
-      output_directory: EMPTY_DIGEST,
-      execution_attempts: vec![],
-      platform: Platform::current().unwrap(),
-    }
-  )
+  assert_eq!(result.stdout_bytes, "foo".as_bytes());
+  assert_eq!(result.stderr_bytes, "bar".as_bytes());
+  assert_eq!(result.original.exit_code, 1);
+  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.execution_attempts, vec![]);
 }
 
 #[tokio::test]
@@ -69,19 +67,14 @@ async fn capture_exit_code_signal() {
     "-c",
     "kill $$",
   ])))
-  .await;
+  .await
+  .unwrap();
 
-  assert_eq!(
-    result.unwrap(),
-    FallibleProcessResultWithPlatform {
-      stdout: as_bytes(""),
-      stderr: as_bytes(""),
-      exit_code: -15,
-      output_directory: EMPTY_DIGEST,
-      execution_attempts: vec![],
-      platform: Platform::current().unwrap(),
-    }
-  )
+  assert_eq!(result.stdout_bytes, "".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, -15);
+  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -92,9 +85,11 @@ async fn env() {
   env.insert("BAR".to_string(), "not foo".to_string());
 
   let result =
-    run_command_locally(Process::new(owned_string_vec(&["/usr/bin/env"])).env(env.clone())).await;
+    run_command_locally(Process::new(owned_string_vec(&["/usr/bin/env"])).env(env.clone()))
+      .await
+      .unwrap();
 
-  let stdout = String::from_utf8(result.unwrap().stdout.to_vec()).unwrap();
+  let stdout = String::from_utf8(result.stdout_bytes.to_vec()).unwrap();
   let got_env: BTreeMap<String, String> = stdout
     .split("\n")
     .filter(|line| !line.is_empty())
@@ -141,18 +136,14 @@ async fn output_files_none() {
     "-c",
     "exit 0",
   ])))
-  .await;
-  assert_eq!(
-    result.unwrap(),
-    FallibleProcessResultWithPlatform {
-      stdout: as_bytes(""),
-      stderr: as_bytes(""),
-      exit_code: 0,
-      output_directory: EMPTY_DIGEST,
-      execution_attempts: vec![],
-      platform: Platform::current().unwrap(),
-    }
-  )
+  .await
+  .unwrap();
+
+  assert_eq!(result.stdout_bytes, "".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.execution_attempts, vec![]);
 }
 
 #[tokio::test]
@@ -165,19 +156,17 @@ async fn output_files_one() {
     ])
     .output_files(vec![PathBuf::from("roland")].into_iter().collect()),
   )
-  .await;
+  .await
+  .unwrap();
 
+  assert_eq!(result.stdout_bytes, "".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
   assert_eq!(
-    result.unwrap(),
-    FallibleProcessResultWithPlatform {
-      stdout: as_bytes(""),
-      stderr: as_bytes(""),
-      exit_code: 0,
-      output_directory: TestDirectory::containing_roland().digest(),
-      execution_attempts: vec![],
-      platform: Platform::current().unwrap(),
-    }
-  )
+    result.original.output_directory,
+    TestDirectory::containing_roland().digest()
+  );
+  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -196,19 +185,17 @@ async fn output_dirs() {
     .output_files(vec![PathBuf::from("treats")].into_iter().collect())
     .output_directories(vec![PathBuf::from("cats")].into_iter().collect()),
   )
-  .await;
+  .await
+  .unwrap();
 
+  assert_eq!(result.stdout_bytes, "".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
   assert_eq!(
-    result.unwrap(),
-    FallibleProcessResultWithPlatform {
-      stdout: as_bytes(""),
-      stderr: as_bytes(""),
-      exit_code: 0,
-      output_directory: TestDirectory::recursive().digest(),
-      execution_attempts: vec![],
-      platform: Platform::current().unwrap(),
-    }
-  )
+    result.original.output_directory,
+    TestDirectory::recursive().digest()
+  );
+  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -229,19 +216,17 @@ async fn output_files_many() {
         .collect(),
     ),
   )
-  .await;
+  .await
+  .unwrap();
 
+  assert_eq!(result.stdout_bytes, "".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
   assert_eq!(
-    result.unwrap(),
-    FallibleProcessResultWithPlatform {
-      stdout: as_bytes(""),
-      stderr: as_bytes(""),
-      exit_code: 0,
-      output_directory: TestDirectory::recursive().digest(),
-      execution_attempts: vec![],
-      platform: Platform::current().unwrap(),
-    }
-  )
+    result.original.output_directory,
+    TestDirectory::recursive().digest()
+  );
+  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -258,19 +243,17 @@ async fn output_files_execution_failure() {
     ])
     .output_files(vec![PathBuf::from("roland")].into_iter().collect()),
   )
-  .await;
+  .await
+  .unwrap();
 
+  assert_eq!(result.stdout_bytes, "".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 1);
   assert_eq!(
-    result.unwrap(),
-    FallibleProcessResultWithPlatform {
-      stdout: as_bytes(""),
-      stderr: as_bytes(""),
-      exit_code: 1,
-      output_directory: TestDirectory::containing_roland().digest(),
-      execution_attempts: vec![],
-      platform: Platform::current().unwrap(),
-    }
-  )
+    result.original.output_directory,
+    TestDirectory::containing_roland().digest()
+  );
+  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -287,19 +270,17 @@ async fn output_files_partial_output() {
         .collect(),
     ),
   )
-  .await;
+  .await
+  .unwrap();
 
+  assert_eq!(result.stdout_bytes, "".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
   assert_eq!(
-    result.unwrap(),
-    FallibleProcessResultWithPlatform {
-      stdout: as_bytes(""),
-      stderr: as_bytes(""),
-      exit_code: 0,
-      output_directory: TestDirectory::containing_roland().digest(),
-      execution_attempts: vec![],
-      platform: Platform::current().unwrap(),
-    }
-  )
+    result.original.output_directory,
+    TestDirectory::containing_roland().digest()
+  );
+  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -313,42 +294,37 @@ async fn output_overlapping_file_and_dir() {
     .output_files(vec![PathBuf::from("cats/roland")].into_iter().collect())
     .output_directories(vec![PathBuf::from("cats")].into_iter().collect()),
   )
-  .await;
+  .await
+  .unwrap();
 
+  assert_eq!(result.stdout_bytes, "".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
   assert_eq!(
-    result.unwrap(),
-    FallibleProcessResultWithPlatform {
-      stdout: as_bytes(""),
-      stderr: as_bytes(""),
-      exit_code: 0,
-      output_directory: TestDirectory::nested().digest(),
-      execution_attempts: vec![],
-      platform: Platform::current().unwrap(),
-    }
-  )
+    result.original.output_directory,
+    TestDirectory::nested().digest()
+  );
+  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
 async fn append_only_cache_created() {
   let name = "geo";
-  let named_cache = NamedCache::new(name.to_owned()).unwrap();
+  let dest = format!(".cache/{}", name);
+  let cache_name = CacheName::new(name.to_owned()).unwrap();
+  let cache_dest = CacheDest::new(dest.clone()).unwrap();
   let result = run_command_locally(
-    Process::new(vec!["/bin/ls".to_owned(), format!(".cache/{}", name)])
-      .append_only_caches(vec![named_cache].into_iter().collect()),
+    Process::new(vec!["/bin/ls".to_owned(), dest.clone()])
+      .append_only_caches(vec![(cache_name, cache_dest)].into_iter().collect()),
   )
-  .await;
+  .await
+  .unwrap();
 
-  assert_eq!(
-    result.unwrap(),
-    FallibleProcessResultWithPlatform {
-      stdout: as_bytes(&format!(".cache/{}\n", name)),
-      stderr: as_bytes(""),
-      exit_code: 0,
-      output_directory: EMPTY_DIGEST,
-      execution_attempts: vec![],
-      platform: Platform::current().unwrap(),
-    }
-  )
+  assert_eq!(result.stdout_bytes, format!("{}\n", dest).as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -366,23 +342,19 @@ async fn jdk_symlink() {
     output_directories: BTreeSet::new(),
     timeout: one_second(),
     description: "cat roland".to_string(),
-    append_only_caches: BTreeSet::new(),
+    append_only_caches: BTreeMap::new(),
     jdk_home: Some(preserved_work_tmpdir.path().to_path_buf()),
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
   })
-  .await;
-  assert_eq!(
-    result,
-    Ok(FallibleProcessResultWithPlatform {
-      stdout: roland,
-      stderr: as_bytes(""),
-      exit_code: 0,
-      output_directory: EMPTY_DIGEST,
-      execution_attempts: vec![],
-      platform: Platform::current().unwrap(),
-    })
-  )
+  .await
+  .unwrap();
+
+  assert_eq!(result.stdout_bytes, roland);
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -456,19 +428,17 @@ async fn all_containing_directories_for_outputs_are_created() {
     .output_files(vec![PathBuf::from("cats/roland")].into_iter().collect())
     .output_directories(vec![PathBuf::from("birds/falcons")].into_iter().collect()),
   )
-  .await;
+  .await
+  .unwrap();
 
+  assert_eq!(result.stdout_bytes, "".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
   assert_eq!(
-    result.unwrap(),
-    FallibleProcessResultWithPlatform {
-      stdout: as_bytes(""),
-      stderr: as_bytes(""),
-      exit_code: 0,
-      output_directory: TestDirectory::nested_dir_and_file().digest(),
-      execution_attempts: vec![],
-      platform: Platform::current().unwrap(),
-    }
-  )
+    result.original.output_directory,
+    TestDirectory::nested_dir_and_file().digest()
+  );
+  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -481,19 +451,17 @@ async fn output_empty_dir() {
     ])
     .output_directories(vec![PathBuf::from("falcons")].into_iter().collect()),
   )
-  .await;
+  .await
+  .unwrap();
 
+  assert_eq!(result.stdout_bytes, "".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
   assert_eq!(
-    result.unwrap(),
-    FallibleProcessResultWithPlatform {
-      stdout: as_bytes(""),
-      stderr: as_bytes(""),
-      exit_code: 0,
-      output_directory: TestDirectory::containing_falcons_dir().digest(),
-      execution_attempts: vec![],
-      platform: Platform::current().unwrap(),
-    }
-  )
+    result.original.output_directory,
+    TestDirectory::containing_falcons_dir().digest()
+  );
+  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
 #[tokio::test]
@@ -511,7 +479,7 @@ async fn timeout() {
     output_directories: BTreeSet::new(),
     timeout: Some(Duration::from_millis(100)),
     description: "sleepy-cat".to_string(),
-    append_only_caches: BTreeSet::new(),
+    append_only_caches: BTreeMap::new(),
     jdk_home: None,
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
@@ -519,8 +487,8 @@ async fn timeout() {
   .await
   .unwrap();
 
-  assert_eq!(result.exit_code, -15);
-  let error_msg = String::from_utf8(result.stdout.to_vec()).unwrap();
+  assert_eq!(result.original.exit_code, -15);
+  let error_msg = String::from_utf8(result.stdout_bytes.to_vec()).unwrap();
   assert_that(&error_msg).contains("Exceeded timeout");
   assert_that(&error_msg).contains("sleepy-cat");
 }
@@ -557,7 +525,7 @@ async fn working_directory() {
       output_directories: BTreeSet::new(),
       timeout: one_second(),
       description: "confused-cat".to_string(),
-      append_only_caches: BTreeSet::new(),
+      append_only_caches: BTreeMap::new(),
       jdk_home: None,
       target_platform: PlatformConstraint::None,
       is_nailgunnable: false,
@@ -567,31 +535,20 @@ async fn working_directory() {
     Some(store),
     Some(executor),
   )
-  .await;
+  .await
+  .unwrap();
 
-  assert_eq!(
-    result.unwrap(),
-    FallibleProcessResultWithPlatform {
-      stdout: as_bytes("roland\n"),
-      stderr: as_bytes(""),
-      exit_code: 0,
-      output_directory: EMPTY_DIGEST,
-      execution_attempts: vec![],
-      platform: Platform::current().unwrap(),
-    }
-  );
+  assert_eq!(result.stdout_bytes, "roland\n".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_eq!(result.original.platform, Platform::current().unwrap());
 }
 
-async fn run_command_locally(req: Process) -> Result<FallibleProcessResultWithPlatform, String> {
+async fn run_command_locally(req: Process) -> Result<LocalTestResult, String> {
   let work_dir = TempDir::new().unwrap();
-  run_command_locally_in_dir_with_cleanup(req, work_dir.path().to_owned()).await
-}
-
-async fn run_command_locally_in_dir_with_cleanup(
-  req: Process,
-  dir: PathBuf,
-) -> Result<FallibleProcessResultWithPlatform, String> {
-  run_command_locally_in_dir(req, dir, true, None, None).await
+  let work_dir_path = work_dir.path().to_owned();
+  run_command_locally_in_dir(req, work_dir_path, true, None, None).await
 }
 
 async fn run_command_locally_in_dir(
@@ -600,20 +557,35 @@ async fn run_command_locally_in_dir(
   cleanup: bool,
   store: Option<Store>,
   executor: Option<task_executor::Executor>,
-) -> Result<FallibleProcessResultWithPlatform, String> {
+) -> Result<LocalTestResult, String> {
   let store_dir = TempDir::new().unwrap();
   let named_cache_dir = TempDir::new().unwrap();
   let executor = executor.unwrap_or_else(|| task_executor::Executor::new(Handle::current()));
   let store =
     store.unwrap_or_else(|| Store::local_only(executor.clone(), store_dir.path()).unwrap());
   let runner = crate::local::CommandRunner::new(
-    store,
+    store.clone(),
     executor.clone(),
     dir,
     NamedCaches::new(named_cache_dir.path().to_owned()),
     cleanup,
   );
-  runner.run(req.into(), Context::default()).await
+  let original = runner.run(req.into(), Context::default()).await?;
+  let stdout_bytes: Vec<u8> = store
+    .load_file_bytes_with(original.stdout_digest, |bytes| bytes.into())
+    .await?
+    .unwrap()
+    .0;
+  let stderr_bytes: Vec<u8> = store
+    .load_file_bytes_with(original.stderr_digest, |bytes| bytes.into())
+    .await?
+    .unwrap()
+    .0;
+  Ok(LocalTestResult {
+    original,
+    stdout_bytes,
+    stderr_bytes,
+  })
 }
 
 fn one_second() -> Option<Duration> {

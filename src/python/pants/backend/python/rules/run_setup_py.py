@@ -52,7 +52,7 @@ from pants.engine.fs import (
 )
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import SubsystemRule, goal_rule, named_rule, rule
+from pants.engine.rules import SubsystemRule, goal_rule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
     Dependencies,
@@ -67,6 +67,7 @@ from pants.engine.unions import UnionMembership
 from pants.option.custom_types import shell_str
 from pants.python.python_setup import PythonSetup
 from pants.source.source_root import SourceRoot, SourceRootRequest
+from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)
@@ -230,6 +231,7 @@ class SetupPyOptions(GoalSubsystem):
             "--args",
             type=list,
             member_type=shell_str,
+            passthrough=True,
             help="Arguments to pass directly to setup.py, e.g. "
             '`--setup-py2-args="bdist_wheel --python-tag py36.py37"`. If unspecified, we just '
             "dump the setup.py chroot.",
@@ -553,7 +555,7 @@ def _is_exported(target: Target) -> bool:
     return target.has_field(PythonProvidesField) and target[PythonProvidesField].value is not None
 
 
-@named_rule(desc="Compute distribution's 3rd party requirements")
+@rule(desc="Compute distribution's 3rd party requirements")
 async def get_requirements(
     dep_owner: DependencyOwner, union_membership: UnionMembership
 ) -> ExportedTargetRequirements:
@@ -603,7 +605,7 @@ async def get_requirements(
     return ExportedTargetRequirements(req_strs)
 
 
-@named_rule(desc="Find all code to be published in the distribution")
+@rule(desc="Find all code to be published in the distribution", level=LogLevel.INFO)
 async def get_owned_dependencies(
     dependency_owner: DependencyOwner, union_membership: UnionMembership
 ) -> OwnedDependencies:
@@ -626,7 +628,7 @@ async def get_owned_dependencies(
     return OwnedDependencies(OwnedDependency(t) for t in owned_dependencies)
 
 
-@named_rule(desc="Get exporting owner for target")
+@rule(desc="Get exporting owner for target")
 async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarget:
     """Find the exported target that owns the given target (and therefore exports it).
 
@@ -673,7 +675,7 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
     raise NoOwnerError(f"No exported target owner found for {target.address.reference()}")
 
 
-@named_rule(desc="Set up setuptools")
+@rule(desc="Set up setuptools")
 async def setup_setuptools(setuptools: Setuptools) -> SetuptoolsSetup:
     # Note that this pex has no entrypoint. We use it to run our generated setup.py, which
     # in turn imports from and invokes setuptools.

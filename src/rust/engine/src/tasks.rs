@@ -8,6 +8,8 @@ use crate::core::{Function, TypeId};
 use crate::intrinsics::Intrinsics;
 use crate::selectors::{DependencyKey, Get, Select};
 
+use log::Level;
+
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub enum Rule {
   // Intrinsic rules are implemented in rust.
@@ -211,10 +213,11 @@ pub struct Task {
   pub display_info: DisplayInfo,
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, Default)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct DisplayInfo {
-  pub name: Option<String>,
+  pub name: String,
   pub desc: Option<String>,
+  pub level: Level,
 }
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
@@ -265,19 +268,27 @@ impl Tasks {
   ///
   /// The following methods define the Task registration lifecycle.
   ///
-  pub fn task_begin(&mut self, func: Function, product: TypeId, cacheable: bool) {
+  pub fn task_begin(
+    &mut self,
+    func: Function,
+    product: TypeId,
+    cacheable: bool,
+    name: String,
+    desc: Option<String>,
+    level: Level,
+  ) {
     assert!(
       self.preparing.is_none(),
       "Must `end()` the previous task creation before beginning a new one!"
     );
 
     self.preparing = Some(Task {
-      cacheable: cacheable,
-      product: product,
+      cacheable,
+      product,
       clause: Vec::new(),
       gets: Vec::new(),
-      func: func,
-      display_info: DisplayInfo::default(),
+      func,
+      display_info: DisplayInfo { name, desc, level },
     });
   }
 
@@ -287,10 +298,7 @@ impl Tasks {
       .as_mut()
       .expect("Must `begin()` a task creation before adding gets!")
       .gets
-      .push(Get {
-        product: product,
-        subject: subject,
-      });
+      .push(Get { product, subject });
   }
 
   pub fn add_select(&mut self, product: TypeId) {
@@ -300,17 +308,6 @@ impl Tasks {
       .expect("Must `begin()` a task creation before adding clauses!")
       .clause
       .push(product);
-  }
-
-  pub fn add_display_info(&mut self, name: String, desc: String) {
-    let mut task = self
-      .preparing
-      .as_mut()
-      .expect("Must `begin()` a task creation before adding display info!");
-    task.display_info = DisplayInfo {
-      name: Some(name),
-      desc: if desc.is_empty() { None } else { Some(desc) },
-    };
   }
 
   pub fn task_end(&mut self) {

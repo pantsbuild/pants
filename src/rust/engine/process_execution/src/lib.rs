@@ -10,7 +10,9 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  clippy::used_underscore_binding
+  // TODO: Falsely triggers for async/await:
+  //   see https://github.com/rust-lang/rust-clippy/issues/5360
+  // clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -24,12 +26,11 @@
 #![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
-#![type_length_limit = "32187898"]
+#![type_length_limit = "35811178"]
 #[macro_use]
 extern crate derivative;
 
 use async_trait::async_trait;
-use bytes::Bytes;
 pub use log::Level;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -66,7 +67,7 @@ pub mod named_caches;
 
 extern crate uname;
 
-pub use crate::named_caches::{NamedCache, NamedCaches};
+pub use crate::named_caches::{CacheDest, CacheName, NamedCaches};
 
 #[derive(PartialOrd, Ord, Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum Platform {
@@ -231,15 +232,18 @@ pub struct Process {
 
   ///
   /// Declares that this process uses the given named caches (which might have associated config
-  /// in the future). Cache names must contain only lowercase ascii characters or underscores.
+  /// in the future) at the associated relative paths within its workspace. Cache names must
+  /// contain only lowercase ascii characters or underscores.
   ///
-  /// Caches are exposed to processes within their workspaces as directories at the relative path
-  /// `.cache/$name`. A @rule wrapped process may optionally check for the existence of the relevant
-  /// directory, and disable use of that cache if it is not defined. These caches are globally
-  /// shared and so must be concurrency safe: a consumer of the cache must never assume that it has
-  /// exclusive access to the provided directory.
+  /// Caches are exposed to processes within their workspaces at the relative paths represented
+  /// by the values of the dict. A process may optionally check for the existence of the relevant
+  /// directory, and disable use of that cache if it has not been created by the executor
+  /// (indicating a lack of support for this feature).
   ///
-  pub append_only_caches: BTreeSet<NamedCache>,
+  /// These caches are globally shared and so must be concurrency safe: a consumer of the cache
+  /// must never assume that it has exclusive access to the provided directory.
+  ///
+  pub append_only_caches: BTreeMap<CacheName, CacheDest>,
 
   ///
   /// If present, a symlink will be created at .jdk which points to this directory for local
@@ -276,7 +280,7 @@ impl Process {
       output_directories: BTreeSet::new(),
       timeout: None,
       description: "".to_string(),
-      append_only_caches: BTreeSet::new(),
+      append_only_caches: BTreeMap::new(),
       jdk_home: None,
       target_platform: PlatformConstraint::None,
       is_nailgunnable: false,
@@ -310,7 +314,10 @@ impl Process {
   ///
   /// Replaces the append only caches for this process.
   ///
-  pub fn append_only_caches(mut self, append_only_caches: BTreeSet<NamedCache>) -> Process {
+  pub fn append_only_caches(
+    mut self,
+    append_only_caches: BTreeMap<CacheName, CacheDest>,
+  ) -> Process {
     self.append_only_caches = append_only_caches;
     self
   }
@@ -379,8 +386,8 @@ pub struct ProcessMetadata {
 ///
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FallibleProcessResultWithPlatform {
-  pub stdout: Bytes,
-  pub stderr: Bytes,
+  pub stdout_digest: Digest,
+  pub stderr_digest: Digest,
   pub exit_code: i32,
   pub platform: Platform,
 
@@ -389,14 +396,6 @@ pub struct FallibleProcessResultWithPlatform {
   pub output_directory: hashing::Digest,
 
   pub execution_attempts: Vec<ExecutionStats>,
-}
-
-#[cfg(test)]
-impl FallibleProcessResultWithPlatform {
-  pub fn without_execution_attempts(mut self) -> Self {
-    self.execution_attempts = vec![];
-    self
-  }
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -514,6 +513,8 @@ impl CommandRunner for BoundedCommandRunner {
       desc: Some(desc.clone()),
       level: Level::Debug,
       blocked: true,
+      stdout: None,
+      stderr: None,
     };
     let bounded_fut = {
       let inner = self.inner.clone();
@@ -526,14 +527,42 @@ impl CommandRunner for BoundedCommandRunner {
           desc: Some(desc),
           level: Level::Info,
           blocked: false,
+          stdout: None,
+          stderr: None,
         };
-        with_workunit(context.workunit_store.clone(), name, metadata, async move {
-          inner.0.run(req, context).await
-        })
+
+        let metadata_updater = |result: &Result<FallibleProcessResultWithPlatform, String>,
+                                old_metadata| match result {
+          Err(_) => old_metadata,
+          Ok(FallibleProcessResultWithPlatform {
+            stdout_digest,
+            stderr_digest,
+            ..
+          }) => WorkunitMetadata {
+            stdout: Some(*stdout_digest),
+            stderr: Some(*stderr_digest),
+            ..old_metadata
+          },
+        };
+
+        with_workunit(
+          context.workunit_store.clone(),
+          name,
+          metadata,
+          async move { inner.0.run(req, context).await },
+          metadata_updater,
+        )
       })
     };
 
-    with_workunit(context.workunit_store, name, outer_metadata, bounded_fut).await
+    with_workunit(
+      context.workunit_store,
+      name,
+      outer_metadata,
+      bounded_fut,
+      |_, metadata| metadata,
+    )
+    .await
   }
 
   fn extract_compatible_request(&self, req: &MultiPlatformProcess) -> Option<Process> {

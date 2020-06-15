@@ -150,6 +150,7 @@ python_library(
     '3rdparty/python:dataclasses',
     'src/python/pants/engine:collection',
     'src/python/pants/engine:fs',
+    'src/python/pants/option:global_options',
     'src/python/pants/util:collections',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:filtering',

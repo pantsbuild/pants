@@ -17,6 +17,16 @@ class GoRun(GoTask):
         return True
 
     @classmethod
+    def passthru_args_kwargs(cls):
+        return dict(
+            passthrough=False,
+            removal_version="1.31.0.dev0",
+            removal_hint=(
+                "This task now receives passthrough arguments via the `--run-args` option."
+            ),
+        )
+
+    @classmethod
     def prepare(cls, options, round_manager):
         super().prepare(options, round_manager)
         round_manager.require_data("exec_binary")

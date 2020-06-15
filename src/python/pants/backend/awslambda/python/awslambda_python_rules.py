@@ -36,7 +36,7 @@ from pants.core.util_rules import strip_source_roots
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import SubsystemRule, named_rule
+from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get
 from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
@@ -55,7 +55,7 @@ class LambdexSetup:
     requirements_pex: Pex
 
 
-@named_rule(desc="Create Python AWS Lambda")
+@rule(desc="Create Python AWS Lambda")
 async def create_python_awslambda(
     field_set: PythonAwsLambdaFieldSet,
     lambdex_setup: LambdexSetup,
@@ -110,7 +110,7 @@ async def create_python_awslambda(
     )
 
 
-@named_rule(desc="Set up lambdex")
+@rule(desc="Set up lambdex")
 async def setup_lambdex(lambdex: Lambdex) -> LambdexSetup:
     requirements_pex = await Get[Pex](
         PexRequest(

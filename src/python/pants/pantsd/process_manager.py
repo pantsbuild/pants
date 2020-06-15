@@ -6,14 +6,19 @@ import logging
 import os
 import signal
 import subprocess
+import sys
 import time
 import traceback
+from abc import ABCMeta
 from contextlib import contextmanager
-from typing import Optional
+from typing import Callable, Optional
 
 import psutil
 
 from pants.base.build_environment import get_buildroot
+from pants.option.options import Options
+from pants.option.options_fingerprinter import OptionsFingerprinter
+from pants.option.scope import GLOBAL_SCOPE
 from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.process.subprocess import Subprocess
 from pants.util.dirutil import read_file, rm_rf, safe_file_dump, safe_mkdir
@@ -112,18 +117,22 @@ class ProcessMetadataManager:
     @classmethod
     def _deadline_until(
         cls,
-        closure,
-        action_msg,
-        timeout=FAIL_WAIT_SEC,
-        wait_interval=WAIT_INTERVAL_SEC,
-        info_interval=INFO_INTERVAL_SEC,
+        closure: Callable[[], bool],
+        ongoing_msg: str,
+        completed_msg: str,
+        timeout: float = FAIL_WAIT_SEC,
+        wait_interval: float = WAIT_INTERVAL_SEC,
+        info_interval: float = INFO_INTERVAL_SEC,
     ):
         """Execute a function/closure repeatedly until a True condition or timeout is met.
 
         :param func closure: the function/closure to execute (should not block for long periods of time
                              and must return True on success).
-        :param str action_msg: a description of the action that is being executed, to be rendered as
-                               info while we wait, and as part of any rendered exception.
+        :param str ongoing_msg: a description of the action that is being executed, to be rendered as
+                                info while we wait, and as part of any rendered exception.
+        :param str completed_msg: a description of the action that is being executed, to be rendered
+                                after the action has succeeded (but only if we have previously rendered
+                                the ongoing_msg).
         :param float timeout: the maximum amount of time to wait for a true result from the closure in
                               seconds. N.B. this is timing based, so won't be exact if the runtime of
                               the closure exceeds the timeout.
@@ -135,34 +144,44 @@ class ProcessMetadataManager:
         now = time.time()
         deadline = now + timeout
         info_deadline = now + info_interval
+        rendered_ongoing = False
         while 1:
             if closure():
+                if rendered_ongoing:
+                    logger.info(completed_msg)
                 return True
 
             now = time.time()
             if now > deadline:
                 raise cls.Timeout(
                     "exceeded timeout of {} seconds while waiting for {}".format(
-                        timeout, action_msg
+                        timeout, ongoing_msg
                     )
                 )
 
             if now > info_deadline:
-                logger.info("waiting for {}...".format(action_msg))
+                logger.info("waiting for {}...".format(ongoing_msg))
+                rendered_ongoing = True
                 info_deadline = info_deadline + info_interval
             elif wait_interval:
                 time.sleep(wait_interval)
 
     @classmethod
-    def _wait_for_file(cls, filename, timeout=FAIL_WAIT_SEC, want_content=True):
+    def _wait_for_file(
+        cls,
+        filename: str,
+        ongoing_msg: str,
+        completed_msg: str,
+        timeout: float = FAIL_WAIT_SEC,
+        want_content: bool = True,
+    ):
         """Wait up to timeout seconds for filename to appear with a non-zero size or raise
         Timeout()."""
 
         def file_waiter():
             return os.path.exists(filename) and (not want_content or os.path.getsize(filename))
 
-        action_msg = "file {} to appear".format(filename)
-        return cls._deadline_until(file_waiter, action_msg, timeout=timeout)
+        return cls._deadline_until(file_waiter, ongoing_msg, completed_msg, timeout=timeout)
 
     @staticmethod
     def _get_metadata_dir_by_name(name, metadata_base_dir):
@@ -208,18 +227,22 @@ class ProcessMetadataManager:
         file_path = self._metadata_file_path(name, metadata_key)
         safe_file_dump(file_path, metadata_value)
 
-    def await_metadata_by_name(self, name, metadata_key, timeout, caster=None):
+    def await_metadata_by_name(
+        self, name, metadata_key, ongoing_msg: str, completed_msg: str, timeout: float, caster=None
+    ):
         """Block up to a timeout for process metadata to arrive on disk.
 
         :param string name: The ProcessMetadataManager identity/name (e.g. 'pantsd').
         :param string metadata_key: The metadata key (e.g. 'pid').
-        :param int timeout: The deadline to write metadata.
+        :param str ongoing_msg: A message that describes what is being waited for while waiting.
+        :param str completed_msg: A message that describes what was being waited for after completion.
+        :param float timeout: The deadline to write metadata.
         :param type caster: A type-casting callable to apply to the read value (e.g. int, str).
         :returns: The value of the metadata key (read from disk post-write).
         :raises: :class:`ProcessMetadataManager.Timeout` on timeout.
         """
         file_path = self._metadata_file_path(name, metadata_key)
-        self._wait_for_file(file_path, timeout=timeout)
+        self._wait_for_file(file_path, ongoing_msg, completed_msg, timeout=timeout)
         return self.read_metadata_by_name(name, metadata_key, caster)
 
     def purge_metadata_by_name(self, name):
@@ -364,11 +387,25 @@ class ProcessManager(ProcessMetadataManager):
 
     def await_pid(self, timeout):
         """Wait up to a given timeout for a process to write pid metadata."""
-        return self.await_metadata_by_name(self._name, "pid", timeout, int)
+        return self.await_metadata_by_name(
+            self._name,
+            "pid",
+            f"{self._name} to start",
+            f"{self._name} started",
+            timeout,
+            caster=int,
+        )
 
     def await_socket(self, timeout):
         """Wait up to a given timeout for a process to write socket info."""
-        return self.await_metadata_by_name(self._name, "socket", timeout, self._socket_type)
+        return self.await_metadata_by_name(
+            self._name,
+            "socket",
+            f"{self._name} socket to be opened",
+            f"{self._name} socket opened",
+            timeout,
+            caster=self._socket_type,
+        )
 
     def write_pid(self, pid=None):
         """Write the current processes PID to the pidfile location."""
@@ -471,7 +508,12 @@ class ProcessManager(ProcessMetadataManager):
 
                 # Wait up to kill_wait seconds to terminate or move onto the next signal.
                 try:
-                    if self._deadline_until(self.is_dead, "daemon to exit", timeout=kill_wait):
+                    if self._deadline_until(
+                        self.is_dead,
+                        f"{self._name} to exit",
+                        f"{self._name} exited",
+                        timeout=kill_wait,
+                    ):
                         alive = False
                         logger.debug("successfully terminated pid {}".format(pid))
                         break
@@ -651,3 +693,55 @@ class FingerprintedProcessManager(ProcessManager):
         :rtype: bool
         """
         return self.is_dead() or not self.has_current_fingerprint(fingerprint)
+
+
+class PantsDaemonProcessManager(FingerprintedProcessManager, metaclass=ABCMeta):
+    """An ABC for classes that interact with pantsd's metadata.
+
+    This is extended by both a pantsd client handle, and by the server: the client reads process
+    metadata, and the server writes it.
+    """
+
+    def __init__(self, bootstrap_options: Options, daemon_entrypoint: str):
+        super().__init__(
+            name="pantsd",
+            metadata_base_dir=bootstrap_options.for_global_scope().pants_subprocessdir,
+        )
+        self._bootstrap_options = bootstrap_options
+        self._daemon_entrypoint = daemon_entrypoint
+
+    @property
+    def options_fingerprint(self):
+        return OptionsFingerprinter.combined_options_fingerprint_for_scope(
+            GLOBAL_SCOPE, self._bootstrap_options, fingerprint_key="daemon", invert=True
+        )
+
+    def needs_restart(self, option_fingerprint):
+        """Overrides ProcessManager.needs_restart, to account for the case where pantsd is running
+        but we want to shutdown after this run.
+
+        :param option_fingerprint: A fingerprint of the global bootstrap options.
+        :return: True if the daemon needs to restart.
+        """
+        return super().needs_restart(option_fingerprint)
+
+    def post_fork_child(self):
+        """Post-fork() child callback for ProcessManager.daemon_spawn()."""
+        spawn_control_env = dict(
+            PANTS_ENTRYPOINT=f"{self._daemon_entrypoint}:launch",
+            # The daemon should run under the same sys.path as us; so we ensure
+            # this. NB: It will scrub PYTHONPATH once started to avoid infecting
+            # its own unrelated subprocesses.
+            PYTHONPATH=os.pathsep.join(sys.path),
+        )
+        exec_env = {**os.environ, **spawn_control_env}
+
+        # Pass all of sys.argv so that we can proxy arg flags e.g. `-ldebug`.
+        cmd = [sys.executable] + sys.argv
+
+        spawn_control_env_vars = " ".join(f"{k}={v}" for k, v in spawn_control_env.items())
+        cmd_line = " ".join(cmd)
+        self._logger.debug(f"cmd is: {spawn_control_env_vars} {cmd_line}")
+
+        # TODO: Improve error handling on launch failures.
+        os.spawnve(os.P_NOWAIT, sys.executable, cmd, env=exec_env)

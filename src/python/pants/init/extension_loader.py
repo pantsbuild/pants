@@ -3,12 +3,10 @@
 
 import importlib
 import traceback
-from textwrap import fill, indent
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from pkg_resources import Requirement, WorkingSet
 
-from pants.base.deprecated import warn_or_error
 from pants.base.exceptions import BackendConfigurationError
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.util.ordered_set import FrozenOrderedSet
@@ -32,7 +30,7 @@ def load_backends_and_plugins(
     working_set: WorkingSet,
     backends1: List[str],
     backends2: List[str],
-    build_configuration: BuildConfiguration,
+    bc_builder: Optional[BuildConfiguration.Builder] = None,
 ) -> BuildConfiguration:
     """Load named plugins and source backends.
 
@@ -41,104 +39,17 @@ def load_backends_and_plugins(
     :param working_set: A pkg_resources.WorkingSet to load plugins from.
     :param backends1: v1 backends to load.
     :param backends2: v2 backends to load.
-    :param build_configuration: The BuildConfiguration (for adding aliases).
+    :param bc_builder: The BuildConfiguration (for adding aliases).
     """
-    if "pants.backend.python.lint.isort" in backends1:
-        reasons = [
-            indent(fill(reason, 78), "  ")
-            for reason in [
-                "1) Avoids unnecessary prework. This new implementation should be faster to run.",
-                (
-                    "2) Has less verbose output. Pants will now only show what isort itself outputs. "
-                    "(Use `--dynamic-ui` if you want to see the work Pants is doing behind-the-scenes.)"
-                ),
-                (
-                    "3) Works with `./pants lint` automatically. When you run `./pants lint`, Pants "
-                    "will run isort in check-only mode."
-                ),
-                (
-                    "4) Works with precise file arguments. If you say `./pants fmt f1.py`, Pants "
-                    "will only run over the file `f1.py`, whereas the old implementation would run "
-                    "over every file belonging to the target that owns `f1.py`."
-                ),
-            ]
-        ]
-        msg_lines = [
-            fill(
-                (
-                    "The original isort implementation is being replaced by an improved "
-                    "implementation made possible by the V2 engine. This new implementation "
-                    "brings these benefits:"
-                ),
-                80,
-            ),
-            "",
-            *(f"{reason}\n" for reason in reasons),
-            "",
-            fill(
-                (
-                    "To prepare for this change, add to the `GLOBAL` section in your `pants.toml` "
-                    "the line `backend_packages.remove = ['pants.backend.python.lint.isort']` "
-                    "(or `backend_packages = -['pants.backend.python.lint.isort']` to your "
-                    "`pants.ini`)."
-                ),
-                80,
-            ),
-            "",
-            fill(
-                (
-                    "If you still want to use isort, add `backend_packages2.add = "
-                    "['pants.backend.python.lint.isort']` to `pants.toml` or `backend_packages2 = "
-                    "+['pants.backend.python.lint.isort']` to your `pants.ini`. Ensure that you "
-                    "have `--v2` enabled (the default value)."
-                ),
-                80,
-            ),
-        ]
-        warn_or_error(
-            deprecated_entity_description="The V1 isort implementation",
-            removal_version="1.30.0.dev0",
-            hint="\n".join(msg_lines),
-        )
-
-    if "pants.contrib.awslambda.python" in backends1:
-        msg_lines = [
-            fill(
-                (
-                    "The original awslambda implementation is being replaced by an improved "
-                    "implementation made possible by the V2 engine."
-                ),
-                80,
-            ),
-            "",
-            fill(
-                (
-                    "To prepare for this change, remove 'pants.contrib.awslambda.python' from the "
-                    "`backend_packages` entry in the `GLOBAL` section in your `pants.toml` "
-                    "(or `pants.ini`). Then add `pants.backend.awslambda.python` to the "
-                    "`backend_packages2` entry. Ensure that you have `--v2` enabled (the default). "
-                    "Then modify your BUILD files to remove the intermediate `python_binary` "
-                    "target and the `binary=` setting on the `python_awslambda` target. "
-                    "Finally, use the `awslambda` goal instead of the `bundle` goal."
-                ),
-                80,
-            ),
-        ]
-        warn_or_error(
-            deprecated_entity_description="The V1 awslambda implementation",
-            removal_version="1.30.0.dev0",
-            deprecation_start_version="1.28.0.dev0",
-            hint="\n".join(msg_lines),
-        )
-
-    load_build_configuration_from_source(build_configuration, backends1, backends2)
-    load_plugins(build_configuration, plugins1, working_set, is_v1_plugin=True)
-    load_plugins(build_configuration, plugins2, working_set, is_v1_plugin=False)
-    return build_configuration
+    bc_builder = bc_builder or BuildConfiguration.Builder()
+    load_build_configuration_from_source(bc_builder, backends1, backends2)
+    load_plugins(bc_builder, plugins1, working_set, is_v1_plugin=True)
+    load_plugins(bc_builder, plugins2, working_set, is_v1_plugin=False)
+    return bc_builder.create()
 
 
 def load_plugins(
-    build_configuration: BuildConfiguration,
+    build_configuration: BuildConfiguration.Builder,
     plugins: List[str],
     working_set: WorkingSet,
     is_v1_plugin: bool,
@@ -211,7 +122,7 @@ def load_plugins(
 
 
 def load_build_configuration_from_source(
-    build_configuration: BuildConfiguration, backends1: List[str], backends2: List[str]
+    build_configuration: BuildConfiguration.Builder, backends1: List[str], backends2: List[str]
 ) -> None:
     """Installs pants backend packages to provide BUILD file symbols and cli goals.
 
@@ -234,7 +145,7 @@ def load_build_configuration_from_source(
 
 
 def load_backend(
-    build_configuration: BuildConfiguration, backend_package: str, is_v1_backend: bool
+    build_configuration: BuildConfiguration.Builder, backend_package: str, is_v1_backend: bool
 ) -> None:
     """Installs the given backend package into the build configuration.
 

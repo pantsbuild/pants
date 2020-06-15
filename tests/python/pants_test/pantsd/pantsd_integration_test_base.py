@@ -40,6 +40,12 @@ class PantsDaemonMonitor(ProcessManager):
     def _log(self):
         print(magenta(f"PantsDaemonMonitor: pid is {self._pid} is_alive={self.is_alive()}"))
 
+    def assert_started_and_stopped(self, timeout: int = 30) -> None:
+        """Asserts that pantsd was alive (it wrote a pid file), but that it stops afterward."""
+        self._process = None
+        self._pid = self.await_pid(timeout)
+        self.assert_stopped()
+
     def assert_started(self, timeout=30):
         self._process = None
         self._pid = self.await_pid(timeout)
@@ -48,7 +54,12 @@ class PantsDaemonMonitor(ProcessManager):
 
     def assert_pantsd_runner_started(self, client_pid, timeout=12):
         return self.await_metadata_by_name(
-            name="nailgun-client", metadata_key=str(client_pid), timeout=timeout, caster=int,
+            name="nailgun-client",
+            metadata_key=str(client_pid),
+            ongoing_msg="client to start",
+            completed_msg="client started",
+            timeout=timeout,
+            caster=int,
         )
 
     def _check_pantsd_is_alive(self):
@@ -110,7 +121,6 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
                 pantsd_config = {
                     "GLOBAL": {
                         "enable_pantsd": True,
-                        "shutdown_pantsd_after_run": False,
                         # The absolute paths in CI can exceed the UNIX socket path limitation
                         # (>104-108 characters), so we override that here with a shorter path.
                         "watchman_socket_path": f"/tmp/watchman.{os.getpid()}.sock",

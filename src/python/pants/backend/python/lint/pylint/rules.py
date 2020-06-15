@@ -28,7 +28,7 @@ from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedS
 from pants.engine.addresses import Address, Addresses
 from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests, PathGlobs, Snapshot
 from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import SubsystemRule, named_rule, rule
+from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
     Dependencies,
@@ -228,7 +228,7 @@ async def pylint_lint_partition(
     return LintResult.from_fallible_process_result(result, linter_name="Pylint")
 
 
-@named_rule(desc="Lint using Pylint")
+@rule(desc="Lint using Pylint")
 async def pylint_lint(
     request: PylintRequest, pylint: Pylint, python_setup: PythonSetup
 ) -> LintResults:

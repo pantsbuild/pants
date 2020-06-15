@@ -1,6 +1,7 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import os
 from functools import partialmethod
 from pathlib import Path, PurePath
 from textwrap import dedent
@@ -42,19 +43,20 @@ from pants.testutil.option.util import create_options_bootstrapper
 #  self.add_to_build_file(), for example?
 class PytestRunnerIntegrationTest(ExternalToolTestBase):
 
-    source_root = "tests/python/pants_test"
+    source_root = "tests/python"
+    package = os.path.join(source_root, "pants_test")
     good_source = FileContent(path="test_good.py", content=b"def test():\n  pass\n")
     bad_source = FileContent(path="test_bad.py", content=b"def test():\n  assert False\n")
     py3_only_source = FileContent(path="test_py3.py", content=b"def test() -> None:\n  pass\n")
     library_source = FileContent(path="library.py", content=b"def add_two(x):\n  return x + 2\n")
 
     create_python_library = partialmethod(
-        ExternalToolTestBase.create_library, path=source_root, target_type="python_library",
+        ExternalToolTestBase.create_library, path=package, target_type="python_library",
     )
 
     def write_file(self, file_content: FileContent) -> None:
         self.create_file(
-            relpath=PurePath(self.source_root, file_content.path).as_posix(),
+            relpath=PurePath(self.package, file_content.path).as_posix(),
             contents=file_content.content.decode(),
         )
 
@@ -70,7 +72,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         interpreter_constraints: Optional[str] = None,
     ) -> None:
         self.add_to_build_file(
-            relpath=self.source_root,
+            relpath=self.package,
             target=dedent(
                 f"""\
                 python_tests(
@@ -136,6 +138,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
     ) -> TestResult:
         args = [
             "--backend-packages2=pants.backend.python",
+            f"--source-root-patterns={self.source_root}",
             # pin to lower versions so that we can run Python 2 tests
             "--pytest-version=pytest>=4.6.6,<4.7",
             "--pytest-pytest-plugins=['zipp==1.0.0']",
@@ -143,7 +146,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         if passthrough_args:
             args.append(f"--pytest-args='{passthrough_args}'")
         options_bootstrapper = create_options_bootstrapper(args=args)
-        address = Address(self.source_root, "target")
+        address = Address(self.package, "target")
         if origin is None:
             origin = SingleAddress(directory=address.spec_path, name=address.target_name)
         tgt = PythonTests({}, address=address)
@@ -182,9 +185,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
 
     def test_precise_file_args(self) -> None:
         self.create_python_test_target([self.good_source, self.bad_source])
-        file_arg = FilesystemLiteralSpec(
-            PurePath(self.source_root, self.good_source.path).as_posix()
-        )
+        file_arg = FilesystemLiteralSpec(PurePath(self.package, self.good_source.path).as_posix())
         result = self.run_pytest(origin=file_arg)
         assert result.status == Status.SUCCESS
         assert "test_good.py ." in result.stdout
@@ -321,7 +322,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         assert py2_result.status == Status.FAILURE
         assert "SyntaxError: invalid syntax" in py2_result.stdout
         Path(
-            self.build_root, self.source_root, "BUILD"
+            self.build_root, self.package, "BUILD"
         ).unlink()  # Cleanup in order to recreate the target
         self.create_python_test_target(
             [self.py3_only_source], interpreter_constraints="CPython>=3.6"

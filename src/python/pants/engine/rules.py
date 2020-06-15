@@ -15,18 +15,10 @@ from pants.engine.selectors import GetConstraints
 from pants.engine.unions import UnionRule, union
 from pants.option.optionable import Optionable, OptionableFactory
 from pants.util.collections import assert_single_element
+from pants.util.logging import LogLevel
 from pants.util.memo import memoized
 from pants.util.meta import decorated_type_checkable, frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
-
-
-@dataclass(frozen=True)
-class RuleAnnotations:
-    canonical_name: Optional[str] = None
-    desc: Optional[str] = None
-
-
-DEFAULT_RULE_ANNOTATIONS = RuleAnnotations()
 
 
 @decorated_type_checkable
@@ -197,7 +189,9 @@ def _make_rule(
     parameter_types: Iterable[Type],
     *,
     cacheable: bool,
-    annotations: RuleAnnotations,
+    canonical_name: str,
+    desc: Optional[str],
+    level: LogLevel,
 ) -> Callable[[Callable], Callable]:
     """A @decorator that declares that a particular static function may be used as a TaskRule.
 
@@ -211,14 +205,13 @@ def _make_rule(
                       its inputs.
     """
 
-    has_goal_return_type = issubclass(return_type, Goal)
-    if cacheable and has_goal_return_type:
+    is_goal_cls = issubclass(return_type, Goal)
+    if cacheable and is_goal_cls:
         raise TypeError(
             "An `@rule` that returns a `Goal` must instead be declared with `@goal_rule`."
         )
-    if not cacheable and not has_goal_return_type:
+    if not cacheable and not is_goal_cls:
         raise TypeError("An `@goal_rule` must return a subclass of `engine.goal.Goal`.")
-    is_goal_cls = has_goal_return_type
 
     def wrapper(func):
         if not inspect.isfunction(func):
@@ -268,16 +261,6 @@ def _make_rule(
         # Register dependencies for @goal_rule/Goal.
         dependency_rules = (SubsystemRule(return_type.subsystem_cls),) if is_goal_cls else None
 
-        # Set a default canonical name if one is not explicitly provided. For Goal classes
-        # this is the name of the Goal; for other named ruled this is the __name__ of the function
-        # that implements it.
-        effective_name = annotations.canonical_name
-        if effective_name is None:
-            effective_name = return_type.name if is_goal_cls else func.__name__
-        normalized_annotations = RuleAnnotations(
-            canonical_name=effective_name, desc=annotations.desc
-        )
-
         # Set our own custom `__line_number__` dunder so that the engine may visualize the line number.
         func.__line_number__ = func.__code__.co_firstlineno
 
@@ -286,9 +269,11 @@ def _make_rule(
             parameter_types,
             func,
             input_gets=gets,
+            canonical_name=canonical_name,
+            desc=desc,
+            level=level,
             dependency_rules=dependency_rules,
             cacheable=cacheable,
-            annotations=normalized_annotations,
         )
 
         return func
@@ -328,31 +313,16 @@ def _ensure_type_annotation(
     return type_annotation
 
 
-PUBLIC_RULE_DECORATOR_ARGUMENTS = {"canonical_name", "desc"}
+PUBLIC_RULE_DECORATOR_ARGUMENTS = {"canonical_name", "desc", "level"}
 # We don't want @rule-writers to use 'cacheable' as a kwarg directly, but rather
 # set it implicitly based on whether the rule annotation is @rule or @goal_rule.
 # So we leave it out of PUBLIC_RULE_DECORATOR_ARGUMENTS.
-IMPLICIT_PRIVATE_RULE_DECORATOR_ARGUMENTS = {"cacheable", "named_rule"}
+IMPLICIT_PRIVATE_RULE_DECORATOR_ARGUMENTS = {"cacheable"}
 
 
-def rule_decorator(*args, **kwargs) -> Callable:
-    if len(args) != 1 and not inspect.isfunction(args[0]):
-        raise ValueError(
-            "The @rule decorator expects no arguments and for the function it decorates to be "
-            f"type-annotated. Given {args}."
-        )
-
-    canonical_name: Optional[str] = kwargs.get("canonical_name")
-    desc: Optional[str] = kwargs.get("desc")
-
-    if kwargs.get("named_rule"):
-        annotations = RuleAnnotations(canonical_name=canonical_name, desc=desc)
-    else:
-        annotations = DEFAULT_RULE_ANNOTATIONS
-        if any(x is not None for x in (canonical_name, desc)):
-            raise UnrecognizedRuleArgument(
-                "@rules that are not @named_rules or @goal_rules do not accept keyword arguments"
-            )
+def rule_decorator(func, **kwargs) -> Callable:
+    if not inspect.isfunction(func):
+        raise ValueError("The @rule decorator expects to be placed on a function.")
 
     if (
         len(
@@ -363,10 +333,8 @@ def rule_decorator(*args, **kwargs) -> Callable:
         != 0
     ):
         raise UnrecognizedRuleArgument(
-            f"`@named_rule`s and `@goal_rule`s only accept the following keyword arguments: {PUBLIC_RULE_DECORATOR_ARGUMENTS}"
+            f"`@rule`s and `@goal_rule`s only accept the following keyword arguments: {PUBLIC_RULE_DECORATOR_ARGUMENTS}"
         )
-
-    func = args[0]
 
     cacheable: bool = kwargs["cacheable"]
 
@@ -385,10 +353,35 @@ def rule_decorator(*args, **kwargs) -> Callable:
         )
         for parameter in inspect.signature(func).parameters
     )
+    is_goal_cls = issubclass(return_type, Goal)
     validate_parameter_types(func_id, parameter_types, cacheable)
-    return _make_rule(return_type, parameter_types, cacheable=cacheable, annotations=annotations)(
-        func
-    )
+
+    # Set a default canonical name if one is not explicitly provided. For Goal classes
+    # this is the name of the Goal; for other named ruled this is the __name__ of the function
+    # that implements it.
+    effective_name = kwargs.get("canonical_name")
+    if effective_name is None:
+        effective_name = return_type.name if is_goal_cls else func.__name__
+
+    effective_desc = kwargs.get("desc")
+    if effective_desc is None and is_goal_cls:
+        effective_desc = f"`{effective_name}` goal"
+
+    effective_level = kwargs.get("level", LogLevel.DEBUG)
+    if not isinstance(effective_level, LogLevel):
+        raise ValueError(
+            "Expected to receive a value of type LogLevel for the level "
+            f"argument, but got: {effective_level}"
+        )
+
+    return _make_rule(
+        return_type,
+        parameter_types,
+        cacheable=cacheable,
+        canonical_name=effective_name,
+        desc=effective_desc,
+        level=effective_level,
+    )(func)
 
 
 def validate_parameter_types(
@@ -418,11 +411,7 @@ def rule(*args, **kwargs) -> Callable:
 
 
 def goal_rule(*args, **kwargs) -> Callable:
-    return inner_rule(*args, **kwargs, cacheable=False, named_rule=True)
-
-
-def named_rule(*args, **kwargs) -> Callable:
-    return inner_rule(*args, **kwargs, cacheable=True, named_rule=True)
+    return inner_rule(*args, **kwargs, cacheable=False)
 
 
 class Rule(ABC):
@@ -459,9 +448,8 @@ class Rule(ABC):
 class TaskRule(Rule):
     """A Rule that runs a task function when all of its input selectors are satisfied.
 
-    NB: This API is experimental, and not meant for direct consumption. To create a `TaskRule` you
-    should always prefer the `@rule` constructor, and in cases where that is too constraining
-    (likely due to #4535) please bump or open a ticket to explain the usecase.
+    NB: This API is not meant for direct consumption. To create a `TaskRule` you should always
+    prefer the `@rule` constructor.
     """
 
     _output_type: Type
@@ -471,7 +459,9 @@ class TaskRule(Rule):
     _dependency_rules: Tuple["TaskRule", ...]
     _dependency_optionables: Tuple[Type[Optionable], ...]
     cacheable: bool
-    annotations: RuleAnnotations
+    canonical_name: str
+    desc: Optional[str]
+    level: LogLevel
 
     def __init__(
         self,
@@ -479,10 +469,12 @@ class TaskRule(Rule):
         input_selectors: Iterable[Type],
         func: Callable,
         input_gets: Iterable[GetConstraints],
+        canonical_name: str,
+        desc: Optional[str] = None,
+        level: LogLevel = LogLevel.DEBUG,
         dependency_rules: Optional[Iterable["TaskRule"]] = None,
         dependency_optionables: Optional[Iterable[Type[Optionable]]] = None,
         cacheable: bool = True,
-        annotations: RuleAnnotations = DEFAULT_RULE_ANNOTATIONS,
     ):
         self._output_type = output_type
         self.input_selectors = tuple(input_selectors)
@@ -491,7 +483,9 @@ class TaskRule(Rule):
         self._dependency_rules = tuple(dependency_rules or ())
         self._dependency_optionables = tuple(dependency_optionables or ())
         self.cacheable = cacheable
-        self.annotations = annotations
+        self.canonical_name = canonical_name
+        self.desc = desc
+        self.level = level
 
     def __str__(self):
         return "(name={}, {}, {!r}, {}, gets={}, opts={})".format(

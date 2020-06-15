@@ -1,238 +1,170 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import os
+from pathlib import PurePath
+from typing import Iterable, Optional, cast
+
 import pytest
 
-from pants.source.source_root import NoSourceRootError, SourceRoot, SourceRoots, SourceRootTrie
-from pants.testutil.test_base import TestBase
+from pants.engine.fs import Digest, PathGlobs, Snapshot
+from pants.source.source_root import (
+    OptionalSourceRoot,
+    SourceRootConfig,
+    SourceRootRequest,
+    get_source_root,
+)
+from pants.testutil.engine.util import MockGet, create_subsystem, run_rule
+
+
+def _find_root(
+    path: str,
+    patterns: Iterable[str],
+    marker_filenames: Optional[Iterable[str]] = None,
+    existing_marker_files: Optional[Iterable[str]] = None,
+) -> Optional[str]:
+    source_root_config = create_subsystem(
+        SourceRootConfig,
+        root_patterns=list(patterns),
+        marker_filenames=list(marker_filenames or []),
+    )
+
+    # This inner function is passed as the callable to the mock, to allow recursion in the rule.
+    def _mock_fs_check(pathglobs: PathGlobs) -> Snapshot:
+        for glob in pathglobs.globs:
+            if glob in (existing_marker_files or []):
+                d, f = os.path.split(pathglobs.globs[0])
+                return Snapshot(digest=Digest("111", 111), files=(f,), dirs=(d,))
+        return Snapshot(digest=Digest("000", 000), files=tuple(), dirs=tuple())
+
+    def _do_find_root(src_root_req: SourceRootRequest) -> OptionalSourceRoot:
+        return cast(
+            OptionalSourceRoot,
+            run_rule(
+                get_source_root,
+                rule_args=[src_root_req, source_root_config],
+                mock_gets=[
+                    MockGet(
+                        product_type=OptionalSourceRoot,
+                        subject_type=SourceRootRequest,
+                        mock=_do_find_root,
+                    ),
+                    MockGet(product_type=Snapshot, subject_type=PathGlobs, mock=_mock_fs_check),
+                ],
+            ),
+        )
+
+    source_root = _do_find_root(SourceRootRequest(PurePath(path))).source_root
+    return None if source_root is None else source_root.path
 
 
 def test_source_root_at_buildroot() -> None:
-    srs = SourceRoots(["/"])
-    assert SourceRoot(".") == srs.strict_find_by_path("foo/bar.py")
-    assert SourceRoot(".") == srs.strict_find_by_path("foo/")
-    assert SourceRoot(".") == srs.strict_find_by_path("foo")
-    with pytest.raises(NoSourceRootError):
-        srs.strict_find_by_path("../foo/bar.py")
+    def find_root(path):
+        return _find_root(path, ("/",))
+
+    assert "." == find_root("foo/bar.py")
+    assert "." == find_root("foo/")
+    assert "." == find_root("foo")
+    with pytest.raises(ValueError, match="cannot contain `..` segment: ../foo/bar.py"):
+        find_root("../foo/bar.py")
 
 
 def test_fixed_source_roots() -> None:
-    srs = SourceRoots(["/root1", "/foo/root2", "/root1/root3"])
-    assert SourceRoot("root1") == srs.strict_find_by_path("root1/bar.py")
-    assert SourceRoot("foo/root2") == srs.strict_find_by_path("foo/root2/bar/baz.py")
-    assert SourceRoot("root1/root3") == srs.strict_find_by_path("root1/root3/qux.py")
-    assert SourceRoot("root1/root3") == srs.strict_find_by_path("root1/root3/qux/quux.py")
-    assert SourceRoot("root1/root3") == srs.strict_find_by_path("root1/root3")
-    with pytest.raises(NoSourceRootError):
-        srs.strict_find_by_path("blah/blah.py")
+    def find_root(path):
+        return _find_root(path, ("/root1", "/foo/root2", "/root1/root3"))
+
+    assert "root1" == find_root("root1/bar.py")
+    assert "foo/root2" == find_root("foo/root2/bar/baz.py")
+    assert "root1/root3" == find_root("root1/root3/qux.py")
+    assert "root1/root3" == find_root("root1/root3/qux/quux.py")
+    assert "root1/root3" == find_root("root1/root3")
+    assert find_root("blah/blah.py") is None
 
 
 def test_source_root_suffixes() -> None:
-    srs = SourceRoots(["src/python", "/"])
-    assert SourceRoot("src/python") == srs.strict_find_by_path("src/python/foo/bar.py")
-    assert SourceRoot("src/python/foo/src/python") == srs.strict_find_by_path(
-        "src/python/foo/src/python/bar.py"
-    )
-    assert SourceRoot(".") == srs.strict_find_by_path("foo/bar.py")
+    def find_root(path):
+        return _find_root(path, ("src/python", "/"))
+
+    assert "src/python" == find_root("src/python/foo/bar.py")
+    assert "src/python/foo/src/python" == find_root("src/python/foo/src/python/bar.py")
+    assert "." == find_root("foo/bar.py")
 
 
 def test_source_root_patterns() -> None:
-    srs = SourceRoots(["src/*", "/project/*"])
-    assert SourceRoot("src/python") == srs.strict_find_by_path("src/python/foo/bar.py")
-    assert SourceRoot("src/python/foo/src/shell") == srs.strict_find_by_path(
-        "src/python/foo/src/shell/bar.sh"
-    )
-    assert SourceRoot("project/python") == srs.strict_find_by_path("project/python/foo/bar.py")
-    with pytest.raises(NoSourceRootError):
-        srs.strict_find_by_path("prefix/project/python/foo/bar.py")
+    def find_root(path):
+        return _find_root(path, ("src/*", "/project/*"))
+
+    assert "src/python" == find_root("src/python/foo/bar.py")
+    assert "src/python/foo/src/shell" == find_root("src/python/foo/src/shell/bar.sh")
+    assert "project/python" == find_root("project/python/foo/bar.py")
+    assert find_root("prefix/project/python/foo/bar.py") is None
 
 
-class SourceRootTest(TestBase):
-    # TODO: Delete all the *_deprecated tests below in 1.30.0.dev0.
-    def test_source_root_trie_deprecated(self):
-        trie = SourceRootTrie()
-        self.assertIsNone(trie.find("src/java/org/pantsbuild/foo/Foo.java"))
+def test_source_root_default_patterns() -> None:
+    # Test that the default root patterns behave as expected.
+    def find_root(path):
+        return _find_root(path, tuple(SourceRootConfig.DEFAULT_ROOT_PATTERNS))
 
-        def root(path):
-            return SourceRoot(path)
+    assert "src/python" == find_root("src/python/foo/bar.py")
+    assert "src" == find_root("src/baz/qux.py")
+    assert "project1/src/python" == find_root("project1/src/python/foo/bar.py")
+    assert "project2/src" == find_root("project2/src/baz/qux.py")
+    assert "." == find_root("corge/grault.py")
 
-        # Wildcard at the end.
-        trie.add_pattern("src/*")
-        self.assertEqual(root("src/java"), trie.find("src/java/org/pantsbuild/foo/Foo.java"))
-        self.assertEqual(
-            root("my/project/src/java"),
-            trie.find("my/project/src/java/org/pantsbuild/foo/Foo.java"),
-        )
-        self.assertEqual(root("src/python"), trie.find("src/python/pantsbuild/foo/foo.py"))
-        self.assertEqual(
-            root("my/project/src/python"),
-            trie.find("my/project/src/python/org/pantsbuild/foo/foo.py"),
+
+def test_marker_file() -> None:
+    def find_root(path):
+        return _find_root(
+            path, tuple(), ("SOURCE_ROOT",), ("project1/SOURCE_ROOT", "project2/src/SOURCE_ROOT",)
         )
 
-        # Overlapping pattern.
-        trie.add_pattern("src/main/*")
-        self.assertEqual(
-            root("src/main/java"), trie.find("src/main/java/org/pantsbuild/foo/Foo.java")
-        )
-        self.assertEqual(
-            root("my/project/src/main/java"),
-            trie.find("my/project/src/main/java/org/pantsbuild/foo/Foo.java"),
-        )
-        self.assertEqual(
-            root("src/main/python"), trie.find("src/main/python/pantsbuild/foo/foo.py")
-        )
-        self.assertEqual(
-            root("my/project/src/main/python"),
-            trie.find("my/project/src/main/python/org/pantsbuild/foo/foo.py"),
-        )
+    assert "project1" == find_root("project1/foo/bar.py")
+    assert "project1" == find_root("project1/foo/")
+    assert "project1" == find_root("project1/foo")
+    assert "project1" == find_root("project1/")
+    assert "project1" == find_root("project1")
+    assert "project2/src" == find_root("project2/src/baz/qux.py")
+    assert "project2/src" == find_root("project2/src/baz/")
+    assert "project2/src" == find_root("project2/src/baz")
+    assert "project2/src" == find_root("project2/src/")
+    assert "project2/src" == find_root("project2/src")
+    assert find_root("project3/qux") is None
+    assert find_root("project3/") is None
+    assert find_root("project3") is None
 
-        # Wildcard in the middle.
-        trie.add_pattern("src/*/code")
-        self.assertEqual(
-            root("src/java/code"), trie.find("src/java/code/org/pantsbuild/foo/Foo.java")
-        )
-        self.assertEqual(
-            root("my/project/src/java/code"),
-            trie.find("my/project/src/java/code/org/pantsbuild/foo/Foo.java"),
-        )
-        self.assertEqual(
-            root("src/python/code"), trie.find("src/python/code/pantsbuild/foo/foo.py")
-        )
-        self.assertEqual(
-            root("my/project/src/python/code"),
-            trie.find("my/project/src/python/code/org/pantsbuild/foo/foo.py"),
+
+def test_marker_file_nested_source_roots() -> None:
+    def find_root(path):
+        return _find_root(
+            path, tuple(), ("SOURCE_ROOT",), ("SOURCE_ROOT", "project1/src/SOURCE_ROOT",)
         )
 
-        # Verify that the now even-more-overlapping pattern still works.
-        self.assertEqual(
-            root("src/main/java"), trie.find("src/main/java/org/pantsbuild/foo/Foo.java")
-        )
-        self.assertEqual(
-            root("my/project/src/main/java"),
-            trie.find("my/project/src/main/java/org/pantsbuild/foo/Foo.java"),
-        )
-        self.assertEqual(
-            root("src/main/python"), trie.find("src/main/python/pantsbuild/foo/foo.py")
-        )
-        self.assertEqual(
-            root("my/project/src/main/python"),
-            trie.find("my/project/src/main/python/org/pantsbuild/foo/foo.py"),
-        )
+    assert "project1/src" == find_root("project1/src/foo/bar.py")
+    assert "project1/src" == find_root("project1/src/foo")
+    assert "project1/src" == find_root("project1/src")
+    assert "." == find_root("project1")
+    assert "." == find_root("baz/qux.py")
+    assert "." == find_root("baz")
+    assert "." == find_root(".")
+    assert "." == find_root("")
 
-        # Verify that we take the first matching prefix.
-        self.assertEqual(root("src/java"), trie.find("src/java/src/python/Foo.java"))
 
-        # Test canonicalization.
-        self.assertEqual(root("src/jvm"), trie.find("src/jvm/org/pantsbuild/foo/Foo.java"))
-        self.assertEqual(root("src/jvm"), trie.find("src/jvm/org/pantsbuild/foo/Foo.scala"))
-        self.assertEqual(root("src/py"), trie.find("src/py/pantsbuild/foo/foo.py"))
-
-        # Non-canonicalized language names should also be detected.
-        self.assertEqual(root("src/kotlin"), trie.find("src/kotlin/org/pantsbuild/foo/Foo.kotlin"))
-
-        # Test fixed roots.
-        trie.add_fixed("mysrc/scalastuff")
-        self.assertEqual(
-            SourceRoot("mysrc/scalastuff"),
-            trie.find("mysrc/scalastuff/org/pantsbuild/foo/Foo.scala"),
-        )
-        self.assertIsNone(trie.find("my/project/mysrc/scalastuff/org/pantsbuild/foo/Foo.scala"))
-
-        # Verify that a fixed root wins over a pattern that is a prefix of it
-        # (e.g., that src/go/src wins over src/go).
-        trie.add_fixed("src/go/src")
-        self.assertEqual(root("src/go/src"), trie.find("src/go/src/foo/bar/baz.go"))
-
-        # Verify that the repo root can be a fixed source root.
-        trie.add_fixed("")
-        self.assertEqual(root(""), trie.find("foo/bar/baz.py"))
-
-    def test_source_root_trie_traverse_deprecated(self):
-        def make_trie() -> SourceRootTrie:
-            return SourceRootTrie()
-
-        trie = make_trie()
-        self.assertEqual(set(), trie.traverse())
-
-        trie.add_pattern("src/*")
-        trie.add_pattern("src/main/*")
-        self.assertEqual({"src/*", "src/main/*"}, trie.traverse())
-
-        trie = make_trie()
-        trie.add_pattern("*")
-        trie.add_pattern("src/*/code")
-        trie.add_pattern("src/main/*/code")
-        trie.add_pattern("src/main/*")
-        trie.add_pattern("src/main/*/foo")
-        self.assertEqual(
-            {"*", "src/*/code", "src/main/*/code", "src/main/*", "src/main/*", "src/main/*/foo"},
-            trie.traverse(),
+def test_multiple_marker_filenames() -> None:
+    def find_root(path):
+        return _find_root(
+            path,
+            tuple(),
+            ("SOURCE_ROOT", "setup.py"),
+            ("project1/javasrc/SOURCE_ROOT", "project2/setup.py",),
         )
 
-        trie = make_trie()
-        trie.add_fixed("src/scala-source-code")
-        trie.add_pattern("src/*/code")
-        trie.add_pattern("src/main/*/code")
-        self.assertEqual(
-            {"src/*/code", "^/src/scala-source-code", "src/main/*/code"}, trie.traverse()
-        )
+    assert "project1/javasrc" == find_root("project1/javasrc/foo/bar.java")
+    assert "project2" == find_root("project2/foo/bar.py")
 
-    def test_fixed_source_root_at_buildroot_deprecated(self):
-        trie = SourceRootTrie()
-        trie.add_fixed("",)
 
-        self.assertEqual(SourceRoot(""), trie.find("foo/proto/bar/baz.proto"))
+def test_marker_file_and_patterns() -> None:
+    def find_root(path):
+        return _find_root(path, ("src/python",), ("setup.py",), ("project1/setup.py",))
 
-    def test_source_root_pattern_at_buildroot_deprecated(self):
-        trie = SourceRootTrie()
-        trie.add_pattern("*")
-
-        self.assertEqual(SourceRoot("java"), trie.find("java/bar/baz.proto"))
-
-    def test_invalid_patterns_deprecated(self):
-        trie = SourceRootTrie()
-        # Bad normalization.
-        self.assertRaises(SourceRootTrie.InvalidPath, lambda: trie.add_fixed("foo/bar/"))
-        self.assertRaises(SourceRootTrie.InvalidPath, lambda: trie.add_pattern("foo//*"))
-        self.assertRaises(SourceRootTrie.InvalidPath, lambda: trie.add_pattern("foo/*/"))
-
-        # Asterisk in fixed pattern.
-        self.assertRaises(SourceRootTrie.InvalidPath, lambda: trie.add_fixed("src/*"))
-
-    def test_trie_traversal_deprecated(self):
-        trie = SourceRootTrie()
-        trie.add_pattern("foo1/bar1/baz1")
-        trie.add_pattern("foo1/bar1/baz2/qux")
-        trie.add_pattern("foo1/bar2/baz1")
-        trie.add_pattern("foo1/bar2/baz2")
-        trie.add_pattern("foo2/bar1")
-        trie.add_fixed("fixed1/bar1")
-        trie.add_fixed("fixed2/bar2")
-
-        # Test raw traversal.
-        self.assertEqual(
-            {"baz1", "baz2/qux"}, set(trie._root.children["foo1"].children["bar1"].subpatterns()),
-        )
-
-        self.assertEqual(
-            {"bar1/baz1", "bar1/baz2/qux", "bar2/baz1", "bar2/baz2",},
-            set(trie._root.children["foo1"].subpatterns()),
-        )
-
-        self.assertEqual(
-            {
-                "foo1/bar1/baz1",
-                "foo1/bar1/baz2/qux",
-                "foo1/bar2/baz1",
-                "foo1/bar2/baz2",
-                "foo2/bar1",
-                "^/fixed1/bar1",
-                "^/fixed2/bar2",
-            },
-            set(trie._root.subpatterns()),
-        )
-
-        # Test the fixed() method.
-        self.assertEqual(
-            {"fixed1/bar1", "fixed2/bar2"}, set(trie.fixed()),
-        )
+    assert "project1" == find_root("project1/foo/bar.py")
+    assert "project2/src/python" == find_root("project2/src/python/baz/qux.py")

@@ -117,6 +117,12 @@ impl StreamedHermeticCommand {
   fn new<S: AsRef<OsStr>>(program: S) -> StreamedHermeticCommand {
     let mut inner = Command::new(program);
     inner
+      // TODO: This will not universally prevent child processes continuing to run in the
+      // background, for a few reasons:
+      //   1) the Graph memoizes runs, and generally completes them rather than cancelling them,
+      //   2) killing a pantsd client with Ctrl+C kills the server with a signal, which won't
+      //      currently result in an orderly dropping of everything in the graph. See #10004.
+      .kill_on_drop(true)
       .env_clear()
       // It would be really nice not to have to manually set PATH but this is sadly the only way
       // to stop automatic PATH searching.
@@ -438,7 +444,7 @@ pub trait CapturedWorkdir {
         })?,
       );
       CommandRunner::construct_output_snapshot(
-        store,
+        store.clone(),
         posix_fs,
         req.output_files,
         req.output_directories,
@@ -452,22 +458,33 @@ pub trait CapturedWorkdir {
     }
 
     match child_results_result {
-      Ok(child_results) => Ok(FallibleProcessResultWithPlatform {
-        stdout: child_results.stdout,
-        stderr: child_results.stderr,
-        exit_code: child_results.exit_code,
-        output_directory: output_snapshot.digest,
-        execution_attempts: vec![],
-        platform,
-      }),
+      Ok(child_results) => {
+        let stdout = child_results.stdout;
+        let stdout_digest = store.store_file_bytes(stdout.clone(), true).await?;
+
+        let stderr = child_results.stderr;
+        let stderr_digest = store.store_file_bytes(stderr.clone(), true).await?;
+
+        Ok(FallibleProcessResultWithPlatform {
+          stdout_digest,
+          stderr_digest,
+          exit_code: child_results.exit_code,
+          output_directory: output_snapshot.digest,
+          execution_attempts: vec![],
+          platform,
+        })
+      }
       Err(msg) => {
         if msg == "deadline has elapsed" {
+          let stdout = Bytes::from(format!(
+            "Exceeded timeout of {:?} for local process execution, {}",
+            req.timeout, req.description
+          ));
+          let stdout_digest = store.store_file_bytes(stdout.clone(), true).await?;
+
           Ok(FallibleProcessResultWithPlatform {
-            stdout: Bytes::from(format!(
-              "Exceeded timeout of {:?} for local process execution, {}",
-              req.timeout, req.description
-            )),
-            stderr: Bytes::new(),
+            stdout_digest,
+            stderr_digest: hashing::EMPTY_DIGEST,
             exit_code: -libc::SIGTERM,
             output_directory: hashing::EMPTY_DIGEST,
             execution_attempts: vec![],

@@ -2,12 +2,11 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use std::fmt::{Debug, Display};
+use std::future::Future;
 use std::hash::Hash;
 
-use boxfuture::BoxFuture;
-use hashing::Digest;
+use async_trait::async_trait;
 
-use futures01::future::Future;
 use petgraph::stable_graph;
 
 use crate::entry::Entry;
@@ -21,36 +20,19 @@ pub type EntryId = stable_graph::NodeIndex<u32>;
 ///
 /// Note that it is assumed that Nodes are very cheap to clone.
 ///
+#[async_trait]
 pub trait Node: Clone + Debug + Display + Eq + Hash + Send + 'static {
   type Context: NodeContext<Node = Self>;
 
   type Item: Clone + Debug + Eq + Send + 'static;
   type Error: NodeError;
 
-  fn run(self, context: Self::Context) -> BoxFuture<Self::Item, Self::Error>;
-
-  ///
-  /// If the given Node output represents an FS operation, returns its Digest.
-  ///
-  fn digest(result: Self::Item) -> Option<Digest>;
+  async fn run(self, context: Self::Context) -> Result<Self::Item, Self::Error>;
 
   ///
   /// If the node result is cacheable, return true.
   ///
   fn cacheable(&self) -> bool;
-
-  /// Nodes optionally have a user-facing name (distinct from their Debug and Display
-  /// implementations). This user-facing name is intended to provide high-level information
-  /// to end users of pants about what computation pants is currently doing. Not all
-  /// `Node`s need a user-facing name. For `Node`s derived from Python `@rule`s, the
-  /// user-facing name should be the same as the `desc` annotation on the rule decorator.
-  fn user_facing_name(&self) -> Option<String> {
-    None
-  }
-
-  /// Provides the `name` field in workunits associated with this node. These names
-  /// should be friendly to machine-parsing (i.e. "my_node" rather than "My awesome node!").
-  fn workunit_name(&self) -> String;
 }
 
 pub trait NodeError: Clone + Debug + Eq + Send {
@@ -129,5 +111,5 @@ pub trait NodeContext: Clone + Send + Sync + 'static {
   ///
   fn spawn<F>(&self, future: F)
   where
-    F: Future<Item = (), Error = ()> + Send + 'static;
+    F: Future<Output = ()> + Send + 'static;
 }

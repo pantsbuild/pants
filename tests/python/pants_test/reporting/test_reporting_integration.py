@@ -9,7 +9,6 @@ from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 
 import psutil
-from parameterized import parameterized
 
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.collections import assert_single_element
@@ -194,18 +193,21 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
         )
         self.assertIn("", pants_run.stdout_data)
 
-    @parameterized.expand(["--quiet", "--no-quiet"])
-    def test_epilog_to_stderr(self, quiet_flag):
-        command = [
-            "--time",
-            quiet_flag,
-            "bootstrap",
-            "examples/src/java/org/pantsbuild/example/hello::",
-        ]
-        pants_run = self.run_pants(command)
-        self.assert_success(pants_run)
-        self.assertIn("Cumulative Timings", pants_run.stderr_data)
-        self.assertNotIn("Cumulative Timings", pants_run.stdout_data)
+    def test_epilog_to_stderr(self) -> None:
+        def run_test(quiet_flag: str) -> None:
+            command = [
+                "--time",
+                quiet_flag,
+                "bootstrap",
+                "examples/src/java/org/pantsbuild/example/hello::",
+            ]
+            pants_run = self.run_pants(command)
+            self.assert_success(pants_run)
+            self.assertIn("Cumulative Timings", pants_run.stderr_data)
+            self.assertNotIn("Cumulative Timings", pants_run.stdout_data)
+
+        run_test("--quiet")
+        run_test("--no-quiet")
 
     def test_zipkin_reporter(self):
         ZipkinHandler = zipkin_handler()

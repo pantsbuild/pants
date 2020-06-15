@@ -6,11 +6,9 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
-boxfuture = { path = "../boxfuture" }
+async-trait = "0.1"
 fnv = "1.0.5"
-futures = { version = "0.3", features = ["compat"] }
-futures01 = { package = "futures", version = "0.1" }
-hashing = { path = "../hashing" }
+futures = "0.3"
 log = "0.4"
 parking_lot = "0.6"
 petgraph = "0.4.5"

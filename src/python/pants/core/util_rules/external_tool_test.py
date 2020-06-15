@@ -71,19 +71,3 @@ def test_generate_request() -> None:
         create_subsystem(
             FooBar, version="9.9.9", known_versions=FooBar.default_known_versions
         ).get_request(Platform.darwin)
-
-
-# Delete this test after ExternalTool.get_default_versions_and_digests() is removed.
-def test_get_default_versions_and_digests() -> None:
-    assert {
-        "darwin": (
-            "3.4.7",
-            "9d0e18cd74b918c7b3edd0203e75569e0c8caecb1367b3be409b45e28514f5be",
-            123321,
-        ),
-        "linux": (
-            "3.4.7",
-            "a019dfc4b32d63c1392aa264aed2253c1e0c2fb09216f8e2cc269bbfb8bb49b5",
-            134213,
-        ),
-    } == FooBar.get_default_versions_and_digests()

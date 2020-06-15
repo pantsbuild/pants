@@ -10,7 +10,7 @@ from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import SubsystemRule, named_rule
+from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import GeneratedSources, GenerateSourcesRequest, Sources, TransitiveTargets
 from pants.engine.unions import UnionRule
@@ -21,7 +21,7 @@ class GeneratePythonFromProtobufRequest(GenerateSourcesRequest):
     output = PythonSources
 
 
-@named_rule(desc="Generate Python from Protobuf")
+@rule(desc="Generate Python from Protobuf")
 async def generate_python_from_protobuf(
     request: GeneratePythonFromProtobufRequest, protoc: Protoc
 ) -> GeneratedSources:

@@ -399,6 +399,22 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                 ),
             )
 
+    def test_pantsd_max_memory_usage(self):
+        """Validates that the max_memory_usage setting is respected."""
+        # We set a very, very low max memory usage, which forces pantsd to restart immediately.
+        max_memory_usage_bytes = 130
+        with self.pantsd_successful_run_context() as ctx:
+            # TODO: We run the command, but we expect it to race pantsd shutting down, so we don't
+            # assert success. https://github.com/pantsbuild/pants/issues/8200 will address waiting
+            # until after the current command completes to invalidate the scheduler, at which point
+            # we can assert success here.
+            ctx.runner(
+                [f"--pantsd-max-memory-usage={max_memory_usage_bytes}", "list", "testprojects::"]
+            )
+
+            # Assert that a pid file is written, but that the server stops afterward.
+            ctx.checker.assert_started_and_stopped()
+
     def test_pantsd_invalidation_stale_sources(self):
         test_path = "tests/python/pants_test/daemon_correctness_test_0001"
         test_build_file = os.path.join(test_path, "BUILD")

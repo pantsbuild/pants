@@ -4,11 +4,17 @@
 import inspect
 from abc import abstractmethod
 from collections import defaultdict
-from typing import Any, Dict, Optional, Tuple, Type, Union, cast
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, FrozenSet, Optional, Tuple, Type, Union, cast
 
 from pants.base.build_file_target_factory import BuildFileTargetFactory
+from pants.base.parse_context import ParseContext
 from pants.build_graph.target import Target
+from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_property
+from pants.util.meta import frozen_after_init
+
+ContextAwareObjectFactory = Callable[[ParseContext], Callable[..., None]]
 
 
 class TargetMacro:
@@ -84,6 +90,8 @@ class TargetMacro:
         """Expands the given BUILD file arguments in to one or more target addressable instances."""
 
 
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class BuildFileAliases:
     """A structure containing sets of symbols to be exposed in BUILD files.
 
@@ -100,6 +108,11 @@ class BuildFileAliases:
       BUILD file path or functions that need to be able to create targets or objects from within the
       BUILD file parse.
     """
+
+    _target_types: FrozenDict[str, Type[Target]]
+    _target_macro_factories: FrozenDict[str, TargetMacro.Factory]
+    _objects: FrozenDict[str, Any]
+    _context_aware_object_factories: FrozenDict[str, ContextAwareObjectFactory]
 
     @staticmethod
     def _is_target_type(obj: Any) -> bool:
@@ -137,9 +150,9 @@ class BuildFileAliases:
     @classmethod
     def _validate_targets(
         cls, targets: Optional[Dict[str, Union[Type[Target], TargetMacro.Factory]]],
-    ) -> Tuple[Dict[str, Type[Target]], Dict[str, TargetMacro.Factory]]:
+    ) -> Tuple[FrozenDict[str, Type[Target]], FrozenDict[str, TargetMacro.Factory]]:
         if not targets:
-            return {}, {}
+            return FrozenDict(), FrozenDict()
 
         target_types = {}
         target_macro_factories = {}
@@ -156,22 +169,24 @@ class BuildFileAliases:
                     "type {typ}".format(alias=alias, value=obj, typ=type(obj).__name__)
                 )
 
-        return target_types, target_macro_factories
+        return FrozenDict(target_types), FrozenDict(target_macro_factories)
 
     @classmethod
-    def _validate_objects(cls, objects):
+    def _validate_objects(cls, objects: Optional[Dict[str, Any]]) -> FrozenDict[str, Any]:
         if not objects:
-            return {}
+            return FrozenDict()
 
         for alias, obj in objects.items():
             cls._validate_alias("objects", alias, obj)
             cls._validate_not_targets("objects", alias, obj)
-        return objects.copy()
+        return FrozenDict(objects)
 
     @classmethod
-    def _validate_context_aware_object_factories(cls, context_aware_object_factories):
+    def _validate_context_aware_object_factories(
+        cls, context_aware_object_factories: Optional[Dict[str, ContextAwareObjectFactory]]
+    ) -> FrozenDict[str, ContextAwareObjectFactory]:
         if not context_aware_object_factories:
-            return {}
+            return FrozenDict()
 
         for alias, obj in context_aware_object_factories.items():
             cls._validate_alias("context_aware_object_factories", alias, obj)
@@ -183,21 +198,16 @@ class BuildFileAliases:
                     )
                 )
 
-        return context_aware_object_factories.copy()
+        return FrozenDict(context_aware_object_factories)
 
     def __init__(
         self,
         targets: Optional[Dict[str, Union[Type[Target], TargetMacro.Factory]]] = None,
-        objects: Optional[Dict] = None,
-        context_aware_object_factories: Optional[Dict] = None,
+        objects: Optional[Dict[str, Any]] = None,
+        context_aware_object_factories: Optional[Dict[str, ContextAwareObjectFactory]] = None,
     ) -> None:
         """
         :API: public
-
-        :param targets: A mapping from string aliases to Target subclasses or TargetMacro.Factory instances
-        :param objects: A mapping from string aliases to arbitrary objects.
-        :param context_aware_object_factories: A mapping from string aliases to context aware
-                                               object factory callables.
         """
         self._target_types, self._target_macro_factories = self._validate_targets(targets)
         self._objects = self._validate_objects(objects)
@@ -206,43 +216,35 @@ class BuildFileAliases:
         )
 
     @property
-    def target_types(self) -> Dict[str, Type[Target]]:
-        """Returns a mapping from string aliases to Target subclasses.
-
+    def target_types(self) -> FrozenDict[str, Type[Target]]:
+        """
         :API: public
         """
         return self._target_types
 
     @property
-    def target_macro_factories(self) -> Dict[str, TargetMacro.Factory]:
-        """Returns a mapping from string aliases to TargetMacro.Factory instances.
-
+    def target_macro_factories(self) -> FrozenDict[str, TargetMacro.Factory]:
+        """
         :API: public
         """
         return self._target_macro_factories
 
     @property
-    def objects(self):
-        """Returns a mapping from string aliases to arbitrary objects.
-
+    def objects(self) -> FrozenDict[str, Any]:
+        """
         :API: public
-
-        :rtype: dict
         """
         return self._objects
 
     @property
-    def context_aware_object_factories(self):
-        """Returns a mapping from string aliases to context aware object factory callables.
-
+    def context_aware_object_factories(self) -> FrozenDict[str, ContextAwareObjectFactory]:
+        """
         :API: public
-
-        :rtype: dict
         """
         return self._context_aware_object_factories
 
     @memoized_property
-    def target_types_by_alias(self):
+    def target_types_by_alias(self) -> FrozenDict[str, FrozenSet[Type[Target]]]:
         """Returns a mapping from target alias to the target types produced for that alias.
 
         Normally there is 1 target type per alias, but macros can expand a single alias to several
@@ -252,30 +254,28 @@ class BuildFileAliases:
 
         :rtype: dict
         """
-        target_types_by_alias = defaultdict(set)
+        target_types_by_alias = defaultdict(list)
         for alias, target_type in self.target_types.items():
-            target_types_by_alias[alias].add(target_type)
+            target_types_by_alias[alias].append(target_type)
         for alias, target_macro_factory in self.target_macro_factories.items():
-            target_types_by_alias[alias].update(target_macro_factory.target_types)
-        return dict(target_types_by_alias)
+            target_types_by_alias[alias].extend(target_macro_factory.target_types)
+        return FrozenDict(
+            (alias, frozenset(target_types))
+            for alias, target_types in target_types_by_alias.items()
+        )
 
-    def merge(self, other):
+    def merge(self, other: "BuildFileAliases") -> "BuildFileAliases":
         """Merges a set of build file aliases and returns a new set of aliases containing both.
 
         Any duplicate aliases from `other` will trump.
 
         :API: public
-
-        :param other: The BuildFileAliases to merge in.
-        :type other: :class:`BuildFileAliases`
-        :returns: A new BuildFileAliases containing `other`'s aliases merged into ours.
-        :rtype: :class:`BuildFileAliases`
         """
         if not isinstance(other, BuildFileAliases):
             raise TypeError("Can only merge other BuildFileAliases, given {0}".format(other))
 
         def merge(*items):
-            merged = {}
+            merged: Dict = {}
             for item in items:
                 merged.update(item)
             return merged
@@ -295,24 +295,6 @@ class BuildFileAliases:
             objects=objects,
             context_aware_object_factories=context_aware_object_factories,
         )
-
-    def _tuple(self):
-        tuplize = lambda d: tuple(sorted(d.items()))
-        return (
-            tuplize(self._target_types),
-            tuplize(self._target_macro_factories),
-            tuplize(self._objects),
-            tuplize(self._context_aware_object_factories),
-        )
-
-    def __eq__(self, other):
-        return isinstance(other, BuildFileAliases) and self._tuple() == other._tuple()
-
-    def __ne__(self, other):
-        return not self == other
-
-    def __hash__(self):
-        return hash(self._tuple())
 
 
 class _BuildFileTargetFactoryMacro(BuildFileTargetFactory, TargetMacro):

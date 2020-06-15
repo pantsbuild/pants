@@ -7,7 +7,7 @@ from abc import ABC, ABCMeta
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import Dict, Iterable, List, Optional, Type, TypeVar
+from typing import Dict, Iterable, List, Optional, Tuple, Type, TypeVar
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.core.util_rules.filter_empty_sources import (
@@ -32,13 +32,32 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership, union
 
-# TODO(#6004): use proper Logging singleton, rather than static logger.
+# TODO: Until we have templating of rule names (#7907) or some other way to affect the level
+# of a workunit for a failed test, we should continue to log tests completing.
 logger = logging.getLogger(__name__)
 
 
 class Status(Enum):
     SUCCESS = "SUCCESS"
     FAILURE = "FAILURE"
+
+
+class CoverageReportType(Enum):
+    CONSOLE = ("console", "report")
+    XML = ("xml", None)
+    HTML = ("html", None)
+
+    _report_name: str
+
+    def __new__(cls, value: str, report_name: Optional[str] = None) -> "CoverageReportType":
+        member: "CoverageReportType" = object.__new__(cls)
+        member._value_ = value
+        member._report_name = report_name if report_name is not None else value
+        return member
+
+    @property
+    def report_name(self) -> str:
+        return self._report_name
 
 
 @dataclass(frozen=True)
@@ -155,6 +174,19 @@ class FilesystemCoverageReport(CoverageReport):
         )
         console.print_stderr(f"\nWrote coverage report to `{self.directory_to_materialize_to}`")
         return self.report_file
+
+
+@dataclass(frozen=True)
+class CoverageReports:
+    reports: Tuple[CoverageReport, ...]
+
+    def materialize(self, console: Console, workspace: Workspace) -> Tuple[PurePath, ...]:
+        report_paths = []
+        for report in self.reports:
+            report_path = report.materialize(console, workspace)
+            if report_path:
+                report_paths.append(report_path)
+        return tuple(report_paths)
 
 
 class TestOptions(GoalSubsystem):
@@ -290,17 +322,16 @@ async def run_tests(
         for data_cls, data in itertools.groupby(all_coverage_data, lambda data: type(data)):
             collection_cls = coverage_types_to_collection_types[data_cls]
             coverage_collections.append(collection_cls(data))
-
-        coverage_reports = await MultiGet(
-            Get[CoverageReport](CoverageDataCollection, coverage_collection)
+        # We can create multiple reports for each coverage data (console, xml and html)
+        coverage_reports_collections = await MultiGet(
+            Get[CoverageReports](CoverageDataCollection, coverage_collection)
             for coverage_collection in coverage_collections
         )
 
-        coverage_report_files = []
-        for report in coverage_reports:
-            report_file = report.materialize(console, workspace)
-            if report_file is not None:
-                coverage_report_files.append(report_file)
+        coverage_report_files: List[PurePath] = []
+        for coverage_reports in coverage_reports_collections:
+            report_files = coverage_reports.materialize(console, workspace)
+            coverage_report_files.extend(report_files)
 
         if coverage_report_files and options.values.open_coverage:
             desktop.ui_open(console, interactive_runner, coverage_report_files)
@@ -311,11 +342,6 @@ async def run_tests(
 @rule
 async def coordinator_of_tests(wrapped_field_set: WrappedTestFieldSet) -> AddressAndTestResult:
     field_set = wrapped_field_set.field_set
-
-    # TODO(#6004): when streaming to live TTY, rely on V2 UI for this information. When not a
-    # live TTY, periodically dump heavy hitters to stderr. See
-    # https://github.com/pantsbuild/pants/issues/6004#issuecomment-492699898.
-    logger.info(f"Starting tests: {field_set.address.reference()}")
     result = await Get[TestResult](TestFieldSet, field_set)
     logger.info(
         f"Tests {'succeeded' if result.status == Status.SUCCESS else 'failed'}: "

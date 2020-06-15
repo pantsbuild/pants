@@ -25,7 +25,7 @@ from typing import (
 from typing_extensions import final
 
 from pants.base.specs import OriginSpec
-from pants.build_graph.app_base import Bundle
+from pants.build_graph.bundle import Bundle
 from pants.engine.addresses import Address, Addresses, assert_single_address
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.fs import (
@@ -39,6 +39,7 @@ from pants.engine.legacy.structs import BundleAdaptor
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.unions import UnionMembership, union
+from pants.option.global_options import GlobalOptions
 from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper, Filespec
 from pants.util.collections import ensure_list, ensure_str_list
 from pants.util.frozendict import FrozenDict
@@ -843,7 +844,10 @@ class UnrecognizedTargetTypeException(Exception):
         for_address = f"for address {address}" if address else ""
         super().__init__(
             f"Target type {repr(target_type)} is not registered{for_address}.\n\nAll valid target "
-            f"types: {sorted(registered_target_types.aliases)}"
+            f"types: {sorted(registered_target_types.aliases)}\n\n(If {repr(target_type)} is a "
+            "custom target type, refer to "
+            "https://groups.google.com/forum/#!topic/pants-devel/WsRFODRLVZI for instructions on "
+            "writing a light-weight Target API binding.)"
         )
 
 
@@ -1673,7 +1677,7 @@ class InferredDependencies(DeduplicatedCollection[Address]):
 
 @rule
 async def resolve_dependencies(
-    request: DependenciesRequest, union_membership: UnionMembership
+    request: DependenciesRequest, union_membership: UnionMembership, global_options: GlobalOptions
 ) -> Addresses:
     provided = request.field.sanitized_raw_value or ()
 
@@ -1689,7 +1693,7 @@ async def resolve_dependencies(
 
     inference_request_types = union_membership.get(InferDependenciesRequest)
     inferred = InferredDependencies()
-    if inference_request_types:
+    if global_options.options.dependency_inference and inference_request_types:
         # Dependency inference is solely determined by the `Sources` field for a Target, so we
         # re-resolve the original target to inspect its `Sources` field, if any.
         wrapped_tgt = await Get[WrappedTarget](Address, request.field.address)

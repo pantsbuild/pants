@@ -10,7 +10,9 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  clippy::used_underscore_binding
+  // TODO: Falsely triggers for async/await:
+  //   see https://github.com/rust-lang/rust-clippy/issues/5360
+  // clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -38,13 +40,10 @@ use std::fs::File;
 use std::hash::BuildHasherDefault;
 use std::io::{self, BufWriter, Write};
 use std::path::Path;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use fnv::FnvHasher;
-
-use futures::compat::Future01CompatExt;
-use futures::future::{FutureExt, TryFutureExt};
-use futures01::future::{self, Future};
+use futures::future;
 use log::{debug, trace, warn};
 use parking_lot::Mutex;
 use petgraph::graph::DiGraph;
@@ -53,7 +52,6 @@ use petgraph::Direction;
 use tokio::time::delay_for;
 
 pub use crate::node::{EntryId, Node, NodeContext, NodeError, NodeVisualizer};
-use boxfuture::{BoxFuture, Boxable};
 
 type FNV = BuildHasherDefault<FnvHasher>;
 
@@ -70,10 +68,6 @@ type Nodes<N> = HashMap<N, EntryId>;
 struct InnerGraph<N: Node> {
   nodes: Nodes<N>,
   pg: PGraph<N>,
-  /// A Graph that is marked `draining:True` will not allow the creation of new `Nodes`. But
-  /// while draining, any Nodes that exist in the Graph will continue to run until/unless they
-  /// attempt to get/create new Nodes.
-  draining: bool,
 }
 
 impl<N: Node> InnerGraph<N> {
@@ -84,10 +78,6 @@ impl<N: Node> InnerGraph<N> {
   // TODO: Now that we never delete Entries, we should consider making this infallible.
   fn entry_for_id(&self, id: EntryId) -> Option<&Entry<N>> {
     self.pg.node_weight(id)
-  }
-
-  fn entry_for_id_mut(&mut self, id: EntryId) -> Option<&mut Entry<N>> {
-    self.pg.node_weight_mut(id)
   }
 
   fn unsafe_entry_for_id(&self, id: EntryId) -> &Entry<N> {
@@ -422,7 +412,11 @@ impl<N: Node> InnerGraph<N> {
     Ok(())
   }
 
-  fn reachable_digest_count(&self, roots: &[N], context: &N::Context) -> usize {
+  fn live_reachable<'g>(
+    &'g self,
+    roots: &[N],
+    context: &N::Context,
+  ) -> impl Iterator<Item = (&N, N::Item)> + 'g {
     // TODO: This is a surprisingly expensive method, because it will clone all reachable values by
     // calling `peek` on them.
     let root_ids = roots
@@ -430,34 +424,27 @@ impl<N: Node> InnerGraph<N> {
       .filter_map(|node| self.entry_id(node))
       .cloned()
       .collect();
-    self
-      .digests_internal(
-        self
-          .walk(root_ids, Direction::Outgoing, |_| false)
-          .collect(),
-        context.clone(),
-      )
-      .count()
+    self.live_internal(
+      self
+        .walk(root_ids, Direction::Outgoing, |_| false)
+        .collect(),
+      context.clone(),
+    )
   }
 
-  fn all_digests(&self, context: &N::Context) -> Vec<hashing::Digest> {
-    self
-      .digests_internal(self.pg.node_indices().collect(), context.clone())
-      .collect()
+  fn live<'g>(&'g self, context: &N::Context) -> impl Iterator<Item = (&N, N::Item)> + 'g {
+    self.live_internal(self.pg.node_indices().collect(), context.clone())
   }
 
-  fn digests_internal<'g>(
+  fn live_internal<'g>(
     &'g self,
     entryids: Vec<EntryId>,
     context: N::Context,
-  ) -> impl Iterator<Item = hashing::Digest> + 'g {
+  ) -> impl Iterator<Item = (&N, N::Item)> + 'g {
     entryids
       .into_iter()
       .filter_map(move |eid| self.entry_for_id(eid))
-      .filter_map(move |entry| match entry.peek(&context) {
-        Some(item) => N::digest(item),
-        _ => None,
-      })
+      .filter_map(move |entry| entry.peek(&context).map(|i| (entry.node(), i)))
   }
 }
 
@@ -466,17 +453,22 @@ impl<N: Node> InnerGraph<N> {
 ///
 pub struct Graph<N: Node> {
   inner: Mutex<InnerGraph<N>>,
+  invalidation_timeout: Duration,
 }
 
 impl<N: Node> Graph<N> {
   pub fn new() -> Graph<N> {
+    Self::new_with_invalidation_timeout(Duration::from_secs(60))
+  }
+
+  pub fn new_with_invalidation_timeout(invalidation_timeout: Duration) -> Graph<N> {
     let inner = InnerGraph {
-      draining: false,
       nodes: HashMap::default(),
       pg: DiGraph::new(),
     };
     Graph {
       inner: Mutex::new(inner),
+      invalidation_timeout,
     }
   }
 
@@ -485,19 +477,16 @@ impl<N: Node> Graph<N> {
     inner.nodes.len()
   }
 
-  fn get_inner(
+  async fn get_inner(
     &self,
     src_id: Option<EntryId>,
     context: &N::Context,
     dst_node: N,
-  ) -> BoxFuture<(N::Item, Generation), N::Error> {
+  ) -> Result<(N::Item, Generation), N::Error> {
     // Compute information about the dst under the Graph lock, and then release it.
     let (dst_retry, mut entry, entry_id) = {
       // Get or create the destination, and then insert the dep and return its state.
       let mut inner = self.inner.lock();
-      if inner.draining {
-        return future::err(N::Error::invalidated()).to_boxed();
-      }
 
       // TODO: doing cycle detection under the lock... unfortunate, but probably unavoidable
       // without a much more complicated algorithm.
@@ -509,7 +498,7 @@ impl<N: Node> Graph<N> {
             .into_iter()
             .map(|e| e.node().to_string())
             .collect();
-          return future::err(N::Error::cyclic(path_strs)).to_boxed();
+          return Err(N::Error::cyclic(path_strs));
         }
 
         // Valid dependency.
@@ -542,25 +531,25 @@ impl<N: Node> Graph<N> {
     if dst_retry {
       // Retry the dst a number of times to handle Node invalidation.
       let context = context.clone();
-      let uncached_node = async move {
-        let mut counter: usize = 8;
-        loop {
-          counter -= 1;
-          if counter == 0 {
-            break Err(N::Error::exhausted());
+      let deadline = Instant::now() + self.invalidation_timeout;
+      let mut interval = Duration::from_millis(100);
+      loop {
+        match entry.get(&context, entry_id).await {
+          Ok(r) => break Ok(r),
+          Err(err) if err == N::Error::invalidated() => {
+            if deadline < Instant::now() {
+              break Err(N::Error::exhausted());
+            }
+            delay_for(interval).await;
+            interval *= 2;
+            continue;
           }
-          let dep_res = entry.get(&context, entry_id).compat().await;
-          match dep_res {
-            Ok(r) => break Ok(r),
-            Err(err) if err == N::Error::invalidated() => continue,
-            Err(other_err) => break Err(other_err),
-          }
+          Err(other_err) => break Err(other_err),
         }
-      };
-      uncached_node.boxed().compat().to_boxed()
+      }
     } else {
       // Not retriable.
-      entry.get(context, entry_id)
+      entry.get(context, entry_id).await
     }
   }
 
@@ -570,23 +559,24 @@ impl<N: Node> Graph<N> {
   /// If there is no src Node, or the src Node is not cacheable, this method will retry for
   /// invalidation until the Node completes.
   ///
-  pub fn get(
+  /// Invalidation events in the graph (generally, filesystem changes) will cause cacheable Nodes
+  /// to be retried here for up to `invalidation_timeout`.
+  ///
+  pub async fn get(
     &self,
     src_id: Option<EntryId>,
     context: &N::Context,
     dst_node: N,
-  ) -> BoxFuture<N::Item, N::Error> {
-    self
-      .get_inner(src_id, context, dst_node)
-      .map(|(res, _generation)| res)
-      .to_boxed()
+  ) -> Result<N::Item, N::Error> {
+    let (res, _generation) = self.get_inner(src_id, context, dst_node).await?;
+    Ok(res)
   }
 
   ///
   /// Return the value of the given Node. Shorthand for `self.get(None, context, node)`.
   ///
-  pub fn create(&self, node: N, context: &N::Context) -> BoxFuture<N::Item, N::Error> {
-    self.get(None, context, node)
+  pub async fn create(&self, node: N, context: &N::Context) -> Result<N::Item, N::Error> {
+    self.get(None, context, node).await
   }
 
   ///
@@ -608,18 +598,14 @@ impl<N: Node> Graph<N> {
         let entry_id = inner.ensure_entry(node.clone());
         inner.unsafe_entry_for_id(entry_id).clone()
       };
-      entry
-        .poll(context, generation)
-        .compat()
-        .await
-        .expect("Polling is infallible");
+      entry.poll(context, generation).await;
       if let Some(delay) = delay {
         delay_for(delay).await;
       }
     };
 
     // Re-request the Node.
-    let (res, generation) = self.get_inner(None, context, node).compat().await?;
+    let (res, generation) = self.get_inner(None, context, node).await?;
     Ok((res, LastObserved(generation)))
   }
 
@@ -693,32 +679,33 @@ impl<N: Node> Graph<N> {
   /// Gets the generations of the dependencies of the given EntryId, (re)computing or cleaning
   /// them first if necessary.
   ///
-  fn dep_generations(
+  async fn dep_generations(
     &self,
     entry_id: EntryId,
     context: &N::Context,
-  ) -> BoxFuture<Vec<Generation>, N::Error> {
-    let mut inner = self.inner.lock();
-    let dep_ids = inner
-      .pg
-      .neighbors_directed(entry_id, Direction::Outgoing)
-      .collect::<Vec<_>>();
+  ) -> Result<Vec<Generation>, N::Error> {
+    let generations = {
+      let inner = self.inner.lock();
+      let dep_ids = inner
+        .pg
+        .neighbors_directed(entry_id, Direction::Outgoing)
+        .collect::<Vec<_>>();
 
-    future::join_all(
       dep_ids
         .into_iter()
         .map(|dep_id| {
-          let entry = inner
-            .entry_for_id_mut(dep_id)
-            .unwrap_or_else(|| panic!("Dependency not present in Graph."));
-          entry
-            .get(context, dep_id)
-            .map(|(_, generation)| generation)
-            .to_boxed()
+          let mut entry = inner
+            .entry_for_id(dep_id)
+            .unwrap_or_else(|| panic!("Dependency not present in Graph."))
+            .clone();
+          async move {
+            let (_, generation) = entry.get(context, dep_id).await?;
+            Ok(generation)
+          }
         })
-        .collect::<Vec<_>>(),
-    )
-    .to_boxed()
+        .collect::<Vec<_>>()
+    };
+    future::try_join_all(generations).await
   }
 
   ///
@@ -848,14 +835,23 @@ impl<N: Node> Graph<N> {
     inner.visualize(visualizer, roots, path, context)
   }
 
-  pub fn reachable_digest_count(&self, roots: &[N], context: &N::Context) -> usize {
+  pub fn visit_live_reachable(
+    &self,
+    roots: &[N],
+    context: &N::Context,
+    mut f: impl FnMut(&N, N::Item) -> (),
+  ) {
     let inner = self.inner.lock();
-    inner.reachable_digest_count(roots, context)
+    for (n, v) in inner.live_reachable(roots, context) {
+      f(n, v);
+    }
   }
 
-  pub fn all_digests(&self, context: &N::Context) -> Vec<hashing::Digest> {
+  pub fn visit_live(&self, context: &N::Context, mut f: impl FnMut(&N, N::Item) -> ()) {
     let inner = self.inner.lock();
-    inner.all_digests(context)
+    for (n, v) in inner.live(context) {
+      f(n, v);
+    }
   }
 
   ///
@@ -868,25 +864,6 @@ impl<N: Node> Graph<N> {
   {
     let _inner = self.inner.lock();
     f()
-  }
-
-  ///
-  /// Marks this Graph with the given draining status. If the Graph already has a matching
-  /// draining status, then the operation will return an Err.
-  ///
-  /// This is an independent operation from acquiring exclusive access to the Graph
-  /// (`with_exclusive`), because once exclusive access has been acquired, threads attempting to
-  /// access the Graph would wait to acquire the lock, rather than acquiring and then failing fast
-  /// as we'd like them to while `draining:True`.
-  ///
-  pub fn mark_draining(&self, draining: bool) -> Result<(), ()> {
-    let mut inner = self.inner.lock();
-    if inner.draining == draining {
-      Err(())
-    } else {
-      inner.draining = draining;
-      Ok(())
-    }
   }
 }
 

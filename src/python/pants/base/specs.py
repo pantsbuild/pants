@@ -189,6 +189,7 @@ class DescendantAddresses(AddressSpec):
     """An AddressSpec representing all addresses located recursively under the given directory."""
 
     directory: str
+    error_if_no_matches: bool = True
 
     def to_spec_string(self) -> str:
         return f"{self.directory}::"
@@ -206,9 +207,9 @@ class DescendantAddresses(AddressSpec):
         self, address_families: Sequence["AddressFamily"]
     ):
         addr_tgt_pairs = self.all_address_target_pairs(address_families)
-        if len(addr_tgt_pairs) == 0:
+        if self.error_if_no_matches and len(addr_tgt_pairs) == 0:
             raise self.AddressResolutionError(
-                "AddressSpec {} does not match any targets.".format(self)
+                f"Address spec {repr(self.to_spec_string())} does not match any targets."
             )
         return addr_tgt_pairs
 

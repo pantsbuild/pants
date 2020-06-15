@@ -40,7 +40,10 @@ class TestPythonAWSLambdaCreation(ExternalToolTestBase):
             Params(
                 PythonAwsLambdaFieldSet.create(target),
                 create_options_bootstrapper(
-                    args=["--backend-packages2=pants.backend.awslambda.python"]
+                    args=[
+                        "--backend-packages2=pants.backend.awslambda.python",
+                        "--source-root-patterns=src/python",
+                    ]
                 ),
             ),
         )
@@ -54,7 +57,7 @@ class TestPythonAWSLambdaCreation(ExternalToolTestBase):
             textwrap.dedent(
                 """
                 def handler(event, context):
-                  print('Hello, World!')
+                    print('Hello, World!')
                 """
             ),
         )

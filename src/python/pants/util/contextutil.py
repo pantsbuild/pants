@@ -121,9 +121,9 @@ def _stdio_stream_as(src_fd: int, dst_fd: int, dst_sys_attribute: str, mode: str
                 termios.tcdrain(dst_fd)
             else:
                 new_dst.flush()
+            new_dst.close()
         except BaseException:
             pass
-        new_dst.close()
 
         # Restore the python and os level file handles.
         os.dup2(old_dst_fd, dst_fd)

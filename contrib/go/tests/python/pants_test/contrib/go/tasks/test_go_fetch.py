@@ -6,15 +6,15 @@ import shutil
 from collections import defaultdict
 
 from pants.build_graph.address import Address
-from pants.testutil.task_test_base import TaskTestBase
 from pants.util.contextutil import temporary_dir
+from pants_test.contrib.go.tasks.go_task_test_base import GoTaskTestBase
 
 from pants.contrib.go.subsystems.fetcher import ArchiveFetcher
 from pants.contrib.go.targets.go_remote_library import GoRemoteLibrary
 from pants.contrib.go.tasks.go_fetch import GoFetch
 
 
-class GoFetchTest(TaskTestBase):
+class GoFetchTest(GoTaskTestBase):
 
     address = Address.parse
 
@@ -111,7 +111,7 @@ class GoFetchTest(TaskTestBase):
     def _create_fetch_context(self, zipdir):
         """Given a directory of zipfiles, creates a context for GoFetch."""
         matcher = ArchiveFetcher.UrlInfo(
-            url_format=os.path.join(zipdir, "\g<zip>.zip"), default_rev="HEAD", strip_level=0
+            url_format=os.path.join(zipdir, r"\g<zip>.zip"), default_rev="HEAD", strip_level=0
         )
         self.set_options_for_scope("go-fetchers", matchers={r"localzip/(?P<zip>[^/]+)": matcher})
         context = self.context()

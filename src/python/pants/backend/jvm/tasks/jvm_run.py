@@ -49,6 +49,16 @@ class JvmRun(JvmTask):
     def supports_passthru_args(cls):
         return True
 
+    @classmethod
+    def passthru_args_kwargs(cls):
+        return dict(
+            passthrough=False,
+            removal_version="1.31.0.dev0",
+            removal_hint=(
+                "This task now receives passthrough arguments via the `--run-args` option."
+            ),
+        )
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.only_write_cmd_line = self.get_options().only_write_cmd_line

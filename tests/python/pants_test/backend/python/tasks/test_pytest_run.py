@@ -61,6 +61,7 @@ class PytestTestBase(PythonTaskTestBase, DeclarativeTaskTestMixin):
         self.set_options_for_scope(
             PythonSetup.options_scope, resolver_cache_dir=self.resolver_cache_dir,
         )
+        self.set_options_for_scope("source", root_patterns=["src/python", "test/python"])
 
     _CONFTEST_CONTENT = "# I am an existing root-level conftest file."
 

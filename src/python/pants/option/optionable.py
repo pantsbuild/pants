@@ -49,7 +49,8 @@ class OptionableFactory(ABC):
         # functions do not have these defined by default and the engine uses these values to
         # visualize functions in error messages and the rule graph.
         snake_scope = cls.options_scope.replace("-", "_")
-        partial_construct_optionable.__name__ = f"construct_scope_{snake_scope}"
+        name = f"construct_scope_{snake_scope}"
+        partial_construct_optionable.__name__ = name
         partial_construct_optionable.__module__ = cls.__module__
         _, class_definition_lineno = inspect.getsourcelines(cls)
         partial_construct_optionable.__line_number__ = class_definition_lineno
@@ -59,6 +60,7 @@ class OptionableFactory(ABC):
             input_selectors=(),
             func=partial_construct_optionable,
             input_gets=(GetConstraints(product_type=ScopedOptions, subject_declared_type=Scope),),
+            canonical_name=name,
             dependency_optionables=(cls.optionable_cls,),
         )
 

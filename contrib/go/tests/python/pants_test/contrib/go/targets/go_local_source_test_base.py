@@ -24,7 +24,7 @@ class GoLocalSourceTestBase(ABC):
     def setUp(self):
         super().setUp()
         # Force setup of SourceRootConfig subsystem, as go targets do computation on source roots.
-        self.context()
+        self.context(options={"source": {"root_patterns": ["/src/go/src"]}})
 
     @property
     @abstractmethod

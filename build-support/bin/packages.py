@@ -19,7 +19,7 @@ from xml.etree import ElementTree
 
 import requests
 from bs4 import BeautifulSoup
-from common import banner, die, green
+from common import banner, die, green, travis_section
 
 # -----------------------------------------------------------------------------------------------
 # Pants package definitions
@@ -100,28 +100,11 @@ def contrib_packages() -> Set[Package]:
             "pantsbuild.pants.contrib.node", "contrib/node/src/python/pants/contrib/node:plugin",
         ),
         Package(
-            "pantsbuild.pants.contrib.python.checks",
-            "contrib/python/src/python/pants/contrib/python/checks:plugin",
-        ),
-        Package(
-            "pantsbuild.pants.contrib.python.checks.checker",
-            "contrib/python/src/python/pants/contrib/python/checks/checker",
-            bdist_wheel_flags=("--universal",),
-        ),
-        Package(
             "pantsbuild.pants.contrib.confluence",
             "contrib/confluence/src/python/pants/contrib/confluence:plugin",
         ),
         Package(
-            "pantsbuild.pants.contrib.codeanalysis",
-            "contrib/codeanalysis/src/python/pants/contrib/codeanalysis:plugin",
-        ),
-        Package(
             "pantsbuild.pants.contrib.mypy", "contrib/mypy/src/python/pants/contrib/mypy:plugin",
-        ),
-        Package(
-            "pantsbuild.pants.contrib.awslambda_python",
-            "contrib/awslambda/python/src/python/pants/contrib/awslambda/python:plugin",
         ),
     }
 
@@ -242,15 +225,18 @@ def build_pants_wheels() -> None:
     destination.mkdir(parents=True, exist_ok=True)
 
     def build(packages: Iterable[Package], bdist_wheel_flags: Iterable[str]) -> None:
-        formatted_flags = " ".join(bdist_wheel_flags)
         args = (
             "./v2",
+            # TODO(#9924).
+            "--no-dynamic-ui",
             # TODO(#7654): It's not safe to use Pantsd because we're already using Pants to run
             #  this script.
             "--concurrent",
             "setup-py2",
-            f"--args=bdist_wheel {formatted_flags}",
             *(package.target for package in packages),
+            "--",
+            "bdist_wheel",
+            *bdist_wheel_flags,
         )
         try:
             subprocess.run(args, check=True)
@@ -285,6 +271,39 @@ def build_pants_wheels() -> None:
         for flags, packages in packages_by_flags.items():
             build(packages, flags)
     green(f"Wrote Pants wheels to {destination}.")
+
+
+def build_fs_util() -> None:
+    # See https://pants.readme.io/docs/contributions-rust for a description of fs_util. We include
+    # it in our releases because it can be a useful standalone tool.
+    with travis_section("fs_util", "Building fs_util"):
+        subprocess.run(
+            [
+                "build-support/bin/native/cargo",
+                "build",
+                "--release",
+                "--manifest-path=src/rust/engine/Cargo.toml",
+                "-p",
+                "fs_util",
+            ],
+            check=True,
+            env={**os.environ, "RUST_BACKTRACE": "1"},
+        )
+        current_os = (
+            subprocess.run(["build-support/bin/get_os.sh"], stdout=subprocess.PIPE, check=True)
+            .stdout.decode()
+            .strip()
+        )
+        dest_dir = (
+            Path(CONSTANTS.deploy_dir)
+            / "bin"
+            / "fs_util"
+            / current_os
+            / CONSTANTS.pants_unstable_version
+        )
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy("src/rust/engine/target/release/fs_util", dest_dir)
+        green(f"Built fs_util at {dest_dir / 'fs_util'}.")
 
 
 def check_clean_git_branch() -> None:
@@ -464,15 +483,49 @@ def check_prebuilt_wheels(check_dir: str) -> None:
     green(f"All {len(all_packages())} pantsbuild.pants packages were fetched and are valid.")
 
 
+def tag_release() -> None:
+    tag_name = f"release_{CONSTANTS.pants_stable_version}"
+    subprocess.run(
+        [
+            "git",
+            "tag",
+            "-f",
+            f"--local-user={get_pgp_key_id()}",
+            "-m",
+            f"pantsbuild.pants release {CONSTANTS.pants_stable_version}",
+            tag_name,
+        ],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "push", "-f", "git@github.com:pantsbuild/pants.git", tag_name], check=True
+    )
+
+
+def publish_docs_if_master_branch() -> None:
+    branch = get_git_branch()
+    if branch != "master":
+        print(
+            f"Skipping publish of pantsbuild.org because you are not on master ({branch}).\n\nTo "
+            "manually publish, first check out the `master` branch, then run "
+            "`build-support/bin/publish_docs.sh -p -y`."
+        )
+        return
+    subprocess.run(["build-support/bin/publish_docs.sh", "-p", "-y"], check=True)
+
+
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command")
 
     subparsers.add_parser("build-pants-wheels")
+    subparsers.add_parser("build-fs-util")
     subparsers.add_parser("check-release-prereqs")
     subparsers.add_parser("list-owners")
     subparsers.add_parser("list-packages")
     subparsers.add_parser("list-prebuilt-wheels")
+    # TODO: replace this with `publish-packages` once release.sh is ported.
+    subparsers.add_parser("post-publish")
 
     parser_fetch_prebuilt_wheels = subparsers.add_parser("fetch-and-check-prebuilt-wheels")
     parser_fetch_prebuilt_wheels.add_argument("--wheels-dest")
@@ -484,6 +537,8 @@ def main() -> None:
     args = create_parser().parse_args()
     if args.command == "build-pants-wheels":
         build_pants_wheels()
+    if args.command == "build-fs-util":
+        build_fs_util()
     if args.command == "check-release-prereqs":
         check_release_prereqs()
     if args.command == "list-owners":
@@ -492,6 +547,9 @@ def main() -> None:
         list_packages()
     if args.command == "list-prebuilt-wheels":
         list_prebuilt_wheels()
+    if args.command == "post-publish":
+        tag_release()
+        publish_docs_if_master_branch()
     if args.command == "fetch-and-check-prebuilt-wheels":
         with TemporaryDirectory() as tempdir:
             dest = args.wheels_dest or tempdir

@@ -10,7 +10,9 @@
   clippy::if_not_else,
   clippy::needless_continue,
   clippy::unseparated_literal_suffix,
-  clippy::used_underscore_binding
+  // TODO: Falsely triggers for async/await:
+  //   see https://github.com/rust-lang/rust-clippy/issues/5360
+  // clippy::used_underscore_binding
 )]
 // It is often more clear to show that nothing is being moved.
 #![allow(clippy::match_ref_pats)]
@@ -194,7 +196,23 @@ async fn main() {
               .help("Whether or not to enable running the process through a Nailgun server.\
                         This will likely start a new Nailgun server as a side effect.")
       )
-    .setting(AppSettings::TrailingVarArg)
+      .arg(
+        Arg::with_name("enable-streaming-client")
+            .long("enable-streaming-client")
+            .takes_value(false)
+            .required(false)
+            .default_value("false")
+            .help("Enable the experimental streaming remote execution client.")
+      )
+      .arg(
+        Arg::with_name("overall-deadline-secs")
+            .long("overall-deadline-secs")
+            .takes_value(true)
+            .required(false)
+            .default_value("600")
+            .help("Overall timeout in seconds for each request from time of submission")
+      )
+      .setting(AppSettings::TrailingVarArg)
     .arg(
       Arg::with_name("argv")
         .multiple(true)
@@ -276,6 +294,8 @@ async fn main() {
     .values_of("headers")
     .map(collection_from_keyvalues::<_, BTreeMap<_, _>>)
     .unwrap_or_default();
+  let enable_streaming_client = args.is_present("enable-streaming-client");
+  let overall_deadline_secs = value_t!(args.value_of("overall-deadline-secs"), u64).unwrap_or(3600);
 
   let executor = task_executor::Executor::new(Handle::current());
 
@@ -343,7 +363,7 @@ async fn main() {
     output_directories,
     timeout: Some(Duration::new(15 * 60, 0)),
     description: "process_executor".to_string(),
-    append_only_caches: BTreeSet::new(),
+    append_only_caches: BTreeMap::new(),
     jdk_home: args.value_of("jdk").map(PathBuf::from),
     target_platform: PlatformConstraint::try_from(
       &args.value_of("target-platform").unwrap().to_string(),
@@ -367,26 +387,49 @@ async fn main() {
           None
         };
 
-      Box::new(
-        process_execution::remote::CommandRunner::new(
-          address,
-          ProcessMetadata {
-            instance_name: remote_instance_arg,
-            cache_key_gen_version: args.value_of("cache-key-gen-version").map(str::to_owned),
-            platform_properties,
-          },
-          root_ca_certs,
-          oauth_bearer_token,
-          headers,
-          store.clone(),
-          Platform::Linux,
-          executor,
-          std::time::Duration::from_secs(320),
-          std::time::Duration::from_millis(500),
-          std::time::Duration::from_secs(5),
+      let command_runner_box: Box<dyn process_execution::CommandRunner> = if enable_streaming_client
+      {
+        Box::new(
+          process_execution::remote::StreamingCommandRunner::new(
+            address,
+            ProcessMetadata {
+              instance_name: remote_instance_arg,
+              cache_key_gen_version: args.value_of("cache-key-gen-version").map(str::to_owned),
+              platform_properties,
+            },
+            root_ca_certs,
+            oauth_bearer_token,
+            headers,
+            store.clone(),
+            Platform::Linux,
+            Duration::from_secs(overall_deadline_secs),
+          )
+          .expect("Failed to make command runner"),
         )
-        .expect("Failed to make command runner"),
-      ) as Box<dyn process_execution::CommandRunner>
+      } else {
+        Box::new(
+          process_execution::remote::CommandRunner::new(
+            address,
+            ProcessMetadata {
+              instance_name: remote_instance_arg,
+              cache_key_gen_version: args.value_of("cache-key-gen-version").map(str::to_owned),
+              platform_properties,
+            },
+            root_ca_certs,
+            oauth_bearer_token,
+            headers,
+            store.clone(),
+            Platform::Linux,
+            executor,
+            std::time::Duration::from_secs(320),
+            std::time::Duration::from_millis(500),
+            std::time::Duration::from_secs(5),
+          )
+          .expect("Failed to make command runner"),
+        )
+      };
+
+      command_runner_box
     }
     None => Box::new(process_execution::local::CommandRunner::new(
       store.clone(),
@@ -410,8 +453,22 @@ async fn main() {
       .unwrap();
   }
 
-  print!("{}", String::from_utf8(result.stdout.to_vec()).unwrap());
-  eprint!("{}", String::from_utf8(result.stderr.to_vec()).unwrap());
+  let stdout: Vec<u8> = store
+    .load_file_bytes_with(result.stdout_digest, |bytes| bytes.to_vec())
+    .await
+    .unwrap()
+    .unwrap()
+    .0;
+
+  let stderr: Vec<u8> = store
+    .load_file_bytes_with(result.stderr_digest, |bytes| bytes.to_vec())
+    .await
+    .unwrap()
+    .unwrap()
+    .0;
+
+  print!("{}", String::from_utf8(stdout).unwrap());
+  eprint!("{}", String::from_utf8(stderr).unwrap());
   exit(result.exit_code);
 }
 

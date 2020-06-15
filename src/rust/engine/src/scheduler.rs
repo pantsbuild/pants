@@ -8,7 +8,6 @@ use std::path::{Path, PathBuf};
 use std::sync::{mpsc, Arc};
 use std::time::{Duration, Instant};
 
-use futures::compat::Future01CompatExt;
 use futures::future;
 
 use crate::context::{Context, Core};
@@ -25,9 +24,23 @@ use watch::Invalidatable;
 use workunit_store::WorkunitStore;
 
 pub enum ExecutionTermination {
+  // Raised as a vanilla keyboard interrupt on the python side.
   KeyboardInterrupt,
-  Timeout,
+  // An execute-method specific timeout: raised as PollTimeout.
+  PollTimeout,
+  // No clear reason: possibly a panic on a background thread.
+  Fatal(String),
 }
+
+enum ExecutionEvent {
+  Completed(Vec<ObservedValueResult>),
+  Stderr(String),
+}
+
+type ObservedValueResult = Result<(Value, Option<LastObserved>), Failure>;
+
+// Root requests are limited to Select nodes, which produce (python) Values.
+type Root = Select;
 
 ///
 /// A Session represents a related series of requests (generally: one run of the pants CLI) on an
@@ -73,7 +86,7 @@ impl Session {
     build_id: String,
     should_report_workunits: bool,
   ) -> Session {
-    let workunit_store = WorkunitStore::new();
+    let workunit_store = WorkunitStore::new(should_render_ui);
     let display = if should_render_ui {
       Some(Mutex::new(ConsoleUI::new(workunit_store.clone())))
     } else {
@@ -176,13 +189,19 @@ impl Session {
     self.should_report_workunits() || self.should_record_zipkin_spans()
   }
 
-  fn maybe_display_initialize(&self, executor: &Executor) {
+  fn maybe_display_initialize(&self, executor: &Executor, sender: &mpsc::Sender<ExecutionEvent>) {
     if let Some(display) = &self.0.display {
-      let session = self.clone();
       let mut display = display.lock();
+      let sender = sender.clone();
       let res = display.initialize(
         executor.clone(),
-        Box::new(move |msg: &str| session.write_stderr(msg)),
+        Box::new(move |msg: &str| {
+          // If we fail to send, it's because the execute loop has exited: we fail the callback to
+          // have the logging module directly log to stderr at that point.
+          sender
+            .send(ExecutionEvent::Stderr(msg.to_owned()))
+            .map_err(|_| ())
+        }),
       );
       if let Err(e) = res {
         warn!("{}", e);
@@ -310,13 +329,18 @@ impl Scheduler {
   pub fn metrics(&self, session: &Session) -> HashMap<&str, i64> {
     let context = Context::new(self.core.clone(), session.clone());
     let mut m = HashMap::new();
-    m.insert(
-      "affected_file_count",
+    m.insert("affected_file_count", {
+      let mut count = 0;
       self
         .core
         .graph
-        .reachable_digest_count(&session.root_nodes(), &context) as i64,
-    );
+        .visit_live_reachable(&session.root_nodes(), &context, |n, _| {
+          if n.fs_subject().is_some() {
+            count += 1;
+          }
+        });
+      count
+    });
     m.insert(
       "preceding_graph_size",
       session.preceding_graph_size() as i64,
@@ -340,9 +364,14 @@ impl Scheduler {
   ///
   /// Return all Digests currently in memory in this Scheduler.
   ///
-  pub fn all_digests(&self, session: &Session) -> Vec<hashing::Digest> {
+  pub fn all_digests(&self, session: &Session) -> HashSet<hashing::Digest> {
     let context = Context::new(self.core.clone(), session.clone());
-    self.core.graph.all_digests(&context)
+    let mut digests = HashSet::new();
+    self
+      .core
+      .graph
+      .visit_live(&context, |_, v| digests.extend(v.digests()));
+    digests
   }
 
   async fn poll_or_create(
@@ -360,12 +389,7 @@ impl Scheduler {
         .await?;
       (result, Some(last_observed))
     } else {
-      let result = context
-        .core
-        .graph
-        .create(root.into(), &context)
-        .compat()
-        .await?;
+      let result = context.core.graph.create(root.into(), &context).await?;
       (result, None)
     };
 
@@ -386,7 +410,7 @@ impl Scheduler {
     &self,
     request: &ExecutionRequest,
     session: &Session,
-    sender: mpsc::Sender<Vec<ObservedValueResult>>,
+    sender: mpsc::Sender<ExecutionEvent>,
   ) {
     let context = Context::new(self.core.clone(), session.clone());
     let roots = session.zip_last_observed(&request.roots);
@@ -404,7 +428,8 @@ impl Scheduler {
       )
       .await;
 
-      let _ = sender.send(res);
+      // The receiver may have gone away due to timeout.
+      let _ = sender.send(ExecutionEvent::Completed(res));
     });
   }
 
@@ -448,24 +473,37 @@ impl Scheduler {
       request.poll
     );
 
-    // Spawn and wait for all roots to complete. Failure here should be impossible, because each
-    // individual Future in the join was (eventually) mapped into success.
-    let (sender, receiver) = mpsc::channel();
-    self.execute_helper(request, session, sender);
-
     let interval = ConsoleUI::render_interval();
     let deadline = request.timeout.map(|timeout| Instant::now() + timeout);
 
-    session.maybe_display_initialize(&self.core.executor);
+    // Spawn and wait for all roots to complete.
+    let (sender, receiver) = mpsc::channel();
+    session.maybe_display_initialize(&self.core.executor, &sender);
+    self.execute_helper(request, session, sender);
     let result = loop {
-      if let Ok(res) = receiver.recv_timeout(Self::refresh_delay(interval, deadline)) {
-        // Completed successfully.
-        break Ok(Self::execute_record_results(&request.roots, &session, res));
-      } else if deadline.map(|d| d < Instant::now()).unwrap_or(false) {
-        // The timeout on the request has been exceeded.
-        break Err(ExecutionTermination::Timeout);
+      match receiver.recv_timeout(Self::refresh_delay(interval, deadline)) {
+        Ok(ExecutionEvent::Completed(res)) => {
+          // Completed successfully.
+          break Ok(Self::execute_record_results(&request.roots, &session, res));
+        }
+        Ok(ExecutionEvent::Stderr(stderr)) => {
+          session.write_stderr(&stderr);
+        }
+        Err(mpsc::RecvTimeoutError::Timeout) => {
+          if deadline.map(|d| d < Instant::now()).unwrap_or(false) {
+            // The timeout on the request has been exceeded.
+            break Err(ExecutionTermination::PollTimeout);
+          } else {
+            // Just a receive timeout. render and continue.
+            session.maybe_display_render();
+          }
+        }
+        Err(mpsc::RecvTimeoutError::Disconnected) => {
+          break Err(ExecutionTermination::Fatal(
+            "Execution threads exited early.".to_owned(),
+          ));
+        }
       }
-      session.maybe_display_render();
     };
     self
       .core
@@ -490,10 +528,3 @@ impl Drop for Scheduler {
     self.core.graph.clear();
   }
 }
-
-///
-/// Root requests are limited to Selectors that produce (python) Values.
-///
-type Root = Select;
-
-pub type ObservedValueResult = Result<(Value, Option<LastObserved>), Failure>;

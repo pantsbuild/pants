@@ -30,10 +30,8 @@ class FileContent:
     content: bytes
     is_executable: bool = False
 
-    def __repr__(self):
-        return "FileContent(path={}, content=(len:{}), is_executable={})".format(
-            self.path, len(self.content), self.is_executable,
-        )
+    def __repr__(self) -> str:
+        return f"FileContent(path={self.path}, content=(len:{len(self.content)}), is_executable={ self.is_executable})"
 
 
 class FilesContent(Collection[FileContent]):
@@ -121,7 +119,7 @@ class Digest:
 
     @classmethod
     def _path(cls, digested_path):
-        return "{}.digest".format(digested_path.rstrip(os.sep))
+        return f"{digested_path.rstrip(os.sep)}.digest"
 
     @classmethod
     def clear(cls, digested_path):
@@ -143,7 +141,7 @@ class Digest:
 
     def dump(self, digested_path):
         """Dump this Digest object adjacent to the given digested_path."""
-        payload = "{}:{}".format(self.fingerprint, self.serialized_bytes_length)
+        payload = f"{self.fingerprint}:{self.serialized_bytes_length}"
         safe_file_dump(self._path(digested_path), payload=payload)
 
 

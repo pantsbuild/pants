@@ -24,7 +24,6 @@ class BinaryFieldSet(FieldSet, metaclass=ABCMeta):
     """The fields necessary to create a binary from a target."""
 
 
-@union
 @dataclass(frozen=True)
 class CreatedBinary:
     digest: Digest

@@ -34,7 +34,7 @@ class ProcessHandler(ABC):
         pass
 
     @abstractmethod
-    def poll(self) -> int:
+    def poll(self) -> Optional[int]:
         pass
 
 
@@ -53,7 +53,7 @@ class SubprocessProcessHandler(ProcessHandler):
     def terminate(self) -> None:
         self._process.terminate()
 
-    def poll(self) -> int:
+    def poll(self) -> Optional[int]:
         return self._process.poll()
 
     def communicate_teeing_stdout_and_stderr(self, stdin=None):

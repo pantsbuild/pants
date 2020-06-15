@@ -16,7 +16,6 @@ from pants.base.build_environment import (
     get_pants_configdir,
     pants_version,
 )
-from pants.base.deprecated import deprecated_conditional
 from pants.option.custom_types import dir_option
 from pants.option.errors import OptionsError
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
@@ -39,22 +38,10 @@ class GlobMatchErrorBehavior(Enum):
 class FileNotFoundBehavior(Enum):
     """What to do when globs do not match in BUILD files."""
 
-    ignore = "ignore"
     warn = "warn"
     error = "error"
 
     def to_glob_match_error_behavior(self) -> GlobMatchErrorBehavior:
-        deprecated_conditional(
-            lambda: self == type(self).ignore,
-            removal_version="1.30.0.dev0",
-            entity_description="--files-not-found-behavior=ignore",
-            hint_message=(
-                "If you currently set `--files-not-found-behavior=ignore`, you will "
-                "need to instead either set `--files-not-found-behavior=warn` (the "
-                "default) or `--files-not-found-behavior=error`. Ignoring when files are "
-                "not found often results in subtle bugs, so we are removing the option."
-            ),
-        )
         return GlobMatchErrorBehavior(self.value)
 
 
@@ -97,6 +84,8 @@ class ExecutionOptions:
     remote_oauth_bearer_token_path: Any
     remote_execution_extra_platform_properties: Any
     remote_execution_headers: Any
+    remote_execution_enable_streaming: bool
+    remote_execution_overall_deadline_secs: int
     process_execution_local_enable_nailgun: bool
 
     @classmethod
@@ -122,6 +111,8 @@ class ExecutionOptions:
             remote_oauth_bearer_token_path=bootstrap_options.remote_oauth_bearer_token_path,
             remote_execution_extra_platform_properties=bootstrap_options.remote_execution_extra_platform_properties,
             remote_execution_headers=bootstrap_options.remote_execution_headers,
+            remote_execution_enable_streaming=bootstrap_options.remote_execution_enable_streaming,
+            remote_execution_overall_deadline_secs=bootstrap_options.remote_execution_overall_deadline_secs,
             process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
         )
 
@@ -147,6 +138,8 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_oauth_bearer_token_path=None,
     remote_execution_extra_platform_properties=[],
     remote_execution_headers={},
+    remote_execution_enable_streaming=False,
+    remote_execution_overall_deadline_secs=60 * 60,  # one hour
     process_execution_local_enable_nailgun=False,
 )
 
@@ -284,7 +277,6 @@ class GlobalOptions(Subsystem):
             default=[
                 "pants.backend.graph_info",
                 "pants.backend.python",
-                "pants.backend.python.lint.isort",
                 "pants.backend.jvm",
                 "pants.backend.native",
                 "pants.backend.codegen.protobuf.java",
@@ -492,7 +484,7 @@ class GlobalOptions(Subsystem):
             "--enable-pantsd",
             advanced=True,
             type=bool,
-            default=False,
+            default=True,
             help=(
                 "Enables use of the pants daemon (pantsd). pantsd can significantly improve "
                 "runtime performance by lowering per-run startup cost, and by caching filesystem "
@@ -527,20 +519,6 @@ class GlobalOptions(Subsystem):
             help="The build ID of the other pants run which spawned this one, if any.",
         )
 
-        # Shutdown pantsd after the current run.
-        # This needs to be accessed at the same time as enable_pantsd,
-        # so we register it at bootstrap time.
-        register(
-            "--shutdown-pantsd-after-run",
-            advanced=True,
-            type=bool,
-            default=False,
-            removal_version="1.30.0.dev0",
-            removal_hint="Not widely used, and will soon be rewritten to be inherent.",
-            help="Create a new pantsd server, and use it, and shut it down immediately after. "
-            "If pantsd is already running, it will shut it down and spawn a new instance (Beta)",
-        )
-
         # NB: We really don't want this option to invalidate the daemon, because different clients might have
         # different needs. For instance, an IDE might have a very long timeout because it only wants to refresh
         # a project in the background, while a user might want a shorter timeout for interactivity.
@@ -555,6 +533,16 @@ class GlobalOptions(Subsystem):
             "Because pantsd currently does not support parallel runs, "
             "any prior running Pants command must be finished for the current one to start. "
             "To never timeout, use the value -1.",
+        )
+        register(
+            "--pantsd-max-memory-usage",
+            advanced=True,
+            type=int,
+            default=2 ** 32,
+            help=(
+                "The maximum memory usage of a pantsd process (in bytes). There is at most one "
+                "pantsd process per workspace."
+            ),
         )
 
         # These facilitate configuring the native engine.
@@ -615,15 +603,6 @@ class GlobalOptions(Subsystem):
 
         # Pants Daemon options.
         register(
-            "--pantsd-pailgun-host",
-            advanced=True,
-            default="127.0.0.1",
-            removal_version="1.30.0.dev0",
-            removal_hint="The nailgun protocol is not authenticated, and so only binds to "
-            "127.0.0.1.",
-            help="The host to bind the pants nailgun server to.",
-        )
-        register(
             "--pantsd-pailgun-port",
             advanced=True,
             type=int,
@@ -660,18 +639,34 @@ class GlobalOptions(Subsystem):
             type=bool,
             advanced=True,
             default=False,
-            removal_version="1.30.0.dev0",
-            removal_hint="The native watcher is now sufficient to monitor for filesystem changes.",
+            removal_version="1.31.0.dev0",
+            removal_hint=(
+                "The native watcher is now sufficient to monitor for filesystem "
+                "changes, so watchman is being removed."
+            ),
             help="Use the watchman daemon filesystem event watcher to watch for changes "
             "in the buildroot in addition to the built in watcher.",
         )
         register(
-            "--watchman-version", advanced=True, default="4.9.0-pants1", help="Watchman version."
+            "--watchman-version",
+            advanced=True,
+            default="4.9.0-pants1",
+            removal_version="1.31.0.dev0",
+            removal_hint=(
+                "The native watcher is now sufficient to monitor for filesystem "
+                "changes, so watchman is being removed."
+            ),
+            help="Watchman version.",
         )
         register(
             "--watchman-supportdir",
             advanced=True,
             default="bin/watchman",
+            removal_version="1.31.0.dev0",
+            removal_hint=(
+                "The native watcher is now sufficient to monitor for filesystem "
+                "changes, so watchman is being removed."
+            ),
             help="Find watchman binaries under this dir. Used as part of the path to lookup "
             "the binary with --binaries-baseurls and --pants-bootstrapdir.",
         )
@@ -680,6 +675,11 @@ class GlobalOptions(Subsystem):
             type=float,
             advanced=True,
             default=60.0,
+            removal_version="1.31.0.dev0",
+            removal_hint=(
+                "The native watcher is now sufficient to monitor for filesystem "
+                "changes, so watchman is being removed."
+            ),
             help="The watchman socket timeout (in seconds) for the initial `watch-project` command. "
             "This may need to be set higher for larger repos due to watchman startup cost.",
         )
@@ -688,6 +688,11 @@ class GlobalOptions(Subsystem):
             type=float,
             advanced=True,
             default=0.1,
+            removal_version="1.31.0.dev0",
+            removal_hint=(
+                "The native watcher is now sufficient to monitor for filesystem "
+                "changes, so watchman is being removed."
+            ),
             help="The watchman client socket timeout in seconds. Setting this to too high a "
             "value can negatively impact the latency of runs forked by pantsd.",
         )
@@ -696,6 +701,11 @@ class GlobalOptions(Subsystem):
             type=str,
             advanced=True,
             default=None,
+            removal_version="1.31.0.dev0",
+            removal_hint=(
+                "The native watcher is now sufficient to monitor for filesystem "
+                "changes, so watchman is being removed."
+            ),
             help="The path to the watchman UNIX socket. This can be overridden if the default "
             "absolute path length exceeds the maximum allowed by the OS.",
         )
@@ -833,6 +843,20 @@ class GlobalOptions(Subsystem):
             default={},
         )
         register(
+            "--remote-execution-enable-streaming",
+            type=bool,
+            default=False,
+            advanced=True,
+            help="Enable the streaming remote execution client (experimental).",
+        )
+        register(
+            "--remote-execution-overall-deadline-secs",
+            type=int,
+            default=DEFAULT_EXECUTION_OPTIONS.remote_execution_overall_deadline_secs,
+            advanced=True,
+            help="Overall timeout in seconds for each remote execution request from time of submission",
+        )
+        register(
             "--process-execution-local-parallelism",
             type=int,
             default=DEFAULT_EXECUTION_OPTIONS.process_execution_local_parallelism,
@@ -889,16 +913,6 @@ class GlobalOptions(Subsystem):
             help="Whether or not to use nailgun to run the requests that are marked as nailgunnable.",
             advanced=True,
         )
-        register(
-            "--experimental-fs-watcher",
-            type=bool,
-            default=True,
-            advanced=True,
-            removal_version="1.30.0.dev0",
-            removal_hint="Enabled by default: flag is disabled.",
-            help="Whether to use the engine filesystem watcher which registers the workspace"
-            " for kernel file change events",
-        )
 
     @classmethod
     def register_options(cls, register):
@@ -941,6 +955,19 @@ class GlobalOptions(Subsystem):
             removal_version="1.31.0.dev0",
             removal_hint="Use --dynamic-ui instead.",
             help="Whether to show v2 engine execution progress.",
+        )
+
+        register(
+            "--dependency-inference",
+            default=False,
+            type=bool,
+            advanced=True,
+            help=(
+                "Enable dependency inference, meaning that Pants will read your source code to "
+                "infer the `dependencies` field for you in BUILD files. You can check what Pants "
+                "inferred by running `./pants dependencies` on your target. You may still need to "
+                "explicitly provide some `dependencies` that cannot be inferred."
+            ),
         )
 
         loop_flag = "--loop"

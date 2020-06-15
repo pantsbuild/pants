@@ -19,7 +19,9 @@ class MavenLayoutTest(TestBase):
 
     def setUp(self):
         super().setUp()
-        init_subsystems([SourceRootConfig, JUnit])
+        init_subsystems(
+            [SourceRootConfig, JUnit], {"source": {"root_patterns": ["src/main/*", "src/test/*"]}}
+        )
         self.create_file("projectB/src/test/scala/a/source")
         self.add_to_build_file(
             "projectB/src/test/scala", 'junit_tests(name="test", sources=["a/source"])'

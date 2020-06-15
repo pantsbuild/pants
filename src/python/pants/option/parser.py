@@ -311,11 +311,9 @@ class Parser:
                 # Reraise a new exception with context on the option being processed at the time of error.
                 # Note that other exception types can be raised here that are caught by ParseError (e.g.
                 # BooleanConversionError), hence we reference the original exception type as type(e).
+                args_str = ", ".join(args)
                 raise type(e)(
-                    "Error computing value for {} in {} (may also be from PANTS_* environment variables)."
-                    "\nCaused by:\n{}".format(
-                        ", ".join(args), self._scope_str(), traceback.format_exc()
-                    )
+                    f"Error computing value for {args_str} in {self._scope_str()} (may also be from PANTS_* environment variables).\nCaused by:\n{traceback.format_exc()}"
                 )
 
             # If the option is explicitly given, check deprecation and mutual exclusion.
@@ -615,19 +613,17 @@ class Parser:
         # Validate kwargs.
         if "implicit_value" in kwargs and kwargs["implicit_value"] is None:
             error(ImplicitValIsNone)
-
-        if "member_type" in kwargs and kwargs.get("type") != list:
-            error(MemberTypeNotAllowed, type_=kwargs.get("type", str).__name__)
-
-        if kwargs.get("member_type", str) not in self._allowed_member_types:
-            error(InvalidMemberType, member_type=kwargs.get("member_type", str).__name__)
+        type_arg = kwargs.get("type", str)
+        if "member_type" in kwargs and type_arg != list:
+            error(MemberTypeNotAllowed, type_=type_arg.__name__)
+        member_type = kwargs.get("member_type", str)
+        if member_type not in self._allowed_member_types:
+            error(InvalidMemberType, member_type=member_type.__name__)
 
         if (
             "passthrough" in kwargs
             and kwargs["passthrough"]
-            and (
-                kwargs.get("type") != list or kwargs.get("member_type", str) not in (shell_str, str)
-            )
+            and (type_arg != list or member_type not in (shell_str, str))
         ):
             error(PassthroughType)
 
@@ -674,18 +670,18 @@ class Parser:
         return name, dest if dest else name
 
     @staticmethod
-    def _wrap_type(t):
-        if t == list:
+    def _wrap_type(type_arg):
+        if type_arg == list:
             return ListValueComponent.create
-        if t == dict:
+        if type_arg == dict:
             return DictValueComponent.create
-        return t
+        return type_arg
 
     @staticmethod
-    def _convert_member_type(t, x):
-        if t == dict:
-            return DictValueComponent.create(x).val
-        return t(x)
+    def _convert_member_type(member_type, value):
+        if member_type == dict:
+            return DictValueComponent.create(value).val
+        return member_type(value)
 
     def _compute_value(self, dest, kwargs, flag_val_strs):
         """Compute the value to use for an option.
@@ -786,9 +782,7 @@ class Parser:
             flag_val = DictValueComponent.merge(flag_vals) if flag_vals else None
         elif len(flag_vals) > 1:
             raise ParseError(
-                "Multiple cmd line flags specified for option {} in {}".format(
-                    dest, self._scope_str()
-                )
+                f"Multiple cmd line flags specified for option {dest} in {self._scope_str()}"
             )
         elif len(flag_vals) == 1:
             flag_val = flag_vals[0]
@@ -850,13 +844,12 @@ class Parser:
             # TODO: convert this into an enum() pattern match!
             if choices is not None and val not in choices:
                 raise ParseError(
-                    "`{}` is not an allowed value for option {} in {}. "
-                    "Must be one of: {}".format(val, dest, self._scope_str(), choices)
+                    f"`{val}` is not an allowed value for option {dest} in {self._scope_str()}. Must be one of: {choices}"
                 )
 
             if type_arg == file_option:
                 check_file_exists(val)
-            if type_arg == dir_option:
+            elif type_arg == dir_option:
                 check_dir_exists(val)
 
         def check_file_exists(val) -> None:
@@ -887,10 +880,9 @@ class Parser:
                 [rv.value for rv in ranked_vals if rv.value is not None]
             ).val
             # TODO: run `check()` for all elements of a list option too!!!
-            merged_val = [
-                self._convert_member_type(kwargs.get("member_type", str), x) for x in merged_val
-            ]
-            if kwargs.get("member_type") == shell_str:
+            member_type = kwargs.get("member_type", str)
+            merged_val = [self._convert_member_type(member_type, val) for val in merged_val]
+            if member_type == shell_str:
                 merged_val = flatten_shlexed_list(merged_val)
             for val in merged_val:
                 check(val)
