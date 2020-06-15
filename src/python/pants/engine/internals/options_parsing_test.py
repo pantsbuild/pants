@@ -21,7 +21,7 @@ class TestEngineOptionsParsing(TestBase):
     def test_options_parse_scoped(self):
         options_bootstrapper = self._ob(
             args=["./pants", "-ldebug", "binary", "src/python::"],
-            env=dict(PANTS_ENABLE_PANTSD="True", PANTS_BINARIES_BASEURLS='["https://bins.com"]'),
+            env=dict(PANTS_PANTSD="True", PANTS_BINARIES_BASEURLS='["https://bins.com"]'),
         )
 
         global_options_params = Params(Scope(str(GLOBAL_SCOPE)), options_bootstrapper)
@@ -31,7 +31,7 @@ class TestEngineOptionsParsing(TestBase):
         )
 
         self.assertEqual(global_options.options.level, LogLevel.DEBUG)
-        self.assertEqual(global_options.options.enable_pantsd, True)
+        self.assertEqual(global_options.options.pantsd, True)
         self.assertEqual(global_options.options.binaries_baseurls, ["https://bins.com"])
 
         self.assertEqual(python_setup_options.options.platforms, ["current"])

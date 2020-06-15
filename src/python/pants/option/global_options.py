@@ -495,11 +495,25 @@ class GlobalOptions(Subsystem):
         )
 
         register(
+            "--pantsd",
+            advanced=True,
+            type=bool,
+            default=True,
+            daemon=True,
+            help=(
+                "Enables use of the pants daemon (pantsd). pantsd can significantly improve "
+                "runtime performance by lowering per-run startup cost, and by caching filesystem "
+                "operations and @rule execution."
+            ),
+        )
+        register(
             "--enable-pantsd",
             advanced=True,
             type=bool,
             default=True,
             daemon=True,
+            removal_version="1.31.0.dev0",
+            removal_hint="Use `--pantsd` instead of `--enable-pantsd`.",
             help=(
                 "Enables use of the pants daemon (pantsd). pantsd can significantly improve "
                 "runtime performance by lowering per-run startup cost, and by caching filesystem "
