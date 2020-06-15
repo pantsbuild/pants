@@ -5,7 +5,8 @@ from dataclasses import dataclass
 from typing import Iterable, List, Type
 
 from pants.backend.python.target_types import PythonSources
-from pants.core.goals.fmt import FmtRequest, FmtResult, LanguageFmtResults, LanguageFmtTargets
+from pants.core.goals.fmt import FmtResult, LanguageFmtResults, LanguageFmtTargets
+from pants.core.goals.style_request import StyleRequest
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
 from pants.engine.fs import Digest, Snapshot
 from pants.engine.rules import rule
@@ -19,7 +20,7 @@ class PythonFmtTargets(LanguageFmtTargets):
 
 
 @union
-class PythonFmtRequest(FmtRequest):
+class PythonFmtRequest(StyleRequest):
     pass
 
 
@@ -37,7 +38,9 @@ async def format_python_target(
     prior_formatter_result = original_sources.snapshot
 
     results: List[FmtResult] = []
-    fmt_request_types: Iterable[Type[FmtRequest]] = union_membership.union_rules[PythonFmtRequest]
+    fmt_request_types: Iterable[Type[PythonFmtRequest]] = union_membership.union_rules[
+        PythonFmtRequest
+    ]
     for fmt_request_type in fmt_request_types:
         result = await Get[FmtResult](
             PythonFmtRequest,

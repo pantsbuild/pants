@@ -18,7 +18,7 @@ from pants.backend.python.rules.pex import (
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.backend.python.target_types import PythonSources
-from pants.core.goals.fmt import FmtRequest, FmtResult
+from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.core.util_rules.determine_source_files import (
@@ -44,7 +44,7 @@ class BlackFieldSet(FieldSetWithOrigin):
     sources: PythonSources
 
 
-class BlackRequest(FmtRequest, LintRequest):
+class BlackRequest(PythonFmtRequest, LintRequest):
     field_set_type = BlackFieldSet
 
 
