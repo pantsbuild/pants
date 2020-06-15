@@ -1,4 +1,8 @@
-use super::{BackoffConfig, EntryType};
+use std::cmp::min;
+use std::collections::{BTreeMap, HashSet};
+use std::convert::TryInto;
+use std::sync::Arc;
+use std::time::Duration;
 
 use bazel_protos::{self, call_option};
 use bytes::{Bytes, BytesMut};
@@ -10,10 +14,8 @@ use futures01::{future, Future, Sink, Stream};
 use hashing::{Digest, Fingerprint};
 use serverset::{retry, Serverset};
 use sha2::Sha256;
-use std::cmp::min;
-use std::collections::{BTreeMap, HashSet};
-use std::sync::Arc;
-use std::time::Duration;
+
+use super::{BackoffConfig, EntryType};
 
 #[derive(Clone)]
 pub struct ByteStore {
@@ -335,7 +337,7 @@ impl ByteStore {
             response
               .get_missing_blob_digests()
               .iter()
-              .map(|digest| digest.into())
+              .map(|digest| digest.try_into())
               .collect::<Result<HashSet<_>, _>>()
           }
         })

@@ -1,3 +1,5 @@
+use std::convert::TryFrom;
+
 impl<'a> From<&'a hashing::Digest> for crate::remote_execution::Digest {
   fn from(d: &hashing::Digest) -> Self {
     let mut digest = super::remote_execution::Digest::new();
@@ -16,8 +18,10 @@ impl<'a> From<&'a hashing::Digest> for crate::build::bazel::remote::execution::v
   }
 }
 
-impl<'a> From<&'a super::remote_execution::Digest> for Result<hashing::Digest, String> {
-  fn from(d: &super::remote_execution::Digest) -> Self {
+impl<'a> TryFrom<&'a super::remote_execution::Digest> for hashing::Digest {
+  type Error = String;
+
+  fn try_from(d: &super::remote_execution::Digest) -> Result<Self, Self::Error> {
     hashing::Fingerprint::from_hex_string(d.get_hash())
       .map_err(|err| format!("Bad fingerprint in Digest {:?}: {:?}", d.get_hash(), err))
       .map(|fingerprint| hashing::Digest(fingerprint, d.get_size_bytes() as usize))

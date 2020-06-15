@@ -27,6 +27,13 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+use std::convert::TryInto;
+use std::io::{self, Write};
+use std::path::{Path, PathBuf};
+use std::process::exit;
+use std::sync::Arc;
+use std::time::Duration;
+
 use boxfuture::{BoxFuture, Boxable};
 use bytes::Bytes;
 use clap::{value_t, App, Arg, SubCommand};
@@ -39,11 +46,6 @@ use parking_lot::Mutex;
 use protobuf::Message;
 use rand::seq::SliceRandom;
 use serde_derive::Serialize;
-use std::io::{self, Write};
-use std::path::{Path, PathBuf};
-use std::process::exit;
-use std::sync::Arc;
-use std::time::Duration;
 use store::{Snapshot, Store, StoreFileByDigest, UploadSummary};
 use tokio::runtime::Handle;
 
@@ -612,7 +614,7 @@ fn expand_files_helper(
         {
           let mut files_unlocked = files.lock();
           for file in dir.get_files() {
-            let file_digest: Result<Digest, String> = file.get_digest().into();
+            let file_digest: Result<Digest, String> = file.get_digest().try_into();
             files_unlocked.push((format!("{}{}", prefix, file.name), file_digest?));
           }
         }
@@ -620,7 +622,7 @@ fn expand_files_helper(
           .get_directories()
           .iter()
           .map(move |subdir| {
-            let digest: Result<Digest, String> = subdir.get_digest().into();
+            let digest: Result<Digest, String> = subdir.get_digest().try_into();
             digest.map(|digest| (subdir, digest))
           })
           .collect::<Result<Vec<_>, _>>()?;
