@@ -249,10 +249,6 @@ impl Value {
       Err(arc_handle) => arc_handle.clone_ref(py),
     }
   }
-
-  pub fn as_py_object(&self) -> Arc<PyObject> {
-    self.0.clone()
-  }
 }
 
 impl PartialEq for Value {

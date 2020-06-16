@@ -816,7 +816,7 @@ impl Task {
       let gil = Python::acquire_gil();
       let py = gil.python();
 
-      if *new_level_val.as_py_object() == py.None() {
+      if *new_level_val == py.None() {
         return None;
       }
     }
@@ -912,7 +912,10 @@ impl WrappedNode for Task {
     match externs::get_type_for(&result_val) {
       t if t == context.core.types.coroutine => Self::generate(context, params, entry, result_val)
         .await
-        .map(|v| (v, None)),
+        .map(|result_val| {
+          let maybe_new_level = Self::compute_new_workunit_level(can_modify_workunit, &result_val);
+          (result_val, maybe_new_level)
+        }),
       t if t == product => {
         let maybe_new_level = Self::compute_new_workunit_level(can_modify_workunit, &result_val);
         Ok((result_val, maybe_new_level))
@@ -1103,63 +1106,54 @@ impl Node for NodeKey {
           .await?;
       }
 
+      let mut level = metadata.level;
+
       let result = match self {
-        NodeKey::DigestFile(n) => {
-          n.run_wrapped_node(context)
-            .map_ok(|v| (NodeOutput::Digest(v), None))
-            .await
-        }
+        NodeKey::DigestFile(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Digest).await,
         NodeKey::DownloadedFile(n) => {
           n.run_wrapped_node(context)
-            .map_ok(|v| (NodeOutput::Snapshot(v), None))
+            .map_ok(NodeOutput::Snapshot)
             .await
         }
         NodeKey::MultiPlatformExecuteProcess(n) => {
           n.run_wrapped_node(context)
-            .map_ok(|r| (NodeOutput::ProcessResult(Box::new(r)), None))
+            .map_ok(|r| NodeOutput::ProcessResult(Box::new(r)))
             .await
         }
         NodeKey::ReadLink(n) => {
           n.run_wrapped_node(context)
-            .map_ok(|v| (NodeOutput::LinkDest(v), None))
+            .map_ok(NodeOutput::LinkDest)
             .await
         }
         NodeKey::Scandir(n) => {
           n.run_wrapped_node(context)
-            .map_ok(|v| (NodeOutput::DirectoryListing(v), None))
+            .map_ok(NodeOutput::DirectoryListing)
             .await
         }
-        NodeKey::Select(n) => {
-          n.run_wrapped_node(context)
-            .map_ok(|v| (NodeOutput::Value(v), None))
-            .await
-        }
+        NodeKey::Select(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Value).await,
         NodeKey::Snapshot(n) => {
           n.run_wrapped_node(context)
-            .map_ok(|v| (NodeOutput::Snapshot(v), None))
+            .map_ok(NodeOutput::Snapshot)
             .await
         }
         NodeKey::Task(n) => {
           n.run_wrapped_node(context)
-            .map_ok(|(v, wk)| (NodeOutput::Value(v), wk))
+            .map_ok(|(v, maybe_new_level)| {
+              if let Some(new_level) = maybe_new_level {
+                level = new_level;
+              }
+              NodeOutput::Value(v)
+            })
             .await
         }
       };
-      let new_level = match result {
-        Ok((_, None)) => metadata.level,
-        Ok((_, Some(new_level))) => new_level,
-        _ => metadata.level,
-      };
-      let final_metadata = WorkunitMetadata {
-        level: new_level,
-        ..metadata
-      };
+      let final_metadata = WorkunitMetadata { level, ..metadata };
       context2
         .session
         .workunit_store()
         .complete_workunit_with_new_metadata(started_workunit_id, final_metadata)
         .unwrap();
-      result.map(|(v, _wk)| v)
+      result
     })
     .await
   }
