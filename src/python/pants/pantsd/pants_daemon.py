@@ -255,7 +255,7 @@ class PantsDaemon(PantsDaemonProcessManager):
 
     def _write_nailgun_port(self):
         """Write the nailgun port to a well known file."""
-        self.write_socket(self._native.nailgun_server_await_bound(self._server))
+        self.write_socket(self._server.port())
 
     def _initialize_pid(self):
         """Writes out our pid and metadata.
@@ -325,7 +325,9 @@ class PantsDaemon(PantsDaemonProcessManager):
                 time.sleep(self.JOIN_TIMEOUT_SECONDS)
 
             # We're exiting: join the server to avoid interrupting ongoing runs.
-            # TODO: This will happen via #8200.
+            self._logger.info("waiting for ongoing runs to complete before exiting...")
+            self._native.nailgun_server_await_shutdown(self._server)
+            self._logger.info("exiting.")
 
 
 def launch():
