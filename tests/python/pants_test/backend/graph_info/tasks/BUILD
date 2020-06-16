@@ -45,22 +45,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'list_targets',
-  sources = ['test_list_targets.py'],
-  dependencies = [
-    'src/python/pants/backend/graph_info/tasks',
-    'src/python/pants/backend/jvm:artifact',
-    'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/build_graph',
-    'src/python/pants/backend/python/targets',
-    'src/python/pants/testutil/subsystem',
-    'src/python/pants/testutil:goal_rule_test_base',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_tests(
   name = 'minimal_cover',
   sources = ['test_minimal_cover.py'],
   dependencies = [
