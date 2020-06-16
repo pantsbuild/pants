@@ -119,7 +119,7 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
                   'should attempt to deduce which packages to emit coverage for.')
     register('--coverage-include-test-sources', fingerprint=True, type=bool,
              help='Whether to include test source files in coverage measurement.')
-    register('--coverage-reports', fingerprint=True, choices=('xml', 'html'), type=list,
+    register('--coverage-reports', fingerprint=True, choices=('xml', 'html', 'console'), type=list,
              member_type=str, default=('xml', 'html'),
              help='Which coverage reports to emit.')
     # For a given --coverage specification (which is fingerprinted), we will always copy the
@@ -384,6 +384,8 @@ class PytestRun(PartitionedTestRunnerTaskMixin, Task):
           else:
             coverage_workdir = workdirs.coverage_path
             coverage_reports = self.get_options().coverage_reports
+            if 'console' in coverage_reports:
+              coverage_run('report', ['-i', '--rcfile', coverage_rc])
             if 'html' in coverage_reports:
               coverage_run('html', ['-i', '--rcfile', coverage_rc, '-d', coverage_workdir])
             if 'xml' in coverage_reports:
