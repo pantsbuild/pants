@@ -20,7 +20,7 @@ from pants.engine.fs import (
 )
 from pants.engine.interactive_process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.internals.nodes import Return, Throw
-from pants.engine.rules import CanModifyWorkunit, Rule, RuleIndex, TaskRule
+from pants.engine.rules import EngineAware, Rule, RuleIndex, TaskRule
 from pants.engine.selectors import Params
 from pants.engine.unions import union
 from pants.option.global_options import ExecutionOptions
@@ -167,7 +167,7 @@ class Scheduler:
             tasks,
             rule.func,
             output_type,
-            issubclass(output_type, CanModifyWorkunit),
+            issubclass(output_type, EngineAware),
             rule.cacheable,
             rule.canonical_name,
             rule.desc or "",

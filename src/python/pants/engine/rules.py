@@ -21,11 +21,12 @@ from pants.util.meta import decorated_type_checkable, frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 
-class CanModifyWorkunit:
-    """This is a marker class used to indicate that an `@rule` can modify its own workunit.
+class EngineAware:
+    """This is a marker class used to indicate that the output of an `@rule` can send metadata about
+    the rule's output to the engine.
 
-    If a rule's return type is a subclass of CanModifyWorkunit, then the level of that workunit will
-    be set to the value of an attribute _level: LogLevel, if it exists and is not None.
+    If a rule's return type is a subclass of EngineAware, then the level of that workunit will be
+    set to the value of an attribute _level: LogLevel, if it exists and is not None.
     """
 
 

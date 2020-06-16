@@ -12,7 +12,7 @@ from pants.engine.fs import EMPTY_DIGEST
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.scheduler_test_base import SchedulerTestBase
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import CanModifyWorkunit, RootRule, rule
+from pants.engine.rules import EngineAware, RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.reporting.streaming_workunit_handler import (
     StreamingWorkunitContext,
@@ -518,7 +518,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
 
     def test_can_modify_workunit(self):
         @dataclass(frozen=True)
-        class ModifiedOutput(CanModifyWorkunit):
+        class ModifiedOutput(EngineAware):
             _level: LogLevel
             val: int
 
@@ -547,7 +547,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
 
     def test_no_can_modify_workunit(self):
         @dataclass(frozen=True)
-        # Without the CanModifyWorkunit class, the engine shouldn't try to interpret
+        # Without the EngineAware class, the engine shouldn't try to interpret
         # _level as a LogLevel at all.
         class ModifiedOutput:
             _level: str
@@ -578,9 +578,9 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
 
     def test_can_modify_workunit_no_level_attr(self):
         @dataclass(frozen=True)
-        # If _level is None, even with the CanModifyWorkunit class, the engine shouldn't try to set
+        # If _level is None, even with the EngineAware class, the engine shouldn't try to set
         # a new workunit level.
-        class ModifiedOutput(CanModifyWorkunit):
+        class ModifiedOutput(EngineAware):
             _level: Optional[LogLevel]
             val: int
 
