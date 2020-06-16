@@ -2,15 +2,18 @@ use tempfile;
 use testutil;
 
 use crate::{
-  CacheDest, CacheName, CommandRunner as CommandRunnerTrait, Context,
+  local::USER_EXECUTABLE_MODE, CacheDest, CacheName, CommandRunner as CommandRunnerTrait, Context,
   FallibleProcessResultWithPlatform, NamedCaches, Platform, PlatformConstraint, Process,
   RelativePath,
 };
 use hashing::EMPTY_DIGEST;
+use shell_quote::bash;
 use spectral::{assert_that, string::StrAssertions};
 use std;
 use std::collections::{BTreeMap, BTreeSet};
+use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
+use std::str;
 use std::time::Duration;
 use store::Store;
 use tempfile::TempDir;
@@ -362,13 +365,11 @@ async fn test_directory_preservation() {
   let preserved_work_tmpdir = TempDir::new().unwrap();
   let preserved_work_root = preserved_work_tmpdir.path().to_owned();
 
+  let bash_contents = format!("echo -n {} > {}", TestData::roland().string(), "roland");
+  let argv = vec![find_bash(), "-c".to_owned(), bash_contents.clone()];
+
   let result = run_command_locally_in_dir(
-    Process::new(vec![
-      find_bash(),
-      "-c".to_owned(),
-      format!("echo -n {} > {}", TestData::roland().string(), "roland"),
-    ])
-    .output_files(vec![PathBuf::from("roland")].into_iter().collect()),
+    Process::new(argv.clone()).output_files(vec![PathBuf::from("roland")].into_iter().collect()),
     preserved_work_root.clone(),
     false,
     None,
@@ -386,6 +387,22 @@ async fn test_directory_preservation() {
   // Then look for a file like e.g. `/tmp/abc1234/process-execution7zt4pH/roland`
   let rolands_path = preserved_work_root.join(&subdirs[0]).join("roland");
   assert!(rolands_path.exists());
+
+  // Ensure that when a directory is preserved, a __run.sh file is created with the process's
+  // command line and environment variables.
+  let run_script_path = preserved_work_root.join(&subdirs[0]).join("__run.sh");
+  assert!(run_script_path.exists());
+  let script_metadata = std::fs::metadata(&run_script_path).unwrap();
+
+  // Ensure the script is executable.
+  assert_eq!(USER_EXECUTABLE_MODE, script_metadata.permissions().mode());
+
+  // Ensure the bash command line is provided.
+  let bytes_quoted_command_line = bash::escape(&bash_contents);
+  let quoted_command_line = str::from_utf8(&bytes_quoted_command_line).unwrap();
+  assert!(std::fs::read_to_string(&run_script_path)
+    .unwrap()
+    .contains(quoted_command_line));
 }
 
 #[tokio::test]
