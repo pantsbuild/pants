@@ -108,16 +108,21 @@ from pants.python.python_setup import PythonSetup
 
 
 COVERAGE_PLUGIN_MODULE_NAME = "__pants_coverage_plugin__"
-COVERAGE_PLUGIN_INPUT = InputFilesContent(
-    FilesContent(
-        (
-            FileContent(
-                path=f"{COVERAGE_PLUGIN_MODULE_NAME}.py",
-                content=pkg_resources.resource_string(__name__, "coverage_plugin/plugin.py"),
-            ),
-        )
+
+
+@dataclass(frozen=True)
+class CoveragePlugin:
+    digest: Digest
+
+
+@rule
+async def prepare_coverage_plugin() -> CoveragePlugin:
+    plugin_file = FileContent(
+        f"{COVERAGE_PLUGIN_MODULE_NAME}.py",
+        pkg_resources.resource_string(__name__, "coverage_plugin/plugin.py"),
     )
-)
+    digest = await Get[Digest](InputFilesContent([plugin_file]))
+    return CoveragePlugin(digest)
 
 
 @dataclass(frozen=True)
@@ -219,18 +224,16 @@ class CoverageSetup:
 
 
 @rule
-async def setup_coverage(coverage: PytestCoverage) -> CoverageSetup:
-    plugin_file_digest = await Get[Digest](InputFilesContent, COVERAGE_PLUGIN_INPUT)
-    output_pex_filename = "coverage.pex"
+async def setup_coverage(coverage: PytestCoverage, plugin: CoveragePlugin) -> CoverageSetup:
     requirements_pex = await Get[Pex](
         PexRequest(
-            output_filename=output_pex_filename,
+            output_filename="coverage.pex",
             requirements=PexRequirements(coverage.get_requirement_specs()),
             interpreter_constraints=PexInterpreterConstraints(
                 coverage.default_interpreter_constraints
             ),
             entry_point=coverage.get_entry_point(),
-            sources=plugin_file_digest,
+            sources=plugin.digest,
         )
     )
     return CoverageSetup(requirements_pex)
@@ -361,6 +364,7 @@ async def generate_coverage_report(
 
 def rules():
     return [
+        prepare_coverage_plugin,
         create_coverage_config,
         generate_coverage_report,
         merge_coverage_data,

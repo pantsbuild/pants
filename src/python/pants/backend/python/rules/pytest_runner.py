@@ -14,9 +14,9 @@ from pants.backend.python.rules.pex import (
 )
 from pants.backend.python.rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.rules.pytest_coverage import (
-    COVERAGE_PLUGIN_INPUT,
     CoverageConfig,
     CoverageConfigRequest,
+    CoveragePlugin,
     PytestCoverageData,
 )
 from pants.backend.python.subsystems.pytest import PyTest
@@ -24,7 +24,6 @@ from pants.backend.python.subsystems.subprocess_environment import SubprocessEnc
 from pants.backend.python.target_types import (
     PythonCoverage,
     PythonInterpreterCompatibility,
-    PythonSources,
     PythonTestsSources,
     PythonTestsTimeout,
 )
@@ -35,7 +34,6 @@ from pants.engine.fs import (
     EMPTY_DIGEST,
     AddPrefix,
     Digest,
-    InputFilesContent,
     MergeDigests,
     PathGlobs,
     Snapshot,
@@ -79,6 +77,7 @@ async def setup_pytest_for_target(
     pytest: PyTest,
     test_options: TestOptions,
     python_setup: PythonSetup,
+    coverage_plugin: CoveragePlugin,
 ) -> TestTargetSetup:
     test_addresses = Addresses((field_set.address,))
 
@@ -107,18 +106,13 @@ async def setup_pytest_for_target(
     # and then by Pytest). See https://github.com/jaraco/zipp/pull/26.
     additional_args_for_pytest = ("--not-zip-safe",)
 
-    use_coverage = test_options.values.use_coverage
-    plugin_file_digest: Optional[Digest] = (
-        await Get[Digest](InputFilesContent, COVERAGE_PLUGIN_INPUT) if use_coverage else None
-    )
-
     pytest_pex_request = Get[Pex](
         PexRequest,
         pex_request(
             output_filename="pytest.pex",
             requirements=PexRequirements(pytest.get_requirement_strings()),
             additional_args=additional_args_for_pytest,
-            sources=plugin_file_digest,
+            sources=coverage_plugin.digest,
         ),
     )
 
@@ -163,6 +157,8 @@ async def setup_pytest_for_target(
             [(field_set.sources, field_set.origin)], strip_source_roots=True
         )
     )
+
+    use_coverage = test_options.values.use_coverage
 
     requests = (
         pytest_pex_request,
