@@ -690,6 +690,7 @@ class Parser:
         """
         type_arg = kwargs.get("type", str)
         member_type = kwargs.get("member_type", str)
+
         # Helper function to convert a string to a value of the option's type.
         def to_value_type(val_str):
             if val_str is None:
