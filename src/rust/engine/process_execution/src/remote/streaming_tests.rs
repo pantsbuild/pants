@@ -279,6 +279,34 @@ async fn server_rejecting_execute_request_gives_error() {
 }
 
 #[tokio::test]
+async fn server_sending_triggering_timeout_with_deadline_exceeded() {
+  let execute_request = echo_foo_request();
+
+  let mock_server = {
+    mock::execution_server::TestServer::new(
+      mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
+        execute_request: crate::remote::make_execute_request(
+          &execute_request.clone().try_into().unwrap(),
+          empty_request_metadata(),
+        )
+        .unwrap()
+        .2,
+        stream_responses: Err(grpcio::RpcStatus::new(
+          grpcio::RpcStatusCode::DEADLINE_EXCEEDED,
+          None,
+        )),
+      }]),
+      None,
+    )
+  };
+
+  let result = run_command_remote(mock_server.address(), execute_request)
+    .await
+    .expect("Should succeed, but with a failed process.");
+  assert!(result.stdout().contains("user timeout"));
+}
+
+#[tokio::test]
 async fn sends_headers() {
   let execute_request = echo_foo_request();
   let op_name = "gimme-foo".to_string();

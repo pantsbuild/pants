@@ -38,6 +38,17 @@ pub(crate) struct RemoteTestResult {
   pub(crate) stderr_bytes: Vec<u8>,
 }
 
+impl RemoteTestResult {
+  pub fn stdout(&self) -> &str {
+    std::str::from_utf8(&self.stdout_bytes).unwrap()
+  }
+
+  #[allow(dead_code)]
+  pub fn stderr(&self) -> &str {
+    std::str::from_utf8(&self.stderr_bytes).unwrap()
+  }
+}
+
 #[derive(Debug, PartialEq)]
 pub(crate) enum StdoutType {
   Raw(String),
