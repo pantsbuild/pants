@@ -39,7 +39,6 @@ from pants.engine.fs import (
     AddPrefix,
     Digest,
     FileContent,
-    FilesContent,
     InputFilesContent,
     MergeDigests,
 )
@@ -74,11 +73,8 @@ from pants.python.python_setup import PythonSetup
 # Step 2.
 # Merging the Results: The `merge_coverage_data` rule executes `coverage combine`.
 #
-# Once we've run the tests, we have a bunch `TestResult`s, each with its own coverage data file,
-# named `.coverage`. In `merge_coverage_data` We stuff all these `.coverage` files into the same
-# PEX, which requires prefixing the filenames with a unique identifier so they don't clobber each
-# other. We then run `coverage combine foo/.coverage bar/.coverage baz/.coverage` to combine all
-# that data into a single .coverage file.
+# After we've run the tests, we have a bunch of individual `PytestCoverageData` values. We run
+# `coverage combine` to convert this into a single `.coverage` file.
 #
 #
 # Step 3.
@@ -225,7 +221,7 @@ class CoverageSetup:
 
 @rule
 async def setup_coverage(coverage: PytestCoverage, plugin: CoveragePlugin) -> CoverageSetup:
-    requirements_pex = await Get[Pex](
+    pex = await Get[Pex](
         PexRequest(
             output_filename="coverage.pex",
             requirements=PexRequirements(coverage.get_requirement_specs()),
@@ -236,7 +232,7 @@ async def setup_coverage(coverage: PytestCoverage, plugin: CoveragePlugin) -> Co
             sources=plugin.digest,
         )
     )
-    return CoverageSetup(requirements_pex)
+    return CoverageSetup(pex)
 
 
 @dataclass(frozen=True)
@@ -244,50 +240,39 @@ class MergedCoverageData:
     coverage_data: Digest
 
 
-@rule(desc="Merge Pytest coverage reports")
+@rule(desc="Merge Pytest coverage data")
 async def merge_coverage_data(
     data_collection: PytestCoverageDataCollection,
     coverage_setup: CoverageSetup,
-    transitive_targets: TransitiveTargets,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> MergedCoverageData:
-    """Takes all Python test results and merges their coverage data into a single SQL file."""
-    # We start with a bunch of test results, each of which has a coverage data file called
-    # `.coverage`. We prefix each of these with their address so that we can write them all into a
-    # single PEX.
+    # We prefix each .coverage file with its corresponding address to avoid collisions.
     coverage_digests = await MultiGet(
         Get[Digest](AddPrefix(data.digest, prefix=data.address.path_safe_spec))
         for data in data_collection
     )
-    sources = await Get[SourceFiles](
-        AllSourceFilesRequest((tgt.get(Sources) for tgt in transitive_targets.closure))
-    )
-    sources_with_inits = await Get[InitInjectedSnapshot](InjectInitRequest(sources.snapshot))
     coverage_config = await Get[CoverageConfig](CoverageConfigRequest(is_test_time=True))
     input_digest = await Get[Digest](
         MergeDigests(
             (
                 *coverage_digests,
-                sources_with_inits.snapshot.digest,
                 coverage_config.digest,
                 coverage_setup.requirements_pex.digest,
             )
         ),
     )
 
-    prefixes = [f"{data.address.path_safe_spec}/.coverage" for data in data_collection]
-    coverage_args = ("combine", *prefixes)
+    prefixes = sorted(f"{data.address.path_safe_spec}/.coverage" for data in data_collection)
     process = coverage_setup.requirements_pex.create_process(
         pex_path=f"./{coverage_setup.requirements_pex.output_filename}",
-        pex_args=coverage_args,
+        pex_args=("combine", *prefixes),
         input_digest=input_digest,
         output_files=(".coverage",),
         description=f"Merge {len(prefixes)} Pytest coverage reports.",
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
     )
-
     result = await Get[ProcessResult](Process, process)
     return MergedCoverageData(coverage_data=result.output_digest)
 
