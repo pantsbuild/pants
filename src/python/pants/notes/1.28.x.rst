@@ -5,6 +5,20 @@ This document describes releases leading up to the ``1.28.x`` ``stable`` series.
 
 See https://pants.readme.io/docs/release-notes-1-28 for an overview of the changes in this release.
 
+1.28.1rc0 (6/16/2020)
+---------------------
+
+N.B.: No further releases are expected in the ``1.28.x`` ``stable`` series. This ``.1rc0``
+release is for those upgrading through stable versions who wish to retain pytest console
+coverage support in Pants "v1".
+
+Bugfixes
+~~~~~~~~
+
+* Restore pytest coverage console report. (#10016)
+  `PR #10016 <https://github.com/pantsbuild/pants/pull/10016>`_
+
+
 1.28.0 (5/22/2020)
 ------------------
 
