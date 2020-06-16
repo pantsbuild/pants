@@ -5,6 +5,11 @@ This document describes releases leading up to the ``1.29.x`` ``stable`` series.
 
 See https://pants.readme.io/v1.29/docs/release-notes-1-29 for an overview of the changes in this release.
 
+1.29.0 (6/17/2020)
+------------------
+
+The first stable release of the ``1.29.x`` series, with no changes since the previous rc!
+
 1.29.0rc4 (6/10/2020)
 ---------------------
 
