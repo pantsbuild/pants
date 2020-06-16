@@ -23,6 +23,7 @@ use crate::selectors;
 use crate::tasks::{self, Rule};
 use boxfuture::{BoxFuture, Boxable};
 use bytes::{self, BufMut};
+use cpython::Python;
 use fs::{
   self, Dir, DirectoryListing, File, FileContent, GlobExpansionConjunction, GlobMatching, Link,
   PathGlobs, PathStat, PreparedPathGlobs, StrictGlobMatching, VFS,
@@ -799,6 +800,42 @@ impl Task {
     future::try_join_all(get_futures).await
   }
 
+  fn compute_new_workunit_level(
+    can_modify_workunit: bool,
+    result_val: &Value,
+  ) -> Option<log::Level> {
+    use num_enum::TryFromPrimitiveError;
+
+    if !can_modify_workunit {
+      return None;
+    }
+
+    let new_level_val: Value = externs::getattr(&result_val, "_level").ok()?;
+
+    {
+      let gil = Python::acquire_gil();
+      let py = gil.python();
+
+      if *new_level_val.as_py_object() == py.None() {
+        return None;
+      }
+    }
+
+    let new_py_level: PythonLogLevel = match externs::project_maybe_u64(&new_level_val, "_level")
+      .and_then(|n: u64| {
+        n.try_into()
+          .map_err(|e: TryFromPrimitiveError<_>| e.to_string())
+      }) {
+      Ok(level) => level,
+      Err(e) => {
+        log::warn!("Couldn't parse {:?} as a LogLevel: {}", new_level_val, e);
+        return None;
+      }
+    };
+
+    Some(new_py_level.into())
+  }
+
   ///
   /// Given a python generator Value, loop to request the generator's dependencies until
   /// it completes with a result Value.
@@ -877,18 +914,8 @@ impl WrappedNode for Task {
         .await
         .map(|v| (v, None)),
       t if t == product => {
-        if !can_modify_workunit {
-          return Ok((result_val, None));
-        }
-        let new_level_value: Value = match externs::getattr(&result_val, "_level") {
-          Ok(v) => v,
-          Err(_) => return Ok((result_val, None)),
-        };
-
-        let level_num: u64 = externs::project_u64(&new_level_value, "_level");
-        let py_log_level: PythonLogLevel = level_num.try_into().unwrap();
-        let level: log::Level = py_log_level.into();
-        Ok((result_val, Some(level)))
+        let maybe_new_level = Self::compute_new_workunit_level(can_modify_workunit, &result_val);
+        Ok((result_val, maybe_new_level))
       }
       _ => Err(throw(&format!(
         "{:?} returned a result value that did not satisfy its constraints: {:?}",

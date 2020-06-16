@@ -25,7 +25,7 @@ class CanModifyWorkunit:
     """This is a marker class used to indicate that an `@rule` can modify its own workunit.
 
     If a rule's return type is a subclass of CanModifyWorkunit, then the level of that workunit will
-    be set to the level of the attribute `_level`, if it exists.
+    be set to the value of an attribute _level: LogLevel, if it exists and is not None.
     """
 
 

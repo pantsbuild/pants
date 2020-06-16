@@ -6,7 +6,7 @@ import time
 import unittest
 from dataclasses import dataclass, field
 from textwrap import dedent
-from typing import List
+from typing import List, Optional
 
 from pants.engine.fs import EMPTY_DIGEST
 from pants.engine.internals.scheduler import ExecutionError
@@ -556,6 +556,37 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         @rule(desc="a_rule")
         def a_rule(n: int) -> ModifiedOutput:
             return ModifiedOutput(val=n, _level="some bogus string")
+
+        rules = [a_rule, RootRule(int)]
+        scheduler = self.mk_scheduler(
+            rules, include_trace_on_error=False, should_report_workunits=True
+        )
+
+        tracker = WorkunitTracker()
+        handler = StreamingWorkunitHandler(
+            scheduler,
+            callbacks=[tracker.add],
+            report_interval_seconds=0.01,
+            max_workunit_verbosity=LogLevel.DEBUG,
+        )
+        with handler.session():
+            scheduler.product_request(ModifiedOutput, subjects=[0])
+
+        finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+        workunit = next(item for item in finished if item["name"] == "a_rule")
+        assert workunit["level"] != "ERROR"
+
+    def test_can_modify_workunit_no_level_attr(self):
+        @dataclass(frozen=True)
+        # If _level is None, even with the CanModifyWorkunit class, the engine shouldn't try to set
+        # a new workunit level.
+        class ModifiedOutput(CanModifyWorkunit):
+            _level: Optional[LogLevel]
+            val: int
+
+        @rule(desc="a_rule")
+        def a_rule(n: int) -> ModifiedOutput:
+            return ModifiedOutput(val=n, _level=None)
 
         rules = [a_rule, RootRule(int)]
         scheduler = self.mk_scheduler(
