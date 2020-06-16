@@ -1,12 +1,17 @@
 use crate::Server;
 
 use std::path::PathBuf;
+use std::sync::Arc;
+use std::time::Duration;
 
+use futures::future;
 use nails::client_handle_connection;
 use nails::execution::{child_channel, ChildInput, ChildOutput, Command, ExitCode};
 use task_executor::Executor;
 use tokio::net::TcpStream;
 use tokio::runtime::Handle;
+use tokio::sync::Notify;
+use tokio::time::delay_for;
 
 #[tokio::test]
 async fn spawn_and_bind() {
@@ -14,7 +19,8 @@ async fn spawn_and_bind() {
     .await
     .unwrap();
   // Should have bound a random port.
-  assert!(0 != server.await_bound().await.unwrap());
+  assert!(0 != server.port());
+  server.shutdown().await.unwrap();
 }
 
 #[tokio::test]
@@ -23,10 +29,56 @@ async fn accept() {
   let server = Server::new(Executor::new(Handle::current()), 0, move |_| exit_code)
     .await
     .unwrap();
-  let server_port = server.await_bound().await.unwrap();
 
   // And connect with a client. This Nail will ignore the content of the command, so we're
   // only validating the exit code.
+  let actual_exit_code = run_client(server.port()).await.unwrap();
+  assert_eq!(exit_code, actual_exit_code);
+  server.shutdown().await.unwrap();
+}
+
+#[tokio::test]
+async fn shutdown_awaits_ongoing() {
+  // A server that waits for a signal to complete a connection.
+  let connection_accepted = Arc::new(Notify::new());
+  let should_complete_connection = Arc::new(Notify::new());
+  let exit_code = ExitCode(42);
+  let server = Server::new(Executor::new(Handle::current()), 0, {
+    let connection_accepted = connection_accepted.clone();
+    let should_complete_connection = should_complete_connection.clone();
+    move |_| {
+      connection_accepted.notify();
+      Handle::current().block_on(should_complete_connection.notified());
+      exit_code
+    }
+  })
+  .await
+  .unwrap();
+
+  // Spawn a connection in the background, and once it has been established, kick off shutdown of
+  // the server.
+  let mut client_completed = tokio::spawn(run_client(server.port()));
+  connection_accepted.notified().await;
+  let mut server_shutdown = tokio::spawn(server.shutdown());
+
+  // Confirm that the client doesn't return, and that the server doesn't shutdown.
+  match future::select(client_completed, delay_for(Duration::from_millis(500))).await {
+    future::Either::Right((_, c_c)) => client_completed = c_c,
+    x => panic!("Client should not have completed: {:?}", x),
+  }
+  match future::select(server_shutdown, delay_for(Duration::from_millis(500))).await {
+    future::Either::Right((_, s_s)) => server_shutdown = s_s,
+    x => panic!("Server should not have shut down: {:?}", x),
+  }
+
+  // Then signal completion of the connection, and confirm that both the client and server exit
+  // cleanly.
+  should_complete_connection.notify();
+  assert_eq!(exit_code, client_completed.await.unwrap().unwrap());
+  server_shutdown.await.unwrap().unwrap();
+}
+
+async fn run_client(port: u16) -> Result<ExitCode, String> {
   let cmd = Command {
     command: "nothing".to_owned(),
     args: vec![],
@@ -35,11 +87,8 @@ async fn accept() {
   };
   let (stdio_write, _stdio_read) = child_channel::<ChildOutput>();
   let (_stdin_write, stdin_read) = child_channel::<ChildInput>();
-  let stream = TcpStream::connect(("127.0.0.1", server_port))
+  let stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+  client_handle_connection(stream, cmd, stdio_write, stdin_read)
     .await
-    .unwrap();
-  let actual_exit_code = client_handle_connection(stream, cmd, stdio_write, stdin_read)
-    .await
-    .unwrap();
-  assert_eq!(exit_code, actual_exit_code);
+    .map_err(|e| e.to_string())
 }
