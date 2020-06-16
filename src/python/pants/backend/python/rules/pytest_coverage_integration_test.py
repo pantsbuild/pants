@@ -58,7 +58,7 @@ class PytestCoverageIntegrationTest(PantsRunIntegrationTest):
             # We only expect this to work because we explicitly set the `coverage` field.
             test_root = Path(tmpdir, "tests", "python", "project_test")
             test_root.mkdir(parents=True)
-            (test_root / "lib_test.py").write_text(
+            (test_root / "test_lib_from_different_source_root.py").write_text(
                 dedent(
                     """\
                     from project.lib import multiply
@@ -73,8 +73,7 @@ class PytestCoverageIntegrationTest(PantsRunIntegrationTest):
                     f"""\
                     python_tests(
                       dependencies=['{tmpdir_relative}/src/python/project'],
-                      # TODO: get this working
-                      # coverage=['project.lib'],
+                      coverage=['project.lib'],
                     )
                     """
                 )
@@ -92,17 +91,17 @@ class PytestCoverageIntegrationTest(PantsRunIntegrationTest):
             )
 
         assert result.returncode == 0
-        assert (
-            dedent(
-                f"""\
-                Name                                                Stmts   Miss Branch BrPart  Cover
-                -------------------------------------------------------------------------------------
-                {tmpdir_relative}/src/python/project/lib.py                   4      1      0      0    75%
-                {tmpdir_relative}/src/python/project/lib_test.py              3      0      0      0   100%
-                {tmpdir_relative}/tests/python/project_test/lib_test.py       3      0      0      0   100%
-                -------------------------------------------------------------------------------------
-                TOTAL                                                  10      1      0      0    90%
-                """
-            )
-            in result.stderr_data
-        )
+        # Regression test: make sure that individual tests do not complain about failing to
+        # generate reports. This was showing up at test-time, even though the final merged report
+        # would work properly.
+        assert "Failed to generate report" not in result.stderr_data
+        assert dedent(
+            f"""\
+            Name                                                Stmts   Miss Branch BrPart  Cover
+            -------------------------------------------------------------------------------------
+            {tmpdir_relative}/src/python/project/lib.py                   4      1      0      0    100%
+            {tmpdir_relative}/src/python/project/lib_test.py              3      0      0      0   100%
+            -------------------------------------------------------------------------------------
+            TOTAL                                                  10      1      0      0    100%
+            """
+        ) in result.stderr_data

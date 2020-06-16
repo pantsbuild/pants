@@ -4,38 +4,40 @@
 import json
 import os
 
-from coverage import CoveragePlugin
+from coverage import CoveragePlugin, FileTracer
 from coverage.config import DEFAULT_PARTIAL, DEFAULT_PARTIAL_ALWAYS
 from coverage.misc import join_regex
 from coverage.parser import PythonParser
-from coverage.python import PythonFileReporter, get_python_source
+from coverage.python import PythonFileReporter
 
 
-# Note: This plugin will appear to do nothing when tests are running. This is expected. The only
-# thing Coverage does with this plugin at test time is storing the class name in its SQL data,
-# i.e.: `__pants_coverage_plugin__.SourceRootRemappingPlugin`. This ensures that the plugin is used
-# in later Coverage commands like `coverage html`.
+class PantsFileTracer(FileTracer):
+  """This tells Coverage which files Pants 'owns'."""
+
+  def __init__(self, filename):
+    super(PantsFileTracer, self).__init__()
+    self.filename = filename
+
+  def source_filename(self):
+    return self.filename
+
 
 class PantsPythonFileReporter(PythonFileReporter):
-  def __init__(self, source_root, stripped_filename, coverage=None):
+  def __init__(self, stripped_filename, full_filename):
     # NB: This constructor is not compatible with the superclass. We intentionally do not call
     # super().
-    self.source_root = source_root
     self.stripped_filename = stripped_filename
-    self.coverage = coverage
+    self.full_filename = full_filename
+    self.coverage = None
     self._parser = None
     self._source = None
-
-  @property
-  def full_filename(self):
-    return os.path.join(self.source_root, self.stripped_filename)
 
   # We override this to handle our source root logic.
   @property
   def filename(self):
     return self.stripped_filename
 
-  # We override this to handle our source root logic.
+  # This is what gets used in reports.
   def relative_filename(self):
     return self.full_filename
 
@@ -52,11 +54,6 @@ class PantsPythonFileReporter(PythonFileReporter):
       join_regex(DEFAULT_PARTIAL_ALWAYS[:]),
     )
 
-  def source(self):
-    if self._source is None:
-      self._source = get_python_source(self.full_filename)
-    return self._source
-
 
 class SourceRootRemappingPlugin(CoveragePlugin):
   """A plugin that knows how to restore source roots from stripped files in Coverage reports."""
@@ -66,21 +63,20 @@ class SourceRootRemappingPlugin(CoveragePlugin):
     self.chroot_path = chroot_path
     self.stripped_files_to_source_roots = stripped_files_to_source_roots
 
-  def find_executable_files(self, top):
-    # Coverage uses this to associate files with this plugin. We only want to be associated with
-    # the sources we know about.
-    if not top.startswith(self.chroot_path):
-      return
-    for dirname, _, filenames in os.walk(top):
-      reldir = os.path.relpath(dirname, self.chroot_path)
-      for filename in filenames:
-        if os.path.join(reldir, filename) in self.stripped_files_to_source_roots:
-          yield os.path.join(dirname, filename)
+  def file_tracer(self, filename):
+    if not filename.startswith(self.chroot_path):
+      return None
+    stripped_file = os.path.relpath(filename, self.chroot_path)
+    if stripped_file in self.stripped_files_to_source_roots:
+      return PantsFileTracer(filename)
 
   def file_reporter(self, filename):
     stripped_file = os.path.relpath(filename, self.chroot_path)
     source_root = self.stripped_files_to_source_roots[stripped_file]
-    return PantsPythonFileReporter(source_root=source_root, stripped_filename=stripped_file)
+    return PantsPythonFileReporter(
+      stripped_filename=stripped_file,
+      full_filename=os.path.join(source_root, stripped_file),
+    )
 
 
 def coverage_init(reg, options):
