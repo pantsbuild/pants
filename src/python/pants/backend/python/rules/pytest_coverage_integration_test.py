@@ -45,7 +45,7 @@ class PytestCoverageIntegrationTest(PantsRunIntegrationTest):
                 dedent(
                     """\
                     python_library()
-                    
+
                     python_tests(
                       name="tests",
                       dependencies=[":project"],
@@ -92,14 +92,17 @@ class PytestCoverageIntegrationTest(PantsRunIntegrationTest):
             )
 
         assert result.returncode == 0
-        assert dedent(
-            f"""\
-            Name                                                Stmts   Miss Branch BrPart  Cover
-            -------------------------------------------------------------------------------------
-            {tmpdir_relative}/src/python/project/lib.py                   4      1      0      0    75%
-            {tmpdir_relative}/src/python/project/lib_test.py              3      0      0      0   100%
-            {tmpdir_relative}/tests/python/project_test/lib_test.py       3      0      0      0   100%
-            -------------------------------------------------------------------------------------
-            TOTAL                                                  10      1      0      0    90%
-            """
-        ) in result.stderr_data
+        assert (
+            dedent(
+                f"""\
+                Name                                                Stmts   Miss Branch BrPart  Cover
+                -------------------------------------------------------------------------------------
+                {tmpdir_relative}/src/python/project/lib.py                   4      1      0      0    75%
+                {tmpdir_relative}/src/python/project/lib_test.py              3      0      0      0   100%
+                {tmpdir_relative}/tests/python/project_test/lib_test.py       3      0      0      0   100%
+                -------------------------------------------------------------------------------------
+                TOTAL                                                  10      1      0      0    90%
+                """
+            )
+            in result.stderr_data
+        )
