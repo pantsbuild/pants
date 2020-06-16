@@ -179,16 +179,7 @@ async def setup_pytest_for_target(
         prepared_sources,
         specified_source_files,
     ) = (
-        await MultiGet(
-            Get(
-                CoverageConfig,
-                CoverageConfigRequest(
-                    Targets((tgt for tgt in all_targets if tgt.has_field(PythonSources))),
-                    is_test_time=True,
-                ),
-            ),
-            *requests,
-        )
+        await MultiGet(Get(CoverageConfig, CoverageConfigRequest(is_test_time=True)), *requests)
         if use_coverage
         else (CoverageConfig(EMPTY_DIGEST), *await MultiGet(*requests))
     )

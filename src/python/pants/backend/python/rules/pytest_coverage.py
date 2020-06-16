@@ -30,7 +30,10 @@ from pants.core.goals.test import (
     FilesystemCoverageReport,
 )
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
-from pants.core.util_rules.strip_source_roots import SourceRootStrippedSources, StripSnapshotRequest
+from pants.core.util_rules.strip_source_roots import (
+    SourceRootStrippedSources,
+    StripSourcesFieldRequest,
+)
 from pants.engine.addresses import Address
 from pants.engine.fs import (
     AddPrefix,
@@ -43,7 +46,7 @@ from pants.engine.fs import (
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get, MultiGet
-from pants.engine.target import Sources, Targets, TransitiveTargets
+from pants.engine.target import Sources, TransitiveTargets
 from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
 
@@ -129,7 +132,6 @@ class PytestCoverageDataCollection(CoverageDataCollection):
 
 @dataclass(frozen=True)
 class CoverageConfigRequest:
-    targets: Targets
     is_test_time: bool
 
 
@@ -139,31 +141,24 @@ class CoverageConfig:
 
 
 @rule
-async def create_coverage_config(coverage_config_request: CoverageConfigRequest) -> CoverageConfig:
-    sources = await Get[SourceFiles](
-        AllSourceFilesRequest(
-            (
-                tgt.get(PythonSources)
-                for tgt in coverage_config_request.targets
-                if tgt.has_field(PythonSources)
-            )
-        )
+async def create_coverage_config(
+    request: CoverageConfigRequest, transitive_targets: TransitiveTargets
+) -> CoverageConfig:
+    all_stripped_sources = await MultiGet(
+        Get(SourceRootStrippedSources, StripSourcesFieldRequest(tgt[PythonSources]))
+        for tgt in transitive_targets.closure
+        if tgt.has_field(PythonSources)
     )
-
-    source_root_stripped_sources = await Get[SourceRootStrippedSources](
-        StripSnapshotRequest(snapshot=sources.snapshot)
-    )
-
-    # Generate a map from source root stripped source to its source root. eg:
-    #  {'pants/testutil/subsystem/util.py': 'src/python'}. This is so that coverage reports
-    #  referencing /chroot/path/pants/testutil/subsystem/util.py can be mapped back to the actual
-    #  sources they reference when generating coverage reports.
-    # Note that this map doesn't contain injected __init__.py files, but we tell coverage
-    # to ignore those using the -i flag (see below).
+    # We map stripped file names to their source roots so that we can map back to the actual
+    # sources file when generating coverage reports. For example,
+    # {'helloworld/project.py': 'src/python'}.
+    # This mapping does not include injected `__init__.py` files, but we tell Coverage to ignore
+    # these using the `-i` flag.
     stripped_files_to_source_roots = {}
-    for source_root, files in source_root_stripped_sources.root_to_relfiles.items():
-        for file in files:
-            stripped_files_to_source_roots[file] = source_root
+    for stripped_sources in all_stripped_sources:
+        stripped_files_to_source_roots.update(
+            {f: root for root, files in stripped_sources.root_to_relfiles.items() for f in files}
+        )
 
     default_config = dedent(
         """
@@ -174,25 +169,23 @@ async def create_coverage_config(coverage_config_request: CoverageConfigRequest)
         """
     )
 
-    config_parser = configparser.ConfigParser()
-    config_parser.read_file(StringIO(default_config))
-    config_parser.set("run", "plugins", COVERAGE_PLUGIN_MODULE_NAME)
-    config_parser.add_section(COVERAGE_PLUGIN_MODULE_NAME)
-    config_parser.set(
+    cp = configparser.ConfigParser()
+    cp.read_string(default_config)
+    cp.set("run", "plugins", COVERAGE_PLUGIN_MODULE_NAME)
+    cp.add_section(COVERAGE_PLUGIN_MODULE_NAME)
+    cp.set(
         COVERAGE_PLUGIN_MODULE_NAME,
         "source_to_target_base",
         json.dumps(stripped_files_to_source_roots),
     )
-    config_parser.set(
-        COVERAGE_PLUGIN_MODULE_NAME, "test_time", json.dumps(coverage_config_request.is_test_time)
-    )
+    cp.set(COVERAGE_PLUGIN_MODULE_NAME, "test_time", json.dumps(request.is_test_time))
 
-    config_io_stream = StringIO()
-    config_parser.write(config_io_stream)
+    config_stream = StringIO()
+    cp.write(config_stream)
+    config_content = config_stream.getvalue()
+
     digest = await Get[Digest](
-        InputFilesContent(
-            [FileContent(".coveragerc", content=config_io_stream.getvalue().encode())]
-        )
+        InputFilesContent([FileContent(".coveragerc", config_content.encode())])
     )
     return CoverageConfig(digest)
 
@@ -268,9 +261,7 @@ async def merge_coverage_data(
         AllSourceFilesRequest((tgt.get(Sources) for tgt in transitive_targets.closure))
     )
     sources_with_inits = await Get[InitInjectedSnapshot](InjectInitRequest(sources.snapshot))
-    coverage_config = await Get[CoverageConfig](
-        CoverageConfigRequest(Targets(transitive_targets.closure), is_test_time=True)
-    )
+    coverage_config = await Get[CoverageConfig](CoverageConfigRequest(is_test_time=True))
     input_digest = await Get[Digest](
         MergeDigests(
             (
@@ -310,9 +301,7 @@ async def generate_coverage_report(
     """Takes all Python test results and generates a single coverage report."""
     requirements_pex = coverage_setup.requirements_pex
 
-    coverage_config = await Get[CoverageConfig](
-        CoverageConfigRequest(Targets(transitive_targets.closure), is_test_time=False)
-    )
+    coverage_config = await Get[CoverageConfig](CoverageConfigRequest(is_test_time=False))
 
     sources = await Get[SourceFiles](
         AllSourceFilesRequest(
