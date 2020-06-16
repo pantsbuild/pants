@@ -119,8 +119,9 @@ pub struct CommandRunner {
   store: Store,
   platform: Platform,
   executor: task_executor::Executor,
-  // We use a buffer time for queuing of process requests so that the process's requested timeout more
-  // accurately reflects how long the caller intended the process to last.
+  // We "back up" the remote execution Action timeout with our own timeout to handle protocol
+  // errors, but we give the server a buffer time / grace period for queuing of process requests
+  // to ensure that we tend to hit the server's timeout before our own in most cases.
   queue_buffer_time: Duration,
   backoff_incremental_wait: Duration,
   backoff_max_wait: Duration,
@@ -135,6 +136,9 @@ pub enum ExecutionError {
   // String is the operation name which can be used to poll the GetOperation gRPC API.
   // Note: Unused by the streaming client.
   NotFinished(String),
+  // The server indicated that the request hit a timeout. Generally this is the timeout that the
+  // client has pushed down on the ExecutionRequest.
+  Timeout,
   // String is the error message.
   Retryable(String),
 }
@@ -304,8 +308,13 @@ impl super::CommandRunner for CommandRunner {
     };
 
     let response = loop {
+      let elapsed = start_time.elapsed();
+      let timeout_has_elapsed = timeout
+        .map(|t| t + self.queue_buffer_time)
+        .map(|t| elapsed > t)
+        .unwrap_or(false);
       match self
-        .extract_execute_response(operation, &mut history)
+        .extract_execute_response(operation, timeout_has_elapsed, &mut history)
         .compat()
         .await
       {
@@ -374,6 +383,20 @@ impl super::CommandRunner for CommandRunner {
                 .await?;
               history.current_attempt += summary;
             }
+            ExecutionError::Timeout => {
+              history.current_attempt.remote_execution = Some(elapsed);
+              history.complete_attempt();
+
+              break populate_fallible_execution_result_for_timeout(
+                &store,
+                &description,
+                timeout,
+                elapsed,
+                history.attempts,
+                platform,
+              )
+              .await?;
+            }
             ExecutionError::NotFinished(operation_name) => {
               let mut operation_request = bazel_protos::operations::GetOperationRequest::new();
               operation_request.set_name(operation_name.clone());
@@ -382,31 +405,6 @@ impl super::CommandRunner for CommandRunner {
                 self.backoff_max_wait,
                 (1 + iter_num) * self.backoff_incremental_wait,
               );
-
-              // Take the grpc result and cancel the op if too much time has passed.
-              // This timeout is here to make sure that if something goes wrong, e.g.
-              // the connection hangs, we don't poll forever.
-              let elapsed = start_time.elapsed();
-              let total_timeout = timeout.map(|t| t + self.queue_buffer_time);
-              if total_timeout.map(|t| elapsed > t).unwrap_or(false) {
-                history.current_attempt.remote_execution = Some(elapsed);
-                history.complete_attempt();
-
-                let stdout = Bytes::from(format!(
-                    "Exceeded timeout of {:?} ({:?} for the process and {:?} for remoting buffer time) with {:?} for operation {}, {}",
-                    total_timeout, timeout, self.queue_buffer_time, elapsed, operation_name, description
-                ));
-                let stdout_digest = store.store_file_bytes(stdout.clone(), true).await?;
-
-                break FallibleProcessResultWithPlatform {
-                  stdout_digest,
-                  stderr_digest: hashing::EMPTY_DIGEST,
-                  exit_code: -libc::SIGTERM,
-                  output_directory: hashing::EMPTY_DIGEST,
-                  execution_attempts: history.attempts,
-                  platform,
-                };
-              }
 
               // Wait before retrying, and then create a new operation.
               // TODO: maybe the delay here should be the min of remaining time and the backoff period
@@ -518,6 +516,7 @@ impl CommandRunner {
   pub(crate) fn extract_execute_response(
     &self,
     operation_or_status: OperationOrStatus,
+    timeout_has_elapsed: bool,
     attempts: &mut ExecutionHistory,
   ) -> BoxFuture<FallibleProcessResultWithPlatform, ExecutionError> {
     trace!("Got operation response: {:?}", operation_or_status);
@@ -525,6 +524,11 @@ impl CommandRunner {
     let status = match operation_or_status {
       OperationOrStatus::Operation(mut operation) => {
         if !operation.get_done() {
+          // This timeout is here to make sure that if something goes wrong, e.g.
+          // the connection hangs, we don't poll forever.
+          if timeout_has_elapsed {
+            return future::err(ExecutionError::Timeout).to_boxed();
+          }
           return future::err(ExecutionError::NotFinished(operation.take_name())).to_boxed();
         }
         if operation.has_error() {
@@ -644,6 +648,7 @@ impl CommandRunner {
 
     match grpcio::RpcStatusCode::from(status.get_code()) {
       grpcio::RpcStatusCode::OK => unreachable!(),
+      grpcio::RpcStatusCode::DEADLINE_EXCEEDED => future::err(ExecutionError::Timeout).to_boxed(),
       grpcio::RpcStatusCode::FAILED_PRECONDITION => {
         if status.get_details().len() != 1 {
           return future::err(ExecutionError::Fatal(format!(
@@ -908,6 +913,13 @@ pub fn make_execute_request(
   action.set_command_digest((&digest(&command)?).into());
   action.set_input_root_digest((&req.input_files).into());
 
+  if let Some(timeout) = req.timeout {
+    let mut timeout_duration = protobuf::well_known_types::Duration::new();
+    timeout_duration.set_seconds(timeout.as_secs() as i64);
+    timeout_duration.set_nanos(timeout.subsec_nanos() as i32);
+    action.set_timeout(timeout_duration);
+  }
+
   let mut execute_request = bazel_protos::remote_execution::ExecuteRequest::new();
   if let Some(instance_name) = instance_name {
     execute_request.set_instance_name(instance_name);
@@ -915,6 +927,32 @@ pub fn make_execute_request(
   execute_request.set_action_digest((&digest(&action)?).into());
 
   Ok((action, command, execute_request))
+}
+
+pub async fn populate_fallible_execution_result_for_timeout(
+  store: &Store,
+  description: &str,
+  timeout: Option<Duration>,
+  elapsed: Duration,
+  execution_attempts: Vec<ExecutionStats>,
+  platform: Platform,
+) -> Result<FallibleProcessResultWithPlatform, String> {
+  let timeout_msg = if let Some(timeout) = timeout {
+    format!("user timeout of {:?} after {:?}", timeout, elapsed)
+  } else {
+    format!("server timeout after {:?}", elapsed)
+  };
+  let stdout = Bytes::from(format!("Exceeded {} for {}", timeout_msg, description));
+  let stdout_digest = store.store_file_bytes(stdout, true).await?;
+
+  Ok(FallibleProcessResultWithPlatform {
+    stdout_digest,
+    stderr_digest: hashing::EMPTY_DIGEST,
+    exit_code: -libc::SIGTERM,
+    output_directory: hashing::EMPTY_DIGEST,
+    execution_attempts,
+    platform,
+  })
 }
 
 pub fn populate_fallible_execution_result(

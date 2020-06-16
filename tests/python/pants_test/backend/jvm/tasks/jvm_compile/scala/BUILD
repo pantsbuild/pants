@@ -18,6 +18,6 @@ python_tests(
   dependencies=[
     ':base_compile_integration_test'
   ],
-  timeout = 640,
+  timeout = 900,
   tags = {'integration', 'partially_type_checked'},
 )
