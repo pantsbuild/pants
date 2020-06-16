@@ -6,7 +6,11 @@ from typing import Optional
 import pytest
 
 from pants.backend.python.subsystems.pytest import PyTest
-from pants.backend.python.target_types import PythonBinarySources, PythonTestsTimeout
+from pants.backend.python.target_types import (
+    PythonBinarySources,
+    PythonCoverage,
+    PythonTestsTimeout,
+)
 from pants.engine.addresses import Address
 from pants.engine.target import InvalidFieldException
 from pants.testutil.subsystem.util import global_subsystem_instance
@@ -76,3 +80,16 @@ def test_translate_source_file_to_entry_point() -> None:
     )
     assert PythonBinarySources.translate_source_file_to_entry_point([]) is None
     assert PythonBinarySources.translate_source_file_to_entry_point(["f1.py", "f2.py"]) is None
+
+
+def test_coverage_packages_to_cover() -> None:
+    addr = Address.parse("project:tests")
+    assert PythonCoverage(["helloworld.project"], address=addr).determine_packages_to_cover(
+        stripped_source_files=[]
+    ) == ("helloworld.project",)
+    assert PythonCoverage(None, address=addr).determine_packages_to_cover(
+        stripped_source_files=[
+            "helloworld/project/test_app.py",
+            "helloworld/project/subdir/demo_test.py",
+        ]
+    ) == ("helloworld.project", "helloworld.project.subdir")

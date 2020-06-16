@@ -41,7 +41,7 @@ from pants.engine.fs import (
     MergeDigests,
 )
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import RootRule, SubsystemRule, rule
+from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Sources, Targets, TransitiveTargets
 from pants.engine.unions import UnionRule
@@ -60,9 +60,9 @@ from pants.python.python_setup import PythonSetup
 # you can see in the working directory as `.coverage`. Along with the coverage data, it also
 # stores some metadata about any plugins it was run with.
 #
-# Note: The pants coverage plugin does nothing at all during test time other than have itself
-# mentioned in that DB. If the plugin is not mentioned in that DB then when we merge the data or
-# generate the report coverage will not use the plugin, regardless of what is in it's configuration
+# Note: The Pants coverage plugin does nothing at all during test time other than have itself
+# mentioned in that DB. If the plugin is not mentioned in that DB, then, when we merge the data or
+# generate the report, coverage will not use the plugin, regardless of what is in it's configuration
 # file. Because we run tests in an environment without source roots (meaning
 # `src/python/foo/bar.py` is in the environment as `foo/bar.py`) all of the data in the resulting
 # .coverage file references the files the source root stripped name - `foo/bar.py`
@@ -378,5 +378,4 @@ def rules():
         setup_coverage,
         SubsystemRule(PytestCoverage),
         UnionRule(CoverageDataCollection, PytestCoverageDataCollection),
-        RootRule(CoverageConfigRequest),
     ]

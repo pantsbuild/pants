@@ -80,9 +80,6 @@ async def setup_pytest_for_target(
     test_options: TestOptions,
     python_setup: PythonSetup,
 ) -> TestTargetSetup:
-    # TODO: Rather than consuming the TestOptions subsystem, the TestRunner should pass on coverage
-    # configuration via #7490.
-
     test_addresses = Addresses((field_set.address,))
 
     transitive_targets = await Get[TransitiveTargets](Addresses, test_addresses)
@@ -208,17 +205,17 @@ async def setup_pytest_for_target(
     coverage_args = []
     if use_coverage:
         coverage_args = [
-            "--cov-report=",  # To not generate any output. https://pytest-cov.readthedocs.io/en/latest/config.html
+            # This turns of all coverage output.
+            "--cov-report=",
         ]
         for package in field_set.coverage.determine_packages_to_cover(
-            specified_source_files=specified_source_files
+            stripped_source_files=specified_source_files.files
         ):
             coverage_args.extend(["--cov", package])
 
-    specified_source_file_names = sorted(specified_source_files.snapshot.files)
     return TestTargetSetup(
         test_runner_pex=test_runner_pex,
-        args=(*pytest.options.args, *coverage_args, *specified_source_file_names),
+        args=(*pytest.options.args, *coverage_args, *specified_source_files.files),
         input_digest=input_digest,
         timeout_seconds=field_set.timeout.calculate_from_global_options(pytest),
         xml_dir=pytest.options.junit_xml_dir,
