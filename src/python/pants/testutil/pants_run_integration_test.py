@@ -177,7 +177,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
         """Subclasses may override to acknowledge that the tests cannot run when pantsd is enabled,
         or they want to configure pantsd themselves.
 
-        In those cases, --enable-pantsd will not be added to their configuration.
+        In those cases, --pantsd will not be added to their configuration.
         This approach is coarsely grained, meaning we disable pantsd in some tests that actually run
         when pantsd is enabled. However:
           - The number of mislabeled tests is currently small (~20 tests).
@@ -322,7 +322,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
             )
 
         if self.use_pantsd_env_var():
-            args.append("--enable-pantsd=True")
+            args.append("--pantsd")
 
         if config:
             toml_file_name = os.path.join(workdir, "pants.toml")

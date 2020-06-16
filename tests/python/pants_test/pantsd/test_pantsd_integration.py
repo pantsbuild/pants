@@ -658,7 +658,7 @@ Interrupted by user over pailgun client!
                 list_and_verify()
 
     def test_concurrent_overrides_pantsd(self):
-        """Tests that the --concurrent flag overrides the --enable-pantsd flag, because we don't
+        """Tests that the --concurrent flag overrides the --pantsd flag, because we don't
         allow concurrent runs under pantsd."""
         config = {"GLOBAL": {"concurrent": True, "pantsd": True}}
         with self.temporary_workdir() as workdir:

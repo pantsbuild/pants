@@ -148,7 +148,7 @@ function execute_packaged_pants_with_internal_backends() {
     -r pants-plugins/3rdparty/python/requirements.txt &> /dev/null && \
   pants \
     --no-verify-config \
-    --no-enable-pantsd \
+    --no-pantsd \
     --pythonpath="['pants-plugins/src/python']" \
     --backend-packages="[\
         'pants.backend.codegen',\
