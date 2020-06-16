@@ -7,8 +7,21 @@ The ``1.27.x`` series deprecates several unused backends and plugins. Please
 see https://groups.google.com/forum/#!topic/pants-devel/ngMZRIJvwHM for more
 information.
 
+1.27.1rc0 (6/16/2020)
+---------------------
+
+N.B.: No further releases are expected in the ``1.27.x`` ``stable`` series. This ``.1rc0``
+release is for those upgrading through stable versions who wish to retain pytest console
+coverage support in Pants "v1".
+
+Bugfixes
+~~~~~~~~
+
+* Restore pytest coverage console report. (#10016)
+  `PR #10016 <https://github.com/pantsbuild/pants/pull/10016>`_
+
 1.27.0 (5/20/2020)
--------------------
+------------------
 
 The first stable release in the ``1.27.x`` series, with no changes since the previous release candidate!
 
