@@ -46,21 +46,21 @@ from pants.python.python_setup import PythonSetup
 An overview of how Pytest Coverage works with Pants:
 
 Step 1: Run each test with the appropriate `--cov` arguments.
-In `python_test_runner.py`, we pass options so that the pytest-cov plugin runs and records which 
-lines were encountered in the test. For each test, it will save a `.coverage` file (SQLite DB 
-format). The files stored in `.coverage` will be stripped of source roots. We load up our custom 
-Pants coverage plugin, but the plugin doesn't actually do anything yet. We only load our plugin 
+In `python_test_runner.py`, we pass options so that the pytest-cov plugin runs and records which
+lines were encountered in the test. For each test, it will save a `.coverage` file (SQLite DB
+format). The files stored in `.coverage` will be stripped of source roots. We load up our custom
+Pants coverage plugin, but the plugin doesn't actually do anything yet. We only load our plugin
 because Coverage expects to find the plugin in the `.coverage` file in the later steps.
 
 Step 2: Merge the results with `coverage combine`.
-We now have a bunch of individual `PytestCoverageData` values. We run `coverage combine` to convert 
+We now have a bunch of individual `PytestCoverageData` values. We run `coverage combine` to convert
 this into a single `.coverage` file.
 
 Step 3: Generate the report with `coverage {html,xml,console}`.
-All the files in the single merged `.coverage` file are still stripped, and we want to generate a 
-report with the source roots restored. Coverage requires that the files it's reporting on be present 
-in its environment when it generates the report, so we populate all the unstripped source files. 
-Our plugin then uses the stripped filename -> source root mapping to determine the correct file 
+All the files in the single merged `.coverage` file are still stripped, and we want to generate a
+report with the source roots restored. Coverage requires that the files it's reporting on be present
+in its environment when it generates the report, so we populate all the unstripped source files.
+Our plugin then uses the stripped filename -> source root mapping to determine the correct file
 name for the report.
 
 Step 4: `test.py` outputs the final report.
@@ -248,7 +248,7 @@ async def generate_coverage_report(
         ),
     )
     coverage_config, unstripped_sources = await MultiGet(
-        [coverage_config_request, unstripped_sources_request]
+        coverage_config_request, unstripped_sources_request
     )
     input_digest = await Get(
         Digest,
