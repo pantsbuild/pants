@@ -83,6 +83,7 @@ python_tests(
     'src/python/pants/testutil:external_tool_test_base',
     'src/python/pants/testutil/subsystem',
     'src/python/pants/testutil:goal_rule_test_base',
+    'src/python/pants/testutil:int-test',
   ],
   tags = {'integration', 'partially_type_checked'},
   timeout = 480,
