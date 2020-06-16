@@ -48,20 +48,20 @@ An overview of how Pytest Coverage works with Pants:
 Step 1: Run each test with the appropriate `--cov` arguments.
 In `python_test_runner.py`, we pass options so that the pytest-cov plugin runs and records which 
 lines were encountered in the test. For each test, it will save a `.coverage` file (SQLite DB 
-format). The files stored in `.coverage` will be stripped of source roots. We load up our 
-custom Pants coverage plugin, but the plugin doesn't actually do anything yet. We only load our 
-plugin because Coverage expects to find the plugin in the `.coverage` file in the later steps.
+format). The files stored in `.coverage` will be stripped of source roots. We load up our custom 
+Pants coverage plugin, but the plugin doesn't actually do anything yet. We only load our plugin 
+because Coverage expects to find the plugin in the `.coverage` file in the later steps.
 
 Step 2: Merge the results with `coverage combine`.
-We now have a bunch of individual `PytestCoverageData` values. We run
-`coverage combine` to convert this into a single `.coverage` file.
+We now have a bunch of individual `PytestCoverageData` values. We run `coverage combine` to convert 
+this into a single `.coverage` file.
 
 Step 3: Generate the report with `coverage {html,xml,console}`.
 All the files in the single merged `.coverage` file are still stripped, and we want to generate a 
-report with the source roots restored. Coverage requires that the files it's reporting 
-on be present in its environment when it generates the report, so we populate all the unstripped 
-source files. Our plugin then uses the stripped filename -> source root mapping to determine the 
-correct file name for the report.
+report with the source roots restored. Coverage requires that the files it's reporting on be present 
+in its environment when it generates the report, so we populate all the unstripped source files. 
+Our plugin then uses the stripped filename -> source root mapping to determine the correct file 
+name for the report.
 
 Step 4: `test.py` outputs the final report.
 """
@@ -94,9 +94,12 @@ class PytestCoverageDataCollection(CoverageDataCollection):
     element_type = PytestCoverageData
 
 
+# TODO(#7490): Once we have support for `await Get` of singletons, we can remove this class. We only
+# have it so that we can avoid `pytest_runner.py` from awaiting `CoverageConfig` if coverage is not
+# being used.
 @dataclass(frozen=True)
 class CoverageConfigRequest:
-    is_test_time: bool
+    pass
 
 
 @dataclass(frozen=True)
@@ -106,7 +109,7 @@ class CoverageConfig:
 
 @rule
 async def create_coverage_config(
-    request: CoverageConfigRequest, transitive_targets: TransitiveTargets
+    _: CoverageConfigRequest, transitive_targets: TransitiveTargets
 ) -> CoverageConfig:
     all_stripped_sources = await MultiGet(
         Get(SourceRootStrippedSources, StripSourcesFieldRequest(tgt[PythonSources]))
@@ -140,7 +143,6 @@ async def create_coverage_config(
         "stripped_files_to_source_roots",
         json.dumps(stripped_files_to_source_roots),
     )
-    cp.set(COVERAGE_PLUGIN_MODULE_NAME, "test_time", json.dumps(request.is_test_time))
 
     config_stream = StringIO()
     cp.write(config_stream)
@@ -238,7 +240,7 @@ async def generate_coverage_report(
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> CoverageReports:
     """Takes all Python test results and generates a single coverage report."""
-    coverage_config_request = Get(CoverageConfig, CoverageConfigRequest(is_test_time=False))
+    coverage_config_request = Get(CoverageConfig, CoverageConfigRequest())
     unstripped_sources_request = Get(
         SourceFiles,
         AllSourceFilesRequest(
