@@ -213,11 +213,7 @@ async def merge_coverage_data(
         Get[Digest](AddPrefix(data.digest, prefix=data.address.path_safe_spec))
         for data in data_collection
     )
-    coverage_config = await Get[CoverageConfig](CoverageConfigRequest(is_test_time=True))
-    input_digest = await Get[Digest](
-        MergeDigests((*coverage_digests, coverage_config.digest, coverage_setup.pex.digest)),
-    )
-
+    input_digest = await Get[Digest](MergeDigests((*coverage_digests, coverage_setup.pex.digest)))
     prefixes = sorted(f"{data.address.path_safe_spec}/.coverage" for data in data_collection)
     process = coverage_setup.pex.create_process(
         pex_path=f"./{coverage_setup.pex.output_filename}",
