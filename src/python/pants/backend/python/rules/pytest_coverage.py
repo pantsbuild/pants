@@ -180,7 +180,7 @@ async def create_coverage_config(
     cp.add_section(COVERAGE_PLUGIN_MODULE_NAME)
     cp.set(
         COVERAGE_PLUGIN_MODULE_NAME,
-        "source_to_target_base",
+        "stripped_files_to_source_roots",
         json.dumps(stripped_files_to_source_roots),
     )
     cp.set(COVERAGE_PLUGIN_MODULE_NAME, "test_time", json.dumps(request.is_test_time))
