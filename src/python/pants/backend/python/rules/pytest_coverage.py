@@ -11,7 +11,6 @@ from typing import Optional
 
 import pkg_resources
 
-from pants.backend.python.rules.inject_init import InitInjectedSnapshot, InjectInitRequest
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
@@ -30,91 +29,59 @@ from pants.core.goals.test import (
     FilesystemCoverageReport,
 )
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
-from pants.core.util_rules.strip_source_roots import SourceRootStrippedSources, StripSnapshotRequest
-from pants.engine.addresses import Address
-from pants.engine.fs import (
-    AddPrefix,
-    Digest,
-    FileContent,
-    FilesContent,
-    InputFilesContent,
-    MergeDigests,
+from pants.core.util_rules.strip_source_roots import (
+    SourceRootStrippedSources,
+    StripSourcesFieldRequest,
 )
+from pants.engine.addresses import Address
+from pants.engine.fs import AddPrefix, Digest, FileContent, InputFilesContent, MergeDigests
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import RootRule, SubsystemRule, rule
+from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get, MultiGet
-from pants.engine.target import Sources, Targets, TransitiveTargets
+from pants.engine.target import TransitiveTargets
 from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
 
-# There are many moving parts in coverage, so here is a high level view of what's going on.
+"""
+An overview of how Pytest Coverage works with Pants:
 
-# Step 1.
-# Test Time: the `run_python_test` rule executes pytest with `--cov` arguments.
-#
-# When we run tests on individual targets (in `python_test_runner.py`) we include a couple of
-# arguments to pytest telling it to use coverage. We also add a coverage configuration file and a
-# custom plugin to the environment in which the test is run (`.coveragerc` is generated, but the
-# plugin code lives in `src/python/pants/backend/python/rules/coverage_plugin/plugin.py` and is
-# copied in as is.). The test runs and coverage collects data and stores it in a sqlite db, which
-# you can see in the working directory as `.coverage`. Along with the coverage data, it also
-# stores some metadata about any plugins it was run with.
-#
-# Note: The pants coverage plugin does nothing at all during test time other than have itself
-# mentioned in that DB. If the plugin is not mentioned in that DB then when we merge the data or
-# generate the report coverage will not use the plugin, regardless of what is in it's configuration
-# file. Because we run tests in an environment without source roots (meaning
-# `src/python/foo/bar.py` is in the environment as `foo/bar.py`) all of the data in the resulting
-# .coverage file references the files the source root stripped name - `foo/bar.py`
-#
-#
-# Step 2.
-# Merging the Results: The `merge_coverage_data` rule executes `coverage combine`.
-#
-# Once we've run the tests, we have a bunch `TestResult`s, each with its own coverage data file,
-# named `.coverage`. In `merge_coverage_data` We stuff all these `.coverage` files into the same
-# PEX, which requires prefixing the filenames with a unique identifier so they don't clobber each
-# other. We then run `coverage combine foo/.coverage bar/.coverage baz/.coverage` to combine all
-# that data into a single .coverage file.
-#
-#
-# Step 3.
-# Generating the Report: The `generate_coverage_report` rule executes `coverage html` or
-# `coverage xml`
-#
-# Now we have one single `.coverage` file containing all our merged coverage data, with all the
-# files referenced as `foo/bar.py` and we want to generate a single report where all those files
-# will be referenced with their buildroot relative paths (`src/python/foo/bar.py`). Coverage
-# requires that the files it's reporting on be present in its environment when it generates the
-# report, so we build a pex with all the source files with their source roots intact, and
-# *finally* our custom plugin starts doing some work. In our config file we've given a map from
-# source root stripped file path to source root - `{'foo/bar.py': 'src/python`}` - As the report is
-# generated, every time coverage needs a file, it asks our plugin and the plugin says, "Oh, you
-# want `foo/bar.py`? Sure! Here's `src/python/foo/bar.py`". And then we get a nice report that
-# references all the files with their buildroot relative names.
-#
-#
-# Step 4.
-# Materializing the Report on Disk: The `run_tests` rule exposes the report to the user.
-#
-# Now we have a directory full of html or an xml file full of coverage data and we want to expose
-# it to the user. This step happens in `test.py` and should handle all kinds of coverage reports,
-# not just pytest coverage. The test runner grabs all our individual test results and requests
-# a CoverageReport, and once it has one, it writes it down in `dist/coverage` (or wherever the user
-# has configured it.)
+Step 1: Run each test with the appropriate `--cov` arguments.
+In `python_test_runner.py`, we pass options so that the pytest-cov plugin runs and records which
+lines were encountered in the test. For each test, it will save a `.coverage` file (SQLite DB
+format). The files stored in `.coverage` will be stripped of source roots. We load up our custom
+Pants coverage plugin, but the plugin doesn't actually do anything yet. We only load our plugin
+because Coverage expects to find the plugin in the `.coverage` file in the later steps.
 
+Step 2: Merge the results with `coverage combine`.
+We now have a bunch of individual `PytestCoverageData` values. We run `coverage combine` to convert
+this into a single `.coverage` file.
+
+Step 3: Generate the report with `coverage {html,xml,console}`.
+All the files in the single merged `.coverage` file are still stripped, and we want to generate a
+report with the source roots restored. Coverage requires that the files it's reporting on be present
+in its environment when it generates the report, so we populate all the unstripped source files.
+Our plugin then uses the stripped filename -> source root mapping to determine the correct file
+name for the report.
+
+Step 4: `test.py` outputs the final report.
+"""
 
 COVERAGE_PLUGIN_MODULE_NAME = "__pants_coverage_plugin__"
-COVERAGE_PLUGIN_INPUT = InputFilesContent(
-    FilesContent(
-        (
-            FileContent(
-                path=f"{COVERAGE_PLUGIN_MODULE_NAME}.py",
-                content=pkg_resources.resource_string(__name__, "coverage_plugin/plugin.py"),
-            ),
-        )
+
+
+@dataclass(frozen=True)
+class CoveragePlugin:
+    digest: Digest
+
+
+@rule
+async def prepare_coverage_plugin() -> CoveragePlugin:
+    plugin_file = FileContent(
+        f"{COVERAGE_PLUGIN_MODULE_NAME}.py",
+        pkg_resources.resource_string(__name__, "coverage_plugin/plugin.py"),
     )
-)
+    digest = await Get[Digest](InputFilesContent([plugin_file]))
+    return CoveragePlugin(digest)
 
 
 @dataclass(frozen=True)
@@ -127,10 +94,12 @@ class PytestCoverageDataCollection(CoverageDataCollection):
     element_type = PytestCoverageData
 
 
+# TODO(#7490): Once we have support for `await Get` of singletons, we can remove this class. We only
+# have it so that we can avoid `pytest_runner.py` from awaiting `CoverageConfig` if coverage is not
+# being used.
 @dataclass(frozen=True)
 class CoverageConfigRequest:
-    targets: Targets
-    is_test_time: bool
+    pass
 
 
 @dataclass(frozen=True)
@@ -139,31 +108,22 @@ class CoverageConfig:
 
 
 @rule
-async def create_coverage_config(coverage_config_request: CoverageConfigRequest) -> CoverageConfig:
-    sources = await Get[SourceFiles](
-        AllSourceFilesRequest(
-            (
-                tgt.get(PythonSources)
-                for tgt in coverage_config_request.targets
-                if tgt.has_field(PythonSources)
-            )
-        )
+async def create_coverage_config(
+    _: CoverageConfigRequest, transitive_targets: TransitiveTargets
+) -> CoverageConfig:
+    all_stripped_sources = await MultiGet(
+        Get(SourceRootStrippedSources, StripSourcesFieldRequest(tgt[PythonSources]))
+        for tgt in transitive_targets.closure
+        if tgt.has_field(PythonSources)
     )
-
-    source_root_stripped_sources = await Get[SourceRootStrippedSources](
-        StripSnapshotRequest(snapshot=sources.snapshot)
-    )
-
-    # Generate a map from source root stripped source to its source root. eg:
-    #  {'pants/testutil/subsystem/util.py': 'src/python'}. This is so that coverage reports
-    #  referencing /chroot/path/pants/testutil/subsystem/util.py can be mapped back to the actual
-    #  sources they reference when generating coverage reports.
-    # Note that this map doesn't contain injected __init__.py files, but we tell coverage
-    # to ignore those using the -i flag (see below).
+    # We map stripped file names to their source roots so that we can map back to the actual
+    # sources file when generating coverage reports. For example,
+    # {'helloworld/project.py': 'src/python'}.
     stripped_files_to_source_roots = {}
-    for source_root, files in source_root_stripped_sources.root_to_relfiles.items():
-        for file in files:
-            stripped_files_to_source_roots[file] = source_root
+    for stripped_sources in all_stripped_sources:
+        stripped_files_to_source_roots.update(
+            {f: root for root, files in stripped_sources.root_to_relfiles.items() for f in files}
+        )
 
     default_config = dedent(
         """
@@ -174,25 +134,22 @@ async def create_coverage_config(coverage_config_request: CoverageConfigRequest)
         """
     )
 
-    config_parser = configparser.ConfigParser()
-    config_parser.read_file(StringIO(default_config))
-    config_parser.set("run", "plugins", COVERAGE_PLUGIN_MODULE_NAME)
-    config_parser.add_section(COVERAGE_PLUGIN_MODULE_NAME)
-    config_parser.set(
+    cp = configparser.ConfigParser()
+    cp.read_string(default_config)
+    cp.set("run", "plugins", COVERAGE_PLUGIN_MODULE_NAME)
+    cp.add_section(COVERAGE_PLUGIN_MODULE_NAME)
+    cp.set(
         COVERAGE_PLUGIN_MODULE_NAME,
-        "source_to_target_base",
+        "stripped_files_to_source_roots",
         json.dumps(stripped_files_to_source_roots),
     )
-    config_parser.set(
-        COVERAGE_PLUGIN_MODULE_NAME, "test_time", json.dumps(coverage_config_request.is_test_time)
-    )
 
-    config_io_stream = StringIO()
-    config_parser.write(config_io_stream)
+    config_stream = StringIO()
+    cp.write(config_stream)
+    config_content = config_stream.getvalue()
+
     digest = await Get[Digest](
-        InputFilesContent(
-            [FileContent(".coveragerc", content=config_io_stream.getvalue().encode())]
-        )
+        InputFilesContent([FileContent(".coveragerc", config_content.encode())])
     )
     return CoverageConfig(digest)
 
@@ -222,25 +179,23 @@ class PytestCoverage(PythonToolBase):
 
 @dataclass(frozen=True)
 class CoverageSetup:
-    requirements_pex: Pex
+    pex: Pex
 
 
 @rule
-async def setup_coverage(coverage: PytestCoverage) -> CoverageSetup:
-    plugin_file_digest = await Get[Digest](InputFilesContent, COVERAGE_PLUGIN_INPUT)
-    output_pex_filename = "coverage.pex"
-    requirements_pex = await Get[Pex](
+async def setup_coverage(coverage: PytestCoverage, plugin: CoveragePlugin) -> CoverageSetup:
+    pex = await Get[Pex](
         PexRequest(
-            output_filename=output_pex_filename,
+            output_filename="coverage.pex",
             requirements=PexRequirements(coverage.get_requirement_specs()),
             interpreter_constraints=PexInterpreterConstraints(
                 coverage.default_interpreter_constraints
             ),
             entry_point=coverage.get_entry_point(),
-            sources=plugin_file_digest,
+            sources=plugin.digest,
         )
     )
-    return CoverageSetup(requirements_pex)
+    return CoverageSetup(pex)
 
 
 @dataclass(frozen=True)
@@ -248,52 +203,29 @@ class MergedCoverageData:
     coverage_data: Digest
 
 
-@rule(desc="Merge Pytest coverage reports")
+@rule(desc="Merge Pytest coverage data")
 async def merge_coverage_data(
     data_collection: PytestCoverageDataCollection,
     coverage_setup: CoverageSetup,
-    transitive_targets: TransitiveTargets,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> MergedCoverageData:
-    """Takes all Python test results and merges their coverage data into a single SQL file."""
-    # We start with a bunch of test results, each of which has a coverage data file called
-    # `.coverage`. We prefix each of these with their address so that we can write them all into a
-    # single PEX.
+    # We prefix each .coverage file with its corresponding address to avoid collisions.
     coverage_digests = await MultiGet(
         Get[Digest](AddPrefix(data.digest, prefix=data.address.path_safe_spec))
         for data in data_collection
     )
-    sources = await Get[SourceFiles](
-        AllSourceFilesRequest((tgt.get(Sources) for tgt in transitive_targets.closure))
-    )
-    sources_with_inits = await Get[InitInjectedSnapshot](InjectInitRequest(sources.snapshot))
-    coverage_config = await Get[CoverageConfig](
-        CoverageConfigRequest(Targets(transitive_targets.closure), is_test_time=True)
-    )
-    input_digest = await Get[Digest](
-        MergeDigests(
-            (
-                *coverage_digests,
-                sources_with_inits.snapshot.digest,
-                coverage_config.digest,
-                coverage_setup.requirements_pex.digest,
-            )
-        ),
-    )
-
-    prefixes = [f"{data.address.path_safe_spec}/.coverage" for data in data_collection]
-    coverage_args = ("combine", *prefixes)
-    process = coverage_setup.requirements_pex.create_process(
-        pex_path=f"./{coverage_setup.requirements_pex.output_filename}",
-        pex_args=coverage_args,
+    input_digest = await Get[Digest](MergeDigests((*coverage_digests, coverage_setup.pex.digest)))
+    prefixes = sorted(f"{data.address.path_safe_spec}/.coverage" for data in data_collection)
+    process = coverage_setup.pex.create_process(
+        pex_path=f"./{coverage_setup.pex.output_filename}",
+        pex_args=("combine", *prefixes),
         input_digest=input_digest,
         output_files=(".coverage",),
         description=f"Merge {len(prefixes)} Pytest coverage reports.",
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
     )
-
     result = await Get[ProcessResult](Process, process)
     return MergedCoverageData(coverage_data=result.output_digest)
 
@@ -308,41 +240,34 @@ async def generate_coverage_report(
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> CoverageReports:
     """Takes all Python test results and generates a single coverage report."""
-    requirements_pex = coverage_setup.requirements_pex
-
-    coverage_config = await Get[CoverageConfig](
-        CoverageConfigRequest(Targets(transitive_targets.closure), is_test_time=False)
-    )
-
-    sources = await Get[SourceFiles](
+    coverage_config_request = Get(CoverageConfig, CoverageConfigRequest())
+    unstripped_sources_request = Get(
+        SourceFiles,
         AllSourceFilesRequest(
-            (tgt.get(Sources) for tgt in transitive_targets.closure), strip_source_roots=False
-        )
+            tgt[PythonSources] for tgt in transitive_targets.closure if tgt.has_field(PythonSources)
+        ),
     )
-    sources_with_inits_snapshot = await Get[InitInjectedSnapshot](
-        InjectInitRequest(sources.snapshot)
+    coverage_config, unstripped_sources = await MultiGet(
+        coverage_config_request, unstripped_sources_request
     )
-    input_digest: Digest = await Get(
+    input_digest = await Get(
         Digest,
         MergeDigests(
             (
                 merged_coverage_data.coverage_data,
                 coverage_config.digest,
-                requirements_pex.digest,
-                sources_with_inits_snapshot.snapshot.digest,
+                coverage_setup.pex.digest,
+                unstripped_sources.snapshot.digest,
             )
         ),
     )
 
     report_type = coverage_subsystem.options.report
-    # The -i flag causes coverage to ignore files it doesn't have sources for.
-    # Specifically, it will ignore the injected __init__.py files, which is what we want since
-    # those are empty and don't correspond to a real source file the user is aware of.
-    coverage_args = [report_type.report_name, "-i"]
-
-    process = requirements_pex.create_process(
-        pex_path=f"./{coverage_setup.requirements_pex.output_filename}",
-        pex_args=coverage_args,
+    process = coverage_setup.pex.create_process(
+        pex_path=f"./{coverage_setup.pex.output_filename}",
+        # We pass `--ignore-errors` because Pants dynamically injects missing `__init__.py` files
+        # and this will cause Coverage to fail.
+        pex_args=(report_type.report_name, "--ignore-errors"),
         input_digest=input_digest,
         output_directories=("htmlcov",),
         output_files=("coverage.xml",),
@@ -353,7 +278,7 @@ async def generate_coverage_report(
     result = await Get[ProcessResult](Process, process)
 
     if report_type == CoverageReportType.CONSOLE:
-        return CoverageReports(reports=(ConsoleCoverageReport(result.stdout.decode()),))
+        return CoverageReports((ConsoleCoverageReport(result.stdout.decode()),))
 
     report_dir = PurePath(coverage_subsystem.options.report_output_path)
 
@@ -367,16 +292,16 @@ async def generate_coverage_report(
         directory_to_materialize_to=report_dir,
         report_file=report_file,
     )
-    return CoverageReports(reports=(fs_report,))
+    return CoverageReports((fs_report,))
 
 
 def rules():
     return [
+        prepare_coverage_plugin,
         create_coverage_config,
         generate_coverage_report,
         merge_coverage_data,
         setup_coverage,
         SubsystemRule(PytestCoverage),
         UnionRule(CoverageDataCollection, PytestCoverageDataCollection),
-        RootRule(CoverageConfigRequest),
     ]

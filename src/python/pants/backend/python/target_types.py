@@ -7,7 +7,6 @@ from typing import Iterable, Optional, Sequence, Tuple, Union, cast
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.targets.python_binary import PythonBinary as PythonBinaryV1
-from pants.core.util_rules.determine_source_files import SourceFiles
 from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
 from pants.engine.target import (
@@ -316,7 +315,7 @@ class PythonCoverage(StringOrStringSequenceField):
     alias = "coverage"
 
     def determine_packages_to_cover(
-        self, *, specified_source_files: SourceFiles
+        self, *, stripped_source_files: Iterable[str]
     ) -> Tuple[str, ...]:
         """Either return the specified `coverage` field value or, if not defined, attempt to
         generate packages with a heuristic that tests have the same package name as their source
@@ -327,14 +326,14 @@ class PythonCoverage(StringOrStringSequenceField):
         names, e.g. `src/python/project` and `tests/python/project` (but not
         `tests/python/test_project`).
         """
-        if self.value is not None:
+        if self.value:
             return self.value
         return tuple(
             sorted(
                 {
                     # Turn file paths into package names.
-                    os.path.dirname(source_file).replace(os.sep, ".")
-                    for source_file in specified_source_files.snapshot.files
+                    os.path.dirname(f).replace(os.sep, ".")
+                    for f in stripped_source_files
                 }
             )
         )

@@ -14,9 +14,9 @@ from pants.backend.python.rules.pex import (
 )
 from pants.backend.python.rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.rules.pytest_coverage import (
-    COVERAGE_PLUGIN_INPUT,
     CoverageConfig,
     CoverageConfigRequest,
+    CoveragePlugin,
     PytestCoverageData,
 )
 from pants.backend.python.subsystems.pytest import PyTest
@@ -24,7 +24,6 @@ from pants.backend.python.subsystems.subprocess_environment import SubprocessEnc
 from pants.backend.python.target_types import (
     PythonCoverage,
     PythonInterpreterCompatibility,
-    PythonSources,
     PythonTestsSources,
     PythonTestsTimeout,
 )
@@ -35,7 +34,6 @@ from pants.engine.fs import (
     EMPTY_DIGEST,
     AddPrefix,
     Digest,
-    InputFilesContent,
     MergeDigests,
     PathGlobs,
     Snapshot,
@@ -79,10 +77,8 @@ async def setup_pytest_for_target(
     pytest: PyTest,
     test_options: TestOptions,
     python_setup: PythonSetup,
+    coverage_plugin: CoveragePlugin,
 ) -> TestTargetSetup:
-    # TODO: Rather than consuming the TestOptions subsystem, the TestRunner should pass on coverage
-    # configuration via #7490.
-
     test_addresses = Addresses((field_set.address,))
 
     transitive_targets = await Get[TransitiveTargets](Addresses, test_addresses)
@@ -110,18 +106,13 @@ async def setup_pytest_for_target(
     # and then by Pytest). See https://github.com/jaraco/zipp/pull/26.
     additional_args_for_pytest = ("--not-zip-safe",)
 
-    use_coverage = test_options.values.use_coverage
-    plugin_file_digest: Optional[Digest] = (
-        await Get[Digest](InputFilesContent, COVERAGE_PLUGIN_INPUT) if use_coverage else None
-    )
-
     pytest_pex_request = Get[Pex](
         PexRequest,
         pex_request(
             output_filename="pytest.pex",
             requirements=PexRequirements(pytest.get_requirement_strings()),
             additional_args=additional_args_for_pytest,
-            sources=plugin_file_digest,
+            sources=coverage_plugin.digest,
         ),
     )
 
@@ -167,6 +158,8 @@ async def setup_pytest_for_target(
         )
     )
 
+    use_coverage = test_options.values.use_coverage
+
     requests = (
         pytest_pex_request,
         requirements_pex_request,
@@ -182,16 +175,7 @@ async def setup_pytest_for_target(
         prepared_sources,
         specified_source_files,
     ) = (
-        await MultiGet(
-            Get(
-                CoverageConfig,
-                CoverageConfigRequest(
-                    Targets((tgt for tgt in all_targets if tgt.has_field(PythonSources))),
-                    is_test_time=True,
-                ),
-            ),
-            *requests,
-        )
+        await MultiGet(Get(CoverageConfig, CoverageConfigRequest()), *requests)
         if use_coverage
         else (CoverageConfig(EMPTY_DIGEST), *await MultiGet(*requests))
     )
@@ -208,17 +192,17 @@ async def setup_pytest_for_target(
     coverage_args = []
     if use_coverage:
         coverage_args = [
-            "--cov-report=",  # To not generate any output. https://pytest-cov.readthedocs.io/en/latest/config.html
+            # This turns of all coverage output.
+            "--cov-report=",
         ]
         for package in field_set.coverage.determine_packages_to_cover(
-            specified_source_files=specified_source_files
+            stripped_source_files=specified_source_files.files
         ):
             coverage_args.extend(["--cov", package])
 
-    specified_source_file_names = sorted(specified_source_files.snapshot.files)
     return TestTargetSetup(
         test_runner_pex=test_runner_pex,
-        args=(*pytest.options.args, *coverage_args, *specified_source_file_names),
+        args=(*pytest.options.args, *coverage_args, *specified_source_files.files),
         input_digest=input_digest,
         timeout_seconds=field_set.timeout.calculate_from_global_options(pytest),
         xml_dir=pytest.options.junit_xml_dir,
