@@ -909,8 +909,9 @@ impl WrappedNode for Task {
     let can_modify_workunit = self.task.can_modify_workunit;
 
     let result_val = externs::call(&externs::val_for(&func.0), &deps)?;
+    let coroutine = context.core.types.coroutine;
     match externs::get_type_for(&result_val) {
-      t if t == context.core.types.coroutine => Self::generate(context, params, entry, result_val)
+      t if t == coroutine => Self::generate(context, params, entry, result_val)
         .await
         .map(|result_val| {
           let maybe_new_level = Self::compute_new_workunit_level(can_modify_workunit, &result_val);
@@ -1089,64 +1090,66 @@ impl Node for NodeKey {
 
     scope_task_workunit_state(Some(workunit_state), async move {
       let context2 = context.clone();
-      if let Some(path) = self.fs_subject() {
+      let maybe_watch = if let Some(path) = self.fs_subject() {
         let abs_path = context.core.build_root.join(path);
-        let _ = context
+        context
           .core
           .watcher
           .watch(abs_path)
           .map_err(|e| Context::mk_error(&format!("{:?}", e)))
-          .map_err(|failure| {
-            if let Some(user_facing_name) = user_facing_name {
-              failure.with_pushed_frame(&user_facing_name)
-            } else {
-              failure
-            }
-          })
-          .await?;
-      }
+          .await
+      } else {
+        Ok(())
+      };
 
       let mut level = metadata.level;
-
-      let result = match self {
-        NodeKey::DigestFile(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Digest).await,
-        NodeKey::DownloadedFile(n) => {
-          n.run_wrapped_node(context)
-            .map_ok(NodeOutput::Snapshot)
-            .await
-        }
-        NodeKey::MultiPlatformExecuteProcess(n) => {
-          n.run_wrapped_node(context)
-            .map_ok(|r| NodeOutput::ProcessResult(Box::new(r)))
-            .await
-        }
-        NodeKey::ReadLink(n) => {
-          n.run_wrapped_node(context)
-            .map_ok(NodeOutput::LinkDest)
-            .await
-        }
-        NodeKey::Scandir(n) => {
-          n.run_wrapped_node(context)
-            .map_ok(NodeOutput::DirectoryListing)
-            .await
-        }
-        NodeKey::Select(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Value).await,
-        NodeKey::Snapshot(n) => {
-          n.run_wrapped_node(context)
-            .map_ok(NodeOutput::Snapshot)
-            .await
-        }
-        NodeKey::Task(n) => {
-          n.run_wrapped_node(context)
-            .map_ok(|(v, maybe_new_level)| {
-              if let Some(new_level) = maybe_new_level {
-                level = new_level;
-              }
-              NodeOutput::Value(v)
-            })
-            .await
-        }
+      let mut result = match maybe_watch {
+        Ok(()) => match self {
+          NodeKey::DigestFile(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Digest).await,
+          NodeKey::DownloadedFile(n) => {
+            n.run_wrapped_node(context)
+              .map_ok(NodeOutput::Snapshot)
+              .await
+          }
+          NodeKey::MultiPlatformExecuteProcess(n) => {
+            n.run_wrapped_node(context)
+              .map_ok(|r| NodeOutput::ProcessResult(Box::new(r)))
+              .await
+          }
+          NodeKey::ReadLink(n) => {
+            n.run_wrapped_node(context)
+              .map_ok(NodeOutput::LinkDest)
+              .await
+          }
+          NodeKey::Scandir(n) => {
+            n.run_wrapped_node(context)
+              .map_ok(NodeOutput::DirectoryListing)
+              .await
+          }
+          NodeKey::Select(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Value).await,
+          NodeKey::Snapshot(n) => {
+            n.run_wrapped_node(context)
+              .map_ok(NodeOutput::Snapshot)
+              .await
+          }
+          NodeKey::Task(n) => {
+            n.run_wrapped_node(context)
+              .map_ok(|(v, maybe_new_level)| {
+                if let Some(new_level) = maybe_new_level {
+                  level = new_level;
+                }
+                NodeOutput::Value(v)
+              })
+              .await
+          }
+        },
+        Err(e) => Err(e),
       };
+
+      if let Some(user_facing_name) = user_facing_name {
+        result = result.map_err(|failure| failure.with_pushed_frame(&user_facing_name));
+      }
+
       let final_metadata = WorkunitMetadata { level, ..metadata };
       context2
         .session
