@@ -814,12 +814,14 @@ pub fn make_execute_request(
     mut platform_properties,
   } = metadata;
 
-  if !req.append_only_caches.is_empty() {
-    platform_properties.extend(NamedCaches::platform_properties(
-      &req.append_only_caches,
-      &cache_key_gen_version,
-    ));
-  }
+  // TODO: Disabling append-only caches in remoting until server support exists due to
+  //       interaction with how servers match platform properties.
+  // if !req.append_only_caches.is_empty() {
+  //   platform_properties.extend(NamedCaches::platform_properties(
+  //     &req.append_only_caches,
+  //     &cache_key_gen_version,
+  //   ));
+  // }
 
   if let Some(cache_key_gen_version) = cache_key_gen_version {
     let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
