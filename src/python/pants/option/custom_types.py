@@ -220,7 +220,7 @@ class ListValueComponent:
         elif isinstance(value, (list, tuple)):  # Ensure we can handle list-typed default values.
             action = cls.REPLACE
             appends = value
-        elif not isinstance(value, str):
+        elif not isinstance(value, str) and member_type != str:
             action = cls.REPLACE
             appends = [value]
         elif value.startswith("[") or value.startswith("("):
