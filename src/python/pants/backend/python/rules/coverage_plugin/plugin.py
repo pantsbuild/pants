@@ -47,7 +47,13 @@ class PantsPythonFileReporter(PythonFileReporter):
 
 
 class SourceRootRemappingPlugin(CoveragePlugin):
-    """A plugin that knows how to restore source roots from stripped files in Coverage reports."""
+    """A plugin that knows how to restore source roots from stripped files in Coverage reports.
+
+    Both `file_tracer` and `find_executable_files` teach Coverage which files are "owned" by this
+    plugin, meaning which files should have their filenames be changed in the final report.
+
+    `file_reporter` hooks up our custom logic to add back the source root in the final report.
+    """
 
     def __init__(self, chroot_path, stripped_files_to_source_roots):
         super(SourceRootRemappingPlugin, self).__init__()
@@ -60,6 +66,16 @@ class SourceRootRemappingPlugin(CoveragePlugin):
         stripped_file = os.path.relpath(filename, self.chroot_path)
         if stripped_file in self.stripped_files_to_source_roots:
             return PantsFileTracer(filename)
+
+    def find_executable_files(self, src_dir):
+        if not src_dir.startswith(self.chroot_path):
+            return None
+        for dirname, _, filenames in os.walk(src_dir):
+            relative_dirname = os.path.relpath(dirname, self.chroot_path)
+            for filename in filenames:
+                stripped_file = os.path.join(relative_dirname, filename)
+                if stripped_file in self.stripped_files_to_source_roots:
+                    yield os.path.join(dirname, filename)
 
     def file_reporter(self, filename):
         stripped_file = os.path.relpath(filename, self.chroot_path)
