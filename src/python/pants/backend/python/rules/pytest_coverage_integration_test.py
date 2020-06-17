@@ -98,12 +98,12 @@ class PytestCoverageIntegrationTest(PantsRunIntegrationTest):
         assert (
             dedent(
                 f"""\
-                Name                                                Stmts   Miss Branch BrPart  Cover
-                -------------------------------------------------------------------------------------
-                {tmpdir_relative}/src/python/project/lib.py                   4      1      0      0    100%
-                {tmpdir_relative}/src/python/project/lib_test.py              3      0      0      0   100%
-                -------------------------------------------------------------------------------------
-                TOTAL                                                  10      1      0      0    100%
+                Name                                         Stmts   Miss Branch BrPart  Cover
+                ------------------------------------------------------------------------------
+                {tmpdir_relative}/src/python/project/lib.py            4      0      0      0   100%
+                {tmpdir_relative}/src/python/project/lib_test.py       3      0      0      0   100%
+                ------------------------------------------------------------------------------
+                TOTAL                                            7      0      0      0   100%
                 """
             )
             in result.stderr_data
