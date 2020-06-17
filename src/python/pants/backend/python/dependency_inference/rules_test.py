@@ -3,7 +3,6 @@
 
 from textwrap import dedent
 
-from pants.backend.project_info.list_roots import all_roots
 from pants.backend.python.dependency_inference.module_mapper import rules as module_mapper_rules
 from pants.backend.python.dependency_inference.rules import (
     InferPythonDependencies,
@@ -17,6 +16,7 @@ from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.engine.target import InferredDependencies, WrappedTarget
 from pants.python.python_requirement import PythonRequirement
+from pants.source.source_root import all_roots
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 

@@ -1,6 +1,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import itertools
 import logging
 import os
 from dataclasses import dataclass
@@ -10,7 +11,7 @@ from typing import Iterable, Optional, Set, Tuple, Union
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.rules import RootRule, SubsystemRule, rule
-from pants.engine.selectors import Get
+from pants.engine.selectors import Get, MultiGet
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method
 
@@ -44,10 +45,6 @@ class NoSourceRootError(SourceRootError):
 
     def __init__(self, path: Union[str, PurePath], extra_msg: str = ""):
         super().__init__(f"No source root found for `{path}`. {extra_msg}")
-
-
-class AllSourceRoots(DeduplicatedCollection[SourceRoot]):
-    sort_input = True
 
 
 # We perform pattern matching against absolute paths, where "/" represents the repo root.
@@ -279,10 +276,62 @@ async def get_source_root_strict(source_root_request: SourceRootRequest) -> Sour
     return optional_source_root.source_root
 
 
+class AllSourceRoots(DeduplicatedCollection[SourceRoot]):
+    sort_input = True
+
+
+@rule
+async def all_roots(source_root_config: SourceRootConfig) -> AllSourceRoots:
+    source_root_pattern_matcher = source_root_config.get_pattern_matcher()
+
+    # Create globs corresponding to all source root patterns.
+    pattern_matches: Set[str] = set()
+    for path in source_root_pattern_matcher.get_patterns():
+        if path == "/":
+            pattern_matches.add("**")
+        elif path.startswith("/"):
+            pattern_matches.add(f"{path[1:]}/")
+        else:
+            pattern_matches.add(f"**/{path}/")
+
+    # Create globs for any marker files.
+    marker_file_matches: Set[str] = set()
+    for marker_filename in source_root_config.options.marker_filenames:
+        marker_file_matches.add(f"**/{marker_filename}")
+
+    # Match the patterns against actual files, to find the roots that actually exist.
+    pattern_snapshot, marker_file_snapshot = await MultiGet(
+        Get[Snapshot](PathGlobs(globs=sorted(pattern_matches))),
+        Get[Snapshot](PathGlobs(globs=sorted(marker_file_matches))),
+    )
+
+    responses = await MultiGet(
+        itertools.chain(
+            (
+                Get[OptionalSourceRoot](SourceRootRequest(PurePath(d)))
+                for d in pattern_snapshot.dirs
+            ),
+            # We don't technically need to issue a SourceRootRequest for the marker files,
+            # since we know that their immediately enclosing dir is a source root by definition.
+            # However we may as well verify this formally, so that we're not replicating that
+            # logic here.
+            (
+                Get[OptionalSourceRoot](SourceRootRequest(PurePath(f)))
+                for f in marker_file_snapshot.files
+            ),
+        )
+    )
+    all_source_roots = {
+        response.source_root for response in responses if response.source_root is not None
+    }
+    return AllSourceRoots(all_source_roots)
+
+
 def rules():
     return [
         get_source_root,
         get_source_root_strict,
+        all_roots,
         SubsystemRule(SourceRootConfig),
         RootRule(SourceRootRequest),
     ]
