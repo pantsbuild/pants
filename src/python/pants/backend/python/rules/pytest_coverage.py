@@ -60,9 +60,8 @@ this into a single `.coverage` file.
 Step 3: Generate the report with `coverage {html,xml,console}`.
 All the files in the single merged `.coverage` file are still stripped, and we want to generate a
 report with the source roots restored. Coverage requires that the files it's reporting on be present
-in its environment when it generates the report, so we populate all the unstripped source files.
-Our plugin then uses the stripped filename -> source root mapping to determine the correct file
-name for the report.
+when it generates the report, so we populate all the stripped source files. Our plugin then uses
+the stripped filename -> source root mapping to determine the correct file name for the report.
 
 Step 4: `test.py` outputs the final report.
 """
@@ -247,15 +246,18 @@ async def generate_coverage_report(
 ) -> CoverageReports:
     """Takes all Python test results and generates a single coverage report."""
     coverage_config_request = Get(CoverageConfig, CoverageConfigRequest())
-    unstripped_sources_request = Get(
+    sources_request = Get(
         SourceFiles,
         AllSourceFilesRequest(
-            tgt[PythonSources] for tgt in transitive_targets.closure if tgt.has_field(PythonSources)
+            (
+                tgt[PythonSources]
+                for tgt in transitive_targets.closure
+                if tgt.has_field(PythonSources)
+            ),
+            strip_source_roots=True,
         ),
     )
-    coverage_config, unstripped_sources = await MultiGet(
-        coverage_config_request, unstripped_sources_request
-    )
+    coverage_config, sources = await MultiGet(coverage_config_request, sources_request)
     input_digest = await Get(
         Digest,
         MergeDigests(
@@ -263,7 +265,7 @@ async def generate_coverage_report(
                 merged_coverage_data.coverage_data,
                 coverage_config.digest,
                 coverage_setup.pex.digest,
-                unstripped_sources.snapshot.digest,
+                sources.snapshot.digest,
             )
         ),
     )
