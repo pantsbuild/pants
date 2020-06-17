@@ -24,8 +24,8 @@ use store::{Snapshot, Store, StoreFileByDigest};
 use tokio::time::delay_for;
 
 use crate::{
-  Context, ExecutionStats, FallibleProcessResultWithPlatform, MultiPlatformProcess, NamedCaches,
-  Platform, PlatformConstraint, Process, ProcessMetadata,
+  Context, ExecutionStats, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform,
+  PlatformConstraint, Process, ProcessMetadata,
 };
 use std::cmp::min;
 use workunit_store::WorkunitStore;
