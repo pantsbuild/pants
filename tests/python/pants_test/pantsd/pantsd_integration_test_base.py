@@ -120,7 +120,7 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
                 print(f"\npantsd log is {workdir}/pantsd/pantsd.log")
                 pantsd_config = {
                     "GLOBAL": {
-                        "enable_pantsd": True,
+                        "pantsd": True,
                         # The absolute paths in CI can exceed the UNIX socket path limitation
                         # (>104-108 characters), so we override that here with a shorter path.
                         "watchman_socket_path": f"/tmp/watchman.{os.getpid()}.sock",

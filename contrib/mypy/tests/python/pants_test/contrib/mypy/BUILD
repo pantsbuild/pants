@@ -19,5 +19,5 @@ python_tests(
     'contrib/mypy:examples_directory',
   ],
   tags={'integration', 'partially_type_checked'},
-  timeout = 120,
+  timeout = 300,
 )

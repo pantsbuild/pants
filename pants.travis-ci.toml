@@ -16,7 +16,7 @@ dynamic_ui = false
 
 # TODO: Eventually we would like pantsd enabled in CI as well, but we blanket disable it for
 # now in order to smooth off rough edges locally.
-enable_pantsd = false
+pantsd = false
 
 [black]
 args = ["--quiet"]

@@ -38,6 +38,17 @@ pub(crate) struct RemoteTestResult {
   pub(crate) stderr_bytes: Vec<u8>,
 }
 
+impl RemoteTestResult {
+  pub fn stdout(&self) -> &str {
+    std::str::from_utf8(&self.stdout_bytes).unwrap()
+  }
+
+  #[allow(dead_code)]
+  pub fn stderr(&self) -> &str {
+    std::str::from_utf8(&self.stderr_bytes).unwrap()
+  }
+}
+
 #[derive(Debug, PartialEq)]
 pub(crate) enum StdoutType {
   Raw(String),
@@ -69,7 +80,7 @@ async fn make_execute_request() {
       .into_iter()
       .map(PathBuf::from)
       .collect(),
-    timeout: one_second(),
+    timeout: None,
     description: "some description".to_owned(),
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
@@ -152,7 +163,7 @@ async fn make_execute_request_with_instance_name() {
       .into_iter()
       .map(PathBuf::from)
       .collect(),
-    timeout: one_second(),
+    timeout: None,
     description: "some description".to_owned(),
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
@@ -243,7 +254,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
       .into_iter()
       .map(PathBuf::from)
       .collect(),
-    timeout: one_second(),
+    timeout: None,
     description: "some description".to_owned(),
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
@@ -333,7 +344,7 @@ async fn make_execute_request_with_jdk() {
     input_files: input_directory.digest(),
     output_files: BTreeSet::new(),
     output_directories: BTreeSet::new(),
-    timeout: one_second(),
+    timeout: None,
     description: "some description".to_owned(),
     append_only_caches: BTreeMap::new(),
     jdk_home: Some(PathBuf::from("/tmp")),
@@ -398,7 +409,7 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
     input_files: input_directory.digest(),
     output_files: BTreeSet::new(),
     output_directories: BTreeSet::new(),
-    timeout: one_second(),
+    timeout: None,
     description: "some description".to_owned(),
     append_only_caches: BTreeMap::new(),
     jdk_home: Some(PathBuf::from("/tmp")),
@@ -485,6 +496,93 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
         ]
       },
     ),
+    Ok((want_action, want_command, want_execute_request))
+  );
+}
+
+#[tokio::test]
+async fn make_execute_request_with_timeout() {
+  let input_directory = TestDirectory::containing_roland();
+  let req = Process {
+    argv: owned_string_vec(&["/bin/echo", "yo"]),
+    env: vec![("SOME".to_owned(), "value".to_owned())]
+      .into_iter()
+      .collect(),
+    working_directory: None,
+    input_files: input_directory.digest(),
+    // Intentionally poorly sorted:
+    output_files: vec!["path/to/file", "other/file"]
+      .into_iter()
+      .map(PathBuf::from)
+      .collect(),
+    output_directories: vec!["directory/name"]
+      .into_iter()
+      .map(PathBuf::from)
+      .collect(),
+    timeout: one_second(),
+    description: "some description".to_owned(),
+    append_only_caches: BTreeMap::new(),
+    jdk_home: None,
+    target_platform: PlatformConstraint::None,
+    is_nailgunnable: false,
+  };
+
+  let mut want_command = bazel_protos::remote_execution::Command::new();
+  want_command.mut_arguments().push("/bin/echo".to_owned());
+  want_command.mut_arguments().push("yo".to_owned());
+  want_command.mut_environment_variables().push({
+    let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
+    env.set_name("SOME".to_owned());
+    env.set_value("value".to_owned());
+    env
+  });
+  want_command
+    .mut_output_files()
+    .push("other/file".to_owned());
+  want_command
+    .mut_output_files()
+    .push("path/to/file".to_owned());
+  want_command
+    .mut_output_directories()
+    .push("directory/name".to_owned());
+  want_command.mut_platform().mut_properties().push({
+    let mut property = bazel_protos::remote_execution::Platform_Property::new();
+    property.set_name("target_platform".to_owned());
+    property.set_value("none".to_owned());
+    property
+  });
+
+  let mut want_action = bazel_protos::remote_execution::Action::new();
+  want_action.set_command_digest(
+    (&Digest(
+      Fingerprint::from_hex_string(
+        "6cfe2081e40c7542a8b369b669618fe7c6e690e274183e406ed75dc3959dc82f",
+      )
+      .unwrap(),
+      99,
+    ))
+      .into(),
+  );
+  want_action.set_input_root_digest((&input_directory.digest()).into());
+
+  let mut timeout_duration = protobuf::well_known_types::Duration::new();
+  timeout_duration.set_seconds(1);
+  want_action.set_timeout(timeout_duration);
+
+  let mut want_execute_request = bazel_protos::remote_execution::ExecuteRequest::new();
+  want_execute_request.set_action_digest(
+    (&Digest(
+      Fingerprint::from_hex_string(
+        "4638ebe2e21095d9ce559041eb4961d2483e0f27659c3a6d930f7722c4878939",
+      )
+      .unwrap(),
+      144,
+    ))
+      .into(),
+  );
+
+  assert_eq!(
+    crate::remote::make_execute_request(&req, empty_request_metadata()),
     Ok((want_action, want_command, want_execute_request))
   );
 }
@@ -825,6 +923,7 @@ async fn extract_response_with_digest_stdout() {
     .op
     .unwrap()
     .unwrap(),
+    false,
     Platform::Linux,
   )
   .await
@@ -852,6 +951,7 @@ async fn extract_response_with_digest_stderr() {
     .op
     .unwrap()
     .unwrap(),
+    false,
     Platform::Linux,
   )
   .await
@@ -879,6 +979,7 @@ async fn extract_response_with_digest_stdout_osx_remote() {
     .op
     .unwrap()
     .unwrap(),
+    false,
     Platform::Darwin,
   )
   .await
@@ -1103,7 +1204,7 @@ async fn timeout_after_sufficiently_delayed_getoperations() {
     .unwrap();
   assert_eq!(result.original.exit_code, -15);
   let error_msg = String::from_utf8(result.stdout_bytes.to_vec()).unwrap();
-  assert_that(&error_msg).contains("Exceeded timeout");
+  assert_that(&error_msg).contains("Exceeded user timeout");
   assert_that(&error_msg).contains("echo-a-foo");
   assert_eq!(result.original.execution_attempts.len(), 1);
   let maybe_execution_duration = result.original.execution_attempts[0].remote_execution;
@@ -1757,7 +1858,7 @@ async fn extract_execute_response_success() {
     response
   }));
 
-  let result = extract_execute_response(operation, Platform::Linux)
+  let result = extract_execute_response(operation, false, Platform::Linux)
     .await
     .unwrap();
 
@@ -1779,7 +1880,7 @@ async fn extract_execute_response_pending() {
   operation.set_done(false);
 
   assert_eq!(
-    extract_execute_response(operation, Platform::Linux).await,
+    extract_execute_response(operation, false, Platform::Linux).await,
     Err(ExecutionError::NotFinished(operation_name))
   );
 }
@@ -1802,7 +1903,7 @@ async fn extract_execute_response_missing_digests() {
     .unwrap();
 
   assert_eq!(
-    extract_execute_response(operation, Platform::Linux).await,
+    extract_execute_response(operation, false, Platform::Linux).await,
     Err(ExecutionError::MissingDigests(missing_files))
   );
 }
@@ -1824,7 +1925,7 @@ async fn extract_execute_response_missing_other_things() {
     .unwrap()
     .unwrap();
 
-  match extract_execute_response(operation, Platform::Linux).await {
+  match extract_execute_response(operation, false, Platform::Linux).await {
     Err(ExecutionError::Fatal(err)) => assert_contains(&err, "monkeys"),
     other => assert!(false, "Want fatal error, got {:?}", other),
   };
@@ -1843,7 +1944,7 @@ async fn extract_execute_response_other_failed_precondition() {
     .unwrap()
     .unwrap();
 
-  match extract_execute_response(operation, Platform::Linux).await {
+  match extract_execute_response(operation, false, Platform::Linux).await {
     Err(ExecutionError::Fatal(err)) => assert_contains(&err, "OUT_OF_CAPACITY"),
     other => assert!(false, "Want fatal error, got {:?}", other),
   };
@@ -1858,7 +1959,7 @@ async fn extract_execute_response_missing_without_list() {
     .unwrap()
     .unwrap();
 
-  match extract_execute_response(operation, Platform::Linux).await {
+  match extract_execute_response(operation, false, Platform::Linux).await {
     Err(ExecutionError::Fatal(err)) => assert_contains(&err.to_lowercase(), "precondition"),
     other => assert!(false, "Want fatal error, got {:?}", other),
   };
@@ -1879,10 +1980,24 @@ async fn extract_execute_response_other_status() {
     response
   }));
 
-  match extract_execute_response(operation, Platform::Linux).await {
+  match extract_execute_response(operation, false, Platform::Linux).await {
     Err(ExecutionError::Fatal(err)) => assert_contains(&err, "PERMISSION_DENIED"),
     other => assert!(false, "Want fatal error, got {:?}", other),
   };
+}
+
+#[tokio::test]
+async fn extract_execute_response_timeout() {
+  let operation_name = "cat".to_owned();
+  let mut operation = bazel_protos::operations::Operation::new();
+  operation.set_name(operation_name.clone());
+  operation.set_done(false);
+
+  assert_eq!(
+    // The response would be NotFinished, but we pass `timeout_has_elapsed: true`.
+    extract_execute_response(operation, true, Platform::Linux).await,
+    Err(ExecutionError::Timeout)
+  );
 }
 
 #[tokio::test]
@@ -2263,6 +2378,7 @@ async fn remote_workunits_are_stored() {
   futures01::future::lazy(move || {
     command_runner.extract_execute_response(
       OperationOrStatus::Operation(operation),
+      false,
       &mut ExecutionHistory::default(),
     )
   })
@@ -2619,6 +2735,7 @@ pub(crate) fn make_store(
 
 async fn extract_execute_response(
   operation: bazel_protos::operations::Operation,
+  timeout_has_elapsed: bool,
   remote_platform: Platform,
 ) -> Result<RemoteTestResult, ExecutionError> {
   let cas = mock::StubCAS::builder()
@@ -2636,6 +2753,7 @@ async fn extract_execute_response(
   let original = command_runner
     .extract_execute_response(
       OperationOrStatus::Operation(operation),
+      timeout_has_elapsed,
       &mut ExecutionHistory::default(),
     )
     .compat()

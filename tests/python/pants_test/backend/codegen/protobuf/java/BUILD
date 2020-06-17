@@ -29,5 +29,5 @@ python_tests(
     'testprojects/src/protobuf/org/pantsbuild/testproject:import_from_buildroot_directory',
   ],
   tags = {'integration', 'partially_type_checked'},
-  timeout = 330,
+  timeout = 480,
 )

@@ -118,8 +118,8 @@ def ensure_daemon(f):
         for enable_daemon in [False, True]:
             enable_daemon_str = str(enable_daemon)
             env = {
-                "HERMETIC_ENV": "PANTS_ENABLE_PANTSD,PANTS_ENABLE_V2_ENGINE,PANTS_SUBPROCESSDIR",
-                "PANTS_ENABLE_PANTSD": enable_daemon_str,
+                "HERMETIC_ENV": "PANTS_PANTSD,PANTS_SUBPROCESSDIR",
+                "PANTS_PANTSD": enable_daemon_str,
             }
             with environment_as(**env):
                 try:
@@ -133,7 +133,7 @@ def ensure_daemon(f):
                         self.run_pants(["kill-pantsd"])
                     else:
                         print(
-                            "Skipping run with enable-pantsd=true because it already failed with enable-pantsd=false."
+                            "Skipping run with pantsd=true because it already failed with pantsd=false."
                         )
                     raise
 
@@ -177,14 +177,14 @@ class PantsRunIntegrationTest(unittest.TestCase):
         """Subclasses may override to acknowledge that the tests cannot run when pantsd is enabled,
         or they want to configure pantsd themselves.
 
-        In those cases, --enable-pantsd will not be added to their configuration.
+        In those cases, --pantsd will not be added to their configuration.
         This approach is coarsely grained, meaning we disable pantsd in some tests that actually run
         when pantsd is enabled. However:
           - The number of mislabeled tests is currently small (~20 tests).
           - Those tests will still run, just with pantsd disabled.
 
         N.B. Currently, this doesn't interact with test hermeticity.
-        This means that, if the test coordinator has set PANTS_ENABLE_PANTSD, and a test is not marked
+        This means that, if the test coordinator has set PANTS_PANTSD, and a test is not marked
         as hermetic, it will run under pantsd regardless of the value of this function.
         """
         should_pantsd = os.getenv("USE_PANTSD_FOR_INTEGRATION_TESTS")
@@ -322,7 +322,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
             )
 
         if self.use_pantsd_env_var():
-            args.append("--enable-pantsd=True")
+            args.append("--pantsd")
 
         if config:
             toml_file_name = os.path.join(workdir, "pants.toml")

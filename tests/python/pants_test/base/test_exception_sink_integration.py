@@ -101,7 +101,7 @@ Exception message:.* 1 Exception encountered:
     def test_logs_unhandled_exception(self):
         with temporary_dir() as tmpdir:
             pants_run = self.run_pants_with_workdir(
-                ["--no-enable-pantsd", "list", "//:this-target-does-not-exist"],
+                ["--no-pantsd", "list", "//:this-target-does-not-exist"],
                 workdir=tmpdir,
                 # The backtrace should be omitted when --print-exception-stacktrace=False.
                 print_exception_stacktrace=False,
@@ -204,7 +204,7 @@ Current thread [^\n]+ \\(most recent call first\\):
         )
         testproject_backend_pkg_name = "test_pants_plugin"
         lifecycle_stub_cmdline = [
-            "--no-enable-pantsd",
+            "--no-pantsd",
             f"--pythonpath=+['{testproject_backend_src_dir}']",
             f"--backend-packages=+['{testproject_backend_pkg_name}']",
             # This task will always raise an exception.
