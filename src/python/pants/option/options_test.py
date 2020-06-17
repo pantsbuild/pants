@@ -1803,3 +1803,26 @@ class OptionsTest(TestBase):
 
         with pytest.raises(ParseError, match="Error computing value for --some-list-enum"):
             options.for_scope("other-enum-scope")
+
+    def test_list_of_enum_set_single_value(self) -> None:
+        options = self._parse(
+            flags="other-enum-scope --some-list-enum-with-default=\"['another-value']\""
+        )
+        assert [self.SomeEnumOption.another_value] == options.for_scope(
+            "other-enum-scope"
+        ).some_list_enum_with_default
+
+    def test_list_of_enum_append(self) -> None:
+        options = self._parse(
+            flags="other-enum-scope --some-list-enum-with-default=\"+['another-value']\""
+        )
+        assert [
+            self.SomeEnumOption.yet_another,
+            self.SomeEnumOption.another_value,
+        ] == options.for_scope("other-enum-scope").some_list_enum_with_default
+
+    def test_list_of_enum_remove(self) -> None:
+        options = self._parse(
+            flags="other-enum-scope --some-list-enum-with-default=\"-['yet-another']\""
+        )
+        assert [] == options.for_scope("other-enum-scope").some_list_enum_with_default
