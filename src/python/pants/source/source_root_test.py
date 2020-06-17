@@ -10,11 +10,14 @@ import pytest
 from pants.engine.fs import Digest, PathGlobs, Snapshot
 from pants.source.source_root import (
     OptionalSourceRoot,
+    SourceRoot,
     SourceRootConfig,
     SourceRootRequest,
+    all_roots,
     get_source_root,
 )
 from pants.testutil.engine.util import MockGet, create_subsystem, run_rule
+from pants.testutil.test_base import TestBase
 
 
 def _find_root(
@@ -168,3 +171,109 @@ def test_marker_file_and_patterns() -> None:
 
     assert "project1" == find_root("project1/foo/bar.py")
     assert "project2/src/python" == find_root("project2/src/python/baz/qux.py")
+
+
+class AllRootsTest(TestBase):
+    def test_all_roots(self):
+
+        dirs = (
+            "contrib/go/examples/src/go/src",
+            "src/java",
+            "src/python",
+            "src/python/subdir/src/python",  # We allow source roots under source roots.
+            "src/kotlin",
+            "my/project/src/java",
+            "src/example/java",
+            "src/example/python",
+            "fixed/root/jvm",
+        )
+
+        options = {
+            "pants_ignore": [],
+            "root_patterns": [
+                "src/*",
+                "src/example/*",
+                "contrib/go/examples/src/go/src",
+                # Dir does not exist, should not be listed as a root.
+                "java",
+                "fixed/root/jvm",
+            ],
+        }
+        options.update(self.options[""])  # We need inherited values for pants_workdir etc.
+
+        self.context(
+            for_subsystems=[SourceRootConfig], options={SourceRootConfig.options_scope: options}
+        )
+
+        source_root_config = SourceRootConfig.global_instance()
+
+        # This function mocks out reading real directories off the file system.
+        def provider_rule(path_globs: PathGlobs) -> Snapshot:
+            return Snapshot(Digest("abcdef", 10), (), dirs)
+
+        def source_root_mock_rule(req: SourceRootRequest) -> OptionalSourceRoot:
+            for d in dirs:
+                if str(req.path).startswith(d):
+                    return OptionalSourceRoot(SourceRoot(str(req.path)))
+            return OptionalSourceRoot(None)
+
+        output = run_rule(
+            all_roots,
+            rule_args=[source_root_config],
+            mock_gets=[
+                MockGet(product_type=Snapshot, subject_type=PathGlobs, mock=provider_rule),
+                MockGet(
+                    product_type=OptionalSourceRoot,
+                    subject_type=SourceRootRequest,
+                    mock=source_root_mock_rule,
+                ),
+            ],
+        )
+
+        self.assertEqual(
+            {
+                SourceRoot("contrib/go/examples/src/go/src"),
+                SourceRoot("src/java"),
+                SourceRoot("src/python"),
+                SourceRoot("src/python/subdir/src/python"),
+                SourceRoot("src/kotlin"),
+                SourceRoot("src/example/java"),
+                SourceRoot("src/example/python"),
+                SourceRoot("my/project/src/java"),
+                SourceRoot("fixed/root/jvm"),
+            },
+            set(output),
+        )
+
+    def test_all_roots_with_root_at_buildroot(self):
+        options = {
+            "pants_ignore": [],
+            "root_patterns": ["/"],
+        }
+        options.update(self.options[""])  # We need inherited values for pants_workdir etc.
+
+        self.context(
+            for_subsystems=[SourceRootConfig], options={SourceRootConfig.options_scope: options}
+        )
+
+        source_root_config = SourceRootConfig.global_instance()
+
+        # This function mocks out reading real directories off the file system
+        def provider_rule(path_globs: PathGlobs) -> Snapshot:
+            dirs = ("foo",)  # A python package at the buildroot.
+            return Snapshot(Digest("abcdef", 10), (), dirs)
+
+        output = run_rule(
+            all_roots,
+            rule_args=[source_root_config],
+            mock_gets=[
+                MockGet(product_type=Snapshot, subject_type=PathGlobs, mock=provider_rule),
+                MockGet(
+                    product_type=OptionalSourceRoot,
+                    subject_type=SourceRootRequest,
+                    mock=lambda req: OptionalSourceRoot(SourceRoot(".")),
+                ),
+            ],
+        )
+
+        self.assertEqual({SourceRoot(".")}, set(output))
