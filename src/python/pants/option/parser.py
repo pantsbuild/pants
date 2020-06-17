@@ -696,7 +696,6 @@ class Parser:
                 return None
             if type_arg == bool:
                 return self._ensure_bool(val_str)
-
             try:
                 if type_arg == dict:
                     return DictValueComponent.create(val_str)
@@ -746,7 +745,6 @@ class Parser:
         config_default_val_or_str = expand(
             self._config.get(Config.DEFAULT_SECTION, dest, default=None)
         )
-
         config_val_or_str = expand(self._config.get(config_section, dest, default=None))
         config_source_file = self._config.get_source_for_option(
             config_section, dest
@@ -754,6 +752,7 @@ class Parser:
         if config_source_file is not None:
             config_source_file = os.path.relpath(config_source_file)
             config_details = f"in {config_source_file}"
+
         # Get value from environment, and capture details about its derivation.
         udest = dest.upper()
         if self._scope == GLOBAL_SCOPE:
@@ -854,6 +853,7 @@ class Parser:
                 raise ParseError(
                     f"`{val}` is not an allowed value for option {dest} in {self._scope_str()}. Must be one of: {choices}"
                 )
+
             if type_arg == list:
                 if inspect.isclass(member_type) and issubclass(member_type, Enum):
                     if len(merged_val) != len(set(merged_val)):
