@@ -908,23 +908,21 @@ impl WrappedNode for Task {
     let product = self.product;
     let can_modify_workunit = self.task.can_modify_workunit;
 
-    let result_val = externs::call(&externs::val_for(&func.0), &deps)?;
-    let coroutine = context.core.types.coroutine;
-    match externs::get_type_for(&result_val) {
-      t if t == coroutine => Self::generate(context, params, entry, result_val)
-        .await
-        .map(|result_val| {
-          let maybe_new_level = Self::compute_new_workunit_level(can_modify_workunit, &result_val);
-          (result_val, maybe_new_level)
-        }),
-      t if t == product => {
-        let maybe_new_level = Self::compute_new_workunit_level(can_modify_workunit, &result_val);
-        Ok((result_val, maybe_new_level))
-      }
-      _ => Err(throw(&format!(
+    let mut result_val = externs::call(&externs::val_for(&func.0), &deps)?;
+    let mut result_type = externs::get_type_for(&result_val);
+    if result_type == context.core.types.coroutine {
+      result_val = Self::generate(context, params, entry, result_val).await?;
+      result_type = externs::get_type_for(&result_val);
+    }
+
+    if result_type == product {
+      let maybe_new_level = Self::compute_new_workunit_level(can_modify_workunit, &result_val);
+      Ok((result_val, maybe_new_level))
+    } else {
+      Err(throw(&format!(
         "{:?} returned a result value that did not satisfy its constraints: {:?}",
         func, result_val
-      ))),
+      )))
     }
   }
 }
