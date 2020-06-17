@@ -221,6 +221,10 @@ pub fn project_u64(value: &Value, field: &str) -> u64 {
   getattr(value, field).unwrap()
 }
 
+pub fn project_maybe_u64(value: &Value, field: &str) -> Result<u64, String> {
+  getattr(value, field)
+}
+
 pub fn project_f64(value: &Value, field: &str) -> f64 {
   getattr(value, field).unwrap()
 }

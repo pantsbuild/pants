@@ -6,13 +6,13 @@ import time
 import unittest
 from dataclasses import dataclass, field
 from textwrap import dedent
-from typing import List
+from typing import List, Optional
 
 from pants.engine.fs import EMPTY_DIGEST
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.scheduler_test_base import SchedulerTestBase
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import RootRule, rule
+from pants.engine.rules import EngineAware, RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.reporting.streaming_workunit_handler import (
     StreamingWorkunitContext,
@@ -515,6 +515,72 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         r_C = next(item for item in finished if item["name"] == "rule_C")
         assert r_B["parent_id"] == r_A["span_id"]
         assert r_C["parent_id"] == r_B["span_id"]
+
+    def test_engine_aware_rule(self):
+        @dataclass(frozen=True)
+        class ModifiedOutput(EngineAware):
+            _level: LogLevel
+            val: int
+
+            def level(self):
+                return self._level
+
+        @rule(desc="a_rule")
+        def a_rule(n: int) -> ModifiedOutput:
+            return ModifiedOutput(val=n, _level=LogLevel.ERROR)
+
+        rules = [a_rule, RootRule(int)]
+        scheduler = self.mk_scheduler(
+            rules, include_trace_on_error=False, should_report_workunits=True
+        )
+
+        tracker = WorkunitTracker()
+        handler = StreamingWorkunitHandler(
+            scheduler,
+            callbacks=[tracker.add],
+            report_interval_seconds=0.01,
+            max_workunit_verbosity=LogLevel.DEBUG,
+        )
+        with handler.session():
+            scheduler.product_request(ModifiedOutput, subjects=[0])
+
+        finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+        workunit = next(item for item in finished if item["name"] == "a_rule")
+        assert workunit["level"] == "ERROR"
+
+    def test_engine_aware_none_case(self):
+        @dataclass(frozen=True)
+        # If level() returns None, the engine shouldn't try to set
+        # a new workunit level.
+        class ModifiedOutput(EngineAware):
+            _level: Optional[LogLevel]
+            val: int
+
+            def level(self):
+                return self._level
+
+        @rule(desc="a_rule")
+        def a_rule(n: int) -> ModifiedOutput:
+            return ModifiedOutput(val=n, _level=None)
+
+        rules = [a_rule, RootRule(int)]
+        scheduler = self.mk_scheduler(
+            rules, include_trace_on_error=False, should_report_workunits=True
+        )
+
+        tracker = WorkunitTracker()
+        handler = StreamingWorkunitHandler(
+            scheduler,
+            callbacks=[tracker.add],
+            report_interval_seconds=0.01,
+            max_workunit_verbosity=LogLevel.DEBUG,
+        )
+        with handler.session():
+            scheduler.product_request(ModifiedOutput, subjects=[0])
+
+        finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
+        workunit = next(item for item in finished if item["name"] == "a_rule")
+        assert workunit["level"] == "DEBUG"
 
 
 class StreamingWorkunitProcessTests(TestBase):

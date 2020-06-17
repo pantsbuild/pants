@@ -287,9 +287,10 @@ py_module_initializer!(native_engine, |py, m| {
         b: PyObject,
         c: PyType,
         d: bool,
-        e: String,
+        e: bool,
         f: String,
-        g: u64
+        g: String,
+        h: u64
       )
     ),
   )?;
@@ -1019,6 +1020,7 @@ fn tasks_task_begin(
   tasks_ptr: PyTasks,
   func: PyObject,
   output_type: PyType,
+  can_modify_workunit: bool,
   cacheable: bool,
   name: String,
   desc: String,
@@ -1033,6 +1035,7 @@ fn tasks_task_begin(
     tasks.task_begin(
       func,
       output_type,
+      can_modify_workunit,
       cacheable,
       name,
       if desc.is_empty() { None } else { Some(desc) },
