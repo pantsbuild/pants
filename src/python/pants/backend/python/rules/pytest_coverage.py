@@ -41,6 +41,7 @@ from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import TransitiveTargets
 from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
+from pants.util.logging import LogLevel
 
 """
 An overview of how Pytest Coverage works with Pants:
@@ -109,7 +110,7 @@ class CoverageConfig:
 
 @rule
 async def create_coverage_config(
-    _: CoverageConfigRequest, transitive_targets: TransitiveTargets
+    _: CoverageConfigRequest, transitive_targets: TransitiveTargets, log_level: LogLevel
 ) -> CoverageConfig:
     all_stripped_sources = await MultiGet(
         Get(SourceRootStrippedSources, StripSourcesFieldRequest(tgt[PythonSources]))
@@ -137,6 +138,11 @@ async def create_coverage_config(
     cp = configparser.ConfigParser()
     cp.read_string(default_config)
     cp.set("run", "plugins", COVERAGE_PLUGIN_MODULE_NAME)
+
+    if log_level in (LogLevel.DEBUG, LogLevel.TRACE):
+        # See https://coverage.readthedocs.io/en/coverage-5.1/cmd.html?highlight=debug#diagnostics.
+        cp.set("run", "debug", "\n\ttrace\n\tconfig")
+
     cp.add_section(COVERAGE_PLUGIN_MODULE_NAME)
     cp.set(
         COVERAGE_PLUGIN_MODULE_NAME,
