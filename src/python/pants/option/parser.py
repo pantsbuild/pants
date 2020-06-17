@@ -674,7 +674,10 @@ class Parser:
     def _convert_member_type(member_type, value):
         if member_type == dict:
             return DictValueComponent.create(value).val
-        return member_type(value)
+        try:
+            return member_type(value)
+        except ValueError as error:
+            raise ParseError(str(error))
 
     def _compute_value(self, dest, kwargs, flag_val_strs):
         """Compute the value to use for an option.
@@ -700,7 +703,7 @@ class Parser:
                 if type_arg != list:
                     return type_arg(val_str)
                 is_enum = inspect.isclass(member_type) and issubclass(member_type, Enum)
-                if isinstance(val_str, str) and is_enum:
+                if isinstance(val_str, str) and is_enum and not val_str.startswith("["):
                     val_str = val_str.split(",")
                 return ListValueComponent.create(val_str, member_type=member_type)
             except (TypeError, ValueError) as e:
@@ -743,6 +746,7 @@ class Parser:
         config_default_val_or_str = expand(
             self._config.get(Config.DEFAULT_SECTION, dest, default=None)
         )
+
         config_val_or_str = expand(self._config.get(config_section, dest, default=None))
         config_source_file = self._config.get_source_for_option(
             config_section, dest
@@ -750,8 +754,6 @@ class Parser:
         if config_source_file is not None:
             config_source_file = os.path.relpath(config_source_file)
             config_details = f"in {config_source_file}"
-        # if "other-enum-scope" in self._scope:
-        #     import pdb; pdb.set_trace()
         # Get value from environment, and capture details about its derivation.
         udest = dest.upper()
         if self._scope == GLOBAL_SCOPE:
@@ -799,6 +801,7 @@ class Parser:
         # Rank all available values.
         # Note that some of these values may already be of the value type, but type conversion
         # is idempotent, so this is OK.
+
         values_to_rank = [
             to_value_type(x)
             for x in [
