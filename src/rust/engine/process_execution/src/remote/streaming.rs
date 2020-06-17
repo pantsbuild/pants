@@ -15,7 +15,7 @@ use futures::compat::{Future01CompatExt, Stream01CompatExt};
 use futures::future::{self as future03};
 use futures::{Stream, StreamExt};
 use hashing::{Digest, Fingerprint};
-use log::{debug, trace, warn};
+use log::{debug, trace, warn, Level};
 use protobuf::Message;
 use store::Store;
 
@@ -27,6 +27,7 @@ use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, PlatformConstraint,
   Process, ProcessMetadata,
 };
+use workunit_store::{expect_workunit_state, new_span_id, WorkunitMetadata};
 
 /// Implementation of CommandRunner that runs a command via the Bazel Remote Execution API
 /// (https://docs.google.com/document/d/1AaGk7fOPByEvpAbqeXIyE8HX_A3_axxNnvroblTZ_6s/edit).
@@ -462,7 +463,7 @@ impl StreamingCommandRunner {
     &self,
     execute_request: ExecuteRequest,
     process: Process,
-    context: Context,
+    context: &Context,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     let start_time = Instant::now();
     let mut current_operation_name: Option<String> = None;
@@ -584,6 +585,8 @@ impl crate::CommandRunner for StreamingCommandRunner {
     request: MultiPlatformProcess,
     context: Context,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
+    let workunit_state = expect_workunit_state();
+
     // Construct the REv2 ExecuteRequest and related data for this execution request.
     let request = self.extract_compatible_request(&request).unwrap();
     let store = self.store.clone();
@@ -605,23 +608,44 @@ impl crate::CommandRunner for StreamingCommandRunner {
     let deadline_duration = self.overall_deadline + request.timeout.unwrap_or_default();
 
     // Upload the action (and related data, i.e. the embedded command and input files).
+    let upload_span_id = context.workunit_store.start_workunit(
+      new_span_id(),
+      "ensure_action_uploaded".to_owned(),
+      workunit_state.parent_id.clone(),
+      WorkunitMetadata::new(),
+    );
     self
       .ensure_action_uploaded(&store, &command, &action, request.input_files)
       .await?;
+    context.workunit_store.complete_workunit(upload_span_id)?;
 
-    let result_fut = self.run_execute_request(execute_request, request, context);
+    // Submit the execution request to the RE server for execution.
+    let execute_span_id = context.workunit_store.start_workunit(
+      new_span_id(),
+      "run_execute_request".to_owned(),
+      workunit_state.parent_id.clone(),
+      WorkunitMetadata::new(),
+    );
+    let result_fut = self.run_execute_request(execute_request, request, &context);
     let timeout_fut = tokio::time::timeout(deadline_duration, result_fut);
     match timeout_fut.await {
-      Ok(r) => r,
+      Ok(r) => {
+        context.workunit_store.complete_workunit(execute_span_id)?;
+        r
+      }
       Err(_) => {
         debug!(
           "remote execution for build_id={} timed out after {:?}",
           &build_id, deadline_duration
         );
-        Err(format!(
-          "remote execution timed out after {:?}",
-          deadline_duration
-        ))
+        let msg = format!("remote execution timed out after {:?}", deadline_duration);
+        let mut metadata = WorkunitMetadata::new();
+        metadata.level = Level::Error;
+        metadata.desc = Some(msg.clone());
+        context
+          .workunit_store
+          .complete_workunit_with_new_metadata(execute_span_id, metadata)?;
+        Err(msg)
       }
     }
   }
