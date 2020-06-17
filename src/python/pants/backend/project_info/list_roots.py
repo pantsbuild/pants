@@ -1,6 +1,6 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
+import itertools
 from pathlib import PurePath
 from typing import Set
 
@@ -32,19 +32,42 @@ async def all_roots(source_root_config: SourceRootConfig) -> AllSourceRoots:
     source_root_pattern_matcher = source_root_config.get_pattern_matcher()
 
     # Create globs corresponding to all source root patterns.
-    all_paths: Set[str] = set()
+    pattern_matches: Set[str] = set()
     for path in source_root_pattern_matcher.get_patterns():
         if path == "/":
-            all_paths.add("**")
+            pattern_matches.add("**")
         elif path.startswith("/"):
-            all_paths.add(f"{path[1:]}/")
+            pattern_matches.add(f"{path[1:]}/")
         else:
-            all_paths.add(f"**/{path}/")
+            pattern_matches.add(f"**/{path}/")
+
+    # Create globs for any marker files.
+    marker_file_matches: Set[str] = set()
+    for marker_filename in source_root_config.options.marker_filenames:
+        marker_file_matches.add(f"**/{marker_filename}")
 
     # Match the patterns against actual files, to find the roots that actually exist.
-    snapshot = await Get[Snapshot](PathGlobs(globs=sorted(all_paths)))
+    snapshots = await MultiGet(
+        Get[Snapshot](PathGlobs(globs=sorted(pattern_matches))),
+        Get[Snapshot](PathGlobs(globs=sorted(marker_file_matches))),
+    )
+    (pattern_snapshot, marker_file_snapshot) = snapshots
+
     responses = await MultiGet(
-        Get[OptionalSourceRoot](SourceRootRequest(PurePath(d))) for d in snapshot.dirs
+        itertools.chain(
+            (
+                Get[OptionalSourceRoot](SourceRootRequest(PurePath(d)))
+                for d in pattern_snapshot.dirs
+            ),
+            # We don't technically need to issue a SourceRootRequest for the marker files,
+            # since we know that their immediately enclosing dir is a source root by definition.
+            # However we may as well verify this formally, so that we're not replicating that
+            # logic here.
+            (
+                Get[OptionalSourceRoot](SourceRootRequest(PurePath(f)))
+                for f in marker_file_snapshot.files
+            ),
+        )
     )
     all_source_roots = {
         response.source_root for response in responses if response.source_root is not None

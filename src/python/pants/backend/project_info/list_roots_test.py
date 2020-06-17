@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import json
+import os
 
 from pants.backend.project_info import list_roots
 from pants.engine.fs import Digest, PathGlobs, Snapshot
@@ -145,3 +146,13 @@ class RootsTest(GoalRuleTestBase):
     def test_buildroot_is_source_root(self):
         source_roots = json.dumps(["/"])
         self.assert_console_output(".", args=[f"--source-root-patterns={source_roots}"])
+
+    def test_marker_file(self):
+        marker_files = json.dumps(["SOURCE_ROOT", "setup.py"])
+        self.create_file(os.path.join("fakerootA", "SOURCE_ROOT"))
+        self.create_file(os.path.join("fakerootB", "setup.py"))
+        self.assert_console_output(
+            "fakerootA",
+            "fakerootB",
+            args=[f"--source-marker-filenames={marker_files}", "--source-root-patterns=[]"],
+        )
