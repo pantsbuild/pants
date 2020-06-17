@@ -112,34 +112,63 @@ class PytestCoverageIntegrationTest(PantsRunIntegrationTest):
                 )
             )
 
-            result = self.run_pants(
-                [
-                    "--no-v1",
-                    "--v2",
-                    "test",
-                    "--use-coverage",
-                    f"{tmpdir_relative}/src/python/project:tests",
-                    f"{tmpdir_relative}/tests/python/project_test:multiply",
-                    f"{tmpdir_relative}/tests/python/project_test:arithmetic",
-                ]
+            # Test a file that does not cover any src code. While this is unlikely to happen, this
+            # tests that we can properly handle the edge case. In particular, we want to make sure
+            # that coverage still works when we omit this test file through the option
+            # `--include-test-sources=false`.
+            no_src_folder = Path(tmpdir, "tests", "python", "project_test", "no_src")
+            no_src_folder.mkdir()
+            (no_src_folder / "test_no_src.py").write_text(
+                "def test_true():\n\tassert True is True\n"
+            )
+            (no_src_folder / "BUILD").write_text("python_tests()")
+
+            command = [
+                "--no-v1",
+                "--v2",
+                "test",
+                "--use-coverage",
+                f"{tmpdir_relative}/src/python/project:tests",
+                f"{tmpdir_relative}/tests/python/project_test:multiply",
+                f"{tmpdir_relative}/tests/python/project_test:arithmetic",
+                f"{tmpdir_relative}/tests/python/project_test/no_src",
+            ]
+            exclude_tests_result = self.run_pants(command)
+            include_tests_result = self.run_pants(
+                [*command, "--pytest-coverage-include-test-sources"]
             )
 
-        assert result.returncode == 0
+        assert exclude_tests_result.returncode == include_tests_result.returncode == 0
         # Regression test: make sure that individual tests do not complain about failing to
         # generate reports. This was showing up at test-time, even though the final merged report
         # would work properly.
-        assert "Failed to generate report" not in result.stderr_data
+        assert "Failed to generate report" not in exclude_tests_result.stderr_data
+        assert "Failed to generate report" not in include_tests_result.stderr_data
         assert (
             dedent(
                 f"""\
-                Name                                         Stmts   Miss Branch BrPart  Cover
-                ------------------------------------------------------------------------------
-                {tmpdir_relative}/src/python/project/lib.py            6      0      0      0   100%
-                {tmpdir_relative}/src/python/project/lib_test.py       3      0      0      0   100%
-                {tmpdir_relative}/src/python/project/random.py         2      2      0      0     0%
-                ------------------------------------------------------------------------------
-                TOTAL                                           11      2      0      0    82%
+                Name                                       Stmts   Miss Branch BrPart  Cover
+                ----------------------------------------------------------------------------
+                {tmpdir_relative}/src/python/project/lib.py          6      0      0      0   100%
+                {tmpdir_relative}/src/python/project/random.py       2      2      0      0     0%
+                ----------------------------------------------------------------------------
+                TOTAL                                          8      2      0      0    75%
                 """
             )
-            in result.stderr_data
+            in exclude_tests_result.stderr_data
+        )
+        assert (
+            dedent(
+                f"""\
+                Name                                                          Stmts   Miss Branch BrPart  Cover
+                -----------------------------------------------------------------------------------------------
+                {tmpdir_relative}/src/python/project/lib.py                             6      0      0      0   100%
+                {tmpdir_relative}/src/python/project/lib_test.py                        3      0      0      0   100%
+                {tmpdir_relative}/src/python/project/random.py                          2      2      0      0     0%
+                {tmpdir_relative}/tests/python/project_test/no_src/test_no_src.py       2      0      0      0   100%
+                -----------------------------------------------------------------------------------------------
+                TOTAL                                                            13      2      0      0    85%
+                """
+            )
+            in include_tests_result.stderr_data
         )
