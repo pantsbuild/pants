@@ -701,8 +701,8 @@ class Parser:
                     return type_arg(val_str)
                 is_enum = inspect.isclass(member_type) and issubclass(member_type, Enum)
                 if isinstance(val_str, str) and is_enum:
-                    val_str = [member_type(val) for val in val_str.split(",")]
-                return ListValueComponent.create(val_str)
+                    val_str = val_str.split(",")
+                return ListValueComponent.create(val_str, member_type=member_type)
             except (TypeError, ValueError) as e:
                 raise ParseError(
                     f"Error applying type '{type_arg.__name__}' to option value '{val_str}', for option "
@@ -750,7 +750,8 @@ class Parser:
         if config_source_file is not None:
             config_source_file = os.path.relpath(config_source_file)
             config_details = f"in {config_source_file}"
-
+        # if "other-enum-scope" in self._scope:
+        #     import pdb; pdb.set_trace()
         # Get value from environment, and capture details about its derivation.
         udest = dest.upper()
         if self._scope == GLOBAL_SCOPE:
@@ -798,7 +799,6 @@ class Parser:
         # Rank all available values.
         # Note that some of these values may already be of the value type, but type conversion
         # is idempotent, so this is OK.
-
         values_to_rank = [
             to_value_type(x)
             for x in [

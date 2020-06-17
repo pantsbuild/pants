@@ -1782,6 +1782,14 @@ class OptionsTest(TestBase):
             self.SomeEnumOption.a_value,
         ] == options_2.for_scope("other-enum-scope").some_list_enum
 
+    def test_list_of_enum_from_config(self) -> None:
+        options = self._parse(
+            config={"other-enum-scope": {"some-list-enum": "['one-more','a-value']"}}
+        )
+        assert [self.SomeEnumOption.one_more, self.SomeEnumOption.a_value] == options.for_scope(
+            "other-enum-scope"
+        ).some_list_enum
+
     def test_list_of_enum_duplicates(self) -> None:
         options = self._parse(
             flags="other-enum-scope --some-list-enum=another-value,one-more,another-value"
