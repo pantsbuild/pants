@@ -41,6 +41,7 @@ from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import TransitiveTargets
 from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
+from pants.util.logging import LogLevel
 
 """
 An overview of how Pytest Coverage works with Pants:
@@ -59,9 +60,8 @@ this into a single `.coverage` file.
 Step 3: Generate the report with `coverage {html,xml,console}`.
 All the files in the single merged `.coverage` file are still stripped, and we want to generate a
 report with the source roots restored. Coverage requires that the files it's reporting on be present
-in its environment when it generates the report, so we populate all the unstripped source files.
-Our plugin then uses the stripped filename -> source root mapping to determine the correct file
-name for the report.
+when it generates the report, so we populate all the stripped source files. Our plugin then uses
+the stripped filename -> source root mapping to determine the correct file name for the report.
 
 Step 4: `test.py` outputs the final report.
 """
@@ -109,7 +109,7 @@ class CoverageConfig:
 
 @rule
 async def create_coverage_config(
-    _: CoverageConfigRequest, transitive_targets: TransitiveTargets
+    _: CoverageConfigRequest, transitive_targets: TransitiveTargets, log_level: LogLevel
 ) -> CoverageConfig:
     all_stripped_sources = await MultiGet(
         Get(SourceRootStrippedSources, StripSourcesFieldRequest(tgt[PythonSources]))
@@ -137,6 +137,11 @@ async def create_coverage_config(
     cp = configparser.ConfigParser()
     cp.read_string(default_config)
     cp.set("run", "plugins", COVERAGE_PLUGIN_MODULE_NAME)
+
+    if log_level in (LogLevel.DEBUG, LogLevel.TRACE):
+        # See https://coverage.readthedocs.io/en/coverage-5.1/cmd.html?highlight=debug#diagnostics.
+        cp.set("run", "debug", "\n\ttrace\n\tconfig")
+
     cp.add_section(COVERAGE_PLUGIN_MODULE_NAME)
     cp.set(
         COVERAGE_PLUGIN_MODULE_NAME,
@@ -210,6 +215,8 @@ async def merge_coverage_data(
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> MergedCoverageData:
+    if len(data_collection) == 1:
+        return MergedCoverageData(data_collection[0].digest)
     # We prefix each .coverage file with its corresponding address to avoid collisions.
     coverage_digests = await MultiGet(
         Get[Digest](AddPrefix(data.digest, prefix=data.address.path_safe_spec))
@@ -227,7 +234,7 @@ async def merge_coverage_data(
         subprocess_encoding_environment=subprocess_encoding_environment,
     )
     result = await Get[ProcessResult](Process, process)
-    return MergedCoverageData(coverage_data=result.output_digest)
+    return MergedCoverageData(result.output_digest)
 
 
 @rule(desc="Generate Pytest coverage report")
@@ -241,15 +248,18 @@ async def generate_coverage_report(
 ) -> CoverageReports:
     """Takes all Python test results and generates a single coverage report."""
     coverage_config_request = Get(CoverageConfig, CoverageConfigRequest())
-    unstripped_sources_request = Get(
+    sources_request = Get(
         SourceFiles,
         AllSourceFilesRequest(
-            tgt[PythonSources] for tgt in transitive_targets.closure if tgt.has_field(PythonSources)
+            (
+                tgt[PythonSources]
+                for tgt in transitive_targets.closure
+                if tgt.has_field(PythonSources)
+            ),
+            strip_source_roots=True,
         ),
     )
-    coverage_config, unstripped_sources = await MultiGet(
-        coverage_config_request, unstripped_sources_request
-    )
+    coverage_config, sources = await MultiGet(coverage_config_request, sources_request)
     input_digest = await Get(
         Digest,
         MergeDigests(
@@ -257,7 +267,7 @@ async def generate_coverage_report(
                 merged_coverage_data.coverage_data,
                 coverage_config.digest,
                 coverage_setup.pex.digest,
-                unstripped_sources.snapshot.digest,
+                sources.snapshot.digest,
             )
         ),
     )
