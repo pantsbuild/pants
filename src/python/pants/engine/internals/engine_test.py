@@ -516,11 +516,14 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         assert r_B["parent_id"] == r_A["span_id"]
         assert r_C["parent_id"] == r_B["span_id"]
 
-    def test_can_modify_workunit(self):
+    def test_engine_aware_rule(self):
         @dataclass(frozen=True)
         class ModifiedOutput(EngineAware):
             _level: LogLevel
             val: int
+
+            def level(self):
+                return self._level
 
         @rule(desc="a_rule")
         def a_rule(n: int) -> ModifiedOutput:
@@ -545,44 +548,16 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         workunit = next(item for item in finished if item["name"] == "a_rule")
         assert workunit["level"] == "ERROR"
 
-    def test_no_can_modify_workunit(self):
+    def test_engine_aware_none_case(self):
         @dataclass(frozen=True)
-        # Without the EngineAware class, the engine shouldn't try to interpret
-        # _level as a LogLevel at all.
-        class ModifiedOutput:
-            _level: str
-            val: int
-
-        @rule(desc="a_rule")
-        def a_rule(n: int) -> ModifiedOutput:
-            return ModifiedOutput(val=n, _level="some bogus string")
-
-        rules = [a_rule, RootRule(int)]
-        scheduler = self.mk_scheduler(
-            rules, include_trace_on_error=False, should_report_workunits=True
-        )
-
-        tracker = WorkunitTracker()
-        handler = StreamingWorkunitHandler(
-            scheduler,
-            callbacks=[tracker.add],
-            report_interval_seconds=0.01,
-            max_workunit_verbosity=LogLevel.DEBUG,
-        )
-        with handler.session():
-            scheduler.product_request(ModifiedOutput, subjects=[0])
-
-        finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
-        workunit = next(item for item in finished if item["name"] == "a_rule")
-        assert workunit["level"] != "ERROR"
-
-    def test_can_modify_workunit_no_level_attr(self):
-        @dataclass(frozen=True)
-        # If _level is None, even with the EngineAware class, the engine shouldn't try to set
+        # If level() returns None, the engine shouldn't try to set
         # a new workunit level.
         class ModifiedOutput(EngineAware):
             _level: Optional[LogLevel]
             val: int
+
+            def level(self):
+                return self._level
 
         @rule(desc="a_rule")
         def a_rule(n: int) -> ModifiedOutput:
@@ -605,7 +580,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
 
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
         workunit = next(item for item in finished if item["name"] == "a_rule")
-        assert workunit["level"] != "ERROR"
+        assert workunit["level"] == "DEBUG"
 
 
 class StreamingWorkunitProcessTests(TestBase):

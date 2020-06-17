@@ -810,7 +810,7 @@ impl Task {
       return None;
     }
 
-    let new_level_val: Value = externs::getattr(&result_val, "_level").ok()?;
+    let new_level_val: Value = externs::call_method(&result_val, "level", &[]).ok()?;
 
     {
       let gil = Python::acquire_gil();

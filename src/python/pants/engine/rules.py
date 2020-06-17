@@ -21,13 +21,17 @@ from pants.util.meta import decorated_type_checkable, frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 
-class EngineAware:
+class EngineAware(ABC):
     """This is a marker class used to indicate that the output of an `@rule` can send metadata about
     the rule's output to the engine.
 
-    If a rule's return type is a subclass of EngineAware, then the level of that workunit will be
-    set to the value of an attribute _level: LogLevel, if it exists and is not None.
+    EngineAware defines abstract methods on the class, all of which return an Optional[T], and which
+    are expected to be overridden by concrete types implementing EngineAware.
     """
+
+    @abstractmethod
+    def level(self) -> Optional[LogLevel]:
+        """Overrides the level of the workunit associated with this type."""
 
 
 @decorated_type_checkable
