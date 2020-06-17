@@ -215,6 +215,8 @@ async def merge_coverage_data(
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> MergedCoverageData:
+    if len(data_collection) == 1:
+        return MergedCoverageData(data_collection[0].digest)
     # We prefix each .coverage file with its corresponding address to avoid collisions.
     coverage_digests = await MultiGet(
         Get[Digest](AddPrefix(data.digest, prefix=data.address.path_safe_spec))
@@ -232,7 +234,7 @@ async def merge_coverage_data(
         subprocess_encoding_environment=subprocess_encoding_environment,
     )
     result = await Get[ProcessResult](Process, process)
-    return MergedCoverageData(coverage_data=result.output_digest)
+    return MergedCoverageData(result.output_digest)
 
 
 @rule(desc="Generate Pytest coverage report")
