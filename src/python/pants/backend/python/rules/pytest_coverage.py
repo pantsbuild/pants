@@ -298,6 +298,7 @@ async def generate_coverage_report(
     elif report_type == CoverageReportType.XML:
         report_file = report_dir / "coverage.xml"
     fs_report = FilesystemCoverageReport(
+        report_type=report_type,
         result_digest=result.output_digest,
         directory_to_materialize_to=report_dir,
         report_file=report_file,
