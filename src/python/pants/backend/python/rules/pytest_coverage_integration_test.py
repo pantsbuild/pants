@@ -115,7 +115,7 @@ class PytestCoverageIntegrationTest(PantsRunIntegrationTest):
             # Test a file that does not cover any src code. While this is unlikely to happen, this
             # tests that we can properly handle the edge case. In particular, we want to make sure
             # that coverage still works when we omit this test file through the option
-            # `--include-test-sources=false`.
+            # `--omit-test-sources`.
             no_src_folder = Path(tmpdir, "tests", "python", "project_test", "no_src")
             no_src_folder.mkdir()
             (no_src_folder / "test_no_src.py").write_text(
@@ -133,15 +133,15 @@ class PytestCoverageIntegrationTest(PantsRunIntegrationTest):
                 f"{tmpdir_relative}/tests/python/project_test:arithmetic",
                 f"{tmpdir_relative}/tests/python/project_test/no_src",
             ]
-            include_tests_result = self.run_pants(command)
-            exclude_tests_result = self.run_pants([*command, "--pytest-coverage-omit-test-sources"])
+            result = self.run_pants(command)
+            omit_test_result = self.run_pants([*command, "--pytest-coverage-omit-test-sources"])
 
-        assert include_tests_result.returncode == exclude_tests_result.returncode == 0
+        assert result.returncode == omit_test_result.returncode == 0
         # Regression test: make sure that individual tests do not complain about failing to
         # generate reports. This was showing up at test-time, even though the final merged report
         # would work properly.
-        assert "Failed to generate report" not in include_tests_result.stderr_data
-        assert "Failed to generate report" not in exclude_tests_result.stderr_data
+        assert "Failed to generate report" not in result.stderr_data
+        assert "Failed to generate report" not in omit_test_result.stderr_data
         assert (
             dedent(
                 f"""\
@@ -155,7 +155,7 @@ class PytestCoverageIntegrationTest(PantsRunIntegrationTest):
                 TOTAL                                                            13      2      0      0    85%
                 """
             )
-            in include_tests_result.stderr_data
+            in result.stderr_data
         )
         assert (
             dedent(
@@ -168,5 +168,5 @@ class PytestCoverageIntegrationTest(PantsRunIntegrationTest):
                 TOTAL                                          8      2      0      0    75%
                 """
             )
-            in exclude_tests_result.stderr_data
+            in omit_test_result.stderr_data
         )
