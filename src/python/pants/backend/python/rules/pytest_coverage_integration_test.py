@@ -133,30 +133,15 @@ class PytestCoverageIntegrationTest(PantsRunIntegrationTest):
                 f"{tmpdir_relative}/tests/python/project_test:arithmetic",
                 f"{tmpdir_relative}/tests/python/project_test/no_src",
             ]
-            exclude_tests_result = self.run_pants(command)
-            include_tests_result = self.run_pants(
-                [*command, "--pytest-coverage-include-test-sources"]
-            )
+            include_tests_result = self.run_pants(command)
+            exclude_tests_result = self.run_pants([*command, "--pytest-coverage-omit-test-sources"])
 
-        assert exclude_tests_result.returncode == include_tests_result.returncode == 0
+        assert include_tests_result.returncode == exclude_tests_result.returncode == 0
         # Regression test: make sure that individual tests do not complain about failing to
         # generate reports. This was showing up at test-time, even though the final merged report
         # would work properly.
-        assert "Failed to generate report" not in exclude_tests_result.stderr_data
         assert "Failed to generate report" not in include_tests_result.stderr_data
-        assert (
-            dedent(
-                f"""\
-                Name                                       Stmts   Miss Branch BrPart  Cover
-                ----------------------------------------------------------------------------
-                {tmpdir_relative}/src/python/project/lib.py          6      0      0      0   100%
-                {tmpdir_relative}/src/python/project/random.py       2      2      0      0     0%
-                ----------------------------------------------------------------------------
-                TOTAL                                          8      2      0      0    75%
-                """
-            )
-            in exclude_tests_result.stderr_data
-        )
+        assert "Failed to generate report" not in exclude_tests_result.stderr_data
         assert (
             dedent(
                 f"""\
@@ -171,4 +156,17 @@ class PytestCoverageIntegrationTest(PantsRunIntegrationTest):
                 """
             )
             in include_tests_result.stderr_data
+        )
+        assert (
+            dedent(
+                f"""\
+                Name                                       Stmts   Miss Branch BrPart  Cover
+                ----------------------------------------------------------------------------
+                {tmpdir_relative}/src/python/project/lib.py          6      0      0      0   100%
+                {tmpdir_relative}/src/python/project/random.py       2      2      0      0     0%
+                ----------------------------------------------------------------------------
+                TOTAL                                          8      2      0      0    75%
+                """
+            )
+            in exclude_tests_result.stderr_data
         )

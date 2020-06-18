@@ -93,11 +93,11 @@ class PytestCoverage(PythonToolBase):
             help="Path to write pytest coverage report to. Must be relative to build root.",
         )
         register(
-            "--include-test-sources",
+            "--omit-test-sources",
             type=bool,
             default=False,
             advanced=True,
-            help="Whether to include the test files in coverage measurement.",
+            help="Whether to exclude the test files in coverage measurement.",
         )
 
     @property
@@ -109,8 +109,8 @@ class PytestCoverage(PythonToolBase):
         return cast(str, self.options.report_output_path)
 
     @property
-    def include_test_sources(self) -> bool:
-        return cast(bool, self.options.include_test_sources)
+    def omit_test_sources(self) -> bool:
+        return cast(bool, self.options.omit_test_sources)
 
 
 @dataclass(frozen=True)
@@ -164,7 +164,7 @@ async def create_coverage_config(
         if tgt.has_field(PythonSources)
     )
     all_stripped_test_sources: Tuple[SourceRootStrippedSources, ...] = ()
-    if not coverage_subsystem.include_test_sources:
+    if coverage_subsystem.omit_test_sources:
         all_stripped_test_sources = await MultiGet(
             Get(SourceRootStrippedSources, StripSourcesFieldRequest(tgt[PythonTestsSources]))
             for tgt in transitive_targets.closure
@@ -193,7 +193,7 @@ async def create_coverage_config(
     cp.read_string(default_config)
     cp.set("run", "plugins", COVERAGE_PLUGIN_MODULE_NAME)
 
-    if not coverage_subsystem.include_test_sources:
+    if coverage_subsystem.omit_test_sources:
         test_files = itertools.chain.from_iterable(
             stripped_test_sources.snapshot.files
             for stripped_test_sources in all_stripped_test_sources
