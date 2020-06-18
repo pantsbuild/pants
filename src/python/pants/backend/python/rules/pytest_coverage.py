@@ -117,7 +117,7 @@ class PytestCoverage(PythonToolBase):
         return cast(CoverageReportType, self.options.report)
 
     @property
-    def output_dir(self) -> str:
+    def output_dir(self) -> PurePath:
         output_dir = resolve_conflicting_options(
             old_scope="pytest-coverage",
             new_scope="pytest-cov",
@@ -126,7 +126,7 @@ class PytestCoverage(PythonToolBase):
             old_container=self.options,
             new_container=self.options,
         )
-        return cast(str, output_dir)
+        return PurePath(output_dir)
 
     @property
     def omit_test_sources(self) -> bool:
@@ -349,17 +349,15 @@ async def generate_coverage_report(
     if report_type == CoverageReportType.CONSOLE:
         return CoverageReports((ConsoleCoverageReport(result.stdout.decode()),))
 
-    report_dir = PurePath(coverage_subsystem.output_dir)
-
     report_file: Optional[PurePath] = None
     if report_type == CoverageReportType.HTML:
-        report_file = report_dir / "htmlcov" / "index.html"
+        report_file = coverage_subsystem.output_dir / "htmlcov" / "index.html"
     elif report_type == CoverageReportType.XML:
-        report_file = report_dir / "coverage.xml"
+        report_file = coverage_subsystem.output_dir / "coverage.xml"
     fs_report = FilesystemCoverageReport(
         report_type=report_type,
         result_digest=result.output_digest,
-        directory_to_materialize_to=report_dir,
+        directory_to_materialize_to=coverage_subsystem.output_dir,
         report_file=report_file,
     )
     return CoverageReports((fs_report,))
