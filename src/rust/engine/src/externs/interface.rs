@@ -80,6 +80,10 @@ py_module_initializer!(native_engine, |py, m| {
   m.add(py, "PollTimeout", py.get_type::<PollTimeout>())
     .unwrap();
 
+  m.add(py, "default_cache_path", py_fn!(py, default_cache_path()))?;
+
+  m.add(py, "default_config_path", py_fn!(py, default_config_path()))?;
+
   m.add(
     py,
     "init_logging",
@@ -1657,6 +1661,36 @@ fn materialize_directories(
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))
     })
   })
+}
+
+fn default_cache_path(py: Python) -> CPyResult<String> {
+  fs::default_cache_path()
+    .into_os_string()
+    .into_string()
+    .map_err(|s| {
+      PyErr::new::<exc::Exception, _>(
+        py,
+        (format!(
+          "Default cache path {:?} could not be converted to a string.",
+          s
+        ),),
+      )
+    })
+}
+
+fn default_config_path(py: Python) -> CPyResult<String> {
+  fs::default_config_path()
+    .into_os_string()
+    .into_string()
+    .map_err(|s| {
+      PyErr::new::<exc::Exception, _>(
+        py,
+        (format!(
+          "Default config path {:?} could not be converted to a string.",
+          s
+        ),),
+      )
+    })
 }
 
 fn init_logging(

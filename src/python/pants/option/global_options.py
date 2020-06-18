@@ -672,8 +672,9 @@ class GlobalOptions(Subsystem):
             advanced=True,
             help="Directory to use for engine's local file store.",
             # This default is also hard-coded into the engine's rust code in
-            # fs::Store::default_path
-            default=os.path.expanduser("~/.cache/pants/lmdb_store"),
+            # fs::Store::default_path so that tools using a Store outside of pants
+            # are likely to be able to use the same storage location.
+            default=os.path.join(get_pants_cachedir(), "lmdb_store"),
         )
         register(
             "--local-execution-root-dir",

@@ -42,7 +42,7 @@ use bazel_protos::remote_execution as remexec;
 use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
 use concrete_time::TimeSpan;
-use fs::FileContent;
+use fs::{default_cache_path, FileContent};
 use futures::compat::Future01CompatExt;
 use futures::future::{self as future03, Either, FutureExt, TryFutureExt};
 use futures01::{future, Future};
@@ -50,6 +50,7 @@ use hashing::Digest;
 use protobuf::Message;
 use serde_derive::Serialize;
 pub use serverset::BackoffConfig;
+
 use std::collections::{BTreeMap, HashMap};
 use std::convert::TryInto;
 use std::fs::OpenOptions;
@@ -272,12 +273,9 @@ impl Store {
     })
   }
 
-  // This default is also hard-coded into the Python options code in global_options.py
+  // This default suffix is also hard-coded into the Python options code in global_options.py
   pub fn default_path() -> PathBuf {
-    match dirs::home_dir() {
-      Some(home_dir) => home_dir.join(".cache").join("pants").join("lmdb_store"),
-      None => panic!("Could not find home dir"),
-    }
+    default_cache_path().join("lmdb_store")
   }
 
   ///
