@@ -15,6 +15,7 @@ from pants.backend.python.rules import (
     pytest_runner,
 )
 from pants.backend.python.rules.pytest_coverage import (
+    PytestCoverage,
     create_coverage_config,
     prepare_coverage_plugin,
 )
@@ -133,6 +134,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
             *strip_source_roots.rules(),
             *subprocess_environment.rules(),
             SubsystemRule(TestOptions),
+            SubsystemRule(PytestCoverage),
             RootRule(PythonTestFieldSet),
         )
 

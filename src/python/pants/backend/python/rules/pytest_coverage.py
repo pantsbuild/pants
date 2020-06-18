@@ -2,12 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import configparser
+import itertools
 import json
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import PurePath
 from textwrap import dedent
-from typing import Optional
+from typing import Optional, Tuple, cast
 
 import pkg_resources
 
@@ -19,7 +20,7 @@ from pants.backend.python.rules.pex import (
 )
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
-from pants.backend.python.target_types import PythonSources
+from pants.backend.python.target_types import PythonSources, PythonTestsSources
 from pants.core.goals.test import (
     ConsoleCoverageReport,
     CoverageData,
@@ -69,6 +70,49 @@ Step 4: `test.py` outputs the final report.
 COVERAGE_PLUGIN_MODULE_NAME = "__pants_coverage_plugin__"
 
 
+class PytestCoverage(PythonToolBase):
+    options_scope = "pytest-coverage"
+    default_version = "coverage>=5.0.3,<5.1"
+    default_entry_point = "coverage"
+    default_interpreter_constraints = ["CPython>=3.6"]
+
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
+        register(
+            "--report",
+            type=CoverageReportType,
+            default=CoverageReportType.CONSOLE,
+            help="Which coverage report type to emit.",
+        )
+        register(
+            "--report-output-path",
+            type=str,
+            default=PurePath("dist", "coverage", "python").as_posix(),
+            advanced=True,
+            help="Path to write pytest coverage report to. Must be relative to build root.",
+        )
+        register(
+            "--omit-test-sources",
+            type=bool,
+            default=False,
+            advanced=True,
+            help="Whether to exclude the test files in coverage measurement.",
+        )
+
+    @property
+    def report(self) -> CoverageReportType:
+        return cast(CoverageReportType, self.options.report)
+
+    @property
+    def report_output_path(self) -> str:
+        return cast(str, self.options.report_output_path)
+
+    @property
+    def omit_test_sources(self) -> bool:
+        return cast(bool, self.options.omit_test_sources)
+
+
 @dataclass(frozen=True)
 class CoveragePlugin:
     digest: Digest
@@ -109,13 +153,24 @@ class CoverageConfig:
 
 @rule
 async def create_coverage_config(
-    _: CoverageConfigRequest, transitive_targets: TransitiveTargets, log_level: LogLevel
+    _: CoverageConfigRequest,
+    transitive_targets: TransitiveTargets,
+    coverage_subsystem: PytestCoverage,
+    log_level: LogLevel,
 ) -> CoverageConfig:
     all_stripped_sources = await MultiGet(
         Get(SourceRootStrippedSources, StripSourcesFieldRequest(tgt[PythonSources]))
         for tgt in transitive_targets.closure
         if tgt.has_field(PythonSources)
     )
+    all_stripped_test_sources: Tuple[SourceRootStrippedSources, ...] = ()
+    if coverage_subsystem.omit_test_sources:
+        all_stripped_test_sources = await MultiGet(
+            Get(SourceRootStrippedSources, StripSourcesFieldRequest(tgt[PythonTestsSources]))
+            for tgt in transitive_targets.closure
+            if tgt.has_field(PythonTestsSources)
+        )
+
     # We map stripped file names to their source roots so that we can map back to the actual
     # sources file when generating coverage reports. For example,
     # {'helloworld/project.py': 'src/python'}.
@@ -138,6 +193,13 @@ async def create_coverage_config(
     cp.read_string(default_config)
     cp.set("run", "plugins", COVERAGE_PLUGIN_MODULE_NAME)
 
+    if coverage_subsystem.omit_test_sources:
+        test_files = itertools.chain.from_iterable(
+            stripped_test_sources.snapshot.files
+            for stripped_test_sources in all_stripped_test_sources
+        )
+        cp.set("run", "omit", ",".join(sorted(test_files)))
+
     if log_level in (LogLevel.DEBUG, LogLevel.TRACE):
         # See https://coverage.readthedocs.io/en/coverage-5.1/cmd.html?highlight=debug#diagnostics.
         cp.set("run", "debug", "\n\ttrace\n\tconfig")
@@ -157,29 +219,6 @@ async def create_coverage_config(
         InputFilesContent([FileContent(".coveragerc", config_content.encode())])
     )
     return CoverageConfig(digest)
-
-
-class PytestCoverage(PythonToolBase):
-    options_scope = "pytest-coverage"
-    default_version = "coverage>=5.0.3,<5.1"
-    default_entry_point = "coverage"
-    default_interpreter_constraints = ["CPython>=3.6"]
-
-    @classmethod
-    def register_options(cls, register):
-        super().register_options(register)
-        register(
-            "--report-output-path",
-            type=str,
-            default=PurePath("dist", "coverage", "python").as_posix(),
-            help="Path to write pytest coverage report to. Must be relative to build root.",
-        )
-        register(
-            "--report",
-            type=CoverageReportType,
-            default=CoverageReportType.CONSOLE,
-            help="Which coverage report type to emit.",
-        )
 
 
 @dataclass(frozen=True)
@@ -272,7 +311,7 @@ async def generate_coverage_report(
         ),
     )
 
-    report_type = coverage_subsystem.options.report
+    report_type = coverage_subsystem.report
     process = coverage_setup.pex.create_process(
         pex_path=f"./{coverage_setup.pex.output_filename}",
         # We pass `--ignore-errors` because Pants dynamically injects missing `__init__.py` files
@@ -281,7 +320,7 @@ async def generate_coverage_report(
         input_digest=input_digest,
         output_directories=("htmlcov",),
         output_files=("coverage.xml",),
-        description="Generate Pytest coverage report.",
+        description=f"Generate Pytest {report_type.report_name} coverage report.",
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
     )
@@ -290,7 +329,7 @@ async def generate_coverage_report(
     if report_type == CoverageReportType.CONSOLE:
         return CoverageReports((ConsoleCoverageReport(result.stdout.decode()),))
 
-    report_dir = PurePath(coverage_subsystem.options.report_output_path)
+    report_dir = PurePath(coverage_subsystem.report_output_path)
 
     report_file: Optional[PurePath] = None
     if report_type == CoverageReportType.HTML:
@@ -298,6 +337,7 @@ async def generate_coverage_report(
     elif report_type == CoverageReportType.XML:
         report_file = report_dir / "coverage.xml"
     fs_report = FilesystemCoverageReport(
+        report_type=report_type,
         result_digest=result.output_digest,
         directory_to_materialize_to=report_dir,
         report_file=report_file,

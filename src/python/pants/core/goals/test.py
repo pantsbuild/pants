@@ -165,6 +165,7 @@ class FilesystemCoverageReport(CoverageReport):
     result_digest: Digest
     directory_to_materialize_to: PurePath
     report_file: Optional[PurePath]
+    report_type: CoverageReportType
 
     def materialize(self, console: Console, workspace: Workspace) -> Optional[PurePath]:
         workspace.materialize_directory(

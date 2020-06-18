@@ -8,7 +8,7 @@ python_tests(
     'src/python/pants/reporting',
   ],
   tags = {"partially_type_checked"},
-  timeout = 10,
+  timeout = 30,
 )
 
 python_tests(
