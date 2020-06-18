@@ -15,7 +15,7 @@ use futures::compat::{Future01CompatExt, Stream01CompatExt};
 use futures::future::{self as future03};
 use futures::{Stream, StreamExt};
 use hashing::{Digest, Fingerprint};
-use log::{debug, trace, warn};
+use log::{debug, trace, warn, Level};
 use protobuf::Message;
 use store::Store;
 
@@ -27,6 +27,7 @@ use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, PlatformConstraint,
   Process, ProcessMetadata,
 };
+use workunit_store::{with_workunit, WorkunitMetadata};
 
 /// Implementation of CommandRunner that runs a command via the Bazel Remote Execution API
 /// (https://docs.google.com/document/d/1AaGk7fOPByEvpAbqeXIyE8HX_A3_axxNnvroblTZ_6s/edit).
@@ -462,7 +463,7 @@ impl StreamingCommandRunner {
     &self,
     execute_request: ExecuteRequest,
     process: Process,
-    context: Context,
+    context: &Context,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     let start_time = Instant::now();
     let mut current_operation_name: Option<String> = None;
@@ -605,13 +606,34 @@ impl crate::CommandRunner for StreamingCommandRunner {
     let deadline_duration = self.overall_deadline + request.timeout.unwrap_or_default();
 
     // Upload the action (and related data, i.e. the embedded command and input files).
-    self
-      .ensure_action_uploaded(&store, &command, &action, request.input_files)
-      .await?;
+    with_workunit(
+      context.workunit_store.clone(),
+      "ensure_action_uploaded".to_owned(),
+      WorkunitMetadata::new(),
+      self.ensure_action_uploaded(&store, &command, &action, request.input_files),
+      |_, md| md,
+    )
+    .await?;
 
-    let result_fut = self.run_execute_request(execute_request, request, context);
+    // Submit the execution request to the RE server for execution.
+    let result_fut = self.run_execute_request(execute_request, request, &context);
     let timeout_fut = tokio::time::timeout(deadline_duration, result_fut);
-    match timeout_fut.await {
+    let response = with_workunit(
+      context.workunit_store.clone(),
+      "run_execute_request".to_owned(),
+      WorkunitMetadata::new(),
+      timeout_fut,
+      |_, mut metadata| {
+        metadata.level = Level::Error;
+        metadata.desc = Some(format!(
+          "remote execution timed out after {:?}",
+          deadline_duration
+        ));
+        metadata
+      },
+    )
+    .await;
+    match response {
       Ok(r) => r,
       Err(_) => {
         debug!(
