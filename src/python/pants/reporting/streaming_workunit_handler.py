@@ -39,12 +39,13 @@ class StreamingWorkunitHandler:
         scheduler: Any,
         callbacks: Iterable[Callable],
         report_interval_seconds: float,
-        max_workunit_verbosity: LogLevel = LogLevel.INFO,
+        max_workunit_verbosity: LogLevel = LogLevel.DEBUG,
     ):
         self.scheduler = scheduler
         self.report_interval = report_interval_seconds
         self.callbacks = callbacks
         self._thread_runner: Optional[_InnerHandler] = None
+        # TODO(10092) The max verbosity should be a per-client setting, rather than a global setting.
         self.max_workunit_verbosity = max_workunit_verbosity
 
     def start(self) -> None:
