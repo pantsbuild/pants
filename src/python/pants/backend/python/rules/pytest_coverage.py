@@ -281,7 +281,7 @@ async def generate_coverage_report(
         input_digest=input_digest,
         output_directories=("htmlcov",),
         output_files=("coverage.xml",),
-        description="Generate Pytest coverage report.",
+        description=f"Generate Pytest {report_type.report_name} coverage report.",
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
     )
@@ -298,6 +298,7 @@ async def generate_coverage_report(
     elif report_type == CoverageReportType.XML:
         report_file = report_dir / "coverage.xml"
     fs_report = FilesystemCoverageReport(
+        report_type=report_type,
         result_digest=result.output_digest,
         directory_to_materialize_to=report_dir,
         report_file=report_file,
