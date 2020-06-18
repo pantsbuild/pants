@@ -138,6 +138,9 @@ async def pylint_lint_partition(
     if pylint.source_plugins:
         # NB: See below for why we set PYTHONPATH to load source plugins. This setting is necessary
         # for PEX to pick up the PYTHONPATH value.
+        # TODO: --inherit-path=fallback will cause the site-packages to be read, which
+        #  is not what we want.  We want PEX to be able to selectively inherit just
+        #  PYTHONPATH, and use that here. See https://github.com/pantsbuild/pex/issues/764.
         pylint_runner_pex_args.append("--inherit-path=fallback")
     pylint_runner_pex_request = Get[Pex](
         PexRequest(

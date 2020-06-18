@@ -132,6 +132,13 @@ async def setup_pytest_for_target(
             entry_point="pytest:main",
             interpreter_constraints=interpreter_constraints,
             additional_args=(
+                # NB: Below we explicitly set PYTHONPATH to the CWD when we run this PEX, as some
+                # pytest plugins (e.g., pytest-django) need it for dynamic loading logic.
+                # This setting is necessary for PEX to pick up the PYTHONPATH value.
+                # TODO: --inherit-path=fallback will cause the site-packages to be read, which
+                #  is not what we want.  We want PEX to be able to selectively inherit just
+                #  PYTHONPATH, and use that here. See https://github.com/pantsbuild/pex/issues/764.
+                "--inherit-path=fallback",
                 "--pex-path",
                 # TODO(John Sirois): Support shading python binaries:
                 #   https://github.com/pantsbuild/pants/issues/9206
@@ -226,7 +233,9 @@ async def run_python_test(
         add_opts.extend(
             (f"--junitxml={test_results_file}", f"-o junit_family={test_setup.junit_family}",)
         )
-    env = {"PYTEST_ADDOPTS": " ".join(add_opts)}
+    # We explicitly set PYTHONPATH to the CWD so that pytest plugins' (e.g., pytest-django's)
+    # dynamic import logic works properly.
+    env = {"PYTEST_ADDOPTS": " ".join(add_opts), "PYTHONPATH": "."}
 
     use_coverage = test_options.values.use_coverage
     output_dirs = [".coverage"] if use_coverage else []

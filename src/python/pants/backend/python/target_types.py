@@ -281,28 +281,12 @@ class PythonBinary(Target):
 
 
 # -----------------------------------------------------------------------------------------------
-# `python_library` target
-# -----------------------------------------------------------------------------------------------
-
-
-class PythonLibrarySources(PythonSources):
-    default = ("*.py", "!test_*.py", "!*_test.py", "!conftest.py")
-
-
-class PythonLibrary(Target):
-    """A Python library that may be imported by other targets."""
-
-    alias = "python_library"
-    core_fields = (*COMMON_PYTHON_FIELDS, PythonLibrarySources)
-
-
-# -----------------------------------------------------------------------------------------------
 # `python_tests` target
 # -----------------------------------------------------------------------------------------------
 
 
 class PythonTestsSources(PythonSources):
-    default = ("test_*.py", "*_test.py", "conftest.py")
+    default = ("tests.py", "test_*.py", "*_test.py", "conftest.py")
 
 
 class PythonCoverage(StringOrStringSequenceField):
@@ -382,6 +366,22 @@ class PythonTests(Target):
 
     alias = "python_tests"
     core_fields = (*COMMON_PYTHON_FIELDS, PythonTestsSources, PythonCoverage, PythonTestsTimeout)
+
+
+# -----------------------------------------------------------------------------------------------
+# `python_library` target
+# -----------------------------------------------------------------------------------------------
+
+
+class PythonLibrarySources(PythonSources):
+    default = ("*.py",) + tuple(f"!{pat}" for pat in PythonTestsSources.default)
+
+
+class PythonLibrary(Target):
+    """A Python library that may be imported by other targets."""
+
+    alias = "python_library"
+    core_fields = (*COMMON_PYTHON_FIELDS, PythonLibrarySources)
 
 
 # -----------------------------------------------------------------------------------------------
