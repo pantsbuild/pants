@@ -702,7 +702,9 @@ class Parser:
                 if type_arg != list:
                     return type_arg(val_str)
                 is_enum = inspect.isclass(member_type) and issubclass(member_type, Enum)
-                is_list_literal = isinstance(val_str, str) and (val_str.startswith("[") or val_str.startswith("+") or val_str.startswith("-"))
+                is_list_literal = isinstance(val_str, str) and (
+                    val_str.startswith("[") or val_str.startswith("+") or val_str.startswith("-")
+                )
                 if isinstance(val_str, str) and is_enum and not is_list_literal:
                     val_str = val_str.split(",")
                 return ListValueComponent.create(val_str, member_type=member_type)
