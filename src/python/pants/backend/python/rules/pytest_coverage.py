@@ -281,7 +281,7 @@ async def generate_coverage_report(
         input_digest=input_digest,
         output_directories=("htmlcov",),
         output_files=("coverage.xml",),
-        description="Generate Pytest coverage report.",
+        description=f"Generate Pytest {report_type.report_name} coverage report.",
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
     )
