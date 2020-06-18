@@ -286,7 +286,7 @@ class PythonBinary(Target):
 
 
 class PythonTestsSources(PythonSources):
-    default = ("tests.py", "test_*.py", "*_test.py", "conftest.py")
+    default = ("test_*.py", "*_test.py", "tests.py", "conftest.py")
 
 
 class PythonCoverage(StringOrStringSequenceField):
