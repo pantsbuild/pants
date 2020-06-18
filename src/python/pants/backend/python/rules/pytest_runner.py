@@ -3,7 +3,9 @@
 
 import functools
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Iterable, Optional, Tuple
+
+from pkg_resources import Requirement, RequirementParseError
 
 from pants.backend.python.rules.importable_python_sources import ImportablePythonSources
 from pants.backend.python.rules.pex import (
@@ -71,6 +73,14 @@ class TestTargetSetup:
     __test__ = False
 
 
+def specifies_plugin(plugin_name: str, pytest_plugins: Iterable[str]) -> bool:
+    try:
+        return any(plugin_name == Requirement.parse(plugin).name for plugin in pytest_plugins)
+    except RequirementParseError:
+        # If any requirement is unparseable we'll fail anyway, so no need to continue checking.
+        return False
+
+
 @rule
 async def setup_pytest_for_target(
     field_set: PythonTestFieldSet,
@@ -102,8 +112,8 @@ async def setup_pytest_for_target(
     # `importlib_metadata` and thus `zipp`, does not play nicely when doing import magic directly
     # from zip files. `zipp` has pathologically bad behavior with large zipfiles.
     # TODO: this does have a performance cost as the pex must now be expanded to disk. Long term,
-    # it would be better to fix Zipp (whose fix would then need to be used by importlib_metadata
-    # and then by Pytest). See https://github.com/jaraco/zipp/pull/26.
+    #  it would be better to fix Zipp (whose fix would then need to be used by importlib_metadata
+    #  and then by Pytest). See https://github.com/jaraco/zipp/pull/26.
     additional_args_for_pytest = ("--not-zip-safe",)
 
     pytest_pex_request = Get[Pex](
@@ -125,33 +135,39 @@ async def setup_pytest_for_target(
         )
     )
 
+    test_runner_additional_args = (
+        "--pex-path",
+        # TODO(John Sirois): Support shading python binaries:
+        #   https://github.com/pantsbuild/pants/issues/9206
+        # Right now any pytest transitive requirements will shadow corresponding user
+        # requirements which will lead to problems when APIs that are used by either
+        # `pytest:main` or the tests themselves break between the two versions.
+        ":".join(
+            (
+                pytest_pex_request.subject.output_filename,
+                requirements_pex_request.subject.output_filename,
+            )
+        ),
+    )
+
+    if specifies_plugin("pytest-django", pytest.options.pytest_plugins):
+        # NB: Below we explicitly set PYTHONPATH to the CWD when we run this PEX, as some
+        # pytest plugins (e.g., pytest-django) need it for dynamic loading logic.
+        # This setting is necessary for PEX to pick up the PYTHONPATH value.
+        # TODO: --inherit-path=fallback will cause the site-packages to be read, which
+        #  is not what we want.  We want PEX to be able to selectively inherit just
+        #  PYTHONPATH, and use that here. See https://github.com/pantsbuild/pex/issues/764.
+        #  In that case it'll be safe to always do this unconditionally. Right now we only
+        #  do it if pytest-django is used, to limit the fallout.
+        test_runner_additional_args += ("--inherit-path=fallback",)
+
     test_runner_pex_request = Get[Pex](
         PexRequest,
         pex_request(
             output_filename="test_runner.pex",
             entry_point="pytest:main",
             interpreter_constraints=interpreter_constraints,
-            additional_args=(
-                # NB: Below we explicitly set PYTHONPATH to the CWD when we run this PEX, as some
-                # pytest plugins (e.g., pytest-django) need it for dynamic loading logic.
-                # This setting is necessary for PEX to pick up the PYTHONPATH value.
-                # TODO: --inherit-path=fallback will cause the site-packages to be read, which
-                #  is not what we want.  We want PEX to be able to selectively inherit just
-                #  PYTHONPATH, and use that here. See https://github.com/pantsbuild/pex/issues/764.
-                "--inherit-path=fallback",
-                "--pex-path",
-                # TODO(John Sirois): Support shading python binaries:
-                #   https://github.com/pantsbuild/pants/issues/9206
-                # Right now any pytest transitive requirements will shadow corresponding user
-                # requirements which will lead to problems when APIs that are used by either
-                # `pytest:main` or the tests themselves break between the two versions.
-                ":".join(
-                    (
-                        pytest_pex_request.subject.output_filename,
-                        requirements_pex_request.subject.output_filename,
-                    )
-                ),
-            ),
+            additional_args=test_runner_additional_args,
         ),
     )
 
@@ -233,8 +249,11 @@ async def run_python_test(
         add_opts.extend(
             (f"--junitxml={test_results_file}", f"-o junit_family={test_setup.junit_family}",)
         )
-    # We explicitly set PYTHONPATH to the CWD so that pytest plugins' (e.g., pytest-django's)
-    # dynamic import logic works properly.
+    # We explicitly set PYTHONPATH to the CWD. Some pytest plugins (e.g., pytest-django)
+    # need this so that their dynamic import logic works properly.
+    # Note that the test runner PEX will ignore this PYTHONPATH unless we set
+    # `--inherit-path=fallback` when building the runner pex, which we only do if necessary.
+    # In other cases this PYTHONPATH setting has no effect, and so no harm.
     env = {"PYTEST_ADDOPTS": " ".join(add_opts), "PYTHONPATH": "."}
 
     use_coverage = test_options.values.use_coverage
