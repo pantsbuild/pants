@@ -21,6 +21,7 @@ from pants.backend.python.rules.pex import (
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.backend.python.target_types import PythonSources, PythonTestsSources
+from pants.base.deprecated import resolve_conflicting_options
 from pants.core.goals.test import (
     ConsoleCoverageReport,
     CoverageData,
@@ -71,10 +72,12 @@ COVERAGE_PLUGIN_MODULE_NAME = "__pants_coverage_plugin__"
 
 
 class PytestCoverage(PythonToolBase):
-    options_scope = "pytest-coverage"
+    options_scope = "coverage-py"
     default_version = "coverage>=5.0.3,<5.1"
     default_entry_point = "coverage"
     default_interpreter_constraints = ["CPython>=3.6"]
+    deprecated_options_scope = "pytest-coverage"
+    deprecated_options_scope_removal_version = "1.31.0.dev0"
 
     @classmethod
     def register_options(cls, register):
@@ -86,9 +89,18 @@ class PytestCoverage(PythonToolBase):
             help="Which coverage report type to emit.",
         )
         register(
+            "--output-dir",
+            type=str,
+            default=str(PurePath("dist", "coverage", "python")),
+            advanced=True,
+            help="Path to write the Pytest Coverage report to. Must be relative to build root.",
+        )
+        register(
             "--report-output-path",
             type=str,
             default=PurePath("dist", "coverage", "python").as_posix(),
+            removal_version="1.31.0.dev0",
+            removal_hint="Use `output_dir` in the `[pytest-cov]` scope instead",
             advanced=True,
             help="Path to write pytest coverage report to. Must be relative to build root.",
         )
@@ -105,8 +117,16 @@ class PytestCoverage(PythonToolBase):
         return cast(CoverageReportType, self.options.report)
 
     @property
-    def report_output_path(self) -> str:
-        return cast(str, self.options.report_output_path)
+    def output_dir(self) -> PurePath:
+        output_dir = resolve_conflicting_options(
+            old_scope="pytest-coverage",
+            new_scope="pytest-cov",
+            old_option="report_output_path",
+            new_option="output_dir",
+            old_container=self.options,
+            new_container=self.options,
+        )
+        return PurePath(output_dir)
 
     @property
     def omit_test_sources(self) -> bool:
@@ -329,17 +349,15 @@ async def generate_coverage_report(
     if report_type == CoverageReportType.CONSOLE:
         return CoverageReports((ConsoleCoverageReport(result.stdout.decode()),))
 
-    report_dir = PurePath(coverage_subsystem.report_output_path)
-
     report_file: Optional[PurePath] = None
     if report_type == CoverageReportType.HTML:
-        report_file = report_dir / "htmlcov" / "index.html"
+        report_file = coverage_subsystem.output_dir / "htmlcov" / "index.html"
     elif report_type == CoverageReportType.XML:
-        report_file = report_dir / "coverage.xml"
+        report_file = coverage_subsystem.output_dir / "coverage.xml"
     fs_report = FilesystemCoverageReport(
         report_type=report_type,
         result_digest=result.output_digest,
-        directory_to_materialize_to=report_dir,
+        directory_to_materialize_to=coverage_subsystem.output_dir,
         report_file=report_file,
     )
     return CoverageReports((fs_report,))
