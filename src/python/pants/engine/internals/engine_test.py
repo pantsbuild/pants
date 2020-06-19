@@ -367,7 +367,10 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
 
         tracker = WorkunitTracker()
         handler = StreamingWorkunitHandler(
-            scheduler, callbacks=[tracker.add], report_interval_seconds=0.01
+            scheduler,
+            callbacks=[tracker.add],
+            report_interval_seconds=0.01,
+            max_workunit_verbosity=LogLevel.INFO,
         )
         with handler.session():
             scheduler.product_request(Fib, subjects=[0])
@@ -393,7 +396,10 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         )
         tracker = WorkunitTracker()
         handler = StreamingWorkunitHandler(
-            scheduler, callbacks=[tracker.add], report_interval_seconds=0.01
+            scheduler,
+            callbacks=[tracker.add],
+            report_interval_seconds=0.01,
+            max_workunit_verbosity=LogLevel.INFO,
         )
 
         with handler.session():
