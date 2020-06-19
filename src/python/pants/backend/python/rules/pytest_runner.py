@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import functools
+import logging
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
@@ -47,6 +48,8 @@ from pants.engine.target import Targets, TransitiveTargets
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
 from pants.python.python_setup import PythonSetup
+
+logger = logging.getLogger()
 
 
 @dataclass(frozen=True)
@@ -247,19 +250,25 @@ async def run_python_test(
 
     coverage_data = None
     if use_coverage:
-        coverage_snapshot = await Get[Snapshot](
-            SnapshotSubset(result.output_digest, PathGlobs([".coverage"]))
+        coverage_snapshot = await Get(
+            Snapshot, SnapshotSubset(result.output_digest, PathGlobs([".coverage"]))
         )
-        coverage_data = PytestCoverageData(field_set.address, coverage_snapshot.digest)
+        if coverage_snapshot.files == (".coverage",):
+            coverage_data = PytestCoverageData(field_set.address, coverage_snapshot.digest)
+        else:
+            logger.warning(f"Failed to generate coverage data for {field_set.address}.")
 
     xml_results_digest = None
     if test_setup.xml_dir:
-        xml_results_snapshot = await Get[Snapshot](
-            SnapshotSubset(result.output_digest, PathGlobs([test_results_file]))
+        xml_results_snapshot = await Get(
+            Snapshot, SnapshotSubset(result.output_digest, PathGlobs([test_results_file]))
         )
-        xml_results_digest = await Get[Digest](
-            AddPrefix(xml_results_snapshot.digest, test_setup.xml_dir)
-        )
+        if xml_results_snapshot.files == (test_results_file,):
+            xml_results_digest = await Get(
+                Digest, AddPrefix(xml_results_snapshot.digest, test_setup.xml_dir)
+            )
+        else:
+            logger.warning(f"Failed to generate JUnit XML data for {field_set.address}.")
 
     return TestResult.from_fallible_process_result(
         result, coverage_data=coverage_data, xml_results=xml_results_digest
