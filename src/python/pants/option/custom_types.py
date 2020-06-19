@@ -213,6 +213,7 @@ class ListValueComponent:
         action = cls.MODIFY
         appends: Sequence[str] = []
         filters: Sequence[str] = []
+        is_enum = inspect.isclass(member_type) and issubclass(member_type, Enum)
         if isinstance(value, cls):  # Ensure idempotency.
             action = value._action
             appends = value._appends
@@ -220,9 +221,8 @@ class ListValueComponent:
         elif isinstance(value, (list, tuple)):  # Ensure we can handle list-typed default values.
             action = cls.REPLACE
             appends = value
-        elif not isinstance(value, str) and member_type != str:
-            action = cls.REPLACE
-            appends = [value]
+        # elif not isinstance(value, str) and member_type != str:
+        #     appends = _convert_list(value[1:], member_type)
         elif value.startswith("[") or value.startswith("("):
             action = cls.REPLACE
             appends = _convert_list(value, member_type)
@@ -230,6 +230,8 @@ class ListValueComponent:
             appends = _convert_list(value[1:], member_type)
         elif value.startswith("-[") or value.startswith("-("):
             filters = _convert_list(value[1:], member_type)
+        elif is_enum and isinstance(value, str):
+            appends = _convert_list(value.split(","), member_type)
         elif isinstance(value, str):
             appends = [value]
         else:

@@ -1757,9 +1757,10 @@ class OptionsTest(TestBase):
 
     def test_list_of_enum_default_value(self) -> None:
         options = self._parse(flags="other-enum-scope --some-list-enum-with-default=another-value")
-        assert [self.SomeEnumOption.another_value] == options.for_scope(
-            "other-enum-scope"
-        ).some_list_enum_with_default
+        assert [
+            self.SomeEnumOption.yet_another,
+            self.SomeEnumOption.another_value,
+        ] == options.for_scope("other-enum-scope").some_list_enum_with_default
         options = self._parse()
         assert [self.SomeEnumOption.yet_another] == options.for_scope(
             "other-enum-scope"
