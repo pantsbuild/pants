@@ -108,8 +108,20 @@ pub struct WorkunitMetadata {
 }
 
 impl WorkunitMetadata {
-  pub fn new() -> WorkunitMetadata {
-    WorkunitMetadata {
+  pub fn new() -> Self {
+    WorkunitMetadata::default()
+  }
+
+  pub fn with_level(level: Level) -> Self {
+    let mut metadata = WorkunitMetadata::default();
+    metadata.level = level;
+    metadata
+  }
+}
+
+impl Default for WorkunitMetadata {
+  fn default() -> Self {
+    Self {
       level: Level::Info,
       desc: None,
       blocked: false,
