@@ -609,7 +609,7 @@ impl crate::CommandRunner for StreamingCommandRunner {
     with_workunit(
       context.workunit_store.clone(),
       "ensure_action_uploaded".to_owned(),
-      WorkunitMetadata::new(),
+      WorkunitMetadata::with_level(Level::Debug),
       self.ensure_action_uploaded(&store, &command, &action, request.input_files),
       |_, md| md,
     )
@@ -621,7 +621,7 @@ impl crate::CommandRunner for StreamingCommandRunner {
     let response = with_workunit(
       context.workunit_store.clone(),
       "run_execute_request".to_owned(),
-      WorkunitMetadata::new(),
+      WorkunitMetadata::with_level(Level::Debug),
       timeout_fut,
       |_, mut metadata| {
         metadata.level = Level::Error;
