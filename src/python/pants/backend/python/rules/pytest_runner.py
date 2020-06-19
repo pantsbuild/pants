@@ -7,6 +7,13 @@ import logging
 from dataclasses import dataclass
 from typing import Optional, Tuple
 
+from pants.backend.python.rules.coverage import (
+    CoverageConfig,
+    CoverageConfigRequest,
+    CoveragePlugin,
+    CoverageSubsystem,
+    PytestCoverageData,
+)
 from pants.backend.python.rules.importable_python_sources import ImportablePythonSources
 from pants.backend.python.rules.pex import (
     Pex,
@@ -15,13 +22,6 @@ from pants.backend.python.rules.pex import (
     PexRequirements,
 )
 from pants.backend.python.rules.pex_from_targets import PexFromTargetsRequest
-from pants.backend.python.rules.pytest_coverage import (
-    CoverageConfig,
-    CoverageConfigRequest,
-    CoveragePlugin,
-    CoverageSubsystem,
-    PytestCoverageData,
-)
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.backend.python.target_types import (
@@ -181,7 +181,7 @@ async def setup_pytest_for_target(
         prepared_sources,
         specified_source_files,
     ) = (
-        await MultiGet(Get(CoverageConfig, CoverageConfigRequest()), *requests)
+        await MultiGet(Get(CoverageConfig, CoverageConfigRequest(all_targets)), *requests)
         if use_coverage
         else (CoverageConfig(EMPTY_DIGEST), *await MultiGet(*requests))
     )

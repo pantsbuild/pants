@@ -9,7 +9,7 @@ from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import temporary_dir
 
 
-class PytestCoverageIntegrationTest(PantsRunIntegrationTest):
+class CoverageIntegrationTest(PantsRunIntegrationTest):
     def test_coverage(self) -> None:
         with temporary_dir(root_dir=get_buildroot()) as tmpdir:
             tmpdir_relative = Path(tmpdir).relative_to(get_buildroot())

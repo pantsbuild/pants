@@ -40,10 +40,11 @@ from pants.engine.fs import AddPrefix, Digest, FileContent, InputFilesContent, M
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get, MultiGet
-from pants.engine.target import TransitiveTargets
+from pants.engine.target import Target, TransitiveTargets
 from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
+from pants.util.ordered_set import FrozenOrderedSet
 
 """
 An overview of how Pytest Coverage works with Pants:
@@ -177,12 +178,9 @@ class PytestCoverageDataCollection(CoverageDataCollection):
     element_type = PytestCoverageData
 
 
-# TODO(#7490): Once we have support for `await Get` of singletons, we can remove this class. We only
-# have it so that we can avoid `pytest_runner.py` from awaiting `CoverageConfig` if coverage is not
-# being used.
 @dataclass(frozen=True)
 class CoverageConfigRequest:
-    pass
+    targets: FrozenOrderedSet[Target]
 
 
 @dataclass(frozen=True)
@@ -192,21 +190,18 @@ class CoverageConfig:
 
 @rule
 async def create_coverage_config(
-    _: CoverageConfigRequest,
-    transitive_targets: TransitiveTargets,
-    coverage_subsystem: CoverageSubsystem,
-    log_level: LogLevel,
+    request: CoverageConfigRequest, coverage_subsystem: CoverageSubsystem, log_level: LogLevel
 ) -> CoverageConfig:
     all_stripped_sources = await MultiGet(
         Get(SourceRootStrippedSources, StripSourcesFieldRequest(tgt[PythonSources]))
-        for tgt in transitive_targets.closure
+        for tgt in request.targets
         if tgt.has_field(PythonSources)
     )
     all_stripped_test_sources: Tuple[SourceRootStrippedSources, ...] = ()
     if coverage_subsystem.omit_test_sources:
         all_stripped_test_sources = await MultiGet(
             Get(SourceRootStrippedSources, StripSourcesFieldRequest(tgt[PythonTestsSources]))
-            for tgt in transitive_targets.closure
+            for tgt in request.targets
             if tgt.has_field(PythonTestsSources)
         )
 
@@ -325,7 +320,7 @@ async def generate_coverage_report(
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> CoverageReports:
     """Takes all Python test results and generates a single coverage report."""
-    coverage_config_request = Get(CoverageConfig, CoverageConfigRequest())
+    coverage_config_request = Get(CoverageConfig, CoverageConfigRequest(transitive_targets.closure))
     sources_request = Get(
         SourceFiles,
         AllSourceFilesRequest(
