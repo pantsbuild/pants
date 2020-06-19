@@ -111,12 +111,19 @@ class CoverageIntegrationTest(PantsRunIntegrationTest):
             # tests that we can properly handle the edge case. In particular, we want to make sure
             # that coverage still works when we omit this test file through the option
             # `--omit-test-sources`.
-            no_src_folder = Path(tmpdir, "tests", "python", "project_test", "no_src")
+            no_src_folder = test_root / "no_src"
             no_src_folder.mkdir()
             (no_src_folder / "test_no_src.py").write_text(
                 "def test_true():\n\tassert True is True\n"
             )
             (no_src_folder / "BUILD").write_text("python_tests()")
+
+            # Test a file that is not included in the transitive closure of any test targets. We
+            # still expect this to be in the report if it is included in the address specs.
+            no_tests_folder = src_root / "no_tests"
+            no_tests_folder.mkdir()
+            (no_tests_folder / "no_tests.py").write_text("NO_TESTS = True\n")
+            (no_tests_folder / "BUILD").write_text("python_library()")
 
             command = [
                 "--no-v1",
@@ -128,13 +135,15 @@ class CoverageIntegrationTest(PantsRunIntegrationTest):
                 f"{tmpdir_relative}/tests/python/project_test:arithmetic",
                 f"{tmpdir_relative}/tests/python/project_test/no_src",
             ]
-            default_result = self.run_pants(command)
+            entire_closure_result = self.run_pants(
+                [*command, f"{tmpdir_relative}/src/python/project/no_tests::"]
+            )
             omit_test_result = self.run_pants([*command, "--coverage-py-omit-test-sources"])
             filter_result = self.run_pants(
                 [*command, "--coverage-py-filter=['project.lib', 'project_test.no_src']"]
             )
 
-        for result in (default_result, omit_test_result, filter_result):
+        for result in (entire_closure_result, omit_test_result, filter_result):
             assert result.returncode == 0
             # Regression test: make sure that individual tests do not complain about failing to
             # generate reports. This was showing up at test-time, even though the final merged
@@ -149,14 +158,15 @@ class CoverageIntegrationTest(PantsRunIntegrationTest):
                 {tmpdir_relative}/src/python/project/lib.py                             6      0      0      0   100%
                 {tmpdir_relative}/src/python/project/lib_test.py                        3      0      0      0   100%
                 {tmpdir_relative}/src/python/project/random.py                          2      2      0      0     0%
+                {tmpdir_relative}/src/python/project/no_tests/no_tests.py               1      1      0      0     0%
                 {tmpdir_relative}/tests/python/project_test/no_src/test_no_src.py       2      0      0      0   100%
                 {tmpdir_relative}/tests/python/project_test/test_arithmetic.py          3      0      0      0   100%
                 {tmpdir_relative}/tests/python/project_test/test_multiply.py            3      0      0      0   100%
                 -----------------------------------------------------------------------------------------------
-                TOTAL                                                            19      2      0      0    89%
+                TOTAL                                                            20      3      0      0    85%
                 """
             )
-            in default_result.stderr_data
+            in entire_closure_result.stderr_data
         )
         assert (
             dedent(
