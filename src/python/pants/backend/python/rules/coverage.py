@@ -218,14 +218,11 @@ async def create_coverage_config(
         """
         [run]
         branch = True
-        timid = False
         relative_files = True
         """
     )
-
     cp = configparser.ConfigParser()
     cp.read_string(default_config)
-    cp.set("run", "plugins", COVERAGE_PLUGIN_MODULE_NAME)
 
     if coverage_subsystem.omit_test_sources:
         test_files = itertools.chain.from_iterable(
@@ -238,6 +235,7 @@ async def create_coverage_config(
         # See https://coverage.readthedocs.io/en/coverage-5.1/cmd.html?highlight=debug#diagnostics.
         cp.set("run", "debug", "\n\ttrace\n\tconfig")
 
+    cp.set("run", "plugins", COVERAGE_PLUGIN_MODULE_NAME)
     cp.add_section(COVERAGE_PLUGIN_MODULE_NAME)
     cp.set(
         COVERAGE_PLUGIN_MODULE_NAME,
