@@ -71,7 +71,7 @@ Step 4: `test.py` outputs the final report.
 COVERAGE_PLUGIN_MODULE_NAME = "__pants_coverage_plugin__"
 
 
-class PytestCoverage(PythonToolBase):
+class CoverageSubsystem(PythonToolBase):
     options_scope = "coverage-py"
     default_version = "coverage>=5.0.3,<5.1"
     default_entry_point = "coverage"
@@ -82,6 +82,21 @@ class PytestCoverage(PythonToolBase):
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
+        register(
+            "--filter",
+            type=list,
+            member_type=str,
+            default=None,
+            help=(
+                "A list of Python modules to use in the coverage report, e.g. "
+                "`['helloworld_test', 'helloworld.util.dirutil']. The modules are recursive: any "
+                "submodules will be included. If you leave this off, the coverage report will "
+                "include every file in the transitive closure of the address/file arguments; "
+                "for example, `test ::` will include every Python file in your project, whereas "
+                "`test project/app_test.py` will include `app_test.py` and any of its transitive "
+                "dependencies."
+            ),
+        )
         register(
             "--report",
             type=CoverageReportType,
@@ -111,6 +126,10 @@ class PytestCoverage(PythonToolBase):
             advanced=True,
             help="Whether to exclude the test files in coverage measurement.",
         )
+
+    @property
+    def filter(self) -> Tuple[str, ...]:
+        return tuple(self.options.filter)
 
     @property
     def report(self) -> CoverageReportType:
@@ -175,7 +194,7 @@ class CoverageConfig:
 async def create_coverage_config(
     _: CoverageConfigRequest,
     transitive_targets: TransitiveTargets,
-    coverage_subsystem: PytestCoverage,
+    coverage_subsystem: CoverageSubsystem,
     log_level: LogLevel,
 ) -> CoverageConfig:
     all_stripped_sources = await MultiGet(
@@ -247,7 +266,7 @@ class CoverageSetup:
 
 
 @rule
-async def setup_coverage(coverage: PytestCoverage, plugin: CoveragePlugin) -> CoverageSetup:
+async def setup_coverage(coverage: CoverageSubsystem, plugin: CoveragePlugin) -> CoverageSetup:
     pex = await Get[Pex](
         PexRequest(
             output_filename="coverage.pex",
@@ -300,7 +319,7 @@ async def merge_coverage_data(
 async def generate_coverage_report(
     merged_coverage_data: MergedCoverageData,
     coverage_setup: CoverageSetup,
-    coverage_subsystem: PytestCoverage,
+    coverage_subsystem: CoverageSubsystem,
     transitive_targets: TransitiveTargets,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
@@ -370,6 +389,6 @@ def rules():
         generate_coverage_report,
         merge_coverage_data,
         setup_coverage,
-        SubsystemRule(PytestCoverage),
+        SubsystemRule(CoverageSubsystem),
         UnionRule(CoverageDataCollection, PytestCoverageDataCollection),
     ]

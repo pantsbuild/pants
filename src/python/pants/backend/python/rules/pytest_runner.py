@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import functools
+import itertools
 import logging
 from dataclasses import dataclass
 from typing import Optional, Tuple
@@ -18,6 +19,7 @@ from pants.backend.python.rules.pytest_coverage import (
     CoverageConfig,
     CoverageConfigRequest,
     CoveragePlugin,
+    CoverageSubsystem,
     PytestCoverageData,
 )
 from pants.backend.python.subsystems.pytest import PyTest
@@ -81,6 +83,7 @@ async def setup_pytest_for_target(
     test_options: TestOptions,
     python_setup: PythonSetup,
     coverage_plugin: CoveragePlugin,
+    coverage_subsystem: CoverageSubsystem,
 ) -> TestTargetSetup:
     test_addresses = Addresses((field_set.address,))
 
@@ -192,17 +195,13 @@ async def setup_pytest_for_target(
     ]
     input_digest = await Get[Digest](MergeDigests(digests_to_merge))
 
-    coverage_args = []
+    coverage_args = ()
     if use_coverage:
-        coverage_args = [
-            # This turns of all coverage output.
-            "--cov-report=",
-        ]
-        for package in field_set.coverage.determine_packages_to_cover(
-            stripped_source_files=specified_source_files.files
-        ):
-            coverage_args.extend(["--cov", package])
-
+        cov_paths = coverage_subsystem.filter if coverage_subsystem.filter else (".",)
+        coverage_args = (
+            "--cov-report=",  # Turn off output.
+            *itertools.chain.from_iterable(["--cov", cov_path] for cov_path in cov_paths),
+        )
     return TestTargetSetup(
         test_runner_pex=test_runner_pex,
         args=(*pytest.options.args, *coverage_args, *specified_source_files.files),
@@ -292,4 +291,5 @@ def rules():
         UnionRule(TestFieldSet, PythonTestFieldSet),
         SubsystemRule(PyTest),
         SubsystemRule(PythonSetup),
+        SubsystemRule(CoverageSubsystem),
     ]
