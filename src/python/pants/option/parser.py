@@ -697,11 +697,11 @@ class Parser:
             if type_arg == bool:
                 return self._ensure_bool(val_str)
             try:
+                if type_arg == list:
+                    return ListValueComponent.create(val_str, member_type=member_type)
                 if type_arg == dict:
                     return DictValueComponent.create(val_str)
-                if type_arg != list:
-                    return type_arg(val_str)
-                return ListValueComponent.create(val_str, member_type=member_type)
+                return type_arg(val_str)
             except (TypeError, ValueError) as e:
                 raise ParseError(
                     f"Error applying type '{type_arg.__name__}' to option value '{val_str}', for option "

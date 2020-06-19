@@ -62,7 +62,7 @@ python_tests(
     'testprojects/src/thrift/org/pantsbuild:thrift_exports_directory',
   ],
   tags={'integration', 'partially_type_checked'},
-  timeout=720,
+  timeout=920,
 )
 
 python_tests(
