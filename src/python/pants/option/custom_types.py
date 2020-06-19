@@ -112,9 +112,9 @@ def _convert(val, acceptable_types):
     return parse_expression(val, acceptable_types, raise_type=ParseError)
 
 
-def _convert_list(val, member_type):
+def _convert_list(val, member_type, is_enum):
     converted = _convert(val, (list, tuple))
-    if not inspect.isclass(member_type) or not issubclass(member_type, Enum):
+    if not is_enum:
         return converted
     return [item if isinstance(item, member_type) else member_type(item) for item in converted]
 
@@ -221,17 +221,15 @@ class ListValueComponent:
         elif isinstance(value, (list, tuple)):  # Ensure we can handle list-typed default values.
             action = cls.REPLACE
             appends = value
-        # elif not isinstance(value, str) and member_type != str:
-        #     appends = _convert_list(value[1:], member_type)
         elif value.startswith("[") or value.startswith("("):
             action = cls.REPLACE
-            appends = _convert_list(value, member_type)
+            appends = _convert_list(value, member_type, is_enum)
         elif value.startswith("+[") or value.startswith("+("):
-            appends = _convert_list(value[1:], member_type)
+            appends = _convert_list(value[1:], member_type, is_enum)
         elif value.startswith("-[") or value.startswith("-("):
-            filters = _convert_list(value[1:], member_type)
+            filters = _convert_list(value[1:], member_type, is_enum)
         elif is_enum and isinstance(value, str):
-            appends = _convert_list(value.split(","), member_type)
+            appends = _convert_list(value.split(","), member_type, True)
         elif isinstance(value, str):
             appends = [value]
         else:
