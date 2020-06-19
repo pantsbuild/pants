@@ -136,6 +136,29 @@ pub struct WorkUnitInnerStore {
   last_seen_completed_idx: usize,
 }
 
+impl WorkUnitInnerStore {
+  fn first_matched_parent(
+    &self,
+    mut span_id: Option<SpanId>,
+    is_visible: impl Fn(&Workunit) -> bool,
+  ) -> Option<SpanId> {
+    while let Some(current_span_id) = span_id {
+      let workunit = self.workunit_records.get(&current_span_id);
+
+      // Is the current workunit visible?
+      if let Some(ref workunit) = workunit {
+        if is_visible(workunit) {
+          return Some(current_span_id);
+        }
+      }
+
+      // If not, try its parent.
+      span_id = workunit.and_then(|workunit| workunit.parent_id.clone());
+    }
+    None
+  }
+}
+
 impl WorkunitStore {
   pub fn new(rendering_dynamic_ui: bool) -> WorkunitStore {
     WorkunitStore {
@@ -174,6 +197,9 @@ impl WorkunitStore {
       .collect()
   }
 
+  ///
+  /// Find the longest running leaf workunits, and render their first visible parents.
+  ///
   pub fn heavy_hitters(&self, k: usize) -> HashMap<String, Option<Duration>> {
     use petgraph::Direction;
 
@@ -181,39 +207,46 @@ impl WorkunitStore {
     let inner = self.inner.lock();
     let workunit_graph = &inner.graph;
 
-    let mut queue: BinaryHeap<(Duration, SpanId)> = BinaryHeap::with_capacity(k);
-    let edge_workunits = workunit_graph.externals(Direction::Outgoing);
-    queue.extend(
-      edge_workunits
-        .map(|entry| workunit_graph[entry].clone())
-        .flat_map(|span_id: SpanId| {
-          let workunit: Option<&Workunit> = inner.workunit_records.get(&span_id);
-          match workunit {
-            Some(Workunit {
-              span_id,
-              state: WorkunitState::Started { start_time, .. },
-              ..
-            }) => now
-              .duration_since(*start_time)
-              .ok()
-              .map(|duration| (duration, span_id.clone())),
-            _ => None,
-          }
-        }),
-    );
-
-    let mut res = HashMap::new();
-    while let Some((dur, span_id)) = queue.pop() {
-      let workunit = inner.workunit_records.get(&span_id).unwrap();
-      let desc = workunit.metadata.desc.as_ref();
-      let blocked = workunit.metadata.blocked;
-      let maybe_duration = if blocked { None } else { Some(dur) };
-      if let Some(effective_name) = desc {
-        res.insert(effective_name.to_string(), maybe_duration);
+    let duration_for = |workunit: &Workunit| -> Option<Duration> {
+      match workunit.state {
+        WorkunitState::Started { ref start_time, .. } => now.duration_since(*start_time).ok(),
+        _ => None,
       }
+    };
 
-      if res.len() >= k {
-        break;
+    let is_visible = |workunit: &Workunit| -> bool {
+      workunit.metadata.level >= Level::Info && workunit.metadata.desc.is_some()
+    };
+
+    // Initialize the heap with the leaves of the workunit graph.
+    let mut queue: BinaryHeap<(Duration, SpanId)> = workunit_graph
+      .externals(Direction::Outgoing)
+      .map(|entry| workunit_graph[entry].clone())
+      .flat_map(|span_id: SpanId| {
+        let workunit: Option<&Workunit> = inner.workunit_records.get(&span_id);
+        match workunit {
+          Some(workunit) if !workunit.metadata.blocked => {
+            duration_for(workunit).map(|d| (d, span_id.clone()))
+          }
+          _ => None,
+        }
+      })
+      .collect();
+
+    // Output the visible parents of the longest running leaves.
+    let mut res = HashMap::new();
+    while let Some((_dur, span_id)) = queue.pop() {
+      // If the leaf is visible or has a visible parent, emit it.
+      if let Some(span_id) = inner.first_matched_parent(Some(span_id), is_visible) {
+        let workunit = inner.workunit_records.get(&span_id).unwrap();
+        if let Some(effective_name) = workunit.metadata.desc.as_ref() {
+          let maybe_duration = duration_for(&workunit);
+
+          res.insert(effective_name.to_string(), maybe_duration);
+          if res.len() >= k {
+            break;
+          }
+        }
       }
     }
     res
@@ -323,54 +356,24 @@ impl WorkunitStore {
   where
     F: FnOnce(&[Workunit], &[Workunit]) -> T,
   {
-    let mut inner_guard = (*self.inner).lock();
-    let inner_store: &mut WorkUnitInnerStore = &mut *inner_guard;
-    let workunit_records = &inner_store.workunit_records;
+    let mut inner_store = self.inner.lock();
 
     let should_emit = |workunit: &Workunit| -> bool { workunit.metadata.level <= max_verbosity };
-
-    let compute_adjusted_parent_id = |workunit: Workunit| -> Workunit {
-      let mut parent_id: Option<SpanId> = workunit.parent_id;
-      loop {
-        if let Some(current_parent_id) = parent_id {
-          let should_emit = match workunit_records.get(&current_parent_id) {
-            None => false,
-            Some(workunit) => should_emit(&workunit),
-          };
-          if should_emit {
-            return Workunit {
-              parent_id: Some(current_parent_id),
-              ..workunit
-            };
-          } else {
-            let new_parent_id: Option<SpanId> = workunit_records
-              .get(&current_parent_id.clone())
-              .and_then(|workunit| match &workunit.parent_id {
-                Some(id) => Some(id.clone()),
-                None => None,
-              });
-            parent_id = new_parent_id;
-          }
-        } else {
-          return Workunit {
-            parent_id: None,
-            ..workunit
-          };
-        }
-      }
-    };
 
     let cur_len = inner_store.started_ids.len();
     let latest: usize = inner_store.last_seen_started_idx;
     let started_workunits: Vec<Workunit> = inner_store.started_ids[latest..cur_len]
       .iter()
-      .flat_map(|id| workunit_records.get(id))
+      .flat_map(|id| inner_store.workunit_records.get(id))
       .flat_map(|workunit| match workunit.state {
         WorkunitState::Started { .. } if should_emit(&workunit) => Some(workunit.clone()),
         WorkunitState::Started { .. } => None,
         WorkunitState::Completed { .. } => None,
       })
-      .map(compute_adjusted_parent_id)
+      .map(|mut w| {
+        w.parent_id = inner_store.first_matched_parent(w.parent_id, should_emit);
+        w
+      })
       .collect();
     inner_store.last_seen_started_idx = cur_len;
 
@@ -379,13 +382,16 @@ impl WorkunitStore {
     let latest: usize = inner_store.last_seen_completed_idx;
     let completed_workunits: Vec<Workunit> = inner_store.completed_ids[latest..cur_len]
       .iter()
-      .flat_map(|id| workunit_records.get(id))
+      .flat_map(|id| inner_store.workunit_records.get(id))
       .flat_map(|workunit| match workunit.state {
         WorkunitState::Completed { .. } if should_emit(&workunit) => Some(workunit.clone()),
         WorkunitState::Completed { .. } => None,
         WorkunitState::Started { .. } => None,
       })
-      .map(compute_adjusted_parent_id)
+      .map(|mut w| {
+        w.parent_id = inner_store.first_matched_parent(w.parent_id, should_emit);
+        w
+      })
       .collect();
     inner_store.last_seen_completed_idx = cur_len;
 
