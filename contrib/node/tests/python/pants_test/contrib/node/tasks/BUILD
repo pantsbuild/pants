@@ -83,7 +83,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'contrib/node:examples_directory',
   ],
-  timeout=240,
+  timeout=440,
   tags={'integration', 'partially_type_checked'},
 )
 
