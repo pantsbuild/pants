@@ -214,7 +214,9 @@ impl WorkunitStore {
       }
     };
 
-    let is_visible = |workunit: &Workunit| -> bool { workunit.metadata.desc.is_some() };
+    let is_visible = |workunit: &Workunit| -> bool {
+      workunit.metadata.level >= Level::Info && workunit.metadata.desc.is_some()
+    };
 
     // Initialize the heap with the leaves of the workunit graph.
     let mut queue: BinaryHeap<(Duration, SpanId)> = workunit_graph
