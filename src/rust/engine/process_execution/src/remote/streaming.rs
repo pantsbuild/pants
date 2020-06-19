@@ -624,7 +624,7 @@ impl crate::CommandRunner for StreamingCommandRunner {
       WorkunitMetadata::with_level(Level::Debug),
       timeout_fut,
       |result, mut metadata| {
-        if let Err(_) = result {
+        if result.is_err() {
           metadata.level = Level::Error;
           metadata.desc = Some(format!(
             "remote execution timed out after {:?}",

@@ -109,7 +109,7 @@ pub struct WorkunitMetadata {
 
 impl WorkunitMetadata {
   pub fn new() -> Self {
-    Default::default()
+    WorkunitMetadata::default()
   }
 
   pub fn with_level(level: Level) -> Self {
