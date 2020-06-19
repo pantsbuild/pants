@@ -102,8 +102,8 @@ async def setup_pytest_for_target(
     # `importlib_metadata` and thus `zipp`, does not play nicely when doing import magic directly
     # from zip files. `zipp` has pathologically bad behavior with large zipfiles.
     # TODO: this does have a performance cost as the pex must now be expanded to disk. Long term,
-    #  it would be better to fix Zipp (whose fix would then need to be used by importlib_metadata
-    #  and then by Pytest). See https://github.com/jaraco/zipp/pull/26.
+    # it would be better to fix Zipp (whose fix would then need to be used by importlib_metadata
+    # and then by Pytest). See https://github.com/jaraco/zipp/pull/26.
     additional_args_for_pytest = ("--not-zip-safe",)
 
     pytest_pex_request = Get[Pex](
