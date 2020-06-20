@@ -21,7 +21,6 @@ from pants.backend.python.rules.pex import (
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.backend.python.target_types import PythonSources, PythonTestsSources
-from pants.base.deprecated import resolve_conflicting_options
 from pants.core.goals.test import (
     ConsoleCoverageReport,
     CoverageData,
@@ -52,13 +51,12 @@ An overview of how Pytest Coverage works with Pants:
 Step 1: Run each test with the appropriate `--cov` arguments.
 In `python_test_runner.py`, we pass options so that the pytest-cov plugin runs and records which
 lines were encountered in the test. For each test, it will save a `.coverage` file (SQLite DB
-format). The files stored in `.coverage` will be stripped of source roots. We load up our custom
-Pants coverage plugin, but the plugin doesn't actually do anything yet. We only load our plugin
-because Coverage expects to find the plugin in the `.coverage` file in the later steps.
+format). The files stored in `.coverage` will be stripped of source roots. Our plugin records which
+files are "owned" by the plugin.
 
 Step 2: Merge the results with `coverage combine`.
-We now have a bunch of individual `PytestCoverageData` values. We run `coverage combine` to convert
-this into a single `.coverage` file.
+We now have a bunch of individual `PytestCoverageData` values, each with their own `.coverage` file.
+We run `coverage combine` to convert this into a single `.coverage` file.
 
 Step 3: Generate the report with `coverage {html,xml,console}`.
 All the files in the single merged `.coverage` file are still stripped, and we want to generate a
@@ -77,8 +75,6 @@ class CoverageSubsystem(PythonToolBase):
     default_version = "coverage>=5.0.3,<5.1"
     default_entry_point = "coverage"
     default_interpreter_constraints = ["CPython>=3.6"]
-    deprecated_options_scope = "pytest-coverage"
-    deprecated_options_scope_removal_version = "1.31.0.dev0"
 
     @classmethod
     def register_options(cls, register):
@@ -112,15 +108,6 @@ class CoverageSubsystem(PythonToolBase):
             help="Path to write the Pytest Coverage report to. Must be relative to build root.",
         )
         register(
-            "--report-output-path",
-            type=str,
-            default=PurePath("dist", "coverage", "python").as_posix(),
-            removal_version="1.31.0.dev0",
-            removal_hint="Use `output_dir` in the `[pytest-cov]` scope instead",
-            advanced=True,
-            help="Path to write pytest coverage report to. Must be relative to build root.",
-        )
-        register(
             "--omit-test-sources",
             type=bool,
             default=False,
@@ -138,15 +125,7 @@ class CoverageSubsystem(PythonToolBase):
 
     @property
     def output_dir(self) -> PurePath:
-        output_dir = resolve_conflicting_options(
-            old_scope="pytest-coverage",
-            new_scope="pytest-cov",
-            old_option="report_output_path",
-            new_option="output_dir",
-            old_container=self.options,
-            new_container=self.options,
-        )
-        return PurePath(output_dir)
+        return PurePath(self.options.output_dir)
 
     @property
     def omit_test_sources(self) -> bool:
