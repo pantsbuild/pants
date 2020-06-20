@@ -185,7 +185,6 @@
                     "3rdparty_py"
                 ]
        },
-       {"pages" : ["go_readme"]},
        {"pages" : ["node_readme"]},
        {"heading": "Code & Doc Generation"},
        {"pages" : [
