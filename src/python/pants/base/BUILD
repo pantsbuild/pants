@@ -169,9 +169,7 @@ python_library(
   name = 'cmd_line_spec_parser',
   sources = ['cmd_line_spec_parser.py'],
   dependencies = [
-    ':build_file',
     ':specs',
-    'src/python/pants/build_graph',
   ],
   tags = {"partially_type_checked"},
 )
