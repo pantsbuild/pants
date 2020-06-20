@@ -260,7 +260,7 @@ class BuildFileAddress(Address):
     :API: public
     """
 
-    def __init__(self, *, rel_path: Optional[str], target_name: Optional[str] = None,) -> None:
+    def __init__(self, *, rel_path: str, target_name: Optional[str] = None) -> None:
         """
         :param target_name: The name of the target within the BUILD file; defaults to the default
                             target, aka the name of the BUILD file parent dir.
