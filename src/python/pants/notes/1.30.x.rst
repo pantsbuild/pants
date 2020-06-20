@@ -20,20 +20,20 @@ API Changes
 * Deprecate `--enable-pantsd` in favor of `--pantsd` (#10049)
   `PR #10049 <https://github.com/pantsbuild/pants/pull/10049>`_
 
+* Set default source root patterns. (#10043)
+  `PR #10043 <https://github.com/pantsbuild/pants/pull/10043>`_
+
 New Features
 ~~~~~~~~~~~~
+
+* Redesign v2 coverage mechanism (#10100)
+  `PR #10100 <https://github.com/pantsbuild/pants/pull/10100>`_
 
 * Add `--pytest-coverage-omit-test-sources` option to v2 (#10085)
   `PR #10085 <https://github.com/pantsbuild/pants/pull/10085>`_
 
-* Add report type to FilesystemCoverageReport (#10086)
-  `PR #10086 <https://github.com/pantsbuild/pants/pull/10086>`_
-
 * Control workunit levels at `@rule` execution time (#10053)
   `PR #10053 <https://github.com/pantsbuild/pants/pull/10053>`_
-
-* Set default source root patterns. (#10043)
-  `PR #10043 <https://github.com/pantsbuild/pants/pull/10043>`_
 
 Bugfixes
 ~~~~~~~~
@@ -95,8 +95,8 @@ Refactoring, Improvements, and Tooling
 * Expose new StreamingWorkunitContext on streaming workunits callback (#10034)
   `PR #10034 <https://github.com/pantsbuild/pants/pull/10034>`_
 
-* Redesign v2 coverage mechanism (#10100)
-  `PR #10100 <https://github.com/pantsbuild/pants/pull/10100>`_
+* Add report type to FilesystemCoverageReport (#10086)
+  `PR #10086 <https://github.com/pantsbuild/pants/pull/10086>`_
 
 Testing
 ~~~~~~~
@@ -128,20 +128,28 @@ Testing
 Documentation
 ~~~~~~~~~~~~~
 * Prepare the 1.28.1rc0 release.
+  `Manual commit <https://github.com/pantsbuild/pants/commit/48b0ab940289ae7d440105224d93c9496fd59825>`_
 
 * Prepare the 1.27.1rc0 release.
+  `PR #10066 <https://github.com/pantsbuild/pants/pull/10066>`_
 
 * Prepare the 1.26.1rc0 release.
+  `PR #10067 <https://github.com/pantsbuild/pants/pull/10067>`_
 
 * Prepare the 1.25.1rc1 release.
+  `PR #10068 <https://github.com/pantsbuild/pants/pull/10068>`_
 
 * Prepare the 1.24.1rc1 release.
+  `PR #10069 <https://github.com/pantsbuild/pants/pull/10069>`_
 
 * Prepare the 1.23.1rc0 release.
+  `PR #10070 <https://github.com/pantsbuild/pants/pull/10070>`_
 
 * Prepare the 1.22.1rc0 release.
+  `PR #10071 <https://github.com/pantsbuild/pants/pull/10071>`_
 
 * Prepare the 1.21.1rc0 release.
+  `PR #10072 <https://github.com/pantsbuild/pants/pull/10072>`_
 
 * Prepare 1.29.0. (#10074)
   `PR #10074 <https://github.com/pantsbuild/pants/pull/10074>`_
