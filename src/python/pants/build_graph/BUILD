@@ -39,8 +39,6 @@ python_library(
   name="address",
   sources=["address.py"],
   dependencies = [
-    'src/python/pants/base:build_file',
-    'src/python/pants/base:deprecated',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:strutil',
   ],

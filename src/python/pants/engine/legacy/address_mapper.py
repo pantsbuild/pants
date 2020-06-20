@@ -4,9 +4,9 @@
 import logging
 import os
 
-from pants.base.build_file import _is_build_file_name
 from pants.base.exceptions import ResolveError
 from pants.base.specs import AddressSpecs, DescendantAddresses, SiblingAddresses
+from pants.build_graph.address import _is_build_file_name
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.address_mapper import AddressMapper
 from pants.engine.addresses import BuildFileAddresses

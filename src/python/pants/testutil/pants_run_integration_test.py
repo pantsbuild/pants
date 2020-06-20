@@ -18,8 +18,8 @@ from typing import Any, Callable, Iterator, List, Optional, Union
 from colors import strip_color
 
 from pants.base.build_environment import get_buildroot
-from pants.base.build_file import _is_build_file_name
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
+from pants.build_graph.address import _is_build_file_name
 from pants.fs.archive import ZIP
 from pants.option.config import TomlSerializer
 from pants.subsystem.subsystem import Subsystem

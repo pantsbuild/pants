@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import re
 from typing import Optional, Sequence, Tuple
 
 from pants.util.dirutil import fast_relpath, longest_dir_prefix
@@ -285,3 +286,7 @@ class BuildFileAddress(Address):
 
     def __repr__(self) -> str:
         return f"BuildFileAddress({self.rel_path}, {self.target_name})"
+
+
+def _is_build_file_name(name: str) -> bool:
+    return bool(re.match(r"^BUILD(\.[a-zA-Z0-9_-]+)?$", name))

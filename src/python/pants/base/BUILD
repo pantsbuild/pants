@@ -27,18 +27,6 @@ python_library(
 )
 
 python_library(
-  name = 'build_file',
-  sources = ['build_file.py'],
-  dependencies = [
-    '3rdparty/python:pathspec',
-    'src/python/pants/util:dirutil',
-    'src/python/pants/util:ordered_set',
-    ':project_tree',
-  ],
-  tags = {'partially_type_checked'},
-)
-
-python_library(
   name = 'build_file_target_factory',
   sources = ['build_file_target_factory.py'],
   tags = {'partially_type_checked'},
