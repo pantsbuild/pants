@@ -195,13 +195,13 @@ async def setup_pytest_for_target(
     ]
     input_digest = await Get[Digest](MergeDigests(digests_to_merge))
 
-    coverage_args = ()
+    coverage_args = []
     if use_coverage:
         cov_paths = coverage_subsystem.filter if coverage_subsystem.filter else (".",)
-        coverage_args = (
+        coverage_args = [
             "--cov-report=",  # Turn off output.
             *itertools.chain.from_iterable(["--cov", cov_path] for cov_path in cov_paths),
-        )
+        ]
     return TestTargetSetup(
         test_runner_pex=test_runner_pex,
         args=(*pytest.options.args, *coverage_args, *specified_source_files.files),
