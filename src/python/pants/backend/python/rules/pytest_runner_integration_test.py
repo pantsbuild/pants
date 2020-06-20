@@ -14,11 +14,7 @@ from pants.backend.python.rules import (
     pex_from_targets,
     pytest_runner,
 )
-from pants.backend.python.rules.pytest_coverage import (
-    PytestCoverage,
-    create_coverage_config,
-    prepare_coverage_plugin,
-)
+from pants.backend.python.rules.coverage import create_coverage_config, prepare_coverage_plugin
 from pants.backend.python.rules.pytest_runner import PythonTestFieldSet
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary, PythonTests
@@ -27,7 +23,7 @@ from pants.backend.python.targets.python_requirement_library import (
     PythonRequirementLibrary as PythonRequirementLibraryV1,
 )
 from pants.backend.python.targets.python_tests import PythonTests as PythonTestsV1
-from pants.base.specs import AddressSpecs, FilesystemLiteralSpec, OriginSpec, SingleAddress
+from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.test import Status, TestDebugRequest, TestOptions, TestResult
 from pants.core.util_rules import determine_source_files, strip_source_roots
@@ -134,7 +130,6 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
             *strip_source_roots.rules(),
             *subprocess_environment.rules(),
             SubsystemRule(TestOptions),
-            SubsystemRule(PytestCoverage),
             RootRule(PythonTestFieldSet),
         )
 
@@ -156,9 +151,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
             origin = SingleAddress(directory=address.spec_path, name=address.target_name)
         tgt = PythonTests({}, address=address)
         params = Params(
-            PythonTestFieldSet.create(TargetWithOrigin(tgt, origin)),
-            options_bootstrapper,
-            AddressSpecs([SingleAddress(address.spec_path, address.target_name)]),
+            PythonTestFieldSet.create(TargetWithOrigin(tgt, origin)), options_bootstrapper
         )
         test_result = self.request_single_product(TestResult, params)
         debug_request = self.request_single_product(TestDebugRequest, params)

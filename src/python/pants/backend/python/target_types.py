@@ -313,30 +313,7 @@ class PythonCoverage(StringOrStringSequenceField):
     """
 
     alias = "coverage"
-
-    def determine_packages_to_cover(
-        self, *, stripped_source_files: Iterable[str]
-    ) -> Tuple[str, ...]:
-        """Either return the specified `coverage` field value or, if not defined, attempt to
-        generate packages with a heuristic that tests have the same package name as their source
-        code.
-
-        This heuristic about package names works when either the tests live in the same folder as
-        their source code, or there is a parallel file structure with the same top-level package
-        names, e.g. `src/python/project` and `tests/python/project` (but not
-        `tests/python/test_project`).
-        """
-        if self.value:
-            return self.value
-        return tuple(
-            sorted(
-                {
-                    # Turn file paths into package names.
-                    os.path.dirname(f).replace(os.sep, ".")
-                    for f in stripped_source_files
-                }
-            )
-        )
+    v1_only = True
 
 
 class PythonTestsTimeout(IntField):

@@ -12,12 +12,12 @@ from pants.backend.python.pants_requirement import PantsRequirement
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.python_requirements import PythonRequirements
 from pants.backend.python.rules import (
+    coverage,
     download_pex_bin,
     importable_python_sources,
     inject_init,
     pex,
     pex_from_targets,
-    pytest_coverage,
     pytest_runner,
     python_create_binary,
     repl,
@@ -121,6 +121,7 @@ def register_goals():
 
 def rules():
     return (
+        *coverage.rules(),
         *download_pex_bin.rules(),
         *inject_init.rules(),
         *importable_python_sources.rules(),
@@ -128,7 +129,6 @@ def rules():
         *module_mapper.rules(),
         *pex.rules(),
         *pex_from_targets.rules(),
-        *pytest_coverage.rules(),
         *pytest_runner.rules(),
         *python_create_binary.rules(),
         *python_native_code.rules(),

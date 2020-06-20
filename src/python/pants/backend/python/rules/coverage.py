@@ -40,10 +40,11 @@ from pants.engine.fs import AddPrefix, Digest, FileContent, InputFilesContent, M
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get, MultiGet
-from pants.engine.target import TransitiveTargets
+from pants.engine.target import Target, TransitiveTargets
 from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
+from pants.util.ordered_set import FrozenOrderedSet
 
 """
 An overview of how Pytest Coverage works with Pants:
@@ -71,7 +72,7 @@ Step 4: `test.py` outputs the final report.
 COVERAGE_PLUGIN_MODULE_NAME = "__pants_coverage_plugin__"
 
 
-class PytestCoverage(PythonToolBase):
+class CoverageSubsystem(PythonToolBase):
     options_scope = "coverage-py"
     default_version = "coverage>=5.0.3,<5.1"
     default_entry_point = "coverage"
@@ -82,6 +83,21 @@ class PytestCoverage(PythonToolBase):
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
+        register(
+            "--filter",
+            type=list,
+            member_type=str,
+            default=None,
+            help=(
+                "A list of Python modules to use in the coverage report, e.g. "
+                "`['helloworld_test', 'helloworld.util.dirutil']. The modules are recursive: any "
+                "submodules will be included. If you leave this off, the coverage report will "
+                "include every file in the transitive closure of the address/file arguments; "
+                "for example, `test ::` will include every Python file in your project, whereas "
+                "`test project/app_test.py` will include `app_test.py` and any of its transitive "
+                "dependencies."
+            ),
+        )
         register(
             "--report",
             type=CoverageReportType,
@@ -111,6 +127,10 @@ class PytestCoverage(PythonToolBase):
             advanced=True,
             help="Whether to exclude the test files in coverage measurement.",
         )
+
+    @property
+    def filter(self) -> Tuple[str, ...]:
+        return tuple(self.options.filter)
 
     @property
     def report(self) -> CoverageReportType:
@@ -158,12 +178,9 @@ class PytestCoverageDataCollection(CoverageDataCollection):
     element_type = PytestCoverageData
 
 
-# TODO(#7490): Once we have support for `await Get` of singletons, we can remove this class. We only
-# have it so that we can avoid `pytest_runner.py` from awaiting `CoverageConfig` if coverage is not
-# being used.
 @dataclass(frozen=True)
 class CoverageConfigRequest:
-    pass
+    targets: FrozenOrderedSet[Target]
 
 
 @dataclass(frozen=True)
@@ -173,21 +190,18 @@ class CoverageConfig:
 
 @rule
 async def create_coverage_config(
-    _: CoverageConfigRequest,
-    transitive_targets: TransitiveTargets,
-    coverage_subsystem: PytestCoverage,
-    log_level: LogLevel,
+    request: CoverageConfigRequest, coverage_subsystem: CoverageSubsystem, log_level: LogLevel
 ) -> CoverageConfig:
     all_stripped_sources = await MultiGet(
         Get(SourceRootStrippedSources, StripSourcesFieldRequest(tgt[PythonSources]))
-        for tgt in transitive_targets.closure
+        for tgt in request.targets
         if tgt.has_field(PythonSources)
     )
     all_stripped_test_sources: Tuple[SourceRootStrippedSources, ...] = ()
     if coverage_subsystem.omit_test_sources:
         all_stripped_test_sources = await MultiGet(
             Get(SourceRootStrippedSources, StripSourcesFieldRequest(tgt[PythonTestsSources]))
-            for tgt in transitive_targets.closure
+            for tgt in request.targets
             if tgt.has_field(PythonTestsSources)
         )
 
@@ -204,14 +218,11 @@ async def create_coverage_config(
         """
         [run]
         branch = True
-        timid = False
         relative_files = True
         """
     )
-
     cp = configparser.ConfigParser()
     cp.read_string(default_config)
-    cp.set("run", "plugins", COVERAGE_PLUGIN_MODULE_NAME)
 
     if coverage_subsystem.omit_test_sources:
         test_files = itertools.chain.from_iterable(
@@ -224,6 +235,7 @@ async def create_coverage_config(
         # See https://coverage.readthedocs.io/en/coverage-5.1/cmd.html?highlight=debug#diagnostics.
         cp.set("run", "debug", "\n\ttrace\n\tconfig")
 
+    cp.set("run", "plugins", COVERAGE_PLUGIN_MODULE_NAME)
     cp.add_section(COVERAGE_PLUGIN_MODULE_NAME)
     cp.set(
         COVERAGE_PLUGIN_MODULE_NAME,
@@ -247,7 +259,7 @@ class CoverageSetup:
 
 
 @rule
-async def setup_coverage(coverage: PytestCoverage, plugin: CoveragePlugin) -> CoverageSetup:
+async def setup_coverage(coverage: CoverageSubsystem, plugin: CoveragePlugin) -> CoverageSetup:
     pex = await Get[Pex](
         PexRequest(
             output_filename="coverage.pex",
@@ -300,13 +312,13 @@ async def merge_coverage_data(
 async def generate_coverage_report(
     merged_coverage_data: MergedCoverageData,
     coverage_setup: CoverageSetup,
-    coverage_subsystem: PytestCoverage,
+    coverage_subsystem: CoverageSubsystem,
     transitive_targets: TransitiveTargets,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> CoverageReports:
     """Takes all Python test results and generates a single coverage report."""
-    coverage_config_request = Get(CoverageConfig, CoverageConfigRequest())
+    coverage_config_request = Get(CoverageConfig, CoverageConfigRequest(transitive_targets.closure))
     sources_request = Get(
         SourceFiles,
         AllSourceFilesRequest(
@@ -370,6 +382,6 @@ def rules():
         generate_coverage_report,
         merge_coverage_data,
         setup_coverage,
-        SubsystemRule(PytestCoverage),
+        SubsystemRule(CoverageSubsystem),
         UnionRule(CoverageDataCollection, PytestCoverageDataCollection),
     ]
