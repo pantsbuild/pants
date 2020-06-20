@@ -961,15 +961,6 @@ class GlobalOptions(Subsystem):
         )
 
         register(
-            "--v2-ui",
-            default=False,
-            type=bool,
-            removal_version="1.31.0.dev0",
-            removal_hint="Use --dynamic-ui instead.",
-            help="Whether to show v2 engine execution progress.",
-        )
-
-        register(
             "--dependency-inference",
             default=False,
             type=bool,

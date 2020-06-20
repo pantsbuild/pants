@@ -8,7 +8,6 @@ from typing import Mapping, Optional, Tuple
 
 from pants.base.build_environment import get_buildroot
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
-from pants.base.deprecated import resolve_conflicting_options
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
 from pants.base.specs import Specs
@@ -31,7 +30,6 @@ from pants.init.specs_calculator import SpecsCalculator
 from pants.option.arg_splitter import UnknownGoalHelp
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.option.scope import GLOBAL_SCOPE
 from pants.reporting.reporting import Reporting
 from pants.reporting.streaming_workunit_handler import StreamingWorkunitHandler
 from pants.subsystem.subsystem import Subsystem
@@ -87,18 +85,7 @@ class LocalPantsRunner:
         )
 
         global_scope = options.for_global_scope()
-
-        if global_scope.v2:
-            dynamic_ui = resolve_conflicting_options(
-                old_option="v2_ui",
-                new_option="dynamic_ui",
-                old_scope=GLOBAL_SCOPE,
-                new_scope=GLOBAL_SCOPE,
-                old_container=global_scope,
-                new_container=global_scope,
-            )
-        else:
-            dynamic_ui = False
+        dynamic_ui = global_scope.dynamic_ui if global_scope.v2 else False
         use_colors = global_scope.get("colors", True)
 
         zipkin_trace_v2 = options.for_scope("reporting").zipkin_trace_v2
