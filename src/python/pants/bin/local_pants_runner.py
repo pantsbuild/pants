@@ -30,7 +30,6 @@ from pants.init.specs_calculator import SpecsCalculator
 from pants.option.arg_splitter import UnknownGoalHelp
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.option.scope import GLOBAL_SCOPE
 from pants.reporting.reporting import Reporting
 from pants.reporting.streaming_workunit_handler import StreamingWorkunitHandler
 from pants.subsystem.subsystem import Subsystem
