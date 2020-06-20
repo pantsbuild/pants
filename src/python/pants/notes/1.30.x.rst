@@ -6,7 +6,7 @@ This document describes releases leading up to the ``1.30.x`` ``stable`` series.
 See https://pants.readme.io/v1.30/docs/release-notes-1-30 for an overview of the changes in this release.
 
 1.30.0rc0 (6/19/2020)
------------------------
+---------------------
 
 API Changes
 ~~~~~~~~~~~
