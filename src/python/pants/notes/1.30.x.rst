@@ -5,6 +5,148 @@ This document describes releases leading up to the ``1.30.x`` ``stable`` series.
 
 See https://pants.readme.io/v1.30/docs/release-notes-1-30 for an overview of the changes in this release.
 
+1.30.0rc0 (6/19/2020)
+-----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Upgrade to Pex 2.1.12. (#10099)
+  `PR #10099 <https://github.com/pantsbuild/pants/pull/10099>`_
+
+* Deprecate `pytest-coverage` scope in favor of `coverage-py` (#10091)
+  `PR #10091 <https://github.com/pantsbuild/pants/pull/10091>`_
+
+* Deprecate `--enable-pantsd` in favor of `--pantsd` (#10049)
+  `PR #10049 <https://github.com/pantsbuild/pants/pull/10049>`_
+
+
+New Features
+~~~~~~~~~~~~
+
+* Add `--pytest-coverage-omit-test-sources` option to v2 (#10085)
+  `PR #10085 <https://github.com/pantsbuild/pants/pull/10085>`_
+
+* Add report type to FilesystemCoverageReport (#10086)
+  `PR #10086 <https://github.com/pantsbuild/pants/pull/10086>`_
+
+* Control workunit levels at `@rule` execution time (#10053)
+  `PR #10053 <https://github.com/pantsbuild/pants/pull/10053>`_
+
+* Set default source root patterns. (#10043)
+  `PR #10043 <https://github.com/pantsbuild/pants/pull/10043>`_
+
+
+Bugfixes
+~~~~~~~~
+
+* Fix v2 Coverage erroring when a test failed to generate data (#10095)
+  `PR #10095 <https://github.com/pantsbuild/pants/pull/10095>`_
+
+* Fix the `coverage` field not working with v2 (#10082)
+  `PR #10082 <https://github.com/pantsbuild/pants/pull/10082>`_
+
+* Wait for ongoing runs to complete before shutting down pantsd (#10052)
+  `PR #10052 <https://github.com/pantsbuild/pants/pull/10052>`_
+
+* use try_into for a fallible conversion to hashing::Digest (#9994)
+  `PR #9994 <https://github.com/pantsbuild/pants/pull/9994>`_
+
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* remoting: use debug level for remoting sub-workunits (#10098)
+  `PR #10098 <https://github.com/pantsbuild/pants/pull/10098>`_
+
+* Render the first visible parent of a workunit in --dynamic-ui. (#9957)
+  `PR #9957 <https://github.com/pantsbuild/pants/pull/9957>`_
+
+* Change StreamingWorkunitHandler default verbosity to DEBUG (#10090)
+  `PR #10090 <https://github.com/pantsbuild/pants/pull/10090>`_
+
+* Inline _wrap_type in `parser.py` (#10096)
+  `PR #10096 <https://github.com/pantsbuild/pants/pull/10096>`_
+
+* Make the `roots` goal display roots configured via marker files (#10079)
+  `PR #10079 <https://github.com/pantsbuild/pants/pull/10079>`_
+
+* Refactor v2 coverage and add an integration test (#10073)
+  `PR #10073 <https://github.com/pantsbuild/pants/pull/10073>`_
+
+* Extract member_type and type_arg in `parser.py` (#10063)
+  `PR #10063 <https://github.com/pantsbuild/pants/pull/10063>`_
+
+* Replace `TargetAdaptor` implementation of `list` with Target API implementation (#9912)
+  `PR #9912 <https://github.com/pantsbuild/pants/pull/9912>`_
+
+* Rename `InteractiveProcessRequest` to `InteractiveProcess` (#10050)
+  `PR #10050 <https://github.com/pantsbuild/pants/pull/10050>`_
+
+* Remove stale TODO (#10048)
+  `PR #10048 <https://github.com/pantsbuild/pants/pull/10048>`_
+
+* Reinitialize pantsd for most configuration changes (#10035)
+  `PR #10035 <https://github.com/pantsbuild/pants/pull/10035>`_
+
+* Remove unused FmtRequest union. (#9934)
+  `PR #9934 <https://github.com/pantsbuild/pants/pull/9934>`_
+
+* Use cargo-metadata not cargo to get packages (#10045)
+  `PR #10045 <https://github.com/pantsbuild/pants/pull/10045>`_
+
+* Expose new StreamingWorkunitContext on streaming workunits callback (#10034)
+  `PR #10034 <https://github.com/pantsbuild/pants/pull/10034>`_
+
+
+Testing
+~~~~~~~
+
+* Increase timeout on test targets (#10097)
+  `PR #10097 <https://github.com/pantsbuild/pants/pull/10097>`_
+
+* Increase timeout for node_test_integration test target (#10094)
+  `PR #10094 <https://github.com/pantsbuild/pants/pull/10094>`_
+
+* Increase timeout for incomplete_custom_scala test target (#10089)
+  `PR #10089 <https://github.com/pantsbuild/pants/pull/10089>`_
+
+* remoting: add workunits for upload and execution (#10084)
+  `PR #10084 <https://github.com/pantsbuild/pants/pull/10084>`_
+
+* disable append-only cache in remoting (#10077)
+  `PR #10077 <https://github.com/pantsbuild/pants/pull/10077>`_
+
+* Push down process timeouts in remote execution (#10044)
+  `PR #10044 <https://github.com/pantsbuild/pants/pull/10044>`_
+
+* Add a __run.sh script to reproduce a process execution in a preserved chroot (#10030)
+  `PR #10030 <https://github.com/pantsbuild/pants/pull/10030>`_
+
+* Fix nightly build. (#10047)
+  `PR #10047 <https://github.com/pantsbuild/pants/pull/10047>`_
+
+Documentation
+~~~~~~~~~~~~~
+* Prepare the 1.28.1rc0 release.
+
+* Prepare the 1.27.1rc0 release.
+
+* Prepare the 1.26.1rc0 release.
+
+* Prepare the 1.25.1rc1 release.
+
+* Prepare the 1.24.1rc1 release.
+
+* Prepare the 1.23.1rc0 release.
+
+* Prepare the 1.22.1rc0 release.
+
+* Prepare the 1.21.1rc0 release.
+
+* Prepare 1.29.0. (#10074)
+  `PR #10074 <https://github.com/pantsbuild/pants/pull/10074>`_
+
 1.30.0.dev1 (6/12/2020)
 -----------------------
 
