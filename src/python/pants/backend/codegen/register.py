@@ -3,12 +3,6 @@
 
 """Enable this backend to turn on every single codegen backend within `pants.backend.codegen`."""
 
-from pants.backend.codegen.grpcio.python.grpcio_prep import GrpcioPrep
-from pants.backend.codegen.grpcio.python.grpcio_run import GrpcioRun
-from pants.backend.codegen.grpcio.python.python_grpcio_library import (
-    PythonGrpcioLibrary as PythonGrpcioLibraryV1,
-)
-from pants.backend.codegen.grpcio.python.target_types import PythonGrpcioLibrary
 from pants.backend.codegen.protobuf.java.java_protobuf_library import (
     JavaProtobufLibrary as JavaProtobufLibraryV1,
 )
@@ -34,7 +28,6 @@ def build_file_aliases():
             "java_protobuf_library": JavaProtobufLibraryV1,
             "java_thrift_library": JavaThriftLibraryV1,
             "python_thrift_library": PythonThriftLibraryV1,
-            "python_grpcio_library": PythonGrpcioLibraryV1,
         }
     )
 
@@ -42,15 +35,8 @@ def build_file_aliases():
 def register_goals():
     task(name="thrift-java", action=ApacheThriftJavaGen).install("gen")
     task(name="thrift-py", action=ApacheThriftPyGen).install("gen")
-    task(name="grpcio-prep", action=GrpcioPrep).install("gen")
-    task(name="grpcio-run", action=GrpcioRun).install("gen")
     task(name="protoc", action=ProtobufGen).install("gen")
 
 
 def target_types():
-    return [
-        PythonGrpcioLibrary,
-        JavaProtobufLibrary,
-        JavaThriftLibrary,
-        PythonThriftLibrary,
-    ]
+    return [JavaProtobufLibrary, JavaThriftLibrary, PythonThriftLibrary]
