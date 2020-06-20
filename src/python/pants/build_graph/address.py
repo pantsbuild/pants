@@ -262,9 +262,9 @@ class BuildFileAddress(Address):
 
     def __init__(self, *, rel_path: str, target_name: Optional[str] = None) -> None:
         """
+        :param rel_path: The BUILD files' path, relative to the root_dir.
         :param target_name: The name of the target within the BUILD file; defaults to the default
                             target, aka the name of the BUILD file parent dir.
-        :param rel_path: The BUILD files' path, relative to the root_dir.
 
         :API: public
         """
