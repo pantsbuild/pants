@@ -6,7 +6,6 @@
 These are always activated and cannot be disabled.
 """
 
-from pants.core_tasks.bash_completion import BashCompletion
 from pants.core_tasks.clean import Clean
 from pants.core_tasks.deferred_sources_mapper import DeferredSourcesMapper
 from pants.core_tasks.explain_options_task import ExplainOptionsTask
@@ -84,9 +83,6 @@ def register_goals():
 
     # Stub for other goals to schedule 'test'. See noop_exec_task.py for why this is useful.
     task(name="legacy", action=NoopTest).install("test")
-
-    # Workspace information.
-    task(name="bash-completion", action=BashCompletion).install()
 
     # Handle sources that aren't loose files in the repo.
     task(name="deferred-sources", action=DeferredSourcesMapper).install()
