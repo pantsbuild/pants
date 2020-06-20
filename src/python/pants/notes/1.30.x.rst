@@ -20,7 +20,6 @@ API Changes
 * Deprecate `--enable-pantsd` in favor of `--pantsd` (#10049)
   `PR #10049 <https://github.com/pantsbuild/pants/pull/10049>`_
 
-
 New Features
 ~~~~~~~~~~~~
 
@@ -36,7 +35,6 @@ New Features
 * Set default source root patterns. (#10043)
   `PR #10043 <https://github.com/pantsbuild/pants/pull/10043>`_
 
-
 Bugfixes
 ~~~~~~~~
 
@@ -51,7 +49,6 @@ Bugfixes
 
 * use try_into for a fallible conversion to hashing::Digest (#9994)
   `PR #9994 <https://github.com/pantsbuild/pants/pull/9994>`_
-
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
