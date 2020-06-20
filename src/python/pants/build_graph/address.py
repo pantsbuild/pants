@@ -2,11 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from functools import total_ordering
 from typing import Optional, Sequence, Tuple
 
-from pants.base.build_file import BuildFile
-from pants.base.deprecated import deprecated_conditional, warn_or_error
 from pants.util.dirutil import fast_relpath, longest_dir_prefix
 from pants.util.strutil import strip_prefix
 
@@ -91,45 +88,6 @@ def parse_spec(
         spec_path = prefix_subproject(normalize_absolute_refs(spec_path))
 
     return spec_path, target_name
-
-
-@total_ordering
-class Addresses:
-    """Used as a sentinel type for identifying a list of string specs.
-
-    addresses: list of string specs
-    rel_path: addresses might be relative specs, so they need to be interpreted
-    relative to the path of the BUILD file they were declared in.
-
-    :API: public
-    """
-
-    def __init__(self, addresses, rel_path):
-        self.addresses = addresses
-        self.rel_path = rel_path
-        warn_or_error(
-            removal_version="1.31.0.dev0",
-            deprecated_entity_description="build_graph.address.Addresses",
-            hint="To store a collection of Addresses, use engine.addresses.Addresses instead.",
-        )
-
-    def __iter__(self):
-        return iter((self.addresses, self.rel_path))
-
-    def __lt__(self, other):
-        try:
-            return tuple(self) < tuple(other)
-        except TypeError:
-            return NotImplemented
-
-    def __eq__(self, other):
-        try:
-            return tuple(self) == tuple(other)
-        except TypeError:
-            return NotImplemented
-
-    def __hash__(self):
-        return hash((self.addresses, self.rel_path))
 
 
 class InvalidSpecPath(ValueError):
@@ -225,7 +183,8 @@ class Address:
 
     @property
     def spec_path(self) -> str:
-        """
+        """The path from the build root to this target.
+
         :API: public
         """
         return self._spec_path
@@ -300,34 +259,14 @@ class BuildFileAddress(Address):
     :API: public
     """
 
-    def __init__(
-        self,
-        build_file: Optional[BuildFile] = None,
-        target_name: Optional[str] = None,
-        rel_path: Optional[str] = None,
-    ) -> None:
+    def __init__(self, *, rel_path: Optional[str], target_name: Optional[str] = None,) -> None:
         """
-        :param build_file: The build file that contains the object this address points to.
-        :param rel_path: The BUILD files' path, relative to the root_dir.
         :param target_name: The name of the target within the BUILD file; defaults to the default
                             target, aka the name of the BUILD file parent dir.
+        :param rel_path: The BUILD files' path, relative to the root_dir.
 
         :API: public
         """
-        deprecated_conditional(
-            lambda: build_file is not None,
-            removal_version="1.31.0.dev0",
-            entity_description="using `build_file` as a parameter to `BuildFileAddress`",
-            hint_message="Use the arguments `target_name` and `rel_path` instead.",
-        )
-
-        if rel_path is None:
-            if build_file is None:
-                raise ValueError(
-                    "You must either provide `rel_path` or `build_file` to the `BuildFileAddress` "
-                    "constructor. Both values were None."
-                )
-            rel_path = build_file.relpath
         spec_path = os.path.dirname(rel_path)
         super().__init__(
             spec_path=spec_path, target_name=target_name or os.path.basename(spec_path)
@@ -345,6 +284,4 @@ class BuildFileAddress(Address):
         return Address(spec_path=self.spec_path, target_name=self.target_name)
 
     def __repr__(self) -> str:
-        return "BuildFileAddress({rel_path}, {target_name})".format(
-            rel_path=self.rel_path, target_name=self.target_name
-        )
+        return f"BuildFileAddress({self.rel_path}, {self.target_name})"
