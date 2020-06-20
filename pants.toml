@@ -24,13 +24,11 @@ v2 = false
 # Enable our own custom loose-source plugins as well as contribs.
 pythonpath = [
   "%(buildroot)s/contrib/mypy/src/python",
-  "%(buildroot)s/contrib/node/src/python",
   "%(buildroot)s/contrib/scrooge/src/python",
   "%(buildroot)s/pants-plugins/src/python",
 ]
 backend_packages.add = [
   "pants.backend.docgen",
-  "pants.contrib.node",
   "pants.contrib.scrooge",
   "internal_backend.repositories",
   "internal_backend.sitegen",
@@ -208,11 +206,6 @@ config = "%(pants_supportdir)s/checkstyle/coding_style.xml"
 
 [docformatter]
 args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
-
-[eslint]
-setupdir = "%(pants_supportdir)s/eslint"
-config = "%(pants_supportdir)s/eslint/.eslintrc"
-ignore = "%(pants_supportdir)s/eslint/.eslintignore"
 
 [flake8]
 config = "build-support/flake8/.flake8"
