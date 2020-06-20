@@ -13,7 +13,6 @@ from pants.init.logging import setup_logging
 from pants.init.util import init_workdir
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.option.scope import GLOBAL_SCOPE
 
 logger = logging.getLogger(__name__)
 
