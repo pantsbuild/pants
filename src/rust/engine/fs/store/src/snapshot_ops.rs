@@ -755,7 +755,7 @@ struct PartiallyExpandedDirectoryContext {
   pub directory_promises: Vec<PathBuf>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum RestrictedPathGlob {
   Wildcard {
     wildcard: Pattern,
