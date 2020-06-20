@@ -23,7 +23,6 @@ v2 = false
 
 # Enable our own custom loose-source plugins as well as contribs.
 pythonpath = [
-  "%(buildroot)s/contrib/go/src/python",
   "%(buildroot)s/contrib/mypy/src/python",
   "%(buildroot)s/contrib/node/src/python",
   "%(buildroot)s/contrib/scrooge/src/python",
@@ -31,7 +30,6 @@ pythonpath = [
 ]
 backend_packages.add = [
   "pants.backend.docgen",
-  "pants.contrib.go",
   "pants.contrib.node",
   "pants.contrib.scrooge",
   "internal_backend.repositories",
@@ -76,7 +74,6 @@ root_patterns = [
   "src/*",
   "src/main/*",
   "src/test/*",
-  "/src/go/src",
   "test/*",
   "tests/*",
   "3rdparty/*",
@@ -162,9 +159,6 @@ deps = ["3rdparty:thrift"]
 [gen.thrift-py]
 deps = ["examples/3rdparty/python:thrift"]
 
-[gen.go-protobuf]
-import_target = "contrib/go/examples/src/protobuf/org/pantsbuild/example:protobuf-deps"
-
 [compile.rsc]
 jvm_options = ['-Xmx4g', '-XX:+UseConcMarkSweepGC', '-XX:ParallelGCThreads=4']
 args = [
@@ -244,9 +238,6 @@ excludes = "%(buildroot)s/build-support/scalastyle/excludes.txt"
 
 [protoc]
 version = "2.4.1"
-
-[protoc.gen.go-protobuf]
-version = "3.11.4"
 
 [scala]
 version = 2.12
@@ -369,11 +360,6 @@ timeout_default = 60
 [test.junit]
 timeouts = true
 timeout_default = 60
-
-[buildgen.go]
-materialize = true
-remote = true
-fail_floating = true
 
 # Site generation options.
 [reference]

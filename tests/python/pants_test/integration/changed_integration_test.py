@@ -98,19 +98,11 @@ def create_isolated_git_repo():
         create_file("README", "N.B. This is just a test tree.")
         create_file(
             "pants.toml",
-            """
+            f"""
             [GLOBAL]
-            pythonpath = [
-                "{0}/contrib/go/src/python",
-                "{0}/pants-plugins/src/python"
-            ]
-            backend_packages.add = [
-                "internal_backend.utilities",
-                "pants.contrib.go"
-            ]
-            """.format(
-                get_buildroot()
-            ),
+            pythonpath = ["{get_buildroot()}/pants-plugins/src/python"]
+            backend_packages.add = ["internal_backend.utilities"]
+            """,
         )
         copy_into(".gitignore")
 
@@ -119,21 +111,6 @@ def create_isolated_git_repo():
             def add_to_git(commit_msg, *files):
                 git.add(*files)
                 git.commit(commit_msg)
-
-            add_to_git(
-                "a go target with default sources",
-                create_file("src/go/tester/BUILD", "go_binary()"),
-                create_file(
-                    "src/go/tester/main.go",
-                    """
-                    package main
-                    import "fmt"
-                    func main() {
-                      fmt.Println("hello, world")
-                    }
-                    """,
-                ),
-            )
 
             add_to_git(
                 "resource file",
@@ -260,12 +237,6 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
             direct=["tests/scala/org/pantsbuild/cp-directories:cp-directories"],
             transitive=["tests/scala/org/pantsbuild/cp-directories:cp-directories"],
         ),
-        # A `go_binary` with default sources.
-        "src/go/tester/main.go": dict(
-            none=["src/go/tester:tester"],
-            direct=["src/go/tester:tester"],
-            transitive=["src/go/tester:tester"],
-        ),
         # An unclaimed source file.
         "src/python/python_targets/test_unclaimed_src.py": dict(none=[], direct=[], transitive=[]),
     }
@@ -376,7 +347,6 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
 
     def test_changed_with_multiple_build_files(self):
         new_build_file = "src/python/python_targets/BUILD.new"
-
         with create_isolated_git_repo() as worktree:
             touch(os.path.join(worktree, new_build_file))
             stdout_data = self.run_list([])
