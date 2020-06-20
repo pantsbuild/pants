@@ -160,7 +160,6 @@ function execute_packaged_pants_with_internal_backends() {
         'pants.backend.python',\
         'pants.cache',\
         'internal_backend.repositories',\
-        'internal_backend.sitegen',\
         'internal_backend.utilities',\
       ]" \
       --backend-packages2="[\

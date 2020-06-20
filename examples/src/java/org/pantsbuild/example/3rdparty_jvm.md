@@ -1,7 +1,7 @@
 JVM Dependency Management
 =========================
 
-In general, we recommend the [[3rdparty idiom|pants('src/docs:3rdparty')]]
+In general, we recommend the 3rdparty idiom
 for organizing dependencies on code from outside the source tree. This document
 describes how to make this work for JVM (Java or Scala) code.
 

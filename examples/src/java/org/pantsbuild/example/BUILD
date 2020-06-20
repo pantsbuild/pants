@@ -25,9 +25,6 @@ page(
     'examples/src/java/org/pantsbuild/example/javac/plugin:readme',
     'examples/src/scala/org/pantsbuild/example:readme',
     'examples/src/scala/org/pantsbuild/example/scalac/plugin:readme',
-    'src/docs:build_files',
-    'src/docs:first_concepts',
-    'src/docs:first_tutorial',
   ]
 )
 
@@ -43,26 +40,16 @@ page(
 page(
   name='publish',
   sources=['publish.md'],
-  links=[
-    'src/docs:dev_tasks_publish_extras',
-    'src/docs:howto_plugin',
-  ],
 )
 
 page(
   name='3rdparty_jvm',
   sources=['3rdparty_jvm.md'],
-  links=[
-    'src/docs:3rdparty',
-  ],
 )
 
 page(
   name='page',
   sources=['page.md'],
-  dependencies=[
-    'src/docs:howto_contribute'
-  ]
 )
 
 files(

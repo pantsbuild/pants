@@ -124,7 +124,7 @@ Publishing
 You can tell Pants to publish a page. So far, there's only one way to
 publish: as a page in an Atlassian Confluence wiki. (You can add other
 doc-publish backends to Pants;
-[[send us a patch|pants('src/docs:howto_contribute')]]!)
+send us a patch!)
 
 To specify the "address" to which to publish a page, give it a
 `provides` parameter.
@@ -158,7 +158,7 @@ set its `provides` to something like:
 
 That `wiki` specifies some information about your wiki server. So far, the only kind of thing you
 can publish to is a Confluence wiki. To set up and register this symbol, set up a
-[[Pants plugin|pants('src/docs:howto_plugin')]] if your workspace doesn't already
+Pants plugin if your workspace doesn't already
 have one. In the plugin, define a `Wiki` and register it:
 
     :::python
