@@ -6,7 +6,6 @@ import os
 from dataclasses import dataclass
 from typing import List, Mapping
 
-from pants.base.deprecated import resolve_conflicting_options
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import ExitCode
 from pants.bin.remote_pants_runner import RemotePantsRunner
@@ -46,16 +45,8 @@ class PantsRunner:
             logger.debug("Pantsd terminating goal detected: {}".format(self.args))
 
         # If we want concurrent pants runs, we can't have pantsd enabled.
-        pantsd_toggle = resolve_conflicting_options(
-            old_option="enable_pantsd",
-            new_option="pantsd",
-            old_scope=GLOBAL_SCOPE,
-            new_scope=GLOBAL_SCOPE,
-            old_container=global_bootstrap_options,
-            new_container=global_bootstrap_options,
-        )
         return (
-            pantsd_toggle
+            global_bootstrap_options.pantsd
             and not terminate_pantsd
             and not global_bootstrap_options.concurrent
             and not is_inner_run
