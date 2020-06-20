@@ -416,7 +416,7 @@ impl IntermediateGlobbedFilesAndDirectories {
             remainder,
           } => {
             let mut subdir_globs: Vec<RestrictedPathGlob> = vec![];
-            if *wildcard == *DOUBLE_STAR_GLOB {
+            if (*wildcard == *DOUBLE_STAR_GLOB) || (*wildcard == *SINGLE_STAR_GLOB) {
               // Here we short-circuit all cases which would swallow up a directory without
               // subsetting it or needing to perform any further recursive work.
               let short_circuit: bool = match &remainder[..] {
@@ -425,6 +425,12 @@ impl IntermediateGlobbedFilesAndDirectories {
                 // ending in /**. Because we want to *avoid* recursing and just use the subdirectory
                 // as-is for /**/* and /**, we `continue` here in both cases.
                 [single_glob] if *single_glob == *SINGLE_STAR_GLOB => true,
+                [double_glob] if *double_glob == *DOUBLE_STAR_GLOB => true,
+                [double_glob, single_glob]
+                  if *double_glob == *DOUBLE_STAR_GLOB && *single_glob == *SINGLE_STAR_GLOB =>
+                {
+                  true
+                }
                 _ => false,
               };
               if short_circuit {
@@ -530,9 +536,7 @@ async fn snapshot_glob_match<T: StoreWrapper>(
       .populate_globbed_files_and_directories()
       .await?;
 
-    // 1c. Push context structs that specify partially-expanded directories onto
-    // `partially_expanded_stack`. We only need to create these if we need to recurse globs into any
-    // subdirectory -- if the glob is just `**` then we do not need to modify any subdirectory.
+    // 1c. Push context structs that specify unexpanded directories onto `unexpanded_stack`.
     let dependencies: Vec<PathBuf> = todo_directories
       .keys()
       .filter_map(|subdir_path| {
