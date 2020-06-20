@@ -21,7 +21,7 @@ mypy==0.780
 Markdown==2.1.1
 packaging==20.3
 pathspec==0.8.0
-pex==2.1.11
+pex==2.1.12
 psutil==5.7.0
 Pygments==2.6.1
 pystache==0.5.4
