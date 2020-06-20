@@ -4,7 +4,6 @@
 target(
   name = 'all_directories',
   dependencies = [
-    ':grpcio_directory',
     ':hello_directory',
     ':pants_publish_plugin_directory',
     ':tensorflow_custom_op_directory',
@@ -26,15 +25,6 @@ page(
   links=[
     'src/docs:3rdparty',
   ]
-)
-
-files(
-  name='grpcio_directory',
-  sources=['grpcio/**/*'],
-  dependencies = [
-    'examples/3rdparty:python_directory',
-    'examples/src/protobuf/org/pantsbuild/example:grpcio_directory',
-  ],
 )
 
 files(

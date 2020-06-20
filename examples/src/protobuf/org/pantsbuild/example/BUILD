@@ -5,7 +5,6 @@ target(
   name = 'all_directories',
   dependencies = [
     ':distance_directory',
-    ':grpcio_directory',
     ':imports_directory',
     ':unpacked_jars_directory',
   ],
@@ -14,14 +13,6 @@ target(
 files(
   name = 'distance_directory',
   sources = ['distance/**/*'],
-)
-
-files(
-  name = 'grpcio_directory',
-  sources = ['grpcio/**/*'],
-  dependencies = [
-    'examples:3rdparty_directory',
-  ],
 )
 
 files(
