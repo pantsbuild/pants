@@ -98,6 +98,8 @@ Refactoring, Improvements, and Tooling
 * Expose new StreamingWorkunitContext on streaming workunits callback (#10034)
   `PR #10034 <https://github.com/pantsbuild/pants/pull/10034>`_
 
+* Redesign v2 coverage mechanism (#10100)
+  `PR #10100 <https://github.com/pantsbuild/pants/pull/10100>`_
 
 Testing
 ~~~~~~~
