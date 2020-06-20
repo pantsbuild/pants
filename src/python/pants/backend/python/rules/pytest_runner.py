@@ -228,7 +228,9 @@ async def run_python_test(
         add_opts.extend(
             (f"--junitxml={test_results_file}", f"-o junit_family={test_setup.junit_family}",)
         )
-    env = {"PYTEST_ADDOPTS": " ".join(add_opts)}
+    # We explicitly add the CWD to the PEX runtime sys.path. Some pytest plugins
+    # (e.g., pytest-django)  need this so that their dynamic import logic works properly.
+    env = {"PYTEST_ADDOPTS": " ".join(add_opts), "PEX_EXTRA_SYS_PATH": "."}
 
     use_coverage = test_options.values.use_coverage
     output_dirs = [".coverage"] if use_coverage else []
