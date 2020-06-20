@@ -135,10 +135,6 @@ async def pylint_lint_partition(
     # Right now any Pylint transitive requirements will shadow corresponding user
     # requirements, which could lead to problems.
     pylint_runner_pex_args = ["--pex-path", ":".join(["pylint.pex", "requirements.pex"])]
-    if pylint.source_plugins:
-        # NB: See below for why we set PYTHONPATH to load source plugins. This setting is necessary
-        # for PEX to pick up the PYTHONPATH value.
-        pylint_runner_pex_args.append("--inherit-path=fallback")
     pylint_runner_pex_request = Get[Pex](
         PexRequest(
             output_filename="pylint_runner.pex",
@@ -212,12 +208,12 @@ async def pylint_lint_partition(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path="./pylint_runner.pex",
-        # NB: Pylint source plugins must be explicitly loaded via PYTHONPATH. The value must
+        # NB: Pylint source plugins must be explicitly loaded via PEX_EXTRA_SYS_PATH. The value must
         # point to the plugin's directory, rather than to a parent's directory, because
         # `load-plugins` takes a module name rather than a path to the module; i.e. `plugin`, but
         # not `path.to.plugin`. (This means users must have specified the parent directory as a
         # source root.)
-        env={"PYTHONPATH": "./__plugins"} if pylint.source_plugins else None,
+        env={"PEX_EXTRA_SYS_PATH": "./__plugins"} if pylint.source_plugins else None,
         pex_args=generate_args(specified_source_files=specified_source_files, pylint=pylint),
         input_digest=input_digest,
         description=(

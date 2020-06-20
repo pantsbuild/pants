@@ -100,10 +100,6 @@ def contrib_packages() -> Set[Package]:
             "pantsbuild.pants.contrib.node", "contrib/node/src/python/pants/contrib/node:plugin",
         ),
         Package(
-            "pantsbuild.pants.contrib.confluence",
-            "contrib/confluence/src/python/pants/contrib/confluence:plugin",
-        ),
-        Package(
             "pantsbuild.pants.contrib.mypy", "contrib/mypy/src/python/pants/contrib/mypy:plugin",
         ),
     }

@@ -9,7 +9,7 @@ from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import temporary_dir
 
 
-class PytestCoverageIntegrationTest(PantsRunIntegrationTest):
+class CoverageIntegrationTest(PantsRunIntegrationTest):
     def test_coverage(self) -> None:
         with temporary_dir(root_dir=get_buildroot()) as tmpdir:
             tmpdir_relative = Path(tmpdir).relative_to(get_buildroot())
@@ -66,8 +66,7 @@ class PytestCoverageIntegrationTest(PantsRunIntegrationTest):
                 )
             )
 
-            # Test the rest of the functionality in a different source root and different folder.
-            # These test that the `coverage` field works properly.
+            # Test that a `tests/` source root accurately gets coverage data for the `src/` root.
             test_root = Path(tmpdir, "tests", "python", "project_test")
             test_root.mkdir(parents=True)
             (test_root / "test_multiply.py").write_text(
@@ -97,16 +96,12 @@ class PytestCoverageIntegrationTest(PantsRunIntegrationTest):
                       name="multiply",
                       sources=["test_multiply.py"],
                       dependencies=['{tmpdir_relative}/src/python/project'],
-                      coverage=['project.lib'],
                     )
 
                     python_tests(
                       name="arithmetic",
                       sources=["test_arithmetic.py"],
                       dependencies=['{tmpdir_relative}/src/python/project'],
-                      # This is a looser module than `project.lib`. We want to make sure we support
-                      # this too.
-                      coverage=['project'],
                     )
                     """
                 )
@@ -133,15 +128,19 @@ class PytestCoverageIntegrationTest(PantsRunIntegrationTest):
                 f"{tmpdir_relative}/tests/python/project_test:arithmetic",
                 f"{tmpdir_relative}/tests/python/project_test/no_src",
             ]
-            result = self.run_pants(command)
-            omit_test_result = self.run_pants([*command, "--pytest-coverage-omit-test-sources"])
+            default_result = self.run_pants(command)
+            omit_test_result = self.run_pants([*command, "--coverage-py-omit-test-sources"])
+            filter_result = self.run_pants(
+                [*command, "--coverage-py-filter=['project.lib', 'project_test.no_src']"]
+            )
 
-        assert result.returncode == omit_test_result.returncode == 0
-        # Regression test: make sure that individual tests do not complain about failing to
-        # generate reports. This was showing up at test-time, even though the final merged report
-        # would work properly.
-        assert "Failed to generate report" not in result.stderr_data
-        assert "Failed to generate report" not in omit_test_result.stderr_data
+        for result in (default_result, omit_test_result, filter_result):
+            assert result.returncode == 0
+            # Regression test: make sure that individual tests do not complain about failing to
+            # generate reports. This was showing up at test-time, even though the final merged
+            # report would work properly.
+            assert "Failed to generate report" not in result.stderr_data
+
         assert (
             dedent(
                 f"""\
@@ -151,11 +150,13 @@ class PytestCoverageIntegrationTest(PantsRunIntegrationTest):
                 {tmpdir_relative}/src/python/project/lib_test.py                        3      0      0      0   100%
                 {tmpdir_relative}/src/python/project/random.py                          2      2      0      0     0%
                 {tmpdir_relative}/tests/python/project_test/no_src/test_no_src.py       2      0      0      0   100%
+                {tmpdir_relative}/tests/python/project_test/test_arithmetic.py          3      0      0      0   100%
+                {tmpdir_relative}/tests/python/project_test/test_multiply.py            3      0      0      0   100%
                 -----------------------------------------------------------------------------------------------
-                TOTAL                                                            13      2      0      0    85%
+                TOTAL                                                            19      2      0      0    89%
                 """
             )
-            in result.stderr_data
+            in default_result.stderr_data
         )
         assert (
             dedent(
@@ -169,4 +170,17 @@ class PytestCoverageIntegrationTest(PantsRunIntegrationTest):
                 """
             )
             in omit_test_result.stderr_data
+        )
+        assert (
+            dedent(
+                f"""\
+                Name                                                          Stmts   Miss Branch BrPart  Cover
+                -----------------------------------------------------------------------------------------------
+                {tmpdir_relative}/src/python/project/lib.py                             6      0      0      0   100%
+                {tmpdir_relative}/tests/python/project_test/no_src/test_no_src.py       2      0      0      0   100%
+                -----------------------------------------------------------------------------------------------
+                TOTAL                                                             8      0      0      0   100%
+                """
+            )
+            in filter_result.stderr_data
         )
