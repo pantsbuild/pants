@@ -5,8 +5,6 @@ target(
   name = 'all_directories',
   dependencies = [
     ':hello_directory',
-    ':useproto_directory',
-    ':useprotoimports_directory',
     ':usethrift_directory',
   ],
 )
@@ -17,22 +15,6 @@ files(
   dependencies = [
     'examples/src/java/org/pantsbuild/example:hello_directory',
     'examples/src/resources/org/pantsbuild/example:hello_directory',
-  ],
-)
-
-files(
-  name = 'useproto_directory',
-  sources = ['useproto/**/*'],
-  dependencies = [
-    'examples/src/protobuf/org/pantsbuild/example:distance_directory',
-  ],
-)
-
-files(
-  name = 'useprotoimports_directory',
-  sources = ['useprotoimports/**/*'],
-  dependencies = [
-    'examples/src/protobuf/org/pantsbuild/example:imports_directory',
   ],
 )
 

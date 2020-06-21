@@ -10,7 +10,6 @@ target(
     ':java_sources_directory',
     ':javac_directory',
     ':make_it_rain_directory',
-    ':protobuf_directory',
     # NB: See `:java_sources_directory` for why we must declare this dependency here.
     'examples/src/scala/org/pantsbuild/example:scala_with_java_sources_directory'
   ],
@@ -104,15 +103,5 @@ files(
   dependencies = [
     'examples/src/thrift/org/pantsbuild/example:distance_directory',
     'examples/src/thrift/org/pantsbuild/example:precipitation_directory',
-  ],
-)
-
-files(
-  name = 'protobuf_directory',
-  sources = ['protobuf/**/*'],
-  dependencies = [
-    'examples/src/protobuf/org/pantsbuild/example:distance_directory',
-    'examples/src/protobuf/org/pantsbuild/example:imports_directory',
-    'examples/src/protobuf/org/pantsbuild/example:unpacked_jars_directory',
   ],
 )
