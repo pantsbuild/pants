@@ -150,7 +150,6 @@ function execute_packaged_pants_with_internal_backends() {
     --pythonpath="['pants-plugins/src/python']" \
     --backend-packages="[\
         'pants.backend.codegen',\
-        'pants.backend.docgen',\
         'pants.backend.graph_info',\
         'pants.backend.jvm',\
         'pants.backend.native',\

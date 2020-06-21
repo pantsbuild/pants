@@ -28,7 +28,6 @@ pythonpath = [
   "%(buildroot)s/pants-plugins/src/python",
 ]
 backend_packages.add = [
-  "pants.backend.docgen",
   "pants.contrib.scrooge",
   "internal_backend.repositories",
   "internal_backend.utilities",
