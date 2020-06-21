@@ -572,6 +572,9 @@ def unit_tests(python_version: PythonVersion) -> Dict:
 
 def _build_wheels_command() -> List[str]:
     return [
+        # If we're on a pull request build, we compile Rust in debug mode for speed. We don't
+        # actually care about the final asset; we only build as a smoke screen.
+        '[[ "${TRAVIS_PULL_REQUEST}" -ne false ]] && export MODE=debug',
         "./build-support/bin/release.sh -n",
         "USE_PY37=true ./build-support/bin/release.sh -n",
         "USE_PY38=true ./build-support/bin/release.sh -n",

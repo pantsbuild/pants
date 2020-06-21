@@ -1418,7 +1418,8 @@ jobs:
       "TRAVIS_UID=$(id -u)" --build-arg "TRAVIS_GROUP=$(id -gn)" --build-arg "TRAVIS_GID=$(id
       -g)" build-support/docker/travis_ci/
     - docker run --rm -t -v "${HOME}:/travis/home" -v "${TRAVIS_BUILD_DIR}:/travis/workdir"
-      travis_ci:latest sh -c "./build-support/bin/release.sh -n && USE_PY37=true ./build-support/bin/release.sh
+      travis_ci:latest sh -c "[[ "${TRAVIS_PULL_REQUEST}" -ne false ]] && export MODE=debug
+      && ./build-support/bin/release.sh -n && USE_PY37=true ./build-support/bin/release.sh
       -n && USE_PY38=true ./build-support/bin/release.sh -n && ./build-support/bin/release.sh
       -f"
     services:
@@ -1463,6 +1464,7 @@ jobs:
     os: osx
     osx_image: xcode8
     script:
+    - '[[ "${TRAVIS_PULL_REQUEST}" -ne false ]] && export MODE=debug'
     - ./build-support/bin/release.sh -n
     - USE_PY37=true ./build-support/bin/release.sh -n
     - USE_PY38=true ./build-support/bin/release.sh -n
