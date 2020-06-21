@@ -28,13 +28,12 @@ class DependenciesIntegrationTest(GoalRuleTestBase):
 
     def create_python_library(self, path: str, *, dependencies: Optional[List[str]] = None) -> None:
         self.add_to_build_file(
-            path,
-            f"python_library(name='target', sources=[], dependencies={dependencies or []})"
+            path, f"python_library(name='target', sources=[], dependencies={dependencies or []})"
         )
 
     def create_python_requirement_library(self, name: str) -> None:
         self.add_to_build_file(
-            f"3rdparty/python",
+            "3rdparty/python",
             dedent(
                 f"""\
                 python_requirement_library(
@@ -42,7 +41,7 @@ class DependenciesIntegrationTest(GoalRuleTestBase):
                     requirements=[python_requirement('{name}==1.0.0')],
                 )
                 """
-            )
+            ),
         )
 
     def assert_dependencies(
