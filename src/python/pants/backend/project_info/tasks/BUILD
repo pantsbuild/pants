@@ -9,7 +9,6 @@ target(
     ':export',
     ':export_dep_as_jar',
     ':filedeps',
-    ':idea_plugin_gen',
   ],
 )
 
@@ -104,27 +103,4 @@ python_library(
     'src/python/pants/task',
   ],
   tags = {"partially_type_checked"},
-)
-
-python_library(
-  name = 'idea_plugin_gen',
-  sources = ['idea_plugin_gen.py'],
-  dependencies = [
-    ':idea_resources',
-    'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/backend/python/targets',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/base:generator',
-    'src/python/pants/task',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:desktop',
-    'src/python/pants/util:dirutil',
-  ],
-  tags = {'partially_type_checked'},
-)
-
-resources(
-  name = 'idea_resources',
-  sources = ['templates/idea/*.mustache'],
 )
