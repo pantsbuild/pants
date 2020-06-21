@@ -5,7 +5,6 @@ import itertools
 from enum import Enum
 from typing import Set
 
-from pants.backend.jvm.target_types import JarsField
 from pants.backend.python.target_types import PythonRequirementsField
 from pants.engine.addresses import Addresses
 from pants.engine.console import Console
@@ -86,15 +85,6 @@ async def dependencies(
             if tgt.has_field(PythonRequirementsField):
                 third_party_requirements.update(
                     str(python_req.requirement) for python_req in tgt[PythonRequirementsField].value
-                )
-            if tgt.has_field(JarsField):
-                third_party_requirements.update(
-                    (
-                        f"{jar.org}:{jar.name}:{jar.rev}"
-                        if jar.rev is not None
-                        else f"{jar.org}:{jar.name}"
-                    )
-                    for jar in tgt[JarsField].value
                 )
 
     with options.line_oriented(console) as print_stdout:
