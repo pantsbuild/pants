@@ -35,8 +35,8 @@ def main() -> None:
 
         if args.githooks:
             run_githooks()
-        if args.sanity_checks:
-            run_sanity_checks()
+        if args.smoke_screens:
+            run_smoke_screens()
         if args.lint:
             run_lint(oauth_token_path=remote_execution_oauth_token_path)
         if args.doc_gen:
@@ -114,9 +114,9 @@ def create_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--githooks", action="store_true", help="Run pre-commit githook.")
     parser.add_argument(
-        "--sanity-checks",
+        "--smoke-screens",
         action="store_true",
-        help="Run sanity checks of bootstrapped Pants and repo BUILD files.",
+        help="Run several smoke screens of bootstrapped Pants and repo BUILD files.",
     )
     parser.add_argument("--lint", action="store_true", help="Run lint over whole codebase.")
     parser.add_argument("--doc-gen", action="store_true", help="Run doc generation tests.")
@@ -409,9 +409,9 @@ def run_githooks() -> None:
     )
 
 
-def run_sanity_checks() -> None:
+def run_smoke_screens() -> None:
     def run_check(command: List[str]) -> None:
-        print(f"* Executing `./pants.pex {' '.join(command)}` as a sanity check")
+        print(f"* Executing `./pants.pex {' '.join(command)}` as a smoke screen")
         try:
             subprocess.run(
                 ["./pants.pex", *command],
@@ -430,7 +430,7 @@ def run_sanity_checks() -> None:
         ["roots"],
         ["targets"],
     ]
-    with travis_section("SanityCheck", "Sanity checking bootstrapped Pants and repo BUILD files"):
+    with travis_section("SmokeScreen", "Smoke screening bootstrapped Pants and repo BUILD files"):
         check_pants_pex_exists()
         for check in checks:
             run_check(check)

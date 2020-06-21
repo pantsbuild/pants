@@ -504,7 +504,7 @@ def lint(python_version: PythonVersion) -> Dict:
         "script": [
             (
                 "travis-wait-enhanced --timeout 50m --interval 9m -- ./build-support/bin/ci.py "
-                f"--githooks --sanity-checks --doc-gen --python-version {python_version.decimal}"
+                f"--githooks --smoke-screens --doc-gen --python-version {python_version.decimal}"
             ),
             # NB: We split up `--lint` into its own shard because it uses remote execution. The
             # RBE token expires after 60 minutes, so we don't want to generate the token until all
@@ -728,32 +728,32 @@ def osx_platform_tests(python_version: PythonVersion) -> Dict:
 
 
 # -------------------------------------------------------------------------
-# OSX sanity checks
+# OSX smoke screens
 # -------------------------------------------------------------------------
 
 
-def _osx_sanity_check(
+def _osx_smoke_screen(
     python_version: PythonVersion, *, os_version_number: int, osx_image: str
 ) -> Dict:
     shard = {
         **osx_shard(python_version=python_version, osx_image=osx_image),
-        "name": f"OSX 10.{os_version_number} sanity check (Python {python_version.decimal})",
+        "name": f"macOS 10.{os_version_number} smoke screen (Python {python_version.decimal})",
         "script": [
-            f"MODE=debug ./build-support/bin/ci.py --sanity-checks --python-version {python_version.decimal}"
+            f"MODE=debug ./build-support/bin/ci.py --smoke-screens --python-version {python_version.decimal}"
         ],
     }
     safe_append(
-        shard, "env", f"CACHE_NAME=osx_sanity.10_{os_version_number}.py{python_version.number}"
+        shard, "env", f"CACHE_NAME=macos_smoke.10_{os_version_number}.py{python_version.number}"
     )
     return shard
 
 
-def osx_10_12_sanity_check(python_version: PythonVersion) -> Dict:
-    return _osx_sanity_check(python_version, os_version_number=12, osx_image="xcode9.2")
+def osx_10_12_smoke_screen(python_version: PythonVersion) -> Dict:
+    return _osx_smoke_screen(python_version, os_version_number=12, osx_image="xcode9.2")
 
 
-def osx_10_13_sanity_check(python_version: PythonVersion) -> Dict:
-    return _osx_sanity_check(python_version, os_version_number=13, osx_image="xcode10.1")
+def osx_10_13_smoke_screen(python_version: PythonVersion) -> Dict:
+    return _osx_smoke_screen(python_version, os_version_number=13, osx_image="xcode10.1")
 
 
 # -------------------------------------------------------------------------
@@ -884,8 +884,8 @@ def main() -> None:
                     build_wheels_linux(),
                     build_wheels_osx(),
                     *[osx_platform_tests(v) for v in supported_python_versions],
-                    *[osx_10_12_sanity_check(v) for v in supported_python_versions],
-                    *[osx_10_13_sanity_check(v) for v in supported_python_versions],
+                    *[osx_10_12_smoke_screen(v) for v in supported_python_versions],
+                    *[osx_10_13_smoke_screen(v) for v in supported_python_versions],
                     *[jvm_tests(v) for v in supported_python_versions],
                     deploy_stable(),
                     deploy_unstable(),

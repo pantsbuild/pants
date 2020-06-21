@@ -119,7 +119,7 @@ class CmdLineSpecParserTest(TestBase):
         double_absolute_address = "/" + os.path.join(self.build_root, "a")
         double_absolute_file = "/" + os.path.join(self.build_root, "a.txt")
         for spec in [double_absolute_address, double_absolute_file]:
-            assert "//" == spec[:2], "A sanity check that we have a leading-// absolute spec"
+            assert "//" == spec[:2], "A check that we have a leading-// absolute spec"
         self.assert_address_spec_parsed(
             double_absolute_address, single(double_absolute_address[2:])
         )
