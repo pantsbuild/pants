@@ -6,7 +6,6 @@ python_library(
     'src/python/pants/backend/project_info/tasks:all',
     'src/python/pants/goal:task_registrar',
     '3rdparty/python:dataclasses',
-    'src/python/pants/backend/graph_info/subsystems',
     'src/python/pants/base:build_root',
     'src/python/pants/engine:addresses',
     'src/python/pants/engine:console',
