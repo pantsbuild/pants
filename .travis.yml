@@ -276,7 +276,7 @@ jobs:
     - '3.7'
     script:
     - travis-wait-enhanced --timeout 50m --interval 9m -- ./build-support/bin/ci.py
-      --githooks --sanity-checks --doc-gen --python-version 3.6
+      --githooks --sanity-checks --python-version 3.6
     - travis-wait-enhanced --timeout 40m --interval 9m -- ./build-support/bin/ci.py
       --remote-execution-enabled --lint --python-version 3.6
     stage: Test Pants
@@ -338,7 +338,7 @@ jobs:
     - '3.7'
     script:
     - travis-wait-enhanced --timeout 50m --interval 9m -- ./build-support/bin/ci.py
-      --githooks --sanity-checks --doc-gen --python-version 3.7
+      --githooks --sanity-checks --python-version 3.7
     - travis-wait-enhanced --timeout 40m --interval 9m -- ./build-support/bin/ci.py
       --remote-execution-enabled --lint --python-version 3.7
     stage: Test Pants (Cron)
