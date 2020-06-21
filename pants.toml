@@ -31,7 +31,6 @@ backend_packages.add = [
   "pants.backend.docgen",
   "pants.contrib.scrooge",
   "internal_backend.repositories",
-  "internal_backend.sitegen",
   "internal_backend.utilities",
 ]
 backend_packages2.add = [
@@ -358,9 +357,6 @@ build_dictionary_template = "reference/build_dictionary_body.html"
 
 [markdown]
 fragment = true
-
-[sitegen]
-config_path = "src/docs/docsite.json"
 
 [native-build-step.cpp-compile-settings]
 # TensorFlow 1.13 on python 3.7 specifically uses a newer C++ ABI than any other TensorFlow release,
