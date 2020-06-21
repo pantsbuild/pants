@@ -38,7 +38,7 @@ Services
 
 A Pants Daemon process has several services that it polls in order. Every service runs in a separate thread, and can be paused, resumed or terminated. Services can communicate with each other.
 
-Examples of services are [`FSEventService`](https://github.com/pantsbuild/pants/blob/master/src/python/pants/pantsd/service/fs_event_service.py#14), which takes care of listening for watchman events, [`SchedulerService`](https://github.com/pantsbuild/pants/blob/master/src/python/pants/pantsd/service/scheduler_service.py#21), which takes care of listening responding to those events to keep a warm `Graph`, and [`PailgunService`](https://github.com/pantsbuild/pants/blob/master/src/python/pants/pantsd/service/pailgun_service.py#15), which listens to `SchedulerService` and manages the lifetime of a `PailgunServer` responsible for spawning pants runs when requested by clients, it takes a `DaemonPantsRunner` as one of its arguments, to use as a template to spawn pants runs when requested by the clients.
+Examples of services are [`SchedulerService`](https://github.com/pantsbuild/pants/blob/master/src/python/pants/pantsd/service/scheduler_service.py#21), which takes care of listening responding to those events to keep a warm `Graph`, and [`PailgunService`](https://github.com/pantsbuild/pants/blob/master/src/python/pants/pantsd/service/pailgun_service.py#15), which listens to `SchedulerService` and manages the lifetime of a `PailgunServer` responsible for spawning pants runs when requested by clients, it takes a `DaemonPantsRunner` as one of its arguments, to use as a template to spawn pants runs when requested by the clients.
 
 ### PailgunService
   
