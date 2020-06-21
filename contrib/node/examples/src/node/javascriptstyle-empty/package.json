@@ -1,7 +1,0 @@
-{
-  "name": "javascriptstyle-empty",
-  "version": "1.0.0",
-  "description": "Empty project to test javascript-style ignore paths",
-  "main": "index.js",
-  "license": "MIT"
-}

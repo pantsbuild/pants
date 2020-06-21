@@ -387,7 +387,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
             compile_workunit_spans = self.find_spans_by_name_and_service_name(
                 trace, "compile", "pants/workunit"
             )
-            self.assertEqual(len(compile_workunit_spans), 4)
+            self.assertEqual(len(compile_workunit_spans), 3)
             self.assertTrue(
                 all(span["parentId"] == rsc_task_span_id for span in compile_workunit_spans)
             )
