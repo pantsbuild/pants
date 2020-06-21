@@ -159,7 +159,6 @@ def _legacy_symbol_table(
     table["python_tests"] = PythonTestsAdaptor
     table["python_binary"] = PythonBinaryAdaptor
     table["remote_sources"] = RemoteSourcesAdaptor
-    table["page"] = PageAdaptor
     table["pants_plugin"] = PantsPluginAdaptor
     table["contrib_plugin"] = PantsPluginAdaptor
 
