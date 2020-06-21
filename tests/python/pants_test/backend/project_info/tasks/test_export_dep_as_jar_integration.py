@@ -134,36 +134,6 @@ class ExportDepAsJarIntegrationTest(ScalacPluginIntegrationTestBase):
         }
         self._check_compiler_options_for_target_are(target_to_test, expected_options, config)
 
-    def test_node_module_deps_as_target_roots(self):
-        targets_to_test = [
-            "examples/src/scala/org/pantsbuild/example/several_scala_targets:greet_json",
-            "examples/src/scala/org/pantsbuild/example/several_scala_targets/node:names_to_greet",
-        ]
-        with self.temporary_workdir() as workdir:
-            pants_run = self.run_pants_with_workdir(
-                ["export-dep-as-jar"] + targets_to_test, workdir, {}
-            )
-            self.assert_success(pants_run)
-            export_output = json.loads(pants_run.stdout_data)
-            self.assertIn(
-                "examples.src.scala.org.pantsbuild.example.several_scala_targets.node.names_to_greet",
-                export_output["libraries"],
-            )
-            artifact_path = os.path.join(
-                export_output["libraries"][
-                    "examples.src.scala.org.pantsbuild.example.several_scala_targets.node.names_to_greet"
-                ]["default"],
-                "names_to_greet",
-                "names.json",
-            )
-            self.assertTrue(os.path.exists(artifact_path))
-            self.assertIn(
-                "examples.src.scala.org.pantsbuild.example.several_scala_targets.node.names_to_greet",
-                export_output["targets"][
-                    "examples/src/scala/org/pantsbuild/example/several_scala_targets:greet_json"
-                ]["libraries"],
-            )
-
     def test_jars_resolve_sources_javadocs(self):
         targets_to_test = ["examples/src/scala/org/pantsbuild/example/scalac/plugin:global"]
         with self.temporary_workdir() as workdir:

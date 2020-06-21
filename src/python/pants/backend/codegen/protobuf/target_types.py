@@ -1,7 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.codegen.protobuf.subsystems.protoc import Protoc
+from pants.backend.codegen.protobuf.protoc import Protoc
 from pants.engine.addresses import Address
 from pants.engine.rules import SubsystemRule, rule
 from pants.engine.target import (

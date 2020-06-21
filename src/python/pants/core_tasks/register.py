@@ -6,7 +6,6 @@
 These are always activated and cannot be disabled.
 """
 
-from pants.core_tasks.bash_completion import BashCompletion
 from pants.core_tasks.clean import Clean
 from pants.core_tasks.deferred_sources_mapper import DeferredSourcesMapper
 from pants.core_tasks.explain_options_task import ExplainOptionsTask
@@ -58,8 +57,7 @@ def register_goals():
     # Pantsd.
     kill_pantsd = task(name="kill-pantsd", action=PantsDaemonKill)
     kill_pantsd.install()
-    # Kill pantsd/watchman first, so that they're not using any files
-    # in .pants.d at the time of removal.
+    # Kill pantsd first so that it's not using any files in .pants.d at the time of removal.
     kill_pantsd.install("clean-all", first=True)
 
     # Reporting server.
@@ -84,9 +82,6 @@ def register_goals():
 
     # Stub for other goals to schedule 'test'. See noop_exec_task.py for why this is useful.
     task(name="legacy", action=NoopTest).install("test")
-
-    # Workspace information.
-    task(name="bash-completion", action=BashCompletion).install()
 
     # Handle sources that aren't loose files in the repo.
     task(name="deferred-sources", action=DeferredSourcesMapper).install()

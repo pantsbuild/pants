@@ -17,7 +17,6 @@ python_tests(
   sources=['test_rsc_compile_integration.py'],
   dependencies=[
     ':rsc_compile_integration_base',
-    'contrib/node:examples_directory',
     'examples/src/scala/org/pantsbuild/example:hello_directory',
     'testprojects/src/scala/org/pantsbuild/testproject:javadepsonscalatransitive_directory',
     'testprojects/src/scala/org/pantsbuild/testproject:javasources_directory',

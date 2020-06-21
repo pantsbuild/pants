@@ -3,6 +3,8 @@
 
 python_library(
   dependencies = [
+    'src/python/pants/core/util_rules',
+    'src/python/pants/engine:platform',
     'src/python/pants/engine:target',
   ],
   tags = {"type_checked"},

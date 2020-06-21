@@ -59,18 +59,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'filesystem_build_file',
-  sources = ['test_filesystem_build_file.py'],
-  dependencies = [
-    '3rdparty/python:pathspec',
-    'src/python/pants/base:build_file',
-    'src/python/pants/util:dirutil',
-    'src/python/pants/util:ordered_set',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_tests(
   name = 'fingerprint_strategy',
   sources = ['test_fingerprint_strategy.py'],
   dependencies = [

@@ -41,18 +41,6 @@ python_tests(
 )
 
 python_tests(
-    name="protobuf_projects_integration",
-    sources=["test_protobuf_projects_integration.py"],
-    dependencies=[
-        ":projects_test_base",
-        "examples/src/protobuf/org/pantsbuild/example:all_directories",
-        "testprojects/src/protobuf/org/pantsbuild/testproject:all_directories",
-    ],
-    tags={"integration", "partially_type_checked"},
-    timeout=300,
-)
-
-python_tests(
     name="python_examples_integration",
     sources=["test_python_examples_integration.py"],
     dependencies=[

@@ -29,9 +29,9 @@ python_library(
   name='address_mapper',
   sources=['address_mapper.py'],
   dependencies=[
-    'src/python/pants/base:build_file',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:specs',
+    'src/python/pants/build_graph:address',
     'src/python/pants/build_graph',
     'src/python/pants/engine:addresses',
     'src/python/pants/util:dirutil',

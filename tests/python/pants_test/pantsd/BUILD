@@ -20,28 +20,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'watchman',
-  sources = ['test_watchman.py'],
-  coverage = ['pants.pantsd.watchman'],
-  dependencies = [
-    ':test_deps',
-    'src/python/pants/pantsd:watchman'
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_tests(
-  name = 'watchman_client',
-  sources = ['test_watchman_client.py'],
-  coverage = ['pants.pantsd.watchman_client'],
-  dependencies = [
-    ':test_deps',
-    'src/python/pants/pantsd:watchman_client'
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_tests(
   name = 'pants_daemon',
   sources = ['test_pants_daemon.py'],
   coverage = ['pants.pantsd.pants_daemon'],
@@ -97,16 +75,4 @@ python_tests(
   ],
   tags = {'integration', 'partially_type_checked'},
   timeout = 900
-)
-
-python_tests(
-  name = 'watchman_launcher',
-  sources = ['test_watchman_launcher.py'],
-  coverage = ['pants.pantsd.watchman_launcher'],
-  dependencies = [
-    'tests/python/pants_test/pantsd:test_deps',
-    'src/python/pants/testutil/subsystem',
-    'src/python/pants/pantsd:watchman_launcher'
-  ],
-  tags = {"partially_type_checked"},
 )

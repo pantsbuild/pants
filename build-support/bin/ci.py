@@ -423,7 +423,6 @@ def run_sanity_checks() -> None:
             die(f"Failed to execute `./pants {command}`.")
 
     checks = [
-        ["bash-completion"],
         ["reference"],
         ["clean-all"],
         ["goals"],

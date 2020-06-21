@@ -41,7 +41,6 @@ target(
     ':page_directory',
     ':phrases_directory',
     ':printversion_directory',
-    ':proto-ordering_directory',
     ':provided_directory',
     ':publish_directory',
     ':resdependency_directory',
@@ -52,7 +51,6 @@ target(
     ':thriftdeptest_directory',
     ':typeparameters_directory',
     ':unicode_directory',
-    ':utf8proto_directory',
     # NB: See `:javasources_directory` for why this must be declared here.
     'testprojects/src/scala/org/pantsbuild/testproject:javasources_directory',
   ],
@@ -288,14 +286,6 @@ files(
 )
 
 files(
-  name = 'proto-ordering_directory',
-  sources = ['proto-ordering/**/*'],
-  dependencies = [
-    'testprojects/src/protobuf/org/pantsbuild/testproject:proto-ordering_directory',
-  ],
-)
-
-files(
   name = 'provided_directory',
   sources = ['provided/**/*'],
 )
@@ -303,9 +293,6 @@ files(
 files(
   name = 'publish_directory',
   sources = ['publish/**/*'],
-  dependencies = [
-    'testprojects/src/protobuf/org/pantsbuild/testproject:distance_directory',
-  ],
 )
 
 files(
@@ -354,13 +341,5 @@ files(
   sources = ['unicode/**/*'],
   dependencies = [
     'testprojects/src/scala/org/pantsbuild/testproject:unicode_directory',
-  ],
-)
-
-files(
-  name = 'utf8proto_directory',
-  sources = ['utf8proto/**/*'],
-  dependencies = [
-    'testprojects/src/protobuf/org/pantsbuild/testproject:utf8proto_directory',
   ],
 )

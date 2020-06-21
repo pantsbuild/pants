@@ -279,10 +279,8 @@ class GlobalOptions(Subsystem):
                 "pants.backend.python",
                 "pants.backend.jvm",
                 "pants.backend.native",
-                "pants.backend.codegen.protobuf.java",
                 "pants.backend.codegen.thrift.java",
                 "pants.backend.codegen.thrift.python",
-                "pants.backend.codegen.grpcio.python",
                 "pants.backend.project_info",
                 "pants.cache",
             ],
@@ -506,20 +504,6 @@ class GlobalOptions(Subsystem):
                 "operations and @rule execution."
             ),
         )
-        register(
-            "--enable-pantsd",
-            advanced=True,
-            type=bool,
-            default=True,
-            daemon=True,
-            removal_version="1.31.0.dev0",
-            removal_hint="Use `--pantsd` instead of `--enable-pantsd`.",
-            help=(
-                "Enables use of the pants daemon (pantsd). pantsd can significantly improve "
-                "runtime performance by lowering per-run startup cost, and by caching filesystem "
-                "operations and @rule execution."
-            ),
-        )
 
         # Whether or not to make necessary arrangements to have concurrent runs in pants.
         # In practice, this means that if this is set, a run will not even try to use pantsd.
@@ -660,83 +644,6 @@ class GlobalOptions(Subsystem):
             daemon=True,
             help="Filesystem events matching any of these globs will trigger a daemon restart. "
             "Pants' own code, plugins, and `--pants-config-files` are inherently invalidated.",
-        )
-
-        # Watchman options.
-        register(
-            "--watchman-enable",
-            type=bool,
-            advanced=True,
-            default=False,
-            removal_version="1.31.0.dev0",
-            removal_hint=(
-                "The native watcher is now sufficient to monitor for filesystem "
-                "changes, so watchman is being removed."
-            ),
-            help="Use the watchman daemon filesystem event watcher to watch for changes "
-            "in the buildroot in addition to the built in watcher.",
-        )
-        register(
-            "--watchman-version",
-            advanced=True,
-            default="4.9.0-pants1",
-            removal_version="1.31.0.dev0",
-            removal_hint=(
-                "The native watcher is now sufficient to monitor for filesystem "
-                "changes, so watchman is being removed."
-            ),
-            help="Watchman version.",
-        )
-        register(
-            "--watchman-supportdir",
-            advanced=True,
-            default="bin/watchman",
-            removal_version="1.31.0.dev0",
-            removal_hint=(
-                "The native watcher is now sufficient to monitor for filesystem "
-                "changes, so watchman is being removed."
-            ),
-            help="Find watchman binaries under this dir. Used as part of the path to lookup "
-            "the binary with --binaries-baseurls and --pants-bootstrapdir.",
-        )
-        register(
-            "--watchman-startup-timeout",
-            type=float,
-            advanced=True,
-            default=60.0,
-            removal_version="1.31.0.dev0",
-            removal_hint=(
-                "The native watcher is now sufficient to monitor for filesystem "
-                "changes, so watchman is being removed."
-            ),
-            help="The watchman socket timeout (in seconds) for the initial `watch-project` command. "
-            "This may need to be set higher for larger repos due to watchman startup cost.",
-        )
-        register(
-            "--watchman-socket-timeout",
-            type=float,
-            advanced=True,
-            default=0.1,
-            removal_version="1.31.0.dev0",
-            removal_hint=(
-                "The native watcher is now sufficient to monitor for filesystem "
-                "changes, so watchman is being removed."
-            ),
-            help="The watchman client socket timeout in seconds. Setting this to too high a "
-            "value can negatively impact the latency of runs forked by pantsd.",
-        )
-        register(
-            "--watchman-socket-path",
-            type=str,
-            advanced=True,
-            default=None,
-            removal_version="1.31.0.dev0",
-            removal_hint=(
-                "The native watcher is now sufficient to monitor for filesystem "
-                "changes, so watchman is being removed."
-            ),
-            help="The path to the watchman UNIX socket. This can be overridden if the default "
-            "absolute path length exceeds the maximum allowed by the OS.",
         )
 
         register(
@@ -972,15 +879,6 @@ class GlobalOptions(Subsystem):
             type=bool,
             default=sys.stderr.isatty(),
             help="Display a dynamically-updating console UI as pants runs.",
-        )
-
-        register(
-            "--v2-ui",
-            default=False,
-            type=bool,
-            removal_version="1.31.0.dev0",
-            removal_hint="Use --dynamic-ui instead.",
-            help="Whether to show v2 engine execution progress.",
         )
 
         register(

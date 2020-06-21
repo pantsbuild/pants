@@ -31,7 +31,6 @@
     "first_tutorial": "dist/markdown/html/src/docs/first_tutorial.html",
     "from_maven": "dist/markdown/html/examples/src/java/org/pantsbuild/example/from_maven.html",
     "globs": "dist/markdown/html/src/docs/common_tasks/globs.html",
-    "go_readme": "dist/markdown/html/contrib/go/README.html",
     "howto_ask": "dist/markdown/html/src/docs/howto_ask.html",
     "howto_contribute": "dist/markdown/html/src/docs/howto_contribute.html",
     "howto_develop": "dist/markdown/html/src/docs/howto_develop.html",
@@ -52,7 +51,6 @@
     "list_targets": "dist/markdown/html/src/docs/common_tasks/list_targets.html",
     "login": "dist/markdown/html/src/docs/common_tasks/login.html",
     "multiple_jvm_versions": "dist/markdown/html/src/docs/common_tasks/multiple_jvm_versions.html",
-    "node_readme": "dist/markdown/html/contrib/node/README.html",
     "notes-1.0.x": "dist/markdown/html/src/python/pants/notes/1.0.x.html",
     "notes-1.1.x": "dist/markdown/html/src/python/pants/notes/1.1.x.html",
     "notes-1.2.x": "dist/markdown/html/src/python/pants/notes/1.2.x.html",
@@ -113,7 +111,6 @@
     "test_suite": "dist/markdown/html/src/docs/common_tasks/test_suite.html",
     "thrift_deps": "dist/markdown/html/examples/src/thrift/org/pantsbuild/example/README.html",
     "thrift_gen": "dist/markdown/html/src/docs/common_tasks/thrift_gen.html",
-    "grpcio_gen": "dist/markdown/html/src/docs/common_tasks/python_proto_gen.html",
     "tshoot": "dist/markdown/html/src/docs/tshoot.html",
     "why_use_pants": "dist/markdown/html/src/docs/why_use_pants.html"
   },
@@ -186,12 +183,9 @@
                     "3rdparty_py"
                 ]
        },
-       {"pages" : ["go_readme"]},
-       {"pages" : ["node_readme"]},
        {"heading": "Code & Doc Generation"},
        {"pages" : [
                     "thrift_deps",
-                    "grpcio_gen",
                     "page"
                 ]
        },

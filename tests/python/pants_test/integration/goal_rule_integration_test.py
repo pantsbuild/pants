@@ -61,18 +61,7 @@ class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
 
             # Launch the loop as a background process.
             handle = self.run_pants_with_workdir_without_waiting(
-                # NB: We disable watchman here because in the context of `--loop`, the total count
-                # of invalidations matters, and with both `notify` and `watchman` enabled we get
-                # twice as many.
-                [
-                    "--no-v1",
-                    "--v2",
-                    "--no-watchman-enable",
-                    "--loop",
-                    "--loop-max=3",
-                    "list",
-                    f"{tmpdir}:",
-                ],
+                ["--no-v1", "--v2", "--loop", "--loop-max=3", "list", f"{tmpdir}:",],
                 workdir,
                 config,
             )

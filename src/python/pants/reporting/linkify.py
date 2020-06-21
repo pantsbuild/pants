@@ -5,7 +5,7 @@ import os
 import re
 from pathlib import Path
 
-from pants.base.build_file import _is_build_file_name
+from pants.build_graph.address import _is_build_file_name
 
 # A regex to recognize substrings that are probably URLs or file paths. Broken down for readability.
 _PREFIX = r"(https?://)?/?"  # http://, https:// or / or nothing.
