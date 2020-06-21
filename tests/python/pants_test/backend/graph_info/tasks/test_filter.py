@@ -3,7 +3,6 @@
 
 from textwrap import dedent
 
-from pants.backend.docgen.targets.doc import Page
 from pants.backend.graph_info.tasks.filter import Filter
 from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.backend.python.targets.python_library import PythonLibrary
@@ -22,7 +21,6 @@ class BaseFilterTest(ConsoleTaskTestBase):
             targets={
                 "target": Target,
                 "java_library": JavaLibrary,
-                "page": Page,
                 "python_library": PythonLibrary,
                 "python_requirement_library": PythonRequirementLibrary,
             }
@@ -36,10 +34,6 @@ class BaseFilterTest(ConsoleTaskTestBase):
 class FilterEmptyTargetsTest(BaseFilterTest):
     def test_no_filters(self):
         self.assert_console_output()
-
-    def test_type(self):
-        self.assert_console_output(options={"type": ["page"]})
-        self.assert_console_output(options={"type": ["java_library"]})
 
     def test_regex(self):
         self.assert_console_output(options={"regex": ["^common"]})

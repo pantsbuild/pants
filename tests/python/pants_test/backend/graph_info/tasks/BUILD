@@ -33,7 +33,6 @@ python_tests(
   name = 'filter',
   sources = ['test_filter.py'],
   dependencies = [
-    'src/python/pants/backend/docgen/targets',
     'src/python/pants/backend/graph_info/tasks',
     'src/python/pants/backend/jvm/targets:java',
     'src/python/pants/backend/python/targets',

@@ -38,7 +38,6 @@ target(
     ':missingjardepswhitelist2_directory',
     ':nocache_directory',
     ':packageinfo_directory',
-    ':page_directory',
     ':phrases_directory',
     ':printversion_directory',
     ':provided_directory',
@@ -265,14 +264,6 @@ files(
 files(
   name = 'packageinfo_directory',
   sources = ['packageinfo/**/*'],
-)
-
-files(
-  name = 'page_directory',
-  sources = ['page/**/*'],
-  dependencies = [
-    'examples/src/java/org/pantsbuild/example:hello_directory',
-  ],
 )
 
 files(

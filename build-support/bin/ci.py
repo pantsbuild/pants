@@ -420,12 +420,11 @@ def run_sanity_checks() -> None:
             die(f"Failed to execute `./pants {command}`.")
 
     checks = [
-        ["reference"],
         ["clean-all"],
         ["goals"],
         ["list", "::"],
         ["roots"],
-        ["targets"],
+        ["target-types"],
     ]
     with travis_section("SanityCheck", "Sanity checking bootstrapped Pants and repo BUILD files"):
         check_pants_pex_exists()

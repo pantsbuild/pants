@@ -14,14 +14,6 @@ target(
   ],
 )
 
-page(
-  name = 'readme',
-  sources = ['README.md'],
-  links = [
-    'examples/src/java/org/pantsbuild/example:readme',
-  ],
-)
-
 files(
   name = 'fact_directory',
   sources = ['fact/**/*'],

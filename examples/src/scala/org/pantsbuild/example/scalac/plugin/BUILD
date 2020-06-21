@@ -73,8 +73,3 @@ scala_library(
     'simple_scalac_plugin': ['args', 'from', 'target', 'local']
   }
 )
-
-page(
-  name='readme',
-  sources=['README.md'],
-)

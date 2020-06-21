@@ -32,14 +32,6 @@ python_library(
   tags = {"partially_type_checked"},
 )
 
-page(
-  name = 'readme',
-  sources = ['README.md'],
-  links = [
-    'src/python/pants:readme',
-  ]
-)
-
 python_library(
   name = 'interpreter_cache',
   sources = ['interpreter_cache.py'],

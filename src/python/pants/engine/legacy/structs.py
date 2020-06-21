@@ -170,17 +170,6 @@ class JvmBinaryAdaptor(TargetAdaptor):
             )
 
 
-class PageAdaptor(TargetAdaptor):
-    def validate_sources(self, sources):
-        if len(sources.files) != 1:
-            raise Target.IllegalArgument(
-                self.address.spec,
-                "page targets must have exactly 1 source, but found {} ({})".format(
-                    len(sources.files), ", ".join(sources.files),
-                ),
-            )
-
-
 @dataclass(frozen=True)
 class BundlesField:
     """Represents the `bundles` argument, each of which has a PathGlobs to represent its
