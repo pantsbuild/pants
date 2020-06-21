@@ -65,18 +65,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'dependees_integration',
-  sources = ['dependees_integration_test.py'],
-  dependencies = [
-    'src/python/pants/testutil:int-test',
-    'examples/src/scala/org/pantsbuild/example:hello_directory',
-    'examples/src/scala/org/pantsbuild/example:jvm_run_directory',
-    'examples/tests/scala/org/pantsbuild/example:hello_directory',
-  ],
-  tags = {'integration', 'partially_type_checked'},
-)
-
-python_tests(
   name = 'dependencies_integration',
   sources = ['dependencies_integration_test.py'],
   dependencies = [
