@@ -15,43 +15,6 @@ target(
   ],
 )
 
-page(
-  name='readme',
-  sources=['README.md'],
-  links=[
-    ':3rdparty_jvm',
-    ':from_maven',
-    ':publish',
-    'examples/src/java/org/pantsbuild/example/javac/plugin:readme',
-    'examples/src/scala/org/pantsbuild/example:readme',
-    'examples/src/scala/org/pantsbuild/example/scalac/plugin:readme',
-  ]
-)
-
-page(
-  name='from_maven',
-  sources=['from_maven.md'],
-  links=[
-    ':3rdparty_jvm',
-    ':readme',
-  ],
-)
-
-page(
-  name='publish',
-  sources=['publish.md'],
-)
-
-page(
-  name='3rdparty_jvm',
-  sources=['3rdparty_jvm.md'],
-)
-
-page(
-  name='page',
-  sources=['page.md'],
-)
-
 files(
   name = 'annotation_directory',
   sources = ['annotation/**/*'],

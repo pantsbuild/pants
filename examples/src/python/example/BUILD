@@ -10,19 +10,6 @@ target(
   ],
 )
 
-page(
-  name='readme',
-  sources=['README.md'],
-  links=[
-    ':3rdparty_py',
-  ]
-)
-
-page(
-  name='3rdparty_py',
-  sources=['3rdparty_py.md'],
-)
-
 files(
   name='hello_directory',
   sources=['hello/**/*'],

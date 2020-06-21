@@ -349,14 +349,6 @@ timeout_default = 60
 timeouts = true
 timeout_default = 60
 
-# Site generation options.
-[reference]
-pants_reference_template = "reference/pants_reference_body.html"
-build_dictionary_template = "reference/build_dictionary_body.html"
-
-[markdown]
-fragment = true
-
 [native-build-step.cpp-compile-settings]
 # TensorFlow 1.13 on python 3.7 specifically uses a newer C++ ABI than any other TensorFlow release,
 # so in this repo's CI we override this option to avoid using the previous ABI for our python 3.7
