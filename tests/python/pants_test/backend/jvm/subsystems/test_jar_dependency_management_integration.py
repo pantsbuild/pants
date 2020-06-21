@@ -177,18 +177,6 @@ class JarDependencyManagementIntegrationTest(PantsRunIntegrationTest):
                 self.assertTrue(os.path.exists(bin1))
                 self.assertTrue(os.path.exists(bin2))
 
-    def test_all_targets_work(self):
-        with self._testing_build_file():
-            run = self.run_pants(
-                [
-                    "export",
-                    f"{self.project}::",
-                    "--jar-dependency-management-default-target=",
-                    "--jar-dependency-management-conflict-strategy=USE_MANAGED",
-                ]
-            )
-            self.assert_success(run)
-
     def test_unit_tests_with_different_sets(self):
         run = self.run_pants(
             [
