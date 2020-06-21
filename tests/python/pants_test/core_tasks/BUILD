@@ -13,17 +13,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'deferred_sources_mapper_integration',
-  sources = ['test_deferred_sources_mapper_integration.py'],
-  dependencies = [
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:dirutil',
-    'src/python/pants/testutil:int-test',
-  ],
-  tags = {'integration', 'partially_type_checked'},
-)
-
-python_tests(
   name = 'prep_command_integration',
   sources = ['test_prep_command_integration.py'],
   dependencies = [
