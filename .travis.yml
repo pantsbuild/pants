@@ -276,7 +276,7 @@ jobs:
     - '3.7'
     script:
     - travis-wait-enhanced --timeout 50m --interval 9m -- ./build-support/bin/ci.py
-      --githooks --sanity-checks --doc-gen --python-version 3.6
+      --githooks --smoke-screens --doc-gen --python-version 3.6
     - travis-wait-enhanced --timeout 40m --interval 9m -- ./build-support/bin/ci.py
       --remote-execution-enabled --lint --python-version 3.6
     stage: Test Pants
@@ -338,7 +338,7 @@ jobs:
     - '3.7'
     script:
     - travis-wait-enhanced --timeout 50m --interval 9m -- ./build-support/bin/ci.py
-      --githooks --sanity-checks --doc-gen --python-version 3.7
+      --githooks --smoke-screens --doc-gen --python-version 3.7
     - travis-wait-enhanced --timeout 40m --interval 9m -- ./build-support/bin/ci.py
       --remote-execution-enabled --lint --python-version 3.7
     stage: Test Pants (Cron)
@@ -1536,13 +1536,13 @@ jobs:
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
-    - CACHE_NAME=osx_sanity.10_12.py36
+    - CACHE_NAME=macos_smoke.10_12.py36
     language: generic
-    name: OSX 10.12 sanity check (Python 3.6)
+    name: macOS 10.12 smoke screen (Python 3.6)
     os: osx
     osx_image: xcode9.2
     script:
-    - MODE=debug ./build-support/bin/ci.py --sanity-checks --python-version 3.6
+    - MODE=debug ./build-support/bin/ci.py --smoke-screens --python-version 3.6
     stage: Test Pants
   - before_install:
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64
@@ -1562,13 +1562,13 @@ jobs:
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
-    - CACHE_NAME=osx_sanity.10_12.py37
+    - CACHE_NAME=macos_smoke.10_12.py37
     language: generic
-    name: OSX 10.12 sanity check (Python 3.7)
+    name: macOS 10.12 smoke screen (Python 3.7)
     os: osx
     osx_image: xcode9.2
     script:
-    - MODE=debug ./build-support/bin/ci.py --sanity-checks --python-version 3.7
+    - MODE=debug ./build-support/bin/ci.py --smoke-screens --python-version 3.7
     stage: Test Pants (Cron)
   - before_install:
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64
@@ -1588,13 +1588,13 @@ jobs:
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
-    - CACHE_NAME=osx_sanity.10_13.py36
+    - CACHE_NAME=macos_smoke.10_13.py36
     language: generic
-    name: OSX 10.13 sanity check (Python 3.6)
+    name: macOS 10.13 smoke screen (Python 3.6)
     os: osx
     osx_image: xcode10.1
     script:
-    - MODE=debug ./build-support/bin/ci.py --sanity-checks --python-version 3.6
+    - MODE=debug ./build-support/bin/ci.py --smoke-screens --python-version 3.6
     stage: Test Pants
   - before_install:
     - curl -L https://github.com/stedolan/jq/releases/download/jq-1.5/jq-osx-amd64
@@ -1614,13 +1614,13 @@ jobs:
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.osx
-    - CACHE_NAME=osx_sanity.10_13.py37
+    - CACHE_NAME=macos_smoke.10_13.py37
     language: generic
-    name: OSX 10.13 sanity check (Python 3.7)
+    name: macOS 10.13 smoke screen (Python 3.7)
     os: osx
     osx_image: xcode10.1
     script:
-    - MODE=debug ./build-support/bin/ci.py --sanity-checks --python-version 3.7
+    - MODE=debug ./build-support/bin/ci.py --smoke-screens --python-version 3.7
     stage: Test Pants (Cron)
   - addons:
       apt:
