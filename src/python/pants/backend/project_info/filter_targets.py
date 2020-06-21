@@ -2,8 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import re
+from functools import partial
 from typing import Callable, Pattern
 
+from pants.base.deprecated import resolve_conflicting_options
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import goal_rule
@@ -52,6 +54,22 @@ class FilterOptions(LineOriented, GoalSubsystem):
             metavar="[+-]regex1,regex2,...",
             help="Filter on targets with tags matching these regexes.",
         )
+        register(
+            "--type",
+            type=list,
+            metavar="[+-]type1,type2,...",
+            help="Filter on these target types, e.g. `resources` or `python_library`.",
+            removal_version="2.1.0.dev0",
+            removal_hint="Use `--target-type` instead of `--type`.",
+        )
+        register(
+            "--regex",
+            type=list,
+            metavar="[+-]regex1,regex2,...",
+            help="Filter on target addresses matching these regexes.",
+            removal_version="2.1.0.dev0",
+            removal_hint="Use `--address-regex` instead of `--regex`.",
+        )
 
 
 class FilterGoal(Goal):
@@ -88,10 +106,20 @@ def filter_targets(
         regex = compile_regex(tag_regex)
         return lambda tgt: any(bool(regex.search(tag)) for tag in tgt.get(Tags).value or ())
 
+    resolve_option = partial(
+        resolve_conflicting_options,
+        old_scope="filter",
+        new_scope="filter",
+        old_container=options.values,
+        new_container=options.values,
+    )
+    target_type = resolve_option(old_option="type", new_option="target_type")
+    address_regex = resolve_option(old_option="regex", new_option="address_regex")
+
     anded_filter: TargetFilter = and_filters(
         [
-            *(create_filters(options.values.target_type, filter_target_type)),
-            *(create_filters(options.values.address_regex, filter_address_regex)),
+            *(create_filters(target_type, filter_target_type)),
+            *(create_filters(address_regex, filter_address_regex)),
             *(create_filters(options.values.tag_regex, filter_tag_regex)),
         ]
     )
