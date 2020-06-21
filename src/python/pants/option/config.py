@@ -7,7 +7,6 @@ import io
 import itertools
 import os
 import re
-import textwrap
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -20,7 +19,6 @@ import toml
 from typing_extensions import Literal
 
 from pants.base.build_environment import get_buildroot, get_pants_cachedir, get_pants_configdir
-from pants.base.deprecated import warn_or_error
 from pants.option.ranked_value import Value
 from pants.util.eval import parse_expression
 from pants.util.ordered_set import OrderedSet
@@ -99,61 +97,16 @@ class Config(ABC):
             content = content_bytes.decode()
             normalized_seed_values = cls._determine_seed_values(seed_values=seed_values)
 
-            config_values: _ConfigValues
             if PurePath(config_path).suffix == ".toml":
-                config_values = cls._meta_load_as_toml(content, normalized_seed_values)
-            elif PurePath(config_path).suffix == ".ini":
-                config_values = cls._meta_load_as_ini(content, normalized_seed_values)
+                config_values = cls._parse_toml(content, normalized_seed_values)
             else:
                 try:
-                    config_values = cls._meta_load_as_toml(content, normalized_seed_values)
-                except Exception as toml_e:
-                    try:
-                        config_values = cls._meta_load_as_ini(content, normalized_seed_values)
-                    except Exception as ini_e:
-                        raise cls.ConfigError(
-                            f"Unsuffixed Config path {config_path} could not be parsed "
-                            f"as either TOML or INI:\n  TOML: {toml_e}\n  INI: {ini_e}"
-                        )
-
-            if isinstance(config_values, _IniValues):
-                script_instructions = (
-                    "curl -L -o migrate_to_toml_config.py 'https://git.io/Jv02R' && chmod +x "
-                    f"migrate_to_toml_config.py && ./migrate_to_toml_config.py {config_path}"
-                )
-                msg = [
-                    textwrap.fill(
-                        "Pants now supports TOML config files. TOML is inspired by the INI "
-                        "file format, and makes several improvements and removes many gotchas. For "
-                        "example, you no longer need to worry about indentation for "
-                        "list and dict options.",
-                        88,
-                    ),
-                    "\n",
-                    textwrap.fill(
-                        "To migrate, we recommend using our migration "
-                        f"script by running `{script_instructions}`.",
-                        88,
-                    ),
-                    "\n",
-                    textwrap.fill(
-                        "You must also upgrade your `./pants` script to understand pants.toml by "
-                        "running `curl -L -o ./pants https://pantsbuild.github.io/setup/pants`.",
-                        88,
-                    ),
-                    "\n",
-                    textwrap.fill(
-                        "See https://pants.readme.io/docs/options for more information on how to "
-                        "set each option type, including adding and removing from a list option "
-                        "and using dict options.",
-                        88,
-                    ),
-                ]
-                warn_or_error(
-                    removal_version="1.31.0.dev0",
-                    deprecated_entity_description=f"INI config files (`{config_path}`)",
-                    hint="\n".join(msg),
-                )
+                    config_values = cls._parse_toml(content, normalized_seed_values)
+                except Exception as e:
+                    raise cls.ConfigError(
+                        f"Unsuffixed Config path {config_path} could not be parsed "
+                        f"as TOML:\n  {e}"
+                    )
 
             single_file_configs.append(
                 _SingleFileConfig(
@@ -163,25 +116,16 @@ class Config(ABC):
         return _ChainedConfig(tuple(reversed(single_file_configs)))
 
     @classmethod
-    def _meta_load_as_toml(
+    def _parse_toml(
         cls, config_content: str, normalized_seed_values: Dict[str, str]
-    ) -> "_TomlValues":
+    ) -> "_ConfigValues":
         """Attempt to parse as TOML, raising an exception on failure."""
         toml_values = cast(Dict[str, Any], toml.loads(config_content))
         toml_values["DEFAULT"] = {
             **normalized_seed_values,
             **toml_values.get("DEFAULT", {}),
         }
-        return _TomlValues(toml_values)
-
-    @classmethod
-    def _meta_load_as_ini(
-        cls, config_content: str, normalized_seed_values: Dict[str, str]
-    ) -> "_IniValues":
-        """Attempt to parse as INI, raising an exception on failure."""
-        ini_parser = configparser.ConfigParser(defaults=normalized_seed_values)
-        ini_parser.read_string(config_content)
-        return _IniValues(ini_parser)
+        return _ConfigValues(toml_values)
 
     @staticmethod
     def _determine_seed_values(*, seed_values: Optional[SeedValues] = None) -> Dict[str, str]:
@@ -269,71 +213,14 @@ class Config(ABC):
         """
 
 
-class _ConfigValues(ABC):
-    """Encapsulates resolving the actual config values specified by the user's config file.
-
-    Due to encapsulation, this allows us to support both TOML and INI config files without any of
-    the rest of the Pants codebase knowing whether the config came from TOML or INI.
-    """
-
-    @property
-    @abstractmethod
-    def sections(self) -> List[str]:
-        """Returns the sections in this config (not including DEFAULT)."""
-
-    @abstractmethod
-    def has_section(self, section: str) -> bool:
-        pass
-
-    @abstractmethod
-    def has_option(self, section: str, option: str) -> bool:
-        pass
-
-    @abstractmethod
-    def get_value(self, section: str, option: str) -> Optional[str]:
-        pass
-
-    @abstractmethod
-    def options(self, section: str) -> List[str]:
-        """All options defined for the section."""
-
-    @property
-    @abstractmethod
-    def defaults(self) -> Mapping[str, str]:
-        """All the DEFAULT values (not interpolated)."""
-
-
-@dataclass(frozen=True)
-class _IniValues(_ConfigValues):
-    parser: configparser.ConfigParser
-
-    @property
-    def sections(self) -> List[str]:
-        return self.parser.sections()
-
-    def has_section(self, section: str) -> bool:
-        return self.parser.has_section(section)
-
-    def has_option(self, section: str, option: str) -> bool:
-        return self.parser.has_option(section, option)
-
-    def get_value(self, section: str, option: str) -> Optional[str]:
-        return self.parser.get(section, option)
-
-    def options(self, section: str) -> List[str]:
-        return self.parser.options(section)
-
-    @property
-    def defaults(self) -> Mapping[str, str]:
-        return self.parser.defaults()
-
-
 _TomlPrimitive = Union[bool, int, float, str]
 _TomlValue = Union[_TomlPrimitive, List[_TomlPrimitive]]
 
 
 @dataclass(frozen=True)
-class _TomlValues(_ConfigValues):
+class _ConfigValues:
+    """The parsed contents of a TOML config file."""
+
     values: Dict[str, Any]
 
     @staticmethod
@@ -360,12 +247,12 @@ class _TomlValues(_ConfigValues):
         that `cache` was defined even though the user never explicitly added it to their config.
         """
         at_least_one_option_defined = any(
-            _TomlValues._is_an_option(section_value) for section_value in section_values.values()
+            _ConfigValues._is_an_option(section_value) for section_value in section_values.values()
         )
-        # We also check if the section was explicitly defined but has no options. We can be confident
-        # that this is not a parent scope (e.g. `cache` when `cache.java` is really what was defined)
-        # because the parent scope would store its child scope in its values, so the values would not
-        # be empty.
+        # We also check if the section was explicitly defined but has no options. We can be
+        # confident that this is not a parent scope (e.g. `cache` when `cache.java` is really what
+        # was defined) because the parent scope would store its child scope in its values, so the
+        # values would not be empty.
         blank_section = len(section_values.values()) == 0
         return at_least_one_option_defined or blank_section
 
@@ -398,8 +285,8 @@ class _TomlValues(_ConfigValues):
         the same section."""
 
         def format_str(value: str) -> str:
-            # Because dictionaries use the symbols `{}`, we must proactively escape the symbols so that
-            # .format() does not try to improperly interpolate.
+            # Because dictionaries use the symbols `{}`, we must proactively escape the symbols so
+            # that .format() does not try to improperly interpolate.
             escaped_str = value.replace("{", "{{").replace("}", "}}")
             new_style_format_str = re.sub(
                 pattern=r"%\((?P<interpolated>[a-zA-Z_0-9]*)\)s",
@@ -416,8 +303,8 @@ class _TomlValues(_ConfigValues):
                 )
 
         def recursively_format_str(value: str) -> str:
-            # It's possible to interpolate with a value that itself has an interpolation. We must fully
-            # evaluate all expressions for parity with configparser.
+            # It's possible to interpolate with a value that itself has an interpolation. We must
+            # fully evaluate all expressions for parity with configparser.
             if not re.search(r"%\([a-zA-Z_0-9]*\)s", value):
                 return value
             return recursively_format_str(value=format_str(value))
