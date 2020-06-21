@@ -6,7 +6,6 @@ python_library(
     '3rdparty/python:ansicolors',
     '3rdparty/python:packaging',
     '3rdparty/python:setuptools',
-    ':templates',
     'src/python/pants/auth',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:deprecated',
@@ -29,9 +28,4 @@ python_library(
     'src/python/pants:version',
   ],
   tags = {'partially_type_checked'},
-)
-
-resources(
-  name='templates',
-  sources=['templates/**/*.mustache'],
 )
