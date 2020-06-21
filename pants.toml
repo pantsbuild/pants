@@ -40,6 +40,7 @@ backend_packages2.add = [
   "pants.backend.python.lint.docformatter",
   "pants.backend.python.lint.flake8",
   "pants.backend.python.lint.isort",
+  "pants.backend.python.lint.mypy",
   "internal_backend.rules_for_testing",
 ]
 
