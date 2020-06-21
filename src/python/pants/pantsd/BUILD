@@ -29,7 +29,6 @@ python_library(
     '3rdparty/python:setproctitle',
     ':pants_daemon_core',
     ':process_manager',
-    ':watchman_launcher',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exception_sink',
     'src/python/pants/base:exiter',
@@ -40,7 +39,6 @@ python_library(
     'src/python/pants/init',
     'src/python/pants/option',
     'src/python/pants/option:options_bootstrapper',
-    'src/python/pants/pantsd/service:fs_event_service',
     'src/python/pants/pantsd/service:scheduler_service',
     'src/python/pants/pantsd/service:store_gc_service',
     'src/python/pants/util:contextutil',
@@ -57,39 +55,6 @@ python_library(
     'src/python/pants/base:build_environment',
     'src/python/pants/process',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:memo',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_library(
-  name = 'watchman',
-  sources = ['watchman.py'],
-  dependencies = [
-    'src/python/pants/util:dirutil',
-    'src/python/pants/util:retry',
-    ':process_manager',
-    ':watchman_client'
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_library(
-  name = 'watchman_client',
-  sources = ['watchman_client.py'],
-  dependencies = [
-    '3rdparty/python:pywatchman'
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_library(
-  name = 'watchman_launcher',
-  sources = ['watchman_launcher.py'],
-  dependencies = [
-    ':watchman',
-    'src/python/pants/binaries',
-    'src/python/pants/util:logging',
     'src/python/pants/util:memo',
   ],
   tags = {"partially_type_checked"},

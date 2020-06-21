@@ -119,14 +119,7 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
                 workdir = os.path.join(workdir_base, ".workdir.pants.d")
                 print(f"\npantsd log is {workdir}/pantsd/pantsd.log")
                 pantsd_config = {
-                    "GLOBAL": {
-                        "pantsd": True,
-                        # The absolute paths in CI can exceed the UNIX socket path limitation
-                        # (>104-108 characters), so we override that here with a shorter path.
-                        "watchman_socket_path": f"/tmp/watchman.{os.getpid()}.sock",
-                        "level": log_level,
-                        "pants_subprocessdir": pid_dir,
-                    }
+                    "GLOBAL": {"pantsd": True, "level": log_level, "pants_subprocessdir": pid_dir,}
                 }
 
                 if extra_config:

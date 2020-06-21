@@ -9,14 +9,14 @@ import psutil
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.internals.scheduler import ExecutionTimeoutError
 from pants.init.engine_initializer import LegacyGraphScheduler
-from pants.pantsd.service.fs_event_service import FSEventService
 from pants.pantsd.service.pants_service import PantsService
 
 
 class SchedulerService(PantsService):
     """The pantsd scheduler service.
 
-    This service holds an online Scheduler instance that is primed via watchman filesystem events.
+    This service uses the scheduler to watch the filesystem and determine whether pantsd needs to
+    restart in order to reload its state.
     """
 
     # The interval on which we will long-poll the invalidation globs. If a glob changes, the poll
@@ -27,7 +27,6 @@ class SchedulerService(PantsService):
     def __init__(
         self,
         *,
-        fs_event_service: Optional[FSEventService],
         legacy_graph_scheduler: LegacyGraphScheduler,
         build_root: str,
         invalidation_globs: List[str],
@@ -35,7 +34,6 @@ class SchedulerService(PantsService):
         max_memory_usage_in_bytes: int,
     ) -> None:
         """
-        :param fs_event_service: An unstarted FSEventService instance for setting up filesystem event handlers.
         :param legacy_graph_scheduler: The LegacyGraphScheduler instance for graph construction.
         :param build_root: The current build root.
         :param invalidation_globs: A list of `globs` that when encountered in filesystem event
@@ -45,7 +43,6 @@ class SchedulerService(PantsService):
                                           shut down if it observes more than this amount in use.
         """
         super().__init__()
-        self._fs_event_service = fs_event_service
         self._graph_helper = legacy_graph_scheduler
         self._build_root = build_root
 
