@@ -80,7 +80,7 @@ FILE_1 = ConfigFile(
             "interpolated_from_section": "overridden_from_default is interpolated",
             "recursively_interpolated_from_section": "overridden_from_default is interpolated (again)",
         },
-    }
+    },
 )
 
 
@@ -89,16 +89,16 @@ FILE_2 = ConfigFile(
         """
         [a]
         fast = true
-        
+
         [b]
         preempt = false
-        
+
         [d]
         list.add = [0, 1]
         list.remove = [8, 9]
-        
+
         [empty_section]
-        
+
         [p.child]
         no_values_in_parent = true
         """
@@ -110,7 +110,7 @@ FILE_2 = ConfigFile(
         "d": {"list": "+[0, 1],-[8, 9]"},
         "empty_section": {},
         "p.child": {"no_values_in_parent": "True"},
-    }
+    },
 )
 
 
