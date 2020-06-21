@@ -28,7 +28,6 @@ from pants.util.strutil import pluralize
 
 
 class ClocBinary(ExternalTool):
-    # Note: Not in scope 'cloc' because that's the name of the singleton task that runs cloc.
     options_scope = "cloc-binary"
     name = "cloc"
     default_version = "1.80"
