@@ -351,4 +351,4 @@ class ScroogeGen(SimpleCodegenTask, NailgunTask):
 
     @property
     def _copy_target_attributes(self):
-        return super()._copy_target_attributes + ["strict_deps"]
+        return super()._copy_target_attributes + ["strict_deps", "compiler_option_sets"]
