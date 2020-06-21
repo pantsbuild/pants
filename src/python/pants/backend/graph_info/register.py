@@ -5,7 +5,6 @@
 targets."""
 
 from pants.backend.graph_info.tasks.filemap import Filemap
-from pants.backend.graph_info.tasks.filter import Filter
 from pants.backend.graph_info.tasks.minimal_cover import MinimalCover
 from pants.backend.graph_info.tasks.paths import Path, Paths
 from pants.backend.graph_info.tasks.sort_targets import SortTargets
@@ -17,5 +16,4 @@ def register_goals():
     task(name="paths", action=Paths).install()
     task(name="filemap", action=Filemap).install()
     task(name="minimize", action=MinimalCover).install()
-    task(name="filter", action=Filter).install()
     task(name="sort", action=SortTargets).install()

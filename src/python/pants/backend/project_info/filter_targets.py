@@ -29,7 +29,7 @@ class FilterOptions(LineOriented, GoalSubsystem):
     between them.
     """
 
-    name = "filter2"
+    name = "filter"
 
     @classmethod
     def register_options(cls, register):
