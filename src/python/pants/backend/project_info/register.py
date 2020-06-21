@@ -17,12 +17,10 @@ from pants.backend.project_info.tasks.dependencies import Dependencies
 from pants.backend.project_info.tasks.depmap import Depmap
 from pants.backend.project_info.tasks.export import Export
 from pants.backend.project_info.tasks.filedeps import FileDeps
-from pants.backend.project_info.tasks.idea_plugin_gen import IdeaPluginGen
 from pants.goal.task_registrar import TaskRegistrar as task
 
 
 def register_goals():
-    task(name="idea-plugin", action=IdeaPluginGen).install()
     task(name="export", action=Export).install()
     task(name="depmap", action=Depmap).install()
     task(name="dependencies", action=Dependencies).install()
