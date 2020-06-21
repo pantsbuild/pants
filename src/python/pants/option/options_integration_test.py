@@ -99,10 +99,10 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
                     dedent(
                         """
                         [options]
-                        colors: False
-                        scope: options
-                        only_overridden: True
-                        show_history: True
+                        colors = false
+                        scope = "options"
+                        only_overridden = true
+                        show_history = true
                         """
                     )
                 )
@@ -119,17 +119,17 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
                     dedent(
                         """
                         [GLOBAL]
-                        verify_config: False
-                        pythonpath: [
+                        verify_config = false
+                        pythonpath = [
                             "%(buildroot)s/testprojects/src/python",
                           ]
 
-                        backend_packages: [
+                        backend_packages = [
                             "plugins.dummy_options",
                           ]
 
                         [options]
-                        colors: False
+                        colors = false
                         """
                     )
                 )
@@ -149,15 +149,15 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
                     dedent(
                         """
                         [DEFAULT]
-                        some_crazy_thing: 123
+                        some_crazy_thing = 123
 
                         [invalid_scope]
-                        colors: False
-                        scope: options
+                        colors = false
+                        scope = "options"
 
                         [another_invalid_scope]
-                        colors: False
-                        scope: options
+                        colors = false
+                        scope = "options"
                         """
                     )
                 )
@@ -174,11 +174,11 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
                     dedent(
                         """
                         [DEFAULT]
-                        some_crazy_thing: 123
+                        some_crazy_thing = 123
 
                         [test.junit]
-                        fail_fast: True
-                        invalid_option: True
+                        fail_fast = true
+                        invalid_option = true
                         """
                     )
                 )
@@ -201,14 +201,14 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
                     dedent(
                         """
                         [DEFAULT]
-                        some_crazy_thing: 123
+                        some_crazy_thing = 123
 
                         [GLOBAL]
-                        invalid_global: True
-                        another_invalid_global: False
+                        invalid_global = true
+                        another_invalid_global = false
 
                         [test.junit]
-                        fail_fast: True
+                        fail_fast = true
                         """
                     )
                 )
@@ -231,10 +231,10 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
                     dedent(
                         """
                         [test.junit]
-                        bad_option: True
+                        bad_option = true
 
                         [invalid_scope]
-                        abc: 123
+                        abc = 123
                         """
                     )
                 )
@@ -307,7 +307,7 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
                     dedent(
                         """
                         [GLOBAL]
-                        pants_ignore: +['some/random/dir']
+                        pants_ignore.add = ['some/random/dir']
                         """
                     )
                 )

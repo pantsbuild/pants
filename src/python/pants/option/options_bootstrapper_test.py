@@ -33,7 +33,7 @@ class OptionsBootstrapperTest(unittest.TestCase):
             fp.write("[DEFAULT]\n")
             if config:
                 for k, v in config.items():
-                    fp.write(f"{k}: {v}\n")
+                    fp.write(f"{k} = {repr(v)}\n")
             fp.close()
 
             args = [*self._config_path(fp.name), *(args or [])]
@@ -114,7 +114,7 @@ class OptionsBootstrapperTest(unittest.TestCase):
 
         assert_pantsrc_is_false = partial(self.assert_bootstrap_options, pantsrc=False)
         assert_pantsrc_is_false(args=["--no-pantsrc"])
-        assert_pantsrc_is_false(config={"pantsrc": False})
+        assert_pantsrc_is_false(config={"pantsrc": "false"})
         assert_pantsrc_is_false(env={"PANTS_PANTSRC": "False"})
 
     def test_create_bootstrapped_options(self) -> None:
@@ -125,10 +125,10 @@ class OptionsBootstrapperTest(unittest.TestCase):
                 dedent(
                     """
                     [foo]
-                    bar: %(pants_workdir)s/baz
+                    bar = "%(pants_workdir)s/baz"
 
                     [fruit]
-                    apple: %(pants_supportdir)s/banana
+                    apple = "%(pants_supportdir)s/banana"
                     """
                 )
             )
@@ -193,10 +193,10 @@ class OptionsBootstrapperTest(unittest.TestCase):
                 dedent(
                     """\
                     [compile.apt]
-                    worker_count: 1
+                    worker_count = 1
 
                     [fruit]
-                    apple: red
+                    apple = "red"
                     """
                 )
             )
@@ -204,7 +204,7 @@ class OptionsBootstrapperTest(unittest.TestCase):
                 dedent(
                     """\
                     [compile.apt]
-                    worker_count: 2
+                    worker_count = 2
                     """
                 )
             )
@@ -230,7 +230,7 @@ class OptionsBootstrapperTest(unittest.TestCase):
                 dedent(
                     """
                     [resolver]
-                    resolver: coursier
+                    resolver = "coursier"
                     """
                 )
             )
@@ -397,9 +397,9 @@ class OptionsBootstrapperTest(unittest.TestCase):
             config1 = os.path.join(tmpdir, "config1")
             config2 = os.path.join(tmpdir, "config2")
             with open(config1, "w") as out1:
-                out1.write(f"[DEFAULT]\npants_config_files: ['{config2}']\nlogdir: logdir1\n")
+                out1.write(f"[DEFAULT]\npants_config_files = ['{config2}']\nlogdir = 'logdir1'\n")
             with open(config2, "w") as out2:
-                out2.write("[DEFAULT]\nlogdir: logdir2\n")
+                out2.write("[DEFAULT]\nlogdir = 'logdir2'\n")
 
             ob = OptionsBootstrapper.create(env={}, args=[f"--pants-config-files=['{config1}']"])
             logdir = ob.get_bootstrap_options().for_global_scope().logdir
