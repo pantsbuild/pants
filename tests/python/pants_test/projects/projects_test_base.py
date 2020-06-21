@@ -106,7 +106,6 @@ class ProjectsTestBase(PantsRunIntegrationTest):
             # resources / loose files
             "files",
             "resources",
-            "page",
             # 3rd-party dependencies
             "jar_library",
             "python_requirement_library",
