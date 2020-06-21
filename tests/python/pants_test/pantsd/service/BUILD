@@ -11,14 +11,3 @@ python_tests(
   ],
   tags = {"partially_type_checked"},
 )
-
-python_tests(
-  name = 'fs_event_service',
-  sources = ['test_fs_event_service.py'],
-  coverage = ['pants.pantsd.service.fs_event_service'],
-  dependencies = [
-    'tests/python/pants_test/pantsd:test_deps',
-    'src/python/pants/pantsd/service:fs_event_service'
-  ],
-  tags = {"partially_type_checked"},
-)
