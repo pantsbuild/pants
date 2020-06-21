@@ -31,7 +31,6 @@
     "first_tutorial": "dist/markdown/html/src/docs/first_tutorial.html",
     "from_maven": "dist/markdown/html/examples/src/java/org/pantsbuild/example/from_maven.html",
     "globs": "dist/markdown/html/src/docs/common_tasks/globs.html",
-    "go_readme": "dist/markdown/html/contrib/go/README.html",
     "howto_ask": "dist/markdown/html/src/docs/howto_ask.html",
     "howto_contribute": "dist/markdown/html/src/docs/howto_contribute.html",
     "howto_develop": "dist/markdown/html/src/docs/howto_develop.html",
@@ -185,7 +184,6 @@
                     "3rdparty_py"
                 ]
        },
-       {"pages" : ["go_readme"]},
        {"pages" : ["node_readme"]},
        {"heading": "Code & Doc Generation"},
        {"pages" : [

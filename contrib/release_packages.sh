@@ -16,13 +16,6 @@ function pkg_scrooge_install_test() {
     --explain lint | grep "thrift" &> /dev/null
 }
 
-function pkg_go_install_test() {
-  local version=$1
-  execute_packaged_pants_with_internal_backends \
-      --plugins="['pantsbuild.pants.contrib.go==${version}']" \
-      --explain test | grep "GoTest_test_go" &> /dev/null
-}
-
 function pkg_node_install_test() {
   local version=$1
   execute_packaged_pants_with_internal_backends \
