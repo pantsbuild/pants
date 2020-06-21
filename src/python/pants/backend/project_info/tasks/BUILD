@@ -4,26 +4,12 @@
 target(
   name = 'all',
   dependencies = [
-    ':dependencies',
     ':depmap',
     ':export',
     ':export_dep_as_jar',
     ':filedeps',
     ':idea_plugin_gen',
   ],
-)
-
-python_library(
-  name = 'dependencies',
-  sources = ['dependencies.py'],
-  dependencies = [
-    'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/base:payload_field',
-    'src/python/pants/task',
-    'src/python/pants/util:ordered_set',
-  ],
-  tags = {"partially_type_checked"},
 )
 
 python_library(

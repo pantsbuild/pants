@@ -11,22 +11,6 @@ python_library(
 )
 
 python_tests(
-  name = 'dependencies',
-  sources = ['test_dependencies.py'],
-  dependencies = [
-    'src/python/pants/java/jar',
-    'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/backend/project_info/tasks:dependencies',
-    'src/python/pants/backend/python/targets',
-    'src/python/pants/build_graph',
-    'src/python/pants/python',
-    'src/python/pants/testutil:task_test_base',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_tests(
   name = 'depmap',
   sources = ['test_depmap.py'],
   coverage = ['pants.backend.project_info.tasks.depmap'],
