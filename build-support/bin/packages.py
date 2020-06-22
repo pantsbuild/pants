@@ -269,18 +269,16 @@ def build_fs_util() -> None:
     # See https://pants.readme.io/docs/contributions-rust for a description of fs_util. We include
     # it in our releases because it can be a useful standalone tool.
     with travis_section("fs_util", "Building fs_util"):
-        subprocess.run(
-            [
-                "build-support/bin/native/cargo",
-                "build",
-                "--release",
-                "--manifest-path=src/rust/engine/Cargo.toml",
-                "-p",
-                "fs_util",
-            ],
-            check=True,
-            env={**os.environ, "RUST_BACKTRACE": "1"},
-        )
+        command = [
+            "build-support/bin/native/cargo",
+            "build",
+            "--manifest-path=src/rust/engine/Cargo.toml",
+            "-p",
+            "fs_util",
+        ]
+        if os.environ.get("MODE") != "DEBUG":
+            command.append("--release")
+        subprocess.run(command, check=True, env={**os.environ, "RUST_BACKTRACE": "1"})
         current_os = (
             subprocess.run(["build-support/bin/get_os.sh"], stdout=subprocess.PIPE, check=True)
             .stdout.decode()
