@@ -57,8 +57,8 @@ def generate_args(mypy: MyPy, *, file_list_path: str) -> Tuple[str, ...]:
     return tuple(args)
 
 
-# TODO: Improve performance, e.g. by leveraging the MyPy cache.
-# TODO: Support plugins and type stubs.
+# TODO(#10131): Improve performance, e.g. by leveraging the MyPy cache.
+# TODO(#10131): Support plugins and type stubs.
 @rule(desc="Lint using MyPy")
 async def mypy_lint(
     request: MyPyRequest,
@@ -79,8 +79,9 @@ async def mypy_lint(
         PexRequest(
             output_filename="mypy.pex",
             requirements=PexRequirements(mypy.get_requirement_specs()),
-            # TODO: figure out how to robustly handle interpreter constraints. Unlike other linters,
-            #  the version of Python used to run MyPy can be different than the version of the code.
+            # TODO(#10131): figure out how to robustly handle interpreter constraints. Unlike other
+            #  linters, the version of Python used to run MyPy can be different than the version of
+            #  the code.
             interpreter_constraints=PexInterpreterConstraints(mypy.default_interpreter_constraints),
             entry_point=mypy.get_entry_point(),
         ),
