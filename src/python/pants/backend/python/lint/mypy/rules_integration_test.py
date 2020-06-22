@@ -7,14 +7,16 @@ from typing import List, Optional
 
 from pants.backend.python.lint.mypy.rules import MyPyFieldSet, MyPyRequest
 from pants.backend.python.lint.mypy.rules import rules as mypy_rules
-from pants.backend.python.target_types import PythonLibrary
+from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.base.specs import SingleAddress
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.lint import LintResults
 from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.engine.target import TargetWithOrigin, WrappedTarget
+from pants.python.python_requirement import PythonRequirement
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option.util import create_options_bootstrapper
 
@@ -60,8 +62,12 @@ class MyPyIntegrationTest(ExternalToolTestBase):
         return (*super().rules(), *mypy_rules(), RootRule(MyPyRequest))
 
     @classmethod
+    def alias_groups(cls):
+        return BuildFileAliases(objects={"python_requirement": PythonRequirement})
+
+    @classmethod
     def target_types(cls):
-        return [PythonLibrary]
+        return [PythonLibrary, PythonRequirementLibrary]
 
     def make_target_with_origin(
         self,
@@ -211,3 +217,65 @@ class MyPyIntegrationTest(ExternalToolTestBase):
         assert len(result) == 1
         assert result[0].exit_code == 1
         assert "project/math/add.py:5" in result[0].stdout
+
+    def test_thirdparty_plugin(self) -> None:
+        self.add_to_build_file(
+            "",
+            dedent(
+                """\
+                python_requirement_library(
+                    name='django',
+                    requirements=[python_requirement('django==2.2.5')],
+                )
+                """
+            ),
+        )
+        settings_file = FileContent(
+            "project/settings.py",
+            dedent(
+                """\
+                from django.urls import URLPattern
+
+                DEBUG = True
+                DEFAULT_FROM_EMAIL = "webmaster@example.com"
+                SECRET_KEY = "not so secret"
+
+                MY_SETTING = URLPattern(pattern="foo", callback=lambda: None)
+                """
+            ).encode(),
+        )
+        app_file = FileContent(
+            "project/app.py",
+            dedent(
+                """\
+                from django.utils import text
+
+                assert "forty-two" == text.slugify("forty two")
+                assert "42" == text.slugify(42)
+                """
+            ).encode(),
+        )
+        target = self.make_target_with_origin(
+            [settings_file, app_file], dependencies=[Address.parse("//:django")]
+        )
+        config_content = dedent(
+            """\
+            [mypy]
+            plugins =
+                mypy_django_plugin.main
+
+            [mypy.plugins.django-stubs]
+            django_settings_module = project.settings
+            """
+        )
+        result = self.run_mypy(
+            [target],
+            config=config_content,
+            additional_args=[
+                "--mypy-extra-requirements=django-stubs==1.5.0",
+                "--mypy-version=mypy==0.770",
+            ],
+        )
+        assert len(result) == 1
+        assert result[0].exit_code == 1
+        assert "project/django/app.py:4" in result[0].stdout
