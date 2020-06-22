@@ -47,7 +47,6 @@ target(
     ':runtime_directory',
     ':shading_directory',
     ':shadingdep_directory',
-    ':thriftdeptest_directory',
     ':typeparameters_directory',
     ':unicode_directory',
     # NB: See `:javasources_directory` for why this must be declared here.
@@ -312,14 +311,6 @@ files(
 files(
   name = 'shadingdep_directory',
   sources = ['shadingdep/**/*'],
-)
-
-files(
-  name = 'thriftdeptest_directory',
-  sources = ['thriftdeptest/**/*'],
-  dependencies = [
-    'testprojects/src/thrift/org/pantsbuild:testproject_directory',
-  ],
 )
 
 files(
