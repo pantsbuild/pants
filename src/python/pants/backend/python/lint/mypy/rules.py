@@ -19,7 +19,14 @@ from pants.backend.python.target_types import PythonSources
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.engine.addresses import Addresses
-from pants.engine.fs import AddPrefix, Digest, MergeDigests, PathGlobs, Snapshot
+from pants.engine.fs import (
+    Digest,
+    FileContent,
+    InputFilesContent,
+    MergeDigests,
+    PathGlobs,
+    Snapshot,
+)
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get, MultiGet
@@ -41,12 +48,12 @@ class MyPyRequest(LintRequest):
     field_set_type = MyPyFieldSet
 
 
-def generate_args(mypy: MyPy, *, sources_directory: str) -> Tuple[str, ...]:
+def generate_args(mypy: MyPy, *, file_list_path: str) -> Tuple[str, ...]:
     args = []
     if mypy.config:
         args.append(f"--config-file={mypy.config}")
     args.extend(mypy.args)
-    args.append(sources_directory)
+    args.append(f"@{file_list_path}")
     return tuple(args)
 
 
@@ -70,7 +77,7 @@ async def mypy_lint(
     pex_request = Get(
         Pex,
         PexRequest(
-            output_filename="bin/mypy.pex",
+            output_filename="mypy.pex",
             requirements=PexRequirements(mypy.get_requirement_specs()),
             # TODO: figure out how to robustly handle interpreter constraints. Unlike other linters,
             #  the version of Python used to run MyPy can be different than the version of the code.
@@ -90,22 +97,31 @@ async def mypy_lint(
         prepared_sources_request, pex_request, config_snapshot_request
     )
 
-    relocated_sources_digest = await Get(
-        Digest, AddPrefix(prepared_sources.snapshot.digest, prefix="src")
-    )
-    merged_input_files = await Get(
-        Digest, MergeDigests([relocated_sources_digest, pex.digest, config_snapshot.digest])
+    file_list_path = "__files.txt"
+    file_list = await Get(
+        Digest,
+        InputFilesContent(
+            [FileContent(file_list_path, "\n".join(prepared_sources.snapshot.files).encode())]
+        ),
     )
 
-    address_references = sorted(tgt.address.spec for tgt in transitive_targets.closure)
+    merged_input_files = await Get(
+        Digest,
+        MergeDigests(
+            [file_list, prepared_sources.snapshot.digest, pex.digest, config_snapshot.digest]
+        ),
+    )
+
+    address_references = ", ".join(sorted(tgt.address.spec for tgt in transitive_targets.closure))
     process = pex.create_process(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path=pex.output_filename,
-        pex_args=generate_args(mypy, sources_directory="src"),
+        pex_args=generate_args(mypy, file_list_path=file_list_path),
         input_digest=merged_input_files,
         description=(
-            f"Run MyPy on {pluralize(len(address_references), 'target')}: {address_references}."
+            f"Run MyPy on {pluralize(len(transitive_targets.closure), 'target')}: "
+            f"{address_references}."
         ),
     )
     result = await Get(FallibleProcessResult, Process, process)
