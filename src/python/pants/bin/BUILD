@@ -74,7 +74,6 @@ python_binary(
   dependencies=[
     ':bin',
     '//:build_root',
-    '//:build_tools',
     '//:pants_toml',
     '//:3rdparty_directory',
     '//:isort_cfg',

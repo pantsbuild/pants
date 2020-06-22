@@ -14,11 +14,6 @@ files(
 )
 
 files(
-  name = 'build_tools',
-  sources = ['BUILD.tools'],
-)
-
-files(
   name = 'gitignore',
   sources = ['.gitignore'],
 )
