@@ -369,8 +369,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         test_path = "tests/python/pants_test/daemon_correctness_test_0001"
         test_build_file = os.path.join(test_path, "BUILD")
         test_src_file = os.path.join(test_path, "some_file.py")
-        has_source_root_regex = r'"source_root": ".*/{}"'.format(test_path)
-        export_cmd = ["--files-not-found-behavior=warn", "export", test_path]
+        filedeps_cmd = ["--files-not-found-behavior=warn", "filedeps", test_path]
 
         try:
             with self.pantsd_successful_run_context() as ctx:
@@ -382,19 +381,21 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                 safe_file_dump(
                     test_build_file, "python_library(sources=['some_non_existent_file.py'])"
                 )
-                result = ctx.runner(export_cmd)
+                non_existent_file = os.path.join(test_path, "some_non_existent_file.py")
+
+                result = ctx.runner(filedeps_cmd)
                 ctx.checker.assert_running()
-                self.assertNotRegex(result.stdout_data, has_source_root_regex)
+                assert non_existent_file not in result.stdout_data
 
                 safe_file_dump(test_build_file, "python_library(sources=['*.py'])")
-                result = ctx.runner(export_cmd)
+                result = ctx.runner(filedeps_cmd)
                 ctx.checker.assert_running()
-                self.assertNotRegex(result.stdout_data, has_source_root_regex)
+                assert non_existent_file not in result.stdout_data
 
-                safe_file_dump(test_src_file, "import this\n")
-                result = ctx.runner(export_cmd)
+                safe_file_dump(test_src_file, "print('hello')\n")
+                result = ctx.runner(filedeps_cmd)
                 ctx.checker.assert_running()
-                self.assertRegex(result.stdout_data, has_source_root_regex)
+                assert test_src_file in result.stdout_data
         finally:
             rm_rf(test_path)
 
