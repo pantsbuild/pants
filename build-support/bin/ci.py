@@ -39,8 +39,6 @@ def main() -> None:
             run_sanity_checks()
         if args.lint:
             run_lint(oauth_token_path=remote_execution_oauth_token_path)
-        if args.doc_gen:
-            run_doc_gen_tests()
         if args.clippy:
             run_clippy()
         if args.cargo_audit:
@@ -119,7 +117,6 @@ def create_parser() -> argparse.ArgumentParser:
         help="Run sanity checks of bootstrapped Pants and repo BUILD files.",
     )
     parser.add_argument("--lint", action="store_true", help="Run lint over whole codebase.")
-    parser.add_argument("--doc-gen", action="store_true", help="Run doc generation tests.")
     parser.add_argument("--clippy", action="store_true", help="Run Clippy on Rust code.")
     parser.add_argument(
         "--cargo-audit", action="store_true", help="Run Cargo audit of Rust dependencies."
@@ -423,12 +420,11 @@ def run_sanity_checks() -> None:
             die(f"Failed to execute `./pants {command}`.")
 
     checks = [
-        ["reference"],
         ["clean-all"],
         ["goals"],
         ["list", "::"],
         ["roots"],
-        ["targets"],
+        ["target-types"],
     ]
     with travis_section("SanityCheck", "Sanity checking bootstrapped Pants and repo BUILD files"):
         check_pants_pex_exists()
@@ -456,15 +452,6 @@ def run_lint(*, oauth_token_path: Optional[str] = None) -> None:
         slug="Lint (V1)",
         start_message="Running V1 lint checks",
         die_message="Lint check failure.",
-    )
-
-
-def run_doc_gen_tests() -> None:
-    _run_command(
-        ["build-support/bin/publish_docs.sh"],
-        slug="DocGen",
-        start_message="Running site doc generation test",
-        die_message="Failed to generate site docs.",
     )
 
 
@@ -573,7 +560,7 @@ def run_jvm_tests() -> None:
     # NB: Ensure that this stays in sync with githooks/prepare-commit-msg.
     targets = ["src/java::", "src/scala::", "tests/java::", "tests/scala::", "zinc::"]
     _run_command(
-        ["./pants.pex", "doc", "test", *targets],
+        ["./pants.pex", "test", *targets],
         slug="CoreJVM",
         start_message="Running JVM tests",
         die_message="JVM test failure.",
