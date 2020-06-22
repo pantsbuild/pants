@@ -147,13 +147,15 @@ class OptionsInitializer:
             *bootstrap_options.pants_config_files,
         )
         for glob in potentially_absolute_globs:
-            glob_relpath = fast_relpath_optional(glob, buildroot) if os.path.isabs(glob) else glob
-            if glob_relpath:
-                invalidation_globs.update([glob_relpath, glob_relpath + "/**"])
-            else:
+            # NB: We use `relpath` here because these paths are untrusted, and might need to be
+            # normalized in addition to being relativized.
+            glob_relpath = os.path.relpath(glob, buildroot)
+            if glob_relpath.startswith(".."):
                 logger.debug(
                     f"Changes to {glob}, outside of the buildroot, will not be invalidated."
                 )
+            else:
+                invalidation_globs.update([glob_relpath, glob_relpath + "/**"])
 
         # Explicitly specified globs are already relative, and are added verbatim.
         invalidation_globs.update(
