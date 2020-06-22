@@ -96,9 +96,6 @@ def contrib_packages() -> Set[Package]:
             "contrib/scrooge/src/python/pants/contrib/scrooge:plugin",
         ),
         Package(
-            "pantsbuild.pants.contrib.node", "contrib/node/src/python/pants/contrib/node:plugin",
-        ),
-        Package(
             "pantsbuild.pants.contrib.mypy", "contrib/mypy/src/python/pants/contrib/mypy:plugin",
         ),
     }
@@ -497,18 +494,6 @@ def tag_release() -> None:
     )
 
 
-def publish_docs_if_master_branch() -> None:
-    branch = get_git_branch()
-    if branch != "master":
-        print(
-            f"Skipping publish of pantsbuild.org because you are not on master ({branch}).\n\nTo "
-            "manually publish, first check out the `master` branch, then run "
-            "`build-support/bin/publish_docs.sh -p -y`."
-        )
-        return
-    subprocess.run(["build-support/bin/publish_docs.sh", "-p", "-y"], check=True)
-
-
 def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest="command")
@@ -544,7 +529,6 @@ def main() -> None:
         list_prebuilt_wheels()
     if args.command == "post-publish":
         tag_release()
-        publish_docs_if_master_branch()
     if args.command == "fetch-and-check-prebuilt-wheels":
         with TemporaryDirectory() as tempdir:
             dest = args.wheels_dest or tempdir

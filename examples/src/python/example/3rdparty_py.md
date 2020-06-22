@@ -2,7 +2,7 @@ Python 3rdparty Pattern
 =======================
 
 In general, we use the
-[[3rdparty idiom|pants('src/docs:3rdparty')]] to organize
+3rdparty idiom to organize
 dependencies on code from outside the source tree. This document
 describes how to make this work for Python code.
 
@@ -84,7 +84,7 @@ Pants will use the explicitly specified `platforms` field of your <a pantsref="b
 target if set for both itself and its dependencies, or will otherwise fall back to the `python-setup.platforms` option value.
 
 Pants will look for those files in the location specified in the
-[[`python-repos`|pants('src/docs:setup_repo')#redirecting-python-requirements-to-other-servers]] field
+`python-repos` field
 in pants.toml. It can understand either a simple local directory of .whl files or a "find links"-friendly
 webpage of links formatted like so:
 

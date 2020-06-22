@@ -9,13 +9,6 @@ target(
   ],
 )
 
-page(
-  name='readme',
-  sources=['README.md'],
-  links=[
-    'examples/src/java/org/pantsbuild/example:publish',
-  ])
-
 files(
   name = 'distance_directory',
   sources = ['distance/**/*'],

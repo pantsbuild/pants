@@ -81,9 +81,6 @@ class ProjectsTestBase(PantsRunIntegrationTest):
             "testprojects/src/python/python_distribution/ctypes:ctypes_test",
             "testprojects/src/python/python_distribution/ctypes_with_third_party:ctypes_test",
             "testprojects/src/python/python_distribution/ctypes_with_extra_compiler_flags:bin",
-            # Requires non-standard settings, and already tested by
-            # `ProtobufIntegrationTest.test_import_from_buildroot`
-            "testprojects/src/protobuf/org/pantsbuild/testproject/import_from_buildroot.*",
         ]
 
         # E.g. tests depend on src/python or tests/python. This is only meant to be a temporary
@@ -109,7 +106,6 @@ class ProjectsTestBase(PantsRunIntegrationTest):
             # resources / loose files
             "files",
             "resources",
-            "page",
             # 3rd-party dependencies
             "jar_library",
             "python_requirement_library",

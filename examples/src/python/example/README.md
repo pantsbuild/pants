@@ -3,7 +3,7 @@ Python Projects with Pants
 
 Pants makes the manipulation and distribution of hermetically sealed
 Python environments painless. You can organize your code in the
-[[Pants way|pants('src/docs:first_concepts')]]
+Pants way|pants
 with targets for binaries, libraries, and
 tests. Pants builds Python code into
 [PEXes](https://github.com/pantsbuild/pex/blob/master/docs/whatispex.rst).
@@ -13,7 +13,7 @@ you have some "common code" used by more than one PEX, Pants makes it
 easy to manage the dependencies.
 
 This page assumes that you've already read
-[[the Pants Tutorial|pants('src/docs:first_tutorial')]].
+the Pants Tutorial.
 
 Relevant Goals and Targets
 --------------------------

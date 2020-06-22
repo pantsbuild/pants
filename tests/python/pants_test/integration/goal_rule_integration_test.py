@@ -19,8 +19,8 @@ class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
     def test_v2_list(self):
         result = self.do_command("list", self.list_target, success=True)
         output_lines = result.stdout_data.splitlines()
-        self.assertEqual(len(output_lines), 5)
-        self.assertIn("examples/src/java/org/pantsbuild/example/hello/main:readme", output_lines)
+        self.assertEqual(len(output_lines), 4)
+        self.assertIn("examples/src/java/org/pantsbuild/example/hello/main:main-bin", output_lines)
 
     def test_v2_list_does_not_cache(self):
         with self.pantsd_successful_run_context() as ctx:
