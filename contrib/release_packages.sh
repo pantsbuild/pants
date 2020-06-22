@@ -6,16 +6,6 @@
 # `PKG_$NAME` definition.
 #
 
-function pkg_scrooge_install_test() {
-  local version=$1
-  execute_packaged_pants_with_internal_backends \
-    --plugins="['pantsbuild.pants.contrib.scrooge==${version}']" \
-    --explain gen | grep "scrooge" &> /dev/null && \
-  execute_packaged_pants_with_internal_backends \
-    --plugins="['pantsbuild.pants.contrib.scrooge==${version}']" \
-    --explain lint | grep "thrift" &> /dev/null
-}
-
 function pkg_mypy_install_test() {
   local version=$1
   execute_packaged_pants_with_internal_backends \

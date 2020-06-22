@@ -24,11 +24,9 @@ v2 = false
 # Enable our own custom loose-source plugins as well as contribs.
 pythonpath = [
   "%(buildroot)s/contrib/mypy/src/python",
-  "%(buildroot)s/contrib/scrooge/src/python",
   "%(buildroot)s/pants-plugins/src/python",
 ]
 backend_packages.add = [
-  "pants.contrib.scrooge",
   "internal_backend.repositories",
   "internal_backend.utilities",
 ]
@@ -96,58 +94,6 @@ ivy_settings = "%(pants_supportdir)s/ivy/ivysettings.xml"
 # We need a custom ivy profile to grab the optional pgp libs for
 # signing artifacts we publish to maven central.
 ivy_profile = "%(pants_supportdir)s/ivy/ivy.xml"
-
-[gen.scrooge]
-service_deps = """
-{
-  'java': [
-    '3rdparty:slf4j-api',
-    '3rdparty:thrift',
-    '3rdparty/jvm/com/twitter:finagle-thrift',
-    '3rdparty/jvm/com/twitter:scrooge-core',
-  ],
-  'scala': [
-    '3rdparty:thrift',
-    '3rdparty/jvm/com/twitter:finagle-thrift',
-    '3rdparty/jvm/com/twitter:scrooge-core',
-  ],
-}
-"""
-structs_deps = """
-{
-  'java': [
-    '3rdparty:thrift',
-    '3rdparty/jvm/com/twitter:scrooge-core',
-  ],
-  'scala': [
-    '3rdparty:thrift',
-    '3rdparty/jvm/com/twitter:scrooge-core',
-  ],
-}
-"""
-service_exports = """
-{
-  'java': [
-    '3rdparty:thrift',
-  ],
-  'scala': [
-    '3rdparty:thrift',
-    '3rdparty/jvm/com/twitter:finagle-thrift',
-    '3rdparty/jvm/com/twitter:scrooge-core',
-  ],
-}
-"""
-structs_exports = """
-{
-  'java': [
-    '3rdparty:thrift',
-  ],
-  'scala': [
-    '3rdparty:thrift',
-    '3rdparty/jvm/com/twitter:scrooge-core',
-  ],
-}
-"""
 
 [gen.thrift-java]
 deps = ["3rdparty:thrift"]
