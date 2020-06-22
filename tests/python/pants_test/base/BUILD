@@ -158,12 +158,12 @@ python_tests(
   sources = ['test_exception_sink.py'],
   dependencies = [
     'src/python/pants/base:exception_sink',
+    'src/python/pants/testutil/option',
+    'src/python/pants/testutil:test_base',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:enums',
     'src/python/pants/util:osutil',
-    'src/python/pants/testutil:test_base',
-    'src/python/pants/testutil/option',
   ],
   tags={'platform_specific_behavior', 'partially_type_checked'},
 )
@@ -172,6 +172,7 @@ python_tests(
   name = 'exception_sink_integration',
   sources = ['test_exception_sink_integration.py'],
   dependencies = [
+    'examples/src/python/example:hello_directory',
     'src/python/pants/base:exception_sink',
     'src/python/pants/testutil:int-test',
     'src/python/pants/util:osutil',

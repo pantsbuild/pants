@@ -14,10 +14,10 @@ from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegratio
 
 
 class ExceptionSinkIntegrationTest(PantsDaemonIntegrationTestBase):
-    def _assert_unhandled_exception_log_matches(self, pid, file_contents):
+    def _assert_unhandled_exception_log_matches(self, pid, file_contents, namespace):
         self.assertRegex(
             file_contents,
-            """\
+            f"""\
 timestamp: ([^\n]+)
 process title: ([^\n]+)
 sys\\.argv: ([^\n]+)
@@ -27,10 +27,8 @@ Exception caught: \\([^)]*\\)
 
 Exception message:.* 1 Exception encountered:
 
-  ResolveError: "this-target-does-not-exist" was not found in namespace ""\\. Did you mean one of:
-""".format(
-                pid=pid
-            ),
+  ResolveError: "this-target-does-not-exist" was not found in namespace "{namespace}"\\. Did you mean one of:
+""",
         )
         # Ensure we write all output such as stderr and reporting files before closing any streams.
         self.assertNotIn("Exception message: I/O operation on closed file.", file_contents)
@@ -99,9 +97,10 @@ Exception message:.* 1 Exception encountered:
                 self.assertEqual("", read_file(shared_log_file))
 
     def test_logs_unhandled_exception(self):
+        directory = "examples/src/python/example/hello/main"
         with temporary_dir() as tmpdir:
             pants_run = self.run_pants_with_workdir(
-                ["--no-pantsd", "list", "//:this-target-does-not-exist"],
+                ["--no-pantsd", "list", f"{directory}:this-target-does-not-exist"],
                 workdir=tmpdir,
                 # The backtrace should be omitted when --print-exception-stacktrace=False.
                 print_exception_stacktrace=False,
@@ -109,15 +108,17 @@ Exception message:.* 1 Exception encountered:
             self.assert_failure(pants_run)
             self.assertRegex(
                 pants_run.stderr_data,
-                """\
-"this-target-does-not-exist" was not found in namespace ""\\. Did you mean one of:
+                f"""\
+"this-target-does-not-exist" was not found in namespace "{directory}"\\. Did you mean one of:
 """,
             )
             pid_specific_log_file, shared_log_file = self._get_log_file_paths(tmpdir, pants_run.pid)
             self._assert_unhandled_exception_log_matches(
-                pants_run.pid, read_file(pid_specific_log_file)
+                pants_run.pid, read_file(pid_specific_log_file), namespace=directory
             )
-            self._assert_unhandled_exception_log_matches(pants_run.pid, read_file(shared_log_file))
+            self._assert_unhandled_exception_log_matches(
+                pants_run.pid, read_file(shared_log_file), namespace=directory
+            )
 
     def _assert_graceful_signal_log_matches(self, pid, signum, signame, contents):
         self.assertRegex(
