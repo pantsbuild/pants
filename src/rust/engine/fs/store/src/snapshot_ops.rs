@@ -404,12 +404,12 @@ impl IntermediateGlobbedFilesAndDirectories {
         // TODO(#9967): Figure out how to consume the existing glob matching logic that works on
         // `VFS` instances!
         match &path_glob {
+          // NB: We interpret globs such that the *only* way to have a glob match the contents of a
+          // whole directory is to end in '/**' or '/**/*'.
           RestrictedPathGlob::Wildcard { wildcard } => {
-            assert_ne!(*wildcard, *DOUBLE_STAR_GLOB);
-            // This directory matched completely, without having to subset its contents
-            // whatsoever. We can avoid traversing its contents and return the node.
-            // NB: This line should be idempotent if the same directory node is added twice.
-            globbed_directories.insert(directory_path, directory_node.clone());
+            if *wildcard == *DOUBLE_STAR_GLOB {
+              globbed_directories.insert(directory_path, directory_node.clone());
+            }
           }
           RestrictedPathGlob::DirWildcard {
             wildcard,
