@@ -88,8 +88,14 @@ def targets_by_platform(targets, python_setup):
 
 
 def identify_missing_init_files(sources: Sequence[str]) -> Set[str]:
-    """Return the list of paths that would need to be added to ensure that every package has an
-    __init__.py."""
+    """Return the paths to add to ensure that every package has an __init__.py.
+
+    NB: If the sources have not had their source roots (e.g., 'src/python') stripped, this
+    function will add superfluous __init__.py files at and above the source roots, (e.g.,
+    src/python/__init__.py, src/__init__.py). It is the caller's responsibiltiy to filter these
+    out if necessary. If the sources have had their source roots stripped, then this function
+    will only identify missing __init__.py in actual packages.
+    """
     packages: Set[str] = set()
     for source in sources:
         if source.endswith(".py"):

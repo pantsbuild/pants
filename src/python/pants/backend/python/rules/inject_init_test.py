@@ -10,6 +10,8 @@ from pants.backend.python.rules.inject_init import (
 )
 from pants.engine.fs import Digest, FilesContent
 from pants.engine.rules import RootRule
+from pants.engine.selectors import Params
+from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
 
@@ -23,11 +25,18 @@ class InjectInitTest(TestBase):
             RootRule(Digest),
         )
 
-    def assert_injected(self, *, original_files: List[str], expected_added: List[str]) -> None:
+    def assert_injected(self, *, original_files: List[str], expected_added: List[str],
+                        sources_stripped=True) -> None:
         request = InjectInitRequest(
-            self.make_snapshot({fp: "# python code" for fp in original_files})
+            self.make_snapshot({fp: "# python code" for fp in original_files}),
+            sources_stripped=sources_stripped,
         )
-        result = self.request_single_product(InitInjectedSnapshot, request).snapshot
+        result = self.request_single_product(
+            InitInjectedSnapshot,
+            Params(
+                request, create_options_bootstrapper(args=["--source-root-patterns=['src/python']"])
+            ),
+        ).snapshot
         assert sorted(result.files) == sorted([*original_files, *expected_added])
         # Ensure all original `__init__.py` are preserved with their original content.
         materialized_original_inits = [
@@ -45,11 +54,11 @@ class InjectInitTest(TestBase):
             original_files=["lib.py", "subdir/lib.py"], expected_added=["subdir/__init__.py"],
         )
         self.assert_injected(
-            original_files=["src/python/lib.py", "src/python/subdir/lib.py"],
+            original_files=["a/b/lib.py", "a/b/subdir/lib.py"],
             expected_added=[
-                "src/__init__.py",
-                "src/python/__init__.py",
-                "src/python/subdir/__init__.py",
+                "a/__init__.py",
+                "a/b/__init__.py",
+                "a/b/subdir/__init__.py",
             ],
         )
 
@@ -60,15 +69,26 @@ class InjectInitTest(TestBase):
         )
         self.assert_injected(
             original_files=[
-                "src/python/lib.py",
-                "src/python/__init__.py",
-                "src/python/subdir/lib.py",
-                "src/python/subdir/__init__.py",
+                "a/b/lib.py",
+                "a/b/__init__.py",
+                "a/b/subdir/lib.py",
+                "a/b/subdir/__init__.py",
             ],
-            expected_added=["src/__init__.py"],
+            expected_added=["a/__init__.py"],
         )
         # No missing `__init__.py` files
         self.assert_injected(
             original_files=["lib.py", "__init__.py", "subdir/lib.py", "subdir/__init__.py"],
             expected_added=[],
+        )
+
+    def test_source_roots_unstripped(self):
+        self.assert_injected(original_files=[
+            "src/python/lib.py",
+            "src/python/subdir/lib.py",
+            "src/python/subdir/__init__.py",
+            "src/python/anothersubdir/lib.py",
+        ],
+            expected_added=["src/python/__init__.py", "src/python/anothersubdir/__init__.py"],
+            sources_stripped=False,
         )

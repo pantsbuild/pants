@@ -14,7 +14,7 @@ from pants.backend.python.rules.coverage import (
     CoverageSubsystem,
     PytestCoverageData,
 )
-from pants.backend.python.rules.importable_python_sources import ImportablePythonSources
+from pants.backend.python.rules.importable_python_sources import IntrospectablePythonSources
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
@@ -68,6 +68,7 @@ class TestTargetSetup:
     test_runner_pex: Pex
     args: Tuple[str, ...]
     input_digest: Digest
+    source_roots: Tuple[str, ...]
     timeout_seconds: Optional[int]
     xml_dir: Optional[str]
     junit_family: str
@@ -154,16 +155,15 @@ async def setup_pytest_for_target(
         ),
     )
 
-    prepared_sources_request = Get[ImportablePythonSources](Targets(all_targets))
+    prepared_sources_request = Get[IntrospectablePythonSources](Targets(all_targets))
 
     # Get the file names for the test_target so that we can specify to Pytest precisely which files
     # to test, rather than using auto-discovery.
     specified_source_files_request = Get[SourceFiles](
         SpecifiedSourceFilesRequest(
-            [(field_set.sources, field_set.origin)], strip_source_roots=True
+            [(field_set.sources, field_set.origin)], strip_source_roots=False
         )
     )
-
     use_coverage = test_options.values.use_coverage
 
     requests = (
@@ -206,6 +206,7 @@ async def setup_pytest_for_target(
         test_runner_pex=test_runner_pex,
         args=(*pytest.options.args, *coverage_args, *specified_source_files.files),
         input_digest=input_digest,
+        source_roots=tuple(prepared_sources.source_roots),
         timeout_seconds=field_set.timeout.calculate_from_global_options(pytest),
         xml_dir=pytest.options.junit_xml_dir,
         junit_family=pytest.options.junit_family,
@@ -228,9 +229,11 @@ async def run_python_test(
         add_opts.extend(
             (f"--junitxml={test_results_file}", f"-o junit_family={test_setup.junit_family}",)
         )
+
     # We explicitly add the CWD to the PEX runtime sys.path. Some pytest plugins
     # (e.g., pytest-django)  need this so that their dynamic import logic works properly.
-    env = {"PYTEST_ADDOPTS": " ".join(add_opts), "PEX_EXTRA_SYS_PATH": "."}
+    extra_sys_path = ":".join([".", *test_setup.source_roots])
+    env = {"PYTEST_ADDOPTS": " ".join(add_opts), "PEX_EXTRA_SYS_PATH": extra_sys_path}
 
     use_coverage = test_options.values.use_coverage
     output_dirs = [".coverage"] if use_coverage else []
