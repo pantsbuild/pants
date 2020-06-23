@@ -76,18 +76,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'filedeps_integration',
-  sources = ['filedeps_integration_test.py'],
-  dependencies = [
-    'src/python/pants/base:project_tree',
-    'src/python/pants/testutil:int-test',
-    'examples/src/scala/org/pantsbuild/example:hello_directory',
-  ],
-  tags = {'integration', 'partially_type_checked'},
-  timeout = 180,
-)
-
-python_tests(
   name='graph_integration',
   sources=['graph_integration_test.py'],
   dependencies=[
