@@ -2,6 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
+from pathlib import PurePath
+from textwrap import dedent
 from typing import Tuple
 
 from pants.backend.python.lint.mypy.subsystem import MyPy
@@ -57,8 +59,46 @@ def generate_args(mypy: MyPy, *, file_list_path: str) -> Tuple[str, ...]:
     return tuple(args)
 
 
+# MyPy searches for types for a package in packages containing a `py.types` arker file or else in
+# a sibling `<package>-stubs` package as per PEP-0561. Going further than that PEP, MyPy restricts
+# its search to `site-packages`. Since PEX deliberately isolates itself from `site-packages` as
+# part of its raison d'être, we monkey-patch `site.getsitepackages` to look inside the scrubbed
+# PEX sys.path before handing off to `mypy`.
+#
+# As a complication, MyPy does its own validation to ensure packages aren't both available in
+# site-packages and on the PYTHONPATH. As such, we elide all PYTHONPATH entries from artificial
+# site-packages we set up since MyPy will manually scan PYTHONPATH outside this PEX to find
+# packages.
+#
+# See:
+#   https://mypy.readthedocs.io/en/stable/installed_packages.html#installed-packages
+#   https://www.python.org/dev/peps/pep-0561/#stub-only-packages
+LAUNCHER_FILE = FileContent(
+    "__pants_mypy_launcher.py",
+    dedent(
+        """\
+        import os
+        import runpy
+        import site
+        import sys
+
+        PYTHONPATH = frozenset(
+            os.path.realpath(p)
+            for p in os.environ.get('PYTHONPATH', '').split(os.pathsep)
+        )
+
+        site.getsitepackages = lambda: [
+            p for p in sys.path if os.path.realpath(p) not in PYTHONPATH
+        ]
+
+        runpy.run_module('mypy', run_name='__main__')
+        """
+    ).encode(),
+)
+
+
 # TODO(#10131): Improve performance, e.g. by leveraging the MyPy cache.
-# TODO(#10131): Support plugins and type stubs.
+# TODO(#10131): Support first-party plugins.
 @rule(desc="Lint using MyPy")
 async def mypy_lint(
     request: MyPyRequest,
@@ -69,8 +109,12 @@ async def mypy_lint(
     if mypy.skip:
         return LintResults()
 
-    transitive_targets = await Get(
+    transitive_targets_request = Get(
         TransitiveTargets, Addresses(fs.address for fs in request.field_sets)
+    )
+    launcher_file_request = Get(Digest, InputFilesContent([LAUNCHER_FILE]))
+    transitive_targets, launcher_file = await MultiGet(
+        transitive_targets_request, launcher_file_request
     )
 
     prepared_sources_request = Get(ImportablePythonSources, Targets(transitive_targets.closure))
@@ -83,7 +127,8 @@ async def mypy_lint(
             #  linters, the version of Python used to run MyPy can be different than the version of
             #  the code.
             interpreter_constraints=PexInterpreterConstraints(mypy.default_interpreter_constraints),
-            entry_point=mypy.get_entry_point(),
+            entry_point=PurePath(LAUNCHER_FILE.path).stem,
+            sources=launcher_file,
         ),
     )
     config_snapshot_request = Get(
