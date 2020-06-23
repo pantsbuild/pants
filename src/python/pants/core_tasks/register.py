@@ -20,7 +20,6 @@ from pants.core_tasks.run_prep_command import (
     RunTestPrepCommand,
 )
 from pants.core_tasks.substitute_aliased_targets import SubstituteAliasedTargets
-from pants.core_tasks.targets_help import TargetsHelp
 from pants.goal.goal import Goal
 from pants.goal.task_registrar import TaskRegistrar as task
 
@@ -70,7 +69,6 @@ def register_goals():
 
     # Getting help.
     task(name="options", action=ExplainOptionsTask).install()
-    task(name="targets", action=TargetsHelp).install()
 
     # Stub for other goals to schedule 'compile'. See noop_exec_task.py for why this is useful.
     task(name="compile", action=NoopCompile).install("compile")
