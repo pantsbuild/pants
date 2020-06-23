@@ -14,11 +14,12 @@ use lmdb::{self, Cursor, Transaction};
 use sha2::Sha256;
 use sharded_lmdb::{ShardedLmdb, VersionedFingerprint, DEFAULT_LEASE_TIME};
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct ByteStore {
   inner: Arc<InnerStore>,
 }
 
+#[derive(Debug)]
 struct InnerStore {
   // Store directories separately from files because:
   //  1. They may have different lifetimes.

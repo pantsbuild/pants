@@ -103,7 +103,7 @@ impl AsRef<[u8]> for VersionedFingerprint {
 // Each LMDB directory can have at most one concurrent writer.
 // We use this type to shard storage into 16 LMDB directories, based on the first 4 bits of the
 // fingerprint being stored, so that we can write to them in parallel.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct ShardedLmdb {
   // First Database is content, second is leases.
   lmdbs: HashMap<u8, (Arc<Environment>, Database, Database)>,
