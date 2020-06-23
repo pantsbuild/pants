@@ -3,11 +3,14 @@
 
 import os
 import tempfile
+from pathlib import Path
 
+from pants.base.build_environment import get_buildroot
+from pants.util.contextutil import temporary_dir
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 
-class IgnorePatternsPantsIniIntegrationTest(PantsRunIntegrationTest):
+class BuildIgnoreIntegrationTest(PantsRunIntegrationTest):
     """Tests the functionality of the build_ignore_patterns option in pants.toml ."""
 
     @classmethod
@@ -43,47 +46,31 @@ class IgnorePatternsPantsIniIntegrationTest(PantsRunIntegrationTest):
         self.assert_success(run_result)
         results = output_to_list(tmp_output)
         for target in targets:
-            self.assertIn(target, results)
+            assert target in results
 
         tmp_output = os.path.join(tempdir, "minimize-output2.txt")
         run_result = self.run_pants(
             ["minimize", testprojects_glob, "--quiet", f"--minimize-output-file={tmp_output}"],
-            config={"DEFAULT": {"build_ignore": [target_path]}},
+            config={"GLOBAL": {"build_ignore": [target_path]}},
         )
         self.assert_success(run_result)
         results = output_to_list(tmp_output)
         for target in targets:
-            self.assertNotIn(target, results)
+            assert target not in results
 
-    def test_build_ignore_dependency(self):
-        run_result = self.run_pants(
-            [
-                "-q",
-                "dependencies",
-                "--transitive",
-                "testprojects/tests/python/pants/constants_only::",
-            ],
-            config={"DEFAULT": {"build_ignore": ["testprojects/src/"]}},
-        )
+    def test_build_ignore_dependency(self) -> None:
+        with temporary_dir(root_dir=get_buildroot()) as tmpdir:
+            Path(tmpdir, "dir1").mkdir()
+            Path(tmpdir, "dir1", "BUILD").write_text("files(sources=[])")
+            Path(tmpdir, "dir2").mkdir()
+            Path(tmpdir, "dir2", "BUILD").write_text(
+                f"files(sources=[], dependencies=['{tmpdir}/dir1'])"
+            )
+            result = self.run_pants(
+                ["dependencies", f"{tmpdir}/dir2"],
+                config={"GLOBAL": {"build_ignore": [f"{tmpdir}/dir1"]}},
+            )
 
-        self.assert_failure(run_result)
+        self.assert_failure(result)
         # Error message complains dependency dir has no BUILD files.
-        self.assertIn(
-            "testprojects/src/thrift/org/pantsbuild/constants_only", run_result.stderr_data
-        )
-
-    def test_build_ignore_dependency_success(self):
-        run_result = self.run_pants(
-            [
-                "-q",
-                "dependencies",
-                "--transitive",
-                "testprojects/tests/python/pants/constants_only::",
-            ],
-            config={"DEFAULT": {"build_ignore": ["testprojects/src/java"]}},
-        )
-
-        self.assert_success(run_result)
-        self.assertIn(
-            "testprojects/tests/python/pants/constants_only:constants_only", run_result.stdout_data
-        )
+        assert f"{tmpdir}/dir1" in result.stderr_data
