@@ -356,10 +356,7 @@ async fn uncachable_node_only_runs_once() {
 #[tokio::test]
 async fn retries() {
   let _logger = env_logger::try_init();
-  let graph = Arc::new(Graph::new_with_invalidation_timeout(
-    Duration::from_secs(10),
-    Duration::from_millis(100),
-  ));
+  let graph = Arc::new(Graph::new());
 
   let context = {
     let delay_for_root = Duration::from_millis(100);
@@ -389,56 +386,10 @@ async fn retries() {
 }
 
 #[tokio::test]
-async fn exhaust_uncacheable_retries() {
-  let _logger = env_logger::try_init();
-  let graph = Arc::new(Graph::new_with_invalidation_timeout(
-    Duration::from_secs(2),
-    Duration::from_millis(100),
-  ));
-
-  let context = {
-    let mut uncacheable = HashSet::new();
-    uncacheable.insert(TNode::new(1));
-    let delay_for_root = Duration::from_millis(100);
-    let mut delays = HashMap::new();
-    delays.insert(TNode::new(0), delay_for_root);
-    TContext::new(graph.clone())
-      .with_uncacheable(uncacheable)
-      .with_delays(delays)
-  };
-
-  let sleep_per_invalidation = Duration::from_millis(10);
-  let graph2 = graph.clone();
-  let (send, recv) = mpsc::channel();
-  let _join = thread::spawn(move || loop {
-    if let Ok(_) = recv.try_recv() {
-      break;
-    };
-    thread::sleep(sleep_per_invalidation);
-    graph2.invalidate_from_roots(|&TNode(n, _)| n == 0);
-  });
-  let (assertion, subject) = match graph.create(TNode::new(2), &context).await {
-    Err(TError::Exhausted) => (true, None),
-    Err(e) => (false, Some(Err(e))),
-    other => (false, Some(other)),
-  };
-  send.send(()).unwrap();
-  assert!(
-    assertion,
-    "expected {:?} found {:?}",
-    Err::<(), TError>(TError::Exhausted),
-    subject
-  );
-}
-
-#[tokio::test]
 async fn canceled_immediately() {
   let _logger = env_logger::try_init();
   let invalidation_delay = Duration::from_millis(10);
-  let graph = Arc::new(Graph::new_with_invalidation_timeout(
-    Duration::from_secs(10),
-    invalidation_delay,
-  ));
+  let graph = Arc::new(Graph::new_with_invalidation_delay(invalidation_delay));
 
   let delay_for_mid = Duration::from_millis(2000);
   let start_time = Instant::now();
@@ -925,16 +876,11 @@ impl Drop for AbortGuard {
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum TError {
   Cyclic,
-  Exhausted,
   Invalidated,
 }
 impl NodeError for TError {
   fn invalidated() -> Self {
     TError::Invalidated
-  }
-
-  fn exhausted() -> Self {
-    TError::Exhausted
   }
 
   fn cyclic(_path: Vec<String>) -> Self {

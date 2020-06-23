@@ -40,11 +40,11 @@ use std::fs::File;
 use std::hash::BuildHasherDefault;
 use std::io::{self, BufWriter, Write};
 use std::path::Path;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use fnv::FnvHasher;
 use futures::future;
-use log::{debug, trace, warn};
+use log::{debug, info, trace, warn};
 use parking_lot::Mutex;
 use petgraph::graph::DiGraph;
 use petgraph::visit::EdgeRef;
@@ -453,26 +453,21 @@ impl<N: Node> InnerGraph<N> {
 ///
 pub struct Graph<N: Node> {
   inner: Mutex<InnerGraph<N>>,
-  invalidation_timeout: Duration,
   invalidation_delay: Duration,
 }
 
 impl<N: Node> Graph<N> {
   pub fn new() -> Graph<N> {
-    Self::new_with_invalidation_timeout(Duration::from_secs(60), Duration::from_millis(500))
+    Self::new_with_invalidation_delay(Duration::from_millis(500))
   }
 
-  pub fn new_with_invalidation_timeout(
-    invalidation_timeout: Duration,
-    invalidation_delay: Duration,
-  ) -> Graph<N> {
+  pub fn new_with_invalidation_delay(invalidation_delay: Duration) -> Graph<N> {
     let inner = InnerGraph {
       nodes: HashMap::default(),
       pg: DiGraph::new(),
     };
     Graph {
       inner: Mutex::new(inner),
-      invalidation_timeout,
       invalidation_delay,
     }
   }
@@ -536,14 +531,18 @@ impl<N: Node> Graph<N> {
     if dst_retry {
       // Retry the dst a number of times to handle Node invalidation.
       let context = context.clone();
-      let deadline = Instant::now() + self.invalidation_timeout;
       loop {
         match entry.get(&context, entry_id).await {
           Ok(r) => break Ok(r),
           Err(err) if err == N::Error::invalidated() => {
-            if deadline < Instant::now() {
-              break Err(N::Error::exhausted());
-            }
+            let node = {
+              let inner = self.inner.lock();
+              inner.unsafe_entry_for_id(entry_id).node().clone()
+            };
+            info!(
+              "Filesystem changed during run: retrying `{}` in {:?}...",
+              node, self.invalidation_delay
+            );
             delay_for(self.invalidation_delay).await;
             continue;
           }

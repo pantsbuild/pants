@@ -1189,10 +1189,6 @@ impl NodeError for Failure {
     Failure::Invalidated
   }
 
-  fn exhausted() -> Failure {
-    Context::mk_error("Exhausted retries while waiting for the filesystem to stabilize.")
-  }
-
   fn cyclic(mut path: Vec<String>) -> Failure {
     let path_len = path.len();
     if path_len > 1 {

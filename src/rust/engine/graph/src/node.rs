@@ -41,12 +41,6 @@ pub trait NodeError: Clone + Debug + Eq + Send {
   /// Graph (generally while running).
   ///
   fn invalidated() -> Self;
-  ///
-  /// Creates an instance that represents an uncacheable node failing from
-  /// retrying its dependencies too many times, but never able to resolve them,
-  /// usually because they were invalidated too many times while running.
-  ///
-  fn exhausted() -> Self;
 
   ///
   /// Creates an instance that represents that a Node dependency was cyclic along the given path.
