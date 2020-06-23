@@ -3,8 +3,6 @@
 
 python_library(
   dependencies = [
-    'src/python/pants/backend/project_info/tasks:all',
-    'src/python/pants/goal:task_registrar',
     '3rdparty/python:dataclasses',
     'src/python/pants/base:build_root',
     'src/python/pants/engine:addresses',

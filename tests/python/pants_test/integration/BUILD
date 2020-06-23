@@ -6,10 +6,8 @@ python_tests(
   sources = [ 'build_ignore_integration_test.py' ],
   dependencies = [
     'src/python/pants/testutil:int-test',
-    'testprojects/src/java/org/pantsbuild/testproject:phrases_directory',
-    'testprojects/tests/python/pants:constants_only_directory',
   ],
-  tags = {'integration', 'partially_type_checked'},
+  tags = {'integration', 'type_checked'},
 )
 
 python_tests(
