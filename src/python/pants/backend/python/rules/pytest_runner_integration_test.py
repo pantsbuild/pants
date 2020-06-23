@@ -373,7 +373,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         assert file.path.startswith("dist/test-results")
         assert b"pants_test.test_good" in file.content
 
-    @pytest.mark.skip(reason="TODO")
+    @pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/10141")
     def test_single_passing_test_with_coverage(self) -> None:
         self.create_python_test_target([self.good_source])
         result = self.run_pytest(use_coverage=True)
