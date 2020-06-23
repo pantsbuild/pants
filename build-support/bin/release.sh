@@ -144,15 +144,12 @@ REQUIREMENTS_3RDPARTY_FILES=(
 # either pexes or venvs (as created by the `pants` script that we distribute) are
 # created outside of the buildroot.
 function execute_packaged_pants_with_internal_backends() {
-  pip install --ignore-installed \
-    -r pants-plugins/3rdparty/python/requirements.txt &> /dev/null && \
   pants \
     --no-verify-config \
     --no-pantsd \
     --pythonpath="['pants-plugins/src/python']" \
     --backend-packages="[\
         'pants.backend.codegen',\
-        'pants.backend.docgen',\
         'pants.backend.graph_info',\
         'pants.backend.jvm',\
         'pants.backend.native',\
@@ -160,7 +157,6 @@ function execute_packaged_pants_with_internal_backends() {
         'pants.backend.python',\
         'pants.cache',\
         'internal_backend.repositories',\
-        'internal_backend.sitegen',\
         'internal_backend.utilities',\
       ]" \
       --backend-packages2="[\

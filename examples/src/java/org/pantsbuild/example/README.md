@@ -2,9 +2,9 @@ JVM Projects with Pants
 =======================
 
 Assuming you know the basic
-[[Pants concepts|pants('src/docs:first_concepts')]]
+Pants concepts
 and have gone through the
-[[first Tutorial|pants('src/docs:first_tutorial')]],
+first Tutorial,
 you've made a great start towards
 using Pants to work with Java and Scala code. This page goes into some
 of the details.
@@ -692,7 +692,7 @@ Dependency Hygiene
 
 As the set of targets in a repository grows larger, it becomes increasingly important that they
 observe good dependency hygiene. In particular, following
-[[the 1:1:1 rule|pants('src/docs:build_files')]] helps keep useful code self-contained. But even
+the 1:1:1 rule helps keep useful code self-contained. But even
 while observing 1:1:1, it's possible to declare and use dependencies that add little or no benefit
 for a target.
 

@@ -44,11 +44,6 @@ resources(
   sources=['dummy.c'],
 )
 
-page(
-  name='readme',
-  sources=['README.md'],
-)
-
 python_library(
   name='version',
   sources=['version.py'],
@@ -62,15 +57,6 @@ python_library(
 resources(
   name='version-resource',
   sources=['VERSION'],
-)
-
-page(
-  name='changelog',
-  sources=['CHANGELOG.md'],
-  description='''
-This file is no longer a changelog, but remains in this location in order to avoid breaking
-older changelog links unnecessarily. Could consider removing it by 2.0.x, perhaps.
-''',
 )
 
 # NB: This is used for the integration test `test_reversion.py`. It includes all transitive

@@ -1,2 +1,1 @@
-twitter.common.confluence>=0.3.11,<0.4
 twitter.common.dirutil>=0.3.11,<0.4

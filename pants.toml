@@ -24,14 +24,10 @@ v2 = false
 # Enable our own custom loose-source plugins as well as contribs.
 pythonpath = [
   "%(buildroot)s/contrib/mypy/src/python",
-  "%(buildroot)s/contrib/scrooge/src/python",
   "%(buildroot)s/pants-plugins/src/python",
 ]
 backend_packages.add = [
-  "pants.backend.docgen",
-  "pants.contrib.scrooge",
   "internal_backend.repositories",
-  "internal_backend.sitegen",
   "internal_backend.utilities",
 ]
 backend_packages2.add = [
@@ -98,58 +94,6 @@ ivy_settings = "%(pants_supportdir)s/ivy/ivysettings.xml"
 # We need a custom ivy profile to grab the optional pgp libs for
 # signing artifacts we publish to maven central.
 ivy_profile = "%(pants_supportdir)s/ivy/ivy.xml"
-
-[gen.scrooge]
-service_deps = """
-{
-  'java': [
-    '3rdparty:slf4j-api',
-    '3rdparty:thrift',
-    '3rdparty/jvm/com/twitter:finagle-thrift',
-    '3rdparty/jvm/com/twitter:scrooge-core',
-  ],
-  'scala': [
-    '3rdparty:thrift',
-    '3rdparty/jvm/com/twitter:finagle-thrift',
-    '3rdparty/jvm/com/twitter:scrooge-core',
-  ],
-}
-"""
-structs_deps = """
-{
-  'java': [
-    '3rdparty:thrift',
-    '3rdparty/jvm/com/twitter:scrooge-core',
-  ],
-  'scala': [
-    '3rdparty:thrift',
-    '3rdparty/jvm/com/twitter:scrooge-core',
-  ],
-}
-"""
-service_exports = """
-{
-  'java': [
-    '3rdparty:thrift',
-  ],
-  'scala': [
-    '3rdparty:thrift',
-    '3rdparty/jvm/com/twitter:finagle-thrift',
-    '3rdparty/jvm/com/twitter:scrooge-core',
-  ],
-}
-"""
-structs_exports = """
-{
-  'java': [
-    '3rdparty:thrift',
-  ],
-  'scala': [
-    '3rdparty:thrift',
-    '3rdparty/jvm/com/twitter:scrooge-core',
-  ],
-}
-"""
 
 [gen.thrift-java]
 deps = ["3rdparty:thrift"]
@@ -228,9 +172,6 @@ config = "%(buildroot)s/build-support/scalastyle/scalastyle_config.xml"
 
 [lint.scalastyle]
 excludes = "%(buildroot)s/build-support/scalastyle/excludes.txt"
-
-[protoc]
-version = "2.4.1"
 
 [scala]
 version = 2.12
@@ -353,17 +294,6 @@ timeout_default = 60
 [test.junit]
 timeouts = true
 timeout_default = 60
-
-# Site generation options.
-[reference]
-pants_reference_template = "reference/pants_reference_body.html"
-build_dictionary_template = "reference/build_dictionary_body.html"
-
-[markdown]
-fragment = true
-
-[sitegen]
-config_path = "src/docs/docsite.json"
 
 [native-build-step.cpp-compile-settings]
 # TensorFlow 1.13 on python 3.7 specifically uses a newer C++ ABI than any other TensorFlow release,

@@ -9,8 +9,7 @@ plugin APIs are used.
 
 Most new plugins should get their own top-level `contrib/` subdirectory although it may make sense
 to house the source code for related plugins under one top-level `contrib/` subdirectory.  The
-`contrib/scrooge` directory is an example of this and houses two plugin tasks that both use the same
-underlying [Scrooge](https://github.com/twitter/scrooge) tool.
+`contrib/mypy` directory is an example of this.
 
 Contrib plugins should generally follow 3 basic setup steps:
 
@@ -47,7 +46,6 @@ Contrib plugins should generally follow 3 basic setup steps:
 
    backend_packages = [
      "internal_backend.repositories",
-     "internal_backend.sitegen",
      "internal_backend.utilities",
      "pants.contrib.example",  # 2
    ]

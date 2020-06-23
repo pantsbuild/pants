@@ -7,7 +7,7 @@ from typing import List
 from pants.backend.codegen.protobuf.python.rules import GeneratePythonFromProtobufRequest
 from pants.backend.codegen.protobuf.python.rules import rules as protobuf_rules
 from pants.backend.codegen.protobuf.target_types import ProtobufLibrary, ProtobufSources
-from pants.core.util_rules import archive, determine_source_files, external_tool
+from pants.core.util_rules import determine_source_files
 from pants.engine.addresses import Address
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
@@ -17,11 +17,11 @@ from pants.engine.target import (
     HydrateSourcesRequest,
     WrappedTarget,
 )
+from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option.util import create_options_bootstrapper
-from pants.testutil.test_base import TestBase
 
 
-class ProtobufPythonIntegrationTest(TestBase):
+class ProtobufPythonIntegrationTest(ExternalToolTestBase):
     @classmethod
     def target_types(cls):
         return [ProtobufLibrary]
@@ -31,9 +31,7 @@ class ProtobufPythonIntegrationTest(TestBase):
         return (
             *super().rules(),
             *protobuf_rules(),
-            *archive.rules(),
             *determine_source_files.rules(),
-            *external_tool.rules(),
             RootRule(GeneratePythonFromProtobufRequest),
         )
 
@@ -117,6 +115,7 @@ class ProtobufPythonIntegrationTest(TestBase):
                     GeneratePythonFromProtobufRequest(protocol_sources.snapshot, tgt),
                     create_options_bootstrapper(
                         args=[
+                            "--backend-packages2=pants.backend.codegen.protobuf.python",
                             "--source-root-patterns=src/protobuf",
                             "--source-root-patterns=tests/protobuf",
                         ]

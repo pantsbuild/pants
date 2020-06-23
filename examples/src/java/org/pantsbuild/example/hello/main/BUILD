@@ -26,11 +26,3 @@ jvm_binary(name = 'main-bin',
   main = 'org.pantsbuild.example.hello.main.HelloMain',
   basename = 'hello-example',
 )
-
-# README page:
-
-page(
-  name="readme",
-  sources=["README.md"],
-)
-

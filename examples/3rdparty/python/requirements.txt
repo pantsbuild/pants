@@ -1,3 +1,2 @@
-protobuf==3.6.1
 tensorflow==1.14.0
 thrift>=0.10.0

@@ -3,7 +3,6 @@
 
 import logging
 import os
-from pathlib import Path
 from typing import Optional
 
 from pants.base.build_root import BuildRoot
@@ -53,10 +52,7 @@ def get_pants_configdir() -> str:
 
 def get_default_pants_config_file() -> str:
     """Return the default location of the Pants config file."""
-    default_toml = Path(get_buildroot(), "pants.toml")
-    if default_toml.is_file():
-        return str(default_toml)
-    return os.path.join(get_buildroot(), "pants.ini")
+    return os.path.join(get_buildroot(), "pants.toml")
 
 
 _SCM: Optional[Scm] = None

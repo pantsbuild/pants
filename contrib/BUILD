@@ -5,7 +5,6 @@ target(
   name = 'plugins',
   dependencies = [
     'contrib/mypy/src/python/pants/contrib/mypy:plugin',
-    'contrib/scrooge/src/python/pants/contrib/scrooge:plugin',
   ]
 )
 

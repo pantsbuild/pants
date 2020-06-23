@@ -13,20 +13,20 @@ from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegratio
 
 class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
 
-    list_target = "examples/src/java/org/pantsbuild/example/hello::"
+    target = "examples/src/python/example/hello::"
 
     @ensure_daemon
     def test_v2_list(self):
-        result = self.do_command("list", self.list_target, success=True)
+        result = self.do_command("list", self.target, success=True)
         output_lines = result.stdout_data.splitlines()
-        self.assertEqual(len(output_lines), 5)
-        self.assertIn("examples/src/java/org/pantsbuild/example/hello/main:readme", output_lines)
+        self.assertEqual(len(output_lines), 3)
+        self.assertIn("examples/src/python/example/hello/main:main", output_lines)
 
     def test_v2_list_does_not_cache(self):
         with self.pantsd_successful_run_context() as ctx:
 
             def run_list():
-                result = ctx.runner(["list", self.list_target])
+                result = ctx.runner(["list", self.target])
                 ctx.checker.assert_started()
                 return result
 
@@ -42,7 +42,7 @@ class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
 
     @ensure_daemon
     def test_v2_goal_validation_both(self):
-        self.do_command("--v1", "--v2", "filedeps", ":", success=True)
+        self.do_command("--v1", "--v2", "filedeps", self.target, success=True)
 
     def test_v2_list_loop(self):
         # Create a BUILD file in a nested temporary directory, and add additional targets to it.
