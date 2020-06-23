@@ -347,8 +347,8 @@ async fn uncachable_node_only_runs_once() {
       TNode::new(2),
       TNode::new(1),
       TNode::new(0),
+      TNode::new(2),
       TNode::new(0),
-      TNode::new(2)
     ]
   );
 }
@@ -425,6 +425,39 @@ async fn exhaust_uncacheable_retries() {
     Err::<(), TError>(TError::Exhausted),
     subject
   );
+}
+
+#[tokio::test]
+async fn canceled_immediately() {
+  let _logger = env_logger::try_init();
+  let graph = Arc::new(Graph::new());
+
+  let delay_for_root = Duration::from_millis(2000);
+  let start_time = Instant::now();
+  let context = {
+    let mut delays = HashMap::new();
+    delays.insert(TNode::new(0), delay_for_root);
+    TContext::new(graph.clone()).with_delays(delays)
+  };
+
+  // We invalidate three times: the root should only actually run to completion once, because we
+  // should cancel it the other times.
+  let iterations = 3;
+  let sleep_per_invalidation = Duration::from_millis(100);
+  let graph2 = graph.clone();
+  let _join = thread::spawn(move || {
+    for _ in 0..iterations {
+      thread::sleep(sleep_per_invalidation);
+      graph2.invalidate_from_roots(|&TNode(n, _)| n == 0);
+    }
+  });
+  assert_eq!(
+    graph.create(TNode::new(2), &context).await,
+    Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
+  );
+
+  // We should have waited much less than the time it would have taken to complete three times.
+  assert!(Instant::now() < start_time + (delay_for_root * iterations));
 }
 
 #[tokio::test]

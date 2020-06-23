@@ -170,7 +170,6 @@ pub enum EntryState<N: Node> {
     generation: Generation,
     waiters: Vec<Waiter<N>>,
     previous_result: Option<EntryResult<N>>,
-    dirty: bool,
   },
   // A node that has completed, and then possibly been marked dirty. Because marking a node
   // dirty does not eagerly re-execute any logic, it will stay this way until a caller moves it
@@ -332,7 +331,6 @@ impl<N: Node> Entry<N> {
       run_token,
       generation,
       previous_result,
-      dirty: false,
     }
   }
 
@@ -456,7 +454,6 @@ impl<N: Node> Entry<N> {
   pub(crate) fn complete(
     &mut self,
     context: &N::Context,
-    entry_id: EntryId,
     result_run_token: RunToken,
     dep_generations: Vec<Generation>,
     result: Option<Result<N::Item, N::Error>>,
@@ -483,30 +480,9 @@ impl<N: Node> Entry<N> {
         run_token,
         mut generation,
         mut previous_result,
-        dirty,
         ..
       } => {
         match result {
-          _ if dirty => {
-            // The node was dirtied while it was running. The dep_generations and new result cannot
-            // be trusted and were never published. We continue to use the previous result.
-            trace!(
-              "Not completing node {:?} because it was dirtied before completing.",
-              self.node
-            );
-            if let Some(previous_result) = previous_result.as_mut() {
-              previous_result.dirty();
-            }
-            Self::run(
-              context,
-              &self.node,
-              entry_id,
-              run_token,
-              generation,
-              None,
-              previous_result,
-            )
-          }
           Some(Err(e)) => {
             if let Some(previous_result) = previous_result.as_mut() {
               previous_result.dirty();
@@ -682,12 +658,6 @@ impl<N: Node> Entry<N> {
     let state = &mut *self.state.lock();
     trace!("Dirtying node {:?}", self.node);
     match state {
-      &mut EntryState::Running { ref mut dirty, .. } => {
-        // An uncacheable node can never be marked dirty.
-        if self.node.cacheable() {
-          *dirty = true;
-        }
-      }
       &mut EntryState::Completed {
         ref mut result,
         ref mut pollers,
@@ -698,8 +668,34 @@ impl<N: Node> Entry<N> {
           let _ = poller.send(());
         }
         result.dirty();
+        return;
       }
-      &mut EntryState::NotStarted { .. } => {}
+      &mut EntryState::NotStarted { .. } => return,
+      &mut EntryState::Running { .. } if !self.node.cacheable() => {
+        // An uncacheable node cannot be interrupted.
+        return;
+      }
+      &mut EntryState::Running { .. } => {
+        // Handled below: we need to move back to NotStarted.
+      }
+    };
+
+    *state = match mem::replace(&mut *state, EntryState::initial()) {
+      EntryState::Running {
+        run_token,
+        generation,
+        previous_result,
+        ..
+      } => {
+        // Dirtying a Running node immediately cancels it.
+        trace!("Node {:?} was dirtied while running.", self.node);
+        EntryState::NotStarted {
+          run_token,
+          generation,
+          previous_result,
+        }
+      }
+      _ => unreachable!(),
     }
   }
 

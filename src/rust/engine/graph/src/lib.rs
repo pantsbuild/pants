@@ -801,7 +801,6 @@ impl<N: Node> Graph<N> {
       let mut inner = self.inner.lock();
       entry.complete(
         context,
-        entry_id,
         run_token,
         dep_generations,
         result,
