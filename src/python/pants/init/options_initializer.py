@@ -150,7 +150,7 @@ class OptionsInitializer:
             # NB: We use `relpath` here because these paths are untrusted, and might need to be
             # normalized in addition to being relativized.
             glob_relpath = os.path.relpath(glob, buildroot)
-            if glob_relpath.startswith(".."):
+            if glob_relpath == "." or glob_relpath.startswith(".."):
                 logger.debug(
                     f"Changes to {glob}, outside of the buildroot, will not be invalidated."
                 )
