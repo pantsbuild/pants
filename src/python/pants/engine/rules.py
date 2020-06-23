@@ -28,9 +28,13 @@ class EngineAware(ABC):
     are expected to be overridden by concrete types implementing EngineAware.
     """
 
-    @abstractmethod
     def level(self) -> Optional[LogLevel]:
         """Overrides the level of the workunit associated with this type."""
+        return None
+
+    def info_message(self) -> Optional[str]:
+        """Sets an info message on the workunit."""
+        return None
 
 
 @decorated_type_checkable

@@ -76,19 +76,24 @@ impl Workunit {
      * multibyte unicode characters in the string
      */
     let max_len = 200;
-    if identifier.len() > max_len {
+    let effective_identifier = if identifier.len() > max_len {
       let truncated_identifier: String = identifier.chars().take(max_len).collect();
       let trunc = identifier.len() - max_len;
-      log!(
-        level,
-        "{} {}... ({} characters truncated)",
-        state,
-        truncated_identifier,
-        trunc
-      );
+      format!(
+        "{}... ({} characters truncated)",
+        truncated_identifier, trunc
+      )
     } else {
-      log!(level, "{} {}", state, identifier);
-    }
+      identifier.to_string()
+    };
+
+    let info_str = if let Some(ref s) = self.metadata.info_msg {
+      format!("\n - {}", s)
+    } else {
+      "".to_string()
+    };
+
+    log!(level, "{} {}{}", state, effective_identifier, info_str);
   }
 }
 
