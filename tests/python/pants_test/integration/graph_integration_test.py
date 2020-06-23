@@ -23,10 +23,7 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
         return False
 
     _NO_BUILD_FILE_TARGET_BASE = "testprojects/src/python/no_build_file"
-
     _SOURCES_TARGET_BASE = "testprojects/src/python/sources"
-
-    _BUNDLE_TARGET_BASE = "testprojects/src/java/org/pantsbuild/testproject/bundle"
 
     _ERR_TARGETS = {
         "testprojects/src/python/sources:some-missing-some-not": [
@@ -38,15 +35,6 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
             "*.scala",
             "Snapshot(PathGlobs(globs=('testprojects/src/python/sources/*.scala', '!testprojects/src/python/sources/*Test.scala', '!testprojects/src/python/sources/*Spec.scala'), glob_match_error_behavior<Exactly(GlobMatchErrorBehavior)>=GlobMatchErrorBehavior(value=error), conjunction<Exactly(GlobExpansionConjunction)>=GlobExpansionConjunction(value=any_match)))",
             'Unmatched glob from testprojects/src/python/sources:missing-sources\'s `sources` field:: "testprojects/src/python/sources/*.scala", excludes: ["testprojects/src/python/sources/*Test.scala", "testprojects/src/python/sources/*Spec.scala"]',
-        ],
-        "testprojects/src/java/org/pantsbuild/testproject/bundle:missing-bundle-fileset": [
-            "['a/b/file1.txt']",
-            "['*.aaaa', '*.bbbb']",
-            "['*.aaaa']",
-            "['**/*.abab']",
-            "['file1.aaaa', 'file2.aaaa']",
-            "Snapshot(PathGlobs(globs=('testprojects/src/java/org/pantsbuild/testproject/bundle/*.aaaa',), glob_match_error_behavior<Exactly(GlobMatchErrorBehavior)>=GlobMatchErrorBehavior(value=error), conjunction<Exactly(GlobExpansionConjunction)>=GlobExpansionConjunction(value=all_match)))",
-            'Unmatched glob from testprojects/src/java/org/pantsbuild/testproject/bundle:missing-bundle-fileset\'s `bundles` field:: "testprojects/src/java/org/pantsbuild/testproject/bundle/*.aaaa"',
         ],
     }
 
@@ -86,28 +74,6 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
             resources(
               name='overlapping-globs',
               sources=['sources.txt', '*.txt'],
-            )
-            """
-        )
-        with self.with_overwritten_file_content(build_path, f"{original_content}\n{new_content}"):
-            yield
-
-    @contextmanager
-    def setup_bundle_target(self) -> Iterator[None]:
-        build_path = Path(self._BUNDLE_TARGET_BASE, "BUILD")
-        original_content = build_path.read_text()
-        new_content = dedent(
-            """\
-            jvm_app(
-              name='missing-bundle-fileset',
-              binary=':bundle-bin',
-              bundles=[
-                bundle(fileset=['a/b/file1.txt']),
-                bundle(fileset=['**/*.aaaa', '**/*.bbbb']),
-                bundle(fileset=['*.aaaa']),
-                bundle(fileset=['**/*.abab']),
-                bundle(fileset=['file1.aaaa', 'file2.aaaa']),
-              ],
             )
             """
         )
@@ -155,41 +121,6 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
         self.assert_success(pants_run)
         assert "[WARN] Unmatched glob" not in pants_run.stderr_data
 
-    def test_missing_bundles_warnings(self):
-        target_full = f"{self._BUNDLE_TARGET_BASE}:missing-bundle-fileset"
-        error_origin = f"from {target_full}'s `bundles` field"
-        with self.setup_bundle_target():
-            pants_run = self.run_pants(
-                ["filedeps", target_full],
-                config={GLOBAL_SCOPE_CONFIG_SECTION: {"files_not_found_behavior": "warn"}},
-            )
-        self.assert_success(pants_run)
-        unmatched_glob = ["*.aaaa", "**/*.abab"]
-        unmatched_globs = [["**/*.aaaa", "**/*.bbbb"], ["file1.aaaa", "file2.aaaa"]]
-        for glob in unmatched_glob:
-            formatted_glob = f'"{os.path.join(self._BUNDLE_TARGET_BASE, glob)}"'
-            assert (
-                f"[WARN] Unmatched glob {error_origin}: {formatted_glob}" in pants_run.stderr_data
-            )
-        for globs in unmatched_globs:
-            formatted_globs = ", ".join(
-                f'"{os.path.join(self._BUNDLE_TARGET_BASE, glob)}"' for glob in globs
-            )
-            assert (
-                f"[WARN] Unmatched globs {error_origin}: [{formatted_globs}]"
-                in pants_run.stderr_data
-            )
-
-    @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/8520")
-    def test_existing_bundles(self):
-        target_full = f"{self._BUNDLE_TARGET_BASE}:mapper"
-        pants_run = self.run_pants(
-            ["filedeps", target_full],
-            config={GLOBAL_SCOPE_CONFIG_SECTION: {"files_not_found_behavior": "warn"}},
-        )
-        self.assert_success(pants_run)
-        self.assertNotIn("[WARN] Unmatched glob", pants_run.stderr_data)
-
     def test_existing_directory_with_no_build_files_fails(self):
         pants_run = self.run_pants(["list", f"{self._NO_BUILD_FILE_TARGET_BASE}::"])
         self.assert_failure(pants_run)
@@ -197,7 +128,7 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
 
     @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/6787")
     def test_error_message(self):
-        with self.setup_bundle_target(), self.setup_sources_targets():
+        with self.setup_sources_targets():
             for target in self._ERR_TARGETS:
                 expected_excerpts = self._ERR_TARGETS[target]
                 pants_run = self.run_pants(

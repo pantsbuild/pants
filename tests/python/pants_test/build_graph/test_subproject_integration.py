@@ -50,11 +50,11 @@ BUILD_FILES = {
                 '//:absolute',
             ],
         )
-    
+
         target(
             name = 'relative',
         )
-    
+
         target(
             name = 'absolute',
         )

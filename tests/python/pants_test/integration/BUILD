@@ -81,7 +81,6 @@ python_tests(
   dependencies=[
     'src/python/pants/option',
     'src/python/pants/testutil:int-test',
-    'testprojects/src/java/org/pantsbuild/testproject:bundle_directory',
     'testprojects/src/python:no_build_file_directory',
     'testprojects/src/python:sources_directory',
   ],

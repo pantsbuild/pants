@@ -48,9 +48,9 @@ class FiledepsTest(GoalRuleTestBase):
     ) -> None:
         args = []
         if globs:
-            args.append("--filedeps2-globs")
+            args.append("--filedeps-globs")
         if transitive:
-            args.append("--filedeps2-transitive")
+            args.append("--filedeps-transitive")
         self.assert_console_output(*expected, args=(*args, *targets))
 
     def test_no_target(self) -> None:

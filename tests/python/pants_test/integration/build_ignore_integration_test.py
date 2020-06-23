@@ -6,8 +6,8 @@ import tempfile
 from pathlib import Path
 
 from pants.base.build_environment import get_buildroot
-from pants.util.contextutil import temporary_dir
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
+from pants.util.contextutil import temporary_dir
 
 
 class BuildIgnoreIntegrationTest(PantsRunIntegrationTest):
