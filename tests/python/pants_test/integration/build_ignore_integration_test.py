@@ -35,7 +35,11 @@ class BuildIgnoreIntegrationTest(PantsRunIntegrationTest):
                 f"files(sources=[], dependencies=['{tmpdir_relative}/dir1'])"
             )
             ignore_result = self.run_pants(
-                [f"--build-ignore={tmpdir_relative}/dir1", "dependencies", f"{tmpdir_relative}/dir2"]
+                [
+                    f"--build-ignore={tmpdir_relative}/dir1",
+                    "dependencies",
+                    f"{tmpdir_relative}/dir2",
+                ]
             )
             no_ignore_result = self.run_pants(["dependencies", f"{tmpdir_relative}/dir2"])
         self.assert_failure(ignore_result)
