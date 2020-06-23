@@ -234,8 +234,7 @@ async def run_python_test(
 
     use_coverage = test_options.values.use_coverage
     output_dirs = [".coverage"] if use_coverage else []
-    if test_setup.xml_dir:
-        output_dirs.append(test_results_file)
+    output_files = [test_results_file] if test_setup.xml_dir else []
     process = test_setup.test_runner_pex.create_process(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
@@ -243,6 +242,7 @@ async def run_python_test(
         pex_args=test_setup.args,
         input_digest=test_setup.input_digest,
         output_directories=tuple(output_dirs) if output_dirs else None,
+        output_files=tuple(output_files) if output_files else None,
         description=f"Run Pytest for {field_set.address.reference()}",
         timeout_seconds=test_setup.timeout_seconds,
         env=env,
