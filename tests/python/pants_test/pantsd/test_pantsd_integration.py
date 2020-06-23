@@ -22,7 +22,6 @@ from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegratio
 def launch_file_toucher(f):
     """Launch a loop to touch the given file, and return a function to call to stop and join it."""
     if not os.path.isfile(f):
-
         raise AssertionError("Refusing to touch a non-file.")
 
     halt = threading.Event()

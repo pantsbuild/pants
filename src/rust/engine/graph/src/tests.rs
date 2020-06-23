@@ -391,11 +391,11 @@ async fn canceled_immediately() {
   let invalidation_delay = Duration::from_millis(10);
   let graph = Arc::new(Graph::new_with_invalidation_delay(invalidation_delay));
 
-  let delay_for_mid = Duration::from_millis(2000);
+  let delay_for_middle = Duration::from_millis(2000);
   let start_time = Instant::now();
   let context = {
     let mut delays = HashMap::new();
-    delays.insert(TNode::new(1), delay_for_mid);
+    delays.insert(TNode::new(1), delay_for_middle);
     TContext::new(graph.clone()).with_delays(delays)
   };
 
@@ -404,7 +404,7 @@ async fn canceled_immediately() {
   // invalidation to ensure that work actually starts before being invalidated.
   let iterations = 3;
   let sleep_per_invalidation = invalidation_delay * 10;
-  assert!(delay_for_mid > sleep_per_invalidation * 3);
+  assert!(delay_for_middle > sleep_per_invalidation * 3);
   let graph2 = graph.clone();
   let _join = thread::spawn(move || {
     for _ in 0..iterations {
@@ -418,7 +418,7 @@ async fn canceled_immediately() {
   );
 
   // We should have waited much less than the time it would have taken to complete three times.
-  assert!(Instant::now() < start_time + (delay_for_mid * iterations));
+  assert!(Instant::now() < start_time + (delay_for_middle * iterations));
 
   // And the top nodes should have seen three aborts.
   assert_eq!(
