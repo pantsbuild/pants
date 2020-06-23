@@ -18,6 +18,15 @@ from pants.engine.target import (
 )
 from pants.util.filtering import and_filters, create_filters
 
+TARGET_REMOVAL_MSG = (
+    "`--filter-target` was removed because it is similar to `--filter-address-regex`. If you still "
+    "need this feature, please message us on Slack (https://pants.readme.io/docs/community)."
+)
+ANCESTOR_REMOVAL_MSG = (
+    "`--filter-ancestor` was removed because it is not trivial to implement. If you still need "
+    "this feature, please message us on Slack (https://pants.readme.io/docs/community)."
+)
+
 
 class FilterOptions(LineOriented, GoalSubsystem):
     """Filter the input targets based on various criteria.
@@ -70,6 +79,22 @@ class FilterOptions(LineOriented, GoalSubsystem):
             removal_version="2.1.0.dev0",
             removal_hint="Use `--address-regex` instead of `--regex`.",
         )
+        register(
+            "--target",
+            type=list,
+            metavar="[+-]spec1,spec2,...",
+            help="Filter on these target addresses.",
+            removal_version="2.1.0.dev0",
+            removal_hint=TARGET_REMOVAL_MSG,
+        )
+        register(
+            "--ancestor",
+            type=list,
+            metavar="[+-]spec1,spec2,...",
+            help="Filter on targets that these targets depend on.",
+            removal_version="2.1.0.dev0",
+            removal_hint=ANCESTOR_REMOVAL_MSG,
+        )
 
 
 class FilterGoal(Goal):
@@ -93,6 +118,11 @@ def filter_targets(
     console: Console,
     registered_target_types: RegisteredTargetTypes,
 ) -> FilterGoal:
+    if not options.values.is_default("target"):
+        raise ValueError(TARGET_REMOVAL_MSG)
+    if not options.values.is_default("ancestor"):
+        raise ValueError(ANCESTOR_REMOVAL_MSG)
+
     def filter_target_type(target_type: str) -> TargetFilter:
         if target_type not in registered_target_types.aliases:
             raise UnrecognizedTargetTypeException(target_type, registered_target_types)
