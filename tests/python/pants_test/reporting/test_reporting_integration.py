@@ -9,6 +9,7 @@ from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 
 import psutil
+import pytest
 
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.collections import assert_single_element
@@ -209,6 +210,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
         run_test("--quiet")
         run_test("--no-quiet")
 
+    @pytest.mark.skip(reason="Doesn't work with v2. Should this still exist?")
     def test_zipkin_reporter(self):
         ZipkinHandler = zipkin_handler()
         with http_server(ZipkinHandler) as port:
@@ -238,6 +240,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
             self.assertTrue(main_children)
             self.assertTrue(any(span["name"] == "list" for span in main_children))
 
+    @pytest.mark.skip(reason="Doesn't work with v2. Should this still exist?")
     def test_zipkin_reporter_with_given_trace_id_parent_id(self):
         ZipkinHandler = zipkin_handler()
         with http_server(ZipkinHandler) as port:
