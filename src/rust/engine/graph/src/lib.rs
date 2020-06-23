@@ -454,14 +454,18 @@ impl<N: Node> InnerGraph<N> {
 pub struct Graph<N: Node> {
   inner: Mutex<InnerGraph<N>>,
   invalidation_timeout: Duration,
+  invalidation_delay: Duration,
 }
 
 impl<N: Node> Graph<N> {
   pub fn new() -> Graph<N> {
-    Self::new_with_invalidation_timeout(Duration::from_secs(60))
+    Self::new_with_invalidation_timeout(Duration::from_secs(60), Duration::from_millis(500))
   }
 
-  pub fn new_with_invalidation_timeout(invalidation_timeout: Duration) -> Graph<N> {
+  pub fn new_with_invalidation_timeout(
+    invalidation_timeout: Duration,
+    invalidation_delay: Duration,
+  ) -> Graph<N> {
     let inner = InnerGraph {
       nodes: HashMap::default(),
       pg: DiGraph::new(),
@@ -469,6 +473,7 @@ impl<N: Node> Graph<N> {
     Graph {
       inner: Mutex::new(inner),
       invalidation_timeout,
+      invalidation_delay,
     }
   }
 
@@ -532,7 +537,6 @@ impl<N: Node> Graph<N> {
       // Retry the dst a number of times to handle Node invalidation.
       let context = context.clone();
       let deadline = Instant::now() + self.invalidation_timeout;
-      let mut interval = Duration::from_millis(100);
       loop {
         match entry.get(&context, entry_id).await {
           Ok(r) => break Ok(r),
@@ -540,8 +544,7 @@ impl<N: Node> Graph<N> {
             if deadline < Instant::now() {
               break Err(N::Error::exhausted());
             }
-            delay_for(interval).await;
-            interval *= 2;
+            delay_for(self.invalidation_delay).await;
             continue;
           }
           Err(other_err) => break Err(other_err),

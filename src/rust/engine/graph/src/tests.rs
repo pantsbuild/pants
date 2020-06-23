@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 use async_trait::async_trait;
 use parking_lot::Mutex;
 use rand::{self, Rng};
-use tokio::time::{timeout, Elapsed};
+use tokio::time::{delay_for, timeout, Elapsed};
 
 use crate::{EntryId, Graph, InvalidationResult, Node, NodeContext, NodeError};
 
@@ -356,9 +356,10 @@ async fn uncachable_node_only_runs_once() {
 #[tokio::test]
 async fn retries() {
   let _logger = env_logger::try_init();
-  let graph = Arc::new(Graph::new_with_invalidation_timeout(Duration::from_secs(
-    10,
-  )));
+  let graph = Arc::new(Graph::new_with_invalidation_timeout(
+    Duration::from_secs(10),
+    Duration::from_millis(100),
+  ));
 
   let context = {
     let delay_for_root = Duration::from_millis(100);
@@ -390,7 +391,10 @@ async fn retries() {
 #[tokio::test]
 async fn exhaust_uncacheable_retries() {
   let _logger = env_logger::try_init();
-  let graph = Arc::new(Graph::new_with_invalidation_timeout(Duration::from_secs(2)));
+  let graph = Arc::new(Graph::new_with_invalidation_timeout(
+    Duration::from_secs(2),
+    Duration::from_millis(100),
+  ));
 
   let context = {
     let mut uncacheable = HashSet::new();
@@ -430,25 +434,31 @@ async fn exhaust_uncacheable_retries() {
 #[tokio::test]
 async fn canceled_immediately() {
   let _logger = env_logger::try_init();
-  let graph = Arc::new(Graph::new());
+  let invalidation_delay = Duration::from_millis(10);
+  let graph = Arc::new(Graph::new_with_invalidation_timeout(
+    Duration::from_secs(10),
+    invalidation_delay,
+  ));
 
-  let delay_for_root = Duration::from_millis(2000);
+  let delay_for_mid = Duration::from_millis(2000);
   let start_time = Instant::now();
   let context = {
     let mut delays = HashMap::new();
-    delays.insert(TNode::new(0), delay_for_root);
+    delays.insert(TNode::new(1), delay_for_mid);
     TContext::new(graph.clone()).with_delays(delays)
   };
 
-  // We invalidate three times: the root should only actually run to completion once, because we
-  // should cancel it the other times.
+  // We invalidate three times: the mid should only actually run to completion once, because we
+  // should cancel it the other times. We wait longer than the invalidation_delay for each
+  // invalidation to ensure that work actually starts before being invalidated.
   let iterations = 3;
-  let sleep_per_invalidation = Duration::from_millis(100);
+  let sleep_per_invalidation = invalidation_delay * 10;
+  assert!(delay_for_mid > sleep_per_invalidation * 3);
   let graph2 = graph.clone();
   let _join = thread::spawn(move || {
     for _ in 0..iterations {
       thread::sleep(sleep_per_invalidation);
-      graph2.invalidate_from_roots(|&TNode(n, _)| n == 0);
+      graph2.invalidate_from_roots(|&TNode(n, _)| n == 1);
     }
   });
   assert_eq!(
@@ -457,7 +467,20 @@ async fn canceled_immediately() {
   );
 
   // We should have waited much less than the time it would have taken to complete three times.
-  assert!(Instant::now() < start_time + (delay_for_root * iterations));
+  assert!(Instant::now() < start_time + (delay_for_mid * iterations));
+
+  // And the top nodes should have seen three aborts.
+  assert_eq!(
+    vec![
+      TNode::new(1),
+      TNode::new(2),
+      TNode::new(1),
+      TNode::new(2),
+      TNode::new(1),
+      TNode::new(2)
+    ],
+    context.aborts(),
+  );
 }
 
 #[tokio::test]
@@ -644,16 +667,19 @@ impl Node for TNode {
   type Error = TError;
 
   async fn run(self, context: TContext) -> Result<Vec<T>, TError> {
+    let mut abort_guard = context.abort_guard(self.clone());
     context.ran(self.clone());
     let token = T(self.0, context.salt());
-    context.maybe_delay(&self);
-    if let Some(dep) = context.dependency_of(&self) {
+    context.maybe_delay(&self).await;
+    let res = if let Some(dep) = context.dependency_of(&self) {
       let mut v = context.get(dep).await?;
       v.push(token);
       Ok(v)
     } else {
       Ok(vec![token])
-    }
+    };
+    abort_guard.did_not_abort();
+    res
   }
 
   fn cacheable(&self) -> bool {
@@ -732,6 +758,7 @@ struct TContext {
   delays: Arc<HashMap<TNode, Duration>>,
   uncacheable: Arc<HashSet<TNode>>,
   graph: Arc<Graph<TNode>>,
+  aborts: Arc<Mutex<Vec<TNode>>>,
   runs: Arc<Mutex<Vec<TNode>>>,
   entry_id: Option<EntryId>,
 }
@@ -747,6 +774,7 @@ impl NodeContext for TContext {
       delays: self.delays.clone(),
       uncacheable: self.uncacheable.clone(),
       graph: self.graph.clone(),
+      aborts: self.aborts.clone(),
       runs: self.runs.clone(),
       entry_id: Some(entry_id),
     }
@@ -778,6 +806,7 @@ impl TContext {
       delays: Arc::default(),
       uncacheable: Arc::default(),
       graph,
+      aborts: Arc::new(Mutex::new(Vec::new())),
       runs: Arc::new(Mutex::new(Vec::new())),
       entry_id: None,
     }
@@ -820,14 +849,26 @@ impl TContext {
     self.graph.get(self.entry_id, self, dst).await
   }
 
+  fn abort_guard(&self, node: TNode) -> AbortGuard {
+    AbortGuard {
+      context: self.clone(),
+      node: Some(node),
+    }
+  }
+
+  fn aborted(&self, node: TNode) {
+    let mut aborts = self.aborts.lock();
+    aborts.push(node);
+  }
+
   fn ran(&self, node: TNode) {
     let mut runs = self.runs.lock();
     runs.push(node);
   }
 
-  fn maybe_delay(&self, node: &TNode) {
+  async fn maybe_delay(&self, node: &TNode) {
     if let Some(delay) = self.delays.get(node) {
-      thread::sleep(*delay);
+      delay_for(*delay).await;
     }
   }
 
@@ -849,8 +890,35 @@ impl TContext {
     }
   }
 
+  fn aborts(&self) -> Vec<TNode> {
+    self.aborts.lock().clone()
+  }
+
   fn runs(&self) -> Vec<TNode> {
     self.runs.lock().clone()
+  }
+}
+
+///
+/// A guard that if dropped, records that the given Node was aborted. When a future is canceled, it
+/// is dropped without re-running.
+///
+struct AbortGuard {
+  context: TContext,
+  node: Option<TNode>,
+}
+
+impl AbortGuard {
+  fn did_not_abort(&mut self) {
+    self.node = None;
+  }
+}
+
+impl Drop for AbortGuard {
+  fn drop(&mut self) {
+    if let Some(node) = self.node.take() {
+      self.context.aborted(node);
+    }
   }
 }
 

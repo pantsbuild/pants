@@ -4,7 +4,7 @@ use std::sync::Arc;
 use crate::node::{EntryId, Node, NodeContext, NodeError};
 
 use futures::channel::oneshot;
-use futures::future::{self, BoxFuture, FutureExt};
+use futures::future::{self, AbortHandle, Abortable, Aborted, BoxFuture, FutureExt};
 use log::{self, trace};
 use parking_lot::Mutex;
 
@@ -167,6 +167,7 @@ pub enum EntryState<N: Node> {
   // The `previous_result` value for a Running node is not a valid value. See NotStarted.
   Running {
     run_token: RunToken,
+    abort_handle: AbortHandle,
     generation: Generation,
     waiters: Vec<Waiter<N>>,
     previous_result: Option<EntryResult<N>>,
@@ -288,6 +289,7 @@ impl<N: Node> Entry<N> {
     let run_token = run_token.next();
     let context = context_factory.clone_for(entry_id);
     let node = node.clone();
+    let (abort_handle, abort_registration) = AbortHandle::new_pair();
 
     context_factory.spawn(async move {
       // If we have previous result generations, compare them to all current dependency
@@ -318,8 +320,13 @@ impl<N: Node> Entry<N> {
           .graph()
           .complete(&context, entry_id, run_token, None);
       } else {
-        // The Node needs to (re-)run!
-        let res = node.run(context.clone()).await;
+        // The Node needs to (re-)run! Wrap the potentially long running computation in an
+        // Abortable.
+        let res = match Abortable::new(node.run(context.clone()), abort_registration).await {
+          Ok(r) => r,
+          Err(Aborted) => Err(N::Error::invalidated()),
+        };
+
         context
           .graph()
           .complete(&context, entry_id, run_token, Some(res));
@@ -327,8 +334,9 @@ impl<N: Node> Entry<N> {
     });
 
     EntryState::Running {
-      waiters: Vec::new(),
       run_token,
+      abort_handle,
+      waiters: Vec::new(),
       generation,
       previous_result,
     }
@@ -469,15 +477,18 @@ impl<N: Node> Entry<N> {
       _ => {
         // We care about exactly one case: a Running state with the same run_token. All other states
         // represent various (legal) race conditions.
-        trace!("Not completing node {:?} because it was invalidated (different run_token) before completing.", self.node);
+        trace!(
+          "Not completing node {:?} because it was invalidated.",
+          self.node
+        );
         return;
       }
     }
 
     *state = match mem::replace(&mut *state, EntryState::initial()) {
       EntryState::Running {
-        waiters,
         run_token,
+        waiters,
         mut generation,
         mut previous_result,
         ..
@@ -617,13 +628,17 @@ impl<N: Node> Entry<N> {
           generation,
           previous_result,
           ..
-        }
-        | EntryState::Running {
+        } => (run_token, generation, previous_result),
+        EntryState::Running {
           run_token,
+          abort_handle,
           generation,
           previous_result,
           ..
-        } => (run_token, generation, previous_result),
+        } => {
+          abort_handle.abort();
+          (run_token, generation, previous_result)
+        }
         EntryState::Completed {
           run_token,
           generation,
@@ -683,12 +698,14 @@ impl<N: Node> Entry<N> {
     *state = match mem::replace(&mut *state, EntryState::initial()) {
       EntryState::Running {
         run_token,
+        abort_handle,
         generation,
         previous_result,
         ..
       } => {
         // Dirtying a Running node immediately cancels it.
         trace!("Node {:?} was dirtied while running.", self.node);
+        abort_handle.abort();
         EntryState::NotStarted {
           run_token,
           generation,
