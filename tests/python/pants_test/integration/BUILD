@@ -63,17 +63,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'filemap_integration',
-  sources = ['filemap_integration_test.py'],
-  dependencies = [
-    'src/python/pants/testutil:int-test',
-    'testprojects/src/python:sources_directory',
-    'testprojects/tests/python/pants:file_sets_directory',
-  ],
-  tags = {'integration', 'partially_type_checked'},
-)
-
-python_tests(
   name='graph_integration',
   sources=['graph_integration_test.py'],
   dependencies=[
