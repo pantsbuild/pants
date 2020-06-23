@@ -30,7 +30,7 @@ class OptionsInitializerTest(unittest.TestCase):
             OptionsInitializer.create(ob, build_config)
         self.assertIn("The `--remote-execution` option requires", str(exc.exception))
 
-    def test_invalidation_globs(self):
+    def test_invalidation_globs(self) -> None:
         # Confirm that an un-normalized relative path in the pythonpath is filtered out.
         suffix = "something-ridiculous"
         ob = OptionsBootstrapper.create(args=[f"--pythonpath=../{suffix}"])
