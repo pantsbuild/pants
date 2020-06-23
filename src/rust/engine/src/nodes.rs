@@ -1074,6 +1074,7 @@ impl Node for NodeKey {
       let parent_id = std::mem::replace(&mut workunit_state.parent_id, Some(span_id.clone()));
       let metadata = WorkunitMetadata {
         desc: user_facing_name.clone(),
+        info_msg: None,
         level: self.workunit_level(),
         blocked: false,
         stdout: None,

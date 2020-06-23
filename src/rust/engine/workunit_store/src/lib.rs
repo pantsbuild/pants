@@ -101,6 +101,7 @@ pub enum WorkunitState {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct WorkunitMetadata {
   pub desc: Option<String>,
+  pub info_msg: Option<String>,
   pub level: Level,
   pub blocked: bool,
   pub stdout: Option<hashing::Digest>,
@@ -124,6 +125,7 @@ impl Default for WorkunitMetadata {
     Self {
       level: Level::Info,
       desc: None,
+      info_msg: None,
       blocked: false,
       stdout: None,
       stderr: None,
