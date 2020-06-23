@@ -4,7 +4,7 @@
 #   buildroot: the root of this repo
 #   pants_bootstrapdir: the global pants scratch space primarily used for caches
 #   pants_configdir: the global pants storage for config files
-#   pants_supportdir: pants support files for this repo go here; for example: ivysettings.xml
+#   pants_supportdir: pants support files for this repo go here
 #   pants_distdir: user visible artifacts for this repo go here
 #   pants_workdir: the scratch space used to for live builds in this repo
 
@@ -87,66 +87,14 @@ write_to = []
 read_from = ["%(local_artifact_cache)s"]
 write_to = ["%(local_artifact_cache)s"]
 
-[ivy]
-# A custom ivysettings.xml file to allow for consumption from a local .m2 repository.
-# If you don't need access to a local .m2 repository, remove this setting to use the default.
-ivy_settings = "%(pants_supportdir)s/ivy/ivysettings.xml"
-# We need a custom ivy profile to grab the optional pgp libs for
-# signing artifacts we publish to maven central.
-ivy_profile = "%(pants_supportdir)s/ivy/ivy.xml"
-
 [gen.thrift-java]
 deps = ["3rdparty:thrift"]
 
 [gen.thrift-py]
 deps = ["examples/3rdparty/python:thrift"]
 
-[compile.rsc]
-jvm_options = ['-Xmx4g', '-XX:+UseConcMarkSweepGC', '-XX:ParallelGCThreads=4']
-args = [
-  # NB: See https://github.com/pantsbuild/pants/issues/3702
-  '-C-encoding', '-CUTF-8',
-  '-S-encoding', '-SUTF-8',
-  '-S-g:vars',
-  # Compiling the zinc codebase with `2.11.12` requires that scala target `JDK8`:
-  # this setting is a function of the fact that the libraries we're consuming require it,
-  # rather than anything inherent to `2.11.12`.
-  '-S-target:jvm-1.8',
-]
-warning_args = [
-  '-S-deprecation',
-  '-S-unchecked',
-  # request warnings for http://www.scala-lang.org/api/2.10.4/index.html#scala.language$
-  '-S-feature',
-]
-no_warning_args = [
-  '-S-nowarn',
-]
-
-[compile.javac]
-args = [
-  '-encoding', 'UTF-8',
-  '-J-Xmx2g',
-]
-# javac -help -X will show the complete list
-warning_args = [
-  '-Xlint:deprecation',
-  '-Xlint:empty',
-  '-Xlint:finally',
-  '-Xlint:overrides',
-  '-Xlint:static',
-  '-Xlint:unchecked',
-  '-Xlint:try',
-]
-no_warning_args = [
-  '-Xlint:none',
-]
-
 [black]
 config = "pyproject.toml"
-
-[checkstyle]
-config = "%(pants_supportdir)s/checkstyle/coding_style.xml"
 
 [docformatter]
 args = ["--wrap-summaries=100", "--wrap-descriptions=100"]
@@ -160,54 +108,6 @@ extra_requirements.add = [
 
 [isort]
 config = [".isort.cfg", "contrib/.isort.cfg", "examples/.isort.cfg"]
-
-[scalafmt]
-skip = true
-
-[scalafix]
-skip = true
-
-[scalastyle]
-config = "%(buildroot)s/build-support/scalastyle/scalastyle_config.xml"
-
-[lint.scalastyle]
-excludes = "%(buildroot)s/build-support/scalastyle/excludes.txt"
-
-[scala]
-version = 2.12
-
-[java]
-strict_deps = true
-
-[jvm]
-options = ["-Xmx1g"]
-
-[jvm.bench]
-options = ["-Xmx1g"]
-
-[jvm.run.jvm]
-options = ["-Xmx1g"]
-
-[jvm.test.junit]
-options = ["-Djava.awt.headless=true", "-Xmx1g"]
-
-# NB(gmalmquist): You can set the bootclasspath relative to the
-# appropriate java home (inferred from the target level) by setting
-# an arg like:
-# "-C-Xbootclasspath:$JAVA_HOME/jre/lib/resources.jar:$JAVA_HOME/jre/lib/rt.jar:$JAVA_HOME/jre/lib/sunrsasign.jar:$JAVA_HOME/jre/lib/jsse.jar:$JAVA_HOME/jre/lib/jce.jar:$JAVA_HOME/jre/lib/charsets.jar:$JAVA_HOME/jre/lib/jfr.jar:$JAVA_HOME/jre/classes"
-[jvm-platform]
-default_platform = "java8"
-# TODO(#8669): remove `java7` once we can install openJDK 11 on the RBE docker image, which would
-# allow fixing testprojects/tests/java/org/pantsbuild/testproject/testjvms:eight-runtime-platform to
-# use Java 8 and 11, rather than Java 7 and 8.
-platforms = """
-{
-  'java7': {'source': '7', 'target': '7', 'args': [] },
-  'java8': {'source': '8', 'target': '8', 'args': [] },
-  'java9': {'source': '9', 'target': '9', 'args': [] },
-}
-"""
-
 
 [pants-releases]
 branch_notes = """
@@ -247,32 +147,6 @@ branch_notes = """
 }
 """
 
-[publish.jar]
-ivy_settings = "%(pants_supportdir)s/ivy/publish.ivysettings.xml"
-push_postscript = """
-# Prevent Travis CI from running for this automated JAR publish commit:
-#  https://docs.travis-ci.com/user/customizing-the-build/#skipping-a-build
-[ci skip]
-"""
-repos = """
-{
-  'public': {  # must match the name of the `Repository` object that you defined in your plugin.
-    'resolver': 'oss.sonatype.org', # must match hostname in ~/.netrc and the <url> parameter
-                                    # in your custom ivysettings.xml.
-    'auth': 'build-support/ivy:netrc',  # Pants spec to a 'credentials()' object.
-    'help': 'Configure your ~/.netrc for oss.sonatype.org access.'
-  }
-}
-"""
-restrict_push_branches = ['master']
-restrict_push_urls = [
-  'git@github.com:pantsbuild/pants.git',
-  'https://github.com/pantsbuild/pants.git',
-]
-# The commithooks on this repository cause a deadlock while acquiring the workspace lock
-# if a commit is made from within pants: skip them.
-verify_commit = false
-
 [python-setup]
 interpreter_cache_dir = "%(pants_bootstrapdir)s/python_cache/interpreters"
 resolver_cache_dir = "%(pants_bootstrapdir)s/python_cache/requirements"
@@ -288,10 +162,6 @@ pytest_plugins.add = [
 ]
 
 [test.pytest]
-timeouts = true
-timeout_default = 60
-
-[test.junit]
 timeouts = true
 timeout_default = 60
 
@@ -311,27 +181,3 @@ enable_libc_search = true
 
 [sourcefile-validation]
 config = "@build-support/regexes/config.yaml"
-
-[coursier]
-repos = [
-  # First try RBE's maven central mirror, as we can get throttled by
-  # maven central due to all RBE traffic appearing to them as coming from a single IP.
-  # There's no harm in trying this even outside RBE, as it is world-visible.
-  'https://maven-central.storage-download.googleapis.com/maven2',
-  'https://repo1.maven.org/maven2',
-  # Custom repo for Kythe jars, as Google doesn't currently publish them anywhere.
-  'https://raw.githubusercontent.com/toolchainlabs/binhost/master/',
-  # Specify local default maven repo to support
-  # testing snapshots of 3rdparty jars published locally.
-  'file://%(homedir)s/.m2/repository',
-]
-
-fetch_options.add = ["--retry-count", "3", "--no-default"]
-
-[cache.resolve.coursier]
-# Only use local artifact for coursier because the cache content contains abs path
-# and is not portable. That said, if remote cache is enabled, this would not break
-# but would be less performant, as the task will validate the entry paths from cache
-# and decide to rerun coursier since the paths are invalid.
-read_from = ["%(local_artifact_cache)s"]
-write_to = ["%(local_artifact_cache)s"]
