@@ -43,6 +43,11 @@ def run_goal(
                 target_type=target_type or [],
                 address_regex=address_regex or [],
                 tag_regex=tag_regex or [],
+                # Deprecated.
+                type=[],
+                target=[],
+                regex=[],
+                ancestor=[],
             ),
             console,
             RegisteredTargetTypes.create({type(tgt) for tgt in targets}),

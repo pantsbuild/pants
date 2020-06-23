@@ -11,7 +11,7 @@ class FiledepsIntegrationTest(PantsRunIntegrationTest):
         self, *, filedeps_options: Optional[List[str]] = None, expected_entries: List[str]
     ) -> None:
         args = [
-            "filedeps2",
+            "filedeps",
             "--transitive",
             *(filedeps_options or []),
             "examples/src/scala/org/pantsbuild/example/hello/exe:exe",

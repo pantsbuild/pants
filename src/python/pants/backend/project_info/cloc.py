@@ -4,8 +4,11 @@
 import itertools
 from dataclasses import dataclass
 
-from pants.backend.graph_info.subsystems.cloc_binary import ClocBinary
-from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
+from pants.core.util_rules.external_tool import (
+    DownloadedExternalTool,
+    ExternalTool,
+    ExternalToolRequest,
+)
 from pants.engine.console import Console
 from pants.engine.fs import (
     Digest,
@@ -22,6 +25,20 @@ from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import SubsystemRule, goal_rule
 from pants.engine.selectors import Get
 from pants.util.strutil import pluralize
+
+
+class ClocBinary(ExternalTool):
+    options_scope = "cloc-binary"
+    name = "cloc"
+    default_version = "1.80"
+    default_known_versions = [
+        "1.80|darwin|2b23012b1c3c53bd6b9dd43cd6aa75715eed4feb2cb6db56ac3fbbd2dffeac9d|546279",
+        "1.80|linux |2b23012b1c3c53bd6b9dd43cd6aa75715eed4feb2cb6db56ac3fbbd2dffeac9d|546279",
+    ]
+
+    def generate_url(self, plat: Platform) -> str:
+        version = self.get_options().version
+        return f"https://github.com/AlDanial/cloc/releases/download/{version}/cloc-{version}.pl"
 
 
 @dataclass(frozen=True)

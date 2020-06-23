@@ -2,8 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import re
+from functools import partial
 from typing import Callable, Pattern
 
+from pants.base.deprecated import resolve_conflicting_options
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import goal_rule
@@ -15,6 +17,15 @@ from pants.engine.target import (
     UnrecognizedTargetTypeException,
 )
 from pants.util.filtering import and_filters, create_filters
+
+TARGET_REMOVAL_MSG = (
+    "`--filter-target` was removed because it is similar to `--filter-address-regex`. If you still "
+    "need this feature, please message us on Slack (https://pants.readme.io/docs/community)."
+)
+ANCESTOR_REMOVAL_MSG = (
+    "`--filter-ancestor` was removed because it is not trivial to implement. If you still need "
+    "this feature, please message us on Slack (https://pants.readme.io/docs/community)."
+)
 
 
 class FilterOptions(LineOriented, GoalSubsystem):
@@ -29,7 +40,7 @@ class FilterOptions(LineOriented, GoalSubsystem):
     between them.
     """
 
-    name = "filter2"
+    name = "filter"
 
     @classmethod
     def register_options(cls, register):
@@ -51,6 +62,38 @@ class FilterOptions(LineOriented, GoalSubsystem):
             type=list,
             metavar="[+-]regex1,regex2,...",
             help="Filter on targets with tags matching these regexes.",
+        )
+        register(
+            "--type",
+            type=list,
+            metavar="[+-]type1,type2,...",
+            help="Filter on these target types, e.g. `resources` or `python_library`.",
+            removal_version="2.1.0.dev0",
+            removal_hint="Use `--target-type` instead of `--type`.",
+        )
+        register(
+            "--regex",
+            type=list,
+            metavar="[+-]regex1,regex2,...",
+            help="Filter on target addresses matching these regexes.",
+            removal_version="2.1.0.dev0",
+            removal_hint="Use `--address-regex` instead of `--regex`.",
+        )
+        register(
+            "--target",
+            type=list,
+            metavar="[+-]spec1,spec2,...",
+            help="Filter on these target addresses.",
+            removal_version="2.1.0.dev0",
+            removal_hint=TARGET_REMOVAL_MSG,
+        )
+        register(
+            "--ancestor",
+            type=list,
+            metavar="[+-]spec1,spec2,...",
+            help="Filter on targets that these targets depend on.",
+            removal_version="2.1.0.dev0",
+            removal_hint=ANCESTOR_REMOVAL_MSG,
         )
 
 
@@ -75,6 +118,11 @@ def filter_targets(
     console: Console,
     registered_target_types: RegisteredTargetTypes,
 ) -> FilterGoal:
+    if not options.values.is_default("target"):
+        raise ValueError(TARGET_REMOVAL_MSG)
+    if not options.values.is_default("ancestor"):
+        raise ValueError(ANCESTOR_REMOVAL_MSG)
+
     def filter_target_type(target_type: str) -> TargetFilter:
         if target_type not in registered_target_types.aliases:
             raise UnrecognizedTargetTypeException(target_type, registered_target_types)
@@ -88,10 +136,20 @@ def filter_targets(
         regex = compile_regex(tag_regex)
         return lambda tgt: any(bool(regex.search(tag)) for tag in tgt.get(Tags).value or ())
 
+    resolve_option = partial(
+        resolve_conflicting_options,
+        old_scope="filter",
+        new_scope="filter",
+        old_container=options.values,
+        new_container=options.values,
+    )
+    target_type = resolve_option(old_option="type", new_option="target_type")
+    address_regex = resolve_option(old_option="regex", new_option="address_regex")
+
     anded_filter: TargetFilter = and_filters(
         [
-            *(create_filters(options.values.target_type, filter_target_type)),
-            *(create_filters(options.values.address_regex, filter_address_regex)),
+            *(create_filters(target_type, filter_target_type)),
+            *(create_filters(address_regex, filter_address_regex)),
             *(create_filters(options.values.tag_regex, filter_tag_regex)),
         ]
     )

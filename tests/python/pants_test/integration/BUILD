@@ -65,28 +65,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'dependees_integration',
-  sources = ['dependees_integration_test.py'],
-  dependencies = [
-    'src/python/pants/testutil:int-test',
-    'examples/src/scala/org/pantsbuild/example:hello_directory',
-    'examples/src/scala/org/pantsbuild/example:jvm_run_directory',
-    'examples/tests/scala/org/pantsbuild/example:hello_directory',
-  ],
-  tags = {'integration', 'partially_type_checked'},
-)
-
-python_tests(
-  name = 'dependencies_integration',
-  sources = ['dependencies_integration_test.py'],
-  dependencies = [
-    'src/python/pants/testutil:int-test',
-    'examples/src/scala/org/pantsbuild/example:hello_directory',
-  ],
-  tags = {'integration', 'partially_type_checked'},
-)
-
-python_tests(
   name = 'filemap_integration',
   sources = ['filemap_integration_test.py'],
   dependencies = [
@@ -98,24 +76,11 @@ python_tests(
 )
 
 python_tests(
-  name = 'filedeps_integration',
-  sources = ['filedeps_integration_test.py'],
-  dependencies = [
-    'src/python/pants/base:project_tree',
-    'src/python/pants/testutil:int-test',
-    'examples/src/scala/org/pantsbuild/example:hello_directory',
-  ],
-  tags = {'integration', 'partially_type_checked'},
-  timeout = 180,
-)
-
-python_tests(
   name='graph_integration',
   sources=['graph_integration_test.py'],
   dependencies=[
     'src/python/pants/option',
     'src/python/pants/testutil:int-test',
-    'testprojects/src/java/org/pantsbuild/testproject:bundle_directory',
     'testprojects/src/python:no_build_file_directory',
     'testprojects/src/python:sources_directory',
   ],
