@@ -92,10 +92,6 @@ def core_packages() -> Set[Package]:
 def contrib_packages() -> Set[Package]:
     return {
         Package(
-            "pantsbuild.pants.contrib.scrooge",
-            "contrib/scrooge/src/python/pants/contrib/scrooge:plugin",
-        ),
-        Package(
             "pantsbuild.pants.contrib.mypy", "contrib/mypy/src/python/pants/contrib/mypy:plugin",
         ),
     }

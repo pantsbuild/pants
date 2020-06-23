@@ -15,8 +15,6 @@ class ProjectsTestBase(PantsRunIntegrationTest):
             # to be first in the context, and test.junit mixes all classpaths.
             "testprojects/maven_layout/resource_collision/example_b/src/test/java/org/pantsbuild/duplicateres/exampleb:exampleb",
             "testprojects/maven_layout/resource_collision/example_c/src/test/java/org/pantsbuild/duplicateres/examplec:examplec",
-            # TODO: This one has a missing dependency, but is intended to succeed... should it?
-            "testprojects/src/java/org/pantsbuild/testproject/thriftdeptest",
             # TODO(Eric Ayers): I don't understand why this fails
             "testprojects/src/java/org/pantsbuild/testproject/jvmprepcommand:compile-prep-command",
             # TODO(#7903): failing to find -ltensorflow_framework
@@ -40,7 +38,6 @@ class ProjectsTestBase(PantsRunIntegrationTest):
             "testprojects/src/java/org/pantsbuild/testproject/runtime:compile-fail",
             "testprojects/src/scala/org/pantsbuild/testproject/compilation_failure",
             "testprojects/src/scala/org/pantsbuild/testproject/compilation_warnings:fatal",
-            "testprojects/src/thrift/org/pantsbuild/thrift_exports:C-without-exports",
             "testprojects/src/thrift/org/pantsbuild/thrift_linter:",
             "testprojects/src/java/org/pantsbuild/testproject/provided:c",
             "testprojects/tests/java/org/pantsbuild/testproject/dummies:failing_target",

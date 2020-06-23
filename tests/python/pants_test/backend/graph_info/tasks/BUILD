@@ -2,41 +2,11 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
-  name = 'dependees',
-  sources = ['test_dependees.py'],
-  dependencies = [
-    'src/python/pants/backend/codegen/thrift/java',
-    'src/python/pants/backend/graph_info/tasks',
-    'src/python/pants/java/jar',
-    'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/backend/python/targets',
-    'src/python/pants/build_graph',
-    'src/python/pants/testutil:task_test_base',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_tests(
   name = 'filemap',
   sources = ['test_filemap.py'],
   dependencies = [
     'src/python/pants/backend/graph_info/tasks',
     'src/python/pants/backend/python/targets',
-    'src/python/pants/build_graph',
-    'src/python/pants/testutil:task_test_base',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_tests(
-  name = 'filter',
-  sources = ['test_filter.py'],
-  dependencies = [
-    'src/python/pants/backend/graph_info/tasks',
-    'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/backend/python/targets',
-    'src/python/pants/base:exceptions',
     'src/python/pants/build_graph',
     'src/python/pants/testutil:task_test_base',
   ],
@@ -82,17 +52,6 @@ python_tests(
   dependencies = [
     'src/python/pants/backend/graph_info/tasks',
     'src/python/pants/backend/python/targets',
-    'src/python/pants/build_graph',
-    'src/python/pants/testutil:task_test_base',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_tests(
-  name='target_filter_task_mixin',
-  sources=['test_target_filter_task_mixin.py'],
-  dependencies=[
-    'src/python/pants/backend/graph_info/tasks',
     'src/python/pants/build_graph',
     'src/python/pants/testutil:task_test_base',
   ],

@@ -19,7 +19,6 @@ target(
     ':rsc_compat_directory',
     ':scaladepsonboth_directory',
     ':sharedsources_directory',
-    ':thriftdeptest_directory',
     ':unicode_directory',
   ],
 )
@@ -107,14 +106,6 @@ files(
 files(
   name = 'sharedsources_directory',
   sources = ['sharedsources/**/*'],
-)
-
-files(
-  name = 'thriftdeptest_directory',
-  sources = ['thriftdeptest/**/*'],
-  dependencies = [
-    'testprojects/src/thrift/org/pantsbuild:testproject_directory',
-  ],
 )
 
 files(

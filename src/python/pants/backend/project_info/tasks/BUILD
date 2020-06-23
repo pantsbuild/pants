@@ -4,23 +4,8 @@
 target(
   name = 'all',
   dependencies = [
-    ':dependencies',
     ':depmap',
-    ':filedeps',
   ],
-)
-
-python_library(
-  name = 'dependencies',
-  sources = ['dependencies.py'],
-  dependencies = [
-    'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/base:payload_field',
-    'src/python/pants/task',
-    'src/python/pants/util:ordered_set',
-  ],
-  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -29,19 +14,6 @@ python_library(
   dependencies = [
     'src/python/pants/java/jar',
     'src/python/pants/base:exceptions',
-    'src/python/pants/task',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_library(
-  name = 'filedeps',
-  sources = ['filedeps.py'],
-  dependencies = [
-    'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/backend/jvm/targets:scala',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/build_graph',
     'src/python/pants/task',
   ],
   tags = {"partially_type_checked"},

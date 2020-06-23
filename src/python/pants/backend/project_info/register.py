@@ -13,16 +13,12 @@ from pants.backend.project_info import (
     list_targets,
     source_file_validator,
 )
-from pants.backend.project_info.tasks.dependencies import Dependencies
 from pants.backend.project_info.tasks.depmap import Depmap
-from pants.backend.project_info.tasks.filedeps import FileDeps
 from pants.goal.task_registrar import TaskRegistrar as task
 
 
 def register_goals():
     task(name="depmap", action=Depmap).install()
-    task(name="dependencies", action=Dependencies).install()
-    task(name="filedeps", action=FileDeps).install("filedeps")
 
 
 def rules():

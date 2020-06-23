@@ -18,14 +18,12 @@ class Isort(PythonToolBase):
             "--skip",
             type=bool,
             default=False,
-            fingerprint=True,
             help="Don't use isort when running `./pants fmt` and `./pants lint`",
         )
         register(
             "--args",
             type=list,
             member_type=shell_str,
-            fingerprint=True,
             help="Arguments to pass directly to isort, e.g. "
             '`--isort-args="--case-sensitive --trailing-comma"`',
         )
@@ -33,6 +31,5 @@ class Isort(PythonToolBase):
             "--config",
             type=list,
             member_type=file_option,
-            fingerprint=True,
             help="Path to `isort.cfg` or alternative isort config file(s)",
         )
