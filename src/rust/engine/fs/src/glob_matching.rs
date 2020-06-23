@@ -4,7 +4,6 @@
 use std::collections::HashSet;
 use std::ffi::OsStr;
 use std::fmt::Display;
-use std::iter::Iterator;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 
@@ -22,9 +21,9 @@ use crate::{
 
 lazy_static! {
   static ref PARENT_DIR: &'static str = "..";
-  pub static ref SINGLE_STAR_GLOB: Pattern = Pattern::new("*").unwrap();
+  static ref SINGLE_STAR_GLOB: Pattern = Pattern::new("*").unwrap();
   static ref DOUBLE_STAR: &'static str = "**";
-  pub static ref DOUBLE_STAR_GLOB: Pattern = Pattern::new(*DOUBLE_STAR).unwrap();
+  static ref DOUBLE_STAR_GLOB: Pattern = Pattern::new(*DOUBLE_STAR).unwrap();
   static ref MISSING_GLOB_SOURCE: GlobParsedSource = GlobParsedSource(String::from(""));
   static ref PATTERN_MATCH_OPTIONS: MatchOptions = MatchOptions {
     require_literal_separator: true,
@@ -33,7 +32,7 @@ lazy_static! {
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum PathGlob {
+pub(crate) enum PathGlob {
   Wildcard {
     canonical_dir: Dir,
     symbolic_path: PathBuf,
@@ -239,19 +238,7 @@ impl PathGlob {
   }
 }
 
-///
-/// This struct extracts out just the include and exclude globs from the `PreparedPathGlobs`
-/// struct. It is a temporary measure to try to share some code between the glob matching
-/// implementation in this file and in snapshot_ops.rs.
-///
-/// TODO(#9967): Remove this struct!
-///
-pub struct ExpandablePathGlobs {
-  pub include: Vec<PathGlob>,
-  pub exclude: Arc<GitignoreStyleExcludes>,
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct PreparedPathGlobs {
   pub(crate) include: Vec<PathGlobIncludeEntry>,
   pub(crate) exclude: Arc<GitignoreStyleExcludes>,
@@ -261,13 +248,6 @@ pub struct PreparedPathGlobs {
 }
 
 impl PreparedPathGlobs {
-  pub fn as_expandable_globs(&self) -> ExpandablePathGlobs {
-    ExpandablePathGlobs {
-      include: Iterator::flatten(self.include.iter().map(|pgie| pgie.globs.clone())).collect(),
-      exclude: self.exclude.clone(),
-    }
-  }
-
   fn parse_patterns_from_include(
     include: &[PathGlobIncludeEntry],
   ) -> Result<Vec<glob::Pattern>, String> {
