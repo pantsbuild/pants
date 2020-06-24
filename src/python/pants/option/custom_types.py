@@ -229,7 +229,7 @@ class ListValueComponent:
         elif value.startswith("-[") or value.startswith("-("):
             filters = _convert_list(value[1:], member_type, is_enum)
         elif is_enum and isinstance(value, str):
-            appends = _convert_list(value.split(","), member_type, True)
+            appends = _convert_list([value], member_type, True)
         elif isinstance(value, str):
             appends = [value]
         else:

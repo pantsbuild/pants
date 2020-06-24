@@ -1766,23 +1766,6 @@ class OptionsTest(TestBase):
             "other-enum-scope"
         ).some_list_enum_with_default
 
-    def test_list_of_enum_multiple_values(self) -> None:
-        options_1 = self._parse(flags="other-enum-scope --some-list-enum=another-value,one-more")
-        options_2 = self._parse(
-            flags="other-enum-scope --some-list-enum=yet-another,one-more,a-value"
-        )
-
-        assert [
-            self.SomeEnumOption.another_value,
-            self.SomeEnumOption.one_more,
-        ] == options_1.for_scope("other-enum-scope").some_list_enum
-
-        assert [
-            self.SomeEnumOption.yet_another,
-            self.SomeEnumOption.one_more,
-            self.SomeEnumOption.a_value,
-        ] == options_2.for_scope("other-enum-scope").some_list_enum
-
     def test_list_of_enum_from_config(self) -> None:
         options = self._parse(
             config={"other-enum-scope": {"some_list_enum": "['one-more', 'a-value']"}}
@@ -1793,15 +1776,15 @@ class OptionsTest(TestBase):
 
     def test_list_of_enum_duplicates(self) -> None:
         options = self._parse(
-            flags="other-enum-scope --some-list-enum=another-value,one-more,another-value"
+            flags="other-enum-scope --some-list-enum=\"['another-value', 'one-more', 'another-value']\""
         )
-
         with pytest.raises(ParseError, match="Duplicate enum values specified in list"):
             options.for_scope("other-enum-scope")
 
     def test_list_of_enum_invalid_value(self) -> None:
-        options = self._parse(flags="other-enum-scope --some-list-enum=another-value,not-a-value")
-
+        options = self._parse(
+            flags="other-enum-scope --some-list-enum=\"['another-value', 'not-a-value']\""
+        )
         with pytest.raises(ParseError, match="Error computing value for --some-list-enum"):
             options.for_scope("other-enum-scope")
 
