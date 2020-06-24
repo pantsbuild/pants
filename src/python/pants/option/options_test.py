@@ -1785,7 +1785,7 @@ class OptionsTest(TestBase):
 
     def test_list_of_enum_from_config(self) -> None:
         options = self._parse(
-            config={"other-enum-scope": {"some_list_enum": "['one-more','a-value']"}}
+            config={"other-enum-scope": {"some_list_enum": "['one-more', 'a-value']"}}
         )
         assert [self.SomeEnumOption.one_more, self.SomeEnumOption.a_value] == options.for_scope(
             "other-enum-scope"
