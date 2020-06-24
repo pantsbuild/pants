@@ -800,11 +800,7 @@ impl Task {
     future::try_join_all(get_futures).await
   }
 
-  fn compute_info_msg(can_modify_workunit: bool, result_val: &Value) -> Option<String> {
-    if !can_modify_workunit {
-      return None;
-    }
-
+  fn compute_info_msg(result_val: &Value) -> Option<String> {
     let info_msg_val: Value = externs::call_method(&result_val, "info_message", &[]).ok()?;
     {
       let gil = Python::acquire_gil();
@@ -817,15 +813,8 @@ impl Task {
     Some(externs::val_to_str(&info_msg_val))
   }
 
-  fn compute_new_workunit_level(
-    can_modify_workunit: bool,
-    result_val: &Value,
-  ) -> Option<log::Level> {
+  fn compute_new_workunit_level(result_val: &Value) -> Option<log::Level> {
     use num_enum::TryFromPrimitiveError;
-
-    if !can_modify_workunit {
-      return None;
-    }
 
     let new_level_val: Value = externs::call_method(&result_val, "level", &[]).ok()?;
 
@@ -939,8 +928,14 @@ impl WrappedNode for Task {
     }
 
     if result_type == product {
-      let new_level = Self::compute_new_workunit_level(can_modify_workunit, &result_val);
-      let info_msg = Self::compute_info_msg(can_modify_workunit, &result_val);
+      let (new_level, info_msg) = if can_modify_workunit {
+        (
+          Self::compute_new_workunit_level(&result_val),
+          Self::compute_info_msg(&result_val),
+        )
+      } else {
+        (None, None)
+      };
       Ok(PythonRuleOutput {
         value: result_val,
         new_level,
