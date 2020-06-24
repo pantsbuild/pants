@@ -160,9 +160,9 @@ pytest_plugins.add = [
   "pytest-icdiff",
   "pygments",
 ]
+timeout_default = 60
 
 [test.pytest]
-timeouts = true
 timeout_default = 60
 
 [native-build-step.cpp-compile-settings]
