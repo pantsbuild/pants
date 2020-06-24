@@ -166,6 +166,7 @@ python_tests(
         ":python_task_test_base",
     ],
     tags={"partially_type_checked"},
+    timeout = 180,
 )
 
 python_tests(
