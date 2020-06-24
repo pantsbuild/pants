@@ -4,10 +4,11 @@
 python_library(
   name = 'valid',
   sources = ['valid.py'],
-  tags = {'partially_type_checked'},
+  tags = ["nolint"],
 )
 
 python_library(
   name = 'invalid',
   sources = ['invalid.py'],
+  tags = ["nolint"],
 )

@@ -53,7 +53,7 @@ def test_invalid_subject_declared_type() -> None:
             f"The subject declared type argument must be a type, given {1} of type {type(1)}."
         ),
     ):
-        Get(AClass, 1, BClass)
+        Get(AClass, 1, BClass)  # type: ignore[call-overload]
 
 
 def test_invalid_product_type() -> None:
@@ -61,7 +61,7 @@ def test_invalid_product_type() -> None:
         expected_exception=TypeError,
         match=re.escape(f"The product type argument must be a type, given {1} of type {type(1)}."),
     ):
-        Get(1, "bob")
+        Get(1, "bob")  # type: ignore[call-overload]
 
 
 def test_multiget_invalid_types() -> None:
@@ -69,7 +69,9 @@ def test_multiget_invalid_types() -> None:
         expected_exception=TypeError,
         match=re.escape("Unexpected MultiGet argument types: Get(AClass, BClass, ...), 'bob'"),
     ):
-        next(MultiGet(Get(AClass, BClass()), "bob").__await__())
+        next(
+            MultiGet(Get(AClass, BClass()), "bob").__await__()  # type: ignore[call-overload]
+        )
 
 
 def test_multiget_invalid_Nones() -> None:
@@ -77,4 +79,6 @@ def test_multiget_invalid_Nones() -> None:
         expected_exception=ValueError,
         match=re.escape("Unexpected MultiGet None arguments: None, Get(AClass, BClass, ...)"),
     ):
-        next(MultiGet(None, Get(AClass, BClass()), None, None).__await__())
+        next(
+            MultiGet(None, Get(AClass, BClass()), None, None).__await__()  # type: ignore[call-overload]
+        )

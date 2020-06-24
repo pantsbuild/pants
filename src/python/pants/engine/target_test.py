@@ -82,8 +82,9 @@ class FortranExtensions(PrimitiveField):
     value: Tuple[str, ...]
     default = ()
 
+    @classmethod
     def compute_value(
-        self, raw_value: Optional[Iterable[str]], *, address: Address
+        cls, raw_value: Optional[Iterable[str]], *, address: Address
     ) -> Tuple[str, ...]:
         value_or_default = super().compute_value(raw_value, address=address)
         # Add some arbitrary validation to test that hydration/validation works properly.
@@ -92,7 +93,7 @@ class FortranExtensions(PrimitiveField):
         ]
         if bad_extensions:
             raise InvalidFieldException(
-                f"The {repr(self.alias)} field in target {address} expects all elements to be "
+                f"The {repr(cls.alias)} field in target {address} expects all elements to be "
                 f"prefixed by `Fortran`. Received {bad_extensions}.",
             )
         return tuple(value_or_default)
@@ -131,7 +132,7 @@ class FortranSourcesResult:
 @rule
 async def hydrate_fortran_sources(request: FortranSourcesRequest) -> FortranSourcesResult:
     sources_field = request.field
-    result = await Get(Snapshot, PathGlobs(sources_field.sanitized_raw_value))
+    result = await Get(Snapshot, PathGlobs(sources_field.sanitized_raw_value or ()))
     # Validate after hydration
     non_fortran_sources = [
         fp for fp in result.files if PurePath(fp).suffix not in (".f95", ".f03", ".f08")
@@ -329,22 +330,23 @@ def test_override_preexisting_field_via_new_target() -> None:
         banned_extensions = ("FortranBannedExt",)
         default_extensions = ("FortranCustomExt",)
 
+        @classmethod
         def compute_value(
-            self, raw_value: Optional[Iterable[str]], *, address: Address
+            cls, raw_value: Optional[Iterable[str]], *, address: Address
         ) -> Tuple[str, ...]:
             # Ensure that we avoid certain problematic extensions and always use some defaults.
             specified_extensions = super().compute_value(raw_value, address=address)
             banned = [
                 extension
                 for extension in specified_extensions
-                if extension in self.banned_extensions
+                if extension in cls.banned_extensions
             ]
             if banned:
                 raise InvalidFieldException(
-                    f"The {repr(self.alias)} field in target {address} is using banned "
+                    f"The {repr(cls.alias)} field in target {address} is using banned "
                     f"extensions: {banned}"
                 )
-            return (*specified_extensions, *self.default_extensions)
+            return (*specified_extensions, *cls.default_extensions)
 
     class CustomFortranTarget(Target):
         alias = "custom_fortran"
@@ -754,7 +756,14 @@ def test_dict_string_to_string_sequence_field() -> None:
         with pytest.raises(InvalidFieldTypeException):
             Example(raw_value, address=addr)
 
-    for v in [0, object(), "hello", ["hello"], {"hello": "world"}, {0: ["world"]}]:
+    for v in [  # type: ignore[assignment]
+        0,
+        object(),
+        "hello",
+        ["hello"],
+        {"hello": "world"},
+        {0: ["world"]},
+    ]:
         assert_invalid_type(v)
 
 
@@ -781,7 +790,7 @@ class TestSources(TestBase):
             with pytest.raises(InvalidFieldTypeException):
                 Sources(raw_value, address=addr)
 
-        for v in [0, object(), "f1.txt"]:
+        for v in [0, object(), "f1.txt"]:  # type: ignore[assignment]
             assert_invalid_type(v)
 
     def test_normal_hydration(self) -> None:
@@ -841,7 +850,7 @@ class TestSources(TestBase):
         # than the normal `all` conjunction.
         self.create_files("src/fortran", files=["default.f95", "f1.f08", "ignored.f08"])
         sources = DefaultSources(None, address=addr)
-        assert set(sources.sanitized_raw_value) == set(DefaultSources.default)
+        assert set(sources.sanitized_raw_value or ()) == set(DefaultSources.default)
 
         hydrated_sources = self.request_single_product(
             HydratedSources, HydrateSourcesRequest(sources)
@@ -904,6 +913,10 @@ class TestSources(TestBase):
 # -----------------------------------------------------------------------------------------------
 
 
+class SmalltalkSources(Sources):
+    pass
+
+
 class AvroSources(Sources):
     pass
 
@@ -913,18 +926,20 @@ class AvroLibrary(Target):
     core_fields = (AvroSources,)
 
 
-class GenerateFortranFromAvroRequest(GenerateSourcesRequest):
+class GenerateSmalltalkFromAvroRequest(GenerateSourcesRequest):
     input = AvroSources
-    output = FortranSources
+    output = SmalltalkSources
 
 
 @rule
-async def generate_fortran_from_avro(request: GenerateFortranFromAvroRequest) -> GeneratedSources:
+async def generate_smalltalk_from_avro(
+    request: GenerateSmalltalkFromAvroRequest,
+) -> GeneratedSources:
     protocol_files = request.protocol_sources.files
 
     def generate_fortran(fp: str) -> FileContent:
-        parent = str(PurePath(fp).parent).replace("src/avro", "src/fortran")
-        file_name = f"{PurePath(fp).stem}.f95"
+        parent = str(PurePath(fp).parent).replace("src/avro", "src/smalltalk")
+        file_name = f"{PurePath(fp).stem}.st"
         return FileContent(str(PurePath(parent, file_name)), b"Generated")
 
     result = await Get(Snapshot, InputFilesContent([generate_fortran(fp) for fp in protocol_files]))
@@ -936,10 +951,10 @@ class TestCodegen(TestBase):
     def rules(cls):
         return (
             *super().rules(),
-            generate_fortran_from_avro,
-            RootRule(GenerateFortranFromAvroRequest),
+            generate_smalltalk_from_avro,
+            RootRule(GenerateSmalltalkFromAvroRequest),
             RootRule(HydrateSourcesRequest),
-            UnionRule(GenerateSourcesRequest, GenerateFortranFromAvroRequest),
+            UnionRule(GenerateSourcesRequest, GenerateSmalltalkFromAvroRequest),
         )
 
     @classmethod
@@ -954,7 +969,7 @@ class TestCodegen(TestBase):
 
     def test_generate_sources(self) -> None:
         protocol_sources = AvroSources(["*.avro"], address=self.address)
-        assert protocol_sources.can_generate(FortranSources, self.union_membership) is True
+        assert protocol_sources.can_generate(SmalltalkSources, self.union_membership) is True
 
         # First, get the original protocol sources.
         hydrated_protocol_sources = self.request_single_product(
@@ -966,44 +981,46 @@ class TestCodegen(TestBase):
         wrapped_tgt = self.request_single_product(WrappedTarget, self.address)
         generated_sources = self.request_single_product(
             GeneratedSources,
-            GenerateFortranFromAvroRequest(hydrated_protocol_sources.snapshot, wrapped_tgt.target),
+            GenerateSmalltalkFromAvroRequest(
+                hydrated_protocol_sources.snapshot, wrapped_tgt.target
+            ),
         )
-        assert generated_sources.snapshot.files == ("src/fortran/f.f95",)
+        assert generated_sources.snapshot.files == ("src/smalltalk/f.st",)
 
         # Test that HydrateSourcesRequest can also be used.
         generated_via_hydrate_sources = self.request_single_product(
             HydratedSources,
             HydrateSourcesRequest(
-                protocol_sources, for_sources_types=[FortranSources], enable_codegen=True
+                protocol_sources, for_sources_types=[SmalltalkSources], enable_codegen=True
             ),
         )
-        assert generated_via_hydrate_sources.snapshot.files == ("src/fortran/f.f95",)
-        assert generated_via_hydrate_sources.sources_type == FortranSources
+        assert generated_via_hydrate_sources.snapshot.files == ("src/smalltalk/f.st",)
+        assert generated_via_hydrate_sources.sources_type == SmalltalkSources
 
     def test_works_with_subclass_fields(self) -> None:
         class CustomAvroSources(AvroSources):
             pass
 
         protocol_sources = CustomAvroSources(["*.avro"], address=self.address)
-        assert protocol_sources.can_generate(FortranSources, self.union_membership) is True
-        generated = self.request_single_product(
-            HydratedSources,
-            HydrateSourcesRequest(
-                protocol_sources, for_sources_types=[FortranSources], enable_codegen=True
-            ),
-        )
-        assert generated.snapshot.files == ("src/fortran/f.f95",)
-
-    def test_cannot_generate_language(self) -> None:
-        class SmalltalkSources(Sources):
-            pass
-
-        protocol_sources = AvroSources(["*.avro"], address=self.address)
-        assert protocol_sources.can_generate(SmalltalkSources, self.union_membership) is False
+        assert protocol_sources.can_generate(SmalltalkSources, self.union_membership) is True
         generated = self.request_single_product(
             HydratedSources,
             HydrateSourcesRequest(
                 protocol_sources, for_sources_types=[SmalltalkSources], enable_codegen=True
+            ),
+        )
+        assert generated.snapshot.files == ("src/smalltalk/f.st",)
+
+    def test_cannot_generate_language(self) -> None:
+        class AdaSources(Sources):
+            pass
+
+        protocol_sources = AvroSources(["*.avro"], address=self.address)
+        assert protocol_sources.can_generate(AdaSources, self.union_membership) is False
+        generated = self.request_single_product(
+            HydratedSources,
+            HydrateSourcesRequest(
+                protocol_sources, for_sources_types=[AdaSources], enable_codegen=True
             ),
         )
         assert generated.snapshot.files == ()
@@ -1011,44 +1028,42 @@ class TestCodegen(TestBase):
 
     def test_ambiguous_implementations_exception(self) -> None:
         # This error message is quite complex. We test that it correctly generates the message.
-        class FortranGenerator1(GenerateSourcesRequest):
-            input = AvroSources
-            output = FortranSources
-
-        class FortranGenerator2(GenerateSourcesRequest):
-            input = AvroSources
-            output = FortranSources
-
-        class SmalltalkSources(Sources):
-            pass
-
-        class SmalltalkGenerator(GenerateSourcesRequest):
+        class SmalltalkGenerator1(GenerateSourcesRequest):
             input = AvroSources
             output = SmalltalkSources
+
+        class SmalltalkGenerator2(GenerateSourcesRequest):
+            input = AvroSources
+            output = SmalltalkSources
+
+        class AdaSources(Sources):
+            pass
+
+        class AdaGenerator(GenerateSourcesRequest):
+            input = AvroSources
+            output = AdaSources
 
         class IrrelevantSources(Sources):
             pass
 
         # Test when all generators have the same input and output.
         exc = AmbiguousCodegenImplementationsException(
-            [FortranGenerator1, FortranGenerator2], for_sources_types=[FortranSources]
+            [SmalltalkGenerator1, SmalltalkGenerator2], for_sources_types=[SmalltalkSources]
         )
-        assert "can generate FortranSources from AvroSources" in str(exc)
-        assert "* FortranGenerator1" in str(exc)
-        assert "* FortranGenerator2" in str(exc)
+        assert "can generate SmalltalkSources from AvroSources" in str(exc)
+        assert "* SmalltalkGenerator1" in str(exc)
+        assert "* SmalltalkGenerator2" in str(exc)
 
         # Test when the generators have different input and output, which usually happens because
         # the call site used too expansive of a `for_sources_types` argument.
         exc = AmbiguousCodegenImplementationsException(
-            [FortranGenerator1, SmalltalkGenerator],
-            for_sources_types=[FortranSources, SmalltalkSources, IrrelevantSources],
+            [SmalltalkGenerator1, AdaGenerator],
+            for_sources_types=[SmalltalkSources, AdaSources, IrrelevantSources],
         )
-        assert "can generate one of ['FortranSources', 'SmalltalkSources'] from AvroSources" in str(
-            exc
-        )
+        assert "can generate one of ['AdaSources', 'SmalltalkSources'] from AvroSources" in str(exc)
         assert "IrrelevantSources" not in str(exc)
-        assert "* FortranGenerator1 -> FortranSources" in str(exc)
-        assert "* SmalltalkGenerator -> SmalltalkSources" in str(exc)
+        assert "* SmalltalkGenerator1 -> SmalltalkSources" in str(exc)
+        assert "* AdaGenerator -> AdaSources" in str(exc)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -1080,10 +1095,6 @@ def inject_smalltalk_deps(_: InjectSmalltalkDependencies) -> InjectedDependencie
 @rule
 def inject_custom_smalltalk_deps(_: InjectCustomSmalltalkDependencies) -> InjectedDependencies:
     return InjectedDependencies([Address.parse("//:custom_injected")])
-
-
-class SmalltalkSources(Sources):
-    pass
 
 
 # NB: We subclass to ensure that dependency inference works properly with subclasses.

@@ -21,6 +21,7 @@ python_library(
   dependencies=[
     ':django-stubs',
   ],
+  tags=["nolint"],
 )
 
 python_library(
@@ -30,6 +31,7 @@ python_library(
     ':django',
     ':settings',
   ],
+  tags=["nolint"],
 )
 
 python_library(
@@ -39,4 +41,5 @@ python_library(
     ':django',
     ':settings',
   ],
+  tags=["nolint"],
 )
