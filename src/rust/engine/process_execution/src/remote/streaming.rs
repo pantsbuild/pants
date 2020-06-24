@@ -604,7 +604,7 @@ impl crate::CommandRunner for StreamingCommandRunner {
     context: Context,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     // Retrieve capabilities for this server.
-    let capabilities = self.capabilities.get().await.unwrap();
+    let capabilities = self.capabilities.get().await?;
     trace!("RE capabilities: {:?}", &capabilities);
 
     // Construct the REv2 ExecuteRequest and related data for this execution request.
