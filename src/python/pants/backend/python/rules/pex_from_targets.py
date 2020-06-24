@@ -5,7 +5,6 @@ import dataclasses
 from dataclasses import dataclass
 from typing import Iterable, Optional, Tuple
 
-from pants.backend.python.rules.importable_python_sources import ImportablePythonSources
 from pants.backend.python.rules.pex import (
     PexInterpreterConstraints,
     PexPlatforms,
@@ -13,6 +12,7 @@ from pants.backend.python.rules.pex import (
     PexRequirements,
     TwoStepPexRequest,
 )
+from pants.backend.python.rules.python_sources import StrippedPythonSources
 from pants.backend.python.target_types import (
     PythonInterpreterCompatibility,
     PythonRequirementsField,
@@ -94,7 +94,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
     if request.additional_sources:
         input_digests.append(request.additional_sources)
     if request.include_source_files:
-        prepared_sources = await Get(ImportablePythonSources, Targets(all_targets))
+        prepared_sources = await Get(StrippedPythonSources, Targets(all_targets))
         input_digests.append(prepared_sources.snapshot.digest)
     merged_input_digest = await Get(Digest, MergeDigests(input_digests))
 

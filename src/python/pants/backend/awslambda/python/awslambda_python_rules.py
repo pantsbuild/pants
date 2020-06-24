@@ -12,12 +12,7 @@ from pants.backend.awslambda.python.target_types import (
     PythonAwsLambdaHandler,
     PythonAwsLambdaRuntime,
 )
-from pants.backend.python.rules import (
-    download_pex_bin,
-    importable_python_sources,
-    pex,
-    pex_from_targets,
-)
+from pants.backend.python.rules import download_pex_bin, pex, pex_from_targets, python_sources
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
@@ -133,7 +128,7 @@ def rules():
         UnionRule(AWSLambdaFieldSet, PythonAwsLambdaFieldSet),
         SubsystemRule(Lambdex),
         *download_pex_bin.rules(),
-        *importable_python_sources.rules(),
+        *python_sources.rules(),
         *pex.rules(),
         *pex_from_targets.rules(),
         *python_native_code.rules(),

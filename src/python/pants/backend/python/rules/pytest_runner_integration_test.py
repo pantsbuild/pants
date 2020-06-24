@@ -7,12 +7,14 @@ from pathlib import Path, PurePath
 from textwrap import dedent
 from typing import List, Optional
 
+import pytest
+
 from pants.backend.python.rules import (
     download_pex_bin,
-    importable_python_sources,
     pex,
     pex_from_targets,
     pytest_runner,
+    python_sources,
 )
 from pants.backend.python.rules.coverage import create_coverage_config, prepare_coverage_plugin
 from pants.backend.python.rules.pytest_runner import PythonTestFieldSet
@@ -28,7 +30,7 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.test import Status, TestDebugRequest, TestOptions, TestResult
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.engine.addresses import Address
-from pants.engine.fs import FileContent
+from pants.engine.fs import FileContent, FilesContent
 from pants.engine.interactive_process import InteractiveRunner
 from pants.engine.rules import RootRule, SubsystemRule
 from pants.engine.selectors import Params
@@ -123,7 +125,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
             *pytest_runner.rules(),
             *download_pex_bin.rules(),
             *determine_source_files.rules(),
-            *importable_python_sources.rules(),
+            *python_sources.rules(),
             *pex.rules(),
             *pex_from_targets.rules(),
             *python_native_code.rules(),
@@ -134,7 +136,12 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         )
 
     def run_pytest(
-        self, *, passthrough_args: Optional[str] = None, origin: Optional[OriginSpec] = None,
+        self,
+        *,
+        passthrough_args: Optional[str] = None,
+        origin: Optional[OriginSpec] = None,
+        junit_xml_dir: Optional[str] = None,
+        use_coverage: bool = False,
     ) -> TestResult:
         args = [
             "--backend-packages2=pants.backend.python",
@@ -145,6 +152,10 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         ]
         if passthrough_args:
             args.append(f"--pytest-args='{passthrough_args}'")
+        if junit_xml_dir:
+            args.append(f"--pytest-junit-xml-dir={junit_xml_dir}")
+        if use_coverage:
+            args.append("--test-use-coverage")
         options_bootstrapper = create_options_bootstrapper(args=args)
         address = Address(self.package, "target")
         if origin is None:
@@ -347,3 +358,26 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         assert result.status == Status.SUCCESS
         assert "test_config.py ." in result.stdout
         assert "collected 2 items / 1 deselected / 1 selected" in result.stdout
+
+    def test_single_passing_test_with_junit(self) -> None:
+        self.create_python_test_target([self.good_source])
+        result = self.run_pytest(junit_xml_dir="dist/test-results")
+
+        assert result.status == Status.SUCCESS
+        assert "test_good.py ." in result.stdout
+        assert result.xml_results is not None
+
+        files: FilesContent = self.request_single_product(FilesContent, result.xml_results)
+        assert len(files) == 1
+        file = files[0]
+        assert file.path.startswith("dist/test-results")
+        assert b"pants_test.test_good" in file.content
+
+    @pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/10141")
+    def test_single_passing_test_with_coverage(self) -> None:
+        self.create_python_test_target([self.good_source])
+        result = self.run_pytest(use_coverage=True)
+
+        assert result.status == Status.SUCCESS
+        assert "test_good.py ." in result.stdout
+        assert result.coverage_data is not None

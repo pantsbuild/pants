@@ -126,10 +126,8 @@ impl StreamedHermeticCommand {
     let mut inner = Command::new(program);
     inner
       // TODO: This will not universally prevent child processes continuing to run in the
-      // background, for a few reasons:
-      //   1) the Graph memoizes runs, and generally completes them rather than cancelling them,
-      //   2) killing a pantsd client with Ctrl+C kills the server with a signal, which won't
-      //      currently result in an orderly dropping of everything in the graph. See #10004.
+      // background, because killing a pantsd client with Ctrl+C kills the server with a signal,
+      // which won't currently result in an orderly dropping of everything in the graph. See #10004.
       .kill_on_drop(true)
       .env_clear()
       // It would be really nice not to have to manually set PATH but this is sadly the only way

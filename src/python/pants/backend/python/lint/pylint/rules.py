@@ -7,14 +7,14 @@ from dataclasses import dataclass
 from typing import Iterable, Tuple
 
 from pants.backend.python.lint.pylint.subsystem import Pylint
-from pants.backend.python.rules import download_pex_bin, importable_python_sources, pex
-from pants.backend.python.rules.importable_python_sources import ImportablePythonSources
+from pants.backend.python.rules import download_pex_bin, pex, python_sources
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
     PexRequest,
     PexRequirements,
 )
+from pants.backend.python.rules.python_sources import StrippedPythonSources
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.backend.python.target_types import (
@@ -156,9 +156,9 @@ async def pylint_lint_partition(
         ),
     )
 
-    prepare_plugin_sources_request = Get(ImportablePythonSources, Targets, partition.plugin_targets)
+    prepare_plugin_sources_request = Get(StrippedPythonSources, Targets, partition.plugin_targets)
     prepare_python_sources_request = Get(
-        ImportablePythonSources, Targets, partition.targets_with_dependencies
+        StrippedPythonSources, Targets, partition.targets_with_dependencies
     )
     specified_source_files_request = Get(
         SourceFiles,
@@ -300,7 +300,7 @@ def rules():
         *download_pex_bin.rules(),
         *determine_source_files.rules(),
         *pex.rules(),
-        *importable_python_sources.rules(),
+        *python_sources.rules(),
         *strip_source_roots.rules(),
         *python_native_code.rules(),
         *subprocess_environment.rules(),

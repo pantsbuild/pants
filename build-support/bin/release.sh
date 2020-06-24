@@ -150,10 +150,8 @@ function execute_packaged_pants_with_internal_backends() {
     --pythonpath="['pants-plugins/src/python']" \
     --backend-packages="[\
         'pants.backend.codegen',\
-        'pants.backend.graph_info',\
         'pants.backend.jvm',\
         'pants.backend.native',\
-        'pants.backend.project_info',\
         'pants.backend.python',\
         'pants.cache',\
         'internal_backend.repositories',\
@@ -162,7 +160,6 @@ function execute_packaged_pants_with_internal_backends() {
       --backend-packages2="[\
         'pants.backend.awslambda.python',\
         'pants.backend.python',\
-        'pants.backend.project_info',\
       ]" \
     "$@"
 }
