@@ -9,7 +9,6 @@ use crate::types::Types;
 use futures::compat::Future01CompatExt;
 use futures::future::{self, BoxFuture, FutureExt, TryFutureExt};
 use indexmap::IndexMap;
-use store::{SnapshotOps, SubsetParams};
 
 use std::path::PathBuf;
 
@@ -203,15 +202,12 @@ fn remove_prefix_request_to_digest(
   args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
   let core = context.core;
-  let store = core.store();
 
   async move {
     let input_digest = lift_digest(&externs::project_ignoring_type(&args[0], "digest"))?;
     let prefix = externs::project_str(&args[0], "prefix");
-    let digest = store
-      .strip_prefix(input_digest, PathBuf::from(prefix))
-      .await
-      .map_err(|e| format!("{:?}", e))?;
+    let digest =
+      store::Snapshot::strip_prefix(core.store(), input_digest, PathBuf::from(prefix)).await?;
     let res: Result<_, String> = Ok(Snapshot::store_directory(&core, &digest));
     res
   }
@@ -224,14 +220,11 @@ fn add_prefix_request_to_digest(
   args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
   let core = context.core;
-  let store = core.store();
   async move {
     let input_digest = lift_digest(&externs::project_ignoring_type(&args[0], "digest"))?;
     let prefix = externs::project_str(&args[0], "prefix");
-    let digest = store
-      .add_prefix(input_digest, PathBuf::from(prefix))
-      .await
-      .map_err(|e| format!("{:?}", e))?;
+    let digest =
+      store::Snapshot::add_prefix(core.store(), input_digest, PathBuf::from(prefix)).await?;
     let res: Result<_, String> = Ok(Snapshot::store_directory(&core, &digest));
     res
   }
@@ -256,16 +249,12 @@ fn merge_digests_request_to_digest(
   args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
   let core = context.core;
-  let store = core.store();
   let digests: Result<Vec<hashing::Digest>, String> = externs::project_multi(&args[0], "digests")
     .into_iter()
     .map(|val| lift_digest(&val))
     .collect();
   async move {
-    let digest = store
-      .merge(digests?)
-      .await
-      .map_err(|e| format!("{:?}", e))?;
+    let digest = store::Snapshot::merge_directories(core.store(), digests?).await?;
     let res: Result<_, String> = Ok(Snapshot::store_directory(&core, &digest));
     res
   }
@@ -327,11 +316,10 @@ fn input_files_content_to_digest(
       }
     })
     .collect();
-  let store = context.core.store();
 
   async move {
     let digests = future::try_join_all(digests).await?;
-    let digest = store.merge(digests).await.map_err(|e| format!("{:?}", e))?;
+    let digest = store::Snapshot::merge_directories(context.core.store(), digests).await?;
     let res: Result<_, String> = Ok(Snapshot::store_directory(&context.core, &digest));
     res
   }
@@ -349,15 +337,8 @@ fn snapshot_subset_to_snapshot(
   async move {
     let path_globs = Snapshot::lift_path_globs(&globs)?;
     let original_digest = lift_digest(&externs::project_ignoring_type(&args[0], "digest"))?;
-    let subset_params = SubsetParams { globs: path_globs };
 
-    let digest = store
-      .subset(original_digest, subset_params)
-      .await
-      .map_err(|e| format!("{:?}", e))?;
-    let snapshot = store::Snapshot::from_digest(store, digest)
-      .await
-      .map_err(|e| format!("{:?}", e))?;
+    let snapshot = store::Snapshot::get_snapshot_subset(store, original_digest, path_globs).await?;
 
     Ok(Snapshot::store_snapshot(&context.core, &snapshot)?)
   }

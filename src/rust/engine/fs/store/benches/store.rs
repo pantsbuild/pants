@@ -29,27 +29,23 @@
 
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use std::collections::HashSet;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use bazel_protos::remote_execution as remexec;
 use bytes::Bytes;
-use fs::{GlobExpansionConjunction, PreparedPathGlobs, StrictGlobMatching};
 use futures::compat::Future01CompatExt;
 use futures::future;
-use hashing::{Digest, EMPTY_DIGEST};
-use protobuf;
+use hashing::Digest;
 use task_executor::Executor;
 use tempfile::TempDir;
 use tokio::runtime::Runtime;
 
-use store::{SnapshotOps, Store, SubsetParams};
+use store::{Snapshot, Store};
 
-pub fn criterion_benchmark_materialize(c: &mut Criterion) {
+pub fn criterion_benchmark(c: &mut Criterion) {
   // Create an executor, store containing the stuff to materialize, and a digest for the stuff.
   // To avoid benchmarking the deleting of things, we create a parent temporary directory (which
   // will be deleted at the end of the benchmark) and then skip deletion of the per-run directories.
@@ -66,10 +62,8 @@ pub fn criterion_benchmark_materialize(c: &mut Criterion) {
     .measurement_time(Duration::from_secs(60))
     .bench_function("materialize_directory", |b| {
       b.iter(|| {
-        // NB: We forget this child tempdir to avoid deleting things during the run.
-        let new_temp = TempDir::new_in(parent_dest_path).unwrap();
-        let dest = new_temp.path().to_path_buf();
-        std::mem::forget(new_temp);
+        // NB: We take ownership of this child tempdir to avoid deleting things during the run.
+        let dest = TempDir::new_in(parent_dest_path).unwrap().into_path();
         let _ = executor
           .block_on(store.materialize_directory(dest, digest).compat())
           .unwrap();
@@ -77,114 +71,7 @@ pub fn criterion_benchmark_materialize(c: &mut Criterion) {
     });
 }
 
-pub fn criterion_benchmark_subset_wildcard(c: &mut Criterion) {
-  let rt = Runtime::new().unwrap();
-  let executor = Executor::new(rt.handle().clone());
-  // NB: We use a much larger snapshot size compared to the materialize benchmark!
-  let (store, _tempdir, digest) = large_snapshot(&executor, 1000);
-
-  let mut cgroup = c.benchmark_group("snapshot_subset");
-
-  cgroup
-    .sample_size(10)
-    .measurement_time(Duration::from_secs(80))
-    .bench_function("wildcard", |b| {
-      b.iter(|| {
-        let get_subset = store.subset(
-          digest,
-          SubsetParams {
-            globs: PreparedPathGlobs::create(
-              vec!["**/*".to_string()],
-              StrictGlobMatching::Ignore,
-              GlobExpansionConjunction::AllMatch,
-            )
-            .unwrap(),
-          },
-        );
-        let _ = executor.block_on(get_subset).unwrap();
-      })
-    });
-}
-
-pub fn criterion_benchmark_merge(c: &mut Criterion) {
-  let rt = Runtime::new().unwrap();
-  let executor = Executor::new(rt.handle().clone());
-  let num_files: usize = 4000;
-  let (store, _tempdir, digest) = large_snapshot(&executor, num_files);
-
-  let (directory, _metadata) = executor
-    .block_on(store.load_directory(digest))
-    .unwrap()
-    .unwrap();
-  // Modify half of the files in the top-level directory by setting them to have the empty
-  // fingerprint (zero content).
-  let mut all_file_nodes = directory.get_files().to_vec();
-  let mut file_nodes_to_modify = all_file_nodes.split_off(all_file_nodes.len() / 2);
-  for file_node in file_nodes_to_modify.iter_mut() {
-    let mut empty_bazel_digest = remexec::Digest::new();
-    empty_bazel_digest.set_hash(EMPTY_DIGEST.0.to_hex());
-    empty_bazel_digest.set_size_bytes(0);
-    file_node.set_digest(empty_bazel_digest);
-  }
-  let modified_file_names: HashSet<String> = file_nodes_to_modify
-    .iter()
-    .map(|file_node| file_node.get_name().to_string())
-    .collect();
-
-  let mut bazel_modified_files_directory = remexec::Directory::new();
-  bazel_modified_files_directory.set_files(protobuf::RepeatedField::from_vec(
-    all_file_nodes
-      .iter()
-      .cloned()
-      .chain(file_nodes_to_modify.into_iter())
-      .collect(),
-  ));
-  bazel_modified_files_directory.set_directories(directory.directories.clone());
-
-  let modified_digest = executor
-    .block_on(store.record_directory(&bazel_modified_files_directory, true))
-    .unwrap();
-
-  let mut bazel_removed_files_directory = remexec::Directory::new();
-  bazel_removed_files_directory.set_files(protobuf::RepeatedField::from_vec(
-    all_file_nodes
-      .into_iter()
-      .filter(|file_node| !modified_file_names.contains(file_node.get_name()))
-      .collect(),
-  ));
-  bazel_removed_files_directory.set_directories(directory.directories.clone());
-  let removed_digest = executor
-    .block_on(store.record_directory(&bazel_removed_files_directory, true))
-    .unwrap();
-
-  let mut cgroup = c.benchmark_group("snapshot_merge");
-
-  cgroup
-    .sample_size(10)
-    .measurement_time(Duration::from_secs(80))
-    .bench_function("snapshot_merge", |b| {
-      b.iter(|| {
-        // Merge the old and the new snapshot together, allowing any file to be duplicated.
-        let old_first: Digest = executor
-          .block_on(store.merge(vec![removed_digest, modified_digest]))
-          .unwrap();
-
-        // Test the performance of either ordering of snapshots.
-        let new_first: Digest = executor
-          .block_on(store.merge(vec![modified_digest, removed_digest]))
-          .unwrap();
-
-        assert_eq!(old_first, new_first);
-      })
-    });
-}
-
-criterion_group!(
-  benches,
-  criterion_benchmark_materialize,
-  criterion_benchmark_subset_wildcard,
-  criterion_benchmark_merge
-);
+criterion_group!(benches, criterion_benchmark);
 criterion_main!(benches);
 
 ///
@@ -220,10 +107,8 @@ pub fn large_snapshot(executor: &Executor, max_files: usize) -> (Store, TempDir,
         })
         .collect::<String>();
 
-      // NB: Split the line by whitespace, then accumulate a PathBuf using each word as a path
-      // component!
-      let path_buf = clean_line.split_whitespace().collect::<PathBuf>();
       // Drop empty or too-long candidates.
+      let path_buf = clean_line.split_whitespace().collect::<PathBuf>();
       let components_too_long = path_buf.components().any(|c| c.as_os_str().len() > 255);
       if components_too_long || path_buf.as_os_str().is_empty() || path_buf.as_os_str().len() > 512
       {
@@ -237,10 +122,9 @@ pub fn large_snapshot(executor: &Executor, max_files: usize) -> (Store, TempDir,
   let storedir = TempDir::new().unwrap();
   let store = Store::local_only(executor.clone(), storedir.path()).unwrap();
 
-  let store2 = store.clone();
   let digests = henries_paths
     .map(|mut path| {
-      let store = store2.clone();
+      let store = store.clone();
       async move {
         // We use the path as the content as well: would be interesting to make this tunable.
         let content = Bytes::from(path.as_os_str().as_bytes());
@@ -257,9 +141,10 @@ pub fn large_snapshot(executor: &Executor, max_files: usize) -> (Store, TempDir,
 
   let digest = executor
     .block_on({
+      let store = store.clone();
       async move {
         let digests = future::try_join_all(digests).await?;
-        store2.merge(digests).await
+        Snapshot::merge_directories(store, digests).await
       }
     })
     .unwrap();

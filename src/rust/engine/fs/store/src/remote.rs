@@ -1,7 +1,6 @@
 use std::cmp::min;
 use std::collections::{BTreeMap, HashSet};
 use std::convert::TryInto;
-use std::fmt;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -27,12 +26,6 @@ pub struct ByteStore {
   env: Arc<grpcio::Environment>,
   serverset: Serverset<grpcio::Channel>,
   headers: BTreeMap<String, String>,
-}
-
-impl fmt::Debug for ByteStore {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "ByteStore(name={:?})", self.instance_name)
-  }
 }
 
 impl ByteStore {
