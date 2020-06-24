@@ -9,7 +9,8 @@ from abc import ABC, ABCMeta, abstractmethod
 from collections import defaultdict
 from contextlib import contextmanager
 from tempfile import mkdtemp
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Type, TypeVar, Union, cast
+from textwrap import dedent
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Type, TypeVar, Union, cast, Set
 
 from pants.base.build_root import BuildRoot
 from pants.build_graph.build_configuration import BuildConfiguration
@@ -83,7 +84,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     _build_graph = None
     _address_mapper = None
 
-    def build_path(self, relpath):
+    def build_path(self, relpath: str) -> str:
         """Returns the canonical BUILD file path for the given relative build path.
 
         :API: public
@@ -93,7 +94,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         else:
             return os.path.join(relpath, "BUILD")
 
-    def create_dir(self, relpath):
+    def create_dir(self, relpath: str) -> str:
         """Creates a directory under the buildroot.
 
         :API: public
@@ -105,7 +106,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         self.invalidate_for(relpath)
         return path
 
-    def create_workdir_dir(self, relpath):
+    def create_workdir_dir(self, relpath: str) -> str:
         """Creates a directory under the work directory.
 
         :API: public
@@ -128,7 +129,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         files = {f for relpath in relpaths for f in recursive_dirname(relpath)}
         return self._scheduler.invalidate_files(files)
 
-    def create_link(self, relsrc, reldst):
+    def create_link(self, relsrc: str, reldst: str):
         """Creates a symlink within the buildroot.
 
         :API: public
@@ -141,7 +142,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         relative_symlink(src, dst)
         self.invalidate_for(reldst)
 
-    def create_file(self, relpath, contents="", mode="w"):
+    def create_file(self, relpath: str, contents: str = "", mode: str = "w") -> str:
         """Writes to a file under the buildroot.
 
         :API: public
@@ -156,7 +157,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         self.invalidate_for(relpath)
         return path
 
-    def create_files(self, path, files):
+    def create_files(self, path: str, files: Iterable[str]) -> None:
         """Writes to a file under the buildroot with contents same as file name.
 
         :API: public
@@ -167,7 +168,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         for f in files:
             self.create_file(os.path.join(path, f), contents=f)
 
-    def create_workdir_file(self, relpath, contents="", mode="w"):
+    def create_workdir_file(self, relpath: str, contents: str = "", mode: str = "w") -> str:
         """Writes to a file under the work directory.
 
         :API: public
@@ -181,7 +182,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
             fp.write(contents)
         return path
 
-    def add_to_build_file(self, relpath, target):
+    def add_to_build_file(self, relpath: str, target: str) -> str:
         """Adds the given target specification to the BUILD file at relpath.
 
         :API: public
@@ -249,7 +250,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
         self._build_configuration = self.build_config()
 
-    def buildroot_files(self, relpath=None):
+    def buildroot_files(self, relpath: Optional[str] = None) -> Set[str]:
         """Returns the set of all files under the test build root.
 
         :API: public
@@ -289,19 +290,19 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
             safe_rmtree(local_store_dir)
 
     @property
-    def build_root(self):
+    def build_root(self) -> str:
         return self._build_root()
 
     @property
-    def pants_workdir(self):
+    def pants_workdir(self) -> str:
         return self._pants_workdir()
 
     @memoized_method
-    def _build_root(self):
+    def _build_root(self) -> str:
         return os.path.realpath(mkdtemp(suffix="_BUILD_ROOT"))
 
     @memoized_method
-    def _pants_workdir(self):
+    def _pants_workdir(self) -> str:
         return os.path.join(self._build_root(), ".pants.d")
 
     def _init_engine(self, local_store_dir: Optional[str] = None) -> None:
