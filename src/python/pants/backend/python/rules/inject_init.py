@@ -37,7 +37,7 @@ async def inject_missing_init_files(request: InjectInitRequest) -> InitInjectedS
         # Get rid of any identified-as-missing __init__.py files that are not under a source root.
         missing_init_files_list = list(missing_init_files)
         optional_src_roots = await MultiGet(
-            Get[OptionalSourceRoot](SourceRootRequest, SourceRootRequest.for_file(init_file))
+            Get(OptionalSourceRoot, SourceRootRequest, SourceRootRequest.for_file(init_file))
             for init_file in missing_init_files_list
         )
         for optional_src_root, init_file in zip(optional_src_roots, missing_init_files_list):

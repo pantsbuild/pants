@@ -149,11 +149,11 @@ async def determine_specified_source_files(request: SpecifiedSourceFilesRequest)
         sources_field, origin = sources_field_with_origin
         if not hydrated_sources.snapshot.files:
             continue
-        result = calculate_specified_sources(hydrated_sources.snapshot, origin)
-        if isinstance(result, Snapshot):
-            full_snapshots[sources_field] = result
+        specified_sources = calculate_specified_sources(hydrated_sources.snapshot, origin)
+        if isinstance(specified_sources, Snapshot):
+            full_snapshots[sources_field] = specified_sources
         else:
-            snapshot_subset_requests[sources_field] = result
+            snapshot_subset_requests[sources_field] = specified_sources
 
     snapshot_subsets: Tuple[Snapshot, ...] = ()
     if snapshot_subset_requests:
