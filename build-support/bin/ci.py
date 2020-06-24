@@ -242,11 +242,19 @@ class TestStrategy(Enum):
                 *PYTEST_PASSTHRU_ARGS,
             ],
             self.v1_chroot: ["./pants.pex", "test.pytest", *sorted(targets), *PYTEST_PASSTHRU_ARGS],
-            self.v2_local: ["./pants.pex", "--no-v1", "--v2", "test", *sorted(targets)],
+            self.v2_local: [
+                "./pants.pex",
+                "--no-v1",
+                "--v2",
+                "test",
+                "--pytest-junit-xml-dir=dist/test-results/",
+                *sorted(targets),
+            ],
             self.v2_remote: [
                 "./pants.pex",
                 *_use_remote_execution(oauth_token_path or ""),
                 "test",
+                "--pytest-junit-xml-dir=dist/test-results/",
                 *sorted(targets),
             ],
         }[
