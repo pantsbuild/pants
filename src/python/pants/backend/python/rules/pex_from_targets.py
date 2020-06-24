@@ -12,7 +12,10 @@ from pants.backend.python.rules.pex import (
     PexRequirements,
     TwoStepPexRequest,
 )
-from pants.backend.python.rules.python_sources import StrippedPythonSources
+from pants.backend.python.rules.python_sources import (
+    StrippedPythonSources,
+    StrippedPythonSourcesRequest,
+)
 from pants.backend.python.target_types import (
     PythonInterpreterCompatibility,
     PythonRequirementsField,
@@ -21,7 +24,7 @@ from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
-from pants.engine.target import Targets, TransitiveTargets
+from pants.engine.target import TransitiveTargets
 from pants.python.python_setup import PythonSetup
 from pants.util.meta import frozen_after_init
 
@@ -94,7 +97,9 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
     if request.additional_sources:
         input_digests.append(request.additional_sources)
     if request.include_source_files:
-        prepared_sources = await Get(StrippedPythonSources, Targets(all_targets))
+        prepared_sources = await Get(
+            StrippedPythonSources, StrippedPythonSourcesRequest(all_targets, include_resources=True)
+        )
         input_digests.append(prepared_sources.snapshot.digest)
     merged_input_digest = await Get(Digest, MergeDigests(input_digests))
 

@@ -14,7 +14,10 @@ from pants.backend.python.rules.pex import (
     PexRequest,
     PexRequirements,
 )
-from pants.backend.python.rules.python_sources import StrippedPythonSources
+from pants.backend.python.rules.python_sources import (
+    StrippedPythonSources,
+    StrippedPythonSourcesRequest,
+)
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.backend.python.target_types import (
@@ -156,9 +159,13 @@ async def pylint_lint_partition(
         ),
     )
 
-    prepare_plugin_sources_request = Get(StrippedPythonSources, Targets, partition.plugin_targets)
+    prepare_plugin_sources_request = Get(
+        StrippedPythonSources,
+        StrippedPythonSourcesRequest(partition.plugin_targets, include_resources=True),
+    )
     prepare_python_sources_request = Get(
-        StrippedPythonSources, Targets, partition.targets_with_dependencies
+        StrippedPythonSources,
+        StrippedPythonSourcesRequest(partition.targets_with_dependencies, include_resources=False),
     )
     specified_source_files_request = Get(
         SourceFiles,
