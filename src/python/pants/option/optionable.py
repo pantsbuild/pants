@@ -16,7 +16,7 @@ from pants.util.objects import get_docstring_summary
 
 async def _construct_optionable(optionable_factory):
     scope = optionable_factory.options_scope
-    scoped_options = await Get[ScopedOptions](Scope(str(scope)))
+    scoped_options = await Get(ScopedOptions, Scope(str(scope)))
     return optionable_factory.optionable_cls(scope, scoped_options.options)
 
 

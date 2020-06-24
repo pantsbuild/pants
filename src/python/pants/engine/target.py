@@ -199,7 +199,7 @@ class AsyncField(Field, metaclass=ABCMeta):
 
         @rule
         def hydrate_sources(request: HydrateSourcesRequest) -> HydratedSources:
-            result = await Get[Snapshot](PathGlobs(request.field.sanitized_raw_value))
+            result = await Get(Snapshot, PathGlobs(request.field.sanitized_raw_value))
             request.field.validate_snapshot(result)
             ...
             return HydratedSources(result)
@@ -211,8 +211,8 @@ class AsyncField(Field, metaclass=ABCMeta):
     Then, call sites can `await Get` if they need to hydrate the field, even if they subclassed
     the original `AsyncField` to have custom behavior:
 
-        sources1 = await Get[HydratedSources](HydrateSourcesRequest(my_tgt.get(Sources)))
-        sources2 = await Get[HydratedSources[(HydrateSourcesRequest(custom_tgt.get(CustomSources)))
+        sources1 = await Get(HydratedSources, HydrateSourcesRequest(my_tgt.get(Sources)))
+        sources2 = await Get(HydratedSources, HydrateSourcesRequest(custom_tgt.get(CustomSources)))
     """
 
     address: Address
@@ -401,7 +401,7 @@ class Target(ABC):
         This will return an instance of the requested field type, e.g. an instance of
         `Compatibility`, `Sources`, `EntryPoint`, etc. Usually, you will want to grab the
         `Field`'s inner value, e.g. `tgt.get(Compatibility).value`. (For `AsyncField`s, you would
-        call `await Get[SourcesResult](SourcesRequest, tgt.get(Sources).request)`).
+        call `await Get(SourcesResult, SourcesRequest, tgt.get(Sources).request)`).
 
         This works with subclasses of `Field`s. For example, if you subclass `Sources` to define a
         custom subclass `PythonSources`, both `python_tgt.get(PythonSources)` and
@@ -1356,7 +1356,8 @@ class Sources(AsyncField):
         and the engine will generate the sources if possible or will return an instance of
         HydratedSources with an empty snapshot if not possible:
 
-            await Get[HydratedSources](
+            await Get(
+                HydratedSources,
                 HydrateSourcesRequest(
                     sources_field,
                     for_sources_types=[FortranSources],
@@ -1534,28 +1535,31 @@ async def hydrate_sources(
         if not sources_field.default or (set(globs) != set(sources_field.default))
         else GlobExpansionConjunction.any_match
     )
-    snapshot = await Get[Snapshot](
+    snapshot = await Get(
+        Snapshot,
         PathGlobs(
             (sources_field.prefix_glob_with_address(glob) for glob in globs),
             conjunction=conjunction,
             glob_match_error_behavior=glob_match_error_behavior,
             # TODO(#9012): add line number referring to the sources field. When doing this, we'll
-            # likely need to `await Get[BuildFileAddress](Address)`.
+            # likely need to `await Get(BuildFileAddress](Address)`.
             description_of_origin=(
                 f"{sources_field.address}'s `{sources_field.alias}` field"
                 if glob_match_error_behavior != GlobMatchErrorBehavior.ignore
                 else None
             ),
-        )
+        ),
     )
     sources_field.validate_snapshot(snapshot)
 
     # Finally, return if codegen is not in use; otherwise, run the relevant code generator.
     if not request.enable_codegen or generate_request_type is None:
         return HydratedSources(snapshot, sources_field.filespec, sources_type=sources_type)
-    wrapped_protocol_target = await Get[WrappedTarget](Address, sources_field.address)
-    generated_sources = await Get[GeneratedSources](
-        GenerateSourcesRequest, generate_request_type(snapshot, wrapped_protocol_target.target)
+    wrapped_protocol_target = await Get(WrappedTarget, Address, sources_field.address)
+    generated_sources = await Get(
+        GeneratedSources,
+        GenerateSourcesRequest,
+        generate_request_type(snapshot, wrapped_protocol_target.target),
     )
     return HydratedSources(
         generated_sources.snapshot, sources_field.filespec, sources_type=sources_type
@@ -1567,9 +1571,9 @@ async def hydrate_sources(
 # -----------------------------------------------------------------------------------------------
 
 # NB: To hydrate the dependencies, use one of:
-#   await Get[Addresses](DependenciesRequest(tgt[Dependencies])
-#   await Get[Targets](DependenciesRequest(tgt[Dependencies])
-#   await Get[TransitiveTargets](DependenciesRequest(tgt[Dependencies])
+#   await Get(Addresses, DependenciesRequest(tgt[Dependencies])
+#   await Get(Targets, DependenciesRequest(tgt[Dependencies])
+#   await Get(TransitiveTargets, DependenciesRequest(tgt[Dependencies])
 class Dependencies(AsyncField):
     """Addresses to other targets that this target depends on, e.g. `['helloworld/subdir:lib']`."""
 
@@ -1656,7 +1660,7 @@ class InferDependenciesRequest:
 
         @rule
         def infer_fortran_dependencies(request: InferFortranDependencies) -> InferredDependencies:
-            hydrated_sources = await Get[HydratedSources](HydrateSources(request.sources_field))
+            hydrated_sources = await Get(HydratedSources, HydrateSources(request.sources_field))
             ...
             return InferredDependencies(...)
 
@@ -1686,7 +1690,7 @@ async def resolve_dependencies(
     # of FortranDependencies will use that rule.
     inject_request_types = union_membership.get(InjectDependenciesRequest)
     injected = await MultiGet(
-        Get[InjectedDependencies](InjectDependenciesRequest, inject_request_type(request.field))
+        Get(InjectedDependencies, InjectDependenciesRequest, inject_request_type(request.field))
         for inject_request_type in inject_request_types
         if isinstance(request.field, inject_request_type.inject_for)
     )
@@ -1696,7 +1700,7 @@ async def resolve_dependencies(
     if global_options.options.dependency_inference and inference_request_types:
         # Dependency inference is solely determined by the `Sources` field for a Target, so we
         # re-resolve the original target to inspect its `Sources` field, if any.
-        wrapped_tgt = await Get[WrappedTarget](Address, request.field.address)
+        wrapped_tgt = await Get(WrappedTarget, Address, request.field.address)
         sources_field = wrapped_tgt.target.get(Sources)
         relevant_inference_request_types = [
             inference_request_type
@@ -1709,8 +1713,10 @@ async def resolve_dependencies(
                     relevant_inference_request_types, from_sources_type=type(sources_field)
                 )
             inference_request_type = relevant_inference_request_types[0]
-            inferred = await Get[InferredDependencies](
-                InferDependenciesRequest, inference_request_type(sources_field)
+            inferred = await Get(
+                InferredDependencies,
+                InferDependenciesRequest,
+                inference_request_type(sources_field),
             )
 
     return Addresses(sorted([*provided, *itertools.chain.from_iterable(injected), *inferred]))

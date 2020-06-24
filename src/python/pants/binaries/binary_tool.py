@@ -354,7 +354,7 @@ async def get_binary_tool_urls(
     version = tool_for_platform.version.version
     url_generator = binary_util.get_url_generator(tool.make_binary_request(version))
 
-    host_platform = await Get[HostPlatform](PlatformConstraint, platform_constraint)
+    host_platform = await Get(HostPlatform, PlatformConstraint, platform_constraint)
 
     return BinaryToolUrlSet(
         tool_for_platform=tool_for_platform,
@@ -377,7 +377,7 @@ async def fetch_binary_tool(req: BinaryToolFetchRequest, url_set: BinaryToolUrlS
     # FallibleProcessResult!
     url_to_fetch = urls[0]
 
-    return await Get[Snapshot](UrlToFetch(url_to_fetch, digest))
+    return await Get(Snapshot, UrlToFetch(url_to_fetch, digest))
 
 
 def rules():

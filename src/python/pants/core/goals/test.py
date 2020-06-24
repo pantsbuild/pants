@@ -244,32 +244,34 @@ async def run_tests(
     union_membership: UnionMembership,
 ) -> Test:
     if options.values.debug:
-        targets_to_valid_field_sets = await Get[TargetsToValidFieldSets](
+        targets_to_valid_field_sets = await Get(
+            TargetsToValidFieldSets,
             TargetsToValidFieldSetsRequest(
                 TestFieldSet,
                 goal_description="`test --debug`",
                 error_if_no_valid_targets=True,
                 expect_single_field_set=True,
-            )
+            ),
         )
         field_set = targets_to_valid_field_sets.field_sets[0]
-        request = await Get[TestDebugRequest](TestFieldSet, field_set)
+        request = await Get(TestDebugRequest, TestFieldSet, field_set)
         debug_result = interactive_runner.run_process(request.process)
         return Test(debug_result.exit_code)
 
-    targets_to_valid_field_sets = await Get[TargetsToValidFieldSets](
+    targets_to_valid_field_sets = await Get(
+        TargetsToValidFieldSets,
         TargetsToValidFieldSetsRequest(
             TestFieldSet,
             goal_description=f"the `{options.name}` goal",
             error_if_no_valid_targets=False,
-        )
+        ),
     )
-    field_sets_with_sources = await Get[FieldSetsWithSources](
-        FieldSetsWithSourcesRequest(targets_to_valid_field_sets.field_sets)
+    field_sets_with_sources = await Get(
+        FieldSetsWithSources, FieldSetsWithSourcesRequest(targets_to_valid_field_sets.field_sets)
     )
 
     results = await MultiGet(
-        Get[AddressAndTestResult](WrappedTestFieldSet(field_set))
+        Get(AddressAndTestResult, WrappedTestFieldSet(field_set))
         for field_set in field_sets_with_sources
     )
 
@@ -325,7 +327,7 @@ async def run_tests(
             coverage_collections.append(collection_cls(data))
         # We can create multiple reports for each coverage data (console, xml and html)
         coverage_reports_collections = await MultiGet(
-            Get[CoverageReports](CoverageDataCollection, coverage_collection)
+            Get(CoverageReports, CoverageDataCollection, coverage_collection)
             for coverage_collection in coverage_collections
         )
 
@@ -343,7 +345,7 @@ async def run_tests(
 @rule
 async def coordinator_of_tests(wrapped_field_set: WrappedTestFieldSet) -> AddressAndTestResult:
     field_set = wrapped_field_set.field_set
-    result = await Get[TestResult](TestFieldSet, field_set)
+    result = await Get(TestResult, TestFieldSet, field_set)
     logger.info(
         f"Tests {'succeeded' if result.status == Status.SUCCESS else 'failed'}: "
         f"{field_set.address.reference()}"

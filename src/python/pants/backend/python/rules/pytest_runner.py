@@ -87,7 +87,7 @@ async def setup_pytest_for_target(
 ) -> TestTargetSetup:
     test_addresses = Addresses((field_set.address,))
 
-    transitive_targets = await Get[TransitiveTargets](Addresses, test_addresses)
+    transitive_targets = await Get(TransitiveTargets, Addresses, test_addresses)
     all_targets = transitive_targets.closure
 
     interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
@@ -112,7 +112,8 @@ async def setup_pytest_for_target(
     # and then by Pytest). See https://github.com/jaraco/zipp/pull/26.
     additional_args_for_pytest = ("--not-zip-safe",)
 
-    pytest_pex_request = Get[Pex](
+    pytest_pex_request = Get(
+        Pex,
         PexRequest,
         pex_request(
             output_filename="pytest.pex",
@@ -122,16 +123,18 @@ async def setup_pytest_for_target(
         ),
     )
 
-    requirements_pex_request = Get[Pex](
+    requirements_pex_request = Get(
+        Pex,
         PexFromTargetsRequest(
             addresses=test_addresses,
             output_filename="requirements.pex",
             include_source_files=False,
             additional_args=additional_args_for_pytest,
-        )
+        ),
     )
 
-    test_runner_pex_request = Get[Pex](
+    test_runner_pex_request = Get(
+        Pex,
         PexRequest,
         pex_request(
             output_filename="test_runner.pex",
@@ -154,14 +157,15 @@ async def setup_pytest_for_target(
         ),
     )
 
-    prepared_sources_request = Get[ImportablePythonSources](Targets(all_targets))
+    prepared_sources_request = Get(ImportablePythonSources, Targets(all_targets))
 
     # Get the file names for the test_target so that we can specify to Pytest precisely which files
     # to test, rather than using auto-discovery.
-    specified_source_files_request = Get[SourceFiles](
+    specified_source_files_request = Get(
+        SourceFiles,
         SpecifiedSourceFilesRequest(
             [(field_set.sources, field_set.origin)], strip_source_roots=True
-        )
+        ),
     )
 
     use_coverage = test_options.values.use_coverage
@@ -193,7 +197,7 @@ async def setup_pytest_for_target(
         pytest_pex.digest,
         test_runner_pex.digest,
     ]
-    input_digest = await Get[Digest](MergeDigests(digests_to_merge))
+    input_digest = await Get(Digest, MergeDigests(digests_to_merge))
 
     coverage_args = []
     if use_coverage:
@@ -247,7 +251,7 @@ async def run_python_test(
         timeout_seconds=test_setup.timeout_seconds,
         env=env,
     )
-    result = await Get[FallibleProcessResult](Process, process)
+    result = await Get(FallibleProcessResult, Process, process)
 
     coverage_data = None
     if use_coverage:

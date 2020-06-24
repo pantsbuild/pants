@@ -63,8 +63,10 @@ class ExternalTool(Subsystem):
 
     @rule
     def my_rule(my_external_tool: MyExternalTool):
-      downloaded_tool = await Get[DownloadedExternalTool](
-        ExternalToolRequest, my_external_tool.get_request(Platform.current)
+      downloaded_tool = await Get(
+        DownloadedExternalTool,
+        ExternalToolRequest,
+        my_external_tool.get_request(Platform.current)
       )
 
     ...
@@ -188,8 +190,8 @@ class ExternalTool(Subsystem):
 
 @rule
 async def download_external_tool(request: ExternalToolRequest) -> DownloadedExternalTool:
-    snapshot = await Get[Snapshot](UrlToFetch, request.url_to_fetch)
-    extracted_digest = await Get[ExtractedDigest](MaybeExtractable(snapshot.digest))
+    snapshot = await Get(Snapshot, UrlToFetch, request.url_to_fetch)
+    extracted_digest = await Get(ExtractedDigest, MaybeExtractable(snapshot.digest))
     return DownloadedExternalTool(extracted_digest.digest, request.exe)
 
 

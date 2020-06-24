@@ -61,7 +61,7 @@ async def list_targets(addresses: Addresses, options: ListOptions, console: Cons
         )
 
     if provides_enabled:
-        targets = await Get[Targets](Addresses, addresses)
+        targets = await Get(Targets, Addresses, addresses)
         addresses_with_provide_artifacts = {
             tgt.address: tgt[ProvidesField].value
             for tgt in targets
@@ -90,7 +90,7 @@ async def list_targets(addresses: Addresses, options: ListOptions, console: Cons
         return List(exit_code=0)
 
     if documented_enabled:
-        targets = await Get[Targets](Addresses, addresses)
+        targets = await Get(Targets, Addresses, addresses)
         addresses_with_descriptions = cast(
             Dict[Address, str],
             {

@@ -31,10 +31,10 @@ async def inject_missing_init_files(request: InjectInitRequest) -> InitInjectedS
     missing_init_files = sorted(identify_missing_init_files(snapshot.files))
     if not missing_init_files:
         return InitInjectedSnapshot(snapshot)
-    generated_inits_digest = await Get[Digest](
-        InputFilesContent(FileContent(path=fp, content=b"") for fp in missing_init_files)
+    generated_inits_digest = await Get(
+        Digest, InputFilesContent(FileContent(path=fp, content=b"") for fp in missing_init_files)
     )
-    result = await Get[Snapshot](MergeDigests((snapshot.digest, generated_inits_digest)))
+    result = await Get(Snapshot, MergeDigests((snapshot.digest, generated_inits_digest)))
     return InitInjectedSnapshot(result)
 
 

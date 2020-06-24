@@ -44,13 +44,14 @@ def _key_func(entry):
 
 @rule
 async def evaluate_preludes(address_mapper: AddressMapper) -> BuildFilePreludeSymbols:
-    snapshot = await Get[Snapshot](
+    snapshot = await Get(
+        Snapshot,
         PathGlobs(
             address_mapper.prelude_glob_patterns,
             glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
-        )
+        ),
     )
-    prelude_files_content = await Get[FilesContent](Digest, snapshot.digest)
+    prelude_files_content = await Get(FilesContent, Digest, snapshot.digest)
     values: Dict[str, Any] = {}
     for file_content in prelude_files_content:
         try:
@@ -82,8 +83,8 @@ async def parse_address_family(
             *(f"!{p}" for p in address_mapper.build_ignore_patterns),
         )
     )
-    snapshot = await Get[Snapshot](PathGlobs, path_globs)
-    files_content = await Get[FilesContent](Digest, snapshot.digest)
+    snapshot = await Get(Snapshot, PathGlobs, path_globs)
+    files_content = await Get(FilesContent, Digest, snapshot.digest)
 
     if not files_content:
         raise ResolveError(
@@ -118,7 +119,7 @@ def _raise_did_you_mean(address_family: AddressFamily, name: str, source=None) -
 
 @rule
 async def find_build_file(address: Address) -> BuildFileAddress:
-    address_family = await Get[AddressFamily](Dir(address.spec_path))
+    address_family = await Get(AddressFamily, Dir(address.spec_path))
     if address not in address_family.addressables:
         _raise_did_you_mean(address_family=address_family, name=address.target_name)
     return next(
@@ -130,7 +131,7 @@ async def find_build_file(address: Address) -> BuildFileAddress:
 
 @rule
 async def find_build_files(addresses: Addresses) -> BuildFileAddresses:
-    bfas = await MultiGet(Get[BuildFileAddress](Address, address) for address in addresses)
+    bfas = await MultiGet(Get(BuildFileAddress, Address, address) for address in addresses)
     return BuildFileAddresses(bfas)
 
 
@@ -141,7 +142,7 @@ async def hydrate_struct(address_mapper: AddressMapper, address: Address) -> Hyd
     Recursively collects any embedded addressables within the Struct, but will not walk into a
     dependencies field, since those should be requested explicitly by rules.
     """
-    address_family = await Get[AddressFamily](Dir(address.spec_path))
+    address_family = await Get(AddressFamily, Dir(address.spec_path))
     struct = address_family.addressables_as_address_keyed.get(address)
     if struct is None:
         _raise_did_you_mean(address_family, address.target_name)
@@ -179,7 +180,7 @@ async def hydrate_struct(address_mapper: AddressMapper, address: Address) -> Hyd
 
     # And then hydrate the inline dependencies.
     hydrated_inline_dependencies = await MultiGet(
-        Get[HydratedStruct](Address, a) for a in inline_dependencies
+        Get(HydratedStruct, Address, a) for a in inline_dependencies
     )
     dependencies = tuple(d.value for d in hydrated_inline_dependencies)
 
@@ -259,9 +260,9 @@ async def addresses_with_origins_from_address_families(
     :raises: :class:`AddressLookupError` if no targets are matched for non-SingleAddress specs.
     """
     # Capture a Snapshot covering all paths for these AddressSpecs, then group by directory.
-    snapshot = await Get[Snapshot](PathGlobs, _address_spec_to_globs(address_mapper, address_specs))
+    snapshot = await Get(Snapshot, PathGlobs, _address_spec_to_globs(address_mapper, address_specs))
     dirnames = {os.path.dirname(f) for f in snapshot.files}
-    address_families = await MultiGet(Get[AddressFamily](Dir(d)) for d in dirnames)
+    address_families = await MultiGet(Get(AddressFamily, Dir(d)) for d in dirnames)
     address_family_by_directory = {af.namespace: af for af in address_families}
 
     matched_addresses: OrderedSet[Address] = OrderedSet()

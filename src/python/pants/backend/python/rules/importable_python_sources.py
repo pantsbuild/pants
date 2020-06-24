@@ -33,15 +33,16 @@ class ImportablePythonSources:
 
 @rule
 async def prepare_python_sources(targets: Targets) -> ImportablePythonSources:
-    stripped_sources = await Get[SourceFiles](
+    stripped_sources = await Get(
+        SourceFiles,
         AllSourceFilesRequest(
             (tgt.get(Sources) for tgt in targets),
             for_sources_types=(PythonSources, ResourcesSources, FilesSources),
             enable_codegen=True,
             strip_source_roots=True,
-        )
+        ),
     )
-    init_injected = await Get[InitInjectedSnapshot](InjectInitRequest(stripped_sources.snapshot))
+    init_injected = await Get(InitInjectedSnapshot, InjectInitRequest(stripped_sources.snapshot))
     return ImportablePythonSources(init_injected.snapshot)
 
 

@@ -69,13 +69,14 @@ async def create_python_binary(
 ) -> CreatedBinary:
     entry_point = field_set.entry_point.value
     if entry_point is None:
-        source_files = await Get[SourceFiles](
-            AllSourceFilesRequest([field_set.sources], strip_source_roots=True)
+        source_files = await Get(
+            SourceFiles, AllSourceFilesRequest([field_set.sources], strip_source_roots=True)
         )
         entry_point = PythonBinarySources.translate_source_file_to_entry_point(source_files.files)
 
     output_filename = f"{field_set.address.target_name}.pex"
-    two_step_pex = await Get[TwoStepPex](
+    two_step_pex = await Get(
+        TwoStepPex,
         TwoStepPexFromTargetsRequest(
             PexFromTargetsRequest(
                 addresses=Addresses([field_set.address]),
@@ -84,7 +85,7 @@ async def create_python_binary(
                 output_filename=output_filename,
                 additional_args=field_set.generate_additional_args(python_binary_defaults),
             )
-        )
+        ),
     )
     pex = two_step_pex.pex
     return CreatedBinary(digest=pex.digest, binary_name=pex.output_filename)

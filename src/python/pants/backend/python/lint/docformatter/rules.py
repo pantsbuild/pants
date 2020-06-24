@@ -74,7 +74,8 @@ async def setup(
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> Setup:
-    requirements_pex_request = Get[Pex](
+    requirements_pex_request = Get(
+        Pex,
         PexRequest(
             output_filename="docformatter.pex",
             requirements=PexRequirements(docformatter.get_requirement_specs()),
@@ -82,16 +83,18 @@ async def setup(
                 docformatter.default_interpreter_constraints
             ),
             entry_point=docformatter.get_entry_point(),
-        )
+        ),
     )
 
-    all_source_files_request = Get[SourceFiles](
-        AllSourceFilesRequest(field_set.sources for field_set in setup_request.request.field_sets)
+    all_source_files_request = Get(
+        SourceFiles,
+        AllSourceFilesRequest(field_set.sources for field_set in setup_request.request.field_sets),
     )
-    specified_source_files_request = Get[SourceFiles](
+    specified_source_files_request = Get(
+        SourceFiles,
         SpecifiedSourceFilesRequest(
             (field_set.sources, field_set.origin) for field_set in setup_request.request.field_sets
-        )
+        ),
     )
 
     requests = requirements_pex_request, specified_source_files_request
@@ -106,8 +109,8 @@ async def setup(
         else setup_request.request.prior_formatter_result
     )
 
-    input_digest = await Get[Digest](
-        MergeDigests((all_source_files_snapshot.digest, requirements_pex.digest))
+    input_digest = await Get(
+        Digest, MergeDigests((all_source_files_snapshot.digest, requirements_pex.digest))
     )
 
     address_references = ", ".join(
@@ -137,8 +140,8 @@ async def setup(
 async def docformatter_fmt(request: DocformatterRequest, docformatter: Docformatter) -> FmtResult:
     if docformatter.options.skip:
         return FmtResult.noop()
-    setup = await Get[Setup](SetupRequest(request, check_only=False))
-    result = await Get[ProcessResult](Process, setup.process)
+    setup = await Get(Setup, SetupRequest(request, check_only=False))
+    result = await Get(ProcessResult, Process, setup.process)
     return FmtResult.from_process_result(
         result, original_digest=setup.original_digest, formatter_name="Docformatter"
     )
@@ -150,8 +153,8 @@ async def docformatter_lint(
 ) -> LintResults:
     if docformatter.options.skip:
         return LintResults()
-    setup = await Get[Setup](SetupRequest(request, check_only=True))
-    result = await Get[FallibleProcessResult](Process, setup.process)
+    setup = await Get(Setup, SetupRequest(request, check_only=True))
+    result = await Get(FallibleProcessResult, Process, setup.process)
     return LintResults(
         [LintResult.from_fallible_process_result(result, linter_name="Docformatter")]
     )

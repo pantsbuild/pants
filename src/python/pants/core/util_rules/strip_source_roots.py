@@ -109,17 +109,17 @@ async def strip_source_roots_from_snapshot(
         return SourceRootStrippedSources(request.snapshot, FrozenDict())
 
     if request.representative_path is not None:
-        source_root_obj = await Get[SourceRoot](
-            SourceRootRequest, SourceRootRequest.for_file(request.representative_path)
+        source_root_obj = await Get(
+            SourceRoot, SourceRootRequest, SourceRootRequest.for_file(request.representative_path)
         )
         source_root = source_root_obj.path
         if source_root == ".":
             return SourceRootStrippedSources.for_single_source_root(request.snapshot, source_root)
-        resulting_snapshot = await Get[Snapshot](RemovePrefix(request.snapshot.digest, source_root))
+        resulting_snapshot = await Get(Snapshot, RemovePrefix(request.snapshot.digest, source_root))
         return SourceRootStrippedSources.for_single_source_root(resulting_snapshot, source_root)
 
     source_roots = await MultiGet(
-        Get[SourceRoot](SourceRootRequest, SourceRootRequest.for_file(file))
+        Get(SourceRoot, SourceRootRequest, SourceRootRequest.for_file(file))
         for file in request.snapshot.files
     )
     file_to_source_root = dict(zip(request.snapshot.files, source_roots))
@@ -134,19 +134,19 @@ async def strip_source_roots_from_snapshot(
         source_root = next(iter(files_grouped_by_source_root.keys()))
         if source_root == ".":
             return SourceRootStrippedSources.for_single_source_root(request.snapshot, source_root)
-        resulting_snapshot = await Get[Snapshot](RemovePrefix(request.snapshot.digest, source_root))
+        resulting_snapshot = await Get(Snapshot, RemovePrefix(request.snapshot.digest, source_root))
         return SourceRootStrippedSources.for_single_source_root(resulting_snapshot, source_root)
 
     snapshot_subsets = await MultiGet(
-        Get[Snapshot](SnapshotSubset(request.snapshot.digest, PathGlobs(files)))
+        Get(Snapshot, SnapshotSubset(request.snapshot.digest, PathGlobs(files)))
         for files in files_grouped_by_source_root.values()
     )
     resulting_digests = await MultiGet(
-        Get[Digest](RemovePrefix(snapshot.digest, source_root))
+        Get(Digest, RemovePrefix(snapshot.digest, source_root))
         for snapshot, source_root in zip(snapshot_subsets, files_grouped_by_source_root.keys())
     )
 
-    resulting_snapshot = await Get[Snapshot](MergeDigests(resulting_digests))
+    resulting_snapshot = await Get(Snapshot, MergeDigests(resulting_digests))
     return SourceRootStrippedSources(
         resulting_snapshot,
         FrozenDict(
@@ -176,12 +176,13 @@ async def strip_source_roots_from_sources_field(
     if request.specified_files_snapshot is not None:
         sources_snapshot = request.specified_files_snapshot
     else:
-        hydrated_sources = await Get[HydratedSources](
+        hydrated_sources = await Get(
+            HydratedSources,
             HydrateSourcesRequest(
                 request.sources_field,
                 for_sources_types=request.for_sources_types,
                 enable_codegen=request.enable_codegen,
-            )
+            ),
         )
         sources_snapshot = hydrated_sources.snapshot
 
@@ -194,11 +195,12 @@ async def strip_source_roots_from_sources_field(
     if isinstance(request.sources_field, FilesSources):
         return SourceRootStrippedSources(sources_snapshot, FrozenDict())
 
-    return await Get[SourceRootStrippedSources](
+    return await Get(
+        SourceRootStrippedSources,
         StripSnapshotRequest(
             sources_snapshot,
             representative_path=representative_path_from_address(request.sources_field.address),
-        )
+        ),
     )
 
 

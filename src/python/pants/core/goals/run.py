@@ -56,16 +56,17 @@ async def run(
     workspace: Workspace,
     build_root: BuildRoot,
 ) -> Run:
-    targets_to_valid_field_sets = await Get[TargetsToValidFieldSets](
+    targets_to_valid_field_sets = await Get(
+        TargetsToValidFieldSets,
         TargetsToValidFieldSetsRequest(
             BinaryFieldSet,
             goal_description=f"the `{options.name}` goal",
             error_if_no_valid_targets=True,
             expect_single_field_set=True,
-        )
+        ),
     )
     field_set = targets_to_valid_field_sets.field_sets[0]
-    binary = await Get[CreatedBinary](BinaryFieldSet, field_set)
+    binary = await Get(CreatedBinary, BinaryFieldSet, field_set)
 
     workdir = global_options.options.pants_workdir
     with temporary_dir(root_dir=workdir, cleanup=True) as tmpdir:

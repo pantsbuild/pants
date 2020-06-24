@@ -83,50 +83,19 @@ class _RuleVisitor(ast.NodeVisitor):
         return f"{self._source_file} at {start_pos}{end_pos}"
 
     def _extract_get_descriptor(self, call_node: ast.Call) -> Optional[_GetDescriptor]:
-        """Check if the node looks like a Get[T](...) call."""
-        if not isinstance(call_node.func, ast.Subscript):
-            if not isinstance(call_node.func, ast.Name):
-                return None
-            if call_node.func.id != "Get":
-                return None
-            return self._GetDescriptor(
-                product_type_expr=call_node.args[0], subject_arg_exprs=call_node.args[1:]
-            )
-
-        subscript_func = call_node.func
-        if not isinstance(subscript_func.slice, ast.Index):
+        """Check if the node looks like a Get(T, ...) call."""
+        if not isinstance(call_node.func, ast.Name):
             return None
-        node_name = subscript_func.value
-        if not isinstance(node_name, ast.Name):
+        if call_node.func.id != "Get":
             return None
-        if node_name.id != "Get":
-            return None
-
-        get_descriptor = self._GetDescriptor(
-            product_type_expr=subscript_func.slice.value, subject_arg_exprs=call_node.args
+        return self._GetDescriptor(
+            product_type_expr=call_node.args[0], subject_arg_exprs=call_node.args[1:]
         )
-
-        # TODO(John Sirois): Turn this on and update Pants own codebase to not trigger the warning
-        #  in a follow-up.
-        #  https://github.com/pantsbuild/pants/issues/9899
-        deprecated_conditional(
-            predicate=lambda: False,
-            deprecation_start_version="1.30.0.dev0",
-            removal_version="1.31.0.dev0",
-            entity_description="Parameterized Get[...](...) calls",
-            hint_message=(
-                f"In {self._identify_source(call_node)} Use "
-                f"Get({get_descriptor.product_type_name}, ...) instead of "
-                f"Get[{get_descriptor.product_type_name}](...)."
-            ),
-        )
-
-        return get_descriptor
 
     def _extract_constraints(self, get_descriptor: _GetDescriptor) -> GetConstraints[Any, Any]:
-        """Parses a `Get[T](...)` call in one of its two legal forms to return its type constraints.
+        """Parses a `Get(T, ...)` call in one of its two legal forms to return its type constraints.
 
-        :param get_descriptor: An `ast.Call` node representing a call to `Get[T](...)`.
+        :param get_descriptor: An `ast.Call` node representing a call to `Get(T, ...)`.
         :return: A tuple of product type id and subject type id.
         """
 
@@ -137,7 +106,7 @@ class _RuleVisitor(ast.NodeVisitor):
                 getattr(subject_arg, "id", type(subject_arg).__name__)
                 for subject_arg in get_descriptor.subject_arg_exprs
             )
-            return f"Get[{get_descriptor.product_type_name}]({rendered_args})"
+            return f"Get({get_descriptor.product_type_name}, {rendered_args})"
 
         if not 1 <= len(get_descriptor.subject_arg_exprs) <= 2:
             raise ValueError(
@@ -150,7 +119,7 @@ class _RuleVisitor(ast.NodeVisitor):
             subject_constructor = get_descriptor.subject_arg_exprs[0]
             if not isinstance(subject_constructor, ast.Call):
                 raise ValueError(
-                    f"Expected Get[product_type](subject_type(subject)), but got: {render_args()}"
+                    f"Expected Get(product_type, subject_type(subject)), but got: {render_args()}"
                 )
             constructor_type_id = subject_constructor.func.id  # type: ignore[attr-defined]
             return GetConstraints[Any, Any](
@@ -161,7 +130,7 @@ class _RuleVisitor(ast.NodeVisitor):
         subject_declared_type, _ = get_descriptor.subject_arg_exprs
         if not isinstance(subject_declared_type, ast.Name):
             raise ValueError(
-                f"Expected Get[product_type](subject_declared_type, subject), but got: "
+                f"Expected Get(product_type, subject_declared_type, subject), but got: "
                 f"{render_args()}"
             )
         return GetConstraints[Any, Any](

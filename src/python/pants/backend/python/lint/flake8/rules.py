@@ -67,7 +67,8 @@ async def flake8_lint_partition(
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> LintResult:
-    requirements_pex_request = Get[Pex](
+    requirements_pex_request = Get(
+        Pex,
         PexRequest(
             output_filename="flake8.pex",
             requirements=PexRequirements(flake8.get_requirement_specs()),
@@ -76,25 +77,27 @@ async def flake8_lint_partition(
                 or PexInterpreterConstraints(flake8.default_interpreter_constraints)
             ),
             entry_point=flake8.get_entry_point(),
-        )
+        ),
     )
 
     config_path: Optional[str] = flake8.options.config
-    config_snapshot_request = Get[Snapshot](
+    config_snapshot_request = Get(
+        Snapshot,
         PathGlobs(
             globs=[config_path] if config_path else [],
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
             description_of_origin="the option `--flake8-config`",
-        )
+        ),
     )
 
-    all_source_files_request = Get[SourceFiles](
-        AllSourceFilesRequest(field_set.sources for field_set in partition.field_sets)
+    all_source_files_request = Get(
+        SourceFiles, AllSourceFilesRequest(field_set.sources for field_set in partition.field_sets)
     )
-    specified_source_files_request = Get[SourceFiles](
+    specified_source_files_request = Get(
+        SourceFiles,
         SpecifiedSourceFilesRequest(
             (field_set.sources, field_set.origin) for field_set in partition.field_sets
-        )
+        ),
     )
 
     requirements_pex, config_snapshot, all_source_files, specified_source_files = await MultiGet(
@@ -104,10 +107,11 @@ async def flake8_lint_partition(
         specified_source_files_request,
     )
 
-    input_digest = await Get[Digest](
+    input_digest = await Get(
+        Digest,
         MergeDigests(
             (all_source_files.snapshot.digest, requirements_pex.digest, config_snapshot.digest)
-        )
+        ),
     )
 
     address_references = ", ".join(
@@ -124,7 +128,7 @@ async def flake8_lint_partition(
             f"Run Flake8 on {pluralize(len(partition.field_sets), 'target')}: {address_references}."
         ),
     )
-    result = await Get[FallibleProcessResult](Process, process)
+    result = await Get(FallibleProcessResult, Process, process)
     return LintResult.from_fallible_process_result(result, linter_name="Flake8")
 
 
@@ -143,7 +147,7 @@ async def flake8_lint(
         request.field_sets, python_setup
     )
     partitioned_results = await MultiGet(
-        Get[LintResult](Flake8Partition(partition_field_sets, partition_compatibility))
+        Get(LintResult, Flake8Partition(partition_field_sets, partition_compatibility))
         for partition_compatibility, partition_field_sets in constraints_to_field_sets.items()
     )
     return LintResults(partitioned_results)

@@ -70,6 +70,13 @@ class _Get(GetConstraints, Generic[_ProductType, _SubjectDeclaredType, _SubjectT
 class _GetMaker(Generic[_ProductType]):
     product_type: Type[_ProductType]
 
+    def _validate_product(self) -> None:
+        if not isinstance(self.product_type, type):
+            raise TypeError(
+                f"The product type argument must be a type, given {self.product_type} of type "
+                f"{type(self.product_type)}."
+            )
+
     @staticmethod
     def _validate_subject_declared_type(subject_declared_type: Any) -> Type[_SubjectDeclaredType]:
         if not isinstance(subject_declared_type, type):
@@ -109,6 +116,7 @@ class _GetMaker(Generic[_ProductType]):
         __arg0: Union[Type[_SubjectDeclaredType], _SubjectType],
         __arg1: Optional[_SubjectType] = None,
     ) -> _Get[_ProductType, _SubjectDeclaredType, _SubjectType]:
+        self._validate_product()
         subject_declared_type: Type[_SubjectDeclaredType] = self._validate_subject_declared_type(
             __arg0 if __arg1 is not None else type(__arg0)
         )
@@ -124,29 +132,6 @@ class _GetFactory:
     @staticmethod
     def isinstance(item: Any) -> bool:
         return isinstance(item, _Get)
-
-    def __getitem__(self, product_type: Type[_ProductType]) -> _GetMaker[_ProductType]:
-        if not isinstance(product_type, type):
-            raise TypeError(
-                f"The product type argument must be a type, given {product_type} of type "
-                f"{type(product_type)}."
-            )
-
-        # TODO(John Sirois): Turn this on and update Pants own codebase to not trigger the warning
-        #  in a follow-up.
-        #  https://github.com/pantsbuild/pants/issues/9899
-        deprecated_conditional(
-            predicate=lambda: False,
-            deprecation_start_version="1.30.0.dev0",
-            removal_version="1.31.0.dev0",
-            entity_description="Parameterized Get[...](...) calls",
-            hint_message=(
-                f"Use Get({product_type.__name__}, ...) instead of "
-                f"Get[{product_type.__name__}](...)."
-            ),
-        )
-
-        return _GetMaker(product_type)
 
     @overload
     def __call__(

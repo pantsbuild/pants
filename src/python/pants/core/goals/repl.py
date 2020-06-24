@@ -94,7 +94,7 @@ async def run_repl(
             tgt for tgt in transitive_targets.closure if repl_implementation_cls.is_valid(tgt)
         )
     )
-    repl_binary = await Get[ReplBinary](ReplImplementation, repl_impl)
+    repl_binary = await Get(ReplBinary, ReplImplementation, repl_impl)
 
     with temporary_dir(root_dir=global_options.options.pants_workdir, cleanup=False) as tmpdir:
         path_relative_to_build_root = PurePath(tmpdir).relative_to(build_root.path).as_posix()

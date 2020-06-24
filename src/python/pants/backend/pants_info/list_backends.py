@@ -163,11 +163,11 @@ def format_section(
 async def list_backends(
     backend_options: BackendsOptions, global_options: GlobalOptions, console: Console,
 ) -> Backends:
-    discovered_register_pys = await Get[Snapshot](PathGlobs(["**/*/register.py"]))
-    register_pys_content = await Get[FilesContent](Digest, discovered_register_pys.digest)
+    discovered_register_pys = await Get(Snapshot, PathGlobs(["**/*/register.py"]))
+    register_pys_content = await Get(FilesContent, Digest, discovered_register_pys.digest)
 
-    source_root_stripped_sources = await Get[SourceRootStrippedSources](
-        StripSnapshotRequest(snapshot=discovered_register_pys)
+    source_root_stripped_sources = await Get(
+        SourceRootStrippedSources, StripSnapshotRequest(snapshot=discovered_register_pys)
     )
     file_to_stripped_file_mapping = source_root_stripped_sources.get_file_to_stripped_file_mapping()
     stripped_paths = []
