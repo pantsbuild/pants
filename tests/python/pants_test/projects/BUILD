@@ -41,7 +41,7 @@ python_tests(
         "examples:isort_cfg",
     ],
     tags={"integration", "partially_type_checked"},
-    timeout = 180,
+    timeout = 240,
 )
 
 python_tests(
