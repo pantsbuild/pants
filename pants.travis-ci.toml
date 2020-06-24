@@ -29,6 +29,10 @@ resolver_jobs = "%(travis_parallelism)s"
 # doesn't give us useful debug info).
 timeout_maximum = 590
 
+[pytest]
+# NB: See `test.pytest`.
+timeout_maximum = 590
+
 [libc]
 # Currently, we only need to search for a libc installation to test the native toolchain.
 enable_libc_search = true
