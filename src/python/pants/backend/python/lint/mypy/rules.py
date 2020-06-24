@@ -86,9 +86,11 @@ async def mypy_lint(
         PexRequest(
             output_filename="mypy.pex",
             requirements=PexRequirements(mypy.get_requirement_specs()),
-            # TODO(#10131): figure out how to robustly handle interpreter constraints. Unlike other
-            #  linters, the version of Python used to run MyPy can be different than the version of
-            #  the code.
+            # NB: This only determines what MyPy is run with. The user can specify what version
+            # their code is with `--python-version`. See
+            # https://mypy.readthedocs.io/en/stable/config_file.html#platform-configuration. We do
+            # not auto-configure this for simplicity and to avoid Pants magically setting values for
+            # users.
             interpreter_constraints=PexInterpreterConstraints(mypy.default_interpreter_constraints),
             entry_point=mypy.get_entry_point(),
         ),
