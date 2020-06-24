@@ -5,14 +5,14 @@ from dataclasses import dataclass
 from typing import Tuple
 
 from pants.backend.python.lint.mypy.subsystem import MyPy
-from pants.backend.python.rules import download_pex_bin, importable_python_sources, pex
-from pants.backend.python.rules.importable_python_sources import ImportablePythonSources
+from pants.backend.python.rules import download_pex_bin, pex, python_sources
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
     PexRequest,
     PexRequirements,
 )
+from pants.backend.python.rules.python_sources import StrippedPythonSources
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.backend.python.target_types import PythonSources
@@ -73,7 +73,7 @@ async def mypy_lint(
         TransitiveTargets, Addresses(fs.address for fs in request.field_sets)
     )
 
-    prepared_sources_request = Get(ImportablePythonSources, Targets(transitive_targets.closure))
+    prepared_sources_request = Get(StrippedPythonSources, Targets(transitive_targets.closure))
     pex_request = Get(
         Pex,
         PexRequest(
@@ -136,7 +136,7 @@ def rules():
         UnionRule(LintRequest, MyPyRequest),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),
-        *importable_python_sources.rules(),
+        *python_sources.rules(),
         *pex.rules(),
         *python_native_code.rules(),
         *strip_source_roots.rules(),
