@@ -35,6 +35,7 @@ python_tests(
     sources=["test_python_examples_integration.py"],
     dependencies=[
         ":projects_test_base",
+        "contrib:isort_cfg",
         "examples/src/python/example:all_directories",
         "examples/tests/python/example_test:all_directories",
         "examples:isort_cfg",
