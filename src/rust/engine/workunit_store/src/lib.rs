@@ -88,7 +88,7 @@ impl Workunit {
     };
 
     let info_str = if let Some(ref s) = self.metadata.info_msg {
-      format!("\n - {}", s)
+      format!(" - {}", s)
     } else {
       "".to_string()
     };
