@@ -222,27 +222,35 @@ async def run_python_test(
     test_options: TestOptions,
 ) -> TestResult:
     """Runs pytest for one target."""
+    output_files = []
+
     add_opts = [f"--color={'yes' if global_options.options.colors else 'no'}"]
+
+    # Configure generation of JUnit-compatible test report.
+    test_results_file = None
     if test_setup.xml_dir:
         test_results_file = f"{field_set.address.path_safe_spec}.xml"
         add_opts.extend(
             (f"--junitxml={test_results_file}", f"-o junit_family={test_setup.junit_family}",)
         )
+        output_files.append(test_results_file)
+
+    # Configure generation of a coverage report.
+    use_coverage = test_options.values.use_coverage
+    if use_coverage:
+        output_files.append(".coverage")
+
     # We explicitly add the CWD to the PEX runtime sys.path. Some pytest plugins
     # (e.g., pytest-django)  need this so that their dynamic import logic works properly.
     env = {"PYTEST_ADDOPTS": " ".join(add_opts), "PEX_EXTRA_SYS_PATH": "."}
 
-    use_coverage = test_options.values.use_coverage
-    output_dirs = [".coverage"] if use_coverage else []
-    if test_setup.xml_dir:
-        output_dirs.append(test_results_file)
     process = test_setup.test_runner_pex.create_process(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path=f"./{test_setup.test_runner_pex.output_filename}",
         pex_args=test_setup.args,
         input_digest=test_setup.input_digest,
-        output_directories=tuple(output_dirs) if output_dirs else None,
+        output_files=tuple(output_files) if output_files else None,
         description=f"Run Pytest for {field_set.address.reference()}",
         timeout_seconds=test_setup.timeout_seconds,
         env=env,
@@ -260,13 +268,14 @@ async def run_python_test(
             logger.warning(f"Failed to generate coverage data for {field_set.address}.")
 
     xml_results_digest = None
-    if test_setup.xml_dir:
+    if test_results_file:
         xml_results_snapshot = await Get(
             Snapshot, SnapshotSubset(result.output_digest, PathGlobs([test_results_file]))
         )
         if xml_results_snapshot.files == (test_results_file,):
             xml_results_digest = await Get(
-                Digest, AddPrefix(xml_results_snapshot.digest, test_setup.xml_dir)
+                Digest,
+                AddPrefix(xml_results_snapshot.digest, test_setup.xml_dir),  # type: ignore[arg-type]
             )
         else:
             logger.warning(f"Failed to generate JUnit XML data for {field_set.address}.")
