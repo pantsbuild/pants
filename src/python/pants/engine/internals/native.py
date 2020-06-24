@@ -4,7 +4,7 @@
 import logging
 import os
 from types import CoroutineType
-from typing import Dict, Iterable, List, Tuple, cast
+from typing import Dict, Iterable, List, Tuple, Union, cast
 
 from typing_extensions import Protocol
 
@@ -27,7 +27,19 @@ from pants.engine.fs import (
     UrlToFetch,
 )
 from pants.engine.interactive_process import InteractiveProcess, InteractiveProcessResult
-from pants.engine.internals import native_engine  # type: ignore
+from pants.engine.internals import native_engine
+from pants.engine.internals.native_engine import (
+    PyExecutionRequest,
+    PyExecutor,
+    PyGeneratorResponseBreak,
+    PyGeneratorResponseGet,
+    PyGeneratorResponseGetMulti,
+    PyNailgunServer,
+    PyScheduler,
+    PySession,
+    PyTasks,
+    PyTypes,
+)
 from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResultWithPlatform, MultiPlatformProcess
 from pants.engine.selectors import Get
@@ -63,7 +75,9 @@ class Externs:
         """Given a `obj`, return str(obj)."""
         return "" if val is None else str(val)
 
-    def generator_send(self, func, arg):
+    def generator_send(
+        self, func, arg
+    ) -> Union[PyGeneratorResponseGet, PyGeneratorResponseGetMulti, PyGeneratorResponseBreak]:
         """Given a generator, send it the given value and return a response."""
         if self._do_raise_keyboardinterrupt:
             raise KeyboardInterrupt("ctrl-c interrupted execution of a ffi method!")
@@ -72,14 +86,14 @@ class Externs:
 
             if Get.isinstance(res):
                 # Get.
-                return self.lib.PyGeneratorResponseGet(
+                return PyGeneratorResponseGet(
                     res.product_type, res.subject_declared_type, res.subject,
                 )
             elif type(res) in (tuple, list):
                 # GetMulti.
-                return self.lib.PyGeneratorResponseGetMulti(
+                return PyGeneratorResponseGetMulti(
                     tuple(
-                        self.lib.PyGeneratorResponseGet(
+                        PyGeneratorResponseGet(
                             get.product_type, get.subject_declared_type, get.subject,
                         )
                         for get in res
@@ -92,7 +106,7 @@ class Externs:
                 raise
             # This was a `return` from a coroutine, as opposed to a `StopIteration` raised
             # by calling `next()` on an empty iterator.
-            return self.lib.PyGeneratorResponseBreak(e.value)
+            return PyGeneratorResponseBreak(e.value)
 
 
 class RawFdRunner(Protocol):
@@ -115,7 +129,7 @@ class Native(metaclass=SingletonMetaclass):
     def __init__(self):
         self.externs = Externs(self.lib)
         self.lib.externs_set(self.externs)
-        self._executor = self.lib.PyExecutor()
+        self._executor = PyExecutor()
 
     class BinaryLocationError(Exception):
         pass
@@ -166,18 +180,18 @@ class Native(metaclass=SingletonMetaclass):
         """
         self.lib.nailgun_server_await_shutdown(self._executor, nailgun_server)
 
-    def new_nailgun_server(self, port: int, runner: RawFdRunner):
+    def new_nailgun_server(self, port: int, runner: RawFdRunner) -> PyNailgunServer:
         """Creates a nailgun server with a requested port.
 
         Returns the server and the actual port it bound to.
         """
-        return self.lib.nailgun_server_create(self._executor, port, runner)
+        return cast(PyNailgunServer, self.lib.nailgun_server_create(self._executor, port, runner))
 
-    def new_tasks(self):
-        return self.lib.PyTasks()
+    def new_tasks(self) -> PyTasks:
+        return PyTasks()
 
-    def new_execution_request(self):
-        return self.lib.PyExecutionRequest()
+    def new_execution_request(self) -> PyExecutionRequest:
+        return PyExecutionRequest()
 
     def new_session(
         self,
@@ -186,8 +200,8 @@ class Native(metaclass=SingletonMetaclass):
         dynamic_ui: bool,
         build_id,
         should_report_workunits: bool,
-    ):
-        return self.lib.PySession(
+    ) -> PySession:
+        return PySession(
             scheduler, should_record_zipkin_spans, dynamic_ui, build_id, should_report_workunits,
         )
 
@@ -202,12 +216,12 @@ class Native(metaclass=SingletonMetaclass):
         ignore_patterns: List[str],
         use_gitignore: bool,
         execution_options,
-    ):
+    ) -> PyScheduler:
         """Create and return a native Scheduler."""
 
         # TODO: There is no longer a need to differentiate constructors from types, as types are
         # callable as well with the cpython crate.
-        engine_types = self.lib.PyTypes(
+        engine_types = PyTypes(
             construct_directory_digest=Digest,
             directory_digest=Digest,
             construct_snapshot=Snapshot,
