@@ -25,17 +25,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'exclude_target_regexp_integration',
-  sources = [ 'test_exclude_target_regexp_integration.py' ],
-  dependencies = [
-    'src/python/pants/testutil:int-test',
-    'testprojects/src/java/org/pantsbuild/testproject:phrases_directory',
-  ],
-  tags = {'integration', 'partially_type_checked'},
-  timeout = 530,
-)
-
-python_tests(
   name = 'cmd_line_spec_parser',
   sources = ['test_cmd_line_spec_parser.py'],
   dependencies = [

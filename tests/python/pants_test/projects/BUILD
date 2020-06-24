@@ -4,7 +4,12 @@
 python_library(
     name="projects_test_base",
     sources=["projects_test_base.py"],
-    dependencies=["src/python/pants/testutil:int-test",],
+    dependencies=[
+        "//:isort_cfg",
+        "contrib:isort_cfg",
+        "examples:isort_cfg",
+        "src/python/pants/testutil:int-test",
+    ],
     tags={"partially_type_checked"},
 )
 
@@ -18,18 +23,6 @@ python_tests(
     ],
     tags={"integration", "partially_type_checked"},
     timeout=360,
-)
-
-python_tests(
-    name="java_testprojects_integration",
-    sources=["test_java_testprojects_integration.py"],
-    dependencies=[
-        ":projects_test_base",
-        "testprojects/src/java/org/pantsbuild/testproject:all_directories",
-        "testprojects/tests/java/org/pantsbuild:all_directories",
-    ],
-    tags={"integration", "partially_type_checked"},
-    timeout=400,
 )
 
 python_tests(

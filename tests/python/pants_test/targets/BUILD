@@ -42,17 +42,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'jvm_app_integration',
-  sources = ['test_jvm_app_integration.py'],
-  dependencies = [
-    'src/python/pants/testutil:int-test',
-    'testprojects/src/java/org/pantsbuild/testproject:bundle_directory',
-  ],
-  tags = {'integration', 'partially_type_checked'},
-  timeout = 300,
-)
-
-python_tests(
   name = 'python_binary',
   sources = ['test_python_binary.py'],
   dependencies = [
