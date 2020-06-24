@@ -33,14 +33,6 @@ pub fn none() -> PyObject {
   gil.python().None()
 }
 
-pub fn get_value_from_type_id(ty: TypeId) -> Value {
-  with_interns(|interns| {
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-    Value::from(interns.type_get(&ty).clone_ref(py).into_object())
-  })
-}
-
 pub fn get_type_for(val: &Value) -> TypeId {
   with_interns_mut(|interns| {
     let gil = Python::acquire_gil();
@@ -70,6 +62,14 @@ pub fn equals(h1: &PyObject, h2: &PyObject) -> bool {
     .cast_as::<PyBool>(gil.python())
     .unwrap()
     .is_true()
+}
+
+pub fn type_for_type_id(ty: TypeId) -> PyType {
+  with_interns(|interns| {
+    let gil = Python::acquire_gil();
+    let py = gil.python();
+    interns.type_get(&ty).clone_ref(py)
+  })
 }
 
 pub fn type_for(py_type: PyType) -> TypeId {
@@ -240,7 +240,7 @@ pub fn key_to_str(key: &Key) -> String {
 }
 
 pub fn type_to_str(type_id: TypeId) -> String {
-  project_str(&get_value_from_type_id(type_id), "__name__")
+  project_str(&type_for_type_id(type_id).into_object().into(), "__name__")
 }
 
 pub fn val_to_str(val: &Value) -> String {

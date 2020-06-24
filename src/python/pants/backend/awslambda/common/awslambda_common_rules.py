@@ -51,18 +51,19 @@ async def create_awslambda(
     buildroot: BuildRoot,
     workspace: Workspace,
 ) -> AWSLambdaGoal:
-    targets_to_valid_field_sets = await Get[TargetsToValidFieldSets](
+    targets_to_valid_field_sets = await Get(
+        TargetsToValidFieldSets,
         TargetsToValidFieldSetsRequest(
             AWSLambdaFieldSet,
             goal_description=f"the `{options.name}` goal",
             error_if_no_valid_targets=True,
-        )
+        ),
     )
     awslambdas = await MultiGet(
-        Get[CreatedAWSLambda](AWSLambdaFieldSet, field_set)
+        Get(CreatedAWSLambda, AWSLambdaFieldSet, field_set)
         for field_set in targets_to_valid_field_sets.field_sets
     )
-    merged_digest = await Get[Digest](MergeDigests(awslambda.digest for awslambda in awslambdas))
+    merged_digest = await Get(Digest, MergeDigests(awslambda.digest for awslambda in awslambdas))
     result = workspace.materialize_directory(
         DirectoryToMaterialize(merged_digest, path_prefix=str(distdir.relpath))
     )

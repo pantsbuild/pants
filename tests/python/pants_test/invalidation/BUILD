@@ -23,15 +23,3 @@ python_tests(
   ],
   tags = {"partially_type_checked"},
 )
-
-python_tests(
-  name = 'strict_deps_invalidation_integration',
-  sources = ['test_strict_deps_invalidation_integration.py'],
-  dependencies = [
-    'src/python/pants/base:build_environment',
-    'src/python/pants/testutil:int-test',
-    'testprojects/tests/java/org/pantsbuild/testproject:strictdeps_directory',
-  ],
-  tags = {'integration', 'partially_type_checked'},
-  timeout = 480,
-)

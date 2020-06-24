@@ -56,7 +56,7 @@ class D:
 
 @rule
 async def transitive_coroutine_rule(c: C) -> D:
-    b = await Get[B](C, c)
+    b = await Get(B, C, c)
     return D(b)
 
 
@@ -100,7 +100,7 @@ def select_union_b(union_b: UnionB) -> A:
 # TODO: add GetMulti testing for unions!
 @rule
 async def a_union_test(union_wrapper: UnionWrapper) -> A:
-    union_a = await Get[A](UnionBase, union_wrapper.inner)
+    union_a = await Get(A, UnionBase, union_wrapper.inner)
     return union_a
 
 
@@ -112,7 +112,7 @@ class UnionX:
 async def error_msg_test_rule(union_wrapper: UnionWrapper) -> UnionX:
     # NB: We install a UnionRule to make UnionWrapper a member of this union, but then we pass the
     # inner value, which is _not_ registered.
-    _ = await Get[A](UnionWithNonMemberErrorMsg, union_wrapper.inner)
+    _ = await Get(A, UnionWithNonMemberErrorMsg, union_wrapper.inner)
     raise AssertionError("The statement above this one should have failed!")
 
 
@@ -209,6 +209,11 @@ class SchedulerTest(TestBase):
         # existence of transitive_b_c().
         with self.assertDoesNotRaise():
             _ = self.request_single_product(D, Params(c))
+
+    def test_consumed_types(self):
+        assert {A, B, C, str} == set(
+            self.scheduler.scheduler.rule_graph_consumed_types([A, C], str)
+        )
 
     @contextmanager
     def _assert_execution_error(self, expected_msg):

@@ -58,19 +58,19 @@ class Process:
 
         Usually, you will want to provide input files/directories via the parameter `input_digest`. The
         process will then be able to access these paths through relative paths. If you want to give
-        multiple input digests, first merge them with `await Get[Digest](MergeDigests)`.
+        multiple input digests, first merge them with `await Get(Digest, MergeDigests)`.
 
         Often, you will want to capture the files/directories created in the process. To do this, you
         can either set `output_files` or `output_directories`. The specified paths will then be used to
         populate `output_digest` on the `ProcessResult`. If you want to split up this output digest
-        into multiple digests, use `await Get[Snapshot](SnapshotSubset)` on the `output_digest`.
+        into multiple digests, use `await Get(Snapshot, SnapshotSubset)` on the `output_digest`.
 
-        To actually run the process, use `await Get[ProcessResult](Process)` or
-        `await Get[FallibleProcessResult](Process)`.
+        To actually run the process, use `await Get(ProcessResult, Process)` or
+        `await Get(FallibleProcessResult, Process)`.
 
         Example:
 
-            result = await Get[ProcessResult](Process(["/bin/echo", "hello world"], description="demo"))
+            result = await Get(ProcessResult, Process(["/bin/echo", "hello world"], description="demo"))
             assert result.stdout == b"hello world"
         """
         self.argv = tuple(argv)

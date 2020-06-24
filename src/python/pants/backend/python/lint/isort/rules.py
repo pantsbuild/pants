@@ -79,7 +79,8 @@ async def setup(
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> Setup:
-    requirements_pex_request = Get[Pex](
+    requirements_pex_request = Get(
+        Pex,
         PexRequest(
             output_filename="isort.pex",
             requirements=PexRequirements(isort.get_requirement_specs()),
@@ -87,26 +88,29 @@ async def setup(
                 isort.default_interpreter_constraints
             ),
             entry_point=isort.get_entry_point(),
-        )
+        ),
     )
 
     config_path: Optional[List[str]] = isort.options.config
-    config_snapshot_request = Get[Snapshot](
+    config_snapshot_request = Get(
+        Snapshot,
         PathGlobs(
             globs=config_path or (),
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
             conjunction=GlobExpansionConjunction.all_match,
             description_of_origin="the option `--isort-config`",
-        )
+        ),
     )
 
-    all_source_files_request = Get[SourceFiles](
-        AllSourceFilesRequest(field_set.sources for field_set in setup_request.request.field_sets)
+    all_source_files_request = Get(
+        SourceFiles,
+        AllSourceFilesRequest(field_set.sources for field_set in setup_request.request.field_sets),
     )
-    specified_source_files_request = Get[SourceFiles](
+    specified_source_files_request = Get(
+        SourceFiles,
         SpecifiedSourceFilesRequest(
             (field_set.sources, field_set.origin) for field_set in setup_request.request.field_sets
-        )
+        ),
     )
 
     requests = (
@@ -125,10 +129,11 @@ async def setup(
         else setup_request.request.prior_formatter_result
     )
 
-    input_digest = await Get[Digest](
+    input_digest = await Get(
+        Digest,
         MergeDigests(
             (all_source_files_snapshot.digest, requirements_pex.digest, config_snapshot.digest)
-        )
+        ),
     )
 
     address_references = ", ".join(
@@ -157,8 +162,8 @@ async def setup(
 async def isort_fmt(request: IsortRequest, isort: Isort) -> FmtResult:
     if isort.options.skip:
         return FmtResult.noop()
-    setup = await Get[Setup](SetupRequest(request, check_only=False))
-    result = await Get[ProcessResult](Process, setup.process)
+    setup = await Get(Setup, SetupRequest(request, check_only=False))
+    result = await Get(ProcessResult, Process, setup.process)
     return FmtResult.from_process_result(
         result,
         original_digest=setup.original_digest,
@@ -171,8 +176,8 @@ async def isort_fmt(request: IsortRequest, isort: Isort) -> FmtResult:
 async def isort_lint(request: IsortRequest, isort: Isort) -> LintResults:
     if isort.options.skip:
         return LintResults()
-    setup = await Get[Setup](SetupRequest(request, check_only=True))
-    result = await Get[FallibleProcessResult](Process, setup.process)
+    setup = await Get(Setup, SetupRequest(request, check_only=True))
+    result = await Get(FallibleProcessResult, Process, setup.process)
     return LintResults(
         [
             LintResult.from_fallible_process_result(

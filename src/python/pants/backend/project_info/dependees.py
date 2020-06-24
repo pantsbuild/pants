@@ -82,9 +82,9 @@ async def dependees_goal(
     specified_addresses: Addresses, options: DependeesOptions, console: Console
 ) -> Dependees:
     # Get every target in the project so that we can iterate over them to find their dependencies.
-    all_targets = await Get[Targets](AddressSpecs([DescendantAddresses("")]))
+    all_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
     dependencies_per_target = await MultiGet(
-        Get[Addresses](DependenciesRequest(tgt.get(Dependencies))) for tgt in all_targets
+        Get(Addresses, DependenciesRequest(tgt.get(Dependencies))) for tgt in all_targets
     )
 
     address_to_dependees = defaultdict(set)

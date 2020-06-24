@@ -23,10 +23,11 @@ class PythonRepl(ReplImplementation):
 @rule
 async def run_python_repl(repl: PythonRepl) -> ReplBinary:
     addresses = Addresses(tgt.address for tgt in repl.targets)
-    two_step_pex = await Get[TwoStepPex](
+    two_step_pex = await Get(
+        TwoStepPex,
         TwoStepPexFromTargetsRequest(
             PexFromTargetsRequest(addresses=addresses, output_filename="python-repl.pex",)
-        )
+        ),
     )
     repl_pex = two_step_pex.pex
     return ReplBinary(digest=repl_pex.digest, binary_name=repl_pex.output_filename)
@@ -40,7 +41,8 @@ class IPythonRepl(ReplImplementation):
 @rule
 async def run_ipython_repl(repl: IPythonRepl, ipython: IPython) -> ReplBinary:
     addresses = Addresses(tgt.address for tgt in repl.targets)
-    two_step_pex = await Get[TwoStepPex](
+    two_step_pex = await Get(
+        TwoStepPex,
         TwoStepPexFromTargetsRequest(
             PexFromTargetsRequest(
                 addresses=addresses,
@@ -48,7 +50,7 @@ async def run_ipython_repl(repl: IPythonRepl, ipython: IPython) -> ReplBinary:
                 entry_point=ipython.get_entry_point(),
                 additional_requirements=ipython.get_requirement_specs(),
             )
-        )
+        ),
     )
     repl_pex = two_step_pex.pex
     return ReplBinary(digest=repl_pex.digest, binary_name=repl_pex.output_filename)

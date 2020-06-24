@@ -14,7 +14,10 @@ from pants.backend.python.rules.pex import (
     PexRequest,
     PexRequirements,
 )
-from pants.backend.python.rules.python_sources import StrippedPythonSources
+from pants.backend.python.rules.python_sources import (
+    StrippedPythonSources,
+    StrippedPythonSourcesRequest,
+)
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.backend.python.target_types import (
@@ -115,52 +118,61 @@ async def pylint_lint_partition(
         for tgt in partition.targets_with_dependencies
         if tgt.has_field(PythonRequirementsField)
     )
-    pylint_pex_request = Get[Pex](
+    pylint_pex_request = Get(
+        Pex,
         PexRequest(
             output_filename="pylint.pex",
             requirements=PexRequirements([*pylint.get_requirement_specs(), *plugin_requirements]),
             interpreter_constraints=partition.interpreter_constraints,
             entry_point=pylint.get_entry_point(),
-        )
+        ),
     )
-    requirements_pex_request = Get[Pex](
+    requirements_pex_request = Get(
+        Pex,
         PexRequest(
             output_filename="requirements.pex",
             requirements=target_requirements,
             interpreter_constraints=partition.interpreter_constraints,
-        )
+        ),
     )
     # TODO(John Sirois): Support shading python binaries:
     #   https://github.com/pantsbuild/pants/issues/9206
     # Right now any Pylint transitive requirements will shadow corresponding user
     # requirements, which could lead to problems.
     pylint_runner_pex_args = ["--pex-path", ":".join(["pylint.pex", "requirements.pex"])]
-    pylint_runner_pex_request = Get[Pex](
+    pylint_runner_pex_request = Get(
+        Pex,
         PexRequest(
             output_filename="pylint_runner.pex",
             entry_point=pylint.get_entry_point(),
             interpreter_constraints=partition.interpreter_constraints,
             additional_args=pylint_runner_pex_args,
-        )
+        ),
     )
 
-    config_snapshot_request = Get[Snapshot](
+    config_snapshot_request = Get(
+        Snapshot,
         PathGlobs(
             globs=[pylint.config] if pylint.config else [],
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
             description_of_origin="the option `--pylint-config`",
-        )
+        ),
     )
 
-    prepare_plugin_sources_request = Get[StrippedPythonSources](Targets, partition.plugin_targets)
-    prepare_python_sources_request = Get[StrippedPythonSources](
-        Targets, partition.targets_with_dependencies
+    prepare_plugin_sources_request = Get(
+        StrippedPythonSources,
+        StrippedPythonSourcesRequest(partition.plugin_targets, include_resources=True),
     )
-    specified_source_files_request = Get[SourceFiles](
+    prepare_python_sources_request = Get(
+        StrippedPythonSources,
+        StrippedPythonSourcesRequest(partition.targets_with_dependencies, include_resources=False),
+    )
+    specified_source_files_request = Get(
+        SourceFiles,
         SpecifiedSourceFilesRequest(
             ((field_set.sources, field_set.origin) for field_set in partition.field_sets),
             strip_source_roots=True,
-        )
+        ),
     )
 
     (
@@ -182,12 +194,13 @@ async def pylint_lint_partition(
     )
 
     prefixed_plugin_sources = (
-        await Get[Digest](AddPrefix(prepared_plugin_sources.snapshot.digest, "__plugins"))
+        await Get(Digest, AddPrefix(prepared_plugin_sources.snapshot.digest, "__plugins"))
         if pylint.source_plugins
         else EMPTY_DIGEST
     )
 
-    input_digest = await Get[Digest](
+    input_digest = await Get(
+        Digest,
         MergeDigests(
             (
                 pylint_pex.digest,
@@ -220,7 +233,7 @@ async def pylint_lint_partition(
             f"Run Pylint on {pluralize(len(partition.field_sets), 'target')}: {address_references}."
         ),
     )
-    result = await Get[FallibleProcessResult](Process, process)
+    result = await Get(FallibleProcessResult, Process, process)
     return LintResult.from_fallible_process_result(result, linter_name="Pylint")
 
 
@@ -231,11 +244,12 @@ async def pylint_lint(
     if pylint.skip:
         return LintResults()
 
-    plugin_targets_request = Get[TransitiveTargets](
-        Addresses(Address.parse(plugin_addr) for plugin_addr in pylint.source_plugins)
+    plugin_targets_request = Get(
+        TransitiveTargets,
+        Addresses(Address.parse(plugin_addr) for plugin_addr in pylint.source_plugins),
     )
-    linted_targets_request = Get[Targets](
-        Addresses(field_set.address for field_set in request.field_sets)
+    linted_targets_request = Get(
+        Targets, Addresses(field_set.address for field_set in request.field_sets)
     )
     plugin_targets, linted_targets = await MultiGet(plugin_targets_request, linted_targets_request)
 
@@ -248,7 +262,7 @@ async def pylint_lint(
     # Pylint needs direct dependencies in the chroot to ensure that imports are valid. However, it
     # doesn't lint those direct dependencies nor does it care about transitive dependencies.
     per_target_dependencies = await MultiGet(
-        Get[Targets](DependenciesRequest(field_set.dependencies))
+        Get(Targets, DependenciesRequest(field_set.dependencies))
         for field_set in request.field_sets
     )
 
@@ -279,7 +293,7 @@ async def pylint_lint(
         )
     )
     partitioned_results = await MultiGet(
-        Get[LintResult](PylintPartition, partition) for partition in partitions
+        Get(LintResult, PylintPartition, partition) for partition in partitions
     )
     return LintResults(partitioned_results)
 

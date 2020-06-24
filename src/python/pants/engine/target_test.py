@@ -131,7 +131,7 @@ class FortranSourcesResult:
 @rule
 async def hydrate_fortran_sources(request: FortranSourcesRequest) -> FortranSourcesResult:
     sources_field = request.field
-    result = await Get[Snapshot](PathGlobs(sources_field.sanitized_raw_value))
+    result = await Get(Snapshot, PathGlobs(sources_field.sanitized_raw_value))
     # Validate after hydration
     non_fortran_sources = [
         fp for fp in result.files if PurePath(fp).suffix not in (".f95", ".f03", ".f08")
@@ -927,7 +927,7 @@ async def generate_fortran_from_avro(request: GenerateFortranFromAvroRequest) ->
         file_name = f"{PurePath(fp).stem}.f95"
         return FileContent(str(PurePath(parent, file_name)), b"Generated")
 
-    result = await Get[Snapshot](InputFilesContent([generate_fortran(fp) for fp in protocol_files]))
+    result = await Get(Snapshot, InputFilesContent([generate_fortran(fp) for fp in protocol_files]))
     return GeneratedSources(result)
 
 
@@ -1104,8 +1104,8 @@ class InferSmalltalkDependencies(InferDependenciesRequest):
 async def infer_smalltalk_dependencies(request: InferSmalltalkDependencies) -> InferredDependencies:
     # To demo an inference rule, we simply treat each `sources` file to contain a list of
     # addresses, one per line.
-    hydrated_sources = await Get[HydratedSources](HydrateSourcesRequest(request.sources_field))
-    file_contents = await Get[FilesContent](Digest, hydrated_sources.snapshot.digest)
+    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.sources_field))
+    file_contents = await Get(FilesContent, Digest, hydrated_sources.snapshot.digest)
     all_lines = itertools.chain.from_iterable(
         fc.content.decode().splitlines() for fc in file_contents
     )

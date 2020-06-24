@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.jvm.subsystems.jvm_tool_mixin import JvmToolMixin
-from pants.backend.jvm.subsystems.shader import Shader
 from pants.backend.jvm.targets.jar_library import JarLibrary
 from pants.build_graph.address import Address
 from pants.build_graph.injectables_mixin import InjectablesMixin
@@ -33,14 +32,7 @@ class JUnit(JvmToolMixin, InjectablesMixin, Subsystem):
             # Clearly both tests and the runner need access to the same @Test,
             # @Before, as well as other annotations, but there is also the Assert
             # class and some subset of the @Rules, @Theories and @RunWith APIs.
-            custom_rules=[
-                Shader.exclude_package("com.sun.xml", recursive=True),
-                Shader.exclude_package("javax.xml.bind", recursive=True),
-                Shader.exclude_package("junit.framework", recursive=True),
-                Shader.exclude_package("org.junit", recursive=True),
-                Shader.exclude_package("org.hamcrest", recursive=True),
-                Shader.exclude_package("org.pantsbuild.junit.annotations", recursive=True),
-            ],
+            custom_rules=[],
         )
 
     def injectables(self, build_graph):

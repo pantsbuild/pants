@@ -24,20 +24,20 @@ class InferPythonDependencies(InferDependenciesRequest):
 
 @rule
 async def infer_python_dependencies(request: InferPythonDependencies) -> InferredDependencies:
-    stripped_sources = await Get[SourceRootStrippedSources](
-        StripSourcesFieldRequest(request.sources_field)
+    stripped_sources = await Get(
+        SourceRootStrippedSources, StripSourcesFieldRequest(request.sources_field)
     )
     modules = tuple(
         PythonModule.create_from_stripped_path(PurePath(fp))
         for fp in stripped_sources.snapshot.files
     )
-    files_content = await Get[FilesContent](Digest, stripped_sources.snapshot.digest)
+    files_content = await Get(FilesContent, Digest, stripped_sources.snapshot.digest)
     imports_per_file = tuple(
         find_python_imports(fc.content.decode(), module_name=module.module)
         for fc, module in zip(files_content, modules)
     )
     owner_per_import = await MultiGet(
-        Get[PythonModuleOwner](PythonModule(imported_module))
+        Get(PythonModuleOwner, PythonModule(imported_module))
         for file_imports in imports_per_file
         for imported_module in file_imports.all_imports
         if imported_module not in combined_stdlib

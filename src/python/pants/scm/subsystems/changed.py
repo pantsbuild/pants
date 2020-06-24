@@ -45,16 +45,16 @@ async def find_owners(
     address_mapper: AddressMapper,
     changed_request: ChangedRequest,
 ) -> ChangedAddresses:
-    owners = await Get[Owners](OwnersRequest(sources=changed_request.sources))
+    owners = await Get(Owners, OwnersRequest(sources=changed_request.sources))
 
     # If the ChangedRequest does not require dependees, then we're done.
     if changed_request.include_dependees == IncludeDependeesOption.NONE:
         return ChangedAddresses(owners.addresses)
 
     # Otherwise: find dependees.
-    all_addresses = await Get[Addresses](AddressSpecs((DescendantAddresses(""),)))
+    all_addresses = await Get(Addresses, AddressSpecs((DescendantAddresses(""),)))
     all_structs = [
-        s.value for s in await MultiGet(Get[HydratedStruct](Address, a) for a in all_addresses)
+        s.value for s in await MultiGet(Get(HydratedStruct, Address, a) for a in all_addresses)
     ]
 
     bfa = build_configuration.registered_aliases()

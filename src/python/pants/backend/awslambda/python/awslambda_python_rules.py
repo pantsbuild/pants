@@ -78,9 +78,9 @@ async def create_python_awslambda(
         )
     )
 
-    pex_result = await Get[TwoStepPex](TwoStepPexFromTargetsRequest, pex_request)
-    input_digest = await Get[Digest](
-        MergeDigests((pex_result.pex.digest, lambdex_setup.requirements_pex.digest))
+    pex_result = await Get(TwoStepPex, TwoStepPexFromTargetsRequest, pex_request)
+    input_digest = await Get(
+        Digest, MergeDigests((pex_result.pex.digest, lambdex_setup.requirements_pex.digest))
     )
 
     # NB: Lambdex modifies its input pex in-place, so the input file is also the output file.
@@ -94,7 +94,7 @@ async def create_python_awslambda(
         output_files=(pex_filename,),
         description=f"Setting up handler in {pex_filename}",
     )
-    result = await Get[ProcessResult](Process, process)
+    result = await Get(ProcessResult, Process, process)
     # Note that the AWS-facing handler function is always lambdex_handler.handler, which
     # is the wrapper injected by lambdex that manages invocation of the actual handler.
     return CreatedAWSLambda(
@@ -107,7 +107,8 @@ async def create_python_awslambda(
 
 @rule(desc="Set up lambdex")
 async def setup_lambdex(lambdex: Lambdex) -> LambdexSetup:
-    requirements_pex = await Get[Pex](
+    requirements_pex = await Get(
+        Pex,
         PexRequest(
             output_filename="lambdex.pex",
             requirements=PexRequirements(lambdex.get_requirement_specs()),
@@ -115,7 +116,7 @@ async def setup_lambdex(lambdex: Lambdex) -> LambdexSetup:
                 lambdex.default_interpreter_constraints
             ),
             entry_point=lambdex.get_entry_point(),
-        )
+        ),
     )
     return LambdexSetup(requirements_pex=requirements_pex,)
 

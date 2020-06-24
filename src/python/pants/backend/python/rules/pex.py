@@ -365,21 +365,23 @@ async def create_pex(
 
     constraint_file_snapshot = EMPTY_SNAPSHOT
     if python_setup.requirement_constraints is not None:
-        constraint_file_snapshot = await Get[Snapshot](
+        constraint_file_snapshot = await Get(
+            Snapshot,
             PathGlobs(
                 [python_setup.requirement_constraints],
                 glob_match_error_behavior=GlobMatchErrorBehavior.error,
                 conjunction=GlobExpansionConjunction.all_match,
                 description_of_origin="the option `--python-setup-requirement-constraints`",
-            )
+            ),
         )
 
-    sources_digest_as_subdir = await Get[Digest](
-        AddPrefix(request.sources or EMPTY_DIGEST, source_dir_name)
+    sources_digest_as_subdir = await Get(
+        Digest, AddPrefix(request.sources or EMPTY_DIGEST, source_dir_name)
     )
     additional_inputs_digest = request.additional_inputs or EMPTY_DIGEST
 
-    merged_digest = await Get[Digest](
+    merged_digest = await Get(
+        Digest,
         MergeDigests(
             (
                 pex_bin.digest,
@@ -387,7 +389,7 @@ async def create_pex(
                 additional_inputs_digest,
                 constraint_file_snapshot.digest,
             )
-        )
+        ),
     )
 
     # NB: PEX outputs are platform dependent so in order to get a PEX that we can use locally, without
@@ -426,7 +428,7 @@ async def create_pex(
         }
     )
 
-    result = await Get[ProcessResult](MultiPlatformProcess, process)
+    result = await Get(ProcessResult, MultiPlatformProcess, process)
 
     if pex_debug.might_log:
         lines = result.stderr.decode().splitlines()
@@ -462,7 +464,7 @@ async def two_step_create_pex(two_step_pex_request: TwoStepPexRequest) -> TwoSte
                 f"{', '.join(request.requirements)}"
             ),
         )
-        requirements_pex = await Get[Pex](PexRequest, requirements_pex_request)
+        requirements_pex = await Get(Pex, PexRequest, requirements_pex_request)
         additional_inputs = requirements_pex.digest
         additional_args = (*request.additional_args, f"--requirements-pex={req_pex_name}")
     else:
@@ -476,7 +478,7 @@ async def two_step_create_pex(two_step_pex_request: TwoStepPexRequest) -> TwoSte
         additional_inputs=additional_inputs,
         additional_args=additional_args,
     )
-    full_pex = await Get[Pex](PexRequest, full_pex_request)
+    full_pex = await Get(Pex, PexRequest, full_pex_request)
     return TwoStepPex(pex=full_pex)
 
 

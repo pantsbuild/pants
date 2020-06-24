@@ -242,7 +242,7 @@ async def validate(
     console: Console, sources_snapshots: SourcesSnapshots, validate_options: ValidateOptions,
 ) -> Validate:
     per_snapshot_rmrs = await MultiGet(
-        Get[RegexMatchResults](SourcesSnapshot, source_snapshot)
+        Get(RegexMatchResults, SourcesSnapshot, source_snapshot)
         for source_snapshot in sources_snapshots
     )
     regex_match_results = list(itertools.chain(*per_snapshot_rmrs))
@@ -288,7 +288,7 @@ async def match_regexes_for_one_snapshot(
     sources_snapshot: SourcesSnapshot, source_file_validation: SourceFileValidation,
 ) -> RegexMatchResults:
     multi_matcher = source_file_validation.get_multi_matcher()
-    files_content = await Get[FilesContent](Digest, sources_snapshot.snapshot.digest)
+    files_content = await Get(FilesContent, Digest, sources_snapshot.snapshot.digest)
     return RegexMatchResults(
         multi_matcher.check_source_file(file_content.path, file_content.content)
         for file_content in files_content

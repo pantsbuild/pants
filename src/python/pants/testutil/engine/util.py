@@ -135,7 +135,7 @@ def run_rule(
 
     If any of the @rule's Get requests involve union members, you should pass a `UnionMembership`
     mapping the union base to any union members you'd like to test. For example, if your rule has
-    `await Get[TestResult](TargetAdaptor, target_adaptor)`, you may pass
+    `await Get(TestResult, TargetAdaptor, target_adaptor)`, you may pass
     `UnionMembership({TargetAdaptor: PythonTestsTargetAdaptor})` to this function.
 
     :returns: The return value of the completed @rule.
@@ -332,7 +332,7 @@ def fmt_rule(rule: Callable, *, gets: Optional[List[Tuple[str, str]]] = None) ->
     gets_str = ""
     if gets:
         get_members = ", ".join(
-            f"Get[{product_subject_pair[0]}]({product_subject_pair[1]})"
+            f"Get({product_subject_pair[0]}, {product_subject_pair[1]})"
             for product_subject_pair in gets
         )
         gets_str = f", gets=[{get_members}]"

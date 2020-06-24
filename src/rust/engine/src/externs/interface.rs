@@ -223,8 +223,16 @@ py_module_initializer!(native_engine, |py, m| {
   )?;
   m.add(
     py,
+    "rule_graph_consumed_types",
+    py_fn!(
+      py,
+      rule_graph_consumed_types(a: PyScheduler, b: Vec<PyType>, c: PyType)
+    ),
+  )?;
+  m.add(
+    py,
     "rule_graph_visualize",
-    py_fn!(py, rule_graph_visualize(a: PyScheduler, d: String)),
+    py_fn!(py, rule_graph_visualize(a: PyScheduler, b: String)),
   )?;
   m.add(
     py,
@@ -1152,6 +1160,34 @@ fn validator_run(py: Python, scheduler_ptr: PyScheduler) -> PyUnitResult {
       .validate()
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))
       .map(|()| None)
+  })
+}
+
+fn rule_graph_consumed_types(
+  py: Python,
+  scheduler_ptr: PyScheduler,
+  param_types: Vec<PyType>,
+  product_type: PyType,
+) -> CPyResult<Vec<PyType>> {
+  with_scheduler(py, scheduler_ptr, |scheduler| {
+    let param_types = param_types
+      .into_iter()
+      .map(externs::type_for)
+      .collect::<Vec<_>>();
+
+    let subgraph = scheduler
+      .core
+      .rule_graph
+      .subgraph(param_types, externs::type_for(product_type))
+      .map_err(|e| PyErr::new::<exc::ValueError, _>(py, (e,)))?;
+
+    Ok(
+      subgraph
+        .consumed_types()
+        .into_iter()
+        .map(externs::type_for_type_id)
+        .collect(),
+    )
   })
 }
 

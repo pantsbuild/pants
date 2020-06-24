@@ -97,20 +97,21 @@ async def run_cloc(
         return CountLinesOfCode(exit_code=0)
 
     input_files_filename = "input_files.txt"
-    input_file_digest = await Get[Digest](
-        InputFilesContent([FileContent(path=input_files_filename, content=file_content)]),
+    input_file_digest = await Get(
+        Digest, InputFilesContent([FileContent(path=input_files_filename, content=file_content)]),
     )
-    downloaded_cloc_binary = await Get[DownloadedExternalTool](
-        ExternalToolRequest, cloc_binary.get_request(Platform.current)
+    downloaded_cloc_binary = await Get(
+        DownloadedExternalTool, ExternalToolRequest, cloc_binary.get_request(Platform.current)
     )
-    digest = await Get[Digest](
+    digest = await Get(
+        Digest,
         MergeDigests(
             (
                 input_file_digest,
                 downloaded_cloc_binary.digest,
                 *(sources_snapshot.snapshot.digest for sources_snapshot in sources_snapshots),
             )
-        )
+        ),
     )
 
     report_filename = "report.txt"
@@ -131,8 +132,8 @@ async def run_cloc(
         description=f"Count lines of code for {pluralize(len(all_file_names), 'file')}",
     )
 
-    exec_result = await Get[ProcessResult](Process, req)
-    files_content = await Get[FilesContent](Digest, exec_result.output_digest)
+    exec_result = await Get(ProcessResult, Process, req)
+    files_content = await Get(FilesContent, Digest, exec_result.output_digest)
 
     file_outputs = {fc.path: fc.content.decode() for fc in files_content}
 

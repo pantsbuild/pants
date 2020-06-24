@@ -27,23 +27,22 @@ class TestHelpIntegration(PantsRunIntegrationTest):
         pants_run = self.run_pants(command=command)
         self.assert_success(pants_run)
         # Spot check to see that scope headings are printed
-        assert "`test.junit` options" in pants_run.stdout_data
+        assert "`pytest` options" in pants_run.stdout_data
         # Spot check to see that full args for all options are printed
-        assert "--binary-dup-max-dups" in pants_run.stdout_data
+        assert "--[no-]test-debug" in pants_run.stdout_data
         # Spot check to see that subsystem options are printing
-        assert "--jvm-options" in pants_run.stdout_data
+        assert "--pytest-version" in pants_run.stdout_data
 
     def test_help_all_advanced(self):
         command = ["--help-all", "--help-advanced"]
         pants_run = self.run_pants(command=command)
         self.assert_success(pants_run)
         # Spot check to see that scope headings are printed even for advanced options
-        assert "`test.junit` options" in pants_run.stdout_data
-        assert "`cache.test.junit` advanced options" in pants_run.stdout_data
+        assert "`pytest` options" in pants_run.stdout_data
+        assert "`pytest` advanced options" in pants_run.stdout_data
         # Spot check to see that full args for all options are printed
-        assert "--binary-dup-max-dups" in pants_run.stdout_data
-        assert "--cache-test-junit-read" in pants_run.stdout_data
+        assert "--[no-]test-debug" in pants_run.stdout_data
         # Spot check to see that subsystem options are printing
-        assert "--jvm-options" in pants_run.stdout_data
+        assert "--pytest-version" in pants_run.stdout_data
         # Spot check to see that advanced subsystem options are printing
-        assert "--jvm-max-subprocess-args" in pants_run.stdout_data
+        assert "--pytest-timeout-default" in pants_run.stdout_data

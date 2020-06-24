@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Tuple
+from typing import Iterable, Tuple, Type
 
 from pants.backend.python.rules.inject_init import InitInjectedSnapshot, InjectInitRequest
 from pants.backend.python.rules.inject_init import rules as inject_init_rules
@@ -14,16 +14,17 @@ from pants.core.util_rules.strip_source_roots import representative_path_from_ad
 from pants.engine.fs import Snapshot
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
-from pants.engine.target import Sources, Targets
+from pants.engine.target import Sources, Target
 from pants.source.source_root import SourceRoot, SourceRootRequest
+from pants.util.meta import frozen_after_init
 
 
 @dataclass(frozen=True)
 class StrippedPythonSources:
     """Sources that can be imported and used by Python, relative to the root.
 
-    Specifically, this will filter out to only have Python, resources(), and files() targets;
-    strip source roots, e.g. `src/python/f.py` -> `f.py`; and will add any missing
+    Specifically, this will filter out to only have Python, and, optionally, resources() and files()
+    targets; strip source roots, e.g. `src/python/f.py` -> `f.py`; and will add any missing
     `__init__.py` files to ensure that modules are recognized correctly.
 
     Use-cases that execute the Python source code (e.g., the `run`, `binary` and `repl` goals) can
@@ -34,12 +35,32 @@ class StrippedPythonSources:
     snapshot: Snapshot
 
 
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class StrippedPythonSourcesRequest:
+    targets: Tuple[Target, ...]
+    include_resources: bool
+
+    def __init__(self, targets: Iterable[Target], *, include_resources: bool) -> None:
+        self.targets = tuple(targets)
+        self.include_resources = include_resources
+
+    @property
+    def valid_sources_types(self) -> Tuple[Type[Sources], ...]:
+        return (
+            (PythonSources,)
+            if not self.include_resources
+            else (PythonSources, FilesSources, ResourcesSources)
+        )
+
+
 @dataclass(frozen=True)
 class UnstrippedPythonSources:
     """Sources that can be introspected by Python, relative to a set of source roots.
 
-    Specifically, this will filter out to only have Python, resources(), and files() targets;
-    and will add any missing `__init__.py` files to ensure that modules are recognized correctly.
+    Specifically, this will filter out to only have Python, and, optionally, resources() and
+    files() targets; and will add any missing `__init__.py` files to ensure that modules are
+    recognized correctly.
 
     Use-cases that introspect Python source code (e.g., the `test, `lint`, `fmt` goals) can
     request this type to get relevant sources that are still relative to their source roots.
@@ -53,45 +74,72 @@ class UnstrippedPythonSources:
     source_roots: Tuple[str, ...]
 
 
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class UnstrippedPythonSourcesRequest:
+    targets: Tuple[Target, ...]
+    include_resources: bool
+
+    def __init__(self, targets: Iterable[Target], *, include_resources: bool) -> None:
+        self.targets = tuple(targets)
+        self.include_resources = include_resources
+
+    @property
+    def valid_sources_types(self) -> Tuple[Type[Sources], ...]:
+        return (
+            (PythonSources,)
+            if not self.include_resources
+            else (PythonSources, FilesSources, ResourcesSources)
+        )
+
+
 @rule
-async def prepare_stripped_python_sources(targets: Targets) -> StrippedPythonSources:
-    stripped_sources = await Get[SourceFiles](
+async def prepare_stripped_python_sources(
+    request: StrippedPythonSourcesRequest,
+) -> StrippedPythonSources:
+    stripped_sources = await Get(
+        SourceFiles,
         AllSourceFilesRequest(
-            (tgt.get(Sources) for tgt in targets),
-            for_sources_types=(PythonSources, ResourcesSources, FilesSources),
+            (tgt.get(Sources) for tgt in request.targets),
+            for_sources_types=request.valid_sources_types,
             enable_codegen=True,
             strip_source_roots=True,
-        )
+        ),
     )
-    init_injected = await Get[InitInjectedSnapshot](
-        InjectInitRequest(sources_snapshot=stripped_sources.snapshot, sources_stripped=True)
+    init_injected = await Get(
+        InitInjectedSnapshot,
+        InjectInitRequest(sources_snapshot=stripped_sources.snapshot, sources_stripped=True),
     )
     return StrippedPythonSources(init_injected.snapshot)
 
 
 @rule
-async def prepare_unstripped_python_sources(targets: Targets) -> UnstrippedPythonSources:
-    sources = await Get[SourceFiles](
+async def prepare_unstripped_python_sources(
+    request: UnstrippedPythonSourcesRequest,
+) -> UnstrippedPythonSources:
+    sources = await Get(
+        SourceFiles,
         AllSourceFilesRequest(
-            (tgt.get(Sources) for tgt in targets),
-            for_sources_types=(PythonSources, ResourcesSources, FilesSources),
+            (tgt.get(Sources) for tgt in request.targets),
+            for_sources_types=request.valid_sources_types,
             enable_codegen=True,
             strip_source_roots=False,
-        )
+        ),
     )
 
     source_root_objs = await MultiGet(
-        Get[SourceRoot](
+        Get(
+            SourceRoot,
             SourceRootRequest,
             SourceRootRequest.for_file(representative_path_from_address(tgt.address)),
         )
-        for tgt in targets
+        for tgt in request.targets
         if tgt.has_field(PythonSources) or tgt.has_field(ResourcesSources)
     )
     source_root_paths = {source_root_obj.path for source_root_obj in source_root_objs}
 
-    init_injected = await Get[InitInjectedSnapshot](
-        InjectInitRequest(sources.snapshot, sources_stripped=False)
+    init_injected = await Get(
+        InitInjectedSnapshot, InjectInitRequest(sources.snapshot, sources_stripped=False)
     )
     return UnstrippedPythonSources(init_injected.snapshot, tuple(sorted(source_root_paths)))
 
@@ -102,5 +150,6 @@ def rules():
         prepare_unstripped_python_sources,
         *determine_source_files.rules(),
         *inject_init_rules(),
-        RootRule(Targets),
+        # TODO: remove this as soon as we have a usage of it.
+        RootRule(UnstrippedPythonSourcesRequest),
     ]

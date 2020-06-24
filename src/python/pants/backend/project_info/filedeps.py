@@ -68,13 +68,13 @@ async def file_deps(
 ) -> Filedeps:
     targets: Iterable[Target]
     if options.values.transitive:
-        transitive_targets = await Get[TransitiveTargets](Addresses, addresses)
+        transitive_targets = await Get(TransitiveTargets, Addresses, addresses)
         targets = transitive_targets.closure
     else:
-        targets = await Get[Targets](Addresses, addresses)
+        targets = await Get(Targets, Addresses, addresses)
 
     build_file_addresses = await MultiGet(
-        Get[BuildFileAddress](Address, tgt.address) for tgt in targets
+        Get(BuildFileAddress, Address, tgt.address) for tgt in targets
     )
     unique_rel_paths = {bfa.rel_path for bfa in build_file_addresses}
 
@@ -84,7 +84,7 @@ async def file_deps(
         )
     else:
         all_hydrated_sources = await MultiGet(
-            Get[HydratedSources](HydrateSourcesRequest(tgt.get(Sources))) for tgt in targets
+            Get(HydratedSources, HydrateSourcesRequest(tgt.get(Sources))) for tgt in targets
         )
         unique_rel_paths.update(
             itertools.chain.from_iterable(

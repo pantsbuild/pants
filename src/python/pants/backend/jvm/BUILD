@@ -31,9 +31,7 @@ python_library(
     ':repository',
     ':scala_artifact',
     'src/python/pants/backend/jvm/subsystems:jar_dependency_management',
-    'src/python/pants/backend/jvm/subsystems:shader',
     'src/python/pants/backend/jvm/targets:all',
-    'src/python/pants/backend/jvm/tasks:all',
     'src/python/pants/base:deprecated',
     'src/python/pants/build_graph',
     'src/python/pants/goal',
@@ -101,7 +99,6 @@ python_library(
   name='target_types',
   sources=['target_types.py'],
   dependencies=[
-    'src/python/pants/backend/jvm/subsystems:shader',
     'src/python/pants/engine:addresses',
     'src/python/pants/engine:target',
     'src/python/pants/java/jar',

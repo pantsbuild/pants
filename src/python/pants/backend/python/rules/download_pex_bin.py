@@ -97,8 +97,8 @@ class DownloadedPexBin(HermeticPex):
 
 @rule
 async def download_pex_bin(pex_binary_tool: PexBin) -> DownloadedPexBin:
-    downloaded_tool = await Get[DownloadedExternalTool](
-        ExternalToolRequest, pex_binary_tool.get_request(Platform.current)
+    downloaded_tool = await Get(
+        DownloadedExternalTool, ExternalToolRequest, pex_binary_tool.get_request(Platform.current)
     )
     return DownloadedPexBin(downloaded_tool)
 
