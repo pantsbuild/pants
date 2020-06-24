@@ -74,5 +74,5 @@ python_tests(
     'testprojects/src/python:print_env_directory',
   ],
   tags = {'integration', 'partially_type_checked'},
-  timeout = 900
+  timeout = 1020
 )
