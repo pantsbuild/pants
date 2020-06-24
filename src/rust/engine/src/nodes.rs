@@ -23,7 +23,7 @@ use crate::selectors;
 use crate::tasks::{self, Rule};
 use boxfuture::{BoxFuture, Boxable};
 use bytes::{self, BufMut};
-use cpython::Python;
+use cpython::{Python, PythonObject};
 use fs::{
   self, Dir, DirectoryListing, File, FileContent, GlobExpansionConjunction, GlobMatching, Link,
   PathGlobs, PathStat, PreparedPathGlobs, StrictGlobMatching, VFS,
@@ -764,7 +764,7 @@ impl Task {
               .cloned()
               .ok_or_else(|| match get.declared_subject {
                 Some(ty) if externs::is_union(ty) => {
-                  let value = externs::get_value_from_type_id(ty);
+                  let value = externs::type_for_type_id(ty).into_object().into();
                   match externs::call_method(
                     &value,
                     "non_member_error_message",

@@ -215,6 +215,16 @@ class Scheduler:
                 for line in fd.readlines():
                     yield line.rstrip()
 
+    def rule_graph_consumed_types(
+        self, root_subject_types: Sequence[Type], product_type: Type
+    ) -> Sequence[Type]:
+        return cast(
+            Sequence[Type],
+            self._native.lib.rule_graph_consumed_types(
+                self._scheduler, root_subject_types, product_type
+            ),
+        )
+
     def invalidate_files(self, direct_filenames):
         # NB: Watchman no longer triggers events when children are created/deleted under a directory,
         # so we always need to invalidate the direct parent as well.
