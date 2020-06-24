@@ -21,7 +21,10 @@ from pants.backend.python.rules.pex import (
     PexRequirements,
 )
 from pants.backend.python.rules.pex_from_targets import PexFromTargetsRequest
-from pants.backend.python.rules.python_sources import StrippedPythonSources
+from pants.backend.python.rules.python_sources import (
+    StrippedPythonSources,
+    StrippedPythonSourcesRequest,
+)
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.backend.python.target_types import (
@@ -46,7 +49,7 @@ from pants.engine.interactive_process import InteractiveProcess
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get, MultiGet
-from pants.engine.target import Targets, TransitiveTargets
+from pants.engine.target import TransitiveTargets
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
 from pants.python.python_setup import PythonSetup
@@ -158,7 +161,9 @@ async def setup_pytest_for_target(
         ),
     )
 
-    prepared_sources_request = Get(StrippedPythonSources, Targets(all_targets))
+    prepared_sources_request = Get(
+        StrippedPythonSources, StrippedPythonSourcesRequest(all_targets, include_resources=True)
+    )
 
     # Get the file names for the test_target so that we can specify to Pytest precisely which files
     # to test, rather than using auto-discovery.

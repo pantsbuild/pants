@@ -3,13 +3,19 @@
 
 from typing import List, Type
 
-from pants.backend.python.rules.python_sources import StrippedPythonSources, UnstrippedPythonSources
+from pants.backend.python.rules.python_sources import (
+    StrippedPythonSources,
+    StrippedPythonSourcesRequest,
+    UnstrippedPythonSources,
+    UnstrippedPythonSourcesRequest,
+)
 from pants.backend.python.rules.python_sources import rules as python_sources_rules
 from pants.backend.python.target_types import PythonSources
 from pants.core.target_types import Files, Resources
 from pants.engine.addresses import Address
+from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
-from pants.engine.target import Sources, Target, Targets
+from pants.engine.target import Sources, Target
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
@@ -27,7 +33,12 @@ class NonPythonTarget(Target):
 class StrippedPythonSourcesTest(TestBase):
     @classmethod
     def rules(cls):
-        return (*super().rules(), *python_sources_rules())
+        return (
+            *super().rules(),
+            *python_sources_rules(),
+            RootRule(StrippedPythonSourcesRequest),
+            RootRule(UnstrippedPythonSourcesRequest),
+        )
 
     def create_target(
         self, *, parent_directory: str, files: List[str], target_cls: Type[Target] = PythonTarget
@@ -51,7 +62,9 @@ class StrippedPythonSourcesTest(TestBase):
         result = self.request_single_product(
             StrippedPythonSources,
             Params(
-                Targets([target_with_init, target_without_init, files_target]),
+                StrippedPythonSourcesRequest(
+                    [target_with_init, target_without_init, files_target], include_resources=True
+                ),
                 create_options_bootstrapper(args=["--source-root-patterns=['src/python']"]),
             ),
         )
@@ -79,20 +92,28 @@ class StrippedPythonSourcesTest(TestBase):
                 parent_directory="src/python", files=["j.java"], target_cls=NonPythonTarget
             ),
         ]
-        result = self.request_single_product(
+        bootstrapper = create_options_bootstrapper()
+        with_resources = self.request_single_product(
             StrippedPythonSources,
-            Params(
-                Targets(targets),
-                create_options_bootstrapper(args=["--source-root-patterns=['src/python']"]),
-            ),
+            Params(StrippedPythonSourcesRequest(targets, include_resources=True), bootstrapper,),
         )
-        assert sorted(result.snapshot.files) == sorted(["p.py", "src/python/f.txt", "r.txt"])
+        assert with_resources.snapshot.files == ("p.py", "r.txt", "src/python/f.txt")
+        without_resources = self.request_single_product(
+            StrippedPythonSources,
+            Params(StrippedPythonSourcesRequest(targets, include_resources=False), bootstrapper,),
+        )
+        assert without_resources.snapshot.files == ("p.py",)
 
 
 class UnstrippedPythonSourcesTest(TestBase):
     @classmethod
     def rules(cls):
-        return (*super().rules(), *python_sources_rules())
+        return (
+            *super().rules(),
+            *python_sources_rules(),
+            RootRule(StrippedPythonSourcesRequest),
+            RootRule(UnstrippedPythonSourcesRequest),
+        )
 
     def create_target(
         self, *, parent_directory: str, files: List[str], target_cls: Type[Target] = PythonTarget
@@ -116,7 +137,9 @@ class UnstrippedPythonSourcesTest(TestBase):
         result = self.request_single_product(
             UnstrippedPythonSources,
             Params(
-                Targets([target_with_init, target_without_init, files_target]),
+                UnstrippedPythonSourcesRequest(
+                    [target_with_init, target_without_init, files_target], include_resources=True
+                ),
                 create_options_bootstrapper(args=["--source-root-patterns=['src/python']"]),
             ),
         )
@@ -144,13 +167,18 @@ class UnstrippedPythonSourcesTest(TestBase):
                 parent_directory="src/python", files=["j.java"], target_cls=NonPythonTarget
             ),
         ]
-        result = self.request_single_product(
+        bootstrapper = create_options_bootstrapper()
+        with_resources = self.request_single_product(
             UnstrippedPythonSources,
-            Params(
-                Targets(targets),
-                create_options_bootstrapper(args=["--source-root-patterns=['src/python']"]),
-            ),
+            Params(UnstrippedPythonSourcesRequest(targets, include_resources=True), bootstrapper),
         )
-        assert sorted(result.snapshot.files) == sorted(
-            ["src/python/p.py", "src/python/f.txt", "src/python/r.txt"]
+        assert with_resources.snapshot.files == (
+            "src/python/f.txt",
+            "src/python/p.py",
+            "src/python/r.txt",
         )
+        without_resources = self.request_single_product(
+            UnstrippedPythonSources,
+            Params(UnstrippedPythonSourcesRequest(targets, include_resources=False), bootstrapper),
+        )
+        assert without_resources.snapshot.files == ("src/python/p.py",)

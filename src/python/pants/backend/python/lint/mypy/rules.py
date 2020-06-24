@@ -12,7 +12,10 @@ from pants.backend.python.rules.pex import (
     PexRequest,
     PexRequirements,
 )
-from pants.backend.python.rules.python_sources import StrippedPythonSources
+from pants.backend.python.rules.python_sources import (
+    StrippedPythonSources,
+    StrippedPythonSourcesRequest,
+)
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.backend.python.target_types import PythonSources
@@ -30,7 +33,7 @@ from pants.engine.fs import (
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get, MultiGet
-from pants.engine.target import FieldSetWithOrigin, Targets, TransitiveTargets
+from pants.engine.target import FieldSetWithOrigin, TransitiveTargets
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
@@ -73,7 +76,10 @@ async def mypy_lint(
         TransitiveTargets, Addresses(fs.address for fs in request.field_sets)
     )
 
-    prepared_sources_request = Get(StrippedPythonSources, Targets(transitive_targets.closure))
+    prepared_sources_request = Get(
+        StrippedPythonSources,
+        StrippedPythonSourcesRequest(transitive_targets.closure, include_resources=False),
+    )
     pex_request = Get(
         Pex,
         PexRequest(
@@ -113,17 +119,13 @@ async def mypy_lint(
         ),
     )
 
-    address_references = ", ".join(sorted(tgt.address.spec for tgt in transitive_targets.closure))
     process = pex.create_process(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path=pex.output_filename,
         pex_args=generate_args(mypy, file_list_path=file_list_path),
         input_digest=merged_input_files,
-        description=(
-            f"Run MyPy on {pluralize(len(transitive_targets.closure), 'target')}: "
-            f"{address_references}."
-        ),
+        description=f"Run MyPy on {pluralize(len(prepared_sources.snapshot.files), 'file')}.",
     )
     result = await Get(FallibleProcessResult, Process, process)
     return LintResults([LintResult.from_fallible_process_result(result, linter_name="MyPy")])
