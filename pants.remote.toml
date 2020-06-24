@@ -55,9 +55,3 @@ interpreter_search_paths = [
 [python-native-code]
 ld_flags = []
 cpp_flags = []
-
-[fmt]
-per_target_caching = true
-
-[lint]
-per_target_caching = true
