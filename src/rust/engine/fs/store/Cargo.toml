@@ -5,7 +5,6 @@ authors = ["Daniel Wagner-Hall <dwagnerhall@twitter.com>"]
 edition = "2018"
 
 [dependencies]
-async-trait = "0.1"
 bazel_protos = { path = "../../process_execution/bazel_protos" }
 boxfuture = { path = "../../boxfuture" }
 bytes = "0.4.5"
@@ -15,7 +14,6 @@ dirs = "1"
 fs = { path = ".." }
 futures01 = { package = "futures", version = "0.1" }
 futures = { version = "0.3", features = ["compat"] }
-glob = "0.2.11"
 # TODO: This is 0.5.1 + https://github.com/tikv/grpc-rs/pull/457 + a workaround for https://github.com/rust-lang/cargo/issues/8258
 grpcio = { git = "https://github.com/pantsbuild/grpc-rs.git", rev = "ed3afa3c24ddf1fdd86826e836f57c00757dfc00", default_features = false, features = ["protobuf-codec", "secure"] }
 hashing = { path = "../../hashing" }
