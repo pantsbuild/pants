@@ -404,12 +404,19 @@ impl IntermediateGlobbedFilesAndDirectories {
         // TODO(#9967): Figure out how to consume the existing glob matching logic that works on
         // `VFS` instances!
         match &path_glob {
-          // NB: We interpret globs such that the *only* way to have a glob match the contents of a
-          // whole directory is to end in '/**' or '/**/*'.
           RestrictedPathGlob::Wildcard { wildcard } => {
-            if *wildcard == *DOUBLE_STAR_GLOB {
-              globbed_directories.insert(directory_path, directory_node.clone());
-            }
+            // NB: We interpret globs such that the *only* way to have a glob match the contents of
+            // a whole directory is to end in '/**' or '/**/*'.
+            let fixed_node = if *wildcard == *DOUBLE_STAR_GLOB {
+              directory_node.clone()
+            } else {
+              // We know this matched a directory node, but not its contents. We produce an empty
+              // directory here.
+              let mut empty_node = directory_node.clone();
+              empty_node.set_digest(to_bazel_digest(EMPTY_DIGEST));
+              empty_node
+            };
+            globbed_directories.insert(directory_path, fixed_node);
           }
           RestrictedPathGlob::DirWildcard {
             wildcard,

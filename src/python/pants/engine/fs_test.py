@@ -663,7 +663,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
 
         subset_snapshot = self.request_single_product(Snapshot, ss)
         assert set(subset_snapshot.files) == {"a.txt", "c.txt", "subdir2/a.txt"}
-        assert set(subset_snapshot.dirs) == {"subdir2"}
+        assert set(subset_snapshot.dirs) == {"subdir2", "subdir2/nested_subdir"}
 
     def test_nonexistent_filename_globs(self) -> None:
         # We expect to ignore, rather than error, on files that don't exist in the original snapshot.
