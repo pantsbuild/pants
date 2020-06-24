@@ -274,7 +274,8 @@ async def run_python_test(
         )
         if xml_results_snapshot.files == (test_results_file,):
             xml_results_digest = await Get(
-                Digest, AddPrefix(xml_results_snapshot.digest, test_setup.xml_dir)
+                Digest,
+                AddPrefix(xml_results_snapshot.digest, test_setup.xml_dir),  # type: ignore[arg-type]
             )
         else:
             logger.warning(f"Failed to generate JUnit XML data for {field_set.address}.")
