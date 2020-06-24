@@ -21,8 +21,9 @@ from pants.testutil.option.util import create_options_bootstrapper
 
 class MyPyIntegrationTest(ExternalToolTestBase):
 
+    source_root = "src/python"
     good_source = FileContent(
-        "project/good.py",
+        f"{source_root}/project/good.py",
         dedent(
             """\
             def add(x: int, y: int) -> int:
@@ -33,7 +34,7 @@ class MyPyIntegrationTest(ExternalToolTestBase):
         ).encode(),
     )
     bad_source = FileContent(
-        "project/bad.py",
+        f"{source_root}/project/bad.py",
         dedent(
             """\
             def add(x: int, y: int) -> int:
@@ -44,7 +45,7 @@ class MyPyIntegrationTest(ExternalToolTestBase):
         ).encode(),
     )
     needs_config_source = FileContent(
-        "project/needs_config.py",
+        f"{source_root}/project/needs_config.py",
         dedent(
             """\
             from typing import Any, cast
@@ -74,7 +75,7 @@ class MyPyIntegrationTest(ExternalToolTestBase):
             self.create_file(source_file.path, source_file.content.decode())
         source_globs = [PurePath(source_file.path).name for source_file in source_files]
         self.add_to_build_file(
-            "project",
+            f"{self.source_root}/project",
             dedent(
                 f"""\
                 python_library(
@@ -85,8 +86,10 @@ class MyPyIntegrationTest(ExternalToolTestBase):
                 """
             ),
         )
-        target = self.request_single_product(WrappedTarget, Address("project", name)).target
-        origin = SingleAddress(directory="project", name=name)
+        target = self.request_single_product(
+            WrappedTarget, Address(f"{self.source_root}/project", name)
+        ).target
+        origin = SingleAddress(directory=f"{self.source_root}/project", name=name)
         return TargetWithOrigin(target, origin)
 
     def run_mypy(
@@ -128,15 +131,15 @@ class MyPyIntegrationTest(ExternalToolTestBase):
         result = self.run_mypy([target])
         assert len(result) == 1
         assert result[0].exit_code == 1
-        assert "project/bad.py:4" in result[0].stdout
+        assert f"{self.source_root}/project/bad.py:4" in result[0].stdout
 
     def test_mixed_sources(self) -> None:
         target = self.make_target_with_origin([self.good_source, self.bad_source])
         result = self.run_mypy([target])
         assert len(result) == 1
         assert result[0].exit_code == 1
-        assert "project/good.py" not in result[0].stdout
-        assert "project/bad.py:4" in result[0].stdout
+        assert f"{self.source_root}/project/good.py" not in result[0].stdout
+        assert f"{self.source_root}/project/bad.py:4" in result[0].stdout
         assert "checked 3 source files" in result[0].stdout
 
     def test_multiple_targets(self) -> None:
@@ -147,8 +150,8 @@ class MyPyIntegrationTest(ExternalToolTestBase):
         result = self.run_mypy(targets)
         assert len(result) == 1
         assert result[0].exit_code == 1
-        assert "project/good.py" not in result[0].stdout
-        assert "project/bad.py:4" in result[0].stdout
+        assert f"{self.source_root}/project/good.py" not in result[0].stdout
+        assert f"{self.source_root}/project/bad.py:4" in result[0].stdout
         assert "checked 3 source files" in result[0].stdout
 
     def test_respects_config_file(self) -> None:
@@ -156,14 +159,14 @@ class MyPyIntegrationTest(ExternalToolTestBase):
         result = self.run_mypy([target], config="[mypy]\ndisallow_any_expr = True\n")
         assert len(result) == 1
         assert result[0].exit_code == 1
-        assert "project/needs_config.py:4" in result[0].stdout
+        assert f"{self.source_root}/project/needs_config.py:4" in result[0].stdout
 
     def test_respects_passthrough_args(self) -> None:
         target = self.make_target_with_origin([self.needs_config_source])
         result = self.run_mypy([target], passthrough_args="--disallow-any-expr")
         assert len(result) == 1
         assert result[0].exit_code == 1
-        assert "project/needs_config.py:4" in result[0].stdout
+        assert f"{self.source_root}/project/needs_config.py:4" in result[0].stdout
 
     def test_skip(self) -> None:
         target = self.make_target_with_origin([self.bad_source])
@@ -172,7 +175,7 @@ class MyPyIntegrationTest(ExternalToolTestBase):
 
     def test_transitive_dependencies(self) -> None:
         self.create_file(
-            "project/util/lib.py",
+            f"{self.source_root}/project/util/lib.py",
             dedent(
                 """\
                 def capitalize(v: str) -> str:
@@ -180,9 +183,9 @@ class MyPyIntegrationTest(ExternalToolTestBase):
                 """
             ),
         )
-        self.add_to_build_file("project/util", "python_library()")
+        self.add_to_build_file(f"{self.source_root}/project/util", "python_library()")
         self.create_file(
-            "project/math/add.py",
+            f"{self.source_root}/project/math/add.py",
             dedent(
                 """\
                 from project.util.lib import capitalize
@@ -193,9 +196,12 @@ class MyPyIntegrationTest(ExternalToolTestBase):
                 """
             ),
         )
-        self.add_to_build_file("project/math", "python_library(dependencies=['project/util'])")
+        self.add_to_build_file(
+            f"{self.source_root}/project/math",
+            f"python_library(dependencies=['{self.source_root}/project/util'])",
+        )
         source_content = FileContent(
-            "project/app.py",
+            f"{self.source_root}/project/app.py",
             dedent(
                 """\
                 from project.math.add import add
@@ -205,9 +211,9 @@ class MyPyIntegrationTest(ExternalToolTestBase):
             ).encode(),
         )
         target = self.make_target_with_origin(
-            [source_content], dependencies=[Address.parse("project/math")]
+            [source_content], dependencies=[Address.parse(f"{self.source_root}/project/math")]
         )
         result = self.run_mypy([target])
         assert len(result) == 1
         assert result[0].exit_code == 1
-        assert "project/math/add.py:5" in result[0].stdout
+        assert f"{self.source_root}/project/math/add.py:5" in result[0].stdout

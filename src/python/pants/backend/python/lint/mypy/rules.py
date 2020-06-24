@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Tuple
 
 from pants.backend.python.lint.mypy.subsystem import MyPy
-from pants.backend.python.rules import download_pex_bin, pex, python_sources
+from pants.backend.python.rules import download_pex_bin, inject_init, pex
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
@@ -13,8 +13,9 @@ from pants.backend.python.rules.pex import (
     PexRequirements,
 )
 from pants.backend.python.rules.python_sources import (
-    StrippedPythonSources,
-    StrippedPythonSourcesRequest,
+    UnstrippedPythonSources,
+    UnstrippedPythonSourcesRequest,
+    prepare_unstripped_python_sources,
 )
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
@@ -77,8 +78,8 @@ async def mypy_lint(
     )
 
     prepared_sources_request = Get(
-        StrippedPythonSources,
-        StrippedPythonSourcesRequest(transitive_targets.closure, include_resources=False),
+        UnstrippedPythonSources,
+        UnstrippedPythonSourcesRequest(transitive_targets.closure, include_resources=False),
     )
     pex_request = Get(
         Pex,
@@ -125,6 +126,7 @@ async def mypy_lint(
         pex_path=pex.output_filename,
         pex_args=generate_args(mypy, file_list_path=file_list_path),
         input_digest=merged_input_files,
+        env={"PEX_EXTRA_SYS_PATH": ":".join(prepared_sources.source_roots)},
         description=f"Run MyPy on {pluralize(len(prepared_sources.snapshot.files), 'file')}.",
     )
     result = await Get(FallibleProcessResult, Process, process)
@@ -134,11 +136,12 @@ async def mypy_lint(
 def rules():
     return [
         mypy_lint,
+        prepare_unstripped_python_sources,
         SubsystemRule(MyPy),
         UnionRule(LintRequest, MyPyRequest),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),
-        *python_sources.rules(),
+        *inject_init.rules(),
         *pex.rules(),
         *python_native_code.rules(),
         *strip_source_roots.rules(),
