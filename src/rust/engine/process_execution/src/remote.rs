@@ -20,7 +20,7 @@ use hashing::{Digest, Fingerprint};
 use log::{debug, trace, warn};
 use protobuf::{self, Message, ProtobufEnum};
 use sha2::Sha256;
-use store::{Snapshot, SnapshotOps, Store, StoreFileByDigest};
+use store::{Snapshot, Store, StoreFileByDigest};
 use tokio::time::delay_for;
 
 use crate::{
@@ -1137,10 +1137,8 @@ pub fn extract_output_files(
       future03::try_join(files_digest, future03::try_join_all(directory_digests)).await?;
 
     directory_digests.push(files_digest);
-
-    store
-      .merge(directory_digests)
-      .map_err(|err| format!("Error when merging output files and directories: {:?}", err))
+    Snapshot::merge_directories(store, directory_digests)
+      .map_err(|err| format!("Error when merging output files and directories: {}", err))
       .await
   })
   .compat()

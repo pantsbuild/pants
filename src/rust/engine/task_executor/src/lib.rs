@@ -33,7 +33,7 @@ use std::sync::Arc;
 use futures::future::FutureExt;
 use tokio::runtime::{Builder, Handle, Runtime};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Executor {
   runtime: Option<Arc<Runtime>>,
   handle: Handle,

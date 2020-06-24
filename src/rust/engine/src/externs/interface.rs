@@ -60,7 +60,6 @@ use log::{self, error, warn, Log};
 use logging::logger::LOGGER;
 use logging::{Destination, Logger, PythonLogLevel};
 use rule_graph::{self, RuleGraph};
-use store::SnapshotOps;
 use task_executor::Executor;
 use tempfile::TempDir;
 use workunit_store::{Workunit, WorkunitState};
@@ -1355,9 +1354,11 @@ fn merge_directories(
         scheduler
           .core
           .executor
-          .block_on(scheduler.core.store().merge(digests))
+          .block_on(store::Snapshot::merge_directories(
+            scheduler.core.store(),
+            digests,
+          ))
           .map(|dir| nodes::Snapshot::store_directory(&scheduler.core, &dir).into())
-          .map_err(|e| format!("{:?}", e))
       })
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))
     })

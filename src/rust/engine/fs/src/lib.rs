@@ -33,10 +33,7 @@ mod glob_matching_tests;
 #[cfg(test)]
 mod posixfs_tests;
 
-pub use crate::glob_matching::{
-  ExpandablePathGlobs, GlobMatching, PathGlob, PreparedPathGlobs, DOUBLE_STAR_GLOB,
-  SINGLE_STAR_GLOB,
-};
+pub use crate::glob_matching::{GlobMatching, PreparedPathGlobs};
 
 use std::cmp::min;
 use std::io::{self, Read};
@@ -201,7 +198,7 @@ impl GitignoreStyleExcludes {
     self.is_ignored_path(stat.path(), is_dir)
   }
 
-  pub fn is_ignored_path(&self, path: &Path, is_dir: bool) -> bool {
+  fn is_ignored_path(&self, path: &Path, is_dir: bool) -> bool {
     match self.gitignore.matched(path, is_dir) {
       ::ignore::Match::None | ::ignore::Match::Whitelist(_) => false,
       ::ignore::Match::Ignore(_) => true,
@@ -216,7 +213,7 @@ impl GitignoreStyleExcludes {
   }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum StrictGlobMatching {
   // NB: the Error and Warn variants store a description of the origin of the PathGlob
   // request so that we can make the error message more helpful to users when globs fail to match.
@@ -260,7 +257,7 @@ impl StrictGlobMatching {
   }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum GlobExpansionConjunction {
   AllMatch,
   AnyMatch,
