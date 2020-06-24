@@ -11,17 +11,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'bundle_integration',
-  sources = ['bundle_integration_test.py'],
-  dependencies = [
-    'src/python/pants/testutil:int-test',
-    'testprojects/src/java/org/pantsbuild/testproject:bundle_directory',
-  ],
-  tags = {'integration', 'partially_type_checked'},
-  timeout = 480,
-)
-
-python_tests(
   name = 'changed_integration',
   sources = ['changed_integration_test.py'],
   dependencies = [

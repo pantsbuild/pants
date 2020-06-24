@@ -21,19 +21,12 @@ pantsd = false
 [black]
 args = ["--quiet"]
 
-[compile.rsc]
-worker_count = "%(travis_parallelism)s"
-
 [python-setup]
 resolver_jobs = "%(travis_parallelism)s"
 
 [test.pytest]
 # NB: We set a maximum timeout of 9.8 minutes to fail before hitting Travis' 10 minute timeout (which
 # doesn't give us useful debug info).
-timeout_maximum = 590
-
-[test.junit]
-# NB: See `test.pytest`.
 timeout_maximum = 590
 
 [libc]

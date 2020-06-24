@@ -23,14 +23,14 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
         self.assert_success(pants_run)
         self.assertIn("options.scope = options", pants_run.stdout_data)
         self.assertIn("options.name = None", pants_run.stdout_data)
-        self.assertNotIn("publish.jar.scm_push_attempts = ", pants_run.stdout_data)
+        self.assertNotIn("pytest.timeouts = ", pants_run.stdout_data)
 
-        pants_run = self.run_pants(["options", "--no-colors", "--scope=publish.jar"])
+        pants_run = self.run_pants(["options", "--no-colors", "--scope=pytest"])
         self.assert_success(pants_run)
         self.assertNotIn("options.colors = False", pants_run.stdout_data)
         self.assertNotIn("options.scope = options", pants_run.stdout_data)
         self.assertNotIn("options.name = None", pants_run.stdout_data)
-        self.assertIn("publish.jar.scm_push_attempts = ", pants_run.stdout_data)
+        self.assertIn("pytest.timeouts = ", pants_run.stdout_data)
 
     def test_valid_json(self) -> None:
         pants_run = self.run_pants(["options", "--output-format=json"])
@@ -63,7 +63,7 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
         )
         self.assert_success(pants_run)
         self.assertIn("options.colors = ", pants_run.stdout_data)
-        self.assertIn("unpack-jars.colors = ", pants_run.stdout_data)
+        self.assertIn("pytest.colors = ", pants_run.stdout_data)
         self.assertNotIn("options.scope = ", pants_run.stdout_data)
 
     def test_options_only_overridden(self) -> None:
@@ -176,8 +176,8 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
                         [DEFAULT]
                         some_crazy_thing = 123
 
-                        [test.junit]
-                        fail_fast = true
+                        [pytest]
+                        timeouts = true
                         invalid_option = true
                         """
                     )
@@ -185,7 +185,7 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
             pants_run = self.run_pants([f"--pants-config-files={config_path}", "goals"])
             self.assert_failure(pants_run)
             self.assertIn(
-                "ERROR] Invalid option 'invalid_option' under [test.junit]", pants_run.stderr_data
+                "ERROR] Invalid option 'invalid_option' under [pytest]", pants_run.stderr_data
             )
 
     def test_from_config_invalid_global_option(self) -> None:
@@ -206,9 +206,6 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
                         [GLOBAL]
                         invalid_global = true
                         another_invalid_global = false
-
-                        [test.junit]
-                        fail_fast = true
                         """
                     )
                 )
@@ -230,7 +227,7 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
                 f.write(
                     dedent(
                         """
-                        [test.junit]
+                        [pytest]
                         bad_option = true
 
                         [invalid_scope]
@@ -242,11 +239,11 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
             # Run with invalid config and invalid command line option.
             # Should error out with invalid command line option only.
             pants_run = self.run_pants(
-                [f"--pants-config-files={config_path}", "--test-junit-invalid=ALL", "goals"]
+                [f"--pants-config-files={config_path}", "--pytest-invalid=ALL", "goals"]
             )
             self.assert_failure(pants_run)
             self.assertIn(
-                "Unrecognized command line flag '--invalid' on scope 'test.junit'",
+                "Unrecognized command line flag '--invalid' on scope 'pytest'",
                 pants_run.stderr_data,
             )
 
@@ -255,29 +252,20 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
             pants_run = self.run_pants([f"--pants-config-files={config_path}", "goals"])
             self.assert_failure(pants_run)
             self.assertIn(
-                "ERROR] Invalid option 'bad_option' under [test.junit]", pants_run.stderr_data
+                "ERROR] Invalid option 'bad_option' under [pytest]", pants_run.stderr_data
             )
             self.assertIn("ERROR] Invalid scope [invalid_scope]", pants_run.stderr_data)
 
     def test_command_line_option_unused_by_goals(self) -> None:
-        self.assert_success(self.run_pants(["filter", "--bundle-jvm-archive=zip"]))
-        self.assert_failure(self.run_pants(["filter", "--jvm-invalid=zip"]))
-
-    def test_non_recursive_quiet_no_output(self) -> None:
-        pants_run = self.run_pants(["-q", "compile"])
-        self.assert_success(pants_run)
-        self.assertEqual("", pants_run.stdout_data)
+        self.assert_success(self.run_pants(["filter", "--test-debug"]))
+        self.assert_failure(self.run_pants(["filter", "--debug"]))
 
     def test_skip_inherited(self) -> None:
         pants_run = self.run_pants(
             [
                 "--no-colors",
-                "--no-jvm-platform-validate-colors",
-                "--test-junit-colors",
-                "--unpack-jars-colors",
-                "--imports-ivy-imports-colors",
-                "--compile-colors",
-                "--no-compile-rsc-colors",
+                "--no-pytest-colors",
+                "--setup-py-colors",
                 "options",
                 "--skip-inherited",
                 "--name=colors",
@@ -291,13 +279,9 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
         # This should be included because it has no super-scopes.
         self.assertIn("colors = False", lines)
         # These should be included because they differ from the super-scope value.
-        self.assertIn("test.junit.colors = True", lines)
-        self.assertIn("unpack-jars.colors = True", lines)
-        self.assertIn("imports.ivy-imports.colors = True", lines)
-        self.assertIn("compile.colors = True", lines)
-        self.assertIn("compile.rsc.colors = False", lines)
+        self.assertIn("setup-py.colors = True", lines)
         # These should be omitted because they have the same value as their super-scope.
-        self.assertNotIn("jvm-platform-validate.colors = False", lines)
+        self.assertNotIn("pytest.colors = False", lines)
 
     def test_pants_ignore_option(self) -> None:
         with temporary_dir(root_dir=os.path.abspath(".")) as tempdir:

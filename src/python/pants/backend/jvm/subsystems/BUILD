@@ -156,26 +156,11 @@ python_library(
   name = 'shader',
   sources = ['shader.py'],
   dependencies = [
-    'src/python/pants/backend/jvm/tasks:classpath_util',
-    'src/python/pants/backend/jvm/tasks:jvm_tool_task_mixin',
     'src/python/pants/java/distribution',
     'src/python/pants/java:executor',
     'src/python/pants/java/jar',
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_library(
-  name = 'zinc',
-  sources = ['zinc.py'],
-  dependencies = [
-    ':dependency_context',
-    ':jvm_tool_mixin',
-    ':shader',
-    'src/python/pants/subsystem',
-    'src/python/pants/util:dirutil',
   ],
   tags = {"partially_type_checked"},
 )
@@ -205,7 +190,6 @@ python_library(
   dependencies=[
     ':jvm_tool_mixin',
     ':shader',
-    ':zinc',
     'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
   ],
