@@ -340,7 +340,7 @@ async def run_tests(
     return Test(exit_code)
 
 
-@rule
+@rule(desc="Run test target")
 async def coordinator_of_tests(wrapped_field_set: WrappedTestFieldSet) -> AddressAndTestResult:
     field_set = wrapped_field_set.field_set
     result = await Get[TestResult](TestFieldSet, field_set)
