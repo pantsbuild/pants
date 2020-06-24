@@ -18,7 +18,7 @@ from pants.source.source_root import SourceRoot, SourceRootRequest
 
 
 @dataclass(frozen=True)
-class ImportablePythonSources:
+class StrippedPythonSources:
     """Sources that can be imported and used by Python, relative to the root.
 
     Specifically, this will filter out to only have Python, resources(), and files() targets;
@@ -34,7 +34,7 @@ class ImportablePythonSources:
 
 
 @dataclass(frozen=True)
-class IntrospectablePythonSources:
+class UnstrippedPythonSources:
     """Sources that can be introspected by Python, relative to a set of source roots.
 
     Specifically, this will filter out to only have Python, resources(), and files() targets;
@@ -53,7 +53,7 @@ class IntrospectablePythonSources:
 
 
 @rule
-async def prepare_importable_python_sources(targets: Targets) -> ImportablePythonSources:
+async def prepare_stripped_python_sources(targets: Targets) -> StrippedPythonSources:
     stripped_sources = await Get[SourceFiles](
         AllSourceFilesRequest(
             (tgt.get(Sources) for tgt in targets),
@@ -65,11 +65,11 @@ async def prepare_importable_python_sources(targets: Targets) -> ImportablePytho
     init_injected = await Get[InitInjectedSnapshot](
         InjectInitRequest(sources_snapshot=stripped_sources.snapshot, sources_stripped=True)
     )
-    return ImportablePythonSources(init_injected.snapshot)
+    return StrippedPythonSources(init_injected.snapshot)
 
 
 @rule
-async def prepare_introspectable_python_sources(targets: Targets) -> IntrospectablePythonSources:
+async def prepare_unstripped_python_sources(targets: Targets) -> UnstrippedPythonSources:
     sources = await Get[SourceFiles](
         AllSourceFilesRequest(
             (tgt.get(Sources) for tgt in targets),
@@ -92,13 +92,13 @@ async def prepare_introspectable_python_sources(targets: Targets) -> Introspecta
     init_injected = await Get[InitInjectedSnapshot](
         InjectInitRequest(sources.snapshot, sources_stripped=False)
     )
-    return IntrospectablePythonSources(init_injected.snapshot, tuple(sorted(source_root_paths)))
+    return UnstrippedPythonSources(init_injected.snapshot, tuple(sorted(source_root_paths)))
 
 
 def rules():
     return [
-        prepare_importable_python_sources,
-        prepare_introspectable_python_sources,
+        prepare_stripped_python_sources,
+        prepare_unstripped_python_sources,
         *determine_source_files.rules(),
         *inject_init_rules(),
         RootRule(Targets),

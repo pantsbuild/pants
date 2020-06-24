@@ -3,10 +3,8 @@
 
 from typing import List, Type
 
-from pants.backend.python.rules.importable_python_sources import ImportablePythonSources
-from pants.backend.python.rules.importable_python_sources import (
-    rules as importable_python_sources_rules,
-)
+from pants.backend.python.rules.python_sources import StrippedPythonSources
+from pants.backend.python.rules.python_sources import rules as python_sources_rules
 from pants.backend.python.target_types import PythonSources
 from pants.core.target_types import Files, Resources
 from pants.engine.addresses import Address
@@ -26,10 +24,10 @@ class NonPythonTarget(Target):
     core_fields = (Sources,)
 
 
-class ImportablePythonSourcesTest(TestBase):
+class StrippedPythonSourcesTest(TestBase):
     @classmethod
     def rules(cls):
-        return (*super().rules(), *importable_python_sources_rules())
+        return (*super().rules(), *python_sources_rules())
 
     def create_target(
         self, *, parent_directory: str, files: List[str], target_cls: Type[Target] = PythonTarget
@@ -51,7 +49,7 @@ class ImportablePythonSourcesTest(TestBase):
             target_cls=Files,
         )
         result = self.request_single_product(
-            ImportablePythonSources,
+            StrippedPythonSources,
             Params(
                 Targets([target_with_init, target_without_init, files_target]),
                 create_options_bootstrapper(args=["--source-root-patterns=src/python"]),
@@ -82,7 +80,7 @@ class ImportablePythonSourcesTest(TestBase):
             ),
         ]
         result = self.request_single_product(
-            ImportablePythonSources,
+            StrippedPythonSources,
             Params(
                 Targets(targets),
                 create_options_bootstrapper(args=["--source-root-patterns=src/python"]),

@@ -14,7 +14,7 @@ from pants.backend.python.rules.coverage import (
     CoverageSubsystem,
     PytestCoverageData,
 )
-from pants.backend.python.rules.importable_python_sources import IntrospectablePythonSources
+from pants.backend.python.rules.python_sources import UnstrippedPythonSources
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
@@ -155,7 +155,7 @@ async def setup_pytest_for_target(
         ),
     )
 
-    prepared_sources_request = Get[IntrospectablePythonSources](Targets(all_targets))
+    prepared_sources_request = Get[UnstrippedPythonSources](Targets(all_targets))
 
     # Get the file names for the test_target so that we can specify to Pytest precisely which files
     # to test, rather than using auto-discovery.

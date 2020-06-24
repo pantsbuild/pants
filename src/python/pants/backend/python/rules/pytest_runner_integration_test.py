@@ -9,10 +9,10 @@ from typing import List, Optional
 
 from pants.backend.python.rules import (
     download_pex_bin,
-    importable_python_sources,
     pex,
     pex_from_targets,
     pytest_runner,
+    python_sources,
 )
 from pants.backend.python.rules.coverage import create_coverage_config, prepare_coverage_plugin
 from pants.backend.python.rules.pytest_runner import PythonTestFieldSet
@@ -123,7 +123,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
             *pytest_runner.rules(),
             *download_pex_bin.rules(),
             *determine_source_files.rules(),
-            *importable_python_sources.rules(),
+            *python_sources.rules(),
             *pex.rules(),
             *pex_from_targets.rules(),
             *python_native_code.rules(),
