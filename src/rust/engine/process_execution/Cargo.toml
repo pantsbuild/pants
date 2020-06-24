@@ -30,7 +30,7 @@ store = { path = "../fs/store" }
 task_executor = { path = "../task_executor" }
 tempfile = "3"
 concrete_time = { path = "../concrete_time" }
-tokio = { version = "0.2", features = ["process", "rt-threaded", "tcp", "time"] }
+tokio = { version = "0.2", features = ["process", "rt-threaded", "sync", "tcp", "time"] }
 tokio-util = { version = "0.2", features = ["codec"] }
 uname = "0.1.1"
 workunit_store = { path = "../workunit_store" }

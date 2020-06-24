@@ -23,6 +23,7 @@ use super::{
   format_error, maybe_add_workunit, populate_fallible_execution_result,
   populate_fallible_execution_result_for_timeout, ExecutionError, OperationOrStatus,
 };
+use crate::remote::async_lazy_value::AsyncLazyValue;
 use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, PlatformConstraint,
   Process, ProcessMetadata,
@@ -54,6 +55,7 @@ pub struct StreamingCommandRunner {
   env: Arc<grpcio::Environment>,
   execution_client: Arc<bazel_protos::remote_execution_grpc::ExecutionClient>,
   overall_deadline: Duration,
+  capabilities: AsyncLazyValue<Result<bazel_protos::remote_execution::ServerCapabilities, String>>,
 }
 
 enum StreamOutcome {
@@ -97,8 +99,23 @@ impl StreamingCommandRunner {
       );
     }
 
-    // Validate that any configured static headers are valid.
-    call_option(&headers, None)?;
+    // Validate that any configured static headers are valid. This will also be used for
+    // the capabilities getter.
+    let opt = call_option(&headers, None)?;
+
+    let capabilities_client =
+      bazel_protos::remote_execution_grpc::CapabilitiesClient::new(channel.clone());
+    let instance_name = metadata.instance_name.clone().unwrap_or_default();
+    let capabilities_fut = async move {
+      let mut request = bazel_protos::remote_execution::GetCapabilitiesRequest::new();
+      request.instance_name = instance_name;
+      capabilities_client
+        .get_capabilities_async_opt(&request, opt)
+        .unwrap()
+        .compat()
+        .await
+        .map_err(super::rpcerror_to_string)
+    };
 
     let command_runner = StreamingCommandRunner {
       metadata,
@@ -109,6 +126,7 @@ impl StreamingCommandRunner {
       store,
       platform,
       overall_deadline,
+      capabilities: AsyncLazyValue::new(capabilities_fut),
     };
 
     Ok(command_runner)
@@ -585,6 +603,10 @@ impl crate::CommandRunner for StreamingCommandRunner {
     request: MultiPlatformProcess,
     context: Context,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
+    // Retrieve capabilities for this server.
+    let capabilities = self.capabilities.get().await.unwrap();
+    trace!("RE capabilities: {:?}", &capabilities);
+
     // Construct the REv2 ExecuteRequest and related data for this execution request.
     let request = self.extract_compatible_request(&request).unwrap();
     let store = self.store.clone();
