@@ -275,13 +275,11 @@ class GlobalOptions(Subsystem):
             advanced=True,
             type=list,
             default=[
-                "pants.backend.graph_info",
                 "pants.backend.python",
                 "pants.backend.jvm",
                 "pants.backend.native",
                 "pants.backend.codegen.thrift.java",
                 "pants.backend.codegen.thrift.python",
-                "pants.backend.project_info",
                 "pants.cache",
             ],
             help=(

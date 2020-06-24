@@ -9,7 +9,7 @@ from contextlib import contextmanager
 from pex.pex_builder import PEXBuilder
 
 from pants.backend.python.targets.python_library import PythonLibrary
-from pants.python.pex_build_util import PexBuilderWrapper
+from pants.python.pex_build_util import PexBuilderWrapper, identify_missing_init_files
 from pants.source.source_root import SourceRootConfig
 from pants.testutil.subsystem.util import init_subsystem
 from pants.testutil.test_base import TestBase
@@ -46,7 +46,7 @@ class TestPexBuilderWrapper(TestBase):
                 os.umask(prior_umask)
             yield pathlib.Path(chroot)
 
-    def test(self):
+    def test(self) -> None:
         init_subsystem(SourceRootConfig, {"source": {"root_patterns": ["src/python"]}})
         self.create_file("src/python/package/module.py")
         implicit_package_target = self.make_target(
@@ -76,3 +76,28 @@ class TestPexBuilderWrapper(TestBase):
                         file_path = pathlib.Path(root) / f
                         if file_path not in user_files:
                             self.assert_file_perms(file_path)
+
+
+def test_identify_missing_init_files() -> None:
+    assert {
+        "a/__init__.py",
+        "a/b/__init__.py",
+        "a/b/c/d/__init__.py",
+    } == identify_missing_init_files(
+        ["a/b/foo.py", "a/b/c/__init__.py", "a/b/c/d/bar.py", "a/e/__init__.py"]
+    )
+
+    assert {
+        "src/__init__.py",
+        "src/python/__init__.py",
+        "src/python/a/__init__.py",
+        "src/python/a/b/__init__.py",
+        "src/python/a/b/c/d/__init__.py",
+    } == identify_missing_init_files(
+        [
+            "src/python/a/b/foo.py",
+            "src/python/a/b/c/__init__.py",
+            "src/python/a/b/c/d/bar.py",
+            "src/python/a/e/__init__.py",
+        ]
+    )
