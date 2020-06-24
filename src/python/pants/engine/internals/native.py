@@ -1,15 +1,11 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import importlib
 import logging
 import os
-import sys
-from contextlib import closing
 from types import CoroutineType
 from typing import Dict, Iterable, List, Tuple, cast
 
-import pkg_resources
 from typing_extensions import Protocol
 
 from pants.base.exiter import ExitCode
@@ -31,18 +27,15 @@ from pants.engine.fs import (
     UrlToFetch,
 )
 from pants.engine.interactive_process import InteractiveProcess, InteractiveProcessResult
+from pants.engine.internals import native_engine  # type: ignore
 from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResultWithPlatform, MultiPlatformProcess
 from pants.engine.selectors import Get
 from pants.engine.unions import union
-from pants.util.dirutil import safe_mkdtemp
 from pants.util.memo import memoized_property
 from pants.util.meta import SingletonMetaclass
 
 logger = logging.getLogger(__name__)
-
-
-NATIVE_ENGINE_MODULE = "native_engine"
 
 
 class Externs:
@@ -128,32 +121,9 @@ class Native(metaclass=SingletonMetaclass):
         pass
 
     @memoized_property
-    def _binary(self):
-        """Load and return the path to the native engine binary."""
-        lib_name = "{}.so".format(NATIVE_ENGINE_MODULE)
-        lib_path = os.path.join(safe_mkdtemp(), lib_name)
-        try:
-            with closing(pkg_resources.resource_stream(__name__, lib_name)) as input_fp:
-                # NB: The header stripping code here must be coordinated with header insertion code in
-                #     build-support/bin/native/bootstrap_code.sh
-                engine_version = input_fp.readline().decode().strip()
-                repo_version = input_fp.readline().decode().strip()
-                logger.debug("using {} built at {}".format(engine_version, repo_version))
-                with open(lib_path, "wb") as output_fp:
-                    output_fp.write(input_fp.read())
-        except (IOError, OSError) as e:
-            raise self.BinaryLocationError(
-                "Error unpacking the native engine binary to path {}: {}".format(lib_path, e), e
-            )
-        return lib_path
-
-    @memoized_property
     def lib(self):
         """Load the native engine as a python module."""
-        native_bin_dir = os.path.dirname(self._binary)
-        logger.debug("loading native engine python module from: %s", native_bin_dir)
-        sys.path.insert(0, native_bin_dir)
-        return importlib.import_module(NATIVE_ENGINE_MODULE)
+        return native_engine
 
     def decompress_tarball(self, tarfile_path, dest_dir):
         return self.lib.decompress_tarball(tarfile_path, dest_dir)
