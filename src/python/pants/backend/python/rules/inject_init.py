@@ -1,5 +1,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 import os
 from dataclasses import dataclass
 
@@ -7,7 +8,6 @@ from pants.engine.fs import Digest, FileContent, InputFilesContent, MergeDigests
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.python.pex_build_util import identify_missing_init_files
-# NB: Needed due to graph ambiguity.
 from pants.source.source_root import OptionalSourceRoot, SourceRootRequest
 
 
