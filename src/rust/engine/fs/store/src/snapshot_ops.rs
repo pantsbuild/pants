@@ -407,16 +407,16 @@ impl IntermediateGlobbedFilesAndDirectories {
           RestrictedPathGlob::Wildcard { wildcard } => {
             // NB: We interpret globs such that the *only* way to have a glob match the contents of
             // a whole directory is to end in '/**' or '/**/*'.
-            let fixed_node = if *wildcard == *DOUBLE_STAR_GLOB {
-              directory_node.clone()
-            } else {
+            if *wildcard == *DOUBLE_STAR_GLOB {
+              globbed_directories.insert(directory_path, directory_node.clone());
+            } else if !globbed_directories.contains_key(&directory_path) {
               // We know this matched a directory node, but not its contents. We produce an empty
-              // directory here.
+              // directory here. We avoid doing this if we have already globbed a full directory,
+              // since we take the union of all matched subglobs.
               let mut empty_node = directory_node.clone();
               empty_node.set_digest(to_bazel_digest(EMPTY_DIGEST));
-              empty_node
+              globbed_directories.insert(directory_path, empty_node);
             };
-            globbed_directories.insert(directory_path, fixed_node);
           }
           RestrictedPathGlob::DirWildcard {
             wildcard,
