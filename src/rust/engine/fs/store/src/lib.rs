@@ -28,17 +28,14 @@
 #![allow(clippy::mutex_atomic)]
 #![type_length_limit = "8576838"]
 
+#[macro_use]
+extern crate log;
+
 mod snapshot;
 pub use crate::snapshot::{OneOffStoreFileByDigest, Snapshot, StoreFileByDigest};
-mod snapshot_ops;
-#[cfg(test)]
-mod snapshot_ops_tests;
 #[cfg(test)]
 mod snapshot_tests;
-pub use crate::snapshot_ops::{SnapshotOps, StoreWrapper, SubsetParams};
 
-use async_trait::async_trait;
-use bazel_protos::remote_execution as remexec;
 use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
 use concrete_time::TimeSpan;
@@ -182,7 +179,7 @@ enum RootOrParentMetadataBuilder {
 /// It can also write back to a remote gRPC server, but will only do so when explicitly instructed
 /// to do so.
 ///
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Store {
   local: local::ByteStore,
   remote: Option<remote::ByteStore>,
@@ -1035,37 +1032,6 @@ impl Store {
 
   pub fn all_local_digests(&self, entry_type: EntryType) -> Result<Vec<Digest>, String> {
     self.local.all_digests(entry_type)
-  }
-}
-
-#[async_trait]
-impl StoreWrapper for Store {
-  async fn load_file_bytes_with<T: Send + 'static, F: Fn(&[u8]) -> T + Send + Sync + 'static>(
-    &self,
-    digest: Digest,
-    f: F,
-  ) -> Result<Option<T>, String> {
-    Ok(
-      Store::load_file_bytes_with(self, digest, f)
-        .await?
-        .map(|(value, _)| value),
-    )
-  }
-
-  async fn load_directory(&self, digest: Digest) -> Result<Option<remexec::Directory>, String> {
-    Ok(
-      Store::load_directory(self, digest)
-        .await?
-        .map(|(dir, _)| dir),
-    )
-  }
-
-  async fn load_directory_or_err(&self, digest: Digest) -> Result<remexec::Directory, String> {
-    Snapshot::get_directory_or_err(self.clone(), digest).await
-  }
-
-  async fn record_directory(&self, directory: &remexec::Directory) -> Result<Digest, String> {
-    Store::record_directory(self, directory, true).await
   }
 }
 

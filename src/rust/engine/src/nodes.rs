@@ -1040,14 +1040,16 @@ impl NodeKey {
   fn user_facing_name(&self) -> Option<String> {
     match self {
       NodeKey::Task(ref task) => task.task.display_info.desc.as_ref().map(|s| s.to_owned()),
-      NodeKey::Snapshot(_) => Some(format!("{}", self)),
+      NodeKey::Snapshot(ref s) => Some(format!("Snapshotting: {}", s.0)),
       NodeKey::MultiPlatformExecuteProcess(mp_epr) => mp_epr.0.user_facing_name(),
       NodeKey::DigestFile(DigestFile(File { path, .. })) => {
         Some(format!("Fingerprinting: {}", path.display()))
       }
-      NodeKey::DownloadedFile(..) => None,
+      NodeKey::DownloadedFile(ref d) => Some(format!("Downloading: {}", d.0)),
       NodeKey::ReadLink(..) => None,
-      NodeKey::Scandir(Scandir(Dir(path))) => Some(format!("Reading {}", path.display())),
+      NodeKey::Scandir(Scandir(Dir(path))) => {
+        Some(format!("Reading directory: {}", path.display()))
+      }
       NodeKey::Select(..) => None,
     }
   }
@@ -1170,16 +1172,22 @@ impl Node for NodeKey {
 impl Display for NodeKey {
   fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
     match self {
-      &NodeKey::DigestFile(ref s) => write!(f, "DigestFile({:?})", s.0),
-      &NodeKey::DownloadedFile(ref s) => write!(f, "DownloadedFile({:?})", s.0),
+      &NodeKey::DigestFile(ref s) => write!(f, "DigestFile({})", s.0.path.display()),
+      &NodeKey::DownloadedFile(ref s) => write!(f, "DownloadedFile({})", s.0),
       &NodeKey::MultiPlatformExecuteProcess(ref s) => {
-        write!(f, "MultiPlatformExecuteProcess({:?}", s.0)
+        if let Some(name) = s.0.user_facing_name() {
+          write!(f, "Process({})", name)
+        } else {
+          write!(f, "Process({:?})", s)
+        }
       }
-      &NodeKey::ReadLink(ref s) => write!(f, "ReadLink({:?})", s.0),
-      &NodeKey::Scandir(ref s) => write!(f, "Scandir({:?})", s.0),
-      &NodeKey::Select(ref s) => write!(f, "Select({}, {})", s.params, s.product,),
-      &NodeKey::Task(ref task) => write!(f, "{:?}", task),
-      &NodeKey::Snapshot(ref s) => write!(f, "Snapshot({})", format!("{}", &s.0)),
+      &NodeKey::ReadLink(ref s) => write!(f, "ReadLink({})", (s.0).0.display()),
+      &NodeKey::Scandir(ref s) => write!(f, "Scandir({})", (s.0).0.display()),
+      &NodeKey::Select(ref s) => write!(f, "{}", s.product),
+      &NodeKey::Task(ref task) => {
+        write!(f, "@rule {}({})", task.task.display_info.name, task.params)
+      }
+      &NodeKey::Snapshot(ref s) => write!(f, "Snapshot({})", s.0),
     }
   }
 }
@@ -1187,10 +1195,6 @@ impl Display for NodeKey {
 impl NodeError for Failure {
   fn invalidated() -> Failure {
     Failure::Invalidated
-  }
-
-  fn exhausted() -> Failure {
-    Context::mk_error("Exhausted retries while waiting for the filesystem to stabilize.")
   }
 
   fn cyclic(mut path: Vec<String>) -> Failure {
