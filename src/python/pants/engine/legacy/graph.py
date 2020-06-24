@@ -436,7 +436,7 @@ async def transitive_hydrated_targets(
     """
 
     transitive_hydrated_targets = await MultiGet(
-        Get[TransitiveHydratedTarget](Address, a) for a in addresses
+        Get(TransitiveHydratedTarget, Address, a) for a in addresses
     )
 
     closure: OrderedSet[HydratedTarget] = OrderedSet()
@@ -458,10 +458,10 @@ async def transitive_hydrated_targets(
 async def legacy_transitive_hydrated_targets(
     addresses: Addresses,
 ) -> LegacyTransitiveHydratedTargets:
-    thts = await Get[TransitiveHydratedTargets](Addresses, addresses)
-    roots_bfas = await MultiGet(Get[BuildFileAddress](Address, ht._address) for ht in thts.roots)
+    thts = await Get(TransitiveHydratedTargets, Addresses, addresses)
+    roots_bfas = await MultiGet(Get(BuildFileAddress, Address, ht._address) for ht in thts.roots)
     closure_bfas = await MultiGet(
-        Get[BuildFileAddress](Address, ht._address) for ht in thts.closure
+        Get(BuildFileAddress, Address, ht._address) for ht in thts.closure
     )
     return LegacyTransitiveHydratedTargets(
         roots=tuple(
@@ -478,7 +478,7 @@ async def legacy_transitive_hydrated_targets(
 @rule
 async def transitive_hydrated_target(root: HydratedTarget) -> TransitiveHydratedTarget:
     dependencies = await MultiGet(
-        Get[TransitiveHydratedTarget](Address, d) for d in root.adaptor.dependencies
+        Get(TransitiveHydratedTarget, Address, d) for d in root.adaptor.dependencies
     )
     return TransitiveHydratedTarget(root, dependencies)
 
@@ -498,7 +498,7 @@ async def hydrate_target(hydrated_struct: HydratedStruct) -> HydratedTarget:
     target_adaptor = cast(TargetAdaptor, hydrated_struct.value)
     # Hydrate the fields of the adaptor and re-construct it.
     hydrated_fields = await MultiGet(
-        Get[HydratedField](HydrateableField, fa) for fa in target_adaptor.field_adaptors
+        Get(HydratedField, HydrateableField, fa) for fa in target_adaptor.field_adaptors
     )
     kwargs = target_adaptor.kwargs()
     for field in hydrated_fields:
@@ -508,7 +508,7 @@ async def hydrate_target(hydrated_struct: HydratedStruct) -> HydratedTarget:
 
 @rule
 async def hydrated_targets(addresses: Addresses) -> HydratedTargets:
-    targets = await MultiGet(Get[HydratedTarget](Address, a) for a in addresses)
+    targets = await MultiGet(Get(HydratedTarget, Address, a) for a in addresses)
     return HydratedTargets(targets)
 
 
@@ -539,14 +539,14 @@ async def hydrate_sources(
         sources_field.path_globs,
         glob_match_error_behavior=glob_match_error_behavior,
         # TODO(#9012): add line number referring to the sources field. When doing this, we'll likely
-        # need to `await Get[BuildFileAddress](Address)`.
+        # need to `await Get(BuildFileAddress](Address)`.
         description_of_origin=(
             f"{address}'s `{sources_field.arg}` field"
             if glob_match_error_behavior != GlobMatchErrorBehavior.ignore
             else None
         ),
     )
-    snapshot = await Get[Snapshot](PathGlobs, path_globs)
+    snapshot = await Get(Snapshot, PathGlobs, path_globs)
     fileset_with_spec = _eager_fileset_with_spec(
         spec_path=address.spec_path,
         filespec=sources_field.source_globs.filespecs,
@@ -568,7 +568,7 @@ async def hydrate_bundles(
             pg,
             glob_match_error_behavior=glob_match_error_behavior,
             # TODO(#9012): add line number referring to the bundles field. When doing this, we'll likely
-            # need to `await Get[BuildFileAddress](Address)`.
+            # need to `await Get(BuildFileAddress, Address)`.
             description_of_origin=(
                 f"{address}'s `bundles` field"
                 if glob_match_error_behavior != GlobMatchErrorBehavior.ignore
@@ -578,7 +578,7 @@ async def hydrate_bundles(
         for pg in bundles_field.path_globs_list
     ]
     snapshot_list = await MultiGet(
-        Get[Snapshot](PathGlobs, pg) for pg in path_globs_with_match_errors
+        Get(Snapshot, PathGlobs, pg) for pg in path_globs_with_match_errors
     )
 
     bundles = []

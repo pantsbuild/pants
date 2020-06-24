@@ -109,7 +109,7 @@ async def lint(
         for lint_request_type in union_membership[LintRequest]
     )
     field_sets_with_sources: Iterable[FieldSetsWithSources] = await MultiGet(
-        Get[FieldSetsWithSources](FieldSetsWithSourcesRequest(lint_request.field_sets))
+        Get(FieldSetsWithSources, FieldSetsWithSourcesRequest(lint_request.field_sets))
         for lint_request in lint_requests
     )
     valid_lint_requests: Iterable[StyleRequest] = tuple(
@@ -120,13 +120,13 @@ async def lint(
 
     if options.values.per_target_caching:
         results = await MultiGet(
-            Get[LintResults](LintRequest, lint_request.__class__([field_set]))
+            Get(LintResults, LintRequest, lint_request.__class__([field_set]))
             for lint_request in valid_lint_requests
             for field_set in lint_request.field_sets
         )
     else:
         results = await MultiGet(
-            Get[LintResults](LintRequest, lint_request) for lint_request in valid_lint_requests
+            Get(LintResults, LintRequest, lint_request) for lint_request in valid_lint_requests
         )
 
     if not results:

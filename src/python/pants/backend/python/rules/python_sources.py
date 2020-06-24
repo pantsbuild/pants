@@ -55,33 +55,37 @@ class UnstrippedPythonSources:
 
 @rule
 async def prepare_stripped_python_sources(targets: Targets) -> StrippedPythonSources:
-    stripped_sources = await Get[SourceFiles](
+    stripped_sources = await Get(
+        SourceFiles,
         AllSourceFilesRequest(
             (tgt.get(Sources) for tgt in targets),
             for_sources_types=(PythonSources, ResourcesSources, FilesSources),
             enable_codegen=True,
             strip_source_roots=True,
-        )
+        ),
     )
-    init_injected = await Get[InitInjectedSnapshot](
-        InjectInitRequest(sources_snapshot=stripped_sources.snapshot, sources_stripped=True)
+    init_injected = await Get(
+        InitInjectedSnapshot,
+        InjectInitRequest(sources_snapshot=stripped_sources.snapshot, sources_stripped=True),
     )
     return StrippedPythonSources(init_injected.snapshot)
 
 
 @rule
 async def prepare_unstripped_python_sources(targets: Targets) -> UnstrippedPythonSources:
-    sources = await Get[SourceFiles](
+    sources = await Get(
+        SourceFiles,
         AllSourceFilesRequest(
             (tgt.get(Sources) for tgt in targets),
             for_sources_types=(PythonSources, ResourcesSources, FilesSources),
             enable_codegen=True,
             strip_source_roots=False,
-        )
+        ),
     )
 
     source_root_objs = await MultiGet(
-        Get[SourceRoot](
+        Get(
+            SourceRoot,
             SourceRootRequest,
             SourceRootRequest.for_file(representative_path_from_address(tgt.address)),
         )
@@ -90,8 +94,8 @@ async def prepare_unstripped_python_sources(targets: Targets) -> UnstrippedPytho
     )
     source_root_paths = {source_root_obj.path for source_root_obj in source_root_objs}
 
-    init_injected = await Get[InitInjectedSnapshot](
-        InjectInitRequest(sources.snapshot, sources_stripped=False)
+    init_injected = await Get(
+        InitInjectedSnapshot, InjectInitRequest(sources.snapshot, sources_stripped=False)
     )
     return UnstrippedPythonSources(init_injected.snapshot, tuple(sorted(source_root_paths)))
 

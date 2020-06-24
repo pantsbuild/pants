@@ -91,7 +91,7 @@ async def resolve_target(
 
 @rule
 async def resolve_targets(addresses: Addresses) -> Targets:
-    wrapped_targets = await MultiGet(Get[WrappedTarget](Address, a) for a in addresses)
+    wrapped_targets = await MultiGet(Get(WrappedTarget, Address, a) for a in addresses)
     return Targets(wrapped_target.target for wrapped_target in wrapped_targets)
 
 
@@ -102,7 +102,7 @@ async def resolve_targets(addresses: Addresses) -> Targets:
 
 @rule
 async def resolve_target_with_origin(address_with_origin: AddressWithOrigin) -> TargetWithOrigin:
-    wrapped_target = await Get[WrappedTarget](Address, address_with_origin.address)
+    wrapped_target = await Get(WrappedTarget, Address, address_with_origin.address)
     return TargetWithOrigin(wrapped_target.target, address_with_origin.origin)
 
 
@@ -111,7 +111,7 @@ async def resolve_targets_with_origins(
     addresses_with_origins: AddressesWithOrigins,
 ) -> TargetsWithOrigins:
     targets_with_origins = await MultiGet(
-        Get[TargetWithOrigin](AddressWithOrigin, address_with_origin)
+        Get(TargetWithOrigin, AddressWithOrigin, address_with_origin)
         for address_with_origin in addresses_with_origins
     )
     return TargetsWithOrigins(targets_with_origins)
@@ -127,8 +127,8 @@ async def transitive_target(wrapped_root: WrappedTarget) -> TransitiveTarget:
     root = wrapped_root.target
     if not root.has_field(Dependencies):
         return TransitiveTarget(root, ())
-    dependency_addresses = await Get[Addresses](DependenciesRequest(root[Dependencies]))
-    dependencies = await MultiGet(Get[TransitiveTarget](Address, d) for d in dependency_addresses)
+    dependency_addresses = await Get(Addresses, DependenciesRequest(root[Dependencies]))
+    dependencies = await MultiGet(Get(TransitiveTarget, Address, d) for d in dependency_addresses)
     return TransitiveTarget(root, dependencies)
 
 
@@ -141,7 +141,7 @@ async def transitive_targets(addresses: Addresses) -> TransitiveTargets:
     TransitiveTargets objects are being constructed for multiple roots, their structure will be
     shared.
     """
-    transitive_targets = await MultiGet(Get[TransitiveTarget](Address, a) for a in addresses)
+    transitive_targets = await MultiGet(Get(TransitiveTarget, Address, a) for a in addresses)
 
     closure: OrderedSet[Target] = OrderedSet()
     to_visit = deque(transitive_targets)
@@ -184,9 +184,9 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
 
     # Walk up the buildroot looking for targets that would conceivably claim changed sources.
     candidate_specs = tuple(AscendantAddresses(directory=d) for d in dirs_set)
-    candidate_targets = await Get[Targets](AddressSpecs(candidate_specs))
+    candidate_targets = await Get(Targets, AddressSpecs(candidate_specs))
     build_file_addresses = await MultiGet(
-        Get[BuildFileAddress](Address, tgt.address) for tgt in candidate_targets
+        Get(BuildFileAddress, Address, tgt.address) for tgt in candidate_targets
     )
 
     owners = Addresses(
@@ -222,10 +222,10 @@ async def addresses_with_origins_from_filesystem_specs(
         for spec in filesystem_specs.includes
     )
     snapshot_per_include = await MultiGet(
-        Get[Snapshot](PathGlobs, pg) for pg in pathglobs_per_include
+        Get(Snapshot, PathGlobs, pg) for pg in pathglobs_per_include
     )
     owners_per_include = await MultiGet(
-        Get[Owners](OwnersRequest(sources=snapshot.files)) for snapshot in snapshot_per_include
+        Get(Owners, OwnersRequest(sources=snapshot.files)) for snapshot in snapshot_per_include
     )
     addresses_to_specs: DefaultDict[
         Address, List[Union[FilesystemLiteralSpec, FilesystemResolvedGlobSpec]]
@@ -275,8 +275,8 @@ async def addresses_with_origins_from_filesystem_specs(
 @rule
 async def sources_snapshot_from_target(wrapped_tgt: WrappedTarget) -> SourcesSnapshot:
     """Construct a SourcesSnapshot from a Target without hydrating any other fields."""
-    hydrated_sources = await Get[HydratedSources](
-        HydrateSourcesRequest(wrapped_tgt.target.get(Sources))
+    hydrated_sources = await Get(
+        HydratedSources, HydrateSourcesRequest(wrapped_tgt.target.get(Sources))
     )
     return SourcesSnapshot(hydrated_sources.snapshot)
 
@@ -288,8 +288,8 @@ async def sources_snapshots_from_address_specs(address_specs: AddressSpecs) -> S
     Each address will map to a corresponding SourcesSnapshot. This rule avoids hydrating any other
     fields.
     """
-    addresses = await Get[Addresses](AddressSpecs, address_specs)
-    snapshots = await MultiGet(Get[SourcesSnapshot](Address, a) for a in addresses)
+    addresses = await Get(Addresses, AddressSpecs, address_specs)
+    snapshots = await MultiGet(Get(SourcesSnapshot, Address, a) for a in addresses)
     return SourcesSnapshots(snapshots)
 
 
@@ -298,7 +298,8 @@ async def sources_snapshots_from_filesystem_specs(
     filesystem_specs: FilesystemSpecs, global_options: GlobalOptions,
 ) -> SourcesSnapshots:
     """Resolve the snapshot associated with the provided filesystem specs."""
-    snapshot = await Get[Snapshot](
+    snapshot = await Get(
+        Snapshot,
         PathGlobs,
         filesystem_specs.to_path_globs(
             global_options.options.owners_not_found_behavior.to_glob_match_error_behavior()

@@ -251,13 +251,13 @@ async def get_source_root(
                     f"Marker filename must be a base name: {marker_filename}"
                 )
         # TODO: An intrinsic to check file existence at a fixed path?
-        snapshot = await Get[Snapshot](PathGlobs([str(path / mf) for mf in marker_filenames]))
+        snapshot = await Get(Snapshot, PathGlobs([str(path / mf) for mf in marker_filenames]))
         if len(snapshot.files) > 0:
             return OptionalSourceRoot(SourceRoot(str(path)))
 
     # The requested path itself is not a source root, but maybe its parent is.
     if str(path) != ".":
-        return await Get[OptionalSourceRoot](SourceRootRequest(path.parent))
+        return await Get(OptionalSourceRoot, SourceRootRequest(path.parent))
 
     # The requested path is not under a source root.
     return OptionalSourceRoot(None)
@@ -270,7 +270,7 @@ async def get_source_root_strict(source_root_request: SourceRootRequest) -> Sour
     That way callers don't have to unpack an OptionalSourceRoot if they know they expect a
     SourceRoot to exist and are willing to error if it doesn't.
     """
-    optional_source_root = await Get[OptionalSourceRoot](SourceRootRequest, source_root_request)
+    optional_source_root = await Get(OptionalSourceRoot, SourceRootRequest, source_root_request)
     if optional_source_root.source_root is None:
         raise NoSourceRootError(source_root_request.path)
     return optional_source_root.source_root
@@ -301,14 +301,14 @@ async def all_roots(source_root_config: SourceRootConfig) -> AllSourceRoots:
 
     # Match the patterns against actual files, to find the roots that actually exist.
     pattern_snapshot, marker_file_snapshot = await MultiGet(
-        Get[Snapshot](PathGlobs(globs=sorted(pattern_matches))),
-        Get[Snapshot](PathGlobs(globs=sorted(marker_file_matches))),
+        Get(Snapshot, PathGlobs(globs=sorted(pattern_matches))),
+        Get(Snapshot, PathGlobs(globs=sorted(marker_file_matches))),
     )
 
     responses = await MultiGet(
         itertools.chain(
             (
-                Get[OptionalSourceRoot](SourceRootRequest(PurePath(d)))
+                Get(OptionalSourceRoot, SourceRootRequest(PurePath(d)))
                 for d in pattern_snapshot.dirs
             ),
             # We don't technically need to issue a SourceRootRequest for the marker files,
@@ -316,7 +316,7 @@ async def all_roots(source_root_config: SourceRootConfig) -> AllSourceRoots:
             # However we may as well verify this formally, so that we're not replicating that
             # logic here.
             (
-                Get[OptionalSourceRoot](SourceRootRequest(PurePath(f)))
+                Get(OptionalSourceRoot, SourceRootRequest(PurePath(f)))
                 for f in marker_file_snapshot.files
             ),
         )

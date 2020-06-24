@@ -87,16 +87,16 @@ class TwoStepPexFromTargetsRequest:
 
 @rule
 async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonSetup) -> PexRequest:
-    transitive_targets = await Get[TransitiveTargets](Addresses, request.addresses)
+    transitive_targets = await Get(TransitiveTargets, Addresses, request.addresses)
     all_targets = transitive_targets.closure
 
     input_digests = []
     if request.additional_sources:
         input_digests.append(request.additional_sources)
     if request.include_source_files:
-        prepared_sources = await Get[StrippedPythonSources](Targets(all_targets))
+        prepared_sources = await Get(StrippedPythonSources, Targets(all_targets))
         input_digests.append(prepared_sources.snapshot.digest)
-    merged_input_digest = await Get[Digest](MergeDigests(input_digests))
+    merged_input_digest = await Get(Digest, MergeDigests(input_digests))
 
     interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(
         (
@@ -131,7 +131,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
 
 @rule
 async def two_step_pex_from_targets(req: TwoStepPexFromTargetsRequest) -> TwoStepPexRequest:
-    pex_request = await Get[PexRequest](PexFromTargetsRequest, req.pex_from_targets_request)
+    pex_request = await Get(PexRequest, PexFromTargetsRequest, req.pex_from_targets_request)
     return TwoStepPexRequest(pex_request=pex_request)
 
 

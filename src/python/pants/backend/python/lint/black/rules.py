@@ -86,7 +86,8 @@ async def setup(
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> Setup:
-    requirements_pex_request = Get[Pex](
+    requirements_pex_request = Get(
+        Pex,
         PexRequest(
             output_filename="black.pex",
             requirements=PexRequirements(black.get_requirement_specs()),
@@ -94,25 +95,28 @@ async def setup(
                 black.default_interpreter_constraints
             ),
             entry_point=black.get_entry_point(),
-        )
+        ),
     )
 
     config_path: Optional[str] = black.options.config
-    config_snapshot_request = Get[Snapshot](
+    config_snapshot_request = Get(
+        Snapshot,
         PathGlobs(
             globs=[config_path] if config_path else [],
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
             description_of_origin="the option `--black-config`",
-        )
+        ),
     )
 
-    all_source_files_request = Get[SourceFiles](
-        AllSourceFilesRequest(field_set.sources for field_set in setup_request.request.field_sets)
+    all_source_files_request = Get(
+        SourceFiles,
+        AllSourceFilesRequest(field_set.sources for field_set in setup_request.request.field_sets),
     )
-    specified_source_files_request = Get[SourceFiles](
+    specified_source_files_request = Get(
+        SourceFiles,
         SpecifiedSourceFilesRequest(
             (field_set.sources, field_set.origin) for field_set in setup_request.request.field_sets
-        )
+        ),
     )
 
     requests = requirements_pex_request, config_snapshot_request, specified_source_files_request
@@ -127,10 +131,11 @@ async def setup(
         else setup_request.request.prior_formatter_result
     )
 
-    input_digest = await Get[Digest](
+    input_digest = await Get(
+        Digest,
         MergeDigests(
             (all_source_files_snapshot.digest, requirements_pex.digest, config_snapshot.digest)
-        )
+        ),
     )
 
     address_references = ", ".join(
@@ -159,8 +164,8 @@ async def setup(
 async def black_fmt(field_sets: BlackRequest, black: Black) -> FmtResult:
     if black.options.skip:
         return FmtResult.noop()
-    setup = await Get[Setup](SetupRequest(field_sets, check_only=False))
-    result = await Get[ProcessResult](Process, setup.process)
+    setup = await Get(Setup, SetupRequest(field_sets, check_only=False))
+    result = await Get(ProcessResult, Process, setup.process)
     return FmtResult.from_process_result(
         result,
         original_digest=setup.original_digest,
@@ -173,8 +178,8 @@ async def black_fmt(field_sets: BlackRequest, black: Black) -> FmtResult:
 async def black_lint(field_sets: BlackRequest, black: Black) -> LintResults:
     if black.options.skip:
         return LintResults()
-    setup = await Get[Setup](SetupRequest(field_sets, check_only=True))
-    result = await Get[FallibleProcessResult](Process, setup.process)
+    setup = await Get(Setup, SetupRequest(field_sets, check_only=True))
+    result = await Get(FallibleProcessResult, Process, setup.process)
     return LintResults(
         [
             LintResult.from_fallible_process_result(

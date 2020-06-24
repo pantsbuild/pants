@@ -58,12 +58,12 @@ async def dependencies(
     console: Console, addresses: Addresses, options: DependenciesOptions,
 ) -> Dependencies:
     if options.values.transitive:
-        transitive_targets = await Get[TransitiveTargets](Addresses, addresses)
+        transitive_targets = await Get(TransitiveTargets, Addresses, addresses)
         targets = Targets(transitive_targets.closure - FrozenOrderedSet(transitive_targets.roots))
     else:
-        target_roots = await Get[Targets](Addresses, addresses)
+        target_roots = await Get(Targets, Addresses, addresses)
         dependencies_per_target_root = await MultiGet(
-            Get[Targets](DependenciesRequest(tgt.get(DependenciesField))) for tgt in target_roots
+            Get(Targets, DependenciesRequest(tgt.get(DependenciesField))) for tgt in target_roots
         )
         targets = Targets(itertools.chain.from_iterable(dependencies_per_target_root))
 

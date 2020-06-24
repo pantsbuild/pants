@@ -4,7 +4,6 @@
 import ast
 import re
 import unittest
-import warnings
 from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent
@@ -61,7 +60,7 @@ class RuleVisitorTest(unittest.TestCase):
             dedent(
                 """
                 async def rule():
-                    a = await Get[A](B, 42)
+                    a = await Get(A, B, 42)
                 """
             ),
             A=str,
@@ -75,9 +74,9 @@ class RuleVisitorTest(unittest.TestCase):
             dedent(
                 """
                 async def rule():
-                    a = await Get[A](B, 42)
+                    a = await Get(A, B, 42)
                     if len(a) > 1:
-                        c = await Get[C](A("bob"))
+                        c = await Get(C, A("bob"))
                 """
             ),
             A=str,
@@ -99,7 +98,7 @@ class RuleVisitorTest(unittest.TestCase):
             dedent(
                 """
                 async def rule():
-                    a = await MultiGet(Get[A](B(x)) for x in range(5))
+                    a = await MultiGet(Get(A, B(x)) for x in range(5))
                 """
             ),
             A=str,
@@ -113,7 +112,7 @@ class RuleVisitorTest(unittest.TestCase):
             dedent(
                 """
                 async def rule():
-                    a = await MultiGet(Get[A](B, 42), Get[B](A('bob')))
+                    a = await MultiGet(Get(A, B, 42), Get(B, A('bob')))
                 """
             ),
             A=str,
@@ -133,43 +132,29 @@ class RuleVisitorTest(unittest.TestCase):
         gets = self._parse_rule_gets("get_type: type = Get")
         assert len(gets) == 0
 
-    def test_get_index_call_deprecated(self) -> None:
-        pytest.xfail(
-            "This should fail until deprecations are switched on: "
-            "https://github.com/pantsbuild/pants/issues/9899"
-        )
-        with warnings.catch_warnings(record=True) as emitted_warnings:
-            self._parse_rule_gets("Get[A](B('bob'))", A=int, B=str)
-
-        assert len(emitted_warnings) == 1
-        emitted_warning = emitted_warnings[0]
-
-        assert emitted_warning.category == DeprecationWarning
-        assert str(emitted_warning.message).endswith("Use Get(A, ...) instead of Get[A](...).")
-
     def test_valid_get_unresolvable_product_type(self) -> None:
         with pytest.raises(KeyError):
-            self._parse_rule_gets("Get[DNE](A(42))", A=int)
+            self._parse_rule_gets("Get(DNE, A(42))", A=int)
 
     def test_valid_get_unresolvable_subject_declared_type(self) -> None:
         with pytest.raises(KeyError):
-            self._parse_rule_gets("Get[int](DNE, 'bob')")
+            self._parse_rule_gets("Get(int, DNE, 'bob')")
 
     def test_invalid_get_no_subject_args(self) -> None:
         with pytest.raises(ValueError):
-            self._parse_rule_gets("Get[A]()", A=int)
+            self._parse_rule_gets("Get(A, )", A=int)
 
     def test_invalid_get_too_many_subject_args(self) -> None:
         with pytest.raises(ValueError):
-            self._parse_rule_gets("Get[A](B, 'bob', 3)", A=int, B=str)
+            self._parse_rule_gets("Get(A, B, 'bob', 3)", A=int, B=str)
 
     def test_invalid_get_invalid_subject_arg_no_constructor_call(self) -> None:
         with pytest.raises(ValueError):
-            self._parse_rule_gets("Get[A]('bob')", A=int)
+            self._parse_rule_gets("Get(A, 'bob')", A=int)
 
     def test_invalid_get_invalid_product_type_not_a_type_name(self) -> None:
         with pytest.raises(ValueError):
-            self._parse_rule_gets("Get[call()](A('bob'))", A=str)
+            self._parse_rule_gets("Get(call(), A('bob'))", A=str)
 
 
 def fmt_graph_rule(rule: Callable, *, gets: Optional[List[Tuple[str, str]]] = None) -> str:
@@ -179,7 +164,7 @@ def fmt_graph_rule(rule: Callable, *, gets: Optional[List[Tuple[str, str]]] = No
     gets_str = ""
     if gets:
         get_members = ",\n".join(
-            f"Get[{product_subject_pair[0]}]({product_subject_pair[1]})"
+            f"Get({product_subject_pair[0]}, {product_subject_pair[1]})"
             for product_subject_pair in gets
         )
         gets_str = f",\ngets=[{get_members}]"
@@ -372,7 +357,7 @@ class Example(Goal):
 
 @goal_rule
 async def a_goal_rule_generator(console: Console) -> Example:
-    a = await Get[A](str("a str!"))
+    a = await Get(A, str("a str!"))
     console.print_stdout(str(a))
     return Example(exit_code=0)
 
@@ -697,7 +682,7 @@ class RuleGraphTest(TestBase):
 
         @rule
         async def d_from_a_and_suba(a: A, suba: SubA) -> D:  # type: ignore[return]
-            _ = await Get[A](C, C())  # noqa: F841
+            _ = await Get(A, C, C())  # noqa: F841
 
         rules = _suba_root_rules + [
             a_from_c,
@@ -930,7 +915,7 @@ class RuleGraphTest(TestBase):
         # be surprising.
         @rule
         async def a(sub_a: SubA) -> A:  # type: ignore[return]
-            _ = await Get[B](C())  # noqa: F841
+            _ = await Get(B, C())  # noqa: F841
 
         @rule
         def b_from_suba(suba: SubA) -> B:
@@ -1265,7 +1250,7 @@ class RuleGraphTest(TestBase):
     def test_get_simple(self):
         @rule
         async def a() -> A:  # type: ignore[return]
-            _ = await Get[B](D, D())  # noqa: F841
+            _ = await Get(B, D, D())  # noqa: F841
 
         @rule
         async def b_from_d(d: D) -> B:

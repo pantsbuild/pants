@@ -155,11 +155,12 @@ async def fmt(
         for language_target_collection_type in language_target_collection_types
     )
     targets_with_sources: Iterable[TargetsWithSources] = await MultiGet(
-        Get[TargetsWithSources](
+        Get(
+            TargetsWithSources,
             TargetsWithSourcesRequest(
                 target_with_origin.target
                 for target_with_origin in language_target_collection.targets_with_origins
-            )
+            ),
         )
         for language_target_collection in language_target_collections
     )
@@ -182,7 +183,8 @@ async def fmt(
 
     if options.values.per_target_caching:
         per_language_results = await MultiGet(
-            Get[LanguageFmtResults](
+            Get(
+                LanguageFmtResults,
                 LanguageFmtTargets,
                 language_target_collection.__class__(TargetsWithOrigins([target_with_origin])),
             )
@@ -191,7 +193,7 @@ async def fmt(
         )
     else:
         per_language_results = await MultiGet(
-            Get[LanguageFmtResults](LanguageFmtTargets, language_target_collection)
+            Get(LanguageFmtResults, LanguageFmtTargets, language_target_collection)
             for language_target_collection in valid_language_target_collections
         )
 
@@ -213,7 +215,7 @@ async def fmt(
         # NB: this will fail if there are any conflicting changes, which we want to happen rather
         # than silently having one result override the other. In practicality, this should never
         # happen due to us grouping each language's formatters into a single digest.
-        merged_formatted_digest = await Get[Digest](MergeDigests(changed_digests))
+        merged_formatted_digest = await Get(Digest, MergeDigests(changed_digests))
         workspace.materialize_directory(DirectoryToMaterialize(merged_formatted_digest))
 
     sorted_results = sorted(individual_results, key=lambda res: res.formatter_name)

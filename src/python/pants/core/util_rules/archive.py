@@ -42,7 +42,7 @@ def get_extraction_cmd(archive_path: str, output_dir: str) -> Optional[Tuple[str
 async def maybe_extract(extractable: MaybeExtractable) -> ExtractedDigest:
     """If digest contains a single archive file, extract it, otherwise return the input digest."""
     digest = extractable.digest
-    snapshot = await Get[Snapshot](Digest, digest)
+    snapshot = await Get(Snapshot, Digest, digest)
     if len(snapshot.files) == 1:
         output_dir = "out/"
         extraction_cmd = get_extraction_cmd(snapshot.files[0], output_dir)
@@ -55,8 +55,8 @@ async def maybe_extract(extractable: MaybeExtractable) -> ExtractedDigest:
                 env={"PATH": "/usr/bin:/bin:/usr/local/bin"},
                 output_directories=(output_dir,),
             )
-            result = await Get[ProcessResult](Process, proc)
-            strip_output_dir = await Get[Digest](RemovePrefix(result.output_digest, output_dir))
+            result = await Get(ProcessResult, Process, proc)
+            strip_output_dir = await Get(Digest, RemovePrefix(result.output_digest, output_dir))
             return ExtractedDigest(strip_output_dir)
     return ExtractedDigest(digest)
 

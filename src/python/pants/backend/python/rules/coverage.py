@@ -143,7 +143,7 @@ async def prepare_coverage_plugin() -> CoveragePlugin:
         f"{COVERAGE_PLUGIN_MODULE_NAME}.py",
         pkg_resources.resource_string(__name__, "coverage_plugin/plugin.py"),
     )
-    digest = await Get[Digest](InputFilesContent([plugin_file]))
+    digest = await Get(Digest, InputFilesContent([plugin_file]))
     return CoveragePlugin(digest)
 
 
@@ -226,8 +226,8 @@ async def create_coverage_config(
     cp.write(config_stream)
     config_content = config_stream.getvalue()
 
-    digest = await Get[Digest](
-        InputFilesContent([FileContent(".coveragerc", config_content.encode())])
+    digest = await Get(
+        Digest, InputFilesContent([FileContent(".coveragerc", config_content.encode())])
     )
     return CoverageConfig(digest)
 
@@ -239,7 +239,8 @@ class CoverageSetup:
 
 @rule
 async def setup_coverage(coverage: CoverageSubsystem, plugin: CoveragePlugin) -> CoverageSetup:
-    pex = await Get[Pex](
+    pex = await Get(
+        Pex,
         PexRequest(
             output_filename="coverage.pex",
             requirements=PexRequirements(coverage.get_requirement_specs()),
@@ -248,7 +249,7 @@ async def setup_coverage(coverage: CoverageSubsystem, plugin: CoveragePlugin) ->
             ),
             entry_point=coverage.get_entry_point(),
             sources=plugin.digest,
-        )
+        ),
     )
     return CoverageSetup(pex)
 
@@ -269,10 +270,10 @@ async def merge_coverage_data(
         return MergedCoverageData(data_collection[0].digest)
     # We prefix each .coverage file with its corresponding address to avoid collisions.
     coverage_digests = await MultiGet(
-        Get[Digest](AddPrefix(data.digest, prefix=data.address.path_safe_spec))
+        Get(Digest, AddPrefix(data.digest, prefix=data.address.path_safe_spec))
         for data in data_collection
     )
-    input_digest = await Get[Digest](MergeDigests((*coverage_digests, coverage_setup.pex.digest)))
+    input_digest = await Get(Digest, MergeDigests((*coverage_digests, coverage_setup.pex.digest)))
     prefixes = sorted(f"{data.address.path_safe_spec}/.coverage" for data in data_collection)
     process = coverage_setup.pex.create_process(
         pex_path=f"./{coverage_setup.pex.output_filename}",
@@ -283,7 +284,7 @@ async def merge_coverage_data(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
     )
-    result = await Get[ProcessResult](Process, process)
+    result = await Get(ProcessResult, Process, process)
     return MergedCoverageData(result.output_digest)
 
 
@@ -335,7 +336,7 @@ async def generate_coverage_report(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
     )
-    result = await Get[ProcessResult](Process, process)
+    result = await Get(ProcessResult, Process, process)
 
     if report_type == CoverageReportType.CONSOLE:
         return CoverageReports((ConsoleCoverageReport(result.stdout.decode()),))

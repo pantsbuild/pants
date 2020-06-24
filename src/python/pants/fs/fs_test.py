@@ -42,7 +42,7 @@ class MockWorkspaceGoal(Goal):
 async def workspace_goal_rule(
     console: Console, workspace: Workspace, msg: MessageToGoalRule
 ) -> MockWorkspaceGoal:
-    digest = await Get[Digest](InputFilesContent, msg.input_files_content)
+    digest = await Get(Digest, InputFilesContent, msg.input_files_content)
     output = workspace.materialize_directory(DirectoryToMaterialize(digest))
     console.print_stdout(output.output_paths[0], end="")
     return MockWorkspaceGoal(exit_code=0)

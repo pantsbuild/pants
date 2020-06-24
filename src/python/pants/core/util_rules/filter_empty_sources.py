@@ -40,7 +40,7 @@ async def determine_field_sets_with_sources(
     request: FieldSetsWithSourcesRequest,
 ) -> FieldSetsWithSources:
     all_sources = await MultiGet(
-        Get[HydratedSources](HydrateSourcesRequest(field_set.sources)) for field_set in request
+        Get(HydratedSources, HydrateSourcesRequest(field_set.sources)) for field_set in request
     )
     return FieldSetsWithSources(
         field_set for field_set, sources in zip(request, all_sources) if sources.snapshot.files
@@ -58,7 +58,7 @@ class TargetsWithSourcesRequest(Collection[Target]):
 @rule
 async def determine_targets_with_sources(request: TargetsWithSourcesRequest) -> TargetsWithSources:
     all_sources = await MultiGet(
-        Get[HydratedSources](HydrateSourcesRequest(tgt.get(SourcesField))) for tgt in request
+        Get(HydratedSources, HydrateSourcesRequest(tgt.get(SourcesField))) for tgt in request
     )
     return TargetsWithSources(
         tgt for tgt, sources in zip(request, all_sources) if sources.snapshot.files

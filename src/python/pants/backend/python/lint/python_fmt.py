@@ -29,11 +29,12 @@ async def format_python_target(
     python_fmt_targets: PythonFmtTargets, union_membership: UnionMembership
 ) -> LanguageFmtResults:
     targets_with_origins = python_fmt_targets.targets_with_origins
-    original_sources = await Get[SourceFiles](
+    original_sources = await Get(
+        SourceFiles,
         AllSourceFilesRequest(
             target_with_origin.target[PythonSources]
             for target_with_origin in python_fmt_targets.targets_with_origins
-        )
+        ),
     )
     prior_formatter_result = original_sources.snapshot
 
@@ -42,7 +43,8 @@ async def format_python_target(
         PythonFmtRequest
     ]
     for fmt_request_type in fmt_request_types:
-        result = await Get[FmtResult](
+        result = await Get(
+            FmtResult,
             PythonFmtRequest,
             fmt_request_type(
                 (
@@ -55,7 +57,7 @@ async def format_python_target(
         if result != FmtResult.noop():
             results.append(result)
         if result.did_change:
-            prior_formatter_result = await Get[Snapshot](Digest, result.output)
+            prior_formatter_result = await Get(Snapshot, Digest, result.output)
     return LanguageFmtResults(
         tuple(results),
         input=original_sources.snapshot.digest,

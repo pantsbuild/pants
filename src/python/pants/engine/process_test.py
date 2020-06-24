@@ -80,13 +80,13 @@ class CatExecutionRequest:
 @rule
 async def cat_files_process_result_concatted(cat_exe_req: CatExecutionRequest) -> Concatted:
     cat_bin = cat_exe_req.shell_cat
-    cat_files_snapshot = await Get[Snapshot](PathGlobs, cat_exe_req.path_globs)
+    cat_files_snapshot = await Get(Snapshot, PathGlobs, cat_exe_req.path_globs)
     process = Process(
         argv=cat_bin.argv_from_snapshot(cat_files_snapshot),
         input_digest=cat_files_snapshot.digest,
         description="cat some files",
     )
-    cat_process_result = await Get[ProcessResult](Process, process)
+    cat_process_result = await Get(ProcessResult, Process, process)
     return Concatted(cat_process_result.stdout.decode())
 
 
@@ -125,7 +125,7 @@ async def get_javac_version_output(
     javac_version_proc_req = Process(
         argv=javac_version_command.gen_argv(), description=javac_version_command.description
     )
-    javac_version_proc_result = await Get[ProcessResult](Process, javac_version_proc_req,)
+    javac_version_proc_result = await Get(ProcessResult, Process, javac_version_proc_req,)
 
     return JavacVersionOutput(javac_version_proc_result.stderr.decode())
 
@@ -178,7 +178,7 @@ async def javac_compile_process_result(
     for java_file in java_files:
         if not java_file.endswith(".java"):
             raise ValueError(f"Can only compile .java files but got {java_file}")
-    sources_snapshot = await Get[Snapshot](PathGlobs, PathGlobs(java_files))
+    sources_snapshot = await Get(Snapshot, PathGlobs, PathGlobs(java_files))
     output_dirs = tuple({os.path.dirname(java_file) for java_file in java_files})
     process = Process(
         argv=javac_compile_req.argv_from_source_snapshot(sources_snapshot),
@@ -186,7 +186,7 @@ async def javac_compile_process_result(
         output_directories=output_dirs,
         description="javac compilation",
     )
-    javac_proc_result = await Get[ProcessResult](Process, process)
+    javac_proc_result = await Get(ProcessResult, Process, process)
 
     return JavacCompileResult(
         javac_proc_result.stdout.decode(),

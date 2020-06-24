@@ -184,7 +184,7 @@ class SnapshotSubset:
 
     Example:
 
-        result = await Get[Snapshot](DigestSubset(original_digest, PathGlobs(["subdir1", "f.txt"]))
+        result = await Get(Snapshot, DigestSubset(original_digest, PathGlobs(["subdir1", "f.txt"]))
     """
 
     digest: Digest
@@ -203,7 +203,7 @@ class MergeDigests:
 
         Example:
 
-            result = await Get[Digest](MergeDigests([digest1, digest2])
+            result = await Get(Digest, MergeDigests([digest1, digest2])
         """
         self.digests = tuple(digests)
 
@@ -223,7 +223,7 @@ class RemovePrefix:
 
     Example:
 
-        result = await Get[Digest](RemovePrefix(input_digest, "my_dir")
+        result = await Get(Digest, RemovePrefix(input_digest, "my_dir")
     """
 
     digest: Digest
@@ -236,7 +236,7 @@ class AddPrefix:
 
     Example:
 
-        result = await Get[Digest](AddPrefix(input_digest, "my_dir")
+        result = await Get(Digest, AddPrefix(input_digest, "my_dir")
     """
 
     digest: Digest

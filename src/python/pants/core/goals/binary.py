@@ -44,16 +44,17 @@ class Binary(Goal):
 
 @goal_rule
 async def create_binary(workspace: Workspace, dist_dir: DistDir, build_root: BuildRoot) -> Binary:
-    targets_to_valid_field_sets = await Get[TargetsToValidFieldSets](
+    targets_to_valid_field_sets = await Get(
+        TargetsToValidFieldSets,
         TargetsToValidFieldSetsRequest(
             BinaryFieldSet, goal_description="the `binary` goal", error_if_no_valid_targets=True
-        )
+        ),
     )
     binaries = await MultiGet(
-        Get[CreatedBinary](BinaryFieldSet, field_set)
+        Get(CreatedBinary, BinaryFieldSet, field_set)
         for field_set in targets_to_valid_field_sets.field_sets
     )
-    merged_digest = await Get[Digest](MergeDigests(binary.digest for binary in binaries))
+    merged_digest = await Get(Digest, MergeDigests(binary.digest for binary in binaries))
     result = workspace.materialize_directory(
         DirectoryToMaterialize(merged_digest, path_prefix=str(dist_dir.relpath))
     )
