@@ -18,7 +18,6 @@ from typing import (
     overload,
 )
 
-from pants.base.deprecated import deprecated_conditional
 from pants.util.meta import frozen_after_init
 
 # These type variables are used to type parameterize a `GetConstraints` (and consequently `_Get`).

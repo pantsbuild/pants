@@ -9,7 +9,6 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Type, Union, get_type_hints
 
-from pants.base.deprecated import deprecated_conditional
 from pants.engine.goal import Goal
 from pants.engine.selectors import GetConstraints
 from pants.engine.unions import UnionRule, union
