@@ -800,17 +800,17 @@ impl Task {
     future::try_join_all(get_futures).await
   }
 
-  fn compute_info_msg(result_val: &Value) -> Option<String> {
-    let info_msg_val: Value = externs::call_method(&result_val, "info_message", &[]).ok()?;
+  fn compute_workunit_message(result_val: &Value) -> Option<String> {
+    let msg_val: Value = externs::call_method(&result_val, "message", &[]).ok()?;
     {
       let gil = Python::acquire_gil();
       let py = gil.python();
 
-      if *info_msg_val == py.None() {
+      if *msg_val == py.None() {
         return None;
       }
     }
-    Some(externs::val_to_str(&info_msg_val))
+    Some(externs::val_to_str(&msg_val))
   }
 
   fn compute_new_workunit_level(result_val: &Value) -> Option<log::Level> {
@@ -887,7 +887,7 @@ impl fmt::Debug for Task {
 pub struct PythonRuleOutput {
   value: Value,
   new_level: Option<log::Level>,
-  info_msg: Option<String>,
+  message: Option<String>,
 }
 
 #[async_trait]
@@ -928,10 +928,10 @@ impl WrappedNode for Task {
     }
 
     if result_type == product {
-      let (new_level, info_msg) = if can_modify_workunit {
+      let (new_level, message) = if can_modify_workunit {
         (
           Self::compute_new_workunit_level(&result_val),
-          Self::compute_info_msg(&result_val),
+          Self::compute_workunit_message(&result_val),
         )
       } else {
         (None, None)
@@ -939,7 +939,7 @@ impl WrappedNode for Task {
       Ok(PythonRuleOutput {
         value: result_val,
         new_level,
-        info_msg,
+        message,
       })
     } else {
       Err(throw(&format!(
@@ -1097,7 +1097,7 @@ impl Node for NodeKey {
       let parent_id = std::mem::replace(&mut workunit_state.parent_id, Some(span_id.clone()));
       let metadata = WorkunitMetadata {
         desc: user_facing_name.clone(),
-        info_msg: None,
+        message: None,
         level: self.workunit_level(),
         blocked: false,
         stdout: None,
@@ -1127,7 +1127,7 @@ impl Node for NodeKey {
       };
 
       let mut level = metadata.level;
-      let mut info_msg = None;
+      let mut message = None;
       let mut result = match maybe_watch {
         Ok(()) => match self {
           NodeKey::DigestFile(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Digest).await,
@@ -1163,7 +1163,7 @@ impl Node for NodeKey {
                 if let Some(new_level) = python_rule_output.new_level {
                   level = new_level;
                 }
-                info_msg = python_rule_output.info_msg;
+                message = python_rule_output.message;
                 NodeOutput::Value(python_rule_output.value)
               })
               .await
@@ -1178,7 +1178,7 @@ impl Node for NodeKey {
 
       let final_metadata = WorkunitMetadata {
         level,
-        info_msg,
+        message,
         ..metadata
       };
       context2
@@ -1271,7 +1271,7 @@ impl TryFrom<NodeOutput> for PythonRuleOutput {
       NodeOutput::Value(v) => Ok(PythonRuleOutput {
         value: v,
         new_level: None,
-        info_msg: None,
+        message: None,
       }),
       _ => Err(()),
     }

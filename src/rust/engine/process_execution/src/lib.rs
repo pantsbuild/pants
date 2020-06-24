@@ -512,7 +512,7 @@ impl CommandRunner for BoundedCommandRunner {
     let outer_metadata = WorkunitMetadata {
       desc: Some(desc.clone()),
       level: Level::Debug,
-      info_msg: None,
+      message: None,
       blocked: true,
       stdout: None,
       stderr: None,
@@ -526,7 +526,7 @@ impl CommandRunner for BoundedCommandRunner {
       semaphore.with_acquired(move || {
         let metadata = WorkunitMetadata {
           desc: Some(desc),
-          info_msg: None,
+          message: None,
           level: Level::Info,
           blocked: false,
           stdout: None,

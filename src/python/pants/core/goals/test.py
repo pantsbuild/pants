@@ -87,10 +87,10 @@ class TestResult(EngineAware):
 
     def level(self):
         if self.status == Status.FAILURE:
-            return LogLevel.WARN
+            return LogLevel.ERROR
         return None
 
-    def info_message(self):
+    def message(self):
         result = "succeeded" if self.status == Status.SUCCESS else "failed"
         return f"tests {result}: {self.address_ref}"
 

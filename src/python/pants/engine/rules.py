@@ -32,8 +32,8 @@ class EngineAware(ABC):
         """Overrides the level of the workunit associated with this type."""
         return None
 
-    def info_message(self) -> Optional[str]:
-        """Sets an info message on the workunit."""
+    def message(self) -> Optional[str]:
+        """Sets an optional result message on the workunit."""
         return None
 
 

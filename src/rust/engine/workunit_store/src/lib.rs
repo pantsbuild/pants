@@ -87,13 +87,13 @@ impl Workunit {
       identifier.to_string()
     };
 
-    let info_str = if let Some(ref s) = self.metadata.info_msg {
+    let message = if let Some(ref s) = self.metadata.message {
       format!(" - {}", s)
     } else {
       "".to_string()
     };
 
-    log!(level, "{} {}{}", state, effective_identifier, info_str);
+    log!(level, "{} {}{}", state, effective_identifier, message);
   }
 }
 
@@ -106,7 +106,7 @@ pub enum WorkunitState {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct WorkunitMetadata {
   pub desc: Option<String>,
-  pub info_msg: Option<String>,
+  pub message: Option<String>,
   pub level: Level,
   pub blocked: bool,
   pub stdout: Option<hashing::Digest>,
@@ -130,7 +130,7 @@ impl Default for WorkunitMetadata {
     Self {
       level: Level::Info,
       desc: None,
-      info_msg: None,
+      message: None,
       blocked: false,
       stdout: None,
       stderr: None,
