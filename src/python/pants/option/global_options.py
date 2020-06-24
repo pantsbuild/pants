@@ -970,8 +970,10 @@ class GlobalOptions(Subsystem):
         register(
             "--dynamic-ui",
             type=bool,
-            default=sys.stderr.isatty(),
-            help="Display a dynamically-updating console UI as pants runs.",
+            default=(("CI" not in os.environ) and sys.stderr.isatty()),
+            help="Display a dynamically-updating console UI as Pants runs. This is true by default "
+            "if Pants detects a TTY and there is no 'CI' environment variable indicating that "
+            "Pants is running in a continuous integration environment; and false otherwise.",
         )
 
         register(
