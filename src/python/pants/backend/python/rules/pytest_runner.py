@@ -4,9 +4,8 @@
 import functools
 import itertools
 import logging
-from typing import Optional, Tuple
-
 from dataclasses import dataclass
+from typing import Optional, Tuple
 
 from pants.backend.python.rules.coverage import (
     CoverageConfig,
