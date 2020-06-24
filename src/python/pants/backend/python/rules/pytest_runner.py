@@ -14,7 +14,6 @@ from pants.backend.python.rules.coverage import (
     CoverageSubsystem,
     PytestCoverageData,
 )
-from pants.backend.python.rules.python_sources import UnstrippedPythonSources
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
@@ -22,6 +21,7 @@ from pants.backend.python.rules.pex import (
     PexRequirements,
 )
 from pants.backend.python.rules.pex_from_targets import PexFromTargetsRequest
+from pants.backend.python.rules.python_sources import UnstrippedPythonSources
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.backend.python.target_types import (

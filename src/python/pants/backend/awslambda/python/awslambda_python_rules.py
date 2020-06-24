@@ -12,12 +12,7 @@ from pants.backend.awslambda.python.target_types import (
     PythonAwsLambdaHandler,
     PythonAwsLambdaRuntime,
 )
-from pants.backend.python.rules import (
-    download_pex_bin,
-    pex,
-    pex_from_targets,
-    python_sources,
-)
+from pants.backend.python.rules import download_pex_bin, pex, pex_from_targets, python_sources
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,

@@ -1,12 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.python.rules import (
-    download_pex_bin,
-    pex,
-    pex_from_targets,
-    python_sources,
-)
+from pants.backend.python.rules import download_pex_bin, pex, pex_from_targets, python_sources
 from pants.backend.python.rules import repl as python_repl
 from pants.backend.python.rules.repl import PythonRepl
 from pants.backend.python.subsystems import python_native_code, subprocess_environment

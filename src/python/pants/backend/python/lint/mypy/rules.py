@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Tuple
 
 from pants.backend.python.lint.mypy.subsystem import MyPy
-from pants.backend.python.rules import download_pex_bin, python_sources, pex
+from pants.backend.python.rules import download_pex_bin, pex, python_sources
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,

@@ -3,7 +3,7 @@
 
 from typing import List, Type
 
-from pants.backend.python.rules.python_sources import StrippedPythonSources
+from pants.backend.python.rules.python_sources import StrippedPythonSources, UnstrippedPythonSources
 from pants.backend.python.rules.python_sources import rules as python_sources_rules
 from pants.backend.python.target_types import PythonSources
 from pants.core.target_types import Files, Resources
@@ -52,7 +52,7 @@ class StrippedPythonSourcesTest(TestBase):
             StrippedPythonSources,
             Params(
                 Targets([target_with_init, target_without_init, files_target]),
-                create_options_bootstrapper(args=["--source-root-patterns=src/python"]),
+                create_options_bootstrapper(args=["--source-root-patterns=['src/python']"]),
             ),
         )
         assert sorted(result.snapshot.files) == sorted(
@@ -83,7 +83,74 @@ class StrippedPythonSourcesTest(TestBase):
             StrippedPythonSources,
             Params(
                 Targets(targets),
-                create_options_bootstrapper(args=["--source-root-patterns=src/python"]),
+                create_options_bootstrapper(args=["--source-root-patterns=['src/python']"]),
             ),
         )
         assert sorted(result.snapshot.files) == sorted(["p.py", "src/python/f.txt", "r.txt"])
+
+
+class UnstrippedPythonSourcesTest(TestBase):
+    @classmethod
+    def rules(cls):
+        return (*super().rules(), *python_sources_rules())
+
+    def create_target(
+        self, *, parent_directory: str, files: List[str], target_cls: Type[Target] = PythonTarget
+    ) -> Target:
+        self.create_files(parent_directory, files=files)
+        address = Address(spec_path=parent_directory, target_name="target")
+        return target_cls({Sources.alias: files}, address=address)
+
+    def test_adds_missing_inits(self) -> None:
+        target_with_init = self.create_target(
+            parent_directory="src/python/project", files=["lib.py", "__init__.py"]
+        )
+        target_without_init = self.create_target(
+            parent_directory="src/python/test_project", files=["f1.py", "f2.py"]
+        )
+        files_target = self.create_target(
+            parent_directory="src/python/project/resources",
+            files=["loose_file.txt"],
+            target_cls=Files,
+        )
+        result = self.request_single_product(
+            UnstrippedPythonSources,
+            Params(
+                Targets([target_with_init, target_without_init, files_target]),
+                create_options_bootstrapper(args=["--source-root-patterns=['src/python']"]),
+            ),
+        )
+        assert sorted(result.snapshot.files) == sorted(
+            [
+                "src/python/project/lib.py",
+                "src/python/project/__init__.py",
+                "src/python/test_project/f1.py",
+                "src/python/test_project/f2.py",
+                "src/python/test_project/__init__.py",
+                "src/python/project/resources/loose_file.txt",
+            ]
+        )
+
+    def test_filters_out_irrelevant_targets(self) -> None:
+        targets = [
+            self.create_target(
+                parent_directory="src/python", files=["p.py"], target_cls=PythonTarget
+            ),
+            self.create_target(parent_directory="src/python", files=["f.txt"], target_cls=Files),
+            self.create_target(
+                parent_directory="src/python", files=["r.txt"], target_cls=Resources
+            ),
+            self.create_target(
+                parent_directory="src/python", files=["j.java"], target_cls=NonPythonTarget
+            ),
+        ]
+        result = self.request_single_product(
+            UnstrippedPythonSources,
+            Params(
+                Targets(targets),
+                create_options_bootstrapper(args=["--source-root-patterns=['src/python']"]),
+            ),
+        )
+        assert sorted(result.snapshot.files) == sorted(
+            ["src/python/p.py", "src/python/f.txt", "src/python/r.txt"]
+        )

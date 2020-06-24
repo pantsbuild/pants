@@ -5,7 +5,6 @@ import dataclasses
 from dataclasses import dataclass
 from typing import Iterable, Optional, Tuple
 
-from pants.backend.python.rules.python_sources import StrippedPythonSources
 from pants.backend.python.rules.pex import (
     PexInterpreterConstraints,
     PexPlatforms,
@@ -13,6 +12,7 @@ from pants.backend.python.rules.pex import (
     PexRequirements,
     TwoStepPexRequest,
 )
+from pants.backend.python.rules.python_sources import StrippedPythonSources
 from pants.backend.python.target_types import (
     PythonInterpreterCompatibility,
     PythonRequirementsField,

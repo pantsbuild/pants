@@ -25,8 +25,9 @@ class InjectInitTest(TestBase):
             RootRule(Digest),
         )
 
-    def assert_injected(self, *, original_files: List[str], expected_added: List[str],
-                        sources_stripped=True) -> None:
+    def assert_injected(
+        self, *, original_files: List[str], expected_added: List[str], sources_stripped=True
+    ) -> None:
         request = InjectInitRequest(
             self.make_snapshot({fp: "# python code" for fp in original_files}),
             sources_stripped=sources_stripped,
@@ -55,11 +56,7 @@ class InjectInitTest(TestBase):
         )
         self.assert_injected(
             original_files=["a/b/lib.py", "a/b/subdir/lib.py"],
-            expected_added=[
-                "a/__init__.py",
-                "a/b/__init__.py",
-                "a/b/subdir/__init__.py",
-            ],
+            expected_added=["a/__init__.py", "a/b/__init__.py", "a/b/subdir/__init__.py",],
         )
 
     def test_preserves_original_inits(self) -> None:
@@ -83,12 +80,13 @@ class InjectInitTest(TestBase):
         )
 
     def test_source_roots_unstripped(self):
-        self.assert_injected(original_files=[
-            "src/python/lib.py",
-            "src/python/subdir/lib.py",
-            "src/python/subdir/__init__.py",
-            "src/python/anothersubdir/lib.py",
-        ],
-            expected_added=["src/python/__init__.py", "src/python/anothersubdir/__init__.py"],
+        self.assert_injected(
+            original_files=[
+                "src/python/lib.py",
+                "src/python/subdir/lib.py",
+                "src/python/subdir/__init__.py",
+                "src/python/anothersubdir/lib.py",
+            ],
+            expected_added=["src/python/anothersubdir/__init__.py"],
             sources_stripped=False,
         )
