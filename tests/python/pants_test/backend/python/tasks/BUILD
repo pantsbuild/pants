@@ -261,6 +261,7 @@ python_tests(
         "src/python/pants/testutil:interpreter_selection_utils",
     ],
     tags={"partially_type_checked"},
+    timeout = 120,
 )
 
 python_tests(

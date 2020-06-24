@@ -37,6 +37,7 @@ python_tests(
     'testprojects/tests/python:owners_integration_target',
   ],
   tags = {'integration', 'partially_type_checked'},
+  timeout = 120,
 )
 
 python_tests(

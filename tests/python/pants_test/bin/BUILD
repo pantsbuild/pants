@@ -13,4 +13,5 @@ python_tests(
     'testprojects/src/python:nested_runs_directory',
   ],
   tags = {'integration', 'partially_type_checked'},
+  timeout = 120,
 )
