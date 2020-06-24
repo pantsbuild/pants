@@ -13,10 +13,9 @@ use futures::compat::Future01CompatExt;
 use futures01::future::{self, Future};
 use hashing::Digest;
 use parking_lot::Mutex;
+use rand::Rng;
 use tokio::runtime::Runtime;
 use tokio::time::{timeout, Elapsed};
-
-use rand::Rng;
 
 use crate::{EntryId, Graph, InvalidationResult, Node, NodeContext, NodeError};
 
@@ -355,8 +354,8 @@ fn uncachable_node_only_runs_once() {
       TNode::new(2),
       TNode::new(1),
       TNode::new(0),
+      TNode::new(2),
       TNode::new(0),
-      TNode::new(2)
     ]
   );
 }
@@ -364,10 +363,8 @@ fn uncachable_node_only_runs_once() {
 #[test]
 fn retries() {
   let _logger = env_logger::try_init();
-  let graph = Arc::new(Graph::new_with_invalidation_timeout(Duration::from_secs(
-    10,
-  )));
   let mut rt = Runtime::new().unwrap();
+  let graph = Arc::new(Graph::new());
 
   let context = {
     let delay_for_root = Duration::from_millis(100);
@@ -397,43 +394,52 @@ fn retries() {
 }
 
 #[test]
-fn exhaust_uncacheable_retries() {
+fn canceled_immediately() {
   let _logger = env_logger::try_init();
-  let graph = Arc::new(Graph::new_with_invalidation_timeout(Duration::from_secs(2)));
   let mut rt = Runtime::new().unwrap();
+  let invalidation_delay = Duration::from_millis(10);
+  let graph = Arc::new(Graph::new_with_invalidation_delay(invalidation_delay));
 
+  let delay_for_middle = Duration::from_millis(2000);
+  let start_time = Instant::now();
   let context = {
-    let mut uncacheable = HashSet::new();
-    uncacheable.insert(TNode::new(1));
-    let delay_for_root = Duration::from_millis(100);
     let mut delays = HashMap::new();
-    delays.insert(TNode::new(0), delay_for_root);
-    TContext::new(graph.clone())
-      .with_uncacheable(uncacheable)
-      .with_delays(delays)
+    delays.insert(TNode::new(1), delay_for_middle);
+    TContext::new(graph.clone()).with_delays(delays)
   };
 
-  let sleep_per_invalidation = Duration::from_millis(10);
+  // We invalidate three times: the mid should only actually run to completion once, because we
+  // should cancel it the other times. We wait longer than the invalidation_delay for each
+  // invalidation to ensure that work actually starts before being invalidated.
+  let iterations = 3;
+  let sleep_per_invalidation = invalidation_delay * 10;
+  assert!(delay_for_middle > sleep_per_invalidation * 3);
   let graph2 = graph.clone();
-  let (send, recv) = mpsc::channel();
-  let _join = thread::spawn(move || loop {
-    if let Ok(_) = recv.try_recv() {
-      break;
-    };
-    thread::sleep(sleep_per_invalidation);
-    graph2.invalidate_from_roots(|&TNode(n, _)| n == 0);
+  let _join = thread::spawn(move || {
+    for _ in 0..iterations {
+      thread::sleep(sleep_per_invalidation);
+      graph2.invalidate_from_roots(|&TNode(n, _)| n == 1);
+    }
   });
-  let (assertion, subject) = match rt.block_on(graph.create(TNode::new(2), &context).compat()) {
-    Err(TError::Exhausted) => (true, None),
-    Err(e) => (false, Some(Err(e))),
-    other => (false, Some(other)),
-  };
-  send.send(()).unwrap();
-  assert!(
-    assertion,
-    "expected {:?} found {:?}",
-    Err::<(), TError>(TError::Exhausted),
-    subject
+  assert_eq!(
+    rt.block_on(graph.create(TNode::new(2), &context).compat()),
+    Ok(vec![T(0, 0), T(1, 0), T(2, 0)])
+  );
+
+  // We should have waited much less than the time it would have taken to complete three times.
+  assert!(Instant::now() < start_time + (delay_for_middle * iterations));
+
+  // And the top nodes should have seen three aborts.
+  assert_eq!(
+    vec![
+      TNode::new(2),
+      TNode::new(2),
+      TNode::new(2),
+      TNode::new(1),
+      TNode::new(1),
+      TNode::new(1)
+    ],
+    context.aborts(),
   );
 }
 
@@ -621,10 +627,11 @@ impl Node for TNode {
   type Error = TError;
 
   fn run(self, context: TContext) -> BoxFuture<Vec<T>, TError> {
+    let mut abort_guard = context.abort_guard(self.clone());
     context.ran(self.clone());
     let token = T(self.0, context.salt());
     context.maybe_delay(&self);
-    if let Some(dep) = context.dependency_of(&self) {
+    let tokens = if let Some(dep) = context.dependency_of(&self) {
       context
         .get(dep)
         .map(move |mut v| {
@@ -634,7 +641,13 @@ impl Node for TNode {
         .to_boxed()
     } else {
       future::ok(vec![token]).to_boxed()
-    }
+    };
+    tokens
+      .map(move |v| {
+        abort_guard.did_not_abort();
+        v
+      })
+      .to_boxed()
   }
 
   fn digest(_result: Self::Item) -> Option<Digest> {
@@ -717,6 +730,7 @@ struct TContext {
   delays: Arc<HashMap<TNode, Duration>>,
   uncacheable: Arc<HashSet<TNode>>,
   graph: Arc<Graph<TNode>>,
+  aborts: Arc<Mutex<Vec<TNode>>>,
   runs: Arc<Mutex<Vec<TNode>>>,
   entry_id: Option<EntryId>,
 }
@@ -732,6 +746,7 @@ impl NodeContext for TContext {
       delays: self.delays.clone(),
       uncacheable: self.uncacheable.clone(),
       graph: self.graph.clone(),
+      aborts: self.aborts.clone(),
       runs: self.runs.clone(),
       entry_id: Some(entry_id),
     }
@@ -766,6 +781,7 @@ impl TContext {
       delays: Arc::default(),
       uncacheable: Arc::default(),
       graph,
+      aborts: Arc::new(Mutex::new(Vec::new())),
       runs: Arc::new(Mutex::new(Vec::new())),
       entry_id: None,
     }
@@ -808,6 +824,18 @@ impl TContext {
     self.graph.get(self.entry_id, self, dst)
   }
 
+  fn abort_guard(&self, node: TNode) -> AbortGuard {
+    AbortGuard {
+      context: self.clone(),
+      node: Some(node),
+    }
+  }
+
+  fn aborted(&self, node: TNode) {
+    let mut aborts = self.aborts.lock();
+    aborts.push(node);
+  }
+
   fn ran(&self, node: TNode) {
     let mut runs = self.runs.lock();
     runs.push(node);
@@ -837,24 +865,46 @@ impl TContext {
     }
   }
 
+  fn aborts(&self) -> Vec<TNode> {
+    self.aborts.lock().clone()
+  }
+
   fn runs(&self) -> Vec<TNode> {
     self.runs.lock().clone()
+  }
+}
+
+///
+/// A guard that if dropped, records that the given Node was aborted. When a future is canceled, it
+/// is dropped without re-running.
+///
+struct AbortGuard {
+  context: TContext,
+  node: Option<TNode>,
+}
+
+impl AbortGuard {
+  fn did_not_abort(&mut self) {
+    self.node = None;
+  }
+}
+
+impl Drop for AbortGuard {
+  fn drop(&mut self) {
+    if let Some(node) = self.node.take() {
+      self.context.aborted(node);
+    }
   }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum TError {
   Cyclic,
-  Exhausted,
   Invalidated,
 }
 impl NodeError for TError {
   fn invalidated() -> Self {
     TError::Invalidated
-  }
-
-  fn exhausted() -> Self {
-    TError::Exhausted
   }
 
   fn cyclic(_path: Vec<String>) -> Self {

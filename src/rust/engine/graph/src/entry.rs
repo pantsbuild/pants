@@ -4,6 +4,8 @@ use std::time::{Duration, Instant};
 
 use crate::node::{EntryId, Node, NodeContext, NodeError};
 
+use futures::compat::Future01CompatExt;
+use futures::future::{AbortHandle, Abortable, Aborted, FutureExt, TryFutureExt};
 use futures01::future::{self, Future};
 use futures01::sync::oneshot;
 use log::{self, trace};
@@ -172,11 +174,11 @@ pub enum EntryState<N: Node> {
   // The `previous_result` value for a Running node is not a valid value. See NotStarted.
   Running {
     run_token: RunToken,
+    abort_handle: AbortHandle,
     generation: Generation,
     start_time: Instant,
     waiters: Vec<oneshot::Sender<Result<(N::Item, Generation), N::Error>>>,
     previous_result: Option<EntryResult<N>>,
-    dirty: bool,
   },
   // A node that has completed, and then possibly been marked dirty. Because marking a node
   // dirty does not eagerly re-execute any logic, it will stay this way until a caller moves it
@@ -297,6 +299,7 @@ impl<N: Node> Entry<N> {
     let run_token = run_token.next();
     let context = context_factory.clone_for(entry_id);
     let node = node.clone();
+    let (abort_handle, abort_registration) = AbortHandle::new_pair();
 
     context_factory.spawn(future::lazy(move || {
       // If we have previous result generations, compare them to all current dependency
@@ -336,9 +339,14 @@ impl<N: Node> Entry<N> {
         } else {
           // The Node needs to (re-)run!
           let context2 = context.clone();
-          node
-            .run(context)
-            .then(move |res| {
+          Abortable::new(node.run(context.clone()).compat(), abort_registration)
+            .boxed()
+            .compat()
+            .then(move |abortable_result| {
+              let res = match abortable_result {
+                Ok(r) => r,
+                Err(Aborted) => Err(N::Error::invalidated()),
+              };
               context2
                 .graph()
                 .complete(&context2, entry_id, run_token, Some(res));
@@ -350,12 +358,12 @@ impl<N: Node> Entry<N> {
     }));
 
     EntryState::Running {
-      waiters: Vec::new(),
-      start_time: Instant::now(),
       run_token,
+      abort_handle,
       generation,
+      start_time: Instant::now(),
+      waiters: Vec::new(),
       previous_result,
-      dirty: false,
     }
   }
 
@@ -483,7 +491,6 @@ impl<N: Node> Entry<N> {
   pub(crate) fn complete(
     &mut self,
     context: &N::Context,
-    entry_id: EntryId,
     result_run_token: RunToken,
     dep_generations: Vec<Generation>,
     result: Option<Result<N::Item, N::Error>>,
@@ -499,21 +506,23 @@ impl<N: Node> Entry<N> {
       _ => {
         // We care about exactly one case: a Running state with the same run_token. All other states
         // represent various (legal) race conditions.
-        trace!("Not completing node {:?} because it was invalidated (different run_token) before completing.", self.node);
+        trace!(
+          "Not completing node {:?} because it was invalidated.",
+          self.node
+        );
         return;
       }
     }
 
     *state = match mem::replace(&mut *state, EntryState::initial()) {
       EntryState::Running {
-        waiters,
         run_token,
+        waiters,
         generation,
         mut previous_result,
-        dirty,
         ..
       } => {
-        if result == Some(Err(N::Error::invalidated())) {
+        if let Some(Err(e)) = result {
           // Because it is always ephemeral, invalidation is the only type of Err that we do not
           // persist in the Graph. Instead, swap the Node to NotStarted to drop all waiters,
           // causing them to also experience invalidation (transitively).
@@ -524,30 +533,14 @@ impl<N: Node> Entry<N> {
           if let Some(previous_result) = previous_result.as_mut() {
             previous_result.dirty();
           }
+          for waiter in waiters {
+            let _ = waiter.send(Err(e.clone()));
+          }
           EntryState::NotStarted {
             run_token: run_token.next(),
             generation,
             previous_result,
           }
-        } else if dirty {
-          // The node was dirtied while it was running. The dep_generations and new result cannot
-          // be trusted and were never published. We continue to use the previous result.
-          trace!(
-            "Not completing node {:?} because it was dirtied before completing.",
-            self.node
-          );
-          if let Some(previous_result) = previous_result.as_mut() {
-            previous_result.dirty();
-          }
-          Self::run(
-            context,
-            &self.node,
-            entry_id,
-            run_token,
-            generation,
-            None,
-            previous_result,
-          )
         } else {
           // If the new result does not match the previous result, the generation increments.
           let (generation, next_result) = if let Some(result) = result {
@@ -670,13 +663,17 @@ impl<N: Node> Entry<N> {
           generation,
           previous_result,
           ..
-        }
-        | EntryState::Running {
+        } => (run_token, generation, previous_result),
+        EntryState::Running {
           run_token,
+          abort_handle,
           generation,
           previous_result,
           ..
-        } => (run_token, generation, previous_result),
+        } => {
+          abort_handle.abort();
+          (run_token, generation, previous_result)
+        }
         EntryState::Completed {
           run_token,
           generation,
@@ -711,12 +708,6 @@ impl<N: Node> Entry<N> {
     let state = &mut *self.state.lock();
     trace!("Dirtying node {:?}", self.node);
     match state {
-      &mut EntryState::Running { ref mut dirty, .. } => {
-        // An uncacheable node can never be marked dirty.
-        if self.node.cacheable() {
-          *dirty = true;
-        }
-      }
       &mut EntryState::Completed {
         ref mut result,
         ref mut pollers,
@@ -727,8 +718,36 @@ impl<N: Node> Entry<N> {
           let _ = poller.send(());
         }
         result.dirty();
+        return;
       }
-      &mut EntryState::NotStarted { .. } => {}
+      &mut EntryState::NotStarted { .. } => return,
+      &mut EntryState::Running { .. } if !self.node.cacheable() => {
+        // An uncacheable node cannot be interrupted.
+        return;
+      }
+      &mut EntryState::Running { .. } => {
+        // Handled below: we need to move back to NotStarted.
+      }
+    };
+
+    *state = match mem::replace(&mut *state, EntryState::initial()) {
+      EntryState::Running {
+        run_token,
+        abort_handle,
+        generation,
+        previous_result,
+        ..
+      } => {
+        // Dirtying a Running node immediately cancels it.
+        trace!("Node {:?} was dirtied while running.", self.node);
+        abort_handle.abort();
+        EntryState::NotStarted {
+          run_token,
+          generation,
+          previous_result,
+        }
+      }
+      _ => unreachable!(),
     }
   }
 
