@@ -210,6 +210,11 @@ class SchedulerTest(TestBase):
         with self.assertDoesNotRaise():
             _ = self.request_single_product(D, Params(c))
 
+    def test_consumed_types(self):
+        assert {A, B, C, str} == set(
+            self.scheduler.scheduler.rule_graph_consumed_types([A, C], str)
+        )
+
     @contextmanager
     def _assert_execution_error(self, expected_msg):
         with assert_execution_error(self, expected_msg):

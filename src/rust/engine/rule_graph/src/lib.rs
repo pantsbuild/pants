@@ -339,6 +339,23 @@ impl<R: Rule> RuleGraph<R> {
   }
 
   ///
+  /// Returns all types consumed by rules within this RuleGraph.
+  ///
+  pub fn consumed_types(&self) -> HashSet<R::TypeId> {
+    self
+      .rule_dependency_edges
+      .iter()
+      .flat_map(|(entry, edges)| {
+        entry
+          .params()
+          .iter()
+          .cloned()
+          .chain(edges.dependencies.keys().map(|k| k.product()))
+      })
+      .collect()
+  }
+
+  ///
   /// Find the entrypoint in this RuleGraph for the given product and params.
   ///
   pub fn find_root<I: IntoIterator<Item = R::TypeId>>(
