@@ -1,0 +1,2 @@
+load("//this/is/ignored", "non_registered_symbol")
+load("//this/is/ignored", "jar")

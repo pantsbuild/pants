@@ -4,7 +4,6 @@
 import logging
 import os
 import tokenize
-from copy import copy
 from io import StringIO
 from pathlib import PurePath
 from typing import Dict, Iterable, Tuple
@@ -157,25 +156,49 @@ class LegacyPythonCallbacksParser(Parser):
                 hint=warning,
             )
 
-    @staticmethod
     def _expose_symbols_from_loaded_files(
-        load_statements: Iterable[LoadStatementWithContent], filepath: str
+        self, load_statements: Iterable[LoadStatementWithContent], filepath: str
     ) -> Dict:
         """Expose symbols from loaded files.
 
-        To achieve that, we exec() the contents of the imported file, which puts all defined symbols
-        in `locals()`. We then copy `locals()` and filter it by the symbols the build file
-        explicitly imports. `locals()` will be emptied at the end of each iteration of the outer
-        `for` loop, so there is no chance of contamination.
+        To achieve that, we exec() the contents of the imported file, with the following arguments:
+        - content: We pass the raw python code of the loaded file
+        - globals: We pass the symbols that would be available to any BUILD file during parsing.
+                    This makes functions like `jar` and `artifact` available to these macros.
+        - locals: We pass an empty dict, that will be populated by function and variable definitions
+                    declared in the loaded file.
+
+        We then filter the locals dict by the symbols the BUILD file explicitly imports.
         """
+
+        def ensure_only_registered_symbols_loaded(path, loaded_sybmols):
+            """Note: For Bazel compatbility, we need to be able to load these pants concepts explicitly,
+                        but pants doesn't have to.
+                        We make sure every loaded concept is already registered with pants.
+            """
+            loaded_symbols_not_already_in_globals = [
+                s for s in loaded_sybmols if s not in self._symbols.keys()
+            ]
+            if loaded_symbols_not_already_in_globals:
+                raise ParseError(
+                    f"File {path} is trying to load() sybmols {loaded_symbols_not_already_in_globals}, which are not registered with pants. "
+                    "This is not allowed for now, please stick to loading only registered symbols. "
+                )
+            logger.debug(
+                f"External macro file {path} is trying to use load() to load registered symbols: {loaded_sybmols}. "
+                f"All loaded symbols are already registered with pants, ignoring load."
+            )
+
         extra_symbols: Dict = {}
         for statement in load_statements:
             content = statement.content.content.decode()
             symbols_to_expose = statement.symbols_to_expose
-            exec(content)
-            local_symbols = copy(
-                locals()
-            )  # We copy the locals so that they don't get lost in the for loop
+            local_symbols = {
+                "load": lambda *args: ensure_only_registered_symbols_loaded(
+                    statement.path, args[1:]
+                )
+            }
+            exec(content, dict(self._symbols), local_symbols)
             for symbol in symbols_to_expose:
                 if symbol in local_symbols:
                     if symbol not in extra_symbols:
@@ -207,7 +230,7 @@ class LegacyPythonCallbacksParser(Parser):
         # this juncture.
         self._parse_context._storage.clear(os.path.dirname(filepath))
 
-        symbols_loaded_from_files = LegacyPythonCallbacksParser._expose_symbols_from_loaded_files(
+        symbols_loaded_from_files = self._expose_symbols_from_loaded_files(
             load_statements, filepath
         )
 

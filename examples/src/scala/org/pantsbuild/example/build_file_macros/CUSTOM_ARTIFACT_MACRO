@@ -1,0 +1,6 @@
+def custom_artifact(name):
+  return artifact(
+    org = "org.pantsbuild.custom_artifact",
+    name = name,
+    repo = public,
+  )

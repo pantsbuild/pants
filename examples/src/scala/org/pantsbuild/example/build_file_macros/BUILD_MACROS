@@ -1,4 +1,3 @@
 def dep_on_welcome():
-
     return ['examples/src/scala/org/pantsbuild/example/hello/welcome:welcome']
 
