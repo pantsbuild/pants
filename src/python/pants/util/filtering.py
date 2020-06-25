@@ -4,8 +4,6 @@
 import operator
 from typing import Callable, Iterable, Sequence, Tuple, TypeVar
 
-from pants.base.deprecated import deprecated
-
 _T = TypeVar("_T")
 Filter = Callable[[_T], bool]
 
@@ -56,18 +54,6 @@ def create_filters(
     for predicate_param in predicate_params:
         filters.append(create_filter(predicate_param, predicate_factory))
     return filters
-
-
-@deprecated(
-    removal_version="1.31.0.dev0",
-    hint_message="Use `pants.util.filtering.and_filters`, which behaves identically.",
-)
-def wrap_filters(filters: Iterable[Filter]) -> Filter:
-    """Returns a single filter that short-circuit ANDs the specified filters.
-
-    :API: public
-    """
-    return and_filters(filters)
 
 
 def and_filters(filters: Iterable[Filter]) -> Filter:
