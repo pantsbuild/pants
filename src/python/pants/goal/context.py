@@ -8,7 +8,6 @@ from contextlib import contextmanager
 from typing import Dict
 
 from pants.base.build_environment import get_buildroot, get_scm
-from pants.base.deprecated import deprecated_conditional
 from pants.base.worker_pool import SubprocPool
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.build_graph.target import Target
@@ -106,21 +105,6 @@ class Context:
         :API: public
         """
         return self._products
-
-    @property
-    def source_roots(self):
-        """Returns the :class:`pants.source.source_root.SourceRoots` instance for the current run.
-
-        :API: public
-        """
-        deprecated_conditional(
-            lambda: True,
-            removal_version="1.31.0.dev0",
-            entity_description="the source_roots property",
-            hint_message="Contact us (https://pants.readme.io/docs/community) if you need this "
-            "functionality.",
-        )
-        return self._source_roots
 
     @property
     def target_roots(self):

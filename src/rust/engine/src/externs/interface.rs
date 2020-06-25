@@ -385,6 +385,7 @@ py_module_initializer!(native_engine, |py, m| {
 
   m.add_class::<PyExecutionRequest>(py)?;
   m.add_class::<PyExecutor>(py)?;
+  m.add_class::<PyNailgunServer>(py)?;
   m.add_class::<PyResult>(py)?;
   m.add_class::<PyScheduler>(py)?;
   m.add_class::<PySession>(py)?;

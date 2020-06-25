@@ -36,9 +36,7 @@ function calculate_current_hash() {
     git ls-files --cached --others --exclude-standard \
      "${NATIVE_ROOT}" \
      "${REPO_ROOT}/rust-toolchain" \
-     "${REPO_ROOT}/src/python/pants/engine/internals/native.py" \
      "${REPO_ROOT}/build-support/bin/native" \
-     "${REPO_ROOT}/3rdparty/python/requirements.txt" \
    | grep -v -E -e "/BUILD$" -e "/[^/]*\.md$" \
    | git hash-object --stdin-paths) | fingerprint_data
   )
