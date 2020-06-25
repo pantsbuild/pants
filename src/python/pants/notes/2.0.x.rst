@@ -39,6 +39,9 @@ API Changes
 * Remove the v1 `export` goal (#10122)
   `PR #10122 <https://github.com/pantsbuild/pants/pull/10122>`_
 
+* Remove `pants.backend.docgen` (#10121)
+  `PR #10121 <https://github.com/pantsbuild/pants/pull/10121>`_
+
 * Remove v1 `idea-plugin` goal (#10115)
   `PR #10115 <https://github.com/pantsbuild/pants/pull/10115>`_
 
@@ -98,6 +101,9 @@ Bugfixes
 * Preserve source roots in MyPy and Pylint output (#10159)
   `PR #10159 <https://github.com/pantsbuild/pants/pull/10159>`_
 
+* Do not include resource targets in v2 MyPy chroot (#10154)
+  `PR #10154 <https://github.com/pantsbuild/pants/pull/10154>`_
+
 * Set dynamic-ui default based on CI (#10140)
   `PR #10140 <https://github.com/pantsbuild/pants/pull/10140>`_
 
@@ -124,9 +130,6 @@ Refactoring, Improvements, and Tooling
 
 * Add message field on workunits and use it to replace some explicit logging (#10158)
   `PR #10158 <https://github.com/pantsbuild/pants/pull/10158>`_
-
-* Do not include resource targets in v2 MyPy chroot (#10154)
-  `PR #10154 <https://github.com/pantsbuild/pants/pull/10154>`_
 
 * Expose the types consumed to produce a type in a RuleGraph. (#10153)
   `PR #10153 <https://github.com/pantsbuild/pants/pull/10153>`_
@@ -167,9 +170,6 @@ Testing
 
 Documentation
 ~~~~~~~~~~~~~
-
-* Remove `pants.backend.docgen` (#10121)
-  `PR #10121 <https://github.com/pantsbuild/pants/pull/10121>`_
 
 * Remove the v1 docsite (#10120)
   `PR #10120 <https://github.com/pantsbuild/pants/pull/10120>`_
