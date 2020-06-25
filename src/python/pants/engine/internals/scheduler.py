@@ -5,21 +5,37 @@ import logging
 import os
 import time
 from dataclasses import dataclass
+from types import CoroutineType
 from typing import Any, Dict, List, NoReturn, Optional, Sequence, Tuple, Type, Union, cast
 
 from typing_extensions import TypedDict
 
 from pants.base.exception_sink import ExceptionSink
+from pants.base.project_tree import Dir, File, Link
+from pants.engine.addresses import Address
 from pants.engine.collection import Collection
 from pants.engine.fs import (
+    AddPrefix,
     Digest,
     DirectoryToMaterialize,
+    FileContent,
+    FilesContent,
+    InputFilesContent,
     MaterializeDirectoriesResult,
     MaterializeDirectoryResult,
+    MergeDigests,
+    PathGlobs,
     PathGlobsAndRoot,
+    RemovePrefix,
+    Snapshot,
+    SnapshotSubset,
+    UrlToFetch,
 )
 from pants.engine.interactive_process import InteractiveProcess, InteractiveProcessResult
+from pants.engine.internals.native_engine import PyTypes
 from pants.engine.internals.nodes import Return, Throw
+from pants.engine.platform import Platform
+from pants.engine.process import FallibleProcessResultWithPlatform, MultiPlatformProcess
 from pants.engine.rules import EngineAware, Rule, RuleIndex, TaskRule
 from pants.engine.selectors import Params
 from pants.engine.unions import union
@@ -111,6 +127,42 @@ class Scheduler:
         # Create the native Scheduler and Session.
         tasks = self._register_rules(rule_index)
 
+        # TODO: There is no longer a need to differentiate constructors from types, as types are
+        # callable as well with the cpython crate.
+        types = PyTypes(
+            construct_directory_digest=Digest,
+            directory_digest=Digest,
+            construct_snapshot=Snapshot,
+            snapshot=Snapshot,
+            construct_file_content=FileContent,
+            construct_files_content=FilesContent,
+            files_content=FilesContent,
+            construct_process_result=FallibleProcessResultWithPlatform,
+            construct_materialize_directories_results=MaterializeDirectoriesResult,
+            construct_materialize_directory_result=MaterializeDirectoryResult,
+            address=Address,
+            path_globs=PathGlobs,
+            merge_digests=MergeDigests,
+            add_prefix=AddPrefix,
+            remove_prefix=RemovePrefix,
+            input_files_content=InputFilesContent,
+            dir=Dir,
+            file=File,
+            link=Link,
+            platform=Platform,
+            multi_platform_process=MultiPlatformProcess,
+            process_result=FallibleProcessResultWithPlatform,
+            coroutine=CoroutineType,
+            url_to_fetch=UrlToFetch,
+            string=str,
+            bytes=bytes,
+            construct_interactive_process_result=InteractiveProcessResult,
+            interactive_process=InteractiveProcess,
+            interactive_process_result=InteractiveProcessResult,
+            snapshot_subset=SnapshotSubset,
+            construct_platform=Platform,
+        )
+
         self._scheduler = native.new_scheduler(
             tasks=tasks,
             root_subject_types=self._root_subject_types,
@@ -121,6 +173,7 @@ class Scheduler:
             ignore_patterns=ignore_patterns,
             use_gitignore=use_gitignore,
             execution_options=execution_options,
+            types=types,
         )
 
         # If configured, visualize the rule graph before asserting that it is valid.

@@ -1,6 +1,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import inspect
 import os
 import re
 from enum import Enum
@@ -111,6 +112,13 @@ def _convert(val, acceptable_types):
     return parse_expression(val, acceptable_types, raise_type=ParseError)
 
 
+def _convert_list(val, member_type, is_enum):
+    converted = _convert(val, (list, tuple))
+    if not is_enum:
+        return converted
+    return [item if isinstance(item, member_type) else member_type(item) for item in converted]
+
+
 class ListValueComponent:
     """A component of the value of a list-typed option.
 
@@ -184,7 +192,7 @@ class ListValueComponent:
         return ret
 
     @classmethod
-    def create(cls, value) -> "ListValueComponent":
+    def create(cls, value, member_type=str) -> "ListValueComponent":
         """Interpret value as either a list or something to extend another list with.
 
         Note that we accept tuple literals, but the internal value is always a list.
@@ -205,6 +213,7 @@ class ListValueComponent:
         action = cls.MODIFY
         appends: Sequence[str] = []
         filters: Sequence[str] = []
+        is_enum = inspect.isclass(member_type) and issubclass(member_type, Enum)
         if isinstance(value, cls):  # Ensure idempotency.
             action = value._action
             appends = value._appends
@@ -214,11 +223,13 @@ class ListValueComponent:
             appends = value
         elif value.startswith("[") or value.startswith("("):
             action = cls.REPLACE
-            appends = _convert(value, (list, tuple))
+            appends = _convert_list(value, member_type, is_enum)
         elif value.startswith("+[") or value.startswith("+("):
-            appends = _convert(value[1:], (list, tuple))
+            appends = _convert_list(value[1:], member_type, is_enum)
         elif value.startswith("-[") or value.startswith("-("):
-            filters = _convert(value[1:], (list, tuple))
+            filters = _convert_list(value[1:], member_type, is_enum)
+        elif is_enum and isinstance(value, str):
+            appends = _convert_list([value], member_type, True)
         elif isinstance(value, str):
             appends = [value]
         else:

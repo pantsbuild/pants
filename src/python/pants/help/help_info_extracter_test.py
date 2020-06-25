@@ -145,6 +145,11 @@ class HelpInfoExtracterTest(unittest.TestCase):
         ohi = HelpInfoExtracter("").get_option_help_info([], kwargs)
         assert ohi.choices == "info, debug"
 
+    def test_list_of_enum(self) -> None:
+        kwargs = {"type": list, "member_type": LogLevel}
+        ohi = HelpInfoExtracter("").get_option_help_info([], kwargs)
+        assert ohi.choices == "info, debug"
+
     def test_grouping(self):
         def do_test(kwargs, expected_basic=False, expected_advanced=False):
             def exp_to_len(exp):

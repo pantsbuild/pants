@@ -53,7 +53,6 @@ from pants.engine.target import TransitiveTargets
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
 from pants.python.python_setup import PythonSetup
-from pants.util.logging import LogLevel
 
 logger = logging.getLogger()
 
@@ -224,7 +223,7 @@ async def setup_pytest_for_target(
     )
 
 
-@rule(level=LogLevel.INFO)
+@rule(desc="Run Pytest")
 async def run_python_test(
     field_set: PythonTestFieldSet,
     test_setup: TestTargetSetup,
@@ -300,7 +299,7 @@ async def run_python_test(
     )
 
 
-@rule(desc="Run pytest in an interactive process")
+@rule(desc="Run Pytest in an interactive process")
 async def debug_python_test(test_setup: TestTargetSetup) -> TestDebugRequest:
     process = InteractiveProcess(
         argv=(test_setup.test_runner_pex.output_filename, *test_setup.args),

@@ -10,6 +10,7 @@ from functools import partial
 from textwrap import dedent
 from typing import Any, Dict, List, Optional, Union, cast
 
+import pytest
 import toml
 import yaml
 from packaging.version import Version
@@ -112,11 +113,14 @@ class OptionsTest(TestBase):
         task("fingerprinting"),
         task("enum-opt"),
         task("separate-enum-opt-scope"),
+        task("other-enum-scope"),
     ]
 
     class SomeEnumOption(Enum):
         a_value = "a-value"
         another_value = "another-value"
+        yet_another = "yet-another"
+        one_more = "one-more"
 
     def _register(self, options):
         def register_global(*args, **kwargs):
@@ -271,6 +275,17 @@ class OptionsTest(TestBase):
 
         # For enum tests
         options.register("enum-opt", "--some-enum", type=self.SomeEnumOption)
+        options.register(
+            "other-enum-scope", "--some-list-enum", type=list, member_type=self.SomeEnumOption
+        )
+        options.register(
+            "other-enum-scope",
+            "--some-list-enum-with-default",
+            type=list,
+            member_type=self.SomeEnumOption,
+            default=[self.SomeEnumOption.yet_another],
+        )
+
         # For testing the default value
         options.register(
             "separate-enum-opt-scope",
@@ -1733,3 +1748,65 @@ class OptionsTest(TestBase):
         single_warning_dummy1 = assert_single_element(w)
         self.assertEqual(single_warning_dummy1.category, DeprecationWarning)
         self.assertEqual("vv", vals1.foo)
+
+    def test_list_of_enum_single_value(self) -> None:
+        options = self._parse(flags="other-enum-scope --some-list-enum=another-value")
+        assert [self.SomeEnumOption.another_value] == options.for_scope(
+            "other-enum-scope"
+        ).some_list_enum
+
+    def test_list_of_enum_default_value(self) -> None:
+        options = self._parse(flags="other-enum-scope --some-list-enum-with-default=another-value")
+        assert [
+            self.SomeEnumOption.yet_another,
+            self.SomeEnumOption.another_value,
+        ] == options.for_scope("other-enum-scope").some_list_enum_with_default
+        options = self._parse()
+        assert [self.SomeEnumOption.yet_another] == options.for_scope(
+            "other-enum-scope"
+        ).some_list_enum_with_default
+
+    def test_list_of_enum_from_config(self) -> None:
+        options = self._parse(
+            config={"other-enum-scope": {"some_list_enum": "['one-more', 'a-value']"}}
+        )
+        assert [self.SomeEnumOption.one_more, self.SomeEnumOption.a_value] == options.for_scope(
+            "other-enum-scope"
+        ).some_list_enum
+
+    def test_list_of_enum_duplicates(self) -> None:
+        options = self._parse(
+            flags="other-enum-scope --some-list-enum=\"['another-value', 'one-more', 'another-value']\""
+        )
+        with pytest.raises(ParseError, match="Duplicate enum values specified in list"):
+            options.for_scope("other-enum-scope")
+
+    def test_list_of_enum_invalid_value(self) -> None:
+        options = self._parse(
+            flags="other-enum-scope --some-list-enum=\"['another-value', 'not-a-value']\""
+        )
+        with pytest.raises(ParseError, match="Error computing value for --some-list-enum"):
+            options.for_scope("other-enum-scope")
+
+    def test_list_of_enum_set_single_value(self) -> None:
+        options = self._parse(
+            flags="other-enum-scope --some-list-enum-with-default=\"['another-value']\""
+        )
+        assert [self.SomeEnumOption.another_value] == options.for_scope(
+            "other-enum-scope"
+        ).some_list_enum_with_default
+
+    def test_list_of_enum_append(self) -> None:
+        options = self._parse(
+            flags="other-enum-scope --some-list-enum-with-default=\"+['another-value']\""
+        )
+        assert [
+            self.SomeEnumOption.yet_another,
+            self.SomeEnumOption.another_value,
+        ] == options.for_scope("other-enum-scope").some_list_enum_with_default
+
+    def test_list_of_enum_remove(self) -> None:
+        options = self._parse(
+            flags="other-enum-scope --some-list-enum-with-default=\"-['yet-another']\""
+        )
+        assert [] == options.for_scope("other-enum-scope").some_list_enum_with_default

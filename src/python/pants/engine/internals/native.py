@@ -1,48 +1,33 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import importlib
 import logging
 import os
-import sys
-from contextlib import closing
-from types import CoroutineType
-from typing import Dict, Iterable, List, Tuple, cast
+from typing import Dict, Iterable, List, Tuple, Union, cast
 
-import pkg_resources
 from typing_extensions import Protocol
 
 from pants.base.exiter import ExitCode
-from pants.base.project_tree import Dir, File, Link
-from pants.engine.addresses import Address
-from pants.engine.fs import (
-    AddPrefix,
-    Digest,
-    FileContent,
-    FilesContent,
-    InputFilesContent,
-    MaterializeDirectoriesResult,
-    MaterializeDirectoryResult,
-    MergeDigests,
-    PathGlobs,
-    RemovePrefix,
-    Snapshot,
-    SnapshotSubset,
-    UrlToFetch,
+from pants.engine.fs import PathGlobs
+from pants.engine.internals import native_engine
+from pants.engine.internals.native_engine import (
+    PyExecutionRequest,
+    PyExecutor,
+    PyGeneratorResponseBreak,
+    PyGeneratorResponseGet,
+    PyGeneratorResponseGetMulti,
+    PyNailgunServer,
+    PyScheduler,
+    PySession,
+    PyTasks,
+    PyTypes,
 )
-from pants.engine.interactive_process import InteractiveProcess, InteractiveProcessResult
-from pants.engine.platform import Platform
-from pants.engine.process import FallibleProcessResultWithPlatform, MultiPlatformProcess
 from pants.engine.selectors import Get
 from pants.engine.unions import union
-from pants.util.dirutil import safe_mkdtemp
 from pants.util.memo import memoized_property
 from pants.util.meta import SingletonMetaclass
 
 logger = logging.getLogger(__name__)
-
-
-NATIVE_ENGINE_MODULE = "native_engine"
 
 
 class Externs:
@@ -70,7 +55,9 @@ class Externs:
         """Given a `obj`, return str(obj)."""
         return "" if val is None else str(val)
 
-    def generator_send(self, func, arg):
+    def generator_send(
+        self, func, arg
+    ) -> Union[PyGeneratorResponseGet, PyGeneratorResponseGetMulti, PyGeneratorResponseBreak]:
         """Given a generator, send it the given value and return a response."""
         if self._do_raise_keyboardinterrupt:
             raise KeyboardInterrupt("ctrl-c interrupted execution of a ffi method!")
@@ -79,14 +66,14 @@ class Externs:
 
             if Get.isinstance(res):
                 # Get.
-                return self.lib.PyGeneratorResponseGet(
+                return PyGeneratorResponseGet(
                     res.product_type, res.subject_declared_type, res.subject,
                 )
             elif type(res) in (tuple, list):
                 # GetMulti.
-                return self.lib.PyGeneratorResponseGetMulti(
+                return PyGeneratorResponseGetMulti(
                     tuple(
-                        self.lib.PyGeneratorResponseGet(
+                        PyGeneratorResponseGet(
                             get.product_type, get.subject_declared_type, get.subject,
                         )
                         for get in res
@@ -99,7 +86,7 @@ class Externs:
                 raise
             # This was a `return` from a coroutine, as opposed to a `StopIteration` raised
             # by calling `next()` on an empty iterator.
-            return self.lib.PyGeneratorResponseBreak(e.value)
+            return PyGeneratorResponseBreak(e.value)
 
 
 class RawFdRunner(Protocol):
@@ -122,38 +109,15 @@ class Native(metaclass=SingletonMetaclass):
     def __init__(self):
         self.externs = Externs(self.lib)
         self.lib.externs_set(self.externs)
-        self._executor = self.lib.PyExecutor()
+        self._executor = PyExecutor()
 
     class BinaryLocationError(Exception):
         pass
 
     @memoized_property
-    def _binary(self):
-        """Load and return the path to the native engine binary."""
-        lib_name = "{}.so".format(NATIVE_ENGINE_MODULE)
-        lib_path = os.path.join(safe_mkdtemp(), lib_name)
-        try:
-            with closing(pkg_resources.resource_stream(__name__, lib_name)) as input_fp:
-                # NB: The header stripping code here must be coordinated with header insertion code in
-                #     build-support/bin/native/bootstrap_code.sh
-                engine_version = input_fp.readline().decode().strip()
-                repo_version = input_fp.readline().decode().strip()
-                logger.debug("using {} built at {}".format(engine_version, repo_version))
-                with open(lib_path, "wb") as output_fp:
-                    output_fp.write(input_fp.read())
-        except (IOError, OSError) as e:
-            raise self.BinaryLocationError(
-                "Error unpacking the native engine binary to path {}: {}".format(lib_path, e), e
-            )
-        return lib_path
-
-    @memoized_property
     def lib(self):
         """Load the native engine as a python module."""
-        native_bin_dir = os.path.dirname(self._binary)
-        logger.debug("loading native engine python module from: %s", native_bin_dir)
-        sys.path.insert(0, native_bin_dir)
-        return importlib.import_module(NATIVE_ENGINE_MODULE)
+        return native_engine
 
     def decompress_tarball(self, tarfile_path, dest_dir):
         return self.lib.decompress_tarball(tarfile_path, dest_dir)
@@ -196,18 +160,18 @@ class Native(metaclass=SingletonMetaclass):
         """
         self.lib.nailgun_server_await_shutdown(self._executor, nailgun_server)
 
-    def new_nailgun_server(self, port: int, runner: RawFdRunner):
+    def new_nailgun_server(self, port: int, runner: RawFdRunner) -> PyNailgunServer:
         """Creates a nailgun server with a requested port.
 
         Returns the server and the actual port it bound to.
         """
-        return self.lib.nailgun_server_create(self._executor, port, runner)
+        return cast(PyNailgunServer, self.lib.nailgun_server_create(self._executor, port, runner))
 
-    def new_tasks(self):
-        return self.lib.PyTasks()
+    def new_tasks(self) -> PyTasks:
+        return PyTasks()
 
-    def new_execution_request(self):
-        return self.lib.PyExecutionRequest()
+    def new_execution_request(self) -> PyExecutionRequest:
+        return PyExecutionRequest()
 
     def new_session(
         self,
@@ -216,8 +180,8 @@ class Native(metaclass=SingletonMetaclass):
         dynamic_ui: bool,
         build_id,
         should_report_workunits: bool,
-    ):
-        return self.lib.PySession(
+    ) -> PySession:
+        return PySession(
             scheduler, should_record_zipkin_spans, dynamic_ui, build_id, should_report_workunits,
         )
 
@@ -232,49 +196,14 @@ class Native(metaclass=SingletonMetaclass):
         ignore_patterns: List[str],
         use_gitignore: bool,
         execution_options,
-    ):
+        types: PyTypes,
+    ) -> PyScheduler:
         """Create and return a native Scheduler."""
-
-        # TODO: There is no longer a need to differentiate constructors from types, as types are
-        # callable as well with the cpython crate.
-        engine_types = self.lib.PyTypes(
-            construct_directory_digest=Digest,
-            directory_digest=Digest,
-            construct_snapshot=Snapshot,
-            snapshot=Snapshot,
-            construct_file_content=FileContent,
-            construct_files_content=FilesContent,
-            files_content=FilesContent,
-            construct_process_result=FallibleProcessResultWithPlatform,
-            construct_materialize_directories_results=MaterializeDirectoriesResult,
-            construct_materialize_directory_result=MaterializeDirectoryResult,
-            address=Address,
-            path_globs=PathGlobs,
-            merge_digests=MergeDigests,
-            add_prefix=AddPrefix,
-            remove_prefix=RemovePrefix,
-            input_files_content=InputFilesContent,
-            dir=Dir,
-            file=File,
-            link=Link,
-            platform=Platform,
-            multi_platform_process=MultiPlatformProcess,
-            process_result=FallibleProcessResultWithPlatform,
-            coroutine=CoroutineType,
-            url_to_fetch=UrlToFetch,
-            string=str,
-            bytes=bytes,
-            construct_interactive_process_result=InteractiveProcessResult,
-            interactive_process=InteractiveProcess,
-            interactive_process_result=InteractiveProcessResult,
-            snapshot_subset=SnapshotSubset,
-            construct_platform=Platform,
-        )
 
         return self.lib.scheduler_create(
             self._executor,
             tasks,
-            engine_types,
+            types,
             # Project tree.
             build_root,
             local_store_dir,
