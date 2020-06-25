@@ -42,6 +42,7 @@ python_tests(
     ],
     timeout=300,
     tags={"integration", "partially_type_checked"},
+    timeout = 240,
 )
 
 python_tests(

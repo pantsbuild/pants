@@ -15,8 +15,8 @@ lazy_static = "1"
 log = "0.4"
 parking_lot = "0.6"
 task_executor = { path = "../task_executor" }
-tempfile = "3"
 
 [dev-dependencies]
+tempfile = "3"
 testutil = { path = "../testutil" }
 tokio = { version = "0.2", features = ["rt-core", "macros"] }

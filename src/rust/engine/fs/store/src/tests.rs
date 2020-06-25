@@ -5,14 +5,12 @@ use crate::{
 
 use bazel_protos;
 use bytes::Bytes;
-use digest::{Digest as DigestTrait, FixedOutput};
 use futures::compat::Future01CompatExt;
 use hashing::{Digest, Fingerprint};
 use maplit::btreemap;
 use mock::StubCAS;
 use protobuf::Message;
 use serverset::BackoffConfig;
-use sha2::Sha256;
 use std;
 use std::collections::HashMap;
 use std::fs::File;
@@ -374,15 +372,8 @@ async fn non_canonical_remote_directory_is_error() {
       .write_to_bytes()
       .expect("Error serializing proto"),
   );
-  let non_canonical_directory_fingerprint = {
-    let mut hasher = Sha256::default();
-    hasher.input(&non_canonical_directory_bytes);
-    Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice())
-  };
-  let directory_digest = Digest(
-    non_canonical_directory_fingerprint,
-    non_canonical_directory_bytes.len(),
-  );
+  let directory_digest = Digest::of_bytes(&non_canonical_directory_bytes);
+  let non_canonical_directory_fingerprint = directory_digest.0;
 
   let dir = TempDir::new().unwrap();
 

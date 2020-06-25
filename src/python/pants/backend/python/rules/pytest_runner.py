@@ -53,6 +53,7 @@ from pants.engine.target import TransitiveTargets
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
 from pants.python.python_setup import PythonSetup
+from pants.util.logging import LogLevel
 
 logger = logging.getLogger()
 
@@ -223,7 +224,7 @@ async def setup_pytest_for_target(
     )
 
 
-@rule
+@rule(level=LogLevel.INFO)
 async def run_python_test(
     field_set: PythonTestFieldSet,
     test_setup: TestTargetSetup,
@@ -292,7 +293,10 @@ async def run_python_test(
             logger.warning(f"Failed to generate JUnit XML data for {field_set.address}.")
 
     return TestResult.from_fallible_process_result(
-        result, coverage_data=coverage_data, xml_results=xml_results_digest
+        result,
+        coverage_data=coverage_data,
+        xml_results=xml_results_digest,
+        address_ref=field_set.address.reference(),
     )
 
 

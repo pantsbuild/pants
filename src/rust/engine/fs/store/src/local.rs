@@ -6,12 +6,10 @@ use std::sync::Arc;
 use std::time::{self, Duration};
 
 use bytes::Bytes;
-use digest::{Digest as DigestTrait, FixedOutput};
 use futures::future;
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
 use lmdb::Error::NotFound;
 use lmdb::{self, Cursor, Transaction};
-use sha2::Sha256;
 use sharded_lmdb::{ShardedLmdb, VersionedFingerprint, DEFAULT_LEASE_TIME};
 
 #[derive(Debug, Clone)]
@@ -255,14 +253,7 @@ impl ByteStore {
     let digest = self
       .inner
       .executor
-      .spawn_blocking(move || {
-        let fingerprint = {
-          let mut hasher = Sha256::default();
-          hasher.input(&bytes);
-          Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice())
-        };
-        Digest(fingerprint, bytes.len())
-      })
+      .spawn_blocking(move || Digest::of_bytes(&bytes))
       .await;
     dbs?.store_bytes(digest.0, bytes2, initial_lease).await?;
     Ok(digest)

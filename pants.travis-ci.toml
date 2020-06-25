@@ -26,6 +26,9 @@ resolver_jobs = "%(travis_parallelism)s"
 # doesn't give us useful debug info).
 timeout_maximum = 590
 
+[pytest]
+# NB: We don't set a max test timeout for v2, because tests run concurrently.
+
 [libc]
 # Currently, we only need to search for a libc installation to test the native toolchain.
 enable_libc_search = true
