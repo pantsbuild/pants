@@ -163,7 +163,7 @@ impl WrappedNode for Select {
               entry: Arc::new(self.entry.clone()),
             })
             .await
-            .map(|(v, _)| v),
+            .map(|output| output.value),
           &Rule::Intrinsic(ref intrinsic) => {
             let intrinsic = intrinsic.clone();
             let values = future::try_join_all(
@@ -800,15 +800,21 @@ impl Task {
     future::try_join_all(get_futures).await
   }
 
-  fn compute_new_workunit_level(
-    can_modify_workunit: bool,
-    result_val: &Value,
-  ) -> Option<log::Level> {
-    use num_enum::TryFromPrimitiveError;
+  fn compute_workunit_message(result_val: &Value) -> Option<String> {
+    let msg_val: Value = externs::call_method(&result_val, "message", &[]).ok()?;
+    {
+      let gil = Python::acquire_gil();
+      let py = gil.python();
 
-    if !can_modify_workunit {
-      return None;
+      if *msg_val == py.None() {
+        return None;
+      }
     }
+    Some(externs::val_to_str(&msg_val))
+  }
+
+  fn compute_new_workunit_level(result_val: &Value) -> Option<log::Level> {
+    use num_enum::TryFromPrimitiveError;
 
     let new_level_val: Value = externs::call_method(&result_val, "level", &[]).ok()?;
 
@@ -878,11 +884,17 @@ impl fmt::Debug for Task {
   }
 }
 
+pub struct PythonRuleOutput {
+  value: Value,
+  new_level: Option<log::Level>,
+  message: Option<String>,
+}
+
 #[async_trait]
 impl WrappedNode for Task {
-  type Item = (Value, Option<log::Level>);
+  type Item = PythonRuleOutput;
 
-  async fn run_wrapped_node(self, context: Context) -> NodeResult<(Value, Option<log::Level>)> {
+  async fn run_wrapped_node(self, context: Context) -> NodeResult<PythonRuleOutput> {
     let params = self.params;
     let deps = {
       let edges = &context
@@ -916,8 +928,19 @@ impl WrappedNode for Task {
     }
 
     if result_type == product {
-      let maybe_new_level = Self::compute_new_workunit_level(can_modify_workunit, &result_val);
-      Ok((result_val, maybe_new_level))
+      let (new_level, message) = if can_modify_workunit {
+        (
+          Self::compute_new_workunit_level(&result_val),
+          Self::compute_workunit_message(&result_val),
+        )
+      } else {
+        (None, None)
+      };
+      Ok(PythonRuleOutput {
+        value: result_val,
+        new_level,
+        message,
+      })
     } else {
       Err(throw(&format!(
         "{:?} returned a result value that did not satisfy its constraints: {:?}",
@@ -1074,6 +1097,7 @@ impl Node for NodeKey {
       let parent_id = std::mem::replace(&mut workunit_state.parent_id, Some(span_id.clone()));
       let metadata = WorkunitMetadata {
         desc: user_facing_name.clone(),
+        message: None,
         level: self.workunit_level(),
         blocked: false,
         stdout: None,
@@ -1103,6 +1127,7 @@ impl Node for NodeKey {
       };
 
       let mut level = metadata.level;
+      let mut message = None;
       let mut result = match maybe_watch {
         Ok(()) => match self {
           NodeKey::DigestFile(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Digest).await,
@@ -1134,11 +1159,12 @@ impl Node for NodeKey {
           }
           NodeKey::Task(n) => {
             n.run_wrapped_node(context)
-              .map_ok(|(v, maybe_new_level)| {
-                if let Some(new_level) = maybe_new_level {
+              .map_ok(|python_rule_output| {
+                if let Some(new_level) = python_rule_output.new_level {
                   level = new_level;
                 }
-                NodeOutput::Value(v)
+                message = python_rule_output.message;
+                NodeOutput::Value(python_rule_output.value)
               })
               .await
           }
@@ -1150,7 +1176,11 @@ impl Node for NodeKey {
         result = result.map_err(|failure| failure.with_pushed_frame(&user_facing_name));
       }
 
-      let final_metadata = WorkunitMetadata { level, ..metadata };
+      let final_metadata = WorkunitMetadata {
+        level,
+        message,
+        ..metadata
+      };
       context2
         .session
         .workunit_store()
@@ -1233,12 +1263,16 @@ impl NodeOutput {
   }
 }
 
-impl TryFrom<NodeOutput> for (Value, Option<log::Level>) {
+impl TryFrom<NodeOutput> for PythonRuleOutput {
   type Error = ();
 
   fn try_from(nr: NodeOutput) -> Result<Self, ()> {
     match nr {
-      NodeOutput::Value(v) => Ok((v, None)),
+      NodeOutput::Value(v) => Ok(PythonRuleOutput {
+        value: v,
+        new_level: None,
+        message: None,
+      }),
       _ => Err(()),
     }
   }

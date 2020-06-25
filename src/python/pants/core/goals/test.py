@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
-import logging
 from abc import ABC, ABCMeta
 from dataclasses import dataclass
 from enum import Enum
@@ -22,7 +21,7 @@ from pants.engine.fs import Digest, DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.interactive_process import InteractiveProcess, InteractiveRunner
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import goal_rule, rule
+from pants.engine.rules import EngineAware, goal_rule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
     FieldSetWithOrigin,
@@ -31,10 +30,7 @@ from pants.engine.target import (
     TargetsToValidFieldSetsRequest,
 )
 from pants.engine.unions import UnionMembership, union
-
-# TODO: Until we have templating of rule names (#7907) or some other way to affect the level
-# of a workunit for a failed test, we should continue to log tests completing.
-logger = logging.getLogger(__name__)
+from pants.util.logging import LogLevel
 
 
 class Status(Enum):
@@ -61,12 +57,13 @@ class CoverageReportType(Enum):
 
 
 @dataclass(frozen=True)
-class TestResult:
+class TestResult(EngineAware):
     status: Status
     stdout: str
     stderr: str
     coverage_data: Optional["CoverageData"]
     xml_results: Optional[Digest]
+    address_ref: str = ""
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
@@ -77,6 +74,7 @@ class TestResult:
         *,
         coverage_data: Optional["CoverageData"] = None,
         xml_results: Optional[Digest] = None,
+        address_ref: str = "",
     ) -> "TestResult":
         return TestResult(
             status=Status.SUCCESS if process_result.exit_code == 0 else Status.FAILURE,
@@ -84,7 +82,17 @@ class TestResult:
             stderr=process_result.stderr.decode(),
             coverage_data=coverage_data,
             xml_results=xml_results,
+            address_ref=address_ref,
         )
+
+    def level(self):
+        if self.status == Status.FAILURE:
+            return LogLevel.ERROR
+        return None
+
+    def message(self):
+        result = "succeeded" if self.status == Status.SUCCESS else "failed"
+        return f"tests {result}: {self.address_ref}"
 
 
 @dataclass(frozen=True)
@@ -346,10 +354,6 @@ async def run_tests(
 async def coordinator_of_tests(wrapped_field_set: WrappedTestFieldSet) -> AddressAndTestResult:
     field_set = wrapped_field_set.field_set
     result = await Get(TestResult, TestFieldSet, field_set)
-    logger.info(
-        f"Tests {'succeeded' if result.status == Status.SUCCESS else 'failed'}: "
-        f"{field_set.address.reference()}"
-    )
     return AddressAndTestResult(field_set.address, result)
 
 
