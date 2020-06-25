@@ -27,13 +27,15 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
+use digest::consts::U32;
+use generic_array::GenericArray;
+use serde::de::{MapAccess, Visitor};
+use serde::export::fmt::Error;
+use serde::export::Formatter;
 use serde::ser::{Serialize, SerializeStruct, Serializer};
 use serde::{Deserialize, Deserializer};
 use sha2::{Digest as Sha256Digest, Sha256};
 
-use serde::de::{MapAccess, Visitor};
-use serde::export::fmt::Error;
-use serde::export::Formatter;
 use std::fmt;
 use std::io::{self, Write};
 
@@ -60,6 +62,10 @@ impl Fingerprint {
     let mut fingerprint = [0; FINGERPRINT_SIZE];
     fingerprint.clone_from_slice(&bytes[0..FINGERPRINT_SIZE]);
     Fingerprint(fingerprint)
+  }
+
+  pub fn from_bytes(bytes: GenericArray<u8, U32>) -> Fingerprint {
+    Fingerprint(bytes.into())
   }
 
   pub fn from_hex_string(hex_string: &str) -> Result<Fingerprint, String> {
@@ -222,10 +228,7 @@ impl Digest {
     let mut hasher = Sha256::default();
     hasher.update(bytes);
 
-    Digest(
-      Fingerprint::from_bytes_unsafe(&hasher.finalize()),
-      bytes.len(),
-    )
+    Digest(Fingerprint::from_bytes(hasher.finalize()), bytes.len())
   }
 }
 
@@ -253,7 +256,7 @@ impl<W: Write> WriterHasher<W> {
   pub fn finish(self) -> (Digest, W) {
     (
       Digest(
-        Fingerprint::from_bytes_unsafe(&self.hasher.finalize()),
+        Fingerprint::from_bytes(self.hasher.finalize()),
         self.byte_count,
       ),
       self.inner,

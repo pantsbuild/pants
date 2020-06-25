@@ -357,8 +357,8 @@ impl NailgunProcessFingerprint {
     let mut hasher = Sha256::default();
     hasher.update(nailgun_server_req_digest.0);
     hasher.update(jdk_realpath.to_string_lossy().as_bytes());
-    Ok(NailgunProcessFingerprint(Fingerprint::from_bytes_unsafe(
-      &hasher.finalize(),
+    Ok(NailgunProcessFingerprint(Fingerprint::from_bytes(
+      hasher.finalize(),
     )))
   }
 }

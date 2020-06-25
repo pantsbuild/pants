@@ -10,7 +10,6 @@ bazel_protos = { path = "../../process_execution/bazel_protos" }
 boxfuture = { path = "../../boxfuture" }
 bytes = "0.4.5"
 concrete_time = { path = "../../concrete_time" }
-digest = "0.8"
 dirs = "1"
 fs = { path = ".." }
 futures01 = { package = "futures", version = "0.1" }
