@@ -24,7 +24,7 @@ libc = "0.2.39"
 log = "0.4"
 nails = "0.5.1"
 protobuf = { version = "2.0.6", features = ["with-bytes"] }
-sha2 = "0.8"
+sha2 = "0.9"
 sharded_lmdb = {  path = "../sharded_lmdb" }
 shell-quote = "0.1.0"
 store = { path = "../fs/store" }

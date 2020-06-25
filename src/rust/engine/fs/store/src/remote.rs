@@ -8,13 +8,11 @@ use std::time::Duration;
 use bazel_protos::{self, call_option};
 use bytes::{Bytes, BytesMut};
 use concrete_time::TimeSpan;
-use digest::{Digest as DigestTrait, FixedOutput};
 use futures::compat::Future01CompatExt;
 use futures::future::{FutureExt, TryFutureExt};
 use futures01::{future, Future, Sink, Stream};
-use hashing::{Digest, Fingerprint};
+use hashing::Digest;
 use serverset::{retry, Serverset};
-use sha2::Sha256;
 
 use super::{BackoffConfig, EntryType};
 
@@ -112,11 +110,8 @@ impl ByteStore {
   pub async fn store_bytes(&self, bytes: &[u8]) -> Result<Digest, String> {
     let start_time = std::time::SystemTime::now();
 
-    let mut hasher = Sha256::default();
-    hasher.input(&bytes);
-    let fingerprint = Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice());
     let len = bytes.len();
-    let digest = Digest(fingerprint, len);
+    let digest = Digest::of_bytes(&bytes);
     let resource_name = format!(
       "{}/uploads/{}/blobs/{}/{}",
       self.instance_name.clone().unwrap_or_default(),

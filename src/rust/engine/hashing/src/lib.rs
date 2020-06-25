@@ -27,10 +27,9 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use digest::{Digest as DigestTrait, FixedOutput};
 use serde::ser::{Serialize, SerializeStruct, Serializer};
 use serde::{Deserialize, Deserializer};
-use sha2::Sha256;
+use sha2::{Digest as Sha256Digest, Sha256};
 
 use serde::de::{MapAccess, Visitor};
 use serde::export::fmt::Error;
@@ -221,10 +220,10 @@ impl<'de> Deserialize<'de> for Digest {
 impl Digest {
   pub fn of_bytes(bytes: &[u8]) -> Self {
     let mut hasher = Sha256::default();
-    hasher.input(bytes);
+    hasher.update(bytes);
 
     Digest(
-      Fingerprint::from_bytes_unsafe(&hasher.fixed_result()),
+      Fingerprint::from_bytes_unsafe(&hasher.finalize()),
       bytes.len(),
     )
   }
@@ -254,7 +253,7 @@ impl<W: Write> WriterHasher<W> {
   pub fn finish(self) -> (Digest, W) {
     (
       Digest(
-        Fingerprint::from_bytes_unsafe(&self.hasher.fixed_result()),
+        Fingerprint::from_bytes_unsafe(&self.hasher.finalize()),
         self.byte_count,
       ),
       self.inner,
@@ -266,7 +265,7 @@ impl<W: Write> Write for WriterHasher<W> {
   fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
     let written = self.inner.write(buf)?;
     // Hash the bytes that were successfully written.
-    self.hasher.input(&buf[0..written]);
+    self.hasher.update(&buf[0..written]);
     self.byte_count += written;
     Ok(written)
   }
