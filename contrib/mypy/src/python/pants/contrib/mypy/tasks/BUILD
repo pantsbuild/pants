@@ -5,6 +5,7 @@ python_library(
   dependencies = [
     '3rdparty/python:pex',
     'src/python/pants/util:process_handler',
+    'src/python/pants/backend/python/lint/mypy',
     'src/python/pants/backend/python:interpreter_cache',
     'src/python/pants/backend/python/subsystems',
     'src/python/pants/backend/python/targets',
@@ -15,7 +16,6 @@ python_library(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:memo',
     'src/python/pants/build_graph',
-    'contrib/mypy/src/python/pants/contrib/mypy/subsystems',
   ],
   tags = {"partially_type_checked"},
 )

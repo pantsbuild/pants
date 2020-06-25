@@ -6,6 +6,7 @@ from pathlib import Path
 from textwrap import dedent
 from typing import Iterable, List, Set
 
+from pants.backend.python.lint.mypy.subsystem import MyPy
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
@@ -24,8 +25,6 @@ from pants.util.memo import memoized_property
 from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 from pex.pex_info import PexInfo
-
-from pants.contrib.mypy.subsystems.subsystem import MyPy
 
 
 class MypyTaskError(TaskError):
