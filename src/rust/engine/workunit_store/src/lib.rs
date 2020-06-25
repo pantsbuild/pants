@@ -138,7 +138,7 @@ impl Default for WorkunitMetadata {
   }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct WorkunitStore {
   rendering_dynamic_ui: bool,
   inner: Arc<Mutex<WorkUnitInnerStore>>,
