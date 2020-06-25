@@ -1,7 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import List
+from typing import List, Optional
 
 from pants.backend.python.rules.inject_init import (
     InitInjectedSnapshot,
@@ -26,8 +26,14 @@ class InjectInitTest(TestBase):
         )
 
     def assert_injected(
-        self, *, original_files: List[str], expected_added: List[str], sources_stripped=True
+        self,
+        *,
+        original_files: List[str],
+        expected_added: List[str],
+        expected_discovered: Optional[List[str]] = None,
+        sources_stripped=True,
     ) -> None:
+        expected_discovered = expected_discovered or ()
         request = InjectInitRequest(
             self.make_snapshot({fp: "# python code" for fp in original_files}),
             sources_stripped=sources_stripped,
@@ -38,12 +44,15 @@ class InjectInitTest(TestBase):
                 request, create_options_bootstrapper(args=["--source-root-patterns=['src/python']"])
             ),
         ).snapshot
-        assert sorted(result.files) == sorted([*original_files, *expected_added])
+        assert list(result.files) == sorted(
+            [*original_files, *expected_added, *expected_discovered]
+        )
         # Ensure all original `__init__.py` are preserved with their original content.
         materialized_original_inits = [
             fc
             for fc in self.request_single_product(FilesContent, result.digest)
-            if fc.path in original_files and fc.path.endswith("__init__.py")
+            if fc.path.endswith("__init__.py")
+            and (fc.path in original_files or fc.path in expected_discovered)
         ]
         for original_init in materialized_original_inits:
             assert (
@@ -79,14 +88,23 @@ class InjectInitTest(TestBase):
             expected_added=[],
         )
 
-    def test_source_roots_unstripped(self):
+    def test_finds_undeclared_original_inits(self) -> None:
+        self.create_file("a/__init__.py", "# python code")
+        self.create_file("a/b/__init__.py", "# python code")
+        self.assert_injected(
+            original_files=["a/b/subdir/lib.py"],
+            expected_added=["a/b/subdir/__init__.py"],
+            expected_discovered=["a/__init__.py", "a/b/__init__.py"],
+        )
+
+    def test_source_roots_unstripped(self) -> None:
         self.assert_injected(
             original_files=[
                 "src/python/lib.py",
                 "src/python/subdir/lib.py",
                 "src/python/subdir/__init__.py",
-                "src/python/anothersubdir/lib.py",
+                "src/python/another_subdir/lib.py",
             ],
-            expected_added=["src/python/anothersubdir/__init__.py"],
+            expected_added=["src/python/another_subdir/__init__.py"],
             sources_stripped=False,
         )

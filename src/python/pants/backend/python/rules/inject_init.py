@@ -4,16 +4,24 @@
 import os
 from dataclasses import dataclass
 
-from pants.engine.fs import Digest, FileContent, InputFilesContent, MergeDigests, Snapshot
+from pants.engine.fs import (
+    Digest,
+    FileContent,
+    InputFilesContent,
+    MergeDigests,
+    PathGlobs,
+    Snapshot,
+)
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.python.pex_build_util import identify_missing_init_files
 from pants.source.source_root import OptionalSourceRoot, SourceRootRequest
+from pants.util.ordered_set import FrozenOrderedSet
 
 
 @dataclass(frozen=True)
 class InjectInitRequest:
-    sources_snapshot: Snapshot
+    snapshot: Snapshot
     sources_stripped: bool  # True iff sources_snapshot has already had source roots stripped.
 
 
@@ -26,33 +34,47 @@ class InitInjectedSnapshot:
 async def inject_missing_init_files(request: InjectInitRequest) -> InitInjectedSnapshot:
     """Ensure that every package has an `__init__.py` file in it.
 
-    This will preserve any `__init__.py` files already in the input snapshot.
+    This will first use any `__init__.py` files in the input snapshot, then read from the filesystem
+    to see if any exist but are not in the snapshot, and finally will create empty files.
     """
-    snapshot = request.sources_snapshot
-    missing_init_files = identify_missing_init_files(snapshot.files)
-    if not missing_init_files:
-        return InitInjectedSnapshot(snapshot)
+    original_missing_init_files = identify_missing_init_files(request.snapshot.files)
+    if not original_missing_init_files:
+        return InitInjectedSnapshot(request.snapshot)
 
+    missing_init_files = original_missing_init_files
     if not request.sources_stripped:
         # Get rid of any identified-as-missing __init__.py files that are not under a source root.
-        missing_init_files_list = list(missing_init_files)
         optional_src_roots = await MultiGet(
             Get(OptionalSourceRoot, SourceRootRequest, SourceRootRequest.for_file(init_file))
-            for init_file in missing_init_files_list
+            for init_file in original_missing_init_files
         )
-        for optional_src_root, init_file in zip(optional_src_roots, missing_init_files_list):
-            # If the identified-as-missing __init__.py file is above or at a source root, remove it.
-            if (
-                optional_src_root.source_root is None
-                or optional_src_root.source_root.path == os.path.dirname(init_file)
-            ):
-                missing_init_files.remove(init_file)
 
+        def is_under_source_root(init_file: str, optional_src_root: OptionalSourceRoot) -> bool:
+            return (
+                optional_src_root.source_root is not None
+                and optional_src_root.source_root.path != os.path.dirname(init_file)
+            )
+
+        missing_init_files = FrozenOrderedSet(
+            init_file
+            for init_file, optional_src_root in zip(original_missing_init_files, optional_src_roots)
+            if is_under_source_root(init_file, optional_src_root)
+        )
+
+    discovered_inits_snapshot = await Get(Snapshot, PathGlobs(missing_init_files))
     generated_inits_digest = await Get(
         Digest,
-        InputFilesContent(FileContent(path=fp, content=b"") for fp in sorted(missing_init_files)),
+        InputFilesContent(
+            FileContent(fp, b"# Generated `__init__.py` file.")
+            for fp in missing_init_files - discovered_inits_snapshot.files
+        ),
     )
-    result = await Get(Snapshot, MergeDigests((snapshot.digest, generated_inits_digest)))
+    result = await Get(
+        Snapshot,
+        MergeDigests(
+            (request.snapshot.digest, discovered_inits_snapshot.digest, generated_inits_digest)
+        ),
+    )
     return InitInjectedSnapshot(result)
 
 

@@ -107,8 +107,7 @@ async def prepare_stripped_python_sources(
         ),
     )
     init_injected = await Get(
-        InitInjectedSnapshot,
-        InjectInitRequest(sources_snapshot=stripped_sources.snapshot, sources_stripped=True),
+        InitInjectedSnapshot, InjectInitRequest(stripped_sources.snapshot, sources_stripped=True)
     )
     return StrippedPythonSources(init_injected.snapshot)
 
