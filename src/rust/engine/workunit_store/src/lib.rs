@@ -36,6 +36,8 @@ use rand::thread_rng;
 use rand::Rng;
 use std::collections::{BinaryHeap, HashMap};
 use tokio::task_local;
+use std::sync::mpsc::{channel, Receiver, Sender};
+
 
 use std::cell::RefCell;
 use std::future::Future;
@@ -142,6 +144,10 @@ impl Default for WorkunitMetadata {
 pub struct WorkunitStore {
   rendering_dynamic_ui: bool,
   inner: Arc<Mutex<WorkUnitInnerStore>>,
+  started_workunits_rx: Arc<Mutex<Receiver<Workunit>>>,
+  started_workunits_tx: Arc<Mutex<Sender<Workunit>>>,
+  completed_workunits_rx: Arc<Mutex<Receiver<Workunit>>>,
+  completed_workunits_tx: Arc<Mutex<Sender<Workunit>>>,
 }
 
 #[derive(Default)]
@@ -180,6 +186,8 @@ impl WorkUnitInnerStore {
 
 impl WorkunitStore {
   pub fn new(rendering_dynamic_ui: bool) -> WorkunitStore {
+    let (started_workunits_tx, started_workunits_rx) = channel();
+    let (completed_workunits_tx, completed_workunits_rx) = channel();
     WorkunitStore {
       rendering_dynamic_ui,
       inner: Arc::new(Mutex::new(WorkUnitInnerStore {
@@ -191,6 +199,10 @@ impl WorkunitStore {
         completed_ids: Vec::new(),
         last_seen_completed_idx: 0,
       })),
+      started_workunits_rx: Arc::new(Mutex::new(started_workunits_rx)),
+      started_workunits_tx: Arc::new(Mutex::new(started_workunits_tx)),
+      completed_workunits_rx: Arc::new(Mutex::new(completed_workunits_rx)),
+      completed_workunits_tx: Arc::new(Mutex::new(completed_workunits_tx)),
     }
   }
 
