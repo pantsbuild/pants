@@ -40,6 +40,7 @@ python_tests(
         "examples/tests/python/example_test:all_directories",
         "examples:isort_cfg",
     ],
+    timeout=300,
     tags={"integration", "partially_type_checked"},
 )
 
@@ -53,7 +54,7 @@ python_tests(
         "testprojects/tests/python:all_directories",
     ],
     tags={"integration", "partially_type_checked"},
-    timeout=180,
+    timeout=400,
 )
 
 python_tests(
