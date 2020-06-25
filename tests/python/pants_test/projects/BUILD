@@ -80,15 +80,3 @@ python_tests(
     tags={"integration", "partially_type_checked"},
     timeout=330,
 )
-
-python_tests(
-    name="thrift_projects_integration",
-    sources=["test_thrift_projects_integration.py"],
-    dependencies=[
-        ":projects_test_base",
-        "examples/src/thrift/org/pantsbuild/example:all_directories",
-        "testprojects/src/thrift/org/pantsbuild:all_directories",
-    ],
-    tags={"integration", "partially_type_checked"},
-    timeout=360,
-)

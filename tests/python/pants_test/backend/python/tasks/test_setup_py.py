@@ -506,61 +506,6 @@ class TestSetupPy(SetupPyTestBase):
                 with open(res_link_path, "r") as fp:
                     self.assertEqual("196884", fp.read())
 
-    def test_prep_command_case(self):
-        PrepCommand.add_allowed_goal("compile")
-        PrepCommand.add_allowed_goal("test")
-        self.add_to_build_file(
-            "build-support/thrift",
-            dedent(
-                """
-                prep_command(
-                  name='prepare_binary_compile',
-                  goals=['compile'],
-                  prep_executable='/bin/true',
-                )
-
-                prep_command(
-                  name='prepare_binary_test',
-                  goals=['test'],
-                  prep_executable='/bin/true',
-                )
-
-                target(
-                  name='prepare_binary',
-                  dependencies=[
-                    ':prepare_binary_compile',
-                    ':prepare_binary_test',
-                  ],
-                )
-                """
-            ),
-        )
-        prepare_binary_compile = self.make_target(
-            spec="build-support/thrift:prepare_binary_compile",
-            target_type=PrepCommand,
-            prep_executable="/bin/true",
-            goals=["compile"],
-        )
-        prepare_binary_test = self.make_target(
-            spec="build-support/thrift:prepare_binary_test",
-            target_type=PrepCommand,
-            prep_executable="/bin/true",
-            goals=["test"],
-        )
-        self.make_target(
-            spec="build-support/thrift:prepare_binary",
-            dependencies=[prepare_binary_compile, prepare_binary_test],
-        )
-
-        pants = self.create_python_library(
-            relpath="src/python/pants",
-            name="pants",
-            provides="setup_py(name='pants', version='0.0.0')",
-            dependencies=["build-support/thrift:prepare_binary"],
-        )
-        with self.run_execute(pants) as created:
-            self.assertEqual([pants], list(created.keys()))
-
     def test_run_invalid_cmd_failure(self):
         self.set_options(run="invalid_command")
         with self.assertRaises(TaskError):

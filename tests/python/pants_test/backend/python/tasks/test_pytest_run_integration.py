@@ -35,32 +35,6 @@ class PytestRunIntegrationTest(PantsRunIntegrationTest):
         pants_run = self.run_pants(["test.pytest", "testprojects/tests/python/pants/conf_test"])
         self.assert_success(pants_run)
 
-    def test_pytest_explicit_coverage(self):
-        with temporary_dir() as coverage_dir:
-            pants_run = self.run_pants(
-                [
-                    "test.pytest",
-                    "--coverage=pants.constants_only",
-                    f"--test-pytest-coverage-output-dir={coverage_dir}",
-                    "testprojects/tests/python/pants/constants_only",
-                ]
-            )
-            self.assert_success(pants_run)
-            self.assertTrue(os.path.exists(os.path.join(coverage_dir, "coverage.xml")))
-
-    def test_pytest_with_profile(self):
-        with temporary_dir() as profile_dir:
-            prof = os.path.join(profile_dir, "pants.prof")
-            pants_run = self.run_pants(
-                ["test.pytest", "testprojects/tests/python/pants/constants_only:constants_only",],
-                extra_env={"PANTS_PROFILE": prof},
-            )
-            self.assert_success(pants_run)
-            # Note that the subprocess profile mechanism will add a ".0" to the profile path.
-            # We won't see a profile at prof itself because PANTS_PROFILE wasn't set when the
-            # current process started.
-            self.assertTrue(os.path.exists(f"{prof}.0"))
-
     @skip_unless_python27_and_python3_present
     def test_pants_test_interpreter_selection_with_pexrc(self):
         """Test the pants test goal with interpreters selected from a PEX_PYTHON_PATH defined in a
