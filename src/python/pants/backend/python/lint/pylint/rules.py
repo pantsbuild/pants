@@ -17,6 +17,8 @@ from pants.backend.python.rules.pex import (
 from pants.backend.python.rules.python_sources import (
     StrippedPythonSources,
     StrippedPythonSourcesRequest,
+    UnstrippedPythonSources,
+    UnstrippedPythonSourcesRequest,
 )
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
@@ -164,14 +166,15 @@ async def pylint_lint_partition(
         StrippedPythonSourcesRequest(partition.plugin_targets, include_resources=True),
     )
     prepare_python_sources_request = Get(
-        StrippedPythonSources,
-        StrippedPythonSourcesRequest(partition.targets_with_dependencies, include_resources=False),
+        UnstrippedPythonSources,
+        UnstrippedPythonSourcesRequest(
+            partition.targets_with_dependencies, include_resources=False
+        ),
     )
     specified_source_files_request = Get(
         SourceFiles,
         SpecifiedSourceFilesRequest(
-            ((field_set.sources, field_set.origin) for field_set in partition.field_sets),
-            strip_source_roots=True,
+            (field_set.sources, field_set.origin) for field_set in partition.field_sets
         ),
     )
 
@@ -199,6 +202,15 @@ async def pylint_lint_partition(
         else EMPTY_DIGEST
     )
 
+    pythonpath = list(prepared_python_sources.source_roots)
+    if pylint.source_plugins:
+        # NB: Pylint source plugins must be explicitly loaded via PEX_EXTRA_SYS_PATH. The value must
+        # point to the plugin's directory, rather than to a parent's directory, because
+        # `load-plugins` takes a module name rather than a path to the module; i.e. `plugin`, but
+        # not `path.to.plugin`. (This means users must have specified the parent directory as a
+        # source root.)
+        pythonpath.append("__plugins")
+
     input_digest = await Get(
         Digest,
         MergeDigests(
@@ -221,12 +233,7 @@ async def pylint_lint_partition(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path="./pylint_runner.pex",
-        # NB: Pylint source plugins must be explicitly loaded via PEX_EXTRA_SYS_PATH. The value must
-        # point to the plugin's directory, rather than to a parent's directory, because
-        # `load-plugins` takes a module name rather than a path to the module; i.e. `plugin`, but
-        # not `path.to.plugin`. (This means users must have specified the parent directory as a
-        # source root.)
-        env={"PEX_EXTRA_SYS_PATH": "./__plugins"} if pylint.source_plugins else None,
+        env={"PEX_EXTRA_SYS_PATH": ":".join(pythonpath)},
         pex_args=generate_args(specified_source_files=specified_source_files, pylint=pylint),
         input_digest=input_digest,
         description=(
