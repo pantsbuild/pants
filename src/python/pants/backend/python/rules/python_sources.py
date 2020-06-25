@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Iterable, Tuple, Type
+from typing import Iterable, List, Tuple, Type
 
 from pants.backend.python.rules.inject_init import InitInjectedSnapshot, InjectInitRequest
 from pants.backend.python.rules.inject_init import rules as inject_init_rules
@@ -39,7 +39,7 @@ class _BasePythonSourcesRequest:
 
     @property
     def valid_sources_types(self) -> Tuple[Type[Sources], ...]:
-        types = [PythonSources]
+        types: List[Type[Sources]] = [PythonSources]
         if self.include_resources:
             types.append(ResourcesSources)
         if self.include_files:
