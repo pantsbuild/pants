@@ -146,6 +146,7 @@ branch_notes = """
   '1.28.x': 'src/python/pants/notes/1.28.x.rst',
   '1.29.x': 'src/python/pants/notes/1.29.x.rst',
   '1.30.x': 'src/python/pants/notes/1.30.x.rst',
+  '2.0.x': 'src/python/pants/notes/2.0.x.rst',
 }
 """
 

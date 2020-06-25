@@ -1,0 +1,175 @@
+2.0.x Stable Releases
+=====================
+
+This document describes releases leading up to the ``2.0.x`` ``stable`` series.
+
+See https://pants.readme.io/v2.0/docs/release-notes-2-0 for an overview of the changes in this release.
+
+2.0.0.dev0 (6/25/2020)
+----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Remove v1 JVM backend Tasks. (#10142)
+  `PR #10142 <https://github.com/pantsbuild/pants/pull/10142>`_
+
+* Remove `targets` goal in favor of `target-types` goal (#10145)
+  `PR #10145 <https://github.com/pantsbuild/pants/pull/10145>`_
+
+* Remove deprecated `Get[P](S)` syntax in favor of `Get(P, S)` (#10148)
+  `Issue #9899 <https://github.com/pantsbuild/pants/issues/9899>`_
+  `PR #10148 <https://github.com/pantsbuild/pants/pull/10148>`_
+
+* Remove v1 `login`, `server`, and `killserver` goals (#10144)
+  `PR #10144 <https://github.com/pantsbuild/pants/pull/10144>`_
+
+* Remove v1 `minimize`, `filemap`, `paths`, `sort`, and `depmap` goals (#10135)
+  `PR #10135 <https://github.com/pantsbuild/pants/pull/10135>`_
+
+* Replace v1 `dependees`, `dependencies`, `filedeps`, and `filter` with v2 (#10117)
+  `PR #10117 <https://github.com/pantsbuild/pants/pull/10117>`_
+
+* Remove the v1 scrooge contrib plugin. (#10127)
+  `PR #10127 <https://github.com/pantsbuild/pants/pull/10127>`_
+
+* Remove support for `pants.ini` (#10123)
+  `PR #10123 <https://github.com/pantsbuild/pants/pull/10123>`_
+
+* Remove the v1 `export` goal (#10122)
+  `PR #10122 <https://github.com/pantsbuild/pants/pull/10122>`_
+
+* Remove v1 `idea-plugin` goal (#10115)
+  `PR #10115 <https://github.com/pantsbuild/pants/pull/10115>`_
+
+* Remove v1 Java Protobuf implementation (#10111)
+  `PR #10111 <https://github.com/pantsbuild/pants/pull/10111>`_
+
+* Remove `pants.contrib.node` plugin (#10113)
+  `PR #10113 <https://github.com/pantsbuild/pants/pull/10113>`_
+
+* Remove v1 `bash-completion` goal (#10112)
+  `PR #10112 <https://github.com/pantsbuild/pants/pull/10112>`_
+
+* Remove watchman. (#10114)
+  `PR #10114 <https://github.com/pantsbuild/pants/pull/10114>`_
+
+* Upgrade default mypy version from 0.780 to 0.781 (#10109)
+  `PR #10109 <https://github.com/pantsbuild/pants/pull/10109>`_
+
+* Remove `pants.contrib.go` plugin (#10107)
+  `PR #10107 <https://github.com/pantsbuild/pants/pull/10107>`_
+
+* Remove v1 Python Grpcio codegen backend (#10108)
+  `PR #10108 <https://github.com/pantsbuild/pants/pull/10108>`_
+
+* Remove deprecated `--v2-ui` in favor of `--dynamic-ui` (#10105)
+  `PR #10105 <https://github.com/pantsbuild/pants/pull/10105>`_
+
+* Remove deprecated `--enable-pantsd` in favor of `--pantsd` (#10104)
+  `PR #10104 <https://github.com/pantsbuild/pants/pull/10104>`_
+
+* Remove deprecated `pytest-coverage` scope in favor of `coverage-py` (#10103)
+  `PR #10103 <https://github.com/pantsbuild/pants/pull/10103>`_
+
+* Remove `pants.contrib.confluence` (#10106)
+  `PR #10106 <https://github.com/pantsbuild/pants/pull/10106>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Add support for MyPy to Pants v2 (#10132)
+  `Issue #10131 <https://github.com/pantsbuild/pants/issues/10131>`_
+  `PR #10132 <https://github.com/pantsbuild/pants/pull/10132>`_
+
+* Changes to support Django. (#10088)
+  `PR #10088 <https://github.com/pantsbuild/pants/pull/10088>`_
+
+* Add support for enum list options. (#10083)
+  `Issue #9968 <https://github.com/pantsbuild/pants/issues/9968>`_
+  `PR #10083 <https://github.com/pantsbuild/pants/pull/10083>`_
+
+Bugfixes
+~~~~~~~~
+
+* Do not render pytest at info by default, but give it a description. (#10164)
+  `PR #10164 <https://github.com/pantsbuild/pants/pull/10164>`_
+
+* Preserve source roots in MyPy and Pylint output (#10159)
+  `PR #10159 <https://github.com/pantsbuild/pants/pull/10159>`_
+
+* Set dynamic-ui default based on CI (#10140)
+  `PR #10140 <https://github.com/pantsbuild/pants/pull/10140>`_
+
+* Fix Pytest XML reports and Coverage breaking with remote execution (#10136)
+  `PR #10136 <https://github.com/pantsbuild/pants/pull/10136>`_
+
+* Retry for filesystem changes more quickly, indefinitely, and with logging (#10139)
+  `PR #10139 <https://github.com/pantsbuild/pants/pull/10139>`_
+
+* Normalize paths before determining whether we can watch them. (#10130)
+  `PR #10130 <https://github.com/pantsbuild/pants/pull/10130>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Remove use of importlib for native_engine loading (#10161)
+  `PR #10161 <https://github.com/pantsbuild/pants/pull/10161>`_
+
+* Update sha2 crate dependency (#10163)
+  `PR #10163 <https://github.com/pantsbuild/pants/pull/10163>`_
+
+* Remove unused rust deps. (#10162)
+  `PR #10162 <https://github.com/pantsbuild/pants/pull/10162>`_
+
+* Add message field on workunits and use it to replace some explicit logging (#10158)
+  `PR #10158 <https://github.com/pantsbuild/pants/pull/10158>`_
+
+* Do not include resource targets in v2 MyPy chroot (#10154)
+  `PR #10154 <https://github.com/pantsbuild/pants/pull/10154>`_
+
+* Expose the types consumed to produce a type in a RuleGraph. (#10153)
+  `PR #10153 <https://github.com/pantsbuild/pants/pull/10153>`_
+
+* Upgrade setuptools from 44.0.0 to 47.3.1 (#10149)
+  `PR #10149 <https://github.com/pantsbuild/pants/pull/10149>`_
+
+* Support for using unstripped python sources (#10138)
+  `PR #10138 <https://github.com/pantsbuild/pants/pull/10138>`_
+
+* fix snapshot subset testing and unrevert #9779 (#10146)
+  `PR #10146 <https://github.com/pantsbuild/pants/pull/10146>`_
+
+* Revert "Make SnapshotSubset() faster (#9779)" (#10143)
+  `PR #9779 <https://github.com/pantsbuild/pants/pull/9779>`_
+  `PR #10143 <https://github.com/pantsbuild/pants/pull/10143>`_
+
+* Make SnapshotSubset() faster (#9779)
+  `PR #9779 <https://github.com/pantsbuild/pants/pull/9779>`_
+
+* upgrade to rust v1.44.1 (#10125)
+  `PR #10125 <https://github.com/pantsbuild/pants/pull/10125>`_
+
+* Remove `BuildFile` (#10102)
+  `PR #10102 <https://github.com/pantsbuild/pants/pull/10102>`_
+
+Testing
+~~~~~~~
+
+* Enable test timeouts for python in v2. (#10147)
+  `PR #10147 <https://github.com/pantsbuild/pants/pull/10147>`_
+
+* Delete many v1 tests. (#10116)
+  `PR #10116 <https://github.com/pantsbuild/pants/pull/10116>`_
+
+* enable REv2 streaming client in CI (#9989)
+  `PR #9989 <https://github.com/pantsbuild/pants/pull/9989>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Remove `pants.backend.docgen` (#10121)
+  `PR #10121 <https://github.com/pantsbuild/pants/pull/10121>`_
+
+* Remove the v1 docsite (#10120)
+  `PR #10120 <https://github.com/pantsbuild/pants/pull/10120>`_
