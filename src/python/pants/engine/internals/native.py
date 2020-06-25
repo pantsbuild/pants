@@ -3,30 +3,12 @@
 
 import logging
 import os
-from types import CoroutineType
 from typing import Dict, Iterable, List, Tuple, Union, cast
 
 from typing_extensions import Protocol
 
 from pants.base.exiter import ExitCode
-from pants.base.project_tree import Dir, File, Link
-from pants.engine.addresses import Address
-from pants.engine.fs import (
-    AddPrefix,
-    Digest,
-    FileContent,
-    FilesContent,
-    InputFilesContent,
-    MaterializeDirectoriesResult,
-    MaterializeDirectoryResult,
-    MergeDigests,
-    PathGlobs,
-    RemovePrefix,
-    Snapshot,
-    SnapshotSubset,
-    UrlToFetch,
-)
-from pants.engine.interactive_process import InteractiveProcess, InteractiveProcessResult
+from pants.engine.fs import PathGlobs
 from pants.engine.internals import native_engine
 from pants.engine.internals.native_engine import (
     PyExecutionRequest,
@@ -40,8 +22,6 @@ from pants.engine.internals.native_engine import (
     PyTasks,
     PyTypes,
 )
-from pants.engine.platform import Platform
-from pants.engine.process import FallibleProcessResultWithPlatform, MultiPlatformProcess
 from pants.engine.selectors import Get
 from pants.engine.unions import union
 from pants.util.memo import memoized_property
@@ -216,49 +196,14 @@ class Native(metaclass=SingletonMetaclass):
         ignore_patterns: List[str],
         use_gitignore: bool,
         execution_options,
+        types: PyTypes,
     ) -> PyScheduler:
         """Create and return a native Scheduler."""
-
-        # TODO: There is no longer a need to differentiate constructors from types, as types are
-        # callable as well with the cpython crate.
-        engine_types = PyTypes(
-            construct_directory_digest=Digest,
-            directory_digest=Digest,
-            construct_snapshot=Snapshot,
-            snapshot=Snapshot,
-            construct_file_content=FileContent,
-            construct_files_content=FilesContent,
-            files_content=FilesContent,
-            construct_process_result=FallibleProcessResultWithPlatform,
-            construct_materialize_directories_results=MaterializeDirectoriesResult,
-            construct_materialize_directory_result=MaterializeDirectoryResult,
-            address=Address,
-            path_globs=PathGlobs,
-            merge_digests=MergeDigests,
-            add_prefix=AddPrefix,
-            remove_prefix=RemovePrefix,
-            input_files_content=InputFilesContent,
-            dir=Dir,
-            file=File,
-            link=Link,
-            platform=Platform,
-            multi_platform_process=MultiPlatformProcess,
-            process_result=FallibleProcessResultWithPlatform,
-            coroutine=CoroutineType,
-            url_to_fetch=UrlToFetch,
-            string=str,
-            bytes=bytes,
-            construct_interactive_process_result=InteractiveProcessResult,
-            interactive_process=InteractiveProcess,
-            interactive_process_result=InteractiveProcessResult,
-            snapshot_subset=SnapshotSubset,
-            construct_platform=Platform,
-        )
 
         return self.lib.scheduler_create(
             self._executor,
             tasks,
-            engine_types,
+            types,
             # Project tree.
             build_root,
             local_store_dir,

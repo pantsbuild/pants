@@ -58,6 +58,7 @@ python_library(
   dependencies = [
     '3rdparty/python:setproctitle',
     'src/python/pants/util:dirutil',
+    'src/python/pants/util:osutil',
     ':build_environment',
     ':exiter',
   ],
