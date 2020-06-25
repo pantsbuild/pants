@@ -107,11 +107,9 @@ async def mypy_lint(
     )
 
     file_list_path = "__files.txt"
+    python_files = "\n".join(f for f in prepared_sources.snapshot.files if f.endswith(".py"))
     file_list = await Get(
-        Digest,
-        InputFilesContent(
-            [FileContent(file_list_path, "\n".join(prepared_sources.snapshot.files).encode())]
-        ),
+        Digest, InputFilesContent([FileContent(file_list_path, python_files.encode())]),
     )
 
     merged_input_files = await Get(
