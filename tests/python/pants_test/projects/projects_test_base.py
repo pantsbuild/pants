@@ -117,5 +117,7 @@ class ProjectsTestBase(PantsRunIntegrationTest):
         return list(sorted(pants_run.stdout_data.split()))
 
     def assert_valid_projects(self, *globs: str) -> None:
-        pants_run = self.run_pants(["compile", "lint", "test", *self.targets_for_globs(*globs)])
+        pants_run = self.run_pants(
+            ["tag=-nolint", "compile", "lint", "test", *self.targets_for_globs(*globs)]
+        )
         self.assert_success(pants_run)
