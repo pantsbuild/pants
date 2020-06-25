@@ -6,8 +6,8 @@ from pathlib import Path
 from textwrap import dedent
 from typing import Iterable, List, Set
 
-from pants.backend.python.lint.mypy.subsystem import MyPy
 from pants.backend.python.interpreter_cache import PythonInterpreterCache
+from pants.backend.python.lint.mypy.subsystem import MyPy
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_target import PythonTarget
