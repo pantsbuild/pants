@@ -352,6 +352,21 @@ impl Context {
         .unwrap_or_else(|_| panic!("A Node implementation was ambiguous.")),
     )
   }
+
+  ///
+  /// Same as for Self::get, but returns None if a cycle would be created.
+  ///
+  pub async fn get_weak<N: WrappedNode>(&self, node: N) -> Result<Option<N::Item>, Failure> {
+    let node_result = self
+      .core
+      .graph
+      .get_weak(self.entry_id, self, node.into())
+      .await?;
+    Ok(node_result.map(|v| {
+      v.try_into()
+        .unwrap_or_else(|_| panic!("A Node implementation was ambiguous."))
+    }))
+  }
 }
 
 impl NodeContext for Context {

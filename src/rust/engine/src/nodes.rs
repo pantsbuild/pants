@@ -93,10 +93,16 @@ pub struct Select {
   pub params: Params,
   pub product: TypeId,
   entry: rule_graph::Entry<Rule>,
+  weak: bool,
 }
 
 impl Select {
-  pub fn new(mut params: Params, product: TypeId, entry: rule_graph::Entry<Rule>) -> Select {
+  pub fn new(
+    mut params: Params,
+    product: TypeId,
+    entry: rule_graph::Entry<Rule>,
+    weak: bool,
+  ) -> Select {
     params.retain(|k| match &entry {
       &rule_graph::Entry::Param(ref type_id) => type_id == k.type_id(),
       &rule_graph::Entry::WithDeps(ref with_deps) => with_deps.params().contains(k.type_id()),
@@ -105,6 +111,7 @@ impl Select {
       params,
       product,
       entry,
+      weak,
     }
   }
 
@@ -119,7 +126,7 @@ impl Select {
       .entry_for(&dependency_key)
       .unwrap_or_else(|| panic!("{:?} did not declare a dependency on {:?}", edges, product))
       .clone();
-    Select::new(params, product, entry)
+    Select::new(params, product, entry, false)
   }
 
   async fn select_product(
@@ -145,8 +152,9 @@ impl Select {
   }
 }
 
-// TODO: This is a Node only because it is used as a root in the graph, but it should never be
-// requested using context.get
+// NB: This is a Node only to allow it to be used as a root in the graph, but it should not be
+// requested using context.get, because it requests only memoizable Nodes itself (sometimes
+// indirectly via intrinsics).
 #[async_trait]
 impl WrappedNode for Select {
   type Item = Value;
@@ -155,15 +163,23 @@ impl WrappedNode for Select {
     match &self.entry {
       &rule_graph::Entry::WithDeps(rule_graph::EntryWithDeps::Inner(ref inner)) => {
         match inner.rule() {
-          &tasks::Rule::Task(ref task) => context
-            .get(Task {
+          &tasks::Rule::Task(ref task) => {
+            let node = Task {
               params: self.params.clone(),
               product: self.product,
               task: task.clone(),
               entry: Arc::new(self.entry.clone()),
-            })
-            .await
-            .map(|output| output.value),
+            };
+            if self.weak {
+              if let Some(output) = context.get_weak(node).await? {
+                Ok(output.value)
+              } else {
+                Ok(externs::none().into())
+              }
+            } else {
+              Ok(context.get(node).await?.value)
+            }
+          }
           &Rule::Intrinsic(ref intrinsic) => {
             let intrinsic = intrinsic.clone();
             let values = future::try_join_all(
@@ -801,7 +817,7 @@ impl Task {
         params.put(get.subject);
         async move {
           let entry = entry_res?;
-          Select::new(params, get.product, entry)
+          Select::new(params, get.product, entry, get.weak)
             .run_wrapped_node(context.clone())
             .await
         }

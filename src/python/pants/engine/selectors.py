@@ -41,16 +41,18 @@ class Get(GetConstraints, Generic[_ProductType, _SubjectType]):
     A Get can be constructed in 2 ways with two variants each:
 
     + Long form:
-    a. Get(<ProductType>, <SubjectType>, subject)
-    b. Get[<ProductType>](<SubjectType>, subject)
+        Get(<ProductType>, <SubjectType>, subject)
 
     + Short form
-    a. Get(<ProductType>, <SubjectType>(<constructor args for subject>))
-    b. Get[<ProductType>](<SubjectType>(<constructor args for subject>))
+        Get(<ProductType>, <SubjectType>(<constructor args for subject>))
 
     The long form supports providing type information to the rule engine that it could not otherwise
     infer from the subject variable [1]. Likewise, the short form must use inline construction of the
     subject in order to convey the subject type to the engine.
+
+    The `weak` parameter is an experimental extension: a "weak" Get will return None rather than the
+    requested value iff the dependency caused by the Get would create a cycle in the dependency
+    graph.
 
     [1] The engine needs to determine all rule and Get input and output types statically before
     executing any rules. Since Gets are declared inside function bodies, the only way to extract this
@@ -61,7 +63,9 @@ class Get(GetConstraints, Generic[_ProductType, _SubjectType]):
     """
 
     @overload
-    def __init__(self, product_type: Type[_ProductType], subject_arg0: _SubjectType) -> None:
+    def __init__(
+        self, product_type: Type[_ProductType], subject_arg0: _SubjectType, *, weak: bool = False
+    ) -> None:
         ...
 
     @overload
@@ -70,6 +74,8 @@ class Get(GetConstraints, Generic[_ProductType, _SubjectType]):
         product_type: Type[_ProductType],
         subject_arg0: Type[_SubjectType],
         subject_arg1: _SubjectType,
+        *,
+        weak: bool = False,
     ) -> None:
         ...
 
@@ -78,6 +84,8 @@ class Get(GetConstraints, Generic[_ProductType, _SubjectType]):
         product_type: Type[_ProductType],
         subject_arg0: Union[Type[_SubjectType], _SubjectType],
         subject_arg1: Optional[_SubjectType] = None,
+        *,
+        weak: bool = False,
     ) -> None:
         self.product_type = product_type
         self.subject_declared_type: Type[_SubjectType] = self._validate_subject_declared_type(
@@ -86,6 +94,7 @@ class Get(GetConstraints, Generic[_ProductType, _SubjectType]):
         self.subject: _SubjectType = self._validate_subject(
             subject_arg1 if subject_arg1 is not None else subject_arg0
         )
+        self.weak = weak
 
         self._validate_product()
 

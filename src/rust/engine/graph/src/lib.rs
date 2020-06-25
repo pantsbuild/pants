@@ -63,6 +63,11 @@ pub struct InvalidationResult {
   pub dirtied: usize,
 }
 
+enum GetError<N: Node> {
+  Cycled(Vec<Entry<N>>),
+  Other(N::Error),
+}
+
 type Nodes<N> = HashMap<N, EntryId>;
 
 struct InnerGraph<N: Node> {
@@ -480,7 +485,7 @@ impl<N: Node> Graph<N> {
     src_id: Option<EntryId>,
     context: &N::Context,
     dst_node: N,
-  ) -> Result<(N::Item, Generation), N::Error> {
+  ) -> Result<(N::Item, Generation), GetError<N>> {
     // Compute information about the dst under the Graph lock, and then release it.
     let (dst_retry, mut entry, entry_id) = {
       // Get or create the destination, and then insert the dep and return its state.
@@ -491,12 +496,7 @@ impl<N: Node> Graph<N> {
       let dst_id = inner.ensure_entry(dst_node);
       let dst_retry = if let Some(src_id) = src_id {
         if let Some(cycle_path) = Self::report_cycle(src_id, dst_id, &mut inner, context) {
-          // Cyclic dependency: render an error.
-          let path_strs = cycle_path
-            .into_iter()
-            .map(|e| e.node().to_string())
-            .collect();
-          return Err(N::Error::cyclic(path_strs));
+          return Err(GetError::Cycled(cycle_path));
         }
 
         // Valid dependency.
@@ -544,12 +544,12 @@ impl<N: Node> Graph<N> {
             delay_for(self.invalidation_delay).await;
             continue;
           }
-          Err(other_err) => break Err(other_err),
+          Err(other_err) => break Err(GetError::Other(other_err)),
         }
       }
     } else {
       // Not retriable.
-      entry.get(context, entry_id).await
+      entry.get(context, entry_id).await.map_err(GetError::Other)
     }
   }
 
@@ -568,8 +568,34 @@ impl<N: Node> Graph<N> {
     context: &N::Context,
     dst_node: N,
   ) -> Result<N::Item, N::Error> {
-    let (res, _generation) = self.get_inner(src_id, context, dst_node).await?;
-    Ok(res)
+    match self.get_inner(src_id, context, dst_node).await {
+      Ok((res, _generation)) => Ok(res),
+      Err(GetError::Cycled(cycle_path)) => {
+        // Cyclic dependency: render an error.
+        let path_strs = cycle_path
+          .into_iter()
+          .map(|e| e.node().to_string())
+          .collect();
+        Err(N::Error::cyclic(path_strs))
+      }
+      Err(GetError::Other(e)) => Err(e),
+    }
+  }
+
+  ///
+  /// Identical to Get, but if a cycle would be created by the dependency, returns None instead.
+  ///
+  pub async fn get_weak(
+    &self,
+    src_id: Option<EntryId>,
+    context: &N::Context,
+    dst_node: N,
+  ) -> Result<Option<N::Item>, N::Error> {
+    match self.get_inner(src_id, context, dst_node).await {
+      Ok((res, _generation)) => Ok(Some(res)),
+      Err(GetError::Cycled(_)) => Ok(None),
+      Err(GetError::Other(e)) => Err(e),
+    }
   }
 
   ///
@@ -605,7 +631,13 @@ impl<N: Node> Graph<N> {
     };
 
     // Re-request the Node.
-    let (res, generation) = self.get_inner(None, context, node).await?;
+    let (res, generation) = self
+      .get_inner(None, context, node)
+      .await
+      .map_err(|e| match e {
+        GetError::Other(e) => e,
+        GetError::Cycled(_) => unreachable!("A get request with no source cannot cycle."),
+      })?;
     Ok((res, LastObserved(generation)))
   }
 
