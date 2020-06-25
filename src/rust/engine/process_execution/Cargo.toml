@@ -13,7 +13,6 @@ bazel_protos = { path = "bazel_protos" }
 boxfuture = { path = "../boxfuture" }
 bytes = "0.4.5"
 derivative = "2.1.1"
-digest = "0.8"
 fs = { path = "../fs" }
 futures01 = { package = "futures", version = "0.1" }
 futures = { version = "0.3", features = ["compat"] }
@@ -24,7 +23,7 @@ libc = "0.2.39"
 log = "0.4"
 nails = "0.5.1"
 protobuf = { version = "2.0.6", features = ["with-bytes"] }
-sha2 = "0.8"
+sha2 = "0.9"
 sharded_lmdb = {  path = "../sharded_lmdb" }
 shell-quote = "0.1.0"
 store = { path = "../fs/store" }
