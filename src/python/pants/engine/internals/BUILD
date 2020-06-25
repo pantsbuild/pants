@@ -117,19 +117,12 @@ python_library(
   name='native',
   sources=['native.py'],
   dependencies=[
-    ':native_engine_so',
-    '3rdparty/python:setuptools',
+    ':native_engine',
     '3rdparty/python:typing-extensions',
     'src/python/pants/base:exiter',
-    'src/python/pants/base:project_tree',
-    'src/python/pants/engine:addresses',
     'src/python/pants/engine:fs',
-    'src/python/pants/engine:interactive_process',
-    'src/python/pants/engine:platform',
-    'src/python/pants/engine:process',
     'src/python/pants/engine:selectors',
     'src/python/pants/engine:unions',
-    'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
   ],
@@ -137,8 +130,11 @@ python_library(
 )
 
 resources(
-  name='native_engine_so',
-  sources=['native_engine.so'],
+  name='native_engine',
+  sources=[
+      'native_engine.so',
+      'native_engine.so.metadata',
+  ],
 )
 
 python_library(
@@ -162,8 +158,12 @@ python_library(
     '3rdparty/python:dataclasses',
     '3rdparty/python:typing-extensions',
     'src/python/pants/base:exception_sink',
+    'src/python/pants/base:project_tree',
     'src/python/pants/engine:collection',
     'src/python/pants/engine:fs',
+    'src/python/pants/engine:interactive_process',
+    'src/python/pants/engine:platform',
+    'src/python/pants/engine:process',
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
     'src/python/pants/engine:unions',
