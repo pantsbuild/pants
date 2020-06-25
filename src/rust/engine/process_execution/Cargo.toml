@@ -7,7 +7,6 @@ publish = false
 
 [dependencies]
 async-trait = "0.1"
-copy_dir = "0.1.2"
 walkdir = "2"
 async_semaphore = { path = "../async_semaphore" }
 bazel_protos = { path = "bazel_protos" }

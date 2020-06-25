@@ -9,7 +9,6 @@ publish = false
 crossbeam-channel = "0.3"
 fs = { path = "../fs" }
 futures = "0.3"
-graph = { path = "../graph" }
 hashing = { path = "../hashing" }
 log = "0.4"
 logging = { path = "../logging" }

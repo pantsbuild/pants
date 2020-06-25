@@ -7,7 +7,6 @@ publish = false
 
 [dependencies]
 bazel_protos = { path = "../../process_execution/bazel_protos" }
-boxfuture = { path = "../../boxfuture" }
 bytes = "0.4.5"
 futures01 = { package = "futures", version = "0.1" }
 futures = { version = "0.3", features = ["compat"] }
