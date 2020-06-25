@@ -617,7 +617,8 @@ class Parser:
         if "member_type" in kwargs and type_arg != list:
             error(MemberTypeNotAllowed, type_=type_arg.__name__)
         member_type = kwargs.get("member_type", str)
-        if member_type not in self._allowed_member_types:
+        is_enum = inspect.isclass(member_type) and issubclass(member_type, Enum)
+        if not is_enum and member_type not in self._allowed_member_types:
             error(InvalidMemberType, member_type=member_type.__name__)
 
         if (
@@ -673,7 +674,10 @@ class Parser:
     def _convert_member_type(member_type, value):
         if member_type == dict:
             return DictValueComponent.create(value).val
-        return member_type(value)
+        try:
+            return member_type(value)
+        except ValueError as error:
+            raise ParseError(str(error))
 
     def _compute_value(self, dest, kwargs, flag_val_strs):
         """Compute the value to use for an option.
@@ -684,6 +688,9 @@ class Parser:
         member_type = kwargs.get("member_type", str)
 
         # Helper function to convert a string to a value of the option's type.
+        type_arg = kwargs.get("type", str)
+        member_type = kwargs.get("member_type", str)
+
         def to_value_type(val_str):
             if val_str is None:
                 return None
@@ -691,7 +698,7 @@ class Parser:
                 return self._ensure_bool(val_str)
             try:
                 if type_arg == list:
-                    return ListValueComponent.create(val_str)
+                    return ListValueComponent.create(val_str, member_type=member_type)
                 if type_arg == dict:
                     return DictValueComponent.create(val_str)
                 return type_arg(val_str)
@@ -844,7 +851,11 @@ class Parser:
                     f"`{val}` is not an allowed value for option {dest} in {self._scope_str()}. Must be one of: {choices}"
                 )
 
-            if type_arg == file_option:
+            if type_arg == list:
+                if inspect.isclass(member_type) and issubclass(member_type, Enum):
+                    if len(merged_val) != len(set(merged_val)):
+                        raise ParseError(f"Duplicate enum values specified in list: {merged_val}")
+            elif type_arg == file_option:
                 check_file_exists(val)
             elif type_arg == dir_option:
                 check_dir_exists(val)
