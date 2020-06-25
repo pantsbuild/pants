@@ -66,7 +66,7 @@ async def inject_missing_init_files(request: InjectInitRequest) -> InitInjectedS
         Digest,
         InputFilesContent(
             FileContent(fp, b"# Generated `__init__.py` file.")
-            for fp in missing_init_files - discovered_inits_snapshot.files
+            for fp in missing_init_files.difference(discovered_inits_snapshot.files)
         ),
     )
     result = await Get(

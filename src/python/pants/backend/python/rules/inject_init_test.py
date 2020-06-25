@@ -33,7 +33,7 @@ class InjectInitTest(TestBase):
         expected_discovered: Optional[List[str]] = None,
         sources_stripped=True,
     ) -> None:
-        expected_discovered = expected_discovered or ()
+        expected_discovered = expected_discovered or []
         request = InjectInitRequest(
             self.make_snapshot({fp: "# python code" for fp in original_files}),
             sources_stripped=sources_stripped,
