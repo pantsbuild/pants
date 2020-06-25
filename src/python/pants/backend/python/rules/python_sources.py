@@ -19,6 +19,34 @@ from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.meta import frozen_after_init
 
 
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class _BasePythonSourcesRequest:
+    targets: Tuple[Target, ...]
+    include_resources: bool
+    include_files: bool
+
+    def __init__(
+        self,
+        targets: Iterable[Target],
+        *,
+        include_resources: bool = True,
+        include_files: bool = False
+    ) -> None:
+        self.targets = tuple(targets)
+        self.include_resources = include_resources
+        self.include_files = include_files
+
+    @property
+    def valid_sources_types(self) -> Tuple[Type[Sources], ...]:
+        types = [PythonSources]
+        if self.include_resources:
+            types.append(ResourcesSources)
+        if self.include_files:
+            types.append(FilesSources)
+        return tuple(types)
+
+
 @dataclass(frozen=True)
 class StrippedPythonSources:
     """Sources that can be imported and used by Python, relative to the root.
@@ -35,23 +63,8 @@ class StrippedPythonSources:
     snapshot: Snapshot
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class StrippedPythonSourcesRequest:
-    targets: Tuple[Target, ...]
-    include_resources: bool
-
-    def __init__(self, targets: Iterable[Target], *, include_resources: bool) -> None:
-        self.targets = tuple(targets)
-        self.include_resources = include_resources
-
-    @property
-    def valid_sources_types(self) -> Tuple[Type[Sources], ...]:
-        return (
-            (PythonSources,)
-            if not self.include_resources
-            else (PythonSources, FilesSources, ResourcesSources)
-        )
+class StrippedPythonSourcesRequest(_BasePythonSourcesRequest):
+    pass
 
 
 @dataclass(frozen=True)
@@ -74,23 +87,8 @@ class UnstrippedPythonSources:
     source_roots: Tuple[str, ...]
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class UnstrippedPythonSourcesRequest:
-    targets: Tuple[Target, ...]
-    include_resources: bool
-
-    def __init__(self, targets: Iterable[Target], *, include_resources: bool) -> None:
-        self.targets = tuple(targets)
-        self.include_resources = include_resources
-
-    @property
-    def valid_sources_types(self) -> Tuple[Type[Sources], ...]:
-        return (
-            (PythonSources,)
-            if not self.include_resources
-            else (PythonSources, FilesSources, ResourcesSources)
-        )
+class UnstrippedPythonSourcesRequest(_BasePythonSourcesRequest):
+    pass
 
 
 @rule

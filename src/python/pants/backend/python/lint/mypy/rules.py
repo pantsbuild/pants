@@ -78,8 +78,7 @@ async def mypy_lint(
     )
 
     prepared_sources_request = Get(
-        UnstrippedPythonSources,
-        UnstrippedPythonSourcesRequest(transitive_targets.closure, include_resources=False),
+        UnstrippedPythonSources, UnstrippedPythonSourcesRequest(transitive_targets.closure),
     )
     pex_request = Get(
         Pex,
