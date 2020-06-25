@@ -8,7 +8,7 @@ import sys
 from dataclasses import dataclass
 from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
-from pants.base.deprecated import deprecated_conditional, warn_or_error
+from pants.base.deprecated import warn_or_error
 from pants.option.arg_splitter import ArgSplitter, HelpRequest
 from pants.option.config import Config
 from pants.option.option_tracker import OptionTracker
@@ -534,11 +534,7 @@ class Options:
         return values
 
     def get_fingerprintable_for_scope(
-        self,
-        bottom_scope: str,
-        include_passthru: Optional[bool] = None,
-        fingerprint_key: str = "fingerprint",
-        invert: bool = False,
+        self, bottom_scope: str, fingerprint_key: str = "fingerprint", invert: bool = False,
     ):
         """Returns a list of fingerprintable (option type, option value) pairs for the given scope.
 
@@ -556,15 +552,6 @@ class Options:
 
         :API: public
         """
-
-        deprecated_conditional(
-            predicate=lambda: include_passthru is not None,
-            removal_version="1.31.0.dev0",
-            entity_description="get_fingerprintable_for_scope `include_passthru` arg",
-            hint_message=(
-                "passthru arguments are fingerprinted if their associated option value is."
-            ),
-        )
 
         fingerprint_default = bool(invert)
         pairs = []
