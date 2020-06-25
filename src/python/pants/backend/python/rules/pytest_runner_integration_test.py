@@ -7,8 +7,6 @@ from pathlib import Path, PurePath
 from textwrap import dedent
 from typing import List, Optional
 
-import pytest
-
 from pants.backend.python.rules import (
     download_pex_bin,
     pex,
@@ -147,7 +145,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
             f"--source-root-patterns={self.source_root}",
             # pin to lower versions so that we can run Python 2 tests
             "--pytest-version=pytest>=4.6.6,<4.7",
-            "--pytest-pytest-plugins=['zipp==1.0.0']",
+            "--pytest-pytest-plugins=['zipp==1.0.0', 'pytest-cov>=2.8.1,<2.9']",
         ]
         if passthrough_args:
             args.append(f"--pytest-args='{passthrough_args}'")
@@ -370,7 +368,6 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         assert file.path.startswith("dist/test-results")
         assert b"pants_test.test_good" in file.content
 
-    @pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/10141")
     def test_coverage(self) -> None:
         self.create_python_test_target([self.good_source])
         result = self.run_pytest(use_coverage=True)
