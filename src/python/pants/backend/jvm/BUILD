@@ -30,6 +30,7 @@ python_library(
     ':ossrh_publication_metadata',
     ':repository',
     ':scala_artifact',
+    ':target_types',
     'src/python/pants/backend/jvm/subsystems:jar_dependency_management',
     'src/python/pants/backend/jvm/targets:all',
     'src/python/pants/base:deprecated',
