@@ -209,7 +209,7 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
                 )
 
     def run_list(self, extra_args, success=True):
-        pants_run = self.do_command(["list", *extra_args], success=success)
+        pants_run = self.do_command("list", *extra_args, success=success)
         return pants_run.stdout_data
 
     def test_changed_exclude_root_targets_only(self):
