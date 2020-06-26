@@ -162,7 +162,7 @@ async def setup_pytest_for_target(
     )
 
     prepared_sources_request = Get(
-        StrippedPythonSources, StrippedPythonSourcesRequest(all_targets, include_resources=True)
+        StrippedPythonSources, StrippedPythonSourcesRequest(all_targets, include_files=True)
     )
 
     # Get the file names for the test_target so that we can specify to Pytest precisely which files

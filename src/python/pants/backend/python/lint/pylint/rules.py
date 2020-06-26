@@ -162,14 +162,11 @@ async def pylint_lint_partition(
     )
 
     prepare_plugin_sources_request = Get(
-        StrippedPythonSources,
-        StrippedPythonSourcesRequest(partition.plugin_targets, include_resources=True),
+        StrippedPythonSources, StrippedPythonSourcesRequest(partition.plugin_targets),
     )
     prepare_python_sources_request = Get(
         UnstrippedPythonSources,
-        UnstrippedPythonSourcesRequest(
-            partition.targets_with_dependencies, include_resources=False
-        ),
+        UnstrippedPythonSourcesRequest(partition.targets_with_dependencies),
     )
     specified_source_files_request = Get(
         SourceFiles,
