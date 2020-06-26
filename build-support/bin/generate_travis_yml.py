@@ -436,7 +436,6 @@ def osx_shard(
 
 # See https://docs.travis-ci.com/user/conditions-v1.
 SKIP_RUST_CONDITION = r"commit_message !~ /\[ci skip-rust-tests\]/"
-SKIP_JVM_CONDITION = r"commit_message !~ /\[ci skip-jvm-tests\]/"
 
 # ----------------------------------------------------------------------
 # Bootstrap engine
@@ -757,27 +756,6 @@ def osx_10_13_sanity_check(python_version: PythonVersion) -> Dict:
 
 
 # -------------------------------------------------------------------------
-# JVM tests
-# -------------------------------------------------------------------------
-
-
-def jvm_tests(python_version: PythonVersion) -> Dict:
-    shard = {
-        **linux_shard(python_version=python_version),
-        # NB: linux_fuse comes after linux_shard to ensure that linux_fuse's before_install
-        # entry is used.
-        **linux_fuse_shard(),
-        "name": f"JVM tests (Python {python_version.decimal})",
-        "script": [
-            f"./build-support/bin/ci.py --jvm-tests --python-version {python_version.decimal}"
-        ],
-        "if": SKIP_JVM_CONDITION,
-    }
-    safe_append(shard, "env", f"CACHE_NAME=jvm_tests.py{python_version.number}")
-    return shard
-
-
-# -------------------------------------------------------------------------
 # Deploy
 # -------------------------------------------------------------------------
 
@@ -886,7 +864,6 @@ def main() -> None:
                     *[osx_platform_tests(v) for v in supported_python_versions],
                     *[osx_10_12_sanity_check(v) for v in supported_python_versions],
                     *[osx_10_13_sanity_check(v) for v in supported_python_versions],
-                    *[jvm_tests(v) for v in supported_python_versions],
                     deploy_stable(),
                     deploy_unstable(),
                 ]

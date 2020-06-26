@@ -47,8 +47,6 @@ def main() -> None:
             run_unit_tests(oauth_token_path=remote_execution_oauth_token_path)
         if args.rust_tests:
             run_rust_tests()
-        if args.jvm_tests:
-            run_jvm_tests()
         if args.integration_tests_v1:
             run_integration_tests_v1(shard=args.integration_shard)
         if args.integration_tests_v2:
@@ -123,7 +121,6 @@ def create_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--unit-tests", action="store_true", help="Run Python unit tests.")
     parser.add_argument("--rust-tests", action="store_true", help="Run Rust tests.")
-    parser.add_argument("--jvm-tests", action="store_true", help="Run JVM tests.")
     parser.add_argument(
         "--integration-tests-v1",
         action="store_true",
@@ -554,17 +551,6 @@ def run_rust_tests() -> None:
             subprocess.run(command, env={**os.environ, "RUST_BACKTRACE": "all"}, check=True)
         except subprocess.CalledProcessError:
             die("Rust test failure.")
-
-
-def run_jvm_tests() -> None:
-    # NB: Ensure that this stays in sync with githooks/prepare-commit-msg.
-    targets = ["src/java::", "src/scala::", "tests/java::", "tests/scala::", "zinc::"]
-    _run_command(
-        ["./pants.pex", "test", *targets],
-        slug="CoreJVM",
-        start_message="Running JVM tests",
-        die_message="JVM test failure.",
-    )
 
 
 def run_integration_tests_v1(*, shard: Optional[str]) -> None:
