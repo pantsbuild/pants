@@ -342,7 +342,7 @@ async def generate_coverage_reports(
                 subprocess_encoding_environment=subprocess_encoding_environment,
             )
         )
-    results: Tuple[ProcessResult, ...] = await MultiGet(tuple(processes))
+    results: Tuple[ProcessResult, ...] = await MultiGet(processes)
     coverage_reports = _get_coverage_reports(coverage_subsystem, report_types, results)
     return CoverageReports(tuple(coverage_reports))
 
