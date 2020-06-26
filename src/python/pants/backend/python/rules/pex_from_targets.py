@@ -98,7 +98,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         input_digests.append(request.additional_sources)
     if request.include_source_files:
         prepared_sources = await Get(
-            StrippedPythonSources, StrippedPythonSourcesRequest(all_targets, include_resources=True)
+            StrippedPythonSources, StrippedPythonSourcesRequest(all_targets)
         )
         input_digests.append(prepared_sources.snapshot.digest)
     merged_input_digest = await Get(Digest, MergeDigests(input_digests))

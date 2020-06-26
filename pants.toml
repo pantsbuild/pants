@@ -42,9 +42,11 @@ backend_packages2.add = [
   "internal_backend.rules_for_testing",
 ]
 
-# The invalidation globs cover the PYTHONPATH by default, but we additionally add the rust code.
+# The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
+# path but not consumed by python, and additionally add the rust code.
 pantsd_invalidation_globs.add = [
   "!*_test.py",
+  "!BUILD",
   # NB: The `target` directory is ignored via `pants_ignore` below.
   "src/rust/engine/**/*.rs",
   "src/rust/engine/**/*.toml",
@@ -148,6 +150,7 @@ branch_notes = """
   '1.28.x': 'src/python/pants/notes/1.28.x.rst',
   '1.29.x': 'src/python/pants/notes/1.29.x.rst',
   '1.30.x': 'src/python/pants/notes/1.30.x.rst',
+  '2.0.x': 'src/python/pants/notes/2.0.x.rst',
 }
 """
 
