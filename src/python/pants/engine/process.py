@@ -4,7 +4,6 @@
 import itertools
 import logging
 from dataclasses import dataclass
-from textwrap import dedent
 from typing import Dict, Iterable, Mapping, Optional, Tuple, Union
 
 from pants.engine.fs import EMPTY_DIGEST, Digest
@@ -174,16 +173,16 @@ class ProcessExecutionFailure(Exception):
         self.exit_code = exit_code
         self.stdout = stdout
         self.stderr = stderr
+        # NB: We don't use dedent on a single format string here because it would attempt to
+        # interpret the stdio content.
         super().__init__(
-            dedent(
-                f"""\
-                Process '{process_description}' failed with exit code {exit_code}.
-                stdout:
-                {stdout.decode()}
-
-                stderr:
-                {stderr.decode()}
-                """
+            "\n".join(
+                [
+                    f"Process '{process_description}' failed with exit code {exit_code}.\nstdout:",
+                    stdout.decode(),
+                    "stderr:",
+                    stderr.decode(),
+                ]
             )
         )
 
