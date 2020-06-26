@@ -278,7 +278,7 @@ class GlobalOptions(Subsystem):
                 "pants.backend.python",
                 "pants.backend.jvm",
                 "pants.backend.native",
-                "pants.cache"
+                "pants.cache",
             ],
             help=(
                 "Register v1 tasks from these backends. The backend packages must be present on "
