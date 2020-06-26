@@ -34,6 +34,7 @@ HAS_CI_SKIP=$?
 
 if [[ "${HAS_CI_SKIP}" -eq 1 ]] && [ "${NUM_NON_MD_FILES}" -eq 0 ]; then
 cat <<EOF >> "${COMMIT_MSG_FILEPATH}"
+
 # All CI will be skipped. Delete if not intended.
 [ci skip]
 EOF
@@ -41,6 +42,7 @@ fi
 
 if [[ "${HAS_RUST_SKIP}" -eq 1 ]] && [ "${NUM_RUST_FILES}" -eq 0 ]; then
 cat <<EOF >> "${COMMIT_MSG_FILEPATH}"
+
 # Rust tests will be skipped. Delete if not intended.
 [ci skip-rust-tests]
 EOF
