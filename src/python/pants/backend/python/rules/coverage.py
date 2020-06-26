@@ -325,22 +325,36 @@ async def generate_coverage_reports(
         ),
     )
 
-    coverage_reports: List[CoverageReport] = []
-    for report_type in coverage_subsystem.reports:
-        process = coverage_setup.pex.create_process(
-            pex_path=f"./{coverage_setup.pex.output_filename}",
-            # We pass `--ignore-errors` because Pants dynamically injects missing `__init__.py` files
-            # and this will cause Coverage to fail.
-            pex_args=(report_type.report_name, "--ignore-errors"),
-            input_digest=input_digest,
-            output_directories=("htmlcov",),
-            output_files=("coverage.xml",),
-            description=f"Generate Pytest {report_type.report_name} coverage report.",
-            python_setup=python_setup,
-            subprocess_encoding_environment=subprocess_encoding_environment,
+    processes = []
+    report_types = coverage_subsystem.reports
+    for report_type in report_types:
+        processes.append(
+            coverage_setup.pex.create_process(
+                pex_path=f"./{coverage_setup.pex.output_filename}",
+                # We pass `--ignore-errors` because Pants dynamically injects missing `__init__.py` files
+                # and this will cause Coverage to fail.
+                pex_args=(report_type.report_name, "--ignore-errors"),
+                input_digest=input_digest,
+                output_directories=("htmlcov",),
+                output_files=("coverage.xml",),
+                description=f"Generate Pytest {report_type.report_name} coverage report.",
+                python_setup=python_setup,
+                subprocess_encoding_environment=subprocess_encoding_environment,
+            )
         )
-        result = await Get(ProcessResult, Process, process)
+    results: Tuple[ProcessResult, ...] = await MultiGet(tuple(processes))
+    coverage_reports = _get_coverage_reports(coverage_subsystem, report_types, results)
+    return CoverageReports(tuple(coverage_reports))
 
+
+def _get_coverage_reports(
+    coverage_subsystem: CoverageSubsystem,
+    report_types: Tuple[CoverageReportType, ...],
+    results: Tuple[ProcessResult, ...],
+) -> List[CoverageReport]:
+    coverage_reports: List[CoverageReport] = []
+    for index, result in enumerate(results):
+        report_type = report_types[index]
         if report_type == CoverageReportType.CONSOLE:
             coverage_reports.append(ConsoleCoverageReport(result.stdout.decode()))
             continue
@@ -361,7 +375,7 @@ async def generate_coverage_reports(
             )
         )
 
-    return CoverageReports(tuple(coverage_reports))
+    return coverage_reports
 
 
 def rules():
