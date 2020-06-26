@@ -140,7 +140,7 @@ python_library(
   sources=['git_util.py'],
   dependencies = [
     'src/python/pants/base:revision',
-    'src/python/pants/scm:git',
+    'src/python/pants/scm',
     'src/python/pants/util:contextutil',
   ],
   tags = {"partially_type_checked"},
