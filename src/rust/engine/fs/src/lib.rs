@@ -669,14 +669,24 @@ pub fn increase_limits() -> Result<String, String> {
       .map_err(|e| format!("Could not validate file handle limits: {}", e))?;
     // If the limit is less than our target.
     if cur < TARGET_NOFILE_LIMIT {
+      let err_suffix = format!(
+        "To avoid 'too many open file handle' errors, we recommend a limit of at least {}: \
+        please see https://pants.readme.io/docs/troubleshooting#too-many-open-files-error \
+        for more information.",
+        TARGET_NOFILE_LIMIT
+      );
       // If we might be able to increase the limit, try to.
       if cur < max {
-        rlimit::Resource::NOFILE.set(max, max)
-          .map_err(|e| format!("Could not raise file handle limit above {}: `{}`. We recommend a limit of at least {}.", cur, e, TARGET_NOFILE_LIMIT))?;
+        rlimit::Resource::NOFILE.set(max, max).map_err(|e| {
+          format!(
+            "Could not raise file handle limit above {}: `{}`. {}",
+            cur, e, err_suffix
+          )
+        })?;
       } else {
         return Err(format!(
-          "File handle limit is capped to: {}. We recommend a limit of at least {}.",
-          max, TARGET_NOFILE_LIMIT
+          "File handle limit is capped to: {}. {}",
+          cur, err_suffix
         ));
       }
     } else {
