@@ -29,6 +29,7 @@ python_tests(
     'src/python/pants/util:logging',
   ],
   tags = {"partially_type_checked"},
+  timeout = 180,
 )
 
 python_tests(

@@ -76,19 +76,24 @@ impl Workunit {
      * multibyte unicode characters in the string
      */
     let max_len = 200;
-    if identifier.len() > max_len {
+    let effective_identifier = if identifier.len() > max_len {
       let truncated_identifier: String = identifier.chars().take(max_len).collect();
       let trunc = identifier.len() - max_len;
-      log!(
-        level,
-        "{} {}... ({} characters truncated)",
-        state,
-        truncated_identifier,
-        trunc
-      );
+      format!(
+        "{}... ({} characters truncated)",
+        truncated_identifier, trunc
+      )
     } else {
-      log!(level, "{} {}", state, identifier);
-    }
+      identifier.to_string()
+    };
+
+    let message = if let Some(ref s) = self.metadata.message {
+      format!(" - {}", s)
+    } else {
+      "".to_string()
+    };
+
+    log!(level, "{} {}{}", state, effective_identifier, message);
   }
 }
 
@@ -101,6 +106,7 @@ pub enum WorkunitState {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct WorkunitMetadata {
   pub desc: Option<String>,
+  pub message: Option<String>,
   pub level: Level,
   pub blocked: bool,
   pub stdout: Option<hashing::Digest>,
@@ -124,6 +130,7 @@ impl Default for WorkunitMetadata {
     Self {
       level: Level::Info,
       desc: None,
+      message: None,
       blocked: false,
       stdout: None,
       stderr: None,

@@ -159,7 +159,7 @@ async def setup_pytest_for_target(
     )
 
     prepared_sources_request = Get(
-        UnstrippedPythonSources, UnstrippedPythonSourcesRequest(all_targets, include_resources=True)
+        UnstrippedPythonSources, UnstrippedPythonSourcesRequest(all_targets, include_files=True)
     )
 
     # Get the file names for the test_target so that we can specify to Pytest precisely which files
@@ -217,7 +217,7 @@ async def setup_pytest_for_target(
     )
 
 
-@rule
+@rule(desc="Run Pytest")
 async def run_python_test(
     field_set: PythonTestFieldSet,
     test_setup: TestTargetSetup,
@@ -287,11 +287,14 @@ async def run_python_test(
             logger.warning(f"Failed to generate JUnit XML data for {field_set.address}.")
 
     return TestResult.from_fallible_process_result(
-        result, coverage_data=coverage_data, xml_results=xml_results_digest
+        result,
+        coverage_data=coverage_data,
+        xml_results=xml_results_digest,
+        address_ref=field_set.address.reference(),
     )
 
 
-@rule(desc="Run pytest in an interactive process")
+@rule(desc="Run Pytest in an interactive process")
 async def debug_python_test(test_setup: TestTargetSetup) -> TestDebugRequest:
     process = InteractiveProcess(
         argv=(test_setup.test_runner_pex.output_filename, *test_setup.args),

@@ -128,15 +128,15 @@ class PylintIntegrationTest(ExternalToolTestBase):
         result = self.run_pylint([target])
         assert len(result) == 1
         assert result[0].exit_code == PYLINT_FAILURE_RETURN_CODE
-        assert "bad.py:2:0: C0103" in result[0].stdout
+        assert f"{self.source_root}/bad.py:2:0: C0103" in result[0].stdout
 
     def test_mixed_sources(self) -> None:
         target = self.make_target_with_origin([self.good_source, self.bad_source])
         result = self.run_pylint([target])
         assert len(result) == 1
         assert result[0].exit_code == PYLINT_FAILURE_RETURN_CODE
-        assert "good.py" not in result[0].stdout
-        assert "bad.py:2:0: C0103" in result[0].stdout
+        assert f"{self.source_root}/good.py" not in result[0].stdout
+        assert f"{self.source_root}/bad.py:2:0: C0103" in result[0].stdout
 
     def test_multiple_targets(self) -> None:
         targets = [
@@ -146,8 +146,8 @@ class PylintIntegrationTest(ExternalToolTestBase):
         result = self.run_pylint(targets)
         assert len(result) == 1
         assert result[0].exit_code == PYLINT_FAILURE_RETURN_CODE
-        assert "good.py" not in result[0].stdout
-        assert "bad.py:2:0: C0103" in result[0].stdout
+        assert f"{self.source_root}/good.py" not in result[0].stdout
+        assert f"{self.source_root}/bad.py:2:0: C0103" in result[0].stdout
 
     def test_precise_file_args(self) -> None:
         target = self.make_target_with_origin(
@@ -298,7 +298,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
         )
         assert len(result) == 1
         assert result[0].exit_code == 4
-        assert "thirdparty_plugin.py:10:8: W5301" in result[0].stdout
+        assert f"{self.source_root}/thirdparty_plugin.py:10:8: W5301" in result[0].stdout
 
     def test_source_plugin(self) -> None:
         # NB: We make this source plugin fairly complex by having it use transitive dependencies.
@@ -390,4 +390,4 @@ class PylintIntegrationTest(ExternalToolTestBase):
         )
         assert len(result) == 1
         assert result[0].exit_code == PYLINT_FAILURE_RETURN_CODE
-        assert "source_plugin.py:2:0: C9871" in result[0].stdout
+        assert f"{self.source_root}/source_plugin.py:2:0: C9871" in result[0].stdout

@@ -84,6 +84,8 @@ class HelpInfoExtracter:
 
         if is_list_option(kwargs):
             member_type = kwargs.get("member_type", str)
+            if inspect.isclass(member_type) and issubclass(member_type, Enum):
+                default = []
 
             def member_str(val):
                 return f"'{val}'" if member_type == str else str(val)
@@ -139,7 +141,10 @@ class HelpInfoExtracter:
     def compute_choices(kwargs) -> Optional[str]:
         """Compute the option choices to display based on an Enum or list type."""
         typ = kwargs.get("type", [])
-        if inspect.isclass(typ) and issubclass(typ, Enum):
+        member_type = kwargs.get("member_type", str)
+        if typ == list and inspect.isclass(member_type) and issubclass(member_type, Enum):
+            values = (choice.value for choice in member_type)
+        elif inspect.isclass(typ) and issubclass(typ, Enum):
             values = (choice.value for choice in typ)
         else:
             values = (str(choice) for choice in kwargs.get("choices", []))

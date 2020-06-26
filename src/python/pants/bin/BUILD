@@ -93,4 +93,6 @@ python_binary(
   # We depend on twitter.common libraries that trigger pex warnings for not properly declaring their
   # dependency on setuptools (for namespace package support).
   emit_warnings=False,
+  # To allow for loading `native_engine.so` when built as a pex, we set zip_safe=False.
+  zip_safe=False,
 )

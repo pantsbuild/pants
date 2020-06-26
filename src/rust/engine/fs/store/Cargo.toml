@@ -10,7 +10,6 @@ bazel_protos = { path = "../../process_execution/bazel_protos" }
 boxfuture = { path = "../../boxfuture" }
 bytes = "0.4.5"
 concrete_time = { path = "../../concrete_time" }
-digest = "0.8"
 dirs = "1"
 fs = { path = ".." }
 futures01 = { package = "futures", version = "0.1" }
@@ -26,7 +25,6 @@ log = "0.4"
 parking_lot = "0.6"
 protobuf = { version = "2.0.6", features = ["with-bytes"] }
 serverset = { path = "../../serverset" }
-sha2 = "0.8"
 serde = "1.0"
 serde_derive = "1.0"
 sharded_lmdb = { path = "../../sharded_lmdb" }

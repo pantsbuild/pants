@@ -20,8 +20,7 @@ use hashing::{Digest, Fingerprint};
 use lazy_static::lazy_static;
 
 use crate::Process;
-use digest::Digest as DigestTrait;
-use sha2::Sha256;
+use sha2::{Digest as Sha256Digest, Sha256};
 use store::Store;
 
 lazy_static! {
@@ -356,10 +355,10 @@ impl NailgunProcessFingerprint {
       .map_err(|err| format!("Error getting the realpath of the jdk home: {}", err))?;
 
     let mut hasher = Sha256::default();
-    hasher.input(nailgun_server_req_digest.0);
-    hasher.input(jdk_realpath.to_string_lossy().as_bytes());
-    Ok(NailgunProcessFingerprint(Fingerprint::from_bytes_unsafe(
-      &hasher.result(),
+    hasher.update(nailgun_server_req_digest.0);
+    hasher.update(jdk_realpath.to_string_lossy().as_bytes());
+    Ok(NailgunProcessFingerprint(Fingerprint::from_bytes(
+      hasher.finalize(),
     )))
   }
 }

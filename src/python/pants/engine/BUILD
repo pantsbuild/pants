@@ -29,7 +29,7 @@ python_tests(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:enums',
   ],
-  timeout=30,
+  timeout = 90,
 )
 
 python_library(

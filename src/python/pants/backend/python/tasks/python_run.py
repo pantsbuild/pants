@@ -13,20 +13,6 @@ from pants.util.osutil import safe_kill
 class PythonRun(PythonExecutionTaskBase):
     """Run a Python executable."""
 
-    @classmethod
-    def supports_passthru_args(cls):
-        return True
-
-    @classmethod
-    def passthru_args_kwargs(cls):
-        return dict(
-            passthrough=False,
-            removal_version="1.31.0.dev0",
-            removal_hint=(
-                "This task now receives passthrough arguments via the `--run-args` option."
-            ),
-        )
-
     def execute(self):
         binary = self.require_single_root_target()
         if isinstance(binary, PythonBinary):
@@ -35,7 +21,7 @@ class PythonRun(PythonExecutionTaskBase):
             # TODO(benjy): Use MutexTask to coordinate this.
 
             pex = self.create_pex(binary.pexinfo)
-            args = [*self.get_passthru_args(), *self.get_options().args]
+            args = list(self.get_options().args)
 
             env = self.prepare_pex_env()
 

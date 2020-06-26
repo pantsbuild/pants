@@ -63,7 +63,7 @@ class StrippedPythonSourcesTest(TestBase):
             StrippedPythonSources,
             Params(
                 StrippedPythonSourcesRequest(
-                    [target_with_init, target_without_init, files_target], include_resources=True
+                    [target_with_init, target_without_init, files_target], include_files=True
                 ),
                 create_options_bootstrapper(args=["--source-root-patterns=['src/python']"]),
             ),
@@ -92,17 +92,31 @@ class StrippedPythonSourcesTest(TestBase):
                 parent_directory="src/python", files=["j.java"], target_cls=NonPythonTarget
             ),
         ]
-        bootstrapper = create_options_bootstrapper()
-        with_resources = self.request_single_product(
-            StrippedPythonSources,
-            Params(StrippedPythonSourcesRequest(targets, include_resources=True), bootstrapper,),
+
+        def assert_has_files(
+            *, include_resources: bool, include_files: bool, expected: List[str]
+        ) -> None:
+            result = self.request_single_product(
+                StrippedPythonSources,
+                Params(
+                    StrippedPythonSourcesRequest(
+                        targets, include_resources=include_resources, include_files=include_files
+                    ),
+                    create_options_bootstrapper(),
+                ),
+            )
+            assert result.snapshot.files == tuple(expected)
+
+        assert_has_files(
+            include_resources=True,
+            include_files=True,
+            expected=["p.py", "r.txt", "src/python/f.txt"],
         )
-        assert with_resources.snapshot.files == ("p.py", "r.txt", "src/python/f.txt")
-        without_resources = self.request_single_product(
-            StrippedPythonSources,
-            Params(StrippedPythonSourcesRequest(targets, include_resources=False), bootstrapper,),
+        assert_has_files(include_resources=True, include_files=False, expected=["p.py", "r.txt"])
+        assert_has_files(
+            include_resources=False, include_files=True, expected=["p.py", "src/python/f.txt"]
         )
-        assert without_resources.snapshot.files == ("p.py",)
+        assert_has_files(include_resources=False, include_files=False, expected=["p.py"])
 
 
 class UnstrippedPythonSourcesTest(TestBase):
@@ -138,7 +152,7 @@ class UnstrippedPythonSourcesTest(TestBase):
             UnstrippedPythonSources,
             Params(
                 UnstrippedPythonSourcesRequest(
-                    [target_with_init, target_without_init, files_target], include_resources=True
+                    [target_with_init, target_without_init, files_target], include_files=True
                 ),
                 create_options_bootstrapper(args=["--source-root-patterns=['src/python']"]),
             ),
@@ -167,18 +181,34 @@ class UnstrippedPythonSourcesTest(TestBase):
                 parent_directory="src/python", files=["j.java"], target_cls=NonPythonTarget
             ),
         ]
-        bootstrapper = create_options_bootstrapper()
-        with_resources = self.request_single_product(
-            UnstrippedPythonSources,
-            Params(UnstrippedPythonSourcesRequest(targets, include_resources=True), bootstrapper),
+
+        def assert_has_files(
+            *, include_resources: bool, include_files: bool, expected: List[str]
+        ) -> None:
+            result = self.request_single_product(
+                UnstrippedPythonSources,
+                Params(
+                    UnstrippedPythonSourcesRequest(
+                        targets, include_resources=include_resources, include_files=include_files
+                    ),
+                    create_options_bootstrapper(),
+                ),
+            )
+            assert result.snapshot.files == tuple(expected)
+
+        assert_has_files(
+            include_resources=True,
+            include_files=True,
+            expected=["src/python/f.txt", "src/python/p.py", "src/python/r.txt"],
         )
-        assert with_resources.snapshot.files == (
-            "src/python/f.txt",
-            "src/python/p.py",
-            "src/python/r.txt",
+        assert_has_files(
+            include_resources=True,
+            include_files=False,
+            expected=["src/python/p.py", "src/python/r.txt"],
         )
-        without_resources = self.request_single_product(
-            UnstrippedPythonSources,
-            Params(UnstrippedPythonSourcesRequest(targets, include_resources=False), bootstrapper),
+        assert_has_files(
+            include_resources=False,
+            include_files=True,
+            expected=["src/python/f.txt", "src/python/p.py"],
         )
-        assert without_resources.snapshot.files == ("src/python/p.py",)
+        assert_has_files(include_resources=False, include_files=False, expected=["src/python/p.py"])

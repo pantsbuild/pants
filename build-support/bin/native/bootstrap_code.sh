@@ -34,6 +34,7 @@ esac
 
 readonly NATIVE_ENGINE_BINARY="native_engine.so"
 readonly NATIVE_ENGINE_RESOURCE="${REPO_ROOT}/src/python/pants/engine/internals/${NATIVE_ENGINE_BINARY}"
+readonly NATIVE_ENGINE_RESOURCE_METADATA="${NATIVE_ENGINE_RESOURCE}.metadata"
 readonly NATIVE_ENGINE_CACHE_DIR=${CACHE_ROOT}/bin/native-engine
 
 function _build_native_code() {
@@ -81,8 +82,6 @@ function bootstrap_native_code() {
     # Pick up Cargo.lock changes if any caused by the `cargo build`.
     native_engine_version="$(calculate_current_hash)"
     engine_version_hdr="engine_version: ${native_engine_version}"
-    target_binary="${NATIVE_ENGINE_CACHE_DIR}/${native_engine_version}/${NATIVE_ENGINE_BINARY}"
-    target_binary_metadata="${target_binary}.metadata"
 
     mkdir -p "$(dirname "${target_binary}")"
     cp "${native_binary}" "${target_binary}"
@@ -93,13 +92,14 @@ function bootstrap_native_code() {
     mv "${metadata_file}" "${target_binary_metadata}"
   fi
 
-  # Establishes the native engine wheel resource only if needed.
-  # NB: The header manipulation code here must be coordinated with header stripping code in
-  #     the Native.binary method in src/python/pants/engine/internals/native.py.
+  # Establishes the native engine wheel resource if it doesn't exist or its metadata mismatches.
   if [[
     ! -f "${NATIVE_ENGINE_RESOURCE}" ||
-    "$(head -1 "${NATIVE_ENGINE_RESOURCE}" | tr '\0' '\n' 2>/dev/null)" != "${engine_version_hdr}"
+    ! -f "${NATIVE_ENGINE_RESOURCE_METADATA}" ||
+    "$(head -1 "${NATIVE_ENGINE_RESOURCE_METADATA}" | tr '\0' '\n' 2>/dev/null)" != "${engine_version_hdr}"
   ]]; then
-    cat "${target_binary_metadata}" "${target_binary}" > "${NATIVE_ENGINE_RESOURCE}"
+    rm -f "${NATIVE_ENGINE_RESOURCE_METADATA}" "${NATIVE_ENGINE_RESOURCE}"
+    cp "${target_binary}" "${NATIVE_ENGINE_RESOURCE}"
+    cp "${target_binary_metadata}" "${NATIVE_ENGINE_RESOURCE_METADATA}"
   fi
 }

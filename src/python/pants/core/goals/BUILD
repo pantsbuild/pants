@@ -70,4 +70,5 @@ python_tests(
     'contrib:isort_cfg',
   ],
   tags = {'integration', 'partially_type_checked'},
+  timeout = 120,
 )

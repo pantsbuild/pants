@@ -79,12 +79,10 @@ class TestPexBuilderWrapper(TestBase):
 
 
 def test_identify_missing_init_files() -> None:
-    assert {
-        "a/__init__.py",
-        "a/b/__init__.py",
-        "a/b/c/d/__init__.py",
-    } == identify_missing_init_files(
-        ["a/b/foo.py", "a/b/c/__init__.py", "a/b/c/d/bar.py", "a/e/__init__.py"]
+    assert {"a/__init__.py", "a/b/__init__.py", "a/b/c/d/__init__.py",} == set(
+        identify_missing_init_files(
+            ["a/b/foo.py", "a/b/c/__init__.py", "a/b/c/d/bar.py", "a/e/__init__.py"]
+        )
     )
 
     assert {
@@ -93,11 +91,13 @@ def test_identify_missing_init_files() -> None:
         "src/python/a/__init__.py",
         "src/python/a/b/__init__.py",
         "src/python/a/b/c/d/__init__.py",
-    } == identify_missing_init_files(
-        [
-            "src/python/a/b/foo.py",
-            "src/python/a/b/c/__init__.py",
-            "src/python/a/b/c/d/bar.py",
-            "src/python/a/e/__init__.py",
-        ]
+    } == set(
+        identify_missing_init_files(
+            [
+                "src/python/a/b/foo.py",
+                "src/python/a/b/c/__init__.py",
+                "src/python/a/b/c/d/bar.py",
+                "src/python/a/e/__init__.py",
+            ]
+        )
     )

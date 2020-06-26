@@ -1,6 +1,4 @@
-use digest::FixedOutput;
 use protobuf::Message;
-use sha2::{self, Digest};
 
 #[derive(Clone)]
 pub struct TestData {
@@ -42,11 +40,11 @@ impl TestData {
   }
 
   pub fn fingerprint(&self) -> hashing::Fingerprint {
-    hash(&self.bytes())
+    self.digest().0
   }
 
   pub fn digest(&self) -> hashing::Digest {
-    hashing::Digest(self.fingerprint(), self.string.len())
+    hashing::Digest::of_bytes(&self.bytes())
   }
 
   pub fn string(&self) -> String {
@@ -304,16 +302,10 @@ impl TestDirectory {
   }
 
   pub fn fingerprint(&self) -> hashing::Fingerprint {
-    hash(&self.bytes())
+    self.digest().0
   }
 
   pub fn digest(&self) -> hashing::Digest {
-    hashing::Digest(self.fingerprint(), self.bytes().len())
+    hashing::Digest::of_bytes(&self.bytes())
   }
-}
-
-fn hash(bytes: &bytes::Bytes) -> hashing::Fingerprint {
-  let mut hasher = sha2::Sha256::default();
-  hasher.input(bytes);
-  hashing::Fingerprint::from_bytes_unsafe(hasher.fixed_result().as_slice())
 }

@@ -11,7 +11,6 @@ use bazel_protos::{self, call_option};
 use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
 use concrete_time::TimeSpan;
-use digest::{Digest as DigestTrait, FixedOutput};
 use fs::{self, File, PathStat};
 use futures::compat::Future01CompatExt;
 use futures::future::{self as future03, TryFutureExt};
@@ -19,7 +18,6 @@ use futures01::{future, Future, Stream};
 use hashing::{Digest, Fingerprint};
 use log::{debug, trace, warn};
 use protobuf::{self, Message, ProtobufEnum};
-use sha2::Sha256;
 use store::{Snapshot, SnapshotOps, Store, StoreFileByDigest};
 use tokio::time::delay_for;
 
@@ -1216,12 +1214,5 @@ fn rpcerror_to_string(error: grpcio::Error) -> String {
 
 pub fn digest(message: &dyn Message) -> Result<Digest, String> {
   let bytes = message.write_to_bytes().map_err(|e| format!("{:?}", e))?;
-
-  let mut hasher = Sha256::default();
-  hasher.input(&bytes);
-
-  Ok(Digest(
-    Fingerprint::from_bytes_unsafe(&hasher.fixed_result()),
-    bytes.len(),
-  ))
+  Ok(Digest::of_bytes(&bytes))
 }
