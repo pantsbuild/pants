@@ -7,7 +7,6 @@ python_library(
   dependencies = [
     ':build_root',
     'src/python/pants/scm',
-    'src/python/pants/scm:git',
     'src/python/pants:version',
   ],
   tags = {"type_checked"},

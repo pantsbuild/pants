@@ -21,11 +21,8 @@ local_artifact_cache = "%(pants_bootstrapdir)s/artifact_cache"
 print_exception_stacktrace = true
 v2 = false
 
-# Enable our own custom loose-source plugins as well as contribs.
-pythonpath = [
-  "%(buildroot)s/contrib/mypy/src/python",
-  "%(buildroot)s/pants-plugins/src/python",
-]
+# Enable our custom loose-source plugins.
+pythonpath = ["%(buildroot)s/pants-plugins/src/python"]
 backend_packages.add = [
   "internal_backend.repositories",
   "internal_backend.utilities",
@@ -38,6 +35,7 @@ backend_packages2.add = [
   "pants.backend.python.lint.docformatter",
   "pants.backend.python.lint.flake8",
   "pants.backend.python.lint.isort",
+  "pants.backend.python.lint.mypy",
   "internal_backend.rules_for_testing",
 ]
 
@@ -89,12 +87,6 @@ write_to = []
 read_from = ["%(local_artifact_cache)s"]
 write_to = ["%(local_artifact_cache)s"]
 
-[gen.thrift-java]
-deps = ["3rdparty:thrift"]
-
-[gen.thrift-py]
-deps = ["examples/3rdparty/python:thrift"]
-
 [black]
 config = "pyproject.toml"
 
@@ -110,6 +102,9 @@ extra_requirements.add = [
 
 [isort]
 config = [".isort.cfg", "contrib/.isort.cfg", "examples/.isort.cfg"]
+
+[mypy]
+config = "build-support/mypy/mypy.ini"
 
 [pants-releases]
 branch_notes = """

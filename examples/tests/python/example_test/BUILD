@@ -6,7 +6,6 @@ target(
   dependencies = [
     ':hello_directory',
     ':tensorflow_custom_op_directory',
-    ':usethriftpy_directory',
   ],
 )
 
@@ -21,15 +20,5 @@ files(
   dependencies = [
     'examples/3rdparty:python_directory',
     'examples/src/python/example:tensorflow_custom_op_directory',
-  ],
-)
-
-files(
-  name = 'usethriftpy_directory',
-  sources = ['usethriftpy/**/*'],
-  dependencies = [
-    'examples/3rdparty:python_directory',
-    'examples/src/thrift/org/pantsbuild/example:distance_directory',
-    'examples/src/thrift/org/pantsbuild/example:precipitation_directory',
   ],
 )

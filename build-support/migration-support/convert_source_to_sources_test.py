@@ -80,7 +80,7 @@ def test_update_build_file() -> None:
         python_library(
             sources=['good.py'],
         )
-        
+
         python_tests(
            {}
         )
@@ -90,4 +90,4 @@ def test_update_build_file() -> None:
         build = Path(tmpdir, "BUILD")
         build.write_text(template.format("source='bad.py'"))
         rewritten = maybe_rewrite_build(build)
-    assert "\n".join(rewritten) + "\n" == template.format("sources=['bad.py']")
+    assert "\n".join(rewritten or ()) + "\n" == template.format("sources=['bad.py']")

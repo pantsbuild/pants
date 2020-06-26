@@ -105,11 +105,11 @@ class GlobFunction(NamedTuple):
         # NB: technically, glob arguments can be different than `globs`, `rglobs`, and `zglobs`, such
         # as using `set()` in an `exclude` clause. We don't try to handle this edge case.
         try:
-            glob_type = GlobType(glob_func.func.id)
+            glob_type = GlobType(glob_func.func.id)  # type: ignore[attr-defined]
         except ValueError:
             logging.warning(
-                f"Could not parse the glob type `{glob_func.func.id}` in {build_file} at line "
-                f"{glob_func.lineno}. Please manually update."
+                f"Could not parse the glob type `{glob_func.func.id}` in {build_file} at "  # type: ignore[attr-defined]
+                f"line {glob_func.lineno}. Please manually update."
             )
             return None
         if not all(isinstance(arg, ast.Str) for arg in glob_func.args):
@@ -118,7 +118,7 @@ class GlobFunction(NamedTuple):
                 f"using variables instead of raw strings. Please manually update."
             )
             return None
-        include_globs: List[str] = [arg.s for arg in glob_func.args]
+        include_globs: List[str] = [arg.s for arg in glob_func.args]  # type: ignore[attr-defined]
 
         # Excludes are tricky...The optional `exclude` keyword is guaranteed to have a list as its
         # value, but that list can have any of these elements:
@@ -128,10 +128,10 @@ class GlobFunction(NamedTuple):
         exclude_globs: Optional[List[str]] = None
         exclude_arg: Optional[ast.keyword] = next(iter(glob_func.keywords), None)
         if exclude_arg is not None and isinstance(exclude_arg.value, ast.List):
-            exclude_elements: List[Union[ast.Call, ast.Str, ast.List]] = exclude_arg.value.elts
+            exclude_elements: List[Union[ast.Call, ast.Str, ast.List]] = exclude_arg.value.elts  # type: ignore[assignment]
             nested_exclude_elements: List[Union[ast.Call, ast.Str]] = list(
                 itertools.chain.from_iterable(
-                    nested_list.elts
+                    nested_list.elts  # type: ignore[misc]
                     for nested_list in exclude_elements
                     if isinstance(nested_list, ast.List)
                 )
@@ -225,12 +225,12 @@ def generate_possibly_new_build(build_file: Path) -> Optional[List[str]]:
         if bundles_arg is not None:
             bundle_funcs: List[ast.Call] = [
                 element
-                for element in bundles_arg.value.elts
-                if isinstance(element, ast.Call) and element.func.id == "bundle"
+                for element in bundles_arg.value.elts  # type: ignore[attr-defined]
+                if isinstance(element, ast.Call) and element.func.id == "bundle"  # type: ignore[attr-defined]
             ]
             for bundle_func in bundle_funcs:
                 # Every `bundle` is guaranteed to have a `fileset` defined.
-                fileset_arg: [ast.keyword] = next(
+                fileset_arg: [ast.keyword] = next(  # type: ignore[misc]
                     kwarg for kwarg in bundle_func.keywords if kwarg.arg == "fileset"
                 )
                 if not isinstance(fileset_arg.value, ast.Call):
@@ -264,7 +264,7 @@ def generate_possibly_new_build(build_file: Path) -> Optional[List[str]]:
         if parsed_glob_function is None:
             continue
 
-        lineno: int = sources_arg.value.lineno
+        lineno: int = sources_arg.value.lineno  # type: ignore[no-redef]
         original_line = updated_text_lines[lineno - 1].rstrip()
         formatted_replacement = parsed_glob_function.convert_to_sources_list(
             use_single_quotes=use_single_quotes(original_line),

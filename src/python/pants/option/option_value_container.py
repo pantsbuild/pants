@@ -103,7 +103,8 @@ class OptionValueContainer:
 
         existing_value = self._value_map.get(key)
         existing_rank = existing_value.rank if existing_value is not None else Rank.NONE
-        if value.rank >= existing_rank:
+        # TODO(#10131): Remove the ignore once we can re-enable our MyPy plugin.
+        if value.rank >= existing_rank:  # type: ignore[operator]
             # We set values from outer scopes before values from inner scopes, so
             # in case of equal rank we overwrite. That way that the inner scope value wins.
             self._value_map[key] = value

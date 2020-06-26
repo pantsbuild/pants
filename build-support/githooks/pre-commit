@@ -51,10 +51,7 @@ if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
     build-support/bin/check_rust_target_headers.sh || exit 1
   fi
 
-  echo "* Checking types"
-  ./build-support/bin/mypy.py || exit 1
-
-  echo "* Checking formatting and Flake8"
+  echo "* Checking MyPy, Flake8, and formatting"
   ./v2 --changed-since="${MERGE_BASE}" --tag='-nolint' lint || \
     die "If there were formatting errors, run \`./v2 --changed-since=$(git rev-parse --symbolic "${MERGE_BASE}") fmt\`"
 
