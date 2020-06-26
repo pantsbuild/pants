@@ -36,7 +36,7 @@ class PantsRequirement:
                             otherwise the parent dir name.
         :param string dist: The pants dist to create a requirement for. This must be a
                             'pantsbuild.pants*' distribution; eg:
-                            'pantsbuild.pants.contrib.python.checks'.
+                            'pantsbuild.pants.testutil'.
         """
         name = name or dist or os.path.basename(self._parse_context.rel_path)
         dist = dist or "pantsbuild.pants"

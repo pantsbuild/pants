@@ -80,21 +80,12 @@ class Package:
         return owners
 
 
-def core_packages() -> Set[Package]:
-    return {
-        # NB: This a native wheel. We expect a distinct wheel for each Python version and each
-        # platform (macOS x linux).
-        Package("pantsbuild.pants", "src/python/pants:pants-packaged", bdist_wheel_flags=()),
-        Package("pantsbuild.pants.testutil", "src/python/pants/testutil:testutil_wheel"),
-    }
-
-
-def contrib_packages() -> Set[Package]:
-    return set()
-
-
-def all_packages() -> Set[Package]:
-    return core_packages().union(contrib_packages())
+PACKAGES = sorted({
+    # NB: This a native wheel. We expect a distinct wheel for each Python version and each
+    # platform (macOS x linux).
+    Package("pantsbuild.pants", "src/python/pants:pants-packaged", bdist_wheel_flags=()),
+    Package("pantsbuild.pants.testutil", "src/python/pants/testutil:testutil_wheel"),
+})
 
 
 # -----------------------------------------------------------------------------------------------
@@ -248,7 +239,7 @@ def build_pants_wheels() -> None:
             )
 
     packages_by_flags = defaultdict(list)
-    for package in sorted(all_packages()):
+    for package in PACKAGES:
         packages_by_flags[package.bdist_wheel_flags].append(package)
 
     with set_pants_version(CONSTANTS.pants_unstable_version):
@@ -328,15 +319,14 @@ def check_pgp() -> None:
 
 def check_ownership(users, minimum_owner_count: int = 3) -> None:
     minimum_owner_count = max(len(users), minimum_owner_count)
-    packages = sorted(all_packages())
-    banner(f"Checking package ownership for {len(packages)} packages")
+    banner(f"Checking package ownership for {len(PACKAGES)} packages")
     users = {user.lower() for user in users}
     insufficient = set()
     unowned: Dict[str, Set[Package]] = dict()
 
     def check_ownership(i: int, package: Package) -> None:
         banner(
-            f"[{i}/{len(packages)}] checking ownership for {package}: > {minimum_owner_count} "
+            f"[{i}/{len(PACKAGES)}] checking ownership for {package}: > {minimum_owner_count} "
             f"releasers including {', '.join(users)}"
         )
         if not package.exists_on_pypi():
@@ -351,12 +341,12 @@ def check_ownership(users, minimum_owner_count: int = 3) -> None:
         for d in difference:
             unowned.setdefault(d, set()).add(package)
 
-    for i, package in enumerate(packages):
+    for i, package in enumerate(PACKAGES):
         check_ownership(i, package)
 
     if unowned:
         for user, unowned_packages in sorted(unowned.items()):
-            formatted_unowned = "\n".join(package.name for package in sorted(packages))
+            formatted_unowned = "\n".join(package.name for package in PACKAGES)
             print(
                 f"PyPI account {user} needs to be added as an owner for the following "
                 f"packages:\n{formatted_unowned}",
@@ -380,7 +370,7 @@ def check_release_prereqs() -> None:
 
 
 def list_owners() -> None:
-    for package in sorted(all_packages()):
+    for package in PACKAGES:
         if not package.exists_on_pypi():
             print(
                 f"The {package.name} package is new!  There are no owners yet.", file=sys.stderr,
@@ -391,7 +381,7 @@ def list_owners() -> None:
 
 
 def list_packages() -> None:
-    print("\n".join(package.name for package in sorted(all_packages())))
+    print("\n".join(package.name for package in PACKAGES))
 
 
 class PrebuiltWheel(NamedTuple):
@@ -448,7 +438,7 @@ def fetch_prebuilt_wheels(destination_dir: str) -> None:
 def check_prebuilt_wheels(check_dir: str) -> None:
     banner(f"Checking prebuilt wheels for {CONSTANTS.pants_unstable_version}")
     missing_packages = []
-    for package in sorted(all_packages()):
+    for package in PACKAGES:
         local_files = package.find_locally(
             version=CONSTANTS.pants_unstable_version, search_dir=check_dir
         )
@@ -464,7 +454,7 @@ def check_prebuilt_wheels(check_dir: str) -> None:
     if missing_packages:
         formatted_missing = "\n  ".join(missing_packages)
         die(f"Failed to find prebuilt wheels:\n  {formatted_missing}")
-    green(f"All {len(all_packages())} pantsbuild.pants packages were fetched and are valid.")
+    green(f"All {len(PACKAGES)} pantsbuild.pants packages were fetched and are valid.")
 
 
 def tag_release() -> None:

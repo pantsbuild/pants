@@ -72,9 +72,6 @@ readonly DEPLOY_PANTS_WHEEL_DIR="${DEPLOY_DIR}/${DEPLOY_PANTS_WHEELS_PATH}"
 # URL from which pex release binaries can be downloaded.
 : "${PEX_DOWNLOAD_PREFIX:="https://github.com/pantsbuild/pex/releases/download"}"
 
-# shellcheck source=contrib/release_packages.sh
-source "${ROOT}/contrib/release_packages.sh"
-
 function requirement() {
   package="$1"
   grep "^${package}[^A-Za-z0-9]" "${ROOT}/3rdparty/python/requirements.txt" || die "Could not find requirement for ${package}"

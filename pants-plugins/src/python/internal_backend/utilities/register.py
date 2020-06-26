@@ -1,21 +1,14 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pathlib import Path, PurePath
-from typing import Callable, Dict, List, Optional, cast
+from pathlib import Path
+from typing import Dict, List, Optional, cast
 
 from packaging.version import Version
 
 from pants.backend.python.python_artifact import PythonArtifact
-from pants.backend.python.target_types import (
-    PythonLibrary,
-    PythonLibrarySources,
-    PythonProvidesField,
-    PythonSources,
-)
-from pants.backend.python.targets.python_library import PythonLibrary as PythonLibraryV1
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.engine.target import Target
+from pants.engine.rules import SubsystemRule
 from pants.subsystem.subsystem import Subsystem
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.version import PANTS_SEMVER, VERSION
@@ -73,88 +66,6 @@ def pants_setup_py(
     )
 
 
-def contrib_setup_py_context_aware_object_factory(parse_context) -> Callable:
-    def contrib_setup_py(
-        name: str,
-        description: str,
-        build_file_aliases: bool = False,
-        global_subsystems: bool = False,
-        register_goals: bool = False,
-        rules: bool = False,
-        target_types: bool = False,
-        additional_classifiers: Optional[List[str]] = None,
-        **kwargs,
-    ) -> PythonArtifact:
-        """Creates the setup_py for a pants contrib plugin artifact.
-
-        :param name: The name of the package; must start with 'pantsbuild.pants.contrib.'.
-        :param description: A brief description of what the plugin provides.
-        :param additional_classifiers: Any additional trove classifiers that apply to the plugin,
-                                       see: https://pypi.org/pypi?%3Aaction=list_classifiers
-        :param build_file_aliases: If `True`, register.py:build_file_aliases must be defined and
-                                   registers the 'build_file_aliases' 'pantsbuild.plugin' entrypoint.
-        :param global_subsystems: If `True`, register.py:global_subsystems must be defined and
-                                  registers the 'global_subsystems' 'pantsbuild.plugin' entrypoint.
-        :param register_goals: If `True`, register.py:register_goals must be defined and
-                               registers the 'register_goals' 'pantsbuild.plugin' entrypoint.
-        :param rules: If `True`, register.py:rules must be defined and registers the 'rules'
-                      'pantsbuild.plugin' entrypoint.
-        :param target_types: If `True`, register.py:target_types must be defined and registers
-                             the 'target_types' 'pantsbuild.plugin' entrypoint.
-        :param kwargs: Any additional keyword arguments to be passed to `setuptools.setup
-                       <https://pythonhosted.org/setuptools/setuptools.html>`_.
-        :returns: A setup_py suitable for building and publishing Pants components.
-        """
-        if not name.startswith("pantsbuild.pants.contrib."):
-            raise ValueError(
-                f"Contrib plugin package names must start with 'pantsbuild.pants.contrib.', given {name}"
-            )
-
-        setup_py = pants_setup_py(
-            name,
-            description,
-            additional_classifiers=additional_classifiers,
-            namespace_packages=["pants", "pants.contrib"],
-            **kwargs,
-        )
-
-        if build_file_aliases or register_goals or global_subsystems or rules or target_types:
-            rel_path = parse_context.rel_path
-            # NB: We don't have proper access to SourceRoot computation here, but
-            #
-            #  we happen to know that:
-            #  A) All existing contribs have their contrib_setup_py() invocation in a BUILD file
-            #    exactly three path segments under the source root (i.e., they all have a source
-            #    root of src/<name>src/python/, and are defined in pants/contrib/<name>/BUILD under
-            #    that.)
-            #  B) We are not adding any new contribs in the future, as this idiom is going away.
-            #
-            # So we can semi-hackily compute the register module using this knowledge.
-            module = (
-                PurePath(rel_path)
-                .relative_to(PurePath(rel_path).parent.parent.parent)
-                .as_posix()
-                .replace("/", ".")
-            )
-            entry_points = []
-            if build_file_aliases:
-                entry_points.append(f"build_file_aliases = {module}.register:build_file_aliases")
-            if register_goals:
-                entry_points.append(f"register_goals = {module}.register:register_goals")
-            if global_subsystems:
-                entry_points.append(f"global_subsystems = {module}.register:global_subsystems")
-            if rules:
-                entry_points.append(f"rules = {module}.register:rules")
-            if target_types:
-                entry_points.append(f"target_types = {module}.register:target_types")
-
-            setup_py.setup_py_keywords["entry_points"] = {"pantsbuild.plugin": entry_points}
-
-        return setup_py
-
-    return contrib_setup_py
-
-
 class PantsReleases(Subsystem):
     """A subsystem to hold per-pants-release configuration."""
 
@@ -197,43 +108,8 @@ class PantsReleases(Subsystem):
         return Path(branch_notes_file).read_text()
 
 
-class ContribPluginV1(PythonLibraryV1):
-    pass
-
-
-class ContribPluginSources(PythonSources):
-    default = ("register.py",)
-
-
-class ContribPluginProvidesField(PythonProvidesField):
-    required = True
-
-
-class ContribPlugin(Target):
-    alias = "contrib_plugin"
-    core_fields = (
-        *(
-            FrozenOrderedSet(PythonLibrary.core_fields)  # type: ignore[misc]
-            - {PythonLibrarySources, PythonProvidesField}
-        ),
-        ContribPluginSources,
-        ContribPluginProvidesField,
-    )
-
-
-def global_subsystems():
-    return {PantsReleases}
-
-
 def build_file_aliases():
-    return BuildFileAliases(
-        context_aware_object_factories={
-            "contrib_setup_py": contrib_setup_py_context_aware_object_factory
-        },
-        objects={"pants_setup_py": pants_setup_py},
-        targets={"contrib_plugin": ContribPluginV1},
-    )
+    return BuildFileAliases(objects={"pants_setup_py": pants_setup_py})
 
-
-def target_types():
-    return [ContribPlugin]
+def rules():
+    return [SubsystemRule(PantsReleases)]
