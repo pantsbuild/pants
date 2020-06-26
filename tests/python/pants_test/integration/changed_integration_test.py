@@ -6,6 +6,8 @@ import shutil
 from contextlib import contextmanager
 from textwrap import dedent
 
+import pytest
+
 from pants.base.build_environment import get_buildroot
 from pants.testutil.git_util import initialize_repo
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
@@ -60,10 +62,6 @@ def create_isolated_git_repo():
     #       |--org/pantsbuild/resourceonly
     #          |--BUILD
     #          |--README.md
-    #    |--java
-    #       |--org/pantsbuild/helloworld
-    #          |--BUILD
-    #          |--helloworld.java
     #    |--python
     #       |--python_targets
     #          |--BUILD
@@ -74,11 +72,6 @@ def create_isolated_git_repo():
     #          |--BUILD
     #          |--sources.py
     #          |--sources.txt
-    # |--tests
-    #    |--scala
-    #       |--org/pantsbuild/cp-directories
-    #          |--BUILD
-    #          |--ClasspathDirectoriesSpec.scala
     with temporary_dir(root_dir=get_buildroot()) as worktree:
 
         def create_file(path, content):
@@ -129,42 +122,6 @@ def create_isolated_git_repo():
             )
 
             add_to_git(
-                "hello world java program with a dependency on a resource file",
-                create_file(
-                    "src/java/org/pantsbuild/helloworld/BUILD",
-                    """
-                    jvm_binary(
-                      dependencies=[
-                        'src/resources/org/pantsbuild/resourceonly:resource',
-                      ],
-                      sources=['helloworld.java'],
-                      main='org.pantsbuild.helloworld.HelloWorld',
-                    )
-                    """,
-                ),
-                create_file(
-                    "src/java/org/pantsbuild/helloworld/helloworld.java",
-                    """
-                    package org.pantsbuild.helloworld;
-
-                    class HelloWorld {
-                      public static void main(String[] args) {
-                        System.out.println("Hello, World!\n");
-                      }
-                    }
-                    """,
-                ),
-            )
-
-            add_to_git(
-                "scala test target",
-                copy_into(
-                    "testprojects/tests/scala/org/pantsbuild/testproject/cp-directories",
-                    "tests/scala/org/pantsbuild/cp-directories",
-                ),
-            )
-
-            add_to_git(
                 "python targets",
                 copy_into("testprojects/src/python/python_targets", "src/python/python_targets"),
             )
@@ -183,12 +140,6 @@ def create_isolated_git_repo():
 class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
 
     TEST_MAPPING = {
-        # A `jvm_binary` with `sources=['file.name']`.
-        "src/java/org/pantsbuild/helloworld/helloworld.java": dict(
-            none=["src/java/org/pantsbuild/helloworld:helloworld"],
-            direct=["src/java/org/pantsbuild/helloworld:helloworld"],
-            transitive=["src/java/org/pantsbuild/helloworld:helloworld"],
-        ),
         # A `python_binary` with `sources=['file.name']`.
         "src/python/python_targets/test_binary.py": dict(
             none=["src/python/python_targets:test"],
@@ -213,29 +164,11 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
                 "src/python/python_targets:test_library_transitive_dependee_4",
             ],
         ),
-        # A `resources` target with `sources=['file.name']` referenced by a `java_library` target.
-        "src/resources/org/pantsbuild/resourceonly/README.md": dict(
-            none=["src/resources/org/pantsbuild/resourceonly:resource"],
-            direct=[
-                "src/java/org/pantsbuild/helloworld:helloworld",
-                "src/resources/org/pantsbuild/resourceonly:resource",
-            ],
-            transitive=[
-                "src/java/org/pantsbuild/helloworld:helloworld",
-                "src/resources/org/pantsbuild/resourceonly:resource",
-            ],
-        ),
         # A `python_library` with `sources=['file.name'] .
         "src/python/sources/sources.py": dict(
             none=["src/python/sources:sources"],
             direct=["src/python/sources:sources"],
             transitive=["src/python/sources:sources"],
-        ),
-        # A `scala_library` with `sources=['file.name']`.
-        "tests/scala/org/pantsbuild/cp-directories/ClasspathDirectoriesSpec.scala": dict(
-            none=["tests/scala/org/pantsbuild/cp-directories:cp-directories"],
-            direct=["tests/scala/org/pantsbuild/cp-directories:cp-directories"],
-            transitive=["tests/scala/org/pantsbuild/cp-directories:cp-directories"],
         ),
         # An unclaimed source file.
         "src/python/python_targets/test_unclaimed_src.py": dict(none=[], direct=[], transitive=[]),
@@ -276,8 +209,7 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
                 )
 
     def run_list(self, extra_args, success=True):
-        list_args = ["-q", "list"] + extra_args
-        pants_run = self.do_command(*list_args, success=success)
+        pants_run = self.do_command("list", *extra_args, success=success)
         return pants_run.stdout_data
 
     def test_changed_exclude_root_targets_only(self):
@@ -363,7 +295,10 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
             self.assert_success(pants_run)
             self.assertEqual(pants_run.stdout_data.strip(), "src/python/sources:text")
 
+    @pytest.mark.skip(reason="Unskip after rewriting these tests to stop using testprojects.")
     def test_changed_with_deleted_target_transitive(self):
+        # TODO: The deleted target should be a dependee of another target. We want to make sure
+        # that this causes a crash because the dependee can't find it's dependency.
         with create_isolated_git_repo() as worktree:
             safe_delete(os.path.join(worktree, "src/resources/org/pantsbuild/resourceonly/BUILD"))
             pants_run = self.run_pants(
