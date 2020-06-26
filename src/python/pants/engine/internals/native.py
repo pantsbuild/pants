@@ -64,7 +64,7 @@ class Externs:
         try:
             res = func.send(arg)
 
-            if Get.isinstance(res):
+            if isinstance(res, Get):
                 # Get.
                 return PyGeneratorResponseGet(
                     res.product_type, res.subject_declared_type, res.subject,

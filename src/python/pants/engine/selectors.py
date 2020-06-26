@@ -20,28 +20,98 @@ from typing import (
 
 from pants.util.meta import frozen_after_init
 
-# These type variables are used to type parameterize a `GetConstraints` (and consequently `_Get`).
+# These type variables are used to type parameterize a `GetConstraints` (and consequently `Get`).
 _ProductType = TypeVar("_ProductType")
-_SubjectDeclaredType = TypeVar("_SubjectDeclaredType")
-
-
-@dataclass(frozen=True)
-class GetConstraints(Generic[_ProductType, _SubjectDeclaredType]):
-    product_type: Type[_ProductType]
-    subject_declared_type: Type[_SubjectDeclaredType]
-
-
-# This type variable is used to type parameterize the subject of a `_Get`.
+# This type variable is used to type parameterize the subject of a `Get`.
 _SubjectType = TypeVar("_SubjectType")
 
 
-@dataclass(frozen=True)
-class _Get(GetConstraints, Generic[_ProductType, _SubjectDeclaredType, _SubjectType]):
-    subject: _SubjectType
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class GetConstraints(Generic[_ProductType, _SubjectType]):
+    product_type: Type[_ProductType]
+    subject_declared_type: Type[_SubjectType]
 
-    def __await__(
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class Get(GetConstraints, Generic[_ProductType, _SubjectType]):
+    """Asynchronous generator API.
+
+    A Get can be constructed in 2 ways with two variants each:
+
+    + Long form:
+    a. Get(<ProductType>, <SubjectType>, subject)
+    b. Get[<ProductType>](<SubjectType>, subject)
+
+    + Short form
+    a. Get(<ProductType>, <SubjectType>(<constructor args for subject>))
+    b. Get[<ProductType>](<SubjectType>(<constructor args for subject>))
+
+    The long form supports providing type information to the rule engine that it could not otherwise
+    infer from the subject variable [1]. Likewise, the short form must use inline construction of the
+    subject in order to convey the subject type to the engine.
+
+    [1] The engine needs to determine all rule and Get input and output types statically before
+    executing any rules. Since Gets are declared inside function bodies, the only way to extract this
+    information is through a parse of the rule function. The parse analysis is rudimentary and cannot
+    infer more than names and calls; so a variable name does not give enough information to infer its
+    type, only a constructor call unambiguously gives this information without more in-depth parsing
+    that includes following imports and more.
+    """
+
+    @overload
+    def __init__(self, product_type: Type[_ProductType], subject_arg0: _SubjectType) -> None:
+        ...
+
+    @overload
+    def __init__(
         self,
-    ) -> ("Generator[_Get[_ProductType, _SubjectDeclaredType, _SubjectType], None, _ProductType]"):
+        product_type: Type[_ProductType],
+        subject_arg0: Type[_SubjectType],
+        subject_arg1: _SubjectType,
+    ) -> None:
+        ...
+
+    def __init__(
+        self,
+        product_type: Type[_ProductType],
+        subject_arg0: Union[Type[_SubjectType], _SubjectType],
+        subject_arg1: Optional[_SubjectType] = None,
+    ) -> None:
+        self.product_type = product_type
+        self.subject_declared_type: Type[_SubjectType] = self._validate_subject_declared_type(
+            subject_arg0 if subject_arg1 is not None else type(subject_arg0)
+        )
+        self.subject: _SubjectType = self._validate_subject(
+            subject_arg1 if subject_arg1 is not None else subject_arg0
+        )
+
+        self._validate_product()
+
+    def _validate_product(self) -> None:
+        if not isinstance(self.product_type, type):
+            raise TypeError(
+                f"The product type argument must be a type, given {self.product_type} of type "
+                f"{type(self.product_type)}."
+            )
+
+    @staticmethod
+    def _validate_subject_declared_type(subject_declared_type: Any) -> Type[_SubjectType]:
+        if not isinstance(subject_declared_type, type):
+            raise TypeError(
+                f"The subject declared type argument must be a type, given {subject_declared_type} "
+                f"of type {type(subject_declared_type)}."
+            )
+        return cast(Type[_SubjectType], subject_declared_type)
+
+    @staticmethod
+    def _validate_subject(subject: Any) -> _SubjectType:
+        if isinstance(subject, type):
+            raise TypeError(f"The subject argument cannot be a type, given {subject}.")
+        return cast(_SubjectType, subject)
+
+    def __await__(self,) -> ("Generator[Get[_ProductType, _SubjectType], None, _ProductType]"):
         """Allow a Get to be `await`ed within an `async` method, returning a strongly-typed result.
 
         The `yield`ed value `self` is interpreted by the engine within `extern_generator_send()` in
@@ -66,127 +136,10 @@ class _Get(GetConstraints, Generic[_ProductType, _SubjectDeclaredType, _SubjectT
 
 
 @dataclass(frozen=True)
-class _GetMaker(Generic[_ProductType]):
-    product_type: Type[_ProductType]
-
-    def _validate_product(self) -> None:
-        if not isinstance(self.product_type, type):
-            raise TypeError(
-                f"The product type argument must be a type, given {self.product_type} of type "
-                f"{type(self.product_type)}."
-            )
-
-    @staticmethod
-    def _validate_subject_declared_type(subject_declared_type: Any) -> Type[_SubjectDeclaredType]:
-        if not isinstance(subject_declared_type, type):
-            raise TypeError(
-                f"The subject declared type argument must be a type, given {subject_declared_type} "
-                f"of type {type(subject_declared_type)}."
-            )
-        return cast(Type[_SubjectDeclaredType], subject_declared_type)
-
-    @staticmethod
-    def _validate_subject(subject: Any) -> _SubjectType:
-        if isinstance(subject, type):
-            raise TypeError(f"The subject argument cannot be a type, given {subject}.")
-        return cast(_SubjectType, subject)
-
-    @overload
-    def __call__(
-        self, __subject: _SubjectType
-    ) -> _Get[_ProductType, _SubjectType, _SubjectType]:  # noqa: F811
-        ...
-
-    @overload
-    def __call__(  # noqa: F811
-        self, __subject_declared_type: Type[_SubjectDeclaredType], __subject: _SubjectType
-    ) -> _Get[_ProductType, _SubjectDeclaredType, _SubjectType]:
-        ...
-
-    def __call__(  # noqa: F811
-        self,
-        __arg0: Union[Type[_SubjectDeclaredType], _SubjectType],
-        __arg1: Optional[_SubjectType] = None,
-    ) -> _Get[_ProductType, _SubjectDeclaredType, _SubjectType]:
-        return self._make_get(__arg0, __arg1)
-
-    def _make_get(
-        self,
-        __arg0: Union[Type[_SubjectDeclaredType], _SubjectType],
-        __arg1: Optional[_SubjectType] = None,
-    ) -> _Get[_ProductType, _SubjectDeclaredType, _SubjectType]:
-        self._validate_product()
-        subject_declared_type: Type[_SubjectDeclaredType] = self._validate_subject_declared_type(
-            __arg0 if __arg1 is not None else type(__arg0)
-        )
-        subject: _SubjectType = self._validate_subject(__arg1 if __arg1 is not None else __arg0)
-        return _Get(
-            product_type=self.product_type,
-            subject_declared_type=subject_declared_type,
-            subject=subject,
-        )
-
-
-class _GetFactory:
-    @staticmethod
-    def isinstance(item: Any) -> bool:
-        return isinstance(item, _Get)
-
-    @overload
-    def __call__(
-        self, __product_type: Type[_ProductType], __subject: _SubjectType
-    ) -> _Get[_ProductType, _SubjectType, _SubjectType]:  # noqa: F811
-        ...
-
-    @overload
-    def __call__(  # noqa: F811
-        self,
-        __product_type: Type[_ProductType],
-        __subject_declared_type: Type[_SubjectDeclaredType],
-        __subject: _SubjectType,
-    ) -> _Get[_ProductType, _SubjectDeclaredType, _SubjectType]:
-        ...
-
-    def __call__(  # noqa: F811
-        self,
-        __product_type: Type[_ProductType],
-        __subject_arg0: Union[Type[_SubjectDeclaredType], _SubjectType],
-        __subject_arg1: Optional[_SubjectType] = None,
-    ) -> _Get[_ProductType, _SubjectDeclaredType, _SubjectType]:
-        return _GetMaker(product_type=__product_type)._make_get(__subject_arg0, __subject_arg1)
-
-
-Get = _GetFactory()
-Get.__doc__ = """Experimental synchronous generator API.
-
-A Get can be constructed in 2 ways with two variants each:
-
-+ Long form:
-  a. Get(<ProductType>, <SubjectDeclaredType>, subject)
-  b. Get[<ProductType>](<SubjectDeclaredType>, subject)
-
-+ Short form
-  a. Get(<ProductType>, <SubjectDeclaredType>(<constructor args for subject>))
-  b. Get[<ProductType>](<SubjectDeclaredType>(<constructor args for subject>))
-
-The long form supports providing type information to the rule engine that it could not otherwise
-infer from the subject variable [1]. Likewise, the short form must use inline construction of the
-subject in order to convey the subject type to the engine.
-
-[1] The engine needs to determine all rule and Get input and output types statically before
-executing any rules. Since Gets are declared inside function bodies, the only way to extract this
-information is through a parse of the rule function. The parse analysis is rudimentary and cannot
-infer more than names and calls; so a variable name does not give enough information to infer its
-type, only a constructor call unambiguously gives this information without more in-depth parsing
-that includes following imports and more.
-"""
-
-
-@dataclass(frozen=True)
 class _MultiGet:
-    gets: Tuple[_Get, ...]
+    gets: Tuple[Get, ...]
 
-    def __await__(self) -> Generator[Tuple[_Get, ...], None, Tuple]:
+    def __await__(self) -> Generator[Tuple[Get, ...], None, Tuple]:
         result = yield self.gets
         return cast(Tuple, result)
 
@@ -230,129 +183,122 @@ _S9 = TypeVar("_S9")
 
 @overload
 async def MultiGet(
-    __gets: Iterable[_Get[_ProductType, _SubjectDeclaredType, _SubjectType]]
+    __gets: Iterable[Get[_ProductType, _SubjectType]]
 ) -> Tuple[_ProductType, ...]:  # noqa: F811
     ...
 
 
 @overload
 async def MultiGet(  # noqa: F811
-    __get0: _Get[_P0, _SDT0, _S0],
-    __get1: _Get[_P1, _SDT1, _S1],
-    __get2: _Get[_P2, _SDT2, _S2],
-    __get3: _Get[_P3, _SDT3, _S3],
-    __get4: _Get[_P4, _SDT4, _S4],
-    __get5: _Get[_P5, _SDT5, _S5],
-    __get6: _Get[_P6, _SDT6, _S6],
-    __get7: _Get[_P7, _SDT7, _S7],
-    __get8: _Get[_P8, _SDT8, _S8],
-    __get9: _Get[_P9, _SDT9, _S9],
+    __get0: Get[_P0, _S0],
+    __get1: Get[_P1, _S1],
+    __get2: Get[_P2, _S2],
+    __get3: Get[_P3, _S3],
+    __get4: Get[_P4, _S4],
+    __get5: Get[_P5, _S5],
+    __get6: Get[_P6, _S6],
+    __get7: Get[_P7, _S7],
+    __get8: Get[_P8, _S8],
+    __get9: Get[_P9, _S9],
 ) -> Tuple[_P0, _P1, _P2, _P3, _P4, _P5, _P6, _P7, _P8, _P9]:
     ...
 
 
 @overload
 async def MultiGet(  # noqa: F811
-    __get0: _Get[_P0, _SDT0, _S0],
-    __get1: _Get[_P1, _SDT1, _S1],
-    __get2: _Get[_P2, _SDT2, _S2],
-    __get3: _Get[_P3, _SDT3, _S3],
-    __get4: _Get[_P4, _SDT4, _S4],
-    __get5: _Get[_P5, _SDT5, _S5],
-    __get6: _Get[_P6, _SDT6, _S6],
-    __get7: _Get[_P7, _SDT7, _S7],
-    __get8: _Get[_P8, _SDT8, _S8],
+    __get0: Get[_P0, _S0],
+    __get1: Get[_P1, _S1],
+    __get2: Get[_P2, _S2],
+    __get3: Get[_P3, _S3],
+    __get4: Get[_P4, _S4],
+    __get5: Get[_P5, _S5],
+    __get6: Get[_P6, _S6],
+    __get7: Get[_P7, _S7],
+    __get8: Get[_P8, _S8],
 ) -> Tuple[_P0, _P1, _P2, _P3, _P4, _P5, _P6, _P7, _P8]:
     ...
 
 
 @overload
 async def MultiGet(  # noqa: F811
-    __get0: _Get[_P0, _SDT0, _S0],
-    __get1: _Get[_P1, _SDT1, _S1],
-    __get2: _Get[_P2, _SDT2, _S2],
-    __get3: _Get[_P3, _SDT3, _S3],
-    __get4: _Get[_P4, _SDT4, _S4],
-    __get5: _Get[_P5, _SDT5, _S5],
-    __get6: _Get[_P6, _SDT6, _S6],
-    __get7: _Get[_P7, _SDT7, _S7],
+    __get0: Get[_P0, _S0],
+    __get1: Get[_P1, _S1],
+    __get2: Get[_P2, _S2],
+    __get3: Get[_P3, _S3],
+    __get4: Get[_P4, _S4],
+    __get5: Get[_P5, _S5],
+    __get6: Get[_P6, _S6],
+    __get7: Get[_P7, _S7],
 ) -> Tuple[_P0, _P1, _P2, _P3, _P4, _P5, _P6, _P7]:
     ...
 
 
 @overload
 async def MultiGet(  # noqa: F811
-    __get0: _Get[_P0, _SDT0, _S0],
-    __get1: _Get[_P1, _SDT1, _S1],
-    __get2: _Get[_P2, _SDT2, _S2],
-    __get3: _Get[_P3, _SDT3, _S3],
-    __get4: _Get[_P4, _SDT4, _S4],
-    __get5: _Get[_P5, _SDT5, _S5],
-    __get6: _Get[_P6, _SDT6, _S6],
+    __get0: Get[_P0, _S0],
+    __get1: Get[_P1, _S1],
+    __get2: Get[_P2, _S2],
+    __get3: Get[_P3, _S3],
+    __get4: Get[_P4, _S4],
+    __get5: Get[_P5, _S5],
+    __get6: Get[_P6, _S6],
 ) -> Tuple[_P0, _P1, _P2, _P3, _P4, _P5, _P6]:
     ...
 
 
 @overload
 async def MultiGet(  # noqa: F811
-    __get0: _Get[_P0, _SDT0, _S0],
-    __get1: _Get[_P1, _SDT1, _S1],
-    __get2: _Get[_P2, _SDT2, _S2],
-    __get3: _Get[_P3, _SDT3, _S3],
-    __get4: _Get[_P4, _SDT4, _S4],
-    __get5: _Get[_P5, _SDT5, _S5],
+    __get0: Get[_P0, _S0],
+    __get1: Get[_P1, _S1],
+    __get2: Get[_P2, _S2],
+    __get3: Get[_P3, _S3],
+    __get4: Get[_P4, _S4],
+    __get5: Get[_P5, _S5],
 ) -> Tuple[_P0, _P1, _P2, _P3, _P4, _P5]:
     ...
 
 
 @overload
 async def MultiGet(  # noqa: F811
-    __get0: _Get[_P0, _SDT0, _S0],
-    __get1: _Get[_P1, _SDT1, _S1],
-    __get2: _Get[_P2, _SDT2, _S2],
-    __get3: _Get[_P3, _SDT3, _S3],
-    __get4: _Get[_P4, _SDT4, _S4],
+    __get0: Get[_P0, _S0],
+    __get1: Get[_P1, _S1],
+    __get2: Get[_P2, _S2],
+    __get3: Get[_P3, _S3],
+    __get4: Get[_P4, _S4],
 ) -> Tuple[_P0, _P1, _P2, _P3, _P4]:
     ...
 
 
 @overload
 async def MultiGet(  # noqa: F811
-    __get0: _Get[_P0, _SDT0, _S0],
-    __get1: _Get[_P1, _SDT1, _S1],
-    __get2: _Get[_P2, _SDT2, _S2],
-    __get3: _Get[_P3, _SDT3, _S3],
+    __get0: Get[_P0, _S0], __get1: Get[_P1, _S1], __get2: Get[_P2, _S2], __get3: Get[_P3, _S3],
 ) -> Tuple[_P0, _P1, _P2, _P3]:
     ...
 
 
 @overload
 async def MultiGet(  # noqa: F811
-    __get0: _Get[_P0, _SDT0, _S0], __get1: _Get[_P1, _SDT1, _S1], __get2: _Get[_P2, _SDT2, _S2]
+    __get0: Get[_P0, _S0], __get1: Get[_P1, _S1], __get2: Get[_P2, _S2]
 ) -> Tuple[_P0, _P1, _P2]:
     ...
 
 
 @overload
-async def MultiGet(  # noqa: F811
-    __get0: _Get[_P0, _SDT0, _S0], __get1: _Get[_P1, _SDT1, _S1]
-) -> Tuple[_P0, _P1]:
+async def MultiGet(__get0: Get[_P0, _S0], __get1: Get[_P1, _S1]) -> Tuple[_P0, _P1]:  # noqa: F811
     ...
 
 
 async def MultiGet(  # noqa: F811
-    __arg0: Union[
-        Iterable[_Get[_ProductType, _SubjectDeclaredType, _SubjectType]], _Get[_P0, _SDT0, _S0]
-    ],
-    __arg1: Optional[_Get[_P1, _SDT1, _S1]] = None,
-    __arg2: Optional[_Get[_P2, _SDT2, _S2]] = None,
-    __arg3: Optional[_Get[_P3, _SDT3, _S3]] = None,
-    __arg4: Optional[_Get[_P4, _SDT4, _S4]] = None,
-    __arg5: Optional[_Get[_P5, _SDT5, _S5]] = None,
-    __arg6: Optional[_Get[_P6, _SDT6, _S6]] = None,
-    __arg7: Optional[_Get[_P7, _SDT7, _S7]] = None,
-    __arg8: Optional[_Get[_P8, _SDT8, _S8]] = None,
-    __arg9: Optional[_Get[_P9, _SDT9, _S9]] = None,
+    __arg0: Union[Iterable[Get[_ProductType, _SubjectType]], Get[_P0, _S0]],
+    __arg1: Optional[Get[_P1, _S1]] = None,
+    __arg2: Optional[Get[_P2, _S2]] = None,
+    __arg3: Optional[Get[_P3, _S3]] = None,
+    __arg4: Optional[Get[_P4, _S4]] = None,
+    __arg5: Optional[Get[_P5, _S5]] = None,
+    __arg6: Optional[Get[_P6, _S6]] = None,
+    __arg7: Optional[Get[_P7, _S7]] = None,
+    __arg8: Optional[Get[_P8, _S8]] = None,
+    __arg9: Optional[Get[_P9, _S9]] = None,
 ) -> Union[
     Tuple[_ProductType, ...],
     Tuple[_P0, _P1, _P2, _P3, _P4, _P5, _P6, _P7, _P8, _P9],
@@ -393,31 +339,31 @@ async def MultiGet(  # noqa: F811
         return await _MultiGet(tuple(__arg0))
 
     if (
-        isinstance(__arg0, _Get)
-        and isinstance(__arg1, _Get)
-        and isinstance(__arg2, _Get)
-        and isinstance(__arg3, _Get)
-        and isinstance(__arg4, _Get)
-        and isinstance(__arg5, _Get)
-        and isinstance(__arg6, _Get)
-        and isinstance(__arg7, _Get)
-        and isinstance(__arg8, _Get)
-        and isinstance(__arg9, _Get)
+        isinstance(__arg0, Get)
+        and isinstance(__arg1, Get)
+        and isinstance(__arg2, Get)
+        and isinstance(__arg3, Get)
+        and isinstance(__arg4, Get)
+        and isinstance(__arg5, Get)
+        and isinstance(__arg6, Get)
+        and isinstance(__arg7, Get)
+        and isinstance(__arg8, Get)
+        and isinstance(__arg9, Get)
     ):
         return await _MultiGet(
             (__arg0, __arg1, __arg2, __arg3, __arg4, __arg5, __arg6, __arg7, __arg8, __arg9)
         )
 
     if (
-        isinstance(__arg0, _Get)
-        and isinstance(__arg1, _Get)
-        and isinstance(__arg2, _Get)
-        and isinstance(__arg3, _Get)
-        and isinstance(__arg4, _Get)
-        and isinstance(__arg5, _Get)
-        and isinstance(__arg6, _Get)
-        and isinstance(__arg7, _Get)
-        and isinstance(__arg8, _Get)
+        isinstance(__arg0, Get)
+        and isinstance(__arg1, Get)
+        and isinstance(__arg2, Get)
+        and isinstance(__arg3, Get)
+        and isinstance(__arg4, Get)
+        and isinstance(__arg5, Get)
+        and isinstance(__arg6, Get)
+        and isinstance(__arg7, Get)
+        and isinstance(__arg8, Get)
         and __arg9 is None
     ):
         return await _MultiGet(
@@ -425,27 +371,27 @@ async def MultiGet(  # noqa: F811
         )
 
     if (
-        isinstance(__arg0, _Get)
-        and isinstance(__arg1, _Get)
-        and isinstance(__arg2, _Get)
-        and isinstance(__arg3, _Get)
-        and isinstance(__arg4, _Get)
-        and isinstance(__arg5, _Get)
-        and isinstance(__arg6, _Get)
-        and isinstance(__arg7, _Get)
+        isinstance(__arg0, Get)
+        and isinstance(__arg1, Get)
+        and isinstance(__arg2, Get)
+        and isinstance(__arg3, Get)
+        and isinstance(__arg4, Get)
+        and isinstance(__arg5, Get)
+        and isinstance(__arg6, Get)
+        and isinstance(__arg7, Get)
         and __arg8 is None
         and __arg9 is None
     ):
         return await _MultiGet((__arg0, __arg1, __arg2, __arg3, __arg4, __arg5, __arg6, __arg7))
 
     if (
-        isinstance(__arg0, _Get)
-        and isinstance(__arg1, _Get)
-        and isinstance(__arg2, _Get)
-        and isinstance(__arg3, _Get)
-        and isinstance(__arg4, _Get)
-        and isinstance(__arg5, _Get)
-        and isinstance(__arg6, _Get)
+        isinstance(__arg0, Get)
+        and isinstance(__arg1, Get)
+        and isinstance(__arg2, Get)
+        and isinstance(__arg3, Get)
+        and isinstance(__arg4, Get)
+        and isinstance(__arg5, Get)
+        and isinstance(__arg6, Get)
         and __arg7 is None
         and __arg8 is None
         and __arg9 is None
@@ -453,12 +399,12 @@ async def MultiGet(  # noqa: F811
         return await _MultiGet((__arg0, __arg1, __arg2, __arg3, __arg4, __arg5, __arg6))
 
     if (
-        isinstance(__arg0, _Get)
-        and isinstance(__arg1, _Get)
-        and isinstance(__arg2, _Get)
-        and isinstance(__arg3, _Get)
-        and isinstance(__arg4, _Get)
-        and isinstance(__arg5, _Get)
+        isinstance(__arg0, Get)
+        and isinstance(__arg1, Get)
+        and isinstance(__arg2, Get)
+        and isinstance(__arg3, Get)
+        and isinstance(__arg4, Get)
+        and isinstance(__arg5, Get)
         and __arg6 is None
         and __arg7 is None
         and __arg8 is None
@@ -467,11 +413,11 @@ async def MultiGet(  # noqa: F811
         return await _MultiGet((__arg0, __arg1, __arg2, __arg3, __arg4, __arg5))
 
     if (
-        isinstance(__arg0, _Get)
-        and isinstance(__arg1, _Get)
-        and isinstance(__arg2, _Get)
-        and isinstance(__arg3, _Get)
-        and isinstance(__arg4, _Get)
+        isinstance(__arg0, Get)
+        and isinstance(__arg1, Get)
+        and isinstance(__arg2, Get)
+        and isinstance(__arg3, Get)
+        and isinstance(__arg4, Get)
         and __arg5 is None
         and __arg6 is None
         and __arg7 is None
@@ -481,10 +427,10 @@ async def MultiGet(  # noqa: F811
         return await _MultiGet((__arg0, __arg1, __arg2, __arg3, __arg4))
 
     if (
-        isinstance(__arg0, _Get)
-        and isinstance(__arg1, _Get)
-        and isinstance(__arg2, _Get)
-        and isinstance(__arg3, _Get)
+        isinstance(__arg0, Get)
+        and isinstance(__arg1, Get)
+        and isinstance(__arg2, Get)
+        and isinstance(__arg3, Get)
         and __arg4 is None
         and __arg5 is None
         and __arg6 is None
@@ -495,9 +441,9 @@ async def MultiGet(  # noqa: F811
         return await _MultiGet((__arg0, __arg1, __arg2, __arg3))
 
     if (
-        isinstance(__arg0, _Get)
-        and isinstance(__arg1, _Get)
-        and isinstance(__arg2, _Get)
+        isinstance(__arg0, Get)
+        and isinstance(__arg1, Get)
+        and isinstance(__arg2, Get)
         and __arg3 is None
         and __arg4 is None
         and __arg5 is None
@@ -509,8 +455,8 @@ async def MultiGet(  # noqa: F811
         return await _MultiGet((__arg0, __arg1, __arg2))
 
     if (
-        isinstance(__arg0, _Get)
-        and isinstance(__arg1, _Get)
+        isinstance(__arg0, Get)
+        and isinstance(__arg1, Get)
         and __arg2 is None
         and __arg3 is None
         and __arg4 is None
@@ -523,7 +469,7 @@ async def MultiGet(  # noqa: F811
         return await _MultiGet((__arg0, __arg1))
 
     if (
-        isinstance(__arg0, _Get)
+        isinstance(__arg0, Get)
         and __arg1 is None
         and __arg2 is None
         and __arg3 is None
@@ -541,7 +487,7 @@ async def MultiGet(  # noqa: F811
     def render_arg(arg: Any) -> Optional[str]:
         if arg is None:
             return None
-        if isinstance(arg, _Get):
+        if isinstance(arg, Get):
             return f"Get({arg.product_type.__name__}, {arg.subject_declared_type.__name__}, ...)"
         return repr(arg)
 
