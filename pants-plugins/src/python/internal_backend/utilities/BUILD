@@ -3,7 +3,7 @@
 
 python_library(
   dependencies=[
-    'src/python/pants/backend/python:python_artifact'
+    'src/python/pants/backend/python:python_artifact',
     'src/python/pants/build_graph',
     'src/python/pants/engine:rules',
     'src/python/pants/subsystem',
