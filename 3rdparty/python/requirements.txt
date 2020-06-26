@@ -8,7 +8,6 @@ fasteners==0.15.0
 # for the mypy task since it configures custom MyPy plugins. That requirement can be found via:
 #
 #   ./pants \
-#     --backend-packages=pants.contrib.mypy \
 #       options \
 #         --output-format=json \
 #         --scope=mypy \

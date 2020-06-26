@@ -85,15 +85,6 @@ python_binary(
 )
 
 python_binary(
-  name = 'mypy',
-  sources = ['mypy.py'],
-  dependencies = [
-    ':common',
-  ],
-  tags = {'type_checked'},
-)
-
-python_binary(
   name = 'shellcheck',
   sources = ['shellcheck.py'],
   dependencies = [

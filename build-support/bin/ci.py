@@ -430,24 +430,17 @@ def run_sanity_checks() -> None:
 
 
 def run_lint(*, oauth_token_path: Optional[str] = None) -> None:
-    targets = ["contrib::", "examples::", "src::", "tests::", "zinc::"]
+    targets = ["build-support::", "contrib::", "examples::", "src::", "tests::"]
     command_prefix = ["./pants.pex", "--tag=-nolint"]
-
-    v2_command = (
+    command = (
         [*command_prefix, "--no-v1", "--v2", "lint", *targets]
         if oauth_token_path is None
         else [*command_prefix, *_use_remote_execution(oauth_token_path), "lint", *targets]
     )
     _run_command(
-        v2_command,
-        slug="Lint (V2)",
-        start_message="Running V2 lint checks",
-        die_message="Lint check failure.",
-    )
-    _run_command(
-        [*command_prefix, "lint", *targets],
-        slug="Lint (V1)",
-        start_message="Running V1 lint checks",
+        command,
+        slug="Lint",
+        start_message="Running lint checks",
         die_message="Lint check failure.",
     )
 
