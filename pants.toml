@@ -21,11 +21,8 @@ local_artifact_cache = "%(pants_bootstrapdir)s/artifact_cache"
 print_exception_stacktrace = true
 v2 = false
 
-# Enable our own custom loose-source plugins as well as contribs.
-pythonpath = [
-  "%(buildroot)s/contrib/mypy/src/python",
-  "%(buildroot)s/pants-plugins/src/python",
-]
+# Enable our custom loose-source plugins.
+pythonpath = ["%(buildroot)s/pants-plugins/src/python"]
 backend_packages.add = [
   "internal_backend.repositories",
   "internal_backend.utilities",
