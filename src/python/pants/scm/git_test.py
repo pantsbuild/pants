@@ -10,9 +10,9 @@ from unittest.case import skipIf
 
 from pants.scm.git import Git
 from pants.scm.scm import Scm
-from pants.testutil.git_util import git_version, MIN_REQUIRED_GIT_VERSION
-from pants.util.contextutil import pushd, environment_as, temporary_dir
-from pants.util.dirutil import safe_mkdtemp, touch, safe_mkdir, safe_open, safe_rmtree, chmod_plus_x
+from pants.testutil.git_util import MIN_REQUIRED_GIT_VERSION, git_version
+from pants.util.contextutil import environment_as, pushd, temporary_dir
+from pants.util.dirutil import chmod_plus_x, safe_mkdir, safe_mkdtemp, safe_open, safe_rmtree, touch
 
 
 @skipIf(
