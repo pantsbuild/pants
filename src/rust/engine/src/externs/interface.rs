@@ -56,7 +56,7 @@ use futures::future::FutureExt;
 use futures::future::{self as future03, TryFutureExt};
 use futures01::{future, Future};
 use hashing::{Digest, EMPTY_DIGEST};
-use log::{self, error, warn, Log};
+use log::{self, debug, error, warn, Log};
 use logging::logger::LOGGER;
 use logging::{Destination, Logger, PythonLogLevel};
 use rule_graph::{self, RuleGraph};
@@ -730,6 +730,10 @@ fn scheduler_create(
   remote_execution_overall_deadline_secs: u64,
   process_execution_local_enable_nailgun: bool,
 ) -> CPyResult<PyScheduler> {
+  match fs::increase_limits() {
+    Ok(msg) => debug!("{}", msg),
+    Err(e) => warn!("{}", e),
+  }
   let core: Result<Core, String> = with_executor(py, executor_ptr, |executor| {
     let types = types_ptr
       .types(py)

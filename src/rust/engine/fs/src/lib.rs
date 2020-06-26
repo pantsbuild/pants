@@ -58,6 +58,8 @@ lazy_static! {
   });
 }
 
+const TARGET_NOFILE_LIMIT: u64 = 10000;
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Stat {
   Link(Link),
@@ -655,8 +657,38 @@ impl fmt::Debug for FileContent {
   }
 }
 
-// Like std::fs::create_dir_all, except handles concurrent calls among multiple
-// threads or processes. Originally lifted from rustc.
+///
+/// Increase file handle limits as much as the OS will allow us to, returning an error if we are
+/// unable to either get or sufficiently raise them. Generally the returned error should be treated
+/// as a warning to be rendered rather than as something fatal.
+///
+pub fn increase_limits() -> Result<String, String> {
+  loop {
+    let (cur, max) = rlimit::Resource::NOFILE
+      .get()
+      .map_err(|e| format!("Could not validate file handle limits: {}", e))?;
+    // If the limit is less than our target.
+    if cur < TARGET_NOFILE_LIMIT {
+      // If we might be able to increase the limit, try to.
+      if cur < max {
+        rlimit::Resource::NOFILE.set(max, max)
+          .map_err(|e| format!("Could not raise file handle limit above {}: `{}`. We recommend a limit of at least {}.", cur, e, TARGET_NOFILE_LIMIT))?;
+      } else {
+        return Err(format!(
+          "File handle limit is capped to: {}. We recommend a limit of at least {}.",
+          max, TARGET_NOFILE_LIMIT
+        ));
+      }
+    } else {
+      return Ok(format!("File handle limit is: {}", cur));
+    };
+  }
+}
+
+///
+/// Like std::fs::create_dir_all, except handles concurrent calls among multiple
+/// threads or processes. Originally lifted from rustc.
+///
 pub fn safe_create_dir_all_ioerror(path: &Path) -> Result<(), io::Error> {
   match fs::create_dir(path) {
     Ok(()) => return Ok(()),
