@@ -182,7 +182,7 @@ class Native(metaclass=SingletonMetaclass):
         should_report_workunits: bool,
     ) -> PySession:
         return PySession(
-            scheduler, should_record_zipkin_spans, dynamic_ui, build_id, should_report_workunits,
+            scheduler, dynamic_ui, build_id, should_report_workunits,
         )
 
     def new_scheduler(
