@@ -6,7 +6,7 @@ import subprocess
 import unittest
 from contextlib import contextmanager
 from textwrap import dedent
-from unittest import skipIf
+from unittest.case import skipIf
 
 from pants.scm.git import Git
 from pants.scm.scm import Scm

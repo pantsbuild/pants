@@ -18,7 +18,7 @@ class StringWriterTest(unittest.TestCase):
                 fb.close()
             with open(p, "rb") as f:
                 contents = f.read()
-                self.assertEquals(contents, b"\xe2\x9d\xa4 Curious Zelda")
+                self.assertEqual(contents, b"\xe2\x9d\xa4 Curious Zelda")
 
     def test_rejects_binary(self):
         with temporary_file_path() as p:
@@ -42,4 +42,4 @@ class StringWriterTest(unittest.TestCase):
                 fb.close()
             with open(p, "rb") as f:
                 contents = f.read()
-                self.assertEquals(contents, b"\xe2\x9d\xa4 Curious Zelda")
+                self.assertEqual(contents, b"\xe2\x9d\xa4 Curious Zelda")
