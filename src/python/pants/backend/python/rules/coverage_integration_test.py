@@ -111,37 +111,47 @@ class CoverageIntegrationTest(PantsRunIntegrationTest):
             # tests that we can properly handle the edge case. In particular, we want to make sure
             # that coverage still works when we omit this test file through the option
             # `--omit-test-sources`.
-            no_src_folder = Path(tmpdir, "tests", "python", "project_test", "no_src")
+            no_src_folder = test_root / "no_src"
             no_src_folder.mkdir()
             (no_src_folder / "test_no_src.py").write_text(
                 "def test_true():\n\tassert True is True\n"
             )
             (no_src_folder / "BUILD").write_text("python_tests()")
 
-            command = [
-                "--no-v1",
-                "--v2",
-                "test",
-                "--use-coverage",
+            # Test a file that is not included in the transitive closure of any test targets. We
+            # still expect this to be in the report if it is included in the address specs.
+            no_tests_folder = src_root / "no_tests"
+            no_tests_folder.mkdir()
+            (no_tests_folder / "no_tests.py").write_text("NO_TESTS = True\n")
+            (no_tests_folder / "BUILD").write_text("python_library()")
+
+            command_prefix = ["--no-v1", "--v2", "test", "--use-coverage"]
+            test_targets = [
                 f"{tmpdir_relative}/src/python/project:tests",
                 f"{tmpdir_relative}/tests/python/project_test:multiply",
                 f"{tmpdir_relative}/tests/python/project_test:arithmetic",
                 f"{tmpdir_relative}/tests/python/project_test/no_src",
             ]
-            default_result = self.run_pants(command)
-            omit_test_result = self.run_pants([*command, "--coverage-py-omit-test-sources"])
+            entire_closure_result = self.run_pants([*command_prefix, "::"])
+            omit_test_result = self.run_pants(
+                [*command_prefix, *test_targets, "--coverage-py-omit-test-sources"]
+            )
             filter_result = self.run_pants(
-                [*command, "--coverage-py-filter=['project.lib', 'project_test.no_src']"]
+                [
+                    *command_prefix,
+                    "::",
+                    "--coverage-py-filter=['project.lib', 'project_test.no_src']",
+                ]
             )
 
-        for result in (default_result, omit_test_result, filter_result):
+        for result in (entire_closure_result, omit_test_result, filter_result):
             assert result.returncode == 0
             # Regression test: make sure that individual tests do not complain about failing to
             # generate reports. This was showing up at test-time, even though the final merged
             # report would work properly.
             assert "Failed to generate report" not in result.stderr_data
 
-        # TODO(#10064): Fix Coverage so that `random.py` shows up in the output.
+        print(entire_closure_result.stderr_data)
         assert (
             dedent(
                 f"""\
@@ -156,7 +166,7 @@ class CoverageIntegrationTest(PantsRunIntegrationTest):
                 TOTAL                                                            17      0      0      0   100%
                 """
             )
-            in default_result.stderr_data
+            in entire_closure_result.stderr_data
         )
         assert (
             dedent(

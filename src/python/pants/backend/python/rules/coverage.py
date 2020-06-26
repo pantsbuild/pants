@@ -213,6 +213,57 @@ async def setup_coverage(coverage: CoverageSubsystem) -> CoverageSetup:
 
 
 @dataclass(frozen=True)
+class NoOpData:
+    """A run over the entire transitive closure to ensure that every file has coverage data.
+
+    We expect each file to have 0% associated with it. That's okay, because it will get merged in
+    with the actual data from tests.
+    """
+
+    digest: Digest
+
+
+@rule
+async def prepare_no_op_data(
+    coverage_setup: CoverageSetup,
+    transitive_targets: TransitiveTargets,
+    python_setup: PythonSetup,
+    subprocess_encoding_environment: SubprocessEncodingEnvironment,
+) -> NoOpData:
+    coverage_config_request = Get(CoverageConfig, CoverageConfigRequest(transitive_targets.closure))
+    sources_request = Get(
+        SourceFiles,
+        AllSourceFilesRequest(
+            tgt[PythonSources] for tgt in transitive_targets.closure if tgt.has_field(PythonSources)
+        ),
+    )
+    coverage_config, sources = await MultiGet(coverage_config_request, sources_request)
+    input_digest = await Get(
+        Digest,
+        MergeDigests([coverage_config.digest, coverage_setup.pex.digest, sources.snapshot.digest]),
+    )
+    process = coverage_setup.pex.create_process(
+        pex_path=f"./{coverage_setup.pex.output_filename}",
+        # `-m pydoc` will simply print out help instructions.
+        pex_args=(
+            "run",
+            "--source=.",
+            f"--omit={coverage_setup.pex.output_filename}/*",
+            "-m",
+            "pydoc",
+        ),
+        input_digest=input_digest,
+        output_files=(".coverage",),
+        description=f"Run a no-op Coverage command to ensure that every file is reported on.",
+        python_setup=python_setup,
+        subprocess_encoding_environment=subprocess_encoding_environment,
+    )
+    result = await Get(ProcessResult, Process, process)
+    prefixed_digest = await Get(Digest, AddPrefix(result.output_digest, "__no_op_data"))
+    return NoOpData(prefixed_digest)
+
+
+@dataclass(frozen=True)
 class MergedCoverageData:
     coverage_data: Digest
 
@@ -220,19 +271,23 @@ class MergedCoverageData:
 @rule(desc="Merge Pytest coverage data")
 async def merge_coverage_data(
     data_collection: PytestCoverageDataCollection,
+    no_op_data: NoOpData,
     coverage_setup: CoverageSetup,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> MergedCoverageData:
-    if len(data_collection) == 1:
-        return MergedCoverageData(data_collection[0].digest)
     # We prefix each .coverage file with its corresponding address to avoid collisions.
     coverage_digests = await MultiGet(
         Get(Digest, AddPrefix(data.digest, prefix=data.address.path_safe_spec))
         for data in data_collection
     )
-    input_digest = await Get(Digest, MergeDigests((*coverage_digests, coverage_setup.pex.digest)))
-    prefixes = sorted(f"{data.address.path_safe_spec}/.coverage" for data in data_collection)
+    input_digest = await Get(
+        Digest, MergeDigests((*coverage_digests, coverage_setup.pex.digest, no_op_data.digest))
+    )
+    prefixes = (
+        # *sorted(f"{data.address.path_safe_spec}/.coverage" for data in data_collection),
+        "__no_op_data/.coverage",
+    )
     process = coverage_setup.pex.create_process(
         pex_path=f"./{coverage_setup.pex.output_filename}",
         pex_args=("combine", *prefixes),
@@ -313,6 +368,7 @@ def rules():
         create_coverage_config,
         generate_coverage_report,
         merge_coverage_data,
+        prepare_no_op_data,
         setup_coverage,
         SubsystemRule(CoverageSubsystem),
         UnionRule(CoverageDataCollection, PytestCoverageDataCollection),
