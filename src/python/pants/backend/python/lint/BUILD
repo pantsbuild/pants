@@ -31,5 +31,6 @@ python_tests(
     'src/python/pants/testutil:external_tool_test_base',
     'src/python/pants/testutil/subsystem',
   ],
+  timeout=90,
   tags = {'integration'},
 )

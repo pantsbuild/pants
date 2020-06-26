@@ -9,7 +9,6 @@ target(
     ':hello_directory',
     ':java_sources_directory',
     ':javac_directory',
-    ':make_it_rain_directory',
     # NB: See `:java_sources_directory` for why we must declare this dependency here.
     'examples/src/scala/org/pantsbuild/example:scala_with_java_sources_directory'
   ],
@@ -45,13 +44,4 @@ files(
 files(
   name = 'javac_directory',
   sources = ['javac/**/*'],
-)
-
-files(
-  name = 'make_it_rain_directory',
-  sources = ['make_it_rain/**/*'],
-  dependencies = [
-    'examples/src/thrift/org/pantsbuild/example:distance_directory',
-    'examples/src/thrift/org/pantsbuild/example:precipitation_directory',
-  ],
 )

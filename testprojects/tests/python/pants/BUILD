@@ -6,7 +6,6 @@ target(
   dependencies = [
     ':build_parsing_directory',
     ':conf_test_directory',
-    ':constants_only_directory',
     ':dummies_directory',
     ':file_sets_directory',
     ':timeout_directory',
@@ -30,14 +29,6 @@ files(
 files(
   name = 'conf_test_directory',
   sources = ['conf_test/**/*'],
-)
-
-files(
-  name = 'constants_only_directory',
-  sources = ['constants_only/**/*'],
-  dependencies = [
-    'testprojects/src/thrift/org/pantsbuild:constants_only_directory',
-  ],
 )
 
 files(

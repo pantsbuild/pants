@@ -89,12 +89,6 @@ write_to = []
 read_from = ["%(local_artifact_cache)s"]
 write_to = ["%(local_artifact_cache)s"]
 
-[gen.thrift-java]
-deps = ["3rdparty:thrift"]
-
-[gen.thrift-py]
-deps = ["examples/3rdparty/python:thrift"]
-
 [black]
 config = "pyproject.toml"
 
