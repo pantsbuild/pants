@@ -28,16 +28,15 @@
 #![allow(clippy::mutex_atomic)]
 
 use concrete_time::TimeSpan;
+use log::log;
 pub use log::Level;
-use log::{info, log};
 use parking_lot::Mutex;
 use petgraph::graph::{DiGraph, NodeIndex};
 use rand::thread_rng;
 use rand::Rng;
 use std::collections::{BinaryHeap, HashMap};
-use tokio::task_local;
 use std::sync::mpsc::{channel, Receiver, Sender};
-
+use tokio::task_local;
 
 use std::cell::RefCell;
 use std::future::Future;
@@ -140,14 +139,18 @@ impl Default for WorkunitMetadata {
   }
 }
 
+type CompletedWorkunitReceiver =
+  Arc<Mutex<Receiver<(SpanId, Option<WorkunitMetadata>, SystemTime)>>>;
+type CompletedWorkunitSender = Arc<Mutex<Sender<(SpanId, Option<WorkunitMetadata>, SystemTime)>>>;
+
 #[derive(Clone)]
 pub struct WorkunitStore {
   rendering_dynamic_ui: bool,
   inner: Arc<Mutex<WorkUnitInnerStore>>,
   started_workunits_rx: Arc<Mutex<Receiver<Workunit>>>,
   started_workunits_tx: Arc<Mutex<Sender<Workunit>>>,
-  completed_workunits_rx: Arc<Mutex<Receiver<Workunit>>>,
-  completed_workunits_tx: Arc<Mutex<Sender<Workunit>>>,
+  completed_workunits_rx: CompletedWorkunitReceiver,
+  completed_workunits_tx: CompletedWorkunitSender,
 }
 
 #[derive(Default)]
@@ -218,6 +221,7 @@ impl WorkunitStore {
   ///
   pub fn heavy_hitters(&self, k: usize) -> HashMap<String, Option<Duration>> {
     use petgraph::Direction;
+    self.handle_queued_workunits();
 
     let now = SystemTime::now();
     let inner = self.inner.lock();
@@ -278,61 +282,74 @@ impl WorkunitStore {
     let started = Workunit {
       name,
       span_id: span_id.clone(),
-      parent_id: parent_id.clone(),
+      parent_id,
       state: WorkunitState::Started {
         start_time: std::time::SystemTime::now(),
       },
       metadata,
     };
-    let mut inner = self.inner.lock();
     if !self.rendering_dynamic_ui {
       started.log_workunit_state()
     }
-
-    inner.workunit_records.insert(span_id.clone(), started);
-    inner.started_ids.push(span_id.clone());
-    let child = inner.graph.add_node(span_id.clone());
-    inner.span_id_to_graph.insert(span_id.clone(), child);
-    if let Some(parent_id) = parent_id {
-      if let Some(parent) = inner.span_id_to_graph.get(&parent_id).cloned() {
-        inner.graph.add_edge(parent, child, ());
-      }
-    }
-
+    let sender = self.started_workunits_tx.lock();
+    sender.send(started).unwrap();
     span_id
   }
 
-  pub fn complete_workunit_with_new_metadata(
-    &self,
-    span_id: SpanId,
-    metadata: WorkunitMetadata,
-  ) -> Result<(), String> {
+  fn add_started_workunit_to_store(started: Workunit, inner_store: &mut WorkUnitInnerStore) {
+    let span_id = started.span_id.clone();
+    let parent_id = started.parent_id.clone();
+
+    inner_store
+      .workunit_records
+      .insert(span_id.clone(), started);
+    inner_store.started_ids.push(span_id.clone());
+
+    let child = inner_store.graph.add_node(span_id.clone());
+    inner_store.span_id_to_graph.insert(span_id, child);
+    if let Some(parent_id) = parent_id {
+      if let Some(parent) = inner_store.span_id_to_graph.get(&parent_id).cloned() {
+        inner_store.graph.add_edge(parent, child, ());
+      }
+    }
+  }
+
+  pub fn complete_workunit_with_new_metadata(&self, span_id: SpanId, metadata: WorkunitMetadata) {
     self.complete_workunit_impl(span_id, Some(metadata))
   }
 
-  pub fn complete_workunit(&self, span_id: SpanId) -> Result<(), String> {
+  pub fn complete_workunit(&self, span_id: SpanId) {
     self.complete_workunit_impl(span_id, None)
   }
 
-  fn complete_workunit_impl(
-    &self,
+  fn complete_workunit_impl(&self, span_id: SpanId, new_metadata: Option<WorkunitMetadata>) {
+    let tx = self.completed_workunits_tx.lock();
+    let time = std::time::SystemTime::now();
+    tx.send((span_id, new_metadata, time)).unwrap();
+  }
+
+  fn add_completed_workunit_to_store(
     span_id: SpanId,
     new_metadata: Option<WorkunitMetadata>,
-  ) -> Result<(), String> {
+    end_time: SystemTime,
+    inner_store: &mut WorkUnitInnerStore,
+  ) {
     use std::collections::hash_map::Entry;
-    let inner = &mut self.inner.lock();
-    match inner.workunit_records.entry(span_id.clone()) {
-      Entry::Vacant(_) => Err(format!(
-        "No previously-started workunit found for id: {}",
-        span_id
-      )),
+
+    match inner_store.workunit_records.entry(span_id.clone()) {
+      Entry::Vacant(_) => {
+        log::warn!("No previously-started workunit found for id: {}", span_id);
+      }
       Entry::Occupied(o) => {
         let (span_id, mut workunit) = o.remove_entry();
         let time_span = match workunit.state {
           WorkunitState::Completed { .. } => {
-            return Err(format!("Workunit {} was already completed", span_id))
+            log::warn!("Workunit {} was already completed", span_id);
+            return;
           }
-          WorkunitState::Started { start_time } => TimeSpan::since(&start_time),
+          WorkunitState::Started { start_time } => {
+            TimeSpan::from_start_and_end_systemtime(&start_time, &end_time)
+          }
         };
         let new_state = WorkunitState::Completed { time_span };
         workunit.state = new_state;
@@ -340,9 +357,10 @@ impl WorkunitStore {
           workunit.metadata = metadata;
         }
         workunit.log_workunit_state();
-        inner.workunit_records.insert(span_id.clone(), workunit);
-        inner.completed_ids.push(span_id);
-        Ok(())
+        inner_store
+          .workunit_records
+          .insert(span_id.clone(), workunit);
+        inner_store.completed_ids.push(span_id);
       }
     }
   }
@@ -368,48 +386,66 @@ impl WorkunitStore {
     inner.completed_ids.push(span_id);
   }
 
+  fn handle_queued_workunits(&self) {
+    let mut inner_store = self.inner.lock();
+    let receiver = self.started_workunits_rx.lock();
+
+    while let Ok(started) = receiver.try_recv() {
+      Self::add_started_workunit_to_store(started, &mut inner_store);
+    }
+
+    let receiver = self.completed_workunits_rx.lock();
+    while let Ok((span_id, new_metadata, time)) = receiver.try_recv() {
+      Self::add_completed_workunit_to_store(span_id, new_metadata, time, &mut inner_store);
+    }
+  }
+
   pub fn with_latest_workunits<F, T>(&mut self, max_verbosity: log::Level, f: F) -> T
   where
     F: FnOnce(&[Workunit], &[Workunit]) -> T,
   {
-    let mut inner_store = self.inner.lock();
+    self.handle_queued_workunits();
+    let (started_workunits, completed_workunits) = {
+      let mut inner_store = self.inner.lock();
 
-    let should_emit = |workunit: &Workunit| -> bool { workunit.metadata.level <= max_verbosity };
+      let should_emit = |workunit: &Workunit| -> bool { workunit.metadata.level <= max_verbosity };
 
-    let cur_len = inner_store.started_ids.len();
-    let latest: usize = inner_store.last_seen_started_idx;
-    let started_workunits: Vec<Workunit> = inner_store.started_ids[latest..cur_len]
-      .iter()
-      .flat_map(|id| inner_store.workunit_records.get(id))
-      .flat_map(|workunit| match workunit.state {
-        WorkunitState::Started { .. } if should_emit(&workunit) => Some(workunit.clone()),
-        WorkunitState::Started { .. } => None,
-        WorkunitState::Completed { .. } => None,
-      })
-      .map(|mut w| {
-        w.parent_id = inner_store.first_matched_parent(w.parent_id, should_emit);
-        w
-      })
-      .collect();
-    inner_store.last_seen_started_idx = cur_len;
+      let cur_len = inner_store.started_ids.len();
+      let latest: usize = inner_store.last_seen_started_idx;
+      let started_workunits: Vec<Workunit> = inner_store.started_ids[latest..cur_len]
+        .iter()
+        .flat_map(|id| inner_store.workunit_records.get(id))
+        .flat_map(|workunit| match workunit.state {
+          WorkunitState::Started { .. } if should_emit(&workunit) => Some(workunit.clone()),
+          WorkunitState::Started { .. } => None,
+          WorkunitState::Completed { .. } => None,
+        })
+        .map(|mut w| {
+          w.parent_id = inner_store.first_matched_parent(w.parent_id, should_emit);
+          w
+        })
+        .collect();
+      inner_store.last_seen_started_idx = cur_len;
 
-    let completed_ids = &inner_store.completed_ids;
-    let cur_len = completed_ids.len();
-    let latest: usize = inner_store.last_seen_completed_idx;
-    let completed_workunits: Vec<Workunit> = inner_store.completed_ids[latest..cur_len]
-      .iter()
-      .flat_map(|id| inner_store.workunit_records.get(id))
-      .flat_map(|workunit| match workunit.state {
-        WorkunitState::Completed { .. } if should_emit(&workunit) => Some(workunit.clone()),
-        WorkunitState::Completed { .. } => None,
-        WorkunitState::Started { .. } => None,
-      })
-      .map(|mut w| {
-        w.parent_id = inner_store.first_matched_parent(w.parent_id, should_emit);
-        w
-      })
-      .collect();
-    inner_store.last_seen_completed_idx = cur_len;
+      let completed_ids = &inner_store.completed_ids;
+      let cur_len = completed_ids.len();
+      let latest: usize = inner_store.last_seen_completed_idx;
+      let completed_workunits: Vec<Workunit> = inner_store.completed_ids[latest..cur_len]
+        .iter()
+        .flat_map(|id| inner_store.workunit_records.get(id))
+        .flat_map(|workunit| match workunit.state {
+          WorkunitState::Completed { .. } if should_emit(&workunit) => Some(workunit.clone()),
+          WorkunitState::Completed { .. } => None,
+          WorkunitState::Started { .. } => None,
+        })
+        .map(|mut w| {
+          w.parent_id = inner_store.first_matched_parent(w.parent_id, should_emit);
+          w
+        })
+        .collect();
+      inner_store.last_seen_completed_idx = cur_len;
+      (started_workunits, completed_workunits)
+    };
 
     f(&started_workunits, &completed_workunits)
   }
@@ -485,9 +521,7 @@ where
   scope_task_workunit_state(Some(workunit_state), async move {
     let result = f.await;
     let final_metadata = final_metadata_fn(&result, initial_metadata);
-    if let Err(e) = workunit_store.complete_workunit_with_new_metadata(started_id, final_metadata) {
-      info!("{}", e);
-    }
+    workunit_store.complete_workunit_with_new_metadata(started_id, final_metadata);
     result
   })
   .await
