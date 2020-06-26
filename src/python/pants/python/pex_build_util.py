@@ -34,7 +34,7 @@ from pants.python.python_setup import PythonSetup
 from pants.subsystem.subsystem import Subsystem
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_file
-from pants.util.ordered_set import OrderedSet
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 from pants.util.strutil import module_dirname
 
 
@@ -87,7 +87,7 @@ def targets_by_platform(targets, python_setup):
     return dict(explicit_platform_settings)
 
 
-def identify_missing_init_files(sources: Sequence[str]) -> Set[str]:
+def identify_missing_init_files(sources: Sequence[str]) -> FrozenOrderedSet[str]:
     """Return the paths to add to ensure that every package has an __init__.py.
 
     NB: If the sources have not had their source roots (e.g., 'src/python') stripped, this
@@ -106,7 +106,9 @@ def identify_missing_init_files(sources: Sequence[str]) -> Set[str]:
                     package = os.path.join(package, component)
                     packages.add(package)
 
-    return {os.path.join(package, "__init__.py") for package in packages} - set(sources)
+    return FrozenOrderedSet(
+        sorted({os.path.join(package, "__init__.py") for package in packages} - set(sources))
+    )
 
 
 class PexBuilderWrapper:
@@ -410,7 +412,7 @@ class PexBuilderWrapper:
                     self._builder.add_source(
                         filename=ns_package.name, env_filename=missing_init_file
                     )
-        return missing_init_files
+        return set(missing_init_files)
 
     def set_emit_warnings(self, emit_warnings):
         self._builder.info.emit_warnings = emit_warnings
