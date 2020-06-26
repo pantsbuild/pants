@@ -111,5 +111,6 @@ class PantsReleases(Subsystem):
 def build_file_aliases():
     return BuildFileAliases(objects={"pants_setup_py": pants_setup_py})
 
+
 def rules():
     return [SubsystemRule(PantsReleases)]

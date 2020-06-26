@@ -80,12 +80,14 @@ class Package:
         return owners
 
 
-PACKAGES = sorted({
-    # NB: This a native wheel. We expect a distinct wheel for each Python version and each
-    # platform (macOS x linux).
-    Package("pantsbuild.pants", "src/python/pants:pants-packaged", bdist_wheel_flags=()),
-    Package("pantsbuild.pants.testutil", "src/python/pants/testutil:testutil_wheel"),
-})
+PACKAGES = sorted(
+    {
+        # NB: This a native wheel. We expect a distinct wheel for each Python version and each
+        # platform (macOS x linux).
+        Package("pantsbuild.pants", "src/python/pants:pants-packaged", bdist_wheel_flags=()),
+        Package("pantsbuild.pants.testutil", "src/python/pants/testutil:testutil_wheel"),
+    }
+)
 
 
 # -----------------------------------------------------------------------------------------------
