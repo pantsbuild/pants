@@ -4,7 +4,6 @@
 contrib_plugin(
   name='plugin',
   dependencies=[
-    'contrib/mypy/src/python/pants',
     'contrib/mypy/src/python/pants/contrib/mypy/tasks',
     'src/python/pants/goal:task_registrar',
   ],

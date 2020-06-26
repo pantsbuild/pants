@@ -3,7 +3,6 @@
 
 python_library(
   dependencies = [
-    'contrib/mypy/src/python/pants',
     '3rdparty/python:pex',
     'src/python/pants/util:process_handler',
     'src/python/pants/backend/python/lint/mypy',
