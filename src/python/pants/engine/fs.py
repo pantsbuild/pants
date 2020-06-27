@@ -4,7 +4,7 @@
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Optional, Tuple
+from typing import Any, Iterable, Optional, Tuple
 
 from pants.engine.collection import Collection
 from pants.engine.rules import RootRule, side_effecting
@@ -278,16 +278,12 @@ class UrlToFetch:
 
 
 @side_effecting
-@frozen_after_init
-@dataclass(unsafe_hash=True)
+@dataclass(frozen=True)
 class Workspace:
-    """Abstract handle for operations that touch the real local filesystem.
+    """Abstract handle for operations that touch the real local filesystem."""
 
-    NB: The `_scheduler: SchedulerSession` field is untyped because fs.py and `scheduler.py` have a cycle.
-    """
-
-    def __init__(self, scheduler) -> None:
-        self._scheduler = scheduler
+    # TODO: SchedulerSession. Untyped because `fs.py` and `scheduler.py` have a cycle.
+    _scheduler: Any
 
     def materialize_directory(self, directory_to_materialize: DirectoryToMaterialize):
         """Materialize one single directory digest to disk.
