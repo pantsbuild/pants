@@ -4,7 +4,7 @@
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterable, Optional, Tuple
+from typing import TYPE_CHECKING, Iterable, Optional, Tuple, cast
 
 from pants.engine.collection import Collection
 from pants.engine.rules import RootRule, side_effecting
@@ -295,13 +295,19 @@ class Workspace:
         If you need to materialize multiple, you should use the parallel materialize_directories()
         instead.
         """
-        return self._scheduler.materialize_directory(directory_to_materialize)
+        return cast(
+            MaterializeDirectoryResult,
+            self._scheduler.materialize_directory(directory_to_materialize),
+        )
 
     def materialize_directories(
         self, directories_to_materialize: Tuple[DirectoryToMaterialize, ...]
     ) -> MaterializeDirectoriesResult:
         """Materialize multiple directory digests to disk in parallel."""
-        return self._scheduler.materialize_directories(directories_to_materialize)
+        return cast(
+            MaterializeDirectoriesResult,
+            self._scheduler.materialize_directories(directories_to_materialize),
+        )
 
 
 # TODO: don't recreate this in python, get this from fs::EMPTY_DIGEST somehow.
