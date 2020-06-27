@@ -1,14 +1,15 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import List, Optional
+from typing import List
 
 from pants.backend.python.rules.inject_init import (
     InitInjectedSnapshot,
     InjectInitRequest,
     inject_missing_init_files,
 )
-from pants.engine.fs import Digest, FilesContent
+from pants.core.util_rules import strip_source_roots
+from pants.engine.fs import FilesContent
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.testutil.option.util import create_options_bootstrapper
@@ -21,90 +22,68 @@ class InjectInitTest(TestBase):
         return (
             *super().rules(),
             inject_missing_init_files,
+            *strip_source_roots.rules(),
             RootRule(InjectInitRequest),
-            RootRule(Digest),
         )
 
     def assert_injected(
         self,
         *,
-        original_files: List[str],
-        expected_added: List[str],
-        expected_discovered: Optional[List[str]] = None,
-        sources_stripped=True,
+        declared_files_stripped: bool,
+        original_declared_files: List[str],
+        original_undeclared_files: List[str],
+        expected_discovered: List[str],
     ) -> None:
-        expected_discovered = expected_discovered or []
+        for f in original_undeclared_files:
+            self.create_file(f, "# undeclared")
         request = InjectInitRequest(
-            self.make_snapshot({fp: "# python code" for fp in original_files}),
-            sources_stripped=sources_stripped,
+            self.make_snapshot({fp: "# declared" for fp in original_declared_files}),
+            sources_stripped=declared_files_stripped,
         )
         result = self.request_single_product(
-            InitInjectedSnapshot,
-            Params(
-                request, create_options_bootstrapper(args=["--source-root-patterns=['src/python']"])
-            ),
+            InitInjectedSnapshot, Params(request, create_options_bootstrapper())
         ).snapshot
-        assert list(result.files) == sorted(
-            [*original_files, *expected_added, *expected_discovered]
-        )
-        # Ensure all original `__init__.py` are preserved with their original content.
-        materialized_original_inits = [
-            fc
-            for fc in self.request_single_product(FilesContent, result.digest)
-            if fc.path.endswith("__init__.py")
-            and (fc.path in original_files or fc.path in expected_discovered)
-        ]
-        for original_init in materialized_original_inits:
-            assert (
-                original_init.content == b"# python code"
-            ), f"{original_init} does not have its original content preserved."
+        assert list(result.files) == sorted([*original_declared_files, *expected_discovered])
 
-    def test_no_inits_present(self) -> None:
-        self.assert_injected(
-            original_files=["lib.py", "subdir/lib.py"], expected_added=["subdir/__init__.py"],
-        )
-        self.assert_injected(
-            original_files=["a/b/lib.py", "a/b/subdir/lib.py"],
-            expected_added=["a/__init__.py", "a/b/__init__.py", "a/b/subdir/__init__.py",],
-        )
+        materialized_result = self.request_single_product(FilesContent, result.digest)
+        for file_content in materialized_result:
+            path = file_content.path
+            if not path.endswith("__init__.py"):
+                continue
+            assert path in original_declared_files or path in expected_discovered
+            expected = b"# declared" if path in original_declared_files else b"# undeclared"
+            assert file_content.content == expected
 
-    def test_preserves_original_inits(self) -> None:
+    def test_unstripped(self) -> None:
         self.assert_injected(
-            original_files=["lib.py", "__init__.py", "subdir/lib.py"],
-            expected_added=["subdir/__init__.py"],
-        )
-        self.assert_injected(
-            original_files=[
-                "a/b/lib.py",
-                "a/b/__init__.py",
-                "a/b/subdir/lib.py",
-                "a/b/subdir/__init__.py",
+            declared_files_stripped=False,
+            original_declared_files=[
+                "src/python/project/lib.py",
+                "src/python/project/subdir/__init__.py",
+                "src/python/project/subdir/lib.py",
+                "src/python/no_init/lib.py",
             ],
-            expected_added=["a/__init__.py"],
-        )
-        # No missing `__init__.py` files
-        self.assert_injected(
-            original_files=["lib.py", "__init__.py", "subdir/lib.py", "subdir/__init__.py"],
-            expected_added=[],
-        )
-
-    def test_finds_undeclared_original_inits(self) -> None:
-        self.create_file("a/__init__.py", "# python code")
-        self.create_file("a/b/__init__.py", "# python code")
-        self.assert_injected(
-            original_files=["a/b/subdir/lib.py"],
-            expected_added=["a/b/subdir/__init__.py"],
-            expected_discovered=["a/__init__.py", "a/b/__init__.py"],
-        )
-
-    def test_source_roots_unstripped(self) -> None:
-        self.assert_injected(
-            original_files=[
-                "src/python/lib.py",
-                "src/python/subdir/lib.py",
-                "src/python/subdir/__init__.py",
-                "src/python/another_subdir/lib.py",
+            original_undeclared_files=[
+                "src/python/project/__init__.py",
+                "tests/python/project/__init__.py",
             ],
-            expected_added=["src/python/another_subdir/__init__.py"],
-            sources_stripped=False,
+            expected_discovered=["src/python/project/__init__.py"],
+        )
+
+    def test_stripped(self) -> None:
+        self.assert_injected(
+            declared_files_stripped=True,
+            original_declared_files=[
+                "project/lib.py",
+                "project/subdir/lib.py",
+                "project/subdir/__init__.py",
+                "project/no_init/lib.py",
+            ],
+            # NB: These will strip down to end up being the same file. If they had different
+            # contents, Pants would error when trying to merge them.
+            original_undeclared_files=[
+                "src/python/project/__init__.py",
+                "tests/python/project/__init__.py",
+            ],
+            expected_discovered=["project/__init__.py"],
         )

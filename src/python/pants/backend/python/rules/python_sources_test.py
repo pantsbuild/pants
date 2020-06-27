@@ -30,96 +30,7 @@ class NonPythonTarget(Target):
     core_fields = (Sources,)
 
 
-class StrippedPythonSourcesTest(TestBase):
-    @classmethod
-    def rules(cls):
-        return (
-            *super().rules(),
-            *python_sources_rules(),
-            RootRule(StrippedPythonSourcesRequest),
-            RootRule(UnstrippedPythonSourcesRequest),
-        )
-
-    def create_target(
-        self, *, parent_directory: str, files: List[str], target_cls: Type[Target] = PythonTarget
-    ) -> Target:
-        self.create_files(parent_directory, files=files)
-        address = Address(spec_path=parent_directory, target_name="target")
-        return target_cls({Sources.alias: files}, address=address)
-
-    def test_adds_missing_inits_and_strips_source_roots(self) -> None:
-        target_with_init = self.create_target(
-            parent_directory="src/python/project", files=["lib.py", "__init__.py"]
-        )
-        target_without_init = self.create_target(
-            parent_directory="src/python/test_project", files=["f1.py", "f2.py"]
-        )
-        files_target = self.create_target(
-            parent_directory="src/python/project/resources",
-            files=["loose_file.txt"],
-            target_cls=Files,
-        )
-        result = self.request_single_product(
-            StrippedPythonSources,
-            Params(
-                StrippedPythonSourcesRequest(
-                    [target_with_init, target_without_init, files_target], include_files=True
-                ),
-                create_options_bootstrapper(args=["--source-root-patterns=['src/python']"]),
-            ),
-        )
-        assert sorted(result.snapshot.files) == sorted(
-            [
-                "project/lib.py",
-                "project/__init__.py",
-                "test_project/f1.py",
-                "test_project/f2.py",
-                "test_project/__init__.py",
-                "src/python/project/resources/loose_file.txt",
-            ]
-        )
-
-    def test_filters_out_irrelevant_targets(self) -> None:
-        targets = [
-            self.create_target(
-                parent_directory="src/python", files=["p.py"], target_cls=PythonTarget
-            ),
-            self.create_target(parent_directory="src/python", files=["f.txt"], target_cls=Files),
-            self.create_target(
-                parent_directory="src/python", files=["r.txt"], target_cls=Resources
-            ),
-            self.create_target(
-                parent_directory="src/python", files=["j.java"], target_cls=NonPythonTarget
-            ),
-        ]
-
-        def assert_has_files(
-            *, include_resources: bool, include_files: bool, expected: List[str]
-        ) -> None:
-            result = self.request_single_product(
-                StrippedPythonSources,
-                Params(
-                    StrippedPythonSourcesRequest(
-                        targets, include_resources=include_resources, include_files=include_files
-                    ),
-                    create_options_bootstrapper(),
-                ),
-            )
-            assert result.snapshot.files == tuple(expected)
-
-        assert_has_files(
-            include_resources=True,
-            include_files=True,
-            expected=["p.py", "r.txt", "src/python/f.txt"],
-        )
-        assert_has_files(include_resources=True, include_files=False, expected=["p.py", "r.txt"])
-        assert_has_files(
-            include_resources=False, include_files=True, expected=["p.py", "src/python/f.txt"]
-        )
-        assert_has_files(include_resources=False, include_files=False, expected=["p.py"])
-
-
-class UnstrippedPythonSourcesTest(TestBase):
+class PythonSourcesTest(TestBase):
     @classmethod
     def rules(cls):
         return (
@@ -140,7 +51,9 @@ class UnstrippedPythonSourcesTest(TestBase):
         target_with_init = self.create_target(
             parent_directory="src/python/project", files=["lib.py", "__init__.py"]
         )
-        target_without_init = self.create_target(
+        # Create an __init__.py not included in any targets. This should be automatically added.
+        self.create_file("src/python/test_project/__init__.py")
+        target_with_undeclared_init = self.create_target(
             parent_directory="src/python/test_project", files=["f1.py", "f2.py"]
         )
         files_target = self.create_target(
@@ -148,16 +61,34 @@ class UnstrippedPythonSourcesTest(TestBase):
             files=["loose_file.txt"],
             target_cls=Files,
         )
-        result = self.request_single_product(
-            UnstrippedPythonSources,
+        targets = [target_with_init, target_with_undeclared_init, files_target]
+
+        stripped_result = self.request_single_product(
+            StrippedPythonSources,
             Params(
-                UnstrippedPythonSourcesRequest(
-                    [target_with_init, target_without_init, files_target], include_files=True
-                ),
-                create_options_bootstrapper(args=["--source-root-patterns=['src/python']"]),
+                StrippedPythonSourcesRequest(targets, include_files=True),
+                create_options_bootstrapper(),
             ),
         )
-        assert sorted(result.snapshot.files) == sorted(
+        assert sorted(stripped_result.snapshot.files) == sorted(
+            [
+                "project/lib.py",
+                "project/__init__.py",
+                "test_project/f1.py",
+                "test_project/f2.py",
+                "test_project/__init__.py",
+                "src/python/project/resources/loose_file.txt",
+            ]
+        )
+
+        unstripped_result = self.request_single_product(
+            UnstrippedPythonSources,
+            Params(
+                UnstrippedPythonSourcesRequest(targets, include_files=True),
+                create_options_bootstrapper(),
+            ),
+        )
+        assert sorted(unstripped_result.snapshot.files) == sorted(
             [
                 "src/python/project/lib.py",
                 "src/python/project/__init__.py",
@@ -183,12 +114,16 @@ class UnstrippedPythonSourcesTest(TestBase):
         ]
 
         def assert_has_files(
-            *, include_resources: bool, include_files: bool, expected: List[str]
+            *, include_resources: bool, include_files: bool, is_stripped: bool, expected: List[str],
         ) -> None:
+            product = StrippedPythonSources if is_stripped else UnstrippedPythonSources
+            subject = (
+                StrippedPythonSourcesRequest if is_stripped else UnstrippedPythonSourcesRequest
+            )
             result = self.request_single_product(
-                UnstrippedPythonSources,
+                product,
                 Params(
-                    UnstrippedPythonSourcesRequest(
+                    subject(
                         targets, include_resources=include_resources, include_files=include_files
                     ),
                     create_options_bootstrapper(),
@@ -199,16 +134,48 @@ class UnstrippedPythonSourcesTest(TestBase):
         assert_has_files(
             include_resources=True,
             include_files=True,
+            is_stripped=True,
+            expected=["p.py", "r.txt", "src/python/f.txt"],
+        )
+        assert_has_files(
+            include_resources=True,
+            include_files=True,
+            is_stripped=False,
             expected=["src/python/f.txt", "src/python/p.py", "src/python/r.txt"],
+        )
+
+        assert_has_files(
+            include_resources=True,
+            include_files=False,
+            is_stripped=True,
+            expected=["p.py", "r.txt"],
         )
         assert_has_files(
             include_resources=True,
             include_files=False,
+            is_stripped=False,
             expected=["src/python/p.py", "src/python/r.txt"],
+        )
+
+        assert_has_files(
+            include_resources=False,
+            include_files=True,
+            is_stripped=True,
+            expected=["p.py", "src/python/f.txt"],
         )
         assert_has_files(
             include_resources=False,
             include_files=True,
+            is_stripped=False,
             expected=["src/python/f.txt", "src/python/p.py"],
         )
-        assert_has_files(include_resources=False, include_files=False, expected=["src/python/p.py"])
+
+        assert_has_files(
+            include_resources=False, include_files=False, is_stripped=True, expected=["p.py"]
+        )
+        assert_has_files(
+            include_resources=False,
+            include_files=False,
+            is_stripped=False,
+            expected=["src/python/p.py"],
+        )

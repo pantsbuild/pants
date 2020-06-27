@@ -123,6 +123,9 @@ async def prepare_unstripped_python_sources(
             strip_source_roots=False,
         ),
     )
+    init_injected = await Get(
+        InitInjectedSnapshot, InjectInitRequest(sources.snapshot, sources_stripped=False)
+    )
 
     source_root_objs = await MultiGet(
         Get(
@@ -134,10 +137,6 @@ async def prepare_unstripped_python_sources(
         if tgt.has_field(PythonSources) or tgt.has_field(ResourcesSources)
     )
     source_root_paths = {source_root_obj.path for source_root_obj in source_root_objs}
-
-    init_injected = await Get(
-        InitInjectedSnapshot, InjectInitRequest(sources.snapshot, sources_stripped=False)
-    )
     return UnstrippedPythonSources(init_injected.snapshot, tuple(sorted(source_root_paths)))
 
 

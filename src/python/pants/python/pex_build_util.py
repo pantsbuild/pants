@@ -92,19 +92,21 @@ def identify_missing_init_files(sources: Sequence[str]) -> FrozenOrderedSet[str]
 
     NB: If the sources have not had their source roots (e.g., 'src/python') stripped, this
     function will add superfluous __init__.py files at and above the source roots, (e.g.,
-    src/python/__init__.py, src/__init__.py). It is the caller's responsibiltiy to filter these
+    src/python/__init__.py, src/__init__.py). It is the caller's responsibility to filter these
     out if necessary. If the sources have had their source roots stripped, then this function
     will only identify missing __init__.py in actual packages.
     """
     packages: Set[str] = set()
     for source in sources:
-        if source.endswith(".py"):
-            pkg_dir = os.path.dirname(source)
-            if pkg_dir and pkg_dir not in packages:
-                package = ""
-                for component in pkg_dir.split(os.sep):
-                    package = os.path.join(package, component)
-                    packages.add(package)
+        if not source.endswith(".py"):
+            continue
+        pkg_dir = os.path.dirname(source)
+        if not pkg_dir or pkg_dir in packages:
+            continue
+        package = ""
+        for component in pkg_dir.split(os.sep):
+            package = os.path.join(package, component)
+            packages.add(package)
 
     return FrozenOrderedSet(
         sorted({os.path.join(package, "__init__.py") for package in packages} - set(sources))
