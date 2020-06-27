@@ -47,7 +47,7 @@ class DependenciesIntegrationTest(GoalRuleTestBase):
     def assert_dependencies(
         self,
         *,
-        target: str,
+        specs: List[str],
         expected: List[str],
         transitive: bool = False,
         dependency_type: DependencyType = DependencyType.SOURCE,
@@ -56,16 +56,17 @@ class DependenciesIntegrationTest(GoalRuleTestBase):
         args = [f"--type={dependency_type.value}"]
         if transitive:
             args.append("--transitive")
-        self.assert_console_output(*expected, args=[*args, target], env=env)
+        self.assert_console_output(*expected, args=[*args, *specs], env=env)
 
     def test_no_target(self) -> None:
-        self.assert_dependencies(target="", expected=[])
+        self.assert_dependencies(specs=[], expected=[])
+        self.assert_dependencies(specs=[], expected=[], transitive=True)
 
     def test_no_dependencies(self) -> None:
         self.create_python_library(path="some/target")
-        self.assert_dependencies(target="some/target", expected=[])
+        self.assert_dependencies(specs=["some/target"], expected=[])
         self.assert_dependencies(
-            target="some/target", expected=[], transitive=True,
+            specs=["some/target"], expected=[], transitive=True,
         )
 
     def test_python_dependencies(self) -> None:
@@ -81,44 +82,46 @@ class DependenciesIntegrationTest(GoalRuleTestBase):
 
         # `--type=source`
         self.assert_dependencies(
-            target="some/other/target",
-            expected=["3rdparty/python:req2", "some/target:target"],
+            specs=["some/other/target"],
             dependency_type=DependencyType.SOURCE,
+            expected=["3rdparty/python:req2", "some/target:target"],
         )
         self.assert_dependencies(
-            target="some/other/target",
+            specs=["some/other/target"],
+            transitive=True,
+            dependency_type=DependencyType.SOURCE,
             expected=[
                 "3rdparty/python:req2",
                 "some/target:target",
                 "3rdparty/python:req1",
                 "dep/target:target",
             ],
-            transitive=True,
-            dependency_type=DependencyType.SOURCE,
         )
 
         # `--type=3rdparty`
         self.assert_dependencies(
-            target="some/other/target",
-            expected=["req2==1.0.0"],
+            specs=["some/other/target"],
             dependency_type=DependencyType.THIRD_PARTY,
+            expected=["req2==1.0.0"],
         )
         self.assert_dependencies(
-            target="some/other/target",
-            expected=["req1==1.0.0", "req2==1.0.0"],
+            specs=["some/other/target"],
             transitive=True,
             dependency_type=DependencyType.THIRD_PARTY,
+            expected=["req1==1.0.0", "req2==1.0.0"],
         )
 
         # `--type=source-and-3rdparty`
         self.assert_dependencies(
-            target="some/other/target",
-            expected=["3rdparty/python:req2", "some/target:target", "req2==1.0.0"],
+            specs=["some/other/target"],
             transitive=False,
             dependency_type=DependencyType.SOURCE_AND_THIRD_PARTY,
+            expected=["3rdparty/python:req2", "some/target:target", "req2==1.0.0"],
         )
         self.assert_dependencies(
-            target="some/other/target",
+            specs=["some/other/target"],
+            transitive=True,
+            dependency_type=DependencyType.SOURCE_AND_THIRD_PARTY,
             expected=[
                 "some/target:target",
                 "dep/target:target",
@@ -127,6 +130,26 @@ class DependenciesIntegrationTest(GoalRuleTestBase):
                 "req1==1.0.0",
                 "req2==1.0.0",
             ],
+        )
+
+        # Glob the whole repo. `some/other/target` should not be included because nothing depends
+        # on it.
+        self.assert_dependencies(
+            specs=["::"],
+            expected=[
+                "3rdparty/python:req1",
+                "3rdparty/python:req2",
+                "dep/target:target",
+                "some/target:target",
+            ],
+        )
+        self.assert_dependencies(
+            specs=["::"],
             transitive=True,
-            dependency_type=DependencyType.SOURCE_AND_THIRD_PARTY,
+            expected=[
+                "3rdparty/python:req1",
+                "3rdparty/python:req2",
+                "dep/target:target",
+                "some/target:target",
+            ],
         )
