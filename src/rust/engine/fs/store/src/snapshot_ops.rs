@@ -671,9 +671,9 @@ pub trait SnapshotOps: StoreWrapper + 'static {
         x => {
           return Err(
             format!(
-              "Cannot add path prefix `{}`: in particular, component \"{:?}\".",
+              "Cannot add component \"{:?}\" of path prefix `{}`.",
+              x,
               prefix.display(),
-              x
             )
             .into(),
           )

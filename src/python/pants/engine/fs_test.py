@@ -396,8 +396,8 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         assert digest == output_digest
 
         # Illegal.
-        with self.assertRaisesWithMessageContaining(
-            Exception, "Cannot add path prefix `../something`: in particular, component "
+        with self.assertRaisesRegex(
+            Exception, r"Cannot add component .*ParentDir.* of path prefix `../something`."
         ):
             self.request_single_product(Digest, AddPrefix(digest, "../something"))
 
