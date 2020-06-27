@@ -32,8 +32,8 @@
 pub mod entry;
 mod node;
 
-pub use crate::entry::{Entry, EntryState};
-use crate::entry::{Generation, RunToken};
+use crate::entry::Generation;
+pub use crate::entry::{Entry, EntryResult, RunToken};
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fs::File;
@@ -44,28 +44,44 @@ use std::time::Duration;
 
 use fnv::FnvHasher;
 use futures::future;
-use log::{debug, info, trace, warn};
+use log::{debug, info, trace};
 use parking_lot::Mutex;
 use petgraph::graph::DiGraph;
 use petgraph::visit::EdgeRef;
 use petgraph::Direction;
 use tokio::time::delay_for;
 
-pub use crate::node::{EntryId, Node, NodeContext, NodeError, NodeVisualizer};
+pub use crate::node::{EdgeId, EntryId, Node, NodeContext, NodeError, NodeVisualizer};
 
 type FNV = BuildHasherDefault<FnvHasher>;
 
-type PGraph<N> = DiGraph<Entry<N>, f32, u32>;
+type PGraph<N> = DiGraph<Entry<N>, (EdgeType, RunToken), u32>;
+
+///
+/// When an edge is created, it is created with one of two types.
+///
+/// A "strong" edge is required, and will always either return the value of the Node it depends
+/// on, or fail if the creation of the edge would result in a cycle of strong edges.
+///
+/// A "weak" edge is optional, in that if adding a weak edge would create a cycle in the graph, the
+/// request for the value may return None rather than failing.
+///
+/// TODO: Currently we do not allow a Node with a weak dependency to participate in a cycle with
+/// itself that involves a strong edge. This means that entering a `strong-weak` cycle from one
+/// side rather than the other has a different result (namely, one side will fail with a cycle
+/// error, while the other doesn't). This can be worked around by making both edges weak.
+///   see https://github.com/pantsbuild/pants/issues/10229
+///
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+enum EdgeType {
+  Weak,
+  Strong,
+}
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct InvalidationResult {
   pub cleared: usize,
   pub dirtied: usize,
-}
-
-enum GetError<N: Node> {
-  Cycled(Vec<Entry<N>>),
-  Other(N::Error),
 }
 
 type Nodes<N> = HashMap<N, EntryId>;
@@ -107,29 +123,46 @@ impl<N: Node> InnerGraph<N> {
     id
   }
 
+  fn add_edge(
+    &mut self,
+    src_id: EntryId,
+    dst_id: EntryId,
+    edge_type: EdgeType,
+    run_token: RunToken,
+  ) {
+    trace!(
+      "Adding dependency {:?} from {:?} to {:?}",
+      (edge_type, run_token),
+      self.entry_for_id(src_id).unwrap().node(),
+      self.entry_for_id(dst_id).unwrap().node(),
+    );
+    self.pg.add_edge(src_id, dst_id, (edge_type, run_token));
+  }
+
   ///
-  /// Detect whether adding an edge from src to dst would create a cycle.
+  /// Detect whether adding an edge from src to dst would create a cycle and returns a path which
+  /// would represent the cycle if an edge were added from src to dst. Returns None if no cycle
+  /// would be created.
   ///
-  /// Returns a path which would cause the cycle if an edge were added from src to dst, or None if
-  /// no cycle would be created.
+  /// This is a very expensive method relative to `detect_cycle`: if you don't need the cyclic
+  /// path, prefer to call `detect_cycle`.
   ///
-  /// This strongly optimizes for the case of no cycles. If cycles are detected, this is very
-  /// expensive to call.
-  ///
-  fn report_cycle(&self, src_id: EntryId, dst_id: EntryId) -> Option<Vec<Entry<N>>> {
-    if src_id == dst_id {
-      let entry = self.entry_for_id(src_id).unwrap();
-      return Some(vec![entry.clone(), entry.clone()]);
-    }
-    if !self.detect_cycle(src_id, dst_id) {
+  fn detect_and_compute_cycle(
+    &self,
+    src_id: EntryId,
+    dst_id: EntryId,
+    should_include_edge: impl Fn(EdgeId) -> bool,
+  ) -> Option<Vec<N>> {
+    if !self.detect_cycle(src_id, dst_id, &should_include_edge) {
       return None;
     }
-    Self::shortest_path(&self.pg, dst_id, src_id).map(|mut path| {
+
+    Self::shortest_path(&self.pg, dst_id, src_id, should_include_edge).map(|mut path| {
       path.reverse();
       path.push(dst_id);
       path
         .into_iter()
-        .map(|index| self.entry_for_id(index).unwrap().clone())
+        .map(|node_index| self.unsafe_entry_for_id(node_index).node().clone())
         .collect()
     })
   }
@@ -140,7 +173,12 @@ impl<N: Node> InnerGraph<N> {
   /// Uses Dijkstra's algorithm, which is significantly cheaper than the Bellman-Ford, but keeps
   /// less context around paths on the way.
   ///
-  fn detect_cycle(&self, src_id: EntryId, dst_id: EntryId) -> bool {
+  fn detect_cycle(
+    &self,
+    src_id: EntryId,
+    dst_id: EntryId,
+    should_include_edge: impl Fn(EdgeId) -> bool,
+  ) -> bool {
     // Search either forward from the dst, or backward from the src.
     let (root, needle, direction) = {
       let out_from_dst = self.pg.neighbors(dst_id).count();
@@ -159,7 +197,7 @@ impl<N: Node> InnerGraph<N> {
     let mut roots = VecDeque::new();
     roots.push_back(root);
     self
-      .walk(roots, direction, |_| false)
+      .walk(roots, direction, should_include_edge)
       .any(|eid| eid == needle)
   }
 
@@ -169,9 +207,33 @@ impl<N: Node> InnerGraph<N> {
   /// Uses Bellman-Ford, which is pretty expensive O(VE) as it has to traverse the whole graph and
   /// keeping a lot of state on the way.
   ///
-  fn shortest_path(graph: &PGraph<N>, src: EntryId, dst: EntryId) -> Option<Vec<EntryId>> {
-    let (_path_weights, paths) = petgraph::algo::bellman_ford(graph, src)
-      .expect("There should not be any negative edge weights");
+  fn shortest_path(
+    graph: &PGraph<N>,
+    src: EntryId,
+    dst: EntryId,
+    should_include_edge: impl Fn(EdgeId) -> bool,
+  ) -> Option<Vec<EntryId>> {
+    let (_path_weights, paths) = {
+      // We map the graph to an empty graph with the same node structure, but with potentially
+      // fewer edges (based on the predicate). Edges are given equal-weighted float edges, because
+      // bellman_ford requires weights.
+      //
+      // Because the graph has identical nodes, it also has identical node indices (guaranteed by
+      // `filter_map`), and we can use the returned path structure as indices into the original
+      // graph.
+      let float_graph = graph.filter_map(
+        |_entry_id, _node| Some(()),
+        |edge_index, _edge_type| {
+          if should_include_edge(edge_index) {
+            Some(1.0_f32)
+          } else {
+            None
+          }
+        },
+      );
+      petgraph::algo::bellman_ford(&float_graph, src)
+        .expect("There should not be any negative edge weights")
+    };
 
     let mut next = dst;
     let mut path = Vec::new();
@@ -279,18 +341,18 @@ impl<N: Node> InnerGraph<N> {
   /// The Walk will iterate over all nodes that descend from the roots in the direction of
   /// traversal but won't necessarily be in topological order.
   ///
-  fn walk<F: Fn(&EntryId) -> bool>(
+  fn walk<F: Fn(EdgeId) -> bool>(
     &self,
     roots: VecDeque<EntryId>,
     direction: Direction,
-    stop_walking_predicate: F,
+    should_walk_edge: F,
   ) -> Walk<'_, N, F> {
     Walk {
       graph: self,
       direction: direction,
       deque: roots,
       walked: HashSet::default(),
-      stop_walking_predicate,
+      should_walk_edge,
     }
   }
 
@@ -329,7 +391,7 @@ impl<N: Node> InnerGraph<N> {
       .walk(
         root_ids.iter().cloned().collect(),
         Direction::Incoming,
-        |_| false,
+        |_| true,
       )
       .filter(|eid| !root_ids.contains(eid))
       .collect();
@@ -355,7 +417,7 @@ impl<N: Node> InnerGraph<N> {
 
     // Dirty transitive entries, but do not yet clear their output edges. We wait to clear
     // outbound edges until we decide whether we can clean an entry: if we can, all edges are
-    // preserved; if we can't, they are cleared in `Graph::clear_deps`.
+    // preserved; if we can't, they are cleared in `Graph::clear_stale_edges`.
     for id in &transitive_ids {
       if let Some(mut entry) = self.pg.node_weight_mut(*id).cloned() {
         entry.dirty(self);
@@ -391,7 +453,7 @@ impl<N: Node> InnerGraph<N> {
       .cloned()
       .collect();
 
-    for eid in self.walk(root_entries, Direction::Outgoing, |_| false) {
+    for eid in self.walk(root_entries, Direction::Outgoing, |_| true) {
       let entry = self.unsafe_entry_for_id(eid);
       let node_str = entry.format(context);
 
@@ -428,9 +490,7 @@ impl<N: Node> InnerGraph<N> {
       .cloned()
       .collect();
     self.live_internal(
-      self
-        .walk(root_ids, Direction::Outgoing, |_| false)
-        .collect(),
+      self.walk(root_ids, Direction::Outgoing, |_| true).collect(),
       context.clone(),
     )
   }
@@ -452,7 +512,26 @@ impl<N: Node> InnerGraph<N> {
 }
 
 ///
-/// A DAG (enforced on mutation) of Entries.
+/// A potentially cyclic graph of Nodes and their dependencies.
+///
+/// ----
+///
+/// A note on cycles: We track the dependencies of Nodes for two primary reasons:
+///
+///   1. To allow for invalidation/dirtying/clearing when the transitive dependencies of a Node
+///      have changed. See `invalidate_from_roots` for more information on this usecase.
+///   2. To detect situations where a running Node might depend on its own result, which would
+///      cause it to deadlock.
+///
+/// The first usecase (invalidation) does not care about cycles in the graph: if a Node
+/// transitively depends on a previous version of itself, that's ok, as invalidation will dirty
+/// the entire cycle.
+///
+/// The second case does care about cycle detection though, so when new dependencies are introduced
+/// in the graph we cycle detect for the case where a running Node might depend on its own result
+/// (as determined by the RunToken). Notably, this does _not_ prevent a Node from depending on a
+/// previous run of itself, as that cannot cause a deadlock: the two computations are independent.
+/// See Graph::report_cycle for more information.
 ///
 pub struct Graph<N: Node> {
   inner: Mutex<InnerGraph<N>>,
@@ -480,12 +559,32 @@ impl<N: Node> Graph<N> {
     inner.nodes.len()
   }
 
+  ///
+  /// A live edge is an edge leaving a Running node with a matching RunToken: ie, an edge that was
+  /// created by the active run of a node. Live edges are not allowed to form cycles, as that would
+  /// cause work to deadlock on itself.
+  ///
+  fn live_edge_predicate<'a>(inner: &'a InnerGraph<N>) -> impl Fn(EdgeId) -> bool + 'a {
+    move |edge_id| {
+      let (edge_src_id, _) = inner.pg.edge_endpoints(edge_id).unwrap();
+      // TODO: This means we're acquiring entry locks per edge... not great. Almost better to just
+      // get rid of Entry locks.
+      if let Some(running_run_token) = inner.unsafe_entry_for_id(edge_src_id).running_run_token() {
+        // Only include the edge if it is live.
+        inner.pg[edge_id].1 == running_run_token
+      } else {
+        // Node is not running.
+        false
+      }
+    }
+  }
+
   async fn get_inner(
     &self,
-    src_id: Option<EntryId>,
     context: &N::Context,
     dst_node: N,
-  ) -> Result<(N::Item, Generation), GetError<N>> {
+    edge_type: EdgeType,
+  ) -> Result<Option<(N::Item, Generation)>, N::Error> {
     // Compute information about the dst under the Graph lock, and then release it.
     let (dst_retry, mut entry, entry_id) = {
       // Get or create the destination, and then insert the dep and return its state.
@@ -494,20 +593,39 @@ impl<N: Node> Graph<N> {
       // TODO: doing cycle detection under the lock... unfortunate, but probably unavoidable
       // without a much more complicated algorithm.
       let dst_id = inner.ensure_entry(dst_node);
-      let dst_retry = if let Some(src_id) = src_id {
-        if let Some(cycle_path) = Self::report_cycle(src_id, dst_id, &mut inner, context) {
-          return Err(GetError::Cycled(cycle_path));
+      let dst_retry = if let Some((src_id, run_token)) = context.entry_id_and_run_token() {
+        // See whether adding this edge would create a cycle.
+        if inner.detect_cycle(src_id, dst_id, Self::live_edge_predicate(&inner)) {
+          // If we have detected a cycle, the type of edge becomes relevant: a strong edge will
+          // report the cycle as a failure, while a weak edge will go ahead and add the dependency,
+          // but return None to indicate that it isn't consumable.
+          match edge_type {
+            EdgeType::Strong => {
+              if let Some(cycle_path) =
+                inner.detect_and_compute_cycle(src_id, dst_id, Self::live_edge_predicate(&inner))
+              {
+                debug!(
+                  "Detected cycle considering adding edge from {:?} to {:?}; existing path: {:?}",
+                  inner.entry_for_id(src_id).unwrap().node(),
+                  inner.entry_for_id(dst_id).unwrap().node(),
+                  cycle_path
+                );
+                // Cyclic dependency: render an error.
+                let path_strs = cycle_path.into_iter().map(|n| n.to_string()).collect();
+                return Err(N::Error::cyclic(path_strs));
+              }
+            }
+            EdgeType::Weak => {
+              // NB: A weak edge is still recorded, as the result can affect the behavior of the
+              // node, and nodes with weak edges complete as Dirty to allow them to re-run.
+              inner.add_edge(src_id, dst_id, edge_type, run_token);
+              return Ok(None);
+            }
+          }
         }
 
         // Valid dependency.
-        trace!(
-          "Adding dependency from {:?} to {:?}",
-          inner.entry_for_id(src_id).unwrap().node(),
-          inner.entry_for_id(dst_id).unwrap().node()
-        );
-        // All edges get a weight of 1.0 so that we can Bellman-Ford over the graph, treating each
-        // edge as having equal weight.
-        inner.pg.add_edge(src_id, dst_id, 1.0);
+        inner.add_edge(src_id, dst_id, edge_type, run_token);
 
         // We can retry the dst Node if the src Node is not cacheable. If the src is not cacheable,
         // it only be allowed to run once, and so Node invalidation does not pass through it.
@@ -531,7 +649,7 @@ impl<N: Node> Graph<N> {
       let context = context.clone();
       loop {
         match entry.get(&context, entry_id).await {
-          Ok(r) => break Ok(r),
+          Ok(r) => break Ok(Some(r)),
           Err(err) if err == N::Error::invalidated() => {
             let node = {
               let inner = self.inner.lock();
@@ -544,17 +662,17 @@ impl<N: Node> Graph<N> {
             delay_for(self.invalidation_delay).await;
             continue;
           }
-          Err(other_err) => break Err(GetError::Other(other_err)),
+          Err(other_err) => break Err(other_err),
         }
       }
     } else {
       // Not retriable.
-      entry.get(context, entry_id).await.map_err(GetError::Other)
+      Ok(Some(entry.get(context, entry_id).await?))
     }
   }
 
   ///
-  /// Request the given dst Node, optionally in the context of the given src Node.
+  /// Request the given dst Node in the given Context (which might represent a src Node).
   ///
   /// If there is no src Node, or the src Node is not cacheable, this method will retry for
   /// invalidation until the Node completes.
@@ -562,23 +680,11 @@ impl<N: Node> Graph<N> {
   /// Invalidation events in the graph (generally, filesystem changes) will cause cacheable Nodes
   /// to be retried here for up to `invalidation_timeout`.
   ///
-  pub async fn get(
-    &self,
-    src_id: Option<EntryId>,
-    context: &N::Context,
-    dst_node: N,
-  ) -> Result<N::Item, N::Error> {
-    match self.get_inner(src_id, context, dst_node).await {
-      Ok((res, _generation)) => Ok(res),
-      Err(GetError::Cycled(cycle_path)) => {
-        // Cyclic dependency: render an error.
-        let path_strs = cycle_path
-          .into_iter()
-          .map(|e| e.node().to_string())
-          .collect();
-        Err(N::Error::cyclic(path_strs))
-      }
-      Err(GetError::Other(e)) => Err(e),
+  pub async fn get(&self, context: &N::Context, dst_node: N) -> Result<N::Item, N::Error> {
+    match self.get_inner(context, dst_node, EdgeType::Strong).await {
+      Ok(Some((res, _generation))) => Ok(res),
+      Err(e) => Err(e),
+      Ok(None) => unreachable!("A strong dependency cannot return None."),
     }
   }
 
@@ -587,22 +693,21 @@ impl<N: Node> Graph<N> {
   ///
   pub async fn get_weak(
     &self,
-    src_id: Option<EntryId>,
     context: &N::Context,
     dst_node: N,
   ) -> Result<Option<N::Item>, N::Error> {
-    match self.get_inner(src_id, context, dst_node).await {
-      Ok((res, _generation)) => Ok(Some(res)),
-      Err(GetError::Cycled(_)) => Ok(None),
-      Err(GetError::Other(e)) => Err(e),
+    match self.get_inner(context, dst_node, EdgeType::Weak).await {
+      Ok(Some((res, _generation))) => Ok(Some(res)),
+      Ok(None) => Ok(None),
+      Err(e) => Err(e),
     }
   }
 
   ///
-  /// Return the value of the given Node. Shorthand for `self.get(None, context, node)`.
+  /// Return the value of the given Node. Synonym for `self.get(context, node)`.
   ///
   pub async fn create(&self, node: N, context: &N::Context) -> Result<N::Item, N::Error> {
-    self.get(None, context, node).await
+    self.get(context, node).await
   }
 
   ///
@@ -632,68 +737,10 @@ impl<N: Node> Graph<N> {
 
     // Re-request the Node.
     let (res, generation) = self
-      .get_inner(None, context, node)
-      .await
-      .map_err(|e| match e {
-        GetError::Other(e) => e,
-        GetError::Cycled(_) => unreachable!("A get request with no source cannot cycle."),
-      })?;
+      .get_inner(context, node, EdgeType::Strong)
+      .await?
+      .expect("A strong dependency cannot return None.");
     Ok((res, LastObserved(generation)))
-  }
-
-  fn report_cycle(
-    src_id: EntryId,
-    potential_dst_id: EntryId,
-    inner: &mut InnerGraph<N>,
-    context: &N::Context,
-  ) -> Option<Vec<Entry<N>>> {
-    let mut counter = 0;
-    loop {
-      // Find one cycle if any cycles exist.
-      if let Some(cycle_path) = inner.report_cycle(src_id, potential_dst_id) {
-        // See if the cycle contains any dirty nodes. If there are dirty nodes, we can try clearing
-        // them, and then check if there are still any cycles in the graph.
-        let dirty_nodes: HashSet<_> = cycle_path
-          .iter()
-          .filter(|n| !n.is_clean(context))
-          .map(|n| n.node().clone())
-          .collect();
-        if dirty_nodes.is_empty() {
-          // We detected a cycle with no dirty nodes - there's a cycle and there's nothing we can do
-          // to remove it. We only log at debug because the UI will render the cycle.
-          debug!(
-            "Detected cycle considering adding edge from {:?} to {:?}; existing path: {:?}",
-            inner.entry_for_id(src_id).unwrap(),
-            inner.entry_for_id(potential_dst_id).unwrap(),
-            cycle_path
-          );
-          return Some(cycle_path);
-        }
-        counter += 1;
-        // Obsolete edges from a dirty node may cause fake cycles to be detected if there was a
-        // dirty dep from A to B, and we're trying to add a dep from B to A.
-        // If we detect a cycle that contains dirty nodes (and so potentially obsolete edges),
-        // we repeatedly cycle-detect, clearing (and re-running) and dirty nodes (and their edges)
-        // that we encounter.
-        //
-        // We do this repeatedly, because there may be multiple paths which would cause cycles,
-        // which contain dirty nodes. If we've cleared 10 separate paths which contain dirty nodes,
-        // and are still detecting cycle-causing paths containing dirty nodes, give up. 10 is a very
-        // arbitrary number, which we can increase if we find real graphs in the wild which hit this
-        // limit.
-        if counter > 10 {
-          warn!(
-            "Couldn't remove cycle containing dirty nodes after {} attempts; nodes in cycle: {:?}",
-            counter, cycle_path
-          );
-          return Some(cycle_path);
-        }
-        // Clear the dirty nodes, removing the edges from them, and try again.
-        inner.invalidate_from_roots(|node| dirty_nodes.contains(node));
-      } else {
-        return None;
-      }
-    }
   }
 
   ///
@@ -716,34 +763,46 @@ impl<N: Node> Graph<N> {
     entry_id: EntryId,
     context: &N::Context,
   ) -> Result<Vec<Generation>, N::Error> {
-    let generations = {
+    let dep_nodes = {
       let inner = self.inner.lock();
-      let dep_ids = inner
+      inner
         .pg
-        .neighbors_directed(entry_id, Direction::Outgoing)
-        .collect::<Vec<_>>();
-
-      dep_ids
-        .into_iter()
-        .map(|dep_id| {
-          let mut entry = inner
-            .entry_for_id(dep_id)
+        .edges_directed(entry_id, Direction::Outgoing)
+        .map(|edge_ref| {
+          let entry = inner
+            .entry_for_id(edge_ref.target())
             .unwrap_or_else(|| panic!("Dependency not present in Graph."))
             .clone();
-          async move {
-            let (_, generation) = entry.get(context, dep_id).await?;
-            Ok(generation)
-          }
+          (edge_ref.weight().0, entry.node().clone())
         })
         .collect::<Vec<_>>()
     };
-    future::try_join_all(generations).await
+    let generations = dep_nodes
+      .into_iter()
+      .map(|(edge_type, node)| async move {
+        Ok(
+          self
+            .get_inner(context, node, edge_type)
+            .await?
+            .map(|(_, generation)| generation),
+        )
+      })
+      .collect::<Vec<_>>();
+    // Weak edges might have returned None: we filter those out, and expect that it might cause the
+    // Node to fail to be cleaned.
+    Ok(
+      future::try_join_all(generations)
+        .await?
+        .into_iter()
+        .filter_map(std::convert::identity)
+        .collect(),
+    )
   }
 
   ///
-  /// Clears the dependency edges of the given EntryId if the RunToken matches.
+  /// Garbage collects the dependency edges of the given EntryId if the RunToken matches.
   ///
-  fn clear_deps(&self, entry_id: EntryId, run_token: RunToken) {
+  fn clear_stale_edges(&self, entry_id: EntryId, run_token: RunToken) {
     let mut inner = self.inner.lock();
     // If the RunToken mismatches, return.
     if let Some(entry) = inner.entry_for_id(entry_id) {
@@ -752,33 +811,33 @@ impl<N: Node> Graph<N> {
       }
     }
 
-    // Otherwise, clear the deps.
-    // NB: Because `remove_edge` changes EdgeIndex values, we remove edges one at a time.
-    while let Some(dep_edge) = inner
-      .pg
-      .edges_directed(entry_id, Direction::Outgoing)
-      .next()
-      .map(|edge| edge.id())
-    {
-      inner.pg.remove_edge(dep_edge);
+    // Collect stale edges.
+    // NB: Because `remove_edge` changes EdgeIndex values, we sort the indices and remove them
+    // back to front to avoid invalidating EdgeIndexes as we go.
+    let descending_stale_edges = {
+      let mut stale_edges = inner
+        .pg
+        .edges_directed(entry_id, Direction::Outgoing)
+        .filter_map(|edge| {
+          if edge.weight().1 == run_token {
+            None
+          } else {
+            Some(edge.id())
+          }
+        })
+        .collect::<Vec<_>>();
+      stale_edges.sort_by(|a, b| a.cmp(b).reverse());
+      stale_edges
+    };
+    for edge in descending_stale_edges {
+      inner.pg.remove_edge(edge);
     }
   }
 
   ///
-  /// When the Executor finishes executing a Node it calls back to store the result value. We use
-  /// the run_token to determine whether the Node changed while we were busy executing it, so that
-  /// we can discard the work.
-  ///
-  /// TODO: We don't track which generation actually added which edges, so over time nodes will end
-  /// up with spurious dependencies. This is mostly sound, but may lead to over-invalidation and
-  /// doing more work than is necessary.
-  /// As an example, if generation 0 of X depends on A and B, and generation 1 of X depends on C,
-  /// nothing will prune the dependencies from X onto A and B, so generation 1 of X will have
-  /// dependencies on A, B, and C in the graph, even though running it only depends on C.
-  /// At some point we should address this, but we must be careful with how we do so; anything which
-  /// ties together the generation of a node with specifics of edges would require careful
-  /// consideration of locking (probably it would require merging the EntryState locks and Graph
-  /// locks, or working out something clever).
+  /// When the Executor finishes executing a Node it calls back to store the result value.
+  /// Entry::complete uses the run_token to determine whether the Node changed while we were busy
+  /// executing it, so that it can discard the work.
   ///
   fn complete(
     &self,
@@ -787,42 +846,50 @@ impl<N: Node> Graph<N> {
     run_token: RunToken,
     result: Option<Result<N::Item, N::Error>>,
   ) {
-    let (entry, has_uncacheable_deps, dep_generations) = {
+    let (entry, has_uncacheable_deps, has_weak_deps, dep_generations) = {
       let inner = self.inner.lock();
       let mut has_uncacheable_deps = false;
+      let mut has_weak_deps = false;
       // Get the Generations of all dependencies of the Node. We can trust that these have not changed
       // since we began executing, as long as the entry's RunToken is still valid (confirmed in
       // Entry::complete).
       let dep_generations = inner
         .pg
-        .neighbors_directed(entry_id, Direction::Outgoing)
-        .filter_map(|dep_id| inner.entry_for_id(dep_id))
-        .map(|entry| {
-          // If a dependency is itself uncacheable or has uncacheable deps, this Node should
-          // also complete as having uncacheable dpes, independent of matching Generation values.
-          // This is to allow for the behaviour that an uncacheable Node should always have "dirty"
-          // (marked as UncacheableDependencies) dependents, transitively.
-          if !entry.node().cacheable() || entry.has_uncacheable_deps() {
-            has_uncacheable_deps = true;
+        .edges_directed(entry_id, Direction::Outgoing)
+        .filter_map(|edge_ref| {
+          if edge_ref.weight().1 == run_token {
+            if edge_ref.weight().0 == EdgeType::Weak {
+              has_weak_deps = true;
+            }
+            // If a dependency is itself uncacheable or has uncacheable deps, this Node should
+            // also complete as having uncacheable deps, independent of matching Generation values.
+            // This is to allow for the behaviour that an uncacheable Node should always have "dirty"
+            // (marked as UncacheableDependencies) dependents, transitively.
+            let entry = inner.entry_for_id(edge_ref.target()).unwrap();
+            if !entry.node().cacheable() || entry.has_uncacheable_deps() {
+              has_uncacheable_deps = true;
+            }
+
+            Some(entry.generation())
+          } else {
+            None
           }
-          entry.generation()
         })
         .collect();
-      (
-        inner.entry_for_id(entry_id).cloned(),
-        has_uncacheable_deps,
-        dep_generations,
-      )
+
+      let entry = inner.entry_for_id(entry_id).unwrap().clone();
+      (entry, has_uncacheable_deps, has_weak_deps, dep_generations)
     };
-    if let Some(mut entry) = entry {
-      entry.complete(
-        context,
-        run_token,
-        dep_generations,
-        result,
-        has_uncacheable_deps,
-      );
-    }
+
+    // Attempt to complete the Node outside the graph lock.
+    entry.complete(
+      context,
+      run_token,
+      dep_generations,
+      result,
+      has_uncacheable_deps,
+      has_weak_deps,
+    );
   }
 
   ///
@@ -891,33 +958,46 @@ pub struct LastObserved(Generation);
 /// Represents the state of a particular walk through a Graph. Implements Iterator and has the same
 /// lifetime as the Graph itself.
 ///
-struct Walk<'a, N: Node, F>
-where
-  F: Fn(&EntryId) -> bool,
-{
+struct Walk<'a, N: Node, F: Fn(EdgeId) -> bool> {
   graph: &'a InnerGraph<N>,
   direction: Direction,
   deque: VecDeque<EntryId>,
   walked: HashSet<EntryId, FNV>,
-  stop_walking_predicate: F,
+  should_walk_edge: F,
 }
 
-impl<'a, N: Node + 'a, F: Fn(&EntryId) -> bool> Iterator for Walk<'a, N, F> {
+impl<'a, N: Node + 'a, F: Fn(EdgeId) -> bool> Iterator for Walk<'a, N, F> {
   type Item = EntryId;
 
   fn next(&mut self) -> Option<Self::Item> {
     while let Some(id) = self.deque.pop_front() {
-      // Visit this node and it neighbors if this node has not yet be visited and we aren't
-      // stopping our walk at this node, based on if it satisfies the stop_walking_predicate.
+      // Visit this node and its neighbors if this node has not yet be visited and we aren't
+      // stopping our walk at this node, based on if it satisfies the should_walk_edge.
       // This mechanism gives us a way to selectively dirty parts of the graph respecting node boundaries
       // like uncacheable nodes, which shouldn't be dirtied.
-      if !self.walked.insert(id) || (self.stop_walking_predicate)(&id) {
+      if !self.walked.insert(id) {
         continue;
       }
 
-      self
-        .deque
-        .extend(self.graph.pg.neighbors_directed(id, self.direction));
+      let should_walk_edge = &self.should_walk_edge;
+      let direction = self.direction;
+      self.deque.extend(
+        self
+          .graph
+          .pg
+          .edges_directed(id, self.direction)
+          .filter_map(|edge_ref| {
+            if should_walk_edge(edge_ref.id()) {
+              let node = match direction {
+                Direction::Outgoing => edge_ref.target(),
+                Direction::Incoming => edge_ref.source(),
+              };
+              Some(node)
+            } else {
+              None
+            }
+          }),
+      );
       return Some(id);
     }
 
