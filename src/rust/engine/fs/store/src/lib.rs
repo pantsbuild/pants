@@ -773,21 +773,29 @@ impl Store {
   ) -> BoxFuture<(), String> {
     let store = self.clone();
     async move {
-      if let RootOrParentMetadataBuilder::Root(..) = root_or_parent_metadata {
-        let destination = destination.clone();
-        store
-          .local
-          .executor()
-          .spawn_blocking(move || fs::safe_create_dir_all(&destination))
-          .await?;
-      } else {
-        let destination = destination.clone();
-        store
-          .local
-          .executor()
-          .spawn_blocking(move || fs::safe_create_dir(&destination))
-          .await?;
-      }
+      let directory_creation =
+        if let RootOrParentMetadataBuilder::Root(..) = root_or_parent_metadata {
+          let destination = destination.clone();
+          store
+            .local
+            .executor()
+            .spawn_blocking(move || fs::safe_create_dir_all(&destination))
+            .await
+        } else {
+          let destination = destination.clone();
+          store
+            .local
+            .executor()
+            .spawn_blocking(move || fs::safe_create_dir(&destination))
+            .await
+        };
+      directory_creation.map_err(|e| {
+        format!(
+          "Failed to create directory {}: {}",
+          destination.display(),
+          e
+        )
+      })?;
 
       let (directory, metadata) = store
         .load_directory(digest)

@@ -375,10 +375,31 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
             )
         )
         digest = self.request_single_product(Digest, input_files_content)
-        output_digest = self.request_single_product(Digest, AddPrefix(digest, "outer_dir"))
+
+        # Two components.
+        output_digest = self.request_single_product(
+            Digest, AddPrefix(digest, "outer_dir/middle_dir")
+        )
         snapshot = self.request_single_product(Snapshot, output_digest)
-        assert sorted(snapshot.files) == ["outer_dir/main.py", "outer_dir/subdir/sub.py"]
-        assert sorted(snapshot.dirs) == ["outer_dir", "outer_dir/subdir"]
+        assert sorted(snapshot.files) == [
+            "outer_dir/middle_dir/main.py",
+            "outer_dir/middle_dir/subdir/sub.py",
+        ]
+        assert sorted(snapshot.dirs) == [
+            "outer_dir",
+            "outer_dir/middle_dir",
+            "outer_dir/middle_dir/subdir",
+        ]
+
+        # Empty.
+        output_digest = self.request_single_product(Digest, AddPrefix(digest, ""))
+        assert digest == output_digest
+
+        # Illegal.
+        with self.assertRaisesWithMessageContaining(
+            Exception, "Cannot add path prefix `../something`: in particular, component "
+        ):
+            self.request_single_product(Digest, AddPrefix(digest, "../something"))
 
     def test_remove_prefix(self) -> None:
         # Set up files:
