@@ -48,9 +48,6 @@ from pants.backend.python.targets.python_requirements_file import (
 )
 from pants.backend.python.targets.python_tests import PythonTests as PythonTestsV1
 from pants.backend.python.targets.unpacked_whls import UnpackedWheels as UnpackedWheelsV1
-from pants.backend.python.tasks.build_local_python_distributions import (
-    BuildLocalPythonDistributions,
-)
 from pants.backend.python.tasks.gather_sources import GatherSources
 from pants.backend.python.tasks.local_python_distribution_artifact import (
     LocalPythonDistributionArtifact,
@@ -105,7 +102,6 @@ def build_file_aliases():
 
 def register_goals():
     task(name="interpreter", action=SelectInterpreter).install("pyprep")
-    task(name="build-local-dists", action=BuildLocalPythonDistributions).install("pyprep")
     task(name="requirements", action=ResolveRequirements).install("pyprep")
     task(name="sources", action=GatherSources).install("pyprep")
     task(name="py", action=PythonRun).install("run")
