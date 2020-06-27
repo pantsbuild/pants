@@ -40,8 +40,9 @@ class InjectInitTest(TestBase):
             self.make_snapshot({fp: "# declared" for fp in original_declared_files}),
             sources_stripped=declared_files_stripped,
         )
+        bootstrapper = create_options_bootstrapper(args=["--source-root-patterns=['src/python', 'tests/python']"])
         result = self.request_single_product(
-            InitInjectedSnapshot, Params(request, create_options_bootstrapper())
+            InitInjectedSnapshot, Params(request, bootstrapper)
         ).snapshot
         assert list(result.files) == sorted([*original_declared_files, *expected_discovered])
 
