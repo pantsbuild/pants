@@ -547,10 +547,19 @@ class TransitiveTarget:
 
 @dataclass(frozen=True)
 class TransitiveTargets:
-    """A set of Target roots, and their transitive, flattened, de-duped closure."""
+    """A set of Target roots, and their transitive, flattened, de-duped dependencies.
+
+    If a target root is a dependency of another target root, then it will show up both in `roots`
+    and in `dependencies`.
+    """
 
     roots: Tuple[Target, ...]
-    closure: FrozenOrderedSet[Target]
+    dependencies: FrozenOrderedSet[Target]
+
+    @memoized_property
+    def closure(self) -> FrozenOrderedSet[Target]:
+        """The roots and the dependencies combined."""
+        return FrozenOrderedSet([*self.roots, *self.dependencies])
 
 
 @frozen_after_init

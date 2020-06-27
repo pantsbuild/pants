@@ -77,4 +77,6 @@ class GraphTest(TestBase):
             Params(Addresses([root.address, d2.address]), create_options_bootstrapper()),
         )
         assert transitive_targets.roots == (root, d2)
+        # NB: `//:d2` is both a target root and a dependency of `//:root`.
+        assert transitive_targets.dependencies == FrozenOrderedSet([d1, d2, d3, t2, t1])
         assert transitive_targets.closure == FrozenOrderedSet([root, d2, d1, d3, t2, t1])
