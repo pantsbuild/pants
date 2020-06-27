@@ -4,7 +4,7 @@
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterable, Optional, Tuple
+from typing import Iterable, Optional, Tuple
 
 from pants.engine.collection import Collection
 from pants.engine.rules import RootRule, side_effecting
@@ -17,9 +17,6 @@ from pants.util.dirutil import (
     safe_file_dump,
 )
 from pants.util.meta import frozen_after_init
-
-if TYPE_CHECKING:
-    from pants.engine.internals.scheduler import SchedulerSession
 
 
 @dataclass(frozen=True)
@@ -281,15 +278,18 @@ class UrlToFetch:
 
 
 @side_effecting
-@dataclass(frozen=True)
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class Workspace:
-    """Abstract handle for operations that touch the real local filesystem."""
+    """Abstract handle for operations that touch the real local filesystem.
 
-    _scheduler: "SchedulerSession"
+    NB: The `_scheduler: SchedulerSession` field is untyped because fs.py and `scheduler.py` have a cycle.
+    """
 
-    def materialize_directory(
-        self, directory_to_materialize: DirectoryToMaterialize
-    ) -> MaterializeDirectoryResult:
+    def __init__(self, scheduler) -> None:
+        self._scheduler = scheduler
+
+    def materialize_directory(self, directory_to_materialize: DirectoryToMaterialize):
         """Materialize one single directory digest to disk.
 
         If you need to materialize multiple, you should use the parallel materialize_directories()
@@ -299,7 +299,7 @@ class Workspace:
 
     def materialize_directories(
         self, directories_to_materialize: Tuple[DirectoryToMaterialize, ...]
-    ) -> MaterializeDirectoriesResult:
+    ):
         """Materialize multiple directory digests to disk in parallel."""
         return self._scheduler.materialize_directories(directories_to_materialize)
 
