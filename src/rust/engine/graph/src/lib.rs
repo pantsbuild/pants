@@ -766,17 +766,8 @@ impl<N: Node> Graph<N> {
 
   ///
   /// When the Executor finishes executing a Node it calls back to store the result value. We use
-  /// the run_token and dirty bits to determine whether the Node changed while we were busy
-  /// executing it, so that we can discard the work.
-  ///
-  /// We use the dirty bit in addition to the RunToken in order to avoid cases where dependencies
-  /// change while we're running. In order for a dependency to "change" it must have been cleared
-  /// or been marked dirty. But if our dependencies have been cleared or marked dirty, then we will
-  /// have been as well. We can thus use the dirty bit as a signal that the generation values of
-  /// our dependencies are still accurate. The dirty bit is safe to rely on as it is only ever
-  /// mutated, and dependencies' dirty bits are only read, under the InnerGraph lock - this is only
-  /// reliably the case because Entry happens to require a &mut InnerGraph reference; it would be
-  /// great not to violate that in the future.
+  /// the run_token to determine whether the Node changed while we were busy executing it, so that
+  /// we can discard the work.
   ///
   /// TODO: We don't track which generation actually added which edges, so over time nodes will end
   /// up with spurious dependencies. This is mostly sound, but may lead to over-invalidation and
@@ -789,13 +780,6 @@ impl<N: Node> Graph<N> {
   /// consideration of locking (probably it would require merging the EntryState locks and Graph
   /// locks, or working out something clever).
   ///
-  /// It would also require careful consideration of nodes in the Running EntryState - these may
-  /// have previous RunToken edges and next RunToken edges which collapse into the same Generation
-  /// edges; when working out whether a dirty node is really clean, care must be taken to avoid
-  /// spurious cycles. Currently we handle this as a special case by, if we detect a cycle that
-  /// contains dirty nodes, clearing those nodes (removing any edges from them). This is a little
-  /// hacky, but will tide us over until we fully solve this problem.
-  ///
   fn complete(
     &self,
     context: &N::Context,
@@ -807,7 +791,8 @@ impl<N: Node> Graph<N> {
       let inner = self.inner.lock();
       let mut has_uncacheable_deps = false;
       // Get the Generations of all dependencies of the Node. We can trust that these have not changed
-      // since we began executing, as long as we are not currently marked dirty (see the method doc).
+      // since we began executing, as long as the entry's RunToken is still valid (confirmed in
+      // Entry::complete).
       let dep_generations = inner
         .pg
         .neighbors_directed(entry_id, Direction::Outgoing)
@@ -830,14 +815,12 @@ impl<N: Node> Graph<N> {
       )
     };
     if let Some(mut entry) = entry {
-      let mut inner = self.inner.lock();
       entry.complete(
         context,
         run_token,
         dep_generations,
         result,
         has_uncacheable_deps,
-        &mut inner,
       );
     }
   }
