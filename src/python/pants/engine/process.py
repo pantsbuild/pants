@@ -178,7 +178,8 @@ class ProcessExecutionFailure(Exception):
         super().__init__(
             "\n".join(
                 [
-                    f"Process '{process_description}' failed with exit code {exit_code}.\nstdout:",
+                    f"Process '{process_description}' failed with exit code {exit_code}.",
+                    "stdout:",
                     stdout.decode(),
                     "stderr:",
                     stderr.decode(),
