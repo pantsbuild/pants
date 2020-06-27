@@ -28,16 +28,10 @@ PYLINT_FAILURE_RETURN_CODE = 16
 
 
 class PylintIntegrationTest(ExternalToolTestBase):
-    source_root = "src/python"
-    good_source = FileContent(
-        f"{source_root}/good.py", b"'''docstring'''\nUPPERCASE_CONSTANT = ''\n",
-    )
-    bad_source = FileContent(
-        f"{source_root}/bad.py", b"'''docstring'''\nlowercase_constant = ''\n",
-    )
-    py3_only_source = FileContent(
-        f"{source_root}/py3.py", b"'''docstring'''\nCONSTANT: str = ''\n",
-    )
+    package = "src/python/project"
+    good_source = FileContent(f"{package}/good.py", b"'''docstring'''\nUPPERCASE_CONSTANT = ''\n",)
+    bad_source = FileContent(f"{package}/bad.py", b"'''docstring'''\nlowercase_constant = ''\n",)
+    py3_only_source = FileContent(f"{package}/py3.py", b"'''docstring'''\nCONSTANT: str = ''\n",)
 
     @classmethod
     def alias_groups(cls):
@@ -60,16 +54,19 @@ class PylintIntegrationTest(ExternalToolTestBase):
         self,
         source_files: List[FileContent],
         *,
+        package: Optional[str] = None,
         name: str = "target",
         interpreter_constraints: Optional[str] = None,
         origin: Optional[OriginSpec] = None,
         dependencies: Optional[List[Address]] = None,
     ) -> TargetWithOrigin:
+        if not package:
+            package = self.package
         for source_file in source_files:
             self.create_file(source_file.path, source_file.content.decode())
         source_globs = [PurePath(source_file.path).name for source_file in source_files]
         self.add_to_build_file(
-            self.source_root,
+            package,
             dedent(
                 f"""\
                 python_library(
@@ -81,9 +78,9 @@ class PylintIntegrationTest(ExternalToolTestBase):
                 """
             ),
         )
-        target = self.request_single_product(WrappedTarget, Address(self.source_root, name)).target
+        target = self.request_single_product(WrappedTarget, Address(package, name)).target
         if origin is None:
-            origin = SingleAddress(directory=self.source_root, name=name)
+            origin = SingleAddress(directory=package, name=name)
         return TargetWithOrigin(target, origin)
 
     def run_pylint(
@@ -97,7 +94,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
     ) -> LintResults:
         args = [
             "--backend-packages2=pants.backend.python.lint.pylint",
-            "--source-root-patterns=src/python",
+            "--source-root-patterns=['src/python', 'tests/python']",
         ]
         if config:
             self.create_file(relpath="pylintrc", contents=config)
@@ -128,15 +125,15 @@ class PylintIntegrationTest(ExternalToolTestBase):
         result = self.run_pylint([target])
         assert len(result) == 1
         assert result[0].exit_code == PYLINT_FAILURE_RETURN_CODE
-        assert f"{self.source_root}/bad.py:2:0: C0103" in result[0].stdout
+        assert f"{self.package}/bad.py:2:0: C0103" in result[0].stdout
 
     def test_mixed_sources(self) -> None:
         target = self.make_target_with_origin([self.good_source, self.bad_source])
         result = self.run_pylint([target])
         assert len(result) == 1
         assert result[0].exit_code == PYLINT_FAILURE_RETURN_CODE
-        assert f"{self.source_root}/good.py" not in result[0].stdout
-        assert f"{self.source_root}/bad.py:2:0: C0103" in result[0].stdout
+        assert f"{self.package}/good.py" not in result[0].stdout
+        assert f"{self.package}/bad.py:2:0: C0103" in result[0].stdout
 
     def test_multiple_targets(self) -> None:
         targets = [
@@ -146,8 +143,8 @@ class PylintIntegrationTest(ExternalToolTestBase):
         result = self.run_pylint(targets)
         assert len(result) == 1
         assert result[0].exit_code == PYLINT_FAILURE_RETURN_CODE
-        assert f"{self.source_root}/good.py" not in result[0].stdout
-        assert f"{self.source_root}/bad.py:2:0: C0103" in result[0].stdout
+        assert f"{self.package}/good.py" not in result[0].stdout
+        assert f"{self.package}/bad.py:2:0: C0103" in result[0].stdout
 
     def test_precise_file_args(self) -> None:
         target = self.make_target_with_origin(
@@ -221,23 +218,21 @@ class PylintIntegrationTest(ExternalToolTestBase):
                 """
             ),
         )
-        self.add_to_build_file(
-            self.source_root, "python_library(name='transitive_dep', sources=[])\n"
-        )
+        self.add_to_build_file(self.package, "python_library(name='transitive_dep', sources=[])\n")
         self.create_file(
-            f"{self.source_root}/direct_dep.py",
+            f"{self.package}/direct_dep.py",
             dedent(
                 """\
                 # No docstring - Pylint doesn't lint dependencies.
 
-                from transitive_dep import doesnt_matter_if_variable_exists
+                from project.transitive_dep import doesnt_matter_if_variable_exists
 
                 THIS_VARIABLE_EXISTS = ''
                 """
             ),
         )
         self.add_to_build_file(
-            self.source_root,
+            self.package,
             dedent(
                 """\
                 python_library(
@@ -253,14 +248,14 @@ class PylintIntegrationTest(ExternalToolTestBase):
             """\
             '''Pylint will check that variables exist and are used.'''
             from colors import green
-            from direct_dep import THIS_VARIABLE_EXISTS
+            from project.direct_dep import THIS_VARIABLE_EXISTS
 
             print(green(THIS_VARIABLE_EXISTS))
             """
         )
         target = self.make_target_with_origin(
-            source_files=[FileContent(f"{self.source_root}/target.py", source_content.encode())],
-            dependencies=[Address(self.source_root, "direct_dep"), Address("", "direct_req")],
+            source_files=[FileContent(f"{self.package}/target.py", source_content.encode())],
+            dependencies=[Address(self.package, "direct_dep"), Address("", "direct_req")],
         )
 
         result = self.run_pylint([target])
@@ -272,6 +267,32 @@ class PylintIntegrationTest(ExternalToolTestBase):
         target = self.make_target_with_origin([self.bad_source])
         result = self.run_pylint([target], skip=True)
         assert not result
+
+    def test_pep420_namespace_packages(self) -> None:
+        test_fc = FileContent(
+            "tests/python/project/good_test.py",
+            dedent(
+                """\
+                '''Docstring.'''
+
+                from project.good import UPPERCASE_CONSTANT
+
+                CONSTANT2 = UPPERCASE_CONSTANT
+                """
+            ).encode(),
+        )
+        targets = [
+            self.make_target_with_origin([self.good_source]),
+            self.make_target_with_origin(
+                [test_fc],
+                package="tests/python/project",
+                dependencies=[Address.parse(f"{self.package}:target")],
+            ),
+        ]
+        result = self.run_pylint(targets)
+        assert len(result) == 1
+        assert result[0].exit_code == 0
+        assert "Your code has been rated at 10.00/10" in result[0].stdout.strip()
 
     def test_3rdparty_plugin(self) -> None:
         source_content = dedent(
@@ -289,7 +310,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
             """
         )
         target = self.make_target_with_origin(
-            [FileContent(f"{self.source_root}/thirdparty_plugin.py", source_content.encode())]
+            [FileContent(f"{self.package}/thirdparty_plugin.py", source_content.encode())]
         )
         result = self.run_pylint(
             [target],
@@ -298,7 +319,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
         )
         assert len(result) == 1
         assert result[0].exit_code == 4
-        assert f"{self.source_root}/thirdparty_plugin.py:10:8: W5301" in result[0].stdout
+        assert f"{self.package}/thirdparty_plugin.py:10:8: W5301" in result[0].stdout
 
     def test_source_plugin(self) -> None:
         # NB: We make this source plugin fairly complex by having it use transitive dependencies.
@@ -378,16 +399,16 @@ class PylintIntegrationTest(ExternalToolTestBase):
             """
         )
         target = self.make_target_with_origin(
-            [FileContent(f"{self.source_root}/source_plugin.py", b"'''Docstring.'''\nprint()\n")]
+            [FileContent(f"{self.package}/source_plugin.py", b"'''Docstring.'''\nprint()\n")]
         )
         result = self.run_pylint(
             [target],
             additional_args=[
                 "--pylint-source-plugins=['build-support/plugins:print_plugin']",
-                f"--source-root-patterns=['build-support/plugins', '{self.source_root}']",
+                f"--source-root-patterns=['build-support/plugins', '{self.package}']",
             ],
             config=config_content,
         )
         assert len(result) == 1
         assert result[0].exit_code == PYLINT_FAILURE_RETURN_CODE
-        assert f"{self.source_root}/source_plugin.py:2:0: C9871" in result[0].stdout
+        assert f"{self.package}/source_plugin.py:2:0: C9871" in result[0].stdout
