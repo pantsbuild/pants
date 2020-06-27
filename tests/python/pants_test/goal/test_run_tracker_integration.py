@@ -22,7 +22,6 @@ class RunTrackerIntegrationTest(PantsRunIntegrationTest):
                     "test",
                     f"--run-tracker-stats-local-json-file={tmpfile}",
                     "--run-tracker-stats-version=2",
-                    "--reporting-zipkin-trace-v2",
                     "testprojects/src/java/org/pantsbuild/testproject/unicode/main",
                 ]
             )
