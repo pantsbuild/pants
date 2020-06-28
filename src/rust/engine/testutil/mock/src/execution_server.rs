@@ -468,15 +468,26 @@ impl bazel_protos::remote_execution_grpc::Capabilities for MockResponder {
     sink: grpcio::UnarySink<bazel_protos::remote_execution::ServerCapabilities>,
   ) {
     let mut cache_capabilities = bazel_protos::remote_execution::CacheCapabilities::new();
-    cache_capabilities.set_digest_function(vec![bazel_protos::remote_execution::DigestFunction::SHA256]);
+    cache_capabilities.set_digest_function(vec![
+      bazel_protos::remote_execution::DigestFunction_Value::SHA256,
+    ]);
 
     let mut execution_capabilities = bazel_protos::remote_execution::ExecutionCapabilities::new();
     execution_capabilities.set_exec_enabled(true);
-    execution_capabilities.set_digest_function(bazel_protos::remote_execution::DigestFunction::SHA256);
+    execution_capabilities
+      .set_digest_function(bazel_protos::remote_execution::DigestFunction_Value::SHA256);
 
     let mut capabilities = bazel_protos::remote_execution::ServerCapabilities::new();
     capabilities.set_cache_capabilities(cache_capabilities);
     capabilities.set_execution_capabilities(execution_capabilities);
+
+    let mut ver_2_0 = bazel_protos::semver::SemVer::new();
+    ver_2_0.set_major(2);
+    ver_2_0.set_minor(0);
+    ver_2_0.set_patch(0);
+
+    capabilities.set_low_api_version(ver_2_0.clone());
+    capabilities.set_high_api_version(ver_2_0);
 
     sink.success(capabilities);
   }

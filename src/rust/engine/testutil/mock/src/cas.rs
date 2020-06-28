@@ -2,8 +2,10 @@ use std::collections::HashMap;
 use std::convert::TryInto;
 use std::sync::Arc;
 
+use bazel_protos::remote_execution::{BatchReadBlobsRequest, BatchReadBlobsResponse};
 use bytes::Bytes;
 use futures01::{Future, IntoFuture, Stream};
+use grpcio::RpcContext;
 use hashing::{Digest, Fingerprint};
 use parking_lot::Mutex;
 use testutil::data::{TestData, TestDirectory};
@@ -510,6 +512,18 @@ impl bazel_protos::remote_execution_grpc::ContentAddressableStorage for StubCASR
     sink.success(response);
   }
 
+  fn batch_read_blobs(
+    &self,
+    _: RpcContext<'_>,
+    _: BatchReadBlobsRequest,
+    sink: grpcio::UnarySink<BatchReadBlobsResponse>,
+  ) {
+    sink.fail(grpcio::RpcStatus::new(
+      grpcio::RpcStatusCode::UNIMPLEMENTED,
+      None,
+    ));
+  }
+
   fn batch_update_blobs(
     &self,
     _ctx: grpcio::RpcContext<'_>,
@@ -521,6 +535,7 @@ impl bazel_protos::remote_execution_grpc::ContentAddressableStorage for StubCASR
       None,
     ));
   }
+
   fn get_tree(
     &self,
     _ctx: grpcio::RpcContext<'_>,
