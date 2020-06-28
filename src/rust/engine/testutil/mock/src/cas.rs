@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::convert::TryInto;
 use std::sync::Arc;
 
-use bazel_protos::remote_execution::{BatchReadBlobsRequest, BatchReadBlobsResponse};
 use bytes::Bytes;
 use futures01::{Future, IntoFuture, Stream};
 use grpcio::RpcContext;
@@ -515,8 +514,8 @@ impl bazel_protos::remote_execution_grpc::ContentAddressableStorage for StubCASR
   fn batch_read_blobs(
     &self,
     _: RpcContext<'_>,
-    _: BatchReadBlobsRequest,
-    sink: grpcio::UnarySink<BatchReadBlobsResponse>,
+    _: bazel_protos::remote_execution::BatchReadBlobsRequest,
+    sink: grpcio::UnarySink<bazel_protos::remote_execution::BatchReadBlobsResponse>,
   ) {
     sink.fail(grpcio::RpcStatus::new(
       grpcio::RpcStatusCode::UNIMPLEMENTED,
