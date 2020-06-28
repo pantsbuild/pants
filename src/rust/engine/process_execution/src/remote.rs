@@ -35,8 +35,6 @@ pub use streaming::StreamingCommandRunner;
 #[cfg(test)]
 mod streaming_tests;
 
-mod async_lazy_value;
-
 // Environment variable which is exclusively used for cache key invalidation.
 // This may be not specified in an Process, and may be populated only by the
 // CommandRunner.
