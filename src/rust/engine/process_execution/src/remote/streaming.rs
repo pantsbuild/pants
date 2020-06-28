@@ -140,20 +140,21 @@ impl StreamingCommandRunner {
   async fn get_capabilities(
     &self,
   ) -> Result<&bazel_protos::remote_execution::ServerCapabilities, String> {
-    let capabilities_client = self.capabilities_client.clone();
     let capabilities_fut = async {
       let opt = call_option(&self.headers, None)?;
       let mut request = bazel_protos::remote_execution::GetCapabilitiesRequest::new();
       if let Some(s) = self.metadata.instance_name.as_ref() {
         request.instance_name = s.clone();
       }
-      capabilities_client
+      self
+        .capabilities_client
         .get_capabilities_async_opt(&request, opt)
         .unwrap()
         .compat()
         .await
         .map_err(super::rpcerror_to_string)
     };
+
     self
       .capabilities_cell
       .get_or_try_init(capabilities_fut)
