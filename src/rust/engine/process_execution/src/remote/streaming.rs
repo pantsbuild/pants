@@ -11,6 +11,7 @@ use bazel_protos::remote_execution::{
 use bazel_protos::status::Status;
 use bytes::Bytes;
 use concrete_time::TimeSpan;
+use double_checked_cell_async::DoubleCheckedCell;
 use futures::compat::{Future01CompatExt, Stream01CompatExt};
 use futures::future::{self as future03};
 use futures::{Stream, StreamExt};
@@ -23,7 +24,6 @@ use super::{
   format_error, maybe_add_workunit, populate_fallible_execution_result,
   populate_fallible_execution_result_for_timeout, ExecutionError, OperationOrStatus,
 };
-use crate::remote::async_lazy_value::AsyncLazyValue;
 use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, PlatformConstraint,
   Process, ProcessMetadata,
@@ -55,7 +55,8 @@ pub struct StreamingCommandRunner {
   env: Arc<grpcio::Environment>,
   execution_client: Arc<bazel_protos::remote_execution_grpc::ExecutionClient>,
   overall_deadline: Duration,
-  capabilities: AsyncLazyValue<Result<bazel_protos::remote_execution::ServerCapabilities, String>>,
+  capabilities_cell: Arc<DoubleCheckedCell<bazel_protos::remote_execution::ServerCapabilities>>,
+  capabilities_client: Arc<bazel_protos::remote_execution_grpc::CapabilitiesClient>,
 }
 
 enum StreamOutcome {
@@ -99,23 +100,11 @@ impl StreamingCommandRunner {
       );
     }
 
-    // Validate that any configured static headers are valid. This will also be used for
-    // the capabilities getter.
-    let opt = call_option(&headers, None)?;
+    // Validate any configured static headers.
+    call_option(&headers, None)?;
 
     let capabilities_client =
-      bazel_protos::remote_execution_grpc::CapabilitiesClient::new(channel.clone());
-    let instance_name = metadata.instance_name.clone().unwrap_or_default();
-    let capabilities_fut = async move {
-      let mut request = bazel_protos::remote_execution::GetCapabilitiesRequest::new();
-      request.instance_name = instance_name;
-      capabilities_client
-        .get_capabilities_async_opt(&request, opt)
-        .unwrap()
-        .compat()
-        .await
-        .map_err(super::rpcerror_to_string)
-    };
+      Arc::new(bazel_protos::remote_execution_grpc::CapabilitiesClient::new(channel.clone()));
 
     let command_runner = StreamingCommandRunner {
       metadata,
@@ -126,7 +115,8 @@ impl StreamingCommandRunner {
       store,
       platform,
       overall_deadline,
-      capabilities: AsyncLazyValue::new(capabilities_fut),
+      capabilities_cell: Arc::new(DoubleCheckedCell::new()),
+      capabilities_client,
     };
 
     Ok(command_runner)
@@ -145,6 +135,29 @@ impl StreamingCommandRunner {
       .store_file_bytes(Bytes::from(command_bytes), true)
       .await
       .map_err(|e| format!("Error saving proto to local store: {:?}", e))
+  }
+
+  async fn get_capabilities(
+    &self,
+  ) -> Result<&bazel_protos::remote_execution::ServerCapabilities, String> {
+    let capabilities_client = self.capabilities_client.clone();
+    let capabilities_fut = async {
+      let opt = call_option(&self.headers, None)?;
+      let mut request = bazel_protos::remote_execution::GetCapabilitiesRequest::new();
+      if let Some(s) = self.metadata.instance_name.as_ref() {
+        request.instance_name = s.clone();
+      }
+      capabilities_client
+        .get_capabilities_async_opt(&request, opt)
+        .unwrap()
+        .compat()
+        .await
+        .map_err(super::rpcerror_to_string)
+    };
+    self
+      .capabilities_cell
+      .get_or_try_init(capabilities_fut)
+      .await
   }
 
   async fn ensure_action_uploaded(
@@ -604,7 +617,7 @@ impl crate::CommandRunner for StreamingCommandRunner {
     context: Context,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     // Retrieve capabilities for this server.
-    let capabilities = self.capabilities.get().await?;
+    let capabilities = self.get_capabilities().await?;
     trace!("RE capabilities: {:?}", &capabilities);
 
     // Construct the REv2 ExecuteRequest and related data for this execution request.
