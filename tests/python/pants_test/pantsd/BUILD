@@ -11,7 +11,6 @@ target(
 python_tests(
   name = 'process_manager',
   sources = ['test_process_manager.py'],
-  coverage = ['pants.pantsd.process_manager'],
   dependencies = [
     ':test_deps',
     'src/python/pants/pantsd:process_manager',
@@ -22,7 +21,6 @@ python_tests(
 python_tests(
   name = 'pants_daemon',
   sources = ['test_pants_daemon.py'],
-  coverage = ['pants.pantsd.pants_daemon'],
   dependencies = [
     ':test_deps',
     'src/python/pants/bin',

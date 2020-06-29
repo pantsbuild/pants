@@ -51,7 +51,6 @@ python_tests(
 python_tests(
   name='scm_publish',
   sources=['test_scm_publish_mixin.py'],
-  coverage=['pants.task.scm_publish_mixin'],
   dependencies=[
     'src/python/pants/task',
   ],
