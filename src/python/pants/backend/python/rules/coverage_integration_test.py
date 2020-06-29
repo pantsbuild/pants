@@ -15,6 +15,7 @@ class CoverageIntegrationTest(PantsRunIntegrationTest):
             tmpdir_relative = Path(tmpdir).relative_to(get_buildroot())
             src_root = Path(tmpdir, "src", "python", "project")
             src_root.mkdir(parents=True)
+            (src_root / "__init__.py").touch()
 
             # Set up the source files. Only `lib.py` will actually be tested, but we still expect
             # `random.py` to show up in the final report correctly.
@@ -69,6 +70,7 @@ class CoverageIntegrationTest(PantsRunIntegrationTest):
             # Test that a `tests/` source root accurately gets coverage data for the `src/` root.
             test_root = Path(tmpdir, "tests", "python", "project_test")
             test_root.mkdir(parents=True)
+            (test_root / "__init__.py").touch()
             (test_root / "test_multiply.py").write_text(
                 dedent(
                     """\
@@ -113,6 +115,7 @@ class CoverageIntegrationTest(PantsRunIntegrationTest):
             # `--omit-test-sources`.
             no_src_folder = Path(tmpdir, "tests", "python", "project_test", "no_src")
             no_src_folder.mkdir()
+            (no_src_folder / "__init__.py").touch()
             (no_src_folder / "test_no_src.py").write_text(
                 "def test_true():\n\tassert True is True\n"
             )
@@ -145,6 +148,7 @@ class CoverageIntegrationTest(PantsRunIntegrationTest):
                 f"""\
                 Name                                                          Stmts   Miss Branch BrPart  Cover
                 -----------------------------------------------------------------------------------------------
+                {tmpdir_relative}/src/python/project/__init__.py                        0      0      0      0   100%
                 {tmpdir_relative}/src/python/project/lib.py                             6      0      0      0   100%
                 {tmpdir_relative}/src/python/project/lib_test.py                        3      0      0      0   100%
                 {tmpdir_relative}/src/python/project/random.py                          2      2      0      0     0%
