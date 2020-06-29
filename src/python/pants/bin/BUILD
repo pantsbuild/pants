@@ -64,9 +64,7 @@ python_binary(
 )
 
 # This binary is for internal use only. It adds deps on internal_backends and build-support config
-# files, both of which are not meant for publishing in the `pantsbuild.pants` sdist. It also adds
-# deps on contrib plugins published as separate sdists from the core `pantsbuild.pants` sdist that
-# this repo uses.
+# files, both of which are not meant for publishing in the `pantsbuild.pants` sdist.
 python_binary(
   name='pants_local_binary',
   entry_point='pants.bin.pants_loader:main',
@@ -86,7 +84,6 @@ python_binary(
     'build-support/regexes',
     'build-support/scalafmt',
     'build-support/scalastyle',
-    'contrib:plugins',
     'pants-plugins/src/python/internal_backend:plugins',
   ],
   tags = {'partially_type_checked'},
