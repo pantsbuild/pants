@@ -547,10 +547,19 @@ class TransitiveTarget:
 
 @dataclass(frozen=True)
 class TransitiveTargets:
-    """A set of Target roots, and their transitive, flattened, de-duped closure."""
+    """A set of Target roots, and their transitive, flattened, de-duped dependencies.
+
+    If a target root is a dependency of another target root, then it will show up both in `roots`
+    and in `dependencies`.
+    """
 
     roots: Tuple[Target, ...]
-    closure: FrozenOrderedSet[Target]
+    dependencies: FrozenOrderedSet[Target]
+
+    @memoized_property
+    def closure(self) -> FrozenOrderedSet[Target]:
+        """The roots and the dependencies combined."""
+        return FrozenOrderedSet([*self.roots, *self.dependencies])
 
 
 @frozen_after_init
@@ -1818,7 +1827,7 @@ class BundlesField(AsyncField):
                 value_or_default,
                 expected_type="an iterable of `bundle` objects (e.g. a list)",
             )
-        return cast(Tuple[BundleAdaptor, ...], tuple(value_or_default))
+        return tuple(value_or_default)
 
     @final
     @property
