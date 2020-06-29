@@ -13,7 +13,6 @@ from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Dependencies as DependenciesField
 from pants.engine.target import DependenciesRequest, Targets, TransitiveTargets
-from pants.util.ordered_set import FrozenOrderedSet
 
 
 class DependencyType(Enum):
@@ -59,7 +58,7 @@ async def dependencies(
 ) -> Dependencies:
     if options.values.transitive:
         transitive_targets = await Get(TransitiveTargets, Addresses, addresses)
-        targets = Targets(transitive_targets.closure - FrozenOrderedSet(transitive_targets.roots))
+        targets = Targets(transitive_targets.dependencies)
     else:
         target_roots = await Get(Targets, Addresses, addresses)
         dependencies_per_target_root = await MultiGet(

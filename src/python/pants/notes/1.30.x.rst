@@ -5,6 +5,18 @@ This document describes releases leading up to the ``1.30.x`` ``stable`` series.
 
 See https://pants.readme.io/v1.30/docs/release-notes-1-30 for an overview of the changes in this release.
 
+1.30.0rc1 (6/27/2020)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Normalize paths before determining whether we can watch them. (#10130)
+  `PR #10130 <https://github.com/pantsbuild/pants/pull/10130>`_
+
+* Scrooge plugin: fix scala `compiler_option_sets` parameter passthrough (#10124)
+  `PR #10124 <https://github.com/pantsbuild/pants/pull/10124>`_
+
 1.30.0rc0 (6/19/2020)
 ---------------------
 
