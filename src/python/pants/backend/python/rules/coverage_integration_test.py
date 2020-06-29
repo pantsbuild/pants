@@ -129,12 +129,11 @@ class CoverageIntegrationTest(PantsRunIntegrationTest):
                 f"{tmpdir_relative}/tests/python/project_test/no_src",
             ]
             default_result = self.run_pants(command)
-            omit_test_result = self.run_pants([*command, "--coverage-py-omit-test-sources"])
             filter_result = self.run_pants(
                 [*command, "--coverage-py-filter=['project.lib', 'project_test.no_src']"]
             )
 
-        for result in (default_result, omit_test_result, filter_result):
+        for result in (default_result, filter_result):
             assert result.returncode == 0
             # Regression test: make sure that individual tests do not complain about failing to
             # generate reports. This was showing up at test-time, even though the final merged
@@ -157,19 +156,6 @@ class CoverageIntegrationTest(PantsRunIntegrationTest):
                 """
             )
             in default_result.stderr_data
-        )
-        assert (
-            dedent(
-                f"""\
-                Name                                       Stmts   Miss Branch BrPart  Cover
-                ----------------------------------------------------------------------------
-                {tmpdir_relative}/src/python/project/lib.py          6      0      0      0   100%
-                {tmpdir_relative}/src/python/project/random.py       2      2      0      0     0%
-                ----------------------------------------------------------------------------
-                TOTAL                                          8      2      0      0    75%
-                """
-            )
-            in omit_test_result.stderr_data
         )
         assert (
             dedent(
