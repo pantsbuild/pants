@@ -54,7 +54,6 @@ from pants.backend.python.tasks.local_python_distribution_artifact import (
 )
 from pants.backend.python.tasks.pytest_prep import PytestPrep
 from pants.backend.python.tasks.pytest_run import PytestRun
-from pants.backend.python.tasks.python_binary_create import PythonBinaryCreate
 from pants.backend.python.tasks.python_bundle import PythonBundle
 from pants.backend.python.tasks.python_repl import PythonRepl
 from pants.backend.python.tasks.python_run import PythonRun
@@ -109,7 +108,6 @@ def register_goals():
     task(name="pytest", action=PytestRun).install("test")
     task(name="py", action=PythonRepl).install("repl")
     task(name="setup-py", action=SetupPy).install()
-    task(name="py", action=PythonBinaryCreate).install("binary")
     task(name="py-wheels", action=LocalPythonDistributionArtifact).install("binary")
     task(name="py", action=PythonBundle).install("bundle")
     task(name="unpack-wheels", action=UnpackWheels).install()
