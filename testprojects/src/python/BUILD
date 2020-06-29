@@ -13,7 +13,6 @@ target(
     ':no_build_file_directory',
     ':plugins_directory',
     ':print_env_directory',
-    ':python_distribution_directory',
     ':python_targets_directory',
     ':sources_directory',
     ':unicode_directory',
@@ -64,15 +63,6 @@ files(
   name = 'print_env_directory',
   sources = ['print_env/**/*'],
 )
-
-files(
-  name = 'python_distribution_directory',
-  sources = ['python_distribution/**/*'],
-  dependencies = [
-    'testprojects/3rdparty:python_directory',
-  ],
-)
-
 
 files(
   name = 'python_targets_directory',
