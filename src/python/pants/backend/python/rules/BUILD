@@ -8,7 +8,6 @@ python_library(
     'src/python/pants/backend/python:target_types',
     'src/python/pants/backend/python/rules/coverage_plugin:plugin',
     'src/python/pants/backend/python/subsystems',
-    'src/python/pants/backend/python/subsystems/ipex',
     'src/python/pants/build_graph',
     'src/python/pants/core',
     'src/python/pants/core/goals',

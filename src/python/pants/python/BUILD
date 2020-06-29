@@ -8,7 +8,6 @@ python_library(
     '3rdparty/python:setuptools',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
-    'src/python/pants/backend/python/subsystems/ipex',
     'src/python/pants/build_graph',
     'src/python/pants/option',
     'src/python/pants/subsystem',
