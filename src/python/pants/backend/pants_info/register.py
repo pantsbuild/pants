@@ -3,8 +3,8 @@
 
 """Information on Pants' internals, such as registered target types and goals."""
 
-from pants.backend.pants_info import list_target_types
+from pants.backend.pants_info import explain_options, list_target_types
 
 
 def rules():
-    return [*list_target_types.rules()]
+    return [*list_target_types.rules(), *explain_options.rules()]

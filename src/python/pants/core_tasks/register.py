@@ -8,7 +8,6 @@ These are always activated and cannot be disabled.
 
 from pants.core_tasks.clean import Clean
 from pants.core_tasks.deferred_sources_mapper import DeferredSourcesMapper
-from pants.core_tasks.explain_options_task import ExplainOptionsTask
 from pants.core_tasks.noop import NoopCompile, NoopTest
 from pants.core_tasks.pantsd_kill import PantsDaemonKill
 from pants.core_tasks.run_prep_command import (
@@ -55,9 +54,6 @@ def register_goals():
     kill_pantsd.install()
     # Kill pantsd first so that it's not using any files in .pants.d at the time of removal.
     kill_pantsd.install("clean-all", first=True)
-
-    # Getting help.
-    task(name="options", action=ExplainOptionsTask).install()
 
     # Stub for other goals to schedule 'compile'. See noop_exec_task.py for why this is useful.
     task(name="compile", action=NoopCompile).install("compile")

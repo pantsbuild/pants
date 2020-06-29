@@ -1,19 +1,25 @@
-# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import json
+from typing import Optional
 
 from colors import black, blue, cyan, green, magenta, red, white
 from packaging.version import Version
 
+from pants.engine.console import Console
+from pants.engine.goal import Goal, GoalSubsystem, LineOriented
+from pants.engine.internals.options_parsing import _Options
+from pants.engine.rules import goal_rule
+from pants.option.global_options import GlobalOptions
+from pants.option.options import Options
 from pants.option.options_fingerprinter import CoercingOptionEncoder
 from pants.option.ranked_value import Rank
 from pants.option.scope import GLOBAL_SCOPE
-from pants.task.console_task import ConsoleTask
 from pants.version import PANTS_SEMVER
 
 
-class ExplainOptionsTask(ConsoleTask):
+class ExplainOptionsOptions(LineOriented, GoalSubsystem):
     """Display meta-information about options.
 
     This "meta-information" includes what values options have, and what values they *used* to have
@@ -21,7 +27,7 @@ class ExplainOptionsTask(ConsoleTask):
     value and then a cli FLAG value).
     """
 
-    _register_console_transitivity_option = False
+    name = "options"
 
     @classmethod
     def register_options(cls, register):
@@ -50,29 +56,53 @@ class ExplainOptionsTask(ConsoleTask):
             help="Specify the format options will be printed.",
         )
 
+
+class ExplainOptions(Goal):
+    subsystem_cls = ExplainOptionsOptions
+
+
+class OptionsExplainer:
+    def __init__(
+        self,
+        options: Options,
+        scope: Optional[str],
+        name: Optional[str],
+        rank: Optional[Rank],
+        show_history: bool,
+        only_overridden: bool,
+        skip_inherited: bool,
+        output_format: str,
+        colors: bool,
+    ):
+        self._options = options
+        self._scope = scope
+        self._name = name
+        self._rank = rank
+        self._show_history = show_history
+        self._only_overridden = only_overridden
+        self._skip_inherited = skip_inherited
+        self._output_format = output_format
+        self._colors = colors
+
     def _scope_filter(self, scope):
-        pattern = self.get_options().scope
         return (
-            not pattern
-            or scope.startswith(pattern)
-            or (pattern == "GLOBAL" and scope == GLOBAL_SCOPE)
+            not self._scope
+            or scope.startswith(self._scope)
+            or (self._scope == "GLOBAL" and scope == GLOBAL_SCOPE)
         )
 
     def _option_filter(self, option):
-        pattern = self.get_options().name
-        if not pattern:
+        if not self._name:
             return True
-        pattern = pattern.replace("-", "_")
-        return option == pattern
+        return option == self._name.replace("-", "_")
 
     def _rank_filter(self, rank):
-        minimum_rank = self.get_options().rank
-        if not minimum_rank:
+        if not self._rank:
             return True
-        return rank >= minimum_rank
+        return rank >= self._rank
 
     def _rank_color(self, rank):
-        if not self.get_options().colors:
+        if not self._colors:
             return lambda x: x
         if rank == Rank.NONE:
             return white
@@ -91,8 +121,8 @@ class ExplainOptionsTask(ConsoleTask):
             return "{scope}{option}".format(
                 scope="{}.".format(scope) if scope else "", option=option,
             )
-        scope_color = cyan if self.get_options().colors else lambda x: x
-        option_color = blue if self.get_options().colors else lambda x: x
+        scope_color = cyan if self._colors else lambda x: x
+        option_color = blue if self._colors else lambda x: x
         return "{scope}{option}".format(
             scope=scope_color("{}.".format(scope) if scope else ""), option=option_color(option),
         )
@@ -103,7 +133,7 @@ class ExplainOptionsTask(ConsoleTask):
             return record.value, simple_rank
         elif self.is_text():
             simple_value = str(record.value)
-            value_color = green if self.get_options().colors else lambda x: x
+            value_color = green if self._colors else lambda x: x
             formatted_value = value_color(simple_value)
             rank_color = self._rank_color(record.rank)
             formatted_rank = "(from {rank}{details})".format(
@@ -112,15 +142,15 @@ class ExplainOptionsTask(ConsoleTask):
             )
             return "{value} {rank}".format(value=formatted_value, rank=formatted_rank,)
 
-    def _show_history(self, history):
+    def _generate_history(self, history):
         for record in reversed(list(history)[:-1]):
             if record.rank > Rank.NONE:
                 yield "  overrode {}".format(self._format_record(record))
 
     def _force_option_parsing(self):
-        scopes = filter(self._scope_filter, list(self.context.options.known_scope_to_info.keys()))
+        scopes = filter(self._scope_filter, list(self._options.known_scope_to_info.keys()))
         for scope in scopes:
-            self.context.options.for_scope(scope)
+            self._options.for_scope(scope)
 
     def _get_parent_scope_option(self, scope, name):
         if not scope:
@@ -128,38 +158,38 @@ class ExplainOptionsTask(ConsoleTask):
         parent_scope = ""
         if "." in scope:
             parent_scope, _ = scope.rsplit(".", 1)
-        options = self.context.options.for_scope(parent_scope)
+        options = self._options.for_scope(parent_scope)
         try:
             return parent_scope, options[name]
         except AttributeError:
             return None, None
 
     def is_json(self):
-        return self.get_options().output_format == "json"
+        return self._output_format == "json"
 
     def is_text(self):
-        return self.get_options().output_format == "text"
+        return self._output_format == "text"
 
-    def console_output(self, targets):
+    def generate(self):
         self._force_option_parsing()
         if self.is_json():
             output_map = {}
-        for scope, options in sorted(self.context.options.tracker.option_history_by_scope.items()):
+        for scope, scoped_options in sorted(self._options.tracker.option_history_by_scope.items()):
             if not self._scope_filter(scope):
                 continue
-            for option, history in sorted(options.items()):
+            for option, history in sorted(scoped_options.items()):
                 if not self._option_filter(option):
                     continue
                 if not self._rank_filter(history.latest.rank):
                     continue
-                if self.get_options().only_overridden and not history.was_overridden:
+                if self._only_overridden and not history.was_overridden:
                     continue
                 # Skip the option if it has already passed the deprecation period.
                 if history.latest.deprecation_version and PANTS_SEMVER >= Version(
                     history.latest.deprecation_version
                 ):
                     continue
-                if self.get_options().skip_inherited:
+                if self._skip_inherited:
                     parent_scope, parent_value = self._get_parent_scope_option(scope, option)
                     if parent_scope is not None and parent_value == history.latest.value:
                         continue
@@ -179,9 +209,9 @@ class ExplainOptionsTask(ConsoleTask):
                     yield "{} = {}".format(
                         self._format_scope(scope, option), self._format_record(history.latest)
                     )
-                if self.get_options().show_history:
+                if self._show_history:
                     history_list = []
-                    for line in self._show_history(history):
+                    for line in self._generate_history(history):
                         if self.is_text():
                             yield line
                         elif self.is_json():
@@ -190,3 +220,32 @@ class ExplainOptionsTask(ConsoleTask):
                         inner_map["history"] = history_list
         if self.is_json():
             yield json.dumps(output_map, indent=2, sort_keys=True, cls=CoercingOptionEncoder)
+
+
+@goal_rule
+def explain_options(
+    explain_options_options: ExplainOptionsOptions,
+    options_wrapper: _Options,
+    global_options: GlobalOptions,
+    console: Console,
+) -> ExplainOptions:
+    eoo = explain_options_options.values
+    explainer = OptionsExplainer(
+        options_wrapper.options,
+        eoo.scope,
+        eoo.name,
+        eoo.rank,
+        eoo.show_history,
+        eoo.only_overridden,
+        eoo.skip_inherited,
+        eoo.output_format,
+        global_options.options.colors,
+    )
+    with explain_options_options.line_oriented(console) as print_stdout:
+        for content in explainer.generate():
+            print_stdout(content)
+    return ExplainOptions(0)
+
+
+def rules():
+    return [explain_options]
