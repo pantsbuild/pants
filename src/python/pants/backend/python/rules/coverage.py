@@ -355,8 +355,7 @@ def _get_coverage_reports(
     results: Tuple[ProcessResult, ...],
 ) -> List[CoverageReport]:
     coverage_reports: List[CoverageReport] = []
-    for index, result in enumerate(results):
-        report_type = report_types[index]
+    for result, report_type in zip(results, report_types):
         if report_type == CoverageReportType.CONSOLE:
             coverage_reports.append(ConsoleCoverageReport(result.stdout.decode()))
             continue
