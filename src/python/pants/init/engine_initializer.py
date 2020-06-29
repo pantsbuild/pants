@@ -37,7 +37,6 @@ from pants.engine.legacy.parser import LegacyPythonCallbacksParser
 from pants.engine.legacy.structs import (
     JvmAppAdaptor,
     JvmBinaryAdaptor,
-    PantsPluginAdaptor,
     PythonBinaryAdaptor,
     PythonTargetAdaptor,
     PythonTestsAdaptor,
@@ -155,8 +154,6 @@ def _legacy_symbol_table(
     table["python_tests"] = PythonTestsAdaptor
     table["python_binary"] = PythonBinaryAdaptor
     table["remote_sources"] = RemoteSourcesAdaptor
-    table["pants_plugin"] = PantsPluginAdaptor
-    table["contrib_plugin"] = PantsPluginAdaptor
 
     return SymbolTable(table)
 

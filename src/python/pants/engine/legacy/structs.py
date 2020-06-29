@@ -288,11 +288,6 @@ class PythonTestsAdaptor(PythonTargetAdaptor):
     pass
 
 
-class PantsPluginAdaptor(PythonTargetAdaptor):
-    def get_sources(self) -> "GlobsWithConjunction":
-        return GlobsWithConjunction.for_literal_files(["register.py"])
-
-
 class SourceGlobs(Locatable):
     """A light wrapper around a target's `sources`.
 
