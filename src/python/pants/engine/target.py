@@ -1827,7 +1827,7 @@ class BundlesField(AsyncField):
                 value_or_default,
                 expected_type="an iterable of `bundle` objects (e.g. a list)",
             )
-        return cast(Tuple[BundleAdaptor, ...], tuple(value_or_default))
+        return tuple(value_or_default)
 
     @final
     @property
