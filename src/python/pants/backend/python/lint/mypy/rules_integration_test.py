@@ -5,6 +5,8 @@ from pathlib import PurePath
 from textwrap import dedent
 from typing import List, Optional
 
+import pytest
+
 from pants.backend.python.lint.mypy.rules import MyPyFieldSet, MyPyRequest
 from pants.backend.python.lint.mypy.rules import rules as mypy_rules
 from pants.backend.python.target_types import PythonLibrary
@@ -89,9 +91,7 @@ class MyPyIntegrationTest(ExternalToolTestBase):
                 """
             ),
         )
-        target = self.request_single_product(
-            WrappedTarget, Address(package, name)
-        ).target
+        target = self.request_single_product(WrappedTarget, Address(package, name)).target
         origin = SingleAddress(directory=package, name=name)
         return TargetWithOrigin(target, origin)
 
@@ -206,8 +206,7 @@ class MyPyIntegrationTest(ExternalToolTestBase):
             ),
         )
         self.add_to_build_file(
-            f"{self.package}/math",
-            f"python_library(dependencies=['{self.package}/util'])",
+            f"{self.package}/math", f"python_library(dependencies=['{self.package}/util'])",
         )
         source_content = FileContent(
             f"{self.package}/app.py",
@@ -227,6 +226,9 @@ class MyPyIntegrationTest(ExternalToolTestBase):
         assert result[0].exit_code == 1
         assert f"{self.package}/math/add.py:5" in result[0].stdout
 
+    @pytest.mark.skip(
+        reason="Figure out how to get MyPy working with both namespace packages and source roots. See https://github.com/Eric-Arellano/mypy-debug."
+    )
     def test_pep420_namespace_packages(self) -> None:
         # Regression test for the issue described in https://github.com/pantsbuild/pants/pull/10183.
         test_fc = FileContent(
