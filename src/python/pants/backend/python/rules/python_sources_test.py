@@ -1,7 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import List, Type
+from typing import List, Type, Union, cast
 
 from pants.backend.python.rules.python_sources import (
     StrippedPythonSources,
@@ -120,13 +120,18 @@ class PythonSourcesTest(TestBase):
             subject = (
                 StrippedPythonSourcesRequest if is_stripped else UnstrippedPythonSourcesRequest
             )
-            result = self.request_single_product(
-                product,
-                Params(
-                    subject(
-                        targets, include_resources=include_resources, include_files=include_files
+            result = cast(
+                Union[StrippedPythonSources, UnstrippedPythonSources],
+                self.request_single_product(
+                    product,
+                    Params(
+                        subject(
+                            targets,
+                            include_resources=include_resources,
+                            include_files=include_files,
+                        ),
+                        create_options_bootstrapper(),
                     ),
-                    create_options_bootstrapper(),
                 ),
             )
             assert result.snapshot.files == tuple(expected)
