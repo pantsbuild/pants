@@ -181,6 +181,7 @@ async def create_coverage_config(request: CoverageConfigRequest) -> CoverageConf
     cp = configparser.ConfigParser()
     cp.read_string(default_config)
 
+    cp.set("run", "omit", "test_runner.pex/*")
     cp.set("run", "plugins", COVERAGE_PLUGIN_MODULE_NAME)
     cp.add_section(COVERAGE_PLUGIN_MODULE_NAME)
     cp.set(
