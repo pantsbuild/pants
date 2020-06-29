@@ -174,16 +174,9 @@ class LegacyGraphScheduler:
     goal_map: Any
 
     def new_session(
-        self,
-        zipkin_trace_v2,
-        build_id,
-        dynamic_ui: bool = False,
-        use_colors=True,
-        should_report_workunits=False,
+        self, build_id, dynamic_ui: bool = False, use_colors=True, should_report_workunits=False,
     ) -> "LegacyGraphSession":
-        session = self.scheduler.new_session(
-            zipkin_trace_v2, build_id, dynamic_ui, should_report_workunits
-        )
+        session = self.scheduler.new_session(build_id, dynamic_ui, should_report_workunits)
         console = Console(use_colors=use_colors, session=session if dynamic_ui else None,)
         return LegacyGraphSession(session, console, self.build_file_aliases, self.goal_map)
 

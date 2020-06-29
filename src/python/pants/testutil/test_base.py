@@ -429,9 +429,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
             build_configuration=self.build_config(),
             build_ignore_patterns=None,
             execution_options=ExecutionOptions.from_bootstrap_options(global_options),
-        ).new_session(
-            zipkin_trace_v2=False, build_id="buildid_for_test", should_report_workunits=True
-        )
+        ).new_session(build_id="buildid_for_test", should_report_workunits=True)
         self._scheduler = graph_session.scheduler_session
         self._build_graph, self._address_mapper = graph_session.create_build_graph(
             Specs(address_specs=AddressSpecs([]), filesystem_specs=FilesystemSpecs([])),

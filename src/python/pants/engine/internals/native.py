@@ -174,16 +174,9 @@ class Native(metaclass=SingletonMetaclass):
         return PyExecutionRequest()
 
     def new_session(
-        self,
-        scheduler,
-        should_record_zipkin_spans,
-        dynamic_ui: bool,
-        build_id,
-        should_report_workunits: bool,
+        self, scheduler, dynamic_ui: bool, build_id, should_report_workunits: bool,
     ) -> PySession:
-        return PySession(
-            scheduler, should_record_zipkin_spans, dynamic_ui, build_id, should_report_workunits,
-        )
+        return PySession(scheduler, dynamic_ui, build_id, should_report_workunits,)
 
     def new_scheduler(
         self,
