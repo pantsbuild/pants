@@ -24,7 +24,6 @@ python_library(
 
 python_tests(
   name = "tests",
-  sources=['*_test.py', '!*_integration_test.py'],
   dependencies = [
     ':project_info',
     'src/python/pants/backend/codegen/protobuf',
@@ -45,16 +44,4 @@ python_tests(
     'src/python/pants/util:ordered_set',
   ],
   tags = {"type_checked"},
-)
-
-python_tests(
-  name='integration',
-  sources=['*_integration_test.py'],
-  dependencies=[
-    'src/python/pants/testutil:int-test',
-    'examples/src/java/org/pantsbuild/example:hello_directory',
-    'examples/src/scala/org/pantsbuild/example:hello_directory',
-    'examples/src/resources/org/pantsbuild/example:hello_directory',
-  ],
-  tags = {'integration', 'type_checked'},
 )
