@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from io import StringIO
 from pathlib import PurePath
 from textwrap import dedent
-from typing import List, Optional, Tuple, cast
+from typing import List, Optional, , Tuple, cast
 
 import pkg_resources
 
@@ -351,7 +351,7 @@ async def generate_coverage_reports(
 
 def _get_coverage_reports(
     coverage_subsystem: CoverageSubsystem,
-    report_types: Tuple[CoverageReportType, ...],
+    report_types: Sequence[CoverageReportType],
     results: Tuple[ProcessResult, ...],
 ) -> List[CoverageReport]:
     coverage_reports: List[CoverageReport] = []
