@@ -20,7 +20,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
                 "--time",
                 quiet_flag,
                 "bootstrap",
-                "examples/src/java/org/pantsbuild/example/hello::",
+                "examples/src/python/example/hello::",
             ]
             pants_run = self.run_pants(command)
             self.assert_success(pants_run)
@@ -39,7 +39,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
                 f"--reporting-zipkin-endpoint={endpoint}",
                 "--reporting-zipkin-sample-rate=0.0",
                 "list",
-                "examples/src/java/org/pantsbuild/example/hello/simple",
+                "examples/src/python/example/hello/greet",
             ]
 
             pants_run = self.run_pants(command)
@@ -60,7 +60,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
                 f"--reporting-zipkin-endpoint={endpoint}",
                 "--reporting-zipkin-trace-v2",
                 "list",
-                "examples/src/java/org/pantsbuild/example/hello/simple",
+                "examples/src/python/example/hello/greet",
             ]
 
             pants_run = self.run_pants(command)

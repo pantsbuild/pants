@@ -42,7 +42,7 @@ python_tests(
   name='integration',
   sources=['*_integration_test.py'],
   dependencies=[
-    'examples/src/scala/org/pantsbuild/example:hello_directory',
+    'examples/src/python/example:hello_directory',
     'src/python/pants/testutil:int-test',
     'src/python/pants/util:contextutil',
   ],
