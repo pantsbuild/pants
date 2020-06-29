@@ -36,6 +36,9 @@ from pants.backend.python.targets.python_library import PythonLibrary as PythonL
 from pants.backend.python.targets.python_requirement_library import (
     PythonRequirementLibrary as PythonRequirementLibraryV1,
 )
+from pants.backend.python.targets.python_requirements_file import (
+    PythonRequirementsFile as PythonRequirementsFileV1,
+)
 from pants.backend.python.targets.python_tests import PythonTests as PythonTestsV1
 from pants.backend.python.tasks.gather_sources import GatherSources
 from pants.backend.python.tasks.pytest_prep import PytestPrep
@@ -63,6 +66,7 @@ def build_file_aliases():
             PythonLibraryV1.alias(): PythonLibraryV1,
             PythonTestsV1.alias(): PythonTestsV1,
             "python_requirement_library": PythonRequirementLibraryV1,
+            PythonRequirementsFileV1.alias(): PythonRequirementsFileV1,
         },
         objects={
             "python_requirement": PythonRequirement,
