@@ -115,7 +115,7 @@ log = "0.4"
 logging = { path = "logging" }
 nailgun = { path = "nailgun" }
 num_enum = "0.4"
-parking_lot = "0.6"
+parking_lot = "0.11"
 process_execution = { path = "process_execution" }
 rand = "0.6"
 reqwest = { version = "0.10", default_features = false, features = ["stream", "rustls-tls"] }

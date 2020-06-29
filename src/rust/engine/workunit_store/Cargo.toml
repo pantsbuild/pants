@@ -8,7 +8,7 @@ publish = false
 [dependencies]
 concrete_time = { path = "../concrete_time" }
 hashing = { path = "../hashing" }
-parking_lot = "0.6"
+parking_lot = "0.11"
 rand = "0.6"
 tokio = { version = "0.2", features = ["rt-util"] }
 petgraph = "0.4.5"

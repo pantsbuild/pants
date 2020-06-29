@@ -22,7 +22,7 @@ indexmap = "1.0.2"
 itertools = "0.7.2"
 lmdb = { git = "https://github.com/pantsbuild/lmdb-rs.git", rev = "06bdfbfc6348f6804127176e561843f214fc17f8" }
 log = "0.4"
-parking_lot = "0.6"
+parking_lot = "0.11"
 protobuf = { version = "2.0.6", features = ["with-bytes"] }
 serverset = { path = "../../serverset" }
 serde = "1.0"
