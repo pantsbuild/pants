@@ -106,6 +106,9 @@ impl TestServer {
       .register_service(bazel_protos::operations_grpc::create_operations(
         mock_responder.clone(),
       ))
+      .register_service(bazel_protos::remote_execution_grpc::create_capabilities(
+        mock_responder.clone(),
+      ))
       .bind("localhost", port.unwrap_or(0))
       .build()
       .unwrap();
@@ -454,5 +457,38 @@ impl bazel_protos::operations_grpc::Operations for MockResponder {
     self.log(&ctx, req.clone());
     self.cancelation_requests.lock().push(req);
     sink.success(bazel_protos::empty::Empty::new());
+  }
+}
+
+impl bazel_protos::remote_execution_grpc::Capabilities for MockResponder {
+  fn get_capabilities(
+    &self,
+    _: grpcio::RpcContext<'_>,
+    _: bazel_protos::remote_execution::GetCapabilitiesRequest,
+    sink: grpcio::UnarySink<bazel_protos::remote_execution::ServerCapabilities>,
+  ) {
+    let mut cache_capabilities = bazel_protos::remote_execution::CacheCapabilities::new();
+    cache_capabilities.set_digest_function(vec![
+      bazel_protos::remote_execution::DigestFunction_Value::SHA256,
+    ]);
+
+    let mut execution_capabilities = bazel_protos::remote_execution::ExecutionCapabilities::new();
+    execution_capabilities.set_exec_enabled(true);
+    execution_capabilities
+      .set_digest_function(bazel_protos::remote_execution::DigestFunction_Value::SHA256);
+
+    let mut capabilities = bazel_protos::remote_execution::ServerCapabilities::new();
+    capabilities.set_cache_capabilities(cache_capabilities);
+    capabilities.set_execution_capabilities(execution_capabilities);
+
+    let mut ver_2_0 = bazel_protos::semver::SemVer::new();
+    ver_2_0.set_major(2);
+    ver_2_0.set_minor(0);
+    ver_2_0.set_patch(0);
+
+    capabilities.set_low_api_version(ver_2_0.clone());
+    capabilities.set_high_api_version(ver_2_0);
+
+    sink.success(capabilities);
   }
 }
