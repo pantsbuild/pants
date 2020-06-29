@@ -89,7 +89,6 @@ python_library(
     'src/python/pants/engine:addresses',
     'src/python/pants/engine:fs',
     'src/python/pants/engine:target',
-    'src/python/pants/fs',
     'src/python/pants/python',
   ],
   tags={"type_checked"},

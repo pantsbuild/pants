@@ -238,10 +238,6 @@ class JvmAppAdaptor(AppAdaptor):
     pass
 
 
-class PythonAppAdaptor(AppAdaptor):
-    pass
-
-
 class RemoteSourcesAdaptor(TargetAdaptor):
     def __init__(self, dest=None, **kwargs):
         """
