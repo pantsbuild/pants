@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from io import StringIO
 from pathlib import PurePath
 from textwrap import dedent
-from typing import List, Optional, , Tuple, cast
+from typing import List, Optional, Sequence, Tuple, cast
 
 import pkg_resources
 
@@ -345,12 +345,12 @@ async def generate_coverage_reports(
     results: Tuple[ProcessResult, ...] = await MultiGet(
         Get(ProcessResult, Process, process) for process in processes
     )
-    coverage_reports = _get_coverage_reports(coverage_subsystem, report_types, results)
+    coverage_reports = _get_coverage_reports(coverage_subsystem.output_dir, report_types, results)
     return CoverageReports(tuple(coverage_reports))
 
 
 def _get_coverage_reports(
-    coverage_subsystem: CoverageSubsystem,
+    output_dir: PurePath,
     report_types: Sequence[CoverageReportType],
     results: Tuple[ProcessResult, ...],
 ) -> List[CoverageReport]:
@@ -363,16 +363,16 @@ def _get_coverage_reports(
 
         report_file: Optional[PurePath] = None
         if report_type == CoverageReportType.HTML:
-            report_file = coverage_subsystem.output_dir / "htmlcov" / "index.html"
+            report_file = output_dir / "htmlcov" / "index.html"
         elif report_type == CoverageReportType.XML:
-            report_file = coverage_subsystem.output_dir / "coverage.xml"
+            report_file = output_dir / "coverage.xml"
         else:
             raise ValueError(f"Invalid coverage report type: {report_type}")
         coverage_reports.append(
             FilesystemCoverageReport(
                 report_type=report_type,
                 result_digest=result.output_digest,
-                directory_to_materialize_to=coverage_subsystem.output_dir,
+                directory_to_materialize_to=output_dir,
                 report_file=report_file,
             )
         )
