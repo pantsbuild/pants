@@ -335,8 +335,8 @@ async def generate_coverage_reports(
                 # and this will cause Coverage to fail.
                 pex_args=(report_type.report_name, "--ignore-errors"),
                 input_digest=input_digest,
-                output_directories=("htmlcov",),
-                output_files=("coverage.xml",),
+                output_directories=("htmlcov",) if report_type == CoverageReportType.HTML else None,
+                output_files=("coverage.xml",) if report_type == CoverageReportType.XML else None,
                 description=f"Generate Pytest {report_type.report_name} coverage report.",
                 python_setup=python_setup,
                 subprocess_encoding_environment=subprocess_encoding_environment,
