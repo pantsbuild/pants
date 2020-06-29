@@ -192,7 +192,7 @@ def run_rule(
     while True:
         try:
             res = rule_coroutine.send(rule_input)
-            if Get.isinstance(res):
+            if isinstance(res, Get):
                 rule_input = get(res.product_type, res.subject)
             elif type(res) in (tuple, list):
                 rule_input = [get(g.product_type, g.subject) for g in res]

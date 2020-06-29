@@ -72,9 +72,6 @@ readonly DEPLOY_PANTS_WHEEL_DIR="${DEPLOY_DIR}/${DEPLOY_PANTS_WHEELS_PATH}"
 # URL from which pex release binaries can be downloaded.
 : "${PEX_DOWNLOAD_PREFIX:="https://github.com/pantsbuild/pex/releases/download"}"
 
-# shellcheck source=contrib/release_packages.sh
-source "${ROOT}/contrib/release_packages.sh"
-
 function requirement() {
   package="$1"
   grep "^${package}[^A-Za-z0-9]" "${ROOT}/3rdparty/python/requirements.txt" || die "Could not find requirement for ${package}"
@@ -150,15 +147,14 @@ function execute_packaged_pants_with_internal_backends() {
     --pythonpath="['pants-plugins/src/python']" \
     --backend-packages="[\
         'pants.backend.jvm',\
-        'pants.backend.native',\
         'pants.backend.python',\
         'pants.cache',\
         'internal_backend.repositories',\
-        'internal_backend.utilities',\
       ]" \
       --backend-packages2="[\
         'pants.backend.awslambda.python',\
         'pants.backend.python',\
+        'internal_backend.utilities',\
       ]" \
     "$@"
 }

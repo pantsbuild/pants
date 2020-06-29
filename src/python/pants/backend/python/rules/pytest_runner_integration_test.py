@@ -63,6 +63,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
     def create_basic_library(self) -> None:
         self.create_python_library(name="library", sources=[self.library_source.path])
         self.write_file(self.library_source)
+        self.create_file(f"{self.package}/__init__.py")
 
     def create_python_test_target(
         self,
@@ -290,6 +291,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         self.create_python_library(
             name="library", sources=["library.py"], dependencies=["3rdparty/python:ordered-set"],
         )
+        self.create_file(f"{self.package}/__init__.py")
         self.write_file(
             FileContent(
                 path="library.py",

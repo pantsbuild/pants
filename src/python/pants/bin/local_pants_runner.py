@@ -88,15 +88,8 @@ class LocalPantsRunner:
         dynamic_ui = global_scope.dynamic_ui if global_scope.v2 else False
         use_colors = global_scope.get("colors", True)
 
-        zipkin_trace_v2 = options.for_scope("reporting").zipkin_trace_v2
-        # TODO(#8658) This should_report_workunits flag must be set to True for
-        # StreamingWorkunitHandler to receive WorkUnits. It should eventually
-        # be merged with the zipkin_trace_v2 flag, since they both involve most
-        # of the same engine functionality, but for now is separate to avoid
-        # breaking functionality associated with zipkin tracing while iterating on streaming workunit reporting.
         stream_workunits = len(options.for_global_scope().streaming_workunits_handlers) != 0
         return graph_scheduler_helper.new_session(
-            zipkin_trace_v2,
             RunTracker.global_instance().run_id,
             dynamic_ui=dynamic_ui,
             use_colors=use_colors,

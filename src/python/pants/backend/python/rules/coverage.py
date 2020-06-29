@@ -14,9 +14,12 @@ from pants.backend.python.rules.pex import (
     PexRequest,
     PexRequirements,
 )
+from pants.backend.python.rules.python_sources import (
+    UnstrippedPythonSources,
+    UnstrippedPythonSourcesRequest,
+)
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
-from pants.backend.python.target_types import PythonSources, PythonTestsSources
 from pants.core.goals.test import (
     ConsoleCoverageReport,
     CoverageData,
@@ -25,24 +28,14 @@ from pants.core.goals.test import (
     CoverageReportType,
     FilesystemCoverageReport,
 )
-from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
 from pants.engine.addresses import Address
-from pants.engine.fs import (
-    EMPTY_SNAPSHOT,
-    AddPrefix,
-    Digest,
-    FileContent,
-    InputFilesContent,
-    MergeDigests,
-)
+from pants.engine.fs import AddPrefix, Digest, FileContent, InputFilesContent, MergeDigests
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get, MultiGet
-from pants.engine.target import Target, TransitiveTargets
+from pants.engine.target import TransitiveTargets
 from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
-from pants.util.logging import LogLevel
-from pants.util.ordered_set import FrozenOrderedSet
 
 
 """
@@ -103,13 +96,6 @@ class CoverageSubsystem(PythonToolBase):
             advanced=True,
             help="Path to write the Pytest Coverage report to. Must be relative to build root.",
         )
-        register(
-            "--omit-test-sources",
-            type=bool,
-            default=False,
-            advanced=True,
-            help="Whether to exclude the test files in coverage measurement.",
-        )
 
     @property
     def filter(self) -> Tuple[str, ...]:
@@ -123,10 +109,6 @@ class CoverageSubsystem(PythonToolBase):
     def output_dir(self) -> PurePath:
         return PurePath(self.options.output_dir)
 
-    @property
-    def omit_test_sources(self) -> bool:
-        return cast(bool, self.options.omit_test_sources)
-
 
 @dataclass(frozen=True)
 class PytestCoverageData(CoverageData):
@@ -139,19 +121,12 @@ class PytestCoverageDataCollection(CoverageDataCollection):
 
 
 @dataclass(frozen=True)
-class CoverageConfigRequest:
-    targets: FrozenOrderedSet[Target]
-
-
-@dataclass(frozen=True)
 class CoverageConfig:
     digest: Digest
 
 
 @rule
-async def create_coverage_config(
-    request: CoverageConfigRequest, coverage_subsystem: CoverageSubsystem, log_level: LogLevel
-) -> CoverageConfig:
+async def create_coverage_config() -> CoverageConfig:
     default_config = dedent(
         """
         [run]
@@ -161,30 +136,10 @@ async def create_coverage_config(
     )
     cp = configparser.ConfigParser()
     cp.read_string(default_config)
-
-    test_sources = (
-        await Get(
-            SourceFiles,
-            AllSourceFilesRequest(
-                tgt[PythonTestsSources]
-                for tgt in request.targets
-                if tgt.has_field(PythonTestsSources)
-            ),
-        )
-        if coverage_subsystem.omit_test_sources
-        else SourceFiles(EMPTY_SNAPSHOT)
-    )
-    if coverage_subsystem.omit_test_sources:
-        cp.set("run", "omit", ",".join(test_sources.files))
-
-    if log_level in (LogLevel.DEBUG, LogLevel.TRACE):
-        # See https://coverage.readthedocs.io/en/coverage-5.1/cmd.html?highlight=debug#diagnostics.
-        cp.set("run", "debug", "\n\ttrace\n\tconfig")
-
+    cp.set("run", "omit", "test_runner.pex/*")
     config_stream = StringIO()
     cp.write(config_stream)
     config_content = config_stream.getvalue()
-
     digest = await Get(
         Digest, InputFilesContent([FileContent(".coveragerc", config_content.encode())])
     )
@@ -250,20 +205,17 @@ async def merge_coverage_data(
 async def generate_coverage_report(
     merged_coverage_data: MergedCoverageData,
     coverage_setup: CoverageSetup,
+    coverage_config: CoverageConfig,
     coverage_subsystem: CoverageSubsystem,
     transitive_targets: TransitiveTargets,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> CoverageReports:
     """Takes all Python test results and generates a single coverage report."""
-    coverage_config_request = Get(CoverageConfig, CoverageConfigRequest(transitive_targets.closure))
-    sources_request = Get(
-        SourceFiles,
-        AllSourceFilesRequest(
-            tgt[PythonSources] for tgt in transitive_targets.closure if tgt.has_field(PythonSources)
-        ),
+    sources = await Get(
+        UnstrippedPythonSources,
+        UnstrippedPythonSourcesRequest(transitive_targets.closure, include_resources=False),
     )
-    coverage_config, sources = await MultiGet(coverage_config_request, sources_request)
     input_digest = await Get(
         Digest,
         MergeDigests(
@@ -279,9 +231,7 @@ async def generate_coverage_report(
     report_type = coverage_subsystem.report
     process = coverage_setup.pex.create_process(
         pex_path=f"./{coverage_setup.pex.output_filename}",
-        # We pass `--ignore-errors` because Pants dynamically injects missing `__init__.py` files
-        # and this will cause Coverage to fail.
-        pex_args=(report_type.report_name, "--ignore-errors"),
+        pex_args=(report_type.report_name,),
         input_digest=input_digest,
         output_directories=("htmlcov",),
         output_files=("coverage.xml",),

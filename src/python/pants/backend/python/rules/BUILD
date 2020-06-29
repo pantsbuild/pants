@@ -7,7 +7,6 @@ python_library(
     '3rdparty/python:setuptools',
     'src/python/pants/backend/python:target_types',
     'src/python/pants/backend/python/subsystems',
-    'src/python/pants/backend/python/subsystems/ipex',
     'src/python/pants/build_graph',
     'src/python/pants/core',
     'src/python/pants/core/goals',

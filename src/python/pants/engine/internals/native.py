@@ -64,7 +64,7 @@ class Externs:
         try:
             res = func.send(arg)
 
-            if Get.isinstance(res):
+            if isinstance(res, Get):
                 # Get.
                 return PyGeneratorResponseGet(
                     res.product_type, res.subject_declared_type, res.subject,
@@ -174,16 +174,9 @@ class Native(metaclass=SingletonMetaclass):
         return PyExecutionRequest()
 
     def new_session(
-        self,
-        scheduler,
-        should_record_zipkin_spans,
-        dynamic_ui: bool,
-        build_id,
-        should_report_workunits: bool,
+        self, scheduler, dynamic_ui: bool, build_id, should_report_workunits: bool,
     ) -> PySession:
-        return PySession(
-            scheduler, should_record_zipkin_spans, dynamic_ui, build_id, should_report_workunits,
-        )
+        return PySession(scheduler, dynamic_ui, build_id, should_report_workunits,)
 
     def new_scheduler(
         self,

@@ -8,8 +8,6 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
     'src/python/pants/backend/native/config',
     'src/python/pants/backend/native/subsystems',
-    'src/python/pants/backend/native/targets',
-    'src/python/pants/backend/native/tasks',
     'src/python/pants/backend/python:interpreter_cache',
     'src/python/pants/backend/python/lint/isort',
     'src/python/pants/backend/python/rules',  # For util.py.

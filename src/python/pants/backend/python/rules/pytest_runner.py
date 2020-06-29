@@ -9,7 +9,6 @@ from typing import Optional, Tuple
 
 from pants.backend.python.rules.coverage import (
     CoverageConfig,
-    CoverageConfigRequest,
     CoverageSubsystem,
     PytestCoverageData,
 )
@@ -35,15 +34,7 @@ from pants.backend.python.target_types import (
 from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestOptions, TestResult
 from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.engine.addresses import Addresses
-from pants.engine.fs import (
-    EMPTY_DIGEST,
-    AddPrefix,
-    Digest,
-    MergeDigests,
-    PathGlobs,
-    Snapshot,
-    SnapshotSubset,
-)
+from pants.engine.fs import AddPrefix, Digest, MergeDigests, PathGlobs, Snapshot, SnapshotSubset
 from pants.engine.interactive_process import InteractiveProcess
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import SubsystemRule, rule
@@ -85,6 +76,7 @@ async def setup_pytest_for_target(
     pytest: PyTest,
     test_options: TestOptions,
     python_setup: PythonSetup,
+    coverage_config: CoverageConfig,
     coverage_subsystem: CoverageSubsystem,
 ) -> TestTargetSetup:
     test_addresses = Addresses((field_set.address,))
@@ -168,37 +160,34 @@ async def setup_pytest_for_target(
         SourceFiles, SpecifiedSourceFilesRequest([(field_set.sources, field_set.origin)])
     )
 
-    use_coverage = test_options.values.use_coverage
-
-    requests = (
+    (
+        pytest_pex,
+        requirements_pex,
+        test_runner_pex,
+        prepared_sources,
+        specified_source_files,
+    ) = await MultiGet(
         pytest_pex_request,
         requirements_pex_request,
         test_runner_pex_request,
         prepared_sources_request,
         specified_source_files_request,
     )
-    (
-        coverage_config,
-        pytest_pex,
-        requirements_pex,
-        test_runner_pex,
-        prepared_sources,
-        specified_source_files,
-    ) = (
-        await MultiGet(Get(CoverageConfig, CoverageConfigRequest(all_targets)), *requests)
-        if use_coverage
-        else (CoverageConfig(EMPTY_DIGEST), *await MultiGet(*requests))
+
+    input_digest = await Get(
+        Digest,
+        MergeDigests(
+            (
+                coverage_config.digest,
+                prepared_sources.snapshot.digest,
+                requirements_pex.digest,
+                pytest_pex.digest,
+                test_runner_pex.digest,
+            )
+        ),
     )
 
-    digests_to_merge = [
-        coverage_config.digest,
-        prepared_sources.snapshot.digest,
-        requirements_pex.digest,
-        pytest_pex.digest,
-        test_runner_pex.digest,
-    ]
-    input_digest = await Get(Digest, MergeDigests(digests_to_merge))
-
+    use_coverage = test_options.values.use_coverage
     coverage_args = []
     if use_coverage:
         cov_paths = coverage_subsystem.filter if coverage_subsystem.filter else (".",)

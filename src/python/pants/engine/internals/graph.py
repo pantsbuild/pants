@@ -1,6 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import itertools
 import logging
 import os.path
 from collections import defaultdict, deque
@@ -141,19 +142,18 @@ async def transitive_targets(addresses: Addresses) -> TransitiveTargets:
     TransitiveTargets objects are being constructed for multiple roots, their structure will be
     shared.
     """
-    transitive_targets = await MultiGet(Get(TransitiveTarget, Address, a) for a in addresses)
+    tts = await MultiGet(Get(TransitiveTarget, Address, a) for a in addresses)
 
-    closure: OrderedSet[Target] = OrderedSet()
-    to_visit = deque(transitive_targets)
-
+    dependencies: OrderedSet[Target] = OrderedSet()
+    to_visit = deque(itertools.chain.from_iterable(tt.dependencies for tt in tts))
     while to_visit:
         tt = to_visit.popleft()
-        if tt.root in closure:
+        if tt.root in dependencies:
             continue
-        closure.add(tt.root)
+        dependencies.add(tt.root)
         to_visit.extend(tt.dependencies)
 
-    return TransitiveTargets(tuple(tt.root for tt in transitive_targets), FrozenOrderedSet(closure))
+    return TransitiveTargets(tuple(tt.root for tt in tts), FrozenOrderedSet(dependencies))
 
 
 # -----------------------------------------------------------------------------------------------

@@ -56,7 +56,7 @@ use futures::future::FutureExt;
 use futures::future::{self as future03, TryFutureExt};
 use futures01::{future, Future};
 use hashing::{Digest, EMPTY_DIGEST};
-use log::{self, error, warn, Log};
+use log::{self, debug, error, warn, Log};
 use logging::logger::LOGGER;
 use logging::{Destination, Logger, PythonLogLevel};
 use rule_graph::{self, RuleGraph};
@@ -498,14 +498,12 @@ py_class!(class PySession |py| {
     data session: Session;
     def __new__(_cls,
           scheduler_ptr: PyScheduler,
-          should_record_zipkin_spans: bool,
           should_render_ui: bool,
           build_id: String,
           should_report_workunits: bool
     ) -> CPyResult<Self> {
       Self::create_instance(py, Session::new(
           scheduler_ptr.scheduler(py),
-          should_record_zipkin_spans,
           should_render_ui,
           build_id,
           should_report_workunits,
@@ -730,6 +728,10 @@ fn scheduler_create(
   remote_execution_overall_deadline_secs: u64,
   process_execution_local_enable_nailgun: bool,
 ) -> CPyResult<PyScheduler> {
+  match fs::increase_limits() {
+    Ok(msg) => debug!("{}", msg),
+    Err(e) => warn!("{}", e),
+  }
   let core: Result<Core, String> = with_executor(py, executor_ptr, |executor| {
     let types = types_ptr
       .types(py)
@@ -923,17 +925,11 @@ fn scheduler_metrics(
 ) -> CPyResult<PyObject> {
   with_scheduler(py, scheduler_ptr, |scheduler| {
     with_session(py, session_ptr, |session| {
-      let mut values = scheduler
+      let values = scheduler
         .metrics(session)
         .into_iter()
         .map(|(metric, value)| (externs::store_utf8(metric), externs::store_i64(value)))
         .collect::<Vec<_>>();
-      if session.should_record_zipkin_spans() {
-        let workunits = session.workunit_store().get_workunits();
-        let mut iter = workunits.iter();
-        let value = workunits_to_py_tuple_value(&mut iter, &scheduler.core)?;
-        values.push((externs::store_utf8("engine_workunits"), value));
-      };
       externs::store_dict(values).map(|d| d.consume_into_py_object(py))
     })
   })

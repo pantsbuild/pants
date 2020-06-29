@@ -15,6 +15,7 @@ class CoverageIntegrationTest(PantsRunIntegrationTest):
             tmpdir_relative = Path(tmpdir).relative_to(get_buildroot())
             src_root = Path(tmpdir, "src", "python", "project")
             src_root.mkdir(parents=True)
+            (src_root / "__init__.py").touch()
 
             # Set up the source files. Only `lib.py` will actually be tested, but we still expect
             # `random.py` to show up in the final report correctly.
@@ -69,6 +70,7 @@ class CoverageIntegrationTest(PantsRunIntegrationTest):
             # Test that a `tests/` source root accurately gets coverage data for the `src/` root.
             test_root = Path(tmpdir, "tests", "python", "project_test")
             test_root.mkdir(parents=True)
+            (test_root / "__init__.py").touch()
             (test_root / "test_multiply.py").write_text(
                 dedent(
                     """\
@@ -113,6 +115,7 @@ class CoverageIntegrationTest(PantsRunIntegrationTest):
             # `--omit-test-sources`.
             no_src_folder = Path(tmpdir, "tests", "python", "project_test", "no_src")
             no_src_folder.mkdir()
+            (no_src_folder / "__init__.py").touch()
             (no_src_folder / "test_no_src.py").write_text(
                 "def test_true():\n\tassert True is True\n"
             )
@@ -129,26 +132,27 @@ class CoverageIntegrationTest(PantsRunIntegrationTest):
                 f"{tmpdir_relative}/tests/python/project_test/no_src",
             ]
             default_result = self.run_pants(command)
-            omit_test_result = self.run_pants([*command, "--coverage-py-omit-test-sources"])
             filter_result = self.run_pants(
                 [*command, "--coverage-py-filter=['project.lib', 'project_test.no_src']"]
             )
 
-        for result in (default_result, omit_test_result, filter_result):
+        for result in (default_result, filter_result):
             assert result.returncode == 0
             # Regression test: make sure that individual tests do not complain about failing to
             # generate reports. This was showing up at test-time, even though the final merged
             # report would work properly.
             assert "Failed to generate report" not in result.stderr_data
 
-        # TODO(#10064): Fix Coverage so that `random.py` shows up in the output.
         assert (
             dedent(
                 f"""\
                 Name                                                          Stmts   Miss Branch BrPart  Cover
                 -----------------------------------------------------------------------------------------------
+                {tmpdir_relative}/src/python/project/__init__.py                        0      0      0      0   100%
                 {tmpdir_relative}/src/python/project/lib.py                             6      0      0      0   100%
                 {tmpdir_relative}/src/python/project/lib_test.py                        3      0      0      0   100%
+                {tmpdir_relative}/tests/python/project_test/__init__.py                 0      0      0      0   100%
+                {tmpdir_relative}/tests/python/project_test/no_src/__init__.py          0      0      0      0   100%
                 {tmpdir_relative}/tests/python/project_test/no_src/test_no_src.py       2      0      0      0   100%
                 {tmpdir_relative}/tests/python/project_test/test_arithmetic.py          3      0      0      0   100%
                 {tmpdir_relative}/tests/python/project_test/test_multiply.py            3      0      0      0   100%
@@ -161,19 +165,10 @@ class CoverageIntegrationTest(PantsRunIntegrationTest):
         assert (
             dedent(
                 f"""\
-                Name                                    Stmts   Miss Branch BrPart  Cover
-                -------------------------------------------------------------------------
-                {tmpdir_relative}/src/python/project/lib.py       6      0      0      0   100%
-                """
-            )
-            in omit_test_result.stderr_data
-        )
-        assert (
-            dedent(
-                f"""\
                 Name                                                          Stmts   Miss Branch BrPart  Cover
                 -----------------------------------------------------------------------------------------------
                 {tmpdir_relative}/src/python/project/lib.py                             6      0      0      0   100%
+                {tmpdir_relative}/tests/python/project_test/no_src/__init__.py          0      0      0      0   100%
                 {tmpdir_relative}/tests/python/project_test/no_src/test_no_src.py       2      0      0      0   100%
                 -----------------------------------------------------------------------------------------------
                 TOTAL                                                             8      0      0      0   100%

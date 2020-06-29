@@ -76,9 +76,7 @@ class SchedulerTestBase:
             include_trace_on_error=include_trace_on_error,
         )
         return scheduler.new_session(
-            zipkin_trace_v2=False,
-            build_id="buildid_for_test",
-            should_report_workunits=should_report_workunits,
+            build_id="buildid_for_test", should_report_workunits=should_report_workunits,
         )
 
     def context_with_scheduler(self, scheduler, *args, **kwargs):

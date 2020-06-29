@@ -58,8 +58,6 @@ struct InnerSession {
   // If enabled, the display that will render the progress of the V2 engine. This is only
   // Some(_) if the --dynamic-ui option is enabled.
   display: Option<Mutex<ConsoleUI>>,
-  // If enabled, Zipkin spans for v2 engine will be collected.
-  should_record_zipkin_spans: bool,
   // A place to store info about workunits in rust part
   workunit_store: WorkunitStore,
   // The unique id for this Session: used for metrics gathering purposes.
@@ -81,7 +79,6 @@ pub struct Session(Arc<InnerSession>);
 impl Session {
   pub fn new(
     scheduler: &Scheduler,
-    should_record_zipkin_spans: bool,
     should_render_ui: bool,
     build_id: String,
     should_report_workunits: bool,
@@ -97,7 +94,6 @@ impl Session {
       preceding_graph_size: scheduler.core.graph.len(),
       roots: Mutex::new(HashMap::new()),
       display,
-      should_record_zipkin_spans,
       workunit_store,
       build_id,
       run_id: Mutex::new(Uuid::new_v4()),
@@ -129,10 +125,6 @@ impl Session {
 
   pub fn preceding_graph_size(&self) -> usize {
     self.0.preceding_graph_size
-  }
-
-  pub fn should_record_zipkin_spans(&self) -> bool {
-    self.0.should_record_zipkin_spans
   }
 
   pub fn should_report_workunits(&self) -> bool {
@@ -183,10 +175,6 @@ impl Session {
     } else {
       f()
     }
-  }
-
-  pub fn should_handle_workunits(&self) -> bool {
-    self.should_report_workunits() || self.should_record_zipkin_spans()
   }
 
   fn maybe_display_initialize(&self, executor: &Executor, sender: &mpsc::Sender<ExecutionEvent>) {

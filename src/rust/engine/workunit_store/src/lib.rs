@@ -201,21 +201,6 @@ impl WorkunitStore {
     }))
   }
 
-  pub fn get_workunits(&self) -> Vec<Workunit> {
-    let mut inner_guard = (*self.inner).lock();
-    let inner_store: &mut WorkUnitInnerStore = &mut *inner_guard;
-    let workunit_records = &inner_store.workunit_records;
-    inner_store
-      .completed_ids
-      .iter()
-      .flat_map(|id| workunit_records.get(id))
-      .flat_map(|workunit| match workunit.state {
-        WorkunitState::Started { .. } => None,
-        WorkunitState::Completed { .. } => Some(workunit.clone()),
-      })
-      .collect()
-  }
-
   ///
   /// Find the longest running leaf workunits, and render their first visible parents.
   ///

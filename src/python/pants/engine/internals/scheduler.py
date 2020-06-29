@@ -350,17 +350,13 @@ class Scheduler:
         self._native.lib.garbage_collect_store(self._scheduler)
 
     def new_session(
-        self,
-        zipkin_trace_v2: bool,
-        build_id,
-        dynamic_ui: bool = False,
-        should_report_workunits: bool = False,
+        self, build_id, dynamic_ui: bool = False, should_report_workunits: bool = False,
     ) -> "SchedulerSession":
         """Creates a new SchedulerSession for this Scheduler."""
         return SchedulerSession(
             self,
             self._native.new_session(
-                self._scheduler, zipkin_trace_v2, dynamic_ui, build_id, should_report_workunits,
+                self._scheduler, dynamic_ui, build_id, should_report_workunits,
             ),
         )
 

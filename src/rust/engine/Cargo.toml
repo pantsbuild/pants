@@ -101,7 +101,7 @@ boxfuture = { path = "boxfuture" }
 bytes = "0.4.5"
 concrete_time = { path = "concrete_time" }
 cpython = "0.5"
-crossbeam-channel = "0.3"
+crossbeam-channel = "0.4"
 fnv = "1.0.5"
 fs = { path = "fs" }
 futures01 = { package = "futures", version = "0.1" }

@@ -649,8 +649,8 @@ class PantsRunIntegrationTest(unittest.TestCase):
             pushd: Any
             new_buildroot: str
 
-        # N.B. BUILD.tools, contrib, 3rdparty needs to be copied vs symlinked to avoid
-        # symlink prefix check error in v1 and v2 engine.
+        # N.B. 3rdparty needs to be copied vs symlinked to avoid symlink prefix check error in
+        # v1 and v2 engine.
         files_to_copy = ("BUILD.tools",)
         files_to_link = (
             "BUILD_ROOT",
