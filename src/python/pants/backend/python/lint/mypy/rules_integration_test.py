@@ -5,18 +5,18 @@ from pathlib import PurePath
 from textwrap import dedent
 from typing import List, Optional
 
-import pytest
-
 from pants.backend.python.lint.mypy.rules import MyPyFieldSet, MyPyRequest
 from pants.backend.python.lint.mypy.rules import rules as mypy_rules
-from pants.backend.python.target_types import PythonLibrary
+from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.base.specs import SingleAddress
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.lint import LintResults
 from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.engine.target import TargetWithOrigin, WrappedTarget
+from pants.python.python_requirement import PythonRequirement
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option.util import create_options_bootstrapper
 
@@ -63,8 +63,12 @@ class MyPyIntegrationTest(ExternalToolTestBase):
         return (*super().rules(), *mypy_rules(), RootRule(MyPyRequest))
 
     @classmethod
+    def alias_groups(cls):
+        return BuildFileAliases(objects={"python_requirement": PythonRequirement})
+
+    @classmethod
     def target_types(cls):
-        return [PythonLibrary]
+        return [PythonLibrary, PythonRequirementLibrary]
 
     def make_target_with_origin(
         self,
@@ -226,31 +230,32 @@ class MyPyIntegrationTest(ExternalToolTestBase):
         assert result[0].exit_code == 1
         assert f"{self.package}/math/add.py:5" in result[0].stdout
 
-    @pytest.mark.skip(
-        reason="Figure out how to get MyPy working with both namespace packages and source roots. See https://github.com/Eric-Arellano/mypy-debug."
-    )
-    def test_pep420_namespace_packages(self) -> None:
-        # Regression test for the issue described in https://github.com/pantsbuild/pants/pull/10183.
-        test_fc = FileContent(
-            "tests/python/project/good_test.py",
+    def test_thirdparty_dependency(self) -> None:
+        self.add_to_build_file(
+            "",
             dedent(
                 """\
-                from project.good import add
+                python_requirement_library(
+                    name='more-itertools',
+                    requirements=[python_requirement('more-itertools==8.4.0')],
+                )
+                """
+            ),
+        )
+        source_file = FileContent(
+            f"{self.package}/itertools.py",
+            dedent(
+                """\
+                from more_itertools import flatten
 
-                def test_add():
-                    assert add(3, 2) == 5
+                assert flatten(42) == [4, 2]
                 """
             ).encode(),
         )
-        targets = [
-            self.make_target_with_origin([self.good_source]),
-            self.make_target_with_origin(
-                [test_fc],
-                package="tests/python/project",
-                dependencies=[Address.parse(f"{self.package}:target")],
-            ),
-        ]
-        result = self.run_mypy(targets, passthrough_args="--namespace-packages")
+        target = self.make_target_with_origin(
+            [source_file], dependencies=[Address.parse("//:more-itertools")]
+        )
+        result = self.run_mypy([target])
         assert len(result) == 1
-        assert result[0].exit_code == 0
-        assert "Success: no issues found" in result[0].stdout.strip()
+        assert result[0].exit_code == 1
+        assert f"{self.package}/itertools.py:4" in result[0].stdout
