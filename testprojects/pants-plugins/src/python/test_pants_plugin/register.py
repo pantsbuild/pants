@@ -55,7 +55,6 @@ async def run_lifecycle_stubs(opts: LifecycleStubsOptions) -> LifecycleStubsGoal
         file_stream = open(output_file, "wb")
         ExceptionSink.reset_interactive_output_stream(file_stream, output_file)
     raise Exception("erroneous!")
-    return LifecycleStubsGoal(0)
 
 
 def rules():
