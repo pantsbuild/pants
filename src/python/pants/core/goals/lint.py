@@ -128,18 +128,16 @@ async def lint(
             Get(LintResults, LintRequest, lint_request) for lint_request in valid_requests
         )
 
-    sorted_results = sorted(
-        itertools.chain.from_iterable(results), key=lambda res: res.typechecker_name
-    )
+    sorted_results = sorted(itertools.chain.from_iterable(results), key=lambda res: res.linter_name)
     if not sorted_results:
         return Lint(exit_code=0)
 
     exit_code = 0
     for result in sorted_results:
         console.print_stderr(
-            f"{console.green('✓')} {result.typechecker_name} succeeded."
+            f"{console.green('✓')} {result.linter_name} succeeded."
             if result.exit_code == 0
-            else f"{console.red('𐄂')} {result.typechecker_name} failed."
+            else f"{console.red('𐄂')} {result.linter_name} failed."
         )
         if result.stdout:
             console.print_stderr(result.stdout)
