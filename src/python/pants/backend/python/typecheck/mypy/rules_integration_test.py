@@ -5,9 +5,9 @@ from pathlib import PurePath
 from textwrap import dedent
 from typing import List, Optional
 
-from pants.backend.python.lint.mypy.rules import MyPyFieldSet, MyPyRequest
-from pants.backend.python.lint.mypy.rules import rules as mypy_rules
 from pants.backend.python.target_types import PythonLibrary
+from pants.backend.python.typecheck.mypy.rules import MyPyFieldSet, MyPyRequest
+from pants.backend.python.typecheck.mypy.rules import rules as mypy_rules
 from pants.base.specs import SingleAddress
 from pants.core.goals.typecheck import TypecheckResults
 from pants.engine.addresses import Address

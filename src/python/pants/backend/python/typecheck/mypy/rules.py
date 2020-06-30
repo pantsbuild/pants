@@ -4,7 +4,6 @@
 from dataclasses import dataclass
 from typing import Tuple
 
-from pants.backend.python.lint.mypy.subsystem import MyPy
 from pants.backend.python.rules import download_pex_bin, inject_init, pex
 from pants.backend.python.rules.pex import (
     Pex,
@@ -20,6 +19,7 @@ from pants.backend.python.rules.python_sources import (
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.backend.python.target_types import PythonSources
+from pants.backend.python.typecheck.mypy.subsystem import MyPy
 from pants.core.goals.typecheck import TypecheckRequest, TypecheckResult, TypecheckResults
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.engine.addresses import Addresses
