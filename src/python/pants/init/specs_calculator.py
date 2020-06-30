@@ -96,7 +96,7 @@ class SpecsCalculator:
                 )
             changed_request = ChangedRequest(
                 sources=tuple(changed_options.changed_files(scm=scm)),
-                include_dependees=changed_options.include_dependees,
+                dependees=changed_options.dependees,
             )
             (changed_addresses,) = session.product_request(ChangedAddresses, [changed_request])
             logger.debug("changed addresses: %s", changed_addresses.addresses)
