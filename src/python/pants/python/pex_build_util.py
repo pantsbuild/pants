@@ -16,7 +16,6 @@ from pex.version import __version__ as pex_version
 from pkg_resources import Distribution
 
 from pants.backend.python.targets.python_binary import PythonBinary
-from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_tests import PythonTests
@@ -42,10 +41,6 @@ def is_python_target(tgt: Target) -> bool:
 
 def has_python_sources(tgt: Target) -> bool:
     return is_python_target(tgt) and tgt.has_sources()
-
-
-def is_local_python_dist(tgt: Target) -> bool:
-    return isinstance(tgt, PythonDistribution)
 
 
 def has_resources(tgt: Target) -> bool:

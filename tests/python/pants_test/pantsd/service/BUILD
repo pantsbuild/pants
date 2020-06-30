@@ -4,7 +4,6 @@
 python_tests(
   name = 'pants_service',
   sources = ['test_pants_service.py'],
-  coverage = ['pants.pantsd.service.pants_service'],
   dependencies = [
     'tests/python/pants_test/pantsd:test_deps',
     'src/python/pants/pantsd/service:pants_service'

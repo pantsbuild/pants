@@ -238,10 +238,6 @@ class JvmAppAdaptor(AppAdaptor):
     pass
 
 
-class PythonAppAdaptor(AppAdaptor):
-    pass
-
-
 class RemoteSourcesAdaptor(TargetAdaptor):
     def __init__(self, dest=None, **kwargs):
         """
@@ -290,11 +286,6 @@ class PythonBinaryAdaptor(PythonTargetAdaptor):
 
 class PythonTestsAdaptor(PythonTargetAdaptor):
     pass
-
-
-class PantsPluginAdaptor(PythonTargetAdaptor):
-    def get_sources(self) -> "GlobsWithConjunction":
-        return GlobsWithConjunction.for_literal_files(["register.py"])
 
 
 class SourceGlobs(Locatable):

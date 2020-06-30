@@ -29,7 +29,6 @@ from pants.base.workunit import WorkUnitLabel
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.resources import Resources
-from pants.python.pex_build_util import is_local_python_dist
 from pants.python.setup_py_runner import SetupPyRunner
 from pants.task.task import Task
 from pants.util.contextutil import temporary_file
@@ -643,7 +642,7 @@ class SetupPy(Task):
         # We drive creation of setup.py distributions from the original target graph, grabbing codegen'd
         # sources when needed. We ignore PythonDistribution targets.
         def is_exported_python_target(t):
-            return t.is_original and self.has_provides(t) and not is_local_python_dist(t)
+            return t.is_original and self.has_provides(t)
 
         exported_python_targets = OrderedSet(
             t for t in self.context.target_roots if is_exported_python_target(t)

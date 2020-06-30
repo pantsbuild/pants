@@ -28,7 +28,6 @@ from pants.backend.python.rules.python_sources import (
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.backend.python.target_types import (
-    PythonCoverage,
     PythonInterpreterCompatibility,
     PythonTestsSources,
     PythonTestsTimeout,
@@ -63,7 +62,6 @@ class PythonTestFieldSet(TestFieldSet):
 
     sources: PythonTestsSources
     timeout: PythonTestsTimeout
-    coverage: PythonCoverage
 
 
 @dataclass(frozen=True)

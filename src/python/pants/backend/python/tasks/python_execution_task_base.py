@@ -8,7 +8,6 @@ from typing import Dict, Optional
 from pex.interpreter import PythonInterpreter
 from pex.pex import PEX
 
-from pants.backend.python.targets.python_distribution import PythonDistribution
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.backend.python.targets.python_target import PythonTarget
 from pants.backend.python.tasks.gather_sources import GatherSources
@@ -136,9 +135,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
         :rtype: :class:`pex.pex.PEX`
         """
         relevant_targets = self.context.targets(
-            lambda tgt: isinstance(
-                tgt, (PythonDistribution, PythonRequirementLibrary, PythonTarget, Files)
-            )
+            lambda tgt: isinstance(tgt, (PythonRequirementLibrary, PythonTarget, Files))
         )
         with self.invalidated(relevant_targets) as invalidation_check:
 

@@ -19,7 +19,7 @@ class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
     def test_v2_list(self):
         result = self.do_command("list", self.target, success=True)
         output_lines = result.stdout_data.splitlines()
-        self.assertEqual(len(output_lines), 3)
+        self.assertEqual(len(output_lines), 2)
         self.assertIn("examples/src/python/example/hello/main:main", output_lines)
 
     def test_v2_list_does_not_cache(self):

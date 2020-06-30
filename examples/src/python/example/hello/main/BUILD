@@ -9,14 +9,3 @@ python_binary(
   ],
   sources=['main.py'],
 )
-
-# An "app" is a binary plus other loose files bundled together in
-# an archive (e.g.: tar.gz, zip). In this example, the archive includes
-# both `main.pex` and `BUILD`.
-python_app(
-  name='hello-app',
-  binary=':main',
-  bundles=[
-    bundle(fileset=['BUILD']),
-  ],
-)
