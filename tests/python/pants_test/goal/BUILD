@@ -33,19 +33,3 @@ python_tests(
   ],
   tags = {"partially_type_checked"},
 )
-
-python_tests(
-  name='run_tracker_integration',
-  sources=[
-    'test_run_tracker_integration.py'
-  ],
-  dependencies=[
-    'src/python/pants/goal:run_tracker',
-    'src/python/pants/testutil:int-test',
-    'tests/python/pants_test/goal/data:plugin',
-    'testprojects/src/java/org/pantsbuild/testproject:extra_jvm_options_directory',
-    'testprojects/src/java/org/pantsbuild/testproject:unicode_directory',
-  ],
-  tags = {'integration', 'partially_type_checked'},
-  timeout = 360,
-)
