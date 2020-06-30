@@ -1,30 +1,65 @@
-# Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
 
-from test_pants_plugin.pants_testutil_tests import PantsTestutilTests
-from test_pants_plugin.subsystems.pants_testutil_subsystem import PantsTestutilSubsystem
-from test_pants_plugin.tasks.deprecation_warning_task import DeprecationWarningTask
-from test_pants_plugin.tasks.lifecycle_stub_task import LifecycleStubTask
-
-from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.goal.task_registrar import TaskRegistrar as task
+from pants.base.deprecated import warn_or_error
+from pants.base.exception_sink import ExceptionSink
+from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.rules import goal_rule
+from pants.option.custom_types import file_option
 
 
-def build_file_aliases():
-    return BuildFileAliases(
-        context_aware_object_factories={"pants_testutil_tests": PantsTestutilTests,}
+class DeprecationWarningOptions(GoalSubsystem):
+    """Make a deprecation warning so that warning filters can be integration tested."""
+
+    name = "deprecation-warning"
+
+
+class DeprecationWarningGoal(Goal):
+    subsystem_cls = DeprecationWarningOptions
+
+
+@goal_rule
+async def run_setup_pys() -> DeprecationWarningGoal:
+    warn_or_error(
+        removal_version="999.999.9.dev9", deprecated_entity_description="This is a test warning!",
     )
+    return DeprecationWarningGoal(0)
 
 
-def register_goals():
-    task(name="deprecation-warning-task", action=DeprecationWarningTask).install()
-    task(name="lifecycle-stub-task", action=LifecycleStubTask).install("lifecycle-stub-goal")
+class LifecycleStubsOptions(GoalSubsystem):
+    """Configure workflows for lifecycle tests (Pants stopping and starting)."""
+
+    name = "lifecycle-stub-goal"
+
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
+        register(
+            "--new-interactive-stream-output-file",
+            type=file_option,
+            default=None,
+            help="Redirect interactive output into a separate file.",
+        )
 
 
-def global_subsystems():
-    return (PantsTestutilSubsystem,)
+class LifecycleStubsGoal(Goal):
+    subsystem_cls = LifecycleStubsOptions
+
+
+@goal_rule
+async def run_lifecycle_stubs(opts: LifecycleStubsOptions) -> LifecycleStubsGoal:
+    output_file = opts.values.new_interactive_stream_output_file
+    if output_file:
+        file_stream = open(output_file, "wb")
+        ExceptionSink.reset_interactive_output_stream(file_stream, output_file)
+    raise Exception("erroneous!")
+    return LifecycleStubsGoal(0)
+
+
+def rules():
+    return [run_setup_pys, run_lifecycle_stubs]
 
 
 if os.environ.get("_RAISE_KEYBOARDINTERRUPT_ON_IMPORT", False):

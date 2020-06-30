@@ -45,7 +45,6 @@ python_tests(
   name='integration',
   sources=['*_integration.py'],
   dependencies=[
-    ':pants_requirement_integration_test_base',
     'src/python/pants/base:build_environment',
     'src/python/pants/testutil:int-test',
     'examples/tests/python/example_test:hello_directory',
@@ -55,14 +54,3 @@ python_tests(
   timeout = 120,
 )
 
-python_library(
-  name='pants_requirement_integration_test_base',
-  sources=['pants_requirement_integration_test_base.py'],
-  dependencies=[
-    'src/python/pants/base:build_environment',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:dirutil',
-    'src/python/pants/testutil:int-test',
-  ],
-  tags = {'partially_type_checked'},
-)
