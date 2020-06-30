@@ -55,8 +55,6 @@ def create_isolated_git_repo():
     # worktree
     # |--README
     # |--pants.toml
-    # |--3rdparty
-    #    |--BUILD
     # |--src
     #    |--resources
     #       |--org/pantsbuild/resourceonly
@@ -130,8 +128,6 @@ def create_isolated_git_repo():
                 'a python_library with resources=["filename"]',
                 copy_into("testprojects/src/python/sources", "src/python/sources"),
             )
-
-            add_to_git("3rdparty/BUILD", copy_into("3rdparty/BUILD"))
 
             with environment_as(PANTS_BUILDROOT_OVERRIDE=worktree):
                 yield worktree
