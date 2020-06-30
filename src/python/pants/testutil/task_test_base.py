@@ -11,7 +11,6 @@ from io import BytesIO
 from typing import Any, Tuple
 
 from pants.goal.goal import Goal
-from pants.ivy.bootstrapper import Bootstrapper
 from pants.task.console_task import ConsoleTask
 from pants.task.task import Task
 from pants.testutil.test_base import TestBase
@@ -83,9 +82,6 @@ class TaskTestBase(TestBase):
         # use artifact caching to speed up tests.
         self._test_workdir = os.path.join(self.pants_workdir, self.task_type().stable_name())
         os.mkdir(self._test_workdir)
-        # TODO: Push this down to JVM-related tests only? Seems wrong to have an ivy-specific
-        # action in this non-JVM-specific, high-level base class.
-        Bootstrapper.reset_instance()
 
     @property
     def test_workdir(self):
