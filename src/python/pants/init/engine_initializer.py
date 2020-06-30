@@ -5,8 +5,6 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Iterable, List, Optional, Set, Tuple, Type, cast
 
-from pants.backend.jvm.targets.jvm_app import JvmApp
-from pants.backend.jvm.targets.jvm_binary import JvmBinary
 from pants.backend.python.targets.python_binary import PythonBinary
 from pants.backend.python.targets.python_library import PythonLibrary
 from pants.backend.python.targets.python_tests import PythonTests
@@ -35,13 +33,11 @@ from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.graph import LegacyBuildGraph, create_legacy_graph_tasks
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
 from pants.engine.legacy.structs import (
-    JvmAppAdaptor,
-    JvmBinaryAdaptor,
     PythonBinaryAdaptor,
     PythonTargetAdaptor,
     PythonTestsAdaptor,
     RemoteSourcesAdaptor,
-    TargetAdaptor,
+    TargetAdaptor
 )
 from pants.engine.legacy.structs import rules as structs_rules
 from pants.engine.platform import create_platform_rules
@@ -98,8 +94,6 @@ def _apply_default_sources_globs(
 # TODO: These calls mutate the adaptor classes for some known library types to copy over
 # their default source globs while preserving their concrete types. As with the alias replacement
 # below, this is a delaying tactic to avoid elevating the TargetAdaptor API.
-_apply_default_sources_globs(JvmAppAdaptor, JvmApp)
-_apply_default_sources_globs(JvmBinaryAdaptor, JvmBinary)
 _apply_default_sources_globs(PythonBinaryAdaptor, PythonBinary)
 _apply_default_sources_globs(PythonTargetAdaptor, PythonLibrary)
 _apply_default_sources_globs(PythonTestsAdaptor, PythonTests)
@@ -149,8 +143,6 @@ def _legacy_symbol_table(
     )
 
     table["python_library"] = PythonTargetAdaptor
-    table["jvm_app"] = JvmAppAdaptor
-    table["jvm_binary"] = JvmBinaryAdaptor
     table["python_tests"] = PythonTestsAdaptor
     table["python_binary"] = PythonBinaryAdaptor
     table["remote_sources"] = RemoteSourcesAdaptor

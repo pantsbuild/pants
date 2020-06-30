@@ -1,23 +1,12 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.jvm.targets.java_library import JavaLibrary
 from pants.base.payload import Payload, PayloadFieldAlreadyDefinedError, PayloadFrozenError
 from pants.base.payload_field import PrimitiveField
-from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.testutil.test_base import TestBase
 
 
 class PayloadTest(TestBase):
-    @classmethod
-    def alias_groups(cls):
-        return BuildFileAliases(
-            targets={
-                # TODO: Use a dummy task type here, instead of depending on the jvm backend.
-                "java_library": JavaLibrary,
-            },
-        )
-
     def test_freeze(self):
         payload = Payload()
         payload.add_field("foo", PrimitiveField())
@@ -62,15 +51,6 @@ class PayloadTest(TestBase):
         payload2 = Payload()
         payload2.add_field("foo", PrimitiveField(None))
         self.assertNotEqual(payload.fingerprint(), payload2.fingerprint())
-
-    def test_globs(self):
-        self.add_to_build_file("y/BUILD", 'java_library(name="y", sources=["*"])')
-        self.context().scan()
-
-    def test_single_source(self):
-        self.create_file("y/Source.scala")
-        self.add_to_build_file("y/BUILD", 'java_library(name="y", sources=["Source.scala"])')
-        self.context().scan()
 
     def test_missing_payload_field(self):
         payload = Payload()

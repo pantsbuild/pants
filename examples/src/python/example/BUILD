@@ -5,16 +5,10 @@ target(
   name = 'all_directories',
   dependencies = [
     ':hello_directory',
-    ':pants_publish_plugin_directory',
   ],
 )
 
 files(
   name='hello_directory',
   sources=['hello/**/*'],
-)
-
-files(
-  name='pants_publish_plugin_directory',
-  sources=['pants_publish_plugin/**/*'],
 )

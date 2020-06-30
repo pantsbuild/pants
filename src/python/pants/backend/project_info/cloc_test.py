@@ -1,11 +1,20 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.jvm.target_types import JavaLibrary
-from pants.backend.project_info import cloc
 from pants.backend.python.target_types import PythonLibrary
+from pants.backend.project_info import cloc
+from pants.engine.target import Sources, Target
 from pants.core.util_rules import archive, external_tool
 from pants.testutil.goal_rule_test_base import GoalRuleResult, GoalRuleTestBase
+
+
+class ElixirSources(Sources):
+    default = ("*.ex",)
+
+
+class ElixirTarget(Target):
+    alias = "elixir"
+    core_fields = (ElixirSources,)
 
 
 def assert_counts(
@@ -32,7 +41,7 @@ class ClocTest(GoalRuleTestBase):
 
     @classmethod
     def target_types(cls):
-        return [JavaLibrary, PythonLibrary]
+        return [PythonLibrary, ElixirTarget]
 
     @classmethod
     def rules(cls):
@@ -46,16 +55,16 @@ class ClocTest(GoalRuleTestBase):
         self.create_file(f"{py_dir}/bar.py", '# A comment.\n\nprint("some more code")')
         self.add_to_build_file(py_dir, "python_library()")
 
-        java_dir = "src/java/foo"
-        self.create_file(f"{java_dir}/Foo.java", "// A comment. \n class Foo(){}\n")
+        elixir_dir = "src/elixir/foo"
+        self.create_file(f"{elixir_dir}/foo.ex", 'IO.puts("Some elixir")\n# A comment')
         self.create_file(
-            f"{java_dir}/Ignored.java", "// We do not expect this file to appear in counts."
+            f"{elixir_dir}/ignored.ex", "# We do not expect this file to appear in counts."
         )
-        self.add_to_build_file(java_dir, "java_library(sources=['Foo.java'])")
+        self.add_to_build_file(elixir_dir, "elixir(sources=['foo.ex'])")
 
-        result = self.execute_rule(args=[py_dir, java_dir])
+        result = self.execute_rule(args=[py_dir, elixir_dir])
         assert_counts(result.stdout, "Python", num_files=2, blank=2, comment=3, code=2)
-        assert_counts(result.stdout, "Java", comment=1, code=1)
+        assert_counts(result.stdout, "Elixir", comment=1, code=1)
 
     def test_ignored(self) -> None:
         py_dir = "src/py/foo"

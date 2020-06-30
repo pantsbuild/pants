@@ -4,8 +4,7 @@
 from textwrap import dedent
 from typing import List, Optional, Tuple, cast
 
-from pants.backend.jvm.artifact import Artifact
-from pants.backend.jvm.repository import Repository
+from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.project_info.list_targets import ListOptions, list_targets
 from pants.engine.addresses import Address, Addresses
 from pants.engine.target import DescriptionField, ProvidesField, Target, Targets
@@ -83,19 +82,10 @@ def test_list_documented() -> None:
 
 
 def test_list_provides() -> None:
-    sample_repo = Repository(name="public", url="http://maven.example.com", push_db_basedir="/tmp")
-    sample_artifact = Artifact(org="example_org", name="test", repo=sample_repo)
+    sample_artifact = PythonArtifact(name="project.demo", version="0.0.0.1")
     targets = [
         MockTarget({ProvidesField.alias: sample_artifact}, address=Address.parse(":provided")),
         MockTarget({}, address=Address.parse(":not_provided")),
     ]
     stdout, _ = run_goal(targets, show_provides=True)
-    assert stdout.strip() == "//:provided example_org#test"
-
-    # Custom columns
-    stdout, _ = run_goal(
-        targets,
-        show_provides=True,
-        provides_columns="push_db_basedir,address,repo_url,repo_name,artifact_id",
-    )
-    assert stdout.strip() == "/tmp //:provided http://maven.example.com public example_org#test"
+    assert stdout.strip() == f"//:provided {sample_artifact}"

@@ -1,8 +1,5 @@
 # Overrides for TravisCI runs.
 [DEFAULT]
-# Turn off all nailgun use.
-execution_strategy = "subprocess"
-
 # If we use typical default process parallelism tied to core count, we see too many cores under
 # travis and either get oomkilled from launching too many processes with too much total memory
 # overhead or else just generally thrash the container and slow things down.
