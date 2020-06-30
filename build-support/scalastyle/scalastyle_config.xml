@@ -1,4 +1,0 @@
-<scalastyle commentFilter="enabled">
- <name>Default Scalastyle configuration</name>
- <check level="error" class="org.scalastyle.scalariform.ImportGroupingChecker" enabled="true"></check>
-</scalastyle>
