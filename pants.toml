@@ -1,22 +1,3 @@
-# All of the following are seeded with defaults in the config
-#   user: the current user
-#   homedir: the current user's home directory
-#   buildroot: the root of this repo
-#   pants_bootstrapdir: the global pants scratch space primarily used for caches
-#   pants_configdir: the global pants storage for config files
-#   pants_supportdir: pants support files for this repo go here
-#   pants_distdir: user visible artifacts for this repo go here
-#   pants_workdir: the scratch space used to for live builds in this repo
-
-
-# [DEFAULT] should only contain variables to be used later in this config or
-# options not in global scope but available in certain subsystems or tasks.
-[DEFAULT]
-# TODO: Still needed until we migrate jvm tools to subsystems.
-jvm_options = ["-Xmx1g"]
-local_artifact_cache = "%(pants_bootstrapdir)s/artifact_cache"
-
-# [GLOBAL] should only contain valid options in global scope.
 [GLOBAL]
 print_exception_stacktrace = true
 v2 = false
@@ -72,18 +53,6 @@ root_patterns = [
   "/build-support/migration-support"
 ]
 
-[cache]
-# Caching is on globally by default, but we disable it here for development purposes.
-# It is explicitly re-enabled below for [cache.bootstrap] only.
-read_from = []
-write_to = []
-
-[cache.bootstrap]
-# The just-in-time tool shading performed by jvm tool bootstrapping is very expensive, so we turn
-# on artifact caching for it that can survive clean-all.
-read_from = ["%(local_artifact_cache)s"]
-write_to = ["%(local_artifact_cache)s"]
-
 [black]
 config = "pyproject.toml"
 
@@ -102,6 +71,20 @@ config = [".isort.cfg", "examples/.isort.cfg"]
 
 [mypy]
 config = "build-support/mypy/mypy.ini"
+
+[pytest]
+pytest_plugins.add = [
+  # TODO(#8651): We need this until we switch to implicit namespace packages so that pytest-cov
+  #  understands our __init__ files. NB: this version matches 3rdparty/python/requirements.txt.
+  "setuptools==47.3.1",
+  "ipdb",
+  "pytest-icdiff",
+  "pygments",
+]
+timeout_default = 60
+
+[sourcefile-validation]
+config = "@build-support/regexes/config.yaml"
 
 [pants-releases]
 branch_notes = """
@@ -141,24 +124,3 @@ branch_notes = """
   '2.0.x': 'src/python/pants/notes/2.0.x.rst',
 }
 """
-
-[python-setup]
-interpreter_cache_dir = "%(pants_bootstrapdir)s/python_cache/interpreters"
-resolver_cache_dir = "%(pants_bootstrapdir)s/python_cache/requirements"
-
-[pytest]
-pytest_plugins.add = [
-  # TODO(#8651): We need this until we switch to implicit namespace packages so that pytest-cov
-  #  understands our __init__ files. NB: this version matches 3rdparty/python/requirements.txt.
-  "setuptools==47.3.1",
-  "ipdb",
-  "pytest-icdiff",
-  "pygments",
-]
-timeout_default = 60
-
-[test.pytest]
-timeout_default = 60
-
-[sourcefile-validation]
-config = "@build-support/regexes/config.yaml"
