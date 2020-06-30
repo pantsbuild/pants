@@ -153,7 +153,7 @@ class LintTest(TestBase):
                 MockGet(
                     product_type=LintResults,
                     subject_type=LintRequest,
-                    mock=lambda field_set_collection: field_set_collection.lint_result,
+                    mock=lambda field_set_collection: field_set_collection.typecheck_results,
                 ),
                 MockGet(
                     product_type=FieldSetsWithSources,

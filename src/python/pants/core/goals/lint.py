@@ -47,9 +47,8 @@ class LintResults(Collection[LintResult]):
     """Zero or more LintResult objects for a single linter.
 
     Typically, linters will return one result. If they no-oped, they will return zero results.
-    However, some linters may need to partition their batch of LinterFieldSets and thus may need to
-    return multiple results. For example, many Python linters will need to group by interpreter
-    compatibility.
+    However, some linters may need to partition their input and thus may need to return multiple
+    results. For example, many Python linters will need to group by interpreter compatibility.
     """
 
 
@@ -99,46 +98,48 @@ async def lint(
     options: LintOptions,
     union_membership: UnionMembership,
 ) -> Lint:
-    lint_request_types = union_membership[LintRequest]
-    lint_requests: Iterable[StyleRequest] = tuple(
-        lint_request_type(
-            lint_request_type.field_set_type.create(target_with_origin)
+    request_types = union_membership[LintRequest]
+    requests: Iterable[StyleRequest] = tuple(
+        request_type(
+            request_type.field_set_type.create(target_with_origin)
             for target_with_origin in targets_with_origins
-            if lint_request_type.field_set_type.is_valid(target_with_origin.target)
+            if request_type.field_set_type.is_valid(target_with_origin.target)
         )
-        for lint_request_type in union_membership[LintRequest]
+        for request_type in request_types
     )
     field_sets_with_sources: Iterable[FieldSetsWithSources] = await MultiGet(
-        Get(FieldSetsWithSources, FieldSetsWithSourcesRequest(lint_request.field_sets))
-        for lint_request in lint_requests
+        Get(FieldSetsWithSources, FieldSetsWithSourcesRequest(request.field_sets))
+        for request in requests
     )
-    valid_lint_requests: Iterable[StyleRequest] = tuple(
-        lint_request_cls(lint_request)
-        for lint_request_cls, lint_request in zip(lint_request_types, field_sets_with_sources)
-        if lint_request
+    valid_requests: Iterable[StyleRequest] = tuple(
+        request_cls(request)
+        for request_cls, request in zip(request_types, field_sets_with_sources)
+        if request
     )
 
     if options.values.per_target_caching:
         results = await MultiGet(
-            Get(LintResults, LintRequest, lint_request.__class__([field_set]))
-            for lint_request in valid_lint_requests
-            for field_set in lint_request.field_sets
+            Get(LintResults, LintRequest, request.__class__([field_set]))
+            for request in valid_requests
+            for field_set in request.field_sets
         )
     else:
         results = await MultiGet(
-            Get(LintResults, LintRequest, lint_request) for lint_request in valid_lint_requests
+            Get(LintResults, LintRequest, lint_request) for lint_request in valid_requests
         )
 
-    if not results:
+    sorted_results = sorted(
+        itertools.chain.from_iterable(results), key=lambda res: res.typechecker_name
+    )
+    if not sorted_results:
         return Lint(exit_code=0)
 
     exit_code = 0
-    sorted_results = sorted(itertools.chain.from_iterable(results), key=lambda res: res.linter_name)
     for result in sorted_results:
         console.print_stderr(
-            f"{console.green('✓')} {result.linter_name} succeeded."
+            f"{console.green('✓')} {result.typechecker_name} succeeded."
             if result.exit_code == 0
-            else f"{console.red('𐄂')} {result.linter_name} failed."
+            else f"{console.red('𐄂')} {result.typechecker_name} failed."
         )
         if result.stdout:
             console.print_stderr(result.stdout)

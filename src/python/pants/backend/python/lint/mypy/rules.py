@@ -20,7 +20,7 @@ from pants.backend.python.rules.python_sources import (
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.backend.python.target_types import PythonSources
-from pants.core.goals.lint import LintRequest, LintResult, LintResults
+from pants.core.goals.typecheck import TypecheckRequest, TypecheckResult, TypecheckResults
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.engine.addresses import Addresses
 from pants.engine.fs import (
@@ -48,7 +48,7 @@ class MyPyFieldSet(FieldSetWithOrigin):
     sources: PythonSources
 
 
-class MyPyRequest(LintRequest):
+class MyPyRequest(TypecheckRequest):
     field_set_type = MyPyFieldSet
 
 
@@ -69,9 +69,9 @@ async def mypy_lint(
     mypy: MyPy,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
-) -> LintResults:
+) -> TypecheckResults:
     if mypy.skip:
-        return LintResults()
+        return TypecheckResults()
 
     transitive_targets = await Get(
         TransitiveTargets, Addresses(fs.address for fs in request.field_sets)
@@ -129,7 +129,9 @@ async def mypy_lint(
         description=f"Run MyPy on {pluralize(len(prepared_sources.snapshot.files), 'file')}.",
     )
     result = await Get(FallibleProcessResult, Process, process)
-    return LintResults([LintResult.from_fallible_process_result(result, linter_name="MyPy")])
+    return TypecheckResults(
+        [TypecheckResult.from_fallible_process_result(result, typechecker_name="MyPy")]
+    )
 
 
 def rules():
@@ -137,7 +139,7 @@ def rules():
         mypy_lint,
         prepare_unstripped_python_sources,
         SubsystemRule(MyPy),
-        UnionRule(LintRequest, MyPyRequest),
+        UnionRule(TypecheckRequest, MyPyRequest),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),
         *inject_init.rules(),
