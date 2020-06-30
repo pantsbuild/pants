@@ -11,7 +11,7 @@ path = "src/console_ui.rs"
 indicatif = "0.14.0"
 futures01 = { package = "futures", version = "0.1" }
 futures = { version = "0.3", features = ["compat"] }
-indexmap = "1.0.2"
+indexmap = "1.4"
 uuid = { version = "0.7", features = ["v4"] }
 logging = { path = "../logging" }
 task_executor = { path = "../task_executor" }

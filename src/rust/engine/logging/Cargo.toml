@@ -10,7 +10,7 @@ chrono = "0.4.10"
 lazy_static = "1"
 log = "0.4"
 num_enum = "0.4"
-parking_lot = "0.6"
+parking_lot = "0.11"
 simplelog = "0.7.4"
 tokio = { version = "0.2", features = ["rt-util"] }
 uuid = { version = "0.7", features = ["v4"] }
