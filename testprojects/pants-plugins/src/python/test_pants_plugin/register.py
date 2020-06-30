@@ -21,7 +21,7 @@ class DeprecationWarningGoal(Goal):
 
 
 @goal_rule
-async def run_setup_pys() -> DeprecationWarningGoal:
+async def show_warning() -> DeprecationWarningGoal:
     warn_or_error(
         removal_version="999.999.9.dev9", deprecated_entity_description="This is a test warning!",
     )
@@ -58,7 +58,7 @@ async def run_lifecycle_stubs(opts: LifecycleStubsOptions) -> LifecycleStubsGoal
 
 
 def rules():
-    return [run_setup_pys, run_lifecycle_stubs]
+    return [show_warning, run_lifecycle_stubs]
 
 
 if os.environ.get("_RAISE_KEYBOARDINTERRUPT_ON_IMPORT", False):
