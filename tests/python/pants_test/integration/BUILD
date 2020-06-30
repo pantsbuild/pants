@@ -23,7 +23,6 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'testprojects/src/python:python_targets_directory',
     'testprojects/src/python:sources_directory',
-    'testprojects/tests/scala/org/pantsbuild/testproject:cp-directories_directory',
   ],
   tags = {'integration', 'partially_type_checked'},
   timeout = 600,
@@ -71,7 +70,6 @@ python_tests(
   dependencies = [
     'src/python/pants/testutil:int-test',
     'testprojects/tests/python/pants:build_parsing_directory',
-    'testprojects/tests/java/org/pantsbuild:build_parsing_directory',
   ],
   tags = {'integration', 'partially_type_checked'},
   timeout = 180,
