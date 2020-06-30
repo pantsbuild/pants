@@ -135,9 +135,7 @@ class PythonExecutionTaskBase(ResolveRequirementsTaskBase):
         :rtype: :class:`pex.pex.PEX`
         """
         relevant_targets = self.context.targets(
-            lambda tgt: isinstance(
-                tgt, (PythonRequirementLibrary, PythonTarget, Files)
-            )
+            lambda tgt: isinstance(tgt, (PythonRequirementLibrary, PythonTarget, Files))
         )
         with self.invalidated(relevant_targets) as invalidation_check:
 

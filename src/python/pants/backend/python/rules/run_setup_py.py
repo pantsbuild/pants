@@ -222,7 +222,7 @@ class SetuptoolsSetup:
 class SetupPyOptions(GoalSubsystem):
     """Run setup.py commands."""
 
-    name = "setup-py"
+    name = "setup-py2"
 
     @classmethod
     def register_options(cls, register):
@@ -233,7 +233,7 @@ class SetupPyOptions(GoalSubsystem):
             member_type=shell_str,
             passthrough=True,
             help="Arguments to pass directly to setup.py, e.g. "
-            '`--setup-py-args="bdist_wheel --python-tag py36.py37"`. If unspecified, Pants will '
+            '`--setup-py2-args="bdist_wheel --python-tag py36.py37"`. If unspecified, Pants will '
             "dump the setup.py chroot.",
         )
         register(
