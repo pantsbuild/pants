@@ -12,19 +12,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'reporting_integration',
-  sources = ['test_reporting_integration.py'],
-  dependencies = [
-    '3rdparty/python:psutil',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/testutil:int-test',
-    'examples/src/python/example:hello_directory',
-  ],
-  tags = {'integration', 'partially_type_checked'},
-  timeout = 600,
-)
-
-python_tests(
   name = 'reporting',
   sources = ['test_reporting.py'],
   dependencies = [
