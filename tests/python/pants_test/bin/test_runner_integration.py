@@ -17,9 +17,9 @@ class RunnerIntegrationTest(PantsRunIntegrationTest):
         cmdline = [
             "--no-pantsd",
             f"--pythonpath=+['{Path(get_buildroot(), 'testprojects/pants-plugins/src/python')}']",
-            "--backend-packages=+['test_pants_plugin']",
+            "--backend-packages2=+['test_pants_plugin']",
             # This task will always emit a DeprecationWarning.
-            "deprecation-warning-task",
+            "deprecation-warning",
         ]
 
         warning_run = self.run_pants(cmdline)

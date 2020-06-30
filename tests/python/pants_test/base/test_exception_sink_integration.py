@@ -207,7 +207,7 @@ Current thread [^\n]+ \\(most recent call first\\):
         lifecycle_stub_cmdline = [
             "--no-pantsd",
             f"--pythonpath=+['{testproject_backend_src_dir}']",
-            f"--backend-packages=+['{testproject_backend_pkg_name}']",
+            f"--backend-packages2=+['{testproject_backend_pkg_name}']",
             # This task will always raise an exception.
             "lifecycle-stub-goal",
         ]
