@@ -16,7 +16,7 @@ class SchedulerIntegrationTest(PantsRunIntegrationTest):
             args = [
                 f"--native-engine-visualize-to={destdir}",
                 "list",
-                "examples/src/scala/org/pantsbuild/example/hello/welcome",
+                "examples/src/python/example/hello/greet",
             ]
             self.assert_success(self.run_pants(args))
             destdir_files = list(Path(destdir).iterdir())
@@ -28,12 +28,11 @@ class SchedulerIntegrationTest(PantsRunIntegrationTest):
             "--no-v1",
             "--v2",
             "list-and-die-for-testing",
-            "examples/src/scala/org/pantsbuild/example/hello/welcome",
+            "examples/src/python/example/hello/greet",
         ]
         pants_result = self.run_pants(args)
         self.assert_failure(pants_result)
         self.assertEqual(
-            pants_result.stdout_data,
-            "examples/src/scala/org/pantsbuild/example/hello/welcome:welcome\n",
+            pants_result.stdout_data, "examples/src/python/example/hello/greet:greet\n",
         )
         self.assertEqual(pants_result.returncode, 42)

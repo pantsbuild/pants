@@ -49,9 +49,7 @@ class SchedulerService(PantsService):
         self._scheduler = legacy_graph_scheduler.scheduler
         # This session is only used for checking whether any invalidation globs have been invalidated.
         # It is not involved with a build itself; just with deciding when we should restart pantsd.
-        self._scheduler_session = self._scheduler.new_session(
-            zipkin_trace_v2=False, build_id="scheduler_service_session",
-        )
+        self._scheduler_session = self._scheduler.new_session(build_id="scheduler_service_session",)
         self._logger = logging.getLogger(__name__)
 
         # NB: We declare these as a single field so that they can be changed atomically.

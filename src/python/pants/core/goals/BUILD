@@ -67,7 +67,6 @@ python_tests(
     'src/python/pants/testutil:int-test',
     '//:isort_cfg',
     'examples:isort_cfg',
-    'contrib:isort_cfg',
   ],
   tags = {'integration', 'partially_type_checked'},
   timeout = 120,

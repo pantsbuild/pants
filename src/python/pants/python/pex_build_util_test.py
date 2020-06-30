@@ -79,7 +79,7 @@ class TestPexBuilderWrapper(TestBase):
 
 
 def test_identify_missing_init_files() -> None:
-    assert {"a/__init__.py", "a/b/__init__.py", "a/b/c/d/__init__.py",} == set(
+    assert {"a/__init__.py", "a/b/__init__.py", "a/b/c/d/__init__.py"} == set(
         identify_missing_init_files(
             ["a/b/foo.py", "a/b/c/__init__.py", "a/b/c/d/bar.py", "a/e/__init__.py"]
         )

@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import configparser
-import itertools
 import json
 from dataclasses import dataclass
 from io import StringIO
@@ -20,7 +19,7 @@ from pants.backend.python.rules.pex import (
 )
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
-from pants.backend.python.target_types import PythonSources, PythonTestsSources
+from pants.backend.python.target_types import PythonSources
 from pants.core.goals.test import (
     ConsoleCoverageReport,
     CoverageData,
@@ -43,7 +42,6 @@ from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Target, TransitiveTargets
 from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
-from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
 """
@@ -109,13 +107,6 @@ class CoverageSubsystem(PythonToolBase):
             advanced=True,
             help="Path to write the Pytest Coverage report to. Must be relative to build root.",
         )
-        register(
-            "--omit-test-sources",
-            type=bool,
-            default=False,
-            advanced=True,
-            help="Whether to exclude the test files in coverage measurement.",
-        )
 
     @property
     def filter(self) -> Tuple[str, ...]:
@@ -128,10 +119,6 @@ class CoverageSubsystem(PythonToolBase):
     @property
     def output_dir(self) -> PurePath:
         return PurePath(self.options.output_dir)
-
-    @property
-    def omit_test_sources(self) -> bool:
-        return cast(bool, self.options.omit_test_sources)
 
 
 @dataclass(frozen=True)
@@ -170,21 +157,12 @@ class CoverageConfig:
 
 
 @rule
-async def create_coverage_config(
-    request: CoverageConfigRequest, coverage_subsystem: CoverageSubsystem, log_level: LogLevel
-) -> CoverageConfig:
+async def create_coverage_config(request: CoverageConfigRequest) -> CoverageConfig:
     all_stripped_sources = await MultiGet(
         Get(SourceRootStrippedSources, StripSourcesFieldRequest(tgt[PythonSources]))
         for tgt in request.targets
         if tgt.has_field(PythonSources)
     )
-    all_stripped_test_sources: Tuple[SourceRootStrippedSources, ...] = ()
-    if coverage_subsystem.omit_test_sources:
-        all_stripped_test_sources = await MultiGet(
-            Get(SourceRootStrippedSources, StripSourcesFieldRequest(tgt[PythonTestsSources]))
-            for tgt in request.targets
-            if tgt.has_field(PythonTestsSources)
-        )
 
     # We map stripped file names to their source roots so that we can map back to the actual
     # sources file when generating coverage reports. For example,
@@ -205,17 +183,7 @@ async def create_coverage_config(
     cp = configparser.ConfigParser()
     cp.read_string(default_config)
 
-    if coverage_subsystem.omit_test_sources:
-        test_files = itertools.chain.from_iterable(
-            stripped_test_sources.snapshot.files
-            for stripped_test_sources in all_stripped_test_sources
-        )
-        cp.set("run", "omit", ",".join(sorted(test_files)))
-
-    if log_level in (LogLevel.DEBUG, LogLevel.TRACE):
-        # See https://coverage.readthedocs.io/en/coverage-5.1/cmd.html?highlight=debug#diagnostics.
-        cp.set("run", "debug", "\n\ttrace\n\tconfig")
-
+    cp.set("run", "omit", "test_runner.pex/*")
     cp.set("run", "plugins", COVERAGE_PLUGIN_MODULE_NAME)
     cp.add_section(COVERAGE_PLUGIN_MODULE_NAME)
     cp.set(

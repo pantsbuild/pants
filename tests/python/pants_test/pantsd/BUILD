@@ -64,9 +64,7 @@ python_tests(
   sources = ['test_pantsd_integration.py'],
   dependencies = [
     ':pantsd_integration_test_base',
-    'examples/src/java/org/pantsbuild/example:hello_directory',
     'examples/src/python/example:hello_directory',
-    'examples/src/scala/org/pantsbuild/example:hello_directory',
     'testprojects/src/java/org/pantsbuild/testproject:bundle_directory',
     'testprojects/src/python:bad_requirements_directory',
     'testprojects/src/python:coordinated_runs_directory',

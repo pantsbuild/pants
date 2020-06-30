@@ -95,13 +95,6 @@ class Reporting(Subsystem):
             help="Rate at which to sample Zipkin traces. Value 0.0 - 100.0.",
         )
         register(
-            "--zipkin-trace-v2",
-            advanced=True,
-            type=bool,
-            default=False,
-            help="If enabled, the zipkin spans are tracked for v2 engine execution progress.",
-        )
-        register(
             "--zipkin-service-name-prefix",
             advanced=True,
             default="pants",

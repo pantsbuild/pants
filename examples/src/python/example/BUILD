@@ -6,7 +6,6 @@ target(
   dependencies = [
     ':hello_directory',
     ':pants_publish_plugin_directory',
-    ':tensorflow_custom_op_directory',
   ],
 )
 
@@ -18,12 +17,4 @@ files(
 files(
   name='pants_publish_plugin_directory',
   sources=['pants_publish_plugin/**/*'],
-)
-
-files(
-  name='tensorflow_custom_op_directory',
-  sources=['tensorflow_custom_op/**/*'],
-  dependencies = [
-    'examples/3rdparty:python_directory',
-  ],
 )

@@ -9,7 +9,6 @@ from http.server import BaseHTTPRequestHandler
 import psutil
 
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
-from pants.util.collections import assert_single_element
 from pants.util.contextutil import http_server
 
 
@@ -20,7 +19,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
                 "--time",
                 quiet_flag,
                 "bootstrap",
-                "examples/src/java/org/pantsbuild/example/hello::",
+                "examples/src/python/example/hello::",
             ]
             pants_run = self.run_pants(command)
             self.assert_success(pants_run)
@@ -39,7 +38,7 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
                 f"--reporting-zipkin-endpoint={endpoint}",
                 "--reporting-zipkin-sample-rate=0.0",
                 "list",
-                "examples/src/java/org/pantsbuild/example/hello/simple",
+                "examples/src/python/example/hello/greet",
             ]
 
             pants_run = self.run_pants(command)
@@ -50,68 +49,6 @@ class TestReportingIntegrationTest(PantsRunIntegrationTest, unittest.TestCase):
 
             num_of_traces = len(ZipkinHandler.traces)
             self.assertEqual(num_of_traces, 0)
-
-    def test_zipkin_reporter_for_v2_engine(self):
-        ZipkinHandler = zipkin_handler()
-        with http_server(ZipkinHandler) as port:
-            endpoint = f"http://localhost:{port}"
-            command = [
-                "-ldebug",
-                f"--reporting-zipkin-endpoint={endpoint}",
-                "--reporting-zipkin-trace-v2",
-                "list",
-                "examples/src/java/org/pantsbuild/example/hello/simple",
-            ]
-
-            pants_run = self.run_pants(command)
-            self.assert_success(pants_run)
-
-            child_processes = self.find_child_processes_that_send_spans(pants_run.stderr_data)
-            self.assertTrue(child_processes)
-
-            self.wait_spans_to_be_sent(child_processes)
-
-            trace = assert_single_element(ZipkinHandler.traces.values())
-
-            v2_span_name_part = "snapshot"
-            self.assertTrue(
-                any(v2_span_name_part in span["name"] for span in trace),
-                "There is no span that contains '{}' in it's name. The trace:{}".format(
-                    v2_span_name_part, trace
-                ),
-            )
-
-    def test_zipkin_reports_for_pure_v2_goals(self):
-        ZipkinHandler = zipkin_handler()
-        with http_server(ZipkinHandler) as port:
-            endpoint = f"http://localhost:{port}"
-            command = [
-                "-ldebug",
-                "--no-v1",
-                "--v2",
-                f"--reporting-zipkin-endpoint={endpoint}",
-                "--reporting-zipkin-trace-v2",
-                "list",
-                "3rdparty:",
-            ]
-
-            pants_run = self.run_pants(command)
-            self.assert_success(pants_run)
-
-            child_processes = self.find_child_processes_that_send_spans(pants_run.stderr_data)
-            self.assertTrue(child_processes)
-
-            self.wait_spans_to_be_sent(child_processes)
-
-            trace = assert_single_element(ZipkinHandler.traces.values())
-
-            v2_span_name_part = "snapshot"
-            self.assertTrue(
-                any(v2_span_name_part in span["name"] for span in trace),
-                "There is no span that contains '{}' in it's name. The trace:{}".format(
-                    v2_span_name_part, trace
-                ),
-            )
 
     @staticmethod
     def find_spans_by_name_and_service_name(trace, name, service_name):

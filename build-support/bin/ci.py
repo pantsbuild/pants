@@ -288,7 +288,6 @@ class TestTargetSets(NamedTuple):
                     "build-support::",
                     "src/python::",
                     "tests/python::",
-                    "contrib::",
                 ],
                 stdout=subprocess.PIPE,
                 encoding="utf-8",
@@ -430,7 +429,7 @@ def run_sanity_checks() -> None:
 
 
 def run_lint(*, oauth_token_path: Optional[str] = None) -> None:
-    targets = ["build-support::", "contrib::", "examples::", "src::", "tests::"]
+    targets = ["build-support::", "examples::", "src::", "tests::"]
     command_prefix = ["./pants.pex", "--tag=-nolint"]
     command = (
         [*command_prefix, "--no-v1", "--v2", "lint", *targets]
