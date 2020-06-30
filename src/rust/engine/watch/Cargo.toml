@@ -13,7 +13,7 @@ hashing = { path = "../hashing" }
 log = "0.4"
 logging = { path = "../logging" }
 notify = "5.0.0-pre.2"
-parking_lot = "0.6"
+parking_lot = "0.11"
 task_executor = { path = "../task_executor" }
 
 [dev-dependencies]
