@@ -146,10 +146,8 @@ function execute_packaged_pants_with_internal_backends() {
     --no-pantsd \
     --pythonpath="['pants-plugins/src/python']" \
     --backend-packages="[\
-        'pants.backend.jvm',\
         'pants.backend.python',\
         'pants.cache',\
-        'internal_backend.repositories',\
       ]" \
       --backend-packages2="[\
         'pants.backend.awslambda.python',\

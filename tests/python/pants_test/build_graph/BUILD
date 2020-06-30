@@ -53,17 +53,6 @@ python_tests(
 )
 
 python_tests(
-  sources = ['test_build_graph.py'],
-  dependencies = [
-    'src/python/pants/java/jar',
-    'src/python/pants/backend/jvm/targets:jvm',
-    'src/python/pants/build_graph',
-    'src/python/pants/testutil:test_base'
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_tests(
   name = 'scopes',
   sources = ['test_scopes.py'],
   dependencies = [
@@ -73,17 +62,6 @@ python_tests(
     'src/python/pants/testutil:test_base',
     'src/python/pants/testutil/subsystem',
     'src/python/pants/util:ordered_set',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_tests(
-  name = 'source_mapper',
-  sources = ['test_source_mapper.py'],
-  dependencies = [
-    'src/python/pants/backend/jvm/targets:java',
-    'src/python/pants/build_graph',
-    'src/python/pants/testutil:test_base',
   ],
   tags = {"partially_type_checked"},
 )

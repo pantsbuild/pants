@@ -34,6 +34,12 @@ class ListOptions(LineOriented, GoalSubsystem):
                 "Display these columns when --provides is specified. Available columns are: "
                 "address, artifact_id, repo_name, repo_url, push_db_basedir"
             ),
+            removal_version="2.0.1.dev0",
+            removal_hint=(
+                "The option `--provides-columns` no longer does anything. It was specific to the "
+                "JVM backend, so no longer makes sense with Pants 2.0 initially only supporting "
+                "Python."
+            ),
         )
         register(
             "--documented",
@@ -67,26 +73,9 @@ async def list_targets(addresses: Addresses, options: ListOptions, console: Cons
             for tgt in targets
             if tgt.get(ProvidesField).value is not None
         }
-        extractor_funcs = {
-            "address": lambda address, _: address.spec,
-            "artifact_id": lambda _, artifact: str(artifact),
-            "repo_name": lambda _, artifact: artifact.repo.name,
-            "repo_url": lambda _, artifact: artifact.repo.url,
-            "push_db_basedir": lambda _, artifact: artifact.repo.push_db_basedir,
-        }
-        try:
-            extractors = [
-                extractor_funcs[col] for col in options.values.provides_columns.split(",")
-            ]
-        except KeyError:
-            raise ValueError(
-                "Invalid columns provided for `--list-provides-columns`: "
-                f"{options.values.provides_columns}. Valid columns are: "
-                f"{', '.join(sorted(extractor_funcs.keys()))}."
-            )
         with options.line_oriented(console) as print_stdout:
             for address, artifact in addresses_with_provide_artifacts.items():
-                print_stdout(" ".join(extractor(address, artifact) for extractor in extractors))
+                print_stdout(f"{address.spec} {artifact}")
         return List(exit_code=0)
 
     if documented_enabled:

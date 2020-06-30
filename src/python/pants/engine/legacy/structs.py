@@ -158,18 +158,6 @@ class SourcesField:
         return f"{self.address}({self.arg}={self.source_globs})"
 
 
-class JvmBinaryAdaptor(TargetAdaptor):
-    def validate_sources(self, sources):
-        if len(sources.files) > 1:
-            raise Target.IllegalArgument(
-                self.address.spec,
-                "jvm_binary must have exactly 0 or 1 sources (typically used to specify the class "
-                "containing the main method). "
-                "Other sources should instead be placed in a java_library, which "
-                "should be referenced in the jvm_binary's dependencies.",
-            )
-
-
 @dataclass(frozen=True)
 class BundlesField:
     """Represents the `bundles` argument, each of which has a PathGlobs to represent its
@@ -232,10 +220,6 @@ class AppAdaptor(TargetAdaptor):
             path_globs_list.append(path_globs)
 
         return BundlesField(self.address, self.bundles, filespecs_list, path_globs_list)
-
-
-class JvmAppAdaptor(AppAdaptor):
-    pass
 
 
 class RemoteSourcesAdaptor(TargetAdaptor):

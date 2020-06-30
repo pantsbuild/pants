@@ -274,7 +274,7 @@ class GlobalOptions(Subsystem):
             "--backend-packages",
             advanced=True,
             type=list,
-            default=["pants.backend.python", "pants.backend.jvm", "pants.cache"],
+            default=["pants.backend.python", "pants.cache"],
             help=(
                 "Register v1 tasks from these backends. The backend packages must be present on "
                 "the PYTHONPATH, typically because they are in the Pants core dist, in a "
