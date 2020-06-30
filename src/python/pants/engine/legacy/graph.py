@@ -9,14 +9,11 @@ from dataclasses import dataclass
 from typing import Any, Dict, Iterable, Iterator, List, Set, Tuple, Type, cast
 
 from pants.base.exceptions import TargetDefinitionException
-from pants.base.parse_context import ParseContext
 from pants.base.specs import AddressSpec, AddressSpecs, SingleAddress
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
-from pants.build_graph.app_base import AppBase
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.build_graph import BuildGraph
-from pants.build_graph.bundle import Bundle
 from pants.build_graph.remote_sources import RemoteSources
 from pants.build_graph.target import Target as TargetV1
 from pants.engine.addresses import Addresses
@@ -24,8 +21,6 @@ from pants.engine.collection import Collection
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.internals.parser import HydratedStruct
 from pants.engine.legacy.structs import (
-    BundleAdaptor,
-    BundlesField,
     HydrateableField,
     SourcesField,
     TargetAdaptor,
@@ -162,10 +157,7 @@ class LegacyBuildGraph(BuildGraph):
             # Replace the `address` field of type `Address` with type `BuildFileAddress`.
             kwargs["address"] = legacy_hydrated_target.build_file_address
 
-            # Instantiate.
-            if issubclass(target_cls, AppBase):
-                return self._instantiate_app(target_cls, kwargs)
-            elif target_cls is RemoteSources:
+            if target_cls is RemoteSources:
                 return self._instantiate_remote_sources(kwargs)
             return target_cls(build_graph=self, **kwargs)
         except TargetDefinitionException:
@@ -175,16 +167,6 @@ class LegacyBuildGraph(BuildGraph):
                 legacy_hydrated_target.build_file_address,
                 "Failed to instantiate Target with type {}: {}".format(target_cls, e),
             )
-
-    def _instantiate_app(self, target_cls: Type[TargetV1], kwargs) -> TargetV1:
-        """For App targets, convert BundleAdaptor to BundleProps."""
-        parse_context = ParseContext(kwargs["address"].spec_path, dict())
-        bundleprops_factory = Bundle(parse_context)
-        kwargs["bundles"] = [
-            bundleprops_factory.create_bundle_props(bundle) for bundle in kwargs["bundles"]
-        ]
-
-        return target_cls(build_graph=self, **kwargs)
 
     def _instantiate_remote_sources(self, kwargs) -> RemoteSources:
         """For RemoteSources target, convert "dest" field to its real target type."""
@@ -556,46 +538,6 @@ async def hydrate_sources(
     return HydratedField(sources_field.arg, fileset_with_spec)
 
 
-@rule
-async def hydrate_bundles(
-    bundles_field: BundlesField, glob_match_error_behavior: GlobMatchErrorBehavior,
-) -> HydratedField:
-    """Given a BundlesField, request Snapshots for each of its filesets and create
-    BundleAdaptors."""
-    address = bundles_field.address
-    path_globs_with_match_errors = [
-        dataclasses.replace(
-            pg,
-            glob_match_error_behavior=glob_match_error_behavior,
-            # TODO(#9012): add line number referring to the bundles field. When doing this, we'll likely
-            # need to `await Get(BuildFileAddress, Address)`.
-            description_of_origin=(
-                f"{address}'s `bundles` field"
-                if glob_match_error_behavior != GlobMatchErrorBehavior.ignore
-                else None
-            ),
-        )
-        for pg in bundles_field.path_globs_list
-    ]
-    snapshot_list = await MultiGet(
-        Get(Snapshot, PathGlobs, pg) for pg in path_globs_with_match_errors
-    )
-
-    bundles = []
-    zipped = zip(bundles_field.bundles, bundles_field.filespecs_list, snapshot_list)
-    for bundle, filespecs, snapshot in zipped:
-        rel_spec_path = getattr(bundle, "rel_path", address.spec_path)
-        kwargs = bundle.kwargs()
-        # NB: We `include_dirs=True` because bundle filesets frequently specify directories in order
-        # to trigger a (deprecated) default inclusion of their recursive contents. See the related
-        # deprecation in `pants.backend.jvm.tasks.bundle_create`.
-        kwargs["fileset"] = _eager_fileset_with_spec(
-            rel_spec_path, filespecs, snapshot, include_dirs=True
-        )
-        bundles.append(BundleAdaptor(**kwargs))
-    return HydratedField("bundles", bundles)
-
-
 def create_legacy_graph_tasks():
     """Create tasks to recursively parse the legacy graph."""
     return [
@@ -605,5 +547,4 @@ def create_legacy_graph_tasks():
         hydrate_target,
         hydrated_targets,
         hydrate_sources,
-        hydrate_bundles,
     ]

@@ -25,7 +25,6 @@ from typing import (
 from typing_extensions import final
 
 from pants.base.specs import OriginSpec
-from pants.build_graph.bundle import Bundle
 from pants.engine.addresses import Address, Addresses, assert_single_address
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.fs import (
@@ -35,7 +34,6 @@ from pants.engine.fs import (
     PathGlobs,
     Snapshot,
 )
-from pants.engine.legacy.structs import BundleAdaptor
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.unions import UnionMembership, union
@@ -1794,45 +1792,6 @@ class ProvidesField(PrimitiveField):
 
     alias = "provides"
     default: ClassVar[Optional[Any]] = None
-
-
-# TODO: Add logic to hydrate this and convert it into V1 + work with `filedeps2`.
-class BundlesField(AsyncField):
-    """One or more `bundle` objects that describe "extra files" that should be included with this
-    app (e.g. config files, startup scripts)."""
-
-    alias = "bundles"
-    # TODO: What should this type be? Our goal is to get rid of `TargetAdaptor`, so
-    #  `BundleAdaptor` should likely go away. This also results in a dependency cycle..
-    sanitized_raw_value: Optional[Tuple[BundleAdaptor, ...]]
-    default = None
-
-    # NB: The type hint for `raw_value` is a lie. While we do expect end-users to use
-    # Iterable[Bundle], the TargetAdaptor code will have already converted those strings
-    # into a List[BundleAdaptor]. But, that's an implementation detail and we don't want our
-    # documentation, which is auto-generated from these type hints, to leak that.
-    @classmethod
-    def sanitize_raw_value(
-        cls, raw_value: Optional[Iterable[Bundle]], *, address: Address
-    ) -> Optional[Tuple[BundleAdaptor, ...]]:
-        value_or_default = super().sanitize_raw_value(raw_value, address=address)
-        if value_or_default is None:
-            return None
-        try:
-            ensure_list(value_or_default, expected_type=BundleAdaptor)
-        except ValueError:
-            raise InvalidFieldTypeException(
-                address,
-                cls.alias,
-                value_or_default,
-                expected_type="an iterable of `bundle` objects (e.g. a list)",
-            )
-        return tuple(value_or_default)
-
-    @final
-    @property
-    def request(self):
-        raise NotImplementedError
 
 
 def rules():

@@ -5,20 +5,19 @@ import logging
 import os.path
 from collections.abc import MutableSequence, MutableSet
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, List, Optional, Sequence, Tuple, Union, cast
+from typing import Callable, Iterable, List, Optional, Sequence, Tuple, Union, cast
 
 from pants.build_graph.address import Address
 from pants.build_graph.target import Target
 from pants.engine.fs import GlobExpansionConjunction, PathGlobs
-from pants.engine.internals.addressable import addressable_sequence
 from pants.engine.internals.objects import Locatable
-from pants.engine.internals.struct import Struct, StructWithDeps
+from pants.engine.internals.struct import StructWithDeps
 from pants.engine.unions import UnionRule, union
 from pants.source import wrapped_globs
 from pants.util.collections import ensure_str_list
 from pants.util.contextutil import exception_logging
 from pants.util.meta import classproperty
-from pants.util.objects import Exactly
+
 
 logger = logging.getLogger(__name__)
 
@@ -158,70 +157,6 @@ class SourcesField:
         return f"{self.address}({self.arg}={self.source_globs})"
 
 
-@dataclass(frozen=True)
-class BundlesField:
-    """Represents the `bundles` argument, each of which has a PathGlobs to represent its
-    `fileset`."""
-
-    address: Address
-    bundles: Any
-    filespecs_list: List[wrapped_globs.Filespec]
-    path_globs_list: List[PathGlobs]
-
-    def __hash__(self):
-        return hash(self.address)
-
-
-class BundleAdaptor(Struct):
-    """A Struct to capture the args for the `bundle` object.
-
-    Bundles have filesets which we need to capture in order to execute them in the engine.
-
-    TODO: Bundles should arguably be Targets, but that distinction blurs in the `exp` examples
-    package, where a Target is just a collection of configuration.
-    """
-
-
-class AppAdaptor(TargetAdaptor):
-    def __init__(self, bundles=None, **kwargs):
-        """
-        :param list bundles: A list of `BundleAdaptor` objects
-        """
-        super().__init__(**kwargs)
-        self.bundles = bundles
-
-    @addressable_sequence(Exactly(BundleAdaptor))
-    def bundles(self):
-        """The BundleAdaptors for this JvmApp."""
-        return self.bundles
-
-    @property
-    def field_adaptors(self) -> Tuple:
-        with exception_logging(logger, "Exception in `field_adaptors` property"):
-            field_adaptors = super().field_adaptors
-            if getattr(self, "bundles", None) is None:
-                return field_adaptors
-
-            bundles_field = self._construct_bundles_field()
-            return (*field_adaptors, bundles_field)
-
-    def _construct_bundles_field(self) -> BundlesField:
-        filespecs_list: List[wrapped_globs.Filespec] = []
-        path_globs_list: List[PathGlobs] = []
-        for bundle in self.bundles:
-            # NB: if a bundle has a rel_path, then the rel_root of the resulting file globs must be
-            # set to that rel_path.
-            rel_root = getattr(bundle, "rel_path", self.address.spec_path)
-
-            source_globs = SourceGlobs.from_sources_field(bundle.fileset)
-            path_globs = source_globs.to_path_globs(rel_root, GlobExpansionConjunction.all_match)
-
-            filespecs_list.append(source_globs.filespecs)
-            path_globs_list.append(path_globs)
-
-        return BundlesField(self.address, self.bundles, filespecs_list, path_globs_list)
-
-
 class RemoteSourcesAdaptor(TargetAdaptor):
     def __init__(self, dest=None, **kwargs):
         """
@@ -336,7 +271,4 @@ class GlobsWithConjunction:
 
 
 def rules():
-    return [
-        UnionRule(HydrateableField, SourcesField),
-        UnionRule(HydrateableField, BundlesField),
-    ]
+    return [UnionRule(HydrateableField, SourcesField)]
