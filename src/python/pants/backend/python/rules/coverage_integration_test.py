@@ -118,7 +118,7 @@ class CoverageIntegrationTest(PantsRunIntegrationTest):
         (no_src_folder / "BUILD").write_text("python_tests()")
         return tmpdir_relative
 
-    def _run_tests(self, tmpdir_relative, *more_args: str):
+    def _run_tests(self, tmpdir_relative, *more_args: str) -> PantsResult:
         command = [
             "--no-v1",
             "--v2",
