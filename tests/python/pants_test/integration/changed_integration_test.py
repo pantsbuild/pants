@@ -189,13 +189,10 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
                     self, filename=filename, dependee_type=dependee_type
                 ):
                     with create_isolated_git_repo() as worktree:
-                        # Mutate the working copy so we can do `--changed-parent=HEAD` deterministically.
+                        # Mutate the working copy so we can do `--changed-since=HEAD` deterministically.
                         with mutated_working_copy([os.path.join(worktree, filename)]):
                             stdout = self.run_list(
-                                [
-                                    f"--changed-include-dependees={dependee_type}",
-                                    "--changed-parent=HEAD",
-                                ],
+                                [f"--changed-dependees={dependee_type}", "--changed-since=HEAD"],
                             )
 
                             self.assertEqual(
@@ -229,8 +226,8 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
                     pants_run = self.run_pants_with_workdir(
                         command=[
                             f"--exclude-target-regexp={exclude_target_regexp}",
-                            "--changed-parent=HEAD",
-                            "--changed-include-dependees=transitive",
+                            "--changed-since=HEAD",
+                            "--changed-dependees=transitive",
                             "list",
                         ],
                         workdir=workdir,
@@ -260,8 +257,8 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
                     pants_run = self.run_pants_with_workdir(
                         [
                             f"--exclude-target-regexp={exclude_target_regexp}",
-                            "--changed-parent=HEAD",
-                            "--changed-include-dependees=transitive",
+                            "--changed-since=HEAD",
+                            "--changed-dependees=transitive",
                             "list",
                         ],
                         workdir=workdir,
@@ -284,14 +281,14 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
     def test_changed_with_deleted_source(self):
         with create_isolated_git_repo() as worktree:
             safe_delete(os.path.join(worktree, "src/python/sources/sources.py"))
-            pants_run = self.run_pants(["list", "--changed-parent=HEAD"])
+            pants_run = self.run_pants(["list", "--changed-since=HEAD"])
             self.assert_success(pants_run)
             self.assertEqual(pants_run.stdout_data.strip(), "src/python/sources:sources")
 
     def test_changed_with_deleted_resource(self):
         with create_isolated_git_repo() as worktree:
             safe_delete(os.path.join(worktree, "src/python/sources/sources.txt"))
-            pants_run = self.run_pants(["list", "--changed-parent=HEAD"])
+            pants_run = self.run_pants(["list", "--changed-since=HEAD"])
             self.assert_success(pants_run)
             self.assertEqual(pants_run.stdout_data.strip(), "src/python/sources:text")
 
@@ -302,7 +299,7 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
         with create_isolated_git_repo() as worktree:
             safe_delete(os.path.join(worktree, "src/resources/org/pantsbuild/resourceonly/BUILD"))
             pants_run = self.run_pants(
-                ["list", "--changed-parent=HEAD", "--changed-include-dependees=transitive"]
+                ["list", "--changed-since=HEAD", "--changed-dependees=transitive"]
             )
             self.assert_failure(pants_run)
             self.assertRegex(
@@ -312,7 +309,7 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
     def test_changed_in_directory_without_build_file(self):
         with create_isolated_git_repo() as worktree:
             create_file_in(worktree, "new-project/README.txt", "This is important.")
-            pants_run = self.run_pants(["list", "--changed-parent=HEAD"])
+            pants_run = self.run_pants(["list", "--changed-since=HEAD"])
             self.assert_success(pants_run)
             self.assertEqual(pants_run.stdout_data.strip(), "")
 
@@ -322,7 +319,7 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
 
         with create_isolated_git_repo() as worktree:
             safe_delete(os.path.join(worktree, deleted_file))
-            pants_run = self.run_pants(["--changed-parent=HEAD", "list"])
+            pants_run = self.run_pants(["--changed-since=HEAD", "list"])
             self.assert_success(pants_run)
             self.assertEqual(pants_run.stdout_data.strip(), "src/python/sources:sources")
 
