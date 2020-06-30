@@ -37,7 +37,7 @@ from pants.engine.legacy.structs import (
     PythonTargetAdaptor,
     PythonTestsAdaptor,
     RemoteSourcesAdaptor,
-    TargetAdaptor
+    TargetAdaptor,
 )
 from pants.engine.legacy.structs import rules as structs_rules
 from pants.engine.platform import create_platform_rules

@@ -39,7 +39,7 @@ class ListOptions(LineOriented, GoalSubsystem):
                 "The option `--provides-columns` no longer does anything. It was specific to the "
                 "JVM backend, so no longer makes sense with Pants 2.0 initially only supporting "
                 "Python."
-            )
+            ),
         )
         register(
             "--documented",

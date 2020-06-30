@@ -4,8 +4,8 @@
 from textwrap import dedent
 from typing import List, Optional, Tuple, cast
 
-from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.project_info.list_targets import ListOptions, list_targets
+from pants.backend.python.python_artifact import PythonArtifact
 from pants.engine.addresses import Address, Addresses
 from pants.engine.target import DescriptionField, ProvidesField, Target, Targets
 from pants.testutil.engine.util import MockConsole, MockGet, create_goal_subsystem, run_rule
