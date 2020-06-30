@@ -6,7 +6,7 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
-parking_lot = "0.6"
+parking_lot = "0.11"
 
 [dev-dependencies]
 futures = "0.3"
