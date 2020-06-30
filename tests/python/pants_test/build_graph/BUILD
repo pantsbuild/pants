@@ -64,33 +64,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'build_graph_integration',
-  sources = ['test_build_graph_integration.py'],
-  dependencies = [
-    'src/python/pants/testutil:int-test',
-    'testprojects/src/java/org/pantsbuild/testproject:cycle1_directory',
-    'testprojects/src/java/org/pantsbuild/testproject:cycle2_directory',
-    'testprojects/src/python:build_file_imports_function_directory',
-    'testprojects/src/python:build_file_imports_module_directory',
-  ],
-  tags = {'integration', 'partially_type_checked'},
-  timeout = 75,
-)
-
-python_tests(
-  name = 'intermediate_target_integration',
-  sources = ['test_intermediate_target_integration.py'],
-  dependencies = [
-    'src/python/pants/build_graph',
-    'src/python/pants/testutil:int-test',
-    'testprojects/maven_layout:provided_patching_directory',
-    'testprojects/src/java/org/pantsbuild/testproject:intransitive_directory',
-    'testprojects/src/java/org/pantsbuild/testproject:runtime_directory',
-  ],
-  tags = {'integration', 'partially_type_checked'},
-)
-
-python_tests(
   name = 'scopes',
   sources = ['test_scopes.py'],
   dependencies = [

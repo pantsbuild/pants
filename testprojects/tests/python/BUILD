@@ -4,7 +4,6 @@
 target(
   name = 'all_directories',
   dependencies = [
-    ':example_test_directory',
     'testprojects/tests/python/pants:all_directories',
   ],
 )
