@@ -10,7 +10,7 @@ from pants.util.contextutil import temporary_dir
 
 
 class CoverageIntegrationTest(PantsRunIntegrationTest):
-    def _prepare_sources(self, tmpdir, build_root):
+    def _prepare_sources(self, tmpdir: str, build_root: str) -> str:
         tmpdir_relative = Path(tmpdir).relative_to(build_root)
         src_root = Path(tmpdir, "src", "python", "project")
         src_root.mkdir(parents=True)
