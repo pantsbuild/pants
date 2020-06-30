@@ -18,6 +18,7 @@ use futures01::{future, Future, Stream};
 use hashing::{Digest, Fingerprint};
 use log::{debug, trace, warn};
 use protobuf::{self, Message, ProtobufEnum};
+use std::time::SystemTime;
 use store::{Snapshot, SnapshotOps, Store, StoreFileByDigest};
 use tokio::time::delay_for;
 
@@ -775,8 +776,16 @@ fn maybe_add_workunit(
   workunit_store: &WorkunitStore,
 ) {
   if !result_cached {
+    let start_time: SystemTime = SystemTime::UNIX_EPOCH + time_span.start.into();
+    let end_time: SystemTime = start_time + time_span.duration.into();
     let metadata = workunit_store::WorkunitMetadata::new();
-    workunit_store.add_completed_workunit(name.to_string(), time_span, parent_id, metadata);
+    workunit_store.add_completed_workunit(
+      name.to_string(),
+      start_time,
+      end_time,
+      parent_id,
+      metadata,
+    );
   }
 }
 

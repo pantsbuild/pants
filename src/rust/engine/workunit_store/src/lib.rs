@@ -146,6 +146,35 @@ type CompletedWorkunitSender = Arc<Mutex<Sender<(SpanId, Option<WorkunitMetadata
 #[derive(Clone)]
 pub struct WorkunitStore {
   rendering_dynamic_ui: bool,
+  streaming_workunit_data: StreamingWorkunitData,
+  heavy_hitters_data: HeavyHittersData,
+}
+
+#[derive(Clone)]
+struct StreamingWorkunitData {
+  started_workunits_rx: Arc<Mutex<Receiver<Workunit>>>,
+  started_workunits_tx: Arc<Mutex<Sender<Workunit>>>,
+  completed_workunits_rx: CompletedWorkunitReceiver,
+  completed_workunits_tx: CompletedWorkunitSender,
+  workunit_records: Arc<Mutex<HashMap<SpanId, Workunit>>>,
+}
+
+impl StreamingWorkunitData {
+  fn new() -> StreamingWorkunitData {
+    let (started_workunits_tx, started_workunits_rx) = channel();
+    let (completed_workunits_tx, completed_workunits_rx) = channel();
+    StreamingWorkunitData {
+      started_workunits_tx: Arc::new(Mutex::new(started_workunits_tx)),
+      started_workunits_rx: Arc::new(Mutex::new(started_workunits_rx)),
+      completed_workunits_tx: Arc::new(Mutex::new(completed_workunits_tx)),
+      completed_workunits_rx: Arc::new(Mutex::new(completed_workunits_rx)),
+      workunit_records: Arc::new(Mutex::new(HashMap::new())),
+    }
+  }
+}
+
+#[derive(Clone)]
+struct HeavyHittersData {
   inner: Arc<Mutex<WorkUnitInnerStore>>,
   started_workunits_rx: Arc<Mutex<Receiver<Workunit>>>,
   started_workunits_tx: Arc<Mutex<Sender<Workunit>>>,
@@ -153,15 +182,50 @@ pub struct WorkunitStore {
   completed_workunits_tx: CompletedWorkunitSender,
 }
 
+impl HeavyHittersData {
+  fn new() -> HeavyHittersData {
+    let (started_workunits_tx, started_workunits_rx) = channel();
+    let (completed_workunits_tx, completed_workunits_rx) = channel();
+    HeavyHittersData {
+      inner: Arc::new(Mutex::new(WorkUnitInnerStore {
+        graph: DiGraph::new(),
+        span_id_to_graph: HashMap::new(),
+        workunit_records: HashMap::new(),
+      })),
+      started_workunits_rx: Arc::new(Mutex::new(started_workunits_rx)),
+      started_workunits_tx: Arc::new(Mutex::new(started_workunits_tx)),
+      completed_workunits_rx: Arc::new(Mutex::new(completed_workunits_rx)),
+      completed_workunits_tx: Arc::new(Mutex::new(completed_workunits_tx)),
+    }
+  }
+}
+
 #[derive(Default)]
 pub struct WorkUnitInnerStore {
   graph: WorkunitGraph,
   span_id_to_graph: HashMap<SpanId, NodeIndex<u32>>,
   workunit_records: HashMap<SpanId, Workunit>,
-  started_ids: Vec<SpanId>,
-  completed_ids: Vec<SpanId>,
-  last_seen_started_idx: usize,
-  last_seen_completed_idx: usize,
+}
+
+fn first_matched_parent(
+  workunit_records: &HashMap<SpanId, Workunit>,
+  mut span_id: Option<SpanId>,
+  is_visible: impl Fn(&Workunit) -> bool,
+) -> Option<SpanId> {
+  while let Some(current_span_id) = span_id {
+    let workunit = workunit_records.get(&current_span_id);
+
+    // Is the current workunit visible?
+    if let Some(ref workunit) = workunit {
+      if is_visible(workunit) {
+        return Some(current_span_id);
+      }
+    }
+
+    // If not, try its parent.
+    span_id = workunit.and_then(|workunit| workunit.parent_id.clone());
+  }
+  None
 }
 
 impl WorkUnitInnerStore {
@@ -189,23 +253,10 @@ impl WorkUnitInnerStore {
 
 impl WorkunitStore {
   pub fn new(rendering_dynamic_ui: bool) -> WorkunitStore {
-    let (started_workunits_tx, started_workunits_rx) = channel();
-    let (completed_workunits_tx, completed_workunits_rx) = channel();
     WorkunitStore {
+      streaming_workunit_data: StreamingWorkunitData::new(),
+      heavy_hitters_data: HeavyHittersData::new(),
       rendering_dynamic_ui,
-      inner: Arc::new(Mutex::new(WorkUnitInnerStore {
-        graph: DiGraph::new(),
-        span_id_to_graph: HashMap::new(),
-        workunit_records: HashMap::new(),
-        started_ids: Vec::new(),
-        last_seen_started_idx: 0,
-        completed_ids: Vec::new(),
-        last_seen_completed_idx: 0,
-      })),
-      started_workunits_rx: Arc::new(Mutex::new(started_workunits_rx)),
-      started_workunits_tx: Arc::new(Mutex::new(started_workunits_tx)),
-      completed_workunits_rx: Arc::new(Mutex::new(completed_workunits_rx)),
-      completed_workunits_tx: Arc::new(Mutex::new(completed_workunits_tx)),
     }
   }
 
@@ -221,10 +272,20 @@ impl WorkunitStore {
   ///
   pub fn heavy_hitters(&self, k: usize) -> HashMap<String, Option<Duration>> {
     use petgraph::Direction;
-    self.handle_queued_workunits();
-
     let now = SystemTime::now();
-    let inner = self.inner.lock();
+    let mut inner = self.heavy_hitters_data.inner.lock();
+
+    let receiver = self.heavy_hitters_data.started_workunits_rx.lock();
+
+    while let Ok(started) = receiver.try_recv() {
+      Self::add_started_workunit_to_store(started, &mut inner);
+    }
+
+    let receiver = self.heavy_hitters_data.completed_workunits_rx.lock();
+    while let Ok((span_id, new_metadata, time)) = receiver.try_recv() {
+      Self::add_completed_workunit_to_store(span_id, new_metadata, time, &mut inner);
+    }
+
     let workunit_graph = &inner.graph;
 
     let duration_for = |workunit: &Workunit| -> Option<Duration> {
@@ -291,7 +352,9 @@ impl WorkunitStore {
     if !self.rendering_dynamic_ui {
       started.log_workunit_state()
     }
-    let sender = self.started_workunits_tx.lock();
+    let sender = self.heavy_hitters_data.started_workunits_tx.lock();
+    sender.send(started.clone()).unwrap();
+    let sender = self.streaming_workunit_data.started_workunits_tx.lock();
     sender.send(started).unwrap();
     span_id
   }
@@ -303,7 +366,6 @@ impl WorkunitStore {
     inner_store
       .workunit_records
       .insert(span_id.clone(), started);
-    inner_store.started_ids.push(span_id.clone());
 
     let child = inner_store.graph.add_node(span_id.clone());
     inner_store.span_id_to_graph.insert(span_id, child);
@@ -323,8 +385,12 @@ impl WorkunitStore {
   }
 
   fn complete_workunit_impl(&self, span_id: SpanId, new_metadata: Option<WorkunitMetadata>) {
-    let tx = self.completed_workunits_tx.lock();
     let time = std::time::SystemTime::now();
+    let tx = self.heavy_hitters_data.completed_workunits_tx.lock();
+    tx.send((span_id.clone(), new_metadata.clone(), time))
+      .unwrap();
+
+    let tx = self.streaming_workunit_data.completed_workunits_tx.lock();
     tx.send((span_id, new_metadata, time)).unwrap();
   }
 
@@ -357,10 +423,7 @@ impl WorkunitStore {
           workunit.metadata = metadata;
         }
         workunit.log_workunit_state();
-        inner_store
-          .workunit_records
-          .insert(span_id.clone(), workunit);
-        inner_store.completed_ids.push(span_id);
+        inner_store.workunit_records.insert(span_id, workunit);
       }
     }
   }
@@ -368,82 +431,91 @@ impl WorkunitStore {
   pub fn add_completed_workunit(
     &self,
     name: String,
-    time_span: TimeSpan,
+    start_time: SystemTime,
+    end_time: SystemTime,
     parent_id: Option<SpanId>,
     metadata: WorkunitMetadata,
   ) {
-    let inner = &mut self.inner.lock();
     let span_id = new_span_id();
+
     let workunit = Workunit {
       name,
       span_id: span_id.clone(),
       parent_id,
-      state: WorkunitState::Completed { time_span },
+      state: WorkunitState::Started { start_time },
       metadata,
     };
 
-    inner.workunit_records.insert(span_id.clone(), workunit);
-    inner.completed_ids.push(span_id);
-  }
+    let sender = self.heavy_hitters_data.started_workunits_tx.lock();
+    sender.send(workunit.clone()).unwrap();
+    let sender = self.streaming_workunit_data.started_workunits_tx.lock();
+    sender.send(workunit).unwrap();
 
-  fn handle_queued_workunits(&self) {
-    let mut inner_store = self.inner.lock();
-    let receiver = self.started_workunits_rx.lock();
-
-    while let Ok(started) = receiver.try_recv() {
-      Self::add_started_workunit_to_store(started, &mut inner_store);
-    }
-
-    let receiver = self.completed_workunits_rx.lock();
-    while let Ok((span_id, new_metadata, time)) = receiver.try_recv() {
-      Self::add_completed_workunit_to_store(span_id, new_metadata, time, &mut inner_store);
-    }
+    let sender = self.heavy_hitters_data.completed_workunits_tx.lock();
+    sender.send((span_id.clone(), None, end_time)).unwrap();
+    let sender = self.streaming_workunit_data.completed_workunits_tx.lock();
+    sender.send((span_id, None, end_time)).unwrap();
   }
 
   pub fn with_latest_workunits<F, T>(&mut self, max_verbosity: log::Level, f: F) -> T
   where
     F: FnOnce(&[Workunit], &[Workunit]) -> T,
   {
-    self.handle_queued_workunits();
+    use std::collections::hash_map::Entry;
+
+    let should_emit = |workunit: &Workunit| -> bool { workunit.metadata.level <= max_verbosity };
+
     let (started_workunits, completed_workunits) = {
-      let mut inner_store = self.inner.lock();
+      let mut workunit_records = self.streaming_workunit_data.workunit_records.lock();
 
-      let should_emit = |workunit: &Workunit| -> bool { workunit.metadata.level <= max_verbosity };
+      let receiver = self.streaming_workunit_data.started_workunits_rx.lock();
+      let mut started_workunits: Vec<Workunit> = vec![];
+      while let Ok(mut started) = receiver.try_recv() {
+        let span_id = started.span_id.clone();
+        workunit_records.insert(span_id.clone(), started.clone());
 
-      let cur_len = inner_store.started_ids.len();
-      let latest: usize = inner_store.last_seen_started_idx;
-      let started_workunits: Vec<Workunit> = inner_store.started_ids[latest..cur_len]
-        .iter()
-        .flat_map(|id| inner_store.workunit_records.get(id))
-        .flat_map(|workunit| match workunit.state {
-          WorkunitState::Started { .. } if should_emit(&workunit) => Some(workunit.clone()),
-          WorkunitState::Started { .. } => None,
-          WorkunitState::Completed { .. } => None,
-        })
-        .map(|mut w| {
-          w.parent_id = inner_store.first_matched_parent(w.parent_id, should_emit);
-          w
-        })
-        .collect();
-      inner_store.last_seen_started_idx = cur_len;
+        if should_emit(&started) {
+          started.parent_id =
+            first_matched_parent(&workunit_records, started.parent_id, should_emit);
+          started_workunits.push(started);
+        }
+      }
 
-      let completed_ids = &inner_store.completed_ids;
-      let cur_len = completed_ids.len();
-      let latest: usize = inner_store.last_seen_completed_idx;
-      let completed_workunits: Vec<Workunit> = inner_store.completed_ids[latest..cur_len]
-        .iter()
-        .flat_map(|id| inner_store.workunit_records.get(id))
-        .flat_map(|workunit| match workunit.state {
-          WorkunitState::Completed { .. } if should_emit(&workunit) => Some(workunit.clone()),
-          WorkunitState::Completed { .. } => None,
-          WorkunitState::Started { .. } => None,
-        })
-        .map(|mut w| {
-          w.parent_id = inner_store.first_matched_parent(w.parent_id, should_emit);
-          w
-        })
-        .collect();
-      inner_store.last_seen_completed_idx = cur_len;
+      let receiver = self.streaming_workunit_data.completed_workunits_rx.lock();
+      let mut completed_workunits: Vec<Workunit> = vec![];
+      while let Ok((span_id, new_metadata, end_time)) = receiver.try_recv() {
+        match workunit_records.entry(span_id.clone()) {
+          Entry::Vacant(_) => {
+            log::warn!("No previously-started workunit found for id: {}", span_id);
+            continue;
+          }
+          Entry::Occupied(o) => {
+            let (span_id, mut workunit) = o.remove_entry();
+            let time_span = match workunit.state {
+              WorkunitState::Completed { .. } => {
+                log::warn!("Workunit {} was already completed", span_id);
+                continue;
+              }
+              WorkunitState::Started { start_time } => {
+                TimeSpan::from_start_and_end_systemtime(&start_time, &end_time)
+              }
+            };
+            let new_state = WorkunitState::Completed { time_span };
+            workunit.state = new_state;
+            if let Some(metadata) = new_metadata {
+              workunit.metadata = metadata;
+            }
+            workunit.log_workunit_state();
+            workunit_records.insert(span_id.clone(), workunit.clone());
+
+            if should_emit(&workunit) {
+              workunit.parent_id =
+                first_matched_parent(&workunit_records, workunit.parent_id, should_emit);
+              completed_workunits.push(workunit);
+            }
+          }
+        }
+      }
       (started_workunits, completed_workunits)
     };
 
