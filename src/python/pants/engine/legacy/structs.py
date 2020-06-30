@@ -18,7 +18,6 @@ from pants.util.collections import ensure_str_list
 from pants.util.contextutil import exception_logging
 from pants.util.meta import classproperty
 
-
 logger = logging.getLogger(__name__)
 
 

@@ -20,11 +20,7 @@ from pants.engine.addresses import Addresses
 from pants.engine.collection import Collection
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.internals.parser import HydratedStruct
-from pants.engine.legacy.structs import (
-    HydrateableField,
-    SourcesField,
-    TargetAdaptor,
-)
+from pants.engine.legacy.structs import HydrateableField, SourcesField, TargetAdaptor
 from pants.engine.rules import rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import RegisteredTargetTypes
