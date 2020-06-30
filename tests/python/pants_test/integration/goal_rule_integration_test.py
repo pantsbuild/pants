@@ -78,10 +78,9 @@ class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
             # Verify that the three different target states were listed, and that the process exited.
             pants_result = handle.join()
             self.assert_success(pants_result)
-            self.assertEquals(
-                [f"{rel_tmpdir}:{name}" for name in ("one", "two", "three")],
-                list(pants_result.stdout_data.splitlines()),
-            )
+            assert [
+                f"{rel_tmpdir}:{name}" for name in ("one", "two", "three")
+            ] == pants_result.stdout_data.splitlines()
 
     def test_unimplemented_goals_noop(self) -> None:
         # If the goal is actually run, it should fail because V2 `run` expects a single target and will
