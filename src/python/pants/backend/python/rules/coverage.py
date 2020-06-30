@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from io import StringIO
 from pathlib import PurePath
 from textwrap import dedent
-from typing import List, Optional, Sequence, Tuple, cast
+from typing import List, Optional, Sequence, Tuple
 
 import pkg_resources
 
@@ -310,9 +310,7 @@ async def generate_coverage_reports(
                 subprocess_encoding_environment=subprocess_encoding_environment,
             )
         )
-    results: Tuple[ProcessResult, ...] = await MultiGet(
-        Get(ProcessResult, Process, process) for process in processes
-    )
+    results = await MultiGet(Get(ProcessResult, Process, process) for process in processes)
     coverage_reports = _get_coverage_reports(coverage_subsystem.output_dir, report_types, results)
     return CoverageReports(tuple(coverage_reports))
 
