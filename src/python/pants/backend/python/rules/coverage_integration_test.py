@@ -196,9 +196,7 @@ class CoverageIntegrationTest(PantsRunIntegrationTest):
 
     def _assert_raw_coverage(self, result: PantsResult, build_root: str) -> None:
         assert "Wrote raw coverage report to `dist/coverage/python`" in result.stderr_data
-        coverage_path = Path(build_root, "dist", "coverage", "python")
-        assert len(list(coverage_path.iterdir())) == 1
-        coverage_data = coverage_path / ".coverage"
+        coverage_data = Path(build_root, "dist", "coverage", "python", ".coverage")
         assert coverage_data.exists() is True
         conn = sqlite3.connect(coverage_data.as_posix())
         cursor = conn.cursor()
@@ -219,3 +217,20 @@ class CoverageIntegrationTest(PantsRunIntegrationTest):
             tmpdir_relative = self._prepare_sources(tmpdir, build_root)
             result = self._run_tests(tmpdir_relative, "--coverage-py-report=raw")
             self._assert_raw_coverage(result, build_root)
+
+    def test_coverage_html_and_xml(self) -> None:
+        build_root = get_buildroot()
+        with temporary_dir(root_dir=build_root) as tmpdir:
+            tmpdir_relative = self._prepare_sources(tmpdir, build_root)
+            result = self._run_tests(tmpdir_relative, "--coverage-py-report=['xml', 'html']")
+            coverage_path = Path(build_root, "dist", "coverage", "python")
+            assert coverage_path.exists() is True
+
+            assert "Wrote xml coverage report to `dist/coverage/python`" in result.stderr_data
+            xml_coverage = coverage_path / "coverage.xml"
+            assert xml_coverage.exists() is True
+
+            assert "Wrote html coverage report to `dist/coverage/python`" in result.stderr_data
+            html_cov_dir = coverage_path / "htmlcov"
+            assert html_cov_dir.exists() is True
+            assert (html_cov_dir / "index.html").exists() is True
