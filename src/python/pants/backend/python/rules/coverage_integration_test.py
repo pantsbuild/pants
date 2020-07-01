@@ -186,7 +186,9 @@ class CoverageIntegrationTest(PantsRunIntegrationTest):
 
     def _assert_raw_coverage(self, result: PantsResult, build_root: str) -> None:
         assert "Wrote raw coverage report to `dist/coverage/python`" in result.stderr_data
-        coverage_data = Path(build_root, "dist", "coverage", "python", ".coverage")
+        coverage_path = Path(build_root, "dist", "coverage", "python")
+        assert len(list(coverage_path.iterdir())) == 1
+        coverage_data = coverage_path/ ".coverage"
         assert coverage_data.exists() is True
         conn = sqlite3.connect(coverage_data.as_posix())
         cursor = conn.cursor()
