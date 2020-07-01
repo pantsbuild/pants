@@ -70,6 +70,8 @@ class HelpPrinter:
         global_options = self._options.for_global_scope()
         goal_descriptions: Dict[str, str] = {}
         if global_options.v2:
+            for scope_info in self._options.known_scope_to_info.values():
+                print(f"XXXXXXXXXXX {scope_info.scope} {scope_info.optionable_cls}")
             goal_scope_infos = [
                 scope_info
                 for scope_info in self._options.known_scope_to_info.values()
@@ -92,7 +94,7 @@ class HelpPrinter:
         if self._use_color:
             title = green(title)
 
-        max_width = max(len(name) for name in goal_descriptions.keys())
+        max_width = max((len(name) for name in goal_descriptions.keys()), default=0)
         chars_before_description = max_width + 2
 
         def format_goal(name: str, descr: str) -> str:
