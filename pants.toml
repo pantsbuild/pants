@@ -155,8 +155,5 @@ pytest_plugins.add = [
 ]
 timeout_default = 60
 
-[test.pytest]
-timeout_default = 60
-
 [sourcefile-validation]
 config = "@build-support/regexes/config.yaml"
