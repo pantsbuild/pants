@@ -5,6 +5,7 @@ python_binary(
   name = 'reversion',
   sources = ['reversion.py'],
   dependencies = [
+    '3rdparty/python:setuptools',  # Needed because we suck in pants/__init__.py, which invokes it.
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
   ],

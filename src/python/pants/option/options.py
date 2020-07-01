@@ -6,7 +6,7 @@ import logging
 import re
 import sys
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
+from typing import Dict, Iterable, List, Mapping, Optional, Sequence
 
 from pants.base.deprecated import warn_or_error
 from pants.option.arg_splitter import ArgSplitter, HelpRequest
@@ -232,32 +232,6 @@ class Options:
         :API: public
         """
         return self._goals
-
-    @memoized_property
-    def goals_by_version(self) -> Tuple[Tuple[str, ...], Tuple[str, ...], Tuple[str, ...]]:
-        """Goals organized into three tuples by whether they are v1, ambiguous, or v2 goals
-        (respectively).
-
-        It's possible for a goal to be implemented with both v1 and v2, in which case a consumer
-        should use the `--v1` and `--v2` global flags to disambiguate.
-        """
-        v1, ambiguous, v2 = [], [], []
-        for goal in self._goals:
-            goal_dot = f"{goal}."
-            scope_categories = {
-                s.category
-                for s in self.known_scope_to_info.values()
-                if s.scope == goal or s.scope.startswith(goal_dot)
-            }
-            is_v1 = ScopeInfo.TASK in scope_categories
-            is_v2 = ScopeInfo.GOAL in scope_categories
-            if is_v1 and is_v2:
-                ambiguous.append(goal)
-            elif is_v1:
-                v1.append(goal)
-            else:
-                v2.append(goal)
-        return tuple(v1), tuple(ambiguous), tuple(v2)
 
     @property
     def known_scope_to_info(self) -> Dict[str, ScopeInfo]:
