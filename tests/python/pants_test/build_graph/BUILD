@@ -91,14 +91,3 @@ python_tests(
   ],
   tags = {"partially_type_checked"},
 )
-
-python_tests(
-  name = 'target_filter_subsystem',
-  sources = ['test_target_filter_subsystem.py'],
-  dependencies = [
-    'src/python/pants/build_graph',
-    'src/python/pants/task',
-    'src/python/pants/testutil:task_test_base',
-  ],
-  tags = {"partially_type_checked"},
-)

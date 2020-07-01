@@ -6,10 +6,8 @@ python_library(
   dependencies=[
     ':int-test-for-export',
     ':test_base',
-    ':file_test_util',
     'src/python/pants/testutil/base:context_utils',
-    'src/python/pants/testutil/engine:engine_test_base',
-    'src/python/pants/testutil/engine:util',
+    'src/python/pants/testutil/engine',
     'src/python/pants/testutil/option',
     'src/python/pants/testutil/subsystem',
   ],
@@ -79,7 +77,7 @@ python_library(
     'src/python/pants/subsystem',
     'src/python/pants/task',
     'src/python/pants/testutil/base:context_utils',
-    'src/python/pants/testutil/engine:util',
+    'src/python/pants/testutil/engine',
     'src/python/pants/testutil/option',
     'src/python/pants/testutil/subsystem',
     'src/python/pants/util:collections',
@@ -116,27 +114,6 @@ python_library(
 )
 
 python_library(
-  name = 'task_test_base',
-  sources = ['task_test_base.py'],
-  dependencies = [
-    'src/python/pants/goal:context',
-    'src/python/pants/task',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:meta',
-    'src/python/pants/util:memo',
-    'src/python/pants/util:objects',
-    ':test_base',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_library(
-  name='file_test_util',
-  sources=['file_test_util.py'],
-  tags = {"partially_type_checked"},
-)
-
-python_library(
   name='git_util',
   sources=['git_util.py'],
   dependencies = [
@@ -150,15 +127,6 @@ python_library(
 python_library(
   name='interpreter_selection_utils',
   sources=['interpreter_selection_utils.py'],
-  tags = {"partially_type_checked"},
-)
-
-python_library(
-  name='mock_logger',
-  sources=['mock_logger.py'],
-  dependencies = [
-    'src/python/pants/reporting',
-  ],
   tags = {"partially_type_checked"},
 )
 
