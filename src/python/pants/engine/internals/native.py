@@ -142,6 +142,9 @@ class Native(metaclass=SingletonMetaclass):
     def write_stderr(self, session, msg: str):
         return self.lib.write_stderr(session, msg)
 
+    def teardown_dynamic_ui(self, scheduler, session):
+        self.lib.teardown_dynamic_ui(scheduler, session)
+
     def flush_log(self):
         return self.lib.flush_log()
 

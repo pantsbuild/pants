@@ -29,6 +29,11 @@ class NativeStdOut(NativeWriter):
     def write(self, payload: str) -> None:
         self.native.write_stdout(self.scheduler_session.session, payload)
 
+    def teardown_dynamic_ui(self) -> None:
+        scheduler = self.scheduler_session.scheduler
+        session = self.scheduler_session.session
+        self.native.teardown_dynamic_ui(scheduler._scheduler, session)
+
 
 class NativeStdErr(NativeWriter):
     def write(self, payload: str) -> None:
@@ -80,6 +85,9 @@ class Console:
 
     def write_stderr(self, payload: str) -> None:
         self.stderr.write(payload)
+
+    def teardown_dynamic_ui(self) -> None:
+        self.stdout.teardown_dynamic_ui()
 
     def print_stdout(self, payload: str, end: str = "\n") -> None:
         self.stdout.write(f"{payload}{end}")
