@@ -12,7 +12,6 @@ from pants.base.build_environment import pants_release, pants_version
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.unions import UnionMembership
 from pants.help.help_formatter import HelpFormatter
-from pants.help.scope_info_iterator import ScopeInfoIterator
 from pants.option.arg_splitter import (
     GoalsHelp,
     HelpRequest,
@@ -136,10 +135,7 @@ class HelpPrinter:
             # The scopes explicitly mentioned by the user on the cmd line.
             help_scopes = set(self._options.scope_to_flags.keys()) - {GLOBAL_SCOPE}
 
-        scope_info_iterator = ScopeInfoIterator(scope_to_info=self._options.known_scope_to_info)
-
-        scope_infos = list(scope_info_iterator.iterate(help_scopes))
-
+        scope_infos = list(self._options.known_scope_to_info[scope] for scope in help_scopes)
         if scope_infos:
             for scope_info in scope_infos:
                 help_str = self._format_help(scope_info, help_request.advanced)
