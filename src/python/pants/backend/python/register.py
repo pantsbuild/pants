@@ -41,7 +41,6 @@ from pants.backend.python.targets.python_requirements_file import (
 )
 from pants.backend.python.targets.python_tests import PythonTests as PythonTestsV1
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.goal.task_registrar import TaskRegistrar as task
 from pants.python.pex_build_util import PexBuilderWrapper
 from pants.python.python_requirement import PythonRequirement
 
