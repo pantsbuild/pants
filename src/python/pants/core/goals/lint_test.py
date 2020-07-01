@@ -48,7 +48,7 @@ class MockLintRequest(LintRequest, metaclass=ABCMeta):
         pass
 
     @property
-    def lint_result(self) -> LintResults:
+    def lint_results(self) -> LintResults:
         addresses = [config.address for config in self.field_sets]
         return LintResults(
             [
@@ -153,7 +153,7 @@ class LintTest(TestBase):
                 MockGet(
                     product_type=LintResults,
                     subject_type=LintRequest,
-                    mock=lambda field_set_collection: field_set_collection.lint_result,
+                    mock=lambda field_set_collection: field_set_collection.lint_results,
                 ),
                 MockGet(
                     product_type=FieldSetsWithSources,

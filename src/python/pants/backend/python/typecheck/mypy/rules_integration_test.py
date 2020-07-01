@@ -5,13 +5,11 @@ from pathlib import PurePath
 from textwrap import dedent
 from typing import List, Optional
 
-import pytest
-
-from pants.backend.python.lint.mypy.rules import MyPyFieldSet, MyPyRequest
-from pants.backend.python.lint.mypy.rules import rules as mypy_rules
 from pants.backend.python.target_types import PythonLibrary
+from pants.backend.python.typecheck.mypy.rules import MyPyFieldSet, MyPyRequest
+from pants.backend.python.typecheck.mypy.rules import rules as mypy_rules
 from pants.base.specs import SingleAddress
-from pants.core.goals.lint import LintResults
+from pants.core.goals.typecheck import TypecheckResults
 from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
 from pants.engine.rules import RootRule
@@ -103,9 +101,9 @@ class MyPyIntegrationTest(ExternalToolTestBase):
         passthrough_args: Optional[str] = None,
         skip: bool = False,
         additional_args: Optional[List[str]] = None,
-    ) -> LintResults:
+    ) -> TypecheckResults:
         args = [
-            "--backend-packages2=pants.backend.python.lint.mypy",
+            "--backend-packages2=pants.backend.python.typecheck.mypy",
             "--source-root-patterns=['src/python', 'tests/python']",
         ]
         if config:
@@ -118,7 +116,7 @@ class MyPyIntegrationTest(ExternalToolTestBase):
         if additional_args:
             args.extend(additional_args)
         return self.request_single_product(
-            LintResults,
+            TypecheckResults,
             Params(
                 MyPyRequest(MyPyFieldSet.create(tgt) for tgt in targets),
                 create_options_bootstrapper(args=args),
@@ -225,32 +223,3 @@ class MyPyIntegrationTest(ExternalToolTestBase):
         assert len(result) == 1
         assert result[0].exit_code == 1
         assert f"{self.package}/math/add.py:5" in result[0].stdout
-
-    @pytest.mark.skip(
-        reason="Figure out how to get MyPy working with both namespace packages and source roots. See https://github.com/Eric-Arellano/mypy-debug."
-    )
-    def test_pep420_namespace_packages(self) -> None:
-        # Regression test for the issue described in https://github.com/pantsbuild/pants/pull/10183.
-        test_fc = FileContent(
-            "tests/python/project/good_test.py",
-            dedent(
-                """\
-                from project.good import add
-
-                def test_add():
-                    assert add(3, 2) == 5
-                """
-            ).encode(),
-        )
-        targets = [
-            self.make_target_with_origin([self.good_source]),
-            self.make_target_with_origin(
-                [test_fc],
-                package="tests/python/project",
-                dependencies=[Address.parse(f"{self.package}:target")],
-            ),
-        ]
-        result = self.run_mypy(targets, passthrough_args="--namespace-packages")
-        assert len(result) == 1
-        assert result[0].exit_code == 0
-        assert "Success: no issues found" in result[0].stdout.strip()
