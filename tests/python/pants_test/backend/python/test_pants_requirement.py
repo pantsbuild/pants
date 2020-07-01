@@ -1,8 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Iterable, Optional
-
 from pants.backend.python.register import build_file_aliases
 from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
 from pants.base.build_environment import pants_version
@@ -21,11 +19,11 @@ class PantsRequirementTest(TestBase):
         self,
         python_requirement_library: PythonRequirementLibrary,
         expected_dist: str = "pantsbuild.pants",
-        expected_modules: Optional[Iterable[str]] = None,
+        expected_module: str = "pants",
     ) -> None:
         assert isinstance(python_requirement_library, PythonRequirementLibrary)
         expected = PythonRequirement(
-            f"{expected_dist}=={pants_version()}", modules=expected_modules
+            f"{expected_dist}=={pants_version()}", modules=[expected_module]
         )
 
         def key(python_requirement):
@@ -64,7 +62,9 @@ class PantsRequirementTest(TestBase):
             "3rdparty/python/pants:pantsbuild.pants.contrib.bob"
         )
         self.assert_pants_requirement(
-            python_requirement_library, expected_dist="pantsbuild.pants.contrib.bob"
+            python_requirement_library,
+            expected_dist="pantsbuild.pants.contrib.bob",
+            expected_module="pants.contrib.bob",
         )
 
     def test_custom_name_contrib(self) -> None:
@@ -74,17 +74,9 @@ class PantsRequirementTest(TestBase):
         )
         python_requirement_library = self.target("3rdparty/python/pants:bob")
         self.assert_pants_requirement(
-            python_requirement_library, expected_dist="pantsbuild.pants.contrib.bob"
-        )
-
-    def test_modules(self) -> None:
-        self.add_to_build_file(
-            "3rdparty/python/pants",
-            "pants_requirement(modules=['pants.mod1', 'pants.mod2.subdir'])",
-        )
-        python_requirement_library = self.target("3rdparty/python/pants")
-        self.assert_pants_requirement(
-            python_requirement_library, expected_modules=["pants.mod1", "pants.mod2.subdir"]
+            python_requirement_library,
+            expected_dist="pantsbuild.pants.contrib.bob",
+            expected_module="pants.contrib.bob",
         )
 
     def test_bad_dist(self) -> None:
