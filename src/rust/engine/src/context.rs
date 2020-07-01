@@ -52,6 +52,26 @@ pub struct Core {
   pub build_root: PathBuf,
 }
 
+#[derive(Clone, Debug)]
+pub struct RemotingOptions {
+  pub execution_enable: bool,
+  pub store_servers: Vec<String>,
+  pub execution_server: Option<String>,
+  pub execution_process_cache_namespace: Option<String>,
+  pub instance_name: Option<String>,
+  pub root_ca_certs_path: Option<PathBuf>,
+  pub oauth_bearer_token_path: Option<PathBuf>,
+  pub store_thread_count: usize,
+  pub store_chunk_bytes: usize,
+  pub store_chunk_upload_timeout: Duration,
+  pub store_rpc_retries: usize,
+  pub store_connection_limit: usize,
+  pub execution_extra_platform_properties: Vec<(String, String)>,
+  pub execution_headers: BTreeMap<String, String>,
+  pub execution_enable_streaming: bool,
+  pub execution_overall_deadline: Duration,
+}
+
 impl Core {
   pub fn new(
     executor: Executor,
@@ -65,38 +85,23 @@ impl Core {
     local_store_dir: PathBuf,
     local_execution_root_dir: PathBuf,
     named_caches_dir: PathBuf,
-    remote_execution: bool,
-    remote_store_servers: Vec<String>,
-    remote_execution_server: Option<String>,
-    remote_execution_process_cache_namespace: Option<String>,
-    remote_instance_name: Option<String>,
-    remote_root_ca_certs_path: Option<PathBuf>,
-    remote_oauth_bearer_token_path: Option<PathBuf>,
-    remote_store_thread_count: usize,
-    remote_store_chunk_bytes: usize,
-    remote_store_chunk_upload_timeout: Duration,
-    remote_store_rpc_retries: usize,
-    remote_store_connection_limit: usize,
-    remote_execution_extra_platform_properties: Vec<(String, String)>,
+    remoting_opts: RemotingOptions,
     process_execution_local_parallelism: usize,
     process_execution_remote_parallelism: usize,
     process_execution_cleanup_local_dirs: bool,
     process_execution_speculation_delay: Duration,
     process_execution_speculation_strategy: String,
     process_execution_use_local_cache: bool,
-    remote_execution_headers: BTreeMap<String, String>,
-    remote_execution_enable_streaming: bool,
-    remote_execution_overall_deadline_secs: u64,
     process_execution_local_enable_nailgun: bool,
   ) -> Result<Core, String> {
     // Randomize CAS address order to avoid thundering herds from common config.
-    let mut remote_store_servers = remote_store_servers;
+    let mut remote_store_servers = remoting_opts.store_servers.clone();
     remote_store_servers.shuffle(&mut rand::thread_rng());
 
     // We re-use these certs for both the execution and store service; they're generally tied together.
-    let root_ca_certs = if let Some(path) = remote_root_ca_certs_path {
+    let root_ca_certs = if let Some(ref path) = remoting_opts.root_ca_certs_path {
       Some(
-        std::fs::read(&path)
+        std::fs::read(path)
           .map_err(|err| format!("Error reading root CA certs file {:?}: {}", path, err))?,
       )
     } else {
@@ -104,9 +109,9 @@ impl Core {
     };
 
     // We re-use this token for both the execution and store service; they're generally tied together.
-    let oauth_bearer_token = if let Some(path) = remote_oauth_bearer_token_path {
+    let oauth_bearer_token = if let Some(ref path) = remoting_opts.oauth_bearer_token_path {
       Some(
-        std::fs::read_to_string(&path)
+        std::fs::read_to_string(path)
           .map_err(|err| format!("Error reading OAuth bearer token file {:?}: {}", path, err))
           .map(|v| v.trim_matches(|c| c == '\r' || c == '\n').to_owned())
           .and_then(|v| {
@@ -124,34 +129,34 @@ impl Core {
     let local_store_dir2 = local_store_dir.clone();
     let store = safe_create_dir_all_ioerror(&local_store_dir)
       .map_err(|e| format!("Error making directory {:?}: {:?}", local_store_dir, e))
-      .and_then(|()| {
-        if !remote_execution || remote_store_servers.is_empty() {
+      .and_then(|_| {
+        if !remoting_opts.execution_enable || remote_store_servers.is_empty() {
           Store::local_only(executor.clone(), local_store_dir)
         } else {
           Store::with_remote(
             executor.clone(),
             local_store_dir,
             remote_store_servers,
-            remote_instance_name.clone(),
+            remoting_opts.instance_name.clone(),
             root_ca_certs.clone(),
             oauth_bearer_token.clone(),
-            remote_store_thread_count,
-            remote_store_chunk_bytes,
-            remote_store_chunk_upload_timeout,
+            remoting_opts.store_thread_count,
+            remoting_opts.store_chunk_bytes,
+            remoting_opts.store_chunk_upload_timeout,
             // TODO: Take a parameter
             store::BackoffConfig::new(Duration::from_millis(10), 1.0, Duration::from_millis(10))
               .unwrap(),
-            remote_store_rpc_retries,
-            remote_store_connection_limit,
+            remoting_opts.store_rpc_retries,
+            remoting_opts.store_connection_limit,
           )
         }
       })
       .map_err(|e| format!("Could not initialize Store: {:?}", e))?;
 
     let process_execution_metadata = ProcessMetadata {
-      instance_name: remote_instance_name,
-      cache_key_gen_version: remote_execution_process_cache_namespace,
-      platform_properties: remote_execution_extra_platform_properties,
+      instance_name: remoting_opts.instance_name,
+      cache_key_gen_version: remoting_opts.execution_process_cache_namespace,
+      platform_properties: remoting_opts.execution_extra_platform_properties,
     };
 
     let local_command_runner = process_execution::local::CommandRunner::new(
@@ -180,32 +185,34 @@ impl Core {
         process_execution_local_parallelism,
       ));
 
-    if remote_execution {
+    if remoting_opts.execution_enable {
       let remote_command_runner: Box<dyn process_execution::CommandRunner> = {
-        let command_runner: Box<dyn CommandRunner> = if remote_execution_enable_streaming {
+        let command_runner: Box<dyn CommandRunner> = if remoting_opts.execution_enable_streaming {
           Box::new(process_execution::remote::StreamingCommandRunner::new(
             // No problem unwrapping here because the global options validation
-            // requires the remote_execution_server be present when remote_execution is set.
-            &remote_execution_server.unwrap(),
+            // requires the remoting_opts.execution_server be present when
+            // remoting_opts.execution_enable is set.
+            &remoting_opts.execution_server.unwrap(),
             process_execution_metadata.clone(),
             root_ca_certs,
             oauth_bearer_token,
-            remote_execution_headers,
+            remoting_opts.execution_headers,
             store.clone(),
             // TODO if we ever want to configure the remote platform to be something else we
             // need to take an option all the way down here and into the remote::CommandRunner struct.
             Platform::Linux,
-            Duration::from_secs(remote_execution_overall_deadline_secs),
+            remoting_opts.execution_overall_deadline,
           )?)
         } else {
           Box::new(process_execution::remote::CommandRunner::new(
             // No problem unwrapping here because the global options validation
-            // requires the remote_execution_server be present when remote_execution is set.
-            &remote_execution_server.unwrap(),
+            // requires the remoting_opts.execution_server be present when
+            // remoting_opts.execution_enable is set.
+            &remoting_opts.execution_server.unwrap(),
             process_execution_metadata.clone(),
             root_ca_certs,
             oauth_bearer_token,
-            remote_execution_headers,
+            remoting_opts.execution_headers,
             store.clone(),
             // TODO if we ever want to configure the remote platform to be something else we
             // need to take an option all the way down here and into the remote::CommandRunner struct.

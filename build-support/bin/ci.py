@@ -35,8 +35,8 @@ def main() -> None:
 
         if args.githooks:
             run_githooks()
-        if args.sanity_checks:
-            run_sanity_checks()
+        if args.smoke_tests:
+            run_smoke_tests()
         if args.lint:
             run_lint(oauth_token_path=remote_execution_oauth_token_path)
         if args.clippy:
@@ -47,10 +47,8 @@ def main() -> None:
             run_unit_tests(oauth_token_path=remote_execution_oauth_token_path)
         if args.rust_tests:
             run_rust_tests()
-        if args.integration_tests_v1:
-            run_integration_tests_v1(shard=args.integration_shard)
-        if args.integration_tests_v2:
-            run_integration_tests_v2(oauth_token_path=remote_execution_oauth_token_path)
+        if args.integration_tests:
+            run_integration_tests(oauth_token_path=remote_execution_oauth_token_path)
         if args.plugin_tests:
             run_plugin_tests(oauth_token_path=remote_execution_oauth_token_path)
         if args.platform_specific_tests:
@@ -110,9 +108,9 @@ def create_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--githooks", action="store_true", help="Run pre-commit githook.")
     parser.add_argument(
-        "--sanity-checks",
+        "--smoke-tests",
         action="store_true",
-        help="Run sanity checks of bootstrapped Pants and repo BUILD files.",
+        help="Run smoke tests of bootstrapped Pants and repo BUILD files.",
     )
     parser.add_argument("--lint", action="store_true", help="Run lint over whole codebase.")
     parser.add_argument("--clippy", action="store_true", help="Run Clippy on Rust code.")
@@ -122,14 +120,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument("--unit-tests", action="store_true", help="Run Python unit tests.")
     parser.add_argument("--rust-tests", action="store_true", help="Run Rust tests.")
     parser.add_argument(
-        "--integration-tests-v1",
-        action="store_true",
-        help="Run Python integration tests w/ V1 runner.",
-    )
-    parser.add_argument(
-        "--integration-tests-v2",
-        action="store_true",
-        help="Run Python integration tests w/ V2 runner.",
+        "--integration-tests", action="store_true", help="Run Python integration tests."
     )
     parser.add_argument(
         "--integration-shard",
@@ -402,9 +393,9 @@ def run_githooks() -> None:
     )
 
 
-def run_sanity_checks() -> None:
+def run_smoke_tests() -> None:
     def run_check(command: List[str]) -> None:
-        print(f"* Executing `./pants.pex {' '.join(command)}` as a sanity check")
+        print(f"* Executing `./pants.pex {' '.join(command)}` as a smoke test")
         try:
             subprocess.run(
                 ["./pants.pex", *command],
@@ -416,7 +407,6 @@ def run_sanity_checks() -> None:
             die(f"Failed to execute `./pants {command}`.")
 
     checks = [
-        ["clean-all"],
         ["goals"],
         ["list", "::"],
         ["roots"],
@@ -545,31 +535,7 @@ def run_rust_tests() -> None:
             die("Rust test failure.")
 
 
-def run_integration_tests_v1(*, shard: Optional[str]) -> None:
-    target_sets = TestTargetSets.calculate(
-        test_type=TestType.integration, remote_execution_enabled=False
-    )
-    if target_sets.v1_no_chroot:
-        _run_command(
-            command=TestStrategy.v1_no_chroot.pants_command(
-                targets=target_sets.v1_no_chroot, shard=shard
-            ),
-            slug="IntegrationTestsV1NoChroot",
-            start_message="Running integration tests via V1 no-chroot strategy.",
-            die_message="Integration test failure (V1 no-chroot)",
-        )
-    if target_sets.v1_chroot:
-        _run_command(
-            command=TestStrategy.v1_chroot.pants_command(
-                targets=target_sets.v1_chroot, shard=shard
-            ),
-            slug="IntegrationTestsV1Chroot",
-            start_message="Running integration tests via V1 chroot strategy.",
-            die_message="Integration test failure (V1 chroot)",
-        )
-
-
-def run_integration_tests_v2(*, oauth_token_path: Optional[str] = None) -> None:
+def run_integration_tests(*, oauth_token_path: Optional[str] = None) -> None:
     target_sets = TestTargetSets.calculate(
         test_type=TestType.integration, remote_execution_enabled=oauth_token_path is not None
     )

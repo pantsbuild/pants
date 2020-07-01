@@ -94,7 +94,6 @@ python_tests(
   name = 'payload_field',
   sources = ['test_payload_field.py'],
   dependencies = [
-    'src/python/pants/java/jar',
     'src/python/pants/base:payload_field',
     'src/python/pants/python',
     'src/python/pants/testutil:test_base',

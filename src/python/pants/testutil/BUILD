@@ -37,6 +37,8 @@ python_library(
     'src/python/pants/base:exiter',
     'src/python/pants/build_graph:address',
     'src/python/pants/fs',
+    'src/python/pants/option',
+    'src/python/pants/pantsd:pants_daemon_client',
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
@@ -118,7 +120,6 @@ python_library(
   sources = ['task_test_base.py'],
   dependencies = [
     'src/python/pants/goal:context',
-    'src/python/pants/ivy',
     'src/python/pants/task',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:meta',

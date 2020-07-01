@@ -4,51 +4,18 @@
 from hashlib import sha1
 
 from pants.base.payload_field import (
-    ExcludesField,
     FingerprintedField,
     FingerprintedMixin,
-    JarsField,
     PrimitiveField,
     PrimitivesSetField,
     PythonRequirementsField,
 )
-from pants.java.jar.exclude import Exclude
-from pants.java.jar.jar_dependency import JarDependency
 from pants.python.python_requirement import PythonRequirement
 from pants.testutil.test_base import TestBase
 from pants.util.strutil import ensure_binary
 
 
 class PayloadTest(TestBase):
-    def test_excludes_field(self):
-        empty = ExcludesField()
-        empty_fp = empty.fingerprint()
-        self.assertEqual(empty_fp, empty.fingerprint())
-        normal = ExcludesField([Exclude("com", "foozle"), Exclude("org")])
-        normal_fp = normal.fingerprint()
-        self.assertEqual(normal_fp, normal.fingerprint())
-        normal_dup = ExcludesField([Exclude("com", "foozle"), Exclude("org")])
-        self.assertEqual(normal_fp, normal_dup.fingerprint())
-        self.assertNotEqual(empty_fp, normal_fp)
-
-    def test_jars_field_order(self):
-        jar1 = JarDependency("com", "foo", "1.0.0")
-        jar2 = JarDependency("org", "baz")
-
-        self.assertNotEqual(
-            JarsField([jar1, jar2]).fingerprint(), JarsField([jar2, jar1]).fingerprint(),
-        )
-
-    def test_jars_field_apidocs(self):
-        """apidocs are not properly rolled into the cache key right now; is this intentional?"""
-
-        jar1 = JarDependency("com", "foo", "1.0.0", apidocs="pantsbuild.github.io")
-        jar2 = JarDependency("com", "foo", "1.0.0", apidocs="someother.pantsbuild.github.io")
-
-        self.assertEqual(
-            JarsField([jar1]).fingerprint(), JarsField([jar2]).fingerprint(),
-        )
-
     def test_python_requirements_field(self):
         req1 = PythonRequirement("foo==1.0")
         req2 = PythonRequirement("bar==1.0")
@@ -76,23 +43,6 @@ class PayloadTest(TestBase):
         )
         self.assertNotEqual(
             PrimitiveField("foo").fingerprint(), PrimitiveField("bar").fingerprint(),
-        )
-
-    def test_excludes_field_again(self):
-        self.assertEqual(
-            ExcludesField([Exclude("com", "foo")]).fingerprint(),
-            ExcludesField([Exclude("com", "foo")]).fingerprint(),
-        )
-        self.assertEqual(
-            ExcludesField([]).fingerprint(), ExcludesField().fingerprint(),
-        )
-        self.assertNotEqual(
-            ExcludesField([Exclude("com", "foo")]).fingerprint(),
-            ExcludesField([Exclude("com")]).fingerprint(),
-        )
-        self.assertNotEqual(
-            ExcludesField([Exclude("com", "foo"), Exclude("org", "bar")]).fingerprint(),
-            ExcludesField([Exclude("org", "bar"), Exclude("com", "foo")]).fingerprint(),
         )
 
     def test_fingerprinted_field(self):

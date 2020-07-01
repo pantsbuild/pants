@@ -30,6 +30,7 @@ python_library(
     'src/python/pants/goal:run_tracker',
     'src/python/pants/help',
     'src/python/pants/init',
+    'src/python/pants/java',
     'src/python/pants/option',
     'src/python/pants/pantsd:pants_daemon_client',
     'src/python/pants/pantsd:pants_daemon_core',

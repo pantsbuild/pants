@@ -41,7 +41,6 @@ python_library(
     'src/python/pants/base:deprecated',
     'src/python/pants/base:worker_pool',
     'src/python/pants/base:workunit',
-    'src/python/pants/java/distribution:distribution',
     'src/python/pants/process',
     'src/python/pants/reporting:report',
     'src/python/pants/source',
