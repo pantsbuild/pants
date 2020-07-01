@@ -31,7 +31,6 @@ from pants.init.extension_loader import (
     load_plugins,
 )
 from pants.subsystem.subsystem import Subsystem
-from pants.task.task import Task
 from pants.util.ordered_set import FrozenOrderedSet
 
 

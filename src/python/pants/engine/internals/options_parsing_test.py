@@ -10,9 +10,9 @@ from pants.util.logging import LogLevel
 
 
 class TestEngineOptionsParsing(TestBase):
-    def _ob(self, args=tuple(), env=tuple()):
+    def _ob(self, args=tuple(), env=None):
         self.create_file("pants.toml")
-        options_bootstrap = OptionsBootstrapper.create(args=tuple(args), env=dict(env),)
+        options_bootstrap = OptionsBootstrapper.create(args=tuple(args), env=env or {},)
         # NB: BuildConfigInitializer has sideeffects on first-run: in actual usage, these
         # sideeffects will happen during setup. We force them here.
         BuildConfigInitializer.get(options_bootstrap)
@@ -20,7 +20,13 @@ class TestEngineOptionsParsing(TestBase):
 
     def test_options_parse_scoped(self):
         options_bootstrapper = self._ob(
-            args=["./pants", "-ldebug", "binary", "src/python::"],
+            args=(
+                "./pants",
+                "-ldebug",
+                "--backend-packages=pants.backend.python",
+                "binary",
+                "src/python::",
+            ),
             env=dict(PANTS_PANTSD="True", PANTS_BINARIES_BASEURLS='["https://bins.com"]'),
         )
 
@@ -39,7 +45,7 @@ class TestEngineOptionsParsing(TestBase):
     def test_options_parse_memoization(self):
         # Confirm that re-executing with a new-but-identical Options object results in memoization.
         def ob():
-            return self._ob(args=["./pants", "-ldebug", "binary", "src/python::"])
+            return self._ob(args=("./pants", "-ldebug", "binary", "src/python::"))
 
         def parse(ob):
             params = Params(Scope(str(GLOBAL_SCOPE)), ob)
