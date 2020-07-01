@@ -15,7 +15,6 @@ class ScopeInfoIterator:
     """Provides relevant ScopeInfo instances in a useful order."""
 
     scope_to_info: Dict[str, ScopeInfo]
-    v2_help: bool = False
 
     def iterate(self, scopes: Set[str]) -> Iterator[ScopeInfo]:
         """Yields ScopeInfo instances for the specified scopes, plus relevant related scopes.
@@ -34,32 +33,10 @@ class ScopeInfoIterator:
         goal2.task21
         ...
         """
-
-        scope_infos: List[ScopeInfo] = []
-
-        if self.v2_help:
-            scope_infos.extend(sorted(self.scope_to_info[s] for s in scopes))
-        else:
-            scope_infos.extend(self.scope_to_info[s] for s in self._expand_tasks(scopes))
+        scope_infos: List[ScopeInfo] = sorted(self.scope_to_info[s] for s in scopes)
 
         for info in self._expand_subsystems(scope_infos):
             yield info
-
-    def _expand_tasks(self, scopes: Set[str]) -> List[str]:
-        """Add all tasks in any requested goals.
-
-        Returns the requested scopes, plus the added tasks, sorted by scope name.
-        """
-        expanded_scopes = set(scopes)
-        for scope, info in self.scope_to_info.items():
-            if info.category == ScopeInfo.TASK:
-                outer = enclosing_scope(scope)
-                while outer != GLOBAL_SCOPE:
-                    if outer in expanded_scopes:
-                        expanded_scopes.add(scope)
-                        break
-                    outer = enclosing_scope(outer)
-        return sorted(expanded_scopes)
 
     def _expand_subsystems(self, scope_infos: List[ScopeInfo]) -> Iterator[ScopeInfo]:
         """Add all subsystems tied to a scope, right after that scope."""
@@ -80,10 +57,7 @@ class ScopeInfoIterator:
                 if issubclass(scope_info.optionable_cls, GlobalOptions):
                     # We were asked for global help, so also yield for all global subsystems.
                     for scope, info in self.scope_to_info.items():
-                        if (
-                            info.category == ScopeInfo.SUBSYSTEM
-                            and enclosing_scope(scope) == GLOBAL_SCOPE
-                        ):
+                        if info.scope != GLOBAL_SCOPE and enclosing_scope(scope) == GLOBAL_SCOPE:
                             yield info
                             if info.optionable_cls is not None:
                                 for subsys_dep in subsys_deps(info.optionable_cls):

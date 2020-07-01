@@ -142,11 +142,7 @@ class SubsystemClientMixin:
                 else optionable_cls.subscope(scoped_to)
             )
             scope_info = ScopeInfo(
-                scope,
-                optionable_cls.options_scope_category,
-                optionable_cls,
-                removal_version=removal_version,
-                removal_hint=removal_hint,
+                scope, optionable_cls, removal_version=removal_version, removal_hint=removal_hint,
             )
 
             if scope_info not in known_scope_infos:

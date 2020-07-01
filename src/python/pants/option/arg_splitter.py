@@ -270,7 +270,7 @@ class ArgSplitter:
                 prefix = flag_prefix + scope_prefix
                 if flag.startswith(prefix):
                     scope = scope_info.scope
-                    if scope_info.category == ScopeInfo.SUBSYSTEM and default_scope != GLOBAL_SCOPE:
+                    if scope != GLOBAL_SCOPE and default_scope != GLOBAL_SCOPE:
                         # We allow goal.task --subsystem-foo to refer to the task-level subsystem instance,
                         # i.e., as if qualified by --subsystem-goal-task-foo.
                         # Note that this means that we can't set a task option on the cmd-line if its

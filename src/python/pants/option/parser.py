@@ -492,7 +492,7 @@ class Parser:
                 yield args, kwargs
         # Then yield our directly-registered options.
         for args, kwargs in self._option_registrations:
-            if "recursive" in kwargs and self._scope_info.category == ScopeInfo.SUBSYSTEM:
+            if "recursive" in kwargs and self._scope_info.scope != GLOBAL_SCOPE:
                 raise RecursiveSubsystemOption(self.scope, args[0])
             yield args, kwargs
 
@@ -508,7 +508,7 @@ class Parser:
             # Note that all subsystem options are implicitly recursive: a subscope of a subsystem
             # scope is another (optionable-specific) instance of the same subsystem, so it needs
             # all the same options.
-            if self._scope_info.category == ScopeInfo.SUBSYSTEM or "recursive" in kwargs:
+            if self._scope_info.scope != GLOBAL_SCOPE or "recursive" in kwargs:
                 yield args, kwargs
 
     def register(self, *args, **kwargs) -> None:

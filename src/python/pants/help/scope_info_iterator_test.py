@@ -33,19 +33,19 @@ class ScopeInfoIteratorTest(unittest.TestCase):
                 return (SubsystemDependency(Subsys1, "goal1.task12"),)
 
         infos = [
-            ScopeInfo(GLOBAL_SCOPE, ScopeInfo.GLOBAL, GlobalOptions),
-            ScopeInfo("subsys2", ScopeInfo.SUBSYSTEM, Subsys2),
-            ScopeInfo("subsys1.subsys2", ScopeInfo.SUBSYSTEM, Subsys1),
-            ScopeInfo("goal1", ScopeInfo.INTERMEDIATE),
-            ScopeInfo("goal1.task11", ScopeInfo.TASK),
-            ScopeInfo("goal1.task12", ScopeInfo.TASK, Goal1Task2),
-            ScopeInfo("subsys1.goal1.task12", ScopeInfo.SUBSYSTEM, Subsys1),
-            ScopeInfo("goal2", ScopeInfo.INTERMEDIATE),
-            ScopeInfo("goal2.task21", ScopeInfo.TASK),
-            ScopeInfo("goal2.task22", ScopeInfo.TASK),
-            ScopeInfo("goal3", ScopeInfo.INTERMEDIATE),
-            ScopeInfo("goal3.task31", ScopeInfo.TASK),
-            ScopeInfo("goal3.task32", ScopeInfo.TASK),
+            ScopeInfo(GLOBAL_SCOPE, GlobalOptions),
+            ScopeInfo("subsys2", Subsys2),
+            ScopeInfo("subsys1.subsys2", Subsys1),
+            ScopeInfo("goal1"),
+            ScopeInfo("goal1.task11"),
+            ScopeInfo("goal1.task12", Goal1Task2),
+            ScopeInfo("subsys1.goal1.task12", Subsys1),
+            ScopeInfo("goal2"),
+            ScopeInfo("goal2.task21"),
+            ScopeInfo("goal2.task22"),
+            ScopeInfo("goal3"),
+            ScopeInfo("goal3.task31"),
+            ScopeInfo("goal3.task32"),
         ]
 
         scope_to_infos = dict((x.scope, x) for x in infos)

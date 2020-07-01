@@ -15,8 +15,6 @@ class GoalOptionsRegistrar(Optionable):
     off selectively.
     """
 
-    options_scope_category = ScopeInfo.GOAL_V1
-
     @classmethod
     def registrar_for_scope(cls, goal):
         """Returns a subclass of this registrar suitable for registering on the specified goal.

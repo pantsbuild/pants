@@ -18,7 +18,7 @@ from pants.base.build_environment import (
 )
 from pants.option.custom_types import dir_option
 from pants.option.errors import OptionsError
-from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
+from pants.option.scope import GLOBAL_SCOPE
 from pants.subsystem.subsystem import Subsystem
 from pants.util.logging import LogLevel
 
@@ -146,7 +146,6 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
 
 class GlobalOptions(Subsystem):
     options_scope = GLOBAL_SCOPE
-    options_scope_category = ScopeInfo.GLOBAL
 
     @classmethod
     def register_bootstrap_options(cls, register):
