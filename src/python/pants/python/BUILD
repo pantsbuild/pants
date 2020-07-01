@@ -22,7 +22,6 @@ python_library(
 
 python_tests(
   name='tests',
-  sources=['*_test.py', '!*_integration.py'],
   dependencies=[
     '3rdparty/python:pex',
     ':python',

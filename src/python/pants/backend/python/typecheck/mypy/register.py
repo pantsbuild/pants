@@ -7,7 +7,7 @@ See https://pants.readme.io/docs/python-linters-and-formatters and
 https://mypy.readthedocs.io/en/stable/.
 """
 
-from pants.backend.python.lint.mypy import rules as mypy_rules
+from pants.backend.python.typecheck.mypy import rules as mypy_rules
 
 
 def rules():

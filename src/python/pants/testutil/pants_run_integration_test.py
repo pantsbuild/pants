@@ -598,7 +598,7 @@ class PantsRunIntegrationTest(unittest.TestCase):
             ".isort.cfg",
             ".pants.d",
             "build-support",
-            # NB: when running with --chroot or the V2 engine, `pants` refers to the source root-stripped
+            # NB: when running with the V2 engine, `pants` refers to the source root-stripped
             # directory src/python/pants, not the script `./pants`.
             "pants",
             "pants.pex",
