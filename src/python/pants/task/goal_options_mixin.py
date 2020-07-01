@@ -4,7 +4,6 @@
 from typing import Optional, Type
 
 from pants.option.optionable import Optionable
-from pants.option.scope import ScopeInfo
 
 
 class GoalOptionsRegistrar(Optionable):

@@ -74,7 +74,7 @@ class HelpPrinter:
             goal_scope_infos = [
                 scope_info
                 for scope_info in self._options.known_scope_to_info.values()
-                if issubclass(scope_info.optionable_cls, Goal)
+                if issubclass(scope_info.optionable_cls, Goal)  # type: ignore[arg-type]
             ]
             for scope_info in goal_scope_infos:
                 optionable_cls = scope_info.optionable_cls
