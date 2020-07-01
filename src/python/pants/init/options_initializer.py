@@ -59,10 +59,8 @@ class BuildConfigInitializer:
         # Load plugins and backends.
         return load_backends_and_plugins(
             self._bootstrap_options.plugins,
-            self._bootstrap_options.plugins2,
             self._working_set,
             self._bootstrap_options.backend_packages,
-            self._bootstrap_options.backend_packages2,
         )
 
     def setup(self) -> BuildConfiguration:

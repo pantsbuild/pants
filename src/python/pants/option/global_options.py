@@ -239,20 +239,11 @@ class GlobalOptions(Subsystem):
             help="The name of the script or binary used to invoke pants. "
             "Useful when printing help messages.",
         )
-
         register(
             "--plugins",
             advanced=True,
             type=list,
-            help="Allow v1 backends to be loaded from these plugins.  The default backends for "
-            "each plugin will be loaded automatically. Other backends in a plugin can be "
-            "loaded by listing them in --backend-packages.",
-        )
-        register(
-            "--plugins2",
-            advanced=True,
-            type=list,
-            help="Allow v2 backends to be loaded from these plugins.  The default backends for "
+            help="Allow backends to be loaded from these plugins.  The default backends for "
             "each plugin will be loaded automatically. Other backends in a plugin can be "
             "loaded by listing them in --backend-packages.",
         )
@@ -269,25 +260,13 @@ class GlobalOptions(Subsystem):
             default=os.path.join(get_pants_cachedir(), "plugins"),
             help="Cache resolved plugin requirements here.",
         )
-
         register(
             "--backend-packages",
             advanced=True,
             type=list,
-            default=["pants.backend.python", "pants.cache"],
-            help=(
-                "Register v1 tasks from these backends. The backend packages must be present on "
-                "the PYTHONPATH, typically because they are in the Pants core dist, in a "
-                "plugin dist, or available as sources in the repo."
-            ),
-        )
-        register(
-            "--backend-packages2",
-            advanced=True,
-            type=list,
             default=[],
             help=(
-                "Register v2 rules from these backends. The backend packages must be present on "
+                "Register rules from these backends. The backend packages must be present on "
                 "the PYTHONPATH, typically because they are in the Pants core dist, in a "
                 "plugin dist, or available as sources in the repo."
             ),

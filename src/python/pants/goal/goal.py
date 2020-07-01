@@ -73,9 +73,7 @@ class Goal:
         """
         goal = cls.by_name(name)
         goal._description = description
-        goal._options_registrar_cls = (
-            options_registrar_cls.registrar_for_scope(name) if options_registrar_cls else None
-        )
+        goal._options_registrar_cls = None
         return goal
 
     @classmethod

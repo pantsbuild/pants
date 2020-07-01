@@ -25,7 +25,7 @@ def register_goals():
     # Register descriptions for the standard multiple-task goals.  Single-task goals get
     # their descriptions from their single task.
     Goal.register("buildgen", "Automatically generate BUILD files.")
-    Goal.register("bootstrap", "Bootstrap tools needed by subsequent build steps.")
+    # Goal.register("bootstrap", "Bootstrap tools needed by subsequent build steps.")
     Goal.register("imports", "Resolve external source dependencies.")
     Goal.register("gen", "Generate code.")
     Goal.register("resolve", "Resolve external binary dependencies.")

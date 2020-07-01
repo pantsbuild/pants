@@ -49,7 +49,7 @@ class DependeesTest(GoalRuleTestBase):
         self.assert_console_output_ordered(
             *expected,
             args=[*args, *targets],
-            global_args=["--backend-packages2=pants.backend.project_info"],
+            global_args=["--backend-packages=pants.backend.project_info"],
         )
 
     def test_no_targets(self) -> None:
