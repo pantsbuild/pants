@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+from typing import Iterable, Optional
 
 from pants.base.build_environment import pants_version
 from pants.base.exceptions import TargetDefinitionException
@@ -11,13 +12,13 @@ from pants.util.meta import classproperty
 
 
 class PantsRequirement:
-    """Exports a `python_requirement_library` pointing at the active pants' corresponding sdist.
+    """Exports a `python_requirement_library` pointing at the active Pants's corresponding sdist.
 
     This requirement is useful for custom plugin authors who want to build and test their plugin with
-    pants itself.  Using the resulting target as a dependency of their plugin target ensures the
-    dependency stays true to the surrounding repo's version of pants.
+    Pants itself. Using the resulting target as a dependency of their plugin target ensures the
+    dependency stays true to the surrounding repo's version of Pants.
 
-    NB: The requirement generated is for official pants releases on pypi; so may not be appropriate
+    NB: The requirement generated is for official Pants releases on PyPI; so may not be appropriate
     for use in a repo that tracks `pantsbuild/pants` or otherwise uses custom pants sdists.
 
     :API: public
@@ -30,13 +31,20 @@ class PantsRequirement:
     def __init__(self, parse_context):
         self._parse_context = parse_context
 
-    def __call__(self, name=None, dist=None):
+    def __call__(
+        self,
+        name: Optional[str] = None,
+        dist: Optional[str] = None,
+        *,
+        modules: Optional[Iterable[str]] = None,
+    ):
         """
-        :param string name: The name to use for the target, defaults to the dist name if specified and
-                            otherwise the parent dir name.
-        :param string dist: The pants dist to create a requirement for. This must be a
-                            'pantsbuild.pants*' distribution; eg:
-                            'pantsbuild.pants.testutil'.
+        :param name: The name to use for the target, defaults to the dist name if specified and
+                     otherwise the parent dir name.
+        :param dist: The Pants dist to create a requirement for. This must be a 'pantsbuild.pants*'
+                     distribution; eg: 'pantsbuild.pants.testutil'.
+        :param modules: The modules exposed by this distribution, e.g. `["pants"]` or
+                        `["pants.testutil"]`.
         """
         name = name or dist or os.path.basename(self._parse_context.rel_path)
         dist = dist or "pantsbuild.pants"
@@ -44,14 +52,13 @@ class PantsRequirement:
             target = Address(spec_path=self._parse_context.rel_path, target_name=name)
             raise TargetDefinitionException(
                 target=target,
-                msg="The {} target only works for pantsbuild.pants "
-                "distributions, given {}".format(self.alias, dist),
+                msg=(
+                    f"The {self.alias} target only works for pantsbuild.pants distributions, but "
+                    f"given {dist}"
+                ),
             )
 
-        requirement = PythonRequirement(
-            requirement="{key}=={version}".format(key=dist, version=pants_version())
-        )
-
+        requirement = PythonRequirement(requirement=f"{dist}=={pants_version()}", modules=modules)
         self._parse_context.create_object(
             "python_requirement_library", name=name, requirements=[requirement]
         )
