@@ -46,7 +46,6 @@ python_library(
     '3rdparty/python:dataclasses',
     ':structs',
     'src/python/pants/base:exceptions',
-    'src/python/pants/base:parse_context',
     'src/python/pants/base:specs',
     'src/python/pants/build_graph',
     'src/python/pants/engine/internals:core_abstractions',

@@ -186,7 +186,6 @@ python_library(
     ':unions',
     '3rdparty/python:typing-extensions',
     'src/python/pants/base:specs',
-    'src/python/pants/build_graph:bundle',
     'src/python/pants/option:global_options',
     'src/python/pants/source',
     'src/python/pants/util:collections',

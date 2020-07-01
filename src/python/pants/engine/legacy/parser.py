@@ -12,7 +12,7 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.internals.build_files import error_on_imports
 from pants.engine.internals.objects import Serializable
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, SymbolTable
-from pants.engine.legacy.structs import BundleAdaptor, TargetAdaptor
+from pants.engine.legacy.structs import TargetAdaptor
 from pants.util.memo import memoized_property
 
 logger = logging.getLogger(__name__)
@@ -97,8 +97,6 @@ class LegacyPythonCallbacksParser(Parser):
             symbols[alias] = target_macro_factory.target_macro(parse_context)
             for target_type in target_macro_factory.target_types:
                 symbols[target_type] = Registrar(parse_context, alias, underlying_symbol)
-
-        symbols["bundle"] = BundleAdaptor
 
         return symbols, parse_context
 

@@ -20,10 +20,8 @@ from colors import strip_color
 from pants.base.build_environment import get_buildroot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.build_graph.address import _is_build_file_name
-from pants.fs.archive import ZIP
 from pants.option.config import TomlSerializer
 from pants.subsystem.subsystem import Subsystem
-from pants.testutil.file_test_util import check_symlinks, contains_exact_files
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import fast_relpath, safe_mkdir, safe_mkdir_for, safe_open
 from pants.util.osutil import Pid
@@ -428,72 +426,6 @@ class PantsRunIntegrationTest(unittest.TestCase):
             yield self.run_pants_with_workdir(
                 command, workdir, config, stdin_data=stdin_data, extra_env=extra_env, **kwargs
             )
-
-    def bundle_and_run(
-        self,
-        target,
-        bundle_name,
-        bundle_jar_name=None,
-        bundle_options=None,
-        args=None,
-        expected_bundle_jar_content=None,
-        expected_bundle_content=None,
-        library_jars_are_symlinks=True,
-    ):
-        """Creates the bundle with pants, then does java -jar {bundle_name}.jar to execute the
-        bundle.
-
-        :param target: target name to compile
-        :param bundle_name: resulting bundle filename (minus .zip extension)
-        :param bundle_jar_name: monolithic jar filename (minus .jar extension), if None will be the
-          same as bundle_name
-        :param bundle_options: additional options for bundle
-        :param args: optional arguments to pass to executable
-        :param expected_bundle_content: verify the bundle zip content
-        :param expected_bundle_jar_content: verify the bundle jar content
-        :param library_jars_are_symlinks: verify library jars are symlinks if True, and actual
-          files if False. Default `True` because we always create symlinks for both external and internal
-          dependencies, only exception is when shading is used.
-        :return: stdout as a string on success, raises an Exception on error
-        """
-        bundle_jar_name = bundle_jar_name or bundle_name
-        bundle_options = bundle_options or []
-        bundle_options = ["bundle.jvm"] + bundle_options + ["--archive=zip", target]
-        with self.pants_results(bundle_options) as pants_run:
-            self.assert_success(pants_run)
-
-            self.assertTrue(
-                check_symlinks(f"dist/{bundle_name}-bundle/libs", library_jars_are_symlinks)
-            )
-            # TODO(John Sirois): We need a zip here to suck in external library classpath elements
-            # pointed to by symlinks in the run_pants ephemeral tmpdir.  Switch run_pants to be a
-            # contextmanager that yields its results while the tmpdir workdir is still active and change
-            # this test back to using an un-archived bundle.
-            with temporary_dir() as workdir:
-                ZIP.extract(f"dist/{bundle_name}.zip", workdir)
-                if expected_bundle_content:
-                    self.assertTrue(contains_exact_files(workdir, expected_bundle_content))
-                if expected_bundle_jar_content:
-                    with temporary_dir() as check_bundle_jar_dir:
-                        bundle_jar = os.path.join(workdir, f"{bundle_jar_name}.jar")
-                        ZIP.extract(bundle_jar, check_bundle_jar_dir)
-                        self.assertTrue(
-                            contains_exact_files(check_bundle_jar_dir, expected_bundle_jar_content)
-                        )
-
-                optional_args = []
-                if args:
-                    optional_args = args
-                java_run = subprocess.Popen(
-                    ["java", "-jar", f"{bundle_jar_name}.jar"] + optional_args,
-                    stdout=subprocess.PIPE,
-                    cwd=workdir,
-                )
-
-                stdout, _ = java_run.communicate()
-            java_returncode = java_run.returncode
-            self.assertEqual(java_returncode, 0)
-            return stdout.decode()
 
     def assert_success(self, pants_run: PantsResult, msg=None):
         self.assert_result(pants_run, PANTS_SUCCEEDED_EXIT_CODE, expected=True, msg=msg)
