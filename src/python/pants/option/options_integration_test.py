@@ -5,11 +5,14 @@ import json
 import os
 from textwrap import dedent
 
+import pytest
+
 from pants.fs.fs import safe_filename_from_path
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import temporary_dir
 
 
+@pytest.mark.skip("Skip until https://github.com/pantsbuild/pants/issues/10206")
 class TestOptionsIntegration(PantsRunIntegrationTest):
     @classmethod
     def hermetic(cls) -> bool:

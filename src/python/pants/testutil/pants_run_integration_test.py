@@ -21,6 +21,8 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.build_graph.address import _is_build_file_name
 from pants.option.config import TomlSerializer
+from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.pantsd.pants_daemon_client import PantsDaemonClient
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import fast_relpath, safe_mkdir, safe_mkdir_for, safe_open
@@ -109,6 +111,15 @@ def ensure_cached(expected_num_artifacts=None):
     return decorator
 
 
+def kill_daemon(pid_dir=None):
+    args = None
+    if pid_dir:
+        args = [f"--pants-subprocessdir={pid_dir}"]
+    pantsd_client = PantsDaemonClient(OptionsBootstrapper.create(args=args).bootstrap_options)
+    with pantsd_client.lifecycle_lock:
+        pantsd_client.terminate()
+
+
 def ensure_daemon(f):
     """A decorator for running an integration test with and without the daemon enabled."""
 
@@ -122,18 +133,16 @@ def ensure_daemon(f):
             with environment_as(**env):
                 try:
                     f(self, *args, **kwargs)
-                    if enable_daemon:
-                        self.assert_success(self.run_pants(["kill-pantsd"]))
                 except Exception:
                     print(f"Test failed with enable-pantsd={enable_daemon}:")
-                    if enable_daemon:
-                        # If we are already raising, do not attempt to confirm that `kill-pantsd` succeeds.
-                        self.run_pants(["kill-pantsd"])
-                    else:
+                    if not enable_daemon:
                         print(
-                            "Skipping run with pantsd=true because it already failed with pantsd=false."
+                            "Skipping run with pantsd=true because it already "
+                            "failed with pantsd=false."
                         )
                     raise
+                finally:
+                    kill_daemon()
 
     return wrapper
 

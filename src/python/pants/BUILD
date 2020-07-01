@@ -64,9 +64,12 @@ resources(
 files(
   name='reversion_file_with_dependencies',
   sources=[
+    '__init__.py',
     'releases/BUILD',
+    'releases/__init__.py',
     'releases/reversion.py',
     'util/BUILD',
+    'util/__init__.py',
     'util/contextutil.py',
     'util/dirutil.py',
     'util/strutil.py',

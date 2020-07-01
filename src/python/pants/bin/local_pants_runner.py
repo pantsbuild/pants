@@ -12,7 +12,6 @@ from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
 from pants.base.specs import Specs
 from pants.base.workunit import WorkUnit
-from pants.bin.goal_runner import GoalRunner
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.internals.native import Native
 from pants.engine.internals.scheduler import ExecutionError
@@ -27,7 +26,6 @@ from pants.init.engine_initializer import (
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.init.repro import Repro, Reproducer
 from pants.init.specs_calculator import SpecsCalculator
-from pants.option.arg_splitter import UnknownGoalHelp
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.reporting.reporting import Reporting
@@ -173,42 +171,10 @@ class LocalPantsRunner:
         if self._repro:
             self._repro.capture(self._run_tracker.run_info.get_as_dict())
 
-    def _maybe_run_v1(self, v1: bool) -> ExitCode:
-        v1_goals, ambiguous_goals, _ = self.options.goals_by_version
-        if not v1:
-            if v1_goals:
-                HelpPrinter(
-                    options=self.options,
-                    help_request=UnknownGoalHelp(list(v1_goals)),
-                    union_membership=self.union_membership,
-                ).print_help()
-                return PANTS_FAILED_EXIT_CODE
-            return PANTS_SUCCEEDED_EXIT_CODE
-
-        if not v1_goals and not ambiguous_goals:
-            return PANTS_SUCCEEDED_EXIT_CODE
-
-        # Setup and run GoalRunner.
-        return (
-            GoalRunner.Factory(
-                self.build_root,
-                self.options_bootstrapper,
-                self.options,
-                self.build_config,
-                self._run_tracker,
-                self._reporting,  # type: ignore
-                self.graph_session,
-                self.specs,
-            )
-            .create()
-            .run()
-        )
-
-    def _maybe_run_v2(self, v2: bool) -> ExitCode:
-        _, ambiguous_goals, v2_goals = self.options.goals_by_version
-        goals = v2_goals + (ambiguous_goals if v2 else tuple())
+    def _run_v2(self) -> ExitCode:
+        goals = self.options.goals
         if self._run_tracker:
-            self._run_tracker.set_v2_goal_rule_names(goals)
+            self._run_tracker.set_v2_goal_rule_names(tuple(goals))
         if not goals:
             return PANTS_SUCCEEDED_EXIT_CODE
         global_options = self.options.for_global_scope()
@@ -328,16 +294,11 @@ class LocalPantsRunner:
                 )
                 return help_printer.print_help()
 
-            v1 = global_options.v1
-            v2 = global_options.v2
             with streaming_reporter.session():
-                engine_result, goal_runner_result = PANTS_FAILED_EXIT_CODE, PANTS_FAILED_EXIT_CODE
+                engine_result = PANTS_FAILED_EXIT_CODE
                 try:
-                    engine_result = self._maybe_run_v2(v2)
-                    goal_runner_result = self._maybe_run_v1(v1)
+                    engine_result = self._run_v2()
                 except Exception as e:
                     ExceptionSink.log_exception(e)
-                run_tracker_result = self._finish_run(
-                    self._merge_exit_codes(engine_result, goal_runner_result)
-                )
-            return self._merge_exit_codes(engine_result, goal_runner_result, run_tracker_result)
+                run_tracker_result = self._finish_run(engine_result)
+            return self._merge_exit_codes(engine_result, run_tracker_result)

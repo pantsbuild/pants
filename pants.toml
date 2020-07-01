@@ -21,6 +21,7 @@ v2 = false
 
 # Enable our custom loose-source plugins.
 pythonpath = ["%(buildroot)s/pants-plugins/src/python"]
+
 backend_packages2.add = [
   "pants.backend.awslambda.python",
   "pants.backend.python",

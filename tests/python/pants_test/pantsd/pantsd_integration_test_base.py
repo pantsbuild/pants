@@ -12,7 +12,11 @@ import psutil
 from colors import bold, cyan, magenta
 
 from pants.pantsd.process_manager import ProcessManager
-from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest, read_pantsd_log
+from pants.testutil.pants_run_integration_test import (
+    PantsRunIntegrationTest,
+    kill_daemon,
+    read_pantsd_log,
+)
 from pants.testutil.process_test_util import (
     TrackedProcessesContext,
     no_lingering_process_by_command,
@@ -127,12 +131,10 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
                 print(f">>> config: \n{pantsd_config}\n")
 
                 checker = PantsDaemonMonitor(runner_process_context, pid_dir)
-                self.assert_runner(workdir, pantsd_config, ["kill-pantsd"])
+                kill_daemon(pid_dir)
                 try:
                     yield (workdir, pantsd_config, checker)
-                    self.assert_runner(
-                        workdir, pantsd_config, ["kill-pantsd"],
-                    )
+                    kill_daemon(pid_dir)
                     checker.assert_stopped()
                 finally:
                     banner("BEGIN pantsd.log")
