@@ -991,11 +991,19 @@ pub fn make_execute_request(
     platform_properties.push(("JDK_SYMLINK".to_owned(), ".jdk".to_owned()));
   }
 
+  // Use values as per https://github.com/bazelbuild/remote-apis/blob/master/build/bazel/remote/execution/v2/platform.md
   if !platform_properties
     .iter()
-    .any(|(k, _)| k == "target_platform")
+    .any(|(k, _)| k == "OSFamily")
   {
-    platform_properties.push(("target_platform".to_owned(), req.target_platform.into()));
+      let target_platform = match req.target_platform {
+        PlatformConstraint::Linux => Some("linux"),
+        PlatformConstraint::Darwin => Some("macos"),
+        PlatformConstraint::None => None,
+      };
+      if let Some(target_platform) = target_platform {
+        platform_properties.push(("OSFamily".to_owned(), target_platform.to_owned()));
+      }
   }
 
   for (name, value) in platform_properties {

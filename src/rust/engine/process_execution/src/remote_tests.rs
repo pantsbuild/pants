@@ -110,21 +110,16 @@ async fn make_execute_request() {
   want_command
     .mut_output_directories()
     .push("directory/name".to_owned());
-  want_command.mut_platform().mut_properties().push({
-    let mut property = bazel_protos::remote_execution::Platform_Property::new();
-    property.set_name("target_platform".to_owned());
-    property.set_value("none".to_owned());
-    property
-  });
+  want_command.set_platform(bazel_protos::remote_execution::Platform::new());
 
   let mut want_action = bazel_protos::remote_execution::Action::new();
   want_action.set_command_digest(
     (&Digest(
       Fingerprint::from_hex_string(
-        "6cfe2081e40c7542a8b369b669618fe7c6e690e274183e406ed75dc3959dc82f",
+        "0e290a4926d69eabd0be14fb85707532c5da224e6949f4fe3adbb9ec3e41e442",
       )
       .unwrap(),
-      99,
+      74,
     ))
       .into(),
   );
@@ -134,7 +129,90 @@ async fn make_execute_request() {
   want_execute_request.set_action_digest(
     (&Digest(
       Fingerprint::from_hex_string(
-        "1b52d1997da65c69c5fe2f8717caa6e538dabc13f90f16332454d95b1f8949a4",
+        "687a950251abfad83345ee0b0631f7215bbe520f38b2f48377172c6d55a5cb22",
+      )
+      .unwrap(),
+      140,
+    ))
+      .into(),
+  );
+
+  assert_eq!(
+    crate::remote::make_execute_request(&req, empty_request_metadata()),
+    Ok((want_action, want_command, want_execute_request))
+  );
+}
+
+#[tokio::test]
+async fn make_execute_request_with_target_platform() {
+  let input_directory = TestDirectory::containing_roland();
+  let req = Process {
+    argv: owned_string_vec(&["/bin/echo", "yo"]),
+    env: vec![("SOME".to_owned(), "value".to_owned())]
+      .into_iter()
+      .collect(),
+    working_directory: None,
+    input_files: input_directory.digest(),
+    // Intentionally poorly sorted:
+    output_files: vec!["path/to/file", "other/file"]
+      .into_iter()
+      .map(PathBuf::from)
+      .collect(),
+    output_directories: vec!["directory/name"]
+      .into_iter()
+      .map(PathBuf::from)
+      .collect(),
+    timeout: None,
+    description: "some description".to_owned(),
+    jdk_home: None,
+    target_platform: PlatformConstraint::Darwin,
+    is_nailgunnable: false,
+    append_only_caches: BTreeMap::new(),
+  };
+
+  let mut want_command = bazel_protos::remote_execution::Command::new();
+  want_command.mut_arguments().push("/bin/echo".to_owned());
+  want_command.mut_arguments().push("yo".to_owned());
+  want_command.mut_environment_variables().push({
+    let mut env = bazel_protos::remote_execution::Command_EnvironmentVariable::new();
+    env.set_name("SOME".to_owned());
+    env.set_value("value".to_owned());
+    env
+  });
+  want_command
+    .mut_output_files()
+    .push("other/file".to_owned());
+  want_command
+    .mut_output_files()
+    .push("path/to/file".to_owned());
+  want_command
+    .mut_output_directories()
+    .push("directory/name".to_owned());
+  want_command.mut_platform().mut_properties().push({
+    let mut property = bazel_protos::remote_execution::Platform_Property::new();
+    property.set_name("OSFamily".to_owned());
+    property.set_value("macos".to_owned());
+    property
+  });
+
+  let mut want_action = bazel_protos::remote_execution::Action::new();
+  want_action.set_command_digest(
+    (&Digest(
+      Fingerprint::from_hex_string(
+        "a3a07dfb972b373e93934a0246e8abb6289811d0d617c3841f4f10bab9ba40f8",
+      )
+      .unwrap(),
+      93,
+    ))
+      .into(),
+  );
+  want_action.set_input_root_digest((&input_directory.digest()).into());
+
+  let mut want_execute_request = bazel_protos::remote_execution::ExecuteRequest::new();
+  want_execute_request.set_action_digest(
+    (&Digest(
+      Fingerprint::from_hex_string(
+        "bc8979d6476ef36eb7587d4ba22a1d85d0b72f26f9a6565c7f9c4ed9723834ac",
       )
       .unwrap(),
       140,
@@ -197,7 +275,7 @@ async fn make_execute_request_with_instance_name() {
     .push("directory/name".to_owned());
   want_command.mut_platform().mut_properties().push({
     let mut property = bazel_protos::remote_execution::Platform_Property::new();
-    property.set_name("target_platform".to_owned());
+    property.set_name("OSFamily".to_owned());
     property.set_value("apple-2e".to_owned()); // overridden by metadata, see below
     property
   });
@@ -206,10 +284,10 @@ async fn make_execute_request_with_instance_name() {
   want_action.set_command_digest(
     (&Digest(
       Fingerprint::from_hex_string(
-        "12111c5c43433f428dfd53ba1f44dfdcad1ae88ecf4560930eeb8eec54551c99",
+        "831eefd120bd37da430d982fbbfe7221614c96076935c2f6510099295d1c3343",
       )
       .unwrap(),
-      103,
+      96,
     ))
       .into(),
   );
@@ -220,7 +298,7 @@ async fn make_execute_request_with_instance_name() {
   want_execute_request.set_action_digest(
     (&Digest(
       Fingerprint::from_hex_string(
-        "f850dad74061fb0919212274da8137d647dde16ec1623c13f0f8eafa4d83a823",
+        "9fa94bbbf801cdd177e7756cde8b6f825b069fe43548bb37b603b4747c63ad21",
       )
       .unwrap(),
       140,
@@ -234,7 +312,7 @@ async fn make_execute_request_with_instance_name() {
       ProcessMetadata {
         instance_name: Some("dark-tower".to_owned()),
         cache_key_gen_version: None,
-        platform_properties: vec![("target_platform".to_owned(), "apple-2e".to_owned())],
+        platform_properties: vec![("OSFamily".to_owned(), "apple-2e".to_owned())],
       }
     ),
     Ok((want_action, want_command, want_execute_request))
@@ -297,21 +375,16 @@ async fn make_execute_request_with_cache_key_gen_version() {
   want_command
     .mut_output_directories()
     .push("directory/name".to_owned());
-  want_command.mut_platform().mut_properties().push({
-    let mut property = bazel_protos::remote_execution::Platform_Property::new();
-    property.set_name("target_platform".to_owned());
-    property.set_value("none".to_owned());
-    property
-  });
+  want_command.set_platform(bazel_protos::remote_execution::Platform::new());
 
   let mut want_action = bazel_protos::remote_execution::Action::new();
   want_action.set_command_digest(
     (&Digest(
       Fingerprint::from_hex_string(
-        "0b560be42712036a85ae33f1570eb12918c0763515517fb9511008dd5615e9d7",
+        "2ed92edba7b453be26df08fab5b3b84767f6d7aa9bc39a052d8466804702ce4f",
       )
       .unwrap(),
-      136,
+      111,
     ))
       .into(),
   );
@@ -321,10 +394,10 @@ async fn make_execute_request_with_cache_key_gen_version() {
   want_execute_request.set_action_digest(
     (&Digest(
       Fingerprint::from_hex_string(
-        "c07f61ace0d3aa8182f4f9248b15dc7ee0a873b5d1f74ac50b70e0c8cbda0122",
+        "44e408f63f9567bfe39718dae3cba7844e49d93240bea24c5452cab15f11c711",
       )
       .unwrap(),
-      141,
+      140,
     ))
       .into(),
   );
@@ -359,21 +432,15 @@ async fn make_execute_request_with_jdk() {
     property.set_value(".jdk".to_owned());
     property
   });
-  want_command.mut_platform().mut_properties().push({
-    let mut property = bazel_protos::remote_execution::Platform_Property::new();
-    property.set_name("target_platform".to_owned());
-    property.set_value("none".to_owned());
-    property
-  });
 
   let mut want_action = bazel_protos::remote_execution::Action::new();
   want_action.set_command_digest(
     (&Digest(
       Fingerprint::from_hex_string(
-        "9a396c5e4359a0e6289c4112098e2851d608fe730e2584881b7182ef08229a42",
+        "f373f421b328ddeedfba63542845c0423d7730f428dd8e916ec6a38243c98448",
       )
       .unwrap(),
-      63,
+      38,
     ))
       .into(),
   );
@@ -383,7 +450,7 @@ async fn make_execute_request_with_jdk() {
   want_execute_request.set_action_digest(
     (&Digest(
       Fingerprint::from_hex_string(
-        "de42e6b80e82818bda020ac5a3b6f040a9d7cef6e4a5aecb5001b6a098a2fe28",
+        "b1fb7179ce496995a4e3636544ec000dca1b951f1f6216493f6c7608dc4dd910",
       )
       .unwrap(),
       140,
@@ -438,21 +505,15 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
     property.set_value("bar".to_owned());
     property
   });
-  want_command.mut_platform().mut_properties().push({
-    let mut property = bazel_protos::remote_execution::Platform_Property::new();
-    property.set_name("target_platform".to_owned());
-    property.set_value("none".to_owned());
-    property
-  });
 
   let mut want_action = bazel_protos::remote_execution::Action::new();
   want_action.set_command_digest(
     (&Digest(
       Fingerprint::from_hex_string(
-        "741a33b863aaa595e2be6a316f9ae187e3c0d8cf8a8054261417eebbede0cefe",
+        "edeef568ddd1e0deed8c75e803e306bbec94a3403295bab8ffe7fbb3accdabe5",
       )
       .unwrap(),
-      118,
+      93,
     ))
       .into(),
   );
@@ -462,7 +523,7 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
   want_execute_request.set_action_digest(
     (&Digest(
       Fingerprint::from_hex_string(
-        "c3dc9c1e73f5cdfbf7e3b55dd6dead4f6fe03323dc19db87b27617fede27e9b4",
+        "c0c0f1d79f91f60ce12d769e43a2c6f890e962d0d074b8677b0f6a83c1338cbb",
       )
       .unwrap(),
       140,
@@ -535,21 +596,16 @@ async fn make_execute_request_with_timeout() {
   want_command
     .mut_output_directories()
     .push("directory/name".to_owned());
-  want_command.mut_platform().mut_properties().push({
-    let mut property = bazel_protos::remote_execution::Platform_Property::new();
-    property.set_name("target_platform".to_owned());
-    property.set_value("none".to_owned());
-    property
-  });
+  want_command.set_platform(bazel_protos::remote_execution::Platform::new());
 
   let mut want_action = bazel_protos::remote_execution::Action::new();
   want_action.set_command_digest(
     (&Digest(
       Fingerprint::from_hex_string(
-        "6cfe2081e40c7542a8b369b669618fe7c6e690e274183e406ed75dc3959dc82f",
+        "0e290a4926d69eabd0be14fb85707532c5da224e6949f4fe3adbb9ec3e41e442",
       )
       .unwrap(),
-      99,
+      74,
     ))
       .into(),
   );
@@ -563,7 +619,7 @@ async fn make_execute_request_with_timeout() {
   want_execute_request.set_action_digest(
     (&Digest(
       Fingerprint::from_hex_string(
-        "4638ebe2e21095d9ce559041eb4961d2483e0f27659c3a6d930f7722c4878939",
+        "fbb659ede2ba2b563860e9c0292f1ff960cbe5dcfb298eb18aabaa118966cdd5",
       )
       .unwrap(),
       144,
