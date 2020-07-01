@@ -569,7 +569,7 @@ def run_plugin_tests(*, oauth_token_path: Optional[str] = None) -> None:
 
 
 def run_platform_specific_tests() -> None:
-    command = TestStrategy.v1_no_chroot.pants_command(targets=["src/python/::", "tests/python::"])
+    command = TestStrategy.v2_local.pants_command(targets=["src/python/::", "tests/python::"])
     command.insert(1, "--tag=+platform_specific_behavior")
     _run_command(
         command,
