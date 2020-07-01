@@ -188,7 +188,7 @@ class CoverageIntegrationTest(PantsRunIntegrationTest):
         assert "Wrote raw coverage report to `dist/coverage/python`" in result.stderr_data
         coverage_path = Path(build_root, "dist", "coverage", "python")
         assert len(list(coverage_path.iterdir())) == 1
-        coverage_data = coverage_path/ ".coverage"
+        coverage_data = coverage_path / ".coverage"
         assert coverage_data.exists() is True
         conn = sqlite3.connect(coverage_data.as_posix())
         cursor = conn.cursor()
