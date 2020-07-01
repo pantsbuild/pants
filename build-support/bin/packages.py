@@ -209,7 +209,7 @@ def build_pants_wheels() -> None:
             # TODO(#7654): It's not safe to use Pantsd because we're already using Pants to run
             #  this script.
             "--concurrent",
-            "setup-py2",
+            "setup-py",
             *(package.target for package in packages),
             "--",
             "bdist_wheel",
