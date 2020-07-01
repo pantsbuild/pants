@@ -40,13 +40,6 @@ from pants.backend.python.targets.python_requirements_file import (
     PythonRequirementsFile as PythonRequirementsFileV1,
 )
 from pants.backend.python.targets.python_tests import PythonTests as PythonTestsV1
-from pants.backend.python.tasks.gather_sources import GatherSources
-from pants.backend.python.tasks.pytest_prep import PytestPrep
-from pants.backend.python.tasks.pytest_run import PytestRun
-from pants.backend.python.tasks.python_run import PythonRun
-from pants.backend.python.tasks.resolve_requirements import ResolveRequirements
-from pants.backend.python.tasks.select_interpreter import SelectInterpreter
-from pants.backend.python.tasks.setup_py import SetupPy
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.goal.task_registrar import TaskRegistrar as task
 from pants.python.pex_build_util import PexBuilderWrapper
@@ -80,16 +73,6 @@ def build_file_aliases():
             PantsRequirement.alias: PantsRequirement,
         },
     )
-
-
-def register_goals():
-    task(name="interpreter", action=SelectInterpreter).install("pyprep")
-    task(name="requirements", action=ResolveRequirements).install("pyprep")
-    task(name="sources", action=GatherSources).install("pyprep")
-    task(name="py", action=PythonRun).install("run")
-    task(name="pytest-prep", action=PytestPrep).install("test")
-    task(name="pytest", action=PytestRun).install("test")
-    task(name="setup-py", action=SetupPy).install()
 
 
 def rules():
