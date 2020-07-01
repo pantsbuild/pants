@@ -301,7 +301,7 @@ async def generate_coverage_reports(
             coverage_reports.append(
                 FilesystemCoverageReport(
                     report_type=CoverageReportType.RAW,
-                    result_digest=input_digest,
+                    result_digest=merged_coverage_data.coverage_data,
                     directory_to_materialize_to=coverage_subsystem.output_dir,
                     report_file=coverage_subsystem.output_dir / ".coverage",
                 )
