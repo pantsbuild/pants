@@ -20,7 +20,13 @@ class TestEngineOptionsParsing(TestBase):
 
     def test_options_parse_scoped(self):
         options_bootstrapper = self._ob(
-            args=["./pants", "-ldebug", "binary", "src/python::"],
+            args=[
+                "./pants",
+                "-ldebug",
+                "--backend-packages2=pants.backend.python",
+                "binary",
+                "src/python::",
+            ],
             env=dict(PANTS_PANTSD="True", PANTS_BINARIES_BASEURLS='["https://bins.com"]'),
         )
 
