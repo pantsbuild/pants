@@ -1184,8 +1184,7 @@ impl Node for NodeKey {
       context2
         .session
         .workunit_store()
-        .complete_workunit_with_new_metadata(started_workunit_id, final_metadata)
-        .unwrap();
+        .complete_workunit_with_new_metadata(started_workunit_id, final_metadata);
       result
     })
     .await

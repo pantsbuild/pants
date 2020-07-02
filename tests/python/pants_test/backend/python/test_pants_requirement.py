@@ -16,10 +16,15 @@ class PantsRequirementTest(TestBase):
         return build_file_aliases()
 
     def assert_pants_requirement(
-        self, python_requirement_library, expected_dist="pantsbuild.pants"
-    ):
-        self.assertIsInstance(python_requirement_library, PythonRequirementLibrary)
-        expected = PythonRequirement(f"{expected_dist}=={pants_version()}")
+        self,
+        python_requirement_library: PythonRequirementLibrary,
+        expected_dist: str = "pantsbuild.pants",
+        expected_module: str = "pants",
+    ) -> None:
+        assert isinstance(python_requirement_library, PythonRequirementLibrary)
+        expected = PythonRequirement(
+            f"{expected_dist}=={pants_version()}", modules=[expected_module]
+        )
 
         def key(python_requirement):
             return (
@@ -28,58 +33,56 @@ class PantsRequirementTest(TestBase):
                 python_requirement.requirement.extras,
             )
 
-        self.assertEqual(
-            [key(expected)], [key(pr) for pr in python_requirement_library.payload.requirements]
-        )
+        assert [key(expected)] == [
+            key(pr) for pr in python_requirement_library.payload.requirements
+        ]
 
-    def test_default_name(self):
+    def test_default_name(self) -> None:
         self.add_to_build_file("3rdparty/python/pants", "pants_requirement()")
-
         python_requirement_library = self.target("3rdparty/python/pants")
         self.assert_pants_requirement(python_requirement_library)
 
-    def test_custom_name(self):
+    def test_custom_name(self) -> None:
         self.add_to_build_file("3rdparty/python/pants", "pants_requirement('pantsbuild.pants')")
-
         python_requirement_library = self.target("3rdparty/python/pants:pantsbuild.pants")
         self.assert_pants_requirement(python_requirement_library)
 
-    def test_dist(self):
+    def test_dist(self) -> None:
         self.add_to_build_file(
             "3rdparty/python/pants", "pants_requirement(dist='pantsbuild.pants')"
         )
-
         python_requirement_library = self.target("3rdparty/python/pants:pantsbuild.pants")
         self.assert_pants_requirement(python_requirement_library)
 
-    def test_contrib(self):
+    def test_contrib(self) -> None:
         self.add_to_build_file(
             "3rdparty/python/pants", "pants_requirement(dist='pantsbuild.pants.contrib.bob')"
         )
-
         python_requirement_library = self.target(
             "3rdparty/python/pants:pantsbuild.pants.contrib.bob"
         )
         self.assert_pants_requirement(
-            python_requirement_library, expected_dist="pantsbuild.pants.contrib.bob"
+            python_requirement_library,
+            expected_dist="pantsbuild.pants.contrib.bob",
+            expected_module="pants.contrib.bob",
         )
 
-    def test_custom_name_contrib(self):
+    def test_custom_name_contrib(self) -> None:
         self.add_to_build_file(
             "3rdparty/python/pants",
             "pants_requirement(name='bob', dist='pantsbuild.pants.contrib.bob')",
         )
-
         python_requirement_library = self.target("3rdparty/python/pants:bob")
         self.assert_pants_requirement(
-            python_requirement_library, expected_dist="pantsbuild.pants.contrib.bob"
+            python_requirement_library,
+            expected_dist="pantsbuild.pants.contrib.bob",
+            expected_module="pants.contrib.bob",
         )
 
-    def test_bad_dist(self):
+    def test_bad_dist(self) -> None:
         self.add_to_build_file(
             "3rdparty/python/pants", "pants_requirement(name='jane', dist='pantsbuild.pantsish')"
         )
-
         with self.assertRaises(AddressLookupError):
             # The pants_requirement should raise on the invalid dist name of pantsbuild.pantsish making
             # the target at 3rdparty/python/pants:jane fail to exist.

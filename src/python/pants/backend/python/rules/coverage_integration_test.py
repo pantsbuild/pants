@@ -1,6 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import sqlite3
 from pathlib import Path
 from textwrap import dedent
 
@@ -182,3 +183,29 @@ class CoverageIntegrationTest(PantsRunIntegrationTest):
             )
             in result.stderr_data
         )
+
+    def _assert_raw_coverage(self, result: PantsResult, build_root: str) -> None:
+        assert "Wrote raw coverage report to `dist/coverage/python`" in result.stderr_data
+        coverage_path = Path(build_root, "dist", "coverage", "python")
+        assert len(list(coverage_path.iterdir())) == 1
+        coverage_data = coverage_path / ".coverage"
+        assert coverage_data.exists() is True
+        conn = sqlite3.connect(coverage_data.as_posix())
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        assert {row[0] for row in cursor.fetchall()} == {
+            "arc",
+            "context",
+            "coverage_schema",
+            "file",
+            "line_bits",
+            "meta",
+            "tracer",
+        }
+
+    def test_coverage_raw(self) -> None:
+        build_root = get_buildroot()
+        with temporary_dir(root_dir=build_root) as tmpdir:
+            tmpdir_relative = self._prepare_sources(tmpdir, build_root)
+            result = self._run_tests(tmpdir_relative, "--coverage-py-report=raw")
+            self._assert_raw_coverage(result, build_root)
