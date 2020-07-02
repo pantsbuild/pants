@@ -36,7 +36,6 @@ from pants.source import source_root
 from pants.source.source_root import SourceRootConfig
 from pants.source.wrapped_globs import EagerFilesetWithSpec
 from pants.subsystem.subsystem import Subsystem
-from pants.task.goal_options_mixin import GoalOptionsMixin
 from pants.testutil.base.context_utils import create_context_from_options
 from pants.testutil.engine.util import init_native
 from pants.testutil.option.fakes import create_options_for_optionables
@@ -515,21 +514,6 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
             if scope is None:
                 raise TaskError("You must set a scope on your task type before using it in tests.")
             optionables.add(task_type)
-            # If task is expected to inherit goal-level options, register those directly on the task,
-            # by subclassing the goal options registrar and settings its scope to the task scope.
-            if issubclass(task_type, GoalOptionsMixin):
-                subclass_name = "test_{}_{}_{}".format(
-                    task_type.__name__,
-                    task_type.goal_options_registrar_cls.options_scope,
-                    task_type.options_scope,
-                )
-                optionables.add(
-                    type(
-                        subclass_name,
-                        (task_type.goal_options_registrar_cls,),
-                        {"options_scope": task_type.options_scope},
-                    )
-                )
 
         # Now expand to all deps.
         all_optionables = set()

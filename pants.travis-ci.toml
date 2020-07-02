@@ -17,6 +17,3 @@ pantsd = false
 
 [python-setup]
 resolver_jobs = "%(travis_parallelism)s"
-
-[pytest]
-# NB: We don't set a max test timeout for v2, because tests run concurrently.
