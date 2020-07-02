@@ -16,7 +16,7 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil:test_base',
     'src/python/pants/testutil:goal_rule_test_base',
-    'src/python/pants/testutil/engine:util',
+    'src/python/pants/testutil/engine',
   ],
   tags = {"partially_type_checked"},
 )

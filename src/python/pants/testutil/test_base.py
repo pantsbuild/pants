@@ -688,37 +688,6 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         )
         return self.target(f"{path}:{name}")
 
-    def create_resources(self, path, name, *sources):
-        """
-        :API: public
-        """
-        return self.create_library(path=path, target_type="resources", name=name, sources=sources,)
-
-    def assertUnorderedPrefixEqual(self, expected, actual_iter):
-        """Consumes len(expected) items from the given iter, and asserts that they match, unordered.
-
-        :API: public
-        """
-        actual = list(itertools.islice(actual_iter, len(expected)))
-        self.assertEqual(sorted(expected), sorted(actual))
-
-    def assertPrefixEqual(self, expected, actual_iter):
-        """Consumes len(expected) items from the given iter, and asserts that they match, in order.
-
-        :API: public
-        """
-        self.assertEqual(expected, list(itertools.islice(actual_iter, len(expected))))
-
-    def assertInFile(self, string, file_path):
-        """Verifies that a string appears in a file.
-
-        :API: public
-        """
-
-        with open(file_path, "r") as f:
-            content = f.read()
-            self.assertIn(string, content, f'"{string}" is not in the file {f.name}:\n{content}')
-
     @contextmanager
     def assertRaisesWithMessage(self, exception_type, error_text):
         """Verifies than an exception message is equal to `error_text`.
@@ -836,60 +805,3 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         self.assertEqual(single_warning.category, category)
         warning_message = single_warning.message
         self.assertEqual(warning_text, str(warning_message))
-
-    def retrieve_single_product_at_target_base(self, product_mapping, target):
-        mapping_for_target = product_mapping.get(target)
-        single_base_dir = assert_single_element(list(mapping_for_target.keys()))
-        single_product = assert_single_element(mapping_for_target[single_base_dir])
-        return single_product
-
-    def populate_target_dict(self, target_map):
-        """Return a dict containing targets with files generated according to `target_map`.
-
-        The keys of `target_map` are target address strings, while the values of `target_map` should be
-        a dict which contains keyword arguments fed into `self.make_target()`, along with a few special
-        keys. Special keys are:
-        - 'key': used to access the target in the returned dict. Defaults to the target address spec.
-        - 'filemap': creates files at the specified relative paths to the target.
-
-        An `OrderedDict` of 2-tuples must be used with the targets topologically ordered, if
-        they have dependencies on each other. Note that dependency cycles are not currently supported
-        with this method.
-
-        :param target_map: Dict mapping each target address to generate -> kwargs for
-                           `self.make_target()`, along with a 'key' and optionally a 'filemap' argument.
-        :return: Dict mapping the required 'key' argument -> target instance for each element of
-                 `target_map`.
-        :rtype: dict
-        """
-        target_dict = {}
-
-        # Create a target from each specification and insert it into `target_dict`.
-        for address_spec, target_kwargs in target_map.items():
-            unprocessed_kwargs = target_kwargs.copy()
-
-            target_base = Address.parse(address_spec).spec_path
-
-            # Populate the target's owned files from the specification.
-            filemap = unprocessed_kwargs.pop("filemap", {})
-            for rel_path, content in filemap.items():
-                buildroot_path = os.path.join(target_base, rel_path)
-                self.create_file(buildroot_path, content)
-
-            # Ensure any dependencies exist in the target dict (`target_map` must then be an
-            # OrderedDict).
-            # The 'key' is used to access the target in `target_dict`, and defaults to `target_spec`.
-            target_address = Address.parse(address_spec)
-            key = unprocessed_kwargs.pop("key", target_address.target_name)
-            dep_targets = []
-            for dep_spec in unprocessed_kwargs.pop("dependencies", []):
-                existing_tgt_key = target_map[dep_spec]["key"]
-                dep_targets.append(target_dict[existing_tgt_key])
-
-            # Register the generated target.
-            generated_target = self.make_target(
-                spec=address_spec, dependencies=dep_targets, **unprocessed_kwargs
-            )
-            target_dict[key] = generated_target
-
-        return target_dict

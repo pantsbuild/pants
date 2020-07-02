@@ -32,7 +32,7 @@ python_tests(
     'src/python/pants/option',
     'src/python/pants/source',
     'src/python/pants/testutil:test_base',
-    'src/python/pants/testutil/engine:util',
+    'src/python/pants/testutil/engine',
     'src/python/pants/testutil/subsystem',
   ],
   tags = {"type_checked"},
