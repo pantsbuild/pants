@@ -27,7 +27,7 @@ class TestListGoalsIntegration(PantsRunIntegrationTest):
 
         implemented_run = self.run_pants(
             [
-                "--backend-packages2=['pants.backend.python', 'pants.backend.python.lint.isort']",
+                "--backend-packages=['pants.backend.python', 'pants.backend.python.lint.isort']",
                 *command,
             ],
         )

@@ -46,7 +46,7 @@ class DocformatterIntegrationTest(ExternalToolTestBase):
         passthrough_args: Optional[str] = None,
         skip: bool = False,
     ) -> Tuple[LintResults, FmtResult]:
-        args = ["--backend-packages2=pants.backend.python.lint.docformatter"]
+        args = ["--backend-packages=pants.backend.python.lint.docformatter"]
         if passthrough_args:
             args.append(f"--docformatter-args='{passthrough_args}'")
         if skip:

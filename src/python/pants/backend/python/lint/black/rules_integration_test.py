@@ -50,7 +50,7 @@ class BlackIntegrationTest(ExternalToolTestBase):
         passthrough_args: Optional[str] = None,
         skip: bool = False,
     ) -> Tuple[LintResults, FmtResult]:
-        args = ["--backend-packages2=pants.backend.python.lint.black"]
+        args = ["--backend-packages=pants.backend.python.lint.black"]
         if config is not None:
             self.create_file(relpath="pyproject.toml", contents=config)
             args.append("--black-config=pyproject.toml")

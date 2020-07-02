@@ -4,7 +4,7 @@ print_exception_stacktrace = true
 # Enable our custom loose-source plugins.
 pythonpath = ["%(buildroot)s/pants-plugins/src/python"]
 
-backend_packages2.add = [
+backend_packages.add = [
   "pants.backend.awslambda.python",
   "pants.backend.python",
   "pants.backend.python.lint.black",

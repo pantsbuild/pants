@@ -143,7 +143,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         use_coverage: bool = False,
     ) -> TestResult:
         args = [
-            "--backend-packages2=pants.backend.python",
+            "--backend-packages=pants.backend.python",
             f"--source-root-patterns={self.source_root}",
             # pin to lower versions so that we can run Python 2 tests
             "--pytest-version=pytest>=4.6.6,<4.7",

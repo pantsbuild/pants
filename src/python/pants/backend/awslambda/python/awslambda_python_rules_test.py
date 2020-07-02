@@ -41,7 +41,7 @@ class TestPythonAWSLambdaCreation(ExternalToolTestBase):
                 PythonAwsLambdaFieldSet.create(target),
                 create_options_bootstrapper(
                     args=[
-                        "--backend-packages2=pants.backend.awslambda.python",
+                        "--backend-packages=pants.backend.awslambda.python",
                         "--source-root-patterns=src/python",
                     ]
                 ),

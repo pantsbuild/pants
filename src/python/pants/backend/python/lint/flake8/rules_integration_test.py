@@ -54,7 +54,7 @@ class Flake8IntegrationTest(ExternalToolTestBase):
         skip: bool = False,
         additional_args: Optional[List[str]] = None,
     ) -> LintResults:
-        args = ["--backend-packages2=pants.backend.python.lint.flake8"]
+        args = ["--backend-packages=pants.backend.python.lint.flake8"]
         if config:
             self.create_file(relpath=".flake8", contents=config)
             args.append("--flake8-config=.flake8")
