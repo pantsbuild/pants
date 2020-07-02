@@ -244,8 +244,8 @@ class GlobalOptions(Subsystem):
             advanced=True,
             type=list,
             help="Allow backends to be loaded from these plugins.  The default backends for "
-                 "each plugin will be loaded automatically. Other backends in a plugin can be "
-                 "loaded by listing them in --backend-packages.",
+            "each plugin will be loaded automatically. Other backends in a plugin can be "
+            "loaded by listing them in --backend-packages.",
         )
         register(
             "--plugins2",
@@ -254,8 +254,8 @@ class GlobalOptions(Subsystem):
             removal_version="2.1.0.dev0",
             removal_hint="Use --plugins instead.",
             help="Allow backends to be loaded from these plugins.  The default backends for "
-                 "each plugin will be loaded automatically. Other backends in a plugin can be "
-                 "loaded by listing them in --backend-packages.",
+            "each plugin will be loaded automatically. Other backends in a plugin can be "
+            "loaded by listing them in --backend-packages.",
         )
         register(
             "--plugins-force-resolve",
