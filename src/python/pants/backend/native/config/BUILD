@@ -7,5 +7,5 @@ python_library(
     'src/python/pants/engine:platform',
     'src/python/pants/util:osutil',
   ],
-  tags = {"partially_type_checked"},
+  tags = {},
 )

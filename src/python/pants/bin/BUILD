@@ -44,7 +44,6 @@ python_library(
     'src/python/pants/util:memo',
     'src/python/pants/util:osutil',
   ],
-  tags = {'partially_type_checked'},
 )
 
 # This binary's entry_point is used by the pantsbuild.pants sdist to setup a binary for
@@ -57,7 +56,6 @@ python_binary(
   dependencies=[
     ':bin',
   ],
-  tags = {'partially_type_checked'},
   # We depend on twitter.common libraries that trigger pex warnings for not properly declaring their
   # dependency on setuptools (for namespace package support).
   emit_warnings=False,
@@ -80,7 +78,6 @@ python_binary(
     'build-support/regexes',
     'pants-plugins/src/python/internal_backend:plugins',
   ],
-  tags = {'partially_type_checked'},
   # We depend on twitter.common libraries that trigger pex warnings for not properly declaring their
   # dependency on setuptools (for namespace package support).
   emit_warnings=False,

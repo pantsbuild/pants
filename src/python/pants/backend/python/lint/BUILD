@@ -10,7 +10,6 @@ python_library(
     'src/python/pants/engine:rules',
     'src/python/pants/engine:unions',
   ],
-  tags = {"type_checked"},
 )
 
 python_tests(

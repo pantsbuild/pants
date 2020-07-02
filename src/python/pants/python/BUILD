@@ -16,7 +16,7 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
     'src/python/pants/util:ordered_set',
-  ]
+  ],
 )
 
 
@@ -32,5 +32,4 @@ python_tests(
     'src/python/pants/testutil:pexrc_util',
     'src/python/pants/testutil:test_base',
   ],
-  tags = {'partially_type_checked'},
 )

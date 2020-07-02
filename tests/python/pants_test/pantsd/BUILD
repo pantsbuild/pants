@@ -1,34 +1,25 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-target(
-  name = 'test_deps',
-  dependencies = [
-    'src/python/pants/testutil:test_base'
-  ]
-)
-
 python_tests(
   name = 'process_manager',
   sources = ['test_process_manager.py'],
   dependencies = [
-    ':test_deps',
+    'src/python/pants/testutil:test_base'
     'src/python/pants/pantsd:process_manager',
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_tests(
   name = 'pants_daemon',
   sources = ['test_pants_daemon.py'],
   dependencies = [
-    ':test_deps',
+    'src/python/pants/testutil:test_base',
     'src/python/pants/bin',
     'src/python/pants/pantsd:pants_daemon',
     'src/python/pants/pantsd/service:pants_service',
     'src/python/pants/util:contextutil',
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -40,7 +31,6 @@ python_tests(
     'src/python/pants/pantsd:pants_daemon_core',
     'src/python/pants/testutil:test_base'
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -54,7 +44,6 @@ python_library(
     'src/python/pants/testutil:retry',
     'src/python/pants/util:collections',
   ],
-  tags = {'partially_type_checked'},
 )
 
 python_tests(
@@ -68,6 +57,6 @@ python_tests(
     'testprojects/src/python:nested_runs_directory',
     'testprojects/src/python:print_env_directory',
   ],
-  tags = {'integration', 'partially_type_checked'},
+  tags = ['integration'],
   timeout = 1020
 )

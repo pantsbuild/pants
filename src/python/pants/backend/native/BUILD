@@ -7,5 +7,5 @@ python_library(
     'src/python/pants/backend/native/subsystems',
     'src/python/pants/backend/native/subsystems/binaries',
   ],
-  tags = {"partially_type_checked"},
+  tags = {},
 )

@@ -10,5 +10,4 @@ python_library(
     'src/python/pants/goal:context',
     'src/python/pants/goal:run_tracker',
   ],
-  tags = {"partially_type_checked"},
 )

@@ -29,13 +29,13 @@ python_tests(
     ':tarutil',
     ':xml_parser',
   ],
-  tags = {'type_checked'},
+  tags = {},
 )
 
 python_library(
   name = 'argutil',
   sources = ['argutil.py'],
-  tags = {'type_checked'},
+  tags = {},
 )
 
 python_library(
@@ -46,13 +46,13 @@ python_library(
     ':dirutil',
     ':tarutil',
   ],
-  tags = {'type_checked'},
+  tags = {},
 )
 
 python_library(
   name = 'collections',
   sources = ['collections.py'],
-  tags = {'type_checked'},
+  tags = {},
 )
 
 python_library(
@@ -61,7 +61,7 @@ python_library(
   dependencies = [
     ':osutil',
   ],
-  tags = {'type_checked'},
+  tags = {},
 )
 
 python_library(
@@ -71,19 +71,19 @@ python_library(
     ':strutil',
     '3rdparty/python:typing-extensions',
   ],
-  tags = {'type_checked'},
+  tags = {},
 )
 
 python_library(
   name = 'enums',
   sources = ['enums.py'],
-  tags = {'type_checked'},
+  tags = {},
 )
 
 python_library(
   name = 'eval',
   sources = ['eval.py'],
-  tags = {'type_checked'},
+  tags = {},
 )
 
 python_library(
@@ -92,7 +92,7 @@ python_library(
   dependencies = [
     ':contextutil',
   ],
-  tags = {'type_checked'},
+  tags = {},
 )
 
 python_library(
@@ -101,19 +101,19 @@ python_library(
   dependencies = [
     'src/python/pants/base:deprecated',
   ],
-  tags = {'type_checked'},
+  tags = {},
 )
 
 python_library(
   name = 'frozendict',
   sources = ['frozendict.py'],
-  tags = {'type_checked'},
+  tags = {},
 )
 
 python_library(
   name = 'logging',
   sources = ['logging.py'],
-  tags = {'type_checked'},
+  tags = {},
 )
 
 python_library(
@@ -122,7 +122,7 @@ python_library(
   dependencies = [
     ':meta'
   ],
-  tags = {'type_checked'},
+  tags = {},
 )
 
 python_library(
@@ -131,49 +131,49 @@ python_library(
   dependencies = [
     '3rdparty/python:dataclasses'
   ],
-  tags = {'type_checked'},
+  tags = {},
 )
 
 python_library(
   name = 'netrc',
   sources = ['netrc.py'],
-  tags = {'partially_type_checked'},
+  tags = {},
 )
 
 python_library(
   name = 'objects',
   sources = ['objects.py'],
-  tags = {'partially_type_checked'},
+  tags = {},
 )
 
 python_library(
   name = 'ordered_set',
   sources = ['ordered_set.py'],
-  tags = {'type_checked'},
+  tags = {},
 )
 
 python_library(
   name = 'osutil',
   sources = ['osutil.py'],
-  tags = {'type_checked'},
+  tags = {},
 )
 
 python_library(
   name = 'process_handler',
   sources = ['process_handler.py'],
-  tags = {'partially_type_checked'},
+  tags = {},
 )
 
 python_library(
   name = 'retry',
   sources = ['retry.py'],
-  tags = {'partially_type_checked'},
+  tags = {},
 )
 
 python_library(
   name = 'rwbuf',
   sources = ['rwbuf.py'],
-  tags = {'partially_type_checked'},
+  tags = {},
 )
 
 python_binary(
@@ -183,29 +183,29 @@ python_binary(
   dependencies = [
     '3rdparty/python:s3logparse'
   ],
-  tags = {"partially_type_checked"},
+  tags = {},
 )
 
 python_library(
   name = 'socket',
   sources = ['socket.py'],
-  tags = {'partially_type_checked'},
+  tags = {},
 )
 
 python_library(
   name = 'strutil',
   sources = ['strutil.py'],
-  tags = {'type_checked'},
+  tags = {},
 )
 
 python_library(
   name = 'tarutil',
   sources = ['tarutil.py'],
-  tags = {'type_checked'},
+  tags = {},
 )
 
 python_library(
   name = 'xml_parser',
   sources = ['xml_parser.py'],
-  tags = {'partially_type_checked'},
+  tags = {},
 )

@@ -21,7 +21,6 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
   ],
-  tags = {"type_checked"},
 )
 
 python_library(
@@ -35,7 +34,6 @@ python_library(
     'src/python/pants/engine:addresses',
     'src/python/pants/util:dirutil',
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -58,7 +56,6 @@ python_library(
     'src/python/pants/util:meta',
     'src/python/pants/util:ordered_set',
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -74,7 +71,6 @@ python_library(
     'src/python/pants/option',
     'src/python/pants/util:memo',
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -86,7 +82,6 @@ python_library(
     'src/python/pants/goal',
     'src/python/pants/util:ordered_set',
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -105,5 +100,4 @@ python_library(
     'src/python/pants/util:meta',
     'src/python/pants/util:objects',
   ],
-  tags = {"partially_type_checked"},
 )

@@ -13,5 +13,4 @@ python_library(
     'src/python/pants/goal:workspace',
     'src/python/pants/subsystem',
   ],
-  tags = {"partially_type_checked"},
 )

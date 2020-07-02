@@ -41,7 +41,6 @@ python_library(
     'src/python/pants/base:specs',
     'src/python/pants/build_graph:address',
   ],
-  tags = {"type_checked"},
 )
 
 python_library(
@@ -50,7 +49,6 @@ python_library(
   dependencies=[
     'src/python/pants/util:ordered_set',
   ],
-  tags = {'type_checked'},
 )
 
 python_library(
@@ -62,7 +60,6 @@ python_library(
     'src/python/pants/engine/internals:native',
     'src/python/pants/engine/internals:scheduler',
   ],
-  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -75,7 +72,6 @@ python_library(
     'src/python/pants/util:osutil',
     'src/python/pants/util:strutil',
   ],
-  tags = {"type_checked"},
 )
 
 python_library(
@@ -91,7 +87,6 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:meta',
   ],
-  tags = {'type_checked'},
 )
 
 python_library(
@@ -105,7 +100,6 @@ python_library(
     'src/python/pants/subsystem',
     'src/python/pants/util:meta',
   ],
-  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -118,7 +112,6 @@ python_library(
     'src/python/pants/base:exception_sink',
     # 'src/python/pants/engine/internals:scheduler',  # dep cycle
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -129,7 +122,6 @@ python_library(
     'src/python/pants/util:memo',
     'src/python/pants/util:osutil',
   ],
-  tags = {"type_checked"},
 )
 
 python_library(
@@ -142,7 +134,6 @@ python_library(
     ':rules',
     'src/python/pants/util:meta',
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -160,7 +151,6 @@ python_library(
     'src/python/pants/util:meta',
     'src/python/pants/util:ordered_set',
   ],
-  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -171,7 +161,6 @@ python_library(
     'src/python/pants/base:deprecated',
     'src/python/pants/util:meta',
   ],
-  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -195,7 +184,6 @@ python_library(
     'src/python/pants/util:ordered_set',
     'src/python/pants/util:strutil',
   ],
-  tags = {'type_checked'},
 )
 
 python_library(
@@ -206,5 +194,4 @@ python_library(
     'src/python/pants/util:ordered_set',
     'src/python/pants/util:meta',
   ],
-  tags = {'type_checked'},
 )

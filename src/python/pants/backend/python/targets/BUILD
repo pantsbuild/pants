@@ -13,5 +13,4 @@ python_library(
     'src/python/pants/util:collections',
     'src/python/pants/util:ordered_set',
   ],
-  tags = {"partially_type_checked"},
 )

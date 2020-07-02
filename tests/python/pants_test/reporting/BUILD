@@ -7,7 +7,6 @@ python_tests(
   dependencies = [
     'src/python/pants/reporting',
   ],
-  tags = {"partially_type_checked"},
   timeout = 30,
 )
 
@@ -22,7 +21,6 @@ python_tests(
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil:test_base',
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -33,5 +31,4 @@ python_tests(
     'src/python/pants/reporting',
     'src/python/pants/testutil:test_base',
   ],
-  tags = {"partially_type_checked"},
 )

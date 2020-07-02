@@ -7,7 +7,6 @@ python_library(
     'src/python/pants/option',
     'src/python/pants/util:ordered_set',
   ],
-  tags = {'partially_type_checked'},
 )
 
 python_tests(
@@ -17,5 +16,4 @@ python_tests(
     'src/python/pants/subsystem',
     'src/python/pants/testutil:test_base',
   ],
-  tags = {'partially_type_checked'},
 )

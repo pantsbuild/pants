@@ -16,7 +16,6 @@ python_library(
     'src/python/pants/goal:task_registrar',
     'src/python/pants/python',
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -28,7 +27,6 @@ python_library(
     ':python_requirements',
     'src/python/pants/python',
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -44,7 +42,6 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -58,7 +55,6 @@ python_library(
     'src/python/pants/python',
     'src/python/pants/util:meta',
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -67,13 +63,11 @@ python_library(
   dependencies = [
     'src/python/pants/base:payload_field',
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_library(
   name = 'python_requirements',
   sources = ['python_requirements.py'],
-  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -90,7 +84,6 @@ python_library(
     'src/python/pants/engine:target',
     'src/python/pants/python',
   ],
-  tags={"type_checked"},
 )
 
 python_tests(

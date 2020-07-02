@@ -18,7 +18,6 @@ python_library(
     'src/python/pants/python',
     'src/python/pants/util:strutil',
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -39,5 +38,5 @@ python_tests(
     'src/python/pants/testutil:external_tool_test_base',
     'src/python/pants/testutil/option',
   ],
-  tags = {'integration', 'partially_type_checked'},
+  tags = ['integration'],
 )

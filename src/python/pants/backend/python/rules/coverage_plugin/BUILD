@@ -4,5 +4,5 @@
 resources(
   name='plugin',
   sources=['plugin.py'],
-  tags = {'partially_type_checked'},
+  tags = {},
 )
