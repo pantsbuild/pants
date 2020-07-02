@@ -194,11 +194,6 @@ class GCCInstallLocationForLLVM:
 
 
 @rule
-def select_gcc_install_location(gcc: GCC) -> GCCInstallLocationForLLVM:
-    return GCCInstallLocationForLLVM(gcc.select())
-
-
-@rule
 async def select_llvm_c_toolchain(
     platform: Platform, native_toolchain: NativeToolchain
 ) -> LLVMCToolchain:
@@ -391,7 +386,6 @@ def create_native_toolchain_rules():
         select_base_linker,
         select_gcc_linker,
         select_llvm_linker,
-        select_gcc_install_location,
         select_llvm_c_toolchain,
         select_llvm_cpp_toolchain,
         select_gcc_c_toolchain,

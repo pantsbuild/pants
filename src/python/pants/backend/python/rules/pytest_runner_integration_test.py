@@ -2,12 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from functools import partialmethod
 from pathlib import Path, PurePath
 from textwrap import dedent
 from typing import List, Optional
-
-import pytest
 
 from pants.backend.python.rules import (
     download_pex_bin,
@@ -20,11 +17,6 @@ from pants.backend.python.rules.coverage import create_coverage_config, prepare_
 from pants.backend.python.rules.pytest_runner import PythonTestFieldSet
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary, PythonTests
-from pants.backend.python.targets.python_library import PythonLibrary as PythonLibraryV1
-from pants.backend.python.targets.python_requirement_library import (
-    PythonRequirementLibrary as PythonRequirementLibraryV1,
-)
-from pants.backend.python.targets.python_tests import PythonTests as PythonTestsV1
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.test import Status, TestDebugRequest, TestOptions, TestResult
@@ -41,8 +33,6 @@ from pants.testutil.interpreter_selection_utils import skip_unless_python27_and_
 from pants.testutil.option.util import create_options_bootstrapper
 
 
-# TODO: Figure out what testing should look like with the Target API. Should we still call
-#  self.add_to_build_file(), for example?
 class PytestRunnerIntegrationTest(ExternalToolTestBase):
 
     source_root = "tests/python"
@@ -52,20 +42,35 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
     py3_only_source = FileContent(path="test_py3.py", content=b"def test() -> None:\n  pass\n")
     library_source = FileContent(path="library.py", content=b"def add_two(x):\n  return x + 2\n")
 
-    create_python_library = partialmethod(
-        ExternalToolTestBase.create_library, path=package, target_type="python_library",
-    )
-
     def write_file(self, file_content: FileContent) -> None:
         self.create_file(
             relpath=PurePath(self.package, file_content.path).as_posix(),
             contents=file_content.content.decode(),
         )
 
-    def create_basic_library(self) -> None:
-        self.create_python_library(name="library", sources=[self.library_source.path])
-        self.write_file(self.library_source)
-        self.create_file(f"{self.package}/__init__.py")
+    def create_python_library(
+        self,
+        source_files: List[FileContent],
+        *,
+        name: str = "library",
+        dependencies: Optional[List[str]] = None,
+    ) -> None:
+        for source_file in source_files:
+            self.write_file(source_file)
+        source_globs = [PurePath(source_file.path).name for source_file in source_files]
+        self.add_to_build_file(
+            self.package,
+            dedent(
+                f"""\
+                python_library(
+                    name={repr(name)},
+                    sources={source_globs},
+                    dependencies={[*(dependencies or ())]},
+                )
+                """
+            ),
+        )
+        self.create_file(os.path.join(self.package, "__init__.py"))
 
     def create_python_test_target(
         self,
@@ -104,14 +109,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
 
     @classmethod
     def alias_groups(cls) -> BuildFileAliases:
-        return BuildFileAliases(
-            targets={
-                "python_library": PythonLibraryV1,
-                "python_tests": PythonTestsV1,
-                "python_requirement_library": PythonRequirementLibraryV1,
-            },
-            objects={"python_requirement": PythonRequirement},
-        )
+        return BuildFileAliases(objects={"python_requirement": PythonRequirement})
 
     @classmethod
     def target_types(cls):
@@ -149,7 +147,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
             f"--source-root-patterns={self.source_root}",
             # pin to lower versions so that we can run Python 2 tests
             "--pytest-version=pytest>=4.6.6,<4.7",
-            "--pytest-pytest-plugins=['zipp==1.0.0']",
+            "--pytest-pytest-plugins=['zipp==1.0.0', 'pytest-cov>=2.8.1,<2.9']",
         ]
         if passthrough_args:
             args.append(f"--pytest-args='{passthrough_args}'")
@@ -202,7 +200,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         assert "test_bad.py F" not in result.stdout
 
     def test_absolute_import(self) -> None:
-        self.create_basic_library()
+        self.create_python_library([self.library_source])
         source = FileContent(
             path="test_absolute_import.py",
             content=dedent(
@@ -220,7 +218,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         assert "test_absolute_import.py ." in result.stdout
 
     def test_relative_import(self) -> None:
-        self.create_basic_library()
+        self.create_python_library([self.library_source])
         source = FileContent(
             path="test_relative_import.py",
             content=dedent(
@@ -238,22 +236,20 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         assert "test_relative_import.py ." in result.stdout
 
     def test_transitive_dep(self) -> None:
-        self.create_basic_library()
-        self.create_python_library(
-            name="transitive_dep", sources=["transitive_dep.py"], dependencies=[":library"],
-        )
-        self.write_file(
-            FileContent(
-                path="transitive_dep.py",
-                content=dedent(
-                    """\
-                    from pants_test.library import add_two
+        self.create_python_library([self.library_source])
+        transitive_dep_fc = FileContent(
+            path="transitive_dep.py",
+            content=dedent(
+                """\
+                from pants_test.library import add_two
 
-                    def add_four(x):
-                      return add_two(x) + 2
-                    """
-                ).encode(),
-            )
+                def add_four(x):
+                  return add_two(x) + 2
+                """
+            ).encode(),
+        )
+        self.create_python_library(
+            [transitive_dep_fc], name="transitive_dep", dependencies=[":library"]
         )
         source = FileContent(
             path="test_transitive_dep.py",
@@ -291,22 +287,19 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
 
     def test_thirdparty_transitive_dep(self) -> None:
         self.setup_thirdparty_dep()
-        self.create_python_library(
-            name="library", sources=["library.py"], dependencies=["3rdparty/python:ordered-set"],
-        )
-        self.create_file(f"{self.package}/__init__.py")
-        self.write_file(
-            FileContent(
-                path="library.py",
-                content=dedent(
-                    """\
-                    import string
-                    from ordered_set import OrderedSet
+        library_fc = FileContent(
+            path="library.py",
+            content=dedent(
+                """\
+                import string
+                from ordered_set import OrderedSet
 
-                    alphabet = OrderedSet(string.ascii_lowercase)
-                    """
-                ).encode(),
-            )
+                alphabet = OrderedSet(string.ascii_lowercase)
+                """
+            ).encode(),
+        )
+        self.create_python_library(
+            [library_fc], dependencies=["3rdparty/python:ordered-set"],
         )
         source = FileContent(
             path="test_3rdparty_transitive_dep.py",
@@ -364,22 +357,18 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
     def test_single_passing_test_with_junit(self) -> None:
         self.create_python_test_target([self.good_source])
         result = self.run_pytest(junit_xml_dir="dist/test-results")
-
         assert result.status == Status.SUCCESS
         assert "test_good.py ." in result.stdout
         assert result.xml_results is not None
-
-        files: FilesContent = self.request_single_product(FilesContent, result.xml_results)
+        files = self.request_single_product(FilesContent, result.xml_results)
         assert len(files) == 1
         file = files[0]
         assert file.path.startswith("dist/test-results")
         assert b"pants_test.test_good" in file.content
 
-    @pytest.mark.skip(reason="https://github.com/pantsbuild/pants/issues/10141")
     def test_single_passing_test_with_coverage(self) -> None:
         self.create_python_test_target([self.good_source])
         result = self.run_pytest(use_coverage=True)
-
         assert result.status == Status.SUCCESS
         assert "test_good.py ." in result.stdout
         assert result.coverage_data is not None

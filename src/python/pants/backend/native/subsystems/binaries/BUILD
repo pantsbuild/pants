@@ -6,7 +6,7 @@ python_library(
   dependencies=[
     'src/python/pants/backend/native/config',
     'src/python/pants/backend/native/subsystems/utils',
-    'src/python/pants/binaries',
+    'src/python/pants/core/util_rules',
     'src/python/pants/engine:rules',
     'src/python/pants/engine:platform',
     'src/python/pants/util:dirutil',

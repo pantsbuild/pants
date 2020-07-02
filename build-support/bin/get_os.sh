@@ -1,6 +1,6 @@
 #!/bin/bash -eu
 
-# Outputs the current operating system and variant, as used by BinaryUtils.
+# Outputs the current operating system and variant.
 # Example output: mac/10.13
 # Example output: linux/x86_64
 

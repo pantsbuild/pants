@@ -27,7 +27,7 @@ class TestEngineOptionsParsing(TestBase):
                 "binary",
                 "src/python::",
             ),
-            env=dict(PANTS_PANTSD="True", PANTS_BINARIES_BASEURLS='["https://bins.com"]'),
+                 env=dict(PANTS_PANTSD="True", PANTS_BUILD_IGNORE='["ignoreme/"]'),
         )
 
         global_options_params = Params(Scope(str(GLOBAL_SCOPE)), options_bootstrapper)
@@ -38,7 +38,7 @@ class TestEngineOptionsParsing(TestBase):
 
         self.assertEqual(global_options.options.level, LogLevel.DEBUG)
         self.assertEqual(global_options.options.pantsd, True)
-        self.assertEqual(global_options.options.binaries_baseurls, ["https://bins.com"])
+        self.assertEqual(global_options.options.build_ignore, ["ignoreme/"])
 
         self.assertEqual(python_setup_options.options.platforms, ["current"])
 

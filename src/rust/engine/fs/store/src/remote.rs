@@ -11,6 +11,7 @@ use futures::compat::Future01CompatExt;
 use futures::future::{FutureExt, TryFutureExt};
 use futures01::{future, Future, Sink, Stream};
 use hashing::Digest;
+use log::Level;
 use serverset::{retry, Serverset};
 use workunit_store::new_span_id;
 
@@ -121,7 +122,7 @@ impl ByteStore {
     let span_id = new_span_id();
     if let Some(workunit_state) = workunit_store::get_workunit_state() {
       let parent_id = workunit_state.parent_id;
-      let metadata = workunit_store::WorkunitMetadata::new();
+      let metadata = workunit_store::WorkunitMetadata::with_level(Level::Debug);
       workunit_state
         .store
         .start_workunit(span_id.clone(), workunit_name, parent_id, metadata);
@@ -241,7 +242,7 @@ impl ByteStore {
     let span_id = new_span_id();
     if let Some(workunit_state) = workunit_store::get_workunit_state() {
       let parent_id = workunit_state.parent_id;
-      let metadata = workunit_store::WorkunitMetadata::new();
+      let metadata = workunit_store::WorkunitMetadata::with_level(Level::Debug);
       workunit_state
         .store
         .start_workunit(span_id.clone(), workunit_name, parent_id, metadata);
@@ -321,7 +322,7 @@ impl ByteStore {
     let span_id = new_span_id();
     if let Some(workunit_state) = workunit_store::get_workunit_state() {
       let parent_id = workunit_state.parent_id;
-      let metadata = workunit_store::WorkunitMetadata::new();
+      let metadata = workunit_store::WorkunitMetadata::with_level(Level::Debug);
       workunit_state
         .store
         .start_workunit(span_id.clone(), workunit_name, parent_id, metadata);

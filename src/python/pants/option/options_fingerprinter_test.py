@@ -3,8 +3,6 @@
 
 import os
 
-from pants.base.payload import Payload
-from pants.base.payload_field import PrimitiveField
 from pants.option.custom_types import (
     DictValueComponent,
     ListValueComponent,
@@ -12,7 +10,6 @@ from pants.option.custom_types import (
     dict_with_files_option,
     dir_option,
     file_option,
-    target_option,
 )
 from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants.testutil.test_base import TestBase
@@ -22,7 +19,7 @@ from pants.util.contextutil import temporary_dir
 class OptionsFingerprinterTest(TestBase):
     def setUp(self) -> None:
         super().setUp()
-        self.options_fingerprinter = OptionsFingerprinter(self.context().build_graph)
+        self.options_fingerprinter = OptionsFingerprinter()
 
     def test_fingerprint_dict(self) -> None:
         d1 = {"b": 1, "a": 2}
@@ -47,34 +44,6 @@ class OptionsFingerprinterTest(TestBase):
             self.options_fingerprinter.fingerprint(ListValueComponent.create, l) for l in (l1, l2)
         )
         self.assertNotEqual(fp1, fp2)
-
-    def test_fingerprint_target_spec(self) -> None:
-        specs = [":t1", ":t2"]
-        payloads = [Payload() for i in range(2)]
-        for i, (s, p) in enumerate(zip(specs, payloads)):
-            p.add_field("foo", PrimitiveField(i))
-            self.make_target(s, payload=p)
-        s1, s2 = specs
-
-        fp_spec = lambda spec: self.options_fingerprinter.fingerprint(target_option, spec)
-        fp1 = fp_spec(s1)
-        fp2 = fp_spec(s2)
-        self.assertNotEqual(fp1, fp2)
-
-    def test_fingerprint_target_spec_list(self) -> None:
-        specs = [":t1", ":t2", ":t3"]
-        payloads = [Payload() for i in range(3)]
-        for i, (s, p) in enumerate(zip(specs, payloads)):
-            p.add_field("foo", PrimitiveField(i))
-            self.make_target(s, payload=p)
-        s1, s2, s3 = specs
-
-        fp_specs = lambda specs: self.options_fingerprinter.fingerprint(target_option, specs)
-        fp1 = fp_specs([s1, s2])
-        fp2 = fp_specs([s2, s1])
-        fp3 = fp_specs([s1, s3])
-        self.assertEqual(fp1, fp2)
-        self.assertNotEqual(fp1, fp3)
 
     def test_fingerprint_file(self) -> None:
         fp1, fp2, fp3 = (
