@@ -33,6 +33,11 @@ from pants.util.osutil import (
 logger = logging.getLogger(__name__)
 
 
+# TODO: This file is now only used by download_binary.sh, which is only used by
+#  build-support/bin/native/cargo.sh.  Find another solution for bootstrapping
+#  native tools (cmake, go, protoc) and get rid of this file.
+
+
 @dataclass(frozen=True)
 class HostPlatform:
     """Describes a platform to resolve binaries for. Determines the binary's location on disk.

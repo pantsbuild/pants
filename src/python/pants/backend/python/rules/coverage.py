@@ -294,8 +294,20 @@ async def generate_coverage_reports(
     )
 
     processes = []
-    report_types = coverage_subsystem.reports
-    for report_type in report_types:
+    report_types = []
+    coverage_reports: List[CoverageReport] = []
+    for report_type in coverage_subsystem.reports:
+        if report_type == CoverageReportType.RAW:
+            coverage_reports.append(
+                FilesystemCoverageReport(
+                    report_type=CoverageReportType.RAW,
+                    result_digest=merged_coverage_data.coverage_data,
+                    directory_to_materialize_to=coverage_subsystem.output_dir,
+                    report_file=coverage_subsystem.output_dir / ".coverage",
+                )
+            )
+            continue
+        report_types.append(report_type)
         processes.append(
             coverage_setup.pex.create_process(
                 pex_path=f"./{coverage_setup.pex.output_filename}",
@@ -311,7 +323,9 @@ async def generate_coverage_reports(
             )
         )
     results = await MultiGet(Get(ProcessResult, Process, process) for process in processes)
-    coverage_reports = _get_coverage_reports(coverage_subsystem.output_dir, report_types, results)
+    coverage_reports.extend(
+        _get_coverage_reports(coverage_subsystem.output_dir, report_types, results)
+    )
     return CoverageReports(tuple(coverage_reports))
 
 

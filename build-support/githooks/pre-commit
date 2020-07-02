@@ -51,10 +51,9 @@ if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
   fi
 
   echo "* Checking MyPy"
-  ./v2 --changed-since="${MERGE_BASE}" --changed-dependees=transitive \
-    --tag='-nolint' typecheck || exit 1
+  ./v2 --changed-since="${MERGE_BASE}" --changed-dependees=transitive --tag='-nolint' typecheck || exit 1
 
-  echo "* Checking Flake8, and formatting"
+  echo "* Checking Flake8 and formatting"
   ./v2 --changed-since="${MERGE_BASE}" --tag='-nolint' lint || \
     die "If there were formatting errors, run \`./v2 --changed-since=$(git rev-parse --symbolic "${MERGE_BASE}") fmt\`"
 

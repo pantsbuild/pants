@@ -133,6 +133,7 @@ class LocalPantsRunner:
 
         global_options = options.for_global_scope()
         specs = SpecsCalculator.create(
+            options_bootstrapper=options_bootstrapper,
             options=options,
             build_root=build_root,
             session=graph_session.scheduler_session,

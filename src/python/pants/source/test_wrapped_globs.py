@@ -216,12 +216,3 @@ class FilesetWithSpecTest(TestBase):
         self.assertEqual(
             list(efws.paths_from_buildroot_iter()), ["test_root/a", "test_root/b", "test_root/c"],
         )
-
-    def test_source_snapshot(self) -> None:
-        self.create_file("package/dir/foo")
-        self.add_to_build_file("package/dir", 'files(name = "target", sources = ["foo"])')
-        target = self.target("package/dir:target")
-        snapshot = target.sources_snapshot(scheduler=self.scheduler)
-        self.assertEqual(("package/dir/foo",), snapshot.files)
-        self.assertEqual(target.sources_relative_to_target_base().files, ("foo",))
-        self.assertEqual(target.sources_relative_to_buildroot(), ["package/dir/foo"])

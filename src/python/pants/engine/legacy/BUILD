@@ -17,7 +17,6 @@ python_tests(
     'src/python/pants/goal',
     'src/python/pants/option',
     'src/python/pants/task',
-    'src/python/pants/testutil/engine:engine_test_base',
     'src/python/pants/testutil:test_base',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',

@@ -5,16 +5,18 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import List, Optional, Tuple, cast
 
+from pants.backend.project_info.dependees import (
+    Dependees,
+    DependeesRequest,
+    find_dependees,
+    map_addresses_to_dependees,
+)
 from pants.base.deprecated import resolve_conflicting_options
-from pants.base.specs import AddressSpecs, DescendantAddresses
-from pants.build_graph.build_configuration import BuildConfiguration
-from pants.engine.addresses import Address, Addresses
+from pants.engine.addresses import Address
+from pants.engine.collection import Collection
 from pants.engine.internals.graph import Owners, OwnersRequest
-from pants.engine.internals.mapper import AddressMapper
-from pants.engine.internals.parser import HydratedStruct
-from pants.engine.legacy.graph import _DependentGraph, target_types_from_build_file_aliases
 from pants.engine.rules import RootRule, rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.selectors import Get
 from pants.goal.workspace import ScmWorkspace
 from pants.option.option_value_container import OptionValueContainer
 from pants.scm.scm import Scm
@@ -33,38 +35,24 @@ class ChangedRequest:
     dependees: DependeesOption
 
 
-@dataclass(frozen=True)
-class ChangedAddresses:
-    """Light wrapper around the addresses referring to the changed targets."""
-
-    addresses: Addresses
+class ChangedAddresses(Collection[Address]):
+    pass
 
 
 @rule
-async def find_owners(
-    build_configuration: BuildConfiguration,
-    address_mapper: AddressMapper,
-    changed_request: ChangedRequest,
-) -> ChangedAddresses:
-    owners = await Get(Owners, OwnersRequest(sources=changed_request.sources))
-
-    # If the ChangedRequest does not require dependees, then we're done.
-    if changed_request.dependees == DependeesOption.NONE:
+async def find_changed_owners(request: ChangedRequest) -> ChangedAddresses:
+    owners = await Get(Owners, OwnersRequest(request.sources))
+    if request.dependees == DependeesOption.NONE:
         return ChangedAddresses(owners.addresses)
-
-    # Otherwise: find dependees.
-    all_addresses = await Get(Addresses, AddressSpecs((DescendantAddresses(""),)))
-    all_structs = [
-        s.value for s in await MultiGet(Get(HydratedStruct, Address, a) for a in all_addresses)
-    ]
-
-    bfa = build_configuration.registered_aliases()
-    graph = _DependentGraph.from_iterable(
-        target_types_from_build_file_aliases(bfa), address_mapper, all_structs
+    address_to_dependees = await Get(
+        Dependees,
+        DependeesRequest(
+            owners.addresses,
+            transitive=request.dependees == DependeesOption.TRANSITIVE,
+            include_roots=True,
+        ),
     )
-    if changed_request.dependees == DependeesOption.DIRECT:
-        return ChangedAddresses(Addresses(graph.dependents_of_addresses(owners.addresses)))
-    return ChangedAddresses(Addresses(graph.transitive_dependents_of_addresses(owners.addresses)))
+    return ChangedAddresses(address_to_dependees)
 
 
 @dataclass(frozen=True)
@@ -156,7 +144,7 @@ class Changed(Subsystem):
             type=DependeesOption,
             default=DependeesOption.NONE,
             help="Include direct or transitive dependees of changed targets.",
-            removal_version="2.0.1.dev0",
+            removal_version="2.1.0.dev0",
             removal_hint="Use `--changed-dependees` instead of `--changed-include-dependees`.",
         )
         register(
@@ -164,10 +152,15 @@ class Changed(Subsystem):
             type=bool,
             default=False,
             help="Stop searching for owners once a source is mapped to at least one owning target.",
-            removal_version="2.0.1.dev0",
+            removal_version="2.1.0.dev0",
             removal_hint="The option `--changed-fast` no longer does anything.",
         )
 
 
 def rules():
-    return [find_owners, RootRule(ChangedRequest)]
+    return [
+        map_addresses_to_dependees,
+        find_dependees,
+        find_changed_owners,
+        RootRule(ChangedRequest),
+    ]

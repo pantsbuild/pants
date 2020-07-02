@@ -96,6 +96,19 @@ impl TimeSpan {
     }
   }
 
+  /// Construct a TimeSpan that started at `start` and ends at `end`.
+  pub fn from_start_and_end_systemtime(
+    start: &std::time::SystemTime,
+    end: &std::time::SystemTime,
+  ) -> TimeSpan {
+    let start = Self::since_epoch(start);
+    let duration = Self::since_epoch(end) - start;
+    TimeSpan {
+      start: start.into(),
+      duration: duration.into(),
+    }
+  }
+
   fn std_duration_from_protobuf_timestamp(
     t: &protobuf::well_known_types::Timestamp,
   ) -> std::time::Duration {

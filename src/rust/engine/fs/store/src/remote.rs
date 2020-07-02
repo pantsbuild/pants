@@ -7,12 +7,13 @@ use std::time::Duration;
 
 use bazel_protos::{self, call_option};
 use bytes::{Bytes, BytesMut};
-use concrete_time::TimeSpan;
 use futures::compat::Future01CompatExt;
 use futures::future::{FutureExt, TryFutureExt};
 use futures01::{future, Future, Sink, Stream};
 use hashing::Digest;
+use log::Level;
 use serverset::{retry, Serverset};
+use workunit_store::new_span_id;
 
 use super::{BackoffConfig, EntryType};
 
@@ -108,8 +109,6 @@ impl ByteStore {
   }
 
   pub async fn store_bytes(&self, bytes: &[u8]) -> Result<Digest, String> {
-    let start_time = std::time::SystemTime::now();
-
     let len = bytes.len();
     let digest = Digest::of_bytes(&bytes);
     let resource_name = format!(
@@ -120,6 +119,14 @@ impl ByteStore {
       digest.1,
     );
     let workunit_name = format!("store_bytes({})", resource_name.clone());
+    let span_id = new_span_id();
+    if let Some(workunit_state) = workunit_store::get_workunit_state() {
+      let parent_id = workunit_state.parent_id;
+      let metadata = workunit_store::WorkunitMetadata::with_level(Level::Debug);
+      workunit_state
+        .store
+        .start_workunit(span_id.clone(), workunit_name, parent_id, metadata);
+    }
     let store = self.clone();
 
     let result = self
@@ -209,14 +216,7 @@ impl ByteStore {
       .await;
 
     if let Some(workunit_state) = workunit_store::get_workunit_state() {
-      let parent_id = workunit_state.parent_id;
-      let metadata = workunit_store::WorkunitMetadata::new();
-      workunit_state.store.add_completed_workunit(
-        workunit_name.clone(),
-        TimeSpan::since(&start_time),
-        parent_id,
-        metadata,
-      );
+      workunit_state.store.complete_workunit(span_id)
     }
 
     result
@@ -231,8 +231,6 @@ impl ByteStore {
     digest: Digest,
     f: F,
   ) -> Result<Option<T>, String> {
-    let start_time = std::time::SystemTime::now();
-
     let store = self.clone();
     let resource_name = format!(
       "{}/blobs/{}/{}",
@@ -241,6 +239,14 @@ impl ByteStore {
       digest.1
     );
     let workunit_name = format!("load_bytes_with({})", resource_name.clone());
+    let span_id = new_span_id();
+    if let Some(workunit_state) = workunit_store::get_workunit_state() {
+      let parent_id = workunit_state.parent_id;
+      let metadata = workunit_store::WorkunitMetadata::with_level(Level::Debug);
+      workunit_state
+        .store
+        .start_workunit(span_id.clone(), workunit_name, parent_id, metadata);
+    }
 
     let result = self
       .with_byte_stream_client(move |client| {
@@ -294,13 +300,7 @@ impl ByteStore {
       .await;
 
     if let Some(workunit_state) = workunit_store::get_workunit_state() {
-      let name = workunit_name.clone();
-      let time_span = TimeSpan::since(&start_time);
-      let parent_id = workunit_state.parent_id;
-      let metadata = workunit_store::WorkunitMetadata::new();
-      workunit_state
-        .store
-        .add_completed_workunit(name, time_span, parent_id, metadata);
+      workunit_state.store.complete_workunit(span_id);
     }
 
     result
@@ -314,13 +314,20 @@ impl ByteStore {
     &self,
     request: bazel_protos::remote_execution::FindMissingBlobsRequest,
   ) -> impl Future<Item = HashSet<Digest>, Error = String> {
-    let start_time = std::time::SystemTime::now();
-
     let store = self.clone();
     let workunit_name = format!(
       "list_missing_digests({})",
       store.instance_name.clone().unwrap_or_default()
     );
+    let span_id = new_span_id();
+    if let Some(workunit_state) = workunit_store::get_workunit_state() {
+      let parent_id = workunit_state.parent_id;
+      let metadata = workunit_store::WorkunitMetadata::with_level(Level::Debug);
+      workunit_state
+        .store
+        .start_workunit(span_id.clone(), workunit_name, parent_id, metadata);
+    }
+
     async move {
       let store2 = store.clone();
       let res = store2
@@ -345,13 +352,7 @@ impl ByteStore {
         })
         .await;
       if let Some(workunit_state) = workunit_store::get_workunit_state() {
-        let name = workunit_name.clone();
-        let time_span = TimeSpan::since(&start_time);
-        let parent_id = workunit_state.parent_id;
-        let metadata = workunit_store::WorkunitMetadata::new();
-        workunit_state
-          .store
-          .add_completed_workunit(name, time_span, parent_id, metadata);
+        workunit_state.store.complete_workunit(span_id);
       }
       res
     }

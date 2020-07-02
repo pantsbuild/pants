@@ -53,7 +53,7 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/engine:fs',
     'src/python/pants/testutil:test_base',
-    'src/python/pants/testutil/engine:util',
+    'src/python/pants/testutil/engine',
   ],
   tags = {"partially_type_checked"},
 )

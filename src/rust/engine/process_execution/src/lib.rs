@@ -418,10 +418,19 @@ impl AddAssign<UploadSummary> for ExecutionStats {
   }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct Context {
   workunit_store: WorkunitStore,
   build_id: String,
+}
+
+impl Default for Context {
+  fn default() -> Self {
+    Context {
+      workunit_store: WorkunitStore::new(false),
+      build_id: String::default(),
+    }
+  }
 }
 
 impl Context {

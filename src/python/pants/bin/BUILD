@@ -14,7 +14,6 @@ python_library(
     'src/python/pants/base:workunit',
     'src/python/pants/binaries',
     'src/python/pants/build_graph',
-    'src/python/pants/core_tasks',
     'src/python/pants/engine/internals:build_files',
     'src/python/pants/engine/internals:core_abstractions',
     'src/python/pants/engine/internals:native',

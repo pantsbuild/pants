@@ -564,6 +564,8 @@ class GlobalOptions(Subsystem):
         )
 
         # BinaryUtil options.
+        # TODO: Nuke these once we get rid of src/python/pants/binaries/binary_util.py
+        #  (see there for what that will take).
         register(
             "--binaries-baseurls",
             type=list,

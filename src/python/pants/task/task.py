@@ -343,7 +343,7 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
         options_hasher = sha1()
         options_hasher.update(scope.encode())
         options_fp = OptionsFingerprinter.combined_options_fingerprint_for_scope(
-            scope, self.context.options, build_graph=self.context.build_graph,
+            scope, self.context.options
         )
         options_hasher.update(options_fp.encode())
         return options_hasher.hexdigest()
@@ -779,9 +779,3 @@ class Task(TaskBase):
 
         :API: public
         """
-
-
-class QuietTaskMixin:
-    """A mixin to signal that pants shouldn't print verbose progress information for this task."""
-
-    pass
