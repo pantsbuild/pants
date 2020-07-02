@@ -51,7 +51,7 @@ if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
   fi
 
   echo "* Checking MyPy"
-  ./v2 --changed-since="${MERGE_BASE}" --changed-include-dependees=transitive \
+  ./v2 --changed-since="${MERGE_BASE}" --changed-dependees=transitive \
     --tag='-nolint' typecheck || exit 1
 
   echo "* Checking Flake8, and formatting"
