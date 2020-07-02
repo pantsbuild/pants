@@ -8,9 +8,9 @@ import platform
 import subprocess
 import tempfile
 from contextlib import contextmanager
-from enum import Enum, auto
+from enum import Enum
 from pathlib import Path
-from typing import Iterable, Iterator, List, NamedTuple, Optional, Set, Union
+from typing import Iterator, List, Optional
 
 from common import banner, die, green, travis_section
 
@@ -49,8 +49,6 @@ def main() -> None:
             run_rust_tests()
         if args.integration_tests:
             run_integration_tests(oauth_token_path=remote_execution_oauth_token_path)
-        if args.plugin_tests:
-            run_plugin_tests(oauth_token_path=remote_execution_oauth_token_path)
         if args.platform_specific_tests:
             run_platform_specific_tests()
 
@@ -123,14 +121,6 @@ def create_parser() -> argparse.ArgumentParser:
         "--integration-tests", action="store_true", help="Run Python integration tests."
     )
     parser.add_argument(
-        "--integration-shard",
-        metavar="SHARD_NUMBER/TOTAL_SHARDS",
-        default=None,
-        help="Divide integration tests into TOTAL_SHARDS shards and just run those in SHARD_NUMBER. "
-        "E.g. `-i 0/2` and `-i 1/2` will split the tests in half.",
-    )
-    parser.add_argument("--plugin-tests", action="store_true", help="Run tests for pants-plugins.")
-    parser.add_argument(
         "--platform-specific-tests", action="store_true", help="Test platform-specific behavior."
     )
     return parser
@@ -198,116 +188,6 @@ def maybe_get_remote_execution_oauth_token_path(
 
 
 # -------------------------------------------------------------------------
-# Block lists
-# -------------------------------------------------------------------------
-
-Target = str
-Glob = str
-TargetSet = Set[Target]
-
-
-class TestStrategy(Enum):
-    v1_no_chroot = auto()
-    v1_chroot = auto()
-    v2_local = auto()
-    v2_remote = auto()
-
-    def pants_command(
-        self,
-        *,
-        targets: Iterable[Union[Target, Glob]],
-        shard: Optional[str] = None,
-        oauth_token_path: Optional[str] = None,
-    ) -> List[str]:
-        if self == self.v2_remote and oauth_token_path is None:  # type: ignore[comparison-overlap]  # issues with understanding `self`
-            raise ValueError("Must specify oauth_token_path.")
-        result = {
-            self.v1_no_chroot: [
-                "./pants.pex",
-                "test.pytest",
-                "--no-chroot",
-                *sorted(targets),
-                *PYTEST_PASSTHRU_ARGS,
-            ],
-            self.v1_chroot: ["./pants.pex", "test.pytest", *sorted(targets), *PYTEST_PASSTHRU_ARGS],
-            self.v2_local: ["./pants.pex", "--no-v1", "--v2", "test", *sorted(targets)],
-            self.v2_remote: [
-                "./pants.pex",
-                *_use_remote_execution(oauth_token_path or ""),
-                "test",
-                *sorted(targets),
-            ],
-        }[
-            self  # type: ignore[index]  # issues with understanding `self`
-        ]
-        if shard is not None and self in [self.v1_no_chroot, self.v1_chroot]:  # type: ignore[comparison-overlap]  # issues with understanding `self`
-            result.insert(2, f"--test-pytest-test-shard={shard}")
-        return result
-
-
-class TestType(Enum):
-    unit = "unit"
-    integration = "integration"
-
-    def __str__(self) -> str:
-        return str(self.value)
-
-
-class TestTargetSets(NamedTuple):
-    v1_no_chroot: TargetSet
-    v1_chroot: TargetSet
-    v2_local: TargetSet
-    v2_remote: TargetSet
-
-    @staticmethod
-    def calculate(
-        *, test_type: TestType, remote_execution_enabled: bool = False
-    ) -> "TestTargetSets":
-        def get_listed_targets(filename: str) -> TargetSet:
-            list_path = Path(f"build-support/ci_lists/{filename}")
-            if not list_path.exists():
-                return set()
-            return {line.strip() for line in list_path.read_text().splitlines()}
-
-        all_targets = set(
-            subprocess.run(
-                [
-                    "./pants.pex",
-                    f"--tag={'-' if test_type == TestType.unit else '+'}integration",
-                    "filter",
-                    "--target-type=python_tests",
-                    "build-support::",
-                    "src/python::",
-                    "tests/python::",
-                ],
-                stdout=subprocess.PIPE,
-                encoding="utf-8",
-                check=True,
-            )
-            .stdout.strip()
-            .split("\n")
-        )
-
-        v1_no_chroot_targets = get_listed_targets(f"{test_type}_chroot_block_list.txt")
-        v1_chroot_targets = get_listed_targets(f"{test_type}_v2_block_list.txt")
-        v2_local_targets = get_listed_targets(f"{test_type}_remote_block_list.txt")
-        v2_remote_targets = (
-            all_targets - v2_local_targets - v1_chroot_targets - v1_no_chroot_targets
-        )
-
-        if not remote_execution_enabled:
-            v2_local_targets |= v2_remote_targets
-            v2_remote_targets = set()
-
-        return TestTargetSets(
-            v1_no_chroot=v1_no_chroot_targets,
-            v1_chroot=v1_chroot_targets,
-            v2_local=v2_local_targets,
-            v2_remote=v2_remote_targets,
-        )
-
-
-# -------------------------------------------------------------------------
 # Bootstrap pants.pex
 # -------------------------------------------------------------------------
 
@@ -353,15 +233,9 @@ def check_pants_pex_exists() -> None:
 # Test commands
 # -------------------------------------------------------------------------
 
-# We only want to output failures and skips.
-# See https://docs.pytest.org/en/latest/usage.html#detailed-summary-report.
-PYTEST_PASSTHRU_ARGS = ["--", "-q", "-rfa"]
-
 
 def _use_remote_execution(oauth_token_path: str) -> List[str]:
     return [
-        "--no-v1",
-        "--v2",
         "--pants-config-files=pants.remote.toml",
         f"--remote-oauth-bearer-token-path={oauth_token_path}",
     ]
@@ -384,11 +258,23 @@ def _run_command(
             die(die_message)
 
 
+def _test_command(
+    *, oauth_token_path: Optional[str] = None, extra_args: Optional[List[str]] = None
+) -> List[str]:
+    targets = ["build-support::", "src::", "tests::", "pants-plugins::"]
+    command = ["./pants.pex", "test", *targets]
+    if extra_args:
+        command.extend(extra_args)
+    if oauth_token_path:
+        command.extend(_use_remote_execution(oauth_token_path))
+    return command
+
+
 def run_githooks() -> None:
     _run_command(
         ["./build-support/githooks/pre-commit"],
         slug="PreCommit",
-        start_message="Running pre-commit checks",
+        start_message="Running pre-commit checks.",
         die_message="Pre-commit checks failed.",
     )
 
@@ -412,7 +298,7 @@ def run_smoke_tests() -> None:
         ["roots"],
         ["target-types"],
     ]
-    with travis_section("SanityCheck", "Sanity checking bootstrapped Pants and repo BUILD files"):
+    with travis_section("SmokeTest", "Smoke testing bootstrapped Pants and repo BUILD files"):
         check_pants_pex_exists()
         for check in checks:
             run_check(check)
@@ -420,22 +306,13 @@ def run_smoke_tests() -> None:
 
 def run_lint(*, oauth_token_path: Optional[str] = None) -> None:
     targets = ["build-support::", "examples::", "src::", "tests::"]
-    command_prefix = ["./pants.pex", "--tag=-nolint"]
-    command = (
-        [*command_prefix, "--no-v1", "--v2", "lint", "typecheck", *targets]
-        if oauth_token_path is None
-        else [
-            *command_prefix,
-            *_use_remote_execution(oauth_token_path),
-            "lint",
-            "typecheck",
-            *targets,
-        ]
-    )
+    command = ["./pants.pex", "--tag=-nolint", "lint", "typecheck", *targets]
+    if oauth_token_path:
+        command.extend(_use_remote_execution(oauth_token_path))
     _run_command(
         command,
         slug="Lint",
-        start_message="Running lint checks",
+        start_message="Running lint checks.",
         die_message="Lint check failure.",
     )
 
@@ -444,7 +321,7 @@ def run_clippy() -> None:
     _run_command(
         ["build-support/bin/check_clippy.sh"],
         slug="RustClippy",
-        start_message="Running Clippy on Rust code",
+        start_message="Running Clippy on Rust code.",
         die_message="Clippy failure.",
         requires_pex=False,
     )
@@ -480,43 +357,6 @@ def run_cargo_audit() -> None:
             die("Cargo audit failure")
 
 
-def run_unit_tests(*, oauth_token_path: Optional[str] = None) -> None:
-    target_sets = TestTargetSets.calculate(
-        test_type=TestType.unit, remote_execution_enabled=oauth_token_path is not None
-    )
-    if target_sets.v2_remote:
-        _run_command(
-            command=TestStrategy.v2_remote.pants_command(
-                targets=target_sets.v2_remote, oauth_token_path=oauth_token_path
-            ),
-            slug="UnitTestsV2Remote",
-            start_message="Running unit tests via remote V2 strategy",
-            die_message="Unit test failure (remote V2 strategy)",
-        )
-    if target_sets.v2_local:
-        _run_command(
-            command=TestStrategy.v2_local.pants_command(targets=target_sets.v2_local),
-            slug="UnitTestsV2Local",
-            start_message="Running unit tests via local V2 strategy",
-            die_message="Unit test failure (local V2)",
-        )
-    if target_sets.v1_chroot:
-        _run_command(
-            command=TestStrategy.v1_chroot.pants_command(targets=target_sets.v1_chroot),
-            slug="UnitTestsV1Chroot",
-            start_message="Running unit tests via local V1 chroot strategy",
-            die_message="Unit test failure (V1 chroot)",
-        )
-
-    if target_sets.v1_no_chroot:
-        _run_command(
-            command=TestStrategy.v1_no_chroot.pants_command(targets=target_sets.v1_no_chroot),
-            slug="UnitTestsV1NoChroot",
-            start_message="Running unit tests via local V1 no-chroot strategy",
-            die_message="Unit test failure (V1 no-chroot)",
-        )
-
-
 def run_rust_tests() -> None:
     is_macos = platform.system() == "Darwin"
     command = [
@@ -541,47 +381,30 @@ def run_rust_tests() -> None:
             die("Rust test failure.")
 
 
-def run_integration_tests(*, oauth_token_path: Optional[str] = None) -> None:
-    target_sets = TestTargetSets.calculate(
-        test_type=TestType.integration, remote_execution_enabled=oauth_token_path is not None
-    )
-    if target_sets.v2_remote:
-        _run_command(
-            command=TestStrategy.v2_remote.pants_command(
-                targets=target_sets.v2_remote, oauth_token_path=oauth_token_path
-            ),
-            slug="IntegrationTestsV2Remote",
-            start_message="Running integration tests via V2 remote strategy.",
-            die_message="Integration test failure (V2 remote)",
-        )
-    if target_sets.v2_local:
-        _run_command(
-            command=TestStrategy.v2_local.pants_command(targets=target_sets.v2_local),
-            slug="IntegrationTestsV2Local",
-            start_message="Running integration tests via V2 local strategy.",
-            die_message="Integration test failure (V2 local)",
-        )
-
-
-def run_plugin_tests(*, oauth_token_path: Optional[str] = None) -> None:
+def run_unit_tests(*, oauth_token_path: Optional[str] = None) -> None:
     _run_command(
-        TestStrategy.v2_remote.pants_command(
-            targets={"pants-plugins/src/python::"}, oauth_token_path=oauth_token_path
-        ),
-        slug="BackendTests",
-        start_message="Running internal backend Python tests",
-        die_message="Internal backend Python test failure.",
+        command=_test_command(oauth_token_path=oauth_token_path, extra_args=["--tag=-integration"]),
+        slug="UnitTestsV2Local",
+        start_message="Running unit tests.",
+        die_message="Unit test failure.",
+    )
+
+
+def run_integration_tests(*, oauth_token_path: Optional[str] = None) -> None:
+    _run_command(
+        command=_test_command(oauth_token_path=oauth_token_path, extra_args=["--tag=+integration"]),
+        slug="IntegrationTests",
+        start_message="Running integration tests.",
+        die_message="Integration test failure.",
     )
 
 
 def run_platform_specific_tests() -> None:
-    command = TestStrategy.v2_local.pants_command(targets=["src/python/::", "tests/python::"])
-    command.insert(1, "--tag=+platform_specific_behavior")
     _run_command(
-        command,
+        command=_test_command(extra_args=["--tag=+platform_specific_behavior"]),
         slug="PlatformSpecificTests",
         start_message=f"Running platform-specific tests on platform {platform.system()}",
-        die_message="Pants platform-specific test failure.",
+        die_message="Platform-specific test failure.",
     )
 
 
