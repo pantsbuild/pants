@@ -223,9 +223,8 @@ class LegacyGraphSession:
 
         for goal in goals:
             goal_product = self.goal_map[goal]
-            # NB: We no-op for goals that have no V2 implementation because no relevant backends are
-            # registered. This allows us to safely set `--v1 --v2`, even if no V2 backends are registered.
-            # Once V1 is removed, we might want to reconsider the behavior to instead warn or error when
+            # NB: We no-op for goals that have no implementation because no relevant backends are
+            # registered. We might want to reconsider the behavior to instead warn or error when
             # trying to run something like `./pants run` without any backends registered.
             is_implemented = union_membership.has_members_for_all(
                 goal_product.subsystem_cls.required_union_implementations

@@ -121,8 +121,6 @@ class CoverageIntegrationTest(PantsRunIntegrationTest):
 
     def _run_tests(self, tmpdir_relative, *more_args: str) -> PantsResult:
         command = [
-            "--no-v1",
-            "--v2",
             "test",
             "--use-coverage",
             f"{tmpdir_relative}/src/python/project:tests",

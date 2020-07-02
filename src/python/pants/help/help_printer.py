@@ -134,7 +134,6 @@ class HelpPrinter:
         """
 
         help_request = cast(OptionsHelp, self._help_request)
-        global_options = self._options.for_global_scope()
 
         if help_request.all_scopes:
             help_scopes = set(self._options.known_scope_to_info.keys())
@@ -142,12 +141,7 @@ class HelpPrinter:
             # The scopes explicitly mentioned by the user on the cmd line.
             help_scopes = set(self._options.scope_to_flags.keys()) - {GLOBAL_SCOPE}
 
-        # If --v1 is enabled at all, don't use v2_help, even if --v2 is also enabled.
-        v2_help = global_options.v2 and not global_options.v1
-
-        scope_info_iterator = ScopeInfoIterator(
-            scope_to_info=self._options.known_scope_to_info, v2_help=v2_help
-        )
+        scope_info_iterator = ScopeInfoIterator(scope_to_info=self._options.known_scope_to_info)
 
         scope_infos = list(scope_info_iterator.iterate(help_scopes))
 

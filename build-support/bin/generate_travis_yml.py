@@ -11,7 +11,7 @@ HEADER = dedent(
     """\
     # GENERATED, DO NOT EDIT!
     # To change, edit `build-support/bin/generate_travis_yml.py` and run:
-    #   ./v2 run build-support/bin:generate_travis_yml > .travis.yml
+    #   ./pants run build-support/bin:generate_travis_yml > .travis.yml
     """
 )
 
