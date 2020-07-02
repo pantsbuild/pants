@@ -1,7 +1,6 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import itertools
 import logging
 import os
 import unittest
@@ -10,14 +9,12 @@ from abc import ABC, ABCMeta, abstractmethod
 from collections import defaultdict
 from contextlib import contextmanager
 from tempfile import mkdtemp
-from textwrap import dedent
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Type, TypeVar, Union, cast
 
 from pants.base.build_root import BuildRoot
-from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exceptions import TaskError
-from pants.base.specs import AddressSpec, AddressSpecs, FilesystemSpecs, Specs
-from pants.build_graph.address import Address, BuildFileAddress
+from pants.base.specs import AddressSpecs, FilesystemSpecs, Specs
+from pants.build_graph.address import BuildFileAddress
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.target import Target as TargetV1
