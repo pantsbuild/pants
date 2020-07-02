@@ -3,8 +3,6 @@
 
 import os
 
-from pants.base.payload import Payload
-from pants.base.payload_field import PrimitiveField
 from pants.option.custom_types import (
     DictValueComponent,
     ListValueComponent,
@@ -12,7 +10,6 @@ from pants.option.custom_types import (
     dict_with_files_option,
     dir_option,
     file_option,
-    target_option,
 )
 from pants.option.options_fingerprinter import OptionsFingerprinter
 from pants.testutil.test_base import TestBase
@@ -22,7 +19,7 @@ from pants.util.contextutil import temporary_dir
 class OptionsFingerprinterTest(TestBase):
     def setUp(self) -> None:
         super().setUp()
-        self.options_fingerprinter = OptionsFingerprinter(self.context().build_graph)
+        self.options_fingerprinter = OptionsFingerprinter()
 
     def test_fingerprint_dict(self) -> None:
         d1 = {"b": 1, "a": 2}
