@@ -126,7 +126,7 @@ Refactoring, Improvements, and Tooling
   `PR #10178 <https://github.com/pantsbuild/pants/pull/10178>`_
 
 * Delete the old BinaryTool mechanism. (#10239)
-  `PR #10210 <https://github.com/pantsbuild/pants/pull/10239>`_
+  `PR #10239 <https://github.com/pantsbuild/pants/pull/10239>`_
 
 * Delete more v1 task-related integration tests. (#10210)
   `PR #10210 <https://github.com/pantsbuild/pants/pull/10210>`_
