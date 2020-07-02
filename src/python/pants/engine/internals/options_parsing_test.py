@@ -27,7 +27,7 @@ class TestEngineOptionsParsing(TestBase):
                 "binary",
                 "src/python::",
             ),
-                 env=dict(PANTS_PANTSD="True", PANTS_BUILD_IGNORE='["ignoreme/"]'),
+            env=dict(PANTS_PANTSD="True", PANTS_BUILD_IGNORE='["ignoreme/"]'),
         )
 
         global_options_params = Params(Scope(str(GLOBAL_SCOPE)), options_bootstrapper)
