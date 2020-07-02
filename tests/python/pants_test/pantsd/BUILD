@@ -5,7 +5,7 @@ python_tests(
   name = 'process_manager',
   sources = ['test_process_manager.py'],
   dependencies = [
-    'src/python/pants/testutil:test_base'
+    'src/python/pants/testutil:test_base',
     'src/python/pants/pantsd:process_manager',
   ],
 )
