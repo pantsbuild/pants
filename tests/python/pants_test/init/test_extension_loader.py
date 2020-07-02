@@ -63,14 +63,11 @@ class DummyTarget2(Target):
 
 
 class DummyObject1:
-    # Test that registering an object with no subsystems() method succeeds.
     pass
 
 
 class DummyObject2:
-    @classmethod
-    def subsystems(cls):
-        return (DummySubsystem,)
+    pass
 
 
 @dataclass(frozen=True)
