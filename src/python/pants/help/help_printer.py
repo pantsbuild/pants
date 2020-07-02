@@ -9,7 +9,7 @@ from colors import cyan, green
 from typing_extensions import Literal
 
 from pants.base.build_environment import pants_release, pants_version
-from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.goal import GoalSubsystem
 from pants.engine.unions import UnionMembership
 from pants.help.help_formatter import HelpFormatter
 from pants.option.arg_splitter import (
@@ -71,13 +71,6 @@ class HelpPrinter:
         goal_descriptions: Dict[str, str] = {}
         if global_options.v2:
             for scope_info in self._options.known_scope_to_info.values():
-                print(f"XXXXXXXXXXX {scope_info.scope} {scope_info.optionable_cls}")
-            goal_scope_infos = [
-                scope_info
-                for scope_info in self._options.known_scope_to_info.values()
-                if issubclass(scope_info.optionable_cls, Goal)  # type: ignore[arg-type]
-            ]
-            for scope_info in goal_scope_infos:
                 optionable_cls = scope_info.optionable_cls
                 if optionable_cls is None or not issubclass(optionable_cls, GoalSubsystem):
                     continue
