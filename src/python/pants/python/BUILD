@@ -1,7 +1,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-
 python_library(
   dependencies=[
     '3rdparty/python:pex',
@@ -25,7 +24,6 @@ python_tests(
   dependencies=[
     '3rdparty/python:pex',
     ':python',
-    'src/python/pants/backend/python/targets',
     'src/python/pants/build_graph',
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil/subsystem',

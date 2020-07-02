@@ -16,11 +16,11 @@ from pants.backend.python.target_types import (
     PexInheritPath,
     PexShebang,
     PexZipSafe,
+    PythonBinaryDefaults,
     PythonBinarySources,
     PythonEntryPoint,
 )
 from pants.backend.python.target_types import PythonPlatforms as PythonPlatformsField
-from pants.backend.python.targets.python_binary import PythonBinary as PythonBinaryV1
 from pants.core.goals.binary import BinaryFieldSet, CreatedBinary
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
 from pants.engine.addresses import Addresses
@@ -45,7 +45,7 @@ class PythonBinaryFieldSet(BinaryFieldSet):
     platforms: PythonPlatformsField
 
     def generate_additional_args(
-        self, python_binary_defaults: PythonBinaryV1.Defaults
+        self, python_binary_defaults: PythonBinaryDefaults
     ) -> Tuple[str, ...]:
         args = []
         if self.always_write_cache.value is True:
@@ -65,7 +65,7 @@ class PythonBinaryFieldSet(BinaryFieldSet):
 
 @rule
 async def create_python_binary(
-    field_set: PythonBinaryFieldSet, python_binary_defaults: PythonBinaryV1.Defaults
+    field_set: PythonBinaryFieldSet, python_binary_defaults: PythonBinaryDefaults
 ) -> CreatedBinary:
     entry_point = field_set.entry_point.value
     if entry_point is None:
@@ -95,5 +95,5 @@ def rules():
     return [
         create_python_binary,
         UnionRule(BinaryFieldSet, PythonBinaryFieldSet),
-        SubsystemRule(PythonBinaryV1.Defaults),
+        SubsystemRule(PythonBinaryDefaults),
     ]

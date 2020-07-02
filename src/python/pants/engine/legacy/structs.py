@@ -5,16 +5,14 @@ import logging
 import os.path
 from collections.abc import MutableSequence, MutableSet
 from dataclasses import dataclass
-from typing import Callable, Iterable, List, Optional, Sequence, Tuple, Union, cast
+from typing import Callable, Iterable, Optional, Sequence, Tuple, Union, cast
 
 from pants.build_graph.address import Address
-from pants.build_graph.target import Target
 from pants.engine.fs import GlobExpansionConjunction, PathGlobs
 from pants.engine.internals.objects import Locatable
 from pants.engine.internals.struct import StructWithDeps
 from pants.engine.unions import UnionRule, union
 from pants.source import wrapped_globs
-from pants.util.collections import ensure_str_list
 from pants.util.contextutil import exception_logging
 from pants.util.meta import classproperty
 
@@ -164,46 +162,6 @@ class RemoteSourcesAdaptor(TargetAdaptor):
         if not isinstance(dest, str):
             dest = dest._type_alias
         super().__init__(dest=dest, **kwargs)
-
-
-class PythonTargetAdaptor(TargetAdaptor):
-    @property
-    def field_adaptors(self) -> Tuple:
-        with exception_logging(logger, "Exception in `field_adaptors` property"):
-            field_adaptors = super().field_adaptors
-            if getattr(self, "resources", None) is None:
-                return field_adaptors
-            source_globs = SourceGlobs.from_sources_field(self.resources)
-            sources_field = SourcesField(
-                address=self.address,
-                arg="resources",
-                source_globs=source_globs,
-                conjunction=GlobExpansionConjunction.all_match,
-            )
-            return (*field_adaptors, sources_field)
-
-    # TODO(#4535): remove this once its superseded by the target API.
-    @property
-    def compatibility(self) -> Optional[List[str]]:
-        if "compatibility" not in self._kwargs:
-            return None
-        return ensure_str_list(self._kwargs["compatibility"], allow_single_str=True)
-
-
-class PythonBinaryAdaptor(PythonTargetAdaptor):
-    def validate_sources(self, sources):
-        if len(sources.files) > 1:
-            raise Target.IllegalArgument(
-                self.address.spec,
-                "python_binary must have exactly 0 or 1 sources (typically used to specify the file "
-                "containing the entry point). "
-                "Other sources should instead be placed in a python_library, which "
-                "should be referenced in the python_binary's dependencies.",
-            )
-
-
-class PythonTestsAdaptor(PythonTargetAdaptor):
-    pass
 
 
 class SourceGlobs(Locatable):

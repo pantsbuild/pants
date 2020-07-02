@@ -110,10 +110,6 @@ branch_notes = """
 }
 """
 
-[python-setup]
-interpreter_cache_dir = "%(pants_bootstrapdir)s/python_cache/interpreters"
-resolver_cache_dir = "%(pants_bootstrapdir)s/python_cache/requirements"
-
 [pytest]
 pytest_plugins.add = [
   # TODO(#8651): We need this until we switch to implicit namespace packages so that pytest-cov
