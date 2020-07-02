@@ -11,6 +11,9 @@ See https://pants.readme.io/v2.0/docs/release-notes-2-0 for an overview of the c
 API Changes
 ~~~~~~~~~~~
 
+* Get rid of --plugins2/--backend-packages2 (#10231)
+  `PR #10231 <https://github.com/pantsbuild/pants/pull/10231>`_
+
 * Deprecate `--changed-include-dependees` in favor of `--changed-dependees` (#10217)
   `PR #10217 <https://github.com/pantsbuild/pants/pull/10217>`_
 
