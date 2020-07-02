@@ -42,6 +42,7 @@ class CoverageReportType(Enum):
     CONSOLE = ("console", "report")
     XML = ("xml", None)
     HTML = ("html", None)
+    RAW = ("raw", None)
 
     _report_name: str
 

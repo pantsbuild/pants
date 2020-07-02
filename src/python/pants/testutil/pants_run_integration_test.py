@@ -4,7 +4,6 @@
 import glob
 import os
 import re
-import shutil
 import subprocess
 import sys
 import unittest
@@ -13,19 +12,16 @@ from dataclasses import dataclass
 from operator import eq, ne
 from pathlib import Path
 from threading import Lock
-from typing import Any, Callable, Iterator, List, Optional, Union
-
-from colors import strip_color
+from typing import Callable, Iterator, List, Optional, Union
 
 from pants.base.build_environment import get_buildroot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
-from pants.build_graph.address import _is_build_file_name
 from pants.option.config import TomlSerializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.pants_daemon_client import PantsDaemonClient
 from pants.subsystem.subsystem import Subsystem
-from pants.util.contextutil import environment_as, pushd, temporary_dir
-from pants.util.dirutil import fast_relpath, safe_mkdir, safe_mkdir_for, safe_open
+from pants.util.contextutil import environment_as, temporary_dir
+from pants.util.dirutil import fast_relpath, safe_mkdir, safe_open
 from pants.util.osutil import Pid
 from pants.util.process_handler import SubprocessProcessHandler
 from pants.util.strutil import ensure_binary
@@ -78,37 +74,6 @@ class PantsJoinHandle:
             workdir=self.workdir,
             pid=self.process.pid,
         )
-
-
-def ensure_cached(expected_num_artifacts=None):
-    """Decorator for asserting cache writes in an integration test.
-
-    :param expected_num_artifacts: Expected number of artifacts to be in the task's
-                                   cache after running the test. If unspecified, will
-                                   assert that the number of artifacts in the cache is
-                                   non-zero.
-    """
-
-    def decorator(test_fn):
-        def wrapper(self, *args, **kwargs):
-            with temporary_dir() as artifact_cache:
-                cache_args = f'--cache-write-to=["{artifact_cache}"]'
-
-                test_fn(self, *args + (cache_args,), **kwargs)
-
-                num_artifacts = 0
-                for (root, _, files) in os.walk(artifact_cache):
-                    print(root, files)
-                    num_artifacts += len(files)
-
-                if expected_num_artifacts is None:
-                    self.assertNotEqual(num_artifacts, 0)
-                else:
-                    self.assertEqual(num_artifacts, expected_num_artifacts)
-
-        return wrapper
-
-    return decorator
 
 
 def kill_daemon(pid_dir=None):
@@ -233,31 +198,6 @@ class PantsRunIntegrationTest(unittest.TestCase):
         safe_mkdir(root)
         return temporary_dir(root_dir=root, cleanup=cleanup, suffix=".pants.d")
 
-    def temporary_cachedir(self):
-        return temporary_dir(suffix="__CACHEDIR")
-
-    def temporary_sourcedir(self):
-        return temporary_dir(root_dir=get_buildroot())
-
-    @contextmanager
-    def source_clone(self, source_dir):
-        with self.temporary_sourcedir() as clone_dir:
-            target_spec_dir = os.path.relpath(clone_dir)
-
-            for dir_path, dir_names, file_names in os.walk(source_dir):
-                clone_dir_path = os.path.join(clone_dir, os.path.relpath(dir_path, source_dir))
-                for dir_name in dir_names:
-                    os.mkdir(os.path.join(clone_dir_path, dir_name))
-                for file_name in file_names:
-                    with open(os.path.join(dir_path, file_name), "r") as f:
-                        content = f.read()
-                    if _is_build_file_name(file_name):
-                        content = content.replace(source_dir, target_spec_dir)
-                    with open(os.path.join(clone_dir_path, file_name), "w") as f:
-                        f.write(content)
-
-            yield clone_dir
-
     # Incremented each time we spawn a pants subprocess.
     # Appended to PANTS_PROFILE in the called pants process, so that each subprocess
     # writes to its own profile file, instead of all stomping on the parent process's profile.
@@ -270,29 +210,6 @@ class PantsRunIntegrationTest(unittest.TestCase):
             ret = cls._profile_disambiguator
             cls._profile_disambiguator += 1
             return ret
-
-    def get_cache_subdir(self, cache_dir, subdir_glob="*/", other_dirs=()):
-        """Check that there is only one entry of `cache_dir` which matches the glob specified by
-        `subdir_glob`, excluding `other_dirs`, and return it.
-
-        :param str cache_dir: absolute path to some directory.
-        :param str subdir_glob: string specifying a glob for (one level down)
-                                subdirectories of `cache_dir`.
-        :param list other_dirs: absolute paths to subdirectories of `cache_dir`
-                                which must exist and match `subdir_glob`.
-        :return: Assert that there is a single remaining directory entry matching
-                 `subdir_glob` after removing `other_dirs`, and return it.
-
-                 This method oes not check if its arguments or return values are
-                 files or directories. If `subdir_glob` has a trailing slash, so
-                 will the return value of this method.
-        """
-        subdirs = set(glob.glob(os.path.join(cache_dir, subdir_glob)))
-        other_dirs = set(other_dirs)
-        self.assertTrue(other_dirs.issubset(subdirs))
-        remaining_dirs = subdirs - other_dirs
-        self.assertEqual(len(remaining_dirs), 1)
-        return list(remaining_dirs)[0]
 
     def run_pants_with_workdir_without_waiting(
         self,
@@ -420,22 +337,6 @@ class PantsRunIntegrationTest(unittest.TestCase):
                 command, workdir, config, stdin_data=stdin_data, extra_env=extra_env, **kwargs
             )
 
-    @contextmanager
-    def pants_results(self, command, config=None, stdin_data=None, extra_env=None, **kwargs):
-        """Similar to run_pants in that it runs pants in a subprocess, but yields in order to give
-        callers a chance to do any necessary validations on the workdir.
-
-        :param list command: A list of command line arguments coming after `./pants`.
-        :param config: Optional data for a generated TOML file. A map of <section-name> ->
-        map of key -> value.
-        :param kwargs: Extra keyword args to pass to `subprocess.Popen`.
-        :returns a PantsResult instance.
-        """
-        with self.temporary_workdir() as workdir:
-            yield self.run_pants_with_workdir(
-                command, workdir, config, stdin_data=stdin_data, extra_env=extra_env, **kwargs
-            )
-
     def assert_success(self, pants_run: PantsResult, msg=None):
         self.assert_result(pants_run, PANTS_SUCCEEDED_EXIT_CODE, expected=True, msg=msg)
 
@@ -476,16 +377,6 @@ class PantsRunIntegrationTest(unittest.TestCase):
             self.assertRegex(log, re.escape(prefix) + r"\d+" + re.escape(suffix))
         else:
             self.assertIn(f"{prefix}{pid}{suffix}", log)
-
-    def assert_is_file(self, file_path):
-        self.assertTrue(os.path.isfile(file_path), f"file path {file_path} does not exist!")
-
-    def assert_is_not_file(self, file_path):
-        self.assertFalse(os.path.isfile(file_path), f"file path {file_path} exists!")
-
-    def normalize(self, s: str) -> str:
-        """Removes escape sequences (e.g. colored output) and all whitespace from string s."""
-        return "".join(strip_color(s).split())
 
     @contextmanager
     def file_renamed(self, prefix, test_name, real_name):
@@ -580,66 +471,6 @@ class PantsRunIntegrationTest(unittest.TestCase):
             with open(file_path, "wb") as f:
                 f.write(file_original_content)
 
-    @contextmanager
-    def mock_buildroot(self, dirs_to_copy=None):
-        """Construct a mock buildroot and return a helper object for interacting with it."""
-
-        @dataclass(frozen=True)
-        class Manager:
-            write_file: Callable[[str, str], None]
-            pushd: Any
-            new_buildroot: str
-
-        # N.B. 3rdparty needs to be copied vs symlinked to avoid symlink prefix check error in
-        # v1 and v2 engine.
-        files_to_copy = ("BUILD.tools",)
-        files_to_link = (
-            "BUILD_ROOT",
-            ".isort.cfg",
-            ".pants.d",
-            "build-support",
-            # NB: when running with the V2 engine, `pants` refers to the source root-stripped
-            # directory src/python/pants, not the script `./pants`.
-            "pants",
-            "pants.pex",
-            "pants-plugins",
-            "pants.toml",
-            "pants.travis-ci.toml",
-            "pyproject.toml",
-            "rust-toolchain",
-            "src",
-        )
-        dirs_to_copy = ("3rdparty", *(dirs_to_copy or []))
-
-        with self.temporary_workdir() as tmp_dir:
-            for filename in files_to_copy:
-                shutil.copy(
-                    os.path.join(get_buildroot(), filename), os.path.join(tmp_dir, filename)
-                )
-
-            for dirname in dirs_to_copy:
-                shutil.copytree(
-                    os.path.join(get_buildroot(), dirname), os.path.join(tmp_dir, dirname)
-                )
-
-            for filename in files_to_link:
-                link_target = os.path.join(get_buildroot(), filename)
-                if os.path.exists(link_target):
-                    os.symlink(link_target, os.path.join(tmp_dir, filename))
-
-            def write_file(file_path, contents):
-                full_file_path = os.path.join(tmp_dir, *file_path.split(os.pathsep))
-                safe_mkdir_for(full_file_path)
-                with open(full_file_path, "w") as fh:
-                    fh.write(contents)
-
-            @contextmanager
-            def dir_context():
-                with pushd(tmp_dir):
-                    yield
-
-            yield Manager(write_file, dir_context, tmp_dir)
-
     def do_command(self, *args, **kwargs) -> PantsResult:
         """Wrapper around run_pants method.
 
@@ -653,14 +484,3 @@ class PantsRunIntegrationTest(unittest.TestCase):
         else:
             self.assert_failure(pants_run)
         return pants_run
-
-    @contextmanager
-    def do_command_yielding_workdir(self, *args, **kwargs):
-        cmd = list(args)
-        success = kwargs.pop("success", True)
-        with self.pants_results(cmd, **kwargs) as pants_run:
-            if success:
-                self.assert_success(pants_run)
-            else:
-                self.assert_failure(pants_run)
-            yield pants_run

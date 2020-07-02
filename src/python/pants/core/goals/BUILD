@@ -42,7 +42,7 @@ python_tests(
     'src/python/pants/engine:rules',
     'src/python/pants/engine:target',
     'src/python/pants/engine:unions',
-    'src/python/pants/testutil/engine:util',
+    'src/python/pants/testutil/engine',
     'src/python/pants/testutil:test_base',
     'src/python/pants/option:global_options',
     'src/python/pants/util:ordered_set',

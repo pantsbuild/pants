@@ -20,7 +20,7 @@ python_tests(
     'src/python/pants/pantsd:pants_daemon',
     'src/python/pants/python',
     'src/python/pants/subsystem',
-    'src/python/pants/testutil/engine:util',
+    'src/python/pants/testutil/engine',
     'src/python/pants/testutil/subsystem',
     'src/python/pants/testutil:interpreter_selection_utils',
     'src/python/pants/testutil:test_base',

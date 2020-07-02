@@ -23,7 +23,7 @@ python_tests(
     'src/python/pants/engine/internals:scheduler_test_base',
     'src/python/pants/option',
     'src/python/pants/testutil:test_base',
-    'src/python/pants/testutil/engine:util',
+    'src/python/pants/testutil/engine',
     'src/python/pants/util:collections',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',

@@ -54,7 +54,7 @@ python_tests(
     'src/python/pants/source',
     'src/python/pants/testutil:interpreter_selection_utils',
     'src/python/pants/testutil:external_tool_test_base',
-    'src/python/pants/testutil/engine:util',
+    'src/python/pants/testutil/engine',
     'src/python/pants/testutil/option',
     'src/python/pants/testutil/subsystem',
     'src/python/pants/util:collections',
