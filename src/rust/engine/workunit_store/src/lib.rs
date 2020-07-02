@@ -139,9 +139,10 @@ impl Default for WorkunitMetadata {
   }
 }
 
-type CompletedWorkunitReceiver =
-  Arc<Mutex<Receiver<(SpanId, Option<WorkunitMetadata>, SystemTime)>>>;
-type CompletedWorkunitSender = Arc<Mutex<Sender<(SpanId, Option<WorkunitMetadata>, SystemTime)>>>;
+enum StoreMsg {
+  Started(Workunit),
+  Completed(SpanId, Option<WorkunitMetadata>, SystemTime),
+}
 
 #[derive(Clone)]
 pub struct WorkunitStore {
@@ -152,22 +153,17 @@ pub struct WorkunitStore {
 
 #[derive(Clone)]
 struct StreamingWorkunitData {
-  started_workunits_rx: Arc<Mutex<Receiver<Workunit>>>,
-  started_workunits_tx: Arc<Mutex<Sender<Workunit>>>,
-  completed_workunits_rx: CompletedWorkunitReceiver,
-  completed_workunits_tx: CompletedWorkunitSender,
+  msg_rx: Arc<Mutex<Receiver<StoreMsg>>>,
+  msg_tx: Arc<Mutex<Sender<StoreMsg>>>,
   workunit_records: Arc<Mutex<HashMap<SpanId, Workunit>>>,
 }
 
 impl StreamingWorkunitData {
   fn new() -> StreamingWorkunitData {
-    let (started_workunits_tx, started_workunits_rx) = channel();
-    let (completed_workunits_tx, completed_workunits_rx) = channel();
+    let (msg_tx, msg_rx) = channel();
     StreamingWorkunitData {
-      started_workunits_tx: Arc::new(Mutex::new(started_workunits_tx)),
-      started_workunits_rx: Arc::new(Mutex::new(started_workunits_rx)),
-      completed_workunits_tx: Arc::new(Mutex::new(completed_workunits_tx)),
-      completed_workunits_rx: Arc::new(Mutex::new(completed_workunits_rx)),
+      msg_tx: Arc::new(Mutex::new(msg_tx)),
+      msg_rx: Arc::new(Mutex::new(msg_rx)),
       workunit_records: Arc::new(Mutex::new(HashMap::new())),
     }
   }
@@ -175,33 +171,28 @@ impl StreamingWorkunitData {
 
 #[derive(Clone)]
 struct HeavyHittersData {
-  inner: Arc<Mutex<WorkUnitInnerStore>>,
-  started_workunits_rx: Arc<Mutex<Receiver<Workunit>>>,
-  started_workunits_tx: Arc<Mutex<Sender<Workunit>>>,
-  completed_workunits_rx: CompletedWorkunitReceiver,
-  completed_workunits_tx: CompletedWorkunitSender,
+  inner: Arc<Mutex<HeavyHittersInnerStore>>,
+  msg_tx: Arc<Mutex<Sender<StoreMsg>>>,
+  msg_rx: Arc<Mutex<Receiver<StoreMsg>>>,
 }
 
 impl HeavyHittersData {
   fn new() -> HeavyHittersData {
-    let (started_workunits_tx, started_workunits_rx) = channel();
-    let (completed_workunits_tx, completed_workunits_rx) = channel();
+    let (msg_tx, msg_rx) = channel();
     HeavyHittersData {
-      inner: Arc::new(Mutex::new(WorkUnitInnerStore {
+      inner: Arc::new(Mutex::new(HeavyHittersInnerStore {
         graph: DiGraph::new(),
         span_id_to_graph: HashMap::new(),
         workunit_records: HashMap::new(),
       })),
-      started_workunits_rx: Arc::new(Mutex::new(started_workunits_rx)),
-      started_workunits_tx: Arc::new(Mutex::new(started_workunits_tx)),
-      completed_workunits_rx: Arc::new(Mutex::new(completed_workunits_rx)),
-      completed_workunits_tx: Arc::new(Mutex::new(completed_workunits_tx)),
+      msg_rx: Arc::new(Mutex::new(msg_rx)),
+      msg_tx: Arc::new(Mutex::new(msg_tx)),
     }
   }
 }
 
 #[derive(Default)]
-pub struct WorkUnitInnerStore {
+pub struct HeavyHittersInnerStore {
   graph: WorkunitGraph,
   span_id_to_graph: HashMap<SpanId, NodeIndex<u32>>,
   workunit_records: HashMap<SpanId, Workunit>,
@@ -228,29 +219,6 @@ fn first_matched_parent(
   None
 }
 
-impl WorkUnitInnerStore {
-  fn first_matched_parent(
-    &self,
-    mut span_id: Option<SpanId>,
-    is_visible: impl Fn(&Workunit) -> bool,
-  ) -> Option<SpanId> {
-    while let Some(current_span_id) = span_id {
-      let workunit = self.workunit_records.get(&current_span_id);
-
-      // Is the current workunit visible?
-      if let Some(ref workunit) = workunit {
-        if is_visible(workunit) {
-          return Some(current_span_id);
-        }
-      }
-
-      // If not, try its parent.
-      span_id = workunit.and_then(|workunit| workunit.parent_id.clone());
-    }
-    None
-  }
-}
-
 impl WorkunitStore {
   pub fn new(rendering_dynamic_ui: bool) -> WorkunitStore {
     WorkunitStore {
@@ -275,15 +243,16 @@ impl WorkunitStore {
     let now = SystemTime::now();
     let mut inner = self.heavy_hitters_data.inner.lock();
 
-    let receiver = self.heavy_hitters_data.started_workunits_rx.lock();
-
-    while let Ok(started) = receiver.try_recv() {
-      Self::add_started_workunit_to_store(started, &mut inner);
-    }
-
-    let receiver = self.heavy_hitters_data.completed_workunits_rx.lock();
-    while let Ok((span_id, new_metadata, time)) = receiver.try_recv() {
-      Self::add_completed_workunit_to_store(span_id, new_metadata, time, &mut inner);
+    {
+      let receiver = self.heavy_hitters_data.msg_rx.lock();
+      while let Ok(msg) = receiver.try_recv() {
+        match msg {
+          StoreMsg::Started(started) => Self::add_started_workunit_to_store(started, &mut inner),
+          StoreMsg::Completed(span_id, new_metadata, time) => {
+            Self::add_completed_workunit_to_store(span_id, new_metadata, time, &mut inner)
+          }
+        }
+      }
     }
 
     let workunit_graph = &inner.graph;
@@ -318,7 +287,9 @@ impl WorkunitStore {
     let mut res = HashMap::new();
     while let Some((_dur, span_id)) = queue.pop() {
       // If the leaf is visible or has a visible parent, emit it.
-      if let Some(span_id) = inner.first_matched_parent(Some(span_id), is_visible) {
+      if let Some(span_id) =
+        first_matched_parent(&inner.workunit_records, Some(span_id), is_visible)
+      {
         let workunit = inner.workunit_records.get(&span_id).unwrap();
         if let Some(effective_name) = workunit.metadata.desc.as_ref() {
           let maybe_duration = duration_for(&workunit);
@@ -352,14 +323,15 @@ impl WorkunitStore {
     if !self.rendering_dynamic_ui {
       started.log_workunit_state()
     }
-    let sender = self.heavy_hitters_data.started_workunits_tx.lock();
-    sender.send(started.clone()).unwrap();
-    let sender = self.streaming_workunit_data.started_workunits_tx.lock();
-    sender.send(started).unwrap();
+
+    let sender = self.heavy_hitters_data.msg_tx.lock();
+    sender.send(StoreMsg::Started(started.clone())).unwrap();
+    let sender = self.streaming_workunit_data.msg_tx.lock();
+    sender.send(StoreMsg::Started(started)).unwrap();
     span_id
   }
 
-  fn add_started_workunit_to_store(started: Workunit, inner_store: &mut WorkUnitInnerStore) {
+  fn add_started_workunit_to_store(started: Workunit, inner_store: &mut HeavyHittersInnerStore) {
     let span_id = started.span_id.clone();
     let parent_id = started.parent_id.clone();
 
@@ -386,19 +358,24 @@ impl WorkunitStore {
 
   fn complete_workunit_impl(&self, span_id: SpanId, new_metadata: Option<WorkunitMetadata>) {
     let time = std::time::SystemTime::now();
-    let tx = self.heavy_hitters_data.completed_workunits_tx.lock();
-    tx.send((span_id.clone(), new_metadata.clone(), time))
-      .unwrap();
+    let tx = self.heavy_hitters_data.msg_tx.lock();
+    tx.send(StoreMsg::Completed(
+      span_id.clone(),
+      new_metadata.clone(),
+      time,
+    ))
+    .unwrap();
 
-    let tx = self.streaming_workunit_data.completed_workunits_tx.lock();
-    tx.send((span_id, new_metadata, time)).unwrap();
+    let tx = self.streaming_workunit_data.msg_tx.lock();
+    tx.send(StoreMsg::Completed(span_id, new_metadata, time))
+      .unwrap();
   }
 
   fn add_completed_workunit_to_store(
     span_id: SpanId,
     new_metadata: Option<WorkunitMetadata>,
     end_time: SystemTime,
-    inner_store: &mut WorkUnitInnerStore,
+    inner_store: &mut HeavyHittersInnerStore,
   ) {
     use std::collections::hash_map::Entry;
 
@@ -446,15 +423,17 @@ impl WorkunitStore {
       metadata,
     };
 
-    let sender = self.heavy_hitters_data.started_workunits_tx.lock();
-    sender.send(workunit.clone()).unwrap();
-    let sender = self.streaming_workunit_data.started_workunits_tx.lock();
-    sender.send(workunit).unwrap();
+    let sender = self.heavy_hitters_data.msg_tx.lock();
+    sender.send(StoreMsg::Started(workunit.clone())).unwrap();
+    sender
+      .send(StoreMsg::Completed(span_id.clone(), None, end_time))
+      .unwrap();
 
-    let sender = self.heavy_hitters_data.completed_workunits_tx.lock();
-    sender.send((span_id.clone(), None, end_time)).unwrap();
-    let sender = self.streaming_workunit_data.completed_workunits_tx.lock();
-    sender.send((span_id, None, end_time)).unwrap();
+    let sender = self.streaming_workunit_data.msg_tx.lock();
+    sender.send(StoreMsg::Started(workunit)).unwrap();
+    sender
+      .send(StoreMsg::Completed(span_id, None, end_time))
+      .unwrap();
   }
 
   pub fn with_latest_workunits<F, T>(&mut self, max_verbosity: log::Level, f: F) -> T
@@ -468,9 +447,23 @@ impl WorkunitStore {
     let (started_workunits, completed_workunits) = {
       let mut workunit_records = self.streaming_workunit_data.workunit_records.lock();
 
-      let receiver = self.streaming_workunit_data.started_workunits_rx.lock();
+      let mut started_messages = vec![];
+      let mut completed_messages = vec![];
+
+      {
+        let receiver = self.streaming_workunit_data.msg_rx.lock();
+        while let Ok(msg) = receiver.try_recv() {
+          match msg {
+            StoreMsg::Started(started) => started_messages.push(started),
+            StoreMsg::Completed(span, metadata, time) => {
+              completed_messages.push((span, metadata, time))
+            }
+          }
+        }
+      }
+
       let mut started_workunits: Vec<Workunit> = vec![];
-      while let Ok(mut started) = receiver.try_recv() {
+      for mut started in started_messages.into_iter() {
         let span_id = started.span_id.clone();
         workunit_records.insert(span_id.clone(), started.clone());
 
@@ -481,9 +474,8 @@ impl WorkunitStore {
         }
       }
 
-      let receiver = self.streaming_workunit_data.completed_workunits_rx.lock();
       let mut completed_workunits: Vec<Workunit> = vec![];
-      while let Ok((span_id, new_metadata, end_time)) = receiver.try_recv() {
+      for (span_id, new_metadata, end_time) in completed_messages.into_iter() {
         match workunit_records.entry(span_id.clone()) {
           Entry::Vacant(_) => {
             log::warn!("No previously-started workunit found for id: {}", span_id);
