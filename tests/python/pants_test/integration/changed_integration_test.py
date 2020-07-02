@@ -202,7 +202,9 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
                 )
 
     def run_list(self, extra_args, success=True):
-        pants_run = self.do_command("list", *extra_args, success=success)
+        pants_run = self.do_command(
+            "--backend-packages=pants.backend.python", "list", *extra_args, success=success
+        )
         return pants_run.stdout_data
 
     def test_changed_exclude_root_targets_only(self):
@@ -224,6 +226,7 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
                             f"--exclude-target-regexp={exclude_target_regexp}",
                             "--changed-since=HEAD",
                             "--changed-dependees=transitive",
+                            "--backend-packages=pants.backend.python",
                             "list",
                         ],
                         workdir=workdir,
@@ -255,6 +258,7 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
                             f"--exclude-target-regexp={exclude_target_regexp}",
                             "--changed-since=HEAD",
                             "--changed-dependees=transitive",
+                            "--backend-packages=pants.backend.python",
                             "list",
                         ],
                         workdir=workdir,
@@ -277,14 +281,18 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
     def test_changed_with_deleted_source(self):
         with create_isolated_git_repo() as worktree:
             safe_delete(os.path.join(worktree, "src/python/sources/sources.py"))
-            pants_run = self.run_pants(["list", "--changed-since=HEAD"])
+            pants_run = self.run_pants(
+                ["--backend-packages=pants.backend.python", "list", "--changed-since=HEAD"]
+            )
             self.assert_success(pants_run)
             self.assertEqual(pants_run.stdout_data.strip(), "src/python/sources:sources")
 
     def test_changed_with_deleted_resource(self):
         with create_isolated_git_repo() as worktree:
             safe_delete(os.path.join(worktree, "src/python/sources/sources.txt"))
-            pants_run = self.run_pants(["list", "--changed-since=HEAD"])
+            pants_run = self.run_pants(
+                ["--backend-packages=pants.backend.python", "list", "--changed-since=HEAD"]
+            )
             self.assert_success(pants_run)
             self.assertEqual(pants_run.stdout_data.strip(), "src/python/sources:text")
 
@@ -295,7 +303,12 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
         with create_isolated_git_repo() as worktree:
             safe_delete(os.path.join(worktree, "src/resources/org/pantsbuild/resourceonly/BUILD"))
             pants_run = self.run_pants(
-                ["list", "--changed-since=HEAD", "--changed-dependees=transitive"]
+                [
+                    "--backend-packages=pants.backend.python",
+                    "list",
+                    "--changed-since=HEAD",
+                    "--changed-dependees=transitive",
+                ]
             )
             self.assert_failure(pants_run)
             self.assertRegex(
@@ -305,7 +318,9 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
     def test_changed_in_directory_without_build_file(self):
         with create_isolated_git_repo() as worktree:
             create_file_in(worktree, "new-project/README.txt", "This is important.")
-            pants_run = self.run_pants(["list", "--changed-since=HEAD"])
+            pants_run = self.run_pants(
+                ["--backend-packages=pants.backend.python", "list", "--changed-since=HEAD"]
+            )
             self.assert_success(pants_run)
             self.assertEqual(pants_run.stdout_data.strip(), "")
 
@@ -315,7 +330,9 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
 
         with create_isolated_git_repo() as worktree:
             safe_delete(os.path.join(worktree, deleted_file))
-            pants_run = self.run_pants(["--changed-since=HEAD", "list"])
+            pants_run = self.run_pants(
+                ["--backend-packages=pants.backend.python", "--changed-since=HEAD", "list"]
+            )
             self.assert_success(pants_run)
             self.assertEqual(pants_run.stdout_data.strip(), "src/python/sources:sources")
 

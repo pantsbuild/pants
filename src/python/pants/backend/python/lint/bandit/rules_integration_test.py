@@ -55,7 +55,7 @@ class BanditIntegrationTest(ExternalToolTestBase):
         skip: bool = False,
         additional_args: Optional[List[str]] = None,
     ) -> LintResults:
-        args = ["--backend-packages2=pants.backend.python.lint.bandit"]
+        args = ["--backend-packages=pants.backend.python.lint.bandit"]
         if config:
             self.create_file(relpath=".bandit", contents=config)
             args.append("--bandit-config=.bandit")

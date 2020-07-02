@@ -93,7 +93,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
         additional_args: Optional[List[str]] = None,
     ) -> LintResults:
         args = [
-            "--backend-packages2=pants.backend.python.lint.pylint",
+            "--backend-packages=pants.backend.python.lint.pylint",
             "--source-root-patterns=['src/python', 'tests/python']",
         ]
         if config:

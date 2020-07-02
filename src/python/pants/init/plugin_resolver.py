@@ -46,9 +46,7 @@ class PluginResolver:
         self._interpreter = interpreter or PythonInterpreter.get()
 
         bootstrap_options = self._options_bootstrapper.get_bootstrap_options().for_global_scope()
-        self._plugin_requirements: List[str] = sorted(
-            set(bootstrap_options.plugins) | set(bootstrap_options.plugins2)
-        )
+        self._plugin_requirements: List[str] = sorted(bootstrap_options.plugins)
         self._plugin_cache_dir: str = bootstrap_options.plugin_cache_dir
         self._plugins_force_resolve: bool = bootstrap_options.plugins_force_resolve
 

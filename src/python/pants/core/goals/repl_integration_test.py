@@ -47,7 +47,7 @@ class ReplTest(GoalRuleTestBase):
         self.setup_python_library()
         self.execute_rule(
             global_args=[
-                "--backend-packages2=pants.backend.python",
+                "--backend-packages=pants.backend.python",
                 "--source-root-patterns=src/python",
             ],
             args=["src/python/lib.py"],
@@ -58,7 +58,7 @@ class ReplTest(GoalRuleTestBase):
         self.setup_python_library()
         self.execute_rule(
             global_args=[
-                "--backend-packages2=pants.backend.python",
+                "--backend-packages=pants.backend.python",
                 "--source-root-patterns=src/python",
             ],
             args=["--shell=ipython", "src/python/lib.py"],
@@ -69,7 +69,7 @@ class ReplTest(GoalRuleTestBase):
         self.setup_python_library()
         result = self.execute_rule(
             global_args=[
-                "--backend-packages2=pants.backend.python",
+                "--backend-packages=pants.backend.python",
                 "--source-root-patterns=src/python",
             ],
             args=["--shell=bogus-repl", "src/python/lib.py"],

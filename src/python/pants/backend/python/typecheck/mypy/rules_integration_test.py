@@ -103,7 +103,7 @@ class MyPyIntegrationTest(ExternalToolTestBase):
         additional_args: Optional[List[str]] = None,
     ) -> TypecheckResults:
         args = [
-            "--backend-packages2=pants.backend.python.typecheck.mypy",
+            "--backend-packages=pants.backend.python.typecheck.mypy",
             "--source-root-patterns=['src/python', 'tests/python']",
         ]
         if config:

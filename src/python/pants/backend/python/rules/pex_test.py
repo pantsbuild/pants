@@ -227,7 +227,7 @@ class PexTest(ExternalToolTestBase):
             Params(
                 request,
                 create_options_bootstrapper(
-                    args=["--backend-packages2=pants.backend.python", *additional_pants_args]
+                    args=["--backend-packages=pants.backend.python", *additional_pants_args]
                 ),
             ),
         )
