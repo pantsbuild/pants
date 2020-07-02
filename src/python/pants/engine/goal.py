@@ -6,7 +6,6 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import ClassVar, Tuple, Type
 
-from pants.cache.cache_setup import CacheSetup
 from pants.option.optionable import Optionable
 from pants.option.options_bootstrapper import is_v2_exclusive
 from pants.option.scope import ScopeInfo
@@ -44,16 +43,6 @@ class GoalSubsystem(SubsystemClientMixin, Optionable):
         """The name used to select the corresponding Goal on the commandline and the options_scope
         for its options."""
 
-    @classproperty
-    def deprecated_cache_setup_removal_version(cls):
-        """Optionally defines a deprecation version for a CacheSetup dependency.
-
-        If this GoalSubsystem should have an associated deprecated instance of `CacheSetup` (which
-        was implicitly required by all v1 Tasks), subclasses may set this to a valid deprecation
-        version to create that association.
-        """
-        return None
-
     @classmethod
     def conflict_free_name(cls):
         # v2 goal names ending in '2' are assumed to be so-named to avoid conflict with a v1 goal.
@@ -70,24 +59,6 @@ class GoalSubsystem(SubsystemClientMixin, Optionable):
     @classproperty
     def options_scope(cls):
         return cls.conflict_free_name()
-
-    @classmethod
-    def subsystem_dependencies(cls):
-        # NB: `GoalSubsystem` implements `SubsystemClientMixin` in order to allow v1 `Tasks` to
-        # depend on v2 Goals, and for `Goals` to declare a deprecated dependency on a `CacheSetup`
-        # instance for backwards compatibility purposes. But v2 Goals should _not_ have subsystem
-        # dependencies: instead, the @rules participating (transitively) in a Goal should directly
-        # declare their Subsystem deps.
-        if cls.deprecated_cache_setup_removal_version:
-            dep = CacheSetup.scoped(
-                cls,
-                removal_version=cls.deprecated_cache_setup_removal_version,
-                removal_hint="Goal `{}` uses an independent caching implementation, and ignores `{}`.".format(
-                    cls.options_scope, CacheSetup.subscope(cls.options_scope),
-                ),
-            )
-            return (dep,)
-        return tuple()
 
     def __init__(self, scope, scoped_options):
         # NB: This constructor is shaped to meet the contract of `Optionable(Factory).signature`.

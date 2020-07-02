@@ -239,12 +239,11 @@ class GlobalOptions(Subsystem):
             help="The name of the script or binary used to invoke pants. "
             "Useful when printing help messages.",
         )
-
         register(
             "--plugins",
             advanced=True,
             type=list,
-            help="Allow v1 backends to be loaded from these plugins.  The default backends for "
+            help="Allow backends to be loaded from these plugins.  The default backends for "
             "each plugin will be loaded automatically. Other backends in a plugin can be "
             "loaded by listing them in --backend-packages.",
         )
@@ -252,7 +251,9 @@ class GlobalOptions(Subsystem):
             "--plugins2",
             advanced=True,
             type=list,
-            help="Allow v2 backends to be loaded from these plugins.  The default backends for "
+            removal_version="2.1.0.dev0",
+            removal_hint="Use --plugins instead.",
+            help="Allow backends to be loaded from these plugins.  The default backends for "
             "each plugin will be loaded automatically. Other backends in a plugin can be "
             "loaded by listing them in --backend-packages.",
         )
@@ -269,14 +270,13 @@ class GlobalOptions(Subsystem):
             default=os.path.join(get_pants_cachedir(), "plugins"),
             help="Cache resolved plugin requirements here.",
         )
-
         register(
             "--backend-packages",
             advanced=True,
             type=list,
-            default=["pants.cache"],
+            default=[],
             help=(
-                "Register v1 tasks from these backends. The backend packages must be present on "
+                "Register rules from these backends. The backend packages must be present on "
                 "the PYTHONPATH, typically because they are in the Pants core dist, in a "
                 "plugin dist, or available as sources in the repo."
             ),
@@ -286,8 +286,10 @@ class GlobalOptions(Subsystem):
             advanced=True,
             type=list,
             default=[],
+            removal_version="2.1.0.dev0",
+            removal_hint="Use --backend-packages instead.",
             help=(
-                "Register v2 rules from these backends. The backend packages must be present on "
+                "Register rules from these backends. The backend packages must be present on "
                 "the PYTHONPATH, typically because they are in the Pants core dist, in a "
                 "plugin dist, or available as sources in the repo."
             ),
@@ -565,6 +567,8 @@ class GlobalOptions(Subsystem):
         )
 
         # BinaryUtil options.
+        # TODO: Nuke these once we get rid of src/python/pants/binaries/binary_util.py
+        #  (see there for what that will take).
         register(
             "--binaries-baseurls",
             type=list,

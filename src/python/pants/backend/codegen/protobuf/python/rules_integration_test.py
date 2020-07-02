@@ -115,7 +115,7 @@ class ProtobufPythonIntegrationTest(ExternalToolTestBase):
                     GeneratePythonFromProtobufRequest(protocol_sources.snapshot, tgt),
                     create_options_bootstrapper(
                         args=[
-                            "--backend-packages2=pants.backend.codegen.protobuf.python",
+                            "--backend-packages=pants.backend.codegen.protobuf.python",
                             "--source-root-patterns=src/protobuf",
                             "--source-root-patterns=tests/protobuf",
                         ]

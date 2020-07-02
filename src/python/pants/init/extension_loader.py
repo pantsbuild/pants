@@ -25,34 +25,26 @@ class PluginLoadOrderError(PluginLoadingError):
 
 
 def load_backends_and_plugins(
-    plugins1: List[str],
-    plugins2: List[str],
+    plugins: List[str],
     working_set: WorkingSet,
-    backends1: List[str],
-    backends2: List[str],
+    backends: List[str],
     bc_builder: Optional[BuildConfiguration.Builder] = None,
 ) -> BuildConfiguration:
     """Load named plugins and source backends.
 
-    :param plugins1: v1 plugins to load.
-    :param plugins2: v2 plugins to load.
+    :param plugins: v2 plugins to load.
     :param working_set: A pkg_resources.WorkingSet to load plugins from.
-    :param backends1: v1 backends to load.
-    :param backends2: v2 backends to load.
+    :param backends: v2 backends to load.
     :param bc_builder: The BuildConfiguration (for adding aliases).
     """
     bc_builder = bc_builder or BuildConfiguration.Builder()
-    load_build_configuration_from_source(bc_builder, backends1, backends2)
-    load_plugins(bc_builder, plugins1, working_set, is_v1_plugin=True)
-    load_plugins(bc_builder, plugins2, working_set, is_v1_plugin=False)
+    load_build_configuration_from_source(bc_builder, backends)
+    load_plugins(bc_builder, plugins, working_set)
     return bc_builder.create()
 
 
 def load_plugins(
-    build_configuration: BuildConfiguration.Builder,
-    plugins: List[str],
-    working_set: WorkingSet,
-    is_v1_plugin: bool,
+    build_configuration: BuildConfiguration.Builder, plugins: List[str], working_set: WorkingSet,
 ) -> None:
     """Load named plugins from the current working_set into the supplied build_configuration.
 
@@ -76,7 +68,6 @@ def load_plugins(
     :param plugins: A list of plugin names optionally with versions, in requirement format.
                               eg ['widgetpublish', 'widgetgen==1.2'].
     :param working_set: A pkg_resources.WorkingSet to load plugins from.
-    :param is_v1_plugin: Whether this is a v1 or v2 plugin.
     """
     loaded: Dict = {}
     for plugin in plugins or []:
@@ -94,65 +85,41 @@ def load_plugins(
                 dep = Requirement.parse(dep_name)
                 if dep.key not in loaded:
                     raise PluginLoadOrderError(f"Plugin {plugin} must be loaded after {dep}")
-
-        # While the Target API is a V2 concept, we expect V1 plugin authors to still write Target
-        # API bindings. So, we end up using this entry point regardless of V1 vs. V2.
-        #
-        # We also always load `build_file_aliases` because mixed repositories need to write V1
-        # bindings for targets to avoid breaking V1-only goals; and there is no V2 entry-point for
-        # `objects` yet. Purely V2-repos can ignore `build_file_aliases`.
         if "target_types" in entries:
             target_types = entries["target_types"].load()()
             build_configuration.register_target_types(target_types)
         if "build_file_aliases" in entries:
             aliases = entries["build_file_aliases"].load()()
             build_configuration.register_aliases(aliases)
-
-        if is_v1_plugin:
-            if "register_goals" in entries:
-                entries["register_goals"].load()()
-            if "global_subsystems" in entries:
-                subsystems = entries["global_subsystems"].load()()
-                build_configuration.register_optionables(subsystems)
-        else:
-            if "rules" in entries:
-                rules = entries["rules"].load()()
-                build_configuration.register_rules(rules)
+        if "rules" in entries:
+            rules = entries["rules"].load()()
+            build_configuration.register_rules(rules)
         loaded[dist.as_requirement().key] = dist
 
 
 def load_build_configuration_from_source(
-    build_configuration: BuildConfiguration.Builder, backends1: List[str], backends2: List[str]
+    build_configuration: BuildConfiguration.Builder, backends: List[str]
 ) -> None:
     """Installs pants backend packages to provide BUILD file symbols and cli goals.
 
     :param build_configuration: The BuildConfiguration (for adding aliases).
-    :param backends1: An list of packages to load v1 backends from.
-    :param backends2: An list of packages to load v2 backends from.
+    :param backends: An list of packages to load v2 backends from.
     :raises: :class:``pants.base.exceptions.BuildConfigurationError`` if there is a problem loading
       the build configuration.
     """
-    # pants.build_graph and pants.core_task must always be loaded, and before any other backends.
-    backend_packages1 = FrozenOrderedSet(["pants.build_graph", *backends1])
-    for backend_package in backend_packages1:
-        load_backend(build_configuration, backend_package, is_v1_backend=True)
-
-    backend_packages2 = FrozenOrderedSet(
-        ["pants.core", "pants.backend.pants_info", "pants.backend.project_info", *backends2]
+    backend_packages = FrozenOrderedSet(
+        ["pants.core", "pants.backend.pants_info", "pants.backend.project_info", *backends]
     )
-    for backend_package in backend_packages2:
-        load_backend(build_configuration, backend_package, is_v1_backend=False)
+    for backend_package in backend_packages:
+        load_backend(build_configuration, backend_package)
 
 
-def load_backend(
-    build_configuration: BuildConfiguration.Builder, backend_package: str, is_v1_backend: bool
-) -> None:
+def load_backend(build_configuration: BuildConfiguration.Builder, backend_package: str) -> None:
     """Installs the given backend package into the build configuration.
 
     :param build_configuration: the BuildConfiguration to install the backend plugin into.
     :param backend_package: the package name containing the backend plugin register module that
       provides the plugin entrypoints.
-    :param is_v1_backend: Is this a v1 or v2 backend.
     :raises: :class:``pants.base.exceptions.BuildConfigurationError`` if there is a problem loading
       the build configuration.
     """
@@ -173,21 +140,12 @@ def load_backend(
                 f"Entrypoint {name} in {backend_module} must be a zero-arg callable: {e!r}"
             )
 
-    # See the comment in `load_plugins` for why we load both `target_types` and
-    # `build_file_aliases` in both V1 and V2.
     target_types = invoke_entrypoint("target_types")
     if target_types:
         build_configuration.register_target_types(target_types)
     build_file_aliases = invoke_entrypoint("build_file_aliases")
     if build_file_aliases:
         build_configuration.register_aliases(build_file_aliases)
-
-    if is_v1_backend:
-        invoke_entrypoint("register_goals")
-        subsystems = invoke_entrypoint("global_subsystems")
-        if subsystems:
-            build_configuration.register_optionables(subsystems)
-    else:
-        rules = invoke_entrypoint("rules")
-        if rules:
-            build_configuration.register_rules(rules)
+    rules = invoke_entrypoint("rules")
+    if rules:
+        build_configuration.register_rules(rules)

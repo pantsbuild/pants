@@ -120,7 +120,9 @@ def plugin_resolution(*, interpreter=None, chroot=None, plugins=None, packager_c
 
         working_set = plugin_resolver.resolve(WorkingSet(entries=[]))
         for dist in working_set:
-            assert Path(cache_dir) in Path(dist.location).parents
+            assert (
+                Path(os.path.realpath(cache_dir)) in Path(os.path.realpath(dist.location)).parents
+            )
 
         yield working_set, root_dir, repo_dir, cache_dir
 

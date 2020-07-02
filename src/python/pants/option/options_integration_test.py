@@ -266,7 +266,7 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
     def test_skip_inherited(self) -> None:
         pants_run = self.run_pants(
             [
-                "--backend-packages2=pants.backend.python",
+                "--backend-packages=pants.backend.python",
                 "--no-colors",
                 "--no-pytest-colors",
                 "--setup-py-colors",

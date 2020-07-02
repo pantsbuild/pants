@@ -87,10 +87,10 @@ class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
         # fail when given the glob `::`.
         command_prefix = ["--v2", "--pants-config-files=[]"]
         target = "testprojects/tests/python/pants/dummies::"
-        self.do_command(*command_prefix, "--backend-packages2=[]", "run", target, success=True)
+        self.do_command(*command_prefix, "--backend-packages=[]", "run", target, success=True)
         self.do_command(
             *command_prefix,
-            "--backend-packages2='pants.backend.python'",
+            "--backend-packages='pants.backend.python'",
             "run",
             target,
             success=False,
