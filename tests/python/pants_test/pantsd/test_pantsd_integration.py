@@ -64,12 +64,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                 # Run target that throws an exception in pants.
                 self.assert_failure(
                     self.run_pants_with_workdir(
-                        [
-                            "--no-v1",
-                            "--v2",
-                            "lint",
-                            "testprojects/src/python/unicode/compilation_failure",
-                        ],
+                        ["lint", "testprojects/src/python/unicode/compilation_failure"],
                         workdir,
                         pantsd_config,
                     )
@@ -77,9 +72,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                 checker.assert_started()
 
                 # Assert pantsd is in a good functional state.
-                self.assert_success(
-                    self.run_pants_with_workdir(["--no-v1", "--v2", "help"], workdir, pantsd_config)
-                )
+                self.assert_success(self.run_pants_with_workdir(["help"], workdir, pantsd_config))
                 checker.assert_running()
 
     def test_pantsd_lifecycle_invalidation(self):

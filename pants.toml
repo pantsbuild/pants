@@ -1,20 +1,3 @@
-# All of the following are seeded with defaults in the config
-#   user: the current user
-#   homedir: the current user's home directory
-#   buildroot: the root of this repo
-#   pants_bootstrapdir: the global pants scratch space primarily used for caches
-#   pants_configdir: the global pants storage for config files
-#   pants_supportdir: pants support files for this repo go here
-#   pants_distdir: user visible artifacts for this repo go here
-#   pants_workdir: the scratch space used to for live builds in this repo
-
-
-# [DEFAULT] should only contain variables to be used later in this config or
-# options not in global scope but available in certain subsystems or tasks.
-[DEFAULT]
-local_artifact_cache = "%(pants_bootstrapdir)s/artifact_cache"
-
-# [GLOBAL] should only contain valid options in global scope.
 [GLOBAL]
 print_exception_stacktrace = true
 

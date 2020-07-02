@@ -782,9 +782,3 @@ class Task(TaskBase):
 
         :API: public
         """
-
-
-class QuietTaskMixin:
-    """A mixin to signal that pants shouldn't print verbose progress information for this task."""
-
-    pass
