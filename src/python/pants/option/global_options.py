@@ -244,8 +244,18 @@ class GlobalOptions(Subsystem):
             advanced=True,
             type=list,
             help="Allow backends to be loaded from these plugins.  The default backends for "
-            "each plugin will be loaded automatically. Other backends in a plugin can be "
-            "loaded by listing them in --backend-packages.",
+                 "each plugin will be loaded automatically. Other backends in a plugin can be "
+                 "loaded by listing them in --backend-packages.",
+        )
+        register(
+            "--plugins2",
+            advanced=True,
+            type=list,
+            removal_version="2.1.0.dev0",
+            removal_hint="Use --plugins instead.",
+            help="Allow backends to be loaded from these plugins.  The default backends for "
+                 "each plugin will be loaded automatically. Other backends in a plugin can be "
+                 "loaded by listing them in --backend-packages.",
         )
         register(
             "--plugins-force-resolve",
@@ -265,6 +275,19 @@ class GlobalOptions(Subsystem):
             advanced=True,
             type=list,
             default=[],
+            help=(
+                "Register rules from these backends. The backend packages must be present on "
+                "the PYTHONPATH, typically because they are in the Pants core dist, in a "
+                "plugin dist, or available as sources in the repo."
+            ),
+        )
+        register(
+            "--backend-packages2",
+            advanced=True,
+            type=list,
+            default=[],
+            removal_version="2.1.0.dev0",
+            removal_hint="Use --backend-packages instead.",
             help=(
                 "Register rules from these backends. The backend packages must be present on "
                 "the PYTHONPATH, typically because they are in the Pants core dist, in a "
