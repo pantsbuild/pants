@@ -12,14 +12,14 @@ from pants.util.meta import classproperty
 
 
 class PantsRequirement:
-    """Exports a `python_requirement_library` pointing at the active Pants's corresponding sdist.
+    """Exports a `python_requirement_library` pointing at the active Pants's corresponding dist.
 
     This requirement is useful for custom plugin authors who want to build and test their plugin with
     Pants itself. Using the resulting target as a dependency of their plugin target ensures the
     dependency stays true to the surrounding repo's version of Pants.
 
     NB: The requirement generated is for official Pants releases on PyPI; so may not be appropriate
-    for use in a repo that tracks `pantsbuild/pants` or otherwise uses custom pants sdists.
+    for use in a repo that tracks `pantsbuild/pants` or otherwise uses custom pants dists.
 
     :API: public
     """
