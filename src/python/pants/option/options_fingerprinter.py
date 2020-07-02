@@ -34,9 +34,7 @@ class OptionsFingerprinter:
     """
 
     @classmethod
-    def combined_options_fingerprint_for_scope(
-        cls, scope, options, build_graph=None, **kwargs
-    ) -> str:
+    def combined_options_fingerprint_for_scope(cls, scope, options, **kwargs) -> str:
         """Given options and a scope, compute a combined fingerprint for the scope.
 
         :param string scope: The scope to fingerprint.
@@ -48,7 +46,7 @@ class OptionsFingerprinter:
         :return: Hexadecimal string representing the fingerprint for all `options`
                  values in `scope`.
         """
-        fingerprinter = cls(build_graph)
+        fingerprinter = cls()
         hasher = sha1()
         pairs = options.get_fingerprintable_for_scope(scope, **kwargs)
         for (option_type, option_value) in pairs:
@@ -60,9 +58,6 @@ class OptionsFingerprinter:
                 fingerprint = "None"
             hasher.update(fingerprint.encode())
         return hasher.hexdigest()
-
-    def __init__(self, build_graph=None):
-        self._build_graph = build_graph
 
     def fingerprint(self, option_type, option_val):
         """Returns a hash of the given option_val based on the option_type.
@@ -81,9 +76,7 @@ class OptionsFingerprinter:
         if not isinstance(option_val, (list, tuple, dict)):
             option_val = [option_val]
 
-        if option_type == target_option:
-            return self._fingerprint_target_specs(option_val)
-        elif option_type == dir_option:
+        if option_type == dir_option:
             return self._fingerprint_dirs(option_val)
         elif option_type == file_option:
             return self._fingerprint_files(option_val)
@@ -91,20 +84,6 @@ class OptionsFingerprinter:
             return self._fingerprint_dict_with_files(option_val)
         else:
             return self._fingerprint_primitives(option_val)
-
-    def _fingerprint_target_specs(self, specs):
-        """Returns a fingerprint of the targets resolved from given target specs."""
-        assert (
-            self._build_graph is not None
-        ), f"cannot fingerprint specs `{specs}` without a `BuildGraph`"
-        hasher = sha1()
-        for spec in sorted(specs):
-            for target in sorted(self._build_graph.resolve(spec)):
-                # Not all targets have hashes; in particular, `Dependencies` targets don't.
-                h = target.compute_invalidation_hash()
-                if h:
-                    hasher.update(h.encode())
-        return hasher.hexdigest()
 
     def _assert_in_buildroot(self, filepath):
         """Raises an error if the given filepath isn't in the buildroot.

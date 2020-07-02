@@ -48,34 +48,6 @@ class OptionsFingerprinterTest(TestBase):
         )
         self.assertNotEqual(fp1, fp2)
 
-    def test_fingerprint_target_spec(self) -> None:
-        specs = [":t1", ":t2"]
-        payloads = [Payload() for i in range(2)]
-        for i, (s, p) in enumerate(zip(specs, payloads)):
-            p.add_field("foo", PrimitiveField(i))
-            self.make_target(s, payload=p)
-        s1, s2 = specs
-
-        fp_spec = lambda spec: self.options_fingerprinter.fingerprint(target_option, spec)
-        fp1 = fp_spec(s1)
-        fp2 = fp_spec(s2)
-        self.assertNotEqual(fp1, fp2)
-
-    def test_fingerprint_target_spec_list(self) -> None:
-        specs = [":t1", ":t2", ":t3"]
-        payloads = [Payload() for i in range(3)]
-        for i, (s, p) in enumerate(zip(specs, payloads)):
-            p.add_field("foo", PrimitiveField(i))
-            self.make_target(s, payload=p)
-        s1, s2, s3 = specs
-
-        fp_specs = lambda specs: self.options_fingerprinter.fingerprint(target_option, specs)
-        fp1 = fp_specs([s1, s2])
-        fp2 = fp_specs([s2, s1])
-        fp3 = fp_specs([s1, s3])
-        self.assertEqual(fp1, fp2)
-        self.assertNotEqual(fp1, fp3)
-
     def test_fingerprint_file(self) -> None:
         fp1, fp2, fp3 = (
             self.options_fingerprinter.fingerprint(file_option, self.create_file(f, contents=c))
