@@ -22,8 +22,8 @@ logging.addLevelName(logging.WARNING, "WARN")
 logging.addLevelName(pants_logging.TRACE, "TRACE")
 
 
-def init_rust_logger(log_level: LogLevel, log_show_rust_3rdparty: bool) -> None:
-    Native().init_rust_logging(log_level.level, log_show_rust_3rdparty)
+def init_rust_logger(log_level: LogLevel, log_show_rust_3rdparty: bool, use_color: bool) -> None:
+    Native().init_rust_logging(log_level.level, log_show_rust_3rdparty, use_color)
 
 
 class NativeHandler(StreamHandler):
@@ -131,7 +131,10 @@ def setup_logging(global_bootstrap_options):
     level = LogLevel.ERROR if getattr(global_bootstrap_options, "quiet", False) else global_level
     log_dir = global_bootstrap_options.logdir
 
-    Native().init_rust_logging(level.level, global_bootstrap_options.log_show_rust_3rdparty)
+    log_show_rust_3rdparty = global_bootstrap_options.log_show_rust_3rdparty
+    use_color = global_bootstrap_options.colors
+
+    init_rust_logger(level, log_show_rust_3rdparty, use_color)
     setup_logging_to_stderr(level, warnings_filter_regexes=ignores)
     if log_dir:
         setup_logging_to_file(global_level, log_dir=log_dir, warnings_filter_regexes=ignores)
