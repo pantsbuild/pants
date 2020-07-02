@@ -5,7 +5,12 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import List, Optional, Tuple, cast
 
-from pants.backend.project_info.dependees import Dependees, DependeesRequest
+from pants.backend.project_info.dependees import (
+    Dependees,
+    DependeesRequest,
+    find_dependees,
+    map_addresses_to_dependees,
+)
 from pants.base.deprecated import resolve_conflicting_options
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
@@ -153,4 +158,9 @@ class Changed(Subsystem):
 
 
 def rules():
-    return [find_changed_owners, RootRule(ChangedRequest)]
+    return [
+        map_addresses_to_dependees,
+        find_dependees,
+        find_changed_owners,
+        RootRule(ChangedRequest),
+    ]
