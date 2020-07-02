@@ -5,6 +5,204 @@ This document describes releases leading up to the ``2.0.x`` ``stable`` series.
 
 See https://pants.readme.io/v2.0/docs/release-notes-2-0 for an overview of the changes in this release.
 
+2.0.0.dev1 (7/2/2020)
+---------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Get rid of --plugins2/--backend-packages2 (#10231)
+  `PR #10231 <https://github.com/pantsbuild/pants/pull/10231>`_
+
+* Deprecate `--changed-include-dependees` in favor of `--changed-dependees` (#10217)
+  `PR #10217 <https://github.com/pantsbuild/pants/pull/10217>`_
+
+* Remove `pants.contrib.mypy` plugin in favor of v2 implementation (#10157)
+  `PR #10157 <https://github.com/pantsbuild/pants/pull/10157>`_
+
+* Remove `--coverage-py-omit-test-sources` (#10202)
+  `PR #10202 <https://github.com/pantsbuild/pants/pull/10202>`_
+
+* Gets rid of the v1 GoalRunner. (#10167)
+  `PR #10167 <https://github.com/pantsbuild/pants/pull/10167>`_
+
+* Remove `pants.backend.jvm` (#10218)
+  `PR #10218 <https://github.com/pantsbuild/pants/pull/10218>`_
+
+* Remove --zipkin-trace-v2 option (#10184)
+  `PR #10184 <https://github.com/pantsbuild/pants/pull/10184>`_
+
+* Remove `core_tasks/` and most of `task/` (#10236)
+  `PR #10236 <https://github.com/pantsbuild/pants/pull/10236>`_
+
+* Remove v1 portions of `backend/native` and `ipex` (#10187)
+  `PR #10187 <https://github.com/pantsbuild/pants/pull/10187>`_
+
+* Delete v1 python backend task code (#10223)
+  `PR #10223 <https://github.com/pantsbuild/pants/pull/10223>`_
+
+* Remove v1 Python `unpack_whls`, `bundle`, and `repl` (#10204)
+  `PR #10204 <https://github.com/pantsbuild/pants/pull/10204>`_
+
+* Remove Thrift (#10171)
+  `PR #10171 <https://github.com/pantsbuild/pants/pull/10171>`_
+
+* Remove `TestBase.create_library() and `TestBase.target()` (#10237)
+  `PR #10237 <https://github.com/pantsbuild/pants/pull/10237>`_
+
+* Remove some v1 parts of `testutil/` (#10233)
+  `PR #10233 <https://github.com/pantsbuild/pants/pull/10233>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Add new `typecheck` goal for MyPy (#10212)
+  `PR #10212 <https://github.com/pantsbuild/pants/pull/10212>`_
+
+* Properly handle PEP 420 namespace packages (#10183)
+  `PR #10183 <https://github.com/pantsbuild/pants/pull/10183>`_
+
+* Add support for creating multiple coverage reports (#9997)
+  `PR #9997 <https://github.com/pantsbuild/pants/pull/9997>`_
+
+* Add the ability to write/output the raw coverage file. (#10195)
+  `PR #10195 <https://github.com/pantsbuild/pants/pull/10195>`_
+
+* Log Coverage report name as part of the console message. (#10194)
+  `PR #10194 <https://github.com/pantsbuild/pants/pull/10194>`_
+
+* Attempt to adjust file handle limits and warn if they cannot be adjusted (#10174)
+  `PR #10174 <https://github.com/pantsbuild/pants/pull/10174>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix `--changed-dependees` to work when v1 is disabled (#10235)
+  `PR #10235 <https://github.com/pantsbuild/pants/pull/10235>`_
+
+* Teach `pants_requirement()` to work with dependency inference (#10232)
+  `PR #10232 <https://github.com/pantsbuild/pants/pull/10232>`_
+
+* Remove indentation in process errors. (#10181)
+  `PR #10181 <https://github.com/pantsbuild/pants/pull/10181>`_
+
+* Automatically include `__init__.py` files (#10166)
+  `PR #10166 <https://github.com/pantsbuild/pants/pull/10166>`_
+
+* Fix AddPrefix to correctly add arbitrarily many parent components (#10189)
+  `PR #10189 <https://github.com/pantsbuild/pants/pull/10189>`_
+
+* Fix `dependencies --transitive` to include target roots that are also dependencies (#10186)
+  `PR #10186 <https://github.com/pantsbuild/pants/pull/10186>`_
+
+* Fix MyPy to include `resources`, but still not `files` (#10168)
+  `PR #10168 <https://github.com/pantsbuild/pants/pull/10168>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Reduce time spend grabbing locks in workunit code (#10179)
+  `PR #10179 <https://github.com/pantsbuild/pants/pull/10179>`_
+
+* local_cas supports an instance-name (#10225)
+  `PR #10225 <https://github.com/pantsbuild/pants/pull/10225>`_
+
+* local_cas supports GetCapabilities request (#10226)
+  `PR #10226 <https://github.com/pantsbuild/pants/pull/10226>`_
+
+* Refactor remoting options into separate struct (#10215)
+  `PR #10215 <https://github.com/pantsbuild/pants/pull/10215>`_
+
+* remoting: log RE capabilities and refresh REv2 proto (#10155)
+  `PR #10155 <https://github.com/pantsbuild/pants/pull/10155>`_
+
+* Fix stray type error in fs.py (#10182)
+  `PR #10182 <https://github.com/pantsbuild/pants/pull/10182>`_
+
+* Remove redundant cast call (#10196)
+  `PR #10196 <https://github.com/pantsbuild/pants/pull/10196>`_
+
+* Use debug level for remote store workunits (#10238)
+  `PR #10238 <https://github.com/pantsbuild/pants/pull/10238>`_
+
+* Simplify Get implementation. (#10178)
+  `PR #10178 <https://github.com/pantsbuild/pants/pull/10178>`_
+
+* Delete the old BinaryTool mechanism. (#10239)
+  `PR #10239 <https://github.com/pantsbuild/pants/pull/10239>`_
+
+* Delete more v1 task-related integration tests. (#10210)
+  `PR #10210 <https://github.com/pantsbuild/pants/pull/10210>`_
+
+* Refactor coverage integration tests (#10209)
+  `PR #10209 <https://github.com/pantsbuild/pants/pull/10209>`_
+
+* Stop using deprecated assertEquals (#10197)
+  `PR #10197 <https://github.com/pantsbuild/pants/pull/10197>`_
+
+* Remove `ivy/` and most of `java/` (#10222)
+  `PR #10222 <https://github.com/pantsbuild/pants/pull/10222>`_
+
+* Remove Bundle and App code (#10221)
+  `PR #10221 <https://github.com/pantsbuild/pants/pull/10221>`_
+
+* Remove more zipkin-related code (#10207)
+  `PR #10207 <https://github.com/pantsbuild/pants/pull/10207>`_
+
+* Remove unused `list_backends.py` (#10205)
+  `PR #10205 <https://github.com/pantsbuild/pants/pull/10205>`_
+
+* Remove internal `contrib/` infrastructure (#10177)
+  `PR #10177 <https://github.com/pantsbuild/pants/pull/10177>`_
+
+* Rewrite/delete some tests that involve v1 tasks. (#10219)
+  `PR #10219 <https://github.com/pantsbuild/pants/pull/10219>`_
+
+* Remove JVM testprojects (#10216)
+  `PR #10216 <https://github.com/pantsbuild/pants/pull/10216>`_
+
+* Stop testing `testprojects::` (#10170)
+  `PR #10170 <https://github.com/pantsbuild/pants/pull/10170>`_
+
+* Remove the src/{scala|java} directories. (#10201)
+  `PR #10201 <https://github.com/pantsbuild/pants/pull/10201>`_
+
+* Delete examples/src/{java,scala}. (#10198)
+  `PR #10198 <https://github.com/pantsbuild/pants/pull/10198>`_
+
+* Stop running JVM tests written in Java/Scala (#10175)
+  `PR #10175 <https://github.com/pantsbuild/pants/pull/10175>`_
+
+* Move `scm/` and `util/` tests to `src` (#10176)
+  `PR #10176 <https://github.com/pantsbuild/pants/pull/10176>`_
+
+* Nuke more v1 tests (#10172)
+  `PR #10172 <https://github.com/pantsbuild/pants/pull/10172>`_
+
+* upgrade tokio to 0.2.21 (#10191)
+  `PR #10191 <https://github.com/pantsbuild/pants/pull/10191>`_
+
+* upgrade futures crate to 0.3.5 (#10190)
+  `PR #10190 <https://github.com/pantsbuild/pants/pull/10190>`_
+
+* upgrade async-trait crate to 0.1.36 (#10193)
+  `PR #10193 <https://github.com/pantsbuild/pants/pull/10193>`_
+
+* upgrade crossbeam-channel create so only one copy (#10192)
+  `PR #10192 <https://github.com/pantsbuild/pants/pull/10192>`_
+
+* upgrade indexmap crate (#10199)
+  `PR #10199 <https://github.com/pantsbuild/pants/pull/10199>`_
+
+* upgrade parking_lot crate (#10200)
+  `PR #10200 <https://github.com/pantsbuild/pants/pull/10200>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Prepare 1.30.0rc1. (#10188)
+  `PR #10188 <https://github.com/pantsbuild/pants/pull/10188>`_
+
 2.0.0.dev0 (6/25/2020)
 ----------------------
 
