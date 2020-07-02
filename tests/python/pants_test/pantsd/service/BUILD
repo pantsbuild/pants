@@ -8,5 +8,4 @@ python_tests(
     'tests/python/pants_test/pantsd:test_deps',
     'src/python/pants/pantsd/service:pants_service'
   ],
-  tags = {},
 )

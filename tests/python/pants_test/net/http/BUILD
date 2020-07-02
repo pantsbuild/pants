@@ -8,5 +8,4 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
   ],
-  tags = {},
 )

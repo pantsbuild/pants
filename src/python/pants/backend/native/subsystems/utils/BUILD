@@ -9,5 +9,4 @@ python_library(
     'src/python/pants/util:ordered_set',
     'src/python/pants/util:strutil',
   ],
-  tags = {},
 )
