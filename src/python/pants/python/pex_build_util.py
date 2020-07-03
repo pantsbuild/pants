@@ -5,7 +5,7 @@ import logging
 import os
 from collections import defaultdict
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Sequence, Set
+from typing import Dict, List, Optional, Sequence, Set
 
 from pex.interpreter import PythonInterpreter
 from pex.pex_builder import PEXBuilder
@@ -15,66 +15,12 @@ from pex.util import DistributionHelper
 from pex.version import __version__ as pex_version
 from pkg_resources import Distribution
 
-from pants.backend.python.targets.python_binary import PythonBinary
-from pants.backend.python.targets.python_library import PythonLibrary
-from pants.backend.python.targets.python_requirement_library import PythonRequirementLibrary
-from pants.backend.python.targets.python_tests import PythonTests
-from pants.base.build_environment import get_buildroot
-from pants.base.exceptions import TaskError
-from pants.build_graph.files import Files
-from pants.build_graph.target import Target
 from pants.python.python_repos import PythonRepos
 from pants.python.python_requirement import PythonRequirement
 from pants.python.python_setup import PythonSetup
 from pants.subsystem.subsystem import Subsystem
-from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_file
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
-
-
-def is_python_target(tgt: Target) -> bool:
-    # We'd like to take all PythonTarget subclasses, but currently PythonThriftLibrary and
-    # PythonAntlrLibrary extend PythonTarget, and until we fix that (which we can't do until
-    # we remove the old python pipeline entirely) we want to ignore those target types here.
-    return isinstance(tgt, (PythonLibrary, PythonTests, PythonBinary))
-
-
-def has_python_sources(tgt: Target) -> bool:
-    return is_python_target(tgt) and tgt.has_sources()
-
-
-def has_resources(tgt: Target) -> bool:
-    return isinstance(tgt, Files) and tgt.has_sources()
-
-
-def has_python_requirements(tgt: Target) -> bool:
-    return isinstance(tgt, PythonRequirementLibrary)
-
-
-def always_uses_default_python_platform(tgt: Target) -> bool:
-    return isinstance(tgt, PythonTests)
-
-
-def may_have_explicit_python_platform(tgt: Target) -> bool:
-    return isinstance(tgt, PythonBinary)
-
-
-def targets_by_platform(targets, python_setup):
-    targets_requiring_default_platforms = []
-    explicit_platform_settings = defaultdict(OrderedSet)
-    for target in targets:
-        if always_uses_default_python_platform(target):
-            targets_requiring_default_platforms.append(target)
-        elif may_have_explicit_python_platform(target):
-            for platform in target.platforms if target.platforms else python_setup.platforms:
-                explicit_platform_settings[platform].add(target)
-    # There are currently no tests for this because they're super platform specific and it's hard for
-    # us to express that on CI, but https://github.com/pantsbuild/pants/issues/7616 has an excellent
-    # repro case for why this is necessary.
-    for target in targets_requiring_default_platforms:
-        for platform in python_setup.platforms:
-            explicit_platform_settings[platform].add(target)
-    return dict(explicit_platform_settings)
 
 
 def identify_missing_init_files(sources: Sequence[str]) -> FrozenOrderedSet[str]:
@@ -187,43 +133,6 @@ class PexBuilderWrapper:
         # find_links repos attached to any single requirement, so it can later resolve those
         # requirements when it is first bootstrapped, using the same resolve options.
         self._all_find_links: OrderedSet[str] = OrderedSet()
-
-    def add_requirement_libs_from(self, req_libs, platforms=None):
-        """Multi-platform dependency resolution for PEX files.
-
-        :param builder: Dump the requirements into this builder.
-        :param interpreter: The :class:`PythonInterpreter` to resolve requirements for.
-        :param req_libs: A list of :class:`PythonRequirementLibrary` targets to resolve.
-        :param log: Use this logger.
-        :param platforms: A list of :class:`Platform`s to resolve requirements for.
-                                            Defaults to the platforms specified by PythonSetup.
-        """
-        reqs = [req for req_lib in req_libs for req in req_lib.requirements]
-        self.add_resolved_requirements(reqs, platforms=platforms)
-
-    class SingleDistExtractionError(Exception):
-        pass
-
-    def extract_single_dist_for_current_platform(self, reqs, dist_key) -> Distribution:
-        """Resolve a specific distribution from a set of requirements matching the current platform.
-
-        :param list reqs: A list of :class:`PythonRequirement` to resolve.
-        :param str dist_key: The value of `distribution.key` to match for a `distribution` from the
-                                                 resolved requirements.
-        :return: The single :class:`pkg_resources.Distribution` matching `dist_key`.
-        :raises: :class:`self.SingleDistExtractionError` if no dists or multiple dists matched the
-                 given `dist_key`.
-        """
-        distributions = self.resolve_distributions(reqs, platforms=["current"])
-        try:
-            matched_dist = assert_single_element(
-                dist for dists in distributions.values() for dist in dists if dist.key == dist_key
-            )
-        except (StopIteration, ValueError) as e:
-            raise self.SingleDistExtractionError(
-                f"Exactly one dist was expected to match name {dist_key} in requirements {reqs}: {e!r}"
-            )
-        return matched_dist
 
     def resolve_distributions(
         self, reqs: List[PythonRequirement], platforms: Optional[List[Platform]] = None,
@@ -342,52 +251,6 @@ class PexBuilderWrapper:
                 distributions[platform].append(resolved_dist.distribution)
 
         return distributions
-
-    def _create_source_dumper(self, tgt: Target) -> Callable[[str], None]:
-        buildroot = get_buildroot()
-
-        def get_chroot_path(relpath: str) -> str:
-            if type(tgt) == Files:
-                # Loose `Files`, as opposed to `Resources` or `PythonTarget`s, have no (implied) package
-                # structure and so we chroot them relative to the build root so that they can be accessed
-                # via the normal Python filesystem APIs just as they would be accessed outside the
-                # chrooted environment. NB: This requires we mark the pex as not zip safe so
-                # these `Files` can still be accessed in the context of a built pex distribution.
-                self._builder.info.zip_safe = False
-                return relpath
-            return str(Path(relpath).relative_to(tgt.target_base))
-
-        def dump_source(relpath: str) -> None:
-            source_path = str(Path(buildroot, relpath))
-            dest_path = get_chroot_path(relpath)
-
-            self._all_added_sources_resources.append(Path(dest_path))
-            if has_resources(tgt):
-                self._builder.add_resource(filename=source_path, env_filename=dest_path)
-            else:
-                self._builder.add_source(filename=source_path, env_filename=dest_path)
-
-        return dump_source
-
-    def add_sources_from(self, tgt: Target) -> None:
-        dump_source = self._create_source_dumper(tgt)
-        self._log.debug(f"  Dumping sources: {tgt}")
-        for relpath in tgt.sources_relative_to_buildroot():
-            try:
-                dump_source(relpath)
-            except OSError:
-                self._log.error(f"Failed to copy {relpath} for target {tgt.address.spec}")
-                raise
-
-        if getattr(tgt, "_resource_target_specs", None) or getattr(
-            tgt, "_synthetic_resources_target", None
-        ):
-            # No one should be on old-style resources any more.  And if they are,
-            # switching to the new python pipeline will be a great opportunity to fix that.
-            raise TaskError(
-                f"Old-style resources not supported for target {tgt.address.spec}. Depend on resources() "
-                "targets instead."
-            )
 
     def _prepare_inits(self) -> Set[str]:
         chroot = self._builder.chroot()

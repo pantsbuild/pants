@@ -31,37 +31,12 @@ from pants.backend.python.target_types import (
     PythonRequirementsFile,
     PythonTests,
 )
-from pants.backend.python.targets.python_binary import PythonBinary as PythonBinaryV1
-from pants.backend.python.targets.python_library import PythonLibrary as PythonLibraryV1
-from pants.backend.python.targets.python_requirement_library import (
-    PythonRequirementLibrary as PythonRequirementLibraryV1,
-)
-from pants.backend.python.targets.python_requirements_file import (
-    PythonRequirementsFile as PythonRequirementsFileV1,
-)
-from pants.backend.python.targets.python_tests import PythonTests as PythonTestsV1
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.python.pex_build_util import PexBuilderWrapper
 from pants.python.python_requirement import PythonRequirement
-
-
-def global_subsystems():
-    return {
-        python_native_code.PythonNativeCode,
-        subprocess_environment.SubprocessEnvironment,
-        PexBuilderWrapper.Factory,
-    }
 
 
 def build_file_aliases():
     return BuildFileAliases(
-        targets={
-            PythonBinaryV1.alias(): PythonBinaryV1,
-            PythonLibraryV1.alias(): PythonLibraryV1,
-            PythonTestsV1.alias(): PythonTestsV1,
-            "python_requirement_library": PythonRequirementLibraryV1,
-            PythonRequirementsFileV1.alias(): PythonRequirementsFileV1,
-        },
         objects={
             "python_requirement": PythonRequirement,
             "python_artifact": PythonArtifact,

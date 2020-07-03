@@ -6,7 +6,6 @@ from typing import Iterable, Optional, Sequence, Tuple, Union, cast
 
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
-from pants.backend.python.targets.python_binary import PythonBinary as PythonBinaryV1
 from pants.engine.addresses import Address
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
@@ -24,6 +23,7 @@ from pants.engine.target import (
 )
 from pants.python.python_requirement import PythonRequirement
 from pants.python.python_setup import PythonSetup
+from pants.subsystem.subsystem import Subsystem
 
 # -----------------------------------------------------------------------------------------------
 # Common fields
@@ -86,6 +86,30 @@ COMMON_PYTHON_FIELDS = (
 # -----------------------------------------------------------------------------------------------
 # `python_binary` target
 # -----------------------------------------------------------------------------------------------
+
+
+class PythonBinaryDefaults(Subsystem):
+    options_scope = "python-binary"
+
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
+        register(
+            "--pex-emit-warnings",
+            advanced=True,
+            type=bool,
+            default=True,
+            fingerprint=True,
+            help=(
+                "Whether built PEX binaries should emit pex warnings at runtime by default. "
+                "Can be over-ridden by specifying the `emit_warnings` parameter of individual "
+                "`python_binary` targets"
+            ),
+        )
+
+    @property
+    def pex_emit_warnings(self) -> bool:
+        return cast(bool, self.options.pex_emit_warnings)
 
 
 class PythonBinarySources(PythonSources):
@@ -200,7 +224,7 @@ class PexEmitWarnings(BoolField):
 
     alias = "emit_warnings"
 
-    def value_or_global_default(self, python_binary_defaults: PythonBinaryV1.Defaults) -> bool:
+    def value_or_global_default(self, python_binary_defaults: PythonBinaryDefaults) -> bool:
         if self.value is None:
             return python_binary_defaults.pex_emit_warnings
         return self.value
