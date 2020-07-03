@@ -11,9 +11,7 @@ from typing_extensions import Literal
 from pants.base.build_environment import pants_release, pants_version
 from pants.engine.goal import GoalSubsystem
 from pants.engine.unions import UnionMembership
-from pants.goal.goal import Goal
 from pants.help.help_formatter import HelpFormatter
-from pants.help.scope_info_iterator import ScopeInfoIterator
 from pants.option.arg_splitter import (
     GoalsHelp,
     HelpRequest,
@@ -72,12 +70,7 @@ class HelpPrinter:
         global_options = self._options.for_global_scope()
         goal_descriptions: Dict[str, str] = {}
         if global_options.v2:
-            goal_scope_infos = [
-                scope_info
-                for scope_info in self._options.known_scope_to_info.values()
-                if scope_info.category == ScopeInfo.GOAL
-            ]
-            for scope_info in goal_scope_infos:
+            for scope_info in self._options.known_scope_to_info.values():
                 optionable_cls = scope_info.optionable_cls
                 if optionable_cls is None or not issubclass(optionable_cls, GoalSubsystem):
                     continue
@@ -88,31 +81,27 @@ class HelpPrinter:
                     continue
                 description = scope_info.description or "<no description>"
                 goal_descriptions[scope_info.scope] = description
-        if global_options.v1:
-            goal_descriptions.update(
-                {goal.name: goal.description_first_line for goal in Goal.all() if goal.description}
-            )
 
         title_text = "Goals"
         title = f"{title_text}\n{'-' * len(title_text)}"
         if self._use_color:
             title = green(title)
 
-        max_width = max(len(name) for name in goal_descriptions.keys())
+        max_width = max((len(name) for name in goal_descriptions.keys()), default=0)
         chars_before_description = max_width + 2
 
-        def format_goal(name: str, description: str) -> str:
+        def format_goal(name: str, descr: str) -> str:
             name = name.ljust(chars_before_description)
             if self._use_color:
                 name = cyan(name)
-            description_lines = textwrap.wrap(description, 80 - chars_before_description)
+            description_lines = textwrap.wrap(descr, 80 - chars_before_description)
             if len(description_lines) > 1:
                 description_lines = [
                     description_lines[0],
                     *(f"{' ' * chars_before_description}{line}" for line in description_lines[1:]),
                 ]
-            description = "\n".join(description_lines)
-            return f"{name}{description}\n"
+            formatted_descr = "\n".join(description_lines)
+            return f"{name}{formatted_descr}\n"
 
         lines = [
             f"\n{title}\n",
@@ -141,10 +130,7 @@ class HelpPrinter:
             # The scopes explicitly mentioned by the user on the cmd line.
             help_scopes = set(self._options.scope_to_flags.keys()) - {GLOBAL_SCOPE}
 
-        scope_info_iterator = ScopeInfoIterator(scope_to_info=self._options.known_scope_to_info)
-
-        scope_infos = list(scope_info_iterator.iterate(help_scopes))
-
+        scope_infos = list(self._options.known_scope_to_info[scope] for scope in help_scopes)
         if scope_infos:
             for scope_info in scope_infos:
                 help_str = self._format_help(scope_info, help_request.advanced)
@@ -182,9 +168,7 @@ class HelpPrinter:
             print("    dir:: to include all targets found recursively under the directory.")
             print("\nFriendly docs:\n  http://pantsbuild.org/")
 
-            print(
-                self._format_help(ScopeInfo(GLOBAL_SCOPE, ScopeInfo.GLOBAL), help_request.advanced)
-            )
+            print(self._format_help(ScopeInfo(GLOBAL_SCOPE), help_request.advanced))
 
     def _format_help(self, scope_info: ScopeInfo, show_advanced_and_deprecated: bool) -> str:
         """Return a help message for the options registered on this object.
