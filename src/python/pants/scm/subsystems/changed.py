@@ -11,13 +11,13 @@ from pants.backend.project_info.dependees import (
     find_dependees,
     map_addresses_to_dependees,
 )
+from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import resolve_conflicting_options
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
 from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
-from pants.goal.workspace import ScmWorkspace
 from pants.option.option_value_container import OptionValueContainer
 from pants.scm.scm import Scm
 from pants.subsystem.subsystem import Subsystem
@@ -92,12 +92,16 @@ class ChangedOptions:
 
     def changed_files(self, *, scm: Scm) -> List[str]:
         """Determines the files changed according to SCM/workspace and options."""
-        workspace = ScmWorkspace(scm)
         if self.diffspec:
-            return cast(List[str], workspace.changes_in(self.diffspec))
+            return cast(List[str], scm.changes_in(self.diffspec, relative_to=get_buildroot()))
 
         changes_since = self.since or scm.current_rev_identifier
-        return cast(List[str], workspace.touched_files(changes_since))
+        return cast(
+            List[str],
+            scm.changed_files(
+                from_commit=changes_since, include_untracked=True, relative_to=get_buildroot()
+            ),
+        )
 
 
 class Changed(Subsystem):

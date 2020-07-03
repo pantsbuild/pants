@@ -4,8 +4,6 @@
 python_library(
   dependencies = [
     'src/python/pants/util:contextutil',
-    'src/python/pants/util:memo',
-    'src/python/pants/util:strutil',
   ],
   tags = {"partially_type_checked"},
 )
