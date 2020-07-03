@@ -25,7 +25,6 @@ from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.graph import LegacyBuildGraph, create_legacy_graph_tasks
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
 from pants.engine.legacy.structs import TargetAdaptor
-from pants.engine.legacy.structs import rules as structs_rules
 from pants.engine.platform import create_platform_rules
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Params
@@ -341,7 +340,6 @@ class EngineInitializer:
             *create_fs_rules(),
             *create_platform_rules(),
             *create_graph_rules(address_mapper),
-            *structs_rules(),
             *changed_rules(),
             *rules,
         )

@@ -13,14 +13,10 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Type, TypeVar,
 
 from pants.base.build_root import BuildRoot
 from pants.base.specs import AddressSpecs, FilesystemSpecs, Specs
-from pants.build_graph.address import BuildFileAddress
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, PathGlobsAndRoot, Snapshot
 from pants.engine.internals.scheduler import SchedulerSession
-from pants.engine.legacy.graph import HydratedField
-from pants.engine.legacy.structs import SourceGlobs, SourcesField
-from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.engine.target import Target
 from pants.init.engine_initializer import EngineInitializer
@@ -28,7 +24,6 @@ from pants.init.util import clean_global_runtime_state
 from pants.option.global_options import ExecutionOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source import source_root
-from pants.source.wrapped_globs import EagerFilesetWithSpec
 from pants.subsystem.subsystem import Subsystem
 from pants.testutil.engine.util import init_native
 from pants.util.collections import assert_single_element
@@ -196,19 +191,6 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         """
         self.create_file(self.build_path(relpath), target, mode="a")
 
-    def sources_for(
-        self, package_relative_path_globs: List[str], package_dir: str = "",
-    ) -> EagerFilesetWithSpec:
-        sources_field = SourcesField(
-            address=BuildFileAddress(
-                rel_path=os.path.join(package_dir, "BUILD"), target_name="_bogus_target_for_test",
-            ),
-            arg="sources",
-            source_globs=SourceGlobs(*package_relative_path_globs),
-        )
-        field = self.scheduler.product_request(HydratedField, [sources_field])[0]
-        return cast(EagerFilesetWithSpec, field.value)
-
     @classmethod
     def alias_groups(cls):
         """
@@ -218,7 +200,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
     @classmethod
     def rules(cls):
-        return [*source_root.rules(), RootRule(SourcesField)]
+        return [*source_root.rules()]
 
     @classmethod
     def target_types(cls) -> Sequence[Type[Target]]:

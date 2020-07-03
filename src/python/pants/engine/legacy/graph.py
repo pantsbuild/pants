@@ -1,12 +1,11 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import dataclasses
 import logging
 from collections import deque
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, Iterator, List, Set, Tuple, Type, cast
+from typing import Dict, Iterable, Iterator, List, Set, Tuple, Type, cast
 
 from pants.base.exceptions import TargetDefinitionException
 from pants.base.specs import AddressSpec, AddressSpecs, SingleAddress
@@ -16,15 +15,11 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.build_graph import BuildGraph
 from pants.build_graph.target import Target as TargetV1
 from pants.engine.addresses import Addresses
-from pants.engine.collection import Collection
-from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.internals.parser import HydratedStruct
-from pants.engine.legacy.structs import HydrateableField, SourcesField, TargetAdaptor
+from pants.engine.legacy.structs import TargetAdaptor
 from pants.engine.rules import rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import RegisteredTargetTypes
-from pants.option.global_options import GlobMatchErrorBehavior
-from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper, Filespec
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
@@ -247,10 +242,6 @@ class HydratedTarget:
         return self.adaptor == other.adaptor
 
 
-class HydratedTargets(Collection[HydratedTarget]):
-    """An intransitive set of HydratedTarget objects."""
-
-
 @dataclass(frozen=True)
 class TransitiveHydratedTarget:
     """A recursive structure wrapping a HydratedTarget root and TransitiveHydratedTarget deps."""
@@ -346,77 +337,13 @@ async def transitive_hydrated_target(root: HydratedTarget) -> TransitiveHydrated
     return TransitiveHydratedTarget(root, dependencies)
 
 
-@dataclass(frozen=True)
-class HydratedField:
-    """A wrapper for a fully constructed replacement kwarg for a HydratedTarget."""
-
-    name: str
-    value: Any
-
-
 @rule
 async def hydrate_target(hydrated_struct: HydratedStruct) -> HydratedTarget:
     """Construct a HydratedTarget from a TargetAdaptor and hydrated versions of its adapted
     fields."""
     target_adaptor = cast(TargetAdaptor, hydrated_struct.value)
-    # Hydrate the fields of the adaptor and re-construct it.
-    hydrated_fields = await MultiGet(
-        Get(HydratedField, HydrateableField, fa) for fa in target_adaptor.field_adaptors
-    )
     kwargs = target_adaptor.kwargs()
-    for field in hydrated_fields:
-        kwargs[field.name] = field.value
     return HydratedTarget(adaptor=type(target_adaptor)(**kwargs))
-
-
-@rule
-async def hydrated_targets(addresses: Addresses) -> HydratedTargets:
-    targets = await MultiGet(Get(HydratedTarget, Address, a) for a in addresses)
-    return HydratedTargets(targets)
-
-
-def _eager_fileset_with_spec(
-    spec_path: str, filespec: Filespec, snapshot: Snapshot, include_dirs: bool = False,
-) -> EagerFilesetWithSpec:
-    rel_include_globs = filespec["globs"]
-
-    relpath_adjusted_filespec = FilesetRelPathWrapper.to_filespec(rel_include_globs, spec_path)
-    if "exclude" in filespec:
-        relpath_adjusted_filespec["exclude"] = [
-            FilesetRelPathWrapper.to_filespec(e["globs"], spec_path) for e in filespec["exclude"]
-        ]
-
-    return EagerFilesetWithSpec(
-        spec_path, relpath_adjusted_filespec, snapshot, include_dirs=include_dirs
-    )
-
-
-@rule
-async def hydrate_sources(
-    sources_field: SourcesField, glob_match_error_behavior: GlobMatchErrorBehavior,
-) -> HydratedField:
-    """Given a SourcesField, request a Snapshot for its path_globs and create an
-    EagerFilesetWithSpec."""
-    address = sources_field.address
-    path_globs = dataclasses.replace(
-        sources_field.path_globs,
-        glob_match_error_behavior=glob_match_error_behavior,
-        # TODO(#9012): add line number referring to the sources field. When doing this, we'll likely
-        # need to `await Get(BuildFileAddress](Address)`.
-        description_of_origin=(
-            f"{address}'s `{sources_field.arg}` field"
-            if glob_match_error_behavior != GlobMatchErrorBehavior.ignore
-            else None
-        ),
-    )
-    snapshot = await Get(Snapshot, PathGlobs, path_globs)
-    fileset_with_spec = _eager_fileset_with_spec(
-        spec_path=address.spec_path,
-        filespec=sources_field.source_globs.filespecs,
-        snapshot=snapshot,
-    )
-    sources_field.validate_fn(fileset_with_spec)
-    return HydratedField(sources_field.arg, fileset_with_spec)
 
 
 def create_legacy_graph_tasks():
@@ -426,6 +353,4 @@ def create_legacy_graph_tasks():
         transitive_hydrated_targets,
         legacy_transitive_hydrated_targets,
         hydrate_target,
-        hydrated_targets,
-        hydrate_sources,
     ]

@@ -14,7 +14,6 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.lint import LintResults
 from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
-from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.engine.target import TargetWithOrigin, WrappedTarget
@@ -43,12 +42,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
 
     @classmethod
     def rules(cls):
-        return (
-            *super().rules(),
-            *pylint_rules(),
-            RootRule(PylintRequest),
-            RootRule(HydratedTargets),
-        )
+        return (*super().rules(), *pylint_rules(), RootRule(PylintRequest))
 
     def make_target_with_origin(
         self,
