@@ -5,7 +5,6 @@ import os
 import shutil
 from hashlib import sha1
 
-from pants.build_graph.build_graph import sort_targets
 from pants.build_graph.target import Target
 from pants.invalidation.build_invalidator import CacheKey
 from pants.util.dirutil import relative_symlink, safe_delete, safe_mkdir, safe_rmtree
@@ -371,7 +370,7 @@ class InvalidationCacheManager:
         def vt_iter():
             if topological_order:
                 target_set = set(targets)
-                sorted_targets = [t for t in reversed(sort_targets(targets)) if t in target_set]
+                sorted_targets = [t for t in reversed(targets) if t in target_set]
             else:
                 sorted_targets = sorted(targets)
             for target in sorted_targets:

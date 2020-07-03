@@ -21,11 +21,8 @@ from pants.engine.internals.mapper import AddressMapper
 from pants.engine.internals.native import Native
 from pants.engine.internals.parser import SymbolTable
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
-from pants.engine.legacy.address_mapper import LegacyAddressMapper
-from pants.engine.legacy.graph import LegacyBuildGraph, create_legacy_graph_tasks
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
 from pants.engine.legacy.structs import TargetAdaptor
-from pants.engine.legacy.structs import rules as structs_rules
 from pants.engine.platform import create_platform_rules
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Params
@@ -37,21 +34,10 @@ from pants.option.global_options import (
     ExecutionOptions,
     GlobMatchErrorBehavior,
 )
-from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.scm.subsystems.changed import rules as changed_rules
 
 logger = logging.getLogger(__name__)
-
-
-def _tuplify(v: Optional[Iterable]) -> Optional[Tuple]:
-    if v is None:
-        return None
-    if isinstance(v, tuple):
-        return v
-    if isinstance(v, (list, set)):
-        return tuple(v)
-    return (v,)
 
 
 def _legacy_symbol_table(registered_target_types: RegisteredTargetTypes) -> SymbolTable:
@@ -117,7 +103,6 @@ class LegacyGraphSession:
         *,
         options_bootstrapper: OptionsBootstrapper,
         union_membership: UnionMembership,
-        options: Options,
         goals: Iterable[str],
         specs: Specs,
         poll: bool = False,
@@ -164,21 +149,6 @@ class LegacyGraphSession:
                 return exit_code
 
         return PANTS_SUCCEEDED_EXIT_CODE
-
-    def create_build_graph(
-        self, specs: Specs, build_root: Optional[str] = None,
-    ) -> Tuple[LegacyBuildGraph, LegacyAddressMapper]:
-        """Construct and return a `BuildGraph` given a set of input specs."""
-        logger.debug("specs are: %r", specs)
-        graph = LegacyBuildGraph.create(self.scheduler_session, self.build_file_aliases)
-        logger.debug("build_graph is: %s", graph)
-        # Ensure the entire generator is unrolled.
-        for _ in graph.inject_roots_closure(specs.address_specs):
-            pass
-
-        address_mapper = LegacyAddressMapper(self.scheduler_session, build_root or get_buildroot())
-        logger.debug("address_mapper is: %s", address_mapper)
-        return graph, address_mapper
 
 
 class EngineInitializer:
@@ -337,11 +307,9 @@ class EngineInitializer:
             *options_parsing.rules(),
             *process.rules(),
             *target.rules(),
-            *create_legacy_graph_tasks(),
             *create_fs_rules(),
             *create_platform_rules(),
             *create_graph_rules(address_mapper),
-            *structs_rules(),
             *changed_rules(),
             *rules,
         )
