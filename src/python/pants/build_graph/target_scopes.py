@@ -1,8 +1,6 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.build_graph.intermediate_target_factory import IntermediateTargetFactoryBase
-
 
 class Scope(frozenset):
     """Represents a set of dependency scope names.
@@ -62,83 +60,3 @@ class Scope(frozenset):
 
     def __str__(self):
         return " ".join(sorted(self))
-
-
-class Scopes:
-    """Default scope constants."""
-
-    DEFAULT = Scope("DEFAULT")
-    # The `FORCED` scope is equivalent to DEFAULT, but additionally declares that a dep
-    # might not be detected as used at compile time, and should thus always be considered
-    # to have been used at compile time.
-    FORCED = Scope("FORCED")
-    COMPILE = Scope("COMPILE")
-    RUNTIME = Scope("RUNTIME")
-    TEST = Scope("TEST")
-
-    DEFAULT_OR_FORCED = DEFAULT | FORCED
-
-    JVM_COMPILE_SCOPES = DEFAULT_OR_FORCED | COMPILE
-    JVM_RUNTIME_SCOPES = DEFAULT_OR_FORCED | RUNTIME
-    JVM_TEST_SCOPES = DEFAULT_OR_FORCED | RUNTIME | TEST
-
-
-class ScopedDependencyFactory(IntermediateTargetFactoryBase):
-    """Creates a dependency with the given scope.
-
-    For example, this makes the syntax:
-
-    ```
-        jar_library(name='gson',
-          jars=[...],
-        )
-
-        target(name='foo',
-          dependencies=[
-            scoped(':gson', scope='runtime'),
-          ],
-        )
-    ```
-
-    Equivalent to:
-
-    ```
-        jar_library(name='gson',
-          jars=[...],
-        )
-
-        target(name='gson-runtime',
-          dependencies=[
-            ':gson',
-          ],
-          scope='runtime',
-        )
-
-        target(name='foo',
-          dependencies=[
-            ':gson-runtime',
-          ],
-        )
-    ```
-
-    The syntax for this feature is experimental and may change in the future.
-    """
-
-    def __init__(self, parse_context):
-        super().__init__(parse_context)
-        self._scope = None
-
-    @property
-    def extra_target_arguments(self):
-        """Extra keyword arguments to pass to the target constructor."""
-        return dict(scope=self._scope) if self._scope else dict()
-
-    def __call__(self, address, scope=None):
-        """
-        :param string address: A target address.
-        :param string scope: The scope of this dependency.
-        :returns: The address of a synthetic intermediary target.
-        """
-        scope = Scope(scope)
-        self._scope = str(scope)
-        return self._create_intermediate_target(address, self._scope)

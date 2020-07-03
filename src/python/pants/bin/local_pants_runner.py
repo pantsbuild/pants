@@ -200,7 +200,6 @@ class LocalPantsRunner:
         return self.graph_session.run_goal_rules(
             options_bootstrapper=self.options_bootstrapper,
             union_membership=self.union_membership,
-            options=self.options,
             goals=goals,
             specs=self.specs,
             poll=poll,

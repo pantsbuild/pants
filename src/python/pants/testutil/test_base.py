@@ -12,15 +12,10 @@ from tempfile import mkdtemp
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Type, TypeVar, Union, cast
 
 from pants.base.build_root import BuildRoot
-from pants.base.specs import AddressSpecs, FilesystemSpecs, Specs
-from pants.build_graph.address import BuildFileAddress
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, PathGlobsAndRoot, Snapshot
 from pants.engine.internals.scheduler import SchedulerSession
-from pants.engine.legacy.graph import HydratedField
-from pants.engine.legacy.structs import SourceGlobs, SourcesField
-from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.engine.target import Target
 from pants.init.engine_initializer import EngineInitializer
@@ -28,7 +23,6 @@ from pants.init.util import clean_global_runtime_state
 from pants.option.global_options import ExecutionOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source import source_root
-from pants.source.wrapped_globs import EagerFilesetWithSpec
 from pants.subsystem.subsystem import Subsystem
 from pants.testutil.engine.util import init_native
 from pants.util.collections import assert_single_element
@@ -196,19 +190,6 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         """
         self.create_file(self.build_path(relpath), target, mode="a")
 
-    def sources_for(
-        self, package_relative_path_globs: List[str], package_dir: str = "",
-    ) -> EagerFilesetWithSpec:
-        sources_field = SourcesField(
-            address=BuildFileAddress(
-                rel_path=os.path.join(package_dir, "BUILD"), target_name="_bogus_target_for_test",
-            ),
-            arg="sources",
-            source_globs=SourceGlobs(*package_relative_path_globs),
-        )
-        field = self.scheduler.product_request(HydratedField, [sources_field])[0]
-        return cast(EagerFilesetWithSpec, field.value)
-
     @classmethod
     def alias_groups(cls):
         """
@@ -218,7 +199,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
     @classmethod
     def rules(cls):
-        return [*source_root.rules(), RootRule(SourcesField)]
+        return [*source_root.rules()]
 
     @classmethod
     def target_types(cls) -> Sequence[Type[Target]]:
@@ -286,7 +267,6 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
     def _reset_engine(self):
         if self._scheduler is not None:
-            self._build_graph.reset()
             self._scheduler.invalidate_all_files()
 
     @contextmanager
@@ -353,10 +333,6 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
             execution_options=ExecutionOptions.from_bootstrap_options(global_options),
         ).new_session(build_id="buildid_for_test", should_report_workunits=True)
         self._scheduler = graph_session.scheduler_session
-        self._build_graph, self._address_mapper = graph_session.create_build_graph(
-            Specs(address_specs=AddressSpecs([]), filesystem_specs=FilesystemSpecs([])),
-            self._build_root(),
-        )
 
     @property
     def scheduler(self) -> SchedulerSession:
@@ -368,29 +344,6 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     def post_scheduler_init(self):
         """Run after initializing the Scheduler, it will have the same lifetime."""
         pass
-
-    @property
-    def address_mapper(self):
-        if self._address_mapper is None:
-            self._init_engine()
-        return self._address_mapper
-
-    @property
-    def build_graph(self):
-        if self._build_graph is None:
-            self._init_engine()
-        return self._build_graph
-
-    def reset_build_graph(self, reset_build_files=False, delete_build_files=False):
-        """Start over with a fresh build graph with no targets in it."""
-        if delete_build_files or reset_build_files:
-            files = [f for f in self.buildroot_files() if os.path.basename(f) == "BUILD"]
-            if delete_build_files:
-                for f in files:
-                    os.remove(os.path.join(self.build_root, f))
-            self.invalidate_for(*files)
-        if self._build_graph is not None:
-            self._build_graph.reset()
 
     _P = TypeVar("_P")
 
