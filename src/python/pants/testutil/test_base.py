@@ -12,7 +12,6 @@ from tempfile import mkdtemp
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Type, TypeVar, Union, cast
 
 from pants.base.build_root import BuildRoot
-from pants.base.exceptions import TaskError
 from pants.base.specs import AddressSpecs, FilesystemSpecs, Specs
 from pants.build_graph.address import BuildFileAddress
 from pants.build_graph.build_configuration import BuildConfiguration
@@ -29,12 +28,9 @@ from pants.init.util import clean_global_runtime_state
 from pants.option.global_options import ExecutionOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source import source_root
-from pants.source.source_root import SourceRootConfig
 from pants.source.wrapped_globs import EagerFilesetWithSpec
 from pants.subsystem.subsystem import Subsystem
-from pants.testutil.base.context_utils import create_context_from_options
 from pants.testutil.engine.util import init_native
-from pants.testutil.option.fakes import create_options_for_optionables
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import (
@@ -406,84 +402,6 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
     def set_options_for_scope(self, scope, **kwargs):
         self.options[scope].update(kwargs)
-
-    def context(
-        self,
-        for_task_types=None,
-        for_subsystems=None,
-        options=None,
-        target_roots=None,
-        console_outstream=None,
-        workspace=None,
-        scheduler=None,
-        address_mapper=None,
-        **kwargs,
-    ):
-        """
-        :API: public
-
-        :param dict **kwargs: keyword arguments passed in to `create_options_for_optionables`.
-        """
-        # Many tests use source root functionality via the SourceRootConfig.global_instance().
-        # (typically accessed via Target.target_base), so we always set it up, for convenience.
-        for_subsystems = set(for_subsystems or ())
-        for subsystem in for_subsystems:
-            if subsystem.options_scope is None:
-                raise TaskError(
-                    "You must set a scope on your subsystem type before using it in tests."
-                )
-
-        optionables = {SourceRootConfig, *self._build_configuration.optionables(), *for_subsystems}
-
-        for_task_types = for_task_types or ()
-        for task_type in for_task_types:
-            scope = task_type.options_scope
-            if scope is None:
-                raise TaskError("You must set a scope on your task type before using it in tests.")
-            optionables.add(task_type)
-
-        # Now expand to all deps.
-        all_optionables = set()
-        for optionable in optionables:
-            all_optionables.update(si.optionable_cls for si in optionable.known_scope_infos())
-
-        # Now default the option values and override with any caller-specified values.
-        # TODO(benjy): Get rid of the options arg, and require tests to call set_options.
-        options = options.copy() if options else {}
-        for s, opts in self.options.items():
-            scoped_opts = options.setdefault(s, {})
-            scoped_opts.update(opts)
-
-        source_options = options.get("source", {})
-        if "root_patterns" not in source_options:
-            # We have many tests that relied on old defaults that we've since changed.
-            # We set those defaults here so we don't have to modify many dozens of call sites.
-            source_options["root_patterns"] = [
-                "src/*",
-                "src/main/*",
-            ]
-            options["source"] = source_options
-
-        fake_options = create_options_for_optionables(all_optionables, options=options, **kwargs)
-
-        Subsystem.reset(reset_options=True)
-        Subsystem.set_options(fake_options)
-
-        scheduler = scheduler or self.scheduler
-
-        address_mapper = address_mapper or self.address_mapper
-
-        context = create_context_from_options(
-            fake_options,
-            target_roots=target_roots,
-            build_graph=self.build_graph,
-            build_configuration=self._build_configuration,
-            address_mapper=address_mapper,
-            console_outstream=console_outstream,
-            workspace=workspace,
-            scheduler=scheduler,
-        )
-        return context
 
     def tearDown(self):
         """
