@@ -188,9 +188,9 @@ class AllRootsTest(TestBase):
             "fixed/root/jvm",
         )
 
-        options = {
-            "pants_ignore": [],
-            "root_patterns": [
+        source_root_config = create_subsystem(
+            SourceRootConfig,
+            root_patterns=[
                 "src/*",
                 "src/example/*",
                 "contrib/go/examples/src/go/src",
@@ -198,17 +198,11 @@ class AllRootsTest(TestBase):
                 "java",
                 "fixed/root/jvm",
             ],
-        }
-        options.update(self.options[""])  # We need inherited values for pants_workdir etc.
-
-        self.context(
-            for_subsystems=[SourceRootConfig], options={SourceRootConfig.options_scope: options}
+            marker_filenames=[],
         )
 
-        source_root_config = SourceRootConfig.global_instance()
-
         # This function mocks out reading real directories off the file system.
-        def provider_rule(path_globs: PathGlobs) -> Snapshot:
+        def provider_rule(_: PathGlobs) -> Snapshot:
             return Snapshot(Digest("abcdef", 10), (), dirs)
 
         def source_root_mock_rule(req: SourceRootRequest) -> OptionalSourceRoot:
@@ -230,36 +224,25 @@ class AllRootsTest(TestBase):
             ],
         )
 
-        self.assertEqual(
-            {
-                SourceRoot("contrib/go/examples/src/go/src"),
-                SourceRoot("src/java"),
-                SourceRoot("src/python"),
-                SourceRoot("src/python/subdir/src/python"),
-                SourceRoot("src/kotlin"),
-                SourceRoot("src/example/java"),
-                SourceRoot("src/example/python"),
-                SourceRoot("my/project/src/java"),
-                SourceRoot("fixed/root/jvm"),
-            },
-            set(output),
-        )
+        assert {
+            SourceRoot("contrib/go/examples/src/go/src"),
+            SourceRoot("src/java"),
+            SourceRoot("src/python"),
+            SourceRoot("src/python/subdir/src/python"),
+            SourceRoot("src/kotlin"),
+            SourceRoot("src/example/java"),
+            SourceRoot("src/example/python"),
+            SourceRoot("my/project/src/java"),
+            SourceRoot("fixed/root/jvm"),
+        } == set(output)
 
     def test_all_roots_with_root_at_buildroot(self):
-        options = {
-            "pants_ignore": [],
-            "root_patterns": ["/"],
-        }
-        options.update(self.options[""])  # We need inherited values for pants_workdir etc.
-
-        self.context(
-            for_subsystems=[SourceRootConfig], options={SourceRootConfig.options_scope: options}
+        source_root_config = create_subsystem(
+            SourceRootConfig, root_patterns=["/"], marker_filenames=[],
         )
 
-        source_root_config = SourceRootConfig.global_instance()
-
         # This function mocks out reading real directories off the file system
-        def provider_rule(path_globs: PathGlobs) -> Snapshot:
+        def provider_rule(_: PathGlobs) -> Snapshot:
             dirs = ("foo",)  # A python package at the buildroot.
             return Snapshot(Digest("abcdef", 10), (), dirs)
 
@@ -275,5 +258,4 @@ class AllRootsTest(TestBase):
                 ),
             ],
         )
-
-        self.assertEqual({SourceRoot(".")}, set(output))
+        assert {SourceRoot(".")} == set(output)
