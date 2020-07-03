@@ -16,7 +16,8 @@ from pants.util.logging import LogLevel
 
 
 class OptionsBootstrapperTest(unittest.TestCase):
-    def _config_path(self, path: Optional[str]) -> List[str]:
+    @staticmethod
+    def _config_path(path: Optional[str]) -> List[str]:
         if path is None:
             return ["--pants-config-files=[]"]
         return [f"--pants-config-files=['{path}']"]
@@ -136,11 +137,7 @@ class OptionsBootstrapperTest(unittest.TestCase):
             args = ["--pants-workdir=/qux"] + self._config_path(fp.name)
             bootstrapper = OptionsBootstrapper.create(env={"PANTS_SUPPORTDIR": "/pear"}, args=args)
             opts = bootstrapper.get_full_options(
-                known_scope_infos=[
-                    ScopeInfo("", ScopeInfo.GLOBAL),
-                    ScopeInfo("foo", ScopeInfo.TASK),
-                    ScopeInfo("fruit", ScopeInfo.TASK),
-                ]
+                known_scope_infos=[ScopeInfo(""), ScopeInfo("foo"), ScopeInfo("fruit"),]
             )
             # So we don't choke on these on the cmd line.
             opts.register("", "--pants-workdir")
@@ -171,11 +168,7 @@ class OptionsBootstrapperTest(unittest.TestCase):
             options_bootstrapper: OptionsBootstrapper, *, expected_worker_count: int,
         ) -> None:
             options = options_bootstrapper.get_full_options(
-                known_scope_infos=[
-                    ScopeInfo("", ScopeInfo.GLOBAL),
-                    ScopeInfo("compile.apt", ScopeInfo.TASK),
-                    ScopeInfo("fruit", ScopeInfo.TASK),
-                ],
+                known_scope_infos=[ScopeInfo(""), ScopeInfo("compile.apt"), ScopeInfo("fruit"),],
             )
             # So we don't choke on these on the cmd line.
             options.register("", "--pants-config-files", type=list)
@@ -237,10 +230,7 @@ class OptionsBootstrapperTest(unittest.TestCase):
             fp.close()
             bootstrapped_options = create_options_bootstrapper(fp.name)
             opts_single_config = bootstrapped_options.get_full_options(
-                known_scope_infos=[
-                    ScopeInfo("", ScopeInfo.GLOBAL),
-                    ScopeInfo("resolver", ScopeInfo.TASK),
-                ]
+                known_scope_infos=[ScopeInfo(""), ScopeInfo("resolver"),]
             )
             opts_single_config.register("", "--pantsrc-files", type=list)
             opts_single_config.register("resolver", "--resolver")
@@ -252,36 +242,22 @@ class OptionsBootstrapperTest(unittest.TestCase):
             bootstrapper = OptionsBootstrapper.create(env={}, args=args)
 
             opts1 = bootstrapper.get_full_options(
-                known_scope_infos=[
-                    ScopeInfo("", ScopeInfo.GLOBAL),
-                    ScopeInfo("foo", ScopeInfo.TASK),
-                ]
+                known_scope_infos=[ScopeInfo(""), ScopeInfo("foo"),]
             )
             opts2 = bootstrapper.get_full_options(
-                known_scope_infos=[
-                    ScopeInfo("foo", ScopeInfo.TASK),
-                    ScopeInfo("", ScopeInfo.GLOBAL),
-                ]
+                known_scope_infos=[ScopeInfo("foo"), ScopeInfo(""),]
             )
             assert opts1 is opts2
 
             opts3 = bootstrapper.get_full_options(
-                known_scope_infos=[
-                    ScopeInfo("", ScopeInfo.GLOBAL),
-                    ScopeInfo("foo", ScopeInfo.TASK),
-                    ScopeInfo("", ScopeInfo.GLOBAL),
-                ]
+                known_scope_infos=[ScopeInfo(""), ScopeInfo("foo"), ScopeInfo(""),]
             )
             assert opts1 is opts3
 
-            opts4 = bootstrapper.get_full_options(
-                known_scope_infos=[ScopeInfo("", ScopeInfo.GLOBAL)]
-            )
+            opts4 = bootstrapper.get_full_options(known_scope_infos=[ScopeInfo("")])
             assert opts1 is not opts4
 
-            opts5 = bootstrapper.get_full_options(
-                known_scope_infos=[ScopeInfo("", ScopeInfo.GLOBAL)]
-            )
+            opts5 = bootstrapper.get_full_options(known_scope_infos=[ScopeInfo("")])
             assert opts4 is opts5
             assert opts1 is not opts5
 

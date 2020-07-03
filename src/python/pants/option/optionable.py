@@ -70,7 +70,6 @@ class Optionable(OptionableFactory, metaclass=ABCMeta):
 
     # Subclasses must override.
     options_scope: Optional[str] = None
-    options_scope_category: Optional[str] = None
 
     # Subclasses may override these to specify a deprecated former name for this Optionable's scope.
     # Option values can be read from the deprecated scope, but a deprecation warning will be issued.
@@ -101,9 +100,9 @@ class Optionable(OptionableFactory, metaclass=ABCMeta):
     @classmethod
     def get_scope_info(cls):
         """Returns a ScopeInfo instance representing this Optionable's options scope."""
-        if cls.options_scope is None or cls.options_scope_category is None:
-            raise OptionsError(f"{cls.__name__} must set options_scope and options_scope_category.")
-        return ScopeInfo(cls.options_scope, cls.options_scope_category, cls)
+        if cls.options_scope is None:
+            raise OptionsError(f"{cls.__name__} must set options_scope.")
+        return ScopeInfo(cls.options_scope, cls)
 
     @classmethod
     def subscope(cls, scope):

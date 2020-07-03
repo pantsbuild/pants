@@ -54,19 +54,19 @@ _FAKE_CUR_VERSION = "1.0.0.dev0"
 
 
 def global_scope() -> ScopeInfo:
-    return ScopeInfo(GLOBAL_SCOPE, ScopeInfo.GLOBAL, GlobalOptions)
+    return ScopeInfo(GLOBAL_SCOPE, GlobalOptions)
 
 
 def task(scope: str) -> ScopeInfo:
-    return ScopeInfo(scope, ScopeInfo.TASK)
+    return ScopeInfo(scope)
 
 
 def intermediate(scope: str) -> ScopeInfo:
-    return ScopeInfo(scope, ScopeInfo.INTERMEDIATE)
+    return ScopeInfo(scope)
 
 
 def subsystem(scope: str) -> ScopeInfo:
-    return ScopeInfo(scope, ScopeInfo.SUBSYSTEM)
+    return ScopeInfo(scope)
 
 
 class OptionsTest(TestBase):
@@ -218,7 +218,7 @@ class OptionsTest(TestBase):
         register_global("--old-name", mutually_exclusive_group="new_name")
 
         # For the design doc example test.
-        options.register("compile", "--c", type=int, recursive=True)
+        options.register("compile", "--c", type=int)
 
         # Test deprecated options with a scope
         options.register("stale", "--still-good")
@@ -1576,13 +1576,11 @@ class OptionsTest(TestBase):
         # old scope. I.e., it's possible to split an old scope's options among multiple new scopes.
         class DummyOptionable1(Optionable):
             options_scope = "new-scope1"
-            options_scope_category = ScopeInfo.SUBSYSTEM
             deprecated_options_scope = "deprecated-scope"
             deprecated_options_scope_removal_version = "9999.9.9.dev0"
 
         class DummyOptionable2(Optionable):
             options_scope = "new-scope2"
-            options_scope_category = ScopeInfo.SUBSYSTEM
             deprecated_options_scope = "deprecated-scope"
             deprecated_options_scope_removal_version = "9999.9.9.dev0"
 
@@ -1645,7 +1643,6 @@ class OptionsTest(TestBase):
         # another scope.
         class DummyOptionable1(Optionable):
             options_scope = "test"
-            options_scope_category = ScopeInfo.SUBSYSTEM
 
             @classmethod
             def register_options(cls, register):
@@ -1654,7 +1651,6 @@ class OptionsTest(TestBase):
 
         class DummyOptionable2(Optionable):
             options_scope = "lint"
-            options_scope_category = ScopeInfo.SUBSYSTEM
             deprecated_options_scope = "test.a-bit-linty"
             deprecated_options_scope_removal_version = "9999.9.9.dev0"
 
@@ -1692,7 +1688,6 @@ class OptionsTest(TestBase):
         # Confirms that a DEFAULT option does not trigger deprecation warnings for a deprecated scope.
         class DummyOptionable1(Optionable):
             options_scope = "new-scope1"
-            options_scope_category = ScopeInfo.SUBSYSTEM
             deprecated_options_scope = "deprecated-scope"
             deprecated_options_scope_removal_version = "9999.9.9.dev0"
 
@@ -1718,7 +1713,6 @@ class OptionsTest(TestBase):
         # Test that a dependency scope can be deprecated.
         class DummyOptionable1(Optionable):
             options_scope = "scope"
-            options_scope_category = ScopeInfo.SUBSYSTEM
 
         options = Options.create(
             env={},
@@ -1730,7 +1724,6 @@ class OptionsTest(TestBase):
                 # imitates the construction of SubsystemClientMixin.known_scope_infos.
                 ScopeInfo(
                     DummyOptionable1.subscope("sub"),
-                    ScopeInfo.SUBSYSTEM,
                     DummyOptionable1,
                     removal_version="9999.9.9.dev0",
                     removal_hint="Sayonara!",

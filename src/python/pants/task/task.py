@@ -22,7 +22,6 @@ from pants.invalidation.build_invalidator import (
 from pants.invalidation.cache_manager import InvalidationCacheManager, InvalidationCheck
 from pants.option.optionable import Optionable
 from pants.option.options_fingerprinter import OptionsFingerprinter
-from pants.option.scope import ScopeInfo
 from pants.reporting.reporting_utils import items_to_report_element
 from pants.source.source_root import SourceRootConfig
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
@@ -56,8 +55,6 @@ class TaskBase(SubsystemClientMixin, Optionable, metaclass=ABCMeta):
     of the helpers.  Ideally console tasks don't inherit a workdir, invalidator or build cache for
     example.
     """
-
-    options_scope_category = ScopeInfo.TASK
 
     # We set this explicitly on the synthetic subclass, so that it shares a stable name with
     # its superclass, which is not necessary for regular use, but can be convenient in tests.

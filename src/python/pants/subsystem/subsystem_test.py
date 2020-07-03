@@ -44,7 +44,7 @@ class ScopedDependentSubsystem(Subsystem):
 
 def si(scope, subsystem_cls):
     """Shorthand helper."""
-    return ScopeInfo(scope, ScopeInfo.SUBSYSTEM, subsystem_cls)
+    return ScopeInfo(scope, subsystem_cls)
 
 
 class SubsystemTest(TestBase):
