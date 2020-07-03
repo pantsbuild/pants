@@ -19,7 +19,6 @@ python_library(
     "src/python/pants/util:ordered_set",
     "src/python/pants/util:strutil",
   ],
-  tags = {"type_checked"},
 )
 
 python_tests(
@@ -28,5 +27,4 @@ python_tests(
     ":dependency_inference",
     "src/python/pants/testutil:test_base",
   ],
-  tags = {"type_checked"},
 )

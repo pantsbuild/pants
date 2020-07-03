@@ -23,7 +23,6 @@ python_library(
     'src/python/pants/option:global_options',
     'src/python/pants/util:contextutil',
   ],
-  tags = {"type_checked"},
 )
 
 python_tests(
@@ -47,7 +46,6 @@ python_tests(
     'src/python/pants/option:global_options',
     'src/python/pants/util:ordered_set',
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -68,6 +66,6 @@ python_tests(
     '//:isort_cfg',
     'examples:isort_cfg',
   ],
-  tags = {'integration', 'partially_type_checked'},
+  tags = ['integration'],
   timeout = 120,
 )

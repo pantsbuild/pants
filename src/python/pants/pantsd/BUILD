@@ -10,7 +10,6 @@ python_library(
     ':process_manager',
     'src/python/pants/option',
   ],
-  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -19,7 +18,6 @@ python_library(
   dependencies = [
     'src/python/pants/init',
   ],
-  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -44,7 +42,6 @@ python_library(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:logging',
   ],
-  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -57,5 +54,4 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
   ],
-  tags = {"partially_type_checked"},
 )

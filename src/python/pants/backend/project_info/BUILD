@@ -19,7 +19,6 @@ python_library(
     'src/python/pants/source',
     'src/python/pants/util:objects',
   ],
-  tags = {"type_checked"},
 )
 
 python_tests(
@@ -42,5 +41,4 @@ python_tests(
     'src/python/pants/testutil/subsystem',
     'src/python/pants/util:ordered_set',
   ],
-  tags = {"type_checked"},
 )

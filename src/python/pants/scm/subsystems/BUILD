@@ -12,5 +12,4 @@ python_library(
     'src/python/pants/engine:addresses',
     'src/python/pants/subsystem',
   ],
-  tags = {"partially_type_checked"},
 )

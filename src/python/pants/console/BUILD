@@ -7,5 +7,4 @@ python_library(
   dependencies = [
     'src/python/pants/util:process_handler',
   ],
-  tags = {"partially_type_checked"},
 )

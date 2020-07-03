@@ -20,7 +20,6 @@ python_binary(
    dependencies = [
      ':common',
    ],
-   tags = {'type_checked'},
  )
 
 python_binary(
@@ -29,7 +28,6 @@ python_binary(
   dependencies = [
     ':common',
   ],
-  tags = {'type_checked'},
 )
 
 python_binary(
@@ -38,7 +36,6 @@ python_binary(
   dependencies = [
     ':common',
   ],
-  tags = {'type_checked'},
 )
 
 python_binary(
@@ -47,13 +44,11 @@ python_binary(
   dependencies = [
     ':common',
   ],
-  tags = {'type_checked'},
 )
 
 python_library(
   name = 'common',
   sources = ['common.py'],
-  tags = {'type_checked'},
 )
 
 python_binary(
@@ -62,7 +57,6 @@ python_binary(
   dependencies = [
     ':common',
   ],
-  tags = {'type_checked'},
 )
 
 python_binary(
@@ -71,7 +65,6 @@ python_binary(
   dependencies = [
     '3rdparty/python:PyYAML',
   ],
-  tags = {'type_checked'},
 )
 
 python_binary(
@@ -81,7 +74,6 @@ python_binary(
     '3rdparty/python:ansicolors',
     '3rdparty/python:requests',
   ],
-  tags = {'type_checked'},
 )
 
 python_binary(
@@ -90,7 +82,6 @@ python_binary(
   dependencies = [
     ':common',
   ],
-  tags = {'type_checked'},
 )
 
 # TODO: rename this to `release.py` once done porting Bash to Python.
@@ -102,5 +93,4 @@ python_binary(
     '3rdparty/python:beautifulsoup4',
     '3rdparty/python:requests',
   ],
-  tags = {"type_checked"},
 )

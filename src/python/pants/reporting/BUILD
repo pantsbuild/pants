@@ -24,7 +24,6 @@ python_library(
     'src/python/pants/util:logging',
     'src/python/pants/util:memo',
   ],
-  tags = {"partially_type_checked"},
 )
 
 resources(
@@ -35,5 +34,4 @@ resources(
 python_library(
   name='report',
   sources=['report.py'],
-  tags = {"partially_type_checked"},
 )

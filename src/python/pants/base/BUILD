@@ -9,7 +9,6 @@ python_library(
     'src/python/pants/scm',
     'src/python/pants:version',
   ],
-  tags = {"type_checked"},
 )
 
 python_library(
@@ -22,13 +21,11 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
   ],
-  tags = {'partially_type_checked'},
 )
 
 python_library(
   name = 'build_file_target_factory',
   sources = ['build_file_target_factory.py'],
-  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -37,7 +34,6 @@ python_library(
   dependencies = [
     'src/python/pants/util:meta',
   ],
-  tags = {"type_checked"},
 )
 
 python_library(
@@ -48,7 +44,6 @@ python_library(
     'src/python/pants:version',
     'src/python/pants/util:memo',
   ],
-  tags = {"type_checked"},
 )
 
 python_library(
@@ -61,7 +56,6 @@ python_library(
     ':build_environment',
     ':exiter',
   ],
-  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -70,13 +64,11 @@ python_library(
   dependencies = [
     ':exiter',
   ],
-  tags = {'partially_type_checked'},
 )
 
 python_library(
   name = 'fingerprint_strategy',
   sources = ['fingerprint_strategy.py'],
-  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -86,7 +78,6 @@ python_library(
     ':mustache',
     '3rdparty/python:pystache',
   ],
-  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -97,7 +88,6 @@ python_library(
     'src/python/pants/util:strutil',
     'src/python/pants/util:ordered_set',
   ],
-  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -106,19 +96,16 @@ python_library(
   dependencies = [
     '3rdparty/python:pystache',
   ],
-  tags = {'partially_type_checked'},
 )
 
 python_library(
   name = 'parse_context',
   sources = ['parse_context.py'],
-  tags = {'partially_type_checked'},
 )
 
 python_library(
   name = 'payload',
   sources = ['payload.py'],
-  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -128,7 +115,6 @@ python_library(
     ':hash_utils',
     'src/python/pants/util:ordered_set',
   ],
-  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -145,13 +131,11 @@ python_library(
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
   ],
-  tags = {'partially_type_checked'},
 )
 
 python_library(
   name = 'revision',
   sources = ['revision.py'],
-  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -162,7 +146,6 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants:version',
   ],
-  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -171,7 +154,6 @@ python_library(
   dependencies = [
     ':specs',
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -181,7 +163,6 @@ python_library(
     ':workunit',
     'src/python/pants/reporting:report', # TODO(pl): Bust this out
   ],
-  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -194,7 +175,6 @@ python_library(
     'src/python/pants/util:memo',
     'src/python/pants/util:rwbuf',
   ],
-  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -204,7 +184,6 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
     'src/python/pants/util:ordered_set',
   ],
-  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -214,7 +193,6 @@ python_library(
     'src/python/pants/util:fileutil',
     'src/python/pants/util:strutil',
   ],
-  tags = {'partially_type_checked'},
 )
 
 python_tests(
@@ -224,5 +202,4 @@ python_tests(
     'src/python/pants/engine/legacy:structs',
     ':specs'
   ],
-  tags = {'partially_type_checked'},
 )
