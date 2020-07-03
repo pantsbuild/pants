@@ -172,7 +172,7 @@ def maybe_get_remote_execution_oauth_token_path(
         yield None
         return
     command = (
-        ["./pants.pex", "--quiet", "run", "build-support/bin:get_rbe_token"]
+        ["./pants.pex", "run", "build-support/bin:get_rbe_token"]
         if os.getenv("CI")
         else ["gcloud", "auth", "application-default", "print-access-token"]
     )
