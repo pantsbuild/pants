@@ -505,7 +505,6 @@ impl WorkunitStore {
             if let Some(metadata) = new_metadata {
               workunit.metadata = metadata;
             }
-            workunit.log_workunit_state();
             workunit_records.insert(span_id.clone(), workunit.clone());
 
             if should_emit(&workunit) {
