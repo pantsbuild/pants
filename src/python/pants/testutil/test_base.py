@@ -16,7 +16,6 @@ from pants.base.specs import AddressSpecs, FilesystemSpecs, Specs
 from pants.build_graph.address import BuildFileAddress
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.build_graph.target import Target as TargetV1
 from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, PathGlobsAndRoot, Snapshot
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.legacy.graph import HydratedField
@@ -32,7 +31,6 @@ from pants.source import source_root
 from pants.source.wrapped_globs import EagerFilesetWithSpec
 from pants.subsystem.subsystem import Subsystem
 from pants.testutil.engine.util import init_native
-from pants.testutil.subsystem import util as subsystem_util
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import (
@@ -45,7 +43,6 @@ from pants.util.dirutil import (
     safe_rmtree,
 )
 from pants.util.memo import memoized_method
-from pants.util.meta import classproperty
 
 
 class AbstractTestGenerator(ABC):
@@ -217,7 +214,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         """
         :API: public
         """
-        return BuildFileAliases(targets={"target": TargetV1})
+        return BuildFileAliases()
 
     @classmethod
     def rules(cls):
@@ -269,8 +266,6 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         }
 
         self._build_configuration = self.build_config()
-        self._inited_target = False
-        subsystem_util.init_subsystem(TargetV1.TagAssignments)
 
     def buildroot_files(self, relpath=None):
         """Returns the set of all files under the test build root.
@@ -414,23 +409,6 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         """
         super().tearDown()
         Subsystem.reset()
-
-    @classproperty
-    def subsystems(cls):
-        """Initialize these subsystems when running your test.
-
-        If your test instantiates a target type that depends on any subsystems, those subsystems need to
-        be initialized in your test. You can override this property to return the necessary subsystem
-        classes.
-
-        :rtype: list of type objects, all subclasses of Subsystem
-        """
-        return TargetV1.subsystems()
-
-    def _init_target_subsystem(self):
-        if not self._inited_target:
-            subsystem_util.init_subsystems(self.subsystems)
-            self._inited_target = True
 
     @contextmanager
     def assertRaisesWithMessage(self, exception_type, error_text):

@@ -10,9 +10,6 @@ from pants.base.build_root import BuildRoot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import AddressSpecs, Specs
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.build_graph.remote_sources import RemoteSources
-from pants.build_graph.target import Target as TargetV1
 from pants.engine import interactive_process, process, target
 from pants.engine.console import Console
 from pants.engine.fs import Workspace, create_fs_rules
@@ -27,7 +24,7 @@ from pants.engine.internals.scheduler import Scheduler, SchedulerSession
 from pants.engine.legacy.address_mapper import LegacyAddressMapper
 from pants.engine.legacy.graph import LegacyBuildGraph, create_legacy_graph_tasks
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
-from pants.engine.legacy.structs import RemoteSourcesAdaptor, TargetAdaptor
+from pants.engine.legacy.structs import TargetAdaptor
 from pants.engine.legacy.structs import rules as structs_rules
 from pants.engine.platform import create_platform_rules
 from pants.engine.rules import RootRule, rule
@@ -57,80 +54,11 @@ def _tuplify(v: Optional[Iterable]) -> Optional[Tuple]:
     return (v,)
 
 
-def _compute_default_sources_globs(
-    v1_target_cls: Type[TargetV1],
-) -> Tuple[Optional[Tuple[str, ...]], Optional[Tuple[str, ...]]]:
-    """Look up the default source globs for the type, and return as a tuple of (globs, excludes)."""
-    if not v1_target_cls.supports_default_sources() or v1_target_cls.default_sources_globs is None:
-        return (None, None)
-
-    globs = _tuplify(v1_target_cls.default_sources_globs)
-    excludes = _tuplify(v1_target_cls.default_sources_exclude_globs)
-
-    return (globs, excludes)
-
-
-def _apply_default_sources_globs(
-    adaptor_cls: Type[TargetAdaptor], v1_target_cls: Type[TargetV1]
-) -> None:
-    """Mutates the given TargetAdaptor subclass to apply default sources from the given legacy
-    target type."""
-    globs, excludes = _compute_default_sources_globs(v1_target_cls)
-    adaptor_cls.default_sources_globs = globs  # type: ignore[assignment]
-    adaptor_cls.default_sources_exclude_globs = excludes  # type: ignore[assignment]
-
-
-# TODO: These calls mutate the adaptor classes for some known library types to copy over
-# their default source globs while preserving their concrete types. As with the alias replacement
-# below, this is a delaying tactic to avoid elevating the TargetAdaptor API.
-_apply_default_sources_globs(RemoteSourcesAdaptor, RemoteSources)
-
-
-def _make_target_adaptor(
-    adaptor_cls: Type[TargetAdaptor], v1_target_cls: Type[TargetV1]
-) -> Type[TargetAdaptor]:
-    """Create an adaptor subclass for the given TargetAdaptor base class and legacy target type."""
-    globs, excludes = _compute_default_sources_globs(v1_target_cls)
-    if globs is None:
-        return adaptor_cls
-
-    class GlobsHandlingTargetAdaptor(adaptor_cls):  # type: ignore[misc,valid-type]
-        default_sources_globs = globs
-        default_sources_exclude_globs = excludes
-
-    return GlobsHandlingTargetAdaptor
-
-
-def _legacy_symbol_table(
-    build_file_aliases: BuildFileAliases, registered_target_types: RegisteredTargetTypes
-) -> SymbolTable:
+def _legacy_symbol_table(registered_target_types: RegisteredTargetTypes) -> SymbolTable:
     """Construct a SymbolTable for the given BuildFileAliases."""
-    table = {
-        alias: _make_target_adaptor(TargetAdaptor, target_type)
-        for alias, target_type in build_file_aliases.target_types.items()
-    }
-    for alias, factory in build_file_aliases.target_macro_factories.items():
-        # TargetMacro.Factory with more than one target type is deprecated.
-        # For default sources, this means that TargetMacro Factories with more than one target_type
-        # will not parse sources through the engine, and will fall back to the legacy python sources
-        # parsing.
-        # Conveniently, multi-target_type TargetMacro.Factory, and legacy python source parsing, are
-        # targeted to be removed in the same version of pants.
-        if len(factory.target_types) == 1:
-            table[alias] = _make_target_adaptor(TargetAdaptor, tuple(factory.target_types)[0],)
-
-    # Now, register any target types only declared in V2 without a V1 equivalent.
-    table.update(
-        {
-            target_type.alias: TargetAdaptor
-            for target_type in registered_target_types.types
-            if target_type.alias not in table
-        }
+    return SymbolTable(
+        {target_type.alias: TargetAdaptor for target_type in registered_target_types.types}
     )
-
-    table["remote_sources"] = RemoteSourcesAdaptor
-
-    return SymbolTable(table)
 
 
 @dataclass(frozen=True)
@@ -357,8 +285,7 @@ class EngineInitializer:
         rules = build_configuration.rules()
 
         registered_target_types = RegisteredTargetTypes.create(build_configuration.target_types())
-
-        symbol_table = _legacy_symbol_table(build_file_aliases, registered_target_types)
+        symbol_table = _legacy_symbol_table(registered_target_types)
 
         execution_options = execution_options or DEFAULT_EXECUTION_OPTIONS
 

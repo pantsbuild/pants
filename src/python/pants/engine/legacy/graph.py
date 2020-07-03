@@ -3,7 +3,7 @@
 
 import dataclasses
 import logging
-from collections import defaultdict, deque
+from collections import deque
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, Iterator, List, Set, Tuple, Type, cast
@@ -14,7 +14,6 @@ from pants.build_graph.address import Address, BuildFileAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.build_graph.build_graph import BuildGraph
-from pants.build_graph.remote_sources import RemoteSources
 from pants.build_graph.target import Target as TargetV1
 from pants.engine.addresses import Addresses
 from pants.engine.collection import Collection
@@ -39,16 +38,6 @@ def target_types_from_build_file_aliases(aliases: BuildFileAliases) -> Dict[str,
         (target_type,) = factory.target_types
         target_types[alias] = target_type
     return target_types
-
-
-@dataclass(frozen=True)
-class _DestWrapper:
-    """A wrapper for dest field of RemoteSources target.
-
-    This is only used when instantiating RemoteSources target.
-    """
-
-    target_types: Any
 
 
 class LegacyBuildGraph(BuildGraph):
@@ -152,9 +141,6 @@ class LegacyBuildGraph(BuildGraph):
 
             # Replace the `address` field of type `Address` with type `BuildFileAddress`.
             kwargs["address"] = legacy_hydrated_target.build_file_address
-
-            if target_cls is RemoteSources:
-                return self._instantiate_remote_sources(kwargs)
             return target_cls(build_graph=self, **kwargs)
         except TargetDefinitionException:
             raise
@@ -163,11 +149,6 @@ class LegacyBuildGraph(BuildGraph):
                 legacy_hydrated_target.build_file_address,
                 "Failed to instantiate Target with type {}: {}".format(target_cls, e),
             )
-
-    def _instantiate_remote_sources(self, kwargs) -> RemoteSources:
-        """For RemoteSources target, convert "dest" field to its real target type."""
-        kwargs["dest"] = _DestWrapper((self._target_types[kwargs["dest"]],))
-        return RemoteSources(build_graph=self, **kwargs)
 
     def inject_address_closure(self, address: Address) -> None:
         self.inject_addresses_closure([address])
@@ -225,102 +206,6 @@ class LegacyBuildGraph(BuildGraph):
 
         for hydrated_target in thts.roots:
             yield hydrated_target.build_file_address
-
-
-class _DependentGraph:
-    """A graph for walking dependent addresses of TargetAdaptor objects.
-
-    This avoids/imitates constructing a v1 BuildGraph object, because that codepath results
-    in many references held in mutable global state (ie, memory leaks).
-
-    The long term goal is to deprecate the `changed` goal in favor of sufficiently good cache
-    hit rates, such that rather than running:
-
-      ./pants --changed-parent=master test
-
-    ...you would always be able to run:
-
-      ./pants test ::
-
-    ...and have it complete in a similar amount of time by hitting relevant caches.
-    """
-
-    @classmethod
-    def from_iterable(cls, target_types, address_mapper, adaptor_iter):
-        """Create a new DependentGraph from an iterable of TargetAdaptor subclasses."""
-        inst = cls(target_types, address_mapper)
-        all_valid_addresses = set()
-        for target_adaptor in adaptor_iter:
-            inst._inject_target(target_adaptor)
-            all_valid_addresses.add(target_adaptor.address)
-        inst._validate(all_valid_addresses)
-        return inst
-
-    def __init__(self, target_types, address_mapper):
-        # TODO: Dependencies and implicit dependencies are mapped independently, because the latter
-        # cannot be validated until:
-        #  1) Subsystems are computed in engine: #5869. Currently instantiating a subsystem to find
-        #     its injectable specs would require options parsing.
-        #  2) Targets-class Subsystem deps can be expanded in-engine (similar to Fields): #4535,
-        self._dependent_address_map = defaultdict(set)
-        self._implicit_dependent_address_map = defaultdict(set)
-        self._target_types = target_types
-        self._address_mapper = address_mapper
-
-    def _validate(self, all_valid_addresses):
-        """Validate that all of the dependencies in the graph exist in the given addresses set."""
-        for dependency, dependents in self._dependent_address_map.items():
-            if dependency not in all_valid_addresses:
-                raise AddressLookupError(
-                    "Dependent graph construction failed: {} did not exist. Was depended on by:\n  {}".format(
-                        dependency.spec, "\n  ".join(d.spec for d in dependents)
-                    )
-                )
-
-    def _inject_target(self, target_adaptor):
-        """Inject a target, respecting all sources of dependencies."""
-        target_cls = self._target_types[target_adaptor.type_alias]
-
-        declared_deps = target_adaptor.dependencies
-        implicit_deps = (
-            Address.parse(
-                s,
-                relative_to=target_adaptor.address.spec_path,
-                subproject_roots=self._address_mapper.subproject_roots,
-            )
-            for s in target_cls.compute_dependency_address_specs(kwargs=target_adaptor.kwargs())
-        )
-        for dep in declared_deps:
-            self._dependent_address_map[dep].add(target_adaptor.address)
-        for dep in implicit_deps:
-            self._implicit_dependent_address_map[dep].add(target_adaptor.address)
-
-    def dependents_of_addresses(self, addresses):
-        """Given an iterable of addresses, return all of those addresses dependents."""
-        seen = OrderedSet(addresses)
-        for address in addresses:
-            seen.update(self._dependent_address_map[address])
-            seen.update(self._implicit_dependent_address_map[address])
-        return seen
-
-    def transitive_dependents_of_addresses(self, addresses):
-        """Given an iterable of addresses, return all of those addresses dependents,
-        transitively."""
-        closure = set()
-        result = []
-        to_visit = deque(addresses)
-
-        while to_visit:
-            address = to_visit.popleft()
-            if address in closure:
-                continue
-
-            closure.add(address)
-            result.append(address)
-            to_visit.extend(self._dependent_address_map[address])
-            to_visit.extend(self._implicit_dependent_address_map[address])
-
-        return result
 
 
 @frozen_after_init

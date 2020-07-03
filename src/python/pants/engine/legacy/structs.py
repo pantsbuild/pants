@@ -154,16 +154,6 @@ class SourcesField:
         return f"{self.address}({self.arg}={self.source_globs})"
 
 
-class RemoteSourcesAdaptor(TargetAdaptor):
-    def __init__(self, dest=None, **kwargs):
-        """
-        :param dest: A target constructor.
-        """
-        if not isinstance(dest, str):
-            dest = dest._type_alias
-        super().__init__(dest=dest, **kwargs)
-
-
 class SourceGlobs(Locatable):
     """A light wrapper around a target's `sources`.
 
