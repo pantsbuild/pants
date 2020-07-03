@@ -12,8 +12,8 @@ use futures::compat::{Future01CompatExt, Sink01CompatExt};
 use futures::future::{FutureExt, TryFutureExt};
 use futures::sink::SinkExt;
 use grpcio::RpcStatus;
-use parking_lot::Mutex;
 use hashing::Digest;
+use parking_lot::Mutex;
 
 ///
 /// Represents an expected API call from the REv2 client. The data carried by each enum
@@ -36,7 +36,7 @@ pub enum ExpectedAPICall {
   GetActionResult {
     action_digest: Digest,
     response: Result<bazel_protos::remote_execution::ActionResult, grpcio::RpcStatus>,
-  }
+  },
 }
 
 ///
@@ -484,16 +484,19 @@ impl bazel_protos::remote_execution_grpc::ActionCache for MockResponder {
       Some(ExpectedAPICall::GetActionResult {
         action_digest,
         response,
-         }) => {
+      }) => {
         let action_digest_from_request: Digest = match req.get_action_digest().try_into() {
           Ok(d) => d,
           Err(e) => {
             sink.fail(grpcio::RpcStatus::new(
               grpcio::RpcStatusCode::INVALID_ARGUMENT,
-              Some(format!("GetActionResult endpoint called with bad digest: {:?}", e,)),
+              Some(format!(
+                "GetActionResult endpoint called with bad digest: {:?}",
+                e,
+              )),
             ));
             return;
-          },
+          }
         };
 
         if action_digest_from_request == action_digest {
@@ -507,7 +510,8 @@ impl bazel_protos::remote_execution_grpc::ActionCache for MockResponder {
             grpcio::RpcStatusCode::INVALID_ARGUMENT,
             Some(format!(
               "Did not expect request with this action digest. Expected: {:?}, Got: {:?}",
-              action_digest, req.get_action_digest()
+              action_digest,
+              req.get_action_digest()
             )),
           ));
         }
@@ -516,7 +520,10 @@ impl bazel_protos::remote_execution_grpc::ActionCache for MockResponder {
       Some(api_call) => {
         error_to_send = Some(grpcio::RpcStatus::new(
           grpcio::RpcStatusCode::INVALID_ARGUMENT,
-          Some(format!("GetActionResult endpoint called. Expected: {:?}", api_call,)),
+          Some(format!(
+            "GetActionResult endpoint called. Expected: {:?}",
+            api_call,
+          )),
         ));
       }
 
