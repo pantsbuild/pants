@@ -117,7 +117,7 @@ impl CommandRunner {
     if let Some((execute_response, platform)) = maybe_execute_response {
       crate::remote::populate_fallible_execution_result(
         self.file_store.clone(),
-        execute_response,
+        execute_response.get_result(),
         vec![],
         platform,
       )

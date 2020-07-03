@@ -1,4 +1,5 @@
 use std::collections::{HashMap, VecDeque};
+use std::convert::TryInto;
 use std::fmt::Debug;
 use std::iter::FromIterator;
 use std::ops::Deref;
@@ -12,6 +13,7 @@ use futures::future::{FutureExt, TryFutureExt};
 use futures::sink::SinkExt;
 use grpcio::RpcStatus;
 use parking_lot::Mutex;
+use hashing::Digest;
 
 ///
 /// Represents an expected API call from the REv2 client. The data carried by each enum
@@ -31,6 +33,10 @@ pub enum ExpectedAPICall {
     operation_name: String,
     operation: MockOperation,
   },
+  GetActionResult {
+    action_digest: Digest,
+    response: Result<bazel_protos::remote_execution::ActionResult, grpcio::RpcStatus>,
+  }
 }
 
 ///
@@ -107,6 +113,9 @@ impl TestServer {
         mock_responder.clone(),
       ))
       .register_service(bazel_protos::remote_execution_grpc::create_capabilities(
+        mock_responder.clone(),
+      ))
+      .register_service(bazel_protos::remote_execution_grpc::create_action_cache(
         mock_responder.clone(),
       ))
       .bind("localhost", port.unwrap_or(0))
@@ -457,6 +466,83 @@ impl bazel_protos::operations_grpc::Operations for MockResponder {
     self.log(&ctx, req.clone());
     self.cancelation_requests.lock().push(req);
     sink.success(bazel_protos::empty::Empty::new());
+  }
+}
+
+impl bazel_protos::remote_execution_grpc::ActionCache for MockResponder {
+  fn get_action_result(
+    &self,
+    ctx: grpcio::RpcContext<'_>,
+    req: bazel_protos::remote_execution::GetActionResultRequest,
+    sink: grpcio::UnarySink<bazel_protos::remote_execution::ActionResult>,
+  ) {
+    self.log(&ctx, req.clone());
+
+    let expected_api_call = self.mock_execution.expected_api_calls.lock().pop_front();
+    let error_to_send: Option<RpcStatus>;
+    match expected_api_call {
+      Some(ExpectedAPICall::GetActionResult {
+        action_digest,
+        response,
+         }) => {
+        let action_digest_from_request: Digest = match req.get_action_digest().try_into() {
+          Ok(d) => d,
+          Err(e) => {
+            sink.fail(grpcio::RpcStatus::new(
+              grpcio::RpcStatusCode::INVALID_ARGUMENT,
+              Some(format!("GetActionResult endpoint called with bad digest: {:?}", e,)),
+            ));
+            return;
+          },
+        };
+
+        if action_digest_from_request == action_digest {
+          match response {
+            Ok(action_result) => sink.success(action_result),
+            Err(status) => sink.fail(status),
+          };
+          return;
+        } else {
+          error_to_send = Some(grpcio::RpcStatus::new(
+            grpcio::RpcStatusCode::INVALID_ARGUMENT,
+            Some(format!(
+              "Did not expect request with this action digest. Expected: {:?}, Got: {:?}",
+              action_digest, req.get_action_digest()
+            )),
+          ));
+        }
+      }
+
+      Some(api_call) => {
+        error_to_send = Some(grpcio::RpcStatus::new(
+          grpcio::RpcStatusCode::INVALID_ARGUMENT,
+          Some(format!("GetActionResult endpoint called. Expected: {:?}", api_call,)),
+        ));
+      }
+
+      None => {
+        error_to_send = Some(grpcio::RpcStatus::new(
+          grpcio::RpcStatusCode::INVALID_ARGUMENT,
+          Some("GetActionResult endpoint called. Did not expect this call.".to_owned()),
+        ));
+      }
+    }
+
+    if let Some(status) = error_to_send {
+      let _ = sink.fail(status);
+    }
+  }
+
+  fn update_action_result(
+    &self,
+    _: grpcio::RpcContext<'_>,
+    _: bazel_protos::remote_execution::UpdateActionResultRequest,
+    sink: grpcio::UnarySink<bazel_protos::remote_execution::ActionResult>,
+  ) {
+    sink.fail(grpcio::RpcStatus::new(
+      grpcio::RpcStatusCode::UNIMPLEMENTED,
+      None,
+    ));
   }
 }
 
