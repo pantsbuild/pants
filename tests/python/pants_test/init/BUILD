@@ -13,8 +13,6 @@ python_tests(
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
     'src/python/pants/fs',
-    'src/python/pants/goal',
-    'src/python/pants/goal:task_registrar',
     'src/python/pants/init',
     'src/python/pants/option',
     'src/python/pants/pantsd:pants_daemon',
