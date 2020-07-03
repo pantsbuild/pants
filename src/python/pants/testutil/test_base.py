@@ -12,7 +12,6 @@ from tempfile import mkdtemp
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Type, TypeVar, Union, cast
 
 from pants.base.build_root import BuildRoot
-from pants.base.specs import AddressSpecs, FilesystemSpecs, Specs
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, PathGlobsAndRoot, Snapshot
@@ -268,7 +267,6 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
     def _reset_engine(self):
         if self._scheduler is not None:
-            self._build_graph.reset()
             self._scheduler.invalidate_all_files()
 
     @contextmanager
@@ -335,10 +333,6 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
             execution_options=ExecutionOptions.from_bootstrap_options(global_options),
         ).new_session(build_id="buildid_for_test", should_report_workunits=True)
         self._scheduler = graph_session.scheduler_session
-        self._build_graph, self._address_mapper = graph_session.create_build_graph(
-            Specs(address_specs=AddressSpecs([]), filesystem_specs=FilesystemSpecs([])),
-            self._build_root(),
-        )
 
     @property
     def scheduler(self) -> SchedulerSession:
@@ -350,29 +344,6 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     def post_scheduler_init(self):
         """Run after initializing the Scheduler, it will have the same lifetime."""
         pass
-
-    @property
-    def address_mapper(self):
-        if self._address_mapper is None:
-            self._init_engine()
-        return self._address_mapper
-
-    @property
-    def build_graph(self):
-        if self._build_graph is None:
-            self._init_engine()
-        return self._build_graph
-
-    def reset_build_graph(self, reset_build_files=False, delete_build_files=False):
-        """Start over with a fresh build graph with no targets in it."""
-        if delete_build_files or reset_build_files:
-            files = [f for f in self.buildroot_files() if os.path.basename(f) == "BUILD"]
-            if delete_build_files:
-                for f in files:
-                    os.remove(os.path.join(self.build_root, f))
-            self.invalidate_for(*files)
-        if self._build_graph is not None:
-            self._build_graph.reset()
 
     _P = TypeVar("_P")
 

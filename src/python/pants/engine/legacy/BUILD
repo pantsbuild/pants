@@ -2,43 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name='address_mapper',
-  sources=['address_mapper.py'],
-  dependencies=[
-    'src/python/pants/base:exceptions',
-    'src/python/pants/base:specs',
-    'src/python/pants/build_graph:address',
-    'src/python/pants/build_graph',
-    'src/python/pants/engine:addresses',
-    'src/python/pants/util:dirutil',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_library(
-  name='graph',
-  sources=['graph.py'],
-  dependencies=[
-    '3rdparty/python:dataclasses',
-    ':structs',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/base:specs',
-    'src/python/pants/build_graph',
-    'src/python/pants/engine/internals:core_abstractions',
-    'src/python/pants/engine:addresses',
-    'src/python/pants/engine:collection',
-    'src/python/pants/engine:fs',
-    'src/python/pants/engine:rules',
-    'src/python/pants/engine:selectors',
-    'src/python/pants/option',
-    'src/python/pants/source',
-    'src/python/pants/util:meta',
-    'src/python/pants/util:ordered_set',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_library(
   name='parser',
   sources=['parser.py'],
   dependencies=[

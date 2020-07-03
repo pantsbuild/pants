@@ -15,7 +15,6 @@ python_library(
     "src/python/pants/engine:selectors",
     "src/python/pants/engine:unions",
     "src/python/pants/engine/internals:native",
-    "src/python/pants/engine/legacy:structs",
     "src/python/pants/util:memo",
     "src/python/pants/util:ordered_set",
     "src/python/pants/util:strutil",

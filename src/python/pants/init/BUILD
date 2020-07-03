@@ -20,8 +20,6 @@ python_library(
     'src/python/pants/engine/internals:native',
     'src/python/pants/engine/internals:options_parsing',
     'src/python/pants/engine/internals:scheduler',
-    'src/python/pants/engine/legacy:address_mapper',
-    'src/python/pants/engine/legacy:graph',
     'src/python/pants/engine/legacy:parser',
     'src/python/pants/engine/legacy:structs',
     'src/python/pants/engine:console',
