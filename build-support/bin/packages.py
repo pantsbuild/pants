@@ -203,7 +203,7 @@ def build_pants_wheels() -> None:
 
     def build(packages: Iterable[Package], bdist_wheel_flags: Iterable[str]) -> None:
         args = (
-            "./v2",
+            "./pants",
             # TODO(#9924).
             "--no-dynamic-ui",
             # TODO(#7654): It's not safe to use Pantsd because we're already using Pants to run

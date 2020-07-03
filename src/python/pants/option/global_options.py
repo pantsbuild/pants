@@ -182,10 +182,14 @@ class GlobalOptions(Subsystem):
             "engine.",
         )
 
-        # Toggles v1/v2 `Task` vs `@rule` pipelines on/off.
-        # Having these in bootstrap options allows them to affect registration of non-bootstrap options.
         register(
-            "--v1", advanced=True, type=bool, default=True, help="Enables execution of v1 Tasks."
+            "--v1",
+            advanced=True,
+            type=bool,
+            default=False,
+            help="Enables execution of v1 Tasks.",
+            removal_version="2.1.0.dev0",
+            removal_hint="The v1 engine no longer exists. This option does nothing.",
         )
 
         register(
@@ -194,6 +198,8 @@ class GlobalOptions(Subsystem):
             type=bool,
             default=True,
             help="Enables execution of v2 @goal_rules.",
+            removal_version="2.1.0.dev0",
+            removal_hint="The v2 engine is the only one available. This option does nothing.",
         )
 
         # TODO(#7203): make a regexp option type!
@@ -891,11 +897,9 @@ class GlobalOptions(Subsystem):
         )
 
         loop_flag = "--loop"
-        loop_passive = register.bootstrap.v1 or not register.bootstrap.v2
         register(
             loop_flag,
             type=bool,
-            passive=loop_passive,
             help="Run v2 @goal_rules continuously as file changes are detected.",
         )
         register(
@@ -903,74 +907,7 @@ class GlobalOptions(Subsystem):
             type=int,
             default=2 ** 32,
             advanced=True,
-            passive=loop_passive,
             help=f"The maximum number of times to loop when `{loop_flag}` is specified.",
-        )
-
-        no_v1 = not register.bootstrap.v1
-        register(
-            "-x",
-            "--time",
-            type=bool,
-            passive=no_v1,
-            help="Output a timing report at the end of the run.",
-        )
-        register(
-            "-e", "--explain", type=bool, passive=no_v1, help="Explain the execution of goals."
-        )
-        register(
-            "-q",
-            "--quiet",
-            type=bool,
-            recursive=True,
-            passive=no_v1,
-            help="Squelches most console output. NOTE: Some tasks default to behaving quietly: "
-            "inverting this option supports making them noisier than they would be otherwise.",
-        )
-        # TODO: After moving to the new options system these abstraction leaks can go away.
-        register(
-            "-k",
-            "--kill-nailguns",
-            advanced=True,
-            type=bool,
-            passive=no_v1,
-            help="Kill nailguns before exiting",
-        )
-        register(
-            "--fail-fast",
-            advanced=True,
-            type=bool,
-            recursive=True,
-            passive=no_v1,
-            help="Exit as quickly as possible on error, rather than attempting to continue "
-            "to process the non-erroneous subset of the input.",
-        )
-        register(
-            "--cache-key-gen-version",
-            advanced=True,
-            default="200",
-            recursive=True,
-            passive=no_v1,
-            help="The cache key generation. Bump this to invalidate every artifact for a scope.",
-        )
-        register(
-            "--workdir-max-build-entries",
-            advanced=True,
-            type=int,
-            default=8,
-            passive=no_v1,
-            help="Maximum number of previous builds to keep per task target pair in workdir. "
-            "If set, minimum 2 will always be kept to support incremental compilation.",
-        )
-        register(
-            "--max-subprocess-args",
-            advanced=True,
-            type=int,
-            default=100,
-            recursive=True,
-            passive=no_v1,
-            help="Used to limit the number of arguments passed to some subprocesses by breaking "
-            "the command up into multiple invocations.",
         )
         register(
             "--lock",

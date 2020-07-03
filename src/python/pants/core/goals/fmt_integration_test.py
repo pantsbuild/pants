@@ -12,9 +12,7 @@ class FmtIntegrationTest(PantsRunIntegrationTest):
     def test_fmt_then_edit(self):
         f = "examples/src/python/example/hello/greet/greet.py"
         with self.temporary_workdir() as workdir:
-            run = lambda: self.run_pants_with_workdir(
-                ["--no-v1", "--v2", "fmt", f], workdir=workdir
-            )
+            run = lambda: self.run_pants_with_workdir(["fmt", f], workdir=workdir)
 
             # Run once to start up, and then capture the file content.
             self.assert_success(run())
