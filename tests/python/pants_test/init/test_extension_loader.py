@@ -67,7 +67,10 @@ class DummyObject1:
 
 
 class DummyObject2:
-    pass
+    # Objects can have a special classmethod `subsystems` to register subsystems.
+    @classmethod
+    def subsystems(cls):
+        return (DummySubsystem,)
 
 
 @dataclass(frozen=True)
