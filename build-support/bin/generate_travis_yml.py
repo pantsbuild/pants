@@ -11,7 +11,7 @@ HEADER = dedent(
     """\
     # GENERATED, DO NOT EDIT!
     # To change, edit `build-support/bin/generate_travis_yml.py` and run:
-    #   ./v2 run build-support/bin:generate_travis_yml > .travis.yml
+    #   ./pants run build-support/bin:generate_travis_yml > .travis.yml
     """
 )
 
@@ -556,8 +556,8 @@ def unit_tests(python_version: PythonVersion) -> Dict:
         **linux_shard(python_version=python_version, install_travis_wait=True),
         "name": f"Unit tests (Python {python_version.decimal})",
         "script": [
-            "travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py --unit-tests --plugin-tests "
-            f"--remote-execution-enabled --python-version {python_version.decimal}"
+            "travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py "
+            f"--unit-tests --remote-execution-enabled --python-version {python_version.decimal}"
         ],
     }
     safe_append(shard, "env", f"CACHE_NAME=unit_tests.py{python_version.number}")
@@ -621,8 +621,9 @@ def integration_tests(python_version: PythonVersion) -> Dict:
         "name": f"Integration tests - V2 (Python {python_version.decimal})",
         "script": [
             (
-                "travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py --integration-tests "
-                f"--remote-execution-enabled --python-version {python_version.decimal}"
+                "travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py "
+                "--integration-tests --remote-execution-enabled --python-version "
+                f"{python_version.decimal}"
             ),
         ],
     }

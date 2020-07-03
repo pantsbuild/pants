@@ -89,7 +89,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
     def test_pantsd_lifecycle_non_invalidation(self):
         with self.pantsd_successful_run_context() as ctx:
-            cmds = (["-q", "help"], ["--no-colors", "help"], ["help"])
+            cmds = (["help"], ["--no-colors", "help"], ["help"])
             last_pid = None
             for cmd in cmds:
                 # Run with a CLI flag.
@@ -195,7 +195,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             }
             with environment_as(**env):
                 result = ctx.runner(
-                    ["-q", "run", "testprojects/src/python/print_env", "--", EXPECTED_KEY]
+                    ["run", "testprojects/src/python/print_env", "--", EXPECTED_KEY]
                 )
                 ctx.checker.assert_running()
 
@@ -209,7 +209,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
             self.assert_failure(
                 self.run_pants_with_workdir(
-                    ["-q", "run", "testprojects/src/python/print_env", "--", "NO_LEAKS"],
+                    ["run", "testprojects/src/python/print_env", "--", "NO_LEAKS"],
                     workdir,
                     pantsd_config,
                 )

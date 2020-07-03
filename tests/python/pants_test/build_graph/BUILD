@@ -42,7 +42,6 @@ python_tests(
   sources = ['test_build_file_aliases.py'],
   dependencies = [
     'src/python/pants/build_graph',
-    'src/python/pants/engine/legacy:graph',
     'src/python/pants/testutil/subsystem',
     'src/python/pants/util:frozendict',
   ],

@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, ClassVar, Optional, Type, cast
+from typing import TYPE_CHECKING, Optional, Type, cast
 
 from pants.option.option_value_container import OptionValueContainer
 
@@ -25,7 +25,6 @@ class ScopeInfo:
     """Information about a scope."""
 
     scope: str
-    category: str
     optionable_cls: Optional[Type["Optionable"]] = None
     # A ScopeInfo may have a deprecated_scope (from its associated optionable_cls), which represents a
     # previous/deprecated name for a current/non-deprecated ScopeInfo. It may also be directly
@@ -33,16 +32,6 @@ class ScopeInfo:
     # including that of a SubsystemDependency (ie, deprecation of a dependency on a scoped Subsystem).
     removal_version: Optional[str] = None
     removal_hint: Optional[str] = None
-
-    # Symbolic constants for different categories of scope.
-    GLOBAL: ClassVar[str] = "GLOBAL"
-    GOAL: ClassVar[str] = "GOAL"
-    GOAL_V1: ClassVar[str] = "GOAL_V1"
-    TASK: ClassVar[str] = "TASK"
-    SUBSYSTEM: ClassVar[str] = "SUBSYSTEM"
-    INTERMEDIATE: ClassVar[
-        str
-    ] = "INTERMEDIATE"  # Scope added automatically to fill out the scope hierarchy.
 
     @property
     def description(self) -> str:

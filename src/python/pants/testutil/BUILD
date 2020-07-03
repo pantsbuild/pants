@@ -6,7 +6,6 @@ python_library(
   dependencies=[
     ':int-test-for-export',
     ':test_base',
-    'src/python/pants/testutil/base:context_utils',
     'src/python/pants/testutil/engine',
     'src/python/pants/testutil/option',
     'src/python/pants/testutil/subsystem',
@@ -73,7 +72,6 @@ python_library(
     'src/python/pants/source',
     'src/python/pants/subsystem',
     'src/python/pants/task',
-    'src/python/pants/testutil/base:context_utils',
     'src/python/pants/testutil/engine',
     'src/python/pants/testutil/option',
     'src/python/pants/testutil/subsystem',

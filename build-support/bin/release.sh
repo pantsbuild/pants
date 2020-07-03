@@ -95,7 +95,7 @@ function run_pex() {
 function run_packages_script() {
   (
     cd "${ROOT}"
-    ./v2 --concurrent run "${ROOT}/build-support/bin/packages.py" -- "$@"
+    ./pants --concurrent run "${ROOT}/build-support/bin/packages.py" -- "$@"
   )
 }
 

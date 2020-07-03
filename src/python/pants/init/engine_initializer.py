@@ -5,17 +5,11 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Iterable, List, Optional, Set, Tuple, Type, cast
 
-from pants.backend.python.targets.python_binary import PythonBinary
-from pants.backend.python.targets.python_library import PythonLibrary
-from pants.backend.python.targets.python_tests import PythonTests
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import AddressSpecs, Specs
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.build_graph.remote_sources import RemoteSources
-from pants.build_graph.target import Target as TargetV1
 from pants.engine import interactive_process, process, target
 from pants.engine.console import Console
 from pants.engine.fs import Workspace, create_fs_rules
@@ -27,17 +21,8 @@ from pants.engine.internals.mapper import AddressMapper
 from pants.engine.internals.native import Native
 from pants.engine.internals.parser import SymbolTable
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
-from pants.engine.legacy.address_mapper import LegacyAddressMapper
-from pants.engine.legacy.graph import LegacyBuildGraph, create_legacy_graph_tasks
 from pants.engine.legacy.parser import LegacyPythonCallbacksParser
-from pants.engine.legacy.structs import (
-    PythonBinaryAdaptor,
-    PythonTargetAdaptor,
-    PythonTestsAdaptor,
-    RemoteSourcesAdaptor,
-    TargetAdaptor,
-)
-from pants.engine.legacy.structs import rules as structs_rules
+from pants.engine.legacy.structs import TargetAdaptor
 from pants.engine.platform import create_platform_rules
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Params
@@ -49,103 +34,17 @@ from pants.option.global_options import (
     ExecutionOptions,
     GlobMatchErrorBehavior,
 )
-from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.scm.subsystems.changed import rules as changed_rules
 
 logger = logging.getLogger(__name__)
 
 
-def _tuplify(v: Optional[Iterable]) -> Optional[Tuple]:
-    if v is None:
-        return None
-    if isinstance(v, tuple):
-        return v
-    if isinstance(v, (list, set)):
-        return tuple(v)
-    return (v,)
-
-
-def _compute_default_sources_globs(
-    v1_target_cls: Type[TargetV1],
-) -> Tuple[Optional[Tuple[str, ...]], Optional[Tuple[str, ...]]]:
-    """Look up the default source globs for the type, and return as a tuple of (globs, excludes)."""
-    if not v1_target_cls.supports_default_sources() or v1_target_cls.default_sources_globs is None:
-        return (None, None)
-
-    globs = _tuplify(v1_target_cls.default_sources_globs)
-    excludes = _tuplify(v1_target_cls.default_sources_exclude_globs)
-
-    return (globs, excludes)
-
-
-def _apply_default_sources_globs(
-    adaptor_cls: Type[TargetAdaptor], v1_target_cls: Type[TargetV1]
-) -> None:
-    """Mutates the given TargetAdaptor subclass to apply default sources from the given legacy
-    target type."""
-    globs, excludes = _compute_default_sources_globs(v1_target_cls)
-    adaptor_cls.default_sources_globs = globs  # type: ignore[assignment]
-    adaptor_cls.default_sources_exclude_globs = excludes  # type: ignore[assignment]
-
-
-# TODO: These calls mutate the adaptor classes for some known library types to copy over
-# their default source globs while preserving their concrete types. As with the alias replacement
-# below, this is a delaying tactic to avoid elevating the TargetAdaptor API.
-_apply_default_sources_globs(PythonBinaryAdaptor, PythonBinary)
-_apply_default_sources_globs(PythonTargetAdaptor, PythonLibrary)
-_apply_default_sources_globs(PythonTestsAdaptor, PythonTests)
-_apply_default_sources_globs(RemoteSourcesAdaptor, RemoteSources)
-
-
-def _make_target_adaptor(
-    adaptor_cls: Type[TargetAdaptor], v1_target_cls: Type[TargetV1]
-) -> Type[TargetAdaptor]:
-    """Create an adaptor subclass for the given TargetAdaptor base class and legacy target type."""
-    globs, excludes = _compute_default_sources_globs(v1_target_cls)
-    if globs is None:
-        return adaptor_cls
-
-    class GlobsHandlingTargetAdaptor(adaptor_cls):  # type: ignore[misc,valid-type]
-        default_sources_globs = globs
-        default_sources_exclude_globs = excludes
-
-    return GlobsHandlingTargetAdaptor
-
-
-def _legacy_symbol_table(
-    build_file_aliases: BuildFileAliases, registered_target_types: RegisteredTargetTypes
-) -> SymbolTable:
+def _legacy_symbol_table(registered_target_types: RegisteredTargetTypes) -> SymbolTable:
     """Construct a SymbolTable for the given BuildFileAliases."""
-    table = {
-        alias: _make_target_adaptor(TargetAdaptor, target_type)
-        for alias, target_type in build_file_aliases.target_types.items()
-    }
-    for alias, factory in build_file_aliases.target_macro_factories.items():
-        # TargetMacro.Factory with more than one target type is deprecated.
-        # For default sources, this means that TargetMacro Factories with more than one target_type
-        # will not parse sources through the engine, and will fall back to the legacy python sources
-        # parsing.
-        # Conveniently, multi-target_type TargetMacro.Factory, and legacy python source parsing, are
-        # targeted to be removed in the same version of pants.
-        if len(factory.target_types) == 1:
-            table[alias] = _make_target_adaptor(TargetAdaptor, tuple(factory.target_types)[0],)
-
-    # Now, register any target types only declared in V2 without a V1 equivalent.
-    table.update(
-        {
-            target_type.alias: TargetAdaptor
-            for target_type in registered_target_types.types
-            if target_type.alias not in table
-        }
+    return SymbolTable(
+        {target_type.alias: TargetAdaptor for target_type in registered_target_types.types}
     )
-
-    table["python_library"] = PythonTargetAdaptor
-    table["python_tests"] = PythonTestsAdaptor
-    table["python_binary"] = PythonBinaryAdaptor
-    table["remote_sources"] = RemoteSourcesAdaptor
-
-    return SymbolTable(table)
 
 
 @dataclass(frozen=True)
@@ -204,7 +103,6 @@ class LegacyGraphSession:
         *,
         options_bootstrapper: OptionsBootstrapper,
         union_membership: UnionMembership,
-        options: Options,
         goals: Iterable[str],
         specs: Specs,
         poll: bool = False,
@@ -223,9 +121,8 @@ class LegacyGraphSession:
 
         for goal in goals:
             goal_product = self.goal_map[goal]
-            # NB: We no-op for goals that have no V2 implementation because no relevant backends are
-            # registered. This allows us to safely set `--v1 --v2`, even if no V2 backends are registered.
-            # Once V1 is removed, we might want to reconsider the behavior to instead warn or error when
+            # NB: We no-op for goals that have no implementation because no relevant backends are
+            # registered. We might want to reconsider the behavior to instead warn or error when
             # trying to run something like `./pants run` without any backends registered.
             is_implemented = union_membership.has_members_for_all(
                 goal_product.subsystem_cls.required_union_implementations
@@ -252,21 +149,6 @@ class LegacyGraphSession:
                 return exit_code
 
         return PANTS_SUCCEEDED_EXIT_CODE
-
-    def create_build_graph(
-        self, specs: Specs, build_root: Optional[str] = None,
-    ) -> Tuple[LegacyBuildGraph, LegacyAddressMapper]:
-        """Construct and return a `BuildGraph` given a set of input specs."""
-        logger.debug("specs are: %r", specs)
-        graph = LegacyBuildGraph.create(self.scheduler_session, self.build_file_aliases)
-        logger.debug("build_graph is: %s", graph)
-        # Ensure the entire generator is unrolled.
-        for _ in graph.inject_roots_closure(specs.address_specs):
-            pass
-
-        address_mapper = LegacyAddressMapper(self.scheduler_session, build_root or get_buildroot())
-        logger.debug("address_mapper is: %s", address_mapper)
-        return graph, address_mapper
 
 
 class EngineInitializer:
@@ -372,8 +254,7 @@ class EngineInitializer:
         rules = build_configuration.rules()
 
         registered_target_types = RegisteredTargetTypes.create(build_configuration.target_types())
-
-        symbol_table = _legacy_symbol_table(build_file_aliases, registered_target_types)
+        symbol_table = _legacy_symbol_table(registered_target_types)
 
         execution_options = execution_options or DEFAULT_EXECUTION_OPTIONS
 
@@ -426,11 +307,9 @@ class EngineInitializer:
             *options_parsing.rules(),
             *process.rules(),
             *target.rules(),
-            *create_legacy_graph_tasks(),
             *create_fs_rules(),
             *create_platform_rules(),
             *create_graph_rules(address_mapper),
-            *structs_rules(),
             *changed_rules(),
             *rules,
         )

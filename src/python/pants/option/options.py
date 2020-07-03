@@ -98,7 +98,7 @@ class Options:
                 )
             original_scopes[si.scope] = si
             if si.deprecated_scope:
-                ret.add(ScopeInfo(si.deprecated_scope, si.category, si.optionable_cls))
+                ret.add(ScopeInfo(si.deprecated_scope, si.optionable_cls))
                 original_scopes[si.deprecated_scope] = si
 
         # TODO: Once scope name validation is enforced (so there can be no dots in scope name
@@ -107,7 +107,7 @@ class Options:
         for si in copy.copy(ret):
             for scope in all_enclosing_scopes(si.scope, allow_global=False):
                 if scope not in original_scopes:
-                    ret.add(ScopeInfo(scope, ScopeInfo.INTERMEDIATE))
+                    ret.add(ScopeInfo(scope))
         return FrozenOrderedSet(ret)
 
     @classmethod
@@ -454,7 +454,6 @@ class Options:
         self,
         flags_in_scope,
         namespace: OptionValueContainer,
-        scope: str,
         include_passive_options: bool = False,
     ) -> Parser.ParseArgsRequest:
         levenshtein_max_distance = (
@@ -497,7 +496,7 @@ class Options:
         # Now add our values.
         flags_in_scope = self._scope_to_flags.get(scope, [])
         parse_args_request = self._make_parse_args_request(
-            flags_in_scope, values, scope, include_passive_options
+            flags_in_scope, values, include_passive_options
         )
         self._parser_hierarchy.get_parser_by_scope(scope).parse_args(parse_args_request)
 

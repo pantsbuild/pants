@@ -18,28 +18,16 @@ from pants.option.scope import ScopeInfo
 from pants.util.contextutil import pushd, temporary_dir
 
 
-def task(scope: str) -> ScopeInfo:
-    return ScopeInfo(scope, ScopeInfo.TASK)
-
-
-def intermediate(scope: str) -> ScopeInfo:
-    return ScopeInfo(scope, ScopeInfo.INTERMEDIATE)
-
-
-def subsys(scope: str) -> ScopeInfo:
-    return ScopeInfo(scope, ScopeInfo.SUBSYSTEM)
-
-
 class ArgSplitterTest(unittest.TestCase):
     _known_scope_infos = [
-        intermediate("compile"),
-        task("compile.java"),
-        task("compile.scala"),
-        subsys("jvm"),
-        subsys("jvm.test.junit"),
-        subsys("reporting"),
-        intermediate("test"),
-        task("test.junit"),
+        ScopeInfo("compile"),
+        ScopeInfo("compile.java"),
+        ScopeInfo("compile.scala"),
+        ScopeInfo("jvm"),
+        ScopeInfo("jvm.test.junit"),
+        ScopeInfo("reporting"),
+        ScopeInfo("test"),
+        ScopeInfo("test.junit"),
     ]
 
     def assert_valid_split(

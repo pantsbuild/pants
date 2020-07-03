@@ -1,6 +1,6 @@
 # GENERATED, DO NOT EDIT!
 # To change, edit `build-support/bin/generate_travis_yml.py` and run:
-#   ./v2 run build-support/bin:generate_travis_yml > .travis.yml
+#   ./pants run build-support/bin:generate_travis_yml > .travis.yml
 
 
 conditions: v1
@@ -433,7 +433,7 @@ jobs:
     - '3.7'
     script:
     - travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py
-      --unit-tests --plugin-tests --remote-execution-enabled --python-version 3.6
+      --unit-tests --remote-execution-enabled --python-version 3.6
     stage: Test Pants
     sudo: required
   - addons:
@@ -493,7 +493,7 @@ jobs:
     - '3.7'
     script:
     - travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py
-      --unit-tests --plugin-tests --remote-execution-enabled --python-version 3.7
+      --unit-tests --remote-execution-enabled --python-version 3.7
     stage: Test Pants (Cron)
     sudo: required
   - addons:

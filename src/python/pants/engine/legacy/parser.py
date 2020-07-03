@@ -92,12 +92,6 @@ class LegacyPythonCallbacksParser(Parser):
         for alias, object_factory in aliases.context_aware_object_factories.items():
             symbols[alias] = object_factory(parse_context)
 
-        for alias, target_macro_factory in aliases.target_macro_factories.items():
-            underlying_symbol = symbols.get(alias, TargetAdaptor)
-            symbols[alias] = target_macro_factory.target_macro(parse_context)
-            for target_type in target_macro_factory.target_types:
-                symbols[target_type] = Registrar(parse_context, alias, underlying_symbol)
-
         return symbols, parse_context
 
     def _make_symbols(self, extra_symbols: BuildFilePreludeSymbols):

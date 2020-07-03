@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class PythonSetup(Subsystem):
-    """A python environment."""
+    """A Python environment."""
 
     options_scope = "python-setup"
 
@@ -67,6 +67,10 @@ class PythonSetup(Subsystem):
             metavar="<dir>",
             help="The parent directory for the interpreter cache. "
             "If unspecified, a standard path under the workdir is used.",
+            removal_version="2.1.0.dev0",
+            removal_hint=(
+                "The option `--python-setup-interpreter-cache-dir` does not anything anymore."
+            ),
         )
         register(
             "--resolver-cache-dir",
@@ -75,6 +79,10 @@ class PythonSetup(Subsystem):
             metavar="<dir>",
             help="The parent directory for the requirement resolver cache. "
             "If unspecified, a standard path under the workdir is used.",
+            removal_version="2.1.0.dev0",
+            removal_hint=(
+                "The option `--python-setup-resolver-cache-dir` does not anything anymore."
+            ),
         )
         register(
             "--resolver-allow-prereleases",

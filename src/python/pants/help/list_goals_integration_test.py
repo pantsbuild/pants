@@ -20,7 +20,7 @@ class TestListGoalsIntegration(PantsRunIntegrationTest):
         goals_that_need_implementation = ["binary", "fmt", "lint", "run", "test"]
         command = ["--pants-config-files=[]", "goals"]
 
-        not_implemented_run = self.run_pants(command)
+        not_implemented_run = self.run_pants(["--backend-packages=[]", *command,])
         self.assert_success(not_implemented_run)
         for goal in goals_that_need_implementation:
             assert goal not in not_implemented_run.stdout_data

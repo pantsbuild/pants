@@ -24,12 +24,12 @@ class TestPythonSetup(TestBase):
     def test_get_environment_paths(self):
         with environment_as(PATH="foo/bar:baz:/qux/quux"):
             paths = PythonSetup.get_environment_paths()
-        self.assertListEqual(["foo/bar", "baz", "/qux/quux"], paths)
+        assert ["foo/bar", "baz", "/qux/quux"] == paths
 
     def test_get_pex_python_paths(self):
         with setup_pexrc_with_pex_python_path(["foo/bar", "baz", "/qux/quux"]):
             paths = PythonSetup.get_pex_python_paths()
-        self.assertListEqual(["foo/bar", "baz", "/qux/quux"], paths)
+        assert ["foo/bar", "baz", "/qux/quux"] == paths
 
     def test_get_pyenv_paths(self):
         local_pyenv_version = "3.5.5"
@@ -48,7 +48,6 @@ class TestPythonSetup(TestBase):
         assert expected_local_paths == local_paths
 
     def test_expand_interpreter_search_paths(self):
-
         local_pyenv_version = "3.5.5"
         all_pyenv_versions = ["2.7.14", local_pyenv_version]
         self.create_file(".python-version", local_pyenv_version + "\n")
@@ -79,4 +78,4 @@ class TestPythonSetup(TestBase):
             + expected_pyenv_local_paths
             + ["/qux"]
         )
-        self.assertListEqual(expected, expanded_paths)
+        assert expected == expanded_paths

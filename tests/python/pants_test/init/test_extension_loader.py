@@ -63,11 +63,11 @@ class DummyTarget2(Target):
 
 
 class DummyObject1:
-    # Test that registering an object with no subsystems() method succeeds.
     pass
 
 
 class DummyObject2:
+    # Objects can have a special classmethod `subsystems` to register subsystems.
     @classmethod
     def subsystems(cls):
         return (DummySubsystem,)
