@@ -15,7 +15,6 @@ python_tests(
   sources = ['test_pants_daemon.py'],
   dependencies = [
     'src/python/pants/testutil:test_base',
-    'src/python/pants/bin',
     'src/python/pants/pantsd:pants_daemon',
     'src/python/pants/pantsd/service:pants_service',
     'src/python/pants/util:contextutil',
@@ -26,7 +25,6 @@ python_tests(
   name = 'pants_daemon_core',
   sources = ['test_pants_daemon_core.py'],
   dependencies = [
-    'src/python/pants/bin',
     'src/python/pants/pantsd/service:pants_service',
     'src/python/pants/pantsd:pants_daemon_core',
     'src/python/pants/testutil:test_base'

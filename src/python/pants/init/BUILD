@@ -2,17 +2,48 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
+  sources=["*.py", "!engine_initializer.py"],
   dependencies=[
-    '3rdparty/python:dataclasses',
-    '3rdparty/python:pex',
-    '3rdparty/python:setuptools',
     ':plugins',
+    '3rdparty/python:pex',
     'src/python/pants/base:build_environment',
-    'src/python/pants/base:build_root',
+    'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/base:exception_sink',
     'src/python/pants/base:exceptions',
     'src/python/pants/base:specs',
-    'src/python/pants/binaries',
+    'src/python/pants/build_graph',
+    'src/python/pants/engine/internals:native',
+    'src/python/pants/engine/internals:scheduler',
+    'src/python/pants/engine:selectors',
+    'src/python/pants/goal',
+    'src/python/pants/goal:run_tracker',
+    'src/python/pants/option:global_options',
+    'src/python/pants/option:options_bootstrapper',
+    'src/python/pants/process',
+    'src/python/pants/python',
+    'src/python/pants/reporting',
+    'src/python/pants/scm/subsystems:changed',
+    'src/python/pants/source',
+    'src/python/pants/subsystem',
+    'src/python/pants/util:contextutil',
+    'src/python/pants/util:dirutil',
+    'src/python/pants/util:logging',
+    'src/python/pants/util:memo',
+    'src/python/pants/util:ordered_set',
+    'src/python/pants:version',
+  ],
+)
+
+python_library(
+  name="engine_initializer",
+  sources=["engine_initializer.py"],
+  dependencies=[
+    ':init',
+    '3rdparty/python:dataclasses',
+    'src/python/pants/base:build_environment',
+    'src/python/pants/base:build_root',
+    'src/python/pants/base:exiter',
+    'src/python/pants/base:specs',
     'src/python/pants/build_graph',
     'src/python/pants/engine/internals:build_files',
     'src/python/pants/engine/internals:core_abstractions',
@@ -23,20 +54,18 @@ python_library(
     'src/python/pants/engine/legacy:parser',
     'src/python/pants/engine/legacy:structs',
     'src/python/pants/engine:console',
+    'src/python/pants/engine:fs',
+    'src/python/pants/engine:goal',
+    'src/python/pants/engine:interactive_process',
     'src/python/pants/engine:platform',
+    'src/python/pants/engine:process',
+    'src/python/pants/engine:rules',
+    'src/python/pants/engine:selectors',
+    'src/python/pants/engine:target',
     'src/python/pants/engine:unions',
-    'src/python/pants/goal',
-    'src/python/pants/goal:run_tracker',
     'src/python/pants/option:global_options',
     'src/python/pants/option:options_bootstrapper',
-    'src/python/pants/process',
-    'src/python/pants/python',
-    'src/python/pants/subsystem',
-    'src/python/pants/util:dirutil',
-    'src/python/pants/util:logging',
-    'src/python/pants/util:memo',
-    'src/python/pants/util:ordered_set',
-    'src/python/pants:version',
+    'src/python/pants/scm/subsystems:changed',
   ],
 )
 
@@ -58,13 +87,4 @@ target(
     'src/python/pants/backend/native',
     'src/python/pants/core:plugin',
   ],
-)
-
-python_library(
-  name = 'util',
-  sources = ['util.py'],
-  dependencies=[
-    ':init',
-    'src/python/pants/testutil:test_base'
-  ]
 )

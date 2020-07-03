@@ -81,3 +81,10 @@ class PantsRequirementTest(TestBase):
                 "pants_requirement(name='jane', dist='pantsbuild.pantsish')",
                 expected_target_name="jane",
             )
+
+    def test_modules_override(self) -> None:
+        self.assert_pants_requirement(
+            "pants_requirement(dist='pantsbuild.pants', modules=['fake'])",
+            expected_target_name="pantsbuild.pants",
+            expected_module="fake",
+        )

@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from typing import Optional
+from typing import Iterable, Optional
 
 from pants.base.build_environment import pants_version
 from pants.base.exceptions import TargetDefinitionException
@@ -32,13 +32,19 @@ class PantsRequirement:
         self._parse_context = parse_context
 
     def __call__(
-        self, name: Optional[str] = None, dist: Optional[str] = None,
+        self,
+        name: Optional[str] = None,
+        dist: Optional[str] = None,
+        *,
+        modules: Optional[Iterable[str]] = None,
     ):
         """
         :param name: The name to use for the target, defaults to the dist name if specified and
                      otherwise the parent dir name.
         :param dist: The Pants dist to create a requirement for. This must be a 'pantsbuild.pants*'
                      distribution; eg: 'pantsbuild.pants.testutil'.
+        :param modules: The modules exposed by the dist, e.g. `['pants.testutil']`. This defaults
+                        to the name of the dist without the leading `pantsbuild`.
         """
         name = name or dist or os.path.basename(self._parse_context.rel_path)
         dist = dist or "pantsbuild.pants"
@@ -52,10 +58,9 @@ class PantsRequirement:
                 ),
             )
 
-        module_name = dist.replace("pantsbuild.", "")
-        requirement = PythonRequirement(
-            requirement=f"{dist}=={pants_version()}", modules=[module_name]
-        )
+        if not modules:
+            modules = [dist.replace("pantsbuild.", "")]
+        requirement = PythonRequirement(requirement=f"{dist}=={pants_version()}", modules=modules)
         self._parse_context.create_object(
             "python_requirement_library", name=name, requirements=[requirement]
         )

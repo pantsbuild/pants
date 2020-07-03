@@ -1,14 +1,12 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-
 python_tests(
   dependencies = [
     '3rdparty/python:dataclasses',
     '3rdparty/python:pex',
     '3rdparty/python:setuptools',
     'src/python/pants/base:exceptions',
-    'src/python/pants/bin',
     'src/python/pants/build_graph',
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
@@ -35,6 +33,6 @@ python_tests(
   name = 'test_util',
   sources = ['test_util.py'],
   dependencies = [
-    'src/python/pants/init:util',
+    'src/python/pants/init',
   ]
 )

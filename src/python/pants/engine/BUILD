@@ -81,7 +81,6 @@ python_library(
     '3rdparty/python:dataclasses',
     ':collection',
     ':rules',
-    # 'src/python/pants/engine/internals:scheduler',  # dep cycle
     'src/python/pants/option',
     'src/python/pants/option:global_options',
     'src/python/pants/util:dirutil',
@@ -110,7 +109,6 @@ python_library(
     ':fs',
     ':rules',
     'src/python/pants/base:exception_sink',
-    # 'src/python/pants/engine/internals:scheduler',  # dep cycle
   ],
 )
 

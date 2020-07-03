@@ -5,15 +5,12 @@ import inspect
 import sys
 import warnings
 from functools import wraps
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import Any, Callable, Optional
 
 from packaging.version import InvalidVersion, Version
 
 from pants.util.memo import memoized_method
 from pants.version import PANTS_SEMVER
-
-if TYPE_CHECKING:
-    from pants.option.option_value_container import OptionValueContainer
 
 
 class DeprecationApplicationError(Exception):
@@ -298,14 +295,16 @@ def deprecated_module(
     )
 
 
+# TODO: old_container and new_container are both `OptionValueContainer`, but that causes a dep
+#  cycle.
 def resolve_conflicting_options(
     *,
     old_option: str,
     new_option: str,
     old_scope: str,
     new_scope: str,
-    old_container: "OptionValueContainer",
-    new_container: "OptionValueContainer",
+    old_container: Any,
+    new_container: Any,
 ):
     """Utility for resolving an option that's been migrated to a new location.
 

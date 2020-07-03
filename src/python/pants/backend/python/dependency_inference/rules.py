@@ -22,7 +22,7 @@ class InferPythonDependencies(InferDependenciesRequest):
     infer_from = PythonSources
 
 
-@rule
+@rule(desc="Inferring Python dependencies.")
 async def infer_python_dependencies(request: InferPythonDependencies) -> InferredDependencies:
     stripped_sources = await Get(
         SourceRootStrippedSources, StripSourcesFieldRequest(request.sources_field)
@@ -39,7 +39,7 @@ async def infer_python_dependencies(request: InferPythonDependencies) -> Inferre
     owner_per_import = await MultiGet(
         Get(PythonModuleOwner, PythonModule(imported_module))
         for file_imports in imports_per_file
-        for imported_module in file_imports.all_imports
+        for imported_module in file_imports.explicit_imports
         if imported_module not in combined_stdlib
     )
     return InferredDependencies(

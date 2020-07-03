@@ -6,7 +6,7 @@ python_library(
   name='entry_point',
   sources=['__main__.py'],
   dependencies=[
-    'src/python/pants/bin',
+    'src/python/pants/bin:pants_loader',
   ],
 )
 
