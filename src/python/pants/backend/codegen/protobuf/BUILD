@@ -7,5 +7,4 @@ python_library(
     'src/python/pants/engine:platform',
     'src/python/pants/engine:target',
   ],
-  tags = {"type_checked"},
 )

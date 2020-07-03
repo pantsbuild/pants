@@ -19,7 +19,6 @@ python_library(
     'src/python/pants/util:objects',
     'src/python/pants/util:ordered_set',
   ],
-  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -32,7 +31,6 @@ python_library(
     'src/python/pants/subsystem',
     'src/python/pants/util:logging',
   ],
-  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -48,7 +46,6 @@ python_library(
     'src/python/pants/util:ordered_set',
     'src/python/pants/util:strutil',
   ],
-  tags = {'partially_type_checked'},
 )
 
 python_tests(
@@ -66,7 +63,6 @@ python_tests(
     'src/python/pants/testutil/option',
     'src/python/pants/testutil:test_base',
   ],
-  tags = {'partially_type_checked'},
   timeout=300,
 )
 
@@ -79,6 +75,6 @@ python_tests(
     'src/python/pants/util:logging',
     'testprojects/src/python:plugins_directory',
   ],
-  tags = {'integration', 'partially_type_checked'},
+  tags = ['integration'],
   timeout=300,
 )

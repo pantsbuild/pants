@@ -10,7 +10,6 @@ python_library(
     'src/python/pants/util:memo',
     'src/python/pants/util:strutil',
   ],
-  tags = {'partially_type_checked'},
 )
 
 resources(

@@ -9,5 +9,5 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'src/python/pants:reversion_file_with_dependencies',
   ],
-  tags = {'integration', 'partially_type_checked'},
+  tags = ['integration'],
 )

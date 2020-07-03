@@ -9,5 +9,4 @@ python_library(
     'src/python/pants/engine:goal',
     'src/python/pants/engine:rules',
   ],
-  tags = {"type_checked"},
 )

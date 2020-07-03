@@ -17,7 +17,6 @@ python_library(
     'src/python/pants/engine:unions',
     'src/python/pants/python',
   ],
-  tags = {"type_checked"},
 )
 
 python_tests(
@@ -37,5 +36,4 @@ python_tests(
     'src/python/pants/testutil:external_tool_test_base',
     'src/python/pants/testutil/option',
   ],
-  tags = {'partially_type_checked'},
 )

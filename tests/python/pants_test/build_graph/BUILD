@@ -11,7 +11,6 @@ python_tests(
     'src/python/pants/util:dirutil',
     'src/python/pants/testutil:test_base',
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -27,7 +26,6 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -36,7 +34,6 @@ python_tests(
   dependencies = [
     'src/python/pants/testutil:int-test',
   ],
-  tags = {'integration', 'type_checked'},
 )
 
 
@@ -48,5 +45,4 @@ python_tests(
     'src/python/pants/testutil/subsystem',
     'src/python/pants/util:frozendict',
   ],
-  tags = {"partially_type_checked"},
 )

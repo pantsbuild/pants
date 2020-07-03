@@ -10,7 +10,6 @@ python_tests(
     'src/python/pants/python',
     'src/python/pants/testutil:test_base',
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -22,5 +21,4 @@ python_tests(
     'src/python/pants/python',
     'src/python/pants/testutil:test_base'
   ],
-  tags = {"partially_type_checked"},
 )

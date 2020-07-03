@@ -14,5 +14,4 @@ python_library(
     'src/python/pants/engine:target',
     'src/python/pants/engine:unions',
   ],
-  tags = {'partially_type_checked'},
 )

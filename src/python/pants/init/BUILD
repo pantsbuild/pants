@@ -38,7 +38,6 @@ python_library(
     'src/python/pants/util:ordered_set',
     'src/python/pants:version',
   ],
-  tags = {'partially_type_checked'},
 )
 
 target(
