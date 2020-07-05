@@ -9,7 +9,7 @@ class Isort(PythonToolBase):
     """The Python import sorter tool (https://timothycrosley.github.io/isort/)."""
 
     options_scope = "isort"
-    default_version = "isort>=4.3.21,<4.4"
+    default_version = "isort>=5.0.0,<6.0"
     default_extra_requirements = ["setuptools<45"]  # NB: `<45` is for Python 2 support
     default_entry_point = "isort.main"
 
