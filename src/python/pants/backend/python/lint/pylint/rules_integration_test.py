@@ -159,7 +159,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
     def test_uses_correct_python_version(self) -> None:
         py2_args = [
             "--pylint-version=pylint<2",
-            "--pylint-extra-requirements=setuptools<45",
+            "--pylint-extra-requirements=['setuptools<45', 'isort>=4.3.21,<4.4']",
         ]
         py2_target = self.make_target_with_origin(
             [self.py3_only_source], name="py2", interpreter_constraints="CPython==2.7.*"
