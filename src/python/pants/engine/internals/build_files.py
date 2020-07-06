@@ -83,19 +83,13 @@ async def parse_address_family(
     )
     snapshot = await Get(Snapshot, PathGlobs, path_globs)
     files_content = await Get(FilesContent, Digest, snapshot.digest)
-
     if not files_content:
         raise ResolveError(f"Directory '{directory.path}' does not contain any BUILD files.")
-    address_maps = []
-    for filecontent_product in files_content:
-        address_maps.append(
-            AddressMap.parse(
-                filecontent_product.path,
-                filecontent_product.content.decode(),
-                address_mapper.parser,
-                prelude_symbols,
-            )
-        )
+
+    address_maps = [
+        AddressMap.parse(fc.path, fc.content.decode(), address_mapper.parser, prelude_symbols)
+        for fc in files_content
+    ]
     return AddressFamily.create(directory.path, address_maps)
 
 

@@ -165,7 +165,7 @@ class AddressMapper:
     def __init__(
         self,
         parser: Parser,
-        prelude_glob_patterns,
+        prelude_glob_patterns: Optional[Iterable[str]] = None,
         build_patterns: Optional[Iterable[str]] = None,
         build_ignore_patterns: Optional[Iterable[str]] = None,
         exclude_target_regexps: Optional[Iterable[str]] = None,
@@ -173,24 +173,20 @@ class AddressMapper:
     ) -> None:
         """Create an AddressMapper.
 
-        Both the set of files that define a mappable BUILD files and the parser used to parse those
-        files can be customized.  See the `pants.engine.parsers` module for example parsers.
-
-        :param parser: The BUILD file parser to use.
-        :param build_patterns: A tuple of fnmatch-compatible patterns for identifying BUILD files
-                              used to resolve addresses.
+        :param build_patterns: A tuple of PathGlob-compatible patterns for identifying BUILD files
+                               used to resolve addresses.
         :param build_ignore_patterns: A list of path ignore patterns used when searching for BUILD files.
         :param exclude_target_regexps: A list of regular expressions for excluding targets.
         """
         self.parser = parser
-        self.prelude_glob_patterns = prelude_glob_patterns
+        self.prelude_glob_patterns = tuple(prelude_glob_patterns or [])
         self.build_patterns = tuple(build_patterns or ["BUILD", "BUILD.*"])
         self.build_ignore_patterns = tuple(build_ignore_patterns or [])
         self.exclude_target_regexps = tuple(exclude_target_regexps or [])
         self.subproject_roots = tuple(subproject_roots or [])
 
     def __repr__(self):
-        return f"AddressMapper(parser={self.parser}, build_patterns={self.build_patterns})"
+        return f"AddressMapper(build_patterns={self.build_patterns})"
 
     @memoized_property
     def exclude_patterns(self):
