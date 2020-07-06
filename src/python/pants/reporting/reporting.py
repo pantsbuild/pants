@@ -89,7 +89,6 @@ class Reporting(Subsystem):
             color=False,
             indent=True,
             timing=False,
-            cache_stats=False,
             label_format=self.get_options().console_label_format,
             tool_output_format=self.get_options().console_tool_output_format,
         )
@@ -137,14 +136,11 @@ class Reporting(Subsystem):
         # terminal truly supports color, but most that don't set TERM=dumb.
         color = global_options.colors and (os.getenv("TERM") != "dumb")
         timing = global_options.time
-        cache_stats = global_options.time  # TODO: Separate flag for this?
 
         if is_quiet:
             console_reporter = QuietReporter(
                 run_tracker,
-                QuietReporter.Settings(
-                    log_level=log_level, color=color, timing=timing, cache_stats=cache_stats
-                ),
+                QuietReporter.Settings(log_level=log_level, color=color, timing=timing),
             )
         else:
             # Set up the new console reporter.
@@ -157,7 +153,6 @@ class Reporting(Subsystem):
                 color=color,
                 indent=True,
                 timing=timing,
-                cache_stats=cache_stats,
                 label_format=self.get_options().console_label_format,
                 tool_output_format=self.get_options().console_tool_output_format,
             )
@@ -180,7 +175,6 @@ class Reporting(Subsystem):
                 color=False,
                 indent=True,
                 timing=True,
-                cache_stats=True,
                 label_format=self.get_options().console_label_format,
                 tool_output_format=self.get_options().console_tool_output_format,
             )
