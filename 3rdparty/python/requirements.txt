@@ -16,7 +16,7 @@ fasteners==0.15.0
 #
 mypy==0.781
 
-packaging==20.3
+packaging==20.4
 pathspec==0.8.0
 pex==2.1.12
 psutil==5.7.0
