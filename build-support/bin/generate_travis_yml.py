@@ -617,7 +617,9 @@ def build_wheels_osx() -> Dict:
 
 def integration_tests(python_version: PythonVersion) -> Dict:
     shard = {
-        **linux_shard(python_version=python_version, install_travis_wait=True),
+        **linux_shard(
+            load_test_config=False, python_version=python_version, install_travis_wait=False
+        ),
         "name": f"Integration tests - V2 (Python {python_version.decimal})",
         "script": [
             "pyenv global",
