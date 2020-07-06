@@ -52,8 +52,6 @@ class BuildConfiguration:
 
     @dataclass
     class Builder:
-        _target_by_alias: Dict[Any, Any] = field(default_factory=dict)
-        _target_macro_factory_by_alias: Dict[Any, Any] = field(default_factory=dict)
         _exposed_object_by_alias: Dict[Any, Any] = field(default_factory=dict)
         _exposed_context_aware_object_factory_by_alias: Dict[Any, Any] = field(default_factory=dict)
         _optionables: OrderedSet = field(default_factory=OrderedSet)
@@ -70,10 +68,7 @@ class BuildConfiguration:
             :returns: A new BuildFileAliases instance containing this BuildConfiguration's registered alias
                       mappings.
             """
-            target_factories_by_alias = self._target_by_alias.copy()
-            target_factories_by_alias.update(self._target_macro_factory_by_alias)
             return BuildFileAliases(
-                targets=target_factories_by_alias,
                 objects=self._exposed_object_by_alias.copy(),
                 context_aware_object_factories=self._exposed_context_aware_object_factory_by_alias.copy(),
             )
@@ -87,12 +82,6 @@ class BuildConfiguration:
             if not isinstance(aliases, BuildFileAliases):
                 raise TypeError("The aliases must be a BuildFileAliases, given {}".format(aliases))
 
-            for alias, target_type in aliases.target_types.items():
-                self._register_target_alias(alias, target_type)
-
-            for alias, target_macro_factory in aliases.target_macro_factories.items():
-                self._register_target_macro_factory_alias(alias, target_macro_factory)
-
             for alias, obj in aliases.objects.items():
                 self._register_exposed_object(alias, obj)
 
@@ -103,28 +92,6 @@ class BuildConfiguration:
                 self._register_exposed_context_aware_object_factory(
                     alias, context_aware_object_factory
                 )
-
-        # TODO(John Sirois): Warn on alias override across all aliases since they share a global
-        # namespace in BUILD files.
-        # See: https://github.com/pantsbuild/pants/issues/2151
-        def _register_target_alias(self, alias, target_type):
-            if alias in self._target_by_alias:
-                logger.debug(
-                    "Target alias {} has already been registered. Overwriting!".format(alias)
-                )
-
-            self._target_by_alias[alias] = target_type
-            self.register_optionables(target_type.subsystems())
-
-        def _register_target_macro_factory_alias(self, alias, target_macro_factory):
-            if alias in self._target_macro_factory_by_alias:
-                logger.debug(
-                    "TargetMacro alias {} has already been registered. Overwriting!".format(alias)
-                )
-
-            self._target_macro_factory_by_alias[alias] = target_macro_factory
-            for target_type in target_macro_factory.target_types:
-                self.register_optionables(target_type.subsystems())
 
         def _register_exposed_object(self, alias, obj):
             if alias in self._exposed_object_by_alias:
@@ -230,10 +197,7 @@ class BuildConfiguration:
             self._target_types.update(target_types)
 
         def create(self) -> "BuildConfiguration":
-            target_factories_by_alias = self._target_by_alias.copy()
-            target_factories_by_alias.update(self._target_macro_factory_by_alias)
             registered_aliases = BuildFileAliases(
-                targets=target_factories_by_alias,
                 objects=self._exposed_object_by_alias.copy(),
                 context_aware_object_factories=self._exposed_context_aware_object_factory_by_alias.copy(),
             )
