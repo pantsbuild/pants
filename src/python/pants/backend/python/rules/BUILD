@@ -56,7 +56,7 @@ python_tests(
     'src/python/pants/util:collections',
     'src/python/pants/util:contextutil',
   ],
-  timeout = 90,
+  timeout = 180,
 )
 
 
