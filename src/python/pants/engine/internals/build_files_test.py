@@ -22,11 +22,7 @@ from pants.engine.internals.build_files import (
     parse_address_family,
     strip_address_origins,
 )
-from pants.engine.internals.examples.parsers import (
-    JsonParser,
-    PythonAssignmentsParser,
-    PythonCallbacksParser,
-)
+from pants.engine.internals.examples.parsers import JsonParser
 from pants.engine.internals.mapper import AddressFamily, AddressMapper
 from pants.engine.internals.nodes import Return, State, Throw
 from pants.engine.internals.parser import BuildFilePreludeSymbols, HydratedStruct, SymbolTable
@@ -299,18 +295,6 @@ class InlinedGraphTest(GraphTestBase):
 
     def test_json(self) -> None:
         scheduler = self.create_json()
-        self.do_test_codegen_simple(scheduler)
-
-    def test_python(self) -> None:
-        scheduler = self.create(
-            build_patterns=("*.BUILD.python",), parser=PythonAssignmentsParser(TEST_TABLE)
-        )
-        self.do_test_codegen_simple(scheduler)
-
-    def test_python_classic(self) -> None:
-        scheduler = self.create(
-            build_patterns=("*.BUILD",), parser=PythonCallbacksParser(TEST_TABLE)
-        )
         self.do_test_codegen_simple(scheduler)
 
     def test_resolve_cache(self) -> None:
