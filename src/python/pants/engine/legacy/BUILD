@@ -14,7 +14,6 @@ python_library(
     'src/python/pants/option',
     'src/python/pants/util:memo',
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -23,5 +22,4 @@ python_library(
   dependencies=[
     'src/python/pants/engine/internals:core_abstractions',
   ],
-  tags = {"partially_type_checked"},
 )

@@ -5,5 +5,4 @@ python_library(
   dependencies=[
     '3rdparty/python:mypy',
   ],
-  tags = {'type_checked'},
 )

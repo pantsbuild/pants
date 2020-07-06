@@ -7,7 +7,6 @@ python_library(
   dependencies = [
     'src/python/pants/util:dirutil',
   ],
-  tags = {"partially_type_checked"},
 )
 
 # this is in goal because of run_tracker
@@ -18,13 +17,11 @@ python_library(
     'src/python/pants/cache',
     'src/python/pants/util:dirutil',
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_library(
   name = 'pantsd_stats',
   sources = ['pantsd_stats.py'],
-  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -46,15 +43,4 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
   ],
-  tags = {"partially_type_checked"},
-)
-
-python_library(
-  name = 'workspace',
-  sources = ['workspace.py'],
-  dependencies = [
-    'src/python/pants/base:build_environment',
-    'src/python/pants/scm',
-  ],
-  tags = {"partially_type_checked"},
 )

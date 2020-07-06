@@ -31,7 +31,6 @@ python_library(
     'src/python/pants/util:objects',
     'src/python/pants/util:ordered_set',
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -41,5 +40,4 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:strutil',
   ],
-  tags = {"type_checked"},
 )

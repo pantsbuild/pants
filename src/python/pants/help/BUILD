@@ -14,7 +14,6 @@ python_library(
     'src/python/pants/option',
     'src/python/pants/subsystem',
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -27,7 +26,6 @@ python_tests(
     'src/python/pants/option:global_options',
     'src/python/pants/subsystem',
   ],
-  tags = {'partially_type_checked'},
 )
 
 python_tests(
@@ -36,6 +34,6 @@ python_tests(
   dependencies=[
     'src/python/pants/testutil:int-test',
   ],
-  tags = {'integration', 'partially_type_checked'},
+  tags = ['integration'],
   timeout = 120,
 )

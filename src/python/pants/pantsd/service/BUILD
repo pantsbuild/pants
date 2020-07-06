@@ -8,7 +8,6 @@ python_library(
     '3rdparty/python:dataclasses',
     'src/python/pants/util:meta'
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -18,7 +17,6 @@ python_library(
     '3rdparty/python/twitter/commons:twitter.common.dirutil',
     ':pants_service'
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -27,7 +25,6 @@ python_library(
   dependencies = [
     ':pants_service',
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -36,5 +33,4 @@ python_tests(
     ':store_gc_service',
     'src/python/pants/testutil:test_base',
   ],
-  tags = {"partially_type_checked"},
 )
