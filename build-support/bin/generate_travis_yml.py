@@ -620,11 +620,9 @@ def integration_tests(python_version: PythonVersion) -> Dict:
         **linux_shard(python_version=python_version, install_travis_wait=True),
         "name": f"Integration tests - V2 (Python {python_version.decimal})",
         "script": [
-            (
-                "travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py "
-                "--integration-tests --remote-execution-enabled --python-version "
-                f"{python_version.decimal}"
-            ),
+            "pyenv global",
+            "pyenv versions --bare | xargs pyenv prefix",
+            *(f"which -a python{version}" for version in ("2.7", "3.6", "3.7")),
         ],
     }
     safe_append(shard, "env", f"CACHE_NAME=integration.v2.py{python_version.number}")
@@ -824,27 +822,7 @@ def main() -> None:
             "env": {"global": GLOBAL_ENV_VARS},
             "stages": Stage.all_entries(),
             "deploy": DEPLOY_SETTINGS,
-            "jobs": {
-                "include": [
-                    *[bootstrap_linux(v) for v in supported_python_versions],
-                    *[bootstrap_osx(v) for v in supported_python_versions],
-                    *[lint(v) for v in supported_python_versions],
-                    clippy(),
-                    # TODO: fix Cargo audit. Run `build-support/bin/ci.py --cargo-audit` locally.
-                    # cargo_audit(),
-                    *[unit_tests(v) for v in supported_python_versions],
-                    *[integration_tests(v) for v in supported_python_versions],
-                    rust_tests_linux(),
-                    rust_tests_osx(),
-                    build_wheels_linux(),
-                    build_wheels_osx(),
-                    *[osx_platform_tests(v) for v in supported_python_versions],
-                    *[osx_10_12_smoke_test(v) for v in supported_python_versions],
-                    *[osx_10_13_smoke_test(v) for v in supported_python_versions],
-                    deploy_stable(),
-                    deploy_unstable(),
-                ]
-            },
+            "jobs": {"include": [*[integration_tests(v) for v in supported_python_versions],]},
         },
         Dumper=NoAliasDumper,
     )
