@@ -5,7 +5,7 @@ import re
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, Optional, Tuple, Union, cast
 
-from pants.base.exceptions import DuplicateNameError, MappingError, UnaddressableObjectError
+from pants.base.exceptions import DuplicateNameError, MappingError
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.internals.objects import Serializable
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
@@ -48,17 +48,11 @@ class AddressMap:
             raise MappingError(f"Failed to parse {filepath}:\n{e!r}")
         objects_by_name: Dict[str, ThinAddressableObject] = {}
         for obj in objects:
-            if not Serializable.is_serializable(obj):
-                raise UnaddressableObjectError("Parsed a non-serializable object: {!r}".format(obj))
             attributes = obj._asdict()
-
-            name = attributes.get("name")
-            if not name:
-                raise UnaddressableObjectError("Parsed a non-addressable object: {!r}".format(obj))
-
+            name = attributes["name"]
             if name in objects_by_name:
                 raise DuplicateNameError(
-                    "An object already exists at {!r} with name {!r}: {!r}.  Cannot "
+                    "An object already exists at {!r} with name {!r}: {!r}. Cannot "
                     "map {!r}".format(filepath, name, objects_by_name[name], obj)
                 )
             objects_by_name[name] = obj
