@@ -12,7 +12,6 @@ python_library(
     'src/python/pants/backend/python/dependency_inference',
     'src/python/pants/backend/python/rules',
     'src/python/pants/build_graph',
-    'src/python/pants/goal:task_registrar',
     'src/python/pants/python',
   ],
 )

@@ -24,7 +24,6 @@ from pants.init.engine_initializer import (
     LegacyGraphSession,
 )
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
-from pants.init.repro import Repro, Reproducer
 from pants.init.specs_calculator import SpecsCalculator
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -59,7 +58,6 @@ class LocalPantsRunner:
     profile_path: Optional[str]
     _run_tracker: RunTracker
     _reporting: Optional[Reporting] = None
-    _repro: Optional[Repro] = None
 
     @staticmethod
     def parse_options(
@@ -167,11 +165,6 @@ class LocalPantsRunner:
         # Note: This will not include values from `--changed-*` flags.
         self._run_tracker.run_info.add_info("specs_from_command_line", specs, stringify=False)
 
-        # Capture a repro of the 'before' state for this build, if needed.
-        self._repro = Reproducer.global_instance().create_repro()
-        if self._repro:
-            self._repro.capture(self._run_tracker.run_info.get_as_dict())
-
     def _run_v2(self) -> ExitCode:
         goals = self.options.goals
         if self._run_tracker:
@@ -258,13 +251,6 @@ class LocalPantsRunner:
             # If we have been interrupted by a signal, calling .end() sometimes writes to a closed file,
             # so we just log that fact here and keep going.
             ExceptionSink.log_exception(exc=e)
-        finally:
-            if self._repro:
-                # TODO: Have Repro capture the 'after' state (as a diff) as well? (in reference to the below
-                # 'before' state comment)
-                # NB: this writes to the logger, which is expected to still be alive if we are exiting from
-                # a signal.
-                self._repro.log_location_of_repro_file()
 
         if additional_messages:
             # NB: We do not log to the exceptions log in this case, because we expect that these are

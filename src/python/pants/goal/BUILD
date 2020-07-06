@@ -2,14 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name = 'task_registrar',
-  sources = ['task_registrar.py'],
-  dependencies = [
-    ':goal',
-  ],
-)
-
-python_library(
   name = 'aggregated_timings',
   sources = ['aggregated_timings.py'],
   dependencies = [
@@ -28,53 +20,8 @@ python_library(
 )
 
 python_library(
-  name = 'context',
-  sources = ['context.py'],
-  dependencies = [
-    ':products',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/build_graph',
-    'src/python/pants/base:deprecated',
-    'src/python/pants/base:worker_pool',
-    'src/python/pants/base:workunit',
-    'src/python/pants/process',
-    'src/python/pants/reporting:report',
-    'src/python/pants/source',
-    'src/python/pants/util:ordered_set',
-  ],
-)
-
-python_library(
-  name = 'error',
-  sources = ['error.py'],
-)
-
-# TODO(benjy): As a result of a renaming, we ended up with this target owning only one source
-# file, whereas its name might indicate to the casual reader that it represents the entire package.
-# However the targets in this BUILD file (and elsewhere) are probably too fine-grained anyway, so
-# we may just solve this possible confusion by refactoring out some stuff and unifying the rest.
-python_library(
-  sources = ['goal.py'],
-  dependencies = [
-    ':error',
-    'src/python/pants/option',
-    'src/python/pants/util:memo',
-  ],
-)
-
-python_library(
   name = 'pantsd_stats',
   sources = ['pantsd_stats.py'],
-)
-
-python_library(
-  name = 'products',
-  sources = ['products.py'],
-  dependencies = [
-    'src/python/pants/util:collections',
-    'src/python/pants/util:dirutil',
-    'src/python/pants/util:ordered_set',
-  ],
 )
 
 python_library(
