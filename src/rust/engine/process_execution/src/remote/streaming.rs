@@ -167,6 +167,12 @@ impl StreamingCommandRunner {
       .await
   }
 
+  /// Check the remote Action Cache for a cached result of running the given `action_digest`.
+  ///
+  /// This check is necessary because some RE servers do not short-circuit the Execute method
+  /// by checking the Action Cache (e.g., BuildBarn). Thus, this client must check the cache
+  /// explicitly in order to avoid duplicating already-cached work. This behavior matches
+  /// the Bazel RE client.
   async fn check_action_cache(
     &self,
     action_digest: Digest,
