@@ -18,7 +18,6 @@ from pants.engine.process import (
 )
 from pants.goal.products import Products
 from pants.goal.run_tracker import RunTracker
-from pants.goal.workspace import ScmWorkspace
 from pants.option.options import Options
 from pants.process.lock import OwnerPrintingInterProcessFileLock
 from pants.source.source_root import SourceRootConfig
@@ -77,7 +76,7 @@ class Context:
         self.requested_goals = requested_goals or []
         self._console_outstream = console_outstream or sys.stdout.buffer
         self._scm = scm or get_scm()
-        self._workspace = workspace or (ScmWorkspace(self._scm) if self._scm else None)
+        self._workspace = workspace
         self._replace_targets(target_roots)
         self._invalidation_report = invalidation_report
         self._scheduler = scheduler

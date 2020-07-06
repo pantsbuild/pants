@@ -32,7 +32,6 @@ python_library(
   sources = ['context.py'],
   dependencies = [
     ':products',
-    ':workspace',
     'src/python/pants/base:build_environment',
     'src/python/pants/build_graph',
     'src/python/pants/base:deprecated',
@@ -96,14 +95,5 @@ python_library(
     'src/python/pants/subsystem',
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
-  ],
-)
-
-python_library(
-  name = 'workspace',
-  sources = ['workspace.py'],
-  dependencies = [
-    'src/python/pants/base:build_environment',
-    'src/python/pants/scm',
   ],
 )

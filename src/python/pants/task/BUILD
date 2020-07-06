@@ -14,7 +14,6 @@ python_library(
     'src/python/pants/build_graph',
     'src/python/pants/cache',
     'src/python/pants/console:stty_utils',
-    'src/python/pants/goal:workspace',
     'src/python/pants/invalidation',
     'src/python/pants/option',
     'src/python/pants/reporting',
