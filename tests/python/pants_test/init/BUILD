@@ -26,7 +26,7 @@ python_tests(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:logging',
   ],
-  timeout = 180,
+  timeout = 240,
 )
 
 python_tests(
