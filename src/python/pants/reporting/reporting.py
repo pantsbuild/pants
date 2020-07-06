@@ -7,7 +7,6 @@ from io import BytesIO
 
 from pants.base.workunit import WorkUnitLabel
 from pants.reporting.html_reporter import HtmlReporter
-from pants.reporting.invalidation_report import InvalidationReport
 from pants.reporting.plaintext_reporter import LabelFormat, PlainTextReporter, ToolOutputFormat
 from pants.reporting.quiet_reporter import QuietReporter
 from pants.reporting.report import Report
@@ -23,11 +22,6 @@ class Reporting(Subsystem):
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
-        register(
-            "--invalidation-report",
-            type=bool,
-            help="Write a formatted report on the invalid objects to the specified path.",
-        )
         register(
             "--reports-dir",
             advanced=True,
@@ -113,9 +107,6 @@ class Reporting(Subsystem):
         # And start tracking the run.
         run_tracker.start(report, start_time)
 
-    def _get_invalidation_report(self):
-        return InvalidationReport() if self.get_options().invalidation_report else None
-
     @staticmethod
     def _consume_stringio(f):
         f.flush()
@@ -183,16 +174,6 @@ class Reporting(Subsystem):
             logfile_reporter.emit(buffered_err, dest=ReporterDestination.ERR)
             logfile_reporter.flush()
             run_tracker.report.add_reporter("logfile", logfile_reporter)
-
-        invalidation_report = self._get_invalidation_report()
-        if invalidation_report:
-            run_id = run_tracker.run_info.get_info("id")
-            outfile = os.path.join(
-                self.get_options().reports_dir, run_id, "invalidation-report.csv"
-            )
-            invalidation_report.set_filename(outfile)
-
-        return invalidation_report
 
 
 def is_hex_string(id_value):
