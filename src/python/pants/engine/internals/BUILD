@@ -8,8 +8,10 @@ python_tests(
     ':build_files',
     ':core_abstractions',
     ':graph',
-    ':options_parsing',
+    ':mapper',
     ':native',
+    ':options_parsing',
+    ':parser',
     ':scheduler',
     ':scheduler_test_base',
     'src/python/pants/base:exceptions',
@@ -52,19 +54,13 @@ python_library(
   name='core_abstractions',
   sources=[
     'addressable.py',
-    'mapper.py',
     'nodes.py',
     'objects.py',
-    'parser.py',
     'struct.py'
   ],
   dependencies=[
     '3rdparty/python:dataclasses',
-    'src/python/pants/base:exceptions',
     'src/python/pants/build_graph:address',
-    'src/python/pants/util:frozendict',
-    'src/python/pants/util:memo',
-    'src/python/pants/util:meta',
     'src/python/pants/util:objects',
   ],
 )
@@ -110,6 +106,20 @@ python_library(
 )
 
 python_library(
+  name="mapper",
+  sources=["mapper.py"],
+  dependencies=[
+    ':core_abstractions',
+    ':parser',
+    '3rdparty/python:dataclasses',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/build_graph:address',
+    'src/python/pants/util:memo',
+    'src/python/pants/util:meta',
+  ]
+)
+
+python_library(
   name='native',
   sources=['native.py'],
   dependencies=[
@@ -127,8 +137,8 @@ python_library(
 resources(
   name='native_engine',
   sources=[
-      'native_engine.so',
-      'native_engine.so.metadata',
+    'native_engine.so',
+    'native_engine.so.metadata',
   ],
 )
 
@@ -140,6 +150,21 @@ python_library(
     'src/python/pants/engine:rules',
     'src/python/pants/option',
     'src/python/pants/util:logging',
+  ],
+)
+
+python_library(
+  name='parser',
+  sources=['parser.py'],
+  dependencies=[
+    ':core_abstractions',
+    '3rdparty/python:dataclasses',
+    'src/python/pants/base:exceptions',
+    'src/python/pants/base:parse_context',
+    'src/python/pants/build_graph',
+    'src/python/pants/engine/legacy:structs',
+    'src/python/pants/util:frozendict',
+    'src/python/pants/util:memo',
   ],
 )
 

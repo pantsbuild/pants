@@ -126,7 +126,7 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
         address_specs = AddressSpecs([SingleAddress("root", "b"), SingleAddress("root", "a")])
 
         expected_rx_str = re.escape(
-            '"b" was not found in namespace "root". Did you mean one of:\n  :a'
+            "'b' was not found in namespace 'root'. Did you mean one of:\n  :a"
         )
         with self.assertRaisesRegex(ResolveError, expected_rx_str):
             self._resolve_addresses(

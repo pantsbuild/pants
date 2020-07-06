@@ -32,22 +32,18 @@ class AddressMap:
     def parse(
         cls,
         filepath: str,
-        filecontent: bytes,
+        build_file_content: str,
         parser: Parser,
         extra_symbols: BuildFilePreludeSymbols,
     ) -> "AddressMap":
         """Parses a source for addressable Serializable objects.
 
-        No matter the parser used, the parsed and mapped addressable objects are all 'thin'; ie: any
-        objects they point to in other namespaces or even in the same namespace but from a separate
-        source are left as unresolved pointers.
-
-        :param filepath: The path to the byte source containing serialized objects.
-        :param filecontent: The content of byte source containing serialized objects to be parsed.
-        :param parser: The parser cls to use.
+        The parsed and mapped addressable objects are all 'thin': any objects they point to in other
+        namespaces or even in the same namespace but from a separate source are left as unresolved
+        pointers.
         """
         try:
-            objects = parser.parse(filepath, filecontent, extra_symbols)
+            objects = parser.parse(filepath, build_file_content, extra_symbols)
         except Exception as e:
             raise MappingError(f"Failed to parse {filepath}:\n{e!r}")
         objects_by_name: Dict[str, ThinAddressableObject] = {}
@@ -200,9 +196,7 @@ class AddressMapper:
         self.subproject_roots = tuple(subproject_roots or [])
 
     def __repr__(self):
-        return "AddressMapper(parser={}, build_patterns={})".format(
-            self.parser, self.build_patterns
-        )
+        return f"AddressMapper(parser={self.parser}, build_patterns={self.build_patterns})"
 
     @memoized_property
     def exclude_patterns(self):

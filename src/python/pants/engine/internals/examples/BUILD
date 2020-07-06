@@ -6,7 +6,7 @@ python_library(
   sources=['parsers.py'],
   dependencies=[
     'src/python/pants/build_graph',
-    'src/python/pants/engine/internals:core_abstractions',
+    'src/python/pants/engine/internals:parser',
     'src/python/pants/util:memo',
     'src/python/pants/util:strutil',
   ],
