@@ -17,7 +17,6 @@ from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.reporting.linkify import linkify
 from pants.reporting.report import Report
 from pants.reporting.reporter import Reporter
-from pants.reporting.reporting_utils import items_to_report_element
 from pants.util.dirutil import safe_mkdir
 
 
@@ -288,40 +287,6 @@ class HtmlReporter(Reporter):
         self._overwrite(
             "self_timings",
             lambda: render_timings(self.run_tracker.self_timings),
-            force=force_overwrite,
-        )
-
-        # Update the artifact cache stats.
-        def render_cache_stats(artifact_cache_stats):
-            def fix_detail_id(e, _id):
-                return e if isinstance(e, str) else e + (_id,)
-
-            msg_elements = []
-            for cache_name, stat in artifact_cache_stats.stats_per_cache.items():
-                # TODO consider display causes for hit/miss targets
-                hit_targets = [tgt for tgt, cause in stat.hit_targets]
-                miss_targets = [tgt for tgt, cause in stat.miss_targets]
-                msg_elements.extend(
-                    [
-                        cache_name + " artifact cache: ",
-                        # Explicitly set the detail ids, so their displayed/hidden state survives a refresh.
-                        fix_detail_id(
-                            items_to_report_element(hit_targets, "hit"), "cache-hit-details"
-                        ),
-                        ", ",
-                        fix_detail_id(
-                            items_to_report_element(miss_targets, "miss"), "cache-miss-details"
-                        ),
-                        ".",
-                    ]
-                )
-            if not msg_elements:
-                msg_elements = ["No artifact cache use."]
-            return self._render_message(*msg_elements)
-
-        self._overwrite(
-            "artifact_cache_stats",
-            lambda: render_cache_stats(self.run_tracker.artifact_cache_stats),
             force=force_overwrite,
         )
 

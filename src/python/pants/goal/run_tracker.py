@@ -22,7 +22,6 @@ from pants.base.run_info import RunInfo
 from pants.base.worker_pool import SubprocPool, WorkerPool
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.goal.aggregated_timings import AggregatedTimings
-from pants.goal.artifact_cache_stats import ArtifactCacheStats
 from pants.goal.pantsd_stats import PantsDaemonStats
 from pants.option.config import Config
 from pants.option.options_fingerprinter import CoercingOptionEncoder
@@ -160,7 +159,6 @@ class RunTracker(Subsystem):
         self.run_info = None
         self.cumulative_timings = None
         self.self_timings = None
-        self.artifact_cache_stats = None
         self.pantsd_stats = None
 
         # Initialized in `start()`.
@@ -272,12 +270,6 @@ class RunTracker(Subsystem):
 
         # Time spent in a workunit, not including its children.
         self.self_timings = AggregatedTimings(os.path.join(self.run_info_dir, "self_timings"))
-
-        # Hit/miss stats for the artifact cache.
-        self.artifact_cache_stats = ArtifactCacheStats(
-            os.path.join(self.run_info_dir, "artifact_cache_stats")
-        )
-
         # Daemon stats.
         self.pantsd_stats = PantsDaemonStats()
 
@@ -518,7 +510,6 @@ class RunTracker(Subsystem):
     def _stats(self) -> dict:
         stats = {
             "run_info": self.run_information(),
-            "artifact_cache_stats": self.artifact_cache_stats.get_all(),
             "pantsd_stats": self.pantsd_stats.get_all(),
             "cumulative_timings": self.cumulative_timings.get_all(),
             "recorded_options": self._get_options_to_record(),

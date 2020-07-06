@@ -9,16 +9,6 @@ python_library(
   ],
 )
 
-# this is in goal because of run_tracker
-python_library(
-  name = 'artifact_cache_stats',
-  sources = ['artifact_cache_stats.py'],
-  dependencies = [
-    'src/python/pants/cache',
-    'src/python/pants/util:dirutil',
-  ],
-)
-
 python_library(
   name = 'pantsd_stats',
   sources = ['pantsd_stats.py'],
@@ -29,7 +19,6 @@ python_library(
   sources = ['run_tracker.py'],
   dependencies = [
     ':aggregated_timings',
-    ':artifact_cache_stats',
     ':pantsd_stats',
     '3rdparty/python:requests',
     'src/python/pants/auth',

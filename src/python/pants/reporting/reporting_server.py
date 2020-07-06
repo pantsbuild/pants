@@ -111,7 +111,6 @@ class PantsHandler(http.server.BaseHTTPRequestHandler):
             report_dir = os.path.dirname(report_relpath)
             self_timings_path = os.path.join(report_dir, "self_timings")
             cumulative_timings_path = os.path.join(report_dir, "cumulative_timings")
-            artifact_cache_stats_path = os.path.join(report_dir, "artifact_cache_stats")
             run_info["timestamp_text"] = datetime.fromtimestamp(
                 float(run_info["timestamp"])
             ).strftime("%H:%M:%S on %A, %B %d %Y")
@@ -128,11 +127,6 @@ class PantsHandler(http.server.BaseHTTPRequestHandler):
                         title="Self timings",
                         class_prefix="aggregated-timings",
                     ),
-                    self._collapsible_fmt_string.format(
-                        id="artifact-cache-stats-collapsible",
-                        title="Artifact cache stats",
-                        class_prefix="artifact-cache-stats",
-                    ),
                 ]
             )
 
@@ -142,7 +136,6 @@ class PantsHandler(http.server.BaseHTTPRequestHandler):
                     "report_path": report_relpath,
                     "self_timings_path": self_timings_path,
                     "cumulative_timings_path": cumulative_timings_path,
-                    "artifact_cache_stats_path": artifact_cache_stats_path,
                     "timings_and_stats": timings_and_stats,
                 }
             )
