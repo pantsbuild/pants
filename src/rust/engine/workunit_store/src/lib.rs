@@ -176,8 +176,6 @@ impl StreamingWorkunitData {
     let should_emit = |workunit: &Workunit| -> bool { workunit.metadata.level <= max_verbosity };
 
     let (started_workunits, completed_workunits) = {
-      let mut workunit_records = self.workunit_records.lock();
-
       let mut started_messages = vec![];
       let mut completed_messages = vec![];
 
@@ -193,6 +191,7 @@ impl StreamingWorkunitData {
         }
       }
 
+      let mut workunit_records = self.workunit_records.lock();
       let mut started_workunits: Vec<Workunit> = vec![];
       for mut started in started_messages.into_iter() {
         let span_id = started.span_id.clone();
