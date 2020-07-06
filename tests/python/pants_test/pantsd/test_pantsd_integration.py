@@ -13,7 +13,6 @@ from textwrap import dedent
 import pytest
 
 from pants.testutil.pants_run_integration_test import read_pantsd_log
-from pants.testutil.process_test_util import no_lingering_process_by_command
 from pants.util.contextutil import environment_as, temporary_dir, temporary_file
 from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, safe_open, touch
 from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
@@ -58,22 +57,20 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             checker.assert_started()
 
     def test_pantsd_pantsd_runner_doesnt_die_after_failed_run(self):
-        # Check for no stray pantsd processes.
-        with no_lingering_process_by_command("pantsd"):
-            with self.pantsd_test_context() as (workdir, pantsd_config, checker):
-                # Run target that throws an exception in pants.
-                self.assert_failure(
-                    self.run_pants_with_workdir(
-                        ["lint", "testprojects/src/python/unicode/compilation_failure"],
-                        workdir,
-                        pantsd_config,
-                    )
+        with self.pantsd_test_context() as (workdir, pantsd_config, checker):
+            # Run target that throws an exception in pants.
+            self.assert_failure(
+                self.run_pants_with_workdir(
+                    ["lint", "testprojects/src/python/unicode/compilation_failure"],
+                    workdir,
+                    pantsd_config,
                 )
-                checker.assert_started()
+            )
+            checker.assert_started()
 
-                # Assert pantsd is in a good functional state.
-                self.assert_success(self.run_pants_with_workdir(["help"], workdir, pantsd_config))
-                checker.assert_running()
+            # Assert pantsd is in a good functional state.
+            self.assert_success(self.run_pants_with_workdir(["help"], workdir, pantsd_config))
+            checker.assert_running()
 
     def test_pantsd_lifecycle_invalidation(self):
         """Run with different values of daemon=True options, which should trigger restarts."""
@@ -465,8 +462,6 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             checker.assert_started()
             checker.assert_pantsd_runner_started(client_pid)
 
-            # Get all the pantsd processes while they're still around.
-            pantsd_runner_processes = checker.runner_process_context.current_processes()
             # This should kill the pantsd processes through the RemotePantsRunner signal handler.
             os.kill(client_pid, signum)
             waiter_run = waiter_handle.join()
@@ -475,12 +470,8 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             for regexp in regexps:
                 self.assertRegex(waiter_run.stderr_data, regexp)
 
-            time.sleep(1)
-            for proc in pantsd_runner_processes:
-                # TODO: we could be checking the return codes of the subprocesses, but psutil is currently
-                # limited on non-Windows hosts -- see https://psutil.readthedocs.io/en/latest/#processes.
-                # The pantsd processes should be dead, and they should have exited with 1.
-                self.assertFalse(proc.is_running())
+            time.sleep(5)
+            checker.assert_stopped()
 
     @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/7554")
     def test_pantsd_sigterm(self):
