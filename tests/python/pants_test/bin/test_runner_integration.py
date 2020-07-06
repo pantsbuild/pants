@@ -19,7 +19,7 @@ class RunnerIntegrationTest(PantsRunIntegrationTest):
             f"--pythonpath=+['{Path(get_buildroot(), 'testprojects/pants-plugins/src/python')}']",
             "--backend-packages=+['test_pants_plugin']",
             # This task will always emit a DeprecationWarning.
-            "deprecation-warning-task",
+            "deprecation-warning",
         ]
 
         warning_run = self.run_pants(cmdline)
@@ -65,7 +65,7 @@ class RunnerIntegrationTest(PantsRunIntegrationTest):
             )
             for run_tracker_sub_dir in run_tracker_sub_dirs:
                 info_path = os.path.join(run_tracker_sub_dir, "info")
-                self.assert_is_file(info_path)
+                assert os.path.isfile(info_path) is True
                 with open(info_path, "r") as info_f:
                     lines = dict(line.split(": ", 1) for line in info_f.readlines())
                     if "goals" in lines["cmd_line"]:

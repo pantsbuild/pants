@@ -11,7 +11,6 @@ import pkg_resources
 from pants.base.build_environment import pants_version
 from pants.base.exceptions import BuildConfigurationError
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.goal.goal import Goal
 from pants.init.extension_loader import load_backends_and_plugins
 from pants.init.global_subsystems import GlobalSubsystems
 from pants.init.plugin_resolver import PluginResolver
@@ -58,11 +57,9 @@ class BuildConfigInitializer:
 
         # Load plugins and backends.
         return load_backends_and_plugins(
-            self._bootstrap_options.plugins,
-            self._bootstrap_options.plugins2,
+            self._bootstrap_options.plugins + self._bootstrap_options.plugins2,
             self._working_set,
-            self._bootstrap_options.backend_packages,
-            self._bootstrap_options.backend_packages2,
+            self._bootstrap_options.backend_packages + self._bootstrap_options.backend_packages2,
         )
 
     def setup(self) -> BuildConfiguration:
@@ -82,21 +79,9 @@ class OptionsInitializer:
 
         :returns: An Options object representing the full set of runtime options.
         """
-        # Now that plugins and backends are loaded, we can gather the known scopes.
-
-        # Gather the optionables that are not scoped to any other.  All known scopes are reachable
-        # via these optionables' known_scope_infos() methods.
-        top_level_optionables = (
-            {GlobalOptions}
-            | GlobalSubsystems.get()
-            | build_configuration.optionables()
-            | set(Goal.get_optionables())
-        )
-
-        # Now that we have the known scopes we can get the full options. `get_full_options` will
-        # sort and de-duplicate these for us.
+        optionables = {GlobalOptions, *GlobalSubsystems.get(), *build_configuration.optionables()}
         known_scope_infos = [
-            si for optionable in top_level_optionables for si in optionable.known_scope_infos()
+            si for optionable in optionables for si in optionable.known_scope_infos()
         ]
         return options_bootstrapper.get_full_options(known_scope_infos)
 

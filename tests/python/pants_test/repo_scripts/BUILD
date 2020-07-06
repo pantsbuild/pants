@@ -10,5 +10,4 @@ python_tests(
     'build-support/bin:bash_scripts',
     'build-support/bin:python_scripts',
   ],
-  tags = {"partially_type_checked"},
 )

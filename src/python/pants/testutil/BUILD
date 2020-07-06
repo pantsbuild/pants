@@ -6,14 +6,10 @@ python_library(
   dependencies=[
     ':int-test-for-export',
     ':test_base',
-    ':file_test_util',
-    'src/python/pants/testutil/base:context_utils',
-    'src/python/pants/testutil/engine:engine_test_base',
-    'src/python/pants/testutil/engine:util',
+    'src/python/pants/testutil/engine',
     'src/python/pants/testutil/option',
     'src/python/pants/testutil/subsystem',
   ],
-  tags = {'partially_type_checked'},
   provides=pants_setup_py(
     name='pantsbuild.pants.testutil',
     description='Test support for writing Pants plugins.',
@@ -30,13 +26,14 @@ python_library(
   dependencies = [
     '//:build_root',
     '//:pants_pex',
-    ':file_test_util',
     '3rdparty/python:ansicolors',
     '3rdparty/python:dataclasses',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exiter',
     'src/python/pants/build_graph:address',
     'src/python/pants/fs',
+    'src/python/pants/option',
+    'src/python/pants/pantsd:pants_daemon_client',
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
     'src/python/pants/util:dirutil',
@@ -45,7 +42,6 @@ python_library(
     'src/python/pants/util:strutil',
     'src/python/pants:entry_point',
   ],
-  tags = {'partially_type_checked'},
 )
 
 target(
@@ -75,9 +71,7 @@ python_library(
     'src/python/pants/option:options_bootstrapper',
     'src/python/pants/source',
     'src/python/pants/subsystem',
-    'src/python/pants/task',
-    'src/python/pants/testutil/base:context_utils',
-    'src/python/pants/testutil/engine:util',
+    'src/python/pants/testutil/engine',
     'src/python/pants/testutil/option',
     'src/python/pants/testutil/subsystem',
     'src/python/pants/util:collections',
@@ -86,7 +80,6 @@ python_library(
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -96,7 +89,6 @@ python_library(
     ':test_base',
     'src/python/pants/core/util_rules',
   ],
-  tags = {"partially_type_checked"},
 )
 
 
@@ -110,29 +102,6 @@ python_library(
     'src/python/pants/testutil/option',
     'src/python/pants/util:meta',
   ],
-  tags = {"partially_type_checked"},
-)
-
-python_library(
-  name = 'task_test_base',
-  sources = ['task_test_base.py'],
-  dependencies = [
-    'src/python/pants/goal:context',
-    'src/python/pants/ivy',
-    'src/python/pants/task',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:meta',
-    'src/python/pants/util:memo',
-    'src/python/pants/util:objects',
-    ':test_base',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-python_library(
-  name='file_test_util',
-  sources=['file_test_util.py'],
-  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -143,28 +112,16 @@ python_library(
     'src/python/pants/scm',
     'src/python/pants/util:contextutil',
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_library(
   name='interpreter_selection_utils',
   sources=['interpreter_selection_utils.py'],
-  tags = {"partially_type_checked"},
-)
-
-python_library(
-  name='mock_logger',
-  sources=['mock_logger.py'],
-  dependencies = [
-    'src/python/pants/reporting',
-  ],
-  tags = {"partially_type_checked"},
 )
 
 python_library(
   name='retry',
   sources=['retry.py'],
-  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -173,7 +130,6 @@ python_library(
   dependencies = [
     ':git_util',
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -183,5 +139,4 @@ python_library(
     '3rdparty/python:dataclasses',
     '3rdparty/python:psutil',
   ],
-  tags = {"partially_type_checked"},
 )

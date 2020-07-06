@@ -2,20 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  name = 'engine_test_base',
-  sources = ['base_engine_test.py'],
-  dependencies = [
-    'src/python/pants/goal',
-    'src/python/pants/goal:task_registrar',
-    'src/python/pants/testutil:test_base',
-  ],
-  tags = {"partially_type_checked"},
-)
-
-
-python_library(
-  name = 'util',
-  sources = ['util.py'],
   dependencies = [
     '3rdparty/python:ansicolors',
     '3rdparty/python:dataclasses',
@@ -30,5 +16,4 @@ python_library(
     'src/python/pants/subsystem',
     'src/python/pants/util:objects',
   ],
-  tags = {"partially_type_checked"},
 )

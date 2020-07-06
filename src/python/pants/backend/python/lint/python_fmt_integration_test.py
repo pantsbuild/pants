@@ -42,7 +42,7 @@ class PythonFmtIntegrationTest(ExternalToolTestBase):
         origin = SingleAddress(directory="test", name=name)
         targets = PythonFmtTargets(TargetsWithOrigins([TargetWithOrigin(target, origin)]))
         args = [
-            "--backend-packages2=['pants.backend.python.lint.black', 'pants.backend.python.lint.isort']",
+            "--backend-packages=['pants.backend.python.lint.black', 'pants.backend.python.lint.isort']",
             *(extra_args or []),
         ]
         results = self.request_single_product(

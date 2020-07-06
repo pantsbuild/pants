@@ -7,5 +7,4 @@ python_library(
     '3rdparty/python:requests',
     'src/python/pants/util:dirutil',
   ],
-  tags = {"partially_type_checked"},
 )

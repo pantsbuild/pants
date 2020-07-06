@@ -45,8 +45,6 @@ class Subsystem(SubsystemClientMixin, Optionable):
     :API: public
     """
 
-    options_scope_category = ScopeInfo.SUBSYSTEM
-
     class UninitializedSubsystemError(SubsystemError):
         def __init__(self, class_name, scope):
             super().__init__(
@@ -75,7 +73,7 @@ class Subsystem(SubsystemClientMixin, Optionable):
         if subscope is None:
             return super().get_scope_info()
         else:
-            return ScopeInfo(cls.subscope(subscope), ScopeInfo.SUBSYSTEM, cls)
+            return ScopeInfo(cls.subscope(subscope), cls)
 
     # The full Options object for this pants run.  Will be set after options are parsed.
     # TODO: A less clunky way to make option values available?

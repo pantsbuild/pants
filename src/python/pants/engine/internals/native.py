@@ -17,6 +17,7 @@ from pants.engine.internals.native_engine import (
     PyGeneratorResponseGet,
     PyGeneratorResponseGetMulti,
     PyNailgunServer,
+    PyRemotingOptions,
     PyScheduler,
     PySession,
     PyTasks,
@@ -193,6 +194,30 @@ class Native(metaclass=SingletonMetaclass):
     ) -> PyScheduler:
         """Create and return a native Scheduler."""
 
+        remoting_options = PyRemotingOptions(
+            execution_enable=execution_options.remote_execution,
+            store_servers=execution_options.remote_store_server,
+            execution_server=execution_options.remote_execution_server,
+            execution_process_cache_namespace=execution_options.remote_execution_process_cache_namespace,
+            instance_name=execution_options.remote_instance_name,
+            root_ca_certs_path=execution_options.remote_ca_certs_path,
+            oauth_bearer_token_path=execution_options.remote_oauth_bearer_token_path,
+            store_thread_count=execution_options.remote_store_thread_count,
+            store_chunk_bytes=execution_options.remote_store_chunk_bytes,
+            store_chunk_upload_timeout=execution_options.remote_store_connection_limit,
+            store_rpc_retries=execution_options.remote_store_chunk_upload_timeout_seconds,
+            store_connection_limit=execution_options.remote_store_rpc_retries,
+            execution_extra_platform_properties=tuple(
+                tuple(pair.split("=", 1))
+                for pair in execution_options.remote_execution_extra_platform_properties
+            ),
+            execution_headers=tuple(
+                (k, v) for (k, v) in execution_options.remote_execution_headers.items()
+            ),
+            execution_enable_streaming=execution_options.remote_execution_enable_streaming,
+            execution_overall_deadline_secs=execution_options.remote_execution_overall_deadline_secs,
+        )
+
         return self.lib.scheduler_create(
             self._executor,
             tasks,
@@ -205,32 +230,13 @@ class Native(metaclass=SingletonMetaclass):
             ignore_patterns,
             use_gitignore,
             root_subject_types,
-            # Remote execution config.
-            execution_options.remote_execution,
-            execution_options.remote_store_server,
-            execution_options.remote_execution_server,
-            execution_options.remote_execution_process_cache_namespace,
-            execution_options.remote_instance_name,
-            execution_options.remote_ca_certs_path,
-            execution_options.remote_oauth_bearer_token_path,
-            execution_options.remote_store_thread_count,
-            execution_options.remote_store_chunk_bytes,
-            execution_options.remote_store_connection_limit,
-            execution_options.remote_store_chunk_upload_timeout_seconds,
-            execution_options.remote_store_rpc_retries,
-            tuple(
-                tuple(pair.split("=", 1))
-                for pair in execution_options.remote_execution_extra_platform_properties
-            ),
+            remoting_options,
             execution_options.process_execution_local_parallelism,
             execution_options.process_execution_remote_parallelism,
             execution_options.process_execution_cleanup_local_dirs,
             execution_options.process_execution_speculation_delay,
             execution_options.process_execution_speculation_strategy,
             execution_options.process_execution_use_local_cache,
-            tuple((k, v) for (k, v) in execution_options.remote_execution_headers.items()),
-            execution_options.remote_execution_enable_streaming,
-            execution_options.remote_execution_overall_deadline_secs,
             execution_options.process_execution_local_enable_nailgun,
         )
 

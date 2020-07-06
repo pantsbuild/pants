@@ -6,7 +6,7 @@ from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 class TestListGoalsIntegration(PantsRunIntegrationTest):
     def test_goals(self) -> None:
-        command = ["--v1", "--v2", "goals"]
+        command = ["goals"]
         pants_run = self.run_pants(command=command)
         self.assert_success(pants_run)
         assert "to get help for a particular goal" in pants_run.stdout_data
@@ -18,16 +18,16 @@ class TestListGoalsIntegration(PantsRunIntegrationTest):
         # Some core goals, such as `./pants test`, require downstream implementations to work
         # properly. We should only show those goals when an implementation is provided.
         goals_that_need_implementation = ["binary", "fmt", "lint", "run", "test"]
-        command = ["--pants-config-files=[]", "--no-v1", "--v2", "goals"]
+        command = ["--pants-config-files=[]", "goals"]
 
-        not_implemented_run = self.run_pants(command)
+        not_implemented_run = self.run_pants(["--backend-packages=[]", *command,])
         self.assert_success(not_implemented_run)
         for goal in goals_that_need_implementation:
             assert goal not in not_implemented_run.stdout_data
 
         implemented_run = self.run_pants(
             [
-                "--backend-packages2=['pants.backend.python', 'pants.backend.python.lint.isort']",
+                "--backend-packages=['pants.backend.python', 'pants.backend.python.lint.isort']",
                 *command,
             ],
         )

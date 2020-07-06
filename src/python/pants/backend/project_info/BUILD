@@ -19,7 +19,6 @@ python_library(
     'src/python/pants/source',
     'src/python/pants/util:objects',
   ],
-  tags = {"type_checked"},
 )
 
 python_tests(
@@ -28,7 +27,6 @@ python_tests(
     ':project_info',
     'src/python/pants/backend/codegen/protobuf',
     'src/python/pants/backend/python/rules',
-    'src/python/pants/backend/python/targets',
     'src/python/pants/core/util_rules',
     'src/python/pants/engine:addresses',
     'src/python/pants/engine:fs',
@@ -39,9 +37,8 @@ python_tests(
     'src/python/pants/source',
     'src/python/pants/testutil:goal_rule_test_base',
     'src/python/pants/testutil:test_base',
-    'src/python/pants/testutil/engine:util',
+    'src/python/pants/testutil/engine',
     'src/python/pants/testutil/subsystem',
     'src/python/pants/util:ordered_set',
   ],
-  tags = {"type_checked"},
 )

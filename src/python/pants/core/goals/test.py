@@ -42,6 +42,7 @@ class CoverageReportType(Enum):
     CONSOLE = ("console", "report")
     XML = ("xml", None)
     HTML = ("html", None)
+    RAW = ("raw", None)
 
     _report_name: str
 
@@ -181,7 +182,9 @@ class FilesystemCoverageReport(CoverageReport):
                 self.result_digest, path_prefix=str(self.directory_to_materialize_to),
             )
         )
-        console.print_stderr(f"\nWrote coverage report to `{self.directory_to_materialize_to}`")
+        console.print_stderr(
+            f"\nWrote {self.report_type.report_name} coverage report to `{self.directory_to_materialize_to}`"
+        )
         return self.report_file
 
 

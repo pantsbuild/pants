@@ -6,11 +6,10 @@ python_library(
   sources = ['changed.py'],
   dependencies = [
     '3rdparty/python:dataclasses',
+    'src/python/pants/backend/project_info',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:exceptions',
     'src/python/pants/engine:addresses',
-    'src/python/pants/goal:workspace',
     'src/python/pants/subsystem',
   ],
-  tags = {"partially_type_checked"},
 )

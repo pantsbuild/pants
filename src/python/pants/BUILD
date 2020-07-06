@@ -8,7 +8,6 @@ python_library(
   dependencies=[
     'src/python/pants/bin',
   ],
-  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -19,7 +18,6 @@ python_library(
     ':entry_point',
     ':version',
   ],
-  tags = {'partially_type_checked'},
   provides=pants_setup_py(
     name='pantsbuild.pants',
     description='A scalable build tool for large, complex, heterogeneous repos.',
@@ -51,7 +49,6 @@ python_library(
     '3rdparty/python:packaging',
     ':version-resource',
   ],
-  tags = {"type_checked"},
 )
 
 resources(
@@ -64,9 +61,12 @@ resources(
 files(
   name='reversion_file_with_dependencies',
   sources=[
+    '__init__.py',
     'releases/BUILD',
+    'releases/__init__.py',
     'releases/reversion.py',
     'util/BUILD',
+    'util/__init__.py',
     'util/contextutil.py',
     'util/dirutil.py',
     'util/strutil.py',

@@ -64,12 +64,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                 # Run target that throws an exception in pants.
                 self.assert_failure(
                     self.run_pants_with_workdir(
-                        [
-                            "--no-v1",
-                            "--v2",
-                            "lint",
-                            "testprojects/src/python/unicode/compilation_failure",
-                        ],
+                        ["lint", "testprojects/src/python/unicode/compilation_failure"],
                         workdir,
                         pantsd_config,
                     )
@@ -77,9 +72,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                 checker.assert_started()
 
                 # Assert pantsd is in a good functional state.
-                self.assert_success(
-                    self.run_pants_with_workdir(["--no-v1", "--v2", "help"], workdir, pantsd_config)
-                )
+                self.assert_success(self.run_pants_with_workdir(["help"], workdir, pantsd_config))
                 checker.assert_running()
 
     def test_pantsd_lifecycle_invalidation(self):
@@ -96,7 +89,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
     def test_pantsd_lifecycle_non_invalidation(self):
         with self.pantsd_successful_run_context() as ctx:
-            cmds = (["-q", "help"], ["--no-colors", "help"], ["help"])
+            cmds = (["help"], ["--no-colors", "help"], ["help"])
             last_pid = None
             for cmd in cmds:
                 # Run with a CLI flag.
@@ -202,7 +195,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             }
             with environment_as(**env):
                 result = ctx.runner(
-                    ["-q", "run", "testprojects/src/python/print_env", "--", EXPECTED_KEY]
+                    ["run", "testprojects/src/python/print_env", "--", EXPECTED_KEY]
                 )
                 ctx.checker.assert_running()
 
@@ -216,7 +209,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
             self.assert_failure(
                 self.run_pants_with_workdir(
-                    ["-q", "run", "testprojects/src/python/print_env", "--", "NO_LEAKS"],
+                    ["run", "testprojects/src/python/print_env", "--", "NO_LEAKS"],
                     workdir,
                     pantsd_config,
                 )

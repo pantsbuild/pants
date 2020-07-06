@@ -24,11 +24,6 @@ EXPECTED_NUM_LINES = 3
 CURRENT_YEAR = str(datetime.datetime.now().year)
 CURRENT_CENTURY_REGEX = re.compile(r"20\d\d")
 
-PY2_DIRECTORIES = {
-    Path("src/python/pants/backend/python/tasks/coverage"),
-    Path("src/python/pants/backend/python/tasks/pytest"),
-}
-
 
 class HeaderCheckFailure(Exception):
     """This is only used for control flow and to propagate the `.message` field."""
@@ -78,7 +73,7 @@ def create_parser() -> argparse.ArgumentParser:
 def check_dir(*, directory: Path, newly_created_files: Sequence[Path]) -> List[HeaderCheckFailure]:
     header_parse_failures: List[HeaderCheckFailure] = []
     for fp in directory.rglob("*.py"):
-        if fp.name == "__init__.py" or fp.parent in PY2_DIRECTORIES:
+        if fp.name == "__init__.py":
             continue
         try:
             check_header(fp, is_newly_created=fp in newly_created_files)

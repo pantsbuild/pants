@@ -6,7 +6,7 @@ import logging
 import re
 import sys
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
+from typing import Dict, Iterable, List, Mapping, Optional, Sequence
 
 from pants.base.deprecated import warn_or_error
 from pants.option.arg_splitter import ArgSplitter, HelpRequest
@@ -98,7 +98,7 @@ class Options:
                 )
             original_scopes[si.scope] = si
             if si.deprecated_scope:
-                ret.add(ScopeInfo(si.deprecated_scope, si.category, si.optionable_cls))
+                ret.add(ScopeInfo(si.deprecated_scope, si.optionable_cls))
                 original_scopes[si.deprecated_scope] = si
 
         # TODO: Once scope name validation is enforced (so there can be no dots in scope name
@@ -107,7 +107,7 @@ class Options:
         for si in copy.copy(ret):
             for scope in all_enclosing_scopes(si.scope, allow_global=False):
                 if scope not in original_scopes:
-                    ret.add(ScopeInfo(scope, ScopeInfo.INTERMEDIATE))
+                    ret.add(ScopeInfo(scope))
         return FrozenOrderedSet(ret)
 
     @classmethod
@@ -232,32 +232,6 @@ class Options:
         :API: public
         """
         return self._goals
-
-    @memoized_property
-    def goals_by_version(self) -> Tuple[Tuple[str, ...], Tuple[str, ...], Tuple[str, ...]]:
-        """Goals organized into three tuples by whether they are v1, ambiguous, or v2 goals
-        (respectively).
-
-        It's possible for a goal to be implemented with both v1 and v2, in which case a consumer
-        should use the `--v1` and `--v2` global flags to disambiguate.
-        """
-        v1, ambiguous, v2 = [], [], []
-        for goal in self._goals:
-            goal_dot = f"{goal}."
-            scope_categories = {
-                s.category
-                for s in self.known_scope_to_info.values()
-                if s.scope == goal or s.scope.startswith(goal_dot)
-            }
-            is_v1 = ScopeInfo.TASK in scope_categories
-            is_v2 = ScopeInfo.GOAL in scope_categories
-            if is_v1 and is_v2:
-                ambiguous.append(goal)
-            elif is_v1:
-                v1.append(goal)
-            else:
-                v2.append(goal)
-        return tuple(v1), tuple(ambiguous), tuple(v2)
 
     @property
     def known_scope_to_info(self) -> Dict[str, ScopeInfo]:
@@ -480,7 +454,6 @@ class Options:
         self,
         flags_in_scope,
         namespace: OptionValueContainer,
-        scope: str,
         include_passive_options: bool = False,
     ) -> Parser.ParseArgsRequest:
         levenshtein_max_distance = (
@@ -523,7 +496,7 @@ class Options:
         # Now add our values.
         flags_in_scope = self._scope_to_flags.get(scope, [])
         parse_args_request = self._make_parse_args_request(
-            flags_in_scope, values, scope, include_passive_options
+            flags_in_scope, values, include_passive_options
         )
         self._parser_hierarchy.get_parser_by_scope(scope).parse_args(parse_args_request)
 

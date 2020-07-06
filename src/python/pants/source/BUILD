@@ -17,7 +17,6 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:memo',
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -28,7 +27,6 @@ python_library(
     'src/python/pants/engine/internals:native',
     'src/python/pants/engine:fs',
   ],
-  tags = {"type_checked"},
 )
 
 python_library(
@@ -41,7 +39,6 @@ python_library(
     'src/python/pants/engine/internals:scheduler',
     'src/python/pants/engine:fs',
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -53,7 +50,6 @@ python_tests(
     'src/python/pants/build_graph',
     'src/python/pants/engine:fs',
     'src/python/pants/testutil:test_base',
-    'src/python/pants/testutil/engine:util',
+    'src/python/pants/testutil/engine',
   ],
-  tags = {"partially_type_checked"},
 )

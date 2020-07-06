@@ -8,5 +8,5 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'tests/python/pants_test/pantsd:pantsd_integration_test_base',
   ],
-  tags = {'integration', 'partially_type_checked'},
+  tags = ['integration'],
 )

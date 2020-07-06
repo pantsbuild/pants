@@ -25,7 +25,6 @@ python_library(
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
   ],
-  tags = {"type_checked"},
 )
 
 python_tests(
@@ -40,9 +39,7 @@ python_tests(
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
     'src/python/pants/engine:target',
-    'src/python/pants/testutil/engine:engine_test_base',
     'src/python/pants/testutil/option',
     'src/python/pants/testutil:test_base',
   ],
-  tags = {"partially_type_checked"},
 )

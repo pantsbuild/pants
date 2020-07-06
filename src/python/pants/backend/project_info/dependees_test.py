@@ -4,9 +4,9 @@
 from textwrap import dedent
 from typing import List
 
-from pants.backend.project_info.dependees import Dependees
+from pants.backend.project_info.dependees import DependeesGoal
 from pants.backend.project_info.dependees import DependeesOutputFormat as OutputFormat
-from pants.backend.project_info.dependees import dependees_goal
+from pants.backend.project_info.dependees import rules as dependee_rules
 from pants.engine.target import Dependencies, Target
 from pants.testutil.goal_rule_test_base import GoalRuleTestBase
 
@@ -17,7 +17,7 @@ class MockTarget(Target):
 
 
 class DependeesTest(GoalRuleTestBase):
-    goal_cls = Dependees
+    goal_cls = DependeesGoal
 
     @classmethod
     def target_types(cls):
@@ -25,7 +25,7 @@ class DependeesTest(GoalRuleTestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), dependees_goal)
+        return (*super().rules(), *dependee_rules())
 
     def setUp(self) -> None:
         self.add_to_build_file("base", "tgt()")
@@ -49,7 +49,7 @@ class DependeesTest(GoalRuleTestBase):
         self.assert_console_output_ordered(
             *expected,
             args=[*args, *targets],
-            global_args=["--backend-packages2=pants.backend.project_info"],
+            global_args=["--backend-packages=pants.backend.project_info"],
         )
 
     def test_no_targets(self) -> None:

@@ -7,7 +7,6 @@ python_library(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:strutil',
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -16,7 +15,6 @@ python_tests(
     'src/python/pants/util:contextutil',
     'src/python/pants/testutil:test_base',
     'src/python/pants/testutil:goal_rule_test_base',
-    'src/python/pants/testutil/engine:util',
+    'src/python/pants/testutil/engine',
   ],
-  tags = {"partially_type_checked"},
 )

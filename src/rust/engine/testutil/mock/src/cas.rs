@@ -149,8 +149,11 @@ impl StubCAS {
         responder.clone(),
       ))
       .register_service(
-        bazel_protos::remote_execution_grpc::create_content_addressable_storage(responder),
+        bazel_protos::remote_execution_grpc::create_content_addressable_storage(responder.clone()),
       )
+      .register_service(bazel_protos::remote_execution_grpc::create_capabilities(
+        responder,
+      ))
       .bind("localhost", port)
       .build()
       .unwrap();
@@ -222,6 +225,22 @@ macro_rules! check_auth {
         );
         return;
       }
+    }
+  };
+}
+
+macro_rules! check_instance_name {
+  ($self:ident, $req:ident, $sink:ident) => {
+    if $req.instance_name != $self.instance_name() {
+      $sink.fail(grpcio::RpcStatus::new(
+        grpcio::RpcStatusCode::NOT_FOUND,
+        Some(format!(
+          "Wrong instance_name; want {:?} got {:?}",
+          $self.instance_name(),
+          $req.instance_name
+        )),
+      ));
+      return;
     }
   };
 }
@@ -488,17 +507,9 @@ impl bazel_protos::remote_execution_grpc::ContentAddressableStorage for StubCASR
       ));
       return;
     }
-    if req.instance_name != self.instance_name() {
-      sink.fail(grpcio::RpcStatus::new(
-        grpcio::RpcStatusCode::NOT_FOUND,
-        Some(format!(
-          "Wrong instance_name; want {:?} got {:?}",
-          self.instance_name(),
-          req.instance_name
-        )),
-      ));
-      return;
-    }
+
+    check_instance_name!(self, req, sink);
+
     let blobs = self.blobs.lock();
     let mut response = bazel_protos::remote_execution::FindMissingBlobsResponse::new();
     for digest in req.get_blob_digests() {
@@ -544,5 +555,34 @@ impl bazel_protos::remote_execution_grpc::ContentAddressableStorage for StubCASR
     // Our client doesn't currently use get_tree, so we don't bother implementing it.
     // We will need to if the client starts wanting to use it.
     unimplemented!()
+  }
+}
+
+impl bazel_protos::remote_execution_grpc::Capabilities for StubCASResponder {
+  fn get_capabilities(
+    &self,
+    _ctx: grpcio::RpcContext<'_>,
+    req: bazel_protos::remote_execution::GetCapabilitiesRequest,
+    sink: grpcio::UnarySink<bazel_protos::remote_execution::ServerCapabilities>,
+  ) {
+    check_instance_name!(self, req, sink);
+
+    let mut response = bazel_protos::remote_execution::ServerCapabilities::new();
+    let cache_capabilities = response.mut_cache_capabilities();
+    cache_capabilities.set_digest_function(vec![
+      bazel_protos::remote_execution::DigestFunction_Value::SHA256,
+    ]);
+    cache_capabilities.max_batch_total_size_bytes = 0;
+
+    response.mut_execution_capabilities().digest_function =
+      bazel_protos::remote_execution::DigestFunction_Value::SHA256;
+    response.mut_execution_capabilities().exec_enabled = true;
+
+    let mut max_semver = bazel_protos::semver::SemVer::new();
+    max_semver.major = 2;
+    max_semver.minor = 999;
+    response.set_high_api_version(max_semver);
+
+    sink.success(response);
   }
 }

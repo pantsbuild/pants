@@ -79,9 +79,6 @@ class SchedulerTestBase:
             build_id="buildid_for_test", should_report_workunits=should_report_workunits,
         )
 
-    def context_with_scheduler(self, scheduler, *args, **kwargs):
-        return self.context(*args, scheduler=scheduler, **kwargs)
-
     def execute(self, scheduler, product, *subjects):
         """Runs an ExecutionRequest for the given product and subjects, and returns the result
         value."""

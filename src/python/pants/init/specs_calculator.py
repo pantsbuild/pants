@@ -15,7 +15,9 @@ from pants.base.specs import (
     Specs,
 )
 from pants.engine.internals.scheduler import SchedulerSession
+from pants.engine.selectors import Params
 from pants.option.options import Options
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.scm.subsystems.changed import ChangedAddresses, ChangedOptions, ChangedRequest
 from pants.util.ordered_set import OrderedSet
 
@@ -63,6 +65,7 @@ class SpecsCalculator:
     @classmethod
     def create(
         cls,
+        options_bootstrapper: OptionsBootstrapper,
         options: Options,
         session: SchedulerSession,
         build_root: Optional[str] = None,
@@ -96,12 +99,14 @@ class SpecsCalculator:
                 )
             changed_request = ChangedRequest(
                 sources=tuple(changed_options.changed_files(scm=scm)),
-                include_dependees=changed_options.include_dependees,
+                dependees=changed_options.dependees,
             )
-            (changed_addresses,) = session.product_request(ChangedAddresses, [changed_request])
-            logger.debug("changed addresses: %s", changed_addresses.addresses)
+            (changed_addresses,) = session.product_request(
+                ChangedAddresses, [Params(changed_request, options_bootstrapper)]
+            )
+            logger.debug("changed addresses: %s", changed_addresses)
             dependencies = tuple(
-                SingleAddress(a.spec_path, a.target_name) for a in changed_addresses.addresses
+                SingleAddress(a.spec_path, a.target_name) for a in changed_addresses
             )
             return Specs(
                 address_specs=AddressSpecs(

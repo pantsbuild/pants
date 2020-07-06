@@ -8,7 +8,6 @@ python_library(
     'src/python/pants/engine:target',
     'src/python/pants/util:frozendict',
   ],
-  tags = {"type_checked"},
 )
 
 python_library(
@@ -21,5 +20,4 @@ python_library(
     'src/python/pants/engine:addresses',
     'src/python/pants/engine:target',
   ],
-  tags = {"type_checked"},
 )

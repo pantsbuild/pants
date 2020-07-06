@@ -6,7 +6,6 @@ python_library(
     '3rdparty/python:dataclasses',
     '3rdparty/python:pex',
     'src/python/pants/backend/native/subsystems',
-    'src/python/pants/backend/python/targets',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:deprecated',
     'src/python/pants/base:exceptions',
@@ -17,5 +16,4 @@ python_library(
     'src/python/pants/util:memo',
     'src/python/pants/util:ordered_set',
   ],
-  tags = {"partially_type_checked"},
 )

@@ -15,12 +15,10 @@ python_library(
     "src/python/pants/engine:selectors",
     "src/python/pants/engine:unions",
     "src/python/pants/engine/internals:native",
-    "src/python/pants/engine/legacy:structs",
     "src/python/pants/util:memo",
     "src/python/pants/util:ordered_set",
     "src/python/pants/util:strutil",
   ],
-  tags = {"type_checked"},
 )
 
 python_tests(
@@ -29,5 +27,4 @@ python_tests(
     ":dependency_inference",
     "src/python/pants/testutil:test_base",
   ],
-  tags = {"type_checked"},
 )

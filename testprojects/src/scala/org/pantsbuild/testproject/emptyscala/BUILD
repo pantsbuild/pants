@@ -1,3 +1,0 @@
-scala_library(
-  sources=['*'],
-)

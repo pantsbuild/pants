@@ -18,7 +18,7 @@ from pants.base.build_environment import (
 )
 from pants.option.custom_types import dir_option
 from pants.option.errors import OptionsError
-from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
+from pants.option.scope import GLOBAL_SCOPE
 from pants.subsystem.subsystem import Subsystem
 from pants.util.logging import LogLevel
 
@@ -146,7 +146,6 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
 
 class GlobalOptions(Subsystem):
     options_scope = GLOBAL_SCOPE
-    options_scope_category = ScopeInfo.GLOBAL
 
     @classmethod
     def register_bootstrap_options(cls, register):
@@ -183,10 +182,14 @@ class GlobalOptions(Subsystem):
             "engine.",
         )
 
-        # Toggles v1/v2 `Task` vs `@rule` pipelines on/off.
-        # Having these in bootstrap options allows them to affect registration of non-bootstrap options.
         register(
-            "--v1", advanced=True, type=bool, default=True, help="Enables execution of v1 Tasks."
+            "--v1",
+            advanced=True,
+            type=bool,
+            default=False,
+            help="Enables execution of v1 Tasks.",
+            removal_version="2.1.0.dev0",
+            removal_hint="The v1 engine no longer exists. This option does nothing.",
         )
 
         register(
@@ -195,6 +198,8 @@ class GlobalOptions(Subsystem):
             type=bool,
             default=True,
             help="Enables execution of v2 @goal_rules.",
+            removal_version="2.1.0.dev0",
+            removal_hint="The v2 engine is the only one available. This option does nothing.",
         )
 
         # TODO(#7203): make a regexp option type!
@@ -239,12 +244,11 @@ class GlobalOptions(Subsystem):
             help="The name of the script or binary used to invoke pants. "
             "Useful when printing help messages.",
         )
-
         register(
             "--plugins",
             advanced=True,
             type=list,
-            help="Allow v1 backends to be loaded from these plugins.  The default backends for "
+            help="Allow backends to be loaded from these plugins.  The default backends for "
             "each plugin will be loaded automatically. Other backends in a plugin can be "
             "loaded by listing them in --backend-packages.",
         )
@@ -252,7 +256,9 @@ class GlobalOptions(Subsystem):
             "--plugins2",
             advanced=True,
             type=list,
-            help="Allow v2 backends to be loaded from these plugins.  The default backends for "
+            removal_version="2.1.0.dev0",
+            removal_hint="Use --plugins instead.",
+            help="Allow backends to be loaded from these plugins.  The default backends for "
             "each plugin will be loaded automatically. Other backends in a plugin can be "
             "loaded by listing them in --backend-packages.",
         )
@@ -269,14 +275,13 @@ class GlobalOptions(Subsystem):
             default=os.path.join(get_pants_cachedir(), "plugins"),
             help="Cache resolved plugin requirements here.",
         )
-
         register(
             "--backend-packages",
             advanced=True,
             type=list,
-            default=["pants.backend.python", "pants.backend.jvm", "pants.cache"],
+            default=[],
             help=(
-                "Register v1 tasks from these backends. The backend packages must be present on "
+                "Register rules from these backends. The backend packages must be present on "
                 "the PYTHONPATH, typically because they are in the Pants core dist, in a "
                 "plugin dist, or available as sources in the repo."
             ),
@@ -286,8 +291,10 @@ class GlobalOptions(Subsystem):
             advanced=True,
             type=list,
             default=[],
+            removal_version="2.1.0.dev0",
+            removal_hint="Use --backend-packages instead.",
             help=(
-                "Register v2 rules from these backends. The backend packages must be present on "
+                "Register rules from these backends. The backend packages must be present on "
                 "the PYTHONPATH, typically because they are in the Pants core dist, in a "
                 "plugin dist, or available as sources in the repo."
             ),
@@ -565,6 +572,8 @@ class GlobalOptions(Subsystem):
         )
 
         # BinaryUtil options.
+        # TODO: Nuke these once we get rid of src/python/pants/binaries/binary_util.py
+        #  (see there for what that will take).
         register(
             "--binaries-baseurls",
             type=list,
@@ -888,11 +897,9 @@ class GlobalOptions(Subsystem):
         )
 
         loop_flag = "--loop"
-        loop_passive = register.bootstrap.v1 or not register.bootstrap.v2
         register(
             loop_flag,
             type=bool,
-            passive=loop_passive,
             help="Run v2 @goal_rules continuously as file changes are detected.",
         )
         register(
@@ -900,74 +907,7 @@ class GlobalOptions(Subsystem):
             type=int,
             default=2 ** 32,
             advanced=True,
-            passive=loop_passive,
             help=f"The maximum number of times to loop when `{loop_flag}` is specified.",
-        )
-
-        no_v1 = not register.bootstrap.v1
-        register(
-            "-x",
-            "--time",
-            type=bool,
-            passive=no_v1,
-            help="Output a timing report at the end of the run.",
-        )
-        register(
-            "-e", "--explain", type=bool, passive=no_v1, help="Explain the execution of goals."
-        )
-        register(
-            "-q",
-            "--quiet",
-            type=bool,
-            recursive=True,
-            passive=no_v1,
-            help="Squelches most console output. NOTE: Some tasks default to behaving quietly: "
-            "inverting this option supports making them noisier than they would be otherwise.",
-        )
-        # TODO: After moving to the new options system these abstraction leaks can go away.
-        register(
-            "-k",
-            "--kill-nailguns",
-            advanced=True,
-            type=bool,
-            passive=no_v1,
-            help="Kill nailguns before exiting",
-        )
-        register(
-            "--fail-fast",
-            advanced=True,
-            type=bool,
-            recursive=True,
-            passive=no_v1,
-            help="Exit as quickly as possible on error, rather than attempting to continue "
-            "to process the non-erroneous subset of the input.",
-        )
-        register(
-            "--cache-key-gen-version",
-            advanced=True,
-            default="200",
-            recursive=True,
-            passive=no_v1,
-            help="The cache key generation. Bump this to invalidate every artifact for a scope.",
-        )
-        register(
-            "--workdir-max-build-entries",
-            advanced=True,
-            type=int,
-            default=8,
-            passive=no_v1,
-            help="Maximum number of previous builds to keep per task target pair in workdir. "
-            "If set, minimum 2 will always be kept to support incremental compilation.",
-        )
-        register(
-            "--max-subprocess-args",
-            advanced=True,
-            type=int,
-            default=100,
-            recursive=True,
-            passive=no_v1,
-            help="Used to limit the number of arguments passed to some subprocesses by breaking "
-            "the command up into multiple invocations.",
         )
         register(
             "--lock",

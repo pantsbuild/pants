@@ -6,10 +6,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import ClassVar, Tuple, Type
 
-from pants.cache.cache_setup import CacheSetup
 from pants.option.optionable import Optionable
-from pants.option.options_bootstrapper import is_v2_exclusive
-from pants.option.scope import ScopeInfo
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 from pants.util.meta import classproperty
 
@@ -32,8 +29,6 @@ class GoalSubsystem(SubsystemClientMixin, Optionable):
     ```
     """
 
-    options_scope_category = ScopeInfo.GOAL
-
     # If the goal requires downstream implementations to work properly, such as `test` and `run`,
     # it should declare the union types that must have members.
     required_union_implementations: Tuple[Type, ...] = ()
@@ -45,49 +40,8 @@ class GoalSubsystem(SubsystemClientMixin, Optionable):
         for its options."""
 
     @classproperty
-    def deprecated_cache_setup_removal_version(cls):
-        """Optionally defines a deprecation version for a CacheSetup dependency.
-
-        If this GoalSubsystem should have an associated deprecated instance of `CacheSetup` (which
-        was implicitly required by all v1 Tasks), subclasses may set this to a valid deprecation
-        version to create that association.
-        """
-        return None
-
-    @classmethod
-    def conflict_free_name(cls):
-        # v2 goal names ending in '2' are assumed to be so-named to avoid conflict with a v1 goal.
-        # If we're in v2-exclusive mode, strip off the '2', so we can use the more natural name.
-        # Note that this implies a change of options scope when changing to v2-only mode: options
-        # on the foo2 scope will need to be moved to the foo scope. But we already expect options
-        # changes when switching to v2-exclusive mode (e.g., some v1 options aren't even registered
-        # in that mode), so this is in keeping with existing expectations. And this provides
-        # a much better experience to new users who never encountered v1 anyway.
-        if is_v2_exclusive and cls.name.endswith("2"):
-            return cls.name[:-1]
-        return cls.name
-
-    @classproperty
     def options_scope(cls):
-        return cls.conflict_free_name()
-
-    @classmethod
-    def subsystem_dependencies(cls):
-        # NB: `GoalSubsystem` implements `SubsystemClientMixin` in order to allow v1 `Tasks` to
-        # depend on v2 Goals, and for `Goals` to declare a deprecated dependency on a `CacheSetup`
-        # instance for backwards compatibility purposes. But v2 Goals should _not_ have subsystem
-        # dependencies: instead, the @rules participating (transitively) in a Goal should directly
-        # declare their Subsystem deps.
-        if cls.deprecated_cache_setup_removal_version:
-            dep = CacheSetup.scoped(
-                cls,
-                removal_version=cls.deprecated_cache_setup_removal_version,
-                removal_hint="Goal `{}` uses an independent caching implementation, and ignores `{}`.".format(
-                    cls.options_scope, CacheSetup.subscope(cls.options_scope),
-                ),
-            )
-            return (dep,)
-        return tuple()
+        return cls.name
 
     def __init__(self, scope, scoped_options):
         # NB: This constructor is shaped to meet the contract of `Optionable(Factory).signature`.
@@ -126,7 +80,7 @@ class Goal:
 
     @classproperty
     def name(cls):
-        return cls.subsystem_cls.conflict_free_name()
+        return cls.subsystem_cls.name
 
 
 class Outputting:

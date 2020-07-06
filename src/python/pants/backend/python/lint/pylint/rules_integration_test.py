@@ -14,7 +14,6 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.lint import LintResults
 from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
-from pants.engine.legacy.graph import HydratedTargets
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.engine.target import TargetWithOrigin, WrappedTarget
@@ -43,12 +42,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
 
     @classmethod
     def rules(cls):
-        return (
-            *super().rules(),
-            *pylint_rules(),
-            RootRule(PylintRequest),
-            RootRule(HydratedTargets),
-        )
+        return (*super().rules(), *pylint_rules(), RootRule(PylintRequest))
 
     def make_target_with_origin(
         self,
@@ -93,7 +87,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
         additional_args: Optional[List[str]] = None,
     ) -> LintResults:
         args = [
-            "--backend-packages2=pants.backend.python.lint.pylint",
+            "--backend-packages=pants.backend.python.lint.pylint",
             "--source-root-patterns=['src/python', 'tests/python']",
         ]
         if config:
@@ -159,7 +153,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
     def test_uses_correct_python_version(self) -> None:
         py2_args = [
             "--pylint-version=pylint<2",
-            "--pylint-extra-requirements=setuptools<45",
+            "--pylint-extra-requirements=['setuptools<45', 'isort>=4.3.21,<4.4']",
         ]
         py2_target = self.make_target_with_origin(
             [self.py3_only_source], name="py2", interpreter_constraints="CPython==2.7.*"

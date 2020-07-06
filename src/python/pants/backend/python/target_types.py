@@ -6,13 +6,10 @@ from typing import Iterable, Optional, Sequence, Tuple, Union, cast
 
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
-from pants.backend.python.targets.python_binary import PythonBinary as PythonBinaryV1
 from pants.engine.addresses import Address
-from pants.engine.fs import Snapshot
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
-    BundlesField,
     Dependencies,
     IntField,
     InvalidFieldException,
@@ -22,12 +19,11 @@ from pants.engine.target import (
     Sources,
     StringField,
     StringOrStringSequenceField,
-    StringSequenceField,
     Target,
 )
-from pants.fs.archive import TYPE_NAMES
 from pants.python.python_requirement import PythonRequirement
 from pants.python.python_setup import PythonSetup
+from pants.subsystem.subsystem import Subsystem
 
 # -----------------------------------------------------------------------------------------------
 # Common fields
@@ -88,55 +84,32 @@ COMMON_PYTHON_FIELDS = (
 
 
 # -----------------------------------------------------------------------------------------------
-# `python_app` target
-# -----------------------------------------------------------------------------------------------
-
-
-class PythonAppBinaryField(StringField):
-    """Target spec of the `python_binary` that contains the app main."""
-
-    alias = "binary"
-
-
-class PythonAppBasename(StringField):
-    """Name of this application, if different from the `name`.
-
-    Pants uses this in the `bundle` goal to name the distribution artifact.
-    """
-
-    alias = "basename"
-
-
-class PythonAppArchiveFormat(StringField):
-    """Create an archive of this type from the bundle."""
-
-    alias = "archive"
-    valid_choices = tuple(sorted(TYPE_NAMES))
-
-
-class PythonApp(Target):
-    """A deployable Python application.
-
-    Invoking the `bundle` goal on one of these targets creates a self-contained artifact suitable
-    for deployment on some other machine. The artifact contains the executable PEX, its
-    dependencies, and extra files like config files, startup scripts, etc.
-    """
-
-    alias = "python_app"
-    core_fields = (
-        *COMMON_TARGET_FIELDS,
-        Dependencies,
-        BundlesField,
-        PythonAppBinaryField,
-        PythonAppBasename,
-        PythonAppArchiveFormat,
-    )
-    v1_only = True
-
-
-# -----------------------------------------------------------------------------------------------
 # `python_binary` target
 # -----------------------------------------------------------------------------------------------
+
+
+class PythonBinaryDefaults(Subsystem):
+    options_scope = "python-binary"
+
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
+        register(
+            "--pex-emit-warnings",
+            advanced=True,
+            type=bool,
+            default=True,
+            fingerprint=True,
+            help=(
+                "Whether built PEX binaries should emit pex warnings at runtime by default. "
+                "Can be over-ridden by specifying the `emit_warnings` parameter of individual "
+                "`python_binary` targets"
+            ),
+        )
+
+    @property
+    def pex_emit_warnings(self) -> bool:
+        return cast(bool, self.options.pex_emit_warnings)
 
 
 class PythonBinarySources(PythonSources):
@@ -251,7 +224,7 @@ class PexEmitWarnings(BoolField):
 
     alias = "emit_warnings"
 
-    def value_or_global_default(self, python_binary_defaults: PythonBinaryV1.Defaults) -> bool:
+    def value_or_global_default(self, python_binary_defaults: PythonBinaryDefaults) -> bool:
         if self.value is None:
             return python_binary_defaults.pex_emit_warnings
         return self.value
@@ -287,17 +260,6 @@ class PythonBinary(Target):
 
 class PythonTestsSources(PythonSources):
     default = ("test_*.py", "*_test.py", "tests.py", "conftest.py")
-
-
-class PythonCoverage(StringOrStringSequenceField):
-    """A list of the module(s) you expect this test target to cover.
-
-    Usually, Pants and pytest-cov can auto-discover this if your tests are located in the same
-    folder as the `python_library` code, but this is useful if the tests are not collocated.
-    """
-
-    alias = "coverage"
-    v1_only = True
 
 
 class PythonTestsTimeout(IntField):
@@ -342,7 +304,7 @@ class PythonTests(Target):
     """
 
     alias = "python_tests"
-    core_fields = (*COMMON_PYTHON_FIELDS, PythonTestsSources, PythonCoverage, PythonTestsTimeout)
+    core_fields = (*COMMON_PYTHON_FIELDS, PythonTestsSources, PythonTestsTimeout)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -359,40 +321,6 @@ class PythonLibrary(Target):
 
     alias = "python_library"
     core_fields = (*COMMON_PYTHON_FIELDS, PythonLibrarySources)
-
-
-# -----------------------------------------------------------------------------------------------
-# `python_distribution` target
-# -----------------------------------------------------------------------------------------------
-
-
-class PythonDistributionSources(PythonSources):
-    default = ("*.py",)
-
-    def validate_snapshot(self, snapshot: Snapshot) -> None:
-        if self.prefix_glob_with_address("setup.py") not in snapshot.files:
-            raise InvalidFieldException(
-                f"The {repr(self.alias)} field in target {self.address} must include "
-                f"`setup.py`. All resolved files: {sorted(snapshot.files)}."
-            )
-
-
-class PythonDistributionSetupRequires(StringSequenceField):
-    """A list of pip-style requirement strings to provide during the invocation of setup.py."""
-
-    alias = "setup_requires"
-
-
-class PythonDistribution(Target):
-    """A Python distribution target that accepts a user-defined setup.py."""
-
-    alias = "python_dist"
-    core_fields = (
-        *COMMON_PYTHON_FIELDS,
-        PythonDistributionSources,
-        PythonDistributionSetupRequires,
-    )
-    v1_only = True
 
 
 # -----------------------------------------------------------------------------------------------
@@ -455,72 +383,3 @@ class PythonRequirementsFile(Target):
 
     alias = "_python_requirements_file"
     core_fields = (*COMMON_TARGET_FIELDS, PythonRequirementsFileSources)
-
-
-# -----------------------------------------------------------------------------------------------
-# `unpacked_wheels` target
-# -----------------------------------------------------------------------------------------------
-
-
-class UnpackedWheelsModuleName(StringField):
-    """The name of the specific Python module containing headers and/or libraries to extract (e.g.
-    'tensorflow')."""
-
-    alias = "module_name"
-    required = True
-
-
-class UnpackedWheelsRequestedLibraries(StringSequenceField):
-    """Addresses of python_requirement_library targets that specify the wheels you want to
-    unpack."""
-
-    alias = "libraries"
-    required = True
-
-
-class UnpackedWheelsIncludePatterns(StringSequenceField):
-    """Fileset patterns to include from the archive."""
-
-    alias = "include_patterns"
-
-
-class UnpackedWheelsExcludePatterns(StringSequenceField):
-    """Fileset patterns to exclude from the archive.
-
-    Exclude patterns are processed before include_patterns.
-    """
-
-    alias = "exclude_patterns"
-
-
-class UnpackedWheelsWithinDataSubdir(BoolField):
-    """If True, descend into '<name>-<version>.data/' when matching `include_patterns`.
-
-    For Python wheels which declare any non-code data, this is usually needed to extract that
-    without manually specifying the relative path, including the package version.
-
-    For example, when `data_files` is used in a setup.py, `within_data_subdir=True` will allow
-    specifying `include_patterns` matching exactly what is specified in the setup.py.
-    """
-
-    alias = "within_data_subdir"
-    default = False
-
-
-class UnpackedWheels(Target):
-    """A set of sources extracted from wheel files.
-
-    Currently, wheels are always resolved for the 'current' platform.
-    """
-
-    alias = "unpacked_whls"
-    core_fields = (
-        *COMMON_TARGET_FIELDS,
-        PythonInterpreterCompatibility,
-        UnpackedWheelsModuleName,
-        UnpackedWheelsRequestedLibraries,
-        UnpackedWheelsIncludePatterns,
-        UnpackedWheelsExcludePatterns,
-        UnpackedWheelsWithinDataSubdir,
-    )
-    v1_only = True

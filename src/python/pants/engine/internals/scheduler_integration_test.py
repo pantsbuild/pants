@@ -25,8 +25,6 @@ class SchedulerIntegrationTest(PantsRunIntegrationTest):
     @ensure_daemon
     def test_graceful_termination(self):
         args = [
-            "--no-v1",
-            "--v2",
             "list-and-die-for-testing",
             "examples/src/python/example/hello/greet",
         ]

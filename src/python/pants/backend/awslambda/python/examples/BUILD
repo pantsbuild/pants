@@ -18,7 +18,6 @@ python_requirement_library(
 python_library(
   name='hello-lib',
   sources = ['hello_lib.py'],
-  tags = {'partially_type_checked'},
 )
 
 python_awslambda(

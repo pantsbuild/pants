@@ -1,8 +1,5 @@
 # Overrides for TravisCI runs.
 [DEFAULT]
-# Turn off all nailgun use.
-execution_strategy = "subprocess"
-
 # If we use typical default process parallelism tied to core count, we see too many cores under
 # travis and either get oomkilled from launching too many processes with too much total memory
 # overhead or else just generally thrash the container and slow things down.
@@ -20,11 +17,3 @@ pantsd = false
 
 [python-setup]
 resolver_jobs = "%(travis_parallelism)s"
-
-[test.pytest]
-# NB: We set a maximum timeout of 9.8 minutes to fail before hitting Travis' 10 minute timeout (which
-# doesn't give us useful debug info).
-timeout_maximum = 590
-
-[pytest]
-# NB: We don't set a max test timeout for v2, because tests run concurrently.

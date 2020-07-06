@@ -11,7 +11,6 @@ python_library(
     'src/python/pants/core',
     'src/python/pants/core/goals',
     'src/python/pants/core/util_rules',
-    'src/python/pants/engine/legacy:graph',
     'src/python/pants/engine:addresses',
     'src/python/pants/engine:collection',
     'src/python/pants/engine:fs',
@@ -29,7 +28,6 @@ python_library(
     'src/python/pants/util:memo',
     'src/python/pants/util:strutil',
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_tests(
@@ -47,19 +45,16 @@ python_tests(
     'src/python/pants/engine:process',
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
-    'src/python/pants/engine/legacy:graph',
-    'src/python/pants/engine/legacy:structs',
     'src/python/pants/python',
     'src/python/pants/source',
     'src/python/pants/testutil:interpreter_selection_utils',
     'src/python/pants/testutil:external_tool_test_base',
-    'src/python/pants/testutil/engine:util',
+    'src/python/pants/testutil/engine',
     'src/python/pants/testutil/option',
     'src/python/pants/testutil/subsystem',
     'src/python/pants/util:collections',
     'src/python/pants/util:contextutil',
   ],
-  tags = {"partially_type_checked"},
 )
 
 
@@ -84,6 +79,6 @@ python_tests(
     'src/python/pants/testutil:goal_rule_test_base',
     'src/python/pants/testutil:int-test',
   ],
-  tags = {'integration', 'partially_type_checked'},
+  tags = ['integration'],
   timeout = 480,
 )

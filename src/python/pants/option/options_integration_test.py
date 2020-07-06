@@ -5,11 +5,14 @@ import json
 import os
 from textwrap import dedent
 
+import pytest
+
 from pants.fs.fs import safe_filename_from_path
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import temporary_dir
 
 
+@pytest.mark.skip("Skip until https://github.com/pantsbuild/pants/issues/10206")
 class TestOptionsIntegration(PantsRunIntegrationTest):
     @classmethod
     def hermetic(cls) -> bool:
@@ -93,7 +96,7 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
 
     def test_from_config(self) -> None:
         with temporary_dir(root_dir=os.path.abspath(".")) as tempdir:
-            config_path = os.path.relpath(os.path.join(tempdir, "config.ini"))
+            config_path = os.path.relpath(os.path.join(tempdir, "config.toml"))
             with open(config_path, "w+") as f:
                 f.write(
                     dedent(
@@ -113,7 +116,7 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
 
     def test_options_deprecation_from_config(self) -> None:
         with temporary_dir(root_dir=os.path.abspath(".")) as tempdir:
-            config_path = os.path.relpath(os.path.join(tempdir, "config.ini"))
+            config_path = os.path.relpath(os.path.join(tempdir, "config.toml"))
             with open(config_path, "w+") as f:
                 f.write(
                     dedent(
@@ -134,16 +137,13 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
                     )
                 )
             pants_run = self.run_pants([f"--pants-config-files={config_path}", "options"])
-            self.assert_success(pants_run)
-
-            self.assertIn("dummy-options.normal_option", pants_run.stdout_data)
-            self.assertIn(
-                "dummy-options.dummy_crufty_deprecated_but_still_functioning", pants_run.stdout_data
-            )
+        self.assert_success(pants_run)
+        self.assertIn("mock-options.normal_option", pants_run.stdout_data)
+        self.assertIn("mock-options.crufty_deprecated_but_still_functioning", pants_run.stdout_data)
 
     def test_from_config_invalid_section(self) -> None:
         with temporary_dir(root_dir=os.path.abspath(".")) as tempdir:
-            config_path = os.path.relpath(os.path.join(tempdir, "config.ini"))
+            config_path = os.path.relpath(os.path.join(tempdir, "config.toml"))
             with open(config_path, "w+") as f:
                 f.write(
                     dedent(
@@ -168,7 +168,7 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
 
     def test_from_config_invalid_option(self) -> None:
         with temporary_dir(root_dir=os.path.abspath(".")) as tempdir:
-            config_path = os.path.relpath(os.path.join(tempdir, "config.ini"))
+            config_path = os.path.relpath(os.path.join(tempdir, "config.toml"))
             with open(config_path, "w+") as f:
                 f.write(
                     dedent(
@@ -195,7 +195,7 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
         2. Variable `invalid_global` is not allowed in [GLOBAL].
         """
         with temporary_dir(root_dir=os.path.abspath(".")) as tempdir:
-            config_path = os.path.relpath(os.path.join(tempdir, "config.ini"))
+            config_path = os.path.relpath(os.path.join(tempdir, "config.toml"))
             with open(config_path, "w+") as f:
                 f.write(
                     dedent(
@@ -222,7 +222,7 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
     def test_invalid_command_line_option_and_invalid_config(self) -> None:
         """Make sure invalid command line error will be thrown and exits."""
         with temporary_dir(root_dir=os.path.abspath(".")) as tempdir:
-            config_path = os.path.relpath(os.path.join(tempdir, "config.ini"))
+            config_path = os.path.relpath(os.path.join(tempdir, "config.toml"))
             with open(config_path, "w+") as f:
                 f.write(
                     dedent(
@@ -263,6 +263,7 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
     def test_skip_inherited(self) -> None:
         pants_run = self.run_pants(
             [
+                "--backend-packages=pants.backend.python",
                 "--no-colors",
                 "--no-pytest-colors",
                 "--setup-py-colors",
@@ -285,7 +286,7 @@ class TestOptionsIntegration(PantsRunIntegrationTest):
 
     def test_pants_ignore_option(self) -> None:
         with temporary_dir(root_dir=os.path.abspath(".")) as tempdir:
-            config_path = os.path.relpath(os.path.join(tempdir, "config.ini"))
+            config_path = os.path.relpath(os.path.join(tempdir, "config.toml"))
             with open(config_path, "w+") as f:
                 f.write(
                     dedent(

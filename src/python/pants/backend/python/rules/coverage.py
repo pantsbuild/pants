@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from io import StringIO
 from pathlib import PurePath
 from textwrap import dedent
-from typing import Optional, Tuple, cast
+from typing import List, Optional, Sequence, Tuple
 
 from pants.backend.python.rules.pex import (
     Pex,
@@ -24,6 +24,7 @@ from pants.core.goals.test import (
     ConsoleCoverageReport,
     CoverageData,
     CoverageDataCollection,
+    CoverageReport,
     CoverageReports,
     CoverageReportType,
     FilesystemCoverageReport,
@@ -85,9 +86,10 @@ class CoverageSubsystem(PythonToolBase):
         )
         register(
             "--report",
-            type=CoverageReportType,
-            default=CoverageReportType.CONSOLE,
-            help="Which coverage report type to emit.",
+            type=list,
+            member_type=CoverageReportType,
+            default=[CoverageReportType.CONSOLE],
+            help="Which coverage report type(s) to emit.",
         )
         register(
             "--output-dir",
@@ -102,8 +104,8 @@ class CoverageSubsystem(PythonToolBase):
         return tuple(self.options.filter)
 
     @property
-    def report(self) -> CoverageReportType:
-        return cast(CoverageReportType, self.options.report)
+    def reports(self) -> Tuple[CoverageReportType, ...]:
+        return tuple(self.options.report)
 
     @property
     def output_dir(self) -> PurePath:
@@ -201,8 +203,8 @@ async def merge_coverage_data(
     return MergedCoverageData(result.output_digest)
 
 
-@rule(desc="Generate Pytest coverage report")
-async def generate_coverage_report(
+@rule(desc="Generate Pytest coverage reports")
+async def generate_coverage_reports(
     merged_coverage_data: MergedCoverageData,
     coverage_setup: CoverageSetup,
     coverage_config: CoverageConfig,
@@ -228,40 +230,76 @@ async def generate_coverage_report(
         ),
     )
 
-    report_type = coverage_subsystem.report
-    process = coverage_setup.pex.create_process(
-        pex_path=f"./{coverage_setup.pex.output_filename}",
-        pex_args=(report_type.report_name,),
-        input_digest=input_digest,
-        output_directories=("htmlcov",),
-        output_files=("coverage.xml",),
-        description=f"Generate Pytest {report_type.report_name} coverage report.",
-        python_setup=python_setup,
-        subprocess_encoding_environment=subprocess_encoding_environment,
+    processes = []
+    report_types = []
+    coverage_reports: List[CoverageReport] = []
+    for report_type in coverage_subsystem.reports:
+        if report_type == CoverageReportType.RAW:
+            coverage_reports.append(
+                FilesystemCoverageReport(
+                    report_type=CoverageReportType.RAW,
+                    result_digest=merged_coverage_data.coverage_data,
+                    directory_to_materialize_to=coverage_subsystem.output_dir,
+                    report_file=coverage_subsystem.output_dir / ".coverage",
+                )
+            )
+            continue
+        report_types.append(report_type)
+        processes.append(
+            coverage_setup.pex.create_process(
+                pex_path=f"./{coverage_setup.pex.output_filename}",
+                # We pass `--ignore-errors` because Pants dynamically injects missing `__init__.py` files
+                # and this will cause Coverage to fail.
+                pex_args=(report_type.report_name, "--ignore-errors"),
+                input_digest=input_digest,
+                output_directories=("htmlcov",) if report_type == CoverageReportType.HTML else None,
+                output_files=("coverage.xml",) if report_type == CoverageReportType.XML else None,
+                description=f"Generate Pytest {report_type.report_name} coverage report.",
+                python_setup=python_setup,
+                subprocess_encoding_environment=subprocess_encoding_environment,
+            )
+        )
+    results = await MultiGet(Get(ProcessResult, Process, process) for process in processes)
+    coverage_reports.extend(
+        _get_coverage_reports(coverage_subsystem.output_dir, report_types, results)
     )
-    result = await Get(ProcessResult, Process, process)
+    return CoverageReports(tuple(coverage_reports))
 
-    if report_type == CoverageReportType.CONSOLE:
-        return CoverageReports((ConsoleCoverageReport(result.stdout.decode()),))
 
-    report_file: Optional[PurePath] = None
-    if report_type == CoverageReportType.HTML:
-        report_file = coverage_subsystem.output_dir / "htmlcov" / "index.html"
-    elif report_type == CoverageReportType.XML:
-        report_file = coverage_subsystem.output_dir / "coverage.xml"
-    fs_report = FilesystemCoverageReport(
-        report_type=report_type,
-        result_digest=result.output_digest,
-        directory_to_materialize_to=coverage_subsystem.output_dir,
-        report_file=report_file,
-    )
-    return CoverageReports((fs_report,))
+def _get_coverage_reports(
+    output_dir: PurePath,
+    report_types: Sequence[CoverageReportType],
+    results: Tuple[ProcessResult, ...],
+) -> List[CoverageReport]:
+    coverage_reports: List[CoverageReport] = []
+    for result, report_type in zip(results, report_types):
+        if report_type == CoverageReportType.CONSOLE:
+            coverage_reports.append(ConsoleCoverageReport(result.stdout.decode()))
+            continue
+
+        report_file: Optional[PurePath] = None
+        if report_type == CoverageReportType.HTML:
+            report_file = output_dir / "htmlcov" / "index.html"
+        elif report_type == CoverageReportType.XML:
+            report_file = output_dir / "coverage.xml"
+        else:
+            raise ValueError(f"Invalid coverage report type: {report_type}")
+        coverage_reports.append(
+            FilesystemCoverageReport(
+                report_type=report_type,
+                result_digest=result.output_digest,
+                directory_to_materialize_to=output_dir,
+                report_file=report_file,
+            )
+        )
+
+    return coverage_reports
 
 
 def rules():
     return [
         create_coverage_config,
-        generate_coverage_report,
+        generate_coverage_reports,
         merge_coverage_data,
         setup_coverage,
         SubsystemRule(CoverageSubsystem),

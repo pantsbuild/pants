@@ -40,17 +40,21 @@
 /// The engine crate contains some cpython interop which we use, notably externs which are functions
 /// and types from Python which we can read from our Rust. This particular wrapper crate is just for
 /// how we expose ourselves back to Python.
-///
+use std::any::Any;
+use std::cell::RefCell;
+use std::convert::TryInto;
+use std::fs::File;
+use std::io;
+use std::os::unix::ffi::OsStrExt;
+use std::panic;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::time::Duration;
+
 use cpython::{
   exc, py_class, py_exception, py_fn, py_module_initializer, NoArgs, PyClone, PyErr, PyList,
   PyObject, PyResult as CPyResult, PyString, PyTuple, PyType, Python, PythonObject, ToPyObject,
 };
-
-use crate::{
-  externs, nodes, Core, ExecutionRequest, ExecutionTermination, Failure, Function, Intrinsics,
-  Params, Rule, Scheduler, Session, Tasks, Types, Value,
-};
-
 use futures::compat::Future01CompatExt;
 use futures::future::FutureExt;
 use futures::future::{self as future03, TryFutureExt};
@@ -65,16 +69,10 @@ use task_executor::Executor;
 use tempfile::TempDir;
 use workunit_store::{Workunit, WorkunitState};
 
-use std::any::Any;
-use std::cell::RefCell;
-use std::convert::TryInto;
-use std::fs::File;
-use std::io;
-use std::os::unix::ffi::OsStrExt;
-use std::panic;
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use std::time::Duration;
+use crate::{
+  externs, nodes, Core, ExecutionRequest, ExecutionTermination, Failure, Function, Intrinsics,
+  Params, RemotingOptions, Rule, Scheduler, Session, Tasks, Types, Value,
+};
 
 py_exception!(native_engine, PollTimeout);
 
@@ -344,28 +342,13 @@ py_module_initializer!(native_engine, |py, m| {
         ignore_patterns: Vec<String>,
         use_gitignore: bool,
         root_type_ids: Vec<PyType>,
-        remote_execution: bool,
-        remote_store_servers: Vec<String>,
-        remote_execution_server: Option<String>,
-        remote_execution_process_cache_namespace: Option<String>,
-        remote_instance_name: Option<String>,
-        remote_root_ca_certs_path: Option<String>,
-        remote_oauth_bearer_token_path: Option<String>,
-        remote_store_thread_count: u64,
-        remote_store_chunk_bytes: u64,
-        remote_store_connection_limit: u64,
-        remote_store_chunk_upload_timeout_seconds: u64,
-        remote_store_rpc_retries: u64,
-        remote_execution_extra_platform_properties: Vec<(String, String)>,
+        remoting_options: PyRemotingOptions,
         process_execution_local_parallelism: u64,
         process_execution_remote_parallelism: u64,
         process_execution_cleanup_local_dirs: bool,
         process_execution_speculation_delay: f64,
         process_execution_speculation_strategy_buf: String,
         process_execution_use_local_cache: bool,
-        remote_execution_headers: Vec<(String, String)>,
-        remote_execution_enable_streaming: bool,
-        remote_execution_overall_deadline_secs: u64,
         process_execution_local_enable_nailgun: bool
       )
     ),
@@ -386,6 +369,7 @@ py_module_initializer!(native_engine, |py, m| {
   m.add_class::<PyExecutionRequest>(py)?;
   m.add_class::<PyExecutor>(py)?;
   m.add_class::<PyNailgunServer>(py)?;
+  m.add_class::<PyRemotingOptions>(py)?;
   m.add_class::<PyResult>(py)?;
   m.add_class::<PyScheduler>(py)?;
   m.add_class::<PySession>(py)?;
@@ -492,6 +476,55 @@ py_class!(class PyExecutor |py| {
 
 py_class!(class PyScheduler |py| {
     data scheduler: Scheduler;
+});
+
+// Represents configuration related to remote execution and caching.
+//
+// The data stored by PyRemotingOptions originally was passed directly into scheduler_create
+// but has been broken out separately because the large number of options became unwieldy.
+py_class!(class PyRemotingOptions |py| {
+  data options: RemotingOptions;
+
+  def __new__(
+    _cls,
+    execution_enable: bool,
+    store_servers: Vec<String>,
+    execution_server: Option<String>,
+    execution_process_cache_namespace: Option<String>,
+    instance_name: Option<String>,
+    root_ca_certs_path: Option<String>,
+    oauth_bearer_token_path: Option<String>,
+    store_thread_count: u64,
+    store_chunk_bytes: u64,
+    store_chunk_upload_timeout: u64,
+    store_rpc_retries: u64,
+    store_connection_limit: u64,
+    execution_extra_platform_properties: Vec<(String, String)>,
+    execution_headers: Vec<(String, String)>,
+    execution_enable_streaming: bool,
+    execution_overall_deadline_secs: u64
+  ) -> CPyResult<Self> {
+    Self::create_instance(py,
+      RemotingOptions {
+        execution_enable,
+        store_servers,
+        execution_server,
+        execution_process_cache_namespace,
+        instance_name,
+        root_ca_certs_path: root_ca_certs_path.map(PathBuf::from),
+        oauth_bearer_token_path: oauth_bearer_token_path.map(PathBuf::from),
+        store_thread_count: store_thread_count as usize,
+        store_chunk_bytes: store_chunk_bytes as usize,
+        store_chunk_upload_timeout: Duration::from_secs(store_chunk_upload_timeout),
+        store_rpc_retries: store_rpc_retries as usize,
+        store_connection_limit: store_connection_limit as usize,
+        execution_extra_platform_properties,
+        execution_headers: execution_headers.into_iter().collect(),
+        execution_enable_streaming,
+        execution_overall_deadline: Duration::from_secs(execution_overall_deadline_secs),
+      }
+    )
+  }
 });
 
 py_class!(class PySession |py| {
@@ -704,28 +737,13 @@ fn scheduler_create(
   ignore_patterns: Vec<String>,
   use_gitignore: bool,
   root_type_ids: Vec<PyType>,
-  remote_execution: bool,
-  remote_store_servers: Vec<String>,
-  remote_execution_server: Option<String>,
-  remote_execution_process_cache_namespace: Option<String>,
-  remote_instance_name: Option<String>,
-  remote_root_ca_certs_path: Option<String>,
-  remote_oauth_bearer_token_path: Option<String>,
-  remote_store_thread_count: u64,
-  remote_store_chunk_bytes: u64,
-  remote_store_connection_limit: u64,
-  remote_store_chunk_upload_timeout_seconds: u64,
-  remote_store_rpc_retries: u64,
-  remote_execution_extra_platform_properties: Vec<(String, String)>,
+  remoting_options: PyRemotingOptions,
   process_execution_local_parallelism: u64,
   process_execution_remote_parallelism: u64,
   process_execution_cleanup_local_dirs: bool,
   process_execution_speculation_delay: f64,
   process_execution_speculation_strategy: String,
   process_execution_use_local_cache: bool,
-  remote_execution_headers: Vec<(String, String)>,
-  remote_execution_enable_streaming: bool,
-  remote_execution_overall_deadline_secs: u64,
   process_execution_local_enable_nailgun: bool,
 ) -> CPyResult<PyScheduler> {
   match fs::increase_limits() {
@@ -754,19 +772,7 @@ fn scheduler_create(
       PathBuf::from(local_store_dir_buf),
       PathBuf::from(local_execution_root_dir_buf),
       PathBuf::from(named_caches_dir_buf),
-      remote_execution,
-      remote_store_servers,
-      remote_execution_server,
-      remote_execution_process_cache_namespace,
-      remote_instance_name,
-      remote_root_ca_certs_path.map(PathBuf::from),
-      remote_oauth_bearer_token_path.map(PathBuf::from),
-      remote_store_thread_count as usize,
-      remote_store_chunk_bytes as usize,
-      Duration::from_secs(remote_store_chunk_upload_timeout_seconds),
-      remote_store_rpc_retries as usize,
-      remote_store_connection_limit as usize,
-      remote_execution_extra_platform_properties,
+      remoting_options.options(py).clone(),
       process_execution_local_parallelism as usize,
       process_execution_remote_parallelism as usize,
       process_execution_cleanup_local_dirs,
@@ -775,9 +781,6 @@ fn scheduler_create(
       Duration::from_millis((process_execution_speculation_delay * 1000.0).round() as u64),
       process_execution_speculation_strategy,
       process_execution_use_local_cache,
-      remote_execution_headers.into_iter().collect(),
-      remote_execution_enable_streaming,
-      remote_execution_overall_deadline_secs,
       process_execution_local_enable_nailgun,
     )
   });

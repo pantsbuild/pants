@@ -30,12 +30,11 @@ python_tests(
     'src/python/pants/option',
     'src/python/pants/reporting',
     'src/python/pants/testutil:test_base',
-    'src/python/pants/testutil/engine:util',
+    'src/python/pants/testutil/engine',
     'src/python/pants/util:logging',
     'src/python/pants/util:objects',
     'src/python/pants/util:ordered_set',
   ],
-  tags = {"type_checked"},
 )
 
 python_tests(
@@ -46,7 +45,7 @@ python_tests(
     'src/python/pants/testutil:int-test',
     'src/python/pants/util:contextutil',
   ],
-  tags = {'integration', 'partially_type_checked'},
+  tags = ['integration'],
 )
 
 python_library(
@@ -68,7 +67,6 @@ python_library(
     'src/python/pants/util:meta',
     'src/python/pants/util:objects',
   ],
-  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -89,7 +87,6 @@ python_library(
     'src/python/pants/util:objects',
     'src/python/pants/util:ordered_set',
   ],
-  tags = {'partially_type_checked'},
 )
 
 python_library(
@@ -110,7 +107,6 @@ python_library(
     'src/python/pants/source:filespec',
     'src/python/pants/util:ordered_set',
   ],
-  tags = {"type_checked"},
 )
 
 python_library(
@@ -126,7 +122,6 @@ python_library(
     'src/python/pants/util:memo',
     'src/python/pants/util:meta',
   ],
-  tags = {"partially_type_checked"},
 )
 
 resources(
@@ -146,7 +141,6 @@ python_library(
     'src/python/pants/option',
     'src/python/pants/util:logging',
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -175,7 +169,6 @@ python_library(
     'src/python/pants/util:ordered_set',
     'src/python/pants/util:strutil',
   ],
-  tags = {"partially_type_checked"},
 )
 
 python_library(
@@ -186,8 +179,7 @@ python_library(
     ':scheduler',
     'src/python/pants/base:project_tree',
     'src/python/pants/engine:fs',
-    'src/python/pants/testutil/engine:util',
+    'src/python/pants/testutil/engine',
     'src/python/pants/util:dirutil',
   ],
-  tags = {"partially_type_checked"},
 )

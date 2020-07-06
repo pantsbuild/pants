@@ -95,7 +95,7 @@ function run_pex() {
 function run_packages_script() {
   (
     cd "${ROOT}"
-    ./v2 --concurrent run "${ROOT}/build-support/bin/packages.py" -- "$@"
+    ./pants --concurrent run "${ROOT}/build-support/bin/packages.py" -- "$@"
   )
 }
 
@@ -145,13 +145,7 @@ function execute_packaged_pants_with_internal_backends() {
     --no-verify-config \
     --no-pantsd \
     --pythonpath="['pants-plugins/src/python']" \
-    --backend-packages="[\
-        'pants.backend.jvm',\
-        'pants.backend.python',\
-        'pants.cache',\
-        'internal_backend.repositories',\
-      ]" \
-      --backend-packages2="[\
+      --backend-packages="[\
         'pants.backend.awslambda.python',\
         'pants.backend.python',\
         'internal_backend.utilities',\

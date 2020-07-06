@@ -13,14 +13,12 @@ python_tests(
     'src/python/pants/engine:rules',
     'src/python/pants/engine:selectors',
     'src/python/pants/fs',
-    'src/python/pants/goal',
-    'src/python/pants/goal:task_registrar',
     'src/python/pants/init',
     'src/python/pants/option',
     'src/python/pants/pantsd:pants_daemon',
     'src/python/pants/python',
     'src/python/pants/subsystem',
-    'src/python/pants/testutil/engine:util',
+    'src/python/pants/testutil/engine',
     'src/python/pants/testutil/subsystem',
     'src/python/pants/testutil:interpreter_selection_utils',
     'src/python/pants/testutil:test_base',
@@ -28,7 +26,6 @@ python_tests(
     'src/python/pants/util:dirutil',
     'src/python/pants/util:logging',
   ],
-  tags = {"partially_type_checked"},
   timeout = 180,
 )
 
@@ -37,6 +34,5 @@ python_tests(
   sources = ['test_util.py'],
   dependencies = [
     'src/python/pants/init:util',
-    # 'src/python/pants/testutil:int-test-for-export'
   ]
 )

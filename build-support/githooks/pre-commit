@@ -50,14 +50,17 @@ if git rev-parse --verify "${MERGE_BASE}" &>/dev/null; then
     build-support/bin/check_rust_target_headers.sh || exit 1
   fi
 
-  echo "* Checking MyPy, Flake8, and formatting"
-  ./v2 --changed-since="${MERGE_BASE}" --tag='-nolint' lint || \
-    die "If there were formatting errors, run \`./v2 --changed-since=$(git rev-parse --symbolic "${MERGE_BASE}") fmt\`"
+  echo "* Checking MyPy"
+  ./pants --changed-since="${MERGE_BASE}" --changed-dependees=transitive --tag='-nolint' typecheck || exit 1
+
+  echo "* Checking Flake8 and formatting"
+  ./pants --changed-since="${MERGE_BASE}" --tag='-nolint' lint || \
+    die "If there were formatting errors, run \`./pants --changed-since=$(git rev-parse --symbolic "${MERGE_BASE}") fmt\`"
 
   if git diff "${MERGE_BASE}" --name-only | grep build-support/bin/generate_travis_yml.py > /dev/null; then
     echo "* Checking .travis.yml generation"
     actual_travis_yml=$(<.travis.yml)
-    expected_travis_yml=$(./v2 run build-support/bin:generate_travis_yml)
+    expected_travis_yml=$(./pants run build-support/bin:generate_travis_yml)
     [ "${expected_travis_yml}" == "${actual_travis_yml}" ] || \
       die "Travis config generator changed, but .travis.yml file was not regenerated. See the header of .travis.yml for instructions."
   fi
