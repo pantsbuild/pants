@@ -37,5 +37,5 @@ python_tests(
     'src/python/pants/testutil/option',
   ],
   tags = ['integration'],
-  timeout = 120,
+  timeout = 180,
 )
