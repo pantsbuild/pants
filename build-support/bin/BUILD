@@ -17,33 +17,21 @@ files(
 python_binary(
    name = 'bootstrap_and_deploy_ci_pants_pex',
    sources = ['bootstrap_and_deploy_ci_pants_pex.py'],
-   dependencies = [
-     ':common',
-   ],
  )
 
 python_binary(
   name = 'check_banned_imports',
   sources = ['check_banned_imports.py'],
-  dependencies = [
-    ':common',
-  ],
 )
 
 python_binary(
   name = 'check_header',
   sources = ['check_header.py'],
-  dependencies = [
-    ':common',
-  ],
 )
 
 python_binary(
   name = 'ci',
   sources = ['ci.py'],
-  dependencies = [
-    ':common',
-  ],
 )
 
 python_library(
@@ -54,43 +42,25 @@ python_library(
 python_binary(
   name = 'deploy_to_s3',
   sources = ['deploy_to_s3.py'],
-  dependencies = [
-    ':common',
-  ],
 )
 
 python_binary(
   name = 'generate_travis_yml',
   sources = ['generate_travis_yml.py'],
-  dependencies = [
-    '3rdparty/python:PyYAML',
-  ],
 )
 
 python_binary(
   name = 'get_rbe_token',
   sources = ['get_rbe_token.py'],
-  dependencies = [
-    '3rdparty/python:ansicolors',
-    '3rdparty/python:requests',
-  ],
 )
 
 python_binary(
   name = 'shellcheck',
   sources = ['shellcheck.py'],
-  dependencies = [
-    ':common',
-  ],
 )
 
 # TODO: rename this to `release.py` once done porting Bash to Python.
 python_binary(
   name = "packages",
   sources = ["packages.py"],
-  dependencies = [
-    ':common',
-    '3rdparty/python:beautifulsoup4',
-    '3rdparty/python:requests',
-  ],
 )

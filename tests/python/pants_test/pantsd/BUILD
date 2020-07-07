@@ -30,5 +30,6 @@ python_integration_tests(
     'testprojects/src/python:nested_runs_directory',
     'testprojects/src/python:print_env_directory',
   ],
+  uses_pants_run=True,
   timeout = 1020
 )

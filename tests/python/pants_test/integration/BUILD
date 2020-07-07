@@ -7,6 +7,7 @@ python_integration_tests(
   dependencies = [
     'src/python/pants/testutil:int-test',
   ],
+  uses_pants_run=True,
 )
 
 python_integration_tests(
@@ -17,6 +18,7 @@ python_integration_tests(
     'testprojects/src/python:python_targets_directory',
     'testprojects/src/python:sources_directory',
   ],
+  uses_pants_run=True,
   timeout = 600,
 )
 
@@ -27,6 +29,7 @@ python_integration_tests(
     'src/python/pants/testutil:int-test',
     'testprojects/tests/python:owners_integration_target',
   ],
+  uses_pants_run=True,
   timeout = 120,
 )
 
@@ -37,6 +40,7 @@ python_integration_tests(
     'examples/src/python/example:hello_directory',
     'testprojects/tests/python/pants:dummies_directory',
   ],
+  uses_pants_run=True,
   timeout = 330,
 )
 
@@ -47,6 +51,7 @@ python_integration_tests(
     'testprojects/src/python:no_build_file_directory',
     'testprojects/src/python:sources_directory',
   ],
+  uses_pants_run=True,
   timeout = 180,
 )
 
@@ -56,10 +61,12 @@ python_integration_tests(
   dependencies = [
     'testprojects/tests/python/pants:build_parsing_directory',
   ],
+  uses_pants_run=True,
   timeout = 180,
 )
 
 python_integration_tests(
   name = 'prelude_integration',
   sources = ['test_prelude_integration.py'],
+  uses_pants_run=True,
 )

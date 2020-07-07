@@ -83,6 +83,7 @@ python_integration_tests(
     'testprojects/src/python:coordinated_runs_directory',
     'testprojects:pants_plugins_directory',
   ],
+  uses_pants_run=True,
   tags = ['platform_specific_behavior'],
   # NB: This frequently times out, but due to hanging. So, we want to fail eagerly. See
   # https://github.com/pantsbuild/pants/issues/8127.
@@ -95,5 +96,6 @@ python_integration_tests(
   dependencies = [
     'testprojects/src/python:unicode_directory',
   ],
+  uses_pants_run=True,
   timeout = 120,
 )

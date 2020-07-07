@@ -14,6 +14,7 @@ python_tests(
 
 python_integration_tests(
   name='integration',
+  uses_pants_run=True,
   dependencies=[
     'examples/src/python/example:hello_directory',
   ],

@@ -3,4 +3,7 @@
 
 python_library()
 
-python_integration_tests(name='integration')
+python_integration_tests(
+  name='integration',
+  uses_pants_run=False,
+)
