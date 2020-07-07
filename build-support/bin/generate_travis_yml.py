@@ -618,7 +618,7 @@ def build_wheels_osx() -> Dict:
 def integration_tests(python_version: PythonVersion) -> Dict:
     shard = {
         **linux_shard(python_version=python_version, install_travis_wait=True),
-        "name": f"Integration tests - V2 (Python {python_version.decimal})",
+        "name": f"Integration tests (Python {python_version.decimal})",
         "script": [
             (
                 "travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py "
@@ -627,7 +627,7 @@ def integration_tests(python_version: PythonVersion) -> Dict:
             ),
         ],
     }
-    safe_append(shard, "env", f"CACHE_NAME=integration.v2.py{python_version.number}")
+    safe_append(shard, "env", f"CACHE_NAME=integration.py{python_version.number}")
     return shard
 
 

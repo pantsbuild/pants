@@ -542,9 +542,9 @@ jobs:
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
-    - CACHE_NAME=integration.v2.py36
+    - CACHE_NAME=integration.py36
     language: python
-    name: Integration tests - V2 (Python 3.6)
+    name: Integration tests (Python 3.6)
     os: linux
     python:
     - '2.7'
@@ -602,9 +602,9 @@ jobs:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
-    - CACHE_NAME=integration.v2.py37
+    - CACHE_NAME=integration.py37
     language: python
-    name: Integration tests - V2 (Python 3.7)
+    name: Integration tests (Python 3.7)
     os: linux
     python:
     - '2.7'
