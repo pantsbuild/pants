@@ -783,33 +783,6 @@ class RunTracker(Subsystem):
             new_data_to_add = cls._create_dict_with_nested_keys_and_val(new_keys, value)
             data.update(new_data_to_add)
 
-    def report_target_info(self, scope, target, keys, val):
-        """Add target information to run_info under target_data.
-
-        Will Recursively construct a nested dict with the keys provided.
-
-        Primitive values can be overwritten with other primitive values,
-        but a primitive value cannot be overwritten with a dictionary.
-
-        For example:
-        Where the dictionary being updated is {'a': {'b': 16}}, reporting the value
-        15 with the key list ['a', 'b'] will result in {'a': {'b':15}};
-        but reporting the value 20 with the key list ['a', 'b', 'c'] will throw
-        an error.
-
-        :param string scope: The scope for which we are reporting the information.
-        :param target: The target for which we want to store information.
-        :type target: :class:`pants.build_graph.target.Target`
-        :param list of string keys: The keys that will be recursively
-               nested and pointing to the information being stored.
-        :param primitive val: The value of the information being stored.
-
-        :API: public
-        """
-        new_key_list = [target.address.spec, scope]
-        new_key_list += keys
-        self._merge_list_of_keys_into_dict(self._target_to_data, new_key_list, val, 0)
-
 
 class RunTrackerLogger:
     """A logger facade that logs into a run tracker."""
