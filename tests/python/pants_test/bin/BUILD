@@ -4,10 +4,6 @@
 python_tests(
   name='integration',
   dependencies=[
-    'src/python/pants/base:build_environment',
-    'src/python/pants/bin:pants_loader',
-    'src/python/pants/option',
-    'src/python/pants/testutil:int-test',
     'testprojects:pants_plugins_directory',
     'testprojects/src/python:nested_runs_directory',
   ],

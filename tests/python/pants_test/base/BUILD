@@ -4,10 +4,6 @@
 python_tests(
   name = 'build_environment',
   sources = ['test_build_environment.py'],
-  dependencies = [
-    'src/python/pants/base:build_environment',
-    'src/python/pants/util:contextutil',
-  ],
 )
 
 python_tests(
@@ -15,131 +11,67 @@ python_tests(
   sources = ['test_build_root.py'],
   dependencies = [
     '//:build_root',
-    'src/python/pants/base:build_root',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:dirutil',
-    'src/python/pants/testutil:test_base',
   ],
 )
 
 python_tests(
   name = 'cmd_line_spec_parser',
   sources = ['test_cmd_line_spec_parser.py'],
-  dependencies = [
-    'src/python/pants/base:cmd_line_spec_parser',
-    'src/python/pants/build_graph',
-    'src/python/pants/testutil:test_base',
-  ],
 )
 
 python_tests(
   name = 'deprecated',
   sources = ['test_deprecated.py'],
-  dependencies = [
-    'src/python/pants/base:deprecated',
-    'src/python/pants/util:collections',
-    'src/python/pants:version',
-    'src/python/pants/testutil:test_base',
-  ],
 )
 
 python_tests(
   name = 'fingerprint_strategy',
   sources = ['test_fingerprint_strategy.py'],
-  dependencies = [
-    'src/python/pants/base:fingerprint_strategy',
-    'src/python/pants/testutil:test_base',
-  ],
 )
 
 python_tests(
   name = 'generator',
   sources = ['test_generator.py'],
-  dependencies = [
-    'src/python/pants/base:generator',
-    'src/python/pants/testutil:test_base',
-  ],
 )
 
 python_tests(
   name = 'hash_utils',
   sources = ['test_hash_utils.py'],
-  dependencies = [
-    'src/python/pants/base:hash_utils',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:ordered_set',
-  ],
 )
 
 python_tests(
   name = 'payload',
   sources = ['test_payload.py'],
-  dependencies = [
-    'src/python/pants/base:payload',
-    'src/python/pants/base:payload_field',
-    'src/python/pants/build_graph',
-    'src/python/pants/testutil:test_base',
-  ],
 )
 
 python_tests(
   name = 'payload_field',
   sources = ['test_payload_field.py'],
-  dependencies = [
-    'src/python/pants/base:payload_field',
-    'src/python/pants/python',
-    'src/python/pants/testutil:test_base',
-  ],
 )
 
 python_tests(
   name = 'revision',
   sources = ['test_revision.py'],
-  dependencies = [
-    'src/python/pants/base:revision',
-    'src/python/pants/testutil:test_base',
-  ],
 )
 
 python_tests(
   name = 'run_info',
   sources = ['test_run_info.py'],
-  dependencies = [
-    'src/python/pants/base:run_info',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/testutil:test_base',
-  ],
 )
 
 python_tests(
   name = 'worker_pool',
   sources = ['test_worker_pool.py'],
-  dependencies = [
-    'src/python/pants/base:worker_pool',
-    'src/python/pants/util:contextutil',
-  ],
 )
 
 python_tests(
   name = 'validation',
   sources = ['test_validation.py'],
-  dependencies = [
-    'src/python/pants/base:validation',
-  ],
 )
 
 python_tests(
-  name = 'exception_sink',
-  sources = ['test_exception_sink.py'],
-  dependencies = [
-    'src/python/pants/base:exception_sink',
-    'src/python/pants/testutil/option',
-    'src/python/pants/testutil:test_base',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:dirutil',
-    'src/python/pants/util:enums',
-    'src/python/pants/util:osutil',
-  ],
+  name='exception_sink',
+  sources=['test_exception_sink.py'],
   tags=['platform_specific_behavior'],
 )
 
@@ -148,12 +80,8 @@ python_tests(
   sources = ['test_exception_sink_integration.py'],
   dependencies = [
     'examples/src/python/example:hello_directory',
-    'src/python/pants/base:exception_sink',
-    'src/python/pants/testutil:int-test',
-    'src/python/pants/util:osutil',
     'testprojects/src/python:coordinated_runs_directory',
     'testprojects:pants_plugins_directory',
-    'tests/python/pants_test/pantsd:pantsd_integration_test_base',
   ],
   tags = ['platform_specific_behavior', 'integration'],
   # NB: This frequently times out, but due to hanging. So, we want to fail eagerly. See
@@ -163,9 +91,8 @@ python_tests(
 
 python_tests(
   name = 'exiter_integration',
-  sources = [ 'test_exiter_integration.py' ],
+  sources = ['test_exiter_integration.py'],
   dependencies = [
-    'src/python/pants/testutil:int-test',
     'testprojects/src/python:unicode_directory',
   ],
   tags = ['integration'],

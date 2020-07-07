@@ -26,21 +26,6 @@ python_library(
   dependencies = [
     '//:build_root',
     '//:pants_pex',
-    '3rdparty/python:ansicolors',
-    '3rdparty/python:dataclasses',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/base:exiter',
-    'src/python/pants/build_graph:address',
-    'src/python/pants/fs',
-    'src/python/pants/option',
-    'src/python/pants/pantsd:pants_daemon_client',
-    'src/python/pants/subsystem',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:dirutil',
-    'src/python/pants/util:osutil',
-    'src/python/pants/util:process_handler',
-    'src/python/pants/util:strutil',
-    'src/python/pants:entry_point',
   ],
 )
 
@@ -61,57 +46,22 @@ target(
 python_library(
   name = 'test_base',
   sources = ['test_base.py'],
-  dependencies = [
-    'src/python/pants/base:build_root',
-    'src/python/pants/base:cmd_line_spec_parser',
-    'src/python/pants/base:exceptions',
-    'src/python/pants/build_graph',
-    'src/python/pants/init',
-    'src/python/pants/option:global_options',
-    'src/python/pants/option:options_bootstrapper',
-    'src/python/pants/source',
-    'src/python/pants/subsystem',
-    'src/python/pants/testutil/engine',
-    'src/python/pants/testutil/option',
-    'src/python/pants/testutil/subsystem',
-    'src/python/pants/util:collections',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:dirutil',
-    'src/python/pants/util:memo',
-    'src/python/pants/util:meta',
-  ],
 )
 
 python_library(
   name = 'external_tool_test_base',
   sources = ['external_tool_test_base.py'],
-  dependencies = [
-    ':test_base',
-    'src/python/pants/core/util_rules',
-  ],
 )
 
 
 python_library(
   name = 'goal_rule_test_base',
   sources = ['goal_rule_test_base.py'],
-  dependencies = [
-    ':test_base',
-    '3rdparty/python:dataclasses',
-    'src/python/pants/init',
-    'src/python/pants/testutil/option',
-    'src/python/pants/util:meta',
-  ],
 )
 
 python_library(
   name='git_util',
   sources=['git_util.py'],
-  dependencies = [
-    'src/python/pants/base:revision',
-    'src/python/pants/scm',
-    'src/python/pants/util:contextutil',
-  ],
 )
 
 python_library(
@@ -127,16 +77,9 @@ python_library(
 python_library(
   name='pexrc_util',
   sources=['pexrc_util.py'],
-  dependencies = [
-    ':git_util',
-  ],
 )
 
 python_library(
   name='process_test_util',
   sources=['process_test_util.py'],
-  dependencies = [
-    '3rdparty/python:dataclasses',
-    '3rdparty/python:psutil',
-  ],
 )

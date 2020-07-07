@@ -3,7 +3,7 @@
 
 python_tests(
   name = 'build_ignore_integration',
-  sources = [ 'build_ignore_integration_test.py' ],
+  sources = ['build_ignore_integration_test.py'],
   dependencies = [
     'src/python/pants/testutil:int-test',
   ],
@@ -15,12 +15,6 @@ python_tests(
   sources = ['changed_integration_test.py'],
   dependencies = [
     '//:gitignore',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/util:contextutil',
-    'src/python/pants/util:dirutil',
-    'src/python/pants/testutil:git_util',
-    'src/python/pants/testutil:test_base',
-    'src/python/pants/testutil:int-test',
     'testprojects/src/python:python_targets_directory',
     'testprojects/src/python:sources_directory',
   ],
@@ -43,7 +37,6 @@ python_tests(
   name = 'goal_rule_integration',
   sources = ['goal_rule_integration_test.py'],
   dependencies = [
-    'tests/python/pants_test/pantsd:pantsd_integration_test_base',
     'examples/src/python/example:hello_directory',
     'testprojects/tests/python/pants:dummies_directory',
   ],
@@ -55,8 +48,6 @@ python_tests(
   name='graph_integration',
   sources=['graph_integration_test.py'],
   dependencies=[
-    'src/python/pants/option',
-    'src/python/pants/testutil:int-test',
     'testprojects/src/python:no_build_file_directory',
     'testprojects/src/python:sources_directory',
   ],
@@ -68,7 +59,6 @@ python_tests(
   name = 'list_integration',
   sources = ['list_integration_test.py'],
   dependencies = [
-    'src/python/pants/testutil:int-test',
     'testprojects/tests/python/pants:build_parsing_directory',
   ],
   tags = ['integration'],
@@ -77,9 +67,6 @@ python_tests(
 
 python_tests(
   name = 'prelude_integration',
-  sources = [ 'test_prelude_integration.py' ],
-  dependencies = [
-    'src/python/pants/testutil:int-test',
-  ],
+  sources = ['test_prelude_integration.py'],
   tags = ['integration'],
 )
