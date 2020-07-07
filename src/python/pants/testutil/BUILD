@@ -25,7 +25,6 @@ python_library(
   sources = ['pants_run_integration_test.py'],
   dependencies = [
     '//:build_root',
-    '//:pants_pex',
     '3rdparty/python:ansicolors',
     '3rdparty/python:dataclasses',
     'src/python/pants/base:build_environment',

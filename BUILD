@@ -32,10 +32,3 @@ files(
   name = 'pyproject',
   sources = ['pyproject.toml'],
 )
-
-# NB: This is used for integration tests. This is generated automatically via `./pants` and
-# `build-support/bin/bootstrap_pants_pex.sh`.
-files(
-  name = 'pants_pex',
-  sources = ['pants.pex'],
-)
