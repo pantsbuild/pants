@@ -21,9 +21,8 @@ python_library(
   sources = ['pantsd_integration_test_base.py'],
 )
 
-python_tests(
+python_integration_tests(
   name = 'pantsd_integration',
-  sources = ['test_pantsd_integration.py'],
   dependencies = [
     'examples/src/python/example:hello_directory',
     'testprojects/src/python:bad_requirements_directory',
@@ -31,6 +30,5 @@ python_tests(
     'testprojects/src/python:nested_runs_directory',
     'testprojects/src/python:print_env_directory',
   ],
-  tags = ['integration'],
   timeout = 1020
 )

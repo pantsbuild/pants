@@ -3,9 +3,7 @@
 
 python_library()
 
-python_tests(
+python_integration_tests(
   name='integration',
-  sources=['*_integration_test.py'],
   timeout=120,
-  tags=['integration'],
 )

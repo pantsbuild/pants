@@ -1,6 +1,8 @@
 [GLOBAL]
 print_exception_stacktrace = true
+
 dependency_inference = true
+files_not_found_behavior = "error"
 
 # Enable our custom loose-source plugins.
 pythonpath = ["%(buildroot)s/pants-plugins/src/python"]
@@ -16,6 +18,8 @@ backend_packages.add = [
   "internal_backend.rules_for_testing",
   "internal_backend.utilities",
 ]
+
+build_file_prelude_globs = ["pants-plugins/python_integration_tests_macro.py"]
 
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
 # path but not consumed by python, and additionally add the rust code.

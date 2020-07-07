@@ -10,9 +10,7 @@ python_tests(
 )
 
 
-python_tests(
+python_integration_tests(
   name='integration',
-  sources=['*_integration_test.py'],
-  tags=['integration'],
   timeout=480,
 )

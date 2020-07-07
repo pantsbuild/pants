@@ -3,8 +3,4 @@
 
 python_library()
 
-python_tests(
-  name='integration',
-  sources=['*_integration_test.py'],
-  tags=['integration'],
-)
+python_integration_tests(name='integration')

@@ -6,13 +6,11 @@ python_tests(
   sources=['*_test.py', '!*_integration_test.py'],
 )
 
-python_tests(
+python_integration_tests(
   name='integration',
-  sources=['*_integration_test.py'],
   dependencies=[
     'examples/src/python/example:hello_directory',
   ],
-  tags = ['integration'],
 )
 
 python_library(
