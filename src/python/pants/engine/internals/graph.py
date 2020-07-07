@@ -195,7 +195,7 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
         if bfa.rel_path in sources_set
         # NB: Deleted files can only be matched against the 'filespec' (i.e. `PathGlobs`) for a
         # target, which is why we use `any_matches_filespec`.
-        or any_matches_filespec(sources_set, tgt.get(Sources).filespec)
+        or any_matches_filespec(tgt.get(Sources).filespec, paths=sources_set)
     )
     return Owners(owners)
 

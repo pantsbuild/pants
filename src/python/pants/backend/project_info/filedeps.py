@@ -80,7 +80,7 @@ async def file_deps(
 
     if options.values.globs:
         unique_rel_paths.update(
-            itertools.chain.from_iterable(tgt.get(Sources).filespec["globs"] for tgt in targets)
+            itertools.chain.from_iterable(tgt.get(Sources).filespec["includes"] for tgt in targets)
         )
     else:
         all_hydrated_sources = await MultiGet(

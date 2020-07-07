@@ -803,10 +803,14 @@ class TestSources(TestBase):
         assert hydrated_sources.snapshot.files == ("src/fortran/f1.f03", "src/fortran/f1.f95")
 
         # Also test that the Filespec is correct. This does not need hydration to be calculated.
-        assert sources.filespec == {
-            "globs": ["src/fortran/*.f03", "src/fortran/f1.f95"],
-            "exclude": [{"globs": ["src/fortran/**/ignore*", "src/fortran/ignored.f03"]}],
-        }
+        assert (
+            sources.filespec
+            == {
+                "includes": ["src/fortran/*.f03", "src/fortran/f1.f95"],
+                "excludes": ["src/fortran/**/ignore*", "src/fortran/ignored.f03"],
+            }
+            == hydrated_sources.filespec
+        )
 
     def test_output_type(self) -> None:
         class SourcesSubclass(Sources):

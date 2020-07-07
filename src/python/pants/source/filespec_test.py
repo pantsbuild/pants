@@ -12,31 +12,23 @@ class FilespecTest(TestBase):
     def assert_rule_match(
         self, glob: str, expected_matches: Tuple[str, ...], negate: bool = False,
     ) -> None:
-        """Tests that in-memory glob matching matches lazy-filesystem traversing globs."""
-        if negate:
-            assertMatch, match_state = self.assertFalse, "erroneously matches"
-        else:
-            assertMatch, match_state = self.assertTrue, "doesn't match"
+        # Confirm in-memory behavior.
+        for path in expected_matches:
+            expected = False if negate else True
+            assert matches_filespec({"includes": [glob]}, path=path) is expected
 
-        # Confirm in-memory behaviour.
-        for expected in expected_matches:
-            assertMatch(
-                matches_filespec(expected, {"globs": [glob]}),
-                f"{glob} {match_state} path `{expected}`",
-            )
-
-        # And confirm that it matches on-disk behaviour.
-        for expected in expected_matches:
-            if expected.endswith("/"):
-                self.create_dir(expected)
+        # Confirm on-disk behavior.
+        for expected_match in expected_matches:
+            if expected_match.endswith("/"):
+                self.create_dir(expected_match)
             else:
-                self.create_file(expected)
+                self.create_file(expected_match)
         snapshot = self.request_single_product(Snapshot, PathGlobs([glob]))
         if negate:
             subset = set(expected_matches).intersection(set(snapshot.files))
-            self.assertEqual(subset, set(), f"{glob} {match_state} path(s) {subset}")
+            assert subset == set()
         else:
-            self.assertEqual(sorted(expected_matches), sorted(snapshot.files))
+            assert sorted(expected_matches) == sorted(snapshot.files)
 
     def test_matches_single_star_0(self) -> None:
         self.assert_rule_match("a/b/*/f.py", ("a/b/c/f.py", "a/b/q/f.py"))

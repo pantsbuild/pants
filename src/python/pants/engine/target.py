@@ -1345,16 +1345,12 @@ class Sources(AsyncField):
         excludes = []
         for glob in self.sanitized_raw_value or ():
             if glob.startswith("!"):
-                excludes.append(glob[1:])
+                excludes.append(os.path.join(self.address.spec_path, glob[1:]))
             else:
-                includes.append(glob)
-        result: Filespec = {
-            "globs": [os.path.join(self.address.spec_path, include) for include in includes]
-        }
+                includes.append(os.path.join(self.address.spec_path, glob))
+        result: Filespec = {"includes": includes}
         if excludes:
-            result["exclude"] = [
-                {"globs": [os.path.join(self.address.spec_path, exclude) for exclude in excludes]}
-            ]
+            result["excludes"] = excludes
         return result
 
     @final
