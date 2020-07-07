@@ -13,7 +13,7 @@ from pants.backend.python.rules import (
     pytest_runner,
     python_sources,
 )
-from pants.backend.python.rules.coverage import create_coverage_config, prepare_coverage_plugin
+from pants.backend.python.rules.coverage import create_coverage_config
 from pants.backend.python.rules.pytest_runner import PythonTestFieldSet
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary, PythonTests
@@ -120,7 +120,6 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         return (
             *super().rules(),
             create_coverage_config,
-            prepare_coverage_plugin,
             *pytest_runner.rules(),
             *download_pex_bin.rules(),
             *determine_source_files.rules(),
@@ -176,28 +175,28 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         self.create_python_test_target([self.good_source])
         result = self.run_pytest()
         assert result.status == Status.SUCCESS
-        assert "test_good.py ." in result.stdout
+        assert f"{self.package}/test_good.py ." in result.stdout
 
     def test_single_failing_test(self) -> None:
         self.create_python_test_target([self.bad_source])
         result = self.run_pytest()
         assert result.status == Status.FAILURE
-        assert "test_bad.py F" in result.stdout
+        assert f"{self.package}/test_bad.py F" in result.stdout
 
     def test_mixed_sources(self) -> None:
         self.create_python_test_target([self.good_source, self.bad_source])
         result = self.run_pytest()
         assert result.status == Status.FAILURE
-        assert "test_good.py ." in result.stdout
-        assert "test_bad.py F" in result.stdout
+        assert f"{self.package}/test_good.py ." in result.stdout
+        assert f"{self.package}/test_bad.py F" in result.stdout
 
     def test_precise_file_args(self) -> None:
         self.create_python_test_target([self.good_source, self.bad_source])
         file_arg = FilesystemLiteralSpec(PurePath(self.package, self.good_source.path).as_posix())
         result = self.run_pytest(origin=file_arg)
         assert result.status == Status.SUCCESS
-        assert "test_good.py ." in result.stdout
-        assert "test_bad.py F" not in result.stdout
+        assert f"{self.package}/test_good.py ." in result.stdout
+        assert f"{self.package}/test_bad.py F" not in result.stdout
 
     def test_absolute_import(self) -> None:
         self.create_python_library([self.library_source])
@@ -215,7 +214,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         self.create_python_test_target([source], dependencies=[":library"])
         result = self.run_pytest()
         assert result.status == Status.SUCCESS
-        assert "test_absolute_import.py ." in result.stdout
+        assert f"{self.package}/test_absolute_import.py ." in result.stdout
 
     def test_relative_import(self) -> None:
         self.create_python_library([self.library_source])
@@ -233,7 +232,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         self.create_python_test_target([source], dependencies=[":library"])
         result = self.run_pytest()
         assert result.status == Status.SUCCESS
-        assert "test_relative_import.py ." in result.stdout
+        assert f"{self.package}/test_relative_import.py ." in result.stdout
 
     def test_transitive_dep(self) -> None:
         self.create_python_library([self.library_source])
@@ -265,7 +264,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         self.create_python_test_target([source], dependencies=[":transitive_dep"])
         result = self.run_pytest()
         assert result.status == Status.SUCCESS
-        assert "test_transitive_dep.py ." in result.stdout
+        assert f"{self.package}/test_transitive_dep.py ." in result.stdout
 
     def test_thirdparty_dep(self) -> None:
         self.setup_thirdparty_dep()
@@ -283,7 +282,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         self.create_python_test_target([source], dependencies=["3rdparty/python:ordered-set"])
         result = self.run_pytest()
         assert result.status == Status.SUCCESS
-        assert "test_3rdparty_dep.py ." in result.stdout
+        assert f"{self.package}/test_3rdparty_dep.py ." in result.stdout
 
     def test_thirdparty_transitive_dep(self) -> None:
         self.setup_thirdparty_dep()
@@ -315,7 +314,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         self.create_python_test_target([source], dependencies=[":library"])
         result = self.run_pytest()
         assert result.status == Status.SUCCESS
-        assert "test_3rdparty_transitive_dep.py ." in result.stdout
+        assert f"{self.package}/test_3rdparty_transitive_dep.py ." in result.stdout
 
     @skip_unless_python27_and_python3_present
     def test_uses_correct_python_version(self) -> None:
@@ -333,7 +332,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         )
         py3_result = self.run_pytest()
         assert py3_result.status == Status.SUCCESS
-        assert "test_py3.py ." in py3_result.stdout
+        assert f"{self.package}/test_py3.py ." in py3_result.stdout
 
     def test_respects_passthrough_args(self) -> None:
         source = FileContent(
@@ -351,14 +350,14 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         self.create_python_test_target([source])
         result = self.run_pytest(passthrough_args="-k test_run_me")
         assert result.status == Status.SUCCESS
-        assert "test_config.py ." in result.stdout
+        assert f"{self.package}/test_config.py ." in result.stdout
         assert "collected 2 items / 1 deselected / 1 selected" in result.stdout
 
-    def test_single_passing_test_with_junit(self) -> None:
+    def test_junit(self) -> None:
         self.create_python_test_target([self.good_source])
         result = self.run_pytest(junit_xml_dir="dist/test-results")
         assert result.status == Status.SUCCESS
-        assert "test_good.py ." in result.stdout
+        assert f"{self.package}/test_good.py ." in result.stdout
         assert result.xml_results is not None
         files = self.request_single_product(FilesContent, result.xml_results)
         assert len(files) == 1
@@ -366,9 +365,9 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         assert file.path.startswith("dist/test-results")
         assert b"pants_test.test_good" in file.content
 
-    def test_single_passing_test_with_coverage(self) -> None:
+    def test_coverage(self) -> None:
         self.create_python_test_target([self.good_source])
         result = self.run_pytest(use_coverage=True)
         assert result.status == Status.SUCCESS
-        assert "test_good.py ." in result.stdout
+        assert f"{self.package}/test_good.py ." in result.stdout
         assert result.coverage_data is not None
