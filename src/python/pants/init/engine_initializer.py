@@ -36,6 +36,7 @@ from pants.option.global_options import (
 )
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.scm.subsystems.changed import rules as changed_rules
+from pants.subsystem.subsystem import Subsystem
 
 logger = logging.getLogger(__name__)
 
@@ -81,8 +82,18 @@ class LegacyGraphSession:
             )
             self.invalid_goals = invalid_goals
 
+    def goal_consumed_subsystem_scopes(self, goal_name: str) -> Tuple[str, ...]:
+        """Return the scopes of subsystems that could be consumed while running the given goal."""
+        goal_product = self.goal_map.get(goal_name)
+        if not goal_product:
+            return tuple()
+        consumed_types = self.goal_consumed_types(goal_product)
+        return tuple(
+            sorted({typ.options_scope for typ in consumed_types if issubclass(typ, Subsystem)})  # type: ignore[misc]
+        )
+
     def goal_consumed_types(self, goal_product: Type) -> Set[Type]:
-        """Return the set of types that could possibly by consumed while running the given goal."""
+        """Return the set of types that could possibly be consumed while running the given goal."""
         # TODO: This needs to be kept in sync with the Params injected in run_goal_rules, with a
         # subtle difference that prevents automating validation that they are kept in sync:
         #

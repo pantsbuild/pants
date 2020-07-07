@@ -6,14 +6,11 @@ from typing import List
 
 from colors import cyan, green, magenta, red
 
-from pants.help.help_info_extracter import HelpInfoExtracter, OptionHelpInfo
+from pants.help.help_info_extracter import OptionHelpInfo, OptionScopeHelpInfo
 
 
 class HelpFormatter:
-    def __init__(
-        self, *, scope: str, show_advanced: bool, show_deprecated: bool, color: bool
-    ) -> None:
-        self._scope = scope
+    def __init__(self, *, show_advanced: bool, show_deprecated: bool, color: bool) -> None:
         self._show_advanced = show_advanced
         self._show_deprecated = show_deprecated
         self._color = color
@@ -33,28 +30,21 @@ class HelpFormatter:
     def _maybe_color(self, color, s):
         return color(s) if self._color else s
 
-    def format_options(self, scope, description, option_registrations_iter):
-        """Return a help message for the specified options.
-
-        :param scope: The options scope.
-        :param description: The description of the scope.
-        :param option_registrations_iter: An iterator over (args, kwargs) pairs, as passed in to
-                                          options registration.
-        """
-        oshi = HelpInfoExtracter(self._scope).get_option_scope_help_info(option_registrations_iter)
+    def format_options(self, oshi: OptionScopeHelpInfo):
+        """Return a help message for the specified options."""
         lines = []
 
         def add_option(ohis, *, category=None):
             lines.append("")
-            display_scope = f"`{scope}`" if scope else "Global"
+            display_scope = f"`{oshi.scope}`" if oshi.scope else "Global"
             if category:
                 title = f"{display_scope} {category} options"
                 lines.append(self._maybe_green(f"{title}\n{'-' * len(title)}"))
             else:
                 title = f"{display_scope} options"
                 lines.append(self._maybe_green(f"{title}\n{'-' * len(title)}"))
-                if description:
-                    lines.append(f"\n{description}")
+                if oshi.description:
+                    lines.append(f"\n{oshi.description}")
             lines.append(" ")
             if not ohis:
                 lines.append("No options available.")
