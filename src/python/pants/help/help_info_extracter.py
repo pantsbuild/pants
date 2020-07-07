@@ -4,17 +4,19 @@
 import inspect
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional, Type
+from typing import Any, Callable, Dict, Optional, Tuple, Type
 
 from pants.base import deprecated
+from pants.engine.goal import GoalSubsystem
+from pants.engine.unions import UnionMembership
 from pants.option.option_util import is_dict_option, is_list_option
+from pants.option.options import Options
 
 
 @dataclass(frozen=True)
 class OptionHelpInfo:
     """A container for help information for a single option.
 
-    registering_class: The type that registered the option.
     display_args: Arg strings suitable for display in help text, including value examples
                   (e.g., [-f, --[no]-foo-bar, --baz=<metavar>].)
     comma_separated_display_args: Display args as a comma-delimited string, used in
@@ -33,13 +35,13 @@ class OptionHelpInfo:
     choices: If this option has a constrained list of choices, a csv list of the choices.
     """
 
-    registering_class: Type
-    display_args: List[str]
+    display_args: Tuple[str, ...]
     comma_separated_display_args: str
-    scoped_cmd_line_args: List[str]
-    unscoped_cmd_line_args: List[str]
+    scoped_cmd_line_args: Tuple[str, ...]
+    unscoped_cmd_line_args: Tuple[str, ...]
     typ: Type
-    default: str
+    default: Any
+    default_str: str
     help: str
     deprecated_message: Optional[str]
     removal_version: Optional[str]
@@ -56,31 +58,81 @@ class OptionScopeHelpInfo:
     """
 
     scope: str
-    basic: List[OptionHelpInfo]
-    advanced: List[OptionHelpInfo]
-    deprecated: List[OptionHelpInfo]
+    description: str
+    basic: Tuple[OptionHelpInfo, ...]
+    advanced: Tuple[OptionHelpInfo, ...]
+    deprecated: Tuple[OptionHelpInfo, ...]
+
+
+@dataclass(frozen=True)
+class GoalHelpInfo:
+    """A container for help information for a goal."""
+
+    name: str
+    description: str
+    is_implemented: bool  # True iff all unions required by the goal are implemented.
+    consumed_scopes: Tuple[str, ...]  # The scopes of subsystems consumed by this goal.
+
+
+@dataclass(frozen=True)
+class AllHelpInfo:
+    """All available help info."""
+
+    scope_to_help_info: Dict[str, OptionScopeHelpInfo]
+    name_to_goal_info: Dict[str, GoalHelpInfo]
+
+
+ConsumedScopesMapper = Callable[[str], Tuple[str, ...]]
 
 
 class HelpInfoExtracter:
     """Extracts information useful for displaying help from option registration args."""
 
     @classmethod
-    def get_option_scope_help_info_from_parser(cls, parser):
-        """Returns a dict of help information for the options registered on the given parser.
+    def get_all_help_info(
+        cls,
+        options: Options,
+        union_membership: UnionMembership,
+        consumed_scopes_mapper: ConsumedScopesMapper,
+    ) -> AllHelpInfo:
+        scope_to_help_info = {}
+        name_to_goal_info = {}
+        for scope_info in sorted(options.known_scope_to_info.values(), key=lambda x: x.scope):
+            oshi: OptionScopeHelpInfo = HelpInfoExtracter(
+                scope_info.scope
+            ).get_option_scope_help_info(
+                scope_info.description,
+                options.get_parser(scope_info.scope).option_registrations_iter(),
+            )
+            scope_to_help_info[oshi.scope] = oshi
 
-        Callers can format this dict into cmd-line help, HTML or whatever.
-        """
-        return cls(parser.scope).get_option_scope_help_info(parser.option_registrations_iter())
+            if issubclass(scope_info.optionable_cls, GoalSubsystem):
+                is_implemented = union_membership.has_members_for_all(
+                    scope_info.optionable_cls.required_union_implementations
+                )
+                name_to_goal_info[scope_info.scope] = GoalHelpInfo(
+                    scope_info.optionable_cls.name,
+                    scope_info.description,
+                    is_implemented,
+                    consumed_scopes_mapper(scope_info.scope),
+                )
+
+        return AllHelpInfo(
+            scope_to_help_info=scope_to_help_info, name_to_goal_info=name_to_goal_info
+        )
 
     @staticmethod
-    def compute_default(kwargs) -> str:
-        """Compute the default val for help display for an option registered with these kwargs."""
+    def compute_default(**kwargs) -> Tuple[Any, str]:
+        """Compute the default val for help display for an option registered with these kwargs.
+
+        Returns a pair (default, stringified default suitable for display).
+        """
         ranked_default = kwargs.get("default")
         typ = kwargs.get("type", str)
 
         default = ranked_default.value if ranked_default else None
         if default is None:
-            return "None"
+            return None, "None"
 
         if is_list_option(kwargs):
             member_type = kwargs.get("member_type", str)
@@ -105,7 +157,7 @@ class HelpInfoExtracter:
             default_str = default.value
         else:
             default_str = str(default)
-        return default_str
+        return default, default_str
 
     @staticmethod
     def stringify_type(t: Type) -> str:
@@ -150,11 +202,11 @@ class HelpInfoExtracter:
             values = (str(choice) for choice in kwargs.get("choices", []))
         return ", ".join(values) or None
 
-    def __init__(self, scope):
+    def __init__(self, scope: str):
         self._scope = scope
         self._scope_prefix = scope.replace(".", "-")
 
-    def get_option_scope_help_info(self, option_registrations_iter):
+    def get_option_scope_help_info(self, description, option_registrations_iter):
         """Returns an OptionScopeHelpInfo for the options registered with the (args, kwargs)
         pairs."""
         basic_options = []
@@ -179,9 +231,10 @@ class HelpInfoExtracter:
 
         return OptionScopeHelpInfo(
             scope=self._scope,
-            basic=basic_options,
-            advanced=advanced_options,
-            deprecated=deprecated_options,
+            description=description,
+            basic=tuple(basic_options),
+            advanced=tuple(advanced_options),
+            deprecated=tuple(deprecated_options),
         )
 
     def get_option_help_info(self, args, kwargs):
@@ -215,7 +268,7 @@ class HelpInfoExtracter:
                     display_args.append(f"... -- [{type_str} [{type_str} [...]]]")
 
         typ = kwargs.get("type", str)
-        default = self.compute_default(kwargs)
+        default, default_str = self.compute_default(**kwargs)
         help_msg = kwargs.get("help", "No help available.")
         removal_version = kwargs.get("removal_version")
         deprecated_message = None
@@ -228,13 +281,13 @@ class HelpInfoExtracter:
         choices = self.compute_choices(kwargs)
 
         ret = OptionHelpInfo(
-            registering_class=kwargs.get("registering_class", type(None)),
-            display_args=display_args,
+            display_args=tuple(display_args),
             comma_separated_display_args=", ".join(display_args),
-            scoped_cmd_line_args=scoped_cmd_line_args,
-            unscoped_cmd_line_args=unscoped_cmd_line_args,
+            scoped_cmd_line_args=tuple(scoped_cmd_line_args),
+            unscoped_cmd_line_args=tuple(unscoped_cmd_line_args),
             typ=typ,
             default=default,
+            default_str=default_str,
             help=help_msg,
             deprecated_message=deprecated_message,
             removal_version=removal_version,

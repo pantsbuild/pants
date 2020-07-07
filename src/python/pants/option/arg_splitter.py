@@ -1,6 +1,6 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
+import dataclasses
 import os.path
 import sys
 from abc import ABC
@@ -31,16 +31,11 @@ class HelpRequest(ABC):
     """Represents an implicit or explicit request for help by the user."""
 
 
+@dataclass(frozen=True)
 class OptionsHelp(HelpRequest):
-    def __init__(self, advanced: bool = False, all_scopes: bool = False) -> None:
-        """The user requested help for cmd-line options.
-
-        :param advanced: Did the user ask for advanced help (e.g., using --help-advanced).
-        :param all_scopes: Did the user ask for help for all goals and tasks (e.g., using --help-all).
-        """
-        super().__init__()
-        self.advanced = advanced
-        self.all_scopes = all_scopes
+    advanced: bool = False
+    all_scopes: bool = False
+    scopes: Tuple[str, ...] = tuple()
 
 
 class GoalsHelp(HelpRequest):
@@ -51,12 +46,11 @@ class VersionHelp(HelpRequest):
     """The user asked for the version of this instance of pants."""
 
 
+@dataclass(frozen=True)
 class UnknownGoalHelp(HelpRequest):
     """The user specified an unknown goal (or task)."""
 
-    def __init__(self, unknown_goals: List[str]) -> None:
-        super().__init__()
-        self.unknown_goals = unknown_goals
+    unknown_goals: Tuple[str, ...]
 
 
 class NoGoalHelp(HelpRequest):
@@ -142,7 +136,9 @@ class ArgSplitter:
             if isinstance(self._help_request, OptionsHelp):
                 advanced = self._help_request.advanced or arg in self._HELP_ADVANCED_ARGS
                 all_scopes = self._help_request.all_scopes or arg in self._HELP_ALL_SCOPES_ARGS
-                self._help_request = OptionsHelp(advanced=advanced, all_scopes=all_scopes)
+                self._help_request = dataclasses.replace(
+                    self._help_request, advanced=advanced, all_scopes=all_scopes
+                )
         return True
 
     def split_args(self, args: Optional[Sequence[str]] = None) -> SplitArgs:
@@ -205,11 +201,13 @@ class ArgSplitter:
             passthru = list(reversed(self._unconsumed_args))
 
         if self._unknown_scopes:
-            self._help_request = UnknownGoalHelp(self._unknown_scopes)
+            self._help_request = UnknownGoalHelp(tuple(self._unknown_scopes))
 
         if not goals and not self._help_request:
             self._help_request = NoGoalHelp()
 
+        if isinstance(self._help_request, OptionsHelp):
+            self._help_request = dataclasses.replace(self._help_request, scopes=tuple(goals))
         return SplitArgs(
             goals=list(goals),
             scope_to_flags=scope_to_flags,

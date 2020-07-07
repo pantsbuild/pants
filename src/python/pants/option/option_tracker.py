@@ -8,22 +8,23 @@ from typing import DefaultDict, Iterator, List, Optional
 from pants.option.ranked_value import Rank
 
 
+@dataclass(frozen=True)
+class OptionHistoryRecord:
+    value: str
+    rank: Rank
+    deprecation_version: Optional[str]
+    details: Optional[str]
+
+
 # TODO: Get rid of this? The parser should be able to lazily track.
 class OptionTracker:
     """Records a history of what options are set and where they came from."""
-
-    @dataclass(frozen=True)
-    class OptionHistoryRecord:
-        value: str
-        rank: Rank
-        deprecation_version: Optional[str]
-        details: Optional[str]
 
     class OptionHistory:
         """Tracks the history of an individual option."""
 
         def __init__(self) -> None:
-            self.values: List["OptionTracker.OptionHistoryRecord"] = []
+            self.values: List[OptionHistoryRecord] = []
 
         def record_value(
             self,
@@ -55,9 +56,7 @@ class OptionTracker:
                     )
 
             self.values.append(
-                OptionTracker.OptionHistoryRecord(
-                    value, rank, deprecation_version_to_write, details
-                )
+                OptionHistoryRecord(value, rank, deprecation_version_to_write, details)
             )
 
         @property
@@ -68,11 +67,11 @@ class OptionTracker:
             return self.latest.rank > Rank.HARDCODED and self.values[-2].rank > Rank.NONE
 
         @property
-        def latest(self) -> Optional["OptionTracker.OptionHistoryRecord"]:
+        def latest(self) -> Optional[OptionHistoryRecord]:
             """The most recent value this option was set to, or None if it was never set."""
             return self.values[-1] if self.values else None
 
-        def __iter__(self) -> Iterator["OptionTracker.OptionHistoryRecord"]:
+        def __iter__(self) -> Iterator[OptionHistoryRecord]:
             for record in self.values:
                 yield record
 

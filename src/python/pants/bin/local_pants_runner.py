@@ -17,6 +17,7 @@ from pants.engine.internals.native import Native
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.unions import UnionMembership
 from pants.goal.run_tracker import RunTracker
+from pants.help.help_info_extracter import HelpInfoExtracter
 from pants.help.help_printer import HelpPrinter
 from pants.init.engine_initializer import (
     EngineInitializer,
@@ -275,8 +276,15 @@ class LocalPantsRunner:
             )
 
             if self.options.help_request:
+                all_help_info = HelpInfoExtracter.get_all_help_info(
+                    self.options,
+                    self.union_membership,
+                    self.graph_session.goal_consumed_subsystem_scopes,
+                )
                 help_printer = HelpPrinter(
-                    options=self.options, union_membership=self.union_membership
+                    bin_name=self.options.for_global_scope().pants_bin_name,
+                    help_request=self.options.help_request,
+                    all_help_info=all_help_info,
                 )
                 return help_printer.print_help()
 
