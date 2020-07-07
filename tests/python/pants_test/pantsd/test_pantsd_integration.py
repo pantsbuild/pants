@@ -676,22 +676,3 @@ Interrupted by user over pailgun client!
                 "pants.bin.daemon_pants_runner._PantsRunFinishedWithFailureException: Terminated with 1",
                 result.stderr_data,
             )
-
-    def test_inner_runs_dont_deadlock(self):
-        """Create a pantsd run that calls testprojects/src/python/nested_runs with the appropriate
-        bootstrap options to avoid restarting pantsd.
-
-        Regression test for issue https://github.com/pantsbuild/pants/issues/7881
-        When a run under pantsd calls pants with pantsd inside it, the inner run will time out
-        waiting for the outer run to end.
-
-        NB: testprojects/src/python/nested_runs assumes that the pants.toml file is in ${workdir}/pants.toml
-        """
-        config = {"GLOBAL": {"pantsd_timeout_when_multiple_invocations": 1}}
-        with self.pantsd_successful_run_context(extra_config=config) as ctx:
-            result = ctx.runner(
-                ["run", "testprojects/src/python/nested_runs", "--", ctx.workdir], expected_runs=2
-            )
-            ctx.checker.assert_started()
-            self.assert_success(result)
-            self.assertNotIn("Another pants invocation is running", result.stderr_data)
