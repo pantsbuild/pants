@@ -56,6 +56,9 @@ python_library(
 python_library(
   name="pants_loader",
   sources=["pants_loader.py"],
+  dependencies=[
+    ":pants_exe",
+  ],
 )
 
 python_library(
@@ -96,7 +99,6 @@ python_binary(
   entry_point='pants.bin.pants_loader:main',
   dependencies=[
     ':pants_loader',
-    ':pants_exe',
   ],
   # We depend on twitter.common libraries that trigger pex warnings for not properly declaring their
   # dependency on setuptools (for namespace package support).
@@ -110,7 +112,6 @@ python_binary(
   entry_point='pants.bin.pants_loader:main',
   dependencies=[
     ':pants_loader',
-    ':pants_exe',
     '//:build_root',
     '//:pants_toml',
     '//:3rdparty_directory',
