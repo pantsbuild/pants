@@ -11,6 +11,9 @@ colors = true
 # TODO: See #9924.
 dynamic_ui = false
 
+# TODO: remove this once we start storing `native_engine.so.metadata` in AWS too.
+files_not_found_behavior = "warn"
+
 # TODO: Eventually we would like pantsd enabled in CI as well, but we blanket disable it for
 # now in order to smooth off rough edges locally.
 pantsd = false
