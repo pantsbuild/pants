@@ -1,8 +1,6 @@
 [GLOBAL]
 print_exception_stacktrace = true
-
 dependency_inference = true
-files_not_found_behavior = "error"
 
 # Enable our custom loose-source plugins.
 pythonpath = ["%(buildroot)s/pants-plugins/src/python"]
