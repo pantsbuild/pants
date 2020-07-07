@@ -3,6 +3,7 @@
 
 import dataclasses
 import itertools
+import os.path
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
@@ -38,7 +39,7 @@ from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.unions import UnionMembership, union
 from pants.option.global_options import GlobalOptions
-from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper, Filespec
+from pants.source.filespec import Filespec
 from pants.util.collections import ensure_list, ensure_str_list
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_property
@@ -1347,9 +1348,14 @@ class Sources(AsyncField):
                 excludes.append(glob[1:])
             else:
                 includes.append(glob)
-        return FilesetRelPathWrapper.to_filespec(
-            args=includes, exclude=[excludes], root=self.address.spec_path
-        )
+        result: Filespec = {
+            "globs": [os.path.join(self.address.spec_path, include) for include in includes]
+        }
+        if excludes:
+            result["exclude"] = [
+                {"globs": [os.path.join(self.address.spec_path, exclude) for exclude in excludes]}
+            ]
+        return result
 
     @final
     @classmethod
@@ -1435,9 +1441,6 @@ class HydratedSources:
     snapshot: Snapshot
     filespec: Filespec
     sources_type: Optional[Type[Sources]]
-
-    def eager_fileset_with_spec(self, *, address: Address) -> EagerFilesetWithSpec:
-        return EagerFilesetWithSpec(address.spec_path, self.filespec, self.snapshot)
 
 
 @union

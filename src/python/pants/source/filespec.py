@@ -3,9 +3,25 @@
 
 from typing import Iterable, List
 
+from typing_extensions import TypedDict
+
 from pants.engine.fs import PathGlobs
 from pants.engine.internals.native import Native
-from pants.source.wrapped_globs import Filespec
+
+
+class _GlobsDict(TypedDict, total=True):
+    globs: List[str]
+
+
+class Filespec(_GlobsDict, total=False):
+    """A dict of globs (required) and excludes (optional).
+
+    For example: {'globs': ['list', 'of' , 'strings'], 'exclude': [{'globs' : ... }, ...] }
+
+    The globs are in zglobs format.
+    """
+
+    exclude: List[_GlobsDict]
 
 
 def globs_matches(
