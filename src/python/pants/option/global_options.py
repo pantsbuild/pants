@@ -547,7 +547,7 @@ class GlobalOptions(Subsystem):
             "--pantsd-max-memory-usage",
             advanced=True,
             type=int,
-            default=2 ** 32,
+            default=2 ** 30,
             help=(
                 "The maximum memory usage of a pantsd process (in bytes). There is at most one "
                 "pantsd process per workspace."

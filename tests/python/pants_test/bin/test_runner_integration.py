@@ -1,7 +1,6 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import os
 from pathlib import Path
 
 from pants.base.build_environment import get_buildroot
@@ -42,33 +41,3 @@ class RunnerIntegrationTest(PantsRunIntegrationTest):
         )
         self.assert_success(non_warning_run)
         self.assertNotIn("test warning", non_warning_run.stderr_data)
-
-    def test_parent_build_id_set_only_for_pants_runs_called_by_other_pants_runs(self):
-        with self.temporary_workdir() as workdir:
-            command = [
-                "run",
-                "testprojects/src/python/nested_runs",
-                "--",
-                workdir,
-            ]
-            result = self.run_pants_with_workdir(command, workdir,)
-            self.assert_success(result)
-
-            run_tracker_dir = os.path.join(workdir, "run-tracker")
-            self.assertTrue(
-                os.path.isdir(run_tracker_dir), f"dir path {run_tracker_dir} does not exist!"
-            )
-            run_tracker_sub_dirs = (
-                os.path.join(run_tracker_dir, dir_name)
-                for dir_name in os.listdir(run_tracker_dir)
-                if dir_name != "latest"
-            )
-            for run_tracker_sub_dir in run_tracker_sub_dirs:
-                info_path = os.path.join(run_tracker_sub_dir, "info")
-                assert os.path.isfile(info_path) is True
-                with open(info_path, "r") as info_f:
-                    lines = dict(line.split(": ", 1) for line in info_f.readlines())
-                    if "goals" in lines["cmd_line"]:
-                        self.assertIn("parent_build_id", lines)
-                    else:
-                        self.assertNotIn("parent_build_id", lines)
