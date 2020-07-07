@@ -36,7 +36,7 @@ class HelpRequest(ABC):
 class OptionsHelp(HelpRequest):
     advanced: bool = False
     all_scopes: bool = False
-    scopes: Tuple[str, ...] = tuple()
+    scopes: Tuple[str, ...] = ()
 
 
 class GoalsHelp(HelpRequest):
