@@ -2,42 +2,91 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
+  name="daemon_pants_runner",
+  sources=["daemon_pants_runner.py"],
   dependencies=[
-    '3rdparty/python:setproctitle',
+    ':local_pants_runner',
+    'src/python/pants/base:exiter',
+    'src/python/pants/engine/internals:native',
+    'src/python/pants/init',
+    'src/python/pants/java',
+    'src/python/pants/option:options_bootstrapper',
+    'src/python/pants/pantsd:pants_daemon_core',
+    'src/python/pants/util:contextutil',
+  ],
+)
+
+python_library(
+  name="local_pants_runner",
+  sources=["local_pants_runner.py"],
+  dependencies=[
+    '3rdparty/python:dataclasses',
     'src/python/pants/base:build_environment',
     'src/python/pants/base:cmd_line_spec_parser',
     'src/python/pants/base:exception_sink',
-    'src/python/pants/base:exceptions',
     'src/python/pants/base:exiter',
-    'src/python/pants/base:project_tree',
     'src/python/pants/base:specs',
     'src/python/pants/base:workunit',
-    'src/python/pants/binaries',
     'src/python/pants/build_graph',
-    'src/python/pants/console:stty_utils',
-    'src/python/pants/engine/internals:build_files',
-    'src/python/pants/engine/internals:core_abstractions',
     'src/python/pants/engine/internals:native',
     'src/python/pants/engine/internals:scheduler',
-    'src/python/pants/engine/legacy:parser',
-    'src/python/pants/engine:fs',
     'src/python/pants/engine:unions',
     'src/python/pants/goal:run_tracker',
     'src/python/pants/help',
     'src/python/pants/init',
-    'src/python/pants/java',
+    'src/python/pants/init:engine_initializer',
     'src/python/pants/option',
-    'src/python/pants/pantsd:pants_daemon_client',
-    'src/python/pants/pantsd:pants_daemon_core',
+    'src/python/pants/option:options_bootstrapper',
     'src/python/pants/reporting',
-    'src/python/pants/scm/subsystems:changed',
     'src/python/pants/subsystem',
     'src/python/pants/util:contextutil',
+  ],
+)
+
+python_library(
+  name="pants_exe",
+  sources=["pants_exe.py"],
+  dependencies=[
+    ':pants_runner',
+    'src/python/pants/base:exiter',
+    'src/python/pants/util:contextutil',
+  ],
+)
+
+python_library(
+  name="pants_loader",
+  sources=["pants_loader.py"],
+  dependencies=[
+    ":pants_exe",
+  ],
+)
+
+python_library(
+  name="pants_runner",
+  sources=["pants_runner.py"],
+  dependencies=[
+    ':local_pants_runner',
+    ':remote_pants_runner',
+    '3rdparty/python:dataclasses',
+    'src/python/pants/base:exception_sink',
+    'src/python/pants/base:exiter',
+    'src/python/pants/init',
+    'src/python/pants/option',
+    'src/python/pants/option:options_bootstrapper',
+  ],
+)
+
+python_library(
+  name="remote_pants_runner",
+  sources=["remote_pants_runner.py"],
+  dependencies=[
+    'src/python/pants/base:exception_sink',
+    'src/python/pants/base:exiter',
+    'src/python/pants/console:stty_utils',
+    'src/python/pants/java',
+    'src/python/pants/option:options_bootstrapper',
+    'src/python/pants/pantsd:pants_daemon_client',
     'src/python/pants/util:dirutil',
-    'src/python/pants/util:filtering',
-    'src/python/pants/util:logging',
-    'src/python/pants/util:memo',
-    'src/python/pants/util:osutil',
   ],
 )
 
@@ -49,7 +98,7 @@ python_binary(
   name='pants',
   entry_point='pants.bin.pants_loader:main',
   dependencies=[
-    ':bin',
+    ':pants_loader',
   ],
   # We depend on twitter.common libraries that trigger pex warnings for not properly declaring their
   # dependency on setuptools (for namespace package support).
@@ -62,7 +111,7 @@ python_binary(
   name='pants_local_binary',
   entry_point='pants.bin.pants_loader:main',
   dependencies=[
-    ':bin',
+    ':pants_loader',
     '//:build_root',
     '//:pants_toml',
     '//:3rdparty_directory',
