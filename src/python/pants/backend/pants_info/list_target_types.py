@@ -54,15 +54,10 @@ class TargetTypes(Goal):
 class AbbreviatedTargetInfo:
     alias: str
     description: Optional[str]
-    v1_only: bool
 
     @classmethod
     def create(cls, target_type: Type[Target]) -> "AbbreviatedTargetInfo":
-        return cls(
-            alias=target_type.alias,
-            description=get_docstring_summary(target_type),
-            v1_only=target_type.v1_only,
-        )
+        return cls(alias=target_type.alias, description=get_docstring_summary(target_type))
 
     def format_for_cli(self, console: Console, *, longest_target_alias: int) -> str:
         chars_before_description = longest_target_alias + 2
@@ -87,7 +82,6 @@ class FieldInfo:
     type_hint: str
     required: bool
     default: Optional[str]
-    v1_only: bool
 
     @classmethod
     def create(cls, field: Type[Field]) -> "FieldInfo":
@@ -155,7 +149,6 @@ class FieldInfo:
             type_hint=type_hint,
             required=field.required,
             default=repr(field.default) if not field.required else None,
-            v1_only=field.v1_only,
         )
 
     def format_for_cli(self, console: Console) -> str:
@@ -195,11 +188,7 @@ class VerboseTargetInfo:
         output.extend(
             [
                 "Valid fields:\n",
-                *sorted(
-                    f"{field.format_for_cli(console)}\n"
-                    for field in self.fields
-                    if not field.alias.startswith("_") and (not v1_disabled or not field.v1_only)
-                ),
+                *sorted(f"{field.format_for_cli(console)}\n" for field in self.fields),
             ]
         )
         return "\n".join(output).rstrip()
@@ -250,7 +239,6 @@ def list_target_types(
                     target_info.format_for_cli(console, longest_target_alias=longest_target_alias)
                     for target_info in target_infos
                     if not target_info.alias.startswith("_")
-                    and (not v1_disabled or not target_info.v1_only)
                 ),
             ]
             print_stdout("\n".join(lines).rstrip())

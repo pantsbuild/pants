@@ -7,14 +7,7 @@ These are always activated and cannot be disabled.
 """
 
 from pants.core.goals import binary, fmt, lint, repl, run, test, typecheck
-from pants.core.target_types import (
-    AliasTarget,
-    Files,
-    GenericTarget,
-    PrepCommand,
-    RemoteSources,
-    Resources,
-)
+from pants.core.target_types import Files, GenericTarget, Resources
 from pants.core.util_rules import (
     archive,
     determine_source_files,
@@ -48,4 +41,4 @@ def rules():
 
 
 def target_types():
-    return [AliasTarget, Files, GenericTarget, PrepCommand, RemoteSources, Resources]
+    return [Files, GenericTarget, Resources]

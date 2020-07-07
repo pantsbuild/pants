@@ -61,7 +61,6 @@ class Field(ABC):
     default: ClassVar[ImmutableValue]
     # Subclasses may define these.
     required: ClassVar[bool] = False
-    v1_only: ClassVar[bool] = False
 
     # This is a little weird to have an abstract __init__(). We do this to ensure that all
     # subclasses have this exact type signature for their constructor.
@@ -263,8 +262,6 @@ class Target(ABC):
     # Subclasses must define these
     alias: ClassVar[str]
     core_fields: ClassVar[Tuple[Type[Field], ...]]
-    # Subclasses may define these
-    v1_only: ClassVar[bool] = False
 
     # These get calculated in the constructor
     address: Address
@@ -1753,42 +1750,14 @@ class DescriptionField(StringField):
     alias = "description"
 
 
-# TODO(#9388): remove? We don't want this in V2, but maybe keep it for V1.
-class NoCacheField(BoolField):
-    """If True, don't store results for this target in the V1 cache."""
-
-    alias = "no_cache"
-    default = False
-    v1_only = True
-
-
-# TODO(#9388): remove?
-class ScopeField(StringField):
-    """A V1-only field for the scope of the target, which is used by the JVM to determine the
-    target's inclusion in the class path.
-
-    See `pants.build_graph.target_scopes.Scopes`.
-    """
-
-    alias = "scope"
-    v1_only = True
-
-
-# TODO(#9388): Remove.
-class IntransitiveField(BoolField):
-    alias = "_transitive"
-    default = False
-    v1_only = True
-
-
-COMMON_TARGET_FIELDS = (Tags, DescriptionField, NoCacheField, ScopeField, IntransitiveField)
+COMMON_TARGET_FIELDS = (Tags, DescriptionField)
 
 
 # TODO: figure out what support looks like for this with the Target API. The expected value is an
-#  Artifact, but V1 has no common Artifact interface.
+#  Artifact, there is no common Artifact interface.
 class ProvidesField(PrimitiveField):
-    """An `artifact`, such as `setup_py` or `scala_artifact`, that describes how to represent this
-    target to the outside world."""
+    """An `artifact`, such as `setup_py`, that describes how to represent this target to the outside
+    world."""
 
     alias = "provides"
     default: ClassVar[Optional[Any]] = None
