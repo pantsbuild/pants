@@ -24,6 +24,7 @@ use super::{
   format_error, maybe_add_workunit, populate_fallible_execution_result,
   populate_fallible_execution_result_for_timeout, ExecutionError, OperationOrStatus,
 };
+use crate::remote::rpcerror_to_string;
 use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform, PlatformConstraint,
   Process, ProcessMetadata,
@@ -54,6 +55,7 @@ pub struct StreamingCommandRunner {
   channel: grpcio::Channel,
   env: Arc<grpcio::Environment>,
   execution_client: Arc<bazel_protos::remote_execution_grpc::ExecutionClient>,
+  action_cache_client: Arc<bazel_protos::remote_execution_grpc::ActionCacheClient>,
   overall_deadline: Duration,
   capabilities_cell: Arc<DoubleCheckedCell<bazel_protos::remote_execution::ServerCapabilities>>,
   capabilities_client: Arc<bazel_protos::remote_execution_grpc::CapabilitiesClient>,
@@ -91,6 +93,9 @@ impl StreamingCommandRunner {
     let execution_client = Arc::new(bazel_protos::remote_execution_grpc::ExecutionClient::new(
       channel.clone(),
     ));
+    let action_cache_client = Arc::new(
+      bazel_protos::remote_execution_grpc::ActionCacheClient::new(channel.clone()),
+    );
 
     let mut headers = headers;
     if let Some(oauth_bearer_token) = oauth_bearer_token {
@@ -112,6 +117,7 @@ impl StreamingCommandRunner {
       channel,
       env,
       execution_client,
+      action_cache_client,
       store,
       platform,
       overall_deadline,
@@ -161,24 +167,81 @@ impl StreamingCommandRunner {
       .await
   }
 
-  async fn ensure_action_uploaded(
+  /// Check the remote Action Cache for a cached result of running the given `action_digest`.
+  ///
+  /// This check is necessary because some RE servers do not short-circuit the Execute method
+  /// by checking the Action Cache (e.g., BuildBarn). Thus, this client must check the cache
+  /// explicitly in order to avoid duplicating already-cached work. This behavior matches
+  /// the Bazel RE client.
+  async fn check_action_cache(
     &self,
-    store: &Store,
+    action_digest: Digest,
+    metadata: &ProcessMetadata,
+    context: &Context,
+  ) -> Result<Option<FallibleProcessResultWithPlatform>, String> {
+    let mut request = bazel_protos::remote_execution::GetActionResultRequest::new();
+    if let Some(ref instance_name) = metadata.instance_name {
+      request.set_instance_name(instance_name.clone());
+    }
+    request.set_action_digest(action_digest.into());
+
+    let call_opt = call_option(&self.headers, Some(context.build_id.clone()))?;
+
+    let action_result_response = self
+      .action_cache_client
+      .get_action_result_async_opt(&request, call_opt)
+      .unwrap()
+      .compat()
+      .await;
+
+    match action_result_response {
+      Ok(action_result) => {
+        let response = populate_fallible_execution_result(
+          self.store.clone(),
+          &action_result,
+          vec![],
+          self.platform,
+        )
+        .compat()
+        .await?;
+        Ok(Some(response))
+      }
+      Err(err) => match err {
+        grpcio::Error::RpcFailure(rpc_status)
+          if rpc_status.status == grpcio::RpcStatusCode::NOT_FOUND =>
+        {
+          Ok(None)
+        }
+        _ => Err(rpcerror_to_string(err)),
+      },
+    }
+  }
+
+  async fn ensure_action_stored_locally(
+    &self,
     command: &Command,
     action: &Action,
-    input_files: Digest,
-  ) -> Result<(), String> {
+  ) -> Result<(Digest, Digest), String> {
     let (command_digest, action_digest) = future03::try_join(
       self.store_proto_locally(command),
       self.store_proto_locally(action),
     )
     .await?;
 
+    Ok((command_digest, action_digest))
+  }
+
+  async fn ensure_action_uploaded(
+    &self,
+    store: &Store,
+    command_digest: Digest,
+    action_digest: Digest,
+    input_files: Digest,
+  ) -> Result<(), String> {
     let _ = store
       .ensure_remote_has_recursive(vec![command_digest, action_digest, input_files])
       .compat()
       .await?;
-
     Ok(())
   }
 
@@ -410,7 +473,7 @@ impl StreamingCommandRunner {
           return Ok(
             populate_fallible_execution_result(
               self.store.clone(),
-              execute_response,
+              execute_response.get_result(),
               vec![],
               self.platform,
             )
@@ -641,12 +704,36 @@ impl crate::CommandRunner for StreamingCommandRunner {
     // deadline for execution of this request.
     let deadline_duration = self.overall_deadline + request.timeout.unwrap_or_default();
 
+    // Ensure the action and command are stored locally.
+    let (command_digest, action_digest) = with_workunit(
+      context.workunit_store.clone(),
+      "ensure_action_stored_locally".to_owned(),
+      WorkunitMetadata::with_level(Level::Debug),
+      self.ensure_action_stored_locally(&command, &action),
+      |_, md| md,
+    )
+    .await?;
+
+    // Check the remote Action Cache to see if this request was already computed.
+    // If so, return immediately with the result.
+    let cached_response_opt = with_workunit(
+      context.workunit_store.clone(),
+      "check_action_cache".to_owned(),
+      WorkunitMetadata::with_level(Level::Debug),
+      self.check_action_cache(action_digest, &self.metadata, &context),
+      |_, md| md,
+    )
+    .await?;
+    if let Some(cached_response) = cached_response_opt {
+      return Ok(cached_response);
+    }
+
     // Upload the action (and related data, i.e. the embedded command and input files).
     with_workunit(
       context.workunit_store.clone(),
       "ensure_action_uploaded".to_owned(),
       WorkunitMetadata::with_level(Level::Debug),
-      self.ensure_action_uploaded(&store, &command, &action, request.input_files),
+      self.ensure_action_uploaded(&store, command_digest, action_digest, request.input_files),
       |_, md| md,
     )
     .await?;

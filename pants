@@ -106,27 +106,4 @@ else
   export PANTS_DEV=1
 fi
 
-# Integration tests depend on an up-to-date `pants.pex`. Here, we check if we're running tests
-# and ensure the `pants.pex` is generated if so. We do this here, rather than via `pants-plugins`,
-# because we want the file to be generated _before_ any tests run, not during that Pants invocation,
-# as the dependency is marked via BUILD files so should not be constructed at runtime.
-#
-# Note that we have no way to distinguish between integration tests vs unit tests here, so we
-# unfortunately rebuild the pants.pex for unit tests too.
-#
-# We do not do this when in CI because CI downloads the PEX from AWS and we never want a worker
-# shard to try bootstrapping the PEX itself.
-test_goal_used=false
-for arg in "$@"; do
-  if [[ "${arg}" == 'test' || "${arg}" == 'test.*' ]]; then
-    test_goal_used=true
-  fi
-done
-
-no_regen_pex="${NO_REGEN_PEX:-${TRAVIS}}"
-if [[ "${test_goal_used}" == 'true' && "${no_regen_pex}" != 'true' ]]; then
-  "$HERE/build-support/bin/bootstrap_pants_pex.sh"
-  echo -e "Finished bootstrapping pants.pex for integration tests.\n" >&2
-fi
-
 exec_pants_bare "$@"

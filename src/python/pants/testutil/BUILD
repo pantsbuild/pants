@@ -29,7 +29,6 @@ python_library(
   sources = ['pants_run_integration_test.py'],
   dependencies = [
     '//:build_root',
-    '//:pants_pex',
     'src/python/pants:entry_point'
   ],
 )

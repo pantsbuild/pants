@@ -5,7 +5,6 @@ python_integration_tests(
   name='integration',
   dependencies=[
     'testprojects:pants_plugins_directory',
-    'testprojects/src/python:nested_runs_directory',
   ],
   uses_pants_run=True,
   timeout = 120,

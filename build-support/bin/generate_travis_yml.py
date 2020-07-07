@@ -510,7 +510,7 @@ def lint(python_version: PythonVersion) -> Dict:
             # local execution has finished.
             (
                 "travis-wait-enhanced --timeout 40m --interval 9m -- ./build-support/bin/ci.py "
-                f"--lint --python-version {python_version.decimal}"
+                f"--remote-execution-enabled --lint --python-version {python_version.decimal}"
             ),
         ],
     }
@@ -557,7 +557,7 @@ def unit_tests(python_version: PythonVersion) -> Dict:
         "name": f"Unit tests (Python {python_version.decimal})",
         "script": [
             "travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py "
-            f"--unit-tests --python-version {python_version.decimal}"
+            f"--unit-tests --remote-execution-enabled --python-version {python_version.decimal}"
         ],
     }
     safe_append(shard, "env", f"CACHE_NAME=unit_tests.py{python_version.number}")
@@ -622,7 +622,8 @@ def integration_tests(python_version: PythonVersion) -> Dict:
         "script": [
             (
                 "travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py "
-                f"--integration-tests --python-version {python_version.decimal}"
+                "--integration-tests --remote-execution-enabled --python-version "
+                f"{python_version.decimal}"
             ),
         ],
     }
