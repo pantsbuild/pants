@@ -14,8 +14,8 @@ class OptionHelpFormatterTest(unittest.TestCase):
         ohi = OptionHelpInfo(
             display_args=("--foo",),
             comma_separated_display_args="--foo",
-            scoped_cmd_line_args=tuple("--foo",),
-            unscoped_cmd_line_args=tuple("--foo",),
+            scoped_cmd_line_args=("--foo",),
+            unscoped_cmd_line_args=("--foo",),
             typ=bool,
             default=None,
             default_str="None",
