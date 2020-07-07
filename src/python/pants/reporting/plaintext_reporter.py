@@ -56,7 +56,6 @@ class PlainTextReporter(PlainTextReporterBase):
         color: bool  # use ANSI colors in output.
         indent: bool  # Whether to indent the reporting to reflect the nesting of workunits.
         timing: bool  # Show timing report at the end of the run.
-        cache_stats: bool  # Show artifact cache report at the end of the run.
         label_format: Any
         tool_output_format: Any
 
@@ -245,16 +244,6 @@ class PlainTextReporter(PlainTextReporterBase):
 
     def _format_aggregated_timings(self, aggregated_timings):
         return "\n".join(["{timing:.3f} {label}".format(**x) for x in aggregated_timings.get_all()])
-
-    def _format_artifact_cache_stats(self, artifact_cache_stats):
-        stats = artifact_cache_stats.get_all()
-        return (
-            "No artifact cache reads."
-            if not stats
-            else "\n".join(
-                ["{cache_name} - Hits: {num_hits} Misses: {num_misses}".format(**x) for x in stats]
-            )
-        )
 
     def _indent(self, workunit):
         return "  " * (len(workunit.ancestors()) - 1)

@@ -15,7 +15,6 @@ python_library(
     'src/python/pants/engine/internals:native',
     'src/python/pants/engine/internals:scheduler',
     'src/python/pants/engine:selectors',
-    'src/python/pants/goal',
     'src/python/pants/goal:run_tracker',
     'src/python/pants/option:global_options',
     'src/python/pants/option:options_bootstrapper',

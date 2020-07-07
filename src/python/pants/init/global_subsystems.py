@@ -2,24 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.goal.run_tracker import RunTracker
-from pants.init.repro import Reproducer
 from pants.process.subprocess import Subprocess
-from pants.python.python_repos import PythonRepos
 from pants.reporting.reporting import Reporting
 from pants.scm.subsystems.changed import Changed
-from pants.source.source_root import SourceRootConfig
 
 
 class GlobalSubsystems:
     @classmethod
     def get(cls):
         """Subsystems used outside of any task."""
-        return {
-            SourceRootConfig,
-            Reporting,
-            Reproducer,
-            RunTracker,
-            Changed,
-            Subprocess.Factory,
-            PythonRepos,
-        }
+        return {Reporting, RunTracker, Changed, Subprocess.Factory}

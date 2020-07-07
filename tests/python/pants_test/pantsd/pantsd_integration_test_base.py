@@ -17,10 +17,6 @@ from pants.testutil.pants_run_integration_test import (
     kill_daemon,
     read_pantsd_log,
 )
-from pants.testutil.process_test_util import (
-    TrackedProcessesContext,
-    no_lingering_process_by_command,
-)
 from pants.testutil.retry import attempts
 from pants.util.collections import recursively_update
 from pants.util.contextutil import temporary_dir
@@ -33,13 +29,8 @@ def banner(s):
 
 
 class PantsDaemonMonitor(ProcessManager):
-    def __init__(self, runner_process_context: TrackedProcessesContext, metadata_base_dir=None):
-        """
-        :param runner_process_context: A TrackedProcessContext that can be used to inspect live
-          pantsd instances created in this context.
-        """
+    def __init__(self, metadata_base_dir=None):
         super().__init__(name="pantsd", metadata_base_dir=metadata_base_dir)
-        self.runner_process_context = runner_process_context
 
     def _log(self):
         print(magenta(f"PantsDaemonMonitor: pid is {self._pid} is_alive={self.is_alive()}"))
@@ -117,30 +108,29 @@ class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
     def pantsd_test_context(
         self, *, log_level: str = "info", extra_config: Optional[Dict[str, Any]] = None
     ) -> Iterator[Tuple[str, Dict[str, Any], PantsDaemonMonitor]]:
-        with no_lingering_process_by_command("pantsd") as runner_process_context:
-            with temporary_dir(root_dir=os.getcwd()) as workdir_base:
-                pid_dir = os.path.join(workdir_base, ".pids")
-                workdir = os.path.join(workdir_base, ".workdir.pants.d")
-                print(f"\npantsd log is {workdir}/pantsd/pantsd.log")
-                pantsd_config = {
-                    "GLOBAL": {"pantsd": True, "level": log_level, "pants_subprocessdir": pid_dir,}
-                }
+        with temporary_dir(root_dir=os.getcwd()) as workdir_base:
+            pid_dir = os.path.join(workdir_base, ".pids")
+            workdir = os.path.join(workdir_base, ".workdir.pants.d")
+            print(f"\npantsd log is {workdir}/pantsd/pantsd.log")
+            pantsd_config = {
+                "GLOBAL": {"pantsd": True, "level": log_level, "pants_subprocessdir": pid_dir,}
+            }
 
-                if extra_config:
-                    recursively_update(pantsd_config, extra_config)
-                print(f">>> config: \n{pantsd_config}\n")
+            if extra_config:
+                recursively_update(pantsd_config, extra_config)
+            print(f">>> config: \n{pantsd_config}\n")
 
-                checker = PantsDaemonMonitor(runner_process_context, pid_dir)
+            checker = PantsDaemonMonitor(pid_dir)
+            kill_daemon(pid_dir)
+            try:
+                yield (workdir, pantsd_config, checker)
                 kill_daemon(pid_dir)
-                try:
-                    yield (workdir, pantsd_config, checker)
-                    kill_daemon(pid_dir)
-                    checker.assert_stopped()
-                finally:
-                    banner("BEGIN pantsd.log")
-                    for line in read_pantsd_log(workdir):
-                        print(line)
-                    banner("END pantsd.log")
+                checker.assert_stopped()
+            finally:
+                banner("BEGIN pantsd.log")
+                for line in read_pantsd_log(workdir):
+                    print(line)
+                banner("END pantsd.log")
 
     @contextmanager
     def pantsd_successful_run_context(self, *args, **kwargs) -> Iterator[PantsdRunContext]:

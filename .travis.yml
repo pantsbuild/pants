@@ -278,7 +278,7 @@ jobs:
     - travis-wait-enhanced --timeout 50m --interval 9m -- ./build-support/bin/ci.py
       --githooks --smoke-tests --python-version 3.6
     - travis-wait-enhanced --timeout 40m --interval 9m -- ./build-support/bin/ci.py
-      --remote-execution-enabled --lint --python-version 3.6
+      --lint --python-version 3.6
     stage: Test Pants
     sudo: required
   - addons:
@@ -340,7 +340,7 @@ jobs:
     - travis-wait-enhanced --timeout 50m --interval 9m -- ./build-support/bin/ci.py
       --githooks --smoke-tests --python-version 3.7
     - travis-wait-enhanced --timeout 40m --interval 9m -- ./build-support/bin/ci.py
-      --remote-execution-enabled --lint --python-version 3.7
+      --lint --python-version 3.7
     stage: Test Pants (Cron)
     sudo: required
   - before_cache:
@@ -433,7 +433,7 @@ jobs:
     - '3.7'
     script:
     - travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py
-      --unit-tests --remote-execution-enabled --python-version 3.6
+      --unit-tests --python-version 3.6
     stage: Test Pants
     sudo: required
   - addons:
@@ -493,7 +493,7 @@ jobs:
     - '3.7'
     script:
     - travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py
-      --unit-tests --remote-execution-enabled --python-version 3.7
+      --unit-tests --python-version 3.7
     stage: Test Pants (Cron)
     sudo: required
   - addons:
@@ -542,9 +542,9 @@ jobs:
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
-    - CACHE_NAME=integration.v2.py36
+    - CACHE_NAME=integration.py36
     language: python
-    name: Integration tests - V2 (Python 3.6)
+    name: Integration tests (Python 3.6)
     os: linux
     python:
     - '2.7'
@@ -552,7 +552,7 @@ jobs:
     - '3.7'
     script:
     - travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py
-      --integration-tests --remote-execution-enabled --python-version 3.6
+      --integration-tests --python-version 3.6
     stage: Test Pants
     sudo: required
   - addons:
@@ -602,9 +602,9 @@ jobs:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
-    - CACHE_NAME=integration.v2.py37
+    - CACHE_NAME=integration.py37
     language: python
-    name: Integration tests - V2 (Python 3.7)
+    name: Integration tests (Python 3.7)
     os: linux
     python:
     - '2.7'
@@ -612,7 +612,7 @@ jobs:
     - '3.7'
     script:
     - travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py
-      --integration-tests --remote-execution-enabled --python-version 3.7
+      --integration-tests --python-version 3.7
     stage: Test Pants (Cron)
     sudo: required
   - before_cache:

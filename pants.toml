@@ -44,8 +44,6 @@ pants_ignore.add = [
 [source]
 root_patterns = [
   "src/*",
-  "src/main/*",
-  "src/test/*",
   "test/*",
   "tests/*",
   "3rdparty/*",

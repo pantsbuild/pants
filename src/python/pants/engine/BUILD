@@ -93,7 +93,6 @@ python_library(
   sources=['goal.py'],
   dependencies=[
     '3rdparty/python:dataclasses',
-    'src/python/pants/cache',
     'src/python/pants/option',
     'src/python/pants/option:options_bootstrapper',
     'src/python/pants/subsystem',

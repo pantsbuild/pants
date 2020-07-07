@@ -71,7 +71,6 @@ python_library(
     'src/python/pants/option:options_bootstrapper',
     'src/python/pants/source',
     'src/python/pants/subsystem',
-    'src/python/pants/task',
     'src/python/pants/testutil/engine',
     'src/python/pants/testutil/option',
     'src/python/pants/testutil/subsystem',

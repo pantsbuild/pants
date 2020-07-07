@@ -15,5 +15,8 @@ dynamic_ui = false
 # now in order to smooth off rough edges locally.
 pantsd = false
 
+process_execution_local_parallelism = "%(travis_parallelism)s"
+
 [python-setup]
-resolver_jobs = "%(travis_parallelism)s"
+# TODO: See https://github.com/pantsbuild/pants/issues/9964
+resolver_jobs = 2

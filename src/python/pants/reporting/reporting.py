@@ -7,7 +7,6 @@ from io import BytesIO
 
 from pants.base.workunit import WorkUnitLabel
 from pants.reporting.html_reporter import HtmlReporter
-from pants.reporting.invalidation_report import InvalidationReport
 from pants.reporting.plaintext_reporter import LabelFormat, PlainTextReporter, ToolOutputFormat
 from pants.reporting.quiet_reporter import QuietReporter
 from pants.reporting.report import Report
@@ -23,11 +22,6 @@ class Reporting(Subsystem):
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
-        register(
-            "--invalidation-report",
-            type=bool,
-            help="Write a formatted report on the invalid objects to the specified path.",
-        )
         register(
             "--reports-dir",
             advanced=True,
@@ -89,7 +83,6 @@ class Reporting(Subsystem):
             color=False,
             indent=True,
             timing=False,
-            cache_stats=False,
             label_format=self.get_options().console_label_format,
             tool_output_format=self.get_options().console_tool_output_format,
         )
@@ -114,9 +107,6 @@ class Reporting(Subsystem):
         # And start tracking the run.
         run_tracker.start(report, start_time)
 
-    def _get_invalidation_report(self):
-        return InvalidationReport() if self.get_options().invalidation_report else None
-
     @staticmethod
     def _consume_stringio(f):
         f.flush()
@@ -137,14 +127,11 @@ class Reporting(Subsystem):
         # terminal truly supports color, but most that don't set TERM=dumb.
         color = global_options.colors and (os.getenv("TERM") != "dumb")
         timing = global_options.time
-        cache_stats = global_options.time  # TODO: Separate flag for this?
 
         if is_quiet:
             console_reporter = QuietReporter(
                 run_tracker,
-                QuietReporter.Settings(
-                    log_level=log_level, color=color, timing=timing, cache_stats=cache_stats
-                ),
+                QuietReporter.Settings(log_level=log_level, color=color, timing=timing),
             )
         else:
             # Set up the new console reporter.
@@ -157,7 +144,6 @@ class Reporting(Subsystem):
                 color=color,
                 indent=True,
                 timing=timing,
-                cache_stats=cache_stats,
                 label_format=self.get_options().console_label_format,
                 tool_output_format=self.get_options().console_tool_output_format,
             )
@@ -180,7 +166,6 @@ class Reporting(Subsystem):
                 color=False,
                 indent=True,
                 timing=True,
-                cache_stats=True,
                 label_format=self.get_options().console_label_format,
                 tool_output_format=self.get_options().console_tool_output_format,
             )
@@ -189,16 +174,6 @@ class Reporting(Subsystem):
             logfile_reporter.emit(buffered_err, dest=ReporterDestination.ERR)
             logfile_reporter.flush()
             run_tracker.report.add_reporter("logfile", logfile_reporter)
-
-        invalidation_report = self._get_invalidation_report()
-        if invalidation_report:
-            run_id = run_tracker.run_info.get_info("id")
-            outfile = os.path.join(
-                self.get_options().reports_dir, run_id, "invalidation-report.csv"
-            )
-            invalidation_report.set_filename(outfile)
-
-        return invalidation_report
 
 
 def is_hex_string(id_value):

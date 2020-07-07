@@ -41,4 +41,5 @@ python_tests(
     'src/python/pants/testutil/subsystem',
     'src/python/pants/util:ordered_set',
   ],
+  timeout = 90,
 )

@@ -5,7 +5,6 @@ import os
 from typing import cast
 
 from pants.fs.fs import safe_filename_from_path
-from pants.goal.goal import Goal
 from pants.init.options_initializer import BuildConfigInitializer
 from pants.option.option_value_container import OptionValueContainer
 from pants.subsystem.subsystem import Subsystem
@@ -61,9 +60,6 @@ def clean_global_runtime_state(reset_subsystem=False):
     if reset_subsystem:
         # Reset subsystem state.
         Subsystem.reset()
-
-    # Reset Goals and Tasks.
-    Goal.clear()
 
     # Reset global plugin state.
     BuildConfigInitializer.reset()
