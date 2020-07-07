@@ -116,6 +116,11 @@ py_module_initializer!(native_engine, |py, m| {
     "write_stderr",
     py_fn!(py, write_stderr(a: PySession, b: String)),
   )?;
+  m.add(
+    py,
+    "teardown_dynamic_ui",
+    py_fn!(py, teardown_dynamic_ui(a: PyScheduler, b: PySession)),
+  )?;
 
   m.add(py, "set_panic_handler", py_fn!(py, set_panic_handler()))?;
 
@@ -1681,6 +1686,25 @@ fn write_stderr(py: Python, session_ptr: PySession, msg: String) -> PyUnitResult
   with_session(py, session_ptr, |session| {
     py.allow_threads(|| {
       session.write_stderr(&msg);
+      Ok(None)
+    })
+  })
+}
+
+fn teardown_dynamic_ui(
+  py: Python,
+  scheduler_ptr: PyScheduler,
+  session_ptr: PySession,
+) -> PyUnitResult {
+  with_scheduler(py, scheduler_ptr, |_scheduler| {
+    with_session(py, session_ptr, |session| {
+      let _ = block_in_place_and_wait(py, || {
+        session
+          .maybe_display_teardown()
+          .unit_error()
+          .boxed_local()
+          .compat()
+      });
       Ok(None)
     })
   })
