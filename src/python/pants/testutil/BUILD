@@ -3,9 +3,13 @@
 
 python_library(
   name='testutil_wheel',
+  sources=[],
   dependencies=[
     ':int-test-for-export',
     ':test_base',
+    ':external_tool_test_base',
+    ':goal_rule_test_base',
+    ':interpreter_selection_utils',
     'src/python/pants/testutil/engine',
     'src/python/pants/testutil/option',
     'src/python/pants/testutil/subsystem',
