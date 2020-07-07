@@ -18,12 +18,12 @@ use testutil::owned_string_vec;
 use tokio::runtime::Handle;
 use workunit_store::{Workunit, WorkunitMetadata, WorkunitState, WorkunitStore};
 
-use crate::remote::{ExecutionError, OperationOrStatus, StreamingCommandRunner};
+use crate::remote::{digest, ExecutionError, OperationOrStatus, StreamingCommandRunner};
 use crate::remote_tests::{
   assert_cancellation_requests, assert_contains, cat_roland_request, echo_foo_request,
-  echo_roland_request, empty_request_metadata, make_any_proto, make_incomplete_operation,
-  make_precondition_failure_operation, make_retryable_operation_failure, make_store,
-  make_successful_operation, make_successful_operation_with_metadata,
+  echo_roland_request, empty_request_metadata, make_action_result, make_any_proto,
+  make_incomplete_operation, make_precondition_failure_operation, make_retryable_operation_failure,
+  make_store, make_successful_operation, make_successful_operation_with_metadata,
   missing_preconditionfailure_violation, run_cmd_runner, workunits_with_constant_span_id,
   RemoteTestResult, StderrType, StdoutType,
 };
@@ -124,24 +124,35 @@ async fn successful_with_only_call_to_execute() {
   let op_name = "gimme-foo".to_string();
 
   let mock_server = {
+    let (action, _, execute_request) = crate::remote::make_execute_request(
+      &execute_request.clone().try_into().unwrap(),
+      empty_request_metadata(),
+    )
+    .unwrap();
+    let action_digest = digest(&action).unwrap();
+
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
-        execute_request: crate::remote::make_execute_request(
-          &execute_request.clone().try_into().unwrap(),
-          empty_request_metadata(),
-        )
-        .unwrap()
-        .2,
-        stream_responses: Ok(vec![
-          make_incomplete_operation(&op_name),
-          make_successful_operation(
-            &op_name,
-            StdoutType::Raw("foo".to_owned()),
-            StderrType::Raw("".to_owned()),
-            0,
-          ),
-        ]),
-      }]),
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::GetActionResult {
+          action_digest,
+          response: Err(grpcio::RpcStatus::new(
+            grpcio::RpcStatusCode::NOT_FOUND,
+            None,
+          )),
+        },
+        ExpectedAPICall::Execute {
+          execute_request,
+          stream_responses: Ok(vec![
+            make_incomplete_operation(&op_name),
+            make_successful_operation(
+              &op_name,
+              StdoutType::Raw("foo".to_owned()),
+              StderrType::Raw("".to_owned()),
+              0,
+            ),
+          ]),
+        },
+      ]),
       None,
     )
   };
@@ -165,15 +176,24 @@ async fn successful_after_reconnect_with_wait_execution() {
   let op_name = "gimme-foo".to_string();
 
   let mock_server = {
+    let (action, _, execute_request) = crate::remote::make_execute_request(
+      &execute_request.clone().try_into().unwrap(),
+      empty_request_metadata(),
+    )
+    .unwrap();
+    let action_digest = digest(&action).unwrap();
+
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::GetActionResult {
+          action_digest,
+          response: Err(grpcio::RpcStatus::new(
+            grpcio::RpcStatusCode::NOT_FOUND,
+            None,
+          )),
+        },
         ExpectedAPICall::Execute {
-          execute_request: crate::remote::make_execute_request(
-            &execute_request.clone().try_into().unwrap(),
-            empty_request_metadata(),
-          )
-          .unwrap()
-          .2,
+          execute_request,
           stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
         },
         ExpectedAPICall::WaitExecution {
@@ -210,27 +230,34 @@ async fn successful_after_reconnect_from_retryable_error() {
   let op_name_2 = "gimme-bar".to_string();
 
   let mock_server = {
+    let (action, _, execute_request) = crate::remote::make_execute_request(
+      &execute_request.clone().try_into().unwrap(),
+      empty_request_metadata(),
+    )
+    .unwrap();
+
+    let execute_request_2 = execute_request.clone();
+
+    let action_digest = digest(&action).unwrap();
+
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::GetActionResult {
+          action_digest,
+          response: Err(grpcio::RpcStatus::new(
+            grpcio::RpcStatusCode::NOT_FOUND,
+            None,
+          )),
+        },
         ExpectedAPICall::Execute {
-          execute_request: crate::remote::make_execute_request(
-            &execute_request.clone().try_into().unwrap(),
-            empty_request_metadata(),
-          )
-          .unwrap()
-          .2,
+          execute_request,
           stream_responses: Ok(vec![
             make_incomplete_operation(&op_name_1),
             make_retryable_operation_failure(),
           ]),
         },
         ExpectedAPICall::Execute {
-          execute_request: crate::remote::make_execute_request(
-            &execute_request.clone().try_into().unwrap(),
-            empty_request_metadata(),
-          )
-          .unwrap()
-          .2,
+          execute_request: execute_request_2,
           stream_responses: Ok(vec![
             make_incomplete_operation(&op_name_2),
             make_successful_operation(
@@ -258,6 +285,48 @@ async fn successful_after_reconnect_from_retryable_error() {
 }
 
 #[tokio::test]
+async fn successful_served_from_action_cache() {
+  let workunit_store = WorkunitStore::new(false);
+  workunit_store.init_thread_state(None);
+  let execute_request = echo_foo_request();
+
+  let mock_server = {
+    let (action, _, _) = crate::remote::make_execute_request(
+      &execute_request.clone().try_into().unwrap(),
+      empty_request_metadata(),
+    )
+    .unwrap();
+
+    let action_digest = digest(&action).unwrap();
+
+    let action_result = make_action_result(
+      StdoutType::Raw("foo".to_owned()),
+      StderrType::Raw("".to_owned()),
+      0,
+      None,
+    );
+
+    mock::execution_server::TestServer::new(
+      mock::execution_server::MockExecution::new(vec![ExpectedAPICall::GetActionResult {
+        action_digest,
+        response: Ok(action_result),
+      }]),
+      None,
+    )
+  };
+
+  let result = run_command_remote(mock_server.address(), execute_request)
+    .await
+    .unwrap();
+
+  assert_eq!(result.stdout_bytes, "foo".as_bytes());
+  assert_eq!(result.stderr_bytes, "".as_bytes());
+  assert_eq!(result.original.exit_code, 0);
+  assert_eq!(result.original.output_directory, EMPTY_DIGEST);
+  assert_cancellation_requests(&mock_server, vec![]);
+}
+
+#[tokio::test]
 async fn server_rejecting_execute_request_gives_error() {
   let workunit_store = WorkunitStore::new(false);
   workunit_store.init_thread_state(None);
@@ -265,18 +334,33 @@ async fn server_rejecting_execute_request_gives_error() {
   let execute_request = echo_foo_request();
 
   let mock_server = mock::execution_server::TestServer::new(
-    mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
-      execute_request: crate::remote::make_execute_request(
-        &Process::new(owned_string_vec(&["/bin/echo", "-n", "bar"])),
-        empty_request_metadata(),
-      )
-      .unwrap()
-      .2,
-      stream_responses: Err(grpcio::RpcStatus::new(
-        grpcio::RpcStatusCode::INVALID_ARGUMENT,
-        None,
-      )),
-    }]),
+    mock::execution_server::MockExecution::new(vec![
+      ExpectedAPICall::GetActionResult {
+        action_digest: hashing::Digest(
+          hashing::Fingerprint::from_hex_string(
+            "b545a9ed4aa9807ae06d203d826b5f39fd3b59cfa627fffc5ac84666c7cd4dbb",
+          )
+          .unwrap(),
+          142,
+        ),
+        response: Err(grpcio::RpcStatus::new(
+          grpcio::RpcStatusCode::NOT_FOUND,
+          None,
+        )),
+      },
+      ExpectedAPICall::Execute {
+        execute_request: crate::remote::make_execute_request(
+          &Process::new(owned_string_vec(&["/bin/echo", "-n", "bar"])),
+          empty_request_metadata(),
+        )
+        .unwrap()
+        .2,
+        stream_responses: Err(grpcio::RpcStatus::new(
+          grpcio::RpcStatusCode::INVALID_ARGUMENT,
+          None,
+        )),
+      },
+    ]),
     None,
   );
 
@@ -295,19 +379,31 @@ async fn server_sending_triggering_timeout_with_deadline_exceeded() {
   let execute_request = echo_foo_request();
 
   let mock_server = {
+    let (action, _, execute_request) = crate::remote::make_execute_request(
+      &execute_request.clone().try_into().unwrap(),
+      empty_request_metadata(),
+    )
+    .unwrap();
+
+    let action_digest = digest(&action).unwrap();
+
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
-        execute_request: crate::remote::make_execute_request(
-          &execute_request.clone().try_into().unwrap(),
-          empty_request_metadata(),
-        )
-        .unwrap()
-        .2,
-        stream_responses: Err(grpcio::RpcStatus::new(
-          grpcio::RpcStatusCode::DEADLINE_EXCEEDED,
-          None,
-        )),
-      }]),
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::GetActionResult {
+          action_digest,
+          response: Err(grpcio::RpcStatus::new(
+            grpcio::RpcStatusCode::NOT_FOUND,
+            None,
+          )),
+        },
+        ExpectedAPICall::Execute {
+          execute_request,
+          stream_responses: Err(grpcio::RpcStatus::new(
+            grpcio::RpcStatusCode::DEADLINE_EXCEEDED,
+            None,
+          )),
+        },
+      ]),
       None,
     )
   };
@@ -327,24 +423,36 @@ async fn sends_headers() {
   let op_name = "gimme-foo".to_string();
 
   let mock_server = {
+    let (action, _, execute_request) = crate::remote::make_execute_request(
+      &execute_request.clone().try_into().unwrap(),
+      empty_request_metadata(),
+    )
+    .unwrap();
+
+    let action_digest = digest(&action).unwrap();
+
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
-        execute_request: crate::remote::make_execute_request(
-          &execute_request.clone().try_into().unwrap(),
-          empty_request_metadata(),
-        )
-        .unwrap()
-        .2,
-        stream_responses: Ok(vec![
-          make_incomplete_operation(&op_name),
-          make_successful_operation(
-            &op_name,
-            StdoutType::Raw("foo".to_owned()),
-            StderrType::Raw("".to_owned()),
-            0,
-          ),
-        ]),
-      }]),
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::GetActionResult {
+          action_digest,
+          response: Err(grpcio::RpcStatus::new(
+            grpcio::RpcStatusCode::NOT_FOUND,
+            None,
+          )),
+        },
+        ExpectedAPICall::Execute {
+          execute_request,
+          stream_responses: Ok(vec![
+            make_incomplete_operation(&op_name),
+            make_successful_operation(
+              &op_name,
+              StdoutType::Raw("foo".to_owned()),
+              StderrType::Raw("".to_owned()),
+              0,
+            ),
+          ]),
+        },
+      ]),
       None,
     )
   };
@@ -394,7 +502,7 @@ async fn sends_headers() {
     .iter()
     .map(|received_message| received_message.headers.clone())
     .collect();
-  assert_that!(message_headers).has_length(1);
+  assert_that!(message_headers).has_length(2);
   for headers in message_headers {
     {
       let want_key = String::from("google.devtools.remoteexecution.v1test.requestmetadata-bin");
@@ -519,24 +627,36 @@ async fn ensure_inline_stdio_is_stored() {
   let mock_server = {
     let op_name = "cat".to_owned();
 
+    let (action, _, execute_request) = crate::remote::make_execute_request(
+      &echo_roland_request().try_into().unwrap(),
+      empty_request_metadata(),
+    )
+    .unwrap();
+
+    let action_digest = digest(&action).unwrap();
+
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
-        execute_request: crate::remote::make_execute_request(
-          &echo_roland_request().try_into().unwrap(),
-          empty_request_metadata(),
-        )
-        .unwrap()
-        .2,
-        stream_responses: Ok(vec![
-          make_incomplete_operation(&op_name),
-          make_successful_operation(
-            &op_name.clone(),
-            StdoutType::Raw(test_stdout.string()),
-            StderrType::Raw(test_stderr.string()),
-            0,
-          ),
-        ]),
-      }]),
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::GetActionResult {
+          action_digest,
+          response: Err(grpcio::RpcStatus::new(
+            grpcio::RpcStatusCode::NOT_FOUND,
+            None,
+          )),
+        },
+        ExpectedAPICall::Execute {
+          execute_request,
+          stream_responses: Ok(vec![
+            make_incomplete_operation(&op_name),
+            make_successful_operation(
+              &op_name.clone(),
+              StdoutType::Raw(test_stdout.string()),
+              StderrType::Raw(test_stderr.string()),
+              0,
+            ),
+          ]),
+        },
+      ]),
       None,
     )
   };
@@ -664,27 +784,39 @@ async fn initial_response_error() {
   let mock_server = {
     let op_name = "gimme-foo".to_string();
 
+    let (action, _, execute_request) = crate::remote::make_execute_request(
+      &execute_request.clone().try_into().unwrap(),
+      empty_request_metadata(),
+    )
+    .unwrap();
+
+    let action_digest = digest(&action).unwrap();
+
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
-        execute_request: crate::remote::make_execute_request(
-          &execute_request.clone().try_into().unwrap(),
-          empty_request_metadata(),
-        )
-        .unwrap()
-        .2,
-        stream_responses: Ok(vec![MockOperation::new({
-          let mut op = bazel_protos::operations::Operation::new();
-          op.set_name(op_name.to_string());
-          op.set_done(true);
-          op.set_error({
-            let mut error = bazel_protos::status::Status::new();
-            error.set_code(bazel_protos::code::Code::INTERNAL.value());
-            error.set_message("Something went wrong".to_string());
-            error
-          });
-          op
-        })]),
-      }]),
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::GetActionResult {
+          action_digest,
+          response: Err(grpcio::RpcStatus::new(
+            grpcio::RpcStatusCode::NOT_FOUND,
+            None,
+          )),
+        },
+        ExpectedAPICall::Execute {
+          execute_request,
+          stream_responses: Ok(vec![MockOperation::new({
+            let mut op = bazel_protos::operations::Operation::new();
+            op.set_name(op_name.to_string());
+            op.set_done(true);
+            op.set_error({
+              let mut error = bazel_protos::status::Status::new();
+              error.set_code(bazel_protos::code::Code::INTERNAL.value());
+              error.set_message("Something went wrong".to_string());
+              error
+            });
+            op
+          })]),
+        },
+      ]),
       None,
     )
   };
@@ -706,21 +838,33 @@ async fn initial_response_missing_response_and_error() {
   let mock_server = {
     let op_name = "gimme-foo".to_string();
 
+    let (action, _, execute_request) = crate::remote::make_execute_request(
+      &execute_request.clone().try_into().unwrap(),
+      empty_request_metadata(),
+    )
+    .unwrap();
+
+    let action_digest = digest(&action).unwrap();
+
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(vec![ExpectedAPICall::Execute {
-        execute_request: crate::remote::make_execute_request(
-          &execute_request.clone().try_into().unwrap(),
-          empty_request_metadata(),
-        )
-        .unwrap()
-        .2,
-        stream_responses: Ok(vec![MockOperation::new({
-          let mut op = bazel_protos::operations::Operation::new();
-          op.set_name(op_name.to_string());
-          op.set_done(true);
-          op
-        })]),
-      }]),
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::GetActionResult {
+          action_digest,
+          response: Err(grpcio::RpcStatus::new(
+            grpcio::RpcStatusCode::NOT_FOUND,
+            None,
+          )),
+        },
+        ExpectedAPICall::Execute {
+          execute_request,
+          stream_responses: Ok(vec![MockOperation::new({
+            let mut op = bazel_protos::operations::Operation::new();
+            op.set_name(op_name.to_string());
+            op.set_done(true);
+            op
+          })]),
+        },
+      ]),
       None,
     )
   };
@@ -744,15 +888,25 @@ async fn execute_missing_file_uploads_if_known() {
   let mock_server = {
     let op_name = "cat".to_owned();
 
+    let (action, _, execute_request) = crate::remote::make_execute_request(
+      &cat_roland_request().try_into().unwrap(),
+      empty_request_metadata(),
+    )
+    .unwrap();
+
+    let action_digest = digest(&action).unwrap();
+
     mock::execution_server::TestServer::new(
       mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::GetActionResult {
+          action_digest,
+          response: Err(grpcio::RpcStatus::new(
+            grpcio::RpcStatusCode::NOT_FOUND,
+            None,
+          )),
+        },
         ExpectedAPICall::Execute {
-          execute_request: crate::remote::make_execute_request(
-            &cat_roland_request().try_into().unwrap(),
-            empty_request_metadata(),
-          )
-          .unwrap()
-          .2,
+          execute_request,
           stream_responses: Ok(vec![
             make_incomplete_operation(&op_name),
             make_precondition_failure_operation(vec![missing_preconditionfailure_violation(
@@ -845,7 +999,19 @@ async fn execute_missing_file_errors_if_unknown() {
 
   let mock_server = {
     mock::execution_server::TestServer::new(
-      mock::execution_server::MockExecution::new(vec![]),
+      mock::execution_server::MockExecution::new(vec![ExpectedAPICall::GetActionResult {
+        action_digest: hashing::Digest(
+          hashing::Fingerprint::from_hex_string(
+            "96153ce7dd84a1ab5af79719e06dae1f051c56fa18247036f3a6ed1f87aedfe0",
+          )
+          .unwrap(),
+          144,
+        ),
+        response: Err(grpcio::RpcStatus::new(
+          grpcio::RpcStatusCode::NOT_FOUND,
+          None,
+        )),
+      }]),
       None,
     )
   };

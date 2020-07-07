@@ -633,7 +633,7 @@ impl CommandRunner {
           execution_attempts.push(attempts.current_attempt);
           return populate_fallible_execution_result(
             self.store.clone(),
-            execute_response,
+            execute_response.get_result(),
             execution_attempts,
             self.platform,
           )
@@ -966,18 +966,19 @@ pub async fn populate_fallible_execution_result_for_timeout(
 
 pub fn populate_fallible_execution_result(
   store: Store,
-  execute_response: bazel_protos::remote_execution::ExecuteResponse,
+  action_result: &bazel_protos::remote_execution::ActionResult,
   execution_attempts: Vec<ExecutionStats>,
   platform: Platform,
 ) -> impl Future<Item = FallibleProcessResultWithPlatform, Error = String> {
-  extract_stdout(&store, &execute_response)
-    .join(extract_stderr(&store, &execute_response))
-    .join(extract_output_files(store, &execute_response))
+  let exit_code = action_result.get_exit_code();
+  extract_stdout(&store, action_result)
+    .join(extract_stderr(&store, action_result))
+    .join(extract_output_files(store, action_result))
     .and_then(move |((stdout_digest, stderr_digest), output_directory)| {
       Ok(FallibleProcessResultWithPlatform {
         stdout_digest,
         stderr_digest,
-        exit_code: execute_response.get_result().get_exit_code(),
+        exit_code,
         output_directory,
         execution_attempts,
         platform,
@@ -988,11 +989,10 @@ pub fn populate_fallible_execution_result(
 
 fn extract_stdout(
   store: &Store,
-  execute_response: &bazel_protos::remote_execution::ExecuteResponse,
+  action_result: &bazel_protos::remote_execution::ActionResult,
 ) -> BoxFuture<Digest, String> {
-  if execute_response.get_result().has_stdout_digest() {
-    let stdout_digest_result: Result<Digest, String> =
-      execute_response.get_result().get_stdout_digest().try_into();
+  if action_result.has_stdout_digest() {
+    let stdout_digest_result: Result<Digest, String> = action_result.get_stdout_digest().try_into();
     let stdout_digest =
       try_future!(stdout_digest_result.map_err(|err| format!("Error extracting stdout: {}", err)));
     Box::pin(async move { Ok(stdout_digest) })
@@ -1000,7 +1000,7 @@ fn extract_stdout(
       .to_boxed()
   } else {
     let store = store.clone();
-    let stdout_raw = Bytes::from(execute_response.get_result().get_stdout_raw());
+    let stdout_raw = Bytes::from(action_result.get_stdout_raw());
     Box::pin(async move {
       let digest = store
         .store_file_bytes(stdout_raw, true)
@@ -1015,11 +1015,10 @@ fn extract_stdout(
 
 fn extract_stderr(
   store: &Store,
-  execute_response: &bazel_protos::remote_execution::ExecuteResponse,
+  action_result: &bazel_protos::remote_execution::ActionResult,
 ) -> BoxFuture<Digest, String> {
-  if execute_response.get_result().has_stderr_digest() {
-    let stderr_digest_result: Result<Digest, String> =
-      execute_response.get_result().get_stderr_digest().try_into();
+  if action_result.has_stderr_digest() {
+    let stderr_digest_result: Result<Digest, String> = action_result.get_stderr_digest().try_into();
     let stderr_digest =
       try_future!(stderr_digest_result.map_err(|err| format!("Error extracting stderr: {}", err)));
     Box::pin(async move { Ok(stderr_digest) })
@@ -1027,7 +1026,7 @@ fn extract_stderr(
       .to_boxed()
   } else {
     let store = store.clone();
-    let stderr_raw = Bytes::from(execute_response.get_result().get_stderr_raw());
+    let stderr_raw = Bytes::from(action_result.get_stderr_raw());
     Box::pin(async move {
       let digest = store
         .store_file_bytes(stderr_raw, true)
@@ -1042,17 +1041,13 @@ fn extract_stderr(
 
 pub fn extract_output_files(
   store: Store,
-  execute_response: &bazel_protos::remote_execution::ExecuteResponse,
+  action_result: &bazel_protos::remote_execution::ActionResult,
 ) -> BoxFuture<Digest, String> {
   // Get Digests of output Directories.
   // Then we'll make a Directory for the output files, and merge them.
-  let mut directory_digests =
-    Vec::with_capacity(execute_response.get_result().get_output_directories().len() + 1);
+  let mut directory_digests = Vec::with_capacity(action_result.get_output_directories().len() + 1);
   // TODO: Maybe take rather than clone
-  let output_directories = execute_response
-    .get_result()
-    .get_output_directories()
-    .to_owned();
+  let output_directories = action_result.get_output_directories().to_owned();
   for dir in output_directories {
     let store = store.clone();
     directory_digests.push(
@@ -1081,8 +1076,7 @@ pub fn extract_output_files(
 
   // Make a directory for the files
   let mut path_map = HashMap::new();
-  let path_stats_result: Result<Vec<PathStat>, String> = execute_response
-    .get_result()
+  let path_stats_result: Result<Vec<PathStat>, String> = action_result
     .get_output_files()
     .iter()
     .map(|output_file| {

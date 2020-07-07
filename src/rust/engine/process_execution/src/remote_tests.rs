@@ -2506,6 +2506,36 @@ fn make_delayed_incomplete_operation(operation_name: &str, delay: Duration) -> M
   }
 }
 
+pub(crate) fn make_action_result(
+  stdout: StdoutType,
+  stderr: StderrType,
+  exit_code: i32,
+  metadata: Option<ExecutedActionMetadata>,
+) -> bazel_protos::remote_execution::ActionResult {
+  let mut action_result = bazel_protos::remote_execution::ActionResult::new();
+  match stdout {
+    StdoutType::Raw(stdout_raw) => {
+      action_result.set_stdout_raw(Bytes::from(stdout_raw));
+    }
+    StdoutType::Digest(stdout_digest) => {
+      action_result.set_stdout_digest((&stdout_digest).into());
+    }
+  }
+  match stderr {
+    StderrType::Raw(stderr_raw) => {
+      action_result.set_stderr_raw(Bytes::from(stderr_raw));
+    }
+    StderrType::Digest(stderr_digest) => {
+      action_result.set_stderr_digest((&stderr_digest).into());
+    }
+  }
+  action_result.set_exit_code(exit_code);
+  if let Some(metadata) = metadata {
+    action_result.set_execution_metadata(metadata);
+  };
+  action_result
+}
+
 fn make_successful_operation_with_maybe_metadata(
   operation_name: &str,
   stdout: StdoutType,
@@ -2518,30 +2548,7 @@ fn make_successful_operation_with_maybe_metadata(
   op.set_done(true);
   op.set_response({
     let mut response_proto = bazel_protos::remote_execution::ExecuteResponse::new();
-    response_proto.set_result({
-      let mut action_result = bazel_protos::remote_execution::ActionResult::new();
-      match stdout {
-        StdoutType::Raw(stdout_raw) => {
-          action_result.set_stdout_raw(Bytes::from(stdout_raw));
-        }
-        StdoutType::Digest(stdout_digest) => {
-          action_result.set_stdout_digest((&stdout_digest).into());
-        }
-      }
-      match stderr {
-        StderrType::Raw(stderr_raw) => {
-          action_result.set_stderr_raw(Bytes::from(stderr_raw));
-        }
-        StderrType::Digest(stderr_digest) => {
-          action_result.set_stderr_digest((&stderr_digest).into());
-        }
-      }
-      action_result.set_exit_code(exit_code);
-      if let Some(metadata) = metadata {
-        action_result.set_execution_metadata(metadata);
-      };
-      action_result
-    });
+    response_proto.set_result(make_action_result(stdout, stderr, exit_code, metadata));
 
     let mut response_wrapper = protobuf::well_known_types::Any::new();
     response_wrapper.set_type_url(format!(
@@ -2790,7 +2797,7 @@ async fn extract_output_files_from_response(
   let executor = task_executor::Executor::new(Handle::current());
   let store_dir = TempDir::new().unwrap();
   let store = make_store(store_dir.path(), &cas, executor.clone());
-  crate::remote::extract_output_files(store, &execute_response)
+  crate::remote::extract_output_files(store, execute_response.get_result())
     .compat()
     .await
 }
