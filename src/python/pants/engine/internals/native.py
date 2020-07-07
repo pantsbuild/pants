@@ -136,10 +136,14 @@ class Native(metaclass=SingletonMetaclass):
         """Proxy a log message to the Rust logging faculties."""
         return self.lib.write_log(msg, level, target)
 
-    def write_stdout(self, session, msg: str):
+    def write_stdout(self, scheduler, session, msg: str, teardown_ui: bool):
+        if teardown_ui:
+            self.teardown_dynamic_ui(scheduler, session)
         return self.lib.write_stdout(session, msg)
 
-    def write_stderr(self, session, msg: str):
+    def write_stderr(self, scheduler, session, msg: str, teardown_ui: bool):
+        if teardown_ui:
+            self.teardown_dynamic_ui(scheduler, session)
         return self.lib.write_stderr(session, msg)
 
     def teardown_dynamic_ui(self, scheduler, session):

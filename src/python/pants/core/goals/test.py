@@ -288,8 +288,6 @@ async def run_tests(
 
     exit_code = PANTS_SUCCEEDED_EXIT_CODE
 
-    console.teardown_dynamic_ui()
-
     for result in results:
         if result.test_result.status == Status.FAILURE:
             exit_code = PANTS_FAILED_EXIT_CODE
