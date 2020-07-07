@@ -143,8 +143,6 @@ class LoaderTest(unittest.TestCase):
     def assert_empty(self):
         build_configuration = self.bc_builder.create()
         registered_aliases = build_configuration.registered_aliases()
-        self.assertEqual(0, len(registered_aliases.target_types))
-        self.assertEqual(0, len(registered_aliases.target_macro_factories))
         self.assertEqual(0, len(registered_aliases.objects))
         self.assertEqual(0, len(registered_aliases.context_aware_object_factories))
         self.assertEqual(build_configuration.optionables(), FrozenOrderedSet())

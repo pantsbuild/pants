@@ -356,7 +356,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             ctx.checker.assert_started_and_stopped()
 
     def test_pantsd_invalidation_stale_sources(self):
-        test_path = "tests/python/pants_test/daemon_correctness_test_0001"
+        test_path = "daemon_correctness_test_0001"
         test_build_file = os.path.join(test_path, "BUILD")
         test_src_file = os.path.join(test_path, "some_file.py")
         filedeps_cmd = ["--files-not-found-behavior=warn", "filedeps", test_path]

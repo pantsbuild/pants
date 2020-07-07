@@ -1,5 +1,6 @@
 [GLOBAL]
 print_exception_stacktrace = true
+dependency_inference = true
 
 # Enable our custom loose-source plugins.
 pythonpath = ["%(buildroot)s/pants-plugins/src/python"]

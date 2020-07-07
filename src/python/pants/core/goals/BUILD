@@ -67,5 +67,5 @@ python_tests(
     'examples:isort_cfg',
   ],
   tags = ['integration'],
-  timeout = 270,
+  timeout = 240,
 )

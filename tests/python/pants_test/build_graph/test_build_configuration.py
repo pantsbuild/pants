@@ -24,8 +24,6 @@ class BuildConfigurationTest(unittest.TestCase):
     def test_register_exposed_object(self):
         self._register_aliases(objects={"jane": 42})
         aliases = self.bc_builder.create().registered_aliases()
-        self.assertEqual(FrozenDict(), aliases.target_types)
-        self.assertEqual(FrozenDict(), aliases.target_macro_factories)
         self.assertEqual(FrozenDict(), aliases.context_aware_object_factories)
         self.assertEqual(FrozenDict(jane=42), aliases.objects)
 
@@ -44,9 +42,7 @@ class BuildConfigurationTest(unittest.TestCase):
             context_aware_object_factories={"func": caof_function, "cls": CaofClass}
         )
         aliases = self.bc_builder.create().registered_aliases()
-        self.assertEqual(FrozenDict(), aliases.target_types)
         self.assertEqual(FrozenDict(), aliases.objects)
-        self.assertEqual(FrozenDict(), aliases.target_macro_factories)
         self.assertEqual(
             FrozenDict({"func": caof_function, "cls": CaofClass}),
             aliases.context_aware_object_factories,
