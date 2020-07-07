@@ -9,7 +9,6 @@ target(
     ':build_file_imports_module_directory',
     ':coordinated_runs_directory',
     ':interpreter_selection_directory',
-    ':nested_runs_directory',
     ':no_build_file_directory',
     ':plugins_directory',
     ':print_env_directory',
@@ -42,11 +41,6 @@ files(
 files(
   name = 'interpreter_selection_directory',
   sources = ['interpreter_selection/**/*'],
-)
-
-files(
-  name = 'nested_runs_directory',
-  sources = ['nested_runs/**/*'],
 )
 
 files(

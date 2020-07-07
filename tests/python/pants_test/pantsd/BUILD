@@ -54,7 +54,6 @@ python_tests(
     'examples/src/python/example:hello_directory',
     'testprojects/src/python:bad_requirements_directory',
     'testprojects/src/python:coordinated_runs_directory',
-    'testprojects/src/python:nested_runs_directory',
     'testprojects/src/python:print_env_directory',
   ],
   tags = ['integration'],
