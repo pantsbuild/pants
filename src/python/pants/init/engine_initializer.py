@@ -89,7 +89,7 @@ class LegacyGraphSession:
             return tuple()
         consumed_types = self.goal_consumed_types(goal_product)
         return tuple(
-            sorted({typ.options_scope for typ in consumed_types if issubclass(typ, Subsystem)})
+            sorted({typ.options_scope for typ in consumed_types if issubclass(typ, Subsystem)})  # type: ignore[misc]
         )
 
     def goal_consumed_types(self, goal_product: Type) -> Set[Type]:

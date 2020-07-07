@@ -106,7 +106,7 @@ class HelpInfoExtracter:
             )
             scope_to_help_info[oshi.scope] = oshi
 
-            if issubclass(scope_info.optionable_cls, GoalSubsystem):
+            if scope_info.optionable_cls and issubclass(scope_info.optionable_cls, GoalSubsystem):
                 is_implemented = union_membership.has_members_for_all(
                     scope_info.optionable_cls.required_union_implementations
                 )
