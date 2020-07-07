@@ -2,8 +2,12 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
-  name = 'tests',
-  timeout = 90,
+  name='tests',
+  dependencies=[
+    'src/python/pants/engine/internals/examples:fs_test',
+    'src/python/pants/engine/internals/examples:parsers',
+  ],
+  timeout=90,
 )
 
 python_library(

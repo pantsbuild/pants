@@ -4,6 +4,12 @@
 python_tests(
   name='tests',
   sources=['*_test.py', '!*_integration_test.py'],
+  dependencies=[
+    'src/python/pants/engine/internals/examples:parsers',
+    'src/python/pants/engine/internals/examples:graph_test',
+    'src/python/pants/engine/internals/examples:mapper_test',
+    'src/python/pants/engine/internals/examples:scheduler_inputs',
+  ],
 )
 
 python_integration_tests(
