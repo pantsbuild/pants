@@ -4,25 +4,7 @@
 python_library(
   sources=['*.py', '!report.py'],
   dependencies=[
-    '3rdparty/python:ansicolors',
-    '3rdparty/python:dataclasses',
-    '3rdparty/python:py-zipkin',
-    '3rdparty/python:pystache',
-    '3rdparty/python:requests',
-    ':report',
     ':reporting_resources',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/base:mustache',
-    'src/python/pants/base:run_info',
-    'src/python/pants/base:workunit',
-    'src/python/pants/build_graph:address',
-    'src/python/pants/build_graph',
-    'src/python/pants/option',
-    'src/python/pants/pantsd:process_manager',
-    'src/python/pants/subsystem',
-    'src/python/pants/util:dirutil',
-    'src/python/pants/util:logging',
-    'src/python/pants/util:memo',
   ],
 )
 

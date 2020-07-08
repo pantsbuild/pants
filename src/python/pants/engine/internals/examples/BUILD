@@ -4,12 +4,6 @@
 python_library(
   name='parsers',
   sources=['parsers.py'],
-  dependencies=[
-    'src/python/pants/build_graph',
-    'src/python/pants/engine/internals:parser',
-    'src/python/pants/util:memo',
-    'src/python/pants/util:strutil',
-  ],
 )
 
 resources(

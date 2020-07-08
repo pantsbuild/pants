@@ -4,7 +4,4 @@
 python_library(
   name='structs',
   sources=['structs.py'],
-  dependencies=[
-    'src/python/pants/engine/internals:core_abstractions',
-  ],
 )

@@ -5,8 +5,5 @@ python_library(
   dependencies=[
     '//:build_root',
     '//:pants_toml',
-    'src/python/pants/option',
-    'src/python/pants/option:global_options',
-    'src/python/pants/option:options_bootstrapper',
   ],
 )

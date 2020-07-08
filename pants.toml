@@ -17,6 +17,8 @@ backend_packages.add = [
   "internal_backend.utilities",
 ]
 
+build_file_prelude_globs = ["pants-plugins/python_integration_tests_macro.py"]
+
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
 # path but not consumed by python, and additionally add the rust code.
 pantsd_invalidation_globs.add = [
