@@ -12,9 +12,11 @@ futures = "0.3"
 log = "0.4"
 parking_lot = "0.11"
 petgraph = "0.4.5"
-tokio = { version = "0.2", features = ["time"] }
+# TODO: See #10291.
+tokio = { version = "=0.2.20", features = ["time"] }
 
 [dev-dependencies]
 rand = "0.6"
 env_logger = "0.5.4"
-tokio = { version = "0.2", features = ["macros", "rt-threaded", "time"] }
+# TODO: See #10291.
+tokio = { version = "=0.2.20", features = ["macros", "rt-threaded", "time"] }
