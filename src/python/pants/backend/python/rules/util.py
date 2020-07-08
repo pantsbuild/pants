@@ -11,7 +11,7 @@ from pkg_resources import Requirement
 from pants.backend.python.target_types import PythonSources
 from pants.core.target_types import ResourcesSources
 from pants.core.util_rules.strip_source_roots import SourceRootStrippedSources
-from pants.engine.fs import FilesContent
+from pants.engine.fs import FileContentCollection
 from pants.engine.target import Target
 from pants.python.python_setup import PythonSetup
 from pants.source.source_root import SourceRootError
@@ -96,7 +96,7 @@ def distutils_repr(obj):
 
 def find_packages(
     tgts_and_stripped_srcs: Iterable[Tuple[Target, SourceRootStrippedSources]],
-    init_py_contents: FilesContent,
+    init_py_contents: FileContentCollection,
     py2: bool,
 ) -> Tuple[Tuple[str, ...], Tuple[str, ...], Tuple[PackageDatum, ...]]:
     """Analyze the package structure for the given sources.

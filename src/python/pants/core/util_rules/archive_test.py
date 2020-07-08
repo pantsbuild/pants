@@ -7,7 +7,7 @@ from io import BytesIO
 
 from pants.core.util_rules.archive import ExtractedDigest, MaybeExtractable
 from pants.core.util_rules.archive import rules as archive_rules
-from pants.engine.fs import FileContent, FilesContent, Snapshot
+from pants.engine.fs import FileContent, FileContentCollection, Snapshot
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.testutil.test_base import TestBase
@@ -17,7 +17,7 @@ class ArchiveTest(TestBase):
 
     files = {"foo": b"bar", "hello/world": b"Hello, World!"}
 
-    expected_files_content = FilesContent(
+    expected_file_content_collection = FileContentCollection(
         [FileContent(name, content) for name, content in files.items()]
     )
 
@@ -38,8 +38,10 @@ class ArchiveTest(TestBase):
             ExtractedDigest, Params(MaybeExtractable(input_snapshot.digest))
         )
 
-        files_content = self.request_single_product(FilesContent, Params(extracted_digest.digest))
-        assert self.expected_files_content == files_content
+        file_content_collection = self.request_single_product(
+            FileContentCollection, Params(extracted_digest.digest)
+        )
+        assert self.expected_file_content_collection == file_content_collection
 
     def test_extract_zip_stored(self) -> None:
         self._do_test_extract_zip(zipfile.ZIP_STORED)
@@ -63,8 +65,10 @@ class ArchiveTest(TestBase):
             ExtractedDigest, Params(MaybeExtractable(input_snapshot.digest))
         )
 
-        files_content = self.request_single_product(FilesContent, Params(extracted_digest.digest))
-        assert self.expected_files_content == files_content
+        file_content_collection = self.request_single_product(
+            FileContentCollection, Params(extracted_digest.digest)
+        )
+        assert self.expected_file_content_collection == file_content_collection
 
     def test_extract_tar(self) -> None:
         self._do_test_extract_tar("")
@@ -84,5 +88,10 @@ class ArchiveTest(TestBase):
             ExtractedDigest, Params(MaybeExtractable(input_snapshot.digest))
         )
 
-        files_content = self.request_single_product(FilesContent, Params(extracted_digest.digest))
-        assert FilesContent([FileContent("test.sh", b"# A shell script")]) == files_content
+        file_content_collection = self.request_single_product(
+            FileContentCollection, Params(extracted_digest.digest)
+        )
+        assert (
+            FileContentCollection([FileContent("test.sh", b"# A shell script")])
+            == file_content_collection
+        )

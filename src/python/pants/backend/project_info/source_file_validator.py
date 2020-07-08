@@ -10,7 +10,7 @@ from typing import Tuple
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.engine.collection import Collection
 from pants.engine.console import Console
-from pants.engine.fs import Digest, FilesContent, SourcesSnapshot, SourcesSnapshots
+from pants.engine.fs import Digest, FileContentCollection, SourcesSnapshot, SourcesSnapshots
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import SubsystemRule, goal_rule, rule
 from pants.engine.selectors import Get, MultiGet
@@ -288,10 +288,12 @@ async def match_regexes_for_one_snapshot(
     sources_snapshot: SourcesSnapshot, source_file_validation: SourceFileValidation,
 ) -> RegexMatchResults:
     multi_matcher = source_file_validation.get_multi_matcher()
-    files_content = await Get(FilesContent, Digest, sources_snapshot.snapshot.digest)
+    file_content_collection = await Get(
+        FileContentCollection, Digest, sources_snapshot.snapshot.digest
+    )
     return RegexMatchResults(
         multi_matcher.check_source_file(file_content.path, file_content.content)
-        for file_content in files_content
+        for file_content in file_content_collection
     )
 
 

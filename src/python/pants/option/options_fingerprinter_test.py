@@ -129,7 +129,7 @@ class OptionsFingerprinterTest(TestBase):
         )
         self.assertEqual(fp1, fp2)
 
-    def test_fingerprint_dict_with_files_content_change(self) -> None:
+    def test_fingerprint_dict_with_file_content_change(self) -> None:
         f1, f2 = (
             self.create_file(f, contents=c)
             for (f, c) in (

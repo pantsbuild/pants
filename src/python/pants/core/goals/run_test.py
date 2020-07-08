@@ -8,7 +8,7 @@ from pants.base.specs import SingleAddress
 from pants.core.goals.binary import BinaryFieldSet, CreatedBinary
 from pants.core.goals.run import Run, RunOptions, run
 from pants.engine.addresses import Address
-from pants.engine.fs import Digest, FileContent, InputFilesContent, Workspace
+from pants.engine.fs import CreateDigest, Digest, FileContent, Workspace
 from pants.engine.interactive_process import InteractiveProcess, InteractiveRunner
 from pants.engine.target import (
     Target,
@@ -29,11 +29,13 @@ from pants.testutil.test_base import TestBase
 
 class RunTest(TestBase):
     def create_mock_binary(self, program_text: bytes) -> CreatedBinary:
-        input_files_content = InputFilesContent(
-            (FileContent(path="program.py", content=program_text, is_executable=True),)
+        digest = self.request_single_product(
+            Digest,
+            CreateDigest(
+                [FileContent(path="program.py", content=program_text, is_executable=True)]
+            ),
         )
-        digest = self.request_single_product(Digest, input_files_content)
-        return CreatedBinary(binary_name="program.py", digest=digest,)
+        return CreatedBinary(binary_name="program.py", digest=digest)
 
     def single_target_run(
         self, *, console: MockConsole, program_text: bytes, address_spec: str,

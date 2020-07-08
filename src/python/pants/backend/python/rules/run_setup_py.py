@@ -38,11 +38,11 @@ from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.console import Console
 from pants.engine.fs import (
     AddPrefix,
+    CreateDigest,
     Digest,
     DirectoryToMaterialize,
     FileContent,
-    FilesContent,
-    InputFilesContent,
+    FileContentCollection,
     MergeDigests,
     PathGlobs,
     RemovePrefix,
@@ -449,7 +449,7 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
     ).encode()
     extra_files_digest = await Get(
         Digest,
-        InputFilesContent(
+        CreateDigest(
             [
                 FileContent("setup.py", setup_py_content),
                 FileContent(
@@ -494,7 +494,7 @@ async def get_sources(request: SetupPySourcesRequest) -> SetupPySources:
     init_pys_snapshot = await Get(
         Snapshot, SnapshotSubset(sources_digest, PathGlobs(["**/__init__.py"]))
     )
-    init_py_contents = await Get(FilesContent, Digest, init_pys_snapshot.digest)
+    init_py_contents = await Get(FileContentCollection, Digest, init_pys_snapshot.digest)
 
     packages, namespace_packages, package_data = find_packages(
         tgts_and_stripped_srcs=list(zip(targets, stripped_srcs_list)),
