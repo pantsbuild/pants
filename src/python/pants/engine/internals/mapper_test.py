@@ -29,7 +29,7 @@ from pants.engine.internals.parser import (
     SymbolTable,
 )
 from pants.engine.internals.scheduler_test_base import SchedulerTestBase
-from pants.engine.internals.struct import Struct
+from pants.engine.internals.struct import Struct, TargetAdaptor
 from pants.engine.rules import rule
 from pants.engine.selectors import Get, MultiGet
 from pants.testutil.engine.util import TARGET_TABLE, Target
@@ -37,13 +37,7 @@ from pants.util.dirutil import safe_open
 from pants.util.frozendict import FrozenDict
 
 
-class Thing:
-    def __init__(self, **kwargs):
-        self._kwargs = kwargs
-
-    def _asdict(self):
-        return self._kwargs
-
+class Thing(TargetAdaptor):
     def _key(self):
         return {k: v for k, v in self._kwargs.items() if k != "type_alias"}
 
@@ -81,7 +75,7 @@ class AddressMapTest(unittest.TestCase):
         assert {
             "one": Thing(name="one", age=42),
             "two": Thing(name="two", age=37),
-        } == address_map.objects_by_name
+        } == address_map.name_to_target_adaptor
 
     def test_duplicate_names(self) -> None:
         with pytest.raises(DuplicateNameError):

@@ -5,14 +5,13 @@ import os.path
 import tokenize
 from dataclasses import dataclass
 from io import StringIO
-from typing import Any, Dict, List, Tuple, Type
+from typing import Any, Dict, List, Tuple, Type, cast
 
 from pants.base.exceptions import UnaddressableObjectError
 from pants.base.parse_context import ParseContext
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.internals.objects import Serializable
-from pants.engine.internals.struct import Struct
-from pants.engine.legacy.structs import TargetAdaptor
+from pants.engine.internals.struct import Struct, TargetAdaptor
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_property
 
@@ -106,7 +105,7 @@ class Parser:
 
     def parse(
         self, filepath: str, build_file_content: str, extra_symbols: BuildFilePreludeSymbols
-    ) -> List:
+    ) -> List[TargetAdaptor]:
         # Mutate the parse context with the new path.
         self._parse_context._storage.clear(os.path.dirname(filepath))
 
@@ -126,7 +125,7 @@ class Parser:
         exec(build_file_content, global_symbols)
         error_on_imports(build_file_content, filepath)
 
-        return list(self._parse_context._storage.objects)
+        return cast(List[TargetAdaptor], list(self._parse_context._storage.objects))
 
 
 def error_on_imports(build_file_content: str, filepath: str) -> None:

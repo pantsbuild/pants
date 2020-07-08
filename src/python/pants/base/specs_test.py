@@ -12,7 +12,7 @@ from pants.base.specs import (
     more_specific,
 )
 from pants.build_graph.address import Address
-from pants.engine.legacy.structs import TargetAdaptor
+from pants.engine.internals.struct import TargetAdaptor
 
 
 def test_more_specific():

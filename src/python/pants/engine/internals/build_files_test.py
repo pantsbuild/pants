@@ -41,8 +41,7 @@ from pants.engine.internals.parser import (
 )
 from pants.engine.internals.scheduler import ExecutionError, ExecutionRequest, SchedulerSession
 from pants.engine.internals.scheduler_test_base import SchedulerTestBase
-from pants.engine.internals.struct import Struct, StructWithDeps
-from pants.engine.legacy.structs import TargetAdaptor
+from pants.engine.internals.struct import Struct, StructWithDeps, TargetAdaptor
 from pants.engine.rules import rule
 from pants.testutil.engine.util import MockGet, Target, run_rule
 from pants.util.frozendict import FrozenDict
@@ -68,7 +67,7 @@ def test_parse_address_family_empty() -> None:
             ),
         ],
     )
-    assert len(af.objects_by_name) == 0
+    assert len(af.name_to_target_adaptors) == 0
 
 
 class AddressesFromAddressFamiliesTest(unittest.TestCase):
@@ -101,7 +100,7 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
         """Test that matching the same AddressSpec twice succeeds."""
         address = SingleAddress("a", "a")
         snapshot = Snapshot(Digest("xx", 2), ("a/BUILD",), ())
-        address_family = AddressFamily("a", {"a": ("a/BUILD", "this is an object!")})
+        address_family = AddressFamily("a", {"a": ("a/BUILD", TargetAdaptor())})
         address_specs = AddressSpecs([address, address])
 
         addresses = self._resolve_addresses(

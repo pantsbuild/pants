@@ -315,3 +315,7 @@ class StructWithDeps(Struct):
 
         :rtype: tuple
         """
+
+
+class TargetAdaptor(StructWithDeps):
+    """A Struct to hold a Target's values before being converted into the Target API."""
