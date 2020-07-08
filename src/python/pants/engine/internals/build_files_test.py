@@ -11,6 +11,7 @@ from typing import Tuple, Type, cast
 from pants.base.exceptions import ResolveError
 from pants.base.project_tree import Dir
 from pants.base.specs import AddressSpecs, SiblingAddresses, SingleAddress
+from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.addresses import Address, Addresses
 from pants.engine.fs import Digest, FileContent, FilesContent, PathGlobs, Snapshot, create_fs_rules
 from pants.engine.internals.addressable import addressable
@@ -22,14 +23,15 @@ from pants.engine.internals.build_files import (
     parse_address_family,
     strip_address_origins,
 )
-from pants.engine.internals.examples.parsers import (
-    JsonParser,
-    PythonAssignmentsParser,
-    PythonCallbacksParser,
-)
+from pants.engine.internals.examples.parsers import JsonParser
 from pants.engine.internals.mapper import AddressFamily, AddressMapper
 from pants.engine.internals.nodes import Return, State, Throw
-from pants.engine.internals.parser import BuildFilePreludeSymbols, HydratedStruct, SymbolTable
+from pants.engine.internals.parser import (
+    BuildFilePreludeSymbols,
+    HydratedStruct,
+    Parser,
+    SymbolTable,
+)
 from pants.engine.internals.scheduler import ExecutionError, ExecutionRequest, SchedulerSession
 from pants.engine.internals.scheduler_test_base import SchedulerTestBase
 from pants.engine.internals.struct import Struct, StructWithDeps
@@ -40,32 +42,31 @@ from pants.util.frozendict import FrozenDict
 from pants.util.objects import Exactly
 
 
-class ParseAddressFamilyTest(unittest.TestCase):
-    def test_empty(self) -> None:
-        """Test that parsing an empty BUILD file results in an empty AddressFamily."""
-        address_mapper = AddressMapper(parser=JsonParser(TEST_TABLE), prelude_glob_patterns=())
-        af = run_rule(
-            parse_address_family,
-            rule_args=[address_mapper, BuildFilePreludeSymbols(FrozenDict()), Dir("/dev/null")],
-            mock_gets=[
-                MockGet(
-                    product_type=Snapshot,
-                    subject_type=PathGlobs,
-                    mock=lambda _: Snapshot(Digest("abc", 10), ("/dev/null/BUILD",), ()),
-                ),
-                MockGet(
-                    product_type=FilesContent,
-                    subject_type=Digest,
-                    mock=lambda _: FilesContent([FileContent(path="/dev/null/BUILD", content=b"")]),
-                ),
-            ],
-        )
-        self.assertEqual(len(af.objects_by_name), 0)
+def test_parse_address_family_empty() -> None:
+    """Test that parsing an empty BUILD file results in an empty AddressFamily."""
+    address_mapper = AddressMapper(parser=Parser(TEST_TABLE, BuildFileAliases()))
+    af = run_rule(
+        parse_address_family,
+        rule_args=[address_mapper, BuildFilePreludeSymbols(FrozenDict()), Dir("/dev/null")],
+        mock_gets=[
+            MockGet(
+                product_type=Snapshot,
+                subject_type=PathGlobs,
+                mock=lambda _: Snapshot(Digest("abc", 10), ("/dev/null/BUILD",), ()),
+            ),
+            MockGet(
+                product_type=FilesContent,
+                subject_type=Digest,
+                mock=lambda _: FilesContent([FileContent(path="/dev/null/BUILD", content=b"")]),
+            ),
+        ],
+    )
+    assert len(af.objects_by_name) == 0
 
 
 class AddressesFromAddressFamiliesTest(unittest.TestCase):
     def _address_mapper(self) -> AddressMapper:
-        return AddressMapper(JsonParser(TEST_TABLE), prelude_glob_patterns=())
+        return AddressMapper(JsonParser(TEST_TABLE))
 
     def _snapshot(self) -> Snapshot:
         return Snapshot(Digest("xx", 2), ("root/BUILD",), ())
@@ -126,7 +127,7 @@ class AddressesFromAddressFamiliesTest(unittest.TestCase):
         address_specs = AddressSpecs([SingleAddress("root", "b"), SingleAddress("root", "a")])
 
         expected_rx_str = re.escape(
-            '"b" was not found in namespace "root". Did you mean one of:\n  :a'
+            "'b' was not found in namespace 'root'. Did you mean one of:\n  :a"
         )
         with self.assertRaisesRegex(ResolveError, expected_rx_str):
             self._resolve_addresses(
@@ -219,9 +220,7 @@ TEST_TABLE = SymbolTable(
 
 class GraphTestBase(unittest.TestCase, SchedulerTestBase):
     def create(self, build_patterns=None, parser=None) -> SchedulerSession:
-        address_mapper = AddressMapper(
-            parser=parser, prelude_glob_patterns=(), build_patterns=build_patterns
-        )
+        address_mapper = AddressMapper(parser=parser, build_patterns=build_patterns)
 
         @rule
         def symbol_table_singleton() -> SymbolTable:
@@ -299,18 +298,6 @@ class InlinedGraphTest(GraphTestBase):
 
     def test_json(self) -> None:
         scheduler = self.create_json()
-        self.do_test_codegen_simple(scheduler)
-
-    def test_python(self) -> None:
-        scheduler = self.create(
-            build_patterns=("*.BUILD.python",), parser=PythonAssignmentsParser(TEST_TABLE)
-        )
-        self.do_test_codegen_simple(scheduler)
-
-    def test_python_classic(self) -> None:
-        scheduler = self.create(
-            build_patterns=("*.BUILD",), parser=PythonCallbacksParser(TEST_TABLE)
-        )
         self.do_test_codegen_simple(scheduler)
 
     def test_resolve_cache(self) -> None:
@@ -393,7 +380,7 @@ class PreludeParsingTest(unittest.TestCase):
 
         symbols = run_rule(
             evaluate_preludes,
-            rule_args=[address_mapper,],
+            rule_args=[address_mapper],
             mock_gets=[
                 MockGet(
                     product_type=Snapshot,

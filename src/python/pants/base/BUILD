@@ -24,11 +24,6 @@ python_library(
 )
 
 python_library(
-  name = 'build_file_target_factory',
-  sources = ['build_file_target_factory.py'],
-)
-
-python_library(
   name = 'build_root',
   sources = ['build_root.py'],
   dependencies = [

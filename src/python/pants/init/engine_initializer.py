@@ -19,9 +19,8 @@ from pants.engine.internals import graph, options_parsing
 from pants.engine.internals.build_files import create_graph_rules
 from pants.engine.internals.mapper import AddressMapper
 from pants.engine.internals.native import Native
-from pants.engine.internals.parser import SymbolTable
+from pants.engine.internals.parser import Parser, SymbolTable
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
-from pants.engine.legacy.parser import LegacyPythonCallbacksParser
 from pants.engine.legacy.structs import TargetAdaptor
 from pants.engine.platform import create_platform_rules
 from pants.engine.rules import RootRule, rule
@@ -39,13 +38,6 @@ from pants.scm.subsystems.changed import rules as changed_rules
 from pants.subsystem.subsystem import Subsystem
 
 logger = logging.getLogger(__name__)
-
-
-def _legacy_symbol_table(registered_target_types: RegisteredTargetTypes) -> SymbolTable:
-    """Construct a SymbolTable for the given BuildFileAliases."""
-    return SymbolTable(
-        {target_type.alias: TargetAdaptor for target_type in registered_target_types.types}
-    )
 
 
 @dataclass(frozen=True)
@@ -259,18 +251,18 @@ class EngineInitializer:
         build_configuration = build_configuration or BuildConfigInitializer.get(
             options_bootstrapper
         )
+
         bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
+        execution_options = execution_options or DEFAULT_EXECUTION_OPTIONS
 
         build_file_aliases = build_configuration.registered_aliases()
         rules = build_configuration.rules()
 
         registered_target_types = RegisteredTargetTypes.create(build_configuration.target_types())
-        symbol_table = _legacy_symbol_table(registered_target_types)
-
-        execution_options = execution_options or DEFAULT_EXECUTION_OPTIONS
-
-        # Register "literal" subjects required for these rules.
-        parser = LegacyPythonCallbacksParser(symbol_table, build_file_aliases)
+        symbol_table_from_registered_targets = SymbolTable(
+            {target_type.alias: TargetAdaptor for target_type in registered_target_types.types}
+        )
+        parser = Parser(symbol_table_from_registered_targets, build_file_aliases)
         address_mapper = AddressMapper(
             parser=parser,
             prelude_glob_patterns=build_file_prelude_globs,
@@ -289,7 +281,7 @@ class EngineInitializer:
 
         @rule
         def symbol_table_singleton() -> SymbolTable:
-            return symbol_table
+            return symbol_table_from_registered_targets
 
         @rule
         def registered_target_types_singleton() -> RegisteredTargetTypes:
