@@ -27,7 +27,7 @@ Exception caught: \\([^)]*\\)
 
 Exception message:.* 1 Exception encountered:
 
-  ResolveError: "this-target-does-not-exist" was not found in namespace "{namespace}"\\. Did you mean one of:
+  ResolveError: 'this-target-does-not-exist' was not found in namespace '{namespace}'\\. Did you mean one of:
 """,
         )
         # Ensure we write all output such as stderr and reporting files before closing any streams.
