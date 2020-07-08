@@ -532,7 +532,7 @@ impl CommandRunner for BoundedCommandRunner {
       let context = context.clone();
       let name = format!("{}-running", req.workunit_name());
 
-      semaphore.with_acquired(move || {
+      semaphore.with_acquired(move |_id| {
         let metadata = WorkunitMetadata {
           desc: Some(desc),
           message: None,

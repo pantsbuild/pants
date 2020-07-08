@@ -255,7 +255,7 @@ impl CapturedWorkdir for CommandRunner {
     let nails_command = self
       .async_semaphore
       .clone()
-      .with_acquired(move || {
+      .with_acquired(move |_id| {
         // Get the port of a running nailgun server (or a new nailgun server if it doesn't exist)
         nailgun_pool
           .connect(
