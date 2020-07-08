@@ -26,9 +26,9 @@ impl Intrinsics {
     intrinsics.insert(
       Intrinsic {
         product: types.directory_digest,
-        inputs: vec![types.input_files_content],
+        inputs: vec![types.create_digest],
       },
-      Box::new(input_files_content_to_digest),
+      Box::new(create_digest_to_digest),
     );
     intrinsics.insert(
       Intrinsic {
@@ -53,10 +53,10 @@ impl Intrinsics {
     );
     intrinsics.insert(
       Intrinsic {
-        product: types.files_content,
+        product: types.digest_contents,
         inputs: vec![types.directory_digest],
       },
-      Box::new(directory_digest_to_files_content),
+      Box::new(directory_digest_to_digest_contents),
     );
     intrinsics.insert(
       Intrinsic {
@@ -179,7 +179,7 @@ fn multi_platform_process_request_to_process_result(
   .boxed()
 }
 
-fn directory_digest_to_files_content(
+fn directory_digest_to_digest_contents(
   context: Context,
   args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
@@ -191,7 +191,7 @@ fn directory_digest_to_files_content(
       .contents_for_directory(digest)
       .compat()
       .await
-      .and_then(move |files_content| Snapshot::store_files_content(&context, &files_content))
+      .and_then(move |digest_contents| Snapshot::store_digest_contents(&context, &digest_contents))
       .map_err(|s| throw(&s))?;
     Ok(snapshot)
   }
@@ -303,7 +303,7 @@ fn path_globs_to_snapshot(
   .boxed()
 }
 
-fn input_files_content_to_digest(
+fn create_digest_to_digest(
   context: Context,
   args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {

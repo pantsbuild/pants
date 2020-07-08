@@ -9,7 +9,7 @@ from pants.backend.python.rules.inject_init import (
     inject_missing_init_files,
 )
 from pants.core.util_rules import strip_source_roots
-from pants.engine.fs import FilesContent
+from pants.engine.fs import DigestContents
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.testutil.option.util import create_options_bootstrapper
@@ -48,7 +48,7 @@ class InjectInitTest(TestBase):
         ).snapshot
         assert list(result.files) == sorted([*original_declared_files, *expected_discovered])
 
-        materialized_result = self.request_single_product(FilesContent, result.digest)
+        materialized_result = self.request_single_product(DigestContents, result.digest)
         for file_content in materialized_result:
             path = file_content.path
             if not path.endswith("__init__.py"):

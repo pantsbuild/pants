@@ -7,10 +7,10 @@ from pathlib import Path
 from pants.engine.console import Console
 from pants.engine.fs import (
     EMPTY_DIGEST,
+    CreateDigest,
     Digest,
     DirectoryToMaterialize,
     FileContent,
-    InputFilesContent,
     MaterializeDirectoriesResult,
     MaterializeDirectoryResult,
     SingleFileExecutable,
@@ -27,7 +27,7 @@ from pants.testutil.test_base import TestBase
 
 @dataclass(frozen=True)
 class MessageToGoalRule:
-    input_files_content: InputFilesContent
+    create_digest: CreateDigest
 
 
 class MockWorkspaceGoalOptions(GoalSubsystem):
@@ -42,7 +42,7 @@ class MockWorkspaceGoal(Goal):
 async def workspace_goal_rule(
     console: Console, workspace: Workspace, msg: MessageToGoalRule
 ) -> MockWorkspaceGoal:
-    digest = await Get(Digest, InputFilesContent, msg.input_files_content)
+    digest = await Get(Digest, CreateDigest, msg.create_digest)
     output = workspace.materialize_directory(DirectoryToMaterialize(digest))
     console.print_stdout(output.output_paths[0], end="")
     return MockWorkspaceGoal(exit_code=0)
@@ -61,7 +61,7 @@ class WorkspaceInGoalRuleTest(GoalRuleTestBase):
 
     def test(self):
         msg = MessageToGoalRule(
-            input_files_content=InputFilesContent([FileContent(path="a.txt", content=b"hello")])
+            create_digest=CreateDigest([FileContent(path="a.txt", content=b"hello")])
         )
         output_path = Path(self.build_root, "a.txt")
         self.assert_console_output_contains(str(output_path), additional_params=[msg])
@@ -76,14 +76,15 @@ class FileSystemTest(TestBase):
         # TODO(#8336): at some point, this test should require that Workspace only be invoked from an @goal_rule
         workspace = Workspace(self.scheduler)
 
-        input_files_content = InputFilesContent(
-            (
-                FileContent(path="a.txt", content=b"hello"),
-                FileContent(path="subdir/b.txt", content=b"goodbye"),
-            )
+        digest = self.request_single_product(
+            Digest,
+            CreateDigest(
+                [
+                    FileContent(path="a.txt", content=b"hello"),
+                    FileContent(path="subdir/b.txt", content=b"goodbye"),
+                ]
+            ),
         )
-
-        digest = self.request_single_product(Digest, input_files_content)
 
         path1 = Path("a.txt")
         path2 = Path("subdir/b.txt")
@@ -118,14 +119,15 @@ class IsChildOfTest(TestBase):
 
 class SingleFileExecutableTest(TestBase):
     def test_raises_with_multiple_files(self):
-        input_files_content = InputFilesContent(
-            (
-                FileContent(path="a.txt", content=b"test file contents"),
-                FileContent(path="b.txt", content=b"more test file contents"),
-            )
+        snapshot = self.request_single_product(
+            Snapshot,
+            CreateDigest(
+                [
+                    FileContent(path="a.txt", content=b"test file contents"),
+                    FileContent(path="b.txt", content=b"more test file contents"),
+                ]
+            ),
         )
-
-        snapshot = self.request_single_product(Snapshot, input_files_content)
 
         with self.assertRaisesWithMessage(
             SingleFileExecutable.ValidationError,
@@ -143,16 +145,14 @@ class SingleFileExecutableTest(TestBase):
             SingleFileExecutable(snapshot)
 
     def test_accepts_single_file_snapshot(self):
-        input_files_content = InputFilesContent(
-            (FileContent(path="subdir/a.txt", content=b"test file contents"),)
+        snapshot = self.request_single_product(
+            Snapshot,
+            CreateDigest([FileContent(path="subdir/a.txt", content=b"test file contents")]),
         )
-        snapshot = self.request_single_product(Snapshot, input_files_content)
-
         assert SingleFileExecutable(snapshot).exe_filename == "./subdir/a.txt"
 
-        input_files_content = InputFilesContent(
-            (FileContent(path="some_silly_file_name", content=b"test file contents"),)
+        snapshot = self.request_single_product(
+            Snapshot,
+            CreateDigest([FileContent(path="some_silly_file_name", content=b"test file contents")]),
         )
-        snapshot = self.request_single_product(Snapshot, input_files_content)
-
         assert SingleFileExecutable(snapshot).exe_filename == "./some_silly_file_name"

@@ -11,7 +11,7 @@ from pants.core.util_rules.strip_source_roots import (
     SourceRootStrippedSources,
     StripSourcesFieldRequest,
 )
-from pants.engine.fs import Digest, FilesContent
+from pants.engine.fs import Digest, DigestContents
 from pants.engine.rules import rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import InferDependenciesRequest, InferredDependencies
@@ -31,10 +31,10 @@ async def infer_python_dependencies(request: InferPythonDependencies) -> Inferre
         PythonModule.create_from_stripped_path(PurePath(fp))
         for fp in stripped_sources.snapshot.files
     )
-    files_content = await Get(FilesContent, Digest, stripped_sources.snapshot.digest)
+    digest_contents = await Get(DigestContents, Digest, stripped_sources.snapshot.digest)
     imports_per_file = tuple(
-        find_python_imports(fc.content.decode(), module_name=module.module)
-        for fc, module in zip(files_content, modules)
+        find_python_imports(file_content.content.decode(), module_name=module.module)
+        for file_content, module in zip(digest_contents, modules)
     )
     owner_per_import = await MultiGet(
         Get(PythonModuleOwner, PythonModule(imported_module))

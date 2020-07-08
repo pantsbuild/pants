@@ -73,6 +73,7 @@ python_tests(
   name='exception_sink',
   sources=['test_exception_sink.py'],
   tags=['platform_specific_behavior'],
+  timeout=90,
 )
 
 python_integration_tests(

@@ -18,11 +18,11 @@ from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.fs import (
     EMPTY_DIGEST,
     AddPrefix,
+    CreateDigest,
     Digest,
+    DigestContents,
     DirectoryToMaterialize,
     FileContent,
-    FilesContent,
-    InputFilesContent,
     MergeDigests,
     PathGlobs,
     PathGlobsAndRoot,
@@ -61,13 +61,13 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
             return globs
         return PathGlobs(globs)
 
-    def read_file_content(self, scheduler, filespecs_or_globs):
+    def read_digest_contents(self, scheduler, filespecs_or_globs):
         """Helper method for reading the content of some files from an existing scheduler
         session."""
         snapshot = self.execute_expecting_one_result(
             scheduler, Snapshot, self.path_globs(filespecs_or_globs)
         ).value
-        result = self.execute_expecting_one_result(scheduler, FilesContent, snapshot.digest).value
+        result = self.execute_expecting_one_result(scheduler, DigestContents, snapshot.digest).value
         return {f.path: f.content for f in result}
 
     def assert_walk_dirs(self, filespecs_or_globs, paths, **kwargs):
@@ -89,7 +89,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
     def assert_content(self, filespecs_or_globs, expected_content):
         with self.mk_project_tree() as project_tree:
             scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree)
-            actual_content = self.read_file_content(scheduler, filespecs_or_globs)
+            actual_content = self.read_digest_contents(scheduler, filespecs_or_globs)
             assert expected_content == actual_content
 
     def assert_digest(self, filespecs_or_globs, expected_files):
@@ -229,16 +229,16 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         )
         self.assert_walk_dirs(["*", "**"], ["a", "c.ln", "d.ln", "a/b", "d.ln/b"])
 
-    def test_files_content_literal(self) -> None:
+    def test_digest_contents_literal(self) -> None:
         self.assert_content(["4.txt", "a/4.txt.ln"], {"4.txt": b"four\n", "a/4.txt.ln": b"four\n"})
 
-    def test_files_content_directory(self) -> None:
+    def test_digest_contents_directory(self) -> None:
         with self.assertRaises(Exception):
             self.assert_content(["a/b/"], {"a/b/": "nope\n"})
         with self.assertRaises(Exception):
             self.assert_content(["a/b"], {"a/b": "nope\n"})
 
-    def test_files_content_symlink(self) -> None:
+    def test_digest_contents_symlink(self) -> None:
         self.assert_content(["c.ln/../3.txt"], {"c.ln/../3.txt": b"three\n"})
 
     def test_files_digest_literal(self) -> None:
@@ -368,13 +368,15 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         assert Path(self.build_root, "test/roland").read_text() == "European Burmese"
 
     def test_add_prefix(self) -> None:
-        input_files_content = InputFilesContent(
-            (
-                FileContent(path="main.py", content=b'print("from main")'),
-                FileContent(path="subdir/sub.py", content=b'print("from sub")'),
-            )
+        digest = self.request_single_product(
+            Digest,
+            CreateDigest(
+                (
+                    FileContent(path="main.py", content=b'print("from main")'),
+                    FileContent(path="subdir/sub.py", content=b'print("from sub")'),
+                )
+            ),
         )
-        digest = self.request_single_product(Digest, input_files_content)
 
         # Two components.
         output_digest = self.request_single_product(
@@ -631,18 +633,20 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
 
     def generate_original_digest(self) -> Digest:
         content = b"dummy content"
-        input_files_content = InputFilesContent(
-            (
-                FileContent(path="a.txt", content=content),
-                FileContent(path="b.txt", content=content),
-                FileContent(path="c.txt", content=content),
-                FileContent(path="subdir/a.txt", content=content),
-                FileContent(path="subdir/b.txt", content=content),
-                FileContent(path="subdir2/a.txt", content=content),
-                FileContent(path="subdir2/nested_subdir/x.txt", content=content),
-            )
+        return self.request_single_product(
+            Digest,
+            CreateDigest(
+                (
+                    FileContent(path="a.txt", content=content),
+                    FileContent(path="b.txt", content=content),
+                    FileContent(path="c.txt", content=content),
+                    FileContent(path="subdir/a.txt", content=content),
+                    FileContent(path="subdir/b.txt", content=content),
+                    FileContent(path="subdir2/a.txt", content=content),
+                    FileContent(path="subdir2/nested_subdir/x.txt", content=content),
+                )
+            ),
         )
-        return self.request_single_product(Digest, input_files_content)
 
     def test_empty_snapshot_subset(self) -> None:
         ss = SnapshotSubset(self.generate_original_digest(), PathGlobs(()),)
@@ -666,7 +670,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         assert set(subset_snapshot.dirs) == {"subdir2", "subdir2/nested_subdir"}
 
         content = b"dummy content"
-        subset_input = InputFilesContent(
+        subset_input = CreateDigest(
             (
                 FileContent(path="a.txt", content=content),
                 FileContent(path="c.txt", content=content),
@@ -696,7 +700,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         assert set(subset_snapshot.files) == {"a.txt"}
 
         content = b"dummy content"
-        subset_input = InputFilesContent((FileContent(path="a.txt", content=content),))
+        subset_input = CreateDigest((FileContent(path="a.txt", content=content),))
 
         subset_digest = self.request_single_product(Digest, subset_input)
         assert subset_snapshot.digest == subset_digest
@@ -710,13 +714,13 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
             fname = "4.txt"
             new_data = "rouf"
             # read the original file so we have a cached value.
-            self.read_file_content(scheduler, [fname])
+            self.read_digest_contents(scheduler, [fname])
             path_to_fname = os.path.join(project_tree.build_root, fname)
             with open(path_to_fname, "w") as f:
                 f.write(new_data)
 
             def assertion_fn() -> bool:
-                new_content = self.read_file_content(scheduler, [fname])
+                new_content = self.read_digest_contents(scheduler, [fname])
                 if new_content[fname].decode() == new_data:
                     # successfully read new data
                     return True
@@ -735,13 +739,13 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
             scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree,)
             fname = "a/b/1.txt"
             # read the original file so we have nodes to invalidate.
-            original_content = self.read_file_content(scheduler, [fname])
+            original_content = self.read_digest_contents(scheduler, [fname])
             self.assertIn(fname, original_content)
             path_to_parent_dir = os.path.join(project_tree.build_root, "a/b/")
             shutil.rmtree(path_to_parent_dir)
 
             def assertion_fn():
-                new_content = self.read_file_content(scheduler, [fname])
+                new_content = self.read_digest_contents(scheduler, [fname])
                 if new_content.get(fname) is None:
                     return True
                 return False

@@ -17,7 +17,7 @@ from pants.engine.addresses import (
     BuildFileAddress,
     BuildFileAddresses,
 )
-from pants.engine.fs import Digest, FilesContent, PathGlobs, Snapshot
+from pants.engine.fs import Digest, DigestContents, PathGlobs, Snapshot
 from pants.engine.internals.addressable import AddressableDescriptor
 from pants.engine.internals.mapper import AddressFamily, AddressMap, AddressMapper
 from pants.engine.internals.objects import Locatable, SerializableFactory, Validatable
@@ -49,9 +49,9 @@ async def evaluate_preludes(address_mapper: AddressMapper) -> BuildFilePreludeSy
             glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
         ),
     )
-    prelude_files_content = await Get(FilesContent, Digest, snapshot.digest)
+    prelude_digest_contents = await Get(DigestContents, Digest, snapshot.digest)
     values: Dict[str, Any] = {}
-    for file_content in prelude_files_content:
+    for file_content in prelude_digest_contents:
         try:
             file_content_str = file_content.content.decode()
             content = compile(file_content_str, file_content.path, "exec")
@@ -82,13 +82,13 @@ async def parse_address_family(
         )
     )
     snapshot = await Get(Snapshot, PathGlobs, path_globs)
-    files_content = await Get(FilesContent, Digest, snapshot.digest)
-    if not files_content:
+    digest_contents = await Get(DigestContents, Digest, snapshot.digest)
+    if not digest_contents:
         raise ResolveError(f"Directory '{directory.path}' does not contain any BUILD files.")
 
     address_maps = [
         AddressMap.parse(fc.path, fc.content.decode(), address_mapper.parser, prelude_symbols)
-        for fc in files_content
+        for fc in digest_contents
     ]
     return AddressFamily.create(directory.path, address_maps)
 

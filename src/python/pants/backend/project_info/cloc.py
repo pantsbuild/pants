@@ -11,10 +11,10 @@ from pants.core.util_rules.external_tool import (
 )
 from pants.engine.console import Console
 from pants.engine.fs import (
+    CreateDigest,
     Digest,
+    DigestContents,
     FileContent,
-    FilesContent,
-    InputFilesContent,
     MergeDigests,
     SingleFileExecutable,
     SourcesSnapshots,
@@ -98,7 +98,7 @@ async def run_cloc(
 
     input_files_filename = "input_files.txt"
     input_file_digest = await Get(
-        Digest, InputFilesContent([FileContent(path=input_files_filename, content=file_content)]),
+        Digest, CreateDigest([FileContent(input_files_filename, file_content)])
     )
     downloaded_cloc_binary = await Get(
         DownloadedExternalTool, ExternalToolRequest, cloc_binary.get_request(Platform.current)
@@ -131,18 +131,19 @@ async def run_cloc(
         output_files=(report_filename, ignore_filename),
         description=f"Count lines of code for {pluralize(len(all_file_names), 'file')}",
     )
-
     exec_result = await Get(ProcessResult, Process, req)
-    files_content = await Get(FilesContent, Digest, exec_result.output_digest)
 
-    file_outputs = {fc.path: fc.content.decode() for fc in files_content}
+    report_digest_contents = await Get(DigestContents, Digest, exec_result.output_digest)
+    reports = {
+        file_content.path: file_content.content.decode() for file_content in report_digest_contents
+    }
 
-    for line in file_outputs[report_filename].splitlines():
+    for line in reports[report_filename].splitlines():
         console.print_stdout(line)
 
     if options.values.ignored:
         console.print_stderr("\nIgnored the following files:")
-        for line in file_outputs[ignore_filename].splitlines():
+        for line in reports[ignore_filename].splitlines():
             console.print_stderr(line)
 
     return CountLinesOfCode(exit_code=0)

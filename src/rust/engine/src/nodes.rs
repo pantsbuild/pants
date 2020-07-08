@@ -556,13 +556,13 @@ impl Snapshot {
     ))
   }
 
-  pub fn store_files_content(context: &Context, item: &[FileContent]) -> Result<Value, String> {
+  pub fn store_digest_contents(context: &Context, item: &[FileContent]) -> Result<Value, String> {
     let entries = item
       .iter()
       .map(|e| Self::store_file_content(context, e))
       .collect::<Result<Vec<_>, _>>()?;
     Ok(externs::unsafe_call(
-      &context.core.types.construct_files_content,
+      &context.core.types.construct_digest_contents,
       &[externs::store_tuple(entries)],
     ))
   }

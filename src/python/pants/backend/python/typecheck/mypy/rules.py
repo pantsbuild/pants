@@ -23,14 +23,7 @@ from pants.backend.python.typecheck.mypy.subsystem import MyPy
 from pants.core.goals.typecheck import TypecheckRequest, TypecheckResult, TypecheckResults
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.engine.addresses import Addresses
-from pants.engine.fs import (
-    Digest,
-    FileContent,
-    InputFilesContent,
-    MergeDigests,
-    PathGlobs,
-    Snapshot,
-)
+from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, PathGlobs, Snapshot
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get, MultiGet
@@ -108,14 +101,14 @@ async def mypy_lint(
 
     file_list_path = "__files.txt"
     python_files = "\n".join(f for f in prepared_sources.snapshot.files if f.endswith(".py"))
-    file_list = await Get(
-        Digest, InputFilesContent([FileContent(file_list_path, python_files.encode())]),
+    file_list_digest = await Get(
+        Digest, CreateDigest([FileContent(file_list_path, python_files.encode())]),
     )
 
     merged_input_files = await Get(
         Digest,
         MergeDigests(
-            [file_list, prepared_sources.snapshot.digest, pex.digest, config_snapshot.digest]
+            [file_list_digest, prepared_sources.snapshot.digest, pex.digest, config_snapshot.digest]
         ),
     )
 

@@ -30,7 +30,7 @@ from pants.core.goals.test import (
     FilesystemCoverageReport,
 )
 from pants.engine.addresses import Address
-from pants.engine.fs import AddPrefix, Digest, FileContent, InputFilesContent, MergeDigests
+from pants.engine.fs import AddPrefix, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get, MultiGet
@@ -142,9 +142,7 @@ async def create_coverage_config() -> CoverageConfig:
     config_stream = StringIO()
     cp.write(config_stream)
     config_content = config_stream.getvalue()
-    digest = await Get(
-        Digest, InputFilesContent([FileContent(".coveragerc", config_content.encode())])
-    )
+    digest = await Get(Digest, CreateDigest([FileContent(".coveragerc", config_content.encode())]))
     return CoverageConfig(digest)
 
 

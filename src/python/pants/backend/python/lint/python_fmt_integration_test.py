@@ -12,7 +12,7 @@ from pants.backend.python.target_types import PythonLibrary
 from pants.base.specs import SingleAddress
 from pants.core.goals.fmt import LanguageFmtResults
 from pants.engine.addresses import Address
-from pants.engine.fs import Digest, FileContent, InputFilesContent
+from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.engine.target import TargetsWithOrigins, TargetWithOrigin
@@ -51,7 +51,7 @@ class PythonFmtIntegrationTest(ExternalToolTestBase):
         return results
 
     def get_digest(self, source_files: List[FileContent]) -> Digest:
-        return self.request_single_product(Digest, InputFilesContent(source_files))
+        return self.request_single_product(Digest, CreateDigest(source_files))
 
     def test_multiple_formatters_changing_the_same_file(self) -> None:
         original_source = FileContent(

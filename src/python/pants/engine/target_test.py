@@ -15,10 +15,10 @@ from pants.base.specs import FilesystemLiteralSpec
 from pants.engine.addresses import Address, Addresses
 from pants.engine.fs import (
     EMPTY_DIGEST,
+    CreateDigest,
     Digest,
+    DigestContents,
     FileContent,
-    FilesContent,
-    InputFilesContent,
     PathGlobs,
     Snapshot,
 )
@@ -942,7 +942,7 @@ async def generate_smalltalk_from_avro(
         file_name = f"{PurePath(fp).stem}.st"
         return FileContent(str(PurePath(parent, file_name)), b"Generated")
 
-    result = await Get(Snapshot, InputFilesContent([generate_fortran(fp) for fp in protocol_files]))
+    result = await Get(Snapshot, CreateDigest([generate_fortran(fp) for fp in protocol_files]))
     return GeneratedSources(result)
 
 
@@ -1116,9 +1116,9 @@ async def infer_smalltalk_dependencies(request: InferSmalltalkDependencies) -> I
     # To demo an inference rule, we simply treat each `sources` file to contain a list of
     # addresses, one per line.
     hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.sources_field))
-    file_contents = await Get(FilesContent, Digest, hydrated_sources.snapshot.digest)
+    digest_contents = await Get(DigestContents, Digest, hydrated_sources.snapshot.digest)
     all_lines = itertools.chain.from_iterable(
-        fc.content.decode().splitlines() for fc in file_contents
+        file_content.content.decode().splitlines() for file_content in digest_contents
     )
     return InferredDependencies(Address.parse(line) for line in all_lines)
 

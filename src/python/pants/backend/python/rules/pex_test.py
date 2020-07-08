@@ -22,7 +22,7 @@ from pants.backend.python.rules.pex import rules as pex_rules
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.target_types import PythonInterpreterCompatibility
 from pants.engine.addresses import Address
-from pants.engine.fs import Digest, DirectoryToMaterialize, FileContent, InputFilesContent
+from pants.engine.fs import CreateDigest, Digest, DirectoryToMaterialize, FileContent
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
@@ -269,14 +269,15 @@ class PexTest(ExternalToolTestBase):
         )
 
     def test_pex_execution(self) -> None:
-        sources_content = InputFilesContent(
-            (
-                FileContent(path="main.py", content=b'print("from main")'),
-                FileContent(path="subdir/sub.py", content=b'print("from sub")'),
-            )
+        sources = self.request_single_product(
+            Digest,
+            CreateDigest(
+                (
+                    FileContent(path="main.py", content=b'print("from main")'),
+                    FileContent(path="subdir/sub.py", content=b'print("from sub")'),
+                )
+            ),
         )
-
-        sources = self.request_single_product(Digest, sources_content)
         pex_output = self.create_pex_and_get_all_data(entry_point="main", sources=sources)
 
         pex_files = pex_output["files"]
@@ -365,10 +366,9 @@ class PexTest(ExternalToolTestBase):
         # This verifies that the file was indeed provided as additional input to the pex call.
         preamble_file = "custom_preamble.txt"
         preamble = "#!CUSTOM PREAMBLE\n"
-        additional_inputs_content = InputFilesContent(
-            (FileContent(path=preamble_file, content=preamble.encode()),)
+        additional_inputs = self.request_single_product(
+            Digest, CreateDigest([FileContent(path=preamble_file, content=preamble.encode())])
         )
-        additional_inputs = self.request_single_product(Digest, additional_inputs_content)
         additional_pex_args = (f"--preamble-file={preamble_file}",)
         pex_output = self.create_pex_and_get_all_data(
             additional_inputs=additional_inputs, additional_pex_args=additional_pex_args
