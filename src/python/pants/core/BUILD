@@ -3,21 +3,9 @@
 
 python_library(
   sources = ['*.py', '!register.py', '!*_test.py'],
-  dependencies = [
-    'src/python/pants/build_graph',
-    'src/python/pants/engine:target',
-    'src/python/pants/util:frozendict',
-  ],
 )
 
 python_library(
   name = 'plugin',
   sources = ['register.py'],
-  dependencies = [
-    ':core',
-    'src/python/pants/core/goals',
-    'src/python/pants/core/util_rules',
-    'src/python/pants/engine:addresses',
-    'src/python/pants/engine:target',
-  ],
 )
