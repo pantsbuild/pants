@@ -5,7 +5,7 @@ import re
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, Optional, Tuple, Union, cast
 
-from pants.base.exceptions import DuplicateNameError, MappingError, UnaddressableObjectError
+from pants.base.exceptions import DuplicateNameError, MappingError
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.internals.objects import Serializable
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
@@ -32,37 +32,27 @@ class AddressMap:
     def parse(
         cls,
         filepath: str,
-        filecontent: bytes,
+        build_file_content: str,
         parser: Parser,
         extra_symbols: BuildFilePreludeSymbols,
     ) -> "AddressMap":
         """Parses a source for addressable Serializable objects.
 
-        No matter the parser used, the parsed and mapped addressable objects are all 'thin'; ie: any
-        objects they point to in other namespaces or even in the same namespace but from a separate
-        source are left as unresolved pointers.
-
-        :param filepath: The path to the byte source containing serialized objects.
-        :param filecontent: The content of byte source containing serialized objects to be parsed.
-        :param parser: The parser cls to use.
+        The parsed and mapped addressable objects are all 'thin': any objects they point to in other
+        namespaces or even in the same namespace but from a separate source are left as unresolved
+        pointers.
         """
         try:
-            objects = parser.parse(filepath, filecontent, extra_symbols)
+            objects = parser.parse(filepath, build_file_content, extra_symbols)
         except Exception as e:
             raise MappingError(f"Failed to parse {filepath}:\n{e!r}")
         objects_by_name: Dict[str, ThinAddressableObject] = {}
         for obj in objects:
-            if not Serializable.is_serializable(obj):
-                raise UnaddressableObjectError("Parsed a non-serializable object: {!r}".format(obj))
             attributes = obj._asdict()
-
-            name = attributes.get("name")
-            if not name:
-                raise UnaddressableObjectError("Parsed a non-addressable object: {!r}".format(obj))
-
+            name = attributes["name"]
             if name in objects_by_name:
                 raise DuplicateNameError(
-                    "An object already exists at {!r} with name {!r}: {!r}.  Cannot "
+                    "An object already exists at {!r} with name {!r}: {!r}. Cannot "
                     "map {!r}".format(filepath, name, objects_by_name[name], obj)
                 )
             objects_by_name[name] = obj
@@ -175,7 +165,7 @@ class AddressMapper:
     def __init__(
         self,
         parser: Parser,
-        prelude_glob_patterns,
+        prelude_glob_patterns: Optional[Iterable[str]] = None,
         build_patterns: Optional[Iterable[str]] = None,
         build_ignore_patterns: Optional[Iterable[str]] = None,
         exclude_target_regexps: Optional[Iterable[str]] = None,
@@ -183,26 +173,20 @@ class AddressMapper:
     ) -> None:
         """Create an AddressMapper.
 
-        Both the set of files that define a mappable BUILD files and the parser used to parse those
-        files can be customized.  See the `pants.engine.parsers` module for example parsers.
-
-        :param parser: The BUILD file parser to use.
-        :param build_patterns: A tuple of fnmatch-compatible patterns for identifying BUILD files
-                              used to resolve addresses.
+        :param build_patterns: A tuple of PathGlob-compatible patterns for identifying BUILD files
+                               used to resolve addresses.
         :param build_ignore_patterns: A list of path ignore patterns used when searching for BUILD files.
         :param exclude_target_regexps: A list of regular expressions for excluding targets.
         """
         self.parser = parser
-        self.prelude_glob_patterns = prelude_glob_patterns
+        self.prelude_glob_patterns = tuple(prelude_glob_patterns or [])
         self.build_patterns = tuple(build_patterns or ["BUILD", "BUILD.*"])
         self.build_ignore_patterns = tuple(build_ignore_patterns or [])
         self.exclude_target_regexps = tuple(exclude_target_regexps or [])
         self.subproject_roots = tuple(subproject_roots or [])
 
     def __repr__(self):
-        return "AddressMapper(parser={}, build_patterns={})".format(
-            self.parser, self.build_patterns
-        )
+        return f"AddressMapper(build_patterns={self.build_patterns})"
 
     @memoized_property
     def exclude_patterns(self):

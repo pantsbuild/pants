@@ -4,7 +4,6 @@
 import functools
 import importlib
 import inspect
-import threading
 from json.decoder import JSONDecoder
 from json.encoder import JSONEncoder
 
@@ -37,7 +36,6 @@ def _import(typename):
 
 class JsonParser(Parser):
     def __init__(self, symbol_table):
-        super().__init__()
         self.symbol_table = symbol_table
 
     def _as_type(self, type_or_name):
@@ -202,96 +200,3 @@ def encode_json(obj, inline=False, **kwargs):
     """
     encoder = JSONEncoder(default=functools.partial(_object_encoder, inline=inline), **kwargs)
     return encoder.encode(obj)
-
-
-class PythonAssignmentsParser(Parser):
-    """A parser that parses the given python code into a list of top-level objects found.
-
-    Only Serializable objects assigned to top-level variables will be collected and returned.  These
-    objects will be addressable via their top-level variable names in the parsed namespace.
-    """
-
-    def __init__(self, symbol_table):
-        super().__init__()
-        self.symbol_table = symbol_table
-
-    @memoized_property
-    def _globals(self):
-        def aliased(type_alias, object_type, **kwargs):
-            return object_type(type_alias=type_alias, **kwargs)
-
-        parse_globals = {}
-        for alias, symbol in self.symbol_table.table.items():
-            parse_globals[alias] = functools.partial(aliased, alias, symbol)
-        return parse_globals
-
-    def parse(self, filepath, filecontent, _extra_symbols):
-        parse_globals = self._globals
-
-        python = filecontent
-        symbols = {}
-        exec(python, parse_globals, symbols)
-
-        objects = []
-        for name, obj in symbols.items():
-            if isinstance(obj, type):
-                # Allow type imports
-                continue
-
-            if not Serializable.is_serializable(obj):
-                raise ParseError(f"Found a non-serializable top-level object: {obj}")
-
-            attributes = obj._asdict()
-            if "name" in attributes:
-                attributes = attributes.copy()
-                redundant_name = attributes.pop("name", None)
-                if redundant_name and redundant_name != name:
-                    raise ParseError(
-                        "The object named {!r} is assigned to a mismatching name {!r}".format(
-                            redundant_name, name
-                        )
-                    )
-            obj_type = type(obj)
-            named_obj = obj_type(name=name, **attributes)
-            objects.append(named_obj)
-        return objects
-
-
-class PythonCallbacksParser(Parser):
-    """A parser that parses the given python code into a list of top-level objects found.
-
-    Only Serializable objects with `name`s will be collected and returned.  These objects will be
-    addressable via their name in the parsed namespace.
-    """
-
-    def __init__(self, symbol_table):
-        super().__init__()
-        self.symbol_table = symbol_table
-        self._lock = threading.Lock()
-
-    @memoized_property
-    def _globals(self):
-        objects = []
-
-        def registered(type_name, object_type, name=None, **kwargs):
-            if name:
-                obj = object_type(name=name, type_alias=type_name, **kwargs)
-                if Serializable.is_serializable(obj):
-                    objects.append(obj)
-                return obj
-            else:
-                return object_type(type_alias=type_name, **kwargs)
-
-        parse_globals = {}
-        for alias, symbol in self.symbol_table.table.items():
-            parse_globals[alias] = functools.partial(registered, alias, symbol)
-        return objects, parse_globals
-
-    def parse(self, filepath, filecontent, _extra_symbols):
-        objects, parse_globals = self._globals
-
-        python = filecontent
-        with self._lock:
-            del objects[:]
-            exec(python, parse_globals, {})
-            return list(objects)

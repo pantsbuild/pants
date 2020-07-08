@@ -113,9 +113,6 @@ branch_notes = """
 
 [pytest]
 pytest_plugins.add = [
-  # TODO(#8651): We need this until we switch to implicit namespace packages so that pytest-cov
-  #  understands our __init__ files. NB: this version matches 3rdparty/python/requirements.txt.
-  "setuptools==47.3.1",
   "ipdb",
   "pytest-icdiff",
   "pygments",

@@ -9,5 +9,5 @@ class Lambdex(PythonToolBase):
     default_version = "lambdex==0.1.3"
     # TODO(John Sirois): Remove when we can upgrade to a version of lambdex with
     # https://github.com/wickman/lambdex/issues/6 fixed.
-    default_extra_requirements = ["setuptools==47.3.1"]
+    default_extra_requirements = ["setuptools==49.1.0"]
     default_entry_point = "lambdex.bin.lambdex"

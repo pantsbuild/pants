@@ -2,9 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os.path
-import tokenize
 from collections.abc import Mapping
-from io import StringIO
 from typing import Any, Dict
 
 from pants.base.exceptions import ResolveError
@@ -23,7 +21,7 @@ from pants.engine.fs import Digest, FilesContent, PathGlobs, Snapshot
 from pants.engine.internals.addressable import AddressableDescriptor
 from pants.engine.internals.mapper import AddressFamily, AddressMap, AddressMapper
 from pants.engine.internals.objects import Locatable, SerializableFactory, Validatable
-from pants.engine.internals.parser import BuildFilePreludeSymbols, HydratedStruct, ParseError
+from pants.engine.internals.parser import BuildFilePreludeSymbols, HydratedStruct, error_on_imports
 from pants.engine.internals.struct import Struct
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
@@ -85,21 +83,13 @@ async def parse_address_family(
     )
     snapshot = await Get(Snapshot, PathGlobs, path_globs)
     files_content = await Get(FilesContent, Digest, snapshot.digest)
-
     if not files_content:
-        raise ResolveError(
-            'Directory "{}" does not contain any BUILD files.'.format(directory.path)
-        )
-    address_maps = []
-    for filecontent_product in files_content:
-        address_maps.append(
-            AddressMap.parse(
-                filecontent_product.path,
-                filecontent_product.content,
-                address_mapper.parser,
-                prelude_symbols,
-            )
-        )
+        raise ResolveError(f"Directory '{directory.path}' does not contain any BUILD files.")
+
+    address_maps = [
+        AddressMap.parse(fc.path, fc.content.decode(), address_mapper.parser, prelude_symbols)
+        for fc in files_content
+    ]
     return AddressFamily.create(directory.path, address_maps)
 
 
@@ -108,8 +98,8 @@ def _raise_did_you_mean(address_family: AddressFamily, name: str, source=None) -
     possibilities = "\n  ".join(":{}".format(target_name) for target_name in sorted(names))
 
     resolve_error = ResolveError(
-        '"{}" was not found in namespace "{}". '
-        "Did you mean one of:\n  {}".format(name, address_family.namespace, possibilities)
+        f"'{name}' was not found in namespace '{address_family.namespace}'. Did you mean one "
+        f"of:\n  {possibilities}"
     )
 
     if source:
@@ -317,31 +307,6 @@ def _address_spec_to_globs(address_mapper: AddressMapper, address_specs: Address
     for address_spec in address_specs:
         patterns.update(address_spec.make_glob_patterns(address_mapper))
     return PathGlobs(globs=(*patterns, *(f"!{p}" for p in address_mapper.build_ignore_patterns)))
-
-
-def error_on_imports(build_file_content: str, filepath: str) -> None:
-    # Perform this check after successful execution, so we know the Python is valid (and should
-    # tokenize properly!)
-    # Note that this is incredibly poor sandboxing. There are many ways to get around it.
-    # But it's sufficient to tell most users who aren't being actively malicious that they're doing
-    # something wrong, and it has a low performance overhead.
-    if "import" not in build_file_content:
-        return
-    io_wrapped_python = StringIO(build_file_content)
-    for token in tokenize.generate_tokens(io_wrapped_python.readline):
-        token_str = token[1]
-        lineno, _ = token[2]
-
-        if token_str != "import":
-            continue
-
-        raise ParseError(
-            f"Import used in {filepath} at line {lineno}. Import statements are banned in "
-            "BUILD files because they can easily break Pants caching and lead to stale results. "
-            "\n\nInstead, consider writing a macro (https://pants.readme.io/docs/macros) or writing "
-            "a plugin (https://pants.readme.io/docs/plugins-overview). If you are using the V1 "
-            "version of Pants, see https://www.pantsbuild.org/howto_plugin.html."
-        )
 
 
 def create_graph_rules(address_mapper: AddressMapper):

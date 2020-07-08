@@ -326,7 +326,6 @@ class Options:
         # TODO(benjy): Make this an instance of a class that implements __call__, so we can
         # docstring it, and so it's less weird than attaching properties to a function.
         def register(*args, **kwargs):
-            kwargs["registering_class"] = optionable_class
             self.register(optionable_class.options_scope, *args, **kwargs)
 
         # Clients can access the bootstrap option values as register.bootstrap.

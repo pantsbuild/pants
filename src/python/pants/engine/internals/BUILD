@@ -24,10 +24,8 @@ python_library(
   name='core_abstractions',
   sources=[
     'addressable.py',
-    'mapper.py',
     'nodes.py',
     'objects.py',
-    'parser.py',
     'struct.py'
   ],
 )
@@ -40,6 +38,11 @@ python_library(
 python_library(
   name='graph',
   sources=['graph.py'],
+)
+
+python_library(
+  name="mapper",
+  sources=["mapper.py"],
 )
 
 python_library(
@@ -61,6 +64,11 @@ resources(
 python_library(
   name='options_parsing',
   sources=['options_parsing.py'],
+)
+
+python_library(
+  name='parser',
+  sources=['parser.py'],
 )
 
 python_library(

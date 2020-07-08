@@ -568,7 +568,6 @@ class Parser:
         "advanced",
         "recursive",
         "recursive_root",
-        "registering_class",
         "fingerprint",
         "removal_version",
         "removal_hint",
