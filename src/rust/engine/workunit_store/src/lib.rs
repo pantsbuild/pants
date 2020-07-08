@@ -434,7 +434,7 @@ impl WorkunitStore {
     self.heavy_hitters_data.heavy_hitters(k)
   }
 
-  pub fn start_workunit(
+  fn start_workunit(
     &self,
     span_id: SpanId,
     name: String,
