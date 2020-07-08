@@ -147,16 +147,12 @@ def run_rule(
 
     if rule_args is not None and len(rule_args) != len(task_rule.input_selectors):
         raise ValueError(
-            "Rule expected to receive arguments of the form: {}; got: {}".format(
-                task_rule.input_selectors, rule_args
-            )
+            f"Rule expected to receive arguments of the form: {task_rule.input_selectors}; got: {rule_args}"
         )
 
     if mock_gets is not None and len(mock_gets) != len(task_rule.input_gets):
         raise ValueError(
-            "Rule expected to receive Get providers for {}; got: {}".format(
-                task_rule.input_gets, mock_gets
-            )
+            f"Rule expected to receive Get providers for {task_rule.input_gets}; got: {mock_gets}"
         )
 
     res = rule(*(rule_args or ()))
@@ -181,9 +177,7 @@ def run_rule(
         )
         if provider is None:
             raise AssertionError(
-                "Rule requested: Get{}, which cannot be satisfied.".format(
-                    (product, type(subject), subject)
-                )
+                f"Rule requested: Get{(product, type(subject), subject)}, which cannot be satisfied."
             )
         return provider(subject)
 
