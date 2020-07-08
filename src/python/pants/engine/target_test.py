@@ -17,8 +17,8 @@ from pants.engine.fs import (
     EMPTY_DIGEST,
     CreateDigest,
     Digest,
+    DigestContents,
     FileContent,
-    FileContentCollection,
     PathGlobs,
     Snapshot,
 )
@@ -1116,9 +1116,9 @@ async def infer_smalltalk_dependencies(request: InferSmalltalkDependencies) -> I
     # To demo an inference rule, we simply treat each `sources` file to contain a list of
     # addresses, one per line.
     hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.sources_field))
-    file_contents = await Get(FileContentCollection, Digest, hydrated_sources.snapshot.digest)
+    digest_contents = await Get(DigestContents, Digest, hydrated_sources.snapshot.digest)
     all_lines = itertools.chain.from_iterable(
-        fc.content.decode().splitlines() for fc in file_contents
+        file_content.content.decode().splitlines() for file_content in digest_contents
     )
     return InferredDependencies(Address.parse(line) for line in all_lines)
 

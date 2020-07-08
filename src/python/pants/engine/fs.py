@@ -31,8 +31,8 @@ class FileContent:
         return f"FileContent(path={self.path}, content=(len:{len(self.content)}), is_executable={self.is_executable})"
 
 
-class FileContentCollection(Collection[FileContent]):
-    pass
+class DigestContents(Collection[FileContent]):
+    """The file contents of a Digest."""
 
 
 class CreateDigest(Collection[FileContent]):

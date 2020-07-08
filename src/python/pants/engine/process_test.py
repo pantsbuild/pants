@@ -5,14 +5,7 @@ import os
 from dataclasses import dataclass
 from typing import ClassVar, Tuple
 
-from pants.engine.fs import (
-    CreateDigest,
-    Digest,
-    FileContent,
-    FileContentCollection,
-    PathGlobs,
-    Snapshot,
-)
+from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, PathGlobs, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import (
     FallibleProcessResult,
@@ -328,10 +321,8 @@ class ProcessTest(TestBase):
             ),
         )
 
-        file_content_collection = self.request_single_product(
-            FileContentCollection, process_result.output_digest,
-        )
-        assert file_content_collection == FileContentCollection(
+        digest_contents = self.request_single_product(DigestContents, process_result.output_digest,)
+        assert digest_contents == DigestContents(
             [FileContent("roland", b"European Burmese", False)]
         )
 
@@ -361,11 +352,11 @@ class Simple {
             BinaryLocation("/usr/bin/javac"), JavacSources(("simple/Simple.java",)),
         )
         result = self.request_single_product(JavacCompileResult, request)
-        file_content_collection = self.request_single_product(FileContentCollection, result.digest)
+        digest_contents = self.request_single_product(DigestContents, result.digest)
         assert sorted(["simple/Simple.java", "simple/Simple.class"]) == sorted(
-            file.path for file in file_content_collection
+            file.path for file in digest_contents
         )
-        assert len(file_content_collection[0].content) > 0
+        assert len(digest_contents[0].content) > 0
 
     def test_javac_compilation_example_failure(self):
         self.create_dir("simple")

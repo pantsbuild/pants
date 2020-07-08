@@ -11,7 +11,7 @@ from pkg_resources import Requirement
 from pants.backend.python.target_types import PythonSources
 from pants.core.target_types import ResourcesSources
 from pants.core.util_rules.strip_source_roots import SourceRootStrippedSources
-from pants.engine.fs import FileContentCollection
+from pants.engine.fs import DigestContents
 from pants.engine.target import Target
 from pants.python.python_setup import PythonSetup
 from pants.source.source_root import SourceRootError
@@ -95,8 +95,9 @@ def distutils_repr(obj):
 
 
 def find_packages(
+    *,
     tgts_and_stripped_srcs: Iterable[Tuple[Target, SourceRootStrippedSources]],
-    init_py_contents: FileContentCollection,
+    init_py_digest_contents: DigestContents,
     py2: bool,
 ) -> Tuple[Tuple[str, ...], Tuple[str, ...], Tuple[PackageDatum, ...]]:
     """Analyze the package structure for the given sources.
@@ -118,8 +119,8 @@ def find_packages(
     # Add any packages implied by ancestor __init__.py files.
     # Note that init_py_contents includes all __init__.py files, not just ancestors, but
     # that's fine - the others will already have been found in tgts_and_stripped_srcs above.
-    for init_py_content in init_py_contents:
-        packages.add(os.path.dirname(init_py_content.path).replace(os.path.sep, "."))
+    for file_content in init_py_digest_contents:
+        packages.add(os.path.dirname(file_content.path).replace(os.path.sep, "."))
 
     # Now find all package_data.
     for tgt, stripped_srcs in tgts_and_stripped_srcs:
@@ -151,7 +152,7 @@ def find_packages(
     # should *not* be listed in the setup namespace_packages kwarg. That's for pkg_resources-style
     # namespace packages only. See https://github.com/pypa/sample-namespace-packages/.
     namespace_packages: Set[str] = set()
-    init_py_by_path: Dict[str, bytes] = {ipc.path: ipc.content for ipc in init_py_contents}
+    init_py_by_path: Dict[str, bytes] = {ipc.path: ipc.content for ipc in init_py_digest_contents}
     for pkg in packages:
         path = os.path.join(pkg.replace(".", os.path.sep), "__init__.py")
         if path in init_py_by_path and declares_pkg_resources_namespace_package(

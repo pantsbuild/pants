@@ -20,9 +20,9 @@ from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
     Digest,
+    DigestContents,
     DirectoryToMaterialize,
     FileContent,
-    FileContentCollection,
     MergeDigests,
     PathGlobs,
     PathGlobsAndRoot,
@@ -61,15 +61,13 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
             return globs
         return PathGlobs(globs)
 
-    def read_file_content_collection(self, scheduler, filespecs_or_globs):
+    def read_digest_contents(self, scheduler, filespecs_or_globs):
         """Helper method for reading the content of some files from an existing scheduler
         session."""
         snapshot = self.execute_expecting_one_result(
             scheduler, Snapshot, self.path_globs(filespecs_or_globs)
         ).value
-        result = self.execute_expecting_one_result(
-            scheduler, FileContentCollection, snapshot.digest
-        ).value
+        result = self.execute_expecting_one_result(scheduler, DigestContents, snapshot.digest).value
         return {f.path: f.content for f in result}
 
     def assert_walk_dirs(self, filespecs_or_globs, paths, **kwargs):
@@ -91,7 +89,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
     def assert_content(self, filespecs_or_globs, expected_content):
         with self.mk_project_tree() as project_tree:
             scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree)
-            actual_content = self.read_file_content_collection(scheduler, filespecs_or_globs)
+            actual_content = self.read_digest_contents(scheduler, filespecs_or_globs)
             assert expected_content == actual_content
 
     def assert_digest(self, filespecs_or_globs, expected_files):
@@ -231,16 +229,16 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         )
         self.assert_walk_dirs(["*", "**"], ["a", "c.ln", "d.ln", "a/b", "d.ln/b"])
 
-    def test_file_content_collection_literal(self) -> None:
+    def test_digest_contents_literal(self) -> None:
         self.assert_content(["4.txt", "a/4.txt.ln"], {"4.txt": b"four\n", "a/4.txt.ln": b"four\n"})
 
-    def test_file_content_collection_directory(self) -> None:
+    def test_digest_contents_directory(self) -> None:
         with self.assertRaises(Exception):
             self.assert_content(["a/b/"], {"a/b/": "nope\n"})
         with self.assertRaises(Exception):
             self.assert_content(["a/b"], {"a/b": "nope\n"})
 
-    def test_file_content_collection_symlink(self) -> None:
+    def test_digest_contents_symlink(self) -> None:
         self.assert_content(["c.ln/../3.txt"], {"c.ln/../3.txt": b"three\n"})
 
     def test_files_digest_literal(self) -> None:
@@ -716,13 +714,13 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
             fname = "4.txt"
             new_data = "rouf"
             # read the original file so we have a cached value.
-            self.read_file_content_collection(scheduler, [fname])
+            self.read_digest_contents(scheduler, [fname])
             path_to_fname = os.path.join(project_tree.build_root, fname)
             with open(path_to_fname, "w") as f:
                 f.write(new_data)
 
             def assertion_fn() -> bool:
-                new_content = self.read_file_content_collection(scheduler, [fname])
+                new_content = self.read_digest_contents(scheduler, [fname])
                 if new_content[fname].decode() == new_data:
                     # successfully read new data
                     return True
@@ -741,13 +739,13 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
             scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree,)
             fname = "a/b/1.txt"
             # read the original file so we have nodes to invalidate.
-            original_content = self.read_file_content_collection(scheduler, [fname])
+            original_content = self.read_digest_contents(scheduler, [fname])
             self.assertIn(fname, original_content)
             path_to_parent_dir = os.path.join(project_tree.build_root, "a/b/")
             shutil.rmtree(path_to_parent_dir)
 
             def assertion_fn():
-                new_content = self.read_file_content_collection(scheduler, [fname])
+                new_content = self.read_digest_contents(scheduler, [fname])
                 if new_content.get(fname) is None:
                     return True
                 return False

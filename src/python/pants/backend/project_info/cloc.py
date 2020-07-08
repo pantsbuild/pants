@@ -13,8 +13,8 @@ from pants.engine.console import Console
 from pants.engine.fs import (
     CreateDigest,
     Digest,
+    DigestContents,
     FileContent,
-    FileContentCollection,
     MergeDigests,
     SingleFileExecutable,
     SourcesSnapshots,
@@ -133,15 +133,17 @@ async def run_cloc(
     )
     exec_result = await Get(ProcessResult, Process, req)
 
-    file_content_collection = await Get(FileContentCollection, Digest, exec_result.output_digest)
-    file_outputs = {fc.path: fc.content.decode() for fc in file_content_collection}
+    report_digest_contents = await Get(DigestContents, Digest, exec_result.output_digest)
+    reports = {
+        file_content.path: file_content.content.decode() for file_content in report_digest_contents
+    }
 
-    for line in file_outputs[report_filename].splitlines():
+    for line in reports[report_filename].splitlines():
         console.print_stdout(line)
 
     if options.values.ignored:
         console.print_stderr("\nIgnored the following files:")
-        for line in file_outputs[ignore_filename].splitlines():
+        for line in reports[ignore_filename].splitlines():
             console.print_stderr(line)
 
     return CountLinesOfCode(exit_code=0)

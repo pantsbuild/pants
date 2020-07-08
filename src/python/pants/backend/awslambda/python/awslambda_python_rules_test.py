@@ -12,7 +12,7 @@ from pants.backend.awslambda.python.awslambda_python_rules import rules as awsla
 from pants.backend.awslambda.python.target_types import PythonAWSLambda
 from pants.backend.python.target_types import PythonLibrary
 from pants.engine.addresses import Address
-from pants.engine.fs import FileContentCollection
+from pants.engine.fs import DigestContents
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.engine.target import WrappedTarget
@@ -47,11 +47,11 @@ class TestPythonAWSLambdaCreation(ExternalToolTestBase):
                 ),
             ),
         )
-        file_content_collection = self.request_single_product(
-            FileContentCollection, created_awslambda.digest
+        created_awslambda_digest_contents = self.request_single_product(
+            DigestContents, created_awslambda.digest
         )
-        assert len(file_content_collection) == 1
-        return created_awslambda.name, file_content_collection[0].content
+        assert len(created_awslambda_digest_contents) == 1
+        return created_awslambda.name, created_awslambda_digest_contents[0].content
 
     def test_create_hello_world_lambda(self) -> None:
         self.create_file(

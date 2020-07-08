@@ -53,10 +53,10 @@ impl Intrinsics {
     );
     intrinsics.insert(
       Intrinsic {
-        product: types.file_content_collection,
+        product: types.digest_contents,
         inputs: vec![types.directory_digest],
       },
-      Box::new(directory_digest_to_file_content_collection),
+      Box::new(directory_digest_to_digest_contents),
     );
     intrinsics.insert(
       Intrinsic {
@@ -179,7 +179,7 @@ fn multi_platform_process_request_to_process_result(
   .boxed()
 }
 
-fn directory_digest_to_file_content_collection(
+fn directory_digest_to_digest_contents(
   context: Context,
   args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
@@ -191,7 +191,7 @@ fn directory_digest_to_file_content_collection(
       .contents_for_directory(digest)
       .compat()
       .await
-      .and_then(move |file_content_collection| Snapshot::store_file_content_collection(&context, &file_content_collection))
+      .and_then(move |digest_contents| Snapshot::store_digest_contents(&context, &digest_contents))
       .map_err(|s| throw(&s))?;
     Ok(snapshot)
   }

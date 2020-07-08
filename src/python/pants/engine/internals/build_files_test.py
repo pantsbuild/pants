@@ -15,8 +15,8 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.addresses import Address, Addresses
 from pants.engine.fs import (
     Digest,
+    DigestContents,
     FileContent,
-    FileContentCollection,
     PathGlobs,
     Snapshot,
     create_fs_rules,
@@ -62,11 +62,9 @@ def test_parse_address_family_empty() -> None:
                 mock=lambda _: Snapshot(Digest("abc", 10), ("/dev/null/BUILD",), ()),
             ),
             MockGet(
-                product_type=FileContentCollection,
+                product_type=DigestContents,
                 subject_type=Digest,
-                mock=lambda _: FileContentCollection(
-                    [FileContent(path="/dev/null/BUILD", content=b"")]
-                ),
+                mock=lambda _: DigestContents([FileContent(path="/dev/null/BUILD", content=b"")]),
             ),
         ],
     )
@@ -397,9 +395,9 @@ class PreludeParsingTest(unittest.TestCase):
                     mock=lambda _: Snapshot(Digest("abc", 10), ("/dev/null/prelude",), ()),
                 ),
                 MockGet(
-                    product_type=FileContentCollection,
+                    product_type=DigestContents,
                     subject_type=Digest,
-                    mock=lambda _: FileContentCollection(
+                    mock=lambda _: DigestContents(
                         [FileContent(path="/dev/null/prelude", content=b"def foo(): return 1")]
                     ),
                 ),
@@ -424,9 +422,9 @@ class PreludeParsingTest(unittest.TestCase):
                         mock=lambda _: Snapshot(Digest("abc", 10), ("/dev/null/prelude",), ()),
                     ),
                     MockGet(
-                        product_type=FileContentCollection,
+                        product_type=DigestContents,
                         subject_type=Digest,
-                        mock=lambda _: FileContentCollection(
+                        mock=lambda _: DigestContents(
                             [FileContent(path="/dev/null/prelude", content=b"blah")]
                         ),
                     ),
@@ -458,9 +456,9 @@ class PreludeParsingTest(unittest.TestCase):
                         mock=lambda _: Snapshot(Digest("abc", 10), ("/dev/null/prelude",), ()),
                     ),
                     MockGet(
-                        product_type=FileContentCollection,
+                        product_type=DigestContents,
                         subject_type=Digest,
-                        mock=lambda _: FileContentCollection(
+                        mock=lambda _: DigestContents(
                             [FileContent(path="/dev/null/prelude", content=prelude)]
                         ),
                     ),

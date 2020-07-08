@@ -22,7 +22,7 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.test import Status, TestDebugRequest, TestOptions, TestResult
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.engine.addresses import Address
-from pants.engine.fs import FileContent, FileContentCollection
+from pants.engine.fs import DigestContents, FileContent
 from pants.engine.interactive_process import InteractiveRunner
 from pants.engine.rules import RootRule, SubsystemRule
 from pants.engine.selectors import Params
@@ -359,9 +359,9 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         assert result.status == Status.SUCCESS
         assert f"{self.package}/test_good.py ." in result.stdout
         assert result.xml_results is not None
-        files = self.request_single_product(FileContentCollection, result.xml_results)
-        assert len(files) == 1
-        file = files[0]
+        digest_contents = self.request_single_product(DigestContents, result.xml_results)
+        assert len(digest_contents) == 1
+        file = digest_contents[0]
         assert file.path.startswith("dist/test-results")
         assert b"pants_test.test_good" in file.content
 
