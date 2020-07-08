@@ -109,7 +109,7 @@ Exception message:.* 1 Exception encountered:
             self.assertRegex(
                 pants_run.stderr_data,
                 f"""\
-"this-target-does-not-exist" was not found in namespace "{directory}"\\. Did you mean one of:
+'this-target-does-not-exist' was not found in namespace '{directory}'\\. Did you mean one of:
 """,
             )
             pid_specific_log_file, shared_log_file = self._get_log_file_paths(tmpdir, pants_run.pid)
