@@ -37,7 +37,8 @@ workunit_store = {path = "../../workunit_store" }
 maplit = "*"
 mock = { path = "../../testutil/mock" }
 testutil = { path = "../../testutil" }
-tokio = { version = "0.2", features = ["rt-core", "macros"] }
+# TODO: See #10291.
+tokio = { version = "=0.2.20", features = ["rt-core", "macros"] }
 walkdir = "2"
 criterion = "0.3"
 

@@ -10,4 +10,5 @@ parking_lot = "0.11"
 
 [dev-dependencies]
 futures = "0.3"
-tokio = { version = "0.2", features = ["rt-core", "macros", "time"] }
+# TODO: See #10291.
+tokio = { version = "=0.2.20", features = ["rt-core", "macros", "time"] }

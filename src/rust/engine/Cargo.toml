@@ -127,7 +127,8 @@ tar_api = { path = "tar_api" }
 task_executor = { path = "task_executor" }
 tempfile = "3"
 time = "0.1.40"
-tokio = { version = "0.2", features = ["rt-threaded"] }
+# TODO: See #10291.
+tokio = { version = "=0.2.20", features = ["rt-threaded"] }
 ui = { path = "ui" }
 url = "2.1"
 uuid = { version = "0.7", features = ["v4"] }
