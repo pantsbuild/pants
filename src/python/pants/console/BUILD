@@ -4,4 +4,7 @@
 python_library(
   name = 'stty_utils',
   sources = ['stty_utils.py'],
+  dependencies = [
+    'src/python/pants/util:process_handler',  # NB: only for a bug with setup-py. Remove when fixed.
+  ],
 )
