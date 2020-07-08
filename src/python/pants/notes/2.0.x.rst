@@ -5,6 +5,137 @@ This document describes releases leading up to the ``2.0.x`` ``stable`` series.
 
 See https://pants.readme.io/v2.0/docs/release-notes-2-0 for an overview of the changes in this release.
 
+2.0.0.dev2 (7/8/2020)
+---------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Rename `FilesContent` to `DigestContents` and `InputFilesContent` to `CreateDigest` (#10290)
+  `PR #10290 <https://github.com/pantsbuild/pants/pull/10290>`_
+
+* remoting: default is streaming client (#10260)
+  `PR #10260 <https://github.com/pantsbuild/pants/pull/10260>`_
+
+* Upgrade setuptools from 47.3.1 to 49.1.0 (#10255)
+  `PR #10255 <https://github.com/pantsbuild/pants/pull/10255>`_
+
+* Upgrade packaging from 20.3 to 20.4 (#10256)
+  `PR #10256 <https://github.com/pantsbuild/pants/pull/10256>`_
+
+* Deprecate the --v1/--v2 global options. (#10245)
+  `PR #10245 <https://github.com/pantsbuild/pants/pull/10245>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Preserve source roots with Pytest output (#10165)
+  `PR #10165 <https://github.com/pantsbuild/pants/pull/10165>`_
+
+Bugfixes
+~~~~~~~~
+
+* Downgrade to tokio 0.2.20 to fix `materialize_directories`. (#10294)
+  `PR #10294 <https://github.com/pantsbuild/pants/pull/10294>`_
+
+* Expose method to bring down dynamic UI (#10234)
+  `Issue #10005 <https://github.com/pantsbuild/pants/issues/10005>`_
+  `PR #10234 <https://github.com/pantsbuild/pants/pull/10234>`_
+
+* Fix double-workunit-completion print (#10247)
+  `PR #10247 <https://github.com/pantsbuild/pants/pull/10247>`_
+  `PR #10179 <https://github.com/pantsbuild/pants/pull/10179>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Remove v1 `source/` abstractions like `EagerFileSet` (#10292)
+  `PR #10292 <https://github.com/pantsbuild/pants/pull/10292>`_
+
+* Use f-strings in engine/util.py (#10288)
+  `PR #10288 <https://github.com/pantsbuild/pants/pull/10288>`_
+
+* Use dependency inference internally (#10283)
+  `PR #10283 <https://github.com/pantsbuild/pants/pull/10283>`_
+
+* Unify `LegacyPythonCallbackParser` and `Parser` (#10281)
+  `PR #10281 <https://github.com/pantsbuild/pants/pull/10281>`_
+
+* Lower the default max-memory usage of pantsd. (#10287)
+  `PR #10287 <https://github.com/pantsbuild/pants/pull/10287>`_
+
+* Improvements and refactoring of help system. (#10280)
+  `PR #10280 <https://github.com/pantsbuild/pants/pull/10280>`_
+
+* Refactor WorkunitStore struct (#10242)
+  `PR #10242 <https://github.com/pantsbuild/pants/pull/10242>`_
+
+* remoting: check action cache for cached result before submitting a request (#10253)
+  `PR #10253 <https://github.com/pantsbuild/pants/pull/10253>`_
+
+* Remove leftover v1 Target API bindings (#10276)
+  `PR #10276 <https://github.com/pantsbuild/pants/pull/10276>`_
+
+* Fix remaining internal dependency cycles (#10254)
+  `PR #10254 <https://github.com/pantsbuild/pants/pull/10254>`_
+
+* Remove `build_graph.Target` (#10266)
+  `PR #10266 <https://github.com/pantsbuild/pants/pull/10266>`_
+
+* Remove `cache/` and `invalidation/` (#10262)
+  `PR #10262 <https://github.com/pantsbuild/pants/pull/10262>`_
+
+* Remove obsolete root patterns. (#10263)
+  `PR #10263 <https://github.com/pantsbuild/pants/pull/10263>`_
+
+* Remove `Task`, `Goal`, and `Context` (#10252)
+  `PR #10252 <https://github.com/pantsbuild/pants/pull/10252>`_
+
+* Simplify `git.py` and `scm.py` (#10251)
+  `PR #10251 <https://github.com/pantsbuild/pants/pull/10251>`_
+
+* Remove the internal tags `type_checked` and `partially_type_checked` (#10244)
+  `PR #10244 <https://github.com/pantsbuild/pants/pull/10244>`_
+
+* Remove `HydratedTarget`, `AddressMapper`, and `BuildGraph` (#10250)
+  `PR #10250 <https://github.com/pantsbuild/pants/pull/10250>`_
+
+* Remove all remaining v1 Targets (#10246)
+  `PR #10246 <https://github.com/pantsbuild/pants/pull/10246>`_
+
+* Remove `TestBase.context()` (#10248)
+  `PR #10248 <https://github.com/pantsbuild/pants/pull/10248>`_
+
+* Delete the rest of v1 `pants.backend.python` (#10240)
+  `PR #10240 <https://github.com/pantsbuild/pants/pull/10240>`_
+
+* Remove the concept of a scope category. (#10224)
+  `PR #10224 <https://github.com/pantsbuild/pants/pull/10224>`_
+
+Testing
+~~~~~~~
+
+* Remove stale "pants.pex for integration tests" mechanism (#10279)
+  `PR #10279 <https://github.com/pantsbuild/pants/pull/10279>`_
+
+* Re-enable RBE (#10284)
+  `PR #10284 <https://github.com/pantsbuild/pants/pull/10284>`_
+
+* Temporarily disable remote execution in CI (#10268)
+  `PR #10268 <https://github.com/pantsbuild/pants/pull/10268>`_
+
+* Upgrade responses from 0.10.14 to 0.10.15 (#10257)
+  `PR #10257 <https://github.com/pantsbuild/pants/pull/10257>`_
+
+* Increase pylint integration tests timeout. (#10261)
+  `PR #10261 <https://github.com/pantsbuild/pants/pull/10261>`_
+
+* Fix broken Pylint test from new isort release (#10259)
+  `PR #10259 <https://github.com/pantsbuild/pants/pull/10259>`_
+
+* Simplify ci.py now that we have no v1 tests (#10241)
+  `PR #10241 <https://github.com/pantsbuild/pants/pull/10241>`_
+
 2.0.0.dev1 (7/2/2020)
 ---------------------
 
