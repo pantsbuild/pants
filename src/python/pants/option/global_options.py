@@ -84,7 +84,6 @@ class ExecutionOptions:
     remote_oauth_bearer_token_path: Any
     remote_execution_extra_platform_properties: Any
     remote_execution_headers: Any
-    remote_execution_enable_streaming: bool
     remote_execution_overall_deadline_secs: int
     process_execution_local_enable_nailgun: bool
 
@@ -111,7 +110,6 @@ class ExecutionOptions:
             remote_oauth_bearer_token_path=bootstrap_options.remote_oauth_bearer_token_path,
             remote_execution_extra_platform_properties=bootstrap_options.remote_execution_extra_platform_properties,
             remote_execution_headers=bootstrap_options.remote_execution_headers,
-            remote_execution_enable_streaming=bootstrap_options.remote_execution_enable_streaming,
             remote_execution_overall_deadline_secs=bootstrap_options.remote_execution_overall_deadline_secs,
             process_execution_local_enable_nailgun=bootstrap_options.process_execution_local_enable_nailgun,
         )
@@ -138,7 +136,6 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_oauth_bearer_token_path=None,
     remote_execution_extra_platform_properties=[],
     remote_execution_headers={},
-    remote_execution_enable_streaming=True,
     remote_execution_overall_deadline_secs=60 * 60,  # one hour
     process_execution_local_enable_nailgun=False,
 )
@@ -781,9 +778,11 @@ class GlobalOptions(Subsystem):
         register(
             "--remote-execution-enable-streaming",
             type=bool,
-            default=DEFAULT_EXECUTION_OPTIONS.remote_execution_enable_streaming,
+            default=True,
             advanced=True,
             help="Enable the streaming remote execution client.",
+            removal_version="2.0.0.dev3",
+            removal_hint="This option is no longer applicable."
         )
         register(
             "--remote-execution-overall-deadline-secs",

@@ -68,7 +68,6 @@ pub struct RemotingOptions {
   pub store_connection_limit: usize,
   pub execution_extra_platform_properties: Vec<(String, String)>,
   pub execution_headers: BTreeMap<String, String>,
-  pub execution_enable_streaming: bool,
   pub execution_overall_deadline: Duration,
 }
 

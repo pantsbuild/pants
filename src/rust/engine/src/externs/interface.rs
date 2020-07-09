@@ -533,7 +533,6 @@ py_class!(class PyRemotingOptions |py| {
     store_connection_limit: u64,
     execution_extra_platform_properties: Vec<(String, String)>,
     execution_headers: Vec<(String, String)>,
-    execution_enable_streaming: bool,
     execution_overall_deadline_secs: u64
   ) -> CPyResult<Self> {
     Self::create_instance(py,
@@ -552,7 +551,6 @@ py_class!(class PyRemotingOptions |py| {
         store_connection_limit: store_connection_limit as usize,
         execution_extra_platform_properties,
         execution_headers: execution_headers.into_iter().collect(),
-        execution_enable_streaming,
         execution_overall_deadline: Duration::from_secs(execution_overall_deadline_secs),
       }
     )
