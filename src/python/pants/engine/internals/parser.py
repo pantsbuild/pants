@@ -11,7 +11,7 @@ from pants.base.exceptions import UnaddressableObjectError
 from pants.base.parse_context import ParseContext
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.internals.objects import Serializable
-from pants.engine.internals.struct import Struct, TargetAdaptor
+from pants.engine.internals.struct import TargetAdaptor
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_property
 
@@ -26,18 +26,6 @@ class SymbolTable:
 @dataclass(frozen=True)
 class BuildFilePreludeSymbols:
     symbols: FrozenDict[str, Any]
-
-
-@dataclass(frozen=True)
-class HydratedStruct:
-    """A wrapper around a Struct subclass post hydration.
-
-    This exists so that the rule graph can statically provide a struct for a target, and rules can
-    depend on this without needing to depend on having a concrete instance of SymbolTable to
-    register their input selectors.
-    """
-
-    value: Struct
 
 
 class ParseError(Exception):

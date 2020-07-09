@@ -26,7 +26,7 @@ from pants.engine.addresses import (
     BuildFileAddress,
 )
 from pants.engine.fs import PathGlobs, Snapshot, SourcesSnapshot, SourcesSnapshots
-from pants.engine.internals.parser import HydratedStruct
+from pants.engine.internals.struct import HydratedTargetAdaptor
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
@@ -59,17 +59,17 @@ logger = logging.getLogger(__name__)
 
 @rule
 async def resolve_target(
-    hydrated_struct: HydratedStruct,
+    hydrated_target_adaptor: HydratedTargetAdaptor,
     registered_target_types: RegisteredTargetTypes,
     union_membership: UnionMembership,
 ) -> WrappedTarget:
-    kwargs = hydrated_struct.value.kwargs().copy()
+    kwargs = hydrated_target_adaptor.value.kwargs().copy()
     type_alias = kwargs.pop("type_alias")
 
     # We special case `address` and the field `name`. The `Target` constructor requires an
-    # `Address`, so we use the value pre-calculated via `build_files.py`'s `hydrate_struct` rule.
-    # We throw away the field `name` because it can be accessed via `tgt.address.target_name`, so
-    # there is no (known) reason to preserve the field.
+    # `Address`, so we use the value pre-calculated via `build_files.py`'s `hydrate_target_adaptor`
+    # rule. We throw away the field `name` because it can be accessed via `tgt.address.target_name`,
+    # so there is no (known) reason to preserve the field.
     address = cast(Address, kwargs.pop("address"))
     kwargs.pop("name", None)
 

@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from collections.abc import MutableMapping, MutableSequence
+from dataclasses import dataclass
 from typing import Any, Dict, Iterable, Optional, cast
 
 from pants.build_graph.address import Address
@@ -319,3 +320,10 @@ class StructWithDeps(Struct):
 
 class TargetAdaptor(StructWithDeps):
     """A Struct to hold a Target's values before being converted into the Target API."""
+
+
+@dataclass(frozen=True)
+class HydratedTargetAdaptor:
+    """A TargetAdaptor that is ready to be converted into the Target API."""
+
+    value: TargetAdaptor
