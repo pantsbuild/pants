@@ -460,7 +460,7 @@ def test_generate_subtarget() -> None:
     ) == MockTarget(
         {Sources.alias: ["subdir/demo.f95"]},
         address=Address(
-            "src/fortran", target_name="subdir__demo.f95", generated_base_target_name="demo"
+            "src/fortran", target_name="subdir/demo.f95", generated_base_target_name="demo"
         ),
     )
 

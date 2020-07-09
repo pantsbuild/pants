@@ -37,7 +37,7 @@ class FirstPartyModuleToAddressMapping:
     This stores addresses to generated subtargets. The rule will first find the original owning
     target, and then will generate a more precise subtarget with file-level precision. For example,
     if the original target owned 4 source files, there will be 4 generated subtargets, one per each
-    file. All of the metadata will be copied, except for the `sources` field.
+    file. All of the metadata will be copied, except for the `sources` field and Address.
 
     If there are >1 original owning targets for a module, no targets will be recorded for that
     module.

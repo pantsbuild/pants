@@ -599,7 +599,7 @@ def generate_subtarget(base_target: Target, *, full_file_name: str) -> Target:
     relativized_file_name = PurePath(full_file_name).relative_to(original_spec_path).as_posix()
     new_address = Address(
         spec_path=original_spec_path,
-        target_name=relativized_file_name.replace("/", "__"),
+        target_name=relativized_file_name,
         generated_base_target_name=base_target.address.target_name,
     )
 

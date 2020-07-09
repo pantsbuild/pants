@@ -68,10 +68,9 @@ async def resolve_target(
         base_target = await Get(
             WrappedTarget, Address(address.spec_path, address.generated_base_target_name)
         )
-        relativized_sources_file = address.target_name.replace("__", "/")
         subtarget = generate_subtarget(
             base_target.target,
-            full_file_name=PurePath(address.spec_path, relativized_sources_file).as_posix(),
+            full_file_name=PurePath(address.spec_path, address.target_name).as_posix(),
         )
         return WrappedTarget(subtarget)
 
