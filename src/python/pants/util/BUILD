@@ -89,11 +89,6 @@ python_library(
 )
 
 python_library(
-  name = 'process_handler',
-  sources = ['process_handler.py'],
-)
-
-python_library(
   name = 'retry',
   sources = ['retry.py'],
 )
