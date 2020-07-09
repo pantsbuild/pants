@@ -35,16 +35,6 @@ class GraphTest(TestBase):
         return (MockTarget,)
 
     def test_transitive_targets(self) -> None:
-        t1 = MockTarget({}, address=Address.parse(":t1"))
-        t2 = MockTarget({Dependencies.alias: [t1.address]}, address=Address.parse(":t2"))
-        d1 = MockTarget({Dependencies.alias: [t1.address]}, address=Address.parse(":d1"))
-        d2 = MockTarget({Dependencies.alias: [t2.address]}, address=Address.parse(":d2"))
-        d3 = MockTarget({}, address=Address.parse(":d3"))
-        root = MockTarget(
-            {Dependencies.alias: [d1.address, d2.address, d3.address]},
-            address=Address.parse(":root"),
-        )
-
         self.add_to_build_file(
             "",
             dedent(
@@ -58,6 +48,16 @@ class GraphTest(TestBase):
                 """
             ),
         )
+
+        def get_target(name: str) -> Target:
+            return self.request_single_product(WrappedTarget, Address.parse(f"//:{name}")).target
+
+        t1 = get_target("t1")
+        t2 = get_target("t2")
+        d1 = get_target("d1")
+        d2 = get_target("d2")
+        d3 = get_target("d3")
+        root = get_target("root")
 
         direct_deps = self.request_single_product(
             Targets, Params(DependenciesRequest(root[Dependencies]), create_options_bootstrapper())
