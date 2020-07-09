@@ -96,7 +96,7 @@ class PythonDependencyInferenceTest(TestBase):
         assert result == InferredDependencies(
             [
                 Address.parse("3rdparty/python:Django"),
-                Address.parse("src/python:app.py"),
-                Address.parse("src/python/util:dep.py"),
+                Address("src/python", target_name="app.py", generated_base_target_name="python"),
+                Address("src/python/util", target_name="dep.py", generated_base_target_name="util"),
             ]
         )
