@@ -76,6 +76,13 @@ class PyTest(Subsystem):
             advanced=True,
             help="The format of the generated XML file. See https://docs.pytest.org/en/latest/reference.html#confval-junit_family.",
         )
+        register(
+            "--execution-slot-var",
+            type=str,
+            default="",
+            advanced=True,
+            help="If a non-empty string, the process execution slot id (an integer) will be exposed to tests under this environment variable name.",
+        )
 
     def get_requirement_strings(self) -> Tuple[str, ...]:
         """Returns a tuple of requirements-style strings for Pytest and Pytest plugins."""
