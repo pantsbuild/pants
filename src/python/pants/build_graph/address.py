@@ -172,14 +172,23 @@ class Address:
                 ),
             )
 
-    def __init__(self, spec_path: str, target_name: str) -> None:
+    def __init__(
+        self,
+        spec_path: str,
+        target_name: str,
+        *,
+        generated_base_target_name: Optional[str] = None
+    ) -> None:
         """
         :param spec_path: The path from the root of the repo to this target.
         :param target_name: The name of a target this Address refers to.
+        :param generated_base_target_name: If this Address refers to a generated subtarget, this
+                                           stores the target_name of the original base target.
         """
         self._spec_path = self.sanitize_path(spec_path)
         self.check_target_name(spec_path, target_name)
         self._target_name = target_name
+        self.generated_base_target_name = generated_base_target_name
         self._hash = hash((self._spec_path, self._target_name))
 
     @property

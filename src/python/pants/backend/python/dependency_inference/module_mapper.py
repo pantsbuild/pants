@@ -14,7 +14,7 @@ from pants.core.util_rules.strip_source_roots import (
 from pants.engine.addresses import Address
 from pants.engine.rules import rule
 from pants.engine.selectors import Get, MultiGet
-from pants.engine.target import Targets
+from pants.engine.target import HydratedSources, HydrateSourcesRequest, Targets, generate_subtarget
 from pants.util.frozendict import FrozenDict
 
 
@@ -32,6 +32,17 @@ class PythonModule:
 
 @dataclass(frozen=True)
 class FirstPartyModuleToAddressMapping:
+    """A mapping of module names to owning addresses.
+
+    This stores addresses to generated subtargets. The rule will first find the original owning
+    target, and then will generate a more precise subtarget with file-level precision. For example,
+    if the original target owned 4 source files, there will be 4 generated subtargets, one per each
+    file. All of the metadata will be copied, except for the `sources` field.
+
+    If there are >1 original owning targets for a module, no targets will be recorded for that
+    module.
+    """
+
     mapping: FrozenDict[str, Address]
 
     def address_for_module(self, module: str) -> Optional[Address]:
@@ -50,21 +61,34 @@ class FirstPartyModuleToAddressMapping:
 
 @rule
 async def map_first_party_modules_to_addresses() -> FirstPartyModuleToAddressMapping:
-    all_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
-    candidate_targets = tuple(tgt for tgt in all_targets if tgt.has_field(PythonSources))
-    sources_per_target = await MultiGet(
+    all_explicit_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
+    candidate_explicit_targets = tuple(
+        tgt for tgt in all_explicit_targets if tgt.has_field(PythonSources)
+    )
+    unstripped_sources_per_explicit_target = await MultiGet(
+        Get(HydratedSources, HydrateSourcesRequest(tgt[PythonSources]))
+        for tgt in candidate_explicit_targets
+    )
+    stripped_sources_per_explicit_target = await MultiGet(
         Get(SourceRootStrippedSources, StripSourcesFieldRequest(tgt[PythonSources]))
-        for tgt in candidate_targets
+        for tgt in candidate_explicit_targets
     )
     modules_to_addresses: Dict[str, Address] = {}
     modules_with_multiple_owners: Set[str] = set()
-    for tgt, sources in zip(candidate_targets, sources_per_target):
-        for f in sources.snapshot.files:
-            module = PythonModule.create_from_stripped_path(PurePath(f)).module
+    for explicit_tgt, unstripped_sources, stripped_sources in zip(
+        candidate_explicit_targets,
+        unstripped_sources_per_explicit_target,
+        stripped_sources_per_explicit_target,
+    ):
+        for unstripped_f, stripped_f in zip(
+            unstripped_sources.snapshot.files, stripped_sources.snapshot.files
+        ):
+            module = PythonModule.create_from_stripped_path(PurePath(stripped_f)).module
             if module in modules_to_addresses:
                 modules_with_multiple_owners.add(module)
             else:
-                modules_to_addresses[module] = tgt.address
+                generated_subtarget = generate_subtarget(explicit_tgt, full_file_name=unstripped_f)
+                modules_to_addresses[module] = generated_subtarget.address
     # Remove modules with ambiguous owners.
     for module in modules_with_multiple_owners:
         modules_to_addresses.pop(module)

@@ -584,6 +584,25 @@ class RegisteredTargetTypes:
         return tuple(self.aliases_to_types.values())
 
 
+def generate_subtarget(target: Target, *, full_file_name: str) -> Target:
+    original_spec_path = target.address.spec_path
+    relativized_file_name = PurePath(full_file_name).relative_to(original_spec_path).as_posix()
+    new_address = Address(
+        spec_path=original_spec_path,
+        target_name=relativized_file_name.replace("/", "__"),
+        generated_base_target_name=target.address.target_name,
+    )
+
+    prior_field_values = {
+        field_cls.alias: (
+            field.value if isinstance(field, PrimitiveField) else field.sanitized_raw_value
+        )
+        for field_cls, field in target.field_values.items()
+    }
+    target_cls = type(target)
+    return target_cls({**prior_field_values, Sources.alias: (relativized_file_name,)}, address=new_address)
+
+
 # -----------------------------------------------------------------------------------------------
 # FieldSet
 # -----------------------------------------------------------------------------------------------

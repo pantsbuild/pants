@@ -44,6 +44,7 @@ from pants.engine.target import (
     TransitiveTargets,
     UnrecognizedTargetTypeException,
     WrappedTarget,
+    generate_subtarget,
 )
 from pants.engine.unions import UnionMembership
 from pants.option.global_options import GlobalOptions, OwnersNotFoundBehavior
@@ -53,16 +54,28 @@ from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 logger = logging.getLogger(__name__)
 
 # -----------------------------------------------------------------------------------------------
-# Struct -> Target(s)
+# Address -> Target(s)
 # -----------------------------------------------------------------------------------------------
 
 
 @rule
 async def resolve_target(
-    hydrated_target_adaptor: HydratedTargetAdaptor,
+    address: Address,
     registered_target_types: RegisteredTargetTypes,
     union_membership: UnionMembership,
 ) -> WrappedTarget:
+    if address.generated_base_target_name:
+        base_target = await Get(
+            WrappedTarget, Address(address.spec_path, address.generated_base_target_name)
+        )
+        relativized_sources_file = address.target_name.replace("__", "/")
+        subtarget = generate_subtarget(
+            base_target.target,
+            full_file_name=PurePath(address.spec_path, relativized_sources_file).as_posix()
+        )
+        return WrappedTarget(subtarget)
+
+    hydrated_target_adaptor = await Get(HydratedTargetAdaptor, Address, address)
     kwargs = hydrated_target_adaptor.value.kwargs().copy()
     type_alias = kwargs.pop("type_alias")
 
