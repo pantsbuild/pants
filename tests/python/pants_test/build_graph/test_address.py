@@ -183,4 +183,12 @@ class AddressTest(unittest.TestCase):
 def test_build_file_address() -> None:
     bfa = BuildFileAddress(rel_path="dir/BUILD", target_name="example")
     assert bfa.spec == "dir:example"
+    assert bfa == Address("dir", "example")
+    assert type(bfa.to_address()) is Address
     assert bfa.to_address() == Address("dir", "example")
+
+    generated_bfa = BuildFileAddress(
+        rel_path="dir/BUILD", target_name="example", generated_base_target_name="original"
+    )
+    assert generated_bfa != BuildFileAddress(rel_path="dir/BUILD", target_name="example")
+    assert generated_bfa == Address("dir", "example", generated_base_target_name="original")

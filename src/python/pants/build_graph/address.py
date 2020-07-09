@@ -269,17 +269,27 @@ class BuildFileAddress(Address):
     :API: public
     """
 
-    def __init__(self, *, rel_path: str, target_name: Optional[str] = None) -> None:
+    def __init__(
+        self,
+        *,
+        rel_path: str,
+        target_name: Optional[str] = None,
+        generated_base_target_name: Optional[str] = None,
+    ) -> None:
         """
         :param rel_path: The BUILD files' path, relative to the root_dir.
         :param target_name: The name of the target within the BUILD file; defaults to the default
                             target, aka the name of the BUILD file parent dir.
+        :param generated_base_target_name: If this Address refers to a generated subtarget, this
+                                           stores the target_name of the original base target.
 
         :API: public
         """
         spec_path = os.path.dirname(rel_path)
         super().__init__(
-            spec_path=spec_path, target_name=target_name or os.path.basename(spec_path)
+            spec_path=spec_path,
+            target_name=target_name or os.path.basename(spec_path),
+            generated_base_target_name=generated_base_target_name,
         )
         self.rel_path = rel_path
 
@@ -291,7 +301,11 @@ class BuildFileAddress(Address):
         #  is weird to subclass `Address` but break Liskov substitution in many places, like the
         #  constructor. The blocker is that this type is used widely by V1 and it can't be cleanly
         #  deprecated.
-        return Address(spec_path=self.spec_path, target_name=self.target_name)
+        return Address(
+            spec_path=self.spec_path,
+            target_name=self.target_name,
+            generated_base_target_name=self.generated_base_target_name,
+        )
 
     def __repr__(self) -> str:
         return f"BuildFileAddress({self.rel_path}, {self.target_name})"
