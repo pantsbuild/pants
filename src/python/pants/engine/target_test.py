@@ -1148,13 +1148,15 @@ class TestDependencies(TestBase):
     def test_normal_resolution(self) -> None:
         self.add_to_build_file("src/smalltalk", "smalltalk()")
         addr = Address.parse("src/smalltalk")
-        deps = Addresses([Address.parse("//:dep1"), Address.parse("//:dep2")])
-        deps_field = Dependencies(deps, address=addr)
-        assert (
-            self.request_single_product(
-                Addresses, Params(DependenciesRequest(deps_field), create_options_bootstrapper())
-            )
-            == deps
+        deps_field = Dependencies(["//:dep1", "//:dep2", ":sibling"], address=addr)
+        assert self.request_single_product(
+            Addresses, Params(DependenciesRequest(deps_field), create_options_bootstrapper())
+        ) == Addresses(
+            [
+                Address.parse("//:dep1"),
+                Address.parse("//:dep2"),
+                Address.parse("src/smalltalk:sibling"),
+            ]
         )
 
         # Also test that we handle no dependencies.
@@ -1167,13 +1169,12 @@ class TestDependencies(TestBase):
         self.add_to_build_file("", "smalltalk(name='target')")
 
         def assert_injected(deps_cls: Type[Dependencies], *, injected: List[str]) -> None:
-            provided_addr = Address.parse("//:provided")
-            deps_field = deps_cls([provided_addr], address=Address.parse("//:target"))
+            deps_field = deps_cls(["//:provided"], address=Address.parse("//:target"))
             result = self.request_single_product(
                 Addresses, Params(DependenciesRequest(deps_field), create_options_bootstrapper())
             )
             assert result == Addresses(
-                sorted([provided_addr, *(Address.parse(addr) for addr in injected)])
+                sorted(Address.parse(addr) for addr in (*injected, "//:provided"))
             )
 
         assert_injected(Dependencies, injected=[])
@@ -1196,7 +1197,7 @@ class TestDependencies(TestBase):
         self.create_file("demo/f2.st", "//:inferred3\n")
         self.add_to_build_file("demo", "smalltalk(sources=['*.st'], dependencies=['//:provided'])")
 
-        deps_field = Dependencies([Address.parse("//:provided")], address=Address.parse("demo"))
+        deps_field = Dependencies(["//:provided"], address=Address.parse("demo"))
         result = self.request_single_product(
             Addresses,
             Params(

@@ -1581,13 +1581,9 @@ class Dependencies(AsyncField):
     """Addresses to other targets that this target depends on, e.g. `['helloworld/subdir:lib']`."""
 
     alias = "dependencies"
-    sanitized_raw_value: Optional[Tuple[Address, ...]]
-    default = None
+    sanitized_raw_value: Optional[Tuple[str, ...]]
+    default: ClassVar[Optional[Tuple[str, ...]]] = None
 
-    # NB: The type hint for `raw_value` is a lie. While we do expect end-users to use
-    # Iterable[str], the Struct and Addressable code will have already converted those strings
-    # into a List[Address]. But, that's an implementation detail and we don't want our
-    # documentation, which is auto-generated from these type hints, to leak that.
     @classmethod
     def sanitize_raw_value(
         cls, raw_value: Optional[Iterable[str]], *, address: Address
@@ -1686,7 +1682,14 @@ class InferredDependencies(DeduplicatedCollection[Address]):
 async def resolve_dependencies(
     request: DependenciesRequest, union_membership: UnionMembership, global_options: GlobalOptions
 ) -> Addresses:
-    provided = request.field.sanitized_raw_value or ()
+    provided = [
+        Address.parse(
+            dep,
+            relative_to=request.field.address.spec_path,
+            subproject_roots=global_options.options.subproject_roots,
+        )
+        for dep in request.field.sanitized_raw_value or ()
+    ]
 
     # Inject any dependencies. This is determined by the `request.field` class. For example, if
     # there is a rule to inject for FortranDependencies, then FortranDependencies and any subclass

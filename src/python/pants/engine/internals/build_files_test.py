@@ -237,8 +237,10 @@ class BuildFileIntegrationTest(TestBase):
                 mock_tgt(
                     fake_field=42,
                     dependencies=[
-                        # Because we don't follow dependencies, this self-cycle should be fine.
+                        # Because we don't follow dependencies or even parse dependencies, this
+                        # self-cycle should be fine.
                         "helloworld",
+                        ":sibling",
                         "helloworld/util",
                         "helloworld/util:tests",
                     ],
@@ -252,9 +254,10 @@ class BuildFileIntegrationTest(TestBase):
         assert target_adaptor.name == "helloworld"
         assert target_adaptor.type_alias == "mock_tgt"
         assert target_adaptor.dependencies == (
-            addr,
-            Address.parse("helloworld/util"),
-            Address.parse("helloworld/util:tests"),
+            "helloworld",
+            ":sibling",
+            "helloworld/util",
+            "helloworld/util:tests",
         )
         # NB: TargetAdaptors do not validate what fields are valid. The Target API should error
         # when encountering this, but it's fine at this stage.
