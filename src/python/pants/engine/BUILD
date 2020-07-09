@@ -5,7 +5,6 @@ python_tests(
   name='tests',
   dependencies=[
     'src/python/pants/engine/internals/examples:fs_test',
-    'src/python/pants/engine/internals/examples:parsers',
   ],
   timeout=90,
 )

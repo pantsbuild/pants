@@ -1,9 +1,9 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import itertools
 import os.path
-from collections.abc import Mapping
-from typing import Any, Dict
+from typing import Any, Dict, cast
 
 from pants.base.exceptions import ResolveError
 from pants.base.project_tree import Dir
@@ -18,11 +18,9 @@ from pants.engine.addresses import (
     BuildFileAddresses,
 )
 from pants.engine.fs import Digest, DigestContents, PathGlobs, Snapshot
-from pants.engine.internals.addressable import AddressableDescriptor
 from pants.engine.internals.mapper import AddressFamily, AddressMap, AddressMapper
-from pants.engine.internals.objects import Locatable, SerializableFactory, Validatable
-from pants.engine.internals.parser import BuildFilePreludeSymbols, HydratedStruct, error_on_imports
-from pants.engine.internals.struct import Struct
+from pants.engine.internals.parser import BuildFilePreludeSymbols, error_on_imports
+from pants.engine.internals.struct import HydratedTargetAdaptor, TargetAdaptor
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.option.global_options import GlobMatchErrorBehavior
@@ -33,11 +31,6 @@ from pants.util.ordered_set import OrderedSet
 
 class ResolvedTypeMismatchError(ResolveError):
     """Indicates a resolved object was not of the expected type."""
-
-
-def _key_func(entry):
-    key, value = entry
-    return key
 
 
 @rule
@@ -74,7 +67,6 @@ async def parse_address_family(
 
     The AddressFamily may be empty, but it will not be None.
     """
-
     path_globs = PathGlobs(
         globs=(
             *(os.path.join(directory.path, p) for p in address_mapper.build_patterns),
@@ -126,120 +118,45 @@ async def find_build_files(addresses: Addresses) -> BuildFileAddresses:
 
 
 @rule
-async def hydrate_struct(address_mapper: AddressMapper, address: Address) -> HydratedStruct:
-    """Given an AddressMapper and an Address, resolve a Struct from a BUILD file.
-
-    Recursively collects any embedded addressables within the Struct, but will not walk into a
-    dependencies field, since those should be requested explicitly by rules.
-    """
+async def hydrate_target_adaptor(
+    address_mapper: AddressMapper, address: Address
+) -> HydratedTargetAdaptor:
+    """Hydrate a TargetAdaptor so that it may be converted into the Target API."""
     address_family = await Get(AddressFamily, Dir(address.spec_path))
-    struct = address_family.addressables_as_address_keyed.get(address)
-    if struct is None:
+    target_adaptor = address_family.addressables_as_address_keyed.get(address)
+    if target_adaptor is None:
         _raise_did_you_mean(address_family, address.target_name)
 
-    inline_dependencies = []
+    target_adaptor = cast(TargetAdaptor, target_adaptor)
 
-    def maybe_append(outer_key, value):
-        if isinstance(value, str):
-            if outer_key != "dependencies":
-                inline_dependencies.append(
-                    Address.parse(
-                        value,
-                        relative_to=address.spec_path,
-                        subproject_roots=address_mapper.subproject_roots,
-                    )
-                )
-        elif isinstance(value, Struct):
-            collect_inline_dependencies(value)
+    def key_func(entry):
+        key, value = entry
+        return key
 
-    def collect_inline_dependencies(item):
-        for key, value in sorted(item._asdict().items(), key=_key_func):
-            if not AddressableDescriptor.is_addressable(item, key):
-                continue
-            if isinstance(value, Mapping):
-                for _, v in sorted(value.items(), key=_key_func):
-                    maybe_append(key, v)
-            elif isinstance(value, (list, tuple)):
-                for v in value:
-                    maybe_append(key, v)
-            else:
-                maybe_append(key, value)
-
-    # Recursively collect inline dependencies from the fields of the struct into `inline_dependencies`.
-    collect_inline_dependencies(struct)
-
-    # And then hydrate the inline dependencies.
-    hydrated_inline_dependencies = await MultiGet(
-        Get(HydratedStruct, Address, a) for a in inline_dependencies
-    )
-    dependencies = tuple(d.value for d in hydrated_inline_dependencies)
-
-    def maybe_consume(outer_key, value):
-        if isinstance(value, str):
-            if outer_key == "dependencies":
-                # Don't recurse into the dependencies field of a Struct, since those will be explicitly
-                # requested by tasks. But do ensure that their addresses are absolute, since we're
-                # about to lose the context in which they were declared.
-                value = Address.parse(
-                    value,
+    hydrated_args = {"address": address}
+    for key, value in sorted(target_adaptor._asdict().items(), key=key_func):
+        if key == "dependencies" and value:
+            value = [
+                Address.parse(
+                    dep,
                     relative_to=address.spec_path,
                     subproject_roots=address_mapper.subproject_roots,
                 )
-            else:
-                value = dependencies[maybe_consume.idx]
-                maybe_consume.idx += 1
-        elif isinstance(value, Struct):
-            value = consume_dependencies(value)
-        return value
-
-    # NB: Some pythons throw an UnboundLocalError for `idx` if it is a simple local variable.
-    # TODO(#8496): create a decorator for functions which declare a sentinel variable like this!
-    maybe_consume.idx = 0  # type: ignore[attr-defined]
-
-    # 'zip' the previously-requested dependencies back together as struct fields.
-    def consume_dependencies(item, args=None):
-        hydrated_args = args or {}
-        for key, value in sorted(item._asdict().items(), key=_key_func):
-            if not AddressableDescriptor.is_addressable(item, key):
-                hydrated_args[key] = value
-                continue
-
-            if isinstance(value, Mapping):
-                hydrated_args[key] = {
-                    k: maybe_consume(key, v) for k, v in sorted(value.items(), key=_key_func)
-                }
-            elif isinstance(value, (list, tuple)):
-                hydrated_args[key] = tuple(maybe_consume(key, v) for v in value)
-            else:
-                hydrated_args[key] = maybe_consume(key, value)
-        return _hydrate(type(item), address.spec_path, **hydrated_args)
-
-    return HydratedStruct(consume_dependencies(struct, args={"address": address}))
-
-
-def _hydrate(item_type, spec_path, **kwargs):
-    # If the item will be Locatable, inject the spec_path.
-    if issubclass(item_type, Locatable):
-        kwargs["spec_path"] = spec_path
+                for dep in value
+            ]
+        hydrated_args[key] = value
 
     try:
-        item = item_type(**kwargs)
+        target_adaptor = TargetAdaptor(**hydrated_args)
     except TypeConstraintError as e:
         raise ResolvedTypeMismatchError(e)
-
-    # Let factories replace the hydrated object.
-    if isinstance(item, SerializableFactory):
-        item = item.create()
-
-    # Finally make sure objects that can self-validate get a chance to do so.
-    if isinstance(item, Validatable):
-        item.validate()
-
-    return item
+    target_adaptor = cast(TargetAdaptor, target_adaptor.create())
+    target_adaptor.validate()
+    return HydratedTargetAdaptor(target_adaptor)
 
 
 @rule
-async def addresses_with_origins_from_address_families(
+async def addresses_with_origins_from_address_specs(
     address_mapper: AddressMapper, address_specs: AddressSpecs,
 ) -> AddressesWithOrigins:
     """Given an AddressMapper and list of AddressSpecs, return matching AddressesWithOrigins.
@@ -250,7 +167,17 @@ async def addresses_with_origins_from_address_families(
     :raises: :class:`AddressLookupError` if no targets are matched for non-SingleAddress specs.
     """
     # Capture a Snapshot covering all paths for these AddressSpecs, then group by directory.
-    snapshot = await Get(Snapshot, PathGlobs, _address_spec_to_globs(address_mapper, address_specs))
+    include_patterns = set(
+        itertools.chain.from_iterable(
+            address_spec.make_glob_patterns(address_mapper) for address_spec in address_specs
+        )
+    )
+    snapshot = await Get(
+        Snapshot,
+        PathGlobs(
+            globs=(*include_patterns, *(f"!{p}" for p in address_mapper.build_ignore_patterns))
+        ),
+    )
     dirnames = {os.path.dirname(f) for f in snapshot.files}
     address_families = await MultiGet(Get(AddressFamily, Dir(d)) for d in dirnames)
     address_family_by_directory = {af.namespace: af for af in address_families}
@@ -259,10 +186,10 @@ async def addresses_with_origins_from_address_families(
     addr_to_origin: Dict[Address, AddressSpec] = {}
 
     for address_spec in address_specs:
-        # NB: if an address spec is provided which expands to some number of targets, but those targets
-        # match --exclude-target-regexp, we do NOT fail! This is why we wait to apply the tag and
-        # exclude patterns until we gather all the targets the address spec would have matched
-        # without them.
+        # NB: if an address spec is provided which expands to some number of targets, but those
+        # targets match --exclude-target-regexp, we do NOT fail! This is why we wait to apply the
+        # tag and exclude patterns until we gather all the targets the address spec would have
+        # matched without them.
         try:
             addr_families_for_spec = address_spec.matching_address_families(
                 address_family_by_directory
@@ -300,17 +227,8 @@ def strip_address_origins(addresses_with_origins: AddressesWithOrigins) -> Addre
     return Addresses(address_with_origin.address for address_with_origin in addresses_with_origins)
 
 
-def _address_spec_to_globs(address_mapper: AddressMapper, address_specs: AddressSpecs) -> PathGlobs:
-    """Given an AddressSpecs object, return a PathGlobs object for the build files that it
-    matches."""
-    patterns = set()
-    for address_spec in address_specs:
-        patterns.update(address_spec.make_glob_patterns(address_mapper))
-    return PathGlobs(globs=(*patterns, *(f"!{p}" for p in address_mapper.build_ignore_patterns)))
-
-
 def create_graph_rules(address_mapper: AddressMapper):
-    """Creates tasks used to parse Structs from BUILD files."""
+    """Creates tasks used to parse targets from BUILD files."""
 
     @rule
     def address_mapper_singleton() -> AddressMapper:
@@ -319,14 +237,14 @@ def create_graph_rules(address_mapper: AddressMapper):
     return [
         address_mapper_singleton,
         # BUILD file parsing.
-        hydrate_struct,
+        hydrate_target_adaptor,
         parse_address_family,
         find_build_file,
         find_build_files,
         evaluate_preludes,
         # AddressSpec handling: locate directories that contain build files, and request
         # AddressFamilies for each of them.
-        addresses_with_origins_from_address_families,
+        addresses_with_origins_from_address_specs,
         strip_address_origins,
         # Root rules representing parameters that might be provided via root subjects.
         RootRule(Address),
