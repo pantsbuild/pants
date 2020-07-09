@@ -46,7 +46,10 @@ target(
   ],
 )
 
-python_tests(name='tests')
+python_tests(
+  name='tests',
+  sources=['*_test.py', '!pants_run_integration_test.py']
+)
 
 python_library(
   name = 'test_base',
