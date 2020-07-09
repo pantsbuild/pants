@@ -90,7 +90,7 @@ class AddressFamily:
                     f"but received: {address_map.path!r}"
                 )
 
-        name_to_target_adaptors = {}
+        name_to_target_adaptors: Dict[str, Tuple[str, TargetAdaptor]] = {}
         for address_map in address_maps:
             for name, target_adaptor in address_map.name_to_target_adaptor.items():
                 if name in name_to_target_adaptors:

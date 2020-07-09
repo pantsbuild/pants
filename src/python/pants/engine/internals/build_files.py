@@ -3,7 +3,7 @@
 
 import itertools
 import os.path
-from typing import Any, Dict
+from typing import Any, Dict, cast
 
 from pants.base.exceptions import ResolveError
 from pants.base.project_tree import Dir
@@ -127,6 +127,8 @@ async def hydrate_target_adaptor(
     if target_adaptor is None:
         _raise_did_you_mean(address_family, address.target_name)
 
+    target_adaptor = cast(TargetAdaptor, target_adaptor)
+
     def key_func(entry):
         key, value = entry
         return key
@@ -148,7 +150,7 @@ async def hydrate_target_adaptor(
         target_adaptor = TargetAdaptor(**hydrated_args)
     except TypeConstraintError as e:
         raise ResolvedTypeMismatchError(e)
-    target_adaptor = target_adaptor.create()
+    target_adaptor = cast(TargetAdaptor, target_adaptor.create())
     target_adaptor.validate()
     return HydratedTargetAdaptor(target_adaptor)
 
