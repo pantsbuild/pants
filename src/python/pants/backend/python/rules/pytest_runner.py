@@ -63,6 +63,7 @@ class TestTargetSetup:
     timeout_seconds: Optional[int]
     xml_dir: Optional[str]
     junit_family: str
+    execution_slot_variable: str
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
@@ -201,6 +202,7 @@ async def setup_pytest_for_target(
         timeout_seconds=field_set.timeout.calculate_from_global_options(pytest),
         xml_dir=pytest.options.junit_xml_dir,
         junit_family=pytest.options.junit_family,
+        execution_slot_variable=pytest.options.execution_slot_var,
     )
 
 
@@ -247,6 +249,7 @@ async def run_python_test(
         description=f"Run Pytest for {field_set.address.reference()}",
         timeout_seconds=test_setup.timeout_seconds,
         env=env,
+        execution_slot_variable=test_setup.execution_slot_variable,
     )
     result = await Get(FallibleProcessResult, Process, process)
 

@@ -33,6 +33,7 @@ class Process:
     timeout_seconds: Union[int, float]
     jdk_home: Optional[str]
     is_nailgunnable: bool
+    execution_slot_variable: Optional[str]
 
     def __init__(
         self,
@@ -48,6 +49,7 @@ class Process:
         timeout_seconds: Optional[Union[int, float]] = None,
         jdk_home: Optional[str] = None,
         is_nailgunnable: bool = False,
+        execution_slot_variable: Optional[str] = None,
     ) -> None:
         """Request to run a subprocess, similar to subprocess.Popen.
 
@@ -86,6 +88,7 @@ class Process:
         self.timeout_seconds = timeout_seconds if timeout_seconds and timeout_seconds > 0 else -1
         self.jdk_home = jdk_home
         self.is_nailgunnable = is_nailgunnable
+        self.execution_slot_variable = execution_slot_variable
 
 
 @frozen_after_init

@@ -349,6 +349,7 @@ async fn jdk_symlink() {
     jdk_home: Some(preserved_work_tmpdir.path().to_path_buf()),
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
+    execution_slot_variable: None,
   })
   .await
   .unwrap();
@@ -500,6 +501,7 @@ async fn timeout() {
     jdk_home: None,
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
+    execution_slot_variable: None,
   })
   .await
   .unwrap();
@@ -546,6 +548,7 @@ async fn working_directory() {
       jdk_home: None,
       target_platform: PlatformConstraint::None,
       is_nailgunnable: false,
+      execution_slot_variable: None,
     },
     work_dir.path().to_owned(),
     true,

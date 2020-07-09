@@ -227,6 +227,9 @@ pub struct Process {
 
   pub timeout: Option<std::time::Duration>,
 
+  /// If not None, then if a BoundedCommandRunner executes this Process
+  pub execution_slot_variable: Option<String>,
+
   #[derivative(PartialEq = "ignore", Hash = "ignore")]
   pub description: String,
 
@@ -284,6 +287,7 @@ impl Process {
       jdk_home: None,
       target_platform: PlatformConstraint::None,
       is_nailgunnable: false,
+      execution_slot_variable: None,
     }
   }
 
@@ -511,7 +515,7 @@ impl CommandRunner for BoundedCommandRunner {
 
   async fn run(
     &self,
-    req: MultiPlatformProcess,
+    mut req: MultiPlatformProcess,
     context: Context,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     let name = format!("{}-waiting", req.workunit_name());
@@ -532,7 +536,7 @@ impl CommandRunner for BoundedCommandRunner {
       let context = context.clone();
       let name = format!("{}-running", req.workunit_name());
 
-      semaphore.with_acquired(move || {
+      semaphore.with_acquired(move |concurrency_id| {
         let metadata = WorkunitMetadata {
           desc: Some(desc),
           message: None,
@@ -555,6 +559,15 @@ impl CommandRunner for BoundedCommandRunner {
             ..old_metadata
           },
         };
+
+        for (_, process) in req.0.iter_mut() {
+          if let Some(ref execution_slot_env_var) = process.execution_slot_variable {
+            let execution_slot = format!("{}", concurrency_id);
+            process
+              .env
+              .insert(execution_slot_env_var.clone(), execution_slot);
+          }
+        }
 
         with_workunit(
           context.workunit_store.clone(),

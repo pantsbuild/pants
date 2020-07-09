@@ -74,11 +74,11 @@ impl AsyncSemaphore {
   ///
   pub async fn with_acquired<F, B, O>(self, f: F) -> O
   where
-    F: FnOnce() -> B + Send + 'static,
+    F: FnOnce(usize) -> B + Send + 'static,
     B: Future<Output = O> + Send + 'static,
   {
     let permit = self.acquire().await;
-    let res = f().await;
+    let res = f(permit.id).await;
     drop(permit);
     res
   }
@@ -93,6 +93,7 @@ impl AsyncSemaphore {
 
 pub struct Permit {
   inner: Arc<Mutex<Inner>>,
+  id: usize,
 }
 
 impl Drop for Permit {
@@ -145,7 +146,7 @@ impl Future for PermitFuture {
         inner.waiters.push_back(this_waiter);
       }
       if inner.available_permits == 0 {
-        false
+        None
       } else {
         let will_issue_permit = {
           if let Some(front_waiter) = inner.waiters.front() {
@@ -157,24 +158,24 @@ impl Future for PermitFuture {
               // queue, so we don't have to waste time searching for it in the Drop
               // handler.
               self.waiter_id = None;
-              true
+              Some(inner.available_permits)
             } else {
               // Don't issue a permit to this task if it isn't at the head of the line,
               // we added it as a waiter above.
-              false
+              None
             }
           } else {
-            false
+            None
           }
         };
-        if will_issue_permit {
+        if will_issue_permit.is_some() {
           inner.available_permits -= 1;
         }
         will_issue_permit
       }
     };
-    if acquired {
-      Poll::Ready(Permit { inner })
+    if let Some(id) = acquired {
+      Poll::Ready(Permit { inner, id })
     } else {
       Poll::Pending
     }
