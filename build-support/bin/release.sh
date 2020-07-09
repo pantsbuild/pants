@@ -279,7 +279,7 @@ function reversion_whls() {
   local output_version=$3
 
   for whl in "${src_dir}"/*.whl; do
-    run_local_pants -q run src/python/pants/releases:reversion -- \
+    run_local_pants -lwarn run src/python/pants/releases:reversion -- \
       --glob='pants/VERSION' \
       "${whl}" "${dest_dir}" "${output_version}" \
       || die "Could not reversion whl ${whl} to ${output_version}"
