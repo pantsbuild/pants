@@ -118,9 +118,7 @@ async def find_build_files(addresses: Addresses) -> BuildFileAddresses:
 
 
 @rule
-async def hydrate_target_adaptor(
-    address_mapper: AddressMapper, address: Address
-) -> HydratedTargetAdaptor:
+async def hydrate_target_adaptor(address: Address) -> HydratedTargetAdaptor:
     """Hydrate a TargetAdaptor so that it may be converted into the Target API."""
     address_family = await Get(AddressFamily, Dir(address.spec_path))
     target_adaptor = address_family.addressables_as_address_keyed.get(address)
@@ -129,23 +127,7 @@ async def hydrate_target_adaptor(
 
     target_adaptor = cast(TargetAdaptor, target_adaptor)
 
-    def key_func(entry):
-        key, value = entry
-        return key
-
-    hydrated_args = {"address": address}
-    for key, value in sorted(target_adaptor._asdict().items(), key=key_func):
-        if key == "dependencies" and value:
-            value = [
-                Address.parse(
-                    dep,
-                    relative_to=address.spec_path,
-                    subproject_roots=address_mapper.subproject_roots,
-                )
-                for dep in value
-            ]
-        hydrated_args[key] = value
-
+    hydrated_args = {"address": address, **target_adaptor._asdict()}
     try:
         target_adaptor = TargetAdaptor(**hydrated_args)
     except TypeConstraintError as e:
