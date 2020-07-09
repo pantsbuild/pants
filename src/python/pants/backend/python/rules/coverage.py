@@ -144,16 +144,21 @@ class CoverageConfig:
     digest: Digest
 
 
-def _validate_and_update_config(coverage_config: configparser.ConfigParser) -> None:
+def _validate_and_update_config(
+    coverage_config: configparser.ConfigParser, config_path: Optional[str]
+) -> None:
     if not coverage_config.has_section("run"):
         coverage_config.add_section("run")
-        coverage_config.set("run", "branch", "True")
     run_section = coverage_config["run"]
     relative_files_str = run_section.get("relative_files", "True")
     if relative_files_str.lower() != "true":
-        raise ValueError("relative_files under the 'run' section must be set to True")
+        raise ValueError(
+            f"relative_files under the 'run' section must be set to True. config file: {config_path}"
+        )
     coverage_config.set("run", "relative_files", "True")
-    omit_elements = [em.strip() for em in run_section.get("omit", "").split("\n") if em.strip()]
+    omit_elements = [
+        em.strip() for em in run_section.get("omit", "").split("\n") if em.strip()
+    ] or ["\n"]
     if "test_runner.pex/*" not in omit_elements:
         omit_elements.append("test_runner.pex/*")
     run_section["omit"] = "\n".join(omit_elements)
@@ -174,7 +179,7 @@ async def create_coverage_config(coverage: CoverageSubsystem) -> CoverageConfig:
         )
         config_contents = await Get(DigestContents, Digest, config_snapshot.digest)
         coverage_config.read_string(config_contents[0].content.decode())
-    _validate_and_update_config(coverage_config)
+    _validate_and_update_config(coverage_config, config_path)
     config_stream = StringIO()
     coverage_config.write(config_stream)
     config_content = config_stream.getvalue()

@@ -51,8 +51,7 @@ class TestCoverageConfig(TestBase):
     def test_default_no_config(self) -> None:
         resolved_config = self.run_create_coverage_config_rule(coverage_config=None)
         assert (
-            resolved_config
-            == "[run]\nbranch = True\nrelative_files = True\nomit = test_runner.pex/*\n\n"
+            resolved_config == "[run]\nrelative_files = True\nomit = \n\t\n\ttest_runner.pex/*\n\n"
         )
 
     def test_simple_config(self) -> None:
@@ -67,7 +66,7 @@ class TestCoverageConfig(TestBase):
         resolved_config = self.run_create_coverage_config_rule(coverage_config=config)
         assert (
             resolved_config
-            == "[run]\nbranch = True\nrelative_files = True\njerry = HELLO\nomit = test_runner.pex/*\n\n"
+            == "[run]\nbranch = True\nrelative_files = True\njerry = HELLO\nomit = \n\t\n\ttest_runner.pex/*\n\n"
         )
 
     def test_config_no_run_section(self) -> None:
@@ -80,7 +79,7 @@ class TestCoverageConfig(TestBase):
         resolved_config = self.run_create_coverage_config_rule(coverage_config=config)
         assert (
             resolved_config
-            == "[report]\nignore_errors = True\n\n[run]\nbranch = True\nrelative_files = True\nomit = test_runner.pex/*\n\n"
+            == "[report]\nignore_errors = True\n\n[run]\nrelative_files = True\nomit = \n\t\n\ttest_runner.pex/*\n\n"
         )
 
     def test_append_omits(self) -> None:
