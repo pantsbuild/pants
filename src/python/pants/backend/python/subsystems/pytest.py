@@ -79,9 +79,10 @@ class PyTest(Subsystem):
         register(
             "--execution-slot-var",
             type=str,
-            default="",
+            default=None,
             advanced=True,
-            help="If a non-empty string, the process execution slot id (an integer) will be exposed to tests under this environment variable name.",
+            help="If a non-empty string, the process execution slot id (an integer) will be exposed to tests under this "
+            "environment variable name.",
         )
 
     def get_requirement_strings(self) -> Tuple[str, ...]:

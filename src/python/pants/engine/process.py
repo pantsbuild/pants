@@ -33,7 +33,7 @@ class Process:
     timeout_seconds: Union[int, float]
     jdk_home: Optional[str]
     is_nailgunnable: bool
-    execution_slot_variable: str
+    execution_slot_variable: Optional[str]
 
     def __init__(
         self,
@@ -49,7 +49,7 @@ class Process:
         timeout_seconds: Optional[Union[int, float]] = None,
         jdk_home: Optional[str] = None,
         is_nailgunnable: bool = False,
-        execution_slot_variable: str = "",
+        execution_slot_variable: Optional[str] = None,
     ) -> None:
         """Request to run a subprocess, similar to subprocess.Popen.
 
