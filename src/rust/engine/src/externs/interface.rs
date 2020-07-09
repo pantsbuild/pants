@@ -70,8 +70,8 @@ use tempfile::TempDir;
 use workunit_store::{Workunit, WorkunitState};
 
 use crate::{
-  externs, nodes, Core, ExecutionRequest, ExecutionTermination, Failure, Function, Intrinsics,
-  Params, RemotingOptions, Rule, Scheduler, Session, Tasks, Types, Value,
+  externs, nodes, Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination, Failure,
+  Function, Intrinsics, Params, RemotingOptions, Rule, Scheduler, Session, Tasks, Types, Value,
 };
 
 py_exception!(native_engine, PollTimeout);
@@ -348,13 +348,7 @@ py_module_initializer!(native_engine, |py, m| {
         use_gitignore: bool,
         root_type_ids: Vec<PyType>,
         remoting_options: PyRemotingOptions,
-        process_execution_local_parallelism: u64,
-        process_execution_remote_parallelism: u64,
-        process_execution_cleanup_local_dirs: bool,
-        process_execution_speculation_delay: f64,
-        process_execution_speculation_strategy_buf: String,
-        process_execution_use_local_cache: bool,
-        process_execution_local_enable_nailgun: bool
+        exec_strategy_opts: PyExecutionStrategyOptions
       )
     ),
   )?;
@@ -372,6 +366,7 @@ py_module_initializer!(native_engine, |py, m| {
   )?;
 
   m.add_class::<PyExecutionRequest>(py)?;
+  m.add_class::<PyExecutionStrategyOptions>(py)?;
   m.add_class::<PyExecutor>(py)?;
   m.add_class::<PyNailgunServer>(py)?;
   m.add_class::<PyRemotingOptions>(py)?;
@@ -481,6 +476,38 @@ py_class!(class PyExecutor |py| {
 
 py_class!(class PyScheduler |py| {
     data scheduler: Scheduler;
+});
+
+// Represents configuration related to process execution strategies.
+//
+// The data stored by PyExecutionStrategyOptions originally was passed directly into
+// scheduler_create but has been broken out separately because the large number of options
+// became unwieldy.
+py_class!(class PyExecutionStrategyOptions |py| {
+  data options: ExecutionStrategyOptions;
+
+  def __new__(
+    _cls,
+    local_parallelism: u64,
+    remote_parallelism: u64,
+    cleanup_local_dirs: bool,
+    speculation_delay: f64,
+    speculation_strategy: String,
+    use_local_cache: bool,
+    local_enable_nailgun: bool
+  ) -> CPyResult<Self> {
+    Self::create_instance(py,
+      ExecutionStrategyOptions {
+        local_parallelism: local_parallelism as usize,
+        remote_parallelism: remote_parallelism as usize,
+        cleanup_local_dirs,
+        speculation_delay: Duration::from_millis((speculation_delay * 1000.0).round() as u64),
+        speculation_strategy,
+        use_local_cache,
+        local_enable_nailgun,
+      }
+    )
+  }
 });
 
 // Represents configuration related to remote execution and caching.
@@ -743,13 +770,7 @@ fn scheduler_create(
   use_gitignore: bool,
   root_type_ids: Vec<PyType>,
   remoting_options: PyRemotingOptions,
-  process_execution_local_parallelism: u64,
-  process_execution_remote_parallelism: u64,
-  process_execution_cleanup_local_dirs: bool,
-  process_execution_speculation_delay: f64,
-  process_execution_speculation_strategy: String,
-  process_execution_use_local_cache: bool,
-  process_execution_local_enable_nailgun: bool,
+  exec_strategy_opts: PyExecutionStrategyOptions,
 ) -> CPyResult<PyScheduler> {
   match fs::increase_limits() {
     Ok(msg) => debug!("{}", msg),
@@ -778,15 +799,7 @@ fn scheduler_create(
       PathBuf::from(local_execution_root_dir_buf),
       PathBuf::from(named_caches_dir_buf),
       remoting_options.options(py).clone(),
-      process_execution_local_parallelism as usize,
-      process_execution_remote_parallelism as usize,
-      process_execution_cleanup_local_dirs,
-      // convert delay from float to millisecond resolution. use from_secs_f64 when it is
-      // off nightly. https://github.com/rust-lang/rust/issues/54361
-      Duration::from_millis((process_execution_speculation_delay * 1000.0).round() as u64),
-      process_execution_speculation_strategy,
-      process_execution_use_local_cache,
-      process_execution_local_enable_nailgun,
+      exec_strategy_opts.options(py).clone(),
     )
   });
   PyScheduler::create_instance(

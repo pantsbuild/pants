@@ -12,6 +12,7 @@ from pants.engine.fs import PathGlobs
 from pants.engine.internals import native_engine
 from pants.engine.internals.native_engine import (
     PyExecutionRequest,
+    PyExecutionStrategyOptions,
     PyExecutor,
     PyGeneratorResponseBreak,
     PyGeneratorResponseGet,
@@ -225,6 +226,16 @@ class Native(metaclass=SingletonMetaclass):
             execution_overall_deadline_secs=execution_options.remote_execution_overall_deadline_secs,
         )
 
+        exec_stategy_opts = PyExecutionStrategyOptions(
+            local_parallelism=execution_options.process_execution_local_parallelism,
+            remote_parallelism=execution_options.process_execution_remote_parallelism,
+            cleanup_local_dirs=execution_options.process_execution_cleanup_local_dirs,
+            speculation_delay=execution_options.process_execution_speculation_delay,
+            speculation_strategy=execution_options.process_execution_speculation_strategy,
+            use_local_cache=execution_options.process_execution_use_local_cache,
+            local_enable_nailgun=execution_options.process_execution_local_enable_nailgun,
+        )
+
         return self.lib.scheduler_create(
             self._executor,
             tasks,
@@ -238,13 +249,7 @@ class Native(metaclass=SingletonMetaclass):
             use_gitignore,
             root_subject_types,
             remoting_options,
-            execution_options.process_execution_local_parallelism,
-            execution_options.process_execution_remote_parallelism,
-            execution_options.process_execution_cleanup_local_dirs,
-            execution_options.process_execution_speculation_delay,
-            execution_options.process_execution_speculation_strategy,
-            execution_options.process_execution_use_local_cache,
-            execution_options.process_execution_local_enable_nailgun,
+            exec_stategy_opts,
         )
 
     def set_panic_handler(self):
