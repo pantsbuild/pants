@@ -56,6 +56,7 @@ from pants.engine.target import (
     StringField,
     StringOrStringSequenceField,
     StringSequenceField,
+    Tags,
     Target,
     TargetsToValidFieldSets,
     TargetsToValidFieldSetsRequest,
@@ -63,6 +64,7 @@ from pants.engine.target import (
     TargetWithOrigin,
     TooManyTargetsException,
     WrappedTarget,
+    generate_subtarget,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.testutil.engine.util import MockGet, run_rule
@@ -423,6 +425,44 @@ def test_required_field() -> None:
         RequiredTarget({"async": 0}, address=address)
     assert str(address) in str(exc.value)
     assert "primitive" in str(exc.value)
+
+
+def test_generate_subtarget() -> None:
+    class NoSourcesTgt(Target):
+        alias = "no_sources_tgt"
+        core_fields = (Tags,)
+
+    no_sources_tgt = NoSourcesTgt({Tags.alias: ["demo"]}, address=Address.parse("//:no_sources"))
+    assert generate_subtarget(no_sources_tgt, full_file_name="fake.txt") == no_sources_tgt
+
+    class MockTarget(Target):
+        alias = "mock_target"
+        core_fields = (Tags, Sources)
+
+    # When the target already only has a single source, the result should be the same, except for a
+    # different address.
+    single_source_tgt = MockTarget(
+        {Sources.alias: ["demo.f95"], Tags.alias: ["demo"]},
+        address=Address.parse("src/fortran:demo"),
+    )
+    assert generate_subtarget(
+        single_source_tgt, full_file_name="src/fortran/demo.f95"
+    ) == MockTarget(
+        {Sources.alias: ["demo.f95"], Tags.alias: ["demo"]},
+        address=Address("src/fortran", target_name="demo.f95", generated_base_target_name="demo"),
+    )
+
+    subdir_tgt = MockTarget(
+        {Sources.alias: ["demo.f95", "subdir/demo.f95"]}, address=Address.parse("src/fortran:demo")
+    )
+    assert generate_subtarget(
+        subdir_tgt, full_file_name="src/fortran/subdir/demo.f95"
+    ) == MockTarget(
+        {Sources.alias: ["subdir/demo.f95"]},
+        address=Address(
+            "src/fortran", target_name="subdir__demo.f95", generated_base_target_name="demo"
+        ),
+    )
 
 
 # -----------------------------------------------------------------------------------------------

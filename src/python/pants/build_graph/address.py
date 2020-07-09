@@ -173,11 +173,7 @@ class Address:
             )
 
     def __init__(
-        self,
-        spec_path: str,
-        target_name: str,
-        *,
-        generated_base_target_name: Optional[str] = None
+        self, spec_path: str, target_name: str, *, generated_base_target_name: Optional[str] = None
     ) -> None:
         """
         :param spec_path: The path from the root of the repo to this target.
@@ -189,7 +185,7 @@ class Address:
         self.check_target_name(spec_path, target_name)
         self._target_name = target_name
         self.generated_base_target_name = generated_base_target_name
-        self._hash = hash((self._spec_path, self._target_name))
+        self._hash = hash((self._spec_path, self._target_name, self.generated_base_target_name))
 
     @property
     def spec_path(self) -> str:
@@ -245,7 +241,11 @@ class Address:
     def __eq__(self, other):
         if not isinstance(other, Address):
             return False
-        return self._spec_path == other._spec_path and self._target_name == other._target_name
+        return (
+            self._spec_path == other._spec_path
+            and self._target_name == other._target_name
+            and self.generated_base_target_name == other.generated_base_target_name
+        )
 
     def __hash__(self):
         return self._hash

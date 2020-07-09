@@ -1,11 +1,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import os
 import unittest
-from contextlib import contextmanager
 
-from pants.base.build_root import BuildRoot
 from pants.build_graph.address import (
     Address,
     BuildFileAddress,
@@ -13,8 +10,6 @@ from pants.build_graph.address import (
     InvalidTargetName,
     parse_spec,
 )
-from pants.util.contextutil import pushd, temporary_dir
-from pants.util.dirutil import touch
 
 
 class ParseSpecTest(unittest.TestCase):
@@ -156,28 +151,23 @@ class ParseSpecTest(unittest.TestCase):
         self.assertEqual("rel", target_name)
 
 
-class BaseAddressTest(unittest.TestCase):
-    @contextmanager
-    def workspace(self, *buildfiles):
-        with temporary_dir() as root_dir:
-            with BuildRoot().temporary(root_dir):
-                with pushd(root_dir):
-                    for buildfile in buildfiles:
-                        touch(os.path.join(root_dir, buildfile))
-                    yield os.path.realpath(root_dir)
+def test_address_equality() -> None:
+    assert "Not really an address" != Address("a/b", "c")
 
+    assert Address("a/b", "c") == Address("a/b", "c")
+    assert Address("a/b", "c") == Address.parse("a/b:c")
+    assert Address.parse("a/b:c") == Address.parse("a/b:c")
+
+    assert Address("a/b", "c") != Address("a/b", "c", generated_base_target_name="original")
+    assert Address("a/b", "c", generated_base_target_name="original") == Address(
+        "a/b", "c", generated_base_target_name="original"
+    )
+
+
+class AddressTest(unittest.TestCase):
     def assert_address(self, spec_path: str, target_name: str, address: Address) -> None:
         self.assertEqual(spec_path, address.spec_path)
         self.assertEqual(target_name, address.target_name)
-
-
-class AddressTest(BaseAddressTest):
-    def test_equivalence(self) -> None:
-        self.assertNotEqual("Not really an address", Address("a/b", "c"))
-
-        self.assertEqual(Address("a/b", "c"), Address("a/b", "c"))
-        self.assertEqual(Address("a/b", "c"), Address.parse("a/b:c"))
-        self.assertEqual(Address.parse("a/b:c"), Address.parse("a/b:c"))
 
     def test_parse(self) -> None:
         self.assert_address("a/b", "target", Address.parse("a/b:target"))

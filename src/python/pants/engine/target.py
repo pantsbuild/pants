@@ -584,29 +584,32 @@ class RegisteredTargetTypes:
         return tuple(self.aliases_to_types.values())
 
 
-def generate_subtarget(target: Target, *, full_file_name: str) -> Target:
+def generate_subtarget(base_target: Target, *, full_file_name: str) -> Target:
     """Generate a new target with the exact same metadata as the original, except for the `sources`
-    field only referring to the single file `full_file_name`.
+    field only referring to the single file `full_file_name` and with a new address.
 
     This is used for greater precision when using dependency inference and file arguments. When we
     are able to deduce specifically which files are being used, we can use only the files we care
     about, rather than the entire `sources` field.
     """
-    original_spec_path = target.address.spec_path
+    if not base_target.has_field(Sources):
+        return base_target
+
+    original_spec_path = base_target.address.spec_path
     relativized_file_name = PurePath(full_file_name).relative_to(original_spec_path).as_posix()
     new_address = Address(
         spec_path=original_spec_path,
         target_name=relativized_file_name.replace("/", "__"),
-        generated_base_target_name=target.address.target_name,
+        generated_base_target_name=base_target.address.target_name,
     )
 
     prior_field_values = {
         field_cls.alias: (
             field.value if isinstance(field, PrimitiveField) else field.sanitized_raw_value  # type: ignore[attr-defined]
         )
-        for field_cls, field in target.field_values.items()
+        for field_cls, field in base_target.field_values.items()
     }
-    target_cls = type(target)
+    target_cls = type(base_target)
     return target_cls(
         {**prior_field_values, Sources.alias: (relativized_file_name,)}, address=new_address
     )

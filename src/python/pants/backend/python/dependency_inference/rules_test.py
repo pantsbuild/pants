@@ -91,6 +91,12 @@ class PythonDependencyInferenceTest(TestBase):
             InferredDependencies,
             Params(InferPythonDependencies(tgt[PythonSources]), options_bootstrapper),
         )
+        # NB: `src/python:f2.py` does not show up because it is not a dependency of any file in
+        # `src/python:python`.
         assert result == InferredDependencies(
-            [Address.parse("3rdparty/python:Django"), Address.parse("src/python/util")]
+            [
+                Address.parse("3rdparty/python:Django"),
+                Address.parse("src/python:app.py"),
+                Address.parse("src/python/util:dep.py"),
+            ]
         )
