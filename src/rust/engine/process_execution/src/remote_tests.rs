@@ -86,6 +86,7 @@ async fn make_execute_request() {
     jdk_home: None,
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
+    execution_slot_variable: None,
   };
 
   let mut want_command = bazel_protos::remote_execution::Command::new();
@@ -169,6 +170,7 @@ async fn make_execute_request_with_instance_name() {
     jdk_home: None,
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
+    execution_slot_variable: None,
   };
 
   let mut want_command = bazel_protos::remote_execution::Command::new();
@@ -260,6 +262,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
     jdk_home: None,
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
+    execution_slot_variable: None,
   };
 
   let mut want_command = bazel_protos::remote_execution::Command::new();
@@ -337,20 +340,10 @@ async fn make_execute_request_with_cache_key_gen_version() {
 #[tokio::test]
 async fn make_execute_request_with_jdk() {
   let input_directory = TestDirectory::containing_roland();
-  let req = Process {
-    argv: owned_string_vec(&["/bin/echo", "yo"]),
-    env: BTreeMap::new(),
-    working_directory: None,
-    input_files: input_directory.digest(),
-    output_files: BTreeSet::new(),
-    output_directories: BTreeSet::new(),
-    timeout: None,
-    description: "some description".to_owned(),
-    append_only_caches: BTreeMap::new(),
-    jdk_home: Some(PathBuf::from("/tmp")),
-    target_platform: PlatformConstraint::None,
-    is_nailgunnable: false,
-  };
+  let mut req = Process::new(owned_string_vec(&["/bin/echo", "yo"]));
+  req.jdk_home = Some(PathBuf::from("/tmp"));
+  req.description = "some description".to_owned();
+  req.input_files = input_directory.digest();
 
   let mut want_command = bazel_protos::remote_execution::Command::new();
   want_command.mut_arguments().push("/bin/echo".to_owned());
@@ -415,6 +408,7 @@ async fn make_execute_request_with_jdk_and_extra_platform_properties() {
     jdk_home: Some(PathBuf::from("/tmp")),
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
+    execution_slot_variable: None,
   };
 
   let mut want_command = bazel_protos::remote_execution::Command::new();
@@ -525,6 +519,7 @@ async fn make_execute_request_with_timeout() {
     jdk_home: None,
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
+    execution_slot_variable: None,
   };
 
   let mut want_command = bazel_protos::remote_execution::Command::new();
@@ -1161,20 +1156,10 @@ async fn timeout_after_sufficiently_delayed_getoperations() {
   // 1 due to the request_timeout.
   let delayed_operation_time = Duration::new(2, 500);
 
-  let execute_request = Process {
-    argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
-    env: BTreeMap::new(),
-    working_directory: None,
-    input_files: EMPTY_DIGEST,
-    output_files: BTreeSet::new(),
-    output_directories: BTreeSet::new(),
-    timeout: Some(request_timeout),
-    description: "echo-a-foo".to_string(),
-    append_only_caches: BTreeMap::new(),
-    jdk_home: None,
-    target_platform: PlatformConstraint::None,
-    is_nailgunnable: false,
-  };
+  let argv = owned_string_vec(&["/bin/echo", "-n", "foo"]);
+  let mut execute_request = Process::new(argv);
+  execute_request.timeout = Some(request_timeout);
+  execute_request.description = "echo-a-foo".to_string();
 
   let op_name = "gimme-foo".to_string();
 
@@ -1220,20 +1205,9 @@ async fn dropped_request_cancels() {
   let request_timeout = Duration::new(10, 0);
   let delayed_operation_time = Duration::new(5, 0);
 
-  let execute_request = Process {
-    argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
-    env: BTreeMap::new(),
-    working_directory: None,
-    input_files: EMPTY_DIGEST,
-    output_files: BTreeSet::new(),
-    output_directories: BTreeSet::new(),
-    timeout: Some(request_timeout),
-    description: "echo-a-foo".to_string(),
-    append_only_caches: BTreeMap::new(),
-    jdk_home: None,
-    target_platform: PlatformConstraint::None,
-    is_nailgunnable: false,
-  };
+  let mut execute_request = Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"]));
+  execute_request.description = "echo-a-foo".to_string();
+  execute_request.timeout = Some(request_timeout);
 
   let op_name = "gimme-foo".to_string();
 
@@ -2459,6 +2433,7 @@ pub fn echo_foo_request() -> MultiPlatformProcess {
     jdk_home: None,
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
+    execution_slot_variable: None,
   };
   req.into()
 }
@@ -2846,25 +2821,15 @@ pub(crate) fn cat_roland_request() -> MultiPlatformProcess {
     jdk_home: None,
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
+    execution_slot_variable: None,
   };
   req.into()
 }
 
 pub(crate) fn echo_roland_request() -> MultiPlatformProcess {
-  let req = Process {
-    argv: owned_string_vec(&["/bin/echo", "meoooow"]),
-    env: BTreeMap::new(),
-    working_directory: None,
-    input_files: EMPTY_DIGEST,
-    output_files: BTreeSet::new(),
-    output_directories: BTreeSet::new(),
-    timeout: one_second(),
-    description: "unleash a roaring meow".to_string(),
-    append_only_caches: BTreeMap::new(),
-    jdk_home: None,
-    target_platform: PlatformConstraint::None,
-    is_nailgunnable: false,
-  };
+  let mut req = Process::new(owned_string_vec(&["/bin/echo", "meoooow"]));
+  req.timeout = one_second();
+  req.description = "unleash a roaring meow".to_string();
   req.into()
 }
 

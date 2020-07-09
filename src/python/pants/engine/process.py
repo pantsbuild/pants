@@ -33,6 +33,7 @@ class Process:
     timeout_seconds: Union[int, float]
     jdk_home: Optional[str]
     is_nailgunnable: bool
+    execution_slot_variable: str = ""
 
     def __init__(
         self,

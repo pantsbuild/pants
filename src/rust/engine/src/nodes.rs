@@ -274,6 +274,15 @@ impl MultiPlatformExecuteProcess {
 
     let is_nailgunnable = externs::project_bool(&value, "is_nailgunnable");
 
+    let execution_slot_variable = {
+      let s = externs::project_str(&value, "execution_slot_variable");
+      if s.is_empty() {
+        None
+      } else {
+        Some(s)
+      }
+    };
+
     Ok(process_execution::Process {
       argv: externs::project_multi_strs(&value, "argv"),
       env,
@@ -287,6 +296,7 @@ impl MultiPlatformExecuteProcess {
       jdk_home,
       target_platform,
       is_nailgunnable,
+      execution_slot_variable,
     })
   }
 

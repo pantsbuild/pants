@@ -64,6 +64,7 @@ fn construct_nailgun_server_request(
     jdk_home: Some(jdk),
     target_platform: platform_constraint,
     is_nailgunnable: true,
+    execution_slot_variable: None,
   }
 }
 
@@ -72,34 +73,11 @@ fn construct_nailgun_client_request(
   client_main_class: String,
   mut client_args: Vec<String>,
 ) -> Process {
-  let Process {
-    argv: _argv,
-    input_files,
-    description,
-    append_only_caches,
-    env: original_request_env,
-    working_directory,
-    output_files,
-    output_directories,
-    timeout,
-    jdk_home: _jdk_home,
-    target_platform,
-    is_nailgunnable,
-  } = original_req;
   client_args.insert(0, client_main_class);
   Process {
     argv: client_args,
-    input_files,
-    description,
-    append_only_caches,
-    env: original_request_env,
-    working_directory,
-    output_files,
-    output_directories,
-    timeout,
     jdk_home: None,
-    target_platform,
-    is_nailgunnable,
+    ..original_req
   }
 }
 
