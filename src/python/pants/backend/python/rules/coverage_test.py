@@ -50,23 +50,37 @@ class TestCoverageConfig(TestBase):
 
     def test_default_no_config(self) -> None:
         resolved_config = self.run_create_coverage_config_rule(coverage_config=None)
-        assert (
-            resolved_config == "[run]\nrelative_files = True\nomit = \n\t\n\ttest_runner.pex/*\n\n"
+        assert resolved_config == dedent(
+            """\
+                [run]
+                branch = True
+                relative_files = True
+                omit = 
+                \ttest_runner.pex/*
+
+            """  # noqa: W291
         )
 
     def test_simple_config(self) -> None:
         config = dedent(
             """
           [run]
-          branch = True
+          branch = False
           relative_files = True
           jerry = HELLO
           """
         )
         resolved_config = self.run_create_coverage_config_rule(coverage_config=config)
-        assert (
-            resolved_config
-            == "[run]\nbranch = True\nrelative_files = True\njerry = HELLO\nomit = \n\t\n\ttest_runner.pex/*\n\n"
+        assert resolved_config == dedent(
+            """\
+                [run]
+                branch = False
+                relative_files = True
+                jerry = HELLO
+                omit = 
+                \ttest_runner.pex/*
+
+                """  # noqa: W291
         )
 
     def test_config_no_run_section(self) -> None:
@@ -77,9 +91,18 @@ class TestCoverageConfig(TestBase):
           """
         )
         resolved_config = self.run_create_coverage_config_rule(coverage_config=config)
-        assert (
-            resolved_config
-            == "[report]\nignore_errors = True\n\n[run]\nrelative_files = True\nomit = \n\t\n\ttest_runner.pex/*\n\n"
+        assert resolved_config == dedent(
+            """\
+                [report]
+                ignore_errors = True
+
+                [run]
+                branch = True
+                relative_files = True
+                omit = 
+                \ttest_runner.pex/*
+
+                """  # noqa: W291
         )
 
     def test_append_omits(self) -> None:
@@ -93,9 +116,16 @@ class TestCoverageConfig(TestBase):
           """
         )
         resolved_config = self.run_create_coverage_config_rule(coverage_config=config)
-        assert (
-            resolved_config
-            == "[run]\nomit = jerry/seinfeld/*.py\n\tfestivus/tinsel/*.py\n\ttest_runner.pex/*\nrelative_files = True\n\n"
+        assert resolved_config == dedent(
+            """\
+                [run]
+                omit = 
+                \tjerry/seinfeld/*.py
+                \tfestivus/tinsel/*.py
+                \ttest_runner.pex/*
+                relative_files = True
+
+                """  # noqa: W291
         )
 
     def test_invalid_relative_files_setting(self) -> None:

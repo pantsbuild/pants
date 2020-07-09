@@ -149,6 +149,7 @@ def _validate_and_update_config(
 ) -> None:
     if not coverage_config.has_section("run"):
         coverage_config.add_section("run")
+        coverage_config.set("run", "branch", "True")
     run_section = coverage_config["run"]
     relative_files_str = run_section.get("relative_files", "True")
     if relative_files_str.lower() != "true":
@@ -156,9 +157,7 @@ def _validate_and_update_config(
             f"relative_files under the 'run' section must be set to True. config file: {config_path}"
         )
     coverage_config.set("run", "relative_files", "True")
-    omit_elements = [
-        em.strip() for em in run_section.get("omit", "").split("\n") if em.strip()
-    ] or ["\n"]
+    omit_elements = [em for em in run_section.get("omit", "").split("\n")] or ["\n"]
     if "test_runner.pex/*" not in omit_elements:
         omit_elements.append("test_runner.pex/*")
     run_section["omit"] = "\n".join(omit_elements)
