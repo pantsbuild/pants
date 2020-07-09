@@ -782,7 +782,7 @@ class GlobalOptions(Subsystem):
             advanced=True,
             help="This option no longer does anything. (It used to enable the streaming remote execution client "
             "which is now the only remote execution client.)",
-            removal_version="2.0.0.dev3",
+            removal_version="2.1.0.dev0",
             removal_hint="This option is no longer applicable.",
         )
         register(
