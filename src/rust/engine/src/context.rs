@@ -72,6 +72,17 @@ pub struct RemotingOptions {
   pub execution_overall_deadline: Duration,
 }
 
+#[derive(Clone, Debug)]
+pub struct ExecutionStrategyOptions {
+  pub local_parallelism: usize,
+  pub remote_parallelism: usize,
+  pub cleanup_local_dirs: bool,
+  pub speculation_delay: Duration,
+  pub speculation_strategy: String,
+  pub use_local_cache: bool,
+  pub local_enable_nailgun: bool,
+}
+
 impl Core {
   pub fn new(
     executor: Executor,
@@ -86,13 +97,7 @@ impl Core {
     local_execution_root_dir: PathBuf,
     named_caches_dir: PathBuf,
     remoting_opts: RemotingOptions,
-    process_execution_local_parallelism: usize,
-    process_execution_remote_parallelism: usize,
-    process_execution_cleanup_local_dirs: bool,
-    process_execution_speculation_delay: Duration,
-    process_execution_speculation_strategy: String,
-    process_execution_use_local_cache: bool,
-    process_execution_local_enable_nailgun: bool,
+    exec_strategy_opts: ExecutionStrategyOptions,
   ) -> Result<Core, String> {
     // Randomize CAS address order to avoid thundering herds from common config.
     let mut remote_store_servers = remoting_opts.store_servers.clone();
@@ -164,11 +169,11 @@ impl Core {
       executor.clone(),
       local_execution_root_dir.clone(),
       NamedCaches::new(named_caches_dir),
-      process_execution_cleanup_local_dirs,
+      exec_strategy_opts.cleanup_local_dirs,
     );
 
     let maybe_nailgunnable_local_command_runner: Box<dyn process_execution::CommandRunner> =
-      if process_execution_local_enable_nailgun {
+      if exec_strategy_opts.local_enable_nailgun {
         Box::new(process_execution::nailgun::CommandRunner::new(
           local_command_runner,
           process_execution_metadata.clone(),
@@ -182,7 +187,7 @@ impl Core {
     let mut command_runner: Box<dyn process_execution::CommandRunner> =
       Box::new(BoundedCommandRunner::new(
         maybe_nailgunnable_local_command_runner,
-        process_execution_local_parallelism,
+        exec_strategy_opts.local_parallelism,
       ));
 
     if remoting_opts.execution_enable {
@@ -228,26 +233,26 @@ impl Core {
 
         Box::new(BoundedCommandRunner::new(
           command_runner,
-          process_execution_remote_parallelism,
+          exec_strategy_opts.remote_parallelism,
         ))
       };
-      command_runner = match process_execution_speculation_strategy.as_ref() {
+      command_runner = match exec_strategy_opts.speculation_strategy.as_ref() {
         "local_first" => Box::new(SpeculatingCommandRunner::new(
           command_runner,
           remote_command_runner,
-          process_execution_speculation_delay,
+          exec_strategy_opts.speculation_delay,
         )),
         "remote_first" => Box::new(SpeculatingCommandRunner::new(
           remote_command_runner,
           command_runner,
-          process_execution_speculation_delay,
+          exec_strategy_opts.speculation_delay,
         )),
         "none" => remote_command_runner,
         _ => unreachable!(),
       };
     }
 
-    if process_execution_use_local_cache {
+    if exec_strategy_opts.use_local_cache {
       let process_execution_store = ShardedLmdb::new(
         local_store_dir2.join("processes"),
         5 * GIGABYTES,
