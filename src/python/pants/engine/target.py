@@ -585,6 +585,13 @@ class RegisteredTargetTypes:
 
 
 def generate_subtarget(target: Target, *, full_file_name: str) -> Target:
+    """Generate a new target with the exact same metadata as the original, except for the `sources`
+    field only referring to the single file `full_file_name`.
+
+    This is used for greater precision when using dependency inference and file arguments. When we
+    are able to deduce specifically which files are being used, we can use only the files we care
+    about, rather than the entire `sources` field.
+    """
     original_spec_path = target.address.spec_path
     relativized_file_name = PurePath(full_file_name).relative_to(original_spec_path).as_posix()
     new_address = Address(
@@ -595,12 +602,14 @@ def generate_subtarget(target: Target, *, full_file_name: str) -> Target:
 
     prior_field_values = {
         field_cls.alias: (
-            field.value if isinstance(field, PrimitiveField) else field.sanitized_raw_value
+            field.value if isinstance(field, PrimitiveField) else field.sanitized_raw_value  # type: ignore[attr-defined]
         )
         for field_cls, field in target.field_values.items()
     }
     target_cls = type(target)
-    return target_cls({**prior_field_values, Sources.alias: (relativized_file_name,)}, address=new_address)
+    return target_cls(
+        {**prior_field_values, Sources.alias: (relativized_file_name,)}, address=new_address
+    )
 
 
 # -----------------------------------------------------------------------------------------------

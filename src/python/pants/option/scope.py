@@ -2,12 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional, Type, cast
+from typing import Optional, Type, cast
 
 from pants.option.option_value_container import OptionValueContainer
-
-if TYPE_CHECKING:
-    from pants.option.optionable import Optionable  # noqa: F401
 
 GLOBAL_SCOPE = ""
 GLOBAL_SCOPE_CONFIG_SECTION = "GLOBAL"
@@ -25,7 +22,7 @@ class ScopeInfo:
     """Information about a scope."""
 
     scope: str
-    optionable_cls: Optional[Type["Optionable"]] = None
+    optionable_cls: Optional[Type] = None
     # A ScopeInfo may have a deprecated_scope (from its associated optionable_cls), which represents a
     # previous/deprecated name for a current/non-deprecated ScopeInfo. It may also be directly
     # deprecated via this `removal_version`, which allows for the deprecation of an entire scope,
