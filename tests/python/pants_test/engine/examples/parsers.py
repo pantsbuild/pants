@@ -62,7 +62,7 @@ class JsonParser(Parser):
         )
         return JSONDecoder(object_hook=decoder, strict=True)
 
-    def parse(self, filepath, filecontent, load_statements=None):
+    def parse(self, filepath, filecontent):
         """Parse the given json encoded string into a list of top-level objects found.
 
         The parser accepts both blank lines and comment lines (those beginning with optional whitespace
@@ -71,8 +71,6 @@ class JsonParser(Parser):
         The parse also supports a simple protocol for serialized types that have an `_asdict` method.
         This includes `namedtuple` subtypes as well as any custom class with an `_asdict` method defined;
         see :class:`pants.engine.serializable.Serializable`.
-
-        Note: We ignore load statements in JSON Build files
         """
         json = ensure_text(filecontent)
 
@@ -227,9 +225,7 @@ class PythonAssignmentsParser(Parser):
             parse_globals[alias] = functools.partial(aliased, alias, symbol)
         return parse_globals
 
-    def parse(self, filepath, filecontent, load_statements=None):
-        # Note: This parser is used for testing, we ignore load statements.
-
+    def parse(self, filepath, filecontent):
         parse_globals = self._globals
 
         python = filecontent
@@ -291,9 +287,7 @@ class PythonCallbacksParser(Parser):
             parse_globals[alias] = functools.partial(registered, alias, symbol)
         return objects, parse_globals
 
-    def parse(self, filepath, filecontent, load_statements=None):
-        # Note: This parser is used for testing, we ignore load statements.
-
+    def parse(self, filepath, filecontent):
         objects, parse_globals = self._globals
 
         python = filecontent

@@ -1,7 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-
 import os.path
 from collections.abc import MutableMapping, MutableSequence
 from typing import Dict
@@ -21,12 +20,6 @@ from pants.engine.addressable import (
     BuildFileAddresses,
 )
 from pants.engine.fs import Digest, FilesContent, PathGlobs, Snapshot
-from pants.engine.load_statements import (
-    BuildFilesWithLoads,
-    load_symbols,
-    parse_build_file_for_load_statements,
-    snapshot_load_statement,
-)
 from pants.engine.mapper import AddressFamily, AddressMap, AddressMapper
 from pants.engine.objects import Locatable, SerializableFactory, Validatable
 from pants.engine.parser import HydratedStruct
@@ -59,20 +52,16 @@ async def parse_address_family(address_mapper: AddressMapper, directory: Dir) ->
     )
     snapshot = await Get[Snapshot](PathGlobs, path_globs)
     files_content = await Get[FilesContent](Digest, snapshot.directory_digest)
-    build_files_with_loads = await Get[BuildFilesWithLoads](FilesContent, files_content)
 
     if not files_content:
         raise ResolveError(
             'Directory "{}" does not contain any BUILD files.'.format(directory.path)
         )
     address_maps = []
-    for (filecontent_product, load_statements) in build_files_with_loads.map.items():
+    for filecontent_product in files_content:
         address_maps.append(
             AddressMap.parse(
-                filecontent_product.path,
-                filecontent_product.content,
-                load_statements,
-                address_mapper.parser,
+                filecontent_product.path, filecontent_product.content, address_mapper.parser
             )
         )
     return AddressFamily.create(directory.path, address_maps)
@@ -317,8 +306,4 @@ def create_graph_rules(address_mapper: AddressMapper):
         RootRule(Address),
         RootRule(AddressWithOrigin),
         RootRule(AddressSpecs),
-        # For parsing load() statements
-        snapshot_load_statement,
-        load_symbols,
-        parse_build_file_for_load_statements,
     ]

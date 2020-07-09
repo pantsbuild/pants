@@ -4,7 +4,6 @@
 target(
   name = 'all_directories',
   dependencies = [
-    ':build_file_macros_directory',
     ':fact_directory',
     ':hello_directory',
     ':jvm_run_directory',
@@ -13,11 +12,6 @@ target(
     ':several_scala_targets_directory',
     ':styleissue_directory',
   ],
-)
-
-files(
-  name = 'build_file_macros_directory',
-  sources = ['build_file_macros/**/*'],
 )
 
 page(

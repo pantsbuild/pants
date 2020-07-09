@@ -1,2 +1,0 @@
-def source_exe_scala():
-  return ["Exe.scala"]
