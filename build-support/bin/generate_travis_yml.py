@@ -547,20 +547,21 @@ def cargo_audit() -> Dict:
 
 
 # -------------------------------------------------------------------------
-# Unit tests
+# Python tests
 # -------------------------------------------------------------------------
 
 
-def unit_tests(python_version: PythonVersion) -> Dict:
+def python_tests(python_version: PythonVersion) -> Dict:
     shard = {
         **linux_shard(python_version=python_version, install_travis_wait=True),
-        "name": f"Unit tests (Python {python_version.decimal})",
+        "name": f"Python tests (Python {python_version.decimal})",
         "script": [
             "travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py "
-            f"--unit-tests --remote-execution-enabled --python-version {python_version.decimal}"
+            "--unit-tests --integration-tests --remote-execution-enabled --python-version "
+            f"{python_version.decimal}"
         ],
     }
-    safe_append(shard, "env", f"CACHE_NAME=unit_tests.py{python_version.number}")
+    safe_append(shard, "env", f"CACHE_NAME=python_tests.py{python_version.number}")
     return shard
 
 
@@ -607,27 +608,6 @@ def build_wheels_osx() -> Dict:
         ),
     }
     safe_extend(shard, "env", _build_wheels_env(platform=Platform.osx))
-    return shard
-
-
-# -------------------------------------------------------------------------
-# Integration tests
-# -------------------------------------------------------------------------
-
-
-def integration_tests(python_version: PythonVersion) -> Dict:
-    shard = {
-        **linux_shard(python_version=python_version, install_travis_wait=True),
-        "name": f"Integration tests (Python {python_version.decimal})",
-        "script": [
-            (
-                "travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py "
-                "--integration-tests --remote-execution-enabled --python-version "
-                f"{python_version.decimal}"
-            ),
-        ],
-    }
-    safe_append(shard, "env", f"CACHE_NAME=integration.py{python_version.number}")
     return shard
 
 
@@ -832,8 +812,7 @@ def main() -> None:
                     clippy(),
                     # TODO: fix Cargo audit. Run `build-support/bin/ci.py --cargo-audit` locally.
                     # cargo_audit(),
-                    *[unit_tests(v) for v in supported_python_versions],
-                    *[integration_tests(v) for v in supported_python_versions],
+                    *[python_tests(v) for v in supported_python_versions],
                     rust_tests_linux(),
                     rust_tests_osx(),
                     build_wheels_linux(),
