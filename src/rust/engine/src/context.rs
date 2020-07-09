@@ -192,23 +192,7 @@ impl Core {
 
     if remoting_opts.execution_enable {
       let remote_command_runner: Box<dyn process_execution::CommandRunner> = {
-        let command_runner: Box<dyn CommandRunner> = if remoting_opts.execution_enable_streaming {
-          Box::new(process_execution::remote::StreamingCommandRunner::new(
-            // No problem unwrapping here because the global options validation
-            // requires the remoting_opts.execution_server be present when
-            // remoting_opts.execution_enable is set.
-            &remoting_opts.execution_server.unwrap(),
-            process_execution_metadata.clone(),
-            root_ca_certs,
-            oauth_bearer_token,
-            remoting_opts.execution_headers,
-            store.clone(),
-            // TODO if we ever want to configure the remote platform to be something else we
-            // need to take an option all the way down here and into the remote::CommandRunner struct.
-            Platform::Linux,
-            remoting_opts.execution_overall_deadline,
-          )?)
-        } else {
+        let command_runner: Box<dyn CommandRunner> = {
           Box::new(process_execution::remote::CommandRunner::new(
             // No problem unwrapping here because the global options validation
             // requires the remoting_opts.execution_server be present when
@@ -222,12 +206,7 @@ impl Core {
             // TODO if we ever want to configure the remote platform to be something else we
             // need to take an option all the way down here and into the remote::CommandRunner struct.
             Platform::Linux,
-            executor.clone(),
-            // The queue buffer time is added to the server-side enforced timeout to ensure that we
-            // tend to see an error from the server before the client gives up.
-            std::time::Duration::from_secs(900),
-            std::time::Duration::from_millis(500),
-            std::time::Duration::from_secs(5),
+            remoting_opts.execution_overall_deadline,
           )?)
         };
 
