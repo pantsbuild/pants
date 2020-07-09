@@ -560,6 +560,7 @@ def python_tests(python_version: PythonVersion) -> Dict:
             "--unit-tests --integration-tests --remote-execution-enabled --python-version "
             f"{python_version.decimal}"
         ],
+        "after_success": ["./build-support/bin/upload_coverage.sh"],
     }
     safe_append(shard, "env", f"CACHE_NAME=python_tests.py{python_version.number}")
     return shard
