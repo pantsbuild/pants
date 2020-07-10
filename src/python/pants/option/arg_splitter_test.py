@@ -30,8 +30,8 @@ class ArgSplitterTest(unittest.TestCase):
         ScopeInfo("test.junit"),
     ]
 
+    @staticmethod
     def assert_valid_split(
-        self,
         args_str: str,
         *,
         expected_goals: List[str],
@@ -61,7 +61,8 @@ class ArgSplitterTest(unittest.TestCase):
         )
         assert expected_unknown_scopes == split_args.unknown_scopes
 
-    def assert_unknown_goal(self, args_str: str, unknown_goals: List[str]) -> None:
+    @staticmethod
+    def assert_unknown_goal(args_str: str, unknown_goals: List[str]) -> None:
         splitter = ArgSplitter(ArgSplitterTest._known_scope_infos)
         result = splitter.split_args(shlex.split(args_str))
         assert isinstance(splitter.help_request, UnknownGoalHelp)

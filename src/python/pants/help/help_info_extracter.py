@@ -1,6 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
+import dataclasses
 import inspect
 from dataclasses import dataclass
 from enum import Enum
@@ -11,6 +11,7 @@ from pants.engine.goal import GoalSubsystem
 from pants.engine.unions import UnionMembership
 from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.options import Options
+from pants.option.parser import OptionValueHistory, Parser
 
 
 @dataclass(frozen=True)
@@ -32,7 +33,7 @@ class OptionHelpInfo:
                         removal_version.
     removal_version: If deprecated: The version at which this option is to be removed.
     removal_hint: If deprecated: The removal hint message registered for this option.
-    choices: If this option has a constrained list of choices, a csv list of the choices.
+    choices: If this option has a constrained set of choices, a tuple of the stringified choices.
     """
 
     display_args: Tuple[str, ...]
@@ -46,7 +47,8 @@ class OptionHelpInfo:
     deprecated_message: Optional[str]
     removal_version: Optional[str]
     removal_hint: Optional[str]
-    choices: Optional[str]
+    choices: Optional[Tuple[str, ...]]
+    value_history: Optional[OptionValueHistory]
 
 
 @dataclass(frozen=True)
@@ -98,11 +100,11 @@ class HelpInfoExtracter:
         scope_to_help_info = {}
         name_to_goal_info = {}
         for scope_info in sorted(options.known_scope_to_info.values(), key=lambda x: x.scope):
+            options.for_scope(scope_info.scope)  # Force parsing.
             oshi: OptionScopeHelpInfo = HelpInfoExtracter(
                 scope_info.scope
             ).get_option_scope_help_info(
-                scope_info.description,
-                options.get_parser(scope_info.scope).option_registrations_iter(),
+                scope_info.description, options.get_parser(scope_info.scope),
             )
             scope_to_help_info[oshi.scope] = oshi
 
@@ -130,11 +132,8 @@ class HelpInfoExtracter:
         ranked_default = kwargs.get("default")
         typ = kwargs.get("type", str)
 
-        default = ranked_default.value if ranked_default else None
-        if default is None:
-            return None, "None"
-
         if is_list_option(kwargs):
+            default = ranked_default.value if ranked_default else []
             member_type = kwargs.get("member_type", str)
             if inspect.isclass(member_type) and issubclass(member_type, Enum):
                 default = []
@@ -146,17 +145,21 @@ class HelpInfoExtracter:
                 f"\"[{', '.join(member_str(val) for val in default)}]\"" if default else "[]"
             )
         elif is_dict_option(kwargs):
+            default = ranked_default.value if ranked_default else {}
             if default:
                 items_str = ", ".join(f"'{k}': {v}" for k, v in default.items())
                 default_str = f"{{ {items_str} }}"
             else:
                 default_str = "{}"
-        elif typ == str:
-            default_str = default.replace("\n", " ")
-        elif inspect.isclass(typ) and issubclass(typ, Enum):
-            default_str = default.value
         else:
+            default = ranked_default.value if ranked_default else None
             default_str = str(default)
+
+        if typ == str:
+            default_str = default_str.replace("\n", " ")
+        elif isinstance(default, Enum):
+            default_str = default.value
+
         return default, default_str
 
     @staticmethod
@@ -190,33 +193,36 @@ class HelpInfoExtracter:
         return metavar
 
     @staticmethod
-    def compute_choices(kwargs) -> Optional[str]:
-        """Compute the option choices to display based on an Enum or list type."""
+    def compute_choices(kwargs) -> Optional[Tuple[str, ...]]:
+        """Compute the option choices to display."""
         typ = kwargs.get("type", [])
         member_type = kwargs.get("member_type", str)
         if typ == list and inspect.isclass(member_type) and issubclass(member_type, Enum):
-            values = (choice.value for choice in member_type)
+            return tuple(choice.value for choice in member_type)
         elif inspect.isclass(typ) and issubclass(typ, Enum):
-            values = (choice.value for choice in typ)
+            return tuple(choice.value for choice in typ)
+        elif "choices" in kwargs:
+            return tuple(str(choice) for choice in kwargs["choices"])
         else:
-            values = (str(choice) for choice in kwargs.get("choices", []))
-        return ", ".join(values) or None
+            return None
 
     def __init__(self, scope: str):
         self._scope = scope
         self._scope_prefix = scope.replace(".", "-")
 
-    def get_option_scope_help_info(self, description, option_registrations_iter):
-        """Returns an OptionScopeHelpInfo for the options registered with the (args, kwargs)
-        pairs."""
+    def get_option_scope_help_info(self, description: str, parser: Parser):
+        """Returns an OptionScopeHelpInfo for the options parsed by the given parser."""
+
         basic_options = []
         advanced_options = []
         deprecated_options = []
         # Sort the arguments, so we display the help in alphabetical order.
-        for args, kwargs in sorted(option_registrations_iter):
+        for args, kwargs in sorted(parser.option_registrations_iter()):
             if kwargs.get("passive"):
                 continue
+            history = parser.history(kwargs["dest"])
             ohi = self.get_option_help_info(args, kwargs)
+            ohi = dataclasses.replace(ohi, value_history=history)
             if kwargs.get("removal_version"):
                 deprecated_options.append(ohi)
             elif kwargs.get("advanced") or (
@@ -293,5 +299,6 @@ class HelpInfoExtracter:
             removal_version=removal_version,
             removal_hint=removal_hint,
             choices=choices,
+            value_history=None,
         )
         return ret

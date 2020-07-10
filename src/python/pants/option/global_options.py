@@ -165,12 +165,7 @@ class GlobalOptions(Subsystem):
         default_rel_distdir = f"/{default_distdir_name}/"
 
         register(
-            "-l",
-            "--level",
-            type=LogLevel,
-            default=LogLevel.INFO,
-            recursive=True,
-            help="Set the logging level.",
+            "-l", "--level", type=LogLevel, default=LogLevel.INFO, help="Set the logging level.",
         )
 
         register(
@@ -862,7 +857,6 @@ class GlobalOptions(Subsystem):
             "--colors",
             type=bool,
             default=sys.stdout.isatty(),
-            recursive=True,
             help="Set whether log messages are displayed in color.",
         )
 

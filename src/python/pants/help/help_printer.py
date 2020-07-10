@@ -134,7 +134,7 @@ class HelpPrinter:
             f"  {self._bin_name} help-advanced                              Get help for global advanced options."
         )
         print(
-            f"  {self._bin_name} help-advanced [goal/subsystem]             Get help for a goal's or subsystem's advanced option."
+            f"  {self._bin_name} help-advanced [goal/subsystem]             Get help for a goal's or subsystem's advanced options."
         )
         print(
             f"  {self._bin_name} help-all                                   Get help for all goals."

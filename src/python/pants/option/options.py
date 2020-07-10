@@ -4,14 +4,12 @@
 import copy
 import logging
 import re
-import sys
 from dataclasses import dataclass
 from typing import Dict, Iterable, List, Mapping, Optional, Sequence
 
 from pants.base.deprecated import warn_or_error
 from pants.option.arg_splitter import ArgSplitter, HelpRequest
 from pants.option.config import Config
-from pants.option.option_tracker import OptionTracker
 from pants.option.option_util import is_list_option
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.parser import Parser
@@ -116,7 +114,7 @@ class Options:
         env: Mapping[str, str],
         config: Config,
         known_scope_infos: Iterable[ScopeInfo],
-        args: Optional[Sequence[str]] = None,
+        args: Sequence[str],
         bootstrap_option_values: Optional[OptionValueContainer] = None,
     ) -> "Options":
         """Create an Options instance.
@@ -132,7 +130,6 @@ class Options:
         # can propagate through them.
         complete_known_scope_infos = cls.complete_scopes(known_scope_infos)
         splitter = ArgSplitter(complete_known_scope_infos)
-        args = sys.argv if args is None else args
         split_args = splitter.split_args(args)
 
         if split_args.passthru and len(split_args.goals) > 1:
@@ -142,8 +139,6 @@ class Options:
                 "Try either specifying only a single goal, or passing the passthrough args "
                 "directly to the relevant consumer via its associated flags."
             )
-
-        option_tracker = OptionTracker()
 
         if bootstrap_option_values:
             spec_files = bootstrap_option_values.spec_files
@@ -156,7 +151,7 @@ class Options:
 
         help_request = splitter.help_request
 
-        parser_hierarchy = ParserHierarchy(env, config, complete_known_scope_infos, option_tracker)
+        parser_hierarchy = ParserHierarchy(env, config, complete_known_scope_infos)
         known_scope_to_info = {s.scope: s for s in complete_known_scope_infos}
         return cls(
             goals=split_args.goals,
@@ -167,7 +162,6 @@ class Options:
             parser_hierarchy=parser_hierarchy,
             bootstrap_option_values=bootstrap_option_values,
             known_scope_to_info=known_scope_to_info,
-            option_tracker=option_tracker,
             unknown_scopes=split_args.unknown_scopes,
         )
 
@@ -181,7 +175,6 @@ class Options:
         parser_hierarchy: ParserHierarchy,
         bootstrap_option_values: Optional[OptionValueContainer],
         known_scope_to_info: Dict[str, ScopeInfo],
-        option_tracker: OptionTracker,
         unknown_scopes: List[str],
     ) -> None:
         """The low-level constructor for an Options instance.
@@ -196,7 +189,6 @@ class Options:
         self._parser_hierarchy = parser_hierarchy
         self._bootstrap_option_values = bootstrap_option_values
         self._known_scope_to_info = known_scope_to_info
-        self._option_tracker = option_tracker
         self._frozen = False
         self._unknown_scopes = unknown_scopes
 
@@ -205,10 +197,6 @@ class Options:
     def frozen(self) -> bool:
         """Whether or not this Options object is frozen from writes."""
         return self._frozen
-
-    @property
-    def tracker(self) -> OptionTracker:
-        return self._option_tracker
 
     @property
     def help_request(self) -> Optional[HelpRequest]:
@@ -296,7 +284,6 @@ class Options:
             parser_hierarchy=self._parser_hierarchy,
             bootstrap_option_values=self._bootstrap_option_values,
             known_scope_to_info=self._known_scope_to_info,
-            option_tracker=self._option_tracker,
             unknown_scopes=self._unknown_scopes,
         )
 
@@ -403,10 +390,10 @@ class Options:
         This information enables fuzzy matching to suggest correct option names when a user specifies an
         unregistered option on the command line.
 
-        :param scope: the 'scope' component of a command-line flag.
-        :param arg: the unscoped flag name as it would appear on the command line.
-        :param normalized_arg: the fully-scoped option name, without any leading dashes.
-        :param scoped_arg: the fully-scoped option as it would appear on the command line.
+        scope: the 'scope' component of a command-line flag.
+        arg: the unscoped flag name as it would appear on the command line.
+        normalized_arg: the fully-scoped option name, without any leading dashes.
+        scoped_arg: the fully-scoped option as it would appear on the command line.
         """
 
         scope: str
@@ -517,8 +504,6 @@ class Options:
         fingerprintable pairs.
 
         :param bottom_scope: The scope to gather fingerprintable options for.
-        :param include_passthru: Whether to include passthru args captured by `bottom_scope` in the
-                                 fingerprintable options.
         :param fingerprint_key: The option kwarg to match against (defaults to 'fingerprint').
         :param invert: Whether or not to invert the boolean check for the fingerprint_key value.
 

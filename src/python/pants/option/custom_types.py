@@ -191,6 +191,10 @@ class ListValueComponent:
             ret = [y for y in ret if y != x]
         return ret
 
+    @property
+    def action(self):
+        return self._action
+
     @classmethod
     def create(cls, value, member_type=str) -> "ListValueComponent":
         """Interpret value as either a list or something to extend another list with.

@@ -151,7 +151,9 @@ class OptionsBootstrapperTest(unittest.TestCase):
     def test_bootstrapped_options_ignore_irrelevant_env(self) -> None:
         included = "PANTS_SUPPORTDIR"
         excluded = "NON_PANTS_ENV"
-        bootstrapper = OptionsBootstrapper.create(env={excluded: "pear", included: "banana"})
+        bootstrapper = OptionsBootstrapper.create(
+            env={excluded: "pear", included: "banana"}, args=[]
+        )
         self.assertIn(included, bootstrapper.env)
         self.assertNotIn(excluded, bootstrapper.env)
 
@@ -161,7 +163,7 @@ class OptionsBootstrapperTest(unittest.TestCase):
 
         def create_options_bootstrapper(*config_paths: str) -> OptionsBootstrapper:
             return OptionsBootstrapper.create(
-                args=[f"--pants-config-files={cp}" for cp in config_paths]
+                env={}, args=[f"--pants-config-files={cp}" for cp in config_paths]
             )
 
         def assert_config_read_correctly(
@@ -216,7 +218,9 @@ class OptionsBootstrapperTest(unittest.TestCase):
 
     def test_options_pantsrc_files(self) -> None:
         def create_options_bootstrapper(*config_paths: str) -> OptionsBootstrapper:
-            return OptionsBootstrapper.create(args=[f"--pantsrc-files={cp}" for cp in config_paths])
+            return OptionsBootstrapper.create(
+                env={}, args=[f"--pantsrc-files={cp}" for cp in config_paths]
+            )
 
         with temporary_file(binary_mode=False) as fp:
             fp.write(
@@ -265,7 +269,7 @@ class OptionsBootstrapperTest(unittest.TestCase):
         def parse_options(*args: str) -> OptionValueContainer:
             full_args = [*args, *self._config_path(None)]
             return (
-                OptionsBootstrapper.create(args=full_args)
+                OptionsBootstrapper.create(env={}, args=full_args)
                 .get_bootstrap_options()
                 .for_global_scope()
             )
@@ -288,7 +292,7 @@ class OptionsBootstrapperTest(unittest.TestCase):
         def parse_options(*args: str) -> OptionValueContainer:
             full_args = [*args, *self._config_path(None)]
             return (
-                OptionsBootstrapper.create(args=full_args)
+                OptionsBootstrapper.create(env={}, args=full_args)
                 .get_bootstrap_options()
                 .for_global_scope()
             )
