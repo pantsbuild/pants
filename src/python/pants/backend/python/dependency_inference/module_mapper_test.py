@@ -94,14 +94,16 @@ class ModuleMapperTest(TestBase):
         options_bootstrapper = create_options_bootstrapper(
             args=["--source-root-patterns=['src/python', 'tests/python', 'build-support']"]
         )
+        # Two modules belonging to the same target. We should generate subtargets for each file.
         self.create_files("src/python/project/util", ["dirutil.py", "tarutil.py"])
         self.add_to_build_file("src/python/project/util", "python_library()")
-        # A module with two owners should not be resolved.
+        # A module with two owners, meaning that neither should not be resolved.
         self.create_file("src/python/two_owners.py")
         self.add_to_build_file("src/python", "python_library()")
         self.create_file("build-support/two_owners.py")
         self.add_to_build_file("build-support", "python_library()")
-        # A package module
+        # A package module. Because there's only one source file belonging to the target, we should
+        # not generate subtargets.
         self.create_file("tests/python/project_test/demo_test/__init__.py")
         self.add_to_build_file("tests/python/project_test/demo_test", "python_library()")
         result = self.request_single_product(FirstPartyModuleToAddressMapping, options_bootstrapper)
@@ -118,9 +120,7 @@ class ModuleMapperTest(TestBase):
                     generated_base_target_name="util",
                 ),
                 "project_test.demo_test": Address(
-                    "tests/python/project_test/demo_test",
-                    target_name="__init__.py",
-                    generated_base_target_name="demo_test",
+                    "tests/python/project_test/demo_test", target_name="demo_test"
                 ),
             }
         )
@@ -188,6 +188,7 @@ class ModuleMapperTest(TestBase):
 
         # Check a first party module using a module path.
         self.create_file("source_root1/project/app.py")
+        self.create_file("source_root1/project/file2.py")
         self.add_to_build_file("source_root1/project", "python_library()")
         assert get_owner("project.app") == Address(
             "source_root1/project", target_name="app.py", generated_base_target_name="project"
@@ -197,9 +198,7 @@ class ModuleMapperTest(TestBase):
         self.create_file("source_root2/project/subdir/__init__.py")
         self.add_to_build_file("source_root2/project/subdir", "python_library()")
         assert get_owner("project.subdir") == Address(
-            "source_root2/project/subdir",
-            target_name="__init__.py",
-            generated_base_target_name="subdir",
+            "source_root2/project/subdir", target_name="subdir"
         )
 
         # Test a module with no owner (stdlib). This also sanity checks that we can handle when
@@ -210,6 +209,4 @@ class ModuleMapperTest(TestBase):
         # can handle when the module includes a symbol (like a class name) at the end.
         self.create_file("script.py")
         self.add_to_build_file("", "python_library(name='script')")
-        assert get_owner("script.Demo") == Address(
-            "", target_name="script.py", generated_base_target_name="script"
-        )
+        assert get_owner("script.Demo") == Address("", target_name="script")

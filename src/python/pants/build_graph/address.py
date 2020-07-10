@@ -254,7 +254,12 @@ class Address:
         return not self == other
 
     def __repr__(self) -> str:
-        return f"Address({self.spec_path}, {self.target_name})"
+        prefix = f"Address({self.spec_path}, {self.target_name}"
+        return (
+            f"{prefix})"
+            if not self.generated_base_target_name
+            else f"{prefix}, generated_base_target_name={self.generated_base_target_name})"
+        )
 
     def __str__(self) -> str:
         return self.spec
@@ -308,7 +313,12 @@ class BuildFileAddress(Address):
         )
 
     def __repr__(self) -> str:
-        return f"BuildFileAddress({self.rel_path}, {self.target_name})"
+        prefix = f"BuildFileAddress({self.rel_path}, {self.target_name}"
+        return (
+            f"{prefix})"
+            if not self.generated_base_target_name
+            else f"{prefix}, generated_base_target_name={self.generated_base_target_name})"
+        )
 
 
 def _is_build_file_name(name: str) -> bool:
