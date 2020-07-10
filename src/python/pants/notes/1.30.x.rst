@@ -5,6 +5,11 @@ This document describes releases leading up to the ``1.30.x`` ``stable`` series.
 
 See https://pants.readme.io/v1.30/docs/release-notes-1-30 for an overview of the changes in this release.
 
+1.30.0 (7/10/2020)
+------------------
+
+The first stable release of the ``1.30.x`` series, with no changes since the previous rc!
+
 1.30.0rc1 (6/27/2020)
 ---------------------
 
