@@ -42,7 +42,7 @@ type ParamTypes<T> = BTreeSet<T>;
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 struct UnreachableError<R: Rule> {
   rule: R,
-  diagnostic: Diagnostic<R::TypeId>,
+  diagnostic: Diagnostic<R>,
 }
 
 impl<R: Rule> UnreachableError<R> {
@@ -152,13 +152,13 @@ impl<R: Rule> InnerEntry<R> {
 }
 
 type RuleDependencyEdges<R> = HashMap<EntryWithDeps<R>, RuleEdges<R>>;
-type UnfulfillableRuleMap<R> = HashMap<EntryWithDeps<R>, Vec<Diagnostic<<R as Rule>::TypeId>>>;
+type UnfulfillableRuleMap<R> = HashMap<EntryWithDeps<R>, Vec<Diagnostic<R>>>;
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
-struct Diagnostic<T: TypeId> {
-  params: ParamTypes<T>,
+struct Diagnostic<R: Rule> {
+  params: ParamTypes<R::TypeId>,
   reason: String,
-  details: Vec<String>,
+  details: Vec<(Entry<R>, Option<&'static str>)>,
 }
 
 ///
@@ -512,12 +512,23 @@ impl<R: Rule> RuleGraph<R> {
         diagnostics.dedup_by(|l, r| l.reason == r.reason);
         let errors = diagnostics
           .into_iter()
-          .map(|mut d| {
+          .map(|d| {
             if d.details.is_empty() {
               d.reason
             } else {
-              d.details.sort();
-              format!("{}:\n      {}", d.reason, d.details.join("\n      "))
+              let mut details: Vec<_> = d
+                .details
+                .iter()
+                .map(|(entry, msg)| {
+                  if let Some(msg) = msg {
+                    format!("{}: {}", entry_str(entry), msg)
+                  } else {
+                    entry_str(entry)
+                  }
+                })
+                .collect();
+              details.sort();
+              format!("{}:\n      {}", d.reason, details.join("\n      "))
             }
           })
           .collect::<Vec<_>>()
