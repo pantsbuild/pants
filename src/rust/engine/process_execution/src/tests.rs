@@ -21,6 +21,7 @@ fn process_equality() {
     jdk_home: None,
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
+    execution_slot_variable: None,
   };
 
   fn hash<Hashable: Hash>(hashable: &Hashable) -> u64 {

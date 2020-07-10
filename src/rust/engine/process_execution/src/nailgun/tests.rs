@@ -52,6 +52,7 @@ fn mock_nailgunnable_request(jdk_home: Option<PathBuf>) -> Process {
     jdk_home: jdk_home,
     target_platform: PlatformConstraint::Darwin,
     is_nailgunnable: true,
+    execution_slot_variable: None,
   }
 }
 

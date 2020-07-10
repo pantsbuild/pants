@@ -46,6 +46,10 @@ target(
   ],
 )
 
+python_tests(
+  name='tests',
+  sources=['*_test.py', '!pants_run_integration_test.py']
+)
 
 python_library(
   name = 'test_base',
@@ -56,7 +60,6 @@ python_library(
   name = 'external_tool_test_base',
   sources = ['external_tool_test_base.py'],
 )
-
 
 python_library(
   name = 'goal_rule_test_base',
@@ -81,6 +84,11 @@ python_library(
 python_library(
   name='pexrc_util',
   sources=['pexrc_util.py'],
+)
+
+python_library(
+  name='process_handler',
+  sources=['process_handler.py'],
 )
 
 python_library(

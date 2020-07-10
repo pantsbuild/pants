@@ -5,40 +5,10 @@ import io
 import multiprocessing
 import subprocess
 import sys
-from abc import ABC, abstractmethod
 from typing import Optional
 
 
-class ProcessHandler(ABC):
-    """An abstraction of process handling calls using the same interface as subprocess.Popen.
-
-    See SubprocessProcessHandler below for an example.
-    """
-
-    @abstractmethod
-    def wait(self, timeout: Optional[float] = None) -> int:
-        """Wait for the underlying process to terminate.
-
-        :param timeout: The time to wait for the process to terminate in fractional seconds. Wait
-                        forever by default.
-        :returns: The process exit code is it has terminated.
-        :raises: :class:`subprocess.TimeoutExpired`
-        """
-
-    @abstractmethod
-    def kill(self) -> None:
-        pass
-
-    @abstractmethod
-    def terminate(self) -> None:
-        pass
-
-    @abstractmethod
-    def poll(self) -> Optional[int]:
-        pass
-
-
-class SubprocessProcessHandler(ProcessHandler):
+class SubprocessProcessHandler:
     """A `ProcessHandler` that delegates directly to a subprocess.Popen object."""
 
     def __init__(self, process: subprocess.Popen) -> None:
