@@ -97,7 +97,7 @@ class ModuleMapperTest(TestBase):
         # Two modules belonging to the same target. We should generate subtargets for each file.
         self.create_files("src/python/project/util", ["dirutil.py", "tarutil.py"])
         self.add_to_build_file("src/python/project/util", "python_library()")
-        # A module with two owners, meaning that neither should not be resolved.
+        # A module with two owners, meaning that neither should be resolved.
         self.create_file("src/python/two_owners.py")
         self.add_to_build_file("src/python", "python_library()")
         self.create_file("build-support/two_owners.py")
