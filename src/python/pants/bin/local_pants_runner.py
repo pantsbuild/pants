@@ -212,9 +212,6 @@ class LocalPantsRunner:
         scheduler_session = self.graph_session.scheduler_session
         metrics = scheduler_session.metrics()
         self._run_tracker.pantsd_stats.set_scheduler_metrics(metrics)
-        engine_workunits = scheduler_session.engine_workunits(metrics)
-        if engine_workunits:
-            self._run_tracker.report.bulk_record_workunits(engine_workunits)
 
     def _finish_run(self, code: ExitCode) -> ExitCode:
         """Checks that the RunTracker is in good shape to exit, and then returns its exit code.
