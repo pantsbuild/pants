@@ -222,7 +222,6 @@ class Native(metaclass=SingletonMetaclass):
             execution_headers=tuple(
                 (k, v) for (k, v) in execution_options.remote_execution_headers.items()
             ),
-            execution_enable_streaming=execution_options.remote_execution_enable_streaming,
             execution_overall_deadline_secs=execution_options.remote_execution_overall_deadline_secs,
         )
 
