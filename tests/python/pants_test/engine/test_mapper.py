@@ -44,7 +44,7 @@ class AddressMapTest(unittest.TestCase):
     @contextmanager
     def parse_address_map(self, json):
         path = "/dev/null"
-        address_map = AddressMap.parse(path, json, [], self._parser)
+        address_map = AddressMap.parse(path, json, self._parser)
         self.assertEqual(path, address_map.path)
         yield address_map
 

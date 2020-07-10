@@ -205,19 +205,6 @@ python_tests(
   tags = {"partially_type_checked"},
 )
 
-
-python_tests(
-    name = "parser_integration",
-    sources = ['test_parser_integration.py'],
-    dependencies = [
-        'src/python/pants/testutil:int-test',
-        'tests/python/pants_test/pantsd:pantsd_integration_test_base',
-        'examples/src/scala/org/pantsbuild/example:build_file_macros_directory',
-    ],
-    tags = {"integration", "partially_type_checked"},
-    timeout = 300,
-)
-
 python_tests(
   name = 'structs',
   sources = ['test_structs.py'],
