@@ -168,8 +168,7 @@ class LocalPantsRunner:
 
     def _run_v2(self) -> ExitCode:
         goals = self.options.goals
-        if self._run_tracker:
-            self._run_tracker.set_v2_goal_rule_names(tuple(goals))
+        self._run_tracker.set_v2_goal_rule_names(tuple(goals))
         if not goals:
             return PANTS_SUCCEEDED_EXIT_CODE
         global_options = self.options.for_global_scope()
