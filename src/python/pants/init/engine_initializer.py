@@ -21,7 +21,7 @@ from pants.engine.internals.mapper import AddressMapper
 from pants.engine.internals.native import Native
 from pants.engine.internals.parser import Parser, SymbolTable
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
-from pants.engine.internals.struct import TargetAdaptor
+from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.platform import create_platform_rules
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Params

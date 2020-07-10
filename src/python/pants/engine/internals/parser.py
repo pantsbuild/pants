@@ -10,10 +10,8 @@ from typing import Any, Dict, List, Tuple, Type, cast
 from pants.base.exceptions import UnaddressableObjectError
 from pants.base.parse_context import ParseContext
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.engine.internals.objects import Serializable
-from pants.engine.internals.struct import TargetAdaptor
+from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.util.frozendict import FrozenDict
-from pants.util.memo import memoized_property
 
 
 @dataclass(frozen=True)
@@ -50,33 +48,27 @@ class Parser:
         parse_context = ParseContext(rel_path=None, type_aliases=symbols)
 
         class Registrar:
-            def __init__(self, parse_context, type_alias, object_type):
+            def __init__(self, parse_context: ParseContext, type_alias: str, object_type):
                 self._parse_context = parse_context
                 self._type_alias = type_alias
                 self._object_type = object_type
-                self._serializable = Serializable.is_serializable_type(self._object_type)
-
-            @memoized_property
-            def target_types(self):
-                return [self._object_type]
 
             def __call__(self, *args, **kwargs):
+                if not issubclass(self._object_type, TargetAdaptor):
+                    return self._object_type(*args, **kwargs)
                 # Target names default to the name of the directory their BUILD file is in
                 # (as long as it's not the root directory).
-                if "name" not in kwargs and issubclass(self._object_type, TargetAdaptor):
+                if "name" not in kwargs:
                     dirname = os.path.basename(self._parse_context.rel_path)
                     if not dirname:
                         raise UnaddressableObjectError(
                             "Targets in root-level BUILD files must be named explicitly."
                         )
                     kwargs["name"] = dirname
-                name = kwargs.get("name")
-                if name and self._serializable:
-                    kwargs.setdefault("type_alias", self._type_alias)
-                    obj = self._object_type(**kwargs)
-                    self._parse_context._storage.add(obj)
-                    return obj
-                return self._object_type(*args, **kwargs)
+                kwargs.setdefault("type_alias", self._type_alias)
+                obj = self._object_type(**kwargs)
+                self._parse_context._storage.add(obj)
+                return obj
 
         for alias, symbol in symbol_table.table.items():
             registrar = Registrar(parse_context, alias, object_type=symbol)

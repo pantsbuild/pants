@@ -279,7 +279,7 @@ class AddressSpecsMatcher:
             def filter_target(tgt):
                 # `tags` can sometimes be explicitly set to `None`. We convert that to an empty list
                 # with `or`.
-                tags = tgt.kwargs().get("tags", []) or []
+                tags = tgt.kwargs.get("tags", []) or []
                 return tag in [str(t_tag) for t_tag in tags]
 
             return filter_target
@@ -289,7 +289,7 @@ class AddressSpecsMatcher:
     def matches_target_address_pair(self, address, target) -> bool:
         """
         :param Address address: An Address to match
-        :param HydratedTarget target: The Target for the address.
+        :param TargetAdaptor target: The Target for the address.
 
         :return: True if the given Address/HydratedTarget are included by this matcher.
         """

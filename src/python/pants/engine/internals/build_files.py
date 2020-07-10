@@ -20,12 +20,11 @@ from pants.engine.addresses import (
 from pants.engine.fs import Digest, DigestContents, PathGlobs, Snapshot
 from pants.engine.internals.mapper import AddressFamily, AddressMap, AddressMapper
 from pants.engine.internals.parser import BuildFilePreludeSymbols, error_on_imports
-from pants.engine.internals.struct import HydratedTargetAdaptor, TargetAdaptor
+from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.frozendict import FrozenDict
-from pants.util.objects import TypeConstraintError
 from pants.util.ordered_set import OrderedSet
 
 
@@ -118,23 +117,13 @@ async def find_build_files(addresses: Addresses) -> BuildFileAddresses:
 
 
 @rule
-async def hydrate_target_adaptor(address: Address) -> HydratedTargetAdaptor:
+async def find_target_adaptor(address: Address) -> TargetAdaptor:
     """Hydrate a TargetAdaptor so that it may be converted into the Target API."""
     address_family = await Get(AddressFamily, Dir(address.spec_path))
     target_adaptor = address_family.addressables_as_address_keyed.get(address)
     if target_adaptor is None:
         _raise_did_you_mean(address_family, address.target_name)
-
-    target_adaptor = cast(TargetAdaptor, target_adaptor)
-
-    hydrated_args = {"address": address, **target_adaptor._asdict()}
-    try:
-        target_adaptor = TargetAdaptor(**hydrated_args)
-    except TypeConstraintError as e:
-        raise ResolvedTypeMismatchError(e)
-    target_adaptor = cast(TargetAdaptor, target_adaptor.create())
-    target_adaptor.validate()
-    return HydratedTargetAdaptor(target_adaptor)
+    return cast(TargetAdaptor, target_adaptor)
 
 
 @rule
@@ -219,7 +208,7 @@ def create_graph_rules(address_mapper: AddressMapper):
     return [
         address_mapper_singleton,
         # BUILD file parsing.
-        hydrate_target_adaptor,
+        find_target_adaptor,
         parse_address_family,
         find_build_file,
         find_build_files,
