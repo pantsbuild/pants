@@ -208,11 +208,6 @@ class LocalPantsRunner:
                 max_code = code
         return max_code
 
-    def _update_stats(self):
-        scheduler_session = self.graph_session.scheduler_session
-        metrics = scheduler_session.metrics()
-        self._run_tracker.pantsd_stats.set_scheduler_metrics(metrics)
-
     def _finish_run(self, code: ExitCode) -> ExitCode:
         """Checks that the RunTracker is in good shape to exit, and then returns its exit code.
 
@@ -221,11 +216,13 @@ class LocalPantsRunner:
         """
 
         run_tracker_result = PANTS_SUCCEEDED_EXIT_CODE
+        scheduler_session = self.graph_session.scheduler_session
 
         # These strings are prepended to the existing exit message when calling the superclass .exit().
         additional_messages = []
         try:
-            self._update_stats()
+            metrics = scheduler_session.metrics()
+            self._run_tracker.pantsd_stats.set_scheduler_metrics(metrics)
 
             if code == PANTS_SUCCEEDED_EXIT_CODE:
                 outcome = WorkUnit.SUCCESS
