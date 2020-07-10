@@ -138,7 +138,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
         # Set for pytest output display.
         self.maxDiff = None
 
-        cmds = [["goals"], ["help"], ["target-types"], ["roots"]]
+        cmds = [["goals"], ["target-types"], ["roots"]]
 
         non_daemon_runs = [self.run_pants(cmd) for cmd in cmds]
 
