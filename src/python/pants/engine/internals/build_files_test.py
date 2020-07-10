@@ -31,7 +31,7 @@ from pants.engine.internals.build_files import (
 from pants.engine.internals.mapper import AddressFamily, AddressMapper
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, SymbolTable
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.internals.struct import HydratedTargetAdaptor, TargetAdaptor
+from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import RootRule
 from pants.engine.target import Target
 from pants.testutil.engine.util import MockGet, run_rule
@@ -80,7 +80,9 @@ def resolve_addresses_with_origins_from_address_specs(
 def test_address_specs_duplicated() -> None:
     """Test that matching the same AddressSpec twice succeeds."""
     address_spec = SingleAddress("root", "root")
-    address_family = AddressFamily("root", {"root": ("root/BUILD", TargetAdaptor())})
+    address_family = AddressFamily(
+        "root", {"root": ("root/BUILD", TargetAdaptor(type_alias="", name="root"))}
+    )
     address_specs = AddressSpecs([address_spec, address_spec])
 
     addresses_with_origins = resolve_addresses_with_origins_from_address_specs(
@@ -98,9 +100,9 @@ def test_address_specs_tag_filter() -> None:
     address_family = AddressFamily(
         "root",
         {
-            "a": ("root/BUILD", TargetAdaptor()),
-            "b": ("root/BUILD", TargetAdaptor(tags={"integration"})),
-            "c": ("root/BUILD", TargetAdaptor(tags={"not_integration"})),
+            "a": ("root/BUILD", TargetAdaptor(type_alias="", name="a")),
+            "b": ("root/BUILD", TargetAdaptor(type_alias="", name="b", tags={"integration"})),
+            "c": ("root/BUILD", TargetAdaptor(type_alias="", name="c", tags={"not_integration"})),
         },
     )
 
@@ -115,7 +117,9 @@ def test_address_specs_tag_filter() -> None:
 
 def test_address_specs_fail_on_nonexistent() -> None:
     """Test that address specs referring to nonexistent targets raise a ResolveError."""
-    address_family = AddressFamily("root", {"a": ("root/BUILD", TargetAdaptor())})
+    address_family = AddressFamily(
+        "root", {"a": ("root/BUILD", TargetAdaptor(type_alias="", name="a"))}
+    )
     address_specs = AddressSpecs([SingleAddress("root", "b"), SingleAddress("root", "a")])
 
     expected_rx_str = re.escape("'b' was not found in namespace 'root'. Did you mean one of:\n  :a")
@@ -134,7 +138,10 @@ def test_address_specs_exclude_pattern() -> None:
     address_specs = AddressSpecs([SiblingAddresses("root")], exclude_patterns=tuple([".exclude*"]))
     address_family = AddressFamily(
         "root",
-        {"exclude_me": ("root/BUILD", TargetAdaptor()), "not_me": ("root/BUILD", TargetAdaptor()),},
+        {
+            "exclude_me": ("root/BUILD", TargetAdaptor(type_alias="", name="exclude_me")),
+            "not_me": ("root/BUILD", TargetAdaptor(type_alias="", name="not_me")),
+        },
     )
 
     addresses_with_origins = resolve_addresses_with_origins_from_address_specs(
@@ -151,7 +158,9 @@ def test_address_specs_exclude_pattern_with_single_address() -> None:
     address_specs = AddressSpecs(
         [SingleAddress("root", "not_me")], exclude_patterns=tuple(["root.*"])
     )
-    address_family = AddressFamily("root", {"not_me": ("root/BUILD", TargetAdaptor())})
+    address_family = AddressFamily(
+        "root", {"not_me": ("root/BUILD", TargetAdaptor(type_alias="", name="not_me"))}
+    )
     assert not resolve_addresses_with_origins_from_address_specs(address_specs, address_family)
 
 
@@ -249,19 +258,18 @@ class BuildFileIntegrationTest(TestBase):
             ),
         )
         addr = Address.parse("helloworld")
-        target_adaptor = self.request_single_product(HydratedTargetAdaptor, addr).value
-        assert target_adaptor.address == addr
+        target_adaptor = self.request_single_product(TargetAdaptor, addr)
         assert target_adaptor.name == "helloworld"
         assert target_adaptor.type_alias == "mock_tgt"
-        assert target_adaptor.dependencies == (
+        assert target_adaptor.kwargs["dependencies"] == [
             "helloworld",
             ":sibling",
             "helloworld/util",
             "helloworld/util:tests",
-        )
+        ]
         # NB: TargetAdaptors do not validate what fields are valid. The Target API should error
         # when encountering this, but it's fine at this stage.
-        assert target_adaptor.fake_field == 42
+        assert target_adaptor.kwargs["fake_field"] == 42
 
     def test_build_file_address(self) -> None:
         self.create_file("helloworld/BUILD.ext", "mock_tgt()")
@@ -287,7 +295,7 @@ class BuildFileIntegrationTest(TestBase):
 
     def test_address_not_found(self) -> None:
         with pytest.raises(ExecutionError) as exc:
-            self.request_single_product(HydratedTargetAdaptor, Address.parse("helloworld"))
+            self.request_single_product(TargetAdaptor, Address.parse("helloworld"))
         assert "Directory \\'helloworld\\' does not contain any BUILD files" in str(exc)
 
         self.add_to_build_file("helloworld", "mock_tgt(name='other_tgt')")
@@ -295,4 +303,4 @@ class BuildFileIntegrationTest(TestBase):
             "'helloworld' was not found in namespace 'helloworld'. Did you mean one of:\n  :other_tgt"
         )
         with pytest.raises(ExecutionError, match=expected_rx_str):
-            self.request_single_product(HydratedTargetAdaptor, Address.parse("helloworld"))
+            self.request_single_product(TargetAdaptor, Address.parse("helloworld"))

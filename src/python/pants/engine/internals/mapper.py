@@ -8,7 +8,7 @@ from typing import Dict, Iterable, Optional, Tuple, cast
 from pants.base.exceptions import DuplicateNameError, MappingError
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
-from pants.engine.internals.struct import TargetAdaptor
+from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
 
@@ -39,8 +39,7 @@ class AddressMap:
             raise MappingError(f"Failed to parse {filepath}:\n{e!r}")
         name_to_target_adaptors: Dict[str, TargetAdaptor] = {}
         for target_adaptor in target_adaptors:
-            attributes = target_adaptor._asdict()
-            name = attributes["name"]
+            name = target_adaptor.name
             if name in name_to_target_adaptors:
                 duplicate = name_to_target_adaptors[name]
                 raise DuplicateNameError(

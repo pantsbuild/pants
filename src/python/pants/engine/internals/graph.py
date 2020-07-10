@@ -7,7 +7,7 @@ import os.path
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import DefaultDict, List, Tuple, Union, cast
+from typing import DefaultDict, List, Tuple, Union
 
 from pants.base.exceptions import ResolveError
 from pants.base.specs import (
@@ -26,7 +26,7 @@ from pants.engine.addresses import (
     BuildFileAddress,
 )
 from pants.engine.fs import PathGlobs, Snapshot, SourcesSnapshot, SourcesSnapshots
-from pants.engine.internals.struct import HydratedTargetAdaptor
+from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
@@ -46,7 +46,6 @@ from pants.engine.target import (
     WrappedTarget,
     generate_subtarget,
 )
-from pants.engine.unions import UnionMembership
 from pants.option.global_options import GlobalOptions, OwnersNotFoundBehavior
 from pants.source.filespec import any_matches_filespec
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
@@ -60,9 +59,7 @@ logger = logging.getLogger(__name__)
 
 @rule
 async def resolve_target(
-    address: Address,
-    registered_target_types: RegisteredTargetTypes,
-    union_membership: UnionMembership,
+    address: Address, registered_target_types: RegisteredTargetTypes
 ) -> WrappedTarget:
     if address.generated_base_target_name:
         base_target = await Get(
@@ -74,32 +71,14 @@ async def resolve_target(
         )
         return WrappedTarget(subtarget)
 
-    hydrated_target_adaptor = await Get(HydratedTargetAdaptor, Address, address)
-    kwargs = hydrated_target_adaptor.value.kwargs().copy()
-    type_alias = kwargs.pop("type_alias")
-
-    # We special case `address` and the field `name`. The `Target` constructor requires an
-    # `Address`, so we use the value pre-calculated via `build_files.py`'s `hydrate_target_adaptor`
-    # rule. We throw away the field `name` because it can be accessed via `tgt.address.target_name`,
-    # so there is no (known) reason to preserve the field.
-    address = cast(Address, kwargs.pop("address"))
-    kwargs.pop("name", None)
-
-    target_type = registered_target_types.aliases_to_types.get(type_alias, None)
+    target_adaptor = await Get(TargetAdaptor, Address, address)
+    target_type = registered_target_types.aliases_to_types.get(target_adaptor.type_alias, None)
     if target_type is None:
-        raise UnrecognizedTargetTypeException(type_alias, registered_target_types, address=address)
-
-    # Not every target type has the Dependencies field registered, but the StructWithDependencies
-    # code means that `kwargs` will always have an entry. We must remove `dependencies` from
-    # `kwargs` for target types without the value, otherwise we'll get an "unrecognized field"
-    # error. But, we also need to be careful to error if the user did explicitly specify
-    # `dependencies` in the BUILD file.
-    if kwargs["dependencies"] is None and not target_type.class_has_field(
-        Dependencies, union_membership=union_membership
-    ):
-        kwargs.pop("dependencies")
-
-    return WrappedTarget(target_type(kwargs, address=address))
+        raise UnrecognizedTargetTypeException(
+            target_adaptor.type_alias, registered_target_types, address=address
+        )
+    target = target_type(target_adaptor.kwargs, address=address)
+    return WrappedTarget(target)
 
 
 @rule

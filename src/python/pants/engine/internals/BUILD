@@ -15,16 +15,6 @@ python_integration_tests(
 )
 
 python_library(
-  name='core_abstractions',
-  sources=[
-    'addressable.py',
-    'nodes.py',
-    'objects.py',
-    'struct.py'
-  ],
-)
-
-python_library(
   name='build_files',
   sources=['build_files.py'],
 )
@@ -56,6 +46,11 @@ resources(
 )
 
 python_library(
+  name='nodes',
+  sources=['nodes.py']
+)
+
+python_library(
   name='options_parsing',
   sources=['options_parsing.py'],
 )
@@ -73,4 +68,9 @@ python_library(
 python_library(
   name='scheduler_test_base',
   sources=['scheduler_test_base.py'],
+)
+
+python_library(
+  name='target_adaptor',
+  sources=['target_adaptor.py']
 )
