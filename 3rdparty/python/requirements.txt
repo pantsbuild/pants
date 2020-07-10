@@ -28,4 +28,5 @@ setuptools==49.1.0
 toml==0.10.1
 typed-ast>=1.4.1,<1.5
 typing-extensions==3.7.4.2
+twitter.common.dirutil>=0.3.11,<0.4
 www-authenticate==0.9.2
