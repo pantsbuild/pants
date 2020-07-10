@@ -5,18 +5,12 @@ import os
 import subprocess
 import unittest
 from contextlib import contextmanager
-from unittest.case import skipIf
 
 from pants.scm.git import Git
-from pants.testutil.git_util import MIN_REQUIRED_GIT_VERSION, git_version
 from pants.util.contextutil import environment_as, pushd, temporary_dir
 from pants.util.dirutil import chmod_plus_x, safe_mkdir, safe_mkdtemp, safe_open, safe_rmtree, touch
 
 
-@skipIf(
-    git_version() < MIN_REQUIRED_GIT_VERSION,
-    f"The GitTest requires git >= {MIN_REQUIRED_GIT_VERSION}.",
-)
 class GitTest(unittest.TestCase):
     @staticmethod
     def init_repo(remote_name, remote):
