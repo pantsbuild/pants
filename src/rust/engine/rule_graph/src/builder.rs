@@ -330,18 +330,25 @@ impl<'t, R: Rule> Builder<'t, R> {
         // If no candidates were fulfillable, this rule is not fulfillable.
         unfulfillable_diagnostics.push(Diagnostic {
           params: params.clone(),
-          reason: if params.is_empty() {
-            format!(
-              "No rule was available to compute {}. Maybe declare RootRule({})?",
-              dependency_key, product,
-            )
-          } else {
-            format!(
-              "No rule was available to compute {} with parameter type{} {}",
-              dependency_key,
-              if params.len() > 1 { "s" } else { "" },
-              params_str(&params),
-            )
+          reason: {
+            let hint = if unfulfillable_candidates.is_empty() {
+              let root_hint = if provided_param.is_none() {
+                format!(
+                    " If that type should be provided from outside the rule graph, consider declaring RootRule({}).",
+                    product
+                )
+              } else {
+                "".to_string()
+              };
+              format!(
+                  " No installed rules return the type {}: Is the rule that you're expecting to run registered?{}",
+                  product,
+                  root_hint
+              )
+            } else {
+              "".to_string()
+            };
+            format!("No rule was able to compute {}.{}", dependency_key, hint)
           },
           details: unfulfillable_candidates,
         });

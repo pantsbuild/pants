@@ -24,7 +24,7 @@ fn no_root() {
     .validate()
     .err()
     .unwrap()
-    .contains("No rule was available to compute DependencyKey(\"b\", None)."));
+    .contains("No rule was able to compute DependencyKey(\"b\", None)."));
 }
 
 #[test]

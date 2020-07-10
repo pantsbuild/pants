@@ -464,8 +464,6 @@ impl<R: Rule> RuleGraph<R> {
   }
 
   pub fn validate(&self) -> Result<(), String> {
-    let mut collated_errors: HashMap<R, Vec<Diagnostic<_>>> = HashMap::new();
-
     let used_rules: HashSet<_> = self
       .rule_dependency_edges
       .keys()
@@ -475,38 +473,110 @@ impl<R: Rule> RuleGraph<R> {
       })
       .collect();
 
-    // Collect and dedupe rule diagnostics, preferring to render an unfulfillable error for a rule
-    // over an unreachable error.
-    let mut rule_diagnostics: HashMap<_, _> = self
+    // Collect diagnostics by type.
+    let (unfulfillable_entries, unfulfillable_roots, unfulfillable_rules) = {
+      let mut unfulfillable_entries = HashMap::new();
+      let mut unfulfillable_roots = Vec::new();
+      let mut unfulfillable_rules = HashSet::new();
+      for (e, diagnostics) in &self.unfulfillable_rules {
+        match e {
+          EntryWithDeps::Inner(InnerEntry { ref rule, .. })
+            if rule.require_reachable()
+              && !diagnostics.is_empty()
+              && !used_rules.contains(&rule) =>
+          {
+            unfulfillable_entries.insert(e, diagnostics.clone());
+            unfulfillable_rules.insert(rule);
+          }
+          EntryWithDeps::Root(re) if !diagnostics.is_empty() => {
+            unfulfillable_entries.insert(e, diagnostics.clone());
+            unfulfillable_roots.push(re);
+          }
+          _ => {}
+        }
+      }
+      (
+        unfulfillable_entries,
+        unfulfillable_roots,
+        unfulfillable_rules,
+      )
+    };
+
+    // Collect unreachable errors for which we would not already report an
+    // unfulfillable error.
+    let unreachable_errors: HashMap<_, _> = self
       .unreachable_rules
       .iter()
-      .map(|u| (&u.rule, vec![u.diagnostic.clone()]))
-      .collect();
-    for (e, diagnostics) in &self.unfulfillable_rules {
-      match e {
-        EntryWithDeps::Inner(InnerEntry { ref rule, .. })
-          if rule.require_reachable() && !diagnostics.is_empty() && !used_rules.contains(&rule) =>
-        {
-          rule_diagnostics.insert(rule, diagnostics.clone());
+      .filter_map(|u| {
+        if unfulfillable_rules.contains(&u.rule) {
+          None
+        } else {
+          Some((&u.rule, vec![u.diagnostic.clone()]))
         }
-        _ => {}
-      }
-    }
-    for (rule, diagnostics) in rule_diagnostics {
-      for d in diagnostics {
-        collated_errors
-          .entry(rule.clone())
-          .or_insert_with(Vec::new)
-          .push(d);
-      }
-    }
+      })
+      .collect();
 
-    if collated_errors.is_empty() {
+    if unfulfillable_rules.is_empty() && unreachable_errors.is_empty() {
       return Ok(());
     }
 
-    let mut msgs: Vec<String> = collated_errors
+    // There are errors. Walk the graph of errored entries to find leaves to render.
+    let unfulfillable_errors: HashMap<_, _> = {
+      let mut entry_stack: Vec<_> = unfulfillable_roots
+        .into_iter()
+        .map(|re| EntryWithDeps::Root(re.clone()))
+        .collect();
+      let mut visited = HashSet::new();
+      let mut errored_leaves = HashSet::new();
+      while let Some(entry) = entry_stack.pop() {
+        if visited.contains(&entry) {
+          continue;
+        }
+        visited.insert(entry.clone());
+        let diagnostics = unfulfillable_entries
+          .get(&entry)
+          .ok_or_else(|| format!("Unknown entry in RuleGraph: {:?}", entry))?;
+
+        // If none of the detail entries of this entry are errored, this is a leaf. Otherwise,
+        // continue recursing into the errored children.
+        let mut causes = diagnostics
+          .iter()
+          .flat_map(|d| d.details.iter())
+          .filter_map(|(detail_entry, _)| match detail_entry {
+            Entry::WithDeps(ref e) if unfulfillable_entries.contains_key(e) => Some(e.clone()),
+            _ => None,
+          })
+          .peekable();
+        if causes.peek().is_some() {
+          // There was at least one errored potential source of a dependency: recurse into them
+          // as potential leaves.
+          entry_stack.extend(causes);
+        } else {
+          // This node had no known cause entries: it's a leaf.
+          errored_leaves.insert(entry);
+        }
+      }
+
+      // Collate the leaves by rule (which is necessary because monomorphization will cause various
+      // permutations of parameters for each rule).
+      let mut collated_unfulfillable_rules = HashMap::new();
+      for (e, diagnostics) in unfulfillable_entries.into_iter() {
+        match e {
+          EntryWithDeps::Inner(InnerEntry { rule, .. }) if errored_leaves.contains(e) => {
+            collated_unfulfillable_rules
+              .entry(rule)
+              .or_insert_with(Vec::new)
+              .extend(diagnostics);
+          }
+          _ => (),
+        }
+      }
+      collated_unfulfillable_rules
+    };
+
+    let mut msgs: Vec<String> = unfulfillable_errors
       .into_iter()
+      .chain(unreachable_errors.into_iter())
       .map(|(rule, mut diagnostics)| {
         diagnostics.sort_by(|l, r| l.reason.cmp(&r.reason));
         diagnostics.dedup_by(|l, r| l.reason == r.reason);
@@ -528,6 +598,7 @@ impl<R: Rule> RuleGraph<R> {
                 })
                 .collect();
               details.sort();
+              details.dedup();
               format!("{}:\n      {}", d.reason, details.join("\n      "))
             }
           })

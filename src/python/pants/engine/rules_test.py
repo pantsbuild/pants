@@ -517,7 +517,7 @@ class RuleGraphTest(TestBase):
                 Rules with errors: 1
 
                   {fmt_rule(a_from_b)}:
-                    No rule was available to compute B with parameter type SubA
+                    No rule was able to compute B. No installed rules return the type B: Is the rule that you're expecting to run registered? If that type should be provided from outside the rule graph, consider declaring RootRule(B).
                 """
             ).strip(),
             str(cm.exception),
@@ -585,8 +585,8 @@ class RuleGraphTest(TestBase):
                 Rules with errors: 1
 
                   {fmt_rule(a_from_b_and_c)}:
-                    No rule was available to compute B with parameter type SubA
-                    No rule was available to compute C with parameter type SubA
+                    No rule was able to compute B. No installed rules return the type B: Is the rule that you're expecting to run registered? If that type should be provided from outside the rule graph, consider declaring RootRule(B).
+                    No rule was able to compute C. No installed rules return the type C: Is the rule that you're expecting to run registered? If that type should be provided from outside the rule graph, consider declaring RootRule(C).
                 """
             ).strip(),
             str(cm.exception),
@@ -620,13 +620,10 @@ class RuleGraphTest(TestBase):
         self.assert_equal_with_printing(
             dedent(
                 f"""\
-                Rules with errors: 2
-
-                  {fmt_rule(a_from_b)}:
-                    No rule was available to compute B with parameter type C
+                Rules with errors: 1
 
                   {fmt_rule(b_from_suba)}:
-                    No rule was available to compute SubA with parameter type C
+                    No rule was able to compute SubA. No installed rules return the type SubA: Is the rule that you're expecting to run registered? If that type should be provided from outside the rule graph, consider declaring RootRule(SubA).
                 """
             ).strip(),
             str(cm.exception),
@@ -657,7 +654,7 @@ class RuleGraphTest(TestBase):
                 Rules with errors: 1
 
                   {fmt_rule(d_from_c)}:
-                    No rule was available to compute C with parameter type A
+                    No rule was able to compute C. No installed rules return the type C: Is the rule that you're expecting to run registered? If that type should be provided from outside the rule graph, consider declaring RootRule(C).
                 """
             ).strip(),
             str(cm.exception),
@@ -692,16 +689,16 @@ class RuleGraphTest(TestBase):
             self,
             dedent(
                 f"""\
-                Rules with errors: 3
+                Rules with errors: 2
 
                   {fmt_rule(a_from_c)}:
                     Was not reachable, either because no rules could produce the params or because it was shadowed by another @rule.
-                  {fmt_rule(b_from_d)}:
 
-                    No rule was available to compute D with parameter type SubA
                   {fmt_rule(d_from_a_and_suba, gets=[("A", "C")])}:
-
-                    No rule was available to compute A with parameter type SubA
+                    No rule was able to compute A.:
+                      @rule(C) -> A
+                pants.engine.rules_test:667:a_from_c
+                for SubA: Was unfulfillable.
                 """
             ).strip(),
             str(cm.exception),
