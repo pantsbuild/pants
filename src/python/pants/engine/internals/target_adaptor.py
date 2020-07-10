@@ -26,8 +26,7 @@ class TargetAdaptor:
                 return tuple(sorted(hashable(v) for v in value))
             return value
 
-        kwargs = sorted((k, hashable(v)) for k, v in self.kwargs.items())
-        return (self.type_alias, self.name, *kwargs)
+        return (self.type_alias, self.name, *sorted(hashable(self.kwargs)))
 
     def __hash__(self):
         return hash(self._key())
