@@ -44,6 +44,7 @@ from pants.engine.target import (
     TransitiveTargets,
     UnrecognizedTargetTypeException,
     WrappedTarget,
+    generate_subtarget,
 )
 from pants.option.global_options import GlobalOptions, OwnersNotFoundBehavior
 from pants.source.filespec import any_matches_filespec
@@ -60,6 +61,16 @@ logger = logging.getLogger(__name__)
 async def resolve_target(
     address: Address, registered_target_types: RegisteredTargetTypes
 ) -> WrappedTarget:
+    if address.generated_base_target_name:
+        base_target = await Get(
+            WrappedTarget, Address(address.spec_path, address.generated_base_target_name)
+        )
+        subtarget = generate_subtarget(
+            base_target.target,
+            full_file_name=PurePath(address.spec_path, address.target_name).as_posix(),
+        )
+        return WrappedTarget(subtarget)
+
     target_adaptor = await Get(TargetAdaptor, Address, address)
     target_type = registered_target_types.aliases_to_types.get(target_adaptor.type_alias, None)
     if target_type is None:
