@@ -40,7 +40,7 @@ class LogOutputIntegrationTest(PantsRunIntegrationTest):
 
         return tmpdir_relative
 
-    def test_completed_log_output(self):
+    def test_completed_log_output(self) -> None:
         build_root = get_buildroot()
         with temporary_dir(root_dir=build_root) as tmpdir:
             tmpdir_relative = self._prepare_sources(tmpdir, build_root)

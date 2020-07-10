@@ -71,13 +71,9 @@ python_integration_tests(
   uses_pants_run=True,
 )
 
-python_tests(
+python_integration_tests(
   name = 'log_output_integration',
-  sources = [ 'log_output_integration_test.py' ],
-  dependencies = [
-    'src/python/pants/engine/internals:tests',
-    'src/python/pants/testutil:int-test',
-  ],
-  tags = ['integration'],
+  sources = ['log_output_integration_test.py'],
+  uses_pants_run=True,
 )
 
