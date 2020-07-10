@@ -584,7 +584,32 @@ class RegisteredTargetTypes:
         return tuple(self.aliases_to_types.values())
 
 
-def generate_subtarget(base_target: Target, *, full_file_name: str) -> Target:
+# -----------------------------------------------------------------------------------------------
+# Generated subtargets
+# -----------------------------------------------------------------------------------------------
+
+
+def generate_subtarget_address(base_target_address: Address, *, full_file_name: str) -> Address:
+    """Return the address for a new target based on the original target, but with a more precise
+    `sources` field.
+
+    The address's target name will be the relativized file, such as `:app.json`, or `:subdir/f.txt`.
+
+    See generate_subtarget().
+    """
+    original_spec_path = base_target_address.spec_path
+    relativized_file_name = PurePath(full_file_name).relative_to(original_spec_path).as_posix()
+    return Address(
+        spec_path=original_spec_path,
+        target_name=relativized_file_name,
+        generated_base_target_name=base_target_address.target_name,
+    )
+
+
+_Tgt = TypeVar("_Tgt", bound=Target)
+
+
+def generate_subtarget(base_target: _Tgt, *, full_file_name: str) -> _Tgt:
     """Generate a new target with the exact same metadata as the original, except for the `sources`
     field only referring to the single file `full_file_name` and with a new address.
 
@@ -592,26 +617,28 @@ def generate_subtarget(base_target: Target, *, full_file_name: str) -> Target:
     are able to deduce specifically which files are being used, we can use only the files we care
     about, rather than the entire `sources` field.
     """
-    if not base_target.has_field(Sources):
-        return base_target
-
-    original_spec_path = base_target.address.spec_path
-    relativized_file_name = PurePath(full_file_name).relative_to(original_spec_path).as_posix()
-    new_address = Address(
-        spec_path=original_spec_path,
-        target_name=relativized_file_name,
-        generated_base_target_name=base_target.address.target_name,
+    relativized_file_name = (
+        PurePath(full_file_name).relative_to(base_target.address.spec_path).as_posix()
     )
 
-    prior_field_values = {
-        field_cls.alias: (
-            field.value if isinstance(field, PrimitiveField) else field.sanitized_raw_value  # type: ignore[attr-defined]
+    base_target_field_values = {
+        field.alias: (
+            field.value
+            if isinstance(field, PrimitiveField)
+            else field.sanitized_raw_value  # type: ignore[attr-defined]
         )
-        for field_cls, field in base_target.field_values.items()
+        for field in base_target.field_values.values()
     }
+    generated_target_fields = (
+        {**base_target_field_values, Sources.alias: (relativized_file_name,)}
+        if base_target.has_field(Sources)
+        else base_target_field_values
+    )
+
     target_cls = type(base_target)
     return target_cls(
-        {**prior_field_values, Sources.alias: (relativized_file_name,)}, address=new_address
+        generated_target_fields,
+        address=generate_subtarget_address(base_target.address, full_file_name=full_file_name),
     )
 
 

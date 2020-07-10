@@ -14,7 +14,12 @@ from pants.core.util_rules.strip_source_roots import (
 from pants.engine.addresses import Address
 from pants.engine.rules import rule
 from pants.engine.selectors import Get, MultiGet
-from pants.engine.target import HydratedSources, HydrateSourcesRequest, Targets, generate_subtarget
+from pants.engine.target import (
+    HydratedSources,
+    HydrateSourcesRequest,
+    Targets,
+    generate_subtarget_address,
+)
 from pants.util.frozendict import FrozenDict
 
 
@@ -92,7 +97,9 @@ async def map_first_party_modules_to_addresses() -> FirstPartyModuleToAddressMap
                 modules_to_addresses[module] = (
                     explicit_tgt.address
                     if only_one_source_file
-                    else generate_subtarget(explicit_tgt, full_file_name=unstripped_f).address
+                    else generate_subtarget_address(
+                        explicit_tgt.address, full_file_name=unstripped_f
+                    )
                 )
     # Remove modules with ambiguous owners.
     for module in modules_with_multiple_owners:
