@@ -2,15 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  sources=["*.py", "!engine_initializer.py"],
   dependencies=[
     ':plugins',
   ],
-)
-
-python_library(
-  name="engine_initializer",
-  sources=["engine_initializer.py"],
 )
 
 target(
@@ -20,7 +14,7 @@ target(
     'src/python/pants/backend/codegen/protobuf/python',
     'src/python/pants/backend/pants_info',
     'src/python/pants/backend/project_info',
-    'src/python/pants/backend/python:plugin',
+    'src/python/pants/backend/python',
     'src/python/pants/backend/python/lint/bandit',
     'src/python/pants/backend/python/lint/black',
     'src/python/pants/backend/python/lint/docformatter',
@@ -29,6 +23,6 @@ target(
     'src/python/pants/backend/python/lint/pylint',
     'src/python/pants/backend/python/typecheck/mypy',
     'src/python/pants/backend/native',
-    'src/python/pants/core:plugin',
+    'src/python/pants/core',
   ],
 )

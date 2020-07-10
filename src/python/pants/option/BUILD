@@ -1,19 +1,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-python_library(
-  sources=["*.py", "!global_options.py", "!options_bootstrapper.py", "!*_test.py"],
-)
-
-python_library(
-  name="global_options",
-  sources=["global_options.py"],
-)
-
-python_library(
-  name="options_bootstrapper",
-  sources=["options_bootstrapper.py"],
-)
+python_library()
 
 python_tests(
   name="tests",
@@ -21,12 +9,11 @@ python_tests(
   timeout=300,
 )
 
-python_tests(
+python_integration_tests(
   name='integration',
-  sources=['*_integration_test.py'],
+  uses_pants_run=True,
   dependencies=[
     'testprojects/src/python:plugins_directory',
   ],
-  tags = ['integration'],
   timeout=300,
 )

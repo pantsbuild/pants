@@ -1,6 +1,5 @@
 ansicolors==1.1.8
 beautifulsoup4>=4.6.0,<4.7
-coverage>=4.5,<4.6
 dataclasses==0.6
 fasteners==0.15.0
 
@@ -23,9 +22,7 @@ psutil==5.7.0
 pystache==0.5.4
 python-Levenshtein==0.12.0
 PyYAML>=5.3.1,<5.4
-py_zipkin==0.20.0
 requests[security]>=2.20.1
-responses==0.10.15
 setproctitle==1.1.10
 setuptools==49.1.0
 toml==0.10.1

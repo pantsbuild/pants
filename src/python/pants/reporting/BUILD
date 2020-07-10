@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  sources=['*.py', '!report.py'],
   dependencies=[
     ':reporting_resources',
   ],
@@ -11,9 +10,4 @@ python_library(
 resources(
   name='reporting_resources',
   sources=['assets/**/*', 'templates/**/*.mustache'],
-)
-
-python_library(
-  name='report',
-  sources=['report.py'],
 )

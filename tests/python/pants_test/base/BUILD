@@ -2,71 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
-  name = 'build_environment',
-  sources = ['test_build_environment.py'],
-)
-
-python_tests(
-  name = 'build_root',
-  sources = ['test_build_root.py'],
+  sources=['test_*.py', '!test_exception_sink.py', '!test_*_integration.py'],
   dependencies = [
     '//:build_root',
   ],
-)
-
-python_tests(
-  name = 'cmd_line_spec_parser',
-  sources = ['test_cmd_line_spec_parser.py'],
-)
-
-python_tests(
-  name = 'deprecated',
-  sources = ['test_deprecated.py'],
-)
-
-python_tests(
-  name = 'fingerprint_strategy',
-  sources = ['test_fingerprint_strategy.py'],
-)
-
-python_tests(
-  name = 'generator',
-  sources = ['test_generator.py'],
-)
-
-python_tests(
-  name = 'hash_utils',
-  sources = ['test_hash_utils.py'],
-)
-
-python_tests(
-  name = 'payload',
-  sources = ['test_payload.py'],
-)
-
-python_tests(
-  name = 'payload_field',
-  sources = ['test_payload_field.py'],
-)
-
-python_tests(
-  name = 'revision',
-  sources = ['test_revision.py'],
-)
-
-python_tests(
-  name = 'run_info',
-  sources = ['test_run_info.py'],
-)
-
-python_tests(
-  name = 'worker_pool',
-  sources = ['test_worker_pool.py'],
-)
-
-python_tests(
-  name = 'validation',
-  sources = ['test_validation.py'],
 )
 
 python_tests(
