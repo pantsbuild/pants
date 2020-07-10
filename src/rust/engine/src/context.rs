@@ -68,8 +68,18 @@ pub struct RemotingOptions {
   pub store_connection_limit: usize,
   pub execution_extra_platform_properties: Vec<(String, String)>,
   pub execution_headers: BTreeMap<String, String>,
-  pub execution_enable_streaming: bool,
   pub execution_overall_deadline: Duration,
+}
+
+#[derive(Clone, Debug)]
+pub struct ExecutionStrategyOptions {
+  pub local_parallelism: usize,
+  pub remote_parallelism: usize,
+  pub cleanup_local_dirs: bool,
+  pub speculation_delay: Duration,
+  pub speculation_strategy: String,
+  pub use_local_cache: bool,
+  pub local_enable_nailgun: bool,
 }
 
 impl Core {
@@ -86,13 +96,7 @@ impl Core {
     local_execution_root_dir: PathBuf,
     named_caches_dir: PathBuf,
     remoting_opts: RemotingOptions,
-    process_execution_local_parallelism: usize,
-    process_execution_remote_parallelism: usize,
-    process_execution_cleanup_local_dirs: bool,
-    process_execution_speculation_delay: Duration,
-    process_execution_speculation_strategy: String,
-    process_execution_use_local_cache: bool,
-    process_execution_local_enable_nailgun: bool,
+    exec_strategy_opts: ExecutionStrategyOptions,
   ) -> Result<Core, String> {
     // Randomize CAS address order to avoid thundering herds from common config.
     let mut remote_store_servers = remoting_opts.store_servers.clone();
@@ -164,11 +168,11 @@ impl Core {
       executor.clone(),
       local_execution_root_dir.clone(),
       NamedCaches::new(named_caches_dir),
-      process_execution_cleanup_local_dirs,
+      exec_strategy_opts.cleanup_local_dirs,
     );
 
     let maybe_nailgunnable_local_command_runner: Box<dyn process_execution::CommandRunner> =
-      if process_execution_local_enable_nailgun {
+      if exec_strategy_opts.local_enable_nailgun {
         Box::new(process_execution::nailgun::CommandRunner::new(
           local_command_runner,
           process_execution_metadata.clone(),
@@ -182,13 +186,13 @@ impl Core {
     let mut command_runner: Box<dyn process_execution::CommandRunner> =
       Box::new(BoundedCommandRunner::new(
         maybe_nailgunnable_local_command_runner,
-        process_execution_local_parallelism,
+        exec_strategy_opts.local_parallelism,
       ));
 
     if remoting_opts.execution_enable {
       let remote_command_runner: Box<dyn process_execution::CommandRunner> = {
-        let command_runner: Box<dyn CommandRunner> = if remoting_opts.execution_enable_streaming {
-          Box::new(process_execution::remote::StreamingCommandRunner::new(
+        let command_runner: Box<dyn CommandRunner> = {
+          Box::new(process_execution::remote::CommandRunner::new(
             // No problem unwrapping here because the global options validation
             // requires the remoting_opts.execution_server be present when
             // remoting_opts.execution_enable is set.
@@ -203,51 +207,30 @@ impl Core {
             Platform::Linux,
             remoting_opts.execution_overall_deadline,
           )?)
-        } else {
-          Box::new(process_execution::remote::CommandRunner::new(
-            // No problem unwrapping here because the global options validation
-            // requires the remoting_opts.execution_server be present when
-            // remoting_opts.execution_enable is set.
-            &remoting_opts.execution_server.unwrap(),
-            process_execution_metadata.clone(),
-            root_ca_certs,
-            oauth_bearer_token,
-            remoting_opts.execution_headers,
-            store.clone(),
-            // TODO if we ever want to configure the remote platform to be something else we
-            // need to take an option all the way down here and into the remote::CommandRunner struct.
-            Platform::Linux,
-            executor.clone(),
-            // The queue buffer time is added to the server-side enforced timeout to ensure that we
-            // tend to see an error from the server before the client gives up.
-            std::time::Duration::from_secs(900),
-            std::time::Duration::from_millis(500),
-            std::time::Duration::from_secs(5),
-          )?)
         };
 
         Box::new(BoundedCommandRunner::new(
           command_runner,
-          process_execution_remote_parallelism,
+          exec_strategy_opts.remote_parallelism,
         ))
       };
-      command_runner = match process_execution_speculation_strategy.as_ref() {
+      command_runner = match exec_strategy_opts.speculation_strategy.as_ref() {
         "local_first" => Box::new(SpeculatingCommandRunner::new(
           command_runner,
           remote_command_runner,
-          process_execution_speculation_delay,
+          exec_strategy_opts.speculation_delay,
         )),
         "remote_first" => Box::new(SpeculatingCommandRunner::new(
           remote_command_runner,
           command_runner,
-          process_execution_speculation_delay,
+          exec_strategy_opts.speculation_delay,
         )),
         "none" => remote_command_runner,
         _ => unreachable!(),
       };
     }
 
-    if process_execution_use_local_cache {
+    if exec_strategy_opts.use_local_cache {
       let process_execution_store = ShardedLmdb::new(
         local_store_dir2.join("processes"),
         5 * GIGABYTES,

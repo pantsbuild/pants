@@ -1,35 +1,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-python_tests(
-  name='tests',
-  dependencies=[
-    '3rdparty/python:dataclasses',
-    'src/python/pants/testutil:test_base',
-    ':argutil',
-    ':collections',
-    ':contextutil',
-    ':dirutil',
-    ':enums',
-    ':eval',
-    ':fileutil',
-    ':filtering',
-    ':frozendict',
-    ':memo',
-    ':meta',
-    ':netrc',
-    ':objects',
-    ':ordered_set',
-    ':osutil',
-    ':process_handler',
-    ':retry',
-    ':rwbuf',
-    ':socket',
-    ':strutil',
-    ':tarutil',
-    ':xml_parser',
-  ],
-)
+python_tests(name='tests')
 
 python_library(
   name = 'argutil',
@@ -39,11 +11,6 @@ python_library(
 python_library(
   name = 'contextutil',
   sources = ['contextutil.py'],
-  dependencies = [
-    '3rdparty/python:ansicolors',
-    ':dirutil',
-    ':tarutil',
-  ],
 )
 
 python_library(
@@ -54,18 +21,11 @@ python_library(
 python_library(
   name = 'desktop',
   sources = ['desktop.py'],
-  dependencies = [
-    ':osutil',
-  ],
 )
 
 python_library(
   name = 'dirutil',
   sources = ['dirutil.py'],
-  dependencies = [
-    ':strutil',
-    '3rdparty/python:typing-extensions',
-  ],
 )
 
 python_library(
@@ -81,17 +41,11 @@ python_library(
 python_library(
   name = 'fileutil',
   sources = ['fileutil.py'],
-  dependencies = [
-    ':contextutil',
-  ],
 )
 
 python_library(
   name = 'filtering',
   sources = ['filtering.py'],
-  dependencies = [
-    'src/python/pants/base:deprecated',
-  ],
 )
 
 python_library(
@@ -107,17 +61,11 @@ python_library(
 python_library(
   name = 'memo',
   sources = ['memo.py'],
-  dependencies = [
-    ':meta'
-  ],
 )
 
 python_library(
   name = 'meta',
   sources = ['meta.py'],
-  dependencies = [
-    '3rdparty/python:dataclasses'
-  ],
 )
 
 python_library(
@@ -141,11 +89,6 @@ python_library(
 )
 
 python_library(
-  name = 'process_handler',
-  sources = ['process_handler.py'],
-)
-
-python_library(
   name = 'retry',
   sources = ['retry.py'],
 )
@@ -159,9 +102,6 @@ python_binary(
   name = 's3_log_aggregator',
   sources = ['s3_log_aggregator.py'],
   entry_point = 'pants.util.s3_log_aggregator',
-  dependencies = [
-    '3rdparty/python:s3logparse'
-  ],
 )
 
 python_library(

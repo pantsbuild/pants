@@ -14,7 +14,6 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import (
-    TYPE_CHECKING,
     Any,
     Callable,
     DefaultDict,
@@ -71,9 +70,6 @@ from pants.option.option_value_container import OptionValueContainer
 from pants.option.ranked_value import Rank, RankedValue
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
 from pants.util.meta import frozen_after_init
-
-if TYPE_CHECKING:
-    from pants.option.options import Options  # noqa: F401
 
 
 @dataclass(frozen=True)
@@ -187,9 +183,7 @@ class Parser:
     class ParseArgsRequest:
         flag_value_map: Dict
         namespace: OptionValueContainer
-        get_all_scoped_flag_names: Callable[
-            ["Parser.ParseArgsRequest"], Sequence["Options.ScopedFlagNameForFuzzyMatching"]
-        ]
+        get_all_scoped_flag_names: Callable[["Parser.ParseArgsRequest"], Sequence]
         levenshtein_max_distance: int
         passthrough_args: List[str]
         # A passive option is one that doesn't affect functionality, or appear in help messages, but
@@ -203,9 +197,7 @@ class Parser:
             self,
             flags_in_scope: Iterable[str],
             namespace: OptionValueContainer,
-            get_all_scoped_flag_names: Callable[
-                [], Sequence["Options.ScopedFlagNameForFuzzyMatching"]
-            ],
+            get_all_scoped_flag_names: Callable[[], Sequence],
             levenshtein_max_distance: int,
             passthrough_args: List[str],
             include_passive_options: bool = False,
@@ -358,10 +350,7 @@ class Parser:
         return namespace
 
     def _raise_error_for_invalid_flag_names(
-        self,
-        flags: Sequence[str],
-        all_scoped_flag_names: Sequence["Options.ScopedFlagNameForFuzzyMatching"],
-        max_edit_distance: int,
+        self, flags: Sequence[str], all_scoped_flag_names: Sequence, max_edit_distance: int,
     ) -> NoReturn:
         """Identify similar option names to unconsumed flags and raise a ParseError with those
         names."""

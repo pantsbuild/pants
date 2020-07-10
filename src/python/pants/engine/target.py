@@ -3,6 +3,7 @@
 
 import dataclasses
 import itertools
+import os.path
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
@@ -38,7 +39,7 @@ from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.unions import UnionMembership, union
 from pants.option.global_options import GlobalOptions
-from pants.source.wrapped_globs import EagerFilesetWithSpec, FilesetRelPathWrapper, Filespec
+from pants.source.filespec import Filespec
 from pants.util.collections import ensure_list, ensure_str_list
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_property
@@ -581,6 +582,64 @@ class RegisteredTargetTypes:
     @property
     def types(self) -> Tuple[Type[Target], ...]:
         return tuple(self.aliases_to_types.values())
+
+
+# -----------------------------------------------------------------------------------------------
+# Generated subtargets
+# -----------------------------------------------------------------------------------------------
+
+
+def generate_subtarget_address(base_target_address: Address, *, full_file_name: str) -> Address:
+    """Return the address for a new target based on the original target, but with a more precise
+    `sources` field.
+
+    The address's target name will be the relativized file, such as `:app.json`, or `:subdir/f.txt`.
+
+    See generate_subtarget().
+    """
+    original_spec_path = base_target_address.spec_path
+    relativized_file_name = PurePath(full_file_name).relative_to(original_spec_path).as_posix()
+    return Address(
+        spec_path=original_spec_path,
+        target_name=relativized_file_name,
+        generated_base_target_name=base_target_address.target_name,
+    )
+
+
+_Tgt = TypeVar("_Tgt", bound=Target)
+
+
+def generate_subtarget(base_target: _Tgt, *, full_file_name: str) -> _Tgt:
+    """Generate a new target with the exact same metadata as the original, except for the `sources`
+    field only referring to the single file `full_file_name` and with a new address.
+
+    This is used for greater precision when using dependency inference and file arguments. When we
+    are able to deduce specifically which files are being used, we can use only the files we care
+    about, rather than the entire `sources` field.
+    """
+    relativized_file_name = (
+        PurePath(full_file_name).relative_to(base_target.address.spec_path).as_posix()
+    )
+
+    base_target_field_values = {
+        field.alias: (
+            field.value
+            if isinstance(field, PrimitiveField)
+            else field.sanitized_raw_value  # type: ignore[attr-defined]
+        )
+        for field in base_target.field_values.values()
+    }
+    generated_target_fields = (
+        {**base_target_field_values, Sources.alias: (relativized_file_name,)}
+        if base_target.has_field(Sources)
+        else base_target_field_values
+    )
+
+    target_cls = type(base_target)
+    return target_cls(
+        generated_target_fields,
+        address=generate_subtarget_address(base_target.address, full_file_name=full_file_name),
+    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -1344,12 +1403,13 @@ class Sources(AsyncField):
         excludes = []
         for glob in self.sanitized_raw_value or ():
             if glob.startswith("!"):
-                excludes.append(glob[1:])
+                excludes.append(os.path.join(self.address.spec_path, glob[1:]))
             else:
-                includes.append(glob)
-        return FilesetRelPathWrapper.to_filespec(
-            args=includes, exclude=[excludes], root=self.address.spec_path
-        )
+                includes.append(os.path.join(self.address.spec_path, glob))
+        result: Filespec = {"includes": includes}
+        if excludes:
+            result["excludes"] = excludes
+        return result
 
     @final
     @classmethod
@@ -1435,9 +1495,6 @@ class HydratedSources:
     snapshot: Snapshot
     filespec: Filespec
     sources_type: Optional[Type[Sources]]
-
-    def eager_fileset_with_spec(self, *, address: Address) -> EagerFilesetWithSpec:
-        return EagerFilesetWithSpec(address.spec_path, self.filespec, self.snapshot)
 
 
 @union
@@ -1582,13 +1639,9 @@ class Dependencies(AsyncField):
     """Addresses to other targets that this target depends on, e.g. `['helloworld/subdir:lib']`."""
 
     alias = "dependencies"
-    sanitized_raw_value: Optional[Tuple[Address, ...]]
-    default = None
+    sanitized_raw_value: Optional[Tuple[str, ...]]
+    default: ClassVar[Optional[Tuple[str, ...]]] = None
 
-    # NB: The type hint for `raw_value` is a lie. While we do expect end-users to use
-    # Iterable[str], the Struct and Addressable code will have already converted those strings
-    # into a List[Address]. But, that's an implementation detail and we don't want our
-    # documentation, which is auto-generated from these type hints, to leak that.
     @classmethod
     def sanitize_raw_value(
         cls, raw_value: Optional[Iterable[str]], *, address: Address
@@ -1687,7 +1740,14 @@ class InferredDependencies(DeduplicatedCollection[Address]):
 async def resolve_dependencies(
     request: DependenciesRequest, union_membership: UnionMembership, global_options: GlobalOptions
 ) -> Addresses:
-    provided = request.field.sanitized_raw_value or ()
+    provided = [
+        Address.parse(
+            dep,
+            relative_to=request.field.address.spec_path,
+            subproject_roots=global_options.options.subproject_roots,
+        )
+        for dep in request.field.sanitized_raw_value or ()
+    ]
 
     # Inject any dependencies. This is determined by the `request.field` class. For example, if
     # there is a rule to inject for FortranDependencies, then FortranDependencies and any subclass

@@ -17,6 +17,8 @@ backend_packages.add = [
   "internal_backend.utilities",
 ]
 
+build_file_prelude_globs = ["pants-plugins/python_integration_tests_macro.py"]
+
 # The invalidation globs cover the PYTHONPATH by default, but we exclude some files that are on the
 # path but not consumed by python, and additionally add the rust code.
 pantsd_invalidation_globs.add = [
@@ -111,9 +113,6 @@ branch_notes = """
 
 [pytest]
 pytest_plugins.add = [
-  # TODO(#8651): We need this until we switch to implicit namespace packages so that pytest-cov
-  #  understands our __init__ files. NB: this version matches 3rdparty/python/requirements.txt.
-  "setuptools==47.3.1",
   "ipdb",
   "pytest-icdiff",
   "pygments",

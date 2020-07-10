@@ -9,6 +9,7 @@ from pants.engine.selectors import Params
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
+    Sources,
     Target,
     Targets,
     TransitiveTarget,
@@ -22,7 +23,7 @@ from pants.util.ordered_set import FrozenOrderedSet
 
 class MockTarget(Target):
     alias = "target"
-    core_fields = (Dependencies,)
+    core_fields = (Dependencies, Sources)
 
 
 class GraphTest(TestBase):
@@ -35,16 +36,6 @@ class GraphTest(TestBase):
         return (MockTarget,)
 
     def test_transitive_targets(self) -> None:
-        t1 = MockTarget({}, address=Address.parse(":t1"))
-        t2 = MockTarget({Dependencies.alias: [t1.address]}, address=Address.parse(":t2"))
-        d1 = MockTarget({Dependencies.alias: [t1.address]}, address=Address.parse(":d1"))
-        d2 = MockTarget({Dependencies.alias: [t2.address]}, address=Address.parse(":d2"))
-        d3 = MockTarget({}, address=Address.parse(":d3"))
-        root = MockTarget(
-            {Dependencies.alias: [d1.address, d2.address, d3.address]},
-            address=Address.parse(":root"),
-        )
-
         self.add_to_build_file(
             "",
             dedent(
@@ -58,6 +49,16 @@ class GraphTest(TestBase):
                 """
             ),
         )
+
+        def get_target(name: str) -> Target:
+            return self.request_single_product(WrappedTarget, Address.parse(f"//:{name}")).target
+
+        t1 = get_target("t1")
+        t2 = get_target("t2")
+        d1 = get_target("d1")
+        d2 = get_target("d2")
+        d3 = get_target("d3")
+        root = get_target("root")
 
         direct_deps = self.request_single_product(
             Targets, Params(DependenciesRequest(root[Dependencies]), create_options_bootstrapper())
@@ -80,3 +81,15 @@ class GraphTest(TestBase):
         # NB: `//:d2` is both a target root and a dependency of `//:root`.
         assert transitive_targets.dependencies == FrozenOrderedSet([d1, d2, d3, t2, t1])
         assert transitive_targets.closure == FrozenOrderedSet([root, d2, d1, d3, t2, t1])
+
+    def test_resolve_generated_subtarget(self) -> None:
+        self.add_to_build_file("helloworld/util", "target(sources=['lang.py', 'dirutil.py'])")
+        generated_target_addresss = Address(
+            "helloworld/util", target_name="lang.py", generated_base_target_name="util"
+        )
+        generated_target = self.request_single_product(
+            WrappedTarget, generated_target_addresss
+        ).target
+        assert generated_target == MockTarget(
+            {Sources.alias: ["lang.py"]}, address=generated_target_addresss
+        )

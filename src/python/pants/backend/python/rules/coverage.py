@@ -5,7 +5,6 @@ import configparser
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import PurePath
-from textwrap import dedent
 from typing import List, Optional, Sequence, Tuple
 
 from pants.backend.python.rules.pex import (
@@ -30,12 +29,23 @@ from pants.core.goals.test import (
     FilesystemCoverageReport,
 )
 from pants.engine.addresses import Address
-from pants.engine.fs import AddPrefix, Digest, FileContent, InputFilesContent, MergeDigests
+from pants.engine.fs import (
+    AddPrefix,
+    CreateDigest,
+    Digest,
+    DigestContents,
+    FileContent,
+    MergeDigests,
+    PathGlobs,
+    Snapshot,
+)
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import TransitiveTargets
 from pants.engine.unions import UnionRule
+from pants.option.custom_types import file_option
+from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
 
 
@@ -98,6 +108,13 @@ class CoverageSubsystem(PythonToolBase):
             advanced=True,
             help="Path to write the Pytest Coverage report to. Must be relative to build root.",
         )
+        register(
+            "--config",
+            type=file_option,
+            default=None,
+            advanced=True,
+            help="Path to `.coveragerc` or alternative coverage config file",
+        )
 
     @property
     def filter(self) -> Tuple[str, ...]:
@@ -127,24 +144,45 @@ class CoverageConfig:
     digest: Digest
 
 
+def _validate_and_update_config(
+    coverage_config: configparser.ConfigParser, config_path: Optional[str]
+) -> None:
+    if not coverage_config.has_section("run"):
+        coverage_config.add_section("run")
+        coverage_config.set("run", "branch", "True")
+    run_section = coverage_config["run"]
+    relative_files_str = run_section.get("relative_files", "True")
+    if relative_files_str.lower() != "true":
+        raise ValueError(
+            f"relative_files under the 'run' section must be set to True. config file: {config_path}"
+        )
+    coverage_config.set("run", "relative_files", "True")
+    omit_elements = [em for em in run_section.get("omit", "").split("\n")] or ["\n"]
+    if "test_runner.pex/*" not in omit_elements:
+        omit_elements.append("test_runner.pex/*")
+    run_section["omit"] = "\n".join(omit_elements)
+
+
 @rule
-async def create_coverage_config() -> CoverageConfig:
-    default_config = dedent(
-        """
-        [run]
-        branch = True
-        relative_files = True
-        """
-    )
-    cp = configparser.ConfigParser()
-    cp.read_string(default_config)
-    cp.set("run", "omit", "test_runner.pex/*")
+async def create_coverage_config(coverage: CoverageSubsystem) -> CoverageConfig:
+    config_path: Optional[str] = coverage.options.config
+    coverage_config = configparser.ConfigParser()
+    if config_path:
+        config_snapshot = await Get(
+            Snapshot,
+            PathGlobs(
+                globs=config_path,
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                description_of_origin=f"the option `--{coverage.options_scope}-config`",
+            ),
+        )
+        config_contents = await Get(DigestContents, Digest, config_snapshot.digest)
+        coverage_config.read_string(config_contents[0].content.decode())
+    _validate_and_update_config(coverage_config, config_path)
     config_stream = StringIO()
-    cp.write(config_stream)
+    coverage_config.write(config_stream)
     config_content = config_stream.getvalue()
-    digest = await Get(
-        Digest, InputFilesContent([FileContent(".coveragerc", config_content.encode())])
-    )
+    digest = await Get(Digest, CreateDigest([FileContent(".coveragerc", config_content.encode())]))
     return CoverageConfig(digest)
 
 

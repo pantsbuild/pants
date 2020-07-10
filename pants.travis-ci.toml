@@ -20,3 +20,9 @@ process_execution_local_parallelism = "%(travis_parallelism)s"
 [python-setup]
 # TODO: See https://github.com/pantsbuild/pants/issues/9964
 resolver_jobs = 2
+
+[test]
+use_coverage = true
+
+[coverage-py]
+report=["raw"]

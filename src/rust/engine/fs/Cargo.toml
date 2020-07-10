@@ -20,4 +20,5 @@ task_executor = { path = "../task_executor" }
 [dev-dependencies]
 tempfile = "3"
 testutil = { path = "../testutil" }
-tokio = { version = "0.2", features = ["rt-core", "macros"] }
+# TODO: See #10291.
+tokio = { version = "=0.2.20", features = ["rt-core", "macros"] }

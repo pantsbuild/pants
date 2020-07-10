@@ -20,10 +20,10 @@ from pants.option.config import TomlSerializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.pants_daemon_client import PantsDaemonClient
 from pants.subsystem.subsystem import Subsystem
+from pants.testutil.process_handler import SubprocessProcessHandler
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import fast_relpath, safe_mkdir, safe_open
 from pants.util.osutil import Pid
-from pants.util.process_handler import SubprocessProcessHandler
 from pants.util.strutil import ensure_binary
 
 # NB: If `shell=True`, it's a single `str`.

@@ -26,6 +26,7 @@
 #![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
+#![type_length_limit = "1303884"]
 
 use std::collections::hash_map::Entry::{Occupied, Vacant};
 use std::collections::HashMap;

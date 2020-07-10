@@ -35,7 +35,7 @@ use process_execution::{
 
 use graph::{Entry, Node, NodeError, NodeVisualizer};
 use store::{self, StoreFileByDigest};
-use workunit_store::{new_span_id, scope_task_workunit_state, Level, WorkunitMetadata};
+use workunit_store::{with_workunit, Level, WorkunitMetadata};
 
 pub type NodeResult<T> = Result<T, Failure>;
 
@@ -274,6 +274,15 @@ impl MultiPlatformExecuteProcess {
 
     let is_nailgunnable = externs::project_bool(&value, "is_nailgunnable");
 
+    let execution_slot_variable = {
+      let s = externs::project_str(&value, "execution_slot_variable");
+      if s.is_empty() {
+        None
+      } else {
+        Some(s)
+      }
+    };
+
     Ok(process_execution::Process {
       argv: externs::project_multi_strs(&value, "argv"),
       env,
@@ -287,6 +296,7 @@ impl MultiPlatformExecuteProcess {
       jdk_home,
       target_platform,
       is_nailgunnable,
+      execution_slot_variable,
     })
   }
 
@@ -556,13 +566,13 @@ impl Snapshot {
     ))
   }
 
-  pub fn store_files_content(context: &Context, item: &[FileContent]) -> Result<Value, String> {
+  pub fn store_digest_contents(context: &Context, item: &[FileContent]) -> Result<Value, String> {
     let entries = item
       .iter()
       .map(|e| Self::store_file_content(context, e))
       .collect::<Result<Vec<_>, _>>()?;
     Ok(externs::unsafe_call(
-      &context.core.types.construct_files_content,
+      &context.core.types.construct_digest_contents,
       &[externs::store_tuple(entries)],
     ))
   }
@@ -1086,34 +1096,22 @@ impl Node for NodeKey {
   type Error = Failure;
 
   async fn run(self, context: Context) -> Result<NodeOutput, Failure> {
-    let mut workunit_state = workunit_store::expect_workunit_state();
+    let workunit_state = workunit_store::expect_workunit_state();
 
-    let (started_workunit_id, user_facing_name, metadata) = {
-      let user_facing_name = self.user_facing_name();
-      let name = self.workunit_name();
-      let span_id = new_span_id();
-
-      // We're starting a new workunit: record our parent, and set the current parent to our span.
-      let parent_id = std::mem::replace(&mut workunit_state.parent_id, Some(span_id.clone()));
-      let metadata = WorkunitMetadata {
-        desc: user_facing_name.clone(),
-        message: None,
-        level: self.workunit_level(),
-        blocked: false,
-        stdout: None,
-        stderr: None,
-      };
-
-      let started_workunit_id =
-        context
-          .session
-          .workunit_store()
-          .start_workunit(span_id, name, parent_id, metadata.clone());
-      (started_workunit_id, user_facing_name, metadata)
+    let user_facing_name = self.user_facing_name();
+    let workunit_name = self.workunit_name();
+    let metadata = WorkunitMetadata {
+      desc: user_facing_name.clone(),
+      message: None,
+      level: self.workunit_level(),
+      blocked: false,
+      stdout: None,
+      stderr: None,
     };
+    let metadata2 = metadata.clone();
 
-    scope_task_workunit_state(Some(workunit_state), async move {
-      let context2 = context.clone();
+    let result_future = async move {
+      let metadata = metadata2;
       let maybe_watch = if let Some(path) = self.fs_subject() {
         let abs_path = context.core.build_root.join(path);
         context
@@ -1181,13 +1179,18 @@ impl Node for NodeKey {
         message,
         ..metadata
       };
-      context2
-        .session
-        .workunit_store()
-        .complete_workunit_with_new_metadata(started_workunit_id, final_metadata);
-      result
-    })
+      (result, final_metadata)
+    };
+
+    with_workunit(
+      workunit_state.store,
+      workunit_name,
+      metadata,
+      result_future,
+      |result, _| result.1.clone(),
+    )
     .await
+    .0
   }
 
   fn cacheable(&self) -> bool {

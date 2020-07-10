@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
+import re
 from pathlib import Path, PurePath
 from textwrap import dedent
 from typing import List, Optional
@@ -22,7 +23,7 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.test import Status, TestDebugRequest, TestOptions, TestResult
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.engine.addresses import Address
-from pants.engine.fs import FileContent, FilesContent
+from pants.engine.fs import DigestContents, FileContent
 from pants.engine.interactive_process import InteractiveRunner
 from pants.engine.rules import RootRule, SubsystemRule
 from pants.engine.selectors import Params
@@ -140,6 +141,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         origin: Optional[OriginSpec] = None,
         junit_xml_dir: Optional[str] = None,
         use_coverage: bool = False,
+        execution_slot_var: Optional[str] = None,
     ) -> TestResult:
         args = [
             "--backend-packages=pants.backend.python",
@@ -154,6 +156,9 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
             args.append(f"--pytest-junit-xml-dir={junit_xml_dir}")
         if use_coverage:
             args.append("--test-use-coverage")
+        if execution_slot_var:
+            args.append(f"--pytest-execution-slot-var={execution_slot_var}")
+
         options_bootstrapper = create_options_bootstrapper(args=args)
         address = Address(self.package, "target")
         if origin is None:
@@ -359,9 +364,9 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         assert result.status == Status.SUCCESS
         assert f"{self.package}/test_good.py ." in result.stdout
         assert result.xml_results is not None
-        files = self.request_single_product(FilesContent, result.xml_results)
-        assert len(files) == 1
-        file = files[0]
+        digest_contents = self.request_single_product(DigestContents, result.xml_results)
+        assert len(digest_contents) == 1
+        file = digest_contents[0]
         assert file.path.startswith("dist/test-results")
         assert b"pants_test.test_good" in file.content
 
@@ -371,3 +376,22 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         assert result.status == Status.SUCCESS
         assert f"{self.package}/test_good.py ." in result.stdout
         assert result.coverage_data is not None
+
+    def test_execution_slot_variable(self) -> None:
+        source = FileContent(
+            path="test_concurrency_slot.py",
+            content=dedent(
+                """\
+                import os
+
+                def test_fail_printing_slot_env_var():
+                    slot = os.getenv("SLOT")
+                    print(f"Value of slot is {slot}")
+                    # Deliberately fail the test so the SLOT output gets printed to stdout
+                    assert 1 == 2
+                """
+            ).encode(),
+        )
+        self.create_python_test_target([source])
+        result = self.run_pytest(execution_slot_var="SLOT")
+        assert re.search(r"Value of slot is \d+", result.stdout)

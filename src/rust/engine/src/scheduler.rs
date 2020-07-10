@@ -197,7 +197,7 @@ impl Session {
     }
   }
 
-  async fn maybe_display_teardown(&self) {
+  pub async fn maybe_display_teardown(&self) {
     if let Some(display) = &self.0.display {
       let teardown = {
         let mut display = display.lock();
@@ -497,7 +497,6 @@ impl Scheduler {
       .core
       .executor
       .block_on(session.maybe_display_teardown());
-
     result
   }
 

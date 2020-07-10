@@ -26,6 +26,7 @@
 #![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
+#![type_length_limit = "1076739"]
 
 use clap::{value_t, App, AppSettings, Arg};
 use futures::compat::Future01CompatExt;
@@ -197,14 +198,6 @@ async fn main() {
                         This will likely start a new Nailgun server as a side effect.")
       )
       .arg(
-        Arg::with_name("enable-streaming-client")
-            .long("enable-streaming-client")
-            .takes_value(false)
-            .required(false)
-            .default_value("false")
-            .help("Enable the experimental streaming remote execution client.")
-      )
-      .arg(
         Arg::with_name("overall-deadline-secs")
             .long("overall-deadline-secs")
             .takes_value(true)
@@ -294,7 +287,6 @@ async fn main() {
     .values_of("headers")
     .map(collection_from_keyvalues::<_, BTreeMap<_, _>>)
     .unwrap_or_default();
-  let enable_streaming_client = args.is_present("enable-streaming-client");
   let overall_deadline_secs = value_t!(args.value_of("overall-deadline-secs"), u64).unwrap_or(3600);
 
   let executor = task_executor::Executor::new(Handle::current());
@@ -370,6 +362,7 @@ async fn main() {
     )
     .expect("invalid value for `target-platform"),
     is_nailgunnable,
+    execution_slot_variable: None,
   };
 
   let runner: Box<dyn process_execution::CommandRunner> = match server_arg {
@@ -387,26 +380,7 @@ async fn main() {
           None
         };
 
-      let command_runner_box: Box<dyn process_execution::CommandRunner> = if enable_streaming_client
-      {
-        Box::new(
-          process_execution::remote::StreamingCommandRunner::new(
-            address,
-            ProcessMetadata {
-              instance_name: remote_instance_arg,
-              cache_key_gen_version: args.value_of("cache-key-gen-version").map(str::to_owned),
-              platform_properties,
-            },
-            root_ca_certs,
-            oauth_bearer_token,
-            headers,
-            store.clone(),
-            Platform::Linux,
-            Duration::from_secs(overall_deadline_secs),
-          )
-          .expect("Failed to make command runner"),
-        )
-      } else {
+      let command_runner_box: Box<dyn process_execution::CommandRunner> = {
         Box::new(
           process_execution::remote::CommandRunner::new(
             address,
@@ -420,10 +394,7 @@ async fn main() {
             headers,
             store.clone(),
             Platform::Linux,
-            executor,
-            std::time::Duration::from_secs(320),
-            std::time::Duration::from_millis(500),
-            std::time::Duration::from_secs(5),
+            Duration::from_secs(overall_deadline_secs),
           )
           .expect("Failed to make command runner"),
         )

@@ -4,33 +4,18 @@
 python_library(
   name = 'pants_service',
   sources = ['pants_service.py'],
-  dependencies = [
-    '3rdparty/python:dataclasses',
-    'src/python/pants/util:meta'
-  ],
 )
 
 python_library(
   name = 'scheduler_service',
   sources = ['scheduler_service.py'],
-  dependencies = [
-    '3rdparty/python/twitter/commons:twitter.common.dirutil',
-    ':pants_service'
-  ],
 )
 
 python_library(
   name = 'store_gc_service',
   sources = ['store_gc_service.py'],
-  dependencies = [
-    ':pants_service',
-  ],
 )
 
 python_tests(
   name = 'tests',
-  dependencies = [
-    ':store_gc_service',
-    'src/python/pants/testutil:test_base',
-  ],
 )

@@ -11,7 +11,7 @@ from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResults
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
 from pants.engine.addresses import Address
-from pants.engine.fs import Digest, FileContent, InputFilesContent
+from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.engine.target import TargetWithOrigin
@@ -73,7 +73,7 @@ class DocformatterIntegrationTest(ExternalToolTestBase):
         return lint_results, fmt_result
 
     def get_digest(self, source_files: List[FileContent]) -> Digest:
-        return self.request_single_product(Digest, InputFilesContent(source_files))
+        return self.request_single_product(Digest, CreateDigest(source_files))
 
     def test_passing_source(self) -> None:
         target = self.make_target_with_origin([self.good_source])

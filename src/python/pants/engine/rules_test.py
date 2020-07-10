@@ -12,11 +12,7 @@ from typing import Callable, List, Optional, Tuple, Type, Union, get_type_hints
 import pytest
 
 from pants.engine.console import Console
-from pants.engine.fs import create_fs_rules
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.internals.build_files import create_graph_rules
-from pants.engine.internals.examples.parsers import JsonParser
-from pants.engine.internals.mapper import AddressMapper
 from pants.engine.rules import (
     MissingParameterTypeAnnotation,
     MissingReturnTypeAnnotation,
@@ -29,7 +25,6 @@ from pants.engine.rules import (
 )
 from pants.engine.selectors import Get, GetConstraints
 from pants.testutil.engine.util import (
-    TARGET_TABLE,
     MockGet,
     assert_equal_with_printing,
     create_scheduler,
@@ -770,39 +765,6 @@ class RuleGraphTest(TestBase):
             ).strip(),
             fullgraph,
         )
-
-    def test_full_graph_for_planner_example(self):
-        address_mapper = AddressMapper(
-            JsonParser(TARGET_TABLE), prelude_glob_patterns=(), build_patterns="*.BUILD.json",
-        )
-        rules = create_graph_rules(address_mapper) + create_fs_rules()
-
-        fullgraph_str = self.create_full_graph(rules)
-
-        print("---diagnostic------")
-        print(fullgraph_str)
-        print("/---diagnostic------")
-
-        in_root_rules = False
-        in_all_rules = False
-        all_rules = []
-        root_rule_lines = []
-        for line in fullgraph_str.splitlines():
-            if line.startswith("  // root subject types:"):
-                pass
-            elif line.startswith("  // root entries"):
-                in_root_rules = True
-            elif line.startswith("  // internal entries"):
-                in_all_rules = True
-            elif in_all_rules:
-                all_rules.append(line)
-            elif in_root_rules:
-                root_rule_lines.append(line)
-            else:
-                pass
-
-        self.assertTrue(6 < len(all_rules))
-        self.assertTrue(12 < len(root_rule_lines))  # 2 lines per entry
 
     def test_smallest_full_test_multiple_root_subject_types(self):
         @rule

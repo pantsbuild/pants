@@ -23,18 +23,14 @@ from typing import (
 from colors import blue, cyan, green, magenta, red
 
 from pants.engine.goal import GoalSubsystem
-from pants.engine.internals.addressable import addressable_sequence
 from pants.engine.internals.native import Native
-from pants.engine.internals.parser import SymbolTable
 from pants.engine.internals.scheduler import Scheduler
-from pants.engine.internals.struct import Struct
 from pants.engine.selectors import Get
 from pants.engine.unions import UnionMembership
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.ranked_value import Rank, RankedValue, Value
 from pants.subsystem.subsystem import Subsystem
-from pants.util.objects import SubclassesOf
 
 
 # TODO(#6742): Improve the type signature by using generics and type vars. `mock` should be
@@ -147,16 +143,12 @@ def run_rule(
 
     if rule_args is not None and len(rule_args) != len(task_rule.input_selectors):
         raise ValueError(
-            "Rule expected to receive arguments of the form: {}; got: {}".format(
-                task_rule.input_selectors, rule_args
-            )
+            f"Rule expected to receive arguments of the form: {task_rule.input_selectors}; got: {rule_args}"
         )
 
     if mock_gets is not None and len(mock_gets) != len(task_rule.input_gets):
         raise ValueError(
-            "Rule expected to receive Get providers for {}; got: {}".format(
-                task_rule.input_gets, mock_gets
-            )
+            f"Rule expected to receive Get providers for {task_rule.input_gets}; got: {mock_gets}"
         )
 
     res = rule(*(rule_args or ()))
@@ -181,9 +173,7 @@ def run_rule(
         )
         if provider is None:
             raise AssertionError(
-                "Rule requested: Get{}, which cannot be satisfied.".format(
-                    (product, type(subject), subject)
-                )
+                f"Rule requested: Get{(product, type(subject), subject)}, which cannot be satisfied."
             )
         return provider(subject)
 
@@ -224,19 +214,6 @@ def create_scheduler(rules, union_rules=None, validate=True, native=None):
         execution_options=DEFAULT_EXECUTION_OPTIONS,
         validate=validate,
     )
-
-
-class Target(Struct):
-    def __init__(self, name=None, configurations=None, **kwargs):
-        super().__init__(name=name, **kwargs)
-        self.configurations = configurations
-
-    @addressable_sequence(SubclassesOf(Struct))
-    def configurations(self):
-        pass
-
-
-TARGET_TABLE = SymbolTable({"struct": Struct, "target": Target})
 
 
 def assert_equal_with_printing(

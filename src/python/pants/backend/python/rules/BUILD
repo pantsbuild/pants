@@ -1,85 +1,17 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-python_library(
-  dependencies=[
-    '3rdparty/python:dataclasses',
-    '3rdparty/python:setuptools',
-    'src/python/pants/backend/python:target_types',
-    'src/python/pants/backend/python/subsystems',
-    'src/python/pants/build_graph',
-    'src/python/pants/core',
-    'src/python/pants/core/goals',
-    'src/python/pants/core/util_rules',
-    'src/python/pants/engine:addresses',
-    'src/python/pants/engine:collection',
-    'src/python/pants/engine:fs',
-    'src/python/pants/engine:platform',
-    'src/python/pants/engine:process',
-    'src/python/pants/engine:rules',
-    'src/python/pants/engine:selectors',
-    'src/python/pants/engine:target',
-    'src/python/pants/engine:unions',
-    'src/python/pants/option',
-    'src/python/pants/python',
-    'src/python/pants/source:source',
-    'src/python/pants/util:logging',
-    'src/python/pants/util:meta',
-    'src/python/pants/util:memo',
-    'src/python/pants/util:strutil',
-  ],
-)
+python_library()
 
 python_tests(
   name='tests',
   sources=['*_test.py', '!*_integration_test.py'],
-  dependencies=[
-    ':rules',
-    'src/python/pants/backend/python:target_types',
-    'src/python/pants/backend/python/subsystems',
-    'src/python/pants/build_graph',
-    'src/python/pants/core',
-    'src/python/pants/core/util_rules',
-    'src/python/pants/engine:addresses',
-    'src/python/pants/engine:fs',
-    'src/python/pants/engine:process',
-    'src/python/pants/engine:rules',
-    'src/python/pants/engine:selectors',
-    'src/python/pants/python',
-    'src/python/pants/source',
-    'src/python/pants/testutil:interpreter_selection_utils',
-    'src/python/pants/testutil:external_tool_test_base',
-    'src/python/pants/testutil/engine',
-    'src/python/pants/testutil/option',
-    'src/python/pants/testutil/subsystem',
-    'src/python/pants/util:collections',
-    'src/python/pants/util:contextutil',
-  ],
-  timeout = 180,
+  timeout=180,
 )
 
 
-python_tests(
+python_integration_tests(
   name='integration',
-  sources=['*_integration_test.py'],
-  dependencies=[
-    ':rules',
-    'src/python/pants/backend/python:target_types',
-    'src/python/pants/backend/python/subsystems',
-    'src/python/pants/core/goals',
-    'src/python/pants/core/util_rules',
-    'src/python/pants/engine:fs',
-    'src/python/pants/engine:rules',
-    'src/python/pants/engine:selectors',
-    'src/python/pants/engine/legacy:structs',
-    'src/python/pants/python',
-    'src/python/pants/source',
-    'src/python/pants/testutil:interpreter_selection_utils',
-    'src/python/pants/testutil:external_tool_test_base',
-    'src/python/pants/testutil/subsystem',
-    'src/python/pants/testutil:goal_rule_test_base',
-    'src/python/pants/testutil:int-test',
-  ],
-  tags = ['integration'],
-  timeout = 480,
+  uses_pants_run=True,
+  timeout=480,
 )

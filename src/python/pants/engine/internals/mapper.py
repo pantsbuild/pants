@@ -3,70 +3,52 @@
 
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, Optional, Tuple, Union, cast
+from typing import Dict, Iterable, Optional, Tuple, cast
 
-from pants.base.exceptions import DuplicateNameError, MappingError, UnaddressableObjectError
+from pants.base.exceptions import DuplicateNameError, MappingError
 from pants.build_graph.address import Address, BuildFileAddress
-from pants.engine.internals.objects import Serializable
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
+from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
-
-ThinAddressableObject = Union[Serializable, Any]
 
 
 @dataclass(frozen=True)
 class AddressMap:
-    """Maps addressable Serializable objects from a byte source.
-
-    To construct an AddressMap, use `parse`.
-
-    :param path: The path to the byte source this address map's objects were passed from.
-    :param objects_by_name: A dict mapping from object name to the parsed 'thin' addressable object.
-    """
+    """Maps target adaptors from a byte source."""
 
     path: str
-    objects_by_name: Dict[str, ThinAddressableObject]
+    name_to_target_adaptor: Dict[str, TargetAdaptor]
 
     @classmethod
     def parse(
         cls,
         filepath: str,
-        filecontent: bytes,
+        build_file_content: str,
         parser: Parser,
         extra_symbols: BuildFilePreludeSymbols,
     ) -> "AddressMap":
-        """Parses a source for addressable Serializable objects.
+        """Parses a source for targets.
 
-        No matter the parser used, the parsed and mapped addressable objects are all 'thin'; ie: any
-        objects they point to in other namespaces or even in the same namespace but from a separate
-        source are left as unresolved pointers.
-
-        :param filepath: The path to the byte source containing serialized objects.
-        :param filecontent: The content of byte source containing serialized objects to be parsed.
-        :param parser: The parser cls to use.
+        The target adaptors are all 'thin': any targets they point to in other namespaces or even in
+        the same namespace but from a separate source are left as unresolved pointers.
         """
         try:
-            objects = parser.parse(filepath, filecontent, extra_symbols)
+            target_adaptors = parser.parse(filepath, build_file_content, extra_symbols)
         except Exception as e:
             raise MappingError(f"Failed to parse {filepath}:\n{e!r}")
-        objects_by_name: Dict[str, ThinAddressableObject] = {}
-        for obj in objects:
-            if not Serializable.is_serializable(obj):
-                raise UnaddressableObjectError("Parsed a non-serializable object: {!r}".format(obj))
-            attributes = obj._asdict()
-
-            name = attributes.get("name")
-            if not name:
-                raise UnaddressableObjectError("Parsed a non-addressable object: {!r}".format(obj))
-
-            if name in objects_by_name:
+        name_to_target_adaptors: Dict[str, TargetAdaptor] = {}
+        for target_adaptor in target_adaptors:
+            name = target_adaptor.name
+            if name in name_to_target_adaptors:
+                duplicate = name_to_target_adaptors[name]
                 raise DuplicateNameError(
-                    "An object already exists at {!r} with name {!r}: {!r}.  Cannot "
-                    "map {!r}".format(filepath, name, objects_by_name[name], obj)
+                    f"A target already exists at {filepath!r} with name {name!r} and target type "
+                    f"{duplicate.type_alias!r}. The {target_adaptor.type_alias!r} target "
+                    "cannot use the same name."
                 )
-            objects_by_name[name] = obj
-        return cls(filepath, dict(sorted(objects_by_name.items())))
+            name_to_target_adaptors[name] = target_adaptor
+        return cls(filepath, dict(sorted(name_to_target_adaptors.items())))
 
 
 class DifferingFamiliesError(MappingError):
@@ -75,20 +57,20 @@ class DifferingFamiliesError(MappingError):
 
 @dataclass(frozen=True)
 class AddressFamily:
-    """Represents the family of addressed objects in a namespace.
+    """Represents the family of target adaptors in a namespace.
 
     To create an AddressFamily, use `create`.
 
-    An address family can be composed of the addressed objects from zero or more underlying address
-    sources. An "empty" AddressFamily is legal, and is the result when there are not build files in a
-    particular namespace.
+    An address family can be composed of the target adaptors from zero or more underlying address
+    sources. An "empty" AddressFamily is legal, and is the result when there are not build files in
+    a particular namespace.
 
     :param namespace: The namespace path of this address family.
-    :param objects_by_name: A dict mapping from object name to the parsed 'thin' addressable object.
+    :param name_to_target_adaptors: A dict mapping from name to the target adaptor.
     """
 
     namespace: str
-    objects_by_name: Dict[str, Tuple[str, ThinAddressableObject]]
+    name_to_target_adaptors: Dict[str, Tuple[str, TargetAdaptor]]
 
     @classmethod
     def create(cls, spec_path: str, address_maps: Iterable[AddressMap]) -> "AddressFamily":
@@ -103,67 +85,53 @@ class AddressFamily:
         for address_map in address_maps:
             if not address_map.path.startswith(spec_path):
                 raise DifferingFamiliesError(
-                    "Expected AddressMaps to share the same parent directory {}, "
-                    "but received: {}".format(spec_path, address_map.path)
+                    f"Expected AddressMaps to share the same parent directory {spec_path!r}, "
+                    f"but received: {address_map.path!r}"
                 )
 
-        objects_by_name: Dict[str, Tuple[str, ThinAddressableObject]] = {}
+        name_to_target_adaptors: Dict[str, Tuple[str, TargetAdaptor]] = {}
         for address_map in address_maps:
-            current_path = address_map.path
-            for name, obj in address_map.objects_by_name.items():
-                previous = objects_by_name.get(name)
-                if previous:
-                    previous_path, _ = previous
+            for name, target_adaptor in address_map.name_to_target_adaptor.items():
+                if name in name_to_target_adaptors:
+                    previous_path, _ = name_to_target_adaptors[name]
                     raise DuplicateNameError(
-                        "An object with name {name!r} is already defined in "
-                        "{previous_path!r}, will not overwrite with {obj!r} from "
-                        "{current_path!r}.".format(
-                            name=name,
-                            previous_path=previous_path,
-                            obj=obj,
-                            current_path=current_path,
-                        )
+                        f"A target with name {name!r} is already defined in {previous_path!r}, but"
+                        f"is also defined in {address_map.path!r}. Because both targets share the "
+                        f"same namespace of {spec_path!r}, this is not allowed."
                     )
-                objects_by_name[name] = (current_path, obj)
+                name_to_target_adaptors[name] = (address_map.path, target_adaptor)
         return AddressFamily(
             namespace=spec_path,
-            objects_by_name={
-                name: (path, obj) for name, (path, obj) in sorted(objects_by_name.items())
-            },
+            name_to_target_adaptors=dict(sorted(name_to_target_adaptors.items())),
         )
 
     @memoized_property
-    def addressables(self) -> Dict[BuildFileAddress, ThinAddressableObject]:
-        """Return a mapping from BuildFileAddress to thin addressable objects in this namespace.
-
-        :rtype: dict from `BuildFileAddress` to thin addressable objects.
-        """
+    def addressables(self) -> Dict[BuildFileAddress, TargetAdaptor]:
         return {
             BuildFileAddress(rel_path=path, target_name=name): obj
-            for name, (path, obj) in self.objects_by_name.items()
+            for name, (path, obj) in self.name_to_target_adaptors.items()
         }
 
     @property
-    def addressables_as_address_keyed(self) -> Dict[Address, ThinAddressableObject]:
-        """Identical to `addresses`, but with a `cast` to allow for type safe lookup of `Address`es.
-
-        :rtype: dict from `Address` to thin addressable objects.
-        """
-        return cast(Dict[Address, ThinAddressableObject], self.addressables)
+    def addressables_as_address_keyed(self) -> Dict[Address, TargetAdaptor]:
+        """Identical to `addresses`, but with a `cast` to allow for type safe lookup of
+        `Address`es."""
+        return cast(Dict[Address, TargetAdaptor], self.addressables)
 
     def __hash__(self):
         return hash(self.namespace)
 
-    def __repr__(self):
-        return "AddressFamily(namespace={!r}, objects_by_name={!r})".format(
-            self.namespace, list(self.objects_by_name.keys())
+    def __repr__(self) -> str:
+        return (
+            f"AddressFamily(namespace={self.namespace!r}, "
+            f"name_to_target_adaptors={sorted(self.name_to_target_adaptors.keys())})"
         )
 
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class AddressMapper:
-    """Configuration to parse build files matching a filename pattern."""
+    """Configuration to parse BUILD files matching a filename pattern."""
 
     parser: Parser
     prelude_glob_patterns: Tuple[str, ...]
@@ -175,7 +143,7 @@ class AddressMapper:
     def __init__(
         self,
         parser: Parser,
-        prelude_glob_patterns,
+        prelude_glob_patterns: Optional[Iterable[str]] = None,
         build_patterns: Optional[Iterable[str]] = None,
         build_ignore_patterns: Optional[Iterable[str]] = None,
         exclude_target_regexps: Optional[Iterable[str]] = None,
@@ -183,26 +151,20 @@ class AddressMapper:
     ) -> None:
         """Create an AddressMapper.
 
-        Both the set of files that define a mappable BUILD files and the parser used to parse those
-        files can be customized.  See the `pants.engine.parsers` module for example parsers.
-
-        :param parser: The BUILD file parser to use.
-        :param build_patterns: A tuple of fnmatch-compatible patterns for identifying BUILD files
-                              used to resolve addresses.
+        :param build_patterns: A tuple of PathGlob-compatible patterns for identifying BUILD files
+                               used to resolve addresses.
         :param build_ignore_patterns: A list of path ignore patterns used when searching for BUILD files.
         :param exclude_target_regexps: A list of regular expressions for excluding targets.
         """
         self.parser = parser
-        self.prelude_glob_patterns = prelude_glob_patterns
+        self.prelude_glob_patterns = tuple(prelude_glob_patterns or [])
         self.build_patterns = tuple(build_patterns or ["BUILD", "BUILD.*"])
         self.build_ignore_patterns = tuple(build_ignore_patterns or [])
         self.exclude_target_regexps = tuple(exclude_target_regexps or [])
         self.subproject_roots = tuple(subproject_roots or [])
 
     def __repr__(self):
-        return "AddressMapper(parser={}, build_patterns={})".format(
-            self.parser, self.build_patterns
-        )
+        return f"AddressMapper(build_patterns={self.build_patterns})"
 
     @memoized_property
     def exclude_patterns(self):

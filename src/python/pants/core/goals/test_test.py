@@ -27,7 +27,7 @@ from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSourcesRequest,
 )
 from pants.engine.addresses import Address
-from pants.engine.fs import Digest, FileContent, InputFilesContent, Workspace
+from pants.engine.fs import CreateDigest, Digest, FileContent, Workspace
 from pants.engine.interactive_process import InteractiveProcess, InteractiveRunner
 from pants.engine.target import (
     Sources,
@@ -116,10 +116,9 @@ class ConditionallySucceedsFieldSet(MockTestFieldSet):
 
 class TestTest(TestBase):
     def make_interactive_process(self) -> InteractiveProcess:
-        input_files_content = InputFilesContent(
-            (FileContent(path="program.py", content=b"def test(): pass"),)
+        digest = self.request_single_product(
+            Digest, CreateDigest((FileContent(path="program.py", content=b"def test(): pass"),))
         )
-        digest = self.request_single_product(Digest, input_files_content)
         return InteractiveProcess(["/usr/bin/python", "program.py"], input_digest=digest)
 
     @staticmethod

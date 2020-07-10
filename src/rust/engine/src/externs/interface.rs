@@ -70,8 +70,8 @@ use tempfile::TempDir;
 use workunit_store::{Workunit, WorkunitState};
 
 use crate::{
-  externs, nodes, Core, ExecutionRequest, ExecutionTermination, Failure, Function, Intrinsics,
-  Params, RemotingOptions, Rule, Scheduler, Session, Tasks, Types, Value,
+  externs, nodes, Core, ExecutionRequest, ExecutionStrategyOptions, ExecutionTermination, Failure,
+  Function, Intrinsics, Params, RemotingOptions, Rule, Scheduler, Session, Tasks, Types, Value,
 };
 
 py_exception!(native_engine, PollTimeout);
@@ -115,6 +115,11 @@ py_module_initializer!(native_engine, |py, m| {
     py,
     "write_stderr",
     py_fn!(py, write_stderr(a: PySession, b: String)),
+  )?;
+  m.add(
+    py,
+    "teardown_dynamic_ui",
+    py_fn!(py, teardown_dynamic_ui(a: PyScheduler, b: PySession)),
   )?;
 
   m.add(py, "set_panic_handler", py_fn!(py, set_panic_handler()))?;
@@ -343,13 +348,7 @@ py_module_initializer!(native_engine, |py, m| {
         use_gitignore: bool,
         root_type_ids: Vec<PyType>,
         remoting_options: PyRemotingOptions,
-        process_execution_local_parallelism: u64,
-        process_execution_remote_parallelism: u64,
-        process_execution_cleanup_local_dirs: bool,
-        process_execution_speculation_delay: f64,
-        process_execution_speculation_strategy_buf: String,
-        process_execution_use_local_cache: bool,
-        process_execution_local_enable_nailgun: bool
+        exec_strategy_opts: PyExecutionStrategyOptions
       )
     ),
   )?;
@@ -367,6 +366,7 @@ py_module_initializer!(native_engine, |py, m| {
   )?;
 
   m.add_class::<PyExecutionRequest>(py)?;
+  m.add_class::<PyExecutionStrategyOptions>(py)?;
   m.add_class::<PyExecutor>(py)?;
   m.add_class::<PyNailgunServer>(py)?;
   m.add_class::<PyRemotingOptions>(py)?;
@@ -400,8 +400,8 @@ py_class!(class PyTypes |py| {
       construct_snapshot: PyObject,
       snapshot: PyType,
       construct_file_content: PyObject,
-      construct_files_content: PyObject,
-      files_content: PyType,
+      construct_digest_contents: PyObject,
+      digest_contents: PyType,
       construct_process_result: PyObject,
       construct_materialize_directories_results: PyObject,
       construct_materialize_directory_result: PyObject,
@@ -410,7 +410,7 @@ py_class!(class PyTypes |py| {
       merge_digests: PyType,
       add_prefix: PyType,
       remove_prefix: PyType,
-      input_files_content: PyType,
+      create_digest: PyType,
       dir: PyType,
       file: PyType,
       link: PyType,
@@ -435,8 +435,8 @@ py_class!(class PyTypes |py| {
         construct_snapshot: Function(externs::key_for(construct_snapshot.into())?),
         snapshot: externs::type_for(snapshot),
         construct_file_content: Function(externs::key_for(construct_file_content.into())?),
-        construct_files_content: Function(externs::key_for(construct_files_content.into())?),
-        files_content: externs::type_for(files_content),
+        construct_digest_contents: Function(externs::key_for(construct_digest_contents.into())?),
+        digest_contents: externs::type_for(digest_contents),
         construct_process_result: Function(externs::key_for(construct_process_result.into())?),
         construct_materialize_directories_results: Function(externs::key_for(construct_materialize_directories_results.into())?),
         construct_materialize_directory_result: Function(externs::key_for(construct_materialize_directory_result.into())?),
@@ -445,7 +445,7 @@ py_class!(class PyTypes |py| {
         merge_digests: externs::type_for(merge_digests),
         add_prefix: externs::type_for(add_prefix),
         remove_prefix: externs::type_for(remove_prefix),
-        input_files_content: externs::type_for(input_files_content),
+        create_digest: externs::type_for(create_digest),
         dir: externs::type_for(dir),
         file: externs::type_for(file),
         link: externs::type_for(link),
@@ -478,6 +478,38 @@ py_class!(class PyScheduler |py| {
     data scheduler: Scheduler;
 });
 
+// Represents configuration related to process execution strategies.
+//
+// The data stored by PyExecutionStrategyOptions originally was passed directly into
+// scheduler_create but has been broken out separately because the large number of options
+// became unwieldy.
+py_class!(class PyExecutionStrategyOptions |py| {
+  data options: ExecutionStrategyOptions;
+
+  def __new__(
+    _cls,
+    local_parallelism: u64,
+    remote_parallelism: u64,
+    cleanup_local_dirs: bool,
+    speculation_delay: f64,
+    speculation_strategy: String,
+    use_local_cache: bool,
+    local_enable_nailgun: bool
+  ) -> CPyResult<Self> {
+    Self::create_instance(py,
+      ExecutionStrategyOptions {
+        local_parallelism: local_parallelism as usize,
+        remote_parallelism: remote_parallelism as usize,
+        cleanup_local_dirs,
+        speculation_delay: Duration::from_millis((speculation_delay * 1000.0).round() as u64),
+        speculation_strategy,
+        use_local_cache,
+        local_enable_nailgun,
+      }
+    )
+  }
+});
+
 // Represents configuration related to remote execution and caching.
 //
 // The data stored by PyRemotingOptions originally was passed directly into scheduler_create
@@ -501,7 +533,6 @@ py_class!(class PyRemotingOptions |py| {
     store_connection_limit: u64,
     execution_extra_platform_properties: Vec<(String, String)>,
     execution_headers: Vec<(String, String)>,
-    execution_enable_streaming: bool,
     execution_overall_deadline_secs: u64
   ) -> CPyResult<Self> {
     Self::create_instance(py,
@@ -520,7 +551,6 @@ py_class!(class PyRemotingOptions |py| {
         store_connection_limit: store_connection_limit as usize,
         execution_extra_platform_properties,
         execution_headers: execution_headers.into_iter().collect(),
-        execution_enable_streaming,
         execution_overall_deadline: Duration::from_secs(execution_overall_deadline_secs),
       }
     )
@@ -738,13 +768,7 @@ fn scheduler_create(
   use_gitignore: bool,
   root_type_ids: Vec<PyType>,
   remoting_options: PyRemotingOptions,
-  process_execution_local_parallelism: u64,
-  process_execution_remote_parallelism: u64,
-  process_execution_cleanup_local_dirs: bool,
-  process_execution_speculation_delay: f64,
-  process_execution_speculation_strategy: String,
-  process_execution_use_local_cache: bool,
-  process_execution_local_enable_nailgun: bool,
+  exec_strategy_opts: PyExecutionStrategyOptions,
 ) -> CPyResult<PyScheduler> {
   match fs::increase_limits() {
     Ok(msg) => debug!("{}", msg),
@@ -773,15 +797,7 @@ fn scheduler_create(
       PathBuf::from(local_execution_root_dir_buf),
       PathBuf::from(named_caches_dir_buf),
       remoting_options.options(py).clone(),
-      process_execution_local_parallelism as usize,
-      process_execution_remote_parallelism as usize,
-      process_execution_cleanup_local_dirs,
-      // convert delay from float to millisecond resolution. use from_secs_f64 when it is
-      // off nightly. https://github.com/rust-lang/rust/issues/54361
-      Duration::from_millis((process_execution_speculation_delay * 1000.0).round() as u64),
-      process_execution_speculation_strategy,
-      process_execution_use_local_cache,
-      process_execution_local_enable_nailgun,
+      exec_strategy_opts.options(py).clone(),
     )
   });
   PyScheduler::create_instance(
@@ -1681,6 +1697,25 @@ fn write_stderr(py: Python, session_ptr: PySession, msg: String) -> PyUnitResult
   with_session(py, session_ptr, |session| {
     py.allow_threads(|| {
       session.write_stderr(&msg);
+      Ok(None)
+    })
+  })
+}
+
+fn teardown_dynamic_ui(
+  py: Python,
+  scheduler_ptr: PyScheduler,
+  session_ptr: PySession,
+) -> PyUnitResult {
+  with_scheduler(py, scheduler_ptr, |_scheduler| {
+    with_session(py, session_ptr, |session| {
+      let _ = block_in_place_and_wait(py, || {
+        session
+          .maybe_display_teardown()
+          .unit_error()
+          .boxed_local()
+          .compat()
+      });
       Ok(None)
     })
   })

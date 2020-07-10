@@ -5,14 +5,7 @@ import os
 from dataclasses import dataclass
 from typing import ClassVar, Tuple
 
-from pants.engine.fs import (
-    Digest,
-    FileContent,
-    FilesContent,
-    InputFilesContent,
-    PathGlobs,
-    Snapshot,
-)
+from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, PathGlobs, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import (
     FallibleProcessResult,
@@ -196,10 +189,7 @@ async def javac_compile_process_result(
 
 
 def create_javac_compile_rules():
-    return [
-        javac_compile_process_result,
-        RootRule(JavacCompileRequest),
-    ]
+    return [javac_compile_process_result, RootRule(JavacCompileRequest)]
 
 
 class TestInputFileCreation(TestBase):
@@ -207,9 +197,9 @@ class TestInputFileCreation(TestBase):
         file_name = "some.filename"
         file_contents = b"some file contents"
 
-        input_file = InputFilesContent((FileContent(path=file_name, content=file_contents),))
-        digest = self.request_single_product(Digest, input_file)
-
+        digest = self.request_single_product(
+            Digest, CreateDigest([FileContent(path=file_name, content=file_contents)])
+        )
         req = Process(
             argv=("/bin/cat", file_name),
             input_digest=digest,
@@ -220,14 +210,15 @@ class TestInputFileCreation(TestBase):
         self.assertEqual(result.stdout, file_contents)
 
     def test_multiple_file_creation(self):
-        input_files_content = InputFilesContent(
-            (
-                FileContent(path="a.txt", content=b"hello"),
-                FileContent(path="b.txt", content=b"goodbye"),
-            )
+        digest = self.request_single_product(
+            Digest,
+            CreateDigest(
+                (
+                    FileContent(path="a.txt", content=b"hello"),
+                    FileContent(path="b.txt", content=b"goodbye"),
+                )
+            ),
         )
-
-        digest = self.request_single_product(Digest, input_files_content)
 
         req = Process(
             argv=("/bin/cat", "a.txt", "b.txt"),
@@ -242,9 +233,9 @@ class TestInputFileCreation(TestBase):
         path = "somedir/filename"
         content = b"file contents"
 
-        input_file = InputFilesContent((FileContent(path=path, content=content),))
-        digest = self.request_single_product(Digest, input_file)
-
+        digest = self.request_single_product(
+            Digest, CreateDigest([FileContent(path=path, content=content)])
+        )
         req = Process(
             argv=("/bin/cat", "somedir/filename"),
             input_digest=digest,
@@ -258,9 +249,9 @@ class TestInputFileCreation(TestBase):
         file_name = "echo.sh"
         file_contents = b'#!/bin/bash -eu\necho "Hello"\n'
 
-        input_file = InputFilesContent((FileContent(path=file_name, content=file_contents),))
-        digest = self.request_single_product(Digest, input_file)
-
+        digest = self.request_single_product(
+            Digest, CreateDigest([FileContent(path=file_name, content=file_contents)])
+        )
         req = Process(
             argv=("./echo.sh",), input_digest=digest, description="cat the contents of this file",
         )
@@ -272,11 +263,10 @@ class TestInputFileCreation(TestBase):
         file_name = "echo.sh"
         file_contents = b'#!/bin/bash -eu\necho "Hello"\n'
 
-        input_file = InputFilesContent(
-            (FileContent(path=file_name, content=file_contents, is_executable=True),)
+        digest = self.request_single_product(
+            Digest,
+            CreateDigest([FileContent(path=file_name, content=file_contents, is_executable=True)]),
         )
-        digest = self.request_single_product(Digest, input_file)
-
         req = Process(
             argv=("./echo.sh",), input_digest=digest, description="cat the contents of this file",
         )
@@ -331,11 +321,8 @@ class ProcessTest(TestBase):
             ),
         )
 
-        files_content_result = self.request_single_product(
-            FilesContent, process_result.output_digest,
-        )
-
-        assert files_content_result == FilesContent(
+        digest_contents = self.request_single_product(DigestContents, process_result.output_digest,)
+        assert digest_contents == DigestContents(
             [FileContent("roland", b"European Burmese", False)]
         )
 
@@ -365,11 +352,11 @@ class Simple {
             BinaryLocation("/usr/bin/javac"), JavacSources(("simple/Simple.java",)),
         )
         result = self.request_single_product(JavacCompileResult, request)
-        files_content = self.request_single_product(FilesContent, result.digest)
+        digest_contents = self.request_single_product(DigestContents, result.digest)
         assert sorted(["simple/Simple.java", "simple/Simple.class"]) == sorted(
-            file.path for file in files_content
+            file.path for file in digest_contents
         )
-        assert len(files_content[0].content) > 0
+        assert len(digest_contents[0].content) > 0
 
     def test_javac_compilation_example_failure(self):
         self.create_dir("simple")

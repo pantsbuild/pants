@@ -30,7 +30,8 @@ store = { path = "../fs/store" }
 task_executor = { path = "../task_executor" }
 tempfile = "3"
 concrete_time = { path = "../concrete_time" }
-tokio = { version = "0.2", features = ["process", "rt-threaded", "sync", "tcp", "time"] }
+# TODO: See #10291.
+tokio = { version = "=0.2.20", features = ["process", "rt-threaded", "sync", "tcp", "time"] }
 tokio-util = { version = "0.2", features = ["codec"] }
 uname = "0.1.1"
 workunit_store = { path = "../workunit_store" }
@@ -49,4 +50,5 @@ parking_lot = "0.11"
 spectral = "0.6.0"
 tempfile = "3"
 testutil = { path = "../testutil" }
-tokio = { version = "0.2", features = ["macros"] }
+# TODO: See #10291.
+tokio = { version = "=0.2.20", features = ["macros"] }

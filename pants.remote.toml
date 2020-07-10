@@ -23,9 +23,6 @@ remote_execution_extra_platform_properties = [
   "container-image=docker://gcr.io/pants-remoting-beta/rbe-remote-execution@sha256:ec94526d1aa0604b7f693a0b1fb224ca7822a0d821ce20dff50ec808cad597b6",
 ]
 
-# Enable the REv2 streaming client.
-remote_execution_enable_streaming = true
-
 # This should correspond to the number of workers running in Google RBE. See
 # https://console.cloud.google.com/apis/api/remotebuildexecution.googleapis.com/quotas?project=pants-remoting-beta&folder&organizationId&duration=PT6H.
 process_execution_remote_parallelism = 32

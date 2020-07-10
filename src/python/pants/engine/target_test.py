@@ -15,10 +15,10 @@ from pants.base.specs import FilesystemLiteralSpec
 from pants.engine.addresses import Address, Addresses
 from pants.engine.fs import (
     EMPTY_DIGEST,
+    CreateDigest,
     Digest,
+    DigestContents,
     FileContent,
-    FilesContent,
-    InputFilesContent,
     PathGlobs,
     Snapshot,
 )
@@ -56,6 +56,7 @@ from pants.engine.target import (
     StringField,
     StringOrStringSequenceField,
     StringSequenceField,
+    Tags,
     Target,
     TargetsToValidFieldSets,
     TargetsToValidFieldSetsRequest,
@@ -63,6 +64,8 @@ from pants.engine.target import (
     TargetWithOrigin,
     TooManyTargetsException,
     WrappedTarget,
+    generate_subtarget,
+    generate_subtarget_address,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.testutil.engine.util import MockGet, run_rule
@@ -423,6 +426,66 @@ def test_required_field() -> None:
         RequiredTarget({"async": 0}, address=address)
     assert str(address) in str(exc.value)
     assert "primitive" in str(exc.value)
+
+
+# -----------------------------------------------------------------------------------------------
+# Test generated subtargets
+# -----------------------------------------------------------------------------------------------
+
+
+def test_generate_subtarget() -> None:
+    class MockTarget(Target):
+        alias = "mock_target"
+        core_fields = (Tags, Sources)
+
+    # When the target already only has a single source, the result should be the same, except for a
+    # different address.
+    single_source_tgt = MockTarget(
+        {Sources.alias: ["demo.f95"], Tags.alias: ["demo"]},
+        address=Address.parse("src/fortran:demo"),
+    )
+    expected_single_source_address = Address(
+        "src/fortran", target_name="demo.f95", generated_base_target_name="demo"
+    )
+    assert generate_subtarget(
+        single_source_tgt, full_file_name="src/fortran/demo.f95"
+    ) == MockTarget(
+        {Sources.alias: ["demo.f95"], Tags.alias: ["demo"]}, address=expected_single_source_address
+    )
+    assert (
+        generate_subtarget_address(single_source_tgt.address, full_file_name="src/fortran/demo.f95")
+        == expected_single_source_address
+    )
+
+    subdir_tgt = MockTarget(
+        {Sources.alias: ["demo.f95", "subdir/demo.f95"]}, address=Address.parse("src/fortran:demo")
+    )
+    expected_subdir_address = Address(
+        "src/fortran", target_name="subdir/demo.f95", generated_base_target_name="demo"
+    )
+    assert generate_subtarget(
+        subdir_tgt, full_file_name="src/fortran/subdir/demo.f95"
+    ) == MockTarget({Sources.alias: ["subdir/demo.f95"]}, address=expected_subdir_address)
+    assert (
+        generate_subtarget_address(subdir_tgt.address, full_file_name="src/fortran/subdir/demo.f95")
+        == expected_subdir_address
+    )
+
+    class NoSourcesTgt(Target):
+        alias = "no_sources_tgt"
+        core_fields = (Tags,)
+
+    no_sources_tgt = NoSourcesTgt({Tags.alias: ["demo"]}, address=Address.parse("//:no_sources"))
+    expected_no_sources_address = Address(
+        "", target_name="fake.txt", generated_base_target_name="no_sources"
+    )
+    assert generate_subtarget(no_sources_tgt, full_file_name="fake.txt") == NoSourcesTgt(
+        {Tags.alias: ["demo"]}, address=expected_no_sources_address
+    )
+    assert (
+        generate_subtarget_address(no_sources_tgt.address, full_file_name="fake.txt")
+        == expected_no_sources_address
+    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -803,10 +866,14 @@ class TestSources(TestBase):
         assert hydrated_sources.snapshot.files == ("src/fortran/f1.f03", "src/fortran/f1.f95")
 
         # Also test that the Filespec is correct. This does not need hydration to be calculated.
-        assert sources.filespec == {
-            "globs": ["src/fortran/*.f03", "src/fortran/f1.f95"],
-            "exclude": [{"globs": ["src/fortran/**/ignore*", "src/fortran/ignored.f03"]}],
-        }
+        assert (
+            sources.filespec
+            == {
+                "includes": ["src/fortran/*.f03", "src/fortran/f1.f95"],
+                "excludes": ["src/fortran/**/ignore*", "src/fortran/ignored.f03"],
+            }
+            == hydrated_sources.filespec
+        )
 
     def test_output_type(self) -> None:
         class SourcesSubclass(Sources):
@@ -942,7 +1009,7 @@ async def generate_smalltalk_from_avro(
         file_name = f"{PurePath(fp).stem}.st"
         return FileContent(str(PurePath(parent, file_name)), b"Generated")
 
-    result = await Get(Snapshot, InputFilesContent([generate_fortran(fp) for fp in protocol_files]))
+    result = await Get(Snapshot, CreateDigest([generate_fortran(fp) for fp in protocol_files]))
     return GeneratedSources(result)
 
 
@@ -1116,9 +1183,9 @@ async def infer_smalltalk_dependencies(request: InferSmalltalkDependencies) -> I
     # To demo an inference rule, we simply treat each `sources` file to contain a list of
     # addresses, one per line.
     hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.sources_field))
-    file_contents = await Get(FilesContent, Digest, hydrated_sources.snapshot.digest)
+    digest_contents = await Get(DigestContents, Digest, hydrated_sources.snapshot.digest)
     all_lines = itertools.chain.from_iterable(
-        fc.content.decode().splitlines() for fc in file_contents
+        file_content.content.decode().splitlines() for file_content in digest_contents
     )
     return InferredDependencies(Address.parse(line) for line in all_lines)
 
@@ -1144,13 +1211,15 @@ class TestDependencies(TestBase):
     def test_normal_resolution(self) -> None:
         self.add_to_build_file("src/smalltalk", "smalltalk()")
         addr = Address.parse("src/smalltalk")
-        deps = Addresses([Address.parse("//:dep1"), Address.parse("//:dep2")])
-        deps_field = Dependencies(deps, address=addr)
-        assert (
-            self.request_single_product(
-                Addresses, Params(DependenciesRequest(deps_field), create_options_bootstrapper())
-            )
-            == deps
+        deps_field = Dependencies(["//:dep1", "//:dep2", ":sibling"], address=addr)
+        assert self.request_single_product(
+            Addresses, Params(DependenciesRequest(deps_field), create_options_bootstrapper())
+        ) == Addresses(
+            [
+                Address.parse("//:dep1"),
+                Address.parse("//:dep2"),
+                Address.parse("src/smalltalk:sibling"),
+            ]
         )
 
         # Also test that we handle no dependencies.
@@ -1163,13 +1232,12 @@ class TestDependencies(TestBase):
         self.add_to_build_file("", "smalltalk(name='target')")
 
         def assert_injected(deps_cls: Type[Dependencies], *, injected: List[str]) -> None:
-            provided_addr = Address.parse("//:provided")
-            deps_field = deps_cls([provided_addr], address=Address.parse("//:target"))
+            deps_field = deps_cls(["//:provided"], address=Address.parse("//:target"))
             result = self.request_single_product(
                 Addresses, Params(DependenciesRequest(deps_field), create_options_bootstrapper())
             )
             assert result == Addresses(
-                sorted([provided_addr, *(Address.parse(addr) for addr in injected)])
+                sorted(Address.parse(addr) for addr in (*injected, "//:provided"))
             )
 
         assert_injected(Dependencies, injected=[])
@@ -1192,7 +1260,7 @@ class TestDependencies(TestBase):
         self.create_file("demo/f2.st", "//:inferred3\n")
         self.add_to_build_file("demo", "smalltalk(sources=['*.st'], dependencies=['//:provided'])")
 
-        deps_field = Dependencies([Address.parse("//:provided")], address=Address.parse("demo"))
+        deps_field = Dependencies(["//:provided"], address=Address.parse("demo"))
         result = self.request_single_product(
             Addresses,
             Params(

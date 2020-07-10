@@ -28,18 +28,18 @@ class FileContent:
     is_executable: bool = False
 
     def __repr__(self) -> str:
-        return f"FileContent(path={self.path}, content=(len:{len(self.content)}), is_executable={ self.is_executable})"
+        return f"FileContent(path={self.path}, content=(len:{len(self.content)}), is_executable={self.is_executable})"
 
 
-class FilesContent(Collection[FileContent]):
-    pass
+class DigestContents(Collection[FileContent]):
+    """The file contents of a Digest."""
 
 
-class InputFilesContent(FilesContent):
-    """A newtype wrapper for FilesContent.
+class CreateDigest(Collection[FileContent]):
+    """A request to create a Digest with the input FileContent values.
 
-    TODO(7710): This class is currently necessary because the engine
-    otherwise finds a cycle between FilesContent <=> DirectoryDigest.
+    This does _not_ actually materialize the digest to the build root. You must use
+    `engine.fs.Workspace` in a `@goal_rule` to save the resulting digest to disk.
     """
 
 
@@ -361,7 +361,7 @@ def create_fs_rules():
     """Creates rules that consume the intrinsic filesystem types."""
     return [
         RootRule(Workspace),
-        RootRule(InputFilesContent),
+        RootRule(CreateDigest),
         RootRule(Digest),
         RootRule(MergeDigests),
         RootRule(PathGlobs),

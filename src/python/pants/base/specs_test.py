@@ -12,7 +12,7 @@ from pants.base.specs import (
     more_specific,
 )
 from pants.build_graph.address import Address
-from pants.engine.legacy.structs import TargetAdaptor
+from pants.engine.internals.target_adaptor import TargetAdaptor
 
 
 def test_more_specific():
@@ -48,10 +48,13 @@ def test_more_specific():
 
 class AddressSpecsMatcherTest(unittest.TestCase):
     def _make_target(self, address: str, **kwargs) -> TargetAdaptor:
-        return TargetAdaptor(address=Address.parse(address), **kwargs)
+        parsed_address = Address.parse(address)
+        return TargetAdaptor(
+            type_alias="", name=parsed_address.target_name, address=parsed_address, **kwargs
+        )
 
     def _matches(self, matcher: AddressSpecsMatcher, target: TargetAdaptor) -> bool:
-        return matcher.matches_target_address_pair(target.address, target)
+        return matcher.matches_target_address_pair(target.kwargs["address"], target)
 
     def test_match_target(self):
         matcher = AddressSpecsMatcher(tags=["-a", "+b"])

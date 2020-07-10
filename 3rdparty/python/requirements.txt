@@ -27,7 +27,7 @@ py_zipkin==0.20.0
 requests[security]>=2.20.1
 responses==0.10.15
 setproctitle==1.1.10
-setuptools==47.3.1
+setuptools==49.1.0
 toml==0.10.1
 typed-ast>=1.4.1,<1.5
 typing-extensions==3.7.4.2

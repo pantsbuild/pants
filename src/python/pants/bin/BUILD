@@ -4,90 +4,34 @@
 python_library(
   name="daemon_pants_runner",
   sources=["daemon_pants_runner.py"],
-  dependencies=[
-    ':local_pants_runner',
-    'src/python/pants/base:exiter',
-    'src/python/pants/engine/internals:native',
-    'src/python/pants/init',
-    'src/python/pants/java',
-    'src/python/pants/option:options_bootstrapper',
-    'src/python/pants/pantsd:pants_daemon_core',
-    'src/python/pants/util:contextutil',
-  ],
 )
 
 python_library(
   name="local_pants_runner",
   sources=["local_pants_runner.py"],
-  dependencies=[
-    '3rdparty/python:dataclasses',
-    'src/python/pants/base:build_environment',
-    'src/python/pants/base:cmd_line_spec_parser',
-    'src/python/pants/base:exception_sink',
-    'src/python/pants/base:exiter',
-    'src/python/pants/base:specs',
-    'src/python/pants/base:workunit',
-    'src/python/pants/build_graph',
-    'src/python/pants/engine/internals:native',
-    'src/python/pants/engine/internals:scheduler',
-    'src/python/pants/engine:unions',
-    'src/python/pants/goal:run_tracker',
-    'src/python/pants/help',
-    'src/python/pants/init',
-    'src/python/pants/init:engine_initializer',
-    'src/python/pants/option',
-    'src/python/pants/option:options_bootstrapper',
-    'src/python/pants/reporting',
-    'src/python/pants/subsystem',
-    'src/python/pants/util:contextutil',
-  ],
 )
 
 python_library(
   name="pants_exe",
   sources=["pants_exe.py"],
-  dependencies=[
-    ':pants_runner',
-    'src/python/pants/base:exiter',
-    'src/python/pants/util:contextutil',
-  ],
 )
 
 python_library(
   name="pants_loader",
   sources=["pants_loader.py"],
   dependencies=[
-    ":pants_exe",
+    ":pants_exe",  # NB: This is not inferred.
   ],
 )
 
 python_library(
   name="pants_runner",
   sources=["pants_runner.py"],
-  dependencies=[
-    ':local_pants_runner',
-    ':remote_pants_runner',
-    '3rdparty/python:dataclasses',
-    'src/python/pants/base:exception_sink',
-    'src/python/pants/base:exiter',
-    'src/python/pants/init',
-    'src/python/pants/option',
-    'src/python/pants/option:options_bootstrapper',
-  ],
 )
 
 python_library(
   name="remote_pants_runner",
   sources=["remote_pants_runner.py"],
-  dependencies=[
-    'src/python/pants/base:exception_sink',
-    'src/python/pants/base:exiter',
-    'src/python/pants/console:stty_utils',
-    'src/python/pants/java',
-    'src/python/pants/option:options_bootstrapper',
-    'src/python/pants/pantsd:pants_daemon_client',
-    'src/python/pants/util:dirutil',
-  ],
 )
 
 # This binary's entry_point is used by the pantsbuild.pants sdist to setup a binary for
