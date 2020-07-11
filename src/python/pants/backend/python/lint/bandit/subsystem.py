@@ -10,9 +10,9 @@ class Bandit(PythonToolBase):
     options_scope = "bandit"
     default_version = "bandit>=1.6.2,<1.7"
     # `setuptools<45` is for Python 2 support. `stevedore` is because the 3.0 release breaks Bandit.
-    default_extra_requirements = ["setuptools<45", "stevedore>=2.0.1,<3"]
+    default_extra_requirements = ["setuptools<45", "stevedore<3"]
     default_entry_point = "bandit"
-    default_interpreter_constraints = ["CPython>=2.7,<3", "CPython>=3.0"]
+    default_interpreter_constraints = ["CPython>=2.7,<3", "CPython>=3.5"]
 
     @classmethod
     def register_options(cls, register):
