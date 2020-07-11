@@ -127,19 +127,13 @@ class Scheduler:
         # Create the native Scheduler and Session.
         tasks = self._register_rules(rule_index)
 
-        # TODO: There is no longer a need to differentiate constructors from types, as types are
-        # callable as well with the cpython crate.
         types = PyTypes(
-            construct_directory_digest=Digest,
             directory_digest=Digest,
-            construct_snapshot=Snapshot,
             snapshot=Snapshot,
-            construct_file_content=FileContent,
-            construct_digest_contents=DigestContents,
+            file_content=FileContent,
             digest_contents=DigestContents,
-            construct_process_result=FallibleProcessResultWithPlatform,
-            construct_materialize_directories_results=MaterializeDirectoriesResult,
-            construct_materialize_directory_result=MaterializeDirectoryResult,
+            materialize_directories_results=MaterializeDirectoriesResult,
+            materialize_directory_result=MaterializeDirectoryResult,
             address=Address,
             path_globs=PathGlobs,
             merge_digests=MergeDigests,
@@ -156,11 +150,9 @@ class Scheduler:
             url_to_fetch=UrlToFetch,
             string=str,
             bytes=bytes,
-            construct_interactive_process_result=InteractiveProcessResult,
             interactive_process=InteractiveProcess,
             interactive_process_result=InteractiveProcessResult,
             snapshot_subset=SnapshotSubset,
-            construct_platform=Platform,
         )
 
         self._scheduler = native.new_scheduler(

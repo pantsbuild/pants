@@ -516,7 +516,7 @@ impl Snapshot {
 
   pub fn store_directory(core: &Arc<Core>, item: &hashing::Digest) -> Value {
     externs::unsafe_call(
-      &core.types.construct_directory_digest,
+      core.types.directory_digest,
       &[
         externs::store_utf8(&item.0.to_hex()),
         externs::store_i64(item.1 as i64),
@@ -538,7 +538,7 @@ impl Snapshot {
       }
     }
     Ok(externs::unsafe_call(
-      &core.types.construct_snapshot,
+      core.types.snapshot,
       &[
         Self::store_directory(core, &item.digest),
         externs::store_tuple(files),
@@ -557,7 +557,7 @@ impl Snapshot {
 
   fn store_file_content(context: &Context, item: &FileContent) -> Result<Value, String> {
     Ok(externs::unsafe_call(
-      &context.core.types.construct_file_content,
+      context.core.types.file_content,
       &[
         Self::store_path(&item.path)?,
         externs::store_bytes(&item.content),
@@ -572,7 +572,7 @@ impl Snapshot {
       .map(|e| Self::store_file_content(context, e))
       .collect::<Result<Vec<_>, _>>()?;
     Ok(externs::unsafe_call(
-      &context.core.types.construct_digest_contents,
+      context.core.types.digest_contents,
       &[externs::store_tuple(entries)],
     ))
   }
