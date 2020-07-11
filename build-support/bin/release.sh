@@ -6,18 +6,6 @@ set -e
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && cd "$(git rev-parse --show-toplevel)" && pwd)
 
-function safe_curl() {
-  real_curl="$(command -v curl)"
-  set +e
-  "${real_curl}" --fail -SL "$@"
-  exit_code=$?
-  set -e
-  if [[ "${exit_code}" -ne 0 ]]; then
-    echo >&2 "Curl failed with args: $*"
-    exit 1
-  fi
-}
-
 # shellcheck source=build-support/common.sh
 source "${ROOT}/build-support/common.sh"
 
@@ -68,29 +56,6 @@ readonly DEPLOY_PANTS_WHEEL_DIR="${DEPLOY_DIR}/${DEPLOY_PANTS_WHEELS_PATH}"
 # A space-separated list of pants packages to include in any pexes that are built: by default,
 # only pants core is included.
 : "${PANTS_PEX_PACKAGES:="pantsbuild.pants"}"
-
-# URL from which pex release binaries can be downloaded.
-: "${PEX_DOWNLOAD_PREFIX:="https://github.com/pantsbuild/pex/releases/download"}"
-
-function requirement() {
-  package="$1"
-  grep "^${package}[^A-Za-z0-9]" "${ROOT}/3rdparty/python/requirements.txt" || die "Could not find requirement for ${package}"
-}
-
-function run_pex() {
-  # TODO: Cache this in case we run pex multiple times
-  (
-    PEX_VERSION="$(requirement pex | sed -e "s|pex==||")"
-
-    pexdir="$(mktemp -d -t build_pex.XXXXX)"
-    trap 'rm -rf "${pexdir}"' EXIT
-
-    pex="${pexdir}/pex"
-
-    safe_curl -s "${PEX_DOWNLOAD_PREFIX}/v${PEX_VERSION}/pex" > "${pex}"
-    "${PY}" "${pex}" "$@"
-  )
-}
 
 function run_packages_script() {
   (
@@ -177,7 +142,7 @@ function activate_tmp_venv() {
   # place, Shellcheck will not be able to find it so we tell Shellcheck to ignore the file.
   # shellcheck source=/dev/null
   VENV_DIR=$(mktemp -d -t pants.XXXXX) && \
-  "${ROOT}/build-support/virtualenv" "$VENV_DIR" && \
+  run_virtualenv "$VENV_DIR" && \
   source "$VENV_DIR/bin/activate"
 }
 
@@ -300,7 +265,7 @@ function activate_twine() {
   local -r venv_dir="${ROOT}/build-support/twine-deps.venv"
 
   rm -rf "${venv_dir}"
-  "${ROOT}/build-support/virtualenv" "${venv_dir}"
+  run_virtualenv "${venv_dir}"
   # Because the venv/bin/activate script's location is dynamic and not located in a fixed
   # place, Shellcheck will not be able to find it so we tell Shellcheck to ignore the file.
   # shellcheck source=/dev/null
@@ -310,12 +275,13 @@ function activate_twine() {
 
 function execute_pex() {
   run_pex \
-      --no-build \
-      --no-pypi \
-      --disable-cache \
-      -f "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
-      -f "${DEPLOY_3RDPARTY_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
-      "$@"
+    --python "${PY}" \
+    --no-build \
+    --no-pypi \
+    --disable-cache \
+    -f "${DEPLOY_PANTS_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
+    -f "${DEPLOY_3RDPARTY_WHEEL_DIR}/${PANTS_UNSTABLE_VERSION}" \
+    "$@"
 }
 
 function build_pex() {

@@ -17,8 +17,8 @@ if [[ -n "${bad_output}" ]]; then
   exit_code=1
 fi
 
-# Skip release.sh because it has a custom function for failing noisily.
-bad_output="$(find ./* -name '*.sh' -not -path './build-support/bin/release.sh' -print0 \
+# Skip common.sh because it has a custom function for failing noisily.
+bad_output="$(find ./* -name '*.sh' -not -path './build-support/common.sh' -print0 \
   | xargs -0 grep -H 'curl '| grep -v 'curl --fail' | cut -d: -f1 \
   | grep -v build-support/bin/check_shell.sh \
   || :)"

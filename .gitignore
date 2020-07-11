@@ -37,9 +37,9 @@ out/
 # remove root-level /bin, which is created by Eclipse
 /bin/
 /build-support/*.pex
+/build-support/pex/
 /build-support/virtualenvs
-/build-support/virtualenv-*
-/build-support/virtualenv.dist/
+/build-support/virtualenv/
 /build-support/phab/
 /build-support/twine-deps.venv/
 /dist/
