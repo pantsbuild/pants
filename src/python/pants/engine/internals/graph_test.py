@@ -9,6 +9,7 @@ from pants.engine.selectors import Params
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
+    Sources,
     Target,
     Targets,
     TransitiveTarget,
@@ -22,7 +23,7 @@ from pants.util.ordered_set import FrozenOrderedSet
 
 class MockTarget(Target):
     alias = "target"
-    core_fields = (Dependencies,)
+    core_fields = (Dependencies, Sources)
 
 
 class GraphTest(TestBase):
@@ -80,3 +81,15 @@ class GraphTest(TestBase):
         # NB: `//:d2` is both a target root and a dependency of `//:root`.
         assert transitive_targets.dependencies == FrozenOrderedSet([d1, d2, d3, t2, t1])
         assert transitive_targets.closure == FrozenOrderedSet([root, d2, d1, d3, t2, t1])
+
+    def test_resolve_generated_subtarget(self) -> None:
+        self.add_to_build_file("helloworld/util", "target(sources=['lang.py', 'dirutil.py'])")
+        generated_target_addresss = Address(
+            "helloworld/util", target_name="lang.py", generated_base_target_name="util"
+        )
+        generated_target = self.request_single_product(
+            WrappedTarget, generated_target_addresss
+        ).target
+        assert generated_target == MockTarget(
+            {Sources.alias: ["lang.py"]}, address=generated_target_addresss
+        )
