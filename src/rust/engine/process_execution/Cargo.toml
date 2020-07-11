@@ -21,7 +21,7 @@ grpcio = { git = "https://github.com/pantsbuild/grpc-rs.git", rev = "ed3afa3c24d
 hashing = { path = "../hashing" }
 libc = "0.2.39"
 log = "0.4"
-nails = "0.5.1"
+nails = "0.6.0"
 protobuf = { version = "2.0.6", features = ["with-bytes"] }
 sha2 = "0.9"
 sharded_lmdb = {  path = "../sharded_lmdb" }

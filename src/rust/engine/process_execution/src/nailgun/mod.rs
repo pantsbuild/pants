@@ -268,7 +268,13 @@ impl CapturedWorkdir for CommandRunner {
         debug!("Connecting to server at {}...", addr);
         TcpStream::connect(addr)
           .and_then(move |stream| {
-            nails::client_handle_connection(stream, cmd, stdio_write, stdin_read)
+            nails::client_handle_connection(
+              nails::Config::default(),
+              stream,
+              cmd,
+              stdio_write,
+              stdin_read,
+            )
           })
           .map_err(|e| format!("Error communicating with server: {}", e))
           .map_ok(ChildOutput::Exit)
