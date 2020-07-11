@@ -50,11 +50,6 @@ python_tests(
 )
 
 python_tests(
-  name = 'revision',
-  sources = ['test_revision.py'],
-)
-
-python_tests(
   name = 'run_info',
   sources = ['test_run_info.py'],
 )

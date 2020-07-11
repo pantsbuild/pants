@@ -72,11 +72,6 @@ python_library(
 )
 
 python_library(
-  name = 'revision',
-  sources = ['revision.py'],
-)
-
-python_library(
   name = 'run_info',
   sources = ['run_info.py'],
 )
