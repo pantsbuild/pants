@@ -943,6 +943,7 @@ async fn sends_headers() {
 
   let command_runner = CommandRunner::new(
     &mock_server.address(),
+    vec![mock_server.address().clone()],
     empty_request_metadata(),
     None,
     Some(String::from("catnip-will-get-you-anywhere")),
@@ -1149,6 +1150,7 @@ async fn ensure_inline_stdio_is_stored() {
 
   let cmd_runner = CommandRunner::new(
     &mock_server.address(),
+    vec![mock_server.address().clone()],
     empty_request_metadata(),
     None,
     None,
@@ -1431,6 +1433,7 @@ async fn execute_missing_file_uploads_if_known() {
     .expect("Saving directory bytes to store");
   let command_runner = CommandRunner::new(
     &mock_server.address(),
+    vec![mock_server.address().clone()],
     empty_request_metadata(),
     None,
     None,
@@ -1506,6 +1509,7 @@ async fn execute_missing_file_errors_if_unknown() {
 
   let runner = CommandRunner::new(
     &mock_server.address(),
+    vec![mock_server.address().clone()],
     empty_request_metadata(),
     None,
     None,
@@ -2209,6 +2213,7 @@ fn create_command_runner(
   let store = make_store(store_dir.path(), cas, runtime.clone());
   let command_runner = CommandRunner::new(
     &address,
+    vec![address.clone()],
     empty_request_metadata(),
     None,
     None,

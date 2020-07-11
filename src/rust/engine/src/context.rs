@@ -197,6 +197,7 @@ impl Core {
             // requires the remoting_opts.execution_server be present when
             // remoting_opts.execution_enable is set.
             &remoting_opts.execution_server.unwrap(),
+            remoting_opts.store_servers.clone(),
             process_execution_metadata.clone(),
             root_ca_certs,
             oauth_bearer_token,

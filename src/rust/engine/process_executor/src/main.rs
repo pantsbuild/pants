@@ -384,6 +384,7 @@ async fn main() {
         Box::new(
           process_execution::remote::CommandRunner::new(
             address,
+            vec![address.to_owned()],
             ProcessMetadata {
               instance_name: remote_instance_arg,
               cache_key_gen_version: args.value_of("cache-key-gen-version").map(str::to_owned),
