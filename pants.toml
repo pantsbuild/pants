@@ -117,6 +117,7 @@ branch_notes = """
 """
 
 [pytest]
+args = ["--no-header"]
 pytest_plugins.add = [
   "ipdb",
   "pytest-icdiff",

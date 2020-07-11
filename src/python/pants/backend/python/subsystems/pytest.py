@@ -23,14 +23,14 @@ class PyTest(Subsystem):
             help='Arguments to pass directly to Pytest, e.g. `--pytest-args="-k test_foo --quiet"`',
         )
         register(
-            "--version", default="pytest>=5.3.5,<5.4", help="Requirement string for Pytest.",
+            "--version", default="pytest>=6.0.1,<6.1", help="Requirement string for Pytest.",
         )
         register(
             "--pytest-plugins",
             type=list,
             default=[
-                "pytest-timeout>=1.3.4,<1.4",
-                "pytest-cov>=2.8.1,<2.9",
+                "pytest-timeout>=1.4.2,<1.5",
+                "pytest-cov>=2.10.1,<2.11",
                 # NB: zipp has frequently destabilized builds due to floating transitive versions under pytest.
                 "zipp==2.1.0",
             ],
