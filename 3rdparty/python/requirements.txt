@@ -18,7 +18,7 @@ mypy==0.781
 
 packaging==20.4
 pathspec==0.8.0
-pex==2.1.12
+pex==2.1.13
 psutil==5.7.0
 pystache==0.5.4
 python-Levenshtein==0.12.0
