@@ -1,19 +1,15 @@
 // Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use crate::core::{Function, TypeId};
+use crate::core::TypeId;
 
 pub struct Types {
-  pub construct_directory_digest: Function,
   pub directory_digest: TypeId,
-  pub construct_snapshot: Function,
   pub snapshot: TypeId,
-  pub construct_file_content: Function,
-  pub construct_digest_contents: Function,
+  pub file_content: TypeId,
   pub digest_contents: TypeId,
-  pub construct_process_result: Function,
-  pub construct_materialize_directories_results: Function,
-  pub construct_materialize_directory_result: Function,
+  pub materialize_directories_results: TypeId,
+  pub materialize_directory_result: TypeId,
   pub address: TypeId,
   pub path_globs: TypeId,
   pub merge_digests: TypeId,
@@ -30,9 +26,7 @@ pub struct Types {
   pub url_to_fetch: TypeId,
   pub string: TypeId,
   pub bytes: TypeId,
-  pub construct_interactive_process_result: Function,
   pub interactive_process: TypeId,
   pub interactive_process_result: TypeId,
   pub snapshot_subset: TypeId,
-  pub construct_platform: Function,
 }

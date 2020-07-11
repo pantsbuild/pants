@@ -16,7 +16,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::atomic;
 
-use crate::core::{Failure, Function, Key, TypeId, Value};
+use crate::core::{Failure, Key, TypeId, Value};
 use crate::interning::Interns;
 
 use cpython::{
@@ -328,14 +328,25 @@ pub fn generator_send(generator: &Value, arg: &Value) -> Result<GeneratorRespons
 }
 
 ///
-/// NB: Panics on failure. Only recommended for use with built-in functions, such as
+/// NB: Panics on failure. Only recommended for use with built-in types, such as
 /// those configured in types::Types.
 ///
-pub fn unsafe_call(func: &Function, args: &[Value]) -> Value {
-  let func_val = with_interns(|interns| interns.key_get(&func.0).clone());
-  call(&func_val, args).unwrap_or_else(|e| {
-    panic!("Core function `{}` failed: {:?}", val_to_str(&func_val), e);
-  })
+pub fn unsafe_call(type_id: TypeId, args: &[Value]) -> Value {
+  let py_type = type_for_type_id(type_id);
+  let arg_handles: Vec<PyObject> = args.iter().map(|v| v.clone().into()).collect();
+  let gil = Python::acquire_gil();
+  let args_tuple = PyTuple::new(gil.python(), &arg_handles);
+  py_type
+    .call(gil.python(), args_tuple, None)
+    .map(Value::from)
+    .unwrap_or_else(|e| {
+      let gil = Python::acquire_gil();
+      panic!(
+        "Core type constructor `{}` failed: {:?}",
+        py_type.name(gil.python()),
+        e
+      );
+    })
 }
 
 lazy_static! {

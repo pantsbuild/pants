@@ -395,16 +395,12 @@ py_class!(class PyTypes |py| {
 
   def __new__(
       _cls,
-      construct_directory_digest: PyObject,
       directory_digest: PyType,
-      construct_snapshot: PyObject,
       snapshot: PyType,
-      construct_file_content: PyObject,
-      construct_digest_contents: PyObject,
+      file_content: PyType,
       digest_contents: PyType,
-      construct_process_result: PyObject,
-      construct_materialize_directories_results: PyObject,
-      construct_materialize_directory_result: PyObject,
+      materialize_directories_results: PyType,
+      materialize_directory_result: PyType,
       address: PyType,
       path_globs: PyType,
       merge_digests: PyType,
@@ -421,25 +417,19 @@ py_class!(class PyTypes |py| {
       url_to_fetch: PyType,
       string: PyType,
       bytes: PyType,
-      construct_interactive_process_result: PyObject,
       interactive_process: PyType,
       interactive_process_result: PyType,
-      snapshot_subset: PyType,
-      construct_platform: PyObject
+      snapshot_subset: PyType
   ) -> CPyResult<Self> {
     Self::create_instance(
         py,
         RefCell::new(Some(Types {
-        construct_directory_digest: Function(externs::key_for(construct_directory_digest.into())?),
         directory_digest: externs::type_for(directory_digest),
-        construct_snapshot: Function(externs::key_for(construct_snapshot.into())?),
         snapshot: externs::type_for(snapshot),
-        construct_file_content: Function(externs::key_for(construct_file_content.into())?),
-        construct_digest_contents: Function(externs::key_for(construct_digest_contents.into())?),
+        file_content: externs::type_for(file_content),
         digest_contents: externs::type_for(digest_contents),
-        construct_process_result: Function(externs::key_for(construct_process_result.into())?),
-        construct_materialize_directories_results: Function(externs::key_for(construct_materialize_directories_results.into())?),
-        construct_materialize_directory_result: Function(externs::key_for(construct_materialize_directory_result.into())?),
+        materialize_directories_results: externs::type_for(materialize_directories_results),
+        materialize_directory_result: externs::type_for(materialize_directory_result),
         address: externs::type_for(address),
         path_globs: externs::type_for(path_globs),
         merge_digests: externs::type_for(merge_digests),
@@ -456,11 +446,9 @@ py_class!(class PyTypes |py| {
         url_to_fetch: externs::type_for(url_to_fetch),
         string: externs::type_for(string),
         bytes: externs::type_for(bytes),
-        construct_interactive_process_result: Function(externs::key_for(construct_interactive_process_result.into())?),
         interactive_process: externs::type_for(interactive_process),
         interactive_process_result: externs::type_for(interactive_process_result),
         snapshot_subset: externs::type_for(snapshot_subset),
-        construct_platform: Function(externs::key_for(construct_platform.into())?),
     })),
     )
   }
@@ -1497,7 +1485,7 @@ fn run_local_interactive_process(
       block_in_place_and_wait(py, ||
         session.with_console_ui_disabled(|| {
           let types = &scheduler.core.types;
-          let construct_interactive_process_result = types.construct_interactive_process_result;
+          let interactive_process_result = types.interactive_process_result;
 
           let value: Value = request.into();
 
@@ -1561,7 +1549,7 @@ fn run_local_interactive_process(
           let code = exit_status.code().unwrap_or(-1);
 
           Ok(externs::unsafe_call(
-            &construct_interactive_process_result,
+            interactive_process_result,
             &[externs::store_i64(i64::from(code))],
           ).into())
         })
@@ -1597,9 +1585,8 @@ fn materialize_directories(
       // TODO: A parent_id should be an explicit argument.
       session.workunit_store().init_thread_state(None);
       let types = &scheduler.core.types;
-      let construct_materialize_directories_results =
-        types.construct_materialize_directories_results;
-      let construct_materialize_directory_result = types.construct_materialize_directory_result;
+      let materialize_directories_results = types.materialize_directories_results;
+      let materialize_directory_result = types.materialize_directory_result;
 
       block_in_place_and_wait(py, || {
         future::join_all(
@@ -1637,7 +1624,7 @@ fn materialize_directories(
                 .collect();
 
               externs::unsafe_call(
-                &construct_materialize_directory_result,
+                materialize_directory_result,
                 &[externs::store_tuple(path_values)],
               )
             },
@@ -1645,7 +1632,7 @@ fn materialize_directories(
           .collect();
 
         externs::unsafe_call(
-          &construct_materialize_directories_results,
+          materialize_directories_results,
           &[externs::store_tuple(entries)],
         )
         .into()
