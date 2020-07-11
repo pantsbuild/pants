@@ -3,10 +3,9 @@
 
 import itertools
 import os
-import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple, Type
+from typing import Dict, Iterable, List, Mapping, Sequence, Set, Tuple, Type
 
 from pants.base.build_environment import get_default_pants_config_file
 from pants.option.config import Config
@@ -94,18 +93,14 @@ class OptionsBootstrapper:
         return bootstrap_options
 
     @classmethod
-    def create(
-        cls, env: Optional[Mapping[str, str]] = None, args: Optional[Sequence[str]] = None,
-    ) -> "OptionsBootstrapper":
+    def create(cls, env: Mapping[str, str], args: Sequence[str]) -> "OptionsBootstrapper":
         """Parses the minimum amount of configuration necessary to create an OptionsBootstrapper.
 
         :param env: An environment dictionary, or None to use `os.environ`.
         :param args: An args array, or None to use `sys.argv`.
         """
-        env = {
-            k: v for k, v in (os.environ if env is None else env).items() if k.startswith("PANTS_")
-        }
-        args = tuple(sys.argv if args is None else args)
+        env = {k: v for k, v in env.items() if k.startswith("PANTS_")}
+        args = tuple(args)
 
         flags = set()
         short_flags = set()
@@ -141,7 +136,7 @@ class OptionsBootstrapper:
         # Take just the bootstrap args, so we don't choke on other global-scope args on the cmd line.
         # Stop before '--' since args after that are pass-through and may have duplicate names to our
         # bootstrap options.
-        bargs = tuple(
+        bargs = ("./pants",) + tuple(
             filter(is_bootstrap_option, itertools.takewhile(lambda arg: arg != "--", args))
         )
 

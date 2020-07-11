@@ -10,7 +10,6 @@ from pants.engine.unions import UnionMembership
 from pants.help.help_info_extracter import HelpInfoExtracter
 from pants.option.config import Config
 from pants.option.global_options import GlobalOptions
-from pants.option.option_tracker import OptionTracker
 from pants.option.options import Options
 from pants.option.parser import Parser
 from pants.option.ranked_value import Rank, RankedValue
@@ -101,12 +100,9 @@ def test_default() -> None:
             config=Config.load([]),
             scope_info=GlobalOptions.get_scope_info(),
             parent_parser=None,
-            option_tracker=OptionTracker(),
         )
         parser.register(*args, **kwargs)
-        oshi = HelpInfoExtracter(parser.scope).get_option_scope_help_info(
-            "description", parser.option_registrations_iter(),
-        )
+        oshi = HelpInfoExtracter(parser.scope).get_option_scope_help_info("description", parser)
         assert oshi.description == "description"
         assert len(oshi.basic) == 1
         ohi = oshi.basic[0]
@@ -159,19 +155,19 @@ def test_passthrough():
 def test_choices() -> None:
     kwargs = {"choices": ["info", "debug"]}
     ohi = HelpInfoExtracter("").get_option_help_info([], kwargs)
-    assert ohi.choices == "info, debug"
+    assert ohi.choices == ("info", "debug")
 
 
 def test_choices_enum() -> None:
     kwargs = {"type": LogLevel}
     ohi = HelpInfoExtracter("").get_option_help_info([], kwargs)
-    assert ohi.choices == "info, debug"
+    assert ohi.choices == ("info", "debug")
 
 
 def test_list_of_enum() -> None:
     kwargs = {"type": list, "member_type": LogLevel}
     ohi = HelpInfoExtracter("").get_option_help_info([], kwargs)
-    assert ohi.choices == "info, debug"
+    assert ohi.choices == ("info", "debug")
 
 
 def test_grouping():
@@ -179,7 +175,14 @@ def test_grouping():
         def exp_to_len(exp):
             return int(exp)  # True -> 1, False -> 0.
 
-        oshi = HelpInfoExtracter("").get_option_scope_help_info("", [([], kwargs)])
+        parser = Parser(
+            env={},
+            config=Config.load([]),
+            scope_info=GlobalOptions.get_scope_info(),
+            parent_parser=None,
+        )
+        parser.register("--foo", **kwargs)
+        oshi = HelpInfoExtracter("").get_option_scope_help_info("", parser)
         assert exp_to_len(expected_basic) == len(oshi.basic)
         assert exp_to_len(expected_advanced) == len(oshi.advanced)
 
@@ -219,7 +222,7 @@ def test_get_all_help_info():
         env={},
         config=Config.load_file_contents(""),
         known_scope_infos=[Global.get_scope_info(), Foo.get_scope_info(), Bar.get_scope_info()],
-        args=[],
+        args=["./pants"],
         bootstrap_option_values=None,
     )
     Global.register_options_on_scope(options)
@@ -244,6 +247,12 @@ def test_get_all_help_info():
                         "comma_separated_display_args": "-o=<int>, --opt1=<int>",
                         "scoped_cmd_line_args": ("-o", "--opt1"),
                         "unscoped_cmd_line_args": ("-o", "--opt1"),
+                        "value_history": {
+                            "ranked_values": (
+                                {"rank": Rank.NONE, "value": None, "details": None},
+                                {"rank": Rank.HARDCODED, "value": 42, "details": None},
+                            ),
+                        },
                         "typ": int,
                         "default": 42,
                         "default_str": "42",
@@ -266,6 +275,12 @@ def test_get_all_help_info():
                         "comma_separated_display_args": "--[no-]foo-opt2",
                         "scoped_cmd_line_args": ("--foo-opt2", "--no-foo-opt2"),
                         "unscoped_cmd_line_args": ("--opt2", "--no-opt2"),
+                        "value_history": {
+                            "ranked_values": (
+                                {"rank": Rank.NONE, "value": None, "details": None},
+                                {"rank": Rank.HARDCODED, "value": True, "details": None},
+                            ),
+                        },
                         "typ": bool,
                         "default": True,
                         "default_str": "True",
@@ -282,6 +297,9 @@ def test_get_all_help_info():
                         "comma_separated_display_args": "--foo-opt3=<str>",
                         "scoped_cmd_line_args": ("--foo-opt3",),
                         "unscoped_cmd_line_args": ("--opt3",),
+                        "value_history": {
+                            "ranked_values": ({"rank": Rank.NONE, "value": None, "details": None},),
+                        },
                         "typ": str,
                         "default": None,
                         "default_str": "None",
@@ -289,7 +307,7 @@ def test_get_all_help_info():
                         "deprecated_message": None,
                         "removal_version": None,
                         "removal_hint": None,
-                        "choices": "a, b, c",
+                        "choices": ("a", "b", "c"),
                     },
                 ),
                 "deprecated": tuple(),

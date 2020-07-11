@@ -77,10 +77,12 @@ class PantsJoinHandle:
 
 
 def kill_daemon(pid_dir=None):
-    args = None
+    args = ["./pants"]
     if pid_dir:
-        args = [f"--pants-subprocessdir={pid_dir}"]
-    pantsd_client = PantsDaemonClient(OptionsBootstrapper.create(args=args).bootstrap_options)
+        args.append(f"--pants-subprocessdir={pid_dir}")
+    pantsd_client = PantsDaemonClient(
+        OptionsBootstrapper.create(env=os.environ, args=args).bootstrap_options
+    )
     with pantsd_client.lifecycle_lock:
         pantsd_client.terminate()
 

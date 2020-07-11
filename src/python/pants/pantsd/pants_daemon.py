@@ -310,4 +310,4 @@ class PantsDaemon(PantsDaemonProcessManager):
 
 def launch():
     """An external entrypoint that spawns a new pantsd instance."""
-    PantsDaemon.create(OptionsBootstrapper.create()).run_sync()
+    PantsDaemon.create(OptionsBootstrapper.create(env=os.environ, args=sys.argv)).run_sync()

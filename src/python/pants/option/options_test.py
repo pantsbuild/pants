@@ -754,7 +754,7 @@ class OptionsTest(TestBase):
         def assertError(expected_error, *args, **kwargs):
             with self.assertRaises(expected_error):
                 options = Options.create(
-                    args=[],
+                    args=["./pants"],
                     env={},
                     config=self._create_config(),
                     known_scope_infos=[global_scope()],
@@ -880,7 +880,7 @@ class OptionsTest(TestBase):
             tmp.flush()
             # Note that we prevent loading a real pants.toml during get_bootstrap_options().
             flags = f'--spec-file={tmp.name} --pants-config-files="[]" compile morx:tgt fleem:tgt'
-            bootstrapper = OptionsBootstrapper.create(args=shlex.split(f"./pants {flags}"))
+            bootstrapper = OptionsBootstrapper.create(env={}, args=shlex.split(f"./pants {flags}"))
             bootstrap_options = bootstrapper.bootstrap_options.for_global_scope()
             options = self._parse(flags=flags, bootstrap_option_values=bootstrap_options)
             sorted_specs = sorted(options.specs)

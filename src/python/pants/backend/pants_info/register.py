@@ -7,4 +7,4 @@ from pants.backend.pants_info import list_target_types
 
 
 def rules():
-    return [*list_target_types.rules()]
+    return list_target_types.rules()

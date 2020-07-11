@@ -862,7 +862,6 @@ class GlobalOptions(Subsystem):
             "--colors",
             type=bool,
             default=sys.stdout.isatty(),
-            recursive=True,
             help="Set whether log messages are displayed in color.",
         )
 

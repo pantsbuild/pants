@@ -3,7 +3,6 @@
 
 import dataclasses
 import os.path
-import sys
 from abc import ABC
 from dataclasses import dataclass
 from pathlib import Path
@@ -34,6 +33,8 @@ class HelpRequest(ABC):
 
 @dataclass(frozen=True)
 class OptionsHelp(HelpRequest):
+    """The user requested help on which options they can set."""
+
     advanced: bool = False
     all_scopes: bool = False
     scopes: Tuple[str, ...] = ()
@@ -77,11 +78,11 @@ class ArgSplitter:
     _HELP_VERSION_ARGS = ("-v", "-V", "--version")
     _HELP_GOALS_ARGS = ("goals",)
     _HELP_ARGS = (
-        _HELP_BASIC_ARGS
-        + _HELP_ADVANCED_ARGS
-        + _HELP_ALL_SCOPES_ARGS
-        + _HELP_VERSION_ARGS
-        + _HELP_GOALS_ARGS
+        *_HELP_BASIC_ARGS,
+        *_HELP_ADVANCED_ARGS,
+        *_HELP_ALL_SCOPES_ARGS,
+        *_HELP_VERSION_ARGS,
+        *_HELP_GOALS_ARGS,
     )
 
     def __init__(self, known_scope_infos: Iterable[ScopeInfo]) -> None:
@@ -142,7 +143,7 @@ class ArgSplitter:
                 )
         return True
 
-    def split_args(self, args: Optional[Sequence[str]] = None) -> SplitArgs:
+    def split_args(self, args: Sequence[str]) -> SplitArgs:
         """Split the specified arg list (or sys.argv if unspecified).
 
         args[0] is ignored.
@@ -160,11 +161,9 @@ class ArgSplitter:
         specs = []
         passthru = []
 
-        self._unconsumed_args = list(reversed(sys.argv if args is None else args))
-        # In regular use the first token is the binary name, so skip it. However tests may
-        # pass just a list of flags, so don't skip it in that case.
-        if not self._at_flag() and self._unconsumed_args:
-            self._unconsumed_args.pop()
+        self._unconsumed_args = list(reversed(args))
+        # The first token is the binary name, so skip it.
+        self._unconsumed_args.pop()
 
         def assign_flag_to_scope(flg: str, default_scope: str) -> None:
             flag_scope, descoped_flag = self._descope_flag(flg, default_scope=default_scope)

@@ -65,12 +65,20 @@ from pants.option.errors import (
     RegistrationError,
     Shadowing,
 )
-from pants.option.option_tracker import OptionTracker
 from pants.option.option_util import flatten_shlexed_list, is_dict_option, is_list_option
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.ranked_value import Rank, RankedValue
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
 from pants.util.meta import frozen_after_init
+
+
+@dataclass(frozen=True)
+class OptionValueHistory:
+    ranked_values: Tuple[RankedValue]
+
+    @property
+    def final_value(self):
+        return self.ranked_values[-1]
 
 
 class Parser:
@@ -120,7 +128,6 @@ class Parser:
         config: Config,
         scope_info: ScopeInfo,
         parent_parser: Optional["Parser"],
-        option_tracker: OptionTracker,
     ) -> None:
         """Create a Parser instance.
 
@@ -129,19 +136,20 @@ class Parser:
         :param scope_info: the scope this parser acts for.
         :param parent_parser: the parser for the scope immediately enclosing this one, or
                               None if this is the global scope.
-        :param option_tracker: the option tracker to record where option values came from.
         """
         self._env = env
         self._config = config
         self._scope_info = scope_info
         self._scope = self._scope_info.scope
-        self._option_tracker = option_tracker
 
         # All option args registered with this parser.  Used to prevent shadowing args in inner scopes.
         self._known_args: Set[str] = set()
 
         # List of (args, kwargs) registration pairs, exactly as captured at registration time.
         self._option_registrations: List[Tuple[Tuple[str, ...], Dict[str, Any]]] = []
+
+        # Map of dest -> history.
+        self._history: Dict[str, OptionValueHistory] = {}
 
         self._parent_parser = parent_parser
         self._child_parsers: List["Parser"] = []
@@ -160,6 +168,9 @@ class Parser:
     @property
     def known_args(self) -> Set[str]:
         return self._known_args
+
+    def history(self, dest: str) -> Optional[OptionValueHistory]:
+        return self._history.get(dest)
 
     def walk(self, callback: Callable) -> None:
         """Invoke callback on this parser and its descendants, in depth-first order."""
@@ -298,7 +309,9 @@ class Parser:
 
             # Get the value for this option, falling back to defaults as needed.
             try:
-                val = self._compute_value(dest, kwargs, flag_vals)
+                value_history = self._compute_value(dest, kwargs, flag_vals)
+                self._history[dest] = value_history
+                val = value_history.final_value
             except ParseError as e:
                 # Reraise a new exception with context on the option being processed at the time of error.
                 # Note that other exception types can be raised here that are caught by ParseError (e.g.
@@ -438,19 +451,26 @@ class Parser:
         Each yielded item is an (args, kwargs) pair, as passed to register(), except that kwargs
         will be normalized in the following ways:
           - It will always have 'dest' explicitly set.
-          - It will always have 'default' explicitly set, and the value will be a Rank.
+          - It will always have 'default' explicitly set, and the value will be a RankedValue.
           - For recursive options, the original registrar will also have 'recursive_root' set.
 
         Note that recursive options we inherit from a parent will also be yielded here, with
         the correctly-scoped default value.
         """
 
-        def normalize_kwargs(args, orig_kwargs):
+        def normalize_kwargs(orig_args, orig_kwargs):
             nkwargs = copy.copy(orig_kwargs)
-            _, dest = self.parse_name_and_dest(*args, **nkwargs)
+            _, dest = self.parse_name_and_dest(*orig_args, **nkwargs)
             nkwargs["dest"] = dest
             if not ("default" in nkwargs and isinstance(nkwargs["default"], RankedValue)):
-                nkwargs["default"] = self._compute_value(dest, nkwargs, [])
+                type_arg = nkwargs.get("type", str)
+                member_type = nkwargs.get("member_type", str)
+                default_val = self.to_value_type(
+                    nkwargs.get("default"), type_arg, member_type, dest
+                )
+                if isinstance(default_val, (ListValueComponent, DictValueComponent)):
+                    default_val = default_val.val
+                nkwargs["default"] = RankedValue(Rank.HARDCODED, default_val)
             return nkwargs
 
         # First yield any recursive options we inherit from our parent.
@@ -667,34 +687,34 @@ class Parser:
         except ValueError as error:
             raise ParseError(str(error))
 
+    def to_value_type(self, val_str, type_arg, member_type, dest):
+        """Convert a string to a value of the option's type."""
+        if val_str is None:
+            return None
+        if type_arg == bool:
+            return self._ensure_bool(val_str)
+        try:
+            if type_arg == list:
+                return ListValueComponent.create(val_str, member_type=member_type)
+            if type_arg == dict:
+                return DictValueComponent.create(val_str)
+            return type_arg(val_str)
+        except (TypeError, ValueError) as e:
+            raise ParseError(
+                f"Error applying type '{type_arg.__name__}' to option value '{val_str}', "
+                f"for option '--{dest}' in {self._scope_str()}: {e}"
+            )
+
     def _compute_value(self, dest, kwargs, flag_val_strs):
         """Compute the value to use for an option.
 
-        The source of the default value is chosen according to the ranking in Rank.
+        The source of the value is chosen according to the ranking in Rank.
         """
         type_arg = kwargs.get("type", str)
         member_type = kwargs.get("member_type", str)
 
-        # Helper function to convert a string to a value of the option's type.
-        type_arg = kwargs.get("type", str)
-        member_type = kwargs.get("member_type", str)
-
         def to_value_type(val_str):
-            if val_str is None:
-                return None
-            if type_arg == bool:
-                return self._ensure_bool(val_str)
-            try:
-                if type_arg == list:
-                    return ListValueComponent.create(val_str, member_type=member_type)
-                if type_arg == dict:
-                    return DictValueComponent.create(val_str)
-                return type_arg(val_str)
-            except (TypeError, ValueError) as e:
-                raise ParseError(
-                    f"Error applying type '{type_arg.__name__}' to option value '{val_str}', for option "
-                    f"'--{dest}' in {self._scope_str()}: {e}"
-                )
+            return self.to_value_type(val_str, type_arg, member_type, dest)
 
         # Helper function to expand a fromfile=True value string, if needed.
         # May return a string or a dict/list decoded from a json/yaml file.
@@ -736,7 +756,7 @@ class Parser:
         ) or self._config.get_source_for_option(Config.DEFAULT_SECTION, dest)
         if config_source_file is not None:
             config_source_file = os.path.relpath(config_source_file)
-            config_details = f"in {config_source_file}"
+            config_details = f"from {config_source_file}"
 
         # Get value from environment, and capture details about its derivation.
         udest = dest.upper()
@@ -781,68 +801,82 @@ class Parser:
             flag_val = flag_vals[0]
         else:
             flag_val = None
+        flag_details = None if flag_val is None else "from command-line flag"
 
         # Rank all available values.
         # Note that some of these values may already be of the value type, but type conversion
         # is idempotent, so this is OK.
 
         values_to_rank = [
-            to_value_type(x)
-            for x in [
-                flag_val,
-                env_val_or_str,
-                config_val_or_str,
-                config_default_val_or_str,
-                kwargs.get("default"),
-                None,
+            (to_value_type(x), detail)
+            for (x, detail) in [
+                (flag_val, flag_details),
+                (env_val_or_str, env_details),
+                (config_val_or_str, config_details),
+                (config_default_val_or_str, config_details),
+                (kwargs.get("default"), None),
+                (None, None),
             ]
         ]
         # Note that ranked_vals will always have at least one element, and all elements will be
         # instances of RankedValue (so none will be None, although they may wrap a None value).
         ranked_vals = list(reversed(list(RankedValue.prioritized_iter(*values_to_rank))))
 
-        def record_option(value, rank, option_details=None):
-            deprecation_version = kwargs.get("removal_version")
-            self._option_tracker.record_option(
-                scope=self._scope,
-                option=dest,
-                value=value,
-                rank=rank,
-                deprecation_version=deprecation_version,
-                details=option_details,
-            )
+        def group(value_component_type, process_val_func) -> List[RankedValue]:
+            # We group any values that are merged together, so that the history can reflect
+            # merges vs. replacements in a useful way. E.g., if we merge [a, b] and [c],
+            # and then replace it with [d, e], the history will contain:
+            #   - [d, e] (from command-line flag)
+            #   - [a, b, c] (from env var, from config)
+            # And similarly for dicts.
+            grouped: List[List[RankedValue]] = [[]]
+            for ranked_val in ranked_vals:
+                if ranked_val.value and ranked_val.value.action == value_component_type.REPLACE:
+                    grouped.append([])
+                grouped[-1].append(ranked_val)
+            return [
+                RankedValue(
+                    grp[-1].rank,
+                    process_val_func(
+                        value_component_type.merge(
+                            rv.value for rv in grp if rv.value is not None
+                        ).val
+                    ),
+                    ", ".join(rv.details for rv in grp if rv.details),
+                )
+                for grp in grouped
+                if grp
+            ]
 
-        # Record info about the derivation of each of the contributing values.
-        detail_history = []
-        for ranked_val in ranked_vals:
-            if ranked_val.rank in (Rank.CONFIG, Rank.CONFIG_DEFAULT):
-                details = config_details
-            elif ranked_val.rank == Rank.ENVIRONMENT:
-                details = env_details
-            else:
-                details = None
-            if details:
-                detail_history.append(details)
-            record_option(value=ranked_val.value, rank=ranked_val.rank, option_details=details)
+        if is_list_option(kwargs):
+
+            def process_list(lst):
+                lst = [self._convert_member_type(member_type, val) for val in lst]
+                if member_type == shell_str:
+                    lst = flatten_shlexed_list(lst)
+                return lst
+
+            historic_ranked_vals = group(ListValueComponent, process_list)
+        elif is_dict_option(kwargs):
+            historic_ranked_vals = group(DictValueComponent, lambda x: x)
+        else:
+            historic_ranked_vals = ranked_vals
+
+        value_history = OptionValueHistory(tuple(historic_ranked_vals))
 
         # Helper function to check various validity constraints on final option values.
-        def check(val):
+        def check_scalar_value(val):
             if val is None:
                 return
             choices = kwargs.get("choices")
             if choices is None and "type" in kwargs:
                 if inspect.isclass(type_arg) and issubclass(type_arg, Enum):
                     choices = list(type_arg)
-            # TODO: convert this into an enum() pattern match!
             if choices is not None and val not in choices:
                 raise ParseError(
-                    f"`{val}` is not an allowed value for option {dest} in {self._scope_str()}. Must be one of: {choices}"
+                    f"`{val}` is not an allowed value for option {dest} in {self._scope_str()}. "
+                    f"Must be one of: {choices}"
                 )
-
-            if type_arg == list:
-                if inspect.isclass(member_type) and issubclass(member_type, Enum):
-                    if len(merged_val) != len(set(merged_val)):
-                        raise ParseError(f"Duplicate enum values specified in list: {merged_val}")
             elif type_arg == file_option:
                 check_file_exists(val)
             elif type_arg == dir_option:
@@ -868,38 +902,21 @@ class Parser:
             if not path.is_dir() and not path_with_buildroot.is_dir():
                 raise ParseError(f"{error_prefix} does not exist.")
 
-        # Generate the final value from all available values, and check that it (or its members,
-        # if a list) are in the set of allowed choices.
-        if is_list_option(kwargs):
-            merged_rank = ranked_vals[-1].rank
-            merged_val = ListValueComponent.merge(
-                [rv.value for rv in ranked_vals if rv.value is not None]
-            ).val
-            merged_val = [self._convert_member_type(member_type, val) for val in merged_val]
-            if member_type == shell_str:
-                merged_val = flatten_shlexed_list(merged_val)
-            for val in merged_val:
-                check(val)
-            ret = RankedValue(merged_rank, merged_val)
-        elif is_dict_option(kwargs):
-            # TODO: convert `member_type` for dict values too!
-            merged_rank = ranked_vals[-1].rank
-            merged_val = DictValueComponent.merge(
-                [rv.value for rv in ranked_vals if rv.value is not None]
-            ).val
-            for val in merged_val:
-                check(val)
-            ret = RankedValue(merged_rank, merged_val)
+        # Validate the final value.
+        final_val = value_history.final_value
+        if isinstance(final_val.value, list):
+            for component in final_val.value:
+                check_scalar_value(component)
+            if inspect.isclass(member_type) and issubclass(member_type, Enum):
+                if len(final_val.value) != len(set(final_val.value)):
+                    raise ParseError(f"Duplicate enum values specified in list: {final_val.value}")
+        elif isinstance(final_val.value, dict):
+            for component in final_val.value.values():
+                check_scalar_value(component)
         else:
-            ret = ranked_vals[-1]
-            check(ret.value)
+            check_scalar_value(final_val.value)
 
-        # Record info about the derivation of the final value.
-        merged_details = ", ".join(detail_history) if detail_history else None
-        record_option(value=ret.value, rank=ret.rank, option_details=merged_details)
-
-        # All done!
-        return ret
+        return value_history
 
     def _inverse_arg(self, arg: str) -> Optional[str]:
         if not arg.startswith("--"):
