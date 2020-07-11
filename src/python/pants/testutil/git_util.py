@@ -1,28 +1,12 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import re
 import subprocess
 from contextlib import contextmanager
 from typing import Iterator, Optional
 
-from pants.base.revision import Revision
 from pants.scm.git import Git
 from pants.util.contextutil import environment_as, temporary_dir
-
-MIN_REQUIRED_GIT_VERSION = Revision.semver("1.7.10")
-
-
-def git_version() -> Revision:
-    """Get a Version() based on installed command-line git's version."""
-    stdout = subprocess.run(
-        ["git", "--version"], stdout=subprocess.PIPE, encoding="utf-8", check=True
-    ).stdout
-    # stdout is like 'git version 1.9.1.598.g9119e8b\n'  We want '1.9.1.598'
-    matches = re.search(r"\s(\d+(?:\.\d+)*)[\s\.]", stdout)
-    if matches is None:
-        raise ValueError(f"Not able to parse git version from {stdout}.")
-    return Revision.lenient(matches.group(1))
 
 
 @contextmanager

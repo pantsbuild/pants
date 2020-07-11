@@ -43,8 +43,8 @@ use futures::channel::{mpsc, oneshot};
 use futures::{future, sink, stream, FutureExt, SinkExt, StreamExt, TryStreamExt};
 use log::{debug, error, info};
 pub use nails::execution::ExitCode;
-use nails::execution::{self, send_to_io, sink_for, stream_for, ChildInput, ChildOutput};
-use nails::Nail;
+use nails::execution::{self, sink_for, stream_for, ChildInput, ChildOutput};
+use nails::{Child, Nail};
 use tokio::fs::File;
 use tokio::net::TcpListener;
 use tokio::sync::{Notify, RwLock};
@@ -79,19 +79,19 @@ impl Server {
 
     // NB: The C client requires noisy_stdin (see the `nails` crate for more info), but neither
     // `nails` nor the pants python client do.
-    let config = nails::Config::new(RawFdNail {
+    let config = nails::Config::default().noisy_stdin(false);
+    let nail = RawFdNail {
       executor: executor.clone(),
       runner: Arc::new(runner),
-    })
-    .noisy_stdin(false);
+    };
 
-    // TODO: No longer necessary to differentiate starting from Bound.
     let (exited_sender, exited_receiver) = oneshot::channel();
     let (exit_sender, exit_receiver) = oneshot::channel();
 
     let _join = executor.spawn(Self::serve(
       executor.clone(),
       config,
+      nail,
       exit_receiver,
       exited_sender,
       listener,
@@ -107,21 +107,23 @@ impl Server {
   ///
   /// The main loop of the server. Public for testing.
   ///
-  pub(crate) async fn serve<N: Nail>(
+  pub(crate) async fn serve(
     executor: Executor,
-    config: nails::Config<N>,
+    config: nails::Config,
+    nail: impl Nail,
     should_exit: oneshot::Receiver<()>,
     exited: oneshot::Sender<Result<(), String>>,
     listener: TcpListener,
   ) {
-    let exit_result = Self::accept_loop(executor, config, should_exit, listener).await;
+    let exit_result = Self::accept_loop(executor, config, nail, should_exit, listener).await;
     info!("Server exiting with {:?}", exit_result);
     let _ = exited.send(exit_result);
   }
 
-  async fn accept_loop<N: Nail>(
+  async fn accept_loop(
     executor: Executor,
-    config: nails::Config<N>,
+    config: nails::Config,
+    nail: impl Nail,
     mut should_exit: oneshot::Receiver<()>,
     mut listener: TcpListener,
   ) -> Result<(), String> {
@@ -154,12 +156,13 @@ impl Server {
       let connection_started = Arc::new(Notify::new());
       let _join = executor.spawn({
         let config = config.clone();
+        let nail = nail.clone();
         let connection_started = connection_started.clone();
         let ongoing_connections = ongoing_connections.clone();
         async move {
           let ongoing_connection_guard = ongoing_connections.read().await;
           connection_started.notify();
-          let result = nails::server_handle_connection(config.clone(), tcp_stream).await;
+          let result = nails::server_handle_connection(config, nail, tcp_stream).await;
           std::mem::drop(ongoing_connection_guard);
           result
         }
@@ -237,29 +240,23 @@ impl Nail for RawFdNail {
   fn spawn(
     &self,
     cmd: execution::Command,
-    mut output_sink: mpsc::Sender<ChildOutput>,
     input_stream: mpsc::Receiver<ChildInput>,
-  ) -> Result<bool, io::Error> {
+  ) -> Result<Child, io::Error> {
     let env = cmd.env.iter().cloned().collect::<HashMap<_, _>>();
 
     // Handle stdin.
     let (stdin_handle, stdin_sink) = Self::input(Self::ttypath_from_env(&env, 0))?;
-    let should_send_stdin = if let Some(mut stdin_sink) = stdin_sink {
-      // We're using a pipe: spawn a task to copy stdin to the child.
-      let mut bounded_input_stream = input_stream
-        .take_while(|child_input| match child_input {
-          &ChildInput::Stdin(_) => future::ready(true),
-          &ChildInput::StdinEOF => future::ready(false),
+    let accepts_stdin = if let Some(mut stdin_sink) = stdin_sink {
+      let mut input_stream = input_stream.filter_map(|child_input| {
+        Box::pin(async move {
+          match child_input {
+            ChildInput::Stdin(bytes) => Some(Ok(bytes)),
+            ChildInput::StdinEOF => None,
+          }
         })
-        .map(|child_input| match child_input {
-          ChildInput::Stdin(bytes) => Ok(bytes),
-          ChildInput::StdinEOF => unreachable!(),
-        });
+      });
       let _join = self.executor.spawn(async move {
-        stdin_sink
-          .send_all(&mut bounded_input_stream)
-          .map(|_| ())
-          .await;
+        stdin_sink.send_all(&mut input_stream).map(|_| ()).await;
       });
       true
     } else {
@@ -284,36 +281,27 @@ impl Nail for RawFdNail {
       })
     });
 
-    // Spawn a task to send all of stdout/sterr/exit to the output sink.
-    let _join = self.executor.spawn(async move {
-      let mut output_stream = stream::select(
-        stdout_stream.map_ok(ChildOutput::Stdout),
-        stderr_stream.map_ok(ChildOutput::Stderr),
-      );
-      while let Some(child_output) = output_stream.next().await {
-        match child_output {
-          Ok(child_output) => output_sink.send(child_output).await.map_err(send_to_io)?,
-          Err(e) => {
-            error!(
-              "Failed to read nailgun output: {}. Exiting unsuccessfully.",
-              e
-            );
-            output_sink
-              .send(ChildOutput::Exit(ExitCode(-1)))
-              .await
-              .map_err(send_to_io)?;
-            return Err(e);
-          }
+    // Fully consume the stdout/stderr streams before waiting on the exit stream.
+    let stdout_stream = stdout_stream.map_ok(ChildOutput::Stdout);
+    let stderr_stream = stderr_stream.map_ok(ChildOutput::Stderr);
+    let exit_stream = exit_code_future
+      .into_stream()
+      .map(|exit_code| Ok(ChildOutput::Exit(exit_code)));
+    let output_stream = stream::select(stdout_stream, stderr_stream)
+      .chain(exit_stream)
+      .map(|res| match res {
+        Ok(o) => o,
+        Err(e) => {
+          error!("IO error interacting with the runner: {:?}", e);
+          ChildOutput::Exit(ExitCode(-1))
         }
-      }
-      output_sink
-        .send(ChildOutput::Exit(exit_code_future.await))
-        .await
-        .map_err(send_to_io)?;
-      Ok(())
-    });
+      })
+      .boxed();
 
-    Ok(should_send_stdin)
+    Ok(Child {
+      output_stream,
+      accepts_stdin,
+    })
   }
 }
 

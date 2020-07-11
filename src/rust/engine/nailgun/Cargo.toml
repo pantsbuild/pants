@@ -9,7 +9,7 @@ publish = false
 bytes = "0.5"
 futures = "0.3"
 log = "0.4"
-nails = "0.5.1"
+nails = "0.6.0"
 os_pipe = "0.9"
 task_executor = { path = "../task_executor" }
 # TODO: See #10291.
