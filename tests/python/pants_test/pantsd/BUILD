@@ -2,18 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
-  name = 'process_manager',
-  sources = ['test_process_manager.py'],
-)
-
-python_tests(
-  name = 'pants_daemon',
-  sources = ['test_pants_daemon.py'],
-)
-
-python_tests(
-  name = 'pants_daemon_core',
-  sources = ['test_pants_daemon_core.py'],
+  sources=['test_*.py'],
 )
 
 python_library(

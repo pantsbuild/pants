@@ -4,7 +4,7 @@
 target(
   name='plugins',
   dependencies = [
-    'pants-plugins/src/python/internal_backend/rules_for_testing:plugin',
+    'pants-plugins/src/python/internal_backend/rules_for_testing',
     'pants-plugins/src/python/internal_backend/utilities',
   ],
 )

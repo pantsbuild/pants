@@ -1,11 +1,9 @@
+# Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
   dependencies=[
-    'src/python/pants/base:deprecated',
-    'src/python/pants/base:exception_sink',
-    'src/python/pants/engine:goal',
-    'src/python/pants/engine:rules',
-    'src/python/pants/option',
+    # TODO: exclude all inferred Pants dependencies.
     'testprojects/pants-plugins/3rdparty/python/pants',
   ],
   provides=setup_py(
