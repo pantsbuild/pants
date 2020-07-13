@@ -1100,7 +1100,7 @@ impl NodeKey {
         Some(format!("Fingerprinting: {}", path.display()))
       }
       NodeKey::DownloadedFile(ref d) => Some(format!("Downloading: {}", d.0)),
-      NodeKey::ReadLink(..) => None,
+      NodeKey::ReadLink(ReadLink(Link(path))) => Some(format!("Reading link: {}", path.display())),
       NodeKey::Scandir(Scandir(Dir(path))) => {
         Some(format!("Reading directory: {}", path.display()))
       }

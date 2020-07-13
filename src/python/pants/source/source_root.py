@@ -280,7 +280,7 @@ class AllSourceRoots(DeduplicatedCollection[SourceRoot]):
     sort_input = True
 
 
-@rule
+@rule(desc="Compute all source roots")
 async def all_roots(source_root_config: SourceRootConfig) -> AllSourceRoots:
     source_root_pattern_matcher = source_root_config.get_pattern_matcher()
 

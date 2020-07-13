@@ -8,7 +8,6 @@ import shutil
 import tarfile
 import time
 import unittest
-from abc import ABCMeta
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler
 from pathlib import Path
@@ -41,7 +40,7 @@ from pants.util.contextutil import http_server, temporary_dir
 from pants.util.dirutil import relative_symlink, safe_file_dump
 
 
-class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
+class FSTest(TestBase, SchedulerTestBase):
 
     _original_src = os.path.join(
         os.path.dirname(__file__), "internals/examples/fs_test/fs_test.tar"
@@ -141,9 +140,9 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
     def test_walk_parent_link(self) -> None:
         self.assert_walk_files(["c.ln/../3.txt"], ["c.ln/../3.txt"])
 
-    def test_walk_escaping_symlink(self) -> None:
+    def test_walk_symlink_escaping(self) -> None:
         link = "subdir/escaping"
-        dest = "../../"
+        dest = "../../.."
 
         def prepare(project_tree):
             link_path = os.path.join(project_tree.build_root, link)
@@ -155,6 +154,30 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         )
         with self.assertRaisesRegex(Exception, exc_reg):
             self.assert_walk_files([link], [], prepare=prepare)
+
+    def test_walk_symlink_dead(self) -> None:
+        link = "subdir/dead"
+        dest = "this_file_does_not_exist"
+
+        def prepare(project_tree):
+            link_path = os.path.join(project_tree.build_root, link)
+            dest_path = os.path.join(project_tree.build_root, dest)
+            relative_symlink(dest_path, link_path)
+
+        # Because the symlink does not escape, it should be ignored.
+        self.assert_walk_files([link], [], prepare=prepare)
+
+    def test_walk_symlink_dead_nested(self) -> None:
+        link = "subdir/dead"
+        dest = "this_folder_does_not_exist/this_file_does_not_exist"
+
+        def prepare(project_tree):
+            link_path = os.path.join(project_tree.build_root, link)
+            dest_path = os.path.join(project_tree.build_root, dest)
+            relative_symlink(dest_path, link_path)
+
+        # Because the symlink does not escape, it should be ignored.
+        self.assert_walk_files([link], [], prepare=prepare)
 
     def test_walk_recursive_all(self) -> None:
         self.assert_walk_files(
