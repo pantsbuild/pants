@@ -43,12 +43,14 @@ def main() -> None:
             run_clippy()
         if args.cargo_audit:
             run_cargo_audit()
-        if args.unit_tests:
-            run_unit_tests(oauth_token_path=remote_execution_oauth_token_path)
+        if args.unit_tests or args.integration_tests:
+            run_python_tests(
+                include_unit=args.unit_tests,
+                include_integration=args.integration_tests,
+                oauth_token_path=remote_execution_oauth_token_path,
+            )
         if args.rust_tests:
             run_rust_tests()
-        if args.integration_tests:
-            run_integration_tests(oauth_token_path=remote_execution_oauth_token_path)
         if args.platform_specific_tests:
             run_platform_specific_tests()
 
@@ -381,21 +383,24 @@ def run_rust_tests() -> None:
             die("Rust test failure.")
 
 
-def run_unit_tests(*, oauth_token_path: Optional[str] = None) -> None:
+def run_python_tests(
+    *, include_unit: bool, include_integration: bool, oauth_token_path: Optional[str] = None
+) -> None:
+    if include_unit and include_integration:
+        extra_args = []
+    elif include_unit and not include_integration:
+        extra_args = ["--tag=-integration"]
+    elif not include_unit and include_integration:
+        extra_args = ["--tag=+integration"]
+    else:
+        raise ValueError(
+            "Must specify True for at least one of `include_unit` and `include_integration`."
+        )
     _run_command(
-        command=_test_command(oauth_token_path=oauth_token_path, extra_args=["--tag=-integration"]),
-        slug="UnitTestsV2Local",
-        start_message="Running unit tests.",
-        die_message="Unit test failure.",
-    )
-
-
-def run_integration_tests(*, oauth_token_path: Optional[str] = None) -> None:
-    _run_command(
-        command=_test_command(oauth_token_path=oauth_token_path, extra_args=["--tag=+integration"]),
-        slug="IntegrationTests",
-        start_message="Running integration tests.",
-        die_message="Integration test failure.",
+        command=_test_command(oauth_token_path=oauth_token_path, extra_args=extra_args),
+        slug="PythonTests",
+        start_message="Running Python tests.",
+        die_message="Python test failure.",
     )
 
 
