@@ -164,20 +164,63 @@ def test_address_equality() -> None:
     )
 
 
-class AddressTest(unittest.TestCase):
-    def assert_address(self, spec_path: str, target_name: str, address: Address) -> None:
-        self.assertEqual(spec_path, address.spec_path)
-        self.assertEqual(target_name, address.target_name)
+def test_address_spec() -> None:
+    normal_addr = Address("a/b", "c")
+    assert normal_addr.spec == "a/b:c" == str(normal_addr) == normal_addr.reference()
+    assert normal_addr.relative_spec == ":c"
+    assert normal_addr.path_safe_spec == "a.b.c"
 
-    def test_parse(self) -> None:
-        self.assert_address("a/b", "target", Address.parse("a/b:target"))
-        self.assert_address("a/b", "target", Address.parse("//a/b:target"))
-        self.assert_address("a/b", "b", Address.parse("a/b"))
-        self.assert_address("a/b", "b", Address.parse("//a/b"))
-        self.assert_address("a/b", "target", Address.parse(":target", relative_to="a/b"))
-        self.assert_address("", "target", Address.parse("//:target", relative_to="a/b"))
-        self.assert_address("", "target", Address.parse(":target"))
-        self.assert_address("a/b", "target", Address.parse(":target", relative_to="a/b"))
+    top_level_addr = Address("", "root")
+    assert top_level_addr.spec == "//:root" == str(top_level_addr) == top_level_addr.reference()
+    assert top_level_addr.relative_spec == ":root"
+    assert top_level_addr.path_safe_spec == ".root"
+
+    generated_addr = Address("a/b", "c.txt", generated_base_target_name="c")
+    assert generated_addr.spec == "a/b/c.txt" == str(generated_addr) == generated_addr.reference()
+    assert generated_addr.relative_spec == "c.txt"
+    assert generated_addr.path_safe_spec == "a.b.c.txt"
+
+    top_level_generated_addr = Address("", "root.txt", generated_base_target_name="root")
+    assert (
+        top_level_generated_addr.spec
+        == "//root.txt"
+        == str(top_level_generated_addr)
+        == top_level_generated_addr.reference()
+    )
+    assert top_level_generated_addr.relative_spec == "root.txt"
+    assert top_level_generated_addr.path_safe_spec == ".root.txt"
+
+    generated_subdirectory_addr = Address(
+        "a/b", "subdir/c.txt", generated_base_target_name="original"
+    )
+    assert (
+        generated_subdirectory_addr.spec
+        == "a/b/subdir/c.txt"
+        == str(generated_subdirectory_addr)
+        == generated_subdirectory_addr.reference()
+        # NB: A relative spec is not safe, so we use the full spec.
+        == generated_subdirectory_addr.relative_spec
+    )
+    assert generated_subdirectory_addr.path_safe_spec == "a.b.subdir.c.txt"
+
+
+def test_address_parse_method() -> None:
+    def assert_parsed(spec_path: str, target_name: str, address: Address) -> None:
+        assert spec_path == address.spec_path
+        assert target_name == address.target_name
+
+    assert_parsed("a/b", "target", Address.parse("a/b:target"))
+    assert_parsed("a/b", "target", Address.parse("//a/b:target"))
+    assert_parsed("a/b", "b", Address.parse("a/b"))
+    assert_parsed("a/b", "b", Address.parse("//a/b"))
+    assert_parsed("a/b", "target", Address.parse(":target", relative_to="a/b"))
+    assert_parsed("", "target", Address.parse("//:target", relative_to="a/b"))
+    assert_parsed("", "target", Address.parse(":target"))
+    assert_parsed("a/b", "target", Address.parse(":target", relative_to="a/b"))
+
+    # Do not attempt to parse generated subtargets, as we would have no way to find the
+    # generated_base_target_name.
+    assert_parsed("a/b/f.py", "f.py", Address.parse("a/b/f.py"))
 
 
 def test_build_file_address() -> None:
@@ -188,7 +231,8 @@ def test_build_file_address() -> None:
     assert bfa.to_address() == Address("dir", "example")
 
     generated_bfa = BuildFileAddress(
-        rel_path="dir/BUILD", target_name="example", generated_base_target_name="original"
+        rel_path="dir/BUILD", target_name="example.txt", generated_base_target_name="original"
     )
-    assert generated_bfa != BuildFileAddress(rel_path="dir/BUILD", target_name="example")
-    assert generated_bfa == Address("dir", "example", generated_base_target_name="original")
+    assert generated_bfa != BuildFileAddress(rel_path="dir/BUILD", target_name="example.txt")
+    assert generated_bfa == Address("dir", "example.txt", generated_base_target_name="original")
+    assert generated_bfa.spec == "dir/example.txt"

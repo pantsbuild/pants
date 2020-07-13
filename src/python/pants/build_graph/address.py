@@ -3,6 +3,7 @@
 
 import os
 import re
+from pathlib import PurePath
 from typing import Optional, Sequence, Tuple
 
 from pants.util.dirutil import fast_relpath, longest_dir_prefix
@@ -121,6 +122,10 @@ class Address:
     def parse(cls, spec: str, relative_to: str = "", subproject_roots=None) -> "Address":
         """Parses an address from its serialized form.
 
+        Note that this does not work properly with generated subtargets, e.g. the address
+        `helloworld/app.py`. We would not be able to calculate the `generated_base_target_name`, so
+        we treat this like a normal target address.
+
         :param spec: An address in string form <path>:<name>.
         :param relative_to: For sibling specs, ie: ':another_in_same_build_family', interprets
                             the missing spec_path part as `relative_to`.
@@ -133,43 +138,36 @@ class Address:
         return cls(spec_path, target_name)
 
     @classmethod
-    def sanitize_path(cls, path: str) -> str:
+    def validate_path(cls, path: str) -> str:
         # A root or relative spec is OK
         if path == "":
             return path
 
         components = path.split(os.sep)
         if any(component in (".", "..", "") for component in components):
-            raise InvalidSpecPath(
-                "Address spec has un-normalized path part '{path}'".format(path=path)
-            )
+            raise InvalidSpecPath(f"Address spec has un-normalized path part '{path}'")
         if components[-1].startswith("BUILD"):
             raise InvalidSpecPath(
-                "Address spec path {path} has {trailing} as the last path part and BUILD is "
-                "a reserved file".format(path=path, trailing=components[-1])
+                f"Address spec path {path} has {components[-1]} as the last path part and BUILD is "
+                "a reserved file."
             )
         if os.path.isabs(path):
             raise InvalidSpecPath(
-                "Address spec has absolute path {path}; expected a path relative "
-                "to the build root.".format(path=path)
+                f"Address spec has absolute path {path}; expected a path relative to the build "
+                "root."
             )
         return path
 
     @classmethod
     def check_target_name(cls, spec_path: str, name: str) -> None:
         if not name:
-            raise InvalidTargetName(
-                "Address spec {spec}:{name} has no name part".format(spec=spec_path, name=name)
-            )
+            raise InvalidTargetName(f"Address spec {spec_path}:{name} has no name part")
 
         banned_chars = BANNED_CHARS_IN_TARGET_NAME & set(name)
-
         if banned_chars:
             raise InvalidTargetName(
-                "banned chars found in target name",
-                "{banned_chars} not allowed in target name: {name}".format(
-                    banned_chars=banned_chars, name=name
-                ),
+                f"Banned chars found in target name. {banned_chars} not allowed in target "
+                f"name: {name}"
             )
 
     def __init__(
@@ -181,8 +179,9 @@ class Address:
         :param generated_base_target_name: If this Address refers to a generated subtarget, this
                                            stores the target_name of the original base target.
         """
-        self._spec_path = self.sanitize_path(spec_path)
+        self.validate_path(spec_path)
         self.check_target_name(spec_path, target_name)
+        self._spec_path = spec_path
         self._target_name = target_name
         self.generated_base_target_name = generated_base_target_name
         self._hash = hash((self._spec_path, self._target_name, self.generated_base_target_name))
@@ -211,7 +210,11 @@ class Address:
 
         :API: public
         """
-        return f"{self._spec_path or '//'}:{self._target_name}"
+        prefix = "//" if not self._spec_path else ""
+        if self.generated_base_target_name:
+            path = os.path.join(self._spec_path, self._target_name)
+            return f"{prefix}{path}"
+        return f"{prefix}{self._spec_path}:{self._target_name}"
 
     @property
     def path_safe_spec(self) -> str:
@@ -225,14 +228,19 @@ class Address:
         """
         :API: public
         """
-        return f":{self._target_name}"
+        # NB: It's possible for the target name of a generated subtarget to be in a subdirectory,
+        # e.g. 'subdir/f.txt'. When this happens, the relative spec is not safe.
+        if self.generated_base_target_name and PurePath(self.target_name).parent.as_posix() != ".":
+            return self.spec
+        prefix = ":" if not self.generated_base_target_name else ""
+        return f"{prefix}{self._target_name}"
 
     def reference(self, referencing_path: Optional[str] = None) -> str:
         """How to reference this address in a BUILD file.
 
         :API: public
         """
-        if referencing_path is not None and self._spec_path == referencing_path:
+        if referencing_path and self._spec_path == referencing_path:
             return self.relative_spec
         if os.path.basename(self._spec_path) != self._target_name:
             return self.spec
@@ -250,9 +258,6 @@ class Address:
     def __hash__(self):
         return self._hash
 
-    def __ne__(self, other):
-        return not self == other
-
     def __repr__(self) -> str:
         prefix = f"Address({self.spec_path}, {self.target_name}"
         return (
@@ -265,7 +270,11 @@ class Address:
         return self.spec
 
     def __lt__(self, other):
-        return (self._spec_path, self._target_name) < (other._spec_path, other._target_name)
+        return (self._spec_path, self._target_name, self.generated_base_target_name) < (
+            other._spec_path,
+            other._target_name,
+            other.generated_base_target_name,
+        )
 
 
 class BuildFileAddress(Address):
