@@ -38,8 +38,8 @@ class TestHelpIntegration(PantsRunIntegrationTest):
         pants_run = self.run_pants(command=command)
         self.assert_success(pants_run)
         # Spot check to see that scope headings are printed even for advanced options
-        assert "`pytest` options" in pants_run.stdout_data
-        assert "`pytest` advanced options" in pants_run.stdout_data
+        assert "`pytest` subsystem options" in pants_run.stdout_data
+        assert "`pytest` subsystem advanced options" in pants_run.stdout_data
         # Spot check to see that full args for all options are printed
         assert "--[no-]test-debug" in pants_run.stdout_data
         # Spot check to see that subsystem options are printing
