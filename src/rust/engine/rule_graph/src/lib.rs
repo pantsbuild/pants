@@ -34,7 +34,7 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use std::io;
 
 pub use crate::builder::Builder;
-pub use crate::rules::{DependencyKey, DisplayForGraph, Rule, TypeId};
+pub use crate::rules::{DependencyKey, DisplayForGraph, DisplayForGraphArgs, Rule, TypeId};
 
 // TODO: Consider switching to HashSet and dropping the Ord bound from TypeId.
 type ParamTypes<T> = BTreeSet<T>;
@@ -202,7 +202,7 @@ fn params_str<T: TypeId>(params: &ParamTypes<T>) -> String {
 }
 
 pub fn entry_str<R: Rule>(entry: &Entry<R>) -> String {
-  entry_node_str_with_attrs(entry).entry_str
+  entry.fmt_for_graph(DisplayForGraphArgs { multiline: false })
 }
 
 #[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq)]
@@ -236,32 +236,68 @@ impl Palette {
 }
 
 impl DisplayForGraph for Palette {
-  fn fmt_for_graph(&self) -> String {
+  fn fmt_for_graph(&self, _: DisplayForGraphArgs) -> String {
     format!("[color=\"{}\",style=filled]", self.color_string())
+  }
+}
+
+impl<R: Rule> DisplayForGraph for Entry<R> {
+  fn fmt_for_graph(&self, display_args: DisplayForGraphArgs) -> String {
+    match self {
+      &Entry::WithDeps(ref e) => e.fmt_for_graph(display_args),
+      &Entry::Param(type_id) => format!("Param({})", type_id),
+    }
+  }
+}
+
+impl<R: Rule> DisplayForGraph for EntryWithDeps<R> {
+  fn fmt_for_graph(&self, display_args: DisplayForGraphArgs) -> String {
+    match self {
+      &EntryWithDeps::Inner(InnerEntry {
+        ref rule,
+        ref params,
+      }) => format!(
+        "{}{}for {}",
+        rule.fmt_for_graph(display_args),
+        display_args.line_separator(),
+        params_str(params)
+      ),
+      &EntryWithDeps::Root(ref root) => format!(
+        // TODO: Consider dropping this (final) public use of the keyword "Select", while ensuring
+        // that error messages remain sufficiently grokkable.
+        "Select({}){}for {}",
+        root.dependency_key,
+        display_args.line_separator(),
+        params_str(&root.params)
+      ),
+    }
   }
 }
 
 ///
 /// Apply coloration to several nodes.
-pub fn entry_node_str_with_attrs<R: Rule>(entry: &Entry<R>) -> GraphVizEntryWithAttrs {
-  let (entry_str, attrs_str) = match entry {
-    &Entry::WithDeps(ref e) => (
-      entry_with_deps_str(e),
+///
+pub fn visualize_entry<R: Rule>(
+  entry: &Entry<R>,
+  display_args: DisplayForGraphArgs,
+) -> GraphVizEntryWithAttrs {
+  let entry_str = entry.fmt_for_graph(display_args);
+  let attrs_str = match entry {
+    &Entry::WithDeps(ref e) => {
       // Color "singleton" entries (with no params)!
       if e.params().is_empty() {
-        Some(Palette::Olive.fmt_for_graph())
+        Some(Palette::Olive.fmt_for_graph(display_args))
       } else if let Some(color) = e.rule().and_then(|r| r.color()) {
         // Color "intrinsic" entries (provided by the rust codebase)!
-        Some(color.fmt_for_graph())
+        Some(color.fmt_for_graph(display_args))
       } else {
         None
-      },
-    ),
-    &Entry::Param(type_id) => (
-      format!("Param({})", type_id),
+      }
+    }
+    &Entry::Param(_) => {
       // Color "Param"s!
-      Some(Palette::Orange.fmt_for_graph()),
-    ),
+      Some(Palette::Orange.fmt_for_graph(display_args))
+    }
   };
   GraphVizEntryWithAttrs {
     entry_str,
@@ -270,19 +306,7 @@ pub fn entry_node_str_with_attrs<R: Rule>(entry: &Entry<R>) -> GraphVizEntryWith
 }
 
 fn entry_with_deps_str<R: Rule>(entry: &EntryWithDeps<R>) -> String {
-  match entry {
-    &EntryWithDeps::Inner(InnerEntry {
-      ref rule,
-      ref params,
-    }) => format!("{}\nfor {}", rule.fmt_for_graph(), params_str(params)),
-    &EntryWithDeps::Root(ref root) => format!(
-      // TODO: Consider dropping this (final) public use of the keyword "Select", while ensuring
-      // that error messages remain sufficiently grokkable.
-      "Select({})\nfor {}",
-      root.dependency_key,
-      params_str(&root.params)
-    ),
-  }
+  entry.fmt_for_graph(DisplayForGraphArgs { multiline: false })
 }
 
 impl<R: Rule> RuleGraph<R> {
@@ -617,6 +641,7 @@ impl<R: Rule> RuleGraph<R> {
   }
 
   pub fn visualize(&self, f: &mut dyn io::Write) -> io::Result<()> {
+    let display_args = DisplayForGraphArgs { multiline: true };
     let mut root_subject_type_strs = self
       .root_param_types
       .iter()
@@ -635,10 +660,10 @@ impl<R: Rule> RuleGraph<R> {
       .iter()
       .filter_map(|(k, deps)| match k {
         EntryWithDeps::Root(_) => {
-          let root_str = entry_with_deps_str(k);
+          let root_str = k.fmt_for_graph(display_args);
           let mut dep_entries = deps
             .all_dependencies()
-            .map(|d| entry_node_str_with_attrs(d))
+            .map(|d| visualize_entry(d, display_args))
             .collect::<Vec<_>>();
           dep_entries.sort();
           let deps_with_attrs = dep_entries
@@ -651,7 +676,7 @@ impl<R: Rule> RuleGraph<R> {
           Some(format!(
             "    \"{}\" {}\n{}    \"{}\" -> {{{}}}",
             root_str,
-            Palette::Blue.fmt_for_graph(),
+            Palette::Blue.fmt_for_graph(display_args),
             deps_with_attrs,
             root_str,
             dep_entries
@@ -676,7 +701,7 @@ impl<R: Rule> RuleGraph<R> {
         &EntryWithDeps::Inner(_) => {
           let mut dep_entries = deps
             .all_dependencies()
-            .map(|d| entry_node_str_with_attrs(d))
+            .map(|d| visualize_entry(d, display_args))
             .collect::<Vec<_>>();
           dep_entries.sort();
           let deps_with_attrs = dep_entries
@@ -689,7 +714,7 @@ impl<R: Rule> RuleGraph<R> {
           Some(format!(
             "{}    \"{}\" -> {{{}}}",
             deps_with_attrs,
-            entry_with_deps_str(k),
+            k.fmt_for_graph(display_args),
             dep_entries
               .iter()
               .cloned()

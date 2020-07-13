@@ -8,6 +8,8 @@ use crate::core::{Function, TypeId};
 use crate::intrinsics::Intrinsics;
 use crate::selectors::{DependencyKey, Get, Select};
 
+use rule_graph::{DisplayForGraph, DisplayForGraphArgs};
+
 use log::Level;
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
@@ -18,30 +20,49 @@ pub enum Rule {
   Task(Task),
 }
 
-impl rule_graph::DisplayForGraph for Rule {
-  fn fmt_for_graph(&self) -> String {
-    let visualization_params = Some(GraphVisualizationParameters {
-      select_clause_threshold: 2,
-      get_clause_threshold: 1,
-    });
+impl DisplayForGraph for Rule {
+  fn fmt_for_graph(&self, display_args: DisplayForGraphArgs) -> String {
     match self {
       Rule::Task(ref task) => {
-        let FormattedTaskRuleElements {
-          rule_type,
-          task_name,
-          clause_portion,
-          product,
-          get_portion,
-        } = Self::extract_task_elements(task, visualization_params);
+        let task_name = task.func.name();
+        let product = format!("{}", task.product);
+
+        let clause_portion = Self::formatted_select_clause(&task.clause, display_args);
+
+        let get_clauses = task
+          .gets
+          .iter()
+          .map(::std::string::ToString::to_string)
+          .collect::<Vec<_>>();
+
+        let get_portion = if get_clauses.is_empty() {
+          "".to_string()
+        } else if get_clauses.len() > 1 {
+          format!(
+            ",{}gets=[{}{}{}]",
+            display_args.line_separator(),
+            display_args.optional_line_separator(),
+            get_clauses.join(&format!(",{}", display_args.line_separator())),
+            display_args.optional_line_separator(),
+          )
+        } else {
+          format!(", gets=[{}]", get_clauses.join(", "))
+        };
+
+        let rule_type = if task.cacheable {
+          "rule".to_string()
+        } else {
+          "goal_rule".to_string()
+        };
 
         format!(
-          "@{}({}) -> {}{}\n{}",
-          rule_type, clause_portion, product, get_portion, task_name,
+          "@{}({}({}) -> {}{})",
+          rule_type, task_name, clause_portion, product, get_portion,
         )
       }
       Rule::Intrinsic(ref intrinsic) => format!(
         "@rule(<intrinsic>({}) -> {})",
-        Self::formatted_select_clause(&intrinsic.inputs, visualization_params),
+        Self::formatted_select_clause(&intrinsic.inputs, display_args),
         intrinsic.product,
       ),
     }
@@ -85,121 +106,33 @@ impl rule_graph::Rule for Rule {
   }
 }
 
-///
-/// A helper struct to contain stringified versions of various components of the rule.
-///
-struct FormattedTaskRuleElements {
-  rule_type: String,
-  task_name: String,
-  clause_portion: String,
-  product: String,
-  get_portion: String,
-}
-
-///
-/// A struct to contain display options consumed by Rule::extract_task_elements().
-///
-#[derive(Clone, Copy)]
-struct GraphVisualizationParameters {
-  ///
-  /// The number of params in the rule to keep on the same output line before splitting by line. If
-  /// the rule uses more than this many params, each param will be formatted on its own
-  /// line. Otherwise, all of the params will be formatted on the same line.
-  ///
-  select_clause_threshold: usize,
-  ///
-  /// The number of Get clauses to keep on the same output line before splitting by line.
-  ///
-  get_clause_threshold: usize,
-}
-
 impl Rule {
-  fn formatted_select_clause(
-    clause: &[TypeId],
-    visualization_params: Option<GraphVisualizationParameters>,
-  ) -> String {
+  fn formatted_select_clause(clause: &[TypeId], display_args: DisplayForGraphArgs) -> String {
     let select_clauses = clause
       .iter()
       .map(|type_id| type_id.to_string())
       .collect::<Vec<_>>();
-    let select_clause_threshold = visualization_params.map(|p| p.select_clause_threshold);
 
-    match select_clause_threshold {
-      None => select_clauses.join(", "),
-      Some(select_clause_threshold) if select_clauses.len() <= select_clause_threshold => {
-        select_clauses.join(", ")
-      }
-      Some(_) => format!("\n{},\n", select_clauses.join(",\n")),
-    }
-  }
-
-  fn extract_task_elements(
-    task: &Task,
-    visualization_params: Option<GraphVisualizationParameters>,
-  ) -> FormattedTaskRuleElements {
-    let product = format!("{}", task.product);
-
-    let clause_portion = Self::formatted_select_clause(&task.clause, visualization_params);
-
-    let get_clauses = task
-      .gets
-      .iter()
-      .map(::std::string::ToString::to_string)
-      .collect::<Vec<_>>();
-    let get_clause_threshold = visualization_params.map(|p| p.get_clause_threshold);
-
-    let get_portion = if get_clauses.is_empty() {
-      "".to_string()
+    if select_clauses.len() > 1 {
+      format!(
+        "{}{}{}",
+        display_args.optional_line_separator(),
+        select_clauses.join(&format!(",{}", display_args.line_separator())),
+        display_args.optional_line_separator(),
+      )
     } else {
-      match get_clause_threshold {
-        None => format!(", gets=[{}]", get_clauses.join(", ")),
-        Some(get_clause_threshold) if get_clauses.len() <= get_clause_threshold => {
-          format!(",\ngets=[{}]", get_clauses.join(", "))
-        }
-        Some(_) => format!(",\ngets=[\n{},\n]", get_clauses.join("\n")),
-      }
-    };
-
-    let rule_type = if task.cacheable {
-      "rule".to_string()
-    } else {
-      "goal_rule".to_string()
-    };
-
-    FormattedTaskRuleElements {
-      rule_type,
-      task_name: task.func.name(),
-      clause_portion,
-      product,
-      get_portion,
+      select_clauses.join(", ")
     }
   }
 }
 
 impl fmt::Display for Rule {
   fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-    match self {
-      &Rule::Task(ref task) => {
-        let FormattedTaskRuleElements {
-          rule_type,
-          task_name,
-          clause_portion,
-          product,
-          get_portion,
-        } = Self::extract_task_elements(task, None);
-        write!(
-          f,
-          "@{}({}({}) -> {}{})",
-          rule_type, task_name, clause_portion, product, get_portion,
-        )
-      }
-      &Rule::Intrinsic(ref intrinsic) => write!(
-        f,
-        "@rule(<intrinsic>({}) -> {})",
-        Self::formatted_select_clause(&intrinsic.inputs, None),
-        intrinsic.product,
-      ),
-    }
+    write!(
+      f,
+      "{}",
+      self.fmt_for_graph(DisplayForGraphArgs { multiline: false })
+    )
   }
 }
 

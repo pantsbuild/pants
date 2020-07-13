@@ -39,7 +39,33 @@ pub trait DisplayForGraph {
   ///
   /// Return a pretty-printed representation of this Rule's graph node, suitable for graphviz.
   ///
-  fn fmt_for_graph(&self) -> String;
+  fn fmt_for_graph(&self, display_args: DisplayForGraphArgs) -> String;
+}
+
+///
+/// A struct to contain display options consumed by DisplayForGraph.
+///
+#[derive(Clone, Copy)]
+pub struct DisplayForGraphArgs {
+  pub multiline: bool,
+}
+
+impl DisplayForGraphArgs {
+  pub fn line_separator(&self) -> &'static str {
+    if self.multiline {
+      "\n"
+    } else {
+      " "
+    }
+  }
+
+  pub fn optional_line_separator(&self) -> &'static str {
+    if self.multiline {
+      "\n"
+    } else {
+      ""
+    }
+  }
 }
 
 pub trait Rule: Clone + Debug + Display + Hash + Eq + Sized + DisplayForGraph + 'static {

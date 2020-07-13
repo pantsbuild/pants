@@ -113,7 +113,7 @@ impl super::Rule for Rule {
 }
 
 impl super::DisplayForGraph for Rule {
-  fn fmt_for_graph(&self) -> String {
+  fn fmt_for_graph(&self, _: super::DisplayForGraphArgs) -> String {
     self.to_string()
   }
 }
