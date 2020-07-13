@@ -102,7 +102,9 @@ def test_default() -> None:
             parent_parser=None,
         )
         parser.register(*args, **kwargs)
-        oshi = HelpInfoExtracter(parser.scope).get_option_scope_help_info("description", parser)
+        oshi = HelpInfoExtracter(parser.scope).get_option_scope_help_info(
+            "description", parser, False
+        )
         assert oshi.description == "description"
         assert len(oshi.basic) == 1
         ohi = oshi.basic[0]
@@ -182,7 +184,7 @@ def test_grouping():
             parent_parser=None,
         )
         parser.register("--foo", **kwargs)
-        oshi = HelpInfoExtracter("").get_option_scope_help_info("", parser)
+        oshi = HelpInfoExtracter("").get_option_scope_help_info("", parser, False)
         assert exp_to_len(expected_basic) == len(oshi.basic)
         assert exp_to_len(expected_advanced) == len(oshi.advanced)
 
@@ -241,6 +243,7 @@ def test_get_all_help_info():
             GLOBAL_SCOPE: {
                 "scope": GLOBAL_SCOPE,
                 "description": "Global options.",
+                "is_goal": False,
                 "basic": (
                     {
                         "display_args": ("-o=<int>", "--opt1=<int>"),
@@ -269,6 +272,7 @@ def test_get_all_help_info():
             "foo": {
                 "scope": "foo",
                 "description": "A foo.",
+                "is_goal": False,
                 "basic": (
                     {
                         "display_args": ("--[no-]foo-opt2",),
@@ -315,6 +319,7 @@ def test_get_all_help_info():
             "bar": {
                 "scope": "bar",
                 "description": "The bar goal.",
+                "is_goal": True,
                 "basic": tuple(),
                 "advanced": tuple(),
                 "deprecated": tuple(),

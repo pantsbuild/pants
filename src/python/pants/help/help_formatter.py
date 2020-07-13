@@ -37,7 +37,8 @@ class HelpFormatter:
 
         def add_option(ohis, *, category=None):
             lines.append("")
-            display_scope = f"`{oshi.scope}`" if oshi.scope else "Global"
+            goal_or_subsystem = "goal" if oshi.is_goal else "subsystem"
+            display_scope = f"`{oshi.scope}` {goal_or_subsystem}" if oshi.scope else "Global"
             if category:
                 title = f"{display_scope} {category} options"
                 lines.append(self._maybe_green(f"{title}\n{'-' * len(title)}"))
@@ -58,7 +59,7 @@ class HelpFormatter:
             add_option(oshi.advanced, category="advanced")
         if self._show_deprecated:
             add_option(oshi.deprecated, category="deprecated")
-        return [*lines, "\n"]
+        return [*lines, ""]
 
     def format_option(self, ohi: OptionHelpInfo) -> List[str]:
         """Format the help output for a single option.
