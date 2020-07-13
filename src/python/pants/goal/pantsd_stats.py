@@ -8,10 +8,8 @@ class PantsDaemonStats:
     def __init__(self):
         self.scheduler_metrics = {}
 
-    def set_scheduler_metrics(self, scheduler_metrics):
-        self.scheduler_metrics = {
-            key: value for (key, value) in scheduler_metrics.items() if key != "engine_workunits"
-        }
+    def set_scheduler_metrics(self, scheduler_metrics) -> None:
+        self.scheduler_metrics = scheduler_metrics
 
     def set_target_root_size(self, size):
         self.scheduler_metrics["target_root_size"] = size
