@@ -1,8 +1,10 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
+import dataclasses
+import json
 import sys
 import textwrap
+from enum import Enum
 from typing import Dict, cast
 
 from colors import cyan, green
@@ -12,6 +14,7 @@ from pants.base.build_environment import pants_release, pants_version
 from pants.help.help_formatter import HelpFormatter
 from pants.help.help_info_extracter import AllHelpInfo
 from pants.option.arg_splitter import (
+    AllHelp,
     GoalsHelp,
     HelpRequest,
     NoGoalHelp,
@@ -42,10 +45,12 @@ class HelpPrinter:
 
         if isinstance(self._help_request, VersionHelp):
             print(pants_version())
-        elif isinstance(self._help_request, OptionsHelp):
-            self._print_options_help()
         elif isinstance(self._help_request, GoalsHelp):
             self._print_goals_help()
+        elif isinstance(self._help_request, AllHelp):
+            self._print_all_help()
+        elif isinstance(self._help_request, OptionsHelp):
+            self._print_options_help()
         elif isinstance(self._help_request, UnknownGoalHelp):
             print("Unknown goals: {}".format(", ".join(self._help_request.unknown_goals)))
             print_hint()
@@ -95,6 +100,9 @@ class HelpPrinter:
         ]
         print("\n".join(lines))
 
+    def _print_all_help(self) -> None:
+        print(self._get_help_json())
+
     def _print_options_help(self) -> None:
         """Print a help screen.
 
@@ -102,15 +110,9 @@ class HelpPrinter:
 
         Note: Ony useful if called after options have been registered.
         """
-
         help_request = cast(OptionsHelp, self._help_request)
-
-        if help_request.all_scopes:
-            help_scopes = set(self._all_help_info.scope_to_help_info.keys())
-        else:
-            # The scopes explicitly mentioned by the user on the cmd line.
-            help_scopes = set(help_request.scopes)
-
+        # The scopes explicitly mentioned by the user on the cmd line.
+        help_scopes = set(help_request.scopes)
         if help_scopes:
             for scope in sorted(help_scopes):
                 help_str = self._format_help(scope, help_request.advanced)
@@ -126,7 +128,7 @@ class HelpPrinter:
         print(
             f"  {self._bin_name} [option ...] [goal ...] [target/file ...]  Attempt the specified goals."
         )
-        print(f"  {self._bin_name} help                                       Get help.")
+        print(f"  {self._bin_name} help                                       Get global help.")
         print(
             f"  {self._bin_name} help [goal/subsystem]                      Get help for a goal or subsystem."
         )
@@ -137,7 +139,7 @@ class HelpPrinter:
             f"  {self._bin_name} help-advanced [goal/subsystem]             Get help for a goal's or subsystem's advanced options."
         )
         print(
-            f"  {self._bin_name} help-all                                   Get help for all goals and subsystems."
+            f"  {self._bin_name} help-all                                   Get a JSON object containing all help info."
         )
         print(
             f"  {self._bin_name} goals                                      List all installed goals."
@@ -154,7 +156,7 @@ class HelpPrinter:
         print(self._format_help(GLOBAL_SCOPE, advanced))
 
     def _format_help(self, scope: str, show_advanced_and_deprecated: bool) -> str:
-        """Return a help message for the options registered on this object.
+        """Return a human-readable help message for the options registered on this object.
 
         Assumes that self._help_request is an instance of OptionsHelp.
         """
@@ -177,3 +179,19 @@ class HelpPrinter:
                 formatted_lines.append(f"{related_subsystems_label} {', '.join(related_scopes)}")
                 formatted_lines.append("")
         return "\n".join(formatted_lines)
+
+    class Encoder(json.JSONEncoder):
+        def default(self, o):
+            if callable(o):
+                return o.__name__
+            if isinstance(o, type):
+                return type.__name__
+            if isinstance(o, Enum):
+                return o.value
+            return super().default(o)
+
+    def _get_help_json(self) -> str:
+        """Return a JSON object containing all the help info we have, for every scope."""
+        return json.dumps(
+            dataclasses.asdict(self._all_help_info), sort_keys=True, indent=2, cls=self.Encoder
+        )

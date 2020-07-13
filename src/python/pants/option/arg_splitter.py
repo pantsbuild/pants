@@ -36,16 +36,19 @@ class OptionsHelp(HelpRequest):
     """The user requested help on which options they can set."""
 
     advanced: bool = False
-    all_scopes: bool = False
     scopes: Tuple[str, ...] = ()
+
+
+class VersionHelp(HelpRequest):
+    """The user asked for the version of this instance of pants."""
 
 
 class GoalsHelp(HelpRequest):
     """The user requested help for installed Goals."""
 
 
-class VersionHelp(HelpRequest):
-    """The user asked for the version of this instance of pants."""
+class AllHelp(HelpRequest):
+    """The user requested a dump of all help info."""
 
 
 @dataclass(frozen=True)
@@ -74,15 +77,15 @@ class ArgSplitter:
 
     _HELP_BASIC_ARGS = ("-h", "--help", "help")
     _HELP_ADVANCED_ARGS = ("--help-advanced", "help-advanced")
-    _HELP_ALL_SCOPES_ARGS = ("--help-all", "help-all")
-    _HELP_VERSION_ARGS = ("-v", "-V", "--version")
+    _HELP_VERSION_ARGS = ("-v", "-V", "--version", "version")
     _HELP_GOALS_ARGS = ("goals",)
+    _HELP_ALL_SCOPES_ARGS = ("help-all",)
     _HELP_ARGS = (
         *_HELP_BASIC_ARGS,
         *_HELP_ADVANCED_ARGS,
-        *_HELP_ALL_SCOPES_ARGS,
         *_HELP_VERSION_ARGS,
         *_HELP_GOALS_ARGS,
+        *_HELP_ALL_SCOPES_ARGS,
     )
 
     def __init__(self, known_scope_infos: Iterable[ScopeInfo]) -> None:
@@ -91,6 +94,7 @@ class ArgSplitter:
         # that we heuristically identify target specs based on it containing /, : or being
         # a top-level directory.
         self._known_scopes = {si.scope for si in known_scope_infos} | {
+            "version",
             "goals",
             "help",
             "help-advanced",
@@ -130,6 +134,8 @@ class ArgSplitter:
             self._help_request = VersionHelp()
         elif arg in self._HELP_GOALS_ARGS:
             self._help_request = GoalsHelp()
+        elif arg in self._HELP_ALL_SCOPES_ARGS:
+            self._help_request = AllHelp()
         else:
             # First ensure that we have a basic OptionsHelp.
             if not self._help_request:
@@ -137,10 +143,7 @@ class ArgSplitter:
             # Now see if we need to enhance it.
             if isinstance(self._help_request, OptionsHelp):
                 advanced = self._help_request.advanced or arg in self._HELP_ADVANCED_ARGS
-                all_scopes = self._help_request.all_scopes or arg in self._HELP_ALL_SCOPES_ARGS
-                self._help_request = dataclasses.replace(
-                    self._help_request, advanced=advanced, all_scopes=all_scopes
-                )
+                self._help_request = dataclasses.replace(self._help_request, advanced=advanced)
         return True
 
     def split_args(self, args: Sequence[str]) -> SplitArgs:
