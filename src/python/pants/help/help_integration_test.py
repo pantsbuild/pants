@@ -34,7 +34,7 @@ class TestHelpIntegration(PantsRunIntegrationTest):
         assert "--pytest-version" in pants_run.stdout_data
 
     def test_help_all_advanced(self):
-        command = ["--help-all", "--help-advanced"]
+        command = ["help-all", "--help-advanced"]
         pants_run = self.run_pants(command=command)
         self.assert_success(pants_run)
         # Spot check to see that scope headings are printed even for advanced options

@@ -299,8 +299,6 @@ class ArgSplitterTest(unittest.TestCase):
         assert_help_no_arguments("./pants --help --help-advanced", expected_help_advanced=True)
         assert_help_no_arguments("./pants --help-advanced --help", expected_help_advanced=True)
         assert_help_no_arguments("./pants help-all", expected_help_all=True)
-        assert_help_no_arguments("./pants --help-all", expected_help_all=True)
-        assert_help_no_arguments("./pants --help --help-all", expected_help_all=True)
         assert_help_no_arguments(
             "./pants help-advanced --help-all", expected_help_advanced=True, expected_help_all=True,
         )
