@@ -138,11 +138,10 @@ class Address:
         return cls(spec_path, target_name)
 
     @classmethod
-    def validate_path(cls, path: str) -> str:
+    def validate_path(cls, path: str) -> None:
         # A root or relative spec is OK
         if path == "":
-            return path
-
+            return
         components = path.split(os.sep)
         if any(component in (".", "..", "") for component in components):
             raise InvalidSpecPath(f"Address spec has un-normalized path part '{path}'")
@@ -156,7 +155,6 @@ class Address:
                 f"Address spec has absolute path {path}; expected a path relative to the build "
                 "root."
             )
-        return path
 
     @classmethod
     def check_target_name(cls, spec_path: str, name: str) -> None:
