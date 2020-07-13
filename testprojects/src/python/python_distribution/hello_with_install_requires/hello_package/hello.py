@@ -3,8 +3,8 @@
 
 
 def hello_string():
-  return 'hello!'
+    return "hello!"
 
 
 def hello():
-  print(hello_string())
+    print(hello_string())

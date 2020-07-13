@@ -3,11 +3,10 @@
 
 from setuptools import find_packages, setup
 
-
 setup(
-  name='ctypes_third_party_test',
-  version='0.0.1',
-  packages=find_packages(),
-  # Declare one shared lib at the top-level directory (denoted by '').
-  data_files=[('', ['libasdf-cpp_ctypes-with-third-party.so'])],
+    name="ctypes_third_party_test",
+    version="0.0.1",
+    packages=find_packages(),
+    # Declare one shared lib at the top-level directory (denoted by '').
+    data_files=[("", ["libasdf-cpp_ctypes-with-third-party.so"])],
 )
