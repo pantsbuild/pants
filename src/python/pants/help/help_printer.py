@@ -112,7 +112,7 @@ class HelpPrinter:
             help_scopes = set(help_request.scopes)
 
         if help_scopes:
-            for scope in help_scopes:
+            for scope in sorted(help_scopes):
                 help_str = self._format_help(scope, help_request.advanced)
                 if help_str:
                     print(help_str)
@@ -137,7 +137,7 @@ class HelpPrinter:
             f"  {self._bin_name} help-advanced [goal/subsystem]             Get help for a goal's or subsystem's advanced options."
         )
         print(
-            f"  {self._bin_name} help-all                                   Get help for all goals."
+            f"  {self._bin_name} help-all                                   Get help for all goals and subsystems."
         )
         print(
             f"  {self._bin_name} goals                                      List all installed goals."
@@ -175,4 +175,5 @@ class HelpPrinter:
                 if self._use_color:
                     related_subsystems_label = green(related_subsystems_label)
                 formatted_lines.append(f"{related_subsystems_label} {', '.join(related_scopes)}")
+                formatted_lines.append("")
         return "\n".join(formatted_lines)

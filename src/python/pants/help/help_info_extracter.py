@@ -5,7 +5,7 @@ import dataclasses
 import inspect
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Dict, Optional, Tuple, Type
+from typing import Any, Callable, Dict, Optional, Tuple, Type, cast
 
 from pants.base import deprecated
 from pants.engine.goal import GoalSubsystem
@@ -62,6 +62,7 @@ class OptionScopeHelpInfo:
 
     scope: str
     description: str
+    is_goal: bool  # True iff the scope belongs to a GoalSubsystem.
     basic: Tuple[OptionHelpInfo, ...]
     advanced: Tuple[OptionHelpInfo, ...]
     deprecated: Tuple[OptionHelpInfo, ...]
@@ -102,19 +103,23 @@ class HelpInfoExtracter:
         name_to_goal_info = {}
         for scope_info in sorted(options.known_scope_to_info.values(), key=lambda x: x.scope):
             options.for_scope(scope_info.scope)  # Force parsing.
+            is_goal = scope_info.optionable_cls is not None and issubclass(
+                scope_info.optionable_cls, GoalSubsystem
+            )
             oshi: OptionScopeHelpInfo = HelpInfoExtracter(
                 scope_info.scope
             ).get_option_scope_help_info(
-                scope_info.description, options.get_parser(scope_info.scope),
+                scope_info.description, options.get_parser(scope_info.scope), is_goal
             )
             scope_to_help_info[oshi.scope] = oshi
 
-            if scope_info.optionable_cls and issubclass(scope_info.optionable_cls, GoalSubsystem):
+            if is_goal:
+                goal_subsystem_cls = cast(Type[GoalSubsystem], scope_info.optionable_cls)
                 is_implemented = union_membership.has_members_for_all(
-                    scope_info.optionable_cls.required_union_implementations
+                    goal_subsystem_cls.required_union_implementations
                 )
                 name_to_goal_info[scope_info.scope] = GoalHelpInfo(
-                    scope_info.optionable_cls.name,
+                    goal_subsystem_cls.name,
                     scope_info.description,
                     is_implemented,
                     consumed_scopes_mapper(scope_info.scope),
@@ -211,7 +216,7 @@ class HelpInfoExtracter:
         self._scope = scope
         self._scope_prefix = scope.replace(".", "-")
 
-    def get_option_scope_help_info(self, description: str, parser: Parser):
+    def get_option_scope_help_info(self, description: str, parser: Parser, is_goal: bool):
         """Returns an OptionScopeHelpInfo for the options parsed by the given parser."""
 
         basic_options = []
@@ -239,6 +244,7 @@ class HelpInfoExtracter:
         return OptionScopeHelpInfo(
             scope=self._scope,
             description=description,
+            is_goal=is_goal,
             basic=tuple(basic_options),
             advanced=tuple(advanced_options),
             deprecated=tuple(deprecated_options),
