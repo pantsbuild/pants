@@ -14,6 +14,7 @@ from pants.base.exception_sink import ExceptionSink
 from pants.base.project_tree import Dir, File, Link
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
+from pants.engine.engine_aware import EngineAware
 from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
@@ -36,7 +37,7 @@ from pants.engine.internals.native_engine import PyTypes
 from pants.engine.internals.nodes import Return, Throw
 from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResultWithPlatform, MultiPlatformProcess
-from pants.engine.rules import EngineAware, Rule, RuleIndex, TaskRule
+from pants.engine.rules import Rule, RuleIndex, TaskRule
 from pants.engine.selectors import Params
 from pants.engine.unions import union
 from pants.option.global_options import ExecutionOptions
