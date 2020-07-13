@@ -137,6 +137,6 @@ function run_virtualenv() {
       mv "${pexdir}" "${VIRTUALENV_DIR}"
     fi
 
-    "${VIRTUALENV_DIR}/virtualenv.pex" --python "${PY}" "$@"
+    "${VIRTUALENV_DIR}/virtualenv.pex" "$@"
   )
 }
