@@ -342,11 +342,11 @@ def rule_decorator(func, **kwargs) -> Callable:
     validate_parameter_types(func_id, parameter_types, cacheable)
 
     # Set a default canonical name if one is not explicitly provided. For Goal classes
-    # this is the name of the Goal; for other named ruled this is the __name__ of the function
-    # that implements it.
+    # this is the name of the Goal; for other named ruled this is the module and name of the
+    # function that implements it.
     effective_name = kwargs.get("canonical_name")
     if effective_name is None:
-        effective_name = return_type.name if is_goal_cls else func.__name__
+        effective_name = return_type.name if is_goal_cls else f"{func.__module__}.{func.__name__}"
 
     effective_desc = kwargs.get("desc")
     if effective_desc is None and is_goal_cls:
