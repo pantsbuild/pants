@@ -80,7 +80,7 @@ def test_update_build_file() -> None:
         python_library(
             sources=['good.py'],
         )
-        
+
         python_tests(
            {}
         )
