@@ -52,7 +52,11 @@ class StreamingWorkunitHandler:
     def start(self) -> None:
         if self.callbacks:
             self._thread_runner = _InnerHandler(
-                self._context, self.callbacks, self.report_interval, self.max_workunit_verbosity
+                scheduler=self.scheduler,
+                context=self._context,
+                callbacks=self.callbacks,
+                report_interval=self.report_interval,
+                max_workunit_verbosity=self.max_workunit_verbosity,
             )
             self._thread_runner.start()
 
@@ -86,12 +90,14 @@ class StreamingWorkunitHandler:
 class _InnerHandler(threading.Thread):
     def __init__(
         self,
+        scheduler: Any,
         context: StreamingWorkunitContext,
         callbacks: Iterable[Callable],
         report_interval: float,
         max_workunit_verbosity: LogLevel,
     ):
         super().__init__(daemon=True)
+        self.scheduler = scheduler
         self._context = context
         self.stop_request = threading.Event()
         self.report_interval = report_interval
