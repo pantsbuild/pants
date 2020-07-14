@@ -28,14 +28,16 @@ class AddressToDependees:
 @rule
 async def map_addresses_to_dependees() -> AddressToDependees:
     # Get every target in the project so that we can iterate over them to find their dependencies.
-    all_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
+    all_explicit_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
     dependencies_per_target = await MultiGet(
-        Get(Addresses, DependenciesRequest(tgt.get(Dependencies))) for tgt in all_targets
+        Get(Addresses, DependenciesRequest(tgt.get(Dependencies))) for tgt in all_explicit_targets
     )
 
     address_to_dependees = defaultdict(set)
-    for tgt, dependencies in zip(all_targets, dependencies_per_target):
+    for tgt, dependencies in zip(all_explicit_targets, dependencies_per_target):
         for dependency in dependencies:
+            # TODO(#10354): teach dependees how to work with generated subtargets.
+            dependency = dependency.maybe_convert_to_base_target()
             address_to_dependees[dependency].add(tgt.address)
     return AddressToDependees(
         FrozenDict(
@@ -54,7 +56,7 @@ class DependeesRequest:
     def __init__(
         self, addresses: Iterable[Address], *, transitive: bool, include_roots: bool
     ) -> None:
-        self.addresses = FrozenOrderedSet(addresses)
+        self.addresses = FrozenOrderedSet(addr.maybe_convert_to_base_target() for addr in addresses)
         self.transitive = transitive
         self.include_roots = include_roots
 

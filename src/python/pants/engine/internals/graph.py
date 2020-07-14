@@ -63,9 +63,7 @@ async def resolve_target(
     address: Address, registered_target_types: RegisteredTargetTypes
 ) -> WrappedTarget:
     if address.generated_base_target_name:
-        base_target = await Get(
-            WrappedTarget, Address(address.spec_path, address.generated_base_target_name)
-        )
+        base_target = await Get(WrappedTarget, Address, address.maybe_convert_to_base_target())
         subtarget = generate_subtarget(
             base_target.target,
             full_file_name=PurePath(address.spec_path, address.target_name).as_posix(),
@@ -271,20 +269,14 @@ async def resolve_addresses_with_origins(specs: Specs) -> AddressesWithOrigins:
     # subtarget; if the user explicitly specified the original owning target, we should use the
     # original target rather than its generated subtarget.
     address_spec_addresses = FrozenOrderedSet(awo.address for awo in from_address_specs)
-
-    def in_address_specs(filesystem_spec_address: Address) -> bool:
-        if not filesystem_spec_address.generated_base_target_name:
-            return filesystem_spec_address in address_spec_addresses
-        original_address = Address(
-            filesystem_spec_address.spec_path,
-            target_name=filesystem_spec_address.generated_base_target_name,
-        )
-        return original_address in address_spec_addresses
-
     return AddressesWithOrigins(
         [
             *from_address_specs,
-            *(awo for awo in from_filesystem_specs if not in_address_specs(awo.address)),
+            *(
+                awo
+                for awo in from_filesystem_specs
+                if awo.address.maybe_convert_to_base_target() not in address_spec_addresses
+            ),
         ]
     )
 

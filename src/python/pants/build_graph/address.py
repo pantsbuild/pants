@@ -244,6 +244,15 @@ class Address:
             return self.spec
         return self._spec_path
 
+    def maybe_convert_to_base_target(self) -> "Address":
+        """If this address is a generated subtarget, convert it back into its original base target.
+
+        Otherwise, return itself unmodified.
+        """
+        if not self.generated_base_target_name:
+            return self
+        return self.__class__(self._spec_path, target_name=self.generated_base_target_name)
+
     def __eq__(self, other):
         if not isinstance(other, Address):
             return False
@@ -318,6 +327,11 @@ class BuildFileAddress(Address):
             target_name=self.target_name,
             generated_base_target_name=self.generated_base_target_name,
         )
+
+    def maybe_convert_to_base_target(self) -> "BuildFileAddress":
+        if not self.generated_base_target_name:
+            return self
+        return self.__class__(rel_path=self.rel_path, target_name=self.generated_base_target_name)
 
     def __repr__(self) -> str:
         prefix = f"BuildFileAddress({self.rel_path}, {self.target_name}"
