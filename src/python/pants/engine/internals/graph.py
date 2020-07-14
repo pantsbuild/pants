@@ -176,7 +176,7 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
     candidate_specs = tuple(AscendantAddresses(directory=d) for d in dirs_set)
     candidate_explicit_targets = await Get(Targets, AddressSpecs(candidate_specs))
 
-    # Generate subtargets.
+    # Generate subtargets. This gives us file-level precision, where each target only owns one file.
     candidate_explicit_target_sources = await MultiGet(
         Get(HydratedSources, HydrateSourcesRequest(tgt.get(Sources)))
         for tgt in candidate_explicit_targets
@@ -216,16 +216,25 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
             original_addresses.add(
                 Address(
                     generated_tgt.address.spec_path,
-                    target_name=generated_tgt.address.generated_base_target_name,
+                    target_name=generated_tgt.address.generated_base_target_name,  # type: ignore[arg-type]
+                )
+            )
+            # We also add the original target of the generated address already stored.
+            already_stored_generated_address = file_name_to_generated_address[file_name]
+            original_addresses.add(
+                Address(
+                    already_stored_generated_address.spec_path,
+                    target_name=already_stored_generated_address.generated_base_target_name,  # type: ignore[arg-type]
                 )
             )
         else:
             file_name_to_generated_address[file_name] = generated_tgt.address
 
-    def already_covered_by_original_addresses(file_name: str, address: Address) -> bool:
+    def already_covered_by_original_addresses(file_name: str, generated_address: Address) -> bool:
         multiple_generated_subtarget_owners = file_name in file_names_with_multiple_owners
         original_address = Address(
-            address.spec_path, target_name=address.generated_base_target_name
+            generated_address.spec_path,
+            target_name=generated_address.generated_base_target_name,  # type: ignore[arg-type]
         )
         return multiple_generated_subtarget_owners or original_address in original_addresses
 

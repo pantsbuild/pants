@@ -23,17 +23,6 @@ python_integration_tests(
 )
 
 python_integration_tests(
-  name = 'filesystem_specs_integration',
-  sources = ['filesystem_specs_integration_test.py'],
-  dependencies = [
-    'src/python/pants/testutil:int-test',
-    'testprojects/tests/python:owners_integration_target',
-  ],
-  uses_pants_run=True,
-  timeout = 120,
-)
-
-python_integration_tests(
   name = 'goal_rule_integration',
   sources = ['goal_rule_integration_test.py'],
   dependencies = [
