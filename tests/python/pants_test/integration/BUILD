@@ -75,5 +75,6 @@ python_integration_tests(
   name = 'log_output_integration',
   sources = ['log_output_integration_test.py'],
   uses_pants_run=True,
+  timeout = 180,
 )
 
