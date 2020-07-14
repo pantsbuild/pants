@@ -84,11 +84,17 @@ class SpecsCalculator:
         logger.debug("specs are: %s", specs)
         logger.debug("changed_options are: %s", changed_options)
 
-        if changed_options.is_actionable() and specs.provided:
-            # We've been provided both a change request and specs.
+        if specs.provided and (changed_options.since or changed_options.diffspec):
+            changed_name = "--changed-since" if changed_options.since else "--changed-diffspec"
+            if specs.filesystem_specs and specs.address_specs:
+                specs_description = "target and file arguments"
+            elif specs.filesystem_specs:
+                specs_description = "file arguments"
+            else:
+                specs_description = "target arguments"
             raise InvalidSpecConstraint(
-                "Multiple target selection methods provided. Please use only one of "
-                "`--changed-*`, address specs, or filesystem specs."
+                f"You used `{changed_name}` at the same time as using {specs_description}. Please "
+                "use only one."
             )
 
         if specs.provided:
