@@ -102,7 +102,14 @@ impl TimeSpan {
     end: &std::time::SystemTime,
   ) -> TimeSpan {
     let start = Self::since_epoch(start);
-    let duration = Self::since_epoch(end) - start;
+    let end = Self::since_epoch(end);
+    let duration = match end.checked_sub(start) {
+      Some(d) => d,
+      None => {
+        log::debug!("Invalid TimeSpan - start: {:?}, end: {:?}", start, end);
+        std::time::Duration::new(0, 0)
+      }
+    };
     TimeSpan {
       start: start.into(),
       duration: duration.into(),
