@@ -442,48 +442,59 @@ impl WorkunitStore {
     name: String,
     parent_id: Option<SpanId>,
     metadata: WorkunitMetadata,
-  ) -> SpanId {
+  ) -> Workunit {
     let started = Workunit {
       name,
-      span_id: span_id.clone(),
+      span_id,
       parent_id,
       state: WorkunitState::Started {
         start_time: std::time::SystemTime::now(),
       },
       metadata,
     };
-    if !self.rendering_dynamic_ui {
+    if self.rendering_dynamic_ui {
+      let sender = self.heavy_hitters_data.msg_tx.lock();
+      sender.send(StoreMsg::Started(started.clone())).unwrap();
+    } else {
       started.log_workunit_state()
     }
 
-    let sender = self.heavy_hitters_data.msg_tx.lock();
-    sender.send(StoreMsg::Started(started.clone())).unwrap();
     let sender = self.streaming_workunit_data.msg_tx.lock();
-    sender.send(StoreMsg::Started(started)).unwrap();
-    span_id
+    sender.send(StoreMsg::Started(started.clone())).unwrap();
+    started
   }
 
-  pub fn complete_workunit_with_new_metadata(&self, span_id: SpanId, metadata: WorkunitMetadata) {
-    self.complete_workunit_impl(span_id, Some(metadata))
-  }
-
-  pub fn complete_workunit(&self, span_id: SpanId) {
-    self.complete_workunit_impl(span_id, None)
-  }
-
-  fn complete_workunit_impl(&self, span_id: SpanId, new_metadata: Option<WorkunitMetadata>) {
+  fn complete_workunit(&self, workunit: Workunit) {
     let time = std::time::SystemTime::now();
-    let tx = self.heavy_hitters_data.msg_tx.lock();
+    self.complete_workunit_impl(workunit, time)
+  }
+
+  fn complete_workunit_impl(&self, mut workunit: Workunit, end_time: SystemTime) {
+    let span_id = workunit.span_id.clone();
+    let new_metadata = Some(workunit.metadata.clone());
+
+    let tx = self.streaming_workunit_data.msg_tx.lock();
     tx.send(StoreMsg::Completed(
       span_id.clone(),
       new_metadata.clone(),
-      time,
+      end_time,
     ))
     .unwrap();
 
-    let tx = self.streaming_workunit_data.msg_tx.lock();
-    tx.send(StoreMsg::Completed(span_id, new_metadata, time))
-      .unwrap();
+    if self.rendering_dynamic_ui {
+      let tx = self.heavy_hitters_data.msg_tx.lock();
+      tx.send(StoreMsg::Completed(span_id, new_metadata, end_time))
+        .unwrap();
+    } else {
+      let start_time = match workunit.state {
+        WorkunitState::Started { start_time } => start_time,
+        _ => panic!(),
+      };
+      let time_span = TimeSpan::from_start_and_end_systemtime(&start_time, &end_time);
+      let new_state = WorkunitState::Completed { time_span };
+      workunit.state = new_state;
+      workunit.log_workunit_state();
+    }
   }
 
   pub fn add_completed_workunit(
@@ -498,23 +509,22 @@ impl WorkunitStore {
 
     let workunit = Workunit {
       name,
-      span_id: span_id.clone(),
+      span_id,
       parent_id,
       state: WorkunitState::Started { start_time },
       metadata,
     };
 
-    let sender = self.heavy_hitters_data.msg_tx.lock();
-    sender.send(StoreMsg::Started(workunit.clone())).unwrap();
-    sender
-      .send(StoreMsg::Completed(span_id.clone(), None, end_time))
-      .unwrap();
+    if self.rendering_dynamic_ui {
+      let sender = self.heavy_hitters_data.msg_tx.lock();
+      sender.send(StoreMsg::Started(workunit.clone())).unwrap();
+    }
+    {
+      let sender = self.streaming_workunit_data.msg_tx.lock();
+      sender.send(StoreMsg::Started(workunit.clone())).unwrap();
+    }
 
-    let sender = self.streaming_workunit_data.msg_tx.lock();
-    sender.send(StoreMsg::Started(workunit)).unwrap();
-    sender
-      .send(StoreMsg::Completed(span_id, None, end_time))
-      .unwrap();
+    self.complete_workunit_impl(workunit, end_time);
   }
 
   pub fn with_latest_workunits<F, T>(&mut self, max_verbosity: log::Level, f: F) -> T
@@ -592,12 +602,13 @@ where
   let mut workunit_state = expect_workunit_state();
   let span_id = new_span_id();
   let parent_id = std::mem::replace(&mut workunit_state.parent_id, Some(span_id.clone()));
-  let started_id =
+  let mut workunit =
     workunit_store.start_workunit(span_id, name, parent_id, initial_metadata.clone());
   scope_task_workunit_state(Some(workunit_state), async move {
     let result = f.await;
     let final_metadata = final_metadata_fn(&result, initial_metadata);
-    workunit_store.complete_workunit_with_new_metadata(started_id, final_metadata);
+    workunit.metadata = final_metadata;
+    workunit_store.complete_workunit(workunit);
     result
   })
   .await
