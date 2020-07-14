@@ -86,7 +86,6 @@ async def map_first_party_modules_to_addresses() -> FirstPartyModuleToAddressMap
         unstripped_sources_per_explicit_target,
         stripped_sources_per_explicit_target,
     ):
-        only_one_source_file = len(unstripped_sources.snapshot.files) == 1
         for unstripped_f, stripped_f in zip(
             unstripped_sources.snapshot.files, stripped_sources.snapshot.files
         ):
@@ -94,13 +93,10 @@ async def map_first_party_modules_to_addresses() -> FirstPartyModuleToAddressMap
             if module in modules_to_addresses:
                 modules_with_multiple_owners.add(module)
             else:
-                modules_to_addresses[module] = (
-                    explicit_tgt.address
-                    if only_one_source_file
-                    else generate_subtarget_address(
-                        explicit_tgt.address, full_file_name=unstripped_f
-                    )
+                modules_to_addresses[module] = generate_subtarget_address(
+                    explicit_tgt.address, full_file_name=unstripped_f
                 )
+
     # Remove modules with ambiguous owners.
     for module in modules_with_multiple_owners:
         modules_to_addresses.pop(module)

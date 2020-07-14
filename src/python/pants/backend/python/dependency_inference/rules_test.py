@@ -97,6 +97,6 @@ class PythonDependencyInferenceTest(TestBase):
             [
                 Address.parse("3rdparty/python:Django"),
                 Address("src/python", target_name="app.py", generated_base_target_name="python"),
-                Address("src/python/util", target_name="util"),
+                Address("src/python/util", target_name="dep.py", generated_base_target_name="util"),
             ]
         )

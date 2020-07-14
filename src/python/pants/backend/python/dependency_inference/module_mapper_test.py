@@ -120,7 +120,9 @@ class ModuleMapperTest(TestBase):
                     generated_base_target_name="util",
                 ),
                 "project_test.demo_test": Address(
-                    "tests/python/project_test/demo_test", target_name="demo_test"
+                    "tests/python/project_test/demo_test",
+                    target_name="__init__.py",
+                    generated_base_target_name="demo_test",
                 ),
             }
         )
@@ -198,7 +200,9 @@ class ModuleMapperTest(TestBase):
         self.create_file("source_root2/project/subdir/__init__.py")
         self.add_to_build_file("source_root2/project/subdir", "python_library()")
         assert get_owner("project.subdir") == Address(
-            "source_root2/project/subdir", target_name="subdir"
+            "source_root2/project/subdir",
+            target_name="__init__.py",
+            generated_base_target_name="subdir",
         )
 
         # Test a module with no owner (stdlib). This also sanity checks that we can handle when
@@ -209,4 +213,6 @@ class ModuleMapperTest(TestBase):
         # can handle when the module includes a symbol (like a class name) at the end.
         self.create_file("script.py")
         self.add_to_build_file("", "python_library(name='script')")
-        assert get_owner("script.Demo") == Address("", target_name="script")
+        assert get_owner("script.Demo") == Address(
+            "", target_name="script.py", generated_base_target_name="script"
+        )

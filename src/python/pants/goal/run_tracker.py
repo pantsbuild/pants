@@ -19,7 +19,7 @@ import requests
 from pants.auth.basic_auth import BasicAuth
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
 from pants.base.run_info import RunInfo
-from pants.base.worker_pool import SubprocPool, WorkerPool
+from pants.base.worker_pool import SubprocPool
 from pants.base.workunit import WorkUnit, WorkUnitLabel
 from pants.goal.aggregated_timings import AggregatedTimings
 from pants.goal.pantsd_stats import PantsDaemonStats
@@ -144,7 +144,6 @@ class RunTracker(Subsystem):
         super().__init__(*args, **kwargs)
         self._run_timestamp = time.time()
         self._cmd_line = " ".join(["pants"] + sys.argv[1:])
-        self._sorted_goal_infos = tuple()
         self._v2_goal_rule_names: Tuple[str, ...] = tuple()
 
         self.run_uuid = uuid.uuid4().hex
@@ -188,7 +187,6 @@ class RunTracker(Subsystem):
         self._logger = RunTrackerLogger(self)
 
         # For background work.  Created lazily if needed.
-        self._background_worker_pool = None
         self._background_root_workunit = None
 
         # Trigger subproc pool init while our memory image is still clean (see SubprocPool docstring).
@@ -213,9 +211,6 @@ class RunTracker(Subsystem):
 
         self._end_memoized_result: Optional[ExitCode] = None
 
-    def set_sorted_goal_infos(self, sorted_goal_infos):
-        self._sorted_goal_infos = sorted_goal_infos
-
     def set_v2_goal_rule_names(self, v2_goal_rule_names: Tuple[str, ...]) -> None:
         self._v2_goal_rule_names = v2_goal_rule_names
 
@@ -233,9 +228,6 @@ class RunTracker(Subsystem):
     def is_under_background_root(self, workunit):
         """Is the workunit running under the background thread's root."""
         return workunit.is_background(self._background_root_workunit)
-
-    def is_main_root_workunit(self, workunit):
-        return workunit is self._main_root_workunit
 
     def is_background_root_workunit(self, workunit):
         return workunit is self._background_root_workunit
@@ -561,14 +553,6 @@ class RunTracker(Subsystem):
         """
         if self._end_memoized_result is not None:
             return self._end_memoized_result
-        if self._background_worker_pool:
-            if self._aborted:
-                self.log(Report.INFO, "Aborting background workers.")
-                self._background_worker_pool.abort()
-            else:
-                self.log(Report.INFO, "Waiting for background workers to finish.")
-                self._background_worker_pool.shutdown()
-            self.end_workunit(self._background_root_workunit)
 
         self.shutdown_worker_pool()
 
@@ -588,16 +572,6 @@ class RunTracker(Subsystem):
         if self.run_info.get_info("outcome") is None:
             # If the goal is clean-all then the run info dir no longer exists, so ignore that error.
             self.run_info.add_info("outcome", outcome_str, ignore_errors=True)
-
-        if self._sorted_goal_infos and self.run_info.get_info("computed_goals") is None:
-            self.run_info.add_info(
-                "computed_goals",
-                self._v2_goal_rule_names
-                + tuple(goal.goal.name for goal in self._sorted_goal_infos),
-                stringify=False,
-                # If the goal is clean-all then the run info dir no longer exists, so ignore that error.
-                ignore_errors=True,
-            )
 
         if self._target_to_data:
             self.run_info.add_info("target_data", self._target_to_data)
@@ -627,13 +601,6 @@ class RunTracker(Subsystem):
         on."""
         setup_workunit = WorkUnitLabel.SETUP.lower()
         transitive_dependencies = dict()
-        for goal_info in self._sorted_goal_infos:
-            deps = transitive_dependencies.setdefault(goal_info.goal.name, set())
-            for dep in goal_info.goal_dependencies:
-                deps.add(dep.name)
-                deps.update(transitive_dependencies.get(dep.name))
-            # Add setup workunit as a dep manually, as its unaccounted for, otherwise.
-            deps.add(setup_workunit)
         raw_timings = dict()
         for entry in self.cumulative_timings.get_all():
             raw_timings[entry["label"]] = entry["timing"]
@@ -657,28 +624,6 @@ class RunTracker(Subsystem):
                 add_to_timings(goal, dep)
 
         return critical_path_timings
-
-    def get_background_root_workunit(self):
-        if self._background_root_workunit is None:
-            self._background_root_workunit = WorkUnit(
-                run_info_dir=self.run_info_dir,
-                parent=self._main_root_workunit,
-                name="background",
-                cmd=None,
-            )
-            self._background_root_workunit.start()
-            self.report.start_workunit(self._background_root_workunit)
-        return self._background_root_workunit
-
-    def background_worker_pool(self):
-        if self._background_worker_pool is None:  # Initialize lazily.
-            self._background_worker_pool = WorkerPool(
-                parent_workunit=self.get_background_root_workunit(),
-                run_tracker=self,
-                num_workers=self._num_background_workers,
-                thread_name_prefix="background",
-            )
-        return self._background_worker_pool
 
     def shutdown_worker_pool(self):
         """Shuts down the SubprocPool.
@@ -714,74 +659,6 @@ class RunTracker(Subsystem):
             raise ValueError(
                 f"Couldn't find option scope {scope}{option_str} for recording ({e!r})"
             )
-
-    @classmethod
-    def _create_dict_with_nested_keys_and_val(cls, keys, value):
-        """Recursively constructs a nested dictionary with the keys pointing to the value.
-
-        For example:
-        Given the list of keys ['a', 'b', 'c', 'd'] and a primitive
-        value 'hello world', the method will produce the nested dictionary
-        {'a': {'b': {'c': {'d': 'hello world'}}}}. The number of keys in the list
-        defines the depth of the nested dict. If the list of keys is ['a'] and
-        the value is 'hello world', then the result would be {'a': 'hello world'}.
-
-        :param list of string keys: A list of keys to be nested as a dictionary.
-        :param primitive value: The value of the information being stored.
-        :return: dict of nested keys leading to the value.
-        """
-
-        if len(keys) > 1:
-            new_keys = keys[:-1]
-            new_val = {keys[-1]: value}
-            return cls._create_dict_with_nested_keys_and_val(new_keys, new_val)
-        elif len(keys) == 1:
-            return {keys[0]: value}
-        else:
-            raise ValueError("Keys must contain at least one key.")
-
-    @classmethod
-    def _merge_list_of_keys_into_dict(cls, data, keys, value, index=0):
-        """Recursively merge list of keys that points to the given value into data.
-
-        Will override a primitive value with another primitive value, but will not
-        override a primitive with a dictionary.
-
-        For example:
-        Given the dictionary {'a': {'b': {'c': 1}}, {'x': {'y': 100}}}, the keys
-        ['a', 'b', 'd'] and the value 2, the updated dictionary would be
-        {'a': {'b': {'c': 1, 'd': 2}}, {'x': {'y': 100}}}. Given this newly updated
-        dictionary, the keys ['a', 'x', 'y', 'z'] and the value 200, the method would raise
-        an error because we would be trying to override the primitive value 100 with the
-        dict {'z': 200}.
-
-        :param dict data: Dictionary to be updated.
-        :param list of string keys: The keys that point to where the value should be stored.
-               Will recursively find the correct place to store in the nested dicts.
-        :param primitive value: The value of the information being stored.
-        :param int index: The index into the list of keys (starting from the beginning).
-        """
-        if len(keys) == 0 or index < 0 or index >= len(keys):
-            raise ValueError(
-                "Keys must contain at least one key and index must be"
-                "an integer greater than 0 and less than the number of keys."
-            )
-        if len(keys) < 2 or not data:
-            new_data_to_add = cls._create_dict_with_nested_keys_and_val(keys, value)
-            data.update(new_data_to_add)
-
-        this_keys_contents = data.get(keys[index])
-        if this_keys_contents:
-            if isinstance(this_keys_contents, dict):
-                cls._merge_list_of_keys_into_dict(this_keys_contents, keys, value, index + 1)
-            elif index < len(keys) - 1:
-                raise ValueError("Keys must point to a dictionary.")
-            else:
-                data[keys[index]] = value
-        else:
-            new_keys = keys[index:]
-            new_data_to_add = cls._create_dict_with_nested_keys_and_val(new_keys, value)
-            data.update(new_data_to_add)
 
 
 class RunTrackerLogger:
