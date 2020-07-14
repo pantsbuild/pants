@@ -17,6 +17,8 @@ from pants.util.dirutil import relative_symlink, safe_mkdir
 
 
 class Reporting(Subsystem):
+    """V1 reporting config."""
+
     options_scope = "reporting"
 
     @classmethod

@@ -11,6 +11,8 @@ from pants.util.memo import memoized_property
 
 
 class Cookies(Subsystem):
+    """Manages HTTP cookies."""
+
     options_scope = "cookies"
 
     @classmethod

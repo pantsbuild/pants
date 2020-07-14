@@ -53,6 +53,8 @@ class Validate(Goal):
 
 
 class SourceFileValidation(Subsystem):
+    """Configuration for source file validation."""
+
     options_scope = "sourcefile-validation"
 
     @classmethod

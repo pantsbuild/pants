@@ -103,9 +103,18 @@ class HelpInfoExtracter:
         name_to_goal_info = {}
         for scope_info in sorted(options.known_scope_to_info.values(), key=lambda x: x.scope):
             options.for_scope(scope_info.scope)  # Force parsing.
-            is_goal = scope_info.optionable_cls is not None and issubclass(
-                scope_info.optionable_cls, GoalSubsystem
-            )
+            optionable_cls = scope_info.optionable_cls
+            if not scope_info.description:
+                cls_name = (
+                    f"{optionable_cls.__module__}.{optionable_cls.__qualname__}"
+                    if optionable_cls
+                    else ""
+                )
+                raise ValueError(
+                    f"Subsystem {cls_name} with scope `{scope_info.scope}` has no description. "
+                    f"Add a docstring or implement get_description()."
+                )
+            is_goal = optionable_cls is not None and issubclass(optionable_cls, GoalSubsystem)
             oshi: OptionScopeHelpInfo = HelpInfoExtracter(
                 scope_info.scope
             ).get_option_scope_help_info(
@@ -114,7 +123,7 @@ class HelpInfoExtracter:
             scope_to_help_info[oshi.scope] = oshi
 
             if is_goal:
-                goal_subsystem_cls = cast(Type[GoalSubsystem], scope_info.optionable_cls)
+                goal_subsystem_cls = cast(Type[GoalSubsystem], optionable_cls)
                 is_implemented = union_membership.has_members_for_all(
                     goal_subsystem_cls.required_union_implementations
                 )

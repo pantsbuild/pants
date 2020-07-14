@@ -8,6 +8,8 @@ from pants.option.custom_types import file_option, shell_str
 
 
 class MyPy(PythonToolBase):
+    """The MyPy Python type checker (http://mypy-lang.org/)."""
+
     options_scope = "mypy"
     default_version = "mypy==0.781"
     default_entry_point = "mypy"

@@ -6,6 +6,8 @@ from pants.option.custom_types import file_option, shell_str
 
 
 class Flake8(PythonToolBase):
+    """The Flake8 Python linter (https://flake8.pycqa.org/)."""
+
     options_scope = "flake8"
     default_version = "flake8>=3.7.9,<3.9"
     default_extra_requirements = ["setuptools<45"]  # NB: `<45` is for Python 2 support

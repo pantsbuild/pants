@@ -27,6 +27,8 @@ from pants.util.strutil import pluralize
 
 
 class ClocBinary(ExternalTool):
+    """The cloc lines-of-code counter (https://github.com/AlDanial/cloc)."""
+
     options_scope = "cloc-binary"
     name = "cloc"
     default_version = "1.80"
