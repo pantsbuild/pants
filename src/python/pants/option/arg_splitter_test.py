@@ -8,12 +8,13 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from pants.option.arg_splitter import (
+    AllHelp,
     ArgSplitter,
     NoGoalHelp,
     OptionsHelp,
     UnknownGoalHelp,
     VersionHelp,
-    AllHelp)
+)
 from pants.option.scope import ScopeInfo
 from pants.util.contextutil import pushd, temporary_dir
 
