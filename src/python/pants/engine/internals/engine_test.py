@@ -651,7 +651,9 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
             scheduler.product_request(Output, subjects=[0])
 
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
-        workunit = next(item for item in finished if item["name"] == "a_rule")
+        workunit = next(
+            item for item in finished if item["name"] == "pants.engine.internals.engine_test.a_rule"
+        )
         artifacts = workunit["artifacts"]
         assert artifacts["some_arbitrary_key"] == EMPTY_DIGEST
 
