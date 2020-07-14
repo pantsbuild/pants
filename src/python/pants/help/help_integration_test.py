@@ -37,4 +37,3 @@ class TestHelpIntegration(PantsRunIntegrationTest):
         assert "" in all_help["scope_to_help_info"]
         assert "pytest" in all_help["scope_to_help_info"]
         assert len(all_help["scope_to_help_info"]["pytest"]["basic"]) > 0
-
