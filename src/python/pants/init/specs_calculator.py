@@ -91,28 +91,27 @@ class SpecsCalculator:
                 "`--changed-*`, address specs, or filesystem specs."
             )
 
-        if changed_options.is_actionable():
-            scm = get_scm()
-            if not scm:
-                raise InvalidSpecConstraint(
-                    "The `--changed-*` options are not available without a recognized SCM (usually Git)."
-                )
-            changed_request = ChangedRequest(
-                sources=tuple(changed_options.changed_files(scm=scm)),
-                dependees=changed_options.dependees,
-            )
-            (changed_addresses,) = session.product_request(
-                ChangedAddresses, [Params(changed_request, options_bootstrapper)]
-            )
-            logger.debug("changed addresses: %s", changed_addresses)
-            dependencies = tuple(
-                SingleAddress(a.spec_path, a.target_name) for a in changed_addresses
-            )
-            return Specs(
-                address_specs=AddressSpecs(
-                    dependencies=dependencies, exclude_patterns=exclude_patterns, tags=tags,
-                ),
-                filesystem_specs=FilesystemSpecs([]),
-            )
+        if specs.provided:
+            return specs
 
-        return specs
+        scm = get_scm()
+        if not scm:
+            raise InvalidSpecConstraint(
+                "The `--changed-*` options are not available without a recognized SCM (usually "
+                "Git)."
+            )
+        changed_request = ChangedRequest(
+            sources=tuple(changed_options.changed_files(scm=scm)),
+            dependees=changed_options.dependees,
+        )
+        (changed_addresses,) = session.product_request(
+            ChangedAddresses, [Params(changed_request, options_bootstrapper)]
+        )
+        logger.debug("changed addresses: %s", changed_addresses)
+        address_specs = tuple(SingleAddress(a.spec_path, a.target_name) for a in changed_addresses)
+        return Specs(
+            address_specs=AddressSpecs(
+                address_specs, exclude_patterns=exclude_patterns, tags=tags,
+            ),
+            filesystem_specs=FilesystemSpecs([]),
+        )
