@@ -272,19 +272,19 @@ async def resolve_addresses_with_origins(specs: Specs) -> AddressesWithOrigins:
     # original target rather than its generated subtarget.
     address_spec_addresses = FrozenOrderedSet(awo.address for awo in from_address_specs)
 
-    def not_in_address_specs(filesystem_spec_address: Address) -> bool:
+    def in_address_specs(filesystem_spec_address: Address) -> bool:
         if not filesystem_spec_address.generated_base_target_name:
-            return filesystem_spec_address not in address_spec_addresses
+            return filesystem_spec_address in address_spec_addresses
         original_address = Address(
             filesystem_spec_address.spec_path,
             target_name=filesystem_spec_address.generated_base_target_name,
         )
-        return original_address not in address_spec_addresses
+        return original_address in address_spec_addresses
 
     return AddressesWithOrigins(
         [
             *from_address_specs,
-            *(awo for awo in from_filesystem_specs if not_in_address_specs(awo.address)),
+            *(awo for awo in from_filesystem_specs if not in_address_specs(awo.address)),
         ]
     )
 
