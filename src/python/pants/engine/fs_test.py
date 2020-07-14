@@ -539,18 +539,20 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         return expected_digest
 
     pantsbuild_digest = Digest(
-        "63652768bd65af8a4938c415bdc25e446e97c473308d26b3da65890aebacf63f", 18
+        "f461fc99bcbe18e667687cf672c2dc68dc5c5db77c5bd426c9690e5c9cec4e3b", 184
     )
 
     def test_download(self) -> None:
         with self.isolated_local_store():
             with http_server(StubHandler) as port:
-                url = UrlToFetch(f"http://localhost:{port}/CNAME", self.pantsbuild_digest)
+                url = UrlToFetch(
+                    f"http://localhost:{port}/do_not_remove_or_edit.txt", self.pantsbuild_digest
+                )
                 snapshot = self.request_single_product(Snapshot, url)
                 self.assert_snapshot_equals(
                     snapshot,
-                    ["CNAME"],
-                    Digest("16ba2118adbe5b53270008790e245bbf7088033389461b08640a4092f7f647cf", 81),
+                    ["do_not_remove_or_edit.txt"],
+                    Digest("03bb499daabafc60212d2f4b2fab49b47b35b83a90c056224c768d52bce02691", 102),
                 )
 
     def test_download_missing_file(self) -> None:
@@ -565,7 +567,7 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
         with self.isolated_local_store():
             with http_server(StubHandler) as port:
                 url = UrlToFetch(
-                    f"http://localhost:{port}/CNAME",
+                    f"http://localhost:{port}/do_not_remove_or_edit.txt",
                     Digest(
                         self.pantsbuild_digest.fingerprint,
                         self.pantsbuild_digest.serialized_bytes_length + 1,
@@ -579,14 +581,14 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
     def test_download_https(self) -> None:
         with self.isolated_local_store():
             url = UrlToFetch(
-                "https://www.pantsbuild.org/CNAME",
-                Digest("63652768bd65af8a4938c415bdc25e446e97c473308d26b3da65890aebacf63f", 18,),
+                "https://binaries.pantsbuild.org/do_not_remove_or_edit.txt",
+                Digest("f461fc99bcbe18e667687cf672c2dc68dc5c5db77c5bd426c9690e5c9cec4e3b", 184,),
             )
             snapshot = self.request_single_product(Snapshot, url)
             self.assert_snapshot_equals(
                 snapshot,
-                ["CNAME"],
-                Digest("16ba2118adbe5b53270008790e245bbf7088033389461b08640a4092f7f647cf", 81),
+                ["do_not_remove_or_edit.txt"],
+                Digest("03bb499daabafc60212d2f4b2fab49b47b35b83a90c056224c768d52bce02691", 102),
             )
 
     def test_caches_downloads(self) -> None:
@@ -787,7 +789,12 @@ class FSTest(TestBase, SchedulerTestBase, metaclass=ABCMeta):
 
 
 class StubHandler(BaseHTTPRequestHandler):
-    response_text = b"www.pantsbuild.org"
+    # See https://binaries.pantsbuild.org/do_not_remove_or_edit.txt
+    response_text = b"""Some tests rely on the existence of this file, with this exact content.
+Edit only if you know what you're doing.
+
+See src/python/pants/engine/fs_test.py in the pants repo for details.
+"""
 
     def do_HEAD(self):
         self.send_headers()
@@ -797,7 +804,7 @@ class StubHandler(BaseHTTPRequestHandler):
         self.wfile.write(self.response_text)
 
     def send_headers(self):
-        code = 200 if self.path == "/CNAME" else 404
+        code = 200 if self.path == "/do_not_remove_or_edit.txt" else 404
         self.send_response(code)
         self.send_header("Content-Type", "text/utf-8")
         self.send_header("Content-Length", f"{len(self.response_text)}")
