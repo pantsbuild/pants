@@ -45,13 +45,18 @@ class StreamingWorkunitHandler:
         self.report_interval = report_interval_seconds
         self.callbacks = callbacks
         self._thread_runner: Optional[_InnerHandler] = None
+        self._context = StreamingWorkunitContext(_scheduler=self.scheduler)
         # TODO(10092) The max verbosity should be a per-client setting, rather than a global setting.
         self.max_workunit_verbosity = max_workunit_verbosity
 
     def start(self) -> None:
         if self.callbacks:
             self._thread_runner = _InnerHandler(
-                self.scheduler, self.callbacks, self.report_interval, self.max_workunit_verbosity
+                scheduler=self.scheduler,
+                context=self._context,
+                callbacks=self.callbacks,
+                report_interval=self.report_interval,
+                max_workunit_verbosity=self.max_workunit_verbosity,
             )
             self._thread_runner.start()
 
@@ -67,7 +72,7 @@ class StreamingWorkunitHandler:
                 workunits=workunits["completed"],
                 started_workunits=workunits["started"],
                 finished=True,
-                context=StreamingWorkunitContext(_scheduler=self.scheduler),
+                context=self._context,
             )
 
     @contextmanager
@@ -86,12 +91,14 @@ class _InnerHandler(threading.Thread):
     def __init__(
         self,
         scheduler: Any,
+        context: StreamingWorkunitContext,
         callbacks: Iterable[Callable],
         report_interval: float,
         max_workunit_verbosity: LogLevel,
     ):
         super().__init__(daemon=True)
         self.scheduler = scheduler
+        self._context = context
         self.stop_request = threading.Event()
         self.report_interval = report_interval
         self.callbacks = callbacks
@@ -105,6 +112,7 @@ class _InnerHandler(threading.Thread):
                     workunits=workunits["completed"],
                     started_workunits=workunits["started"],
                     finished=False,
+                    context=self._context,
                 )
             self.stop_request.wait(timeout=self.report_interval)
 
