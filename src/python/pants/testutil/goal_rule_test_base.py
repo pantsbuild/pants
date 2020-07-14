@@ -70,7 +70,7 @@ class GoalRuleTestBase(TestBase):
         # Run for the specs parsed from the args.
         specs = SpecsCalculator.parse_specs(full_options.specs, self.build_root)
         params = Params(
-            specs.provided_specs,
+            specs,
             console,
             options_bootstrapper,
             Workspace(self.scheduler),

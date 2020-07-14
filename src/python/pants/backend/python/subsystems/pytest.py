@@ -8,6 +8,8 @@ from pants.subsystem.subsystem import Subsystem
 
 
 class PyTest(Subsystem):
+    """The pytest Python test framework (https://docs.pytest.org/)."""
+
     options_scope = "pytest"
 
     @classmethod

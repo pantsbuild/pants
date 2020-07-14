@@ -5,6 +5,8 @@ from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 
 
 class Setuptools(PythonToolBase):
+    """The Python setuptools library (https://github.com/pypa/setuptools)."""
+
     # NB: setuptools doesn't have an entrypoint, unlike most python tools.
     # We call it via a generated setup.py script.
     options_scope = "setuptools"

@@ -84,35 +84,40 @@ class SpecsCalculator:
         logger.debug("specs are: %s", specs)
         logger.debug("changed_options are: %s", changed_options)
 
-        if changed_options.is_actionable() and specs.provided_specs.dependencies:
-            # We've been provided both a change request and specs.
+        if specs.provided and changed_options.provided:
+            changed_name = "--changed-since" if changed_options.since else "--changed-diffspec"
+            if specs.filesystem_specs and specs.address_specs:
+                specs_description = "target and file arguments"
+            elif specs.filesystem_specs:
+                specs_description = "file arguments"
+            else:
+                specs_description = "target arguments"
             raise InvalidSpecConstraint(
-                "Multiple target selection methods provided. Please use only one of "
-                "`--changed-*`, address specs, or filesystem specs."
+                f"You used `{changed_name}` at the same time as using {specs_description}. Please "
+                "use only one."
             )
 
-        if changed_options.is_actionable():
-            scm = get_scm()
-            if not scm:
-                raise InvalidSpecConstraint(
-                    "The `--changed-*` options are not available without a recognized SCM (usually Git)."
-                )
-            changed_request = ChangedRequest(
-                sources=tuple(changed_options.changed_files(scm=scm)),
-                dependees=changed_options.dependees,
-            )
-            (changed_addresses,) = session.product_request(
-                ChangedAddresses, [Params(changed_request, options_bootstrapper)]
-            )
-            logger.debug("changed addresses: %s", changed_addresses)
-            dependencies = tuple(
-                SingleAddress(a.spec_path, a.target_name) for a in changed_addresses
-            )
-            return Specs(
-                address_specs=AddressSpecs(
-                    dependencies=dependencies, exclude_patterns=exclude_patterns, tags=tags,
-                ),
-                filesystem_specs=FilesystemSpecs([]),
-            )
+        if not changed_options.provided:
+            return specs
 
-        return specs
+        scm = get_scm()
+        if not scm:
+            raise InvalidSpecConstraint(
+                "The `--changed-*` options are not available without a recognized SCM (usually "
+                "Git)."
+            )
+        changed_request = ChangedRequest(
+            sources=tuple(changed_options.changed_files(scm=scm)),
+            dependees=changed_options.dependees,
+        )
+        (changed_addresses,) = session.product_request(
+            ChangedAddresses, [Params(changed_request, options_bootstrapper)]
+        )
+        logger.debug("changed addresses: %s", changed_addresses)
+        address_specs = tuple(SingleAddress(a.spec_path, a.target_name) for a in changed_addresses)
+        return Specs(
+            address_specs=AddressSpecs(
+                address_specs, exclude_patterns=exclude_patterns, tags=tags,
+            ),
+            filesystem_specs=FilesystemSpecs([]),
+        )
