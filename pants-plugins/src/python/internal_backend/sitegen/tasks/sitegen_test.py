@@ -189,7 +189,7 @@ class AllTheThingsTestCase(unittest.TestCase):
             self.precomputed,
             """
             {{#site_toc}}
-            DEPTH={{depth}} LINK={{links}} HEADING={{heading}} 
+            DEPTH={{depth}} LINK={{links}} HEADING={{heading}}
             {{/site_toc}}
             """,
         )
