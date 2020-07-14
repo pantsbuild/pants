@@ -267,11 +267,26 @@ async def resolve_addresses_with_origins(specs: Specs) -> AddressesWithOrigins:
     )
     # It's possible to resolve the same address both with filesystem specs and address specs. We
     # dedupe, but must go through some ceremony for the equality check because the OriginSpec will
-    # differ.
-    filesystem_addresses = FrozenOrderedSet(awo.address for awo in from_filesystem_specs)
-    result = OrderedSet(from_filesystem_specs)
-    result.update(awo for awo in from_address_specs if awo.address not in filesystem_addresses)
-    return AddressesWithOrigins(result)
+    # differ. We must also consider that the filesystem spec may have resulted in a generated
+    # subtarget; if the user explicitly specified the original owning target, we should use the
+    # original target rather than its generated subtarget.
+    address_spec_addresses = FrozenOrderedSet(awo.address for awo in from_address_specs)
+
+    def not_in_address_specs(filesystem_spec_address: Address) -> bool:
+        if not filesystem_spec_address.generated_base_target_name:
+            return filesystem_spec_address not in address_spec_addresses
+        original_address = Address(
+            filesystem_spec_address.spec_path,
+            target_name=filesystem_spec_address.generated_base_target_name,
+        )
+        return original_address not in address_spec_addresses
+
+    return AddressesWithOrigins(
+        [
+            *from_address_specs,
+            *(awo for awo in from_filesystem_specs if not_in_address_specs(awo.address)),
+        ]
+    )
 
 
 # -----------------------------------------------------------------------------------------------
