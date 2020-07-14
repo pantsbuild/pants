@@ -7,7 +7,7 @@ import os.path
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import DefaultDict, List, Tuple, Union
+from typing import DefaultDict, Dict, List, Tuple, Union
 
 from pants.base.exceptions import ResolveError
 from pants.base.specs import (
@@ -181,29 +181,60 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
         Get(HydratedSources, HydrateSourcesRequest(tgt.get(Sources)))
         for tgt in candidate_explicit_targets
     )
-    candidate_targets: OrderedSet[Target] = OrderedSet()
+    candidate_generated_targets: OrderedSet[Target] = OrderedSet()
     for explicit_tgt, explicit_tgt_sources in zip(
         candidate_explicit_targets, candidate_explicit_target_sources
     ):
         if not explicit_tgt_sources.snapshot.files:
             continue
-        candidate_targets.update(
+        candidate_generated_targets.update(
             generate_subtarget(explicit_tgt, full_file_name=f)
             for f in explicit_tgt_sources.snapshot.files
         )
 
     build_file_addresses = await MultiGet(
-        Get(BuildFileAddress, Address, tgt.address) for tgt in candidate_targets
+        Get(BuildFileAddress, Address, tgt.address) for tgt in candidate_generated_targets
     )
 
-    return Owners(
-        tgt.address
-        for tgt, bfa in zip(candidate_targets, build_file_addresses)
-        if bfa.rel_path in sources_set
+    # Determine which candidates are owners. We check if there are multiple owners of the same file
+    # so that we can know to use the original owning target, rather than the generated subtarget.
+    file_name_to_generated_address: Dict[str, Address] = {}
+    file_names_with_multiple_owners: OrderedSet[str] = OrderedSet()
+    original_addresses: OrderedSet[Address] = OrderedSet()
+    for generated_tgt, bfa in zip(candidate_generated_targets, build_file_addresses):
         # NB: Deleted files can only be matched against the 'filespec' (i.e. `PathGlobs`) for a
-        # target, which is why we use `matches_filespec`.
-        or bool(matches_filespec(tgt.get(Sources).filespec, paths=sources_set))
+        # target, which is why we use `any_matches_filespec`.
+        if bfa.rel_path not in sources_set and not bool(
+            matches_filespec(generated_tgt.get(Sources).filespec, paths=sources_set)
+        ):
+            continue
+        file_name = PurePath(
+            generated_tgt.address.spec_path, generated_tgt.address.target_name
+        ).as_posix()
+        if file_name in file_name_to_generated_address:
+            file_names_with_multiple_owners.add(file_name)
+            original_addresses.add(
+                Address(
+                    generated_tgt.address.spec_path,
+                    target_name=generated_tgt.address.generated_base_target_name,
+                )
+            )
+        else:
+            file_name_to_generated_address[file_name] = generated_tgt.address
+
+    def already_covered_by_original_addresses(file_name: str, address: Address) -> bool:
+        multiple_generated_subtarget_owners = file_name in file_names_with_multiple_owners
+        original_address = Address(
+            address.spec_path, target_name=address.generated_base_target_name
+        )
+        return multiple_generated_subtarget_owners or original_address in original_addresses
+
+    remaining_generated_addresses = FrozenOrderedSet(
+        address
+        for file_name, address in file_name_to_generated_address.items()
+        if not already_covered_by_original_addresses(file_name, address)
     )
+    return Owners([*original_addresses, *remaining_generated_addresses])
 
 
 # -----------------------------------------------------------------------------------------------
