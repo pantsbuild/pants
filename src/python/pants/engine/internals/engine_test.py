@@ -109,7 +109,7 @@ class Epsilon:
     pass
 
 
-@rule(canonical_name="rule_one", desc="Rule number 1", level=LogLevel.INFO)
+@rule(canonical_name="canonical_rule_one", desc="Rule number 1", level=LogLevel.INFO)
 async def rule_one_function(i: Input) -> Beta:
     """This rule should be the first one executed by the engine, and thus have no parent."""
     a = Alpha()
@@ -411,24 +411,38 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
 
         # rule_one should complete well-after the other rules because of the artificial delay in it caused by the sleep().
         assert {item["name"] for item in tracker.finished_workunit_chunks[0]} == {
-            "rule_two",
-            "rule_three",
-            "rule_four",
+            "pants.engine.internals.engine_test.rule_two",
+            "pants.engine.internals.engine_test.rule_three",
+            "pants.engine.internals.engine_test.rule_four",
         }
 
         # Because of the artificial delay in rule_one, it should have time to be reported as
         # started but not yet finished.
         started = list(itertools.chain.from_iterable(tracker.started_workunit_chunks))
-        assert len(list(item for item in started if item["name"] == "rule_one")) > 0
+        assert len(list(item for item in started if item["name"] == "canonical_rule_one")) > 0
 
-        assert {item["name"] for item in tracker.finished_workunit_chunks[1]} == {"rule_one"}
+        assert {item["name"] for item in tracker.finished_workunit_chunks[1]} == {
+            "canonical_rule_one"
+        }
 
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
 
-        r1 = next(item for item in finished if item["name"] == "rule_one")
-        r2 = next(item for item in finished if item["name"] == "rule_two")
-        r3 = next(item for item in finished if item["name"] == "rule_three")
-        r4 = next(item for item in finished if item["name"] == "rule_four")
+        r1 = next(item for item in finished if item["name"] == "canonical_rule_one")
+        r2 = next(
+            item
+            for item in finished
+            if item["name"] == "pants.engine.internals.engine_test.rule_two"
+        )
+        r3 = next(
+            item
+            for item in finished
+            if item["name"] == "pants.engine.internals.engine_test.rule_three"
+        )
+        r4 = next(
+            item
+            for item in finished
+            if item["name"] == "pants.engine.internals.engine_test.rule_four"
+        )
 
         # rule_one should have no parent_id because its actual parent workunit was filted based on level
         assert r1.get("parent_id", None) is None
@@ -465,12 +479,18 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         select = next(
             item
             for item in finished
-            if item["name"] not in {"rule_one", "rule_two", "rule_three", "rule_four"}
+            if item["name"]
+            not in {
+                "canonical_rule_one",
+                "pants.engine.internals.engine_test.rule_two",
+                "pants.engine.internals.engine_test.rule_three",
+                "pants.engine.internals.engine_test.rule_four",
+            }
         )
         assert select["name"] == "select"
         assert select["level"] == "DEBUG"
 
-        r1 = next(item for item in finished if item["name"] == "rule_one")
+        r1 = next(item for item in finished if item["name"] == "canonical_rule_one")
         assert r1["parent_id"] == select["span_id"]
 
     def test_streaming_workunit_log_level_parent_rewrite(self) -> None:
@@ -494,8 +514,12 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
 
         assert len(finished) == 2
-        r_A = next(item for item in finished if item["name"] == "rule_A")
-        r_C = next(item for item in finished if item["name"] == "rule_C")
+        r_A = next(
+            item for item in finished if item["name"] == "pants.engine.internals.engine_test.rule_A"
+        )
+        r_C = next(
+            item for item in finished if item["name"] == "pants.engine.internals.engine_test.rule_C"
+        )
         assert "parent_id" not in r_A
         assert r_C["parent_id"] == r_A["span_id"]
 
@@ -517,9 +541,15 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         assert tracker.finished
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
 
-        r_A = next(item for item in finished if item["name"] == "rule_A")
-        r_B = next(item for item in finished if item["name"] == "rule_B")
-        r_C = next(item for item in finished if item["name"] == "rule_C")
+        r_A = next(
+            item for item in finished if item["name"] == "pants.engine.internals.engine_test.rule_A"
+        )
+        r_B = next(
+            item for item in finished if item["name"] == "pants.engine.internals.engine_test.rule_B"
+        )
+        r_C = next(
+            item for item in finished if item["name"] == "pants.engine.internals.engine_test.rule_C"
+        )
         assert r_B["parent_id"] == r_A["span_id"]
         assert r_C["parent_id"] == r_B["span_id"]
 
@@ -552,7 +582,9 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
             scheduler.product_request(ModifiedOutput, subjects=[0])
 
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
-        workunit = next(item for item in finished if item["name"] == "a_rule")
+        workunit = next(
+            item for item in finished if item["name"] == "pants.engine.internals.engine_test.a_rule"
+        )
         assert workunit["level"] == "ERROR"
 
     def test_engine_aware_none_case(self):
@@ -586,7 +618,9 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
             scheduler.product_request(ModifiedOutput, subjects=[0])
 
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
-        workunit = next(item for item in finished if item["name"] == "a_rule")
+        workunit = next(
+            item for item in finished if item["name"] == "pants.engine.internals.engine_test.a_rule"
+        )
         assert workunit["level"] == "DEBUG"
 
     def test_artifacts_on_engine_aware_type(self) -> None:

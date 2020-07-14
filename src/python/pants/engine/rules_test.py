@@ -403,7 +403,7 @@ class RuleArgumentAnnotationTest(unittest.TestCase):
             return False
 
         self.assertIsNotNone(a_named_rule.rule)
-        self.assertEqual(a_named_rule.rule.canonical_name, "a_named_rule")
+        self.assertEqual(a_named_rule.rule.canonical_name, "pants.engine.rules_test.a_named_rule")
         self.assertEqual(a_named_rule.rule.desc, None)
         self.assertEqual(a_named_rule.rule.level, LogLevel.INFO)
 
