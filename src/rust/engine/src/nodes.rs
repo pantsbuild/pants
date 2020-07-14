@@ -1134,13 +1134,23 @@ impl Node for NodeKey {
 
     let result_future = async move {
       let metadata = metadata2;
+      // To avoid races, we must ensure that we have installed a watch for the subject before
+      // executing the node logic. But in case of failure, we wait to see if the Node itself
+      // fails, and prefer that error message if so (because we have little control over the
+      // error messages of the watch API).
       let maybe_watch = if let Some(path) = self.fs_subject() {
         let abs_path = context.core.build_root.join(path);
         context
           .core
           .watcher
           .watch(abs_path)
-          .map_err(|e| Context::mk_error(&format!("{:?}", e)))
+          .map_err(|e| {
+            Context::mk_error(&format!(
+              "Failed to watch filesystem for `{}`: {:?}",
+              path.display(),
+              e
+            ))
+          })
           .await
       } else {
         Ok(())
@@ -1149,53 +1159,59 @@ impl Node for NodeKey {
       let mut level = metadata.level;
       let mut message = None;
       let mut artifacts = Vec::new();
-      let mut result = match maybe_watch {
-        Ok(()) => match self {
-          NodeKey::DigestFile(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Digest).await,
-          NodeKey::DownloadedFile(n) => {
-            n.run_wrapped_node(context)
-              .map_ok(NodeOutput::Snapshot)
-              .await
-          }
-          NodeKey::MultiPlatformExecuteProcess(n) => {
-            n.run_wrapped_node(context)
-              .map_ok(|r| NodeOutput::ProcessResult(Box::new(r)))
-              .await
-          }
-          NodeKey::ReadLink(n) => {
-            n.run_wrapped_node(context)
-              .map_ok(NodeOutput::LinkDest)
-              .await
-          }
-          NodeKey::Scandir(n) => {
-            n.run_wrapped_node(context)
-              .map_ok(NodeOutput::DirectoryListing)
-              .await
-          }
-          NodeKey::Select(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Value).await,
-          NodeKey::Snapshot(n) => {
-            n.run_wrapped_node(context)
-              .map_ok(NodeOutput::Snapshot)
-              .await
-          }
-          NodeKey::Task(n) => {
-            n.run_wrapped_node(context)
-              .map_ok(|python_rule_output| {
-                if let Some(new_level) = python_rule_output.new_level {
-                  level = new_level;
-                }
-                message = python_rule_output.message;
-                artifacts = python_rule_output.new_artifacts;
-                NodeOutput::Value(python_rule_output.value)
-              })
-              .await
-          }
-        },
-        Err(e) => Err(e),
+      let mut result = match self {
+        NodeKey::DigestFile(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Digest).await,
+        NodeKey::DownloadedFile(n) => {
+          n.run_wrapped_node(context)
+            .map_ok(NodeOutput::Snapshot)
+            .await
+        }
+        NodeKey::MultiPlatformExecuteProcess(n) => {
+          n.run_wrapped_node(context)
+            .map_ok(|r| NodeOutput::ProcessResult(Box::new(r)))
+            .await
+        }
+        NodeKey::ReadLink(n) => {
+          n.run_wrapped_node(context)
+            .map_ok(NodeOutput::LinkDest)
+            .await
+        }
+        NodeKey::Scandir(n) => {
+          n.run_wrapped_node(context)
+            .map_ok(NodeOutput::DirectoryListing)
+            .await
+        }
+        NodeKey::Select(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Value).await,
+        NodeKey::Snapshot(n) => {
+          n.run_wrapped_node(context)
+            .map_ok(NodeOutput::Snapshot)
+            .await
+        }
+        NodeKey::Task(n) => {
+          n.run_wrapped_node(context)
+            .map_ok(|python_rule_output| {
+              if let Some(new_level) = python_rule_output.new_level {
+                level = new_level;
+              }
+              message = python_rule_output.message;
+              artifacts = python_rule_output.new_artifacts;
+              NodeOutput::Value(python_rule_output.value)
+            })
+            .await
+        }
       };
 
       if let Some(user_facing_name) = user_facing_name {
         result = result.map_err(|failure| failure.with_pushed_frame(&user_facing_name));
+      }
+
+      // If both the Node and the watch failed, prefer the Node's error message.
+      match (&result, maybe_watch) {
+        (Ok(_), Ok(_)) => {}
+        (Err(_), _) => {}
+        (Ok(_), Err(e)) => {
+          result = Err(e);
+        }
       }
 
       let final_metadata = WorkunitMetadata {
