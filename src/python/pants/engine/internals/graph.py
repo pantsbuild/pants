@@ -17,6 +17,7 @@ from pants.base.specs import (
     FilesystemMergedSpec,
     FilesystemResolvedGlobSpec,
     FilesystemSpecs,
+    Specs,
 )
 from pants.engine.addresses import (
     Address,
@@ -25,7 +26,7 @@ from pants.engine.addresses import (
     AddressWithOrigin,
     BuildFileAddress,
 )
-from pants.engine.fs import PathGlobs, Snapshot, SourcesSnapshot, SourcesSnapshots
+from pants.engine.fs import PathGlobs, Snapshot, SourcesSnapshots
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
@@ -232,10 +233,10 @@ async def addresses_with_origins_from_filesystem_specs(
             file_path = PurePath(spec.to_spec_string())
             msg = (
                 f"No owning targets could be found for the file `{file_path}`.\n\nPlease check "
-                f"that there is a BUILD file in `{file_path.parent}` with a target whose `sources` field "
-                f"includes `{file_path}`. See https://pants.readme.io/docs/targets for more "
-                "information on target definitions.\n"
-                "If you would like to ignore un-owned files, please pass `--owners-not-found-behavior=ignore`."
+                f"that there is a BUILD file in `{file_path.parent}` with a target whose `sources` "
+                f"field includes `{file_path}`. See https://pants.readme.io/docs/targets for more "
+                "information on target definitions.\nIf you would like to ignore un-owned files, "
+                "please pass `--owners-not-found-behavior=ignore`."
             )
             if global_options.options.owners_not_found_behavior == OwnersNotFoundBehavior.warn:
                 logger.warning(msg)
@@ -258,45 +259,58 @@ async def addresses_with_origins_from_filesystem_specs(
     )
 
 
+@rule
+async def resolve_addresses_with_origins(specs: Specs) -> AddressesWithOrigins:
+    from_address_specs, from_filesystem_specs = await MultiGet(
+        Get(AddressesWithOrigins, AddressSpecs, specs.address_specs),
+        Get(AddressesWithOrigins, FilesystemSpecs, specs.filesystem_specs),
+    )
+    # It's possible to resolve the same address both with filesystem specs and address specs. We
+    # dedupe, but most go through some ceremony for the equality check because the OriginSpec will
+    # differ.
+    filesystem_addresses = FrozenOrderedSet(awo.address for awo in from_filesystem_specs)
+    result = OrderedSet(from_filesystem_specs)
+    result.update(awo for awo in from_address_specs if awo.address not in filesystem_addresses)
+    return AddressesWithOrigins(result)
+
+
 # -----------------------------------------------------------------------------------------------
 # SourcesSnapshots
 # -----------------------------------------------------------------------------------------------
 
 
 @rule
-async def sources_snapshot_from_target(wrapped_tgt: WrappedTarget) -> SourcesSnapshot:
-    """Construct a SourcesSnapshot from a Target without hydrating any other fields."""
-    hydrated_sources = await Get(
-        HydratedSources, HydrateSourcesRequest(wrapped_tgt.target.get(Sources))
-    )
-    return SourcesSnapshot(hydrated_sources.snapshot)
-
-
-@rule
-async def sources_snapshots_from_address_specs(address_specs: AddressSpecs) -> SourcesSnapshots:
-    """Request SourcesSnapshots for the given address specs.
-
-    Each address will map to a corresponding SourcesSnapshot. This rule avoids hydrating any other
-    fields.
-    """
-    addresses = await Get(Addresses, AddressSpecs, address_specs)
-    snapshots = await MultiGet(Get(SourcesSnapshot, Address, a) for a in addresses)
-    return SourcesSnapshots(snapshots)
-
-
-@rule
-async def sources_snapshots_from_filesystem_specs(
-    filesystem_specs: FilesystemSpecs, global_options: GlobalOptions,
+async def resolve_sources_snapshots(
+    specs: Specs, global_options: GlobalOptions
 ) -> SourcesSnapshots:
-    """Resolve the snapshot associated with the provided filesystem specs."""
-    snapshot = await Get(
-        Snapshot,
-        PathGlobs,
-        filesystem_specs.to_path_globs(
-            global_options.options.owners_not_found_behavior.to_glob_match_error_behavior()
-        ),
+    """Request snapshots for the given specs.
+
+    Address specs will use their `Sources` field, and Filesystem specs will use whatever args were
+    given. Filesystem specs may safely refer to files with no owning target.
+    """
+    targets = await Get(Targets, AddressSpecs, specs.address_specs)
+    all_hydrated_sources = await MultiGet(
+        Get(HydratedSources, HydrateSourcesRequest(tgt[Sources]))
+        for tgt in targets
+        if tgt.has_field(Sources)
     )
-    return SourcesSnapshots([SourcesSnapshot(snapshot)])
+
+    filesystem_specs_snapshot = (
+        await Get(
+            Snapshot,
+            PathGlobs,
+            specs.filesystem_specs.to_path_globs(
+                global_options.options.owners_not_found_behavior.to_glob_match_error_behavior()
+            ),
+        )
+        if specs.filesystem_specs
+        else None
+    )
+
+    result = [hydrated_sources.snapshot for hydrated_sources in all_hydrated_sources]
+    if filesystem_specs_snapshot:
+        result.append(filesystem_specs_snapshot)
+    return SourcesSnapshots(result)
 
 
 def rules():
@@ -309,9 +323,8 @@ def rules():
         transitive_targets,
         find_owners,
         addresses_with_origins_from_filesystem_specs,
-        sources_snapshot_from_target,
-        sources_snapshots_from_address_specs,
-        sources_snapshots_from_filesystem_specs,
-        RootRule(FilesystemSpecs),
+        resolve_sources_snapshots,
+        resolve_addresses_with_origins,
+        RootRule(Specs),
         RootRule(OwnersRequest),
     ]

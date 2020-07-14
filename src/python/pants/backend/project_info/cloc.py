@@ -85,11 +85,7 @@ async def run_cloc(
 ) -> CountLinesOfCode:
     """Runs the cloc Perl script."""
     all_file_names = sorted(
-        set(
-            itertools.chain.from_iterable(
-                sources_snapshot.snapshot.files for sources_snapshot in sources_snapshots
-            )
-        )
+        set(itertools.chain.from_iterable(snapshot.files for snapshot in sources_snapshots))
     )
     file_content = "\n".join(all_file_names).encode()
 
@@ -109,7 +105,7 @@ async def run_cloc(
             (
                 input_file_digest,
                 downloaded_cloc_binary.digest,
-                *(sources_snapshot.snapshot.digest for sources_snapshot in sources_snapshots),
+                *(snapshot.digest for snapshot in sources_snapshots),
             )
         ),
     )

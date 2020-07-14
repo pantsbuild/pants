@@ -84,7 +84,7 @@ class SpecsCalculator:
         logger.debug("specs are: %s", specs)
         logger.debug("changed_options are: %s", changed_options)
 
-        if changed_options.is_actionable() and specs.provided_specs.dependencies:
+        if changed_options.is_actionable() and specs.provided:
             # We've been provided both a change request and specs.
             raise InvalidSpecConstraint(
                 "Multiple target selection methods provided. Please use only one of "

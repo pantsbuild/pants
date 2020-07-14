@@ -21,7 +21,7 @@ from pants.engine.fs import Digest, DigestContents, PathGlobs, Snapshot
 from pants.engine.internals.mapper import AddressFamily, AddressMap, AddressMapper
 from pants.engine.internals.parser import BuildFilePreludeSymbols, error_on_imports
 from pants.engine.internals.target_adaptor import TargetAdaptor
-from pants.engine.rules import RootRule, rule
+from pants.engine.rules import rule
 from pants.engine.selectors import Get, MultiGet
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.frozendict import FrozenDict
@@ -231,8 +231,4 @@ def create_graph_rules(address_mapper: AddressMapper):
         # AddressFamilies for each of them.
         addresses_with_origins_from_address_specs,
         strip_address_origins,
-        # Root rules representing parameters that might be provided via root subjects.
-        RootRule(Address),
-        RootRule(AddressWithOrigin),
-        RootRule(AddressSpecs),
     ]

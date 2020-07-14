@@ -10,7 +10,7 @@ from typing import Tuple
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.engine.collection import Collection
 from pants.engine.console import Console
-from pants.engine.fs import Digest, DigestContents, SourcesSnapshot, SourcesSnapshots
+from pants.engine.fs import Digest, DigestContents, Snapshot, SourcesSnapshots
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import SubsystemRule, goal_rule, rule
 from pants.engine.selectors import Get, MultiGet
@@ -242,8 +242,7 @@ async def validate(
     console: Console, sources_snapshots: SourcesSnapshots, validate_options: ValidateOptions,
 ) -> Validate:
     per_snapshot_rmrs = await MultiGet(
-        Get(RegexMatchResults, SourcesSnapshot, source_snapshot)
-        for source_snapshot in sources_snapshots
+        Get(RegexMatchResults, Snapshot, source_snapshot) for source_snapshot in sources_snapshots
     )
     regex_match_results = list(itertools.chain(*per_snapshot_rmrs))
 
@@ -285,10 +284,10 @@ async def validate(
 
 @rule
 async def match_regexes_for_one_snapshot(
-    sources_snapshot: SourcesSnapshot, source_file_validation: SourceFileValidation,
+    snapshot: Snapshot, source_file_validation: SourceFileValidation,
 ) -> RegexMatchResults:
     multi_matcher = source_file_validation.get_multi_matcher()
-    digest_contents = await Get(DigestContents, Digest, sources_snapshot.snapshot.digest)
+    digest_contents = await Get(DigestContents, Digest, snapshot.digest)
     return RegexMatchResults(
         multi_matcher.check_source_file(file_content.path, file_content.content)
         for file_content in digest_contents

@@ -317,6 +317,9 @@ class AddressSpecs:
     def __iter__(self) -> Iterator[AddressSpec]:
         return iter(self.dependencies)
 
+    def __bool__(self) -> bool:
+        return bool(self.dependencies)
+
 
 class FilesystemSpec(Spec, metaclass=ABCMeta):
     pass
@@ -459,22 +462,10 @@ class Specs:
     address_specs: AddressSpecs
     filesystem_specs: FilesystemSpecs
 
-    def __post_init__(self) -> None:
-        if self.address_specs.dependencies and self.filesystem_specs.dependencies:
-            raise AmbiguousSpecs(
-                "Both address specs and filesystem specs given. Please use only one type of spec.\n\n"
-                f"Address specs: {', '.join(spec.to_spec_string() for spec in self.address_specs)}\n"
-                f"Filesystem specs: {', '.join(spec.to_spec_string() for spec in self.filesystem_specs)}"
-            )
-
     @property
-    def provided_specs(self) -> Union[AddressSpecs, FilesystemSpecs]:
-        """Return whichever types of specs was provided by the user.
-
-        It is guaranteed that there will only ever be AddressSpecs or FilesystemSpecs, but not both,
-        through validation in the constructor.
-        """
-        return self.filesystem_specs if self.filesystem_specs.dependencies else self.address_specs
+    def provided(self) -> bool:
+        """Did the user provide specs?"""
+        return bool(self.address_specs) or bool(self.filesystem_specs)
 
 
 OriginSpec = Union[AddressSpec, FilesystemResolvedSpec]
