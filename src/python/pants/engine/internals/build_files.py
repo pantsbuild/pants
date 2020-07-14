@@ -101,11 +101,7 @@ def _raise_did_you_mean(address_family: AddressFamily, name: str, source=None) -
 @rule
 async def find_build_file(address: Address) -> BuildFileAddress:
     address_family = await Get(AddressFamily, Dir(address.spec_path))
-    owning_address = (
-        address
-        if not address.generated_base_target_name
-        else Address(address.spec_path, address.generated_base_target_name)
-    )
+    owning_address = address.maybe_convert_to_base_target()
     if owning_address not in address_family.addressables:
         _raise_did_you_mean(address_family=address_family, name=owning_address.target_name)
     bfa = next(

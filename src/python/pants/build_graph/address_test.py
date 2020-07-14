@@ -204,6 +204,14 @@ def test_address_spec() -> None:
     assert generated_subdirectory_addr.path_safe_spec == "a.b.subdir.c.txt"
 
 
+def test_address_maybe_convert_to_base_target() -> None:
+    generated_addr = Address("a/b", "c.txt", generated_base_target_name="c")
+    assert generated_addr.maybe_convert_to_base_target() == Address("a/b", "c")
+
+    normal_addr = Address("a/b", "c")
+    assert normal_addr.maybe_convert_to_base_target() is normal_addr
+
+
 def test_address_parse_method() -> None:
     def assert_parsed(spec_path: str, target_name: str, address: Address) -> None:
         assert spec_path == address.spec_path
@@ -236,3 +244,6 @@ def test_build_file_address() -> None:
     assert generated_bfa != BuildFileAddress(rel_path="dir/BUILD", target_name="example.txt")
     assert generated_bfa == Address("dir", "example.txt", generated_base_target_name="original")
     assert generated_bfa.spec == "dir/example.txt"
+    assert generated_bfa.maybe_convert_to_base_target() == BuildFileAddress(
+        rel_path="dir/BUILD", target_name="original"
+    )
