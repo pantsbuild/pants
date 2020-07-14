@@ -42,6 +42,8 @@ BasicAuthCreds = namedtuple("BasicAuthCreds", ["username", "password"])
 
 
 class BasicAuth(Subsystem):
+    """Support for HTTP basicauth."""
+
     options_scope = "basicauth"
 
     @classmethod
