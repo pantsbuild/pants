@@ -260,6 +260,16 @@ pub fn create_exception(msg: &str) -> Value {
   Value::from(with_externs(|py, e| e.call_method(py, "create_exception", (msg,), None)).unwrap())
 }
 
+pub fn check_for_python_none(value: Value) -> Option<Value> {
+  let gil = Python::acquire_gil();
+  let py = gil.python();
+
+  if *value == py.None() {
+    return None;
+  }
+  Some(value)
+}
+
 pub fn call_method(value: &Value, method: &str, args: &[Value]) -> Result<Value, Failure> {
   let arg_handles: Vec<PyObject> = args.iter().map(|v| v.clone().into()).collect();
   let gil = Python::acquire_gil();

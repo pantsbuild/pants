@@ -522,14 +522,8 @@ impl CommandRunner for BoundedCommandRunner {
     let desc = req
       .user_facing_name()
       .unwrap_or_else(|| "<Unnamed process>".to_string());
-    let outer_metadata = WorkunitMetadata {
-      desc: Some(desc.clone()),
-      level: Level::Debug,
-      message: None,
-      blocked: true,
-      stdout: None,
-      stderr: None,
-    };
+    let mut outer_metadata = WorkunitMetadata::with_level(Level::Debug);
+    outer_metadata.desc = Some(desc.clone());
     let bounded_fut = {
       let inner = self.inner.clone();
       let semaphore = self.inner.1.clone();
@@ -537,14 +531,8 @@ impl CommandRunner for BoundedCommandRunner {
       let name = format!("{}-running", req.workunit_name());
 
       semaphore.with_acquired(move |concurrency_id| {
-        let metadata = WorkunitMetadata {
-          desc: Some(desc),
-          message: None,
-          level: Level::Info,
-          blocked: false,
-          stdout: None,
-          stderr: None,
-        };
+        let mut metadata = WorkunitMetadata::with_level(Level::Info);
+        metadata.desc = Some(desc);
 
         let metadata_updater = |result: &Result<FallibleProcessResultWithPlatform, String>,
                                 old_metadata| match result {
