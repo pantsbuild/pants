@@ -122,14 +122,17 @@ impl CommandRunner {
     ));
 
     let store_channel = {
+      let store_server = store_servers
+        .get(0)
+        .ok_or_else(|| "At least one store_server must be specified".to_owned())?;
       let builder = grpcio::ChannelBuilder::new(env.clone());
       if let Some(ref root_ca_certs) = root_ca_certs {
         let creds = grpcio::ChannelCredentialsBuilder::new()
           .root_cert(root_ca_certs.clone())
           .build();
-        builder.secure_connect(&store_servers[0], creds)
+        builder.secure_connect(&store_server, creds)
       } else {
-        builder.connect(&store_servers[0])
+        builder.connect(&store_server)
       }
     };
     let action_cache_client = Arc::new(
