@@ -467,10 +467,6 @@ class SchedulerSession:
         """Returns metrics for this SchedulerSession as a dict of metric name to metric value."""
         return self._scheduler._metrics(self._session)
 
-    @staticmethod
-    def engine_workunits(metrics):
-        return metrics.get("engine_workunits")
-
     def _maybe_visualize(self):
         if self._scheduler.visualize_to_dir is not None:
             name = f"graph.{self._run_count:03d}.dot"
