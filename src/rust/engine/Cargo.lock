@@ -379,6 +379,7 @@ dependencies = [
 name = "concrete_time"
 version = "0.0.1"
 dependencies = [
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "protobuf 2.0.6 (git+https://github.com/pantsbuild/rust-protobuf?rev=171611c33ec92f07e1b7107327f6d0139a7afebf)",
  "serde 1.0.111 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.111 (registry+https://github.com/rust-lang/crates.io-index)",
