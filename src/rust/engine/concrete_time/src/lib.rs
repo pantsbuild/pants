@@ -106,7 +106,7 @@ impl TimeSpan {
     let duration = match end.checked_sub(start) {
       Some(d) => d,
       None => {
-        log::warn!("Invalid TimeSpan - start: {:?}, end: {:?}", start, end);
+        log::debug!("Invalid TimeSpan - start: {:?}, end: {:?}", start, end);
         std::time::Duration::new(0, 0)
       }
     };
