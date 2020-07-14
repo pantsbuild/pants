@@ -17,11 +17,12 @@ from pants.engine import desktop
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
 from pants.engine.console import Console
+from pants.engine.engine_aware import EngineAware
 from pants.engine.fs import Digest, DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.interactive_process import InteractiveProcess, InteractiveRunner
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import EngineAware, goal_rule, rule
+from pants.engine.rules import goal_rule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
     FieldSetWithOrigin,

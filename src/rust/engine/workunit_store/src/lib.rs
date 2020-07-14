@@ -112,6 +112,7 @@ pub struct WorkunitMetadata {
   pub blocked: bool,
   pub stdout: Option<hashing::Digest>,
   pub stderr: Option<hashing::Digest>,
+  pub artifacts: Vec<(String, hashing::Digest)>,
 }
 
 impl WorkunitMetadata {
@@ -135,6 +136,7 @@ impl Default for WorkunitMetadata {
       blocked: false,
       stdout: None,
       stderr: None,
+      artifacts: Vec::new(),
     }
   }
 }

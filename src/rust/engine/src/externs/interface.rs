@@ -865,6 +865,13 @@ fn workunit_to_py_value(workunit: &Workunit, core: &Arc<Core>) -> CPyResult<Valu
 
   let mut artifact_entries = Vec::new();
 
+  for (artifact_name, digest) in workunit.metadata.artifacts.iter() {
+    artifact_entries.push((
+      externs::store_utf8(artifact_name.as_str()),
+      crate::nodes::Snapshot::store_directory(core, digest),
+    ))
+  }
+
   if let Some(stdout_digest) = &workunit.metadata.stdout.as_ref() {
     artifact_entries.push((
       externs::store_utf8("stdout_digest"),
