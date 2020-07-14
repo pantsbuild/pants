@@ -43,13 +43,11 @@ class ChangedAddresses(Collection[Address]):
 async def find_changed_owners(request: ChangedRequest) -> ChangedAddresses:
     owners = await Get(Owners, OwnersRequest(request.sources))
     if request.dependees == DependeesOption.NONE:
-        return ChangedAddresses(owners.addresses)
+        return ChangedAddresses(owners)
     address_to_dependees = await Get(
         Dependees,
         DependeesRequest(
-            owners.addresses,
-            transitive=request.dependees == DependeesOption.TRANSITIVE,
-            include_roots=True,
+            owners, transitive=request.dependees == DependeesOption.TRANSITIVE, include_roots=True,
         ),
     )
     return ChangedAddresses(address_to_dependees)

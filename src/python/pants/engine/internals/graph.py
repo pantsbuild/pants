@@ -26,6 +26,7 @@ from pants.engine.addresses import (
     AddressWithOrigin,
     BuildFileAddress,
 )
+from pants.engine.collection import Collection
 from pants.engine.fs import MergeDigests, PathGlobs, Snapshot, SourcesSnapshot
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import RootRule, rule
@@ -162,9 +163,8 @@ class OwnersRequest:
     sources: Tuple[str, ...]
 
 
-@dataclass(frozen=True)
-class Owners:
-    addresses: Addresses
+class Owners(Collection[Address]):
+    pass
 
 
 @rule
@@ -174,12 +174,29 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
 
     # Walk up the buildroot looking for targets that would conceivably claim changed sources.
     candidate_specs = tuple(AscendantAddresses(directory=d) for d in dirs_set)
-    candidate_targets = await Get(Targets, AddressSpecs(candidate_specs))
+    candidate_explicit_targets = await Get(Targets, AddressSpecs(candidate_specs))
+
+    # Generate subtargets.
+    candidate_explicit_target_sources = await MultiGet(
+        Get(HydratedSources, HydrateSourcesRequest(tgt.get(Sources)))
+        for tgt in candidate_explicit_targets
+    )
+    candidate_targets: OrderedSet[Target] = OrderedSet()
+    for explicit_tgt, explicit_tgt_sources in zip(
+        candidate_explicit_targets, candidate_explicit_target_sources
+    ):
+        if not explicit_tgt_sources.snapshot.files:
+            continue
+        candidate_targets.update(
+            generate_subtarget(explicit_tgt, full_file_name=f)
+            for f in explicit_tgt_sources.snapshot.files
+        )
+
     build_file_addresses = await MultiGet(
         Get(BuildFileAddress, Address, tgt.address) for tgt in candidate_targets
     )
 
-    owners = Addresses(
+    return Owners(
         tgt.address
         for tgt, bfa in zip(candidate_targets, build_file_addresses)
         if bfa.rel_path in sources_set
@@ -187,7 +204,6 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
         # target, which is why we use `matches_filespec`.
         or bool(matches_filespec(tgt.get(Sources).filespec, paths=sources_set))
     )
-    return Owners(owners)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -201,6 +217,9 @@ async def addresses_with_origins_from_filesystem_specs(
 ) -> AddressesWithOrigins:
     """Find the owner(s) for each FilesystemSpec while preserving the original FilesystemSpec those
     owners come from.
+
+    When a file has only one owning target, we generate a subtarget from that owner whose source's
+    field only refers to that one file. Otherwise, we use all the original owning targets.
 
     This will merge FilesystemSpecs that come from the same owning target into a single
     FilesystemMergedSpec.
@@ -226,7 +245,7 @@ async def addresses_with_origins_from_filesystem_specs(
         if (
             global_options.options.owners_not_found_behavior != OwnersNotFoundBehavior.ignore
             and isinstance(spec, FilesystemLiteralSpec)
-            and not owners.addresses
+            and not owners
         ):
             file_path = PurePath(spec.to_spec_string())
             msg = (
@@ -247,7 +266,7 @@ async def addresses_with_origins_from_filesystem_specs(
             if isinstance(spec, FilesystemLiteralSpec)
             else FilesystemResolvedGlobSpec(glob=spec.glob, files=snapshot.files)
         )
-        for address in owners.addresses:
+        for address in owners:
             addresses_to_specs[address].append(origin)
     return AddressesWithOrigins(
         AddressWithOrigin(
