@@ -5,6 +5,27 @@ This document describes releases leading up to the ``1.30.x`` ``stable`` series.
 
 See https://pants.readme.io/v1.30/docs/release-notes-1-30 for an overview of the changes in this release.
 
+1.30.0rc2 (7/14/2020)
+---------------------
+
+Bugfixes
+~~~~~~~~
+
+* Fix Pytest XML reports and Coverage breaking with remote execution (cherrypick of #10136) (#10324)
+  `PR #10324 <https://github.com/pantsbuild/pants/pull/10324>`_
+
+* Set dynamic-ui default based on CI (cherrypick of #10140) (#10325)
+  `PR #10140 <https://github.com/pantsbuild/pants/pull/10140>`_
+
+* Hotfix Bandit breaking from Stevedore 3.0 release (#10322)
+  `PR #10322 <https://github.com/pantsbuild/pants/pull/10322>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Fix tests that relied on the docsite CNAME file. (cherrypick of #10337) (#10342)
+  `PR #10342 <https://github.com/pantsbuild/pants/pull/10342>`_
+
 1.30.0rc1 (6/27/2020)
 ---------------------
 
