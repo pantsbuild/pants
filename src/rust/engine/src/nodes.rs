@@ -23,7 +23,7 @@ use crate::selectors;
 use crate::tasks::{self, Rule};
 use boxfuture::{BoxFuture, Boxable};
 use bytes::{self, BufMut};
-use cpython::{Python, PythonObject};
+use cpython::{PyDict, PyString, Python, PythonObject};
 use fs::{
   self, Dir, DirectoryListing, File, FileContent, GlobExpansionConjunction, GlobMatching, Link,
   PathGlobs, PathStat, PreparedPathGlobs, StrictGlobMatching, VFS,
@@ -810,16 +810,42 @@ impl Task {
     future::try_join_all(get_futures).await
   }
 
+  fn compute_new_artifacts(result_val: &Value) -> Option<Vec<(String, hashing::Digest)>> {
+    let artifacts_val: Value = externs::call_method(&result_val, "artifacts", &[]).ok()?;
+    let artifacts_val: Value = externs::check_for_python_none(artifacts_val)?;
+    let gil = Python::acquire_gil();
+    let py = gil.python();
+    let artifacts_dict: &PyDict = &*artifacts_val.cast_as::<PyDict>(py).ok()?;
+    let mut output = Vec::new();
+
+    for (key, value) in artifacts_dict.items(py).into_iter() {
+      let key_name: String = match key.cast_as::<PyString>(py) {
+        Ok(s) => s.to_string_lossy(py).into(),
+        Err(e) => {
+          log::warn!(
+            "Error in EngineAware.artifacts() implementation - non-string key: {:?}",
+            e
+          );
+          return None;
+        }
+      };
+      let digest = match lift_digest(&Value::new(value)) {
+        Ok(digest) => digest,
+        Err(e) => {
+          log::warn!("Error in EngineAware.artifacts() implementation: {}", e);
+          return None;
+        }
+      };
+
+      output.push((key_name, digest));
+    }
+
+    Some(output)
+  }
+
   fn compute_workunit_message(result_val: &Value) -> Option<String> {
     let msg_val: Value = externs::call_method(&result_val, "message", &[]).ok()?;
-    {
-      let gil = Python::acquire_gil();
-      let py = gil.python();
-
-      if *msg_val == py.None() {
-        return None;
-      }
-    }
+    let msg_val = externs::check_for_python_none(msg_val)?;
     Some(externs::val_to_str(&msg_val))
   }
 
@@ -827,15 +853,7 @@ impl Task {
     use num_enum::TryFromPrimitiveError;
 
     let new_level_val: Value = externs::call_method(&result_val, "level", &[]).ok()?;
-
-    {
-      let gil = Python::acquire_gil();
-      let py = gil.python();
-
-      if *new_level_val == py.None() {
-        return None;
-      }
-    }
+    let new_level_val = externs::check_for_python_none(new_level_val)?;
 
     let new_py_level: PythonLogLevel = match externs::project_maybe_u64(&new_level_val, "_level")
       .and_then(|n: u64| {
@@ -898,6 +916,7 @@ pub struct PythonRuleOutput {
   value: Value,
   new_level: Option<log::Level>,
   message: Option<String>,
+  new_artifacts: Vec<(String, hashing::Digest)>,
 }
 
 #[async_trait]
@@ -938,18 +957,20 @@ impl WrappedNode for Task {
     }
 
     if result_type == product {
-      let (new_level, message) = if can_modify_workunit {
+      let (new_level, message, new_artifacts) = if can_modify_workunit {
         (
           Self::compute_new_workunit_level(&result_val),
           Self::compute_workunit_message(&result_val),
+          Self::compute_new_artifacts(&result_val).unwrap_or_else(Vec::new),
         )
       } else {
-        (None, None)
+        (None, None, Vec::new())
       };
       Ok(PythonRuleOutput {
         value: result_val,
         new_level,
         message,
+        new_artifacts,
       })
     } else {
       Err(throw(&format!(
@@ -1107,6 +1128,7 @@ impl Node for NodeKey {
       blocked: false,
       stdout: None,
       stderr: None,
+      artifacts: Vec::new(),
     };
     let metadata2 = metadata.clone();
 
@@ -1126,6 +1148,7 @@ impl Node for NodeKey {
 
       let mut level = metadata.level;
       let mut message = None;
+      let mut artifacts = Vec::new();
       let mut result = match maybe_watch {
         Ok(()) => match self {
           NodeKey::DigestFile(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Digest).await,
@@ -1162,6 +1185,7 @@ impl Node for NodeKey {
                   level = new_level;
                 }
                 message = python_rule_output.message;
+                artifacts = python_rule_output.new_artifacts;
                 NodeOutput::Value(python_rule_output.value)
               })
               .await
@@ -1177,6 +1201,7 @@ impl Node for NodeKey {
       let final_metadata = WorkunitMetadata {
         level,
         message,
+        artifacts,
         ..metadata
       };
       (result, final_metadata)
@@ -1274,6 +1299,7 @@ impl TryFrom<NodeOutput> for PythonRuleOutput {
         value: v,
         new_level: None,
         message: None,
+        new_artifacts: Vec::new(),
       }),
       _ => Err(()),
     }
