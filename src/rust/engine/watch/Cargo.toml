@@ -12,7 +12,8 @@ futures = "0.3"
 hashing = { path = "../hashing" }
 log = "0.4"
 logging = { path = "../logging" }
-notify = "5.0.0-pre.2"
+# TODO: See https://github.com/notify-rs/notify/issues/255.
+notify = { git = "https://github.com/pantsbuild/notify", rev = "64880f0662db2b5ecbf25f1cccdca64bb8fac1bc" }
 parking_lot = "0.11"
 task_executor = { path = "../task_executor" }
 
