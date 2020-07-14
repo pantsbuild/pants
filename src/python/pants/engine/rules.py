@@ -20,23 +20,6 @@ from pants.util.meta import decorated_type_checkable, frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 
-class EngineAware(ABC):
-    """This is a marker class used to indicate that the output of an `@rule` can send metadata about
-    the rule's output to the engine.
-
-    EngineAware defines abstract methods on the class, all of which return an Optional[T], and which
-    are expected to be overridden by concrete types implementing EngineAware.
-    """
-
-    def level(self) -> Optional[LogLevel]:
-        """Overrides the level of the workunit associated with this type."""
-        return None
-
-    def message(self) -> Optional[str]:
-        """Sets an optional result message on the workunit."""
-        return None
-
-
 @decorated_type_checkable
 def side_effecting(cls):
     """Annotates a class to indicate that it is a side-effecting type, which needs to be handled
@@ -342,11 +325,11 @@ def rule_decorator(func, **kwargs) -> Callable:
     validate_parameter_types(func_id, parameter_types, cacheable)
 
     # Set a default canonical name if one is not explicitly provided. For Goal classes
-    # this is the name of the Goal; for other named ruled this is the __name__ of the function
-    # that implements it.
+    # this is the name of the Goal; for other named ruled this is the module and name of the
+    # function that implements it.
     effective_name = kwargs.get("canonical_name")
     if effective_name is None:
-        effective_name = return_type.name if is_goal_cls else func.__name__
+        effective_name = return_type.name if is_goal_cls else f"{func.__module__}.{func.__name__}"
 
     effective_desc = kwargs.get("desc")
     if effective_desc is None and is_goal_cls:

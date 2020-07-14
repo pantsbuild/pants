@@ -33,7 +33,7 @@ function remove_venv() {
 
 function create_venv() {
   remove_venv
-  run_virtualenv "$(venv_dir)"
+  "${REPO_ROOT}/build-support/virtualenv" "$(venv_dir)"
 }
 
 function ensure_gcc() {
