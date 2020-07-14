@@ -86,6 +86,7 @@ class LegacyGraphSession:
 
     def goal_consumed_types(self, goal_product: Type) -> Set[Type]:
         """Return the set of types that could possibly be consumed while running the given goal."""
+        # NB: Keep this in sync with the method `run_goal_rules`.
         return set(
             self.scheduler_session.scheduler.rule_graph_consumed_types(
                 [Specs, Console, InteractiveRunner, OptionsBootstrapper, Workspace], goal_product
@@ -123,6 +124,7 @@ class LegacyGraphSession:
             )
             if not is_implemented:
                 continue
+            # NB: Keep this in sync with the method `goal_consumed_types`.
             params = Params(
                 specs, options_bootstrapper, self.console, workspace, interactive_runner
             )

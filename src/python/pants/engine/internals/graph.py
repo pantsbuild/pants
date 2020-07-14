@@ -266,7 +266,7 @@ async def resolve_addresses_with_origins(specs: Specs) -> AddressesWithOrigins:
         Get(AddressesWithOrigins, FilesystemSpecs, specs.filesystem_specs),
     )
     # It's possible to resolve the same address both with filesystem specs and address specs. We
-    # dedupe, but most go through some ceremony for the equality check because the OriginSpec will
+    # dedupe, but must go through some ceremony for the equality check because the OriginSpec will
     # differ.
     filesystem_addresses = FrozenOrderedSet(awo.address for awo in from_filesystem_specs)
     result = OrderedSet(from_filesystem_specs)
