@@ -130,6 +130,30 @@ class GraphTest(TestBase):
         )
         assert result.snapshot.files == ("demo/BUILD", "demo/f1.txt", "demo/f2.txt")
 
+    def test_owners_source_file_does_not_exist(self) -> None:
+        """Test when a source file belongs to a target, even though the file does not actually
+        exist.
+
+        This happens, for example, when the file is deleted and we're computing `--changed-since`.
+        In this case, we should not attempt to generate a subtarget and should use the original
+        target.
+        """
+        self.create_file("demo/f.txt")
+        self.add_to_build_file("demo", "target(sources=['*.txt'])")
+        result = self.request_single_product(Owners, OwnersRequest(("demo/deleted.txt",)))
+        assert result == Owners([Address("demo", "demo")])
+        # For files that do exist, we should still use a generated subtarget, though.
+        result = self.request_single_product(Owners, OwnersRequest(("demo/f.txt",)))
+        assert result == Owners(
+            [Address("demo", target_name="f.txt", generated_base_target_name="demo")]
+        )
+        # However, if a sibling file must use the original target, then we should always use
+        # the original target to avoid redundancy.
+        result = self.request_single_product(
+            Owners, OwnersRequest(("demo/f.txt", "demo/deleted.txt"))
+        )
+        assert result == Owners([Address("demo", "demo")])
+
     def test_owners_multiple_owners(self) -> None:
         """This tests that we do not use generated subtargets when there are multiple owners.
 
