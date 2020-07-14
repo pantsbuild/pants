@@ -87,6 +87,10 @@ class ChangedOptions:
         )
         return cls(since, options.diffspec, dependees)
 
+    @property
+    def provided(self) -> bool:
+        return bool(self.since) or bool(self.diffspec)
+
     def changed_files(self, *, scm: Scm) -> List[str]:
         """Determines the files changed according to SCM/workspace and options."""
         if self.diffspec:

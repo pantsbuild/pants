@@ -84,7 +84,7 @@ class SpecsCalculator:
         logger.debug("specs are: %s", specs)
         logger.debug("changed_options are: %s", changed_options)
 
-        if specs.provided and (changed_options.since or changed_options.diffspec):
+        if specs.provided and changed_options.provided:
             changed_name = "--changed-since" if changed_options.since else "--changed-diffspec"
             if specs.filesystem_specs and specs.address_specs:
                 specs_description = "target and file arguments"
@@ -97,7 +97,7 @@ class SpecsCalculator:
                 "use only one."
             )
 
-        if specs.provided:
+        if not changed_options.provided:
             return specs
 
         scm = get_scm()
