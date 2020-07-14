@@ -26,7 +26,7 @@ from pants.engine.addresses import (
     AddressWithOrigin,
     BuildFileAddress,
 )
-from pants.engine.fs import PathGlobs, Snapshot, SourcesSnapshots
+from pants.engine.fs import MergeDigests, PathGlobs, Snapshot, SourcesSnapshot
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
@@ -290,15 +290,13 @@ async def resolve_addresses_with_origins(specs: Specs) -> AddressesWithOrigins:
 
 
 # -----------------------------------------------------------------------------------------------
-# SourcesSnapshots
+# SourcesSnapshot
 # -----------------------------------------------------------------------------------------------
 
 
 @rule
-async def resolve_sources_snapshots(
-    specs: Specs, global_options: GlobalOptions
-) -> SourcesSnapshots:
-    """Request snapshots for the given specs.
+async def resolve_sources_snapshot(specs: Specs, global_options: GlobalOptions) -> SourcesSnapshot:
+    """Request a snapshot for the given specs.
 
     Address specs will use their `Sources` field, and Filesystem specs will use whatever args were
     given. Filesystem specs may safely refer to files with no owning target.
@@ -322,10 +320,13 @@ async def resolve_sources_snapshots(
         else None
     )
 
-    result = [hydrated_sources.snapshot for hydrated_sources in all_hydrated_sources]
+    # NB: We merge into a single snapshot to avoid the same files being duplicated if they were
+    # covered both by address specs and filesystem specs.
+    digests = [hydrated_sources.snapshot.digest for hydrated_sources in all_hydrated_sources]
     if filesystem_specs_snapshot:
-        result.append(filesystem_specs_snapshot)
-    return SourcesSnapshots(result)
+        digests.append(filesystem_specs_snapshot.digest)
+    result = await Get(Snapshot, MergeDigests(digests))
+    return SourcesSnapshot(result)
 
 
 def rules():
@@ -338,7 +339,7 @@ def rules():
         transitive_targets,
         find_owners,
         addresses_with_origins_from_filesystem_specs,
-        resolve_sources_snapshots,
+        resolve_sources_snapshot,
         resolve_addresses_with_origins,
         RootRule(Specs),
         RootRule(OwnersRequest),

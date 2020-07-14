@@ -337,12 +337,15 @@ class SingleFileExecutable:
         self.digest = snapshot.digest
 
 
-class SourcesSnapshots(Collection[Snapshot]):
-    """A collection of sources matched by command line specs.
+@dataclass(frozen=True)
+class SourcesSnapshot:
+    """Sources matched by command line specs.
 
     `@goal_rule`s may request this when they only need source files to operate and do not need any
-    target information.
+    target information. This allows running on files with no owning targets.
     """
+
+    snapshot: Snapshot
 
 
 def create_fs_rules():

@@ -1,7 +1,6 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import itertools
 import re
 from dataclasses import dataclass
 from enum import Enum
@@ -10,10 +9,10 @@ from typing import Tuple
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.engine.collection import Collection
 from pants.engine.console import Console
-from pants.engine.fs import Digest, DigestContents, Snapshot, SourcesSnapshots
+from pants.engine.fs import Digest, DigestContents, SourcesSnapshot
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.rules import SubsystemRule, goal_rule, rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.rules import SubsystemRule, goal_rule
+from pants.engine.selectors import Get
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method
 
@@ -235,19 +234,23 @@ class MultiMatcher:
         return applicable_content_pattern_names, content_encoding
 
 
-# TODO: Switch this to `lint` once we figure out a good way for v1 tasks and v2 rules
-# to share goal names.
+# TODO: Consider switching this to `lint`. The main downside is that we would no longer be able to
+#  run on files with no owning targets, such as running on BUILD files.
 @goal_rule
 async def validate(
-    console: Console, sources_snapshots: SourcesSnapshots, validate_options: ValidateOptions,
+    console: Console,
+    sources_snapshot: SourcesSnapshot,
+    validate_options: ValidateOptions,
+    source_file_validation: SourceFileValidation,
 ) -> Validate:
-    per_snapshot_rmrs = await MultiGet(
-        Get(RegexMatchResults, Snapshot, source_snapshot) for source_snapshot in sources_snapshots
+    multi_matcher = source_file_validation.get_multi_matcher()
+    digest_contents = await Get(DigestContents, Digest, sources_snapshot.snapshot.digest)
+    regex_match_results = RegexMatchResults(
+        multi_matcher.check_source_file(file_content.path, file_content.content)
+        for file_content in sorted(digest_contents, key=lambda fc: fc.path)
     )
-    regex_match_results = list(itertools.chain(*per_snapshot_rmrs))
 
     detail_level = validate_options.values.detail_level
-    regex_match_results = sorted(regex_match_results, key=lambda x: x.path)
     num_matched_all = 0
     num_nonmatched_some = 0
     for rmr in regex_match_results:
@@ -282,21 +285,5 @@ async def validate(
     return Validate(exit_code)
 
 
-@rule
-async def match_regexes_for_one_snapshot(
-    snapshot: Snapshot, source_file_validation: SourceFileValidation,
-) -> RegexMatchResults:
-    multi_matcher = source_file_validation.get_multi_matcher()
-    digest_contents = await Get(DigestContents, Digest, snapshot.digest)
-    return RegexMatchResults(
-        multi_matcher.check_source_file(file_content.path, file_content.content)
-        for file_content in digest_contents
-    )
-
-
 def rules():
-    return [
-        validate,
-        match_regexes_for_one_snapshot,
-        SubsystemRule(SourceFileValidation),
-    ]
+    return [validate, SubsystemRule(SourceFileValidation)]

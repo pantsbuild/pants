@@ -1,7 +1,6 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import itertools
 from dataclasses import dataclass
 
 from pants.core.util_rules.external_tool import (
@@ -17,7 +16,7 @@ from pants.engine.fs import (
     FileContent,
     MergeDigests,
     SingleFileExecutable,
-    SourcesSnapshots,
+    SourcesSnapshot,
 )
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.platform import Platform
@@ -81,20 +80,18 @@ async def run_cloc(
     console: Console,
     options: CountLinesOfCodeOptions,
     cloc_binary: ClocBinary,
-    sources_snapshots: SourcesSnapshots,
+    sources_snapshot: SourcesSnapshot,
 ) -> CountLinesOfCode:
     """Runs the cloc Perl script."""
-    all_file_names = sorted(
-        set(itertools.chain.from_iterable(snapshot.files for snapshot in sources_snapshots))
-    )
-    file_content = "\n".join(all_file_names).encode()
-
-    if not file_content:
+    if not sources_snapshot.snapshot.files:
         return CountLinesOfCode(exit_code=0)
 
     input_files_filename = "input_files.txt"
     input_file_digest = await Get(
-        Digest, CreateDigest([FileContent(input_files_filename, file_content)])
+        Digest,
+        CreateDigest(
+            [FileContent(input_files_filename, "\n".join(sources_snapshot.snapshot.files).encode())]
+        ),
     )
     downloaded_cloc_binary = await Get(
         DownloadedExternalTool, ExternalToolRequest, cloc_binary.get_request(Platform.current)
@@ -102,11 +99,7 @@ async def run_cloc(
     digest = await Get(
         Digest,
         MergeDigests(
-            (
-                input_file_digest,
-                downloaded_cloc_binary.digest,
-                *(snapshot.digest for snapshot in sources_snapshots),
-            )
+            (input_file_digest, downloaded_cloc_binary.digest, sources_snapshot.snapshot.digest)
         ),
     )
 
@@ -125,7 +118,9 @@ async def run_cloc(
         argv=cmd,
         input_digest=digest,
         output_files=(report_filename, ignore_filename),
-        description=f"Count lines of code for {pluralize(len(all_file_names), 'file')}",
+        description=(
+            f"Count lines of code for {pluralize(len(sources_snapshot.snapshot.files), 'file')}"
+        ),
     )
     exec_result = await Get(ProcessResult, Process, req)
 
