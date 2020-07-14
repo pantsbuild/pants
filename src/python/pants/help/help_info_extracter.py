@@ -103,6 +103,12 @@ class HelpInfoExtracter:
         name_to_goal_info = {}
         for scope_info in sorted(options.known_scope_to_info.values(), key=lambda x: x.scope):
             options.for_scope(scope_info.scope)  # Force parsing.
+            if not scope_info.description:
+                raise ValueError(
+                    f"Subsystem {scope_info.optionable_cls.__name__} with scope "
+                    f"`{scope_info.scope}` has no description. Add a docstring or "
+                    f"implement get_description()."
+                )
             is_goal = scope_info.optionable_cls is not None and issubclass(
                 scope_info.optionable_cls, GoalSubsystem
             )
