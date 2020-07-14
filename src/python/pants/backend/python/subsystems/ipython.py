@@ -7,6 +7,8 @@ from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 
 
 class IPython(PythonToolBase):
+    """The IPython enhanced REPL (https://ipython.org/)."""
+
     options_scope = "ipython"
     default_version = "ipython==5.8.0"
     default_extra_requirements: List[str] = []

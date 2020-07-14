@@ -8,7 +8,7 @@ from typing import Any, Iterable, List, Optional, Set, Tuple, Type, cast
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
-from pants.base.specs import AddressSpecs, Specs
+from pants.base.specs import Specs
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine import interactive_process, process, target
 from pants.engine.console import Console
@@ -86,18 +86,10 @@ class LegacyGraphSession:
 
     def goal_consumed_types(self, goal_product: Type) -> Set[Type]:
         """Return the set of types that could possibly be consumed while running the given goal."""
-        # TODO: This needs to be kept in sync with the Params injected in run_goal_rules, with a
-        # subtle difference that prevents automating validation that they are kept in sync:
-        #
-        # The specs that we inject are a Union[AddressSpecs, FilesystemSpecs], which means that
-        # there are technically two entrypoints to the graph, containing different rules and having
-        # different dependencies. That should be resolved: but until then, we lie here and indicate
-        # that we always inject/consume AddressSpecs.
-        #   see https://github.com/pantsbuild/pants/issues/10152
+        # NB: Keep this in sync with the method `run_goal_rules`.
         return set(
             self.scheduler_session.scheduler.rule_graph_consumed_types(
-                [AddressSpecs, Console, InteractiveRunner, OptionsBootstrapper, Workspace,],
-                goal_product,
+                [Specs, Console, InteractiveRunner, OptionsBootstrapper, Workspace], goal_product
             )
         )
 
@@ -132,13 +124,9 @@ class LegacyGraphSession:
             )
             if not is_implemented:
                 continue
-            # NB: Keep in sync with `goal_consumed_types`: see TODO.
+            # NB: Keep this in sync with the method `goal_consumed_types`.
             params = Params(
-                specs.provided_specs,
-                options_bootstrapper,
-                self.console,
-                workspace,
-                interactive_runner,
+                specs, options_bootstrapper, self.console, workspace, interactive_runner
             )
             logger.debug(f"requesting {goal_product} to satisfy execution of `{goal}` goal")
             try:

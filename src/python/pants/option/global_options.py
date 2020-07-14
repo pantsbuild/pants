@@ -142,6 +142,8 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
 
 
 class GlobalOptions(Subsystem):
+    """Global options."""
+
     options_scope = GLOBAL_SCOPE
 
     @classmethod

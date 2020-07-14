@@ -10,6 +10,8 @@ from pants.subsystem.subsystem import Subsystem
 
 
 class SubprocessEnvironment(Subsystem):
+    """Environment for forked subprocesses."""
+
     options_scope = "subprocess-environment"
 
     @classmethod

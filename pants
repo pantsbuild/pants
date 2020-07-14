@@ -88,7 +88,7 @@ function exec_pants_bare() {
   activate_pants_venv 1>&2
   bootstrap_native_code 1>&2
   PYTHONPATH="${PANTS_SRCPATH_STR}:${PYTHONPATH}" RUNNING_PANTS_FROM_SOURCES=1 \
-    exec python "${PANTS_EXE}" "$@"
+    exec "${PY}" "${PANTS_EXE}" "$@"
 }
 
 if [[ -n "${WRAPPER_REQUIREMENTS}" ]]; then

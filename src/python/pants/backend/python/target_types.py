@@ -89,6 +89,8 @@ COMMON_PYTHON_FIELDS = (
 
 
 class PythonBinaryDefaults(Subsystem):
+    """Default settings for creating Python executables."""
+
     options_scope = "python-binary"
 
     @classmethod

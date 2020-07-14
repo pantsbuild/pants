@@ -14,8 +14,10 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Type, TypeVar,
 from pants.base.build_root import BuildRoot
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
+from pants.engine.addresses import Address
 from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, PathGlobsAndRoot, Snapshot
 from pants.engine.internals.scheduler import SchedulerSession
+from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.engine.target import Target
 from pants.init.engine_initializer import EngineInitializer
@@ -199,7 +201,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
     @classmethod
     def rules(cls):
-        return [*source_root.rules()]
+        return [*source_root.rules(), RootRule(Address)]
 
     @classmethod
     def target_types(cls) -> Sequence[Type[Target]]:
