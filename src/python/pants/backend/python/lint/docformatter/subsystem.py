@@ -6,6 +6,8 @@ from pants.option.custom_types import shell_str
 
 
 class Docformatter(PythonToolBase):
+    """The Python docformatter tool (https://github.com/myint/docformatter)."""
+
     options_scope = "docformatter"
     default_version = "docformatter>=1.3.1,<1.4"
     default_entry_point = "docformatter:main"

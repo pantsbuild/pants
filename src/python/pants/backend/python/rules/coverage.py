@@ -71,6 +71,8 @@ Step 4: `test.py` outputs the final report.
 
 
 class CoverageSubsystem(PythonToolBase):
+    """Configuration for Python test coverage measurement."""
+
     options_scope = "coverage-py"
     default_version = "coverage>=5.0.3,<5.1"
     default_entry_point = "coverage"

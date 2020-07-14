@@ -105,15 +105,16 @@ class HelpInfoExtracter:
             options.for_scope(scope_info.scope)  # Force parsing.
             optionable_cls = scope_info.optionable_cls
             if not scope_info.description:
-                cls_name = (f"{optionable_cls.__module__}.{optionable_cls.__qualname__}"
-                    if optionable_cls else "")
+                cls_name = (
+                    f"{optionable_cls.__module__}.{optionable_cls.__qualname__}"
+                    if optionable_cls
+                    else ""
+                )
                 raise ValueError(
                     f"Subsystem {cls_name} with scope `{scope_info.scope}` has no description. "
                     f"Add a docstring or implement get_description()."
                 )
-            is_goal = optionable_cls is not None and issubclass(
-                optionable_cls, GoalSubsystem
-            )
+            is_goal = optionable_cls is not None and issubclass(optionable_cls, GoalSubsystem)
             oshi: OptionScopeHelpInfo = HelpInfoExtracter(
                 scope_info.scope
             ).get_option_scope_help_info(

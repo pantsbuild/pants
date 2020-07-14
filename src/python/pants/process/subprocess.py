@@ -6,9 +6,9 @@ from pants.subsystem.subsystem import Subsystem
 
 
 class Subprocess:
-    """A subsystem for managing subprocess state."""
-
     class Factory(Subsystem):
+        """A subsystem for managing subprocess state."""
+
         # N.B. This scope is completely unused as of now, as this subsystem's current primary function
         # is to surface the `--pants-subprocessdir` global/bootstrap option at runtime. This option
         # needs to be set on the bootstrap scope vs a Subsystem scope such that we have early access

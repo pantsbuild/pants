@@ -21,6 +21,8 @@ from pants.python.python_setup import PythonSetup
 
 
 class PexBin(ExternalTool):
+    """The PEX (Python EXecutable) tool (https://github.com/pantsbuild/pex)."""
+
     options_scope = "download-pex-bin"
     name = "pex"
     default_version = "v2.1.13"
