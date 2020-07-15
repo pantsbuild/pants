@@ -31,8 +31,10 @@
 use std::collections::{hash_map, BTreeSet, HashMap, HashSet};
 
 use crate::rules::{DependencyKey, Rule};
+// TODO: The Builder should likely not be using `params_str`: we should be able to build a graph
+// without ever rendering a string representation, and deferring that for when/if we have errored.
 use crate::{
-  entry_str, params_str, Diagnostic, Entry, EntryWithDeps, InnerEntry, ParamTypes, RootEntry,
+  params_str, Diagnostic, Entry, EntryWithDeps, InnerEntry, ParamTypes, RootEntry,
   RuleDependencyEdges, RuleEdges, RuleGraph, UnfulfillableRuleMap, UnreachableError,
 };
 
@@ -43,7 +45,7 @@ enum ConstructGraphResult<R: Rule> {
   // contains copies of the input Entry for each set subset of the parameters that satisfy it.
   Fulfilled(Vec<EntryWithDeps<R>>),
   // The Entry was not satisfiable with installed rules.
-  Unfulfillable,
+  Unfulfillable(EntryWithDeps<R>),
   // The dependencies of an Entry might be satisfiable, but is currently blocked waiting for the
   // results of the given entries.
   //
@@ -173,7 +175,7 @@ impl<'t, R: Rule> Builder<'t, R> {
       return ConstructGraphResult::Fulfilled(simplified.clone());
     } else if unfulfillable_rules.get(&entry).is_some() {
       // The rule is unfulfillable.
-      return ConstructGraphResult::Unfulfillable;
+      return ConstructGraphResult::Unfulfillable(entry);
     }
 
     // Otherwise, store a placeholder in the rule_dependency_edges map and then visit its
@@ -258,6 +260,7 @@ impl<'t, R: Rule> Builder<'t, R> {
       let fulfillable_candidates = fulfillable_candidates_by_key
         .entry(dependency_key)
         .or_insert_with(Vec::new);
+      let mut unfulfillable_candidates = Vec::new();
       for candidate in self.rhs(&params, product) {
         match candidate {
           Entry::WithDeps(c) => match self.construct_graph_helper(
@@ -266,7 +269,9 @@ impl<'t, R: Rule> Builder<'t, R> {
             unfulfillable_rules,
             c,
           ) {
-            ConstructGraphResult::Unfulfillable => {}
+            ConstructGraphResult::Unfulfillable(c) => {
+              unfulfillable_candidates.push((Entry::WithDeps(c), Some("Was unfulfillable.")));
+            }
             ConstructGraphResult::Fulfilled(simplified_entries) => {
               fulfillable_candidates.push(
                 simplified_entries
@@ -305,6 +310,11 @@ impl<'t, R: Rule> Builder<'t, R> {
             // be consumed.
             if provided_param.is_none() {
               fulfillable_candidates.push(vec![Entry::Param(param)]);
+            } else {
+              unfulfillable_candidates.push((
+                Entry::Param(param),
+                Some("Cannot consume a Param to fulfill a Get."),
+              ));
             }
           }
         };
@@ -320,20 +330,27 @@ impl<'t, R: Rule> Builder<'t, R> {
         // If no candidates were fulfillable, this rule is not fulfillable.
         unfulfillable_diagnostics.push(Diagnostic {
           params: params.clone(),
-          reason: if params.is_empty() {
-            format!(
-              "No rule was available to compute {}. Maybe declare RootRule({})?",
-              dependency_key, product,
-            )
-          } else {
-            format!(
-              "No rule was available to compute {} with parameter type{} {}",
-              dependency_key,
-              if params.len() > 1 { "s" } else { "" },
-              params_str(&params),
-            )
+          reason: {
+            let hint = if unfulfillable_candidates.is_empty() {
+              let root_hint = if provided_param.is_none() {
+                format!(
+                    " If that type should be provided from outside the rule graph, consider declaring RootRule({}).",
+                    product
+                )
+              } else {
+                "".to_string()
+              };
+              format!(
+                  " No installed rules return the type {}: Is the rule that you're expecting to run registered?{}",
+                  product,
+                  root_hint
+              )
+            } else {
+              "".to_string()
+            };
+            format!("No rule was able to compute {}.{}", dependency_key, hint)
           },
-          details: vec![],
+          details: unfulfillable_candidates,
         });
       }
     }
@@ -348,7 +365,7 @@ impl<'t, R: Rule> Builder<'t, R> {
         .or_insert_with(Vec::new)
         .extend(unfulfillable_diagnostics);
       rule_dependency_edges.remove(&entry);
-      return Ok(ConstructGraphResult::Unfulfillable);
+      return Ok(ConstructGraphResult::Unfulfillable(entry));
     }
 
     // No dependencies were completely unfulfillable (although some may have been cyclic).
@@ -368,7 +385,7 @@ impl<'t, R: Rule> Builder<'t, R> {
             .or_insert_with(Vec::new)
             .extend(ambiguous_diagnostics);
           rule_dependency_edges.remove(&entry);
-          return Ok(ConstructGraphResult::Unfulfillable);
+          return Ok(ConstructGraphResult::Unfulfillable(entry));
         }
       };
     let simplified_entries_only: Vec<_> = simplified_entries.keys().cloned().collect();
@@ -418,7 +435,7 @@ impl<'t, R: Rule> Builder<'t, R> {
   fn monomorphize(
     entry: &EntryWithDeps<R>,
     deps: &[(R::DependencyKey, Vec<Entry<R>>)],
-  ) -> Result<RuleDependencyEdges<R>, Vec<Diagnostic<R::TypeId>>> {
+  ) -> Result<RuleDependencyEdges<R>, Vec<Diagnostic<R>>> {
     // Collect the powerset of the union of used parameters, ordered by set size.
     let params_powerset: Vec<Vec<R::TypeId>> = {
       let mut all_used_params = BTreeSet::new();
@@ -488,7 +505,7 @@ impl<'t, R: Rule> Builder<'t, R> {
   fn choose_dependencies<'a>(
     available_params: &ParamTypes<R::TypeId>,
     deps: &'a [(R::DependencyKey, Vec<Entry<R>>)],
-  ) -> Result<Option<Vec<ChosenDependency<'a, R>>>, Diagnostic<R::TypeId>> {
+  ) -> Result<Option<Vec<ChosenDependency<'a, R>>>, Diagnostic<R>> {
     let mut combination = Vec::new();
     for (key, input_entries) in deps {
       let provided_param = key.provided_param();
@@ -525,7 +542,10 @@ impl<'t, R: Rule> Builder<'t, R> {
               params_clause,
               params_str(&available_params),
             ),
-            details: chosen_entries.into_iter().map(entry_str).collect(),
+            details: chosen_entries
+              .into_iter()
+              .map(|e| (e.clone(), None))
+              .collect(),
           });
         }
       }

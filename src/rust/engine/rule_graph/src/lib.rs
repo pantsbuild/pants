@@ -34,7 +34,7 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use std::io;
 
 pub use crate::builder::Builder;
-pub use crate::rules::{DependencyKey, DisplayForGraph, Rule, TypeId};
+pub use crate::rules::{DependencyKey, DisplayForGraph, DisplayForGraphArgs, Rule, TypeId};
 
 // TODO: Consider switching to HashSet and dropping the Ord bound from TypeId.
 type ParamTypes<T> = BTreeSet<T>;
@@ -42,7 +42,7 @@ type ParamTypes<T> = BTreeSet<T>;
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 struct UnreachableError<R: Rule> {
   rule: R,
-  diagnostic: Diagnostic<R::TypeId>,
+  diagnostic: Diagnostic<R>,
 }
 
 impl<R: Rule> UnreachableError<R> {
@@ -152,13 +152,13 @@ impl<R: Rule> InnerEntry<R> {
 }
 
 type RuleDependencyEdges<R> = HashMap<EntryWithDeps<R>, RuleEdges<R>>;
-type UnfulfillableRuleMap<R> = HashMap<EntryWithDeps<R>, Vec<Diagnostic<<R as Rule>::TypeId>>>;
+type UnfulfillableRuleMap<R> = HashMap<EntryWithDeps<R>, Vec<Diagnostic<R>>>;
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
-struct Diagnostic<T: TypeId> {
-  params: ParamTypes<T>,
+struct Diagnostic<R: Rule> {
+  params: ParamTypes<R::TypeId>,
   reason: String,
-  details: Vec<String>,
+  details: Vec<(Entry<R>, Option<&'static str>)>,
 }
 
 ///
@@ -202,7 +202,7 @@ fn params_str<T: TypeId>(params: &ParamTypes<T>) -> String {
 }
 
 pub fn entry_str<R: Rule>(entry: &Entry<R>) -> String {
-  entry_node_str_with_attrs(entry).entry_str
+  entry.fmt_for_graph(DisplayForGraphArgs { multiline: false })
 }
 
 #[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq)]
@@ -236,32 +236,68 @@ impl Palette {
 }
 
 impl DisplayForGraph for Palette {
-  fn fmt_for_graph(&self) -> String {
+  fn fmt_for_graph(&self, _: DisplayForGraphArgs) -> String {
     format!("[color=\"{}\",style=filled]", self.color_string())
+  }
+}
+
+impl<R: Rule> DisplayForGraph for Entry<R> {
+  fn fmt_for_graph(&self, display_args: DisplayForGraphArgs) -> String {
+    match self {
+      &Entry::WithDeps(ref e) => e.fmt_for_graph(display_args),
+      &Entry::Param(type_id) => format!("Param({})", type_id),
+    }
+  }
+}
+
+impl<R: Rule> DisplayForGraph for EntryWithDeps<R> {
+  fn fmt_for_graph(&self, display_args: DisplayForGraphArgs) -> String {
+    match self {
+      &EntryWithDeps::Inner(InnerEntry {
+        ref rule,
+        ref params,
+      }) => format!(
+        "{}{}for {}",
+        rule.fmt_for_graph(display_args),
+        display_args.line_separator(),
+        params_str(params)
+      ),
+      &EntryWithDeps::Root(ref root) => format!(
+        // TODO: Consider dropping this (final) public use of the keyword "Select", while ensuring
+        // that error messages remain sufficiently grokkable.
+        "Select({}){}for {}",
+        root.dependency_key,
+        display_args.line_separator(),
+        params_str(&root.params)
+      ),
+    }
   }
 }
 
 ///
 /// Apply coloration to several nodes.
-pub fn entry_node_str_with_attrs<R: Rule>(entry: &Entry<R>) -> GraphVizEntryWithAttrs {
-  let (entry_str, attrs_str) = match entry {
-    &Entry::WithDeps(ref e) => (
-      entry_with_deps_str(e),
+///
+pub fn visualize_entry<R: Rule>(
+  entry: &Entry<R>,
+  display_args: DisplayForGraphArgs,
+) -> GraphVizEntryWithAttrs {
+  let entry_str = entry.fmt_for_graph(display_args);
+  let attrs_str = match entry {
+    &Entry::WithDeps(ref e) => {
       // Color "singleton" entries (with no params)!
       if e.params().is_empty() {
-        Some(Palette::Olive.fmt_for_graph())
+        Some(Palette::Olive.fmt_for_graph(display_args))
       } else if let Some(color) = e.rule().and_then(|r| r.color()) {
         // Color "intrinsic" entries (provided by the rust codebase)!
-        Some(color.fmt_for_graph())
+        Some(color.fmt_for_graph(display_args))
       } else {
         None
-      },
-    ),
-    &Entry::Param(type_id) => (
-      format!("Param({})", type_id),
+      }
+    }
+    &Entry::Param(_) => {
       // Color "Param"s!
-      Some(Palette::Orange.fmt_for_graph()),
-    ),
+      Some(Palette::Orange.fmt_for_graph(display_args))
+    }
   };
   GraphVizEntryWithAttrs {
     entry_str,
@@ -270,19 +306,7 @@ pub fn entry_node_str_with_attrs<R: Rule>(entry: &Entry<R>) -> GraphVizEntryWith
 }
 
 fn entry_with_deps_str<R: Rule>(entry: &EntryWithDeps<R>) -> String {
-  match entry {
-    &EntryWithDeps::Inner(InnerEntry {
-      ref rule,
-      ref params,
-    }) => format!("{}\nfor {}", rule.fmt_for_graph(), params_str(params)),
-    &EntryWithDeps::Root(ref root) => format!(
-      // TODO: Consider dropping this (final) public use of the keyword "Select", while ensuring
-      // that error messages remain sufficiently grokkable.
-      "Select({})\nfor {}",
-      root.dependency_key,
-      params_str(&root.params)
-    ),
-  }
+  entry.fmt_for_graph(DisplayForGraphArgs { multiline: false })
 }
 
 impl<R: Rule> RuleGraph<R> {
@@ -464,8 +488,6 @@ impl<R: Rule> RuleGraph<R> {
   }
 
   pub fn validate(&self) -> Result<(), String> {
-    let mut collated_errors: HashMap<R, Vec<Diagnostic<_>>> = HashMap::new();
-
     let used_rules: HashSet<_> = self
       .rule_dependency_edges
       .keys()
@@ -475,49 +497,133 @@ impl<R: Rule> RuleGraph<R> {
       })
       .collect();
 
-    // Collect and dedupe rule diagnostics, preferring to render an unfulfillable error for a rule
-    // over an unreachable error.
-    let mut rule_diagnostics: HashMap<_, _> = self
+    // Collect diagnostics by type.
+    let (unfulfillable_entries, unfulfillable_roots, unfulfillable_rules) = {
+      let mut unfulfillable_entries = HashMap::new();
+      let mut unfulfillable_roots = Vec::new();
+      let mut unfulfillable_rules = HashSet::new();
+      for (e, diagnostics) in &self.unfulfillable_rules {
+        match e {
+          EntryWithDeps::Inner(InnerEntry { ref rule, .. })
+            if rule.require_reachable()
+              && !diagnostics.is_empty()
+              && !used_rules.contains(&rule) =>
+          {
+            unfulfillable_entries.insert(e, diagnostics.clone());
+            unfulfillable_rules.insert(rule);
+          }
+          EntryWithDeps::Root(re) if !diagnostics.is_empty() => {
+            unfulfillable_entries.insert(e, diagnostics.clone());
+            unfulfillable_roots.push(re);
+          }
+          _ => {}
+        }
+      }
+      (
+        unfulfillable_entries,
+        unfulfillable_roots,
+        unfulfillable_rules,
+      )
+    };
+
+    // Collect unreachable errors for which we would not already report an
+    // unfulfillable error.
+    let unreachable_errors: HashMap<_, _> = self
       .unreachable_rules
       .iter()
-      .map(|u| (&u.rule, vec![u.diagnostic.clone()]))
-      .collect();
-    for (e, diagnostics) in &self.unfulfillable_rules {
-      match e {
-        EntryWithDeps::Inner(InnerEntry { ref rule, .. })
-          if rule.require_reachable() && !diagnostics.is_empty() && !used_rules.contains(&rule) =>
-        {
-          rule_diagnostics.insert(rule, diagnostics.clone());
+      .filter_map(|u| {
+        if unfulfillable_rules.contains(&u.rule) {
+          None
+        } else {
+          Some((&u.rule, vec![u.diagnostic.clone()]))
         }
-        _ => {}
-      }
-    }
-    for (rule, diagnostics) in rule_diagnostics {
-      for d in diagnostics {
-        collated_errors
-          .entry(rule.clone())
-          .or_insert_with(Vec::new)
-          .push(d);
-      }
-    }
+      })
+      .collect();
 
-    if collated_errors.is_empty() {
+    if unfulfillable_rules.is_empty() && unreachable_errors.is_empty() {
       return Ok(());
     }
 
-    let mut msgs: Vec<String> = collated_errors
+    // There are errors. Walk the graph of errored entries to find leaves to render.
+    let unfulfillable_errors: HashMap<_, _> = {
+      let mut entry_stack: Vec<_> = unfulfillable_roots
+        .into_iter()
+        .map(|re| EntryWithDeps::Root(re.clone()))
+        .collect();
+      let mut visited = HashSet::new();
+      let mut errored_leaves = HashSet::new();
+      while let Some(entry) = entry_stack.pop() {
+        if visited.contains(&entry) {
+          continue;
+        }
+        visited.insert(entry.clone());
+        let diagnostics = unfulfillable_entries
+          .get(&entry)
+          .ok_or_else(|| format!("Unknown entry in RuleGraph: {:?}", entry))?;
+
+        // If none of the detail entries of this entry are errored, this is a leaf. Otherwise,
+        // continue recursing into the errored children.
+        let mut causes = diagnostics
+          .iter()
+          .flat_map(|d| d.details.iter())
+          .filter_map(|(detail_entry, _)| match detail_entry {
+            Entry::WithDeps(ref e) if unfulfillable_entries.contains_key(e) => Some(e.clone()),
+            _ => None,
+          })
+          .peekable();
+        if causes.peek().is_some() {
+          // There was at least one errored potential source of a dependency: recurse into them
+          // as potential leaves.
+          entry_stack.extend(causes);
+        } else {
+          // This node had no known cause entries: it's a leaf.
+          errored_leaves.insert(entry);
+        }
+      }
+
+      // Collate the leaves by rule (which is necessary because monomorphization will cause various
+      // permutations of parameters for each rule).
+      let mut collated_unfulfillable_rules = HashMap::new();
+      for (e, diagnostics) in unfulfillable_entries.into_iter() {
+        match e {
+          EntryWithDeps::Inner(InnerEntry { rule, .. }) if errored_leaves.contains(e) => {
+            collated_unfulfillable_rules
+              .entry(rule)
+              .or_insert_with(Vec::new)
+              .extend(diagnostics);
+          }
+          _ => (),
+        }
+      }
+      collated_unfulfillable_rules
+    };
+
+    let mut msgs: Vec<String> = unfulfillable_errors
       .into_iter()
+      .chain(unreachable_errors.into_iter())
       .map(|(rule, mut diagnostics)| {
         diagnostics.sort_by(|l, r| l.reason.cmp(&r.reason));
         diagnostics.dedup_by(|l, r| l.reason == r.reason);
         let errors = diagnostics
           .into_iter()
-          .map(|mut d| {
+          .map(|d| {
             if d.details.is_empty() {
               d.reason
             } else {
-              d.details.sort();
-              format!("{}:\n      {}", d.reason, d.details.join("\n      "))
+              let mut details: Vec<_> = d
+                .details
+                .iter()
+                .map(|(entry, msg)| {
+                  if let Some(msg) = msg {
+                    format!("{}: {}", entry_str(entry), msg)
+                  } else {
+                    entry_str(entry)
+                  }
+                })
+                .collect();
+              details.sort();
+              details.dedup();
+              format!("{}:\n      {}", d.reason, details.join("\n      "))
             }
           })
           .collect::<Vec<_>>()
@@ -535,6 +641,7 @@ impl<R: Rule> RuleGraph<R> {
   }
 
   pub fn visualize(&self, f: &mut dyn io::Write) -> io::Result<()> {
+    let display_args = DisplayForGraphArgs { multiline: true };
     let mut root_subject_type_strs = self
       .root_param_types
       .iter()
@@ -553,10 +660,10 @@ impl<R: Rule> RuleGraph<R> {
       .iter()
       .filter_map(|(k, deps)| match k {
         EntryWithDeps::Root(_) => {
-          let root_str = entry_with_deps_str(k);
+          let root_str = k.fmt_for_graph(display_args);
           let mut dep_entries = deps
             .all_dependencies()
-            .map(|d| entry_node_str_with_attrs(d))
+            .map(|d| visualize_entry(d, display_args))
             .collect::<Vec<_>>();
           dep_entries.sort();
           let deps_with_attrs = dep_entries
@@ -569,7 +676,7 @@ impl<R: Rule> RuleGraph<R> {
           Some(format!(
             "    \"{}\" {}\n{}    \"{}\" -> {{{}}}",
             root_str,
-            Palette::Blue.fmt_for_graph(),
+            Palette::Blue.fmt_for_graph(display_args),
             deps_with_attrs,
             root_str,
             dep_entries
@@ -594,7 +701,7 @@ impl<R: Rule> RuleGraph<R> {
         &EntryWithDeps::Inner(_) => {
           let mut dep_entries = deps
             .all_dependencies()
-            .map(|d| entry_node_str_with_attrs(d))
+            .map(|d| visualize_entry(d, display_args))
             .collect::<Vec<_>>();
           dep_entries.sort();
           let deps_with_attrs = dep_entries
@@ -607,7 +714,7 @@ impl<R: Rule> RuleGraph<R> {
           Some(format!(
             "{}    \"{}\" -> {{{}}}",
             deps_with_attrs,
-            entry_with_deps_str(k),
+            k.fmt_for_graph(display_args),
             dep_entries
               .iter()
               .cloned()
