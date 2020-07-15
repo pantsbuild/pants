@@ -77,7 +77,7 @@ class OptionValueHistory:
     ranked_values: Tuple[RankedValue]
 
     @property
-    def final_value(self):
+    def final_value(self) -> RankedValue:
         return self.ranked_values[-1]
 
 
