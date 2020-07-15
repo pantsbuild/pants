@@ -85,7 +85,7 @@ class FilespecTest(TestBase):
                 "all/nested/.dot",
                 ".some/hidden/nested/dir/file.py",
             ),
-            should_not_match=True,
+            should_match=False,
         )
 
     def test_matches_dirs(self) -> None:
