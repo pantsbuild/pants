@@ -1,17 +1,6 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-target(
-  name = 'all_directories',
-  dependencies = [
-    ':build_parsing_directory',
-    ':conf_test_directory',
-    ':dummies_directory',
-    ':file_sets_directory',
-    ':timeout_directory',
-  ],
-)
-
 # An example of a BUILD file in a parent directory which shares source files with targets in
 # subdirectories. Pants supports this, although some text editors such as IntelliJ will not allow a
 # directory containing source files to be shared across more than one module when imported via the
@@ -27,18 +16,8 @@ files(
 )
 
 files(
-  name = 'conf_test_directory',
-  sources = ['conf_test/**/*'],
-)
-
-files(
   name = 'dummies_directory',
   sources = ['dummies/**/*'],
-)
-
-files(
-  name = 'file_sets_directory',
-  sources = ['file_sets/**/*'],
 )
 
 files(
