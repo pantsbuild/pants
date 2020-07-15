@@ -298,19 +298,28 @@ def fmt_rust_function(func: Callable) -> str:
     return f"{func.__module__}:{func.__code__.co_firstlineno}:{func.__name__}"
 
 
-def fmt_rule(rule: Callable, *, gets: Optional[List[Tuple[str, str]]] = None) -> str:
+def fmt_rule(
+    rule: Callable, *, gets: Optional[List[Tuple[str, str]]] = None, multiline: bool = False
+) -> str:
     """Generate the str that the engine will use for the rule.
 
-    This is useful when comparing strings against engine error messages.
+    This is useful when comparing strings against engine error messages. Emulates the implementation
+    of the DisplayForGraph trait.
     """
+    line_sep = "\n" if multiline else " "
+    optional_line_sep = "\n" if multiline else ""
+
     type_hints = get_type_hints(rule)
     product = type_hints.pop("return").__name__
-    params = ", ".join(t.__name__ for t in type_hints.values())
+    params = f",{line_sep}".join(t.__name__ for t in type_hints.values())
+    params_str = (
+        f"{optional_line_sep}{params}{optional_line_sep}" if len(type_hints) > 1 else params
+    )
     gets_str = ""
     if gets:
-        get_members = ", ".join(
+        get_members = f",{line_sep}".join(
             f"Get({product_subject_pair[0]}, {product_subject_pair[1]})"
             for product_subject_pair in gets
         )
-        gets_str = f", gets=[{get_members}]"
-    return f"@rule({fmt_rust_function(rule)}({params}) -> {product}{gets_str})"
+        gets_str = f", gets=[{optional_line_sep}{get_members}{optional_line_sep}]"
+    return f"@rule({fmt_rust_function(rule)}({params_str}) -> {product}{gets_str})"

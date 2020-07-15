@@ -182,6 +182,13 @@ class GlobalOptions(Subsystem):
         )
 
         register(
+            "--colors",
+            type=bool,
+            default=sys.stdout.isatty(),
+            help="Set whether log messages are displayed in color.",
+        )
+
+        register(
             "--v1",
             advanced=True,
             type=bool,
@@ -859,13 +866,6 @@ class GlobalOptions(Subsystem):
         # won't choke on them on the command line, and also so we can access their values as regular
         # global-scope options, for convenience.
         cls.register_bootstrap_options(register)
-
-        register(
-            "--colors",
-            type=bool,
-            default=sys.stdout.isatty(),
-            help="Set whether log messages are displayed in color.",
-        )
 
         register(
             "--tag",

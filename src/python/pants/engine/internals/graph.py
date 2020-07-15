@@ -203,7 +203,7 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
         if deleted_files_matched:
             original_addresses_due_to_deleted_files.add(candidate_tgt.address)
             continue
-        # Else, we generate subtargets for greater precision. We use those subtaraets, unless
+        # Else, we generate subtargets for greater precision. We use those subtargets, unless
         # there are multiple owners of their file.
         generated_subtargets = tuple(
             generate_subtarget(candidate_tgt, full_file_name=f)

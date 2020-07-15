@@ -124,8 +124,8 @@ class Native(metaclass=SingletonMetaclass):
     def decompress_tarball(self, tarfile_path, dest_dir):
         return self.lib.decompress_tarball(tarfile_path, dest_dir)
 
-    def init_rust_logging(self, level, log_show_rust_3rdparty):
-        return self.lib.init_logging(level, log_show_rust_3rdparty)
+    def init_rust_logging(self, level, log_show_rust_3rdparty: bool, use_color: bool):
+        return self.lib.init_logging(level, log_show_rust_3rdparty, use_color)
 
     def setup_pantsd_logger(self, log_file_path, level):
         return self.lib.setup_pantsd_logger(log_file_path, level)

@@ -19,11 +19,7 @@ from pants.reporting.streaming_workunit_handler import (
     StreamingWorkunitContext,
     StreamingWorkunitHandler,
 )
-from pants.testutil.engine.util import (
-    assert_equal_with_printing,
-    fmt_rule,
-    remove_locations_from_traceback,
-)
+from pants.testutil.engine.util import assert_equal_with_printing, remove_locations_from_traceback
 from pants.testutil.test_base import TestBase
 from pants.util.logging import LogLevel
 
@@ -325,17 +321,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
         with self.assertRaises(Exception) as cm:
             list(self.mk_scheduler(rules=rules, include_trace_on_error=False))
 
-        self.assert_equal_with_printing(
-            dedent(
-                f"""
-                Rules with errors: 1
-
-                  {fmt_rule(upcast)}:
-                    No rule was available to compute MyInt. Maybe declare RootRule(MyInt)?
-                """
-            ).strip(),
-            str(cm.exception),
-        )
+        assert "consider declaring RootRule(MyInt)" in str(cm.exception)
 
 
 @dataclass
