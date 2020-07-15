@@ -12,6 +12,7 @@ from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSourcesRequest,
 )
 from pants.engine.addresses import Address
+from pants.engine.fs import Workspace
 from pants.engine.target import (
     FieldSetWithOrigin,
     Sources,
@@ -57,6 +58,7 @@ class MockLintRequest(LintRequest, metaclass=ABCMeta):
                     self.stdout(addresses),
                     "",
                     linter_name=self.linter_name,
+                    results_file=None,
                 )
             ]
         )
@@ -131,8 +133,8 @@ class LintTest(TestBase):
             origin=SingleAddress(directory=address.spec_path, name=address.target_name),
         )
 
-    @staticmethod
     def run_lint_rule(
+        self,
         *,
         lint_request_types: List[Type[LintRequest]],
         targets: List[TargetWithOrigin],
@@ -140,11 +142,13 @@ class LintTest(TestBase):
         include_sources: bool = True,
     ) -> Tuple[int, str]:
         console = MockConsole(use_colors=False)
+        workspace = Workspace(self.scheduler)
         union_membership = UnionMembership({LintRequest: lint_request_types})
         result: Lint = run_rule(
             lint,
             rule_args=[
                 console,
+                workspace,
                 TargetsWithOrigins(targets),
                 create_goal_subsystem(LintOptions, per_target_caching=per_target_caching),
                 union_membership,
