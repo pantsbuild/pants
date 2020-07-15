@@ -363,7 +363,7 @@ impl WrappedNode for MultiPlatformExecuteProcess {
         .command_runner
         .run(request, execution_context)
         .await
-        .map_err(|e| throw(&format!("Failed to execute process: {}", e)))?;
+        .map_err(|e| throw(&e))?;
 
       Ok(ProcessResult(res))
     } else {

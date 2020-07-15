@@ -268,6 +268,7 @@ impl super::CommandRunner for CommandRunner {
     context: Context,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     let req = self.extract_compatible_request(&req).unwrap();
+    let req_debug_repr = format!("{:#?}", req);
     self
       .run_and_capture_workdir(
         req,
@@ -278,6 +279,17 @@ impl super::CommandRunner for CommandRunner {
         &self.work_dir_base,
         self.platform(),
       )
+      .map_err(|msg| {
+        // Processes that experience no infrastructure issues should result in an "Ok" return,
+        // potentially with an exit code that indicates that they failed (with more information
+        // on stderr). Actually failing at this level indicates a failure to start or otherwise
+        // interact with the process, which would generally be an infrastructure or implementation
+        // error (something missing from the sandbox, incorrect permissions, etc).
+        //
+        // Given that this is expected to be rare, we dump the entire process definition in the
+        // error.
+        format!("Failed to execute: {}\n\n{}", req_debug_repr, msg)
+      })
       .await
   }
 }
@@ -530,26 +542,23 @@ export {}
           platform,
         })
       }
-      Err(msg) => {
-        if msg == "deadline has elapsed" {
-          let stdout = Bytes::from(format!(
-            "Exceeded timeout of {:?} for local process execution, {}",
-            req.timeout, req.description
-          ));
-          let stdout_digest = store.store_file_bytes(stdout.clone(), true).await?;
+      Err(msg) if msg == "deadline has elapsed" => {
+        let stdout = Bytes::from(format!(
+          "Exceeded timeout of {:?} for local process execution, {}",
+          req.timeout, req.description
+        ));
+        let stdout_digest = store.store_file_bytes(stdout.clone(), true).await?;
 
-          Ok(FallibleProcessResultWithPlatform {
-            stdout_digest,
-            stderr_digest: hashing::EMPTY_DIGEST,
-            exit_code: -libc::SIGTERM,
-            output_directory: hashing::EMPTY_DIGEST,
-            execution_attempts: vec![],
-            platform,
-          })
-        } else {
-          Err(msg)
-        }
+        Ok(FallibleProcessResultWithPlatform {
+          stdout_digest,
+          stderr_digest: hashing::EMPTY_DIGEST,
+          exit_code: -libc::SIGTERM,
+          output_directory: hashing::EMPTY_DIGEST,
+          execution_attempts: vec![],
+          platform,
+        })
       }
+      Err(msg) => Err(msg),
     }
   }
 
