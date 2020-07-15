@@ -30,11 +30,9 @@ Bugfixes
 ~~~~~~~~
 
 * Fix generated subtargets not working with `dependees` (#10355)
-  `Issue #10354 <https://github.com/pantsbuild/pants/issues/10354>`_
   `PR #10355 <https://github.com/pantsbuild/pants/pull/10355>`_
 
 * Ignore dead symlinks on Linux as well as OSX (#10339)
-  `Issue #255) <https://github.com/notify-rs/notify/issues/255)>`_
   `PR #10339 <https://github.com/pantsbuild/pants/pull/10339>`_
 
 * Fix bug where workunit completion was not reported correctly (#10277)
