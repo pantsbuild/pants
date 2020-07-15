@@ -4,31 +4,21 @@
 # Adding quotes around these may change their meaning, so don't do so without thought.
 
 path_patterns:
-  - name: java_source
-    pattern: \.java$
-    content_encoding: utf8
-  - name: scala_source
-    pattern: \.scala$
-    content_encoding: utf8
   - name: python_source
     pattern: (?<!__init__)\.py$
     content_encoding: utf8
+  - name: build_files
+    pattern: BUILD(?:\..*)?$
 
 content_patterns:
-    - name: jvm_header
-      pattern: |+
-        ^// Copyright 20\d\d Pants project contributors \(see CONTRIBUTORS.md\).
-        // Licensed under the Apache License, Version 2.0 \(see LICENSE\).
-
     - name: python_header
       pattern: |+
-        ^# Copyright 20\d\d Pants project contributors \(see CONTRIBUTORS.md\).
+        ^(?:#\!\/usr\/bin\/env python3
+        )?# Copyright 20\d\d Pants project contributors \(see CONTRIBUTORS.md\).
         # Licensed under the Apache License, Version 2.0 \(see LICENSE\).
 
 required_matches:
-  java_source:
-    - jvm_header
-  scala_source:
-    - jvm_header
   python_source:
+    - python_header
+  build_files:
     - python_header
