@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from pants.option.arg_splitter import (
+    AllHelp,
     ArgSplitter,
     NoGoalHelp,
     OptionsHelp,
@@ -56,9 +57,7 @@ class ArgSplitterTest(unittest.TestCase):
         assert expected_help_advanced == (
             isinstance(splitter.help_request, OptionsHelp) and splitter.help_request.advanced
         )
-        assert expected_help_all == (
-            isinstance(splitter.help_request, OptionsHelp) and splitter.help_request.all_scopes
-        )
+        assert expected_help_all == isinstance(splitter.help_request, AllHelp)
         assert expected_unknown_scopes == split_args.unknown_scopes
 
     @staticmethod
@@ -299,17 +298,6 @@ class ArgSplitterTest(unittest.TestCase):
         assert_help_no_arguments("./pants --help --help-advanced", expected_help_advanced=True)
         assert_help_no_arguments("./pants --help-advanced --help", expected_help_advanced=True)
         assert_help_no_arguments("./pants help-all", expected_help_all=True)
-        assert_help_no_arguments("./pants --help-all", expected_help_all=True)
-        assert_help_no_arguments("./pants --help --help-all", expected_help_all=True)
-        assert_help_no_arguments(
-            "./pants help-advanced --help-all", expected_help_advanced=True, expected_help_all=True,
-        )
-        assert_help_no_arguments(
-            "./pants --help-all --help --help-advanced",
-            expected_help_advanced=True,
-            expected_help_all=True,
-        )
-
         assert_help(
             "./pants -f",
             expected_goals=[],

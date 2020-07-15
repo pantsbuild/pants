@@ -1,6 +1,8 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import json
+
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 
 
@@ -26,23 +28,13 @@ class TestHelpIntegration(PantsRunIntegrationTest):
         command = ["help-all"]
         pants_run = self.run_pants(command=command)
         self.assert_success(pants_run)
-        # Spot check to see that scope headings are printed
-        assert "`pytest` subsystem options" in pants_run.stdout_data
-        # Spot check to see that full args for all options are printed
-        assert "--[no-]test-debug" in pants_run.stdout_data
-        # Spot check to see that subsystem options are printing
-        assert "--pytest-version" in pants_run.stdout_data
+        all_help = json.loads(pants_run.stdout_data)
 
-    def test_help_all_advanced(self):
-        command = ["--help-all", "--help-advanced"]
-        pants_run = self.run_pants(command=command)
-        self.assert_success(pants_run)
-        # Spot check to see that scope headings are printed even for advanced options
-        assert "`pytest` subsystem options" in pants_run.stdout_data
-        assert "`pytest` subsystem advanced options" in pants_run.stdout_data
-        # Spot check to see that full args for all options are printed
-        assert "--[no-]test-debug" in pants_run.stdout_data
-        # Spot check to see that subsystem options are printing
-        assert "--pytest-version" in pants_run.stdout_data
-        # Spot check to see that advanced subsystem options are printing
-        assert "--pytest-timeout-default" in pants_run.stdout_data
+        # Spot check the data.
+        assert "name_to_goal_info" in all_help
+        assert "test" in all_help["name_to_goal_info"]
+
+        assert "scope_to_help_info" in all_help
+        assert "" in all_help["scope_to_help_info"]
+        assert "pytest" in all_help["scope_to_help_info"]
+        assert len(all_help["scope_to_help_info"]["pytest"]["basic"]) > 0
