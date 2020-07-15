@@ -158,7 +158,7 @@ class GraphTest(TestBase):
         """This tests that we do not use generated subtargets when there are multiple owners.
 
         There are two edge cases:
-        - There are two owners of the file in question.
+        - There are >1 owners of the file in question.
         - The file in question only has one owner, but its sibling from the same target does have
           >1 owner. In this case, we use the original owning target because it would be
           redundant to include the generated subtarget.
@@ -188,6 +188,30 @@ class GraphTest(TestBase):
         assert sibling_has_two_owners_result == Owners(
             [Address("demo", "f2"), Address("demo", "all")]
         )
+
+    def test_owners_build_file(self) -> None:
+        """A BUILD file owns every target defined in it.
+
+        This must also respect the general rules for when to use generated subtargets vs. the
+        original owning target. See `test_owners_multiple_owners`.
+        """
+        self.create_files("demo", ["f1.txt", "f2.txt"])
+        self.add_to_build_file(
+            "demo",
+            dedent(
+                """\
+                target(name='f1', sources=['f1.txt'])
+                target(name='f2_first', sources=['f2.txt'])
+                target(name='f2_second', sources=['f2.txt'])
+                """
+            ),
+        )
+        result = self.request_single_product(Owners, OwnersRequest(("demo/BUILD",)))
+        assert set(result) == {
+            Address("demo", target_name="f1.txt", generated_base_target_name="f1"),
+            Address("demo", "f2_first"),
+            Address("demo", "f2_second"),
+        }
 
     def test_filesystem_specs_literal_file(self) -> None:
         self.create_files("demo", ["f1.txt", "f2.txt"])

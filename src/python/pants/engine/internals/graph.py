@@ -174,68 +174,59 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
 
     # Walk up the buildroot looking for targets that would conceivably claim changed sources.
     candidate_specs = tuple(AscendantAddresses(directory=d) for d in dirs_set)
-    candidate_explicit_targets = await Get(Targets, AddressSpecs(candidate_specs))
-
-    # Generate subtargets. This gives us file-level precision, where each target only owns one file.
-    # We may not end up using every generated subtarget, but we need to consider each of them. We
-    # also consider the original owning targets so that we can handle deleted files that would have
-    # belonged to those targets.
-    candidate_explicit_target_sources = await MultiGet(
-        Get(HydratedSources, HydrateSourcesRequest(tgt.get(Sources)))
-        for tgt in candidate_explicit_targets
+    candidate_targets = await Get(Targets, AddressSpecs(candidate_specs))
+    candidate_target_sources = await MultiGet(
+        Get(HydratedSources, HydrateSourcesRequest(tgt.get(Sources))) for tgt in candidate_targets
     )
-    candidate_targets: OrderedSet[Target] = OrderedSet(candidate_explicit_targets)
-    for explicit_tgt, explicit_tgt_sources in zip(
-        candidate_explicit_targets, candidate_explicit_target_sources
-    ):
-        candidate_targets.update(
-            generate_subtarget(explicit_tgt, full_file_name=f)
-            for f in explicit_tgt_sources.snapshot.files
-        )
-
     build_file_addresses = await MultiGet(
         Get(BuildFileAddress, Address, tgt.address) for tgt in candidate_targets
     )
 
-    # Determine which candidates are owners. We try to use generated subtargets, but fall back to
-    # the original owning target if a) there are multiple owners of the same file or b) a matched
-    # file is deleted; deleted files cannot have a generated subtarget because that file no longer
-    # exists.
+    # We use this to determine if any of the matched files are deleted or not.
     all_source_files = set(
         itertools.chain.from_iterable(
-            sources.snapshot.files for sources in candidate_explicit_target_sources
+            sources.snapshot.files for sources in candidate_target_sources
         )
     )
+
     file_name_to_generated_address: Dict[str, Address] = {}
     file_names_with_multiple_owners: OrderedSet[str] = OrderedSet()
     original_addresses_due_to_deleted_files: OrderedSet[Address] = OrderedSet()
     original_addresses_due_to_multiple_owners: OrderedSet[Address] = OrderedSet()
-    for candidate_tgt, bfa in zip(candidate_targets, build_file_addresses):
+    for candidate_tgt, candidate_tgt_sources, bfa in zip(
+        candidate_targets, candidate_target_sources, build_file_addresses
+    ):
         matching_files = matches_filespec(candidate_tgt.get(Sources).filespec, paths=sources_set)
         if bfa.rel_path not in sources_set and not matching_files:
             continue
-        if candidate_tgt.address.generated_base_target_name is None:
-            deleted_files_matched = bool(set(matching_files) - all_source_files)
-            if deleted_files_matched:
-                original_addresses_due_to_deleted_files.add(candidate_tgt.address)
+        deleted_files_matched = bool(set(matching_files) - all_source_files)
+        if deleted_files_matched:
+            original_addresses_due_to_deleted_files.add(candidate_tgt.address)
             continue
-        # Else, we know it's a generated subtarget. We check if there are multiple owners of its
-        # file.
-        file_name = PurePath(
-            candidate_tgt.address.spec_path, candidate_tgt.address.target_name
-        ).as_posix()
-        if file_name in file_name_to_generated_address:
-            file_names_with_multiple_owners.add(file_name)
-            original_addresses_due_to_multiple_owners.add(
-                candidate_tgt.address.maybe_convert_to_base_target()
-            )
-            # We also add the original target of the generated address already stored.
-            already_stored_generated_address = file_name_to_generated_address[file_name]
-            original_addresses_due_to_multiple_owners.add(
-                already_stored_generated_address.maybe_convert_to_base_target()
-            )
-        else:
-            file_name_to_generated_address[file_name] = candidate_tgt.address
+        # Else, we generate subtargets for greater precision. We use those subtaraets, unless
+        # there are multiple owners of their file.
+        generated_subtargets = tuple(
+            generate_subtarget(candidate_tgt, full_file_name=f)
+            for f in candidate_tgt_sources.snapshot.files
+        )
+        for generated_subtarget, file_name in zip(
+            generated_subtargets, candidate_tgt_sources.snapshot.files
+        ):
+            if bfa.rel_path not in sources_set and not matches_filespec(
+                generated_subtarget.get(Sources).filespec, paths=sources_set
+            ):
+                continue
+
+            if file_name in file_name_to_generated_address:
+                file_names_with_multiple_owners.add(file_name)
+                original_addresses_due_to_multiple_owners.add(candidate_tgt.address)
+                # We also add the original target of the generated address already stored.
+                already_stored_generated_address = file_name_to_generated_address[file_name]
+                original_addresses_due_to_multiple_owners.add(
+                    already_stored_generated_address.maybe_convert_to_base_target()
+                )
+            else:
+                file_name_to_generated_address[file_name] = generated_subtarget.address
 
     def already_covered_by_original_addresses(file_name: str, generated_address: Address) -> bool:
         multiple_generated_subtarget_owners = file_name in file_names_with_multiple_owners
