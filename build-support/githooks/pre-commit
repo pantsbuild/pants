@@ -75,7 +75,7 @@ echo "* Checking packages"
 ./build-support/bin/check_packages.sh "${DIRS_TO_CHECK[@]}" || exit 1
 
 echo "* Checking headers"
-./pants --changed-since="${MERGE_BASE}" validate || exit 1
+./pants validate '**' || exit 1
 
 echo "* Checking for banned imports"
 ./build-support/bin/check_banned_imports.py || exit 1

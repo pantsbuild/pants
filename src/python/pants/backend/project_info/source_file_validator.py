@@ -24,13 +24,15 @@ class DetailLevel(Enum):
 
     none: Emit nothing.
     summary: Emit a summary only.
-    nonmatching: Emit details for source files that failed to match at least one required pattern.
-    all: Emit details for all source files.
+    nonmatching: Emit details for files that failed to match at least one pattern.
+    name_only: Emit just the paths of files that failed to match at least one pattern.
+    all: Emit details for all files.
     """
 
     none = "none"
     summary = "summary"
     nonmatching = "nonmatching"
+    names = "names"
     all = "all"
 
 
@@ -294,6 +296,11 @@ async def validate(
     for rmr in regex_match_results:
         if not rmr.matching and not rmr.nonmatching:
             continue
+        if detail_level == DetailLevel.names:
+            if rmr.nonmatching:
+                console.print_stdout(rmr.path)
+            continue
+
         if rmr.nonmatching:
             icon = "X"
             num_nonmatched_some += 1
@@ -309,14 +316,13 @@ async def validate(
         ):
             console.print_stdout("{} {}:{}{}".format(icon, rmr.path, matched_msg, nonmatched_msg))
 
-    if detail_level != DetailLevel.none:
+    if detail_level not in (DetailLevel.none, DetailLevel.names):
         console.print_stdout("\n{} files matched all required patterns.".format(num_matched_all))
         console.print_stdout(
             "{} files failed to match at least one required pattern.".format(num_nonmatched_some)
         )
 
     if num_nonmatched_some:
-        console.print_stderr("Files failed validation.")
         exit_code = PANTS_FAILED_EXIT_CODE
     else:
         exit_code = PANTS_SUCCEEDED_EXIT_CODE
