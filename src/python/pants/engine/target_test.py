@@ -1,53 +1,30 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import itertools
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from textwrap import dedent
-from typing import Any, Dict, Iterable, List, Optional, Tuple, Type
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import pytest
 from typing_extensions import final
 
 from pants.base.specs import FilesystemLiteralSpec
-from pants.engine.addresses import Address, Addresses
-from pants.engine.fs import (
-    EMPTY_DIGEST,
-    CreateDigest,
-    Digest,
-    DigestContents,
-    FileContent,
-    PathGlobs,
-    Snapshot,
-)
-from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.rules import RootRule, rule
-from pants.engine.selectors import Get, Params
+from pants.engine.addresses import Address
+from pants.engine.fs import EMPTY_DIGEST, PathGlobs, Snapshot
+from pants.engine.rules import rule
+from pants.engine.selectors import Get
 from pants.engine.target import (
-    AmbiguousCodegenImplementationsException,
-    AmbiguousImplementationsException,
     AsyncField,
     BoolField,
     Dependencies,
-    DependenciesRequest,
     DictStringToStringField,
     DictStringToStringSequenceField,
     FieldSet,
     FieldSetWithOrigin,
-    GeneratedSources,
-    GenerateSourcesRequest,
-    HydratedSources,
-    HydrateSourcesRequest,
-    InferDependenciesRequest,
-    InferredDependencies,
-    InjectDependenciesRequest,
-    InjectedDependencies,
     InvalidFieldChoiceException,
     InvalidFieldException,
     InvalidFieldTypeException,
-    NoValidTargetsException,
     PrimitiveField,
     RequiredFieldMissingException,
     ScalarField,
@@ -58,19 +35,12 @@ from pants.engine.target import (
     StringSequenceField,
     Tags,
     Target,
-    TargetsToValidFieldSets,
-    TargetsToValidFieldSetsRequest,
-    TargetsWithOrigins,
     TargetWithOrigin,
-    TooManyTargetsException,
-    WrappedTarget,
     generate_subtarget,
     generate_subtarget_address,
 )
-from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.engine.unions import UnionMembership
 from pants.testutil.engine.util import MockGet, run_rule
-from pants.testutil.option.util import create_options_bootstrapper
-from pants.testutil.test_base import TestBase
 from pants.util.collections import ensure_str_list
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import OrderedSet
@@ -489,7 +459,7 @@ def test_generate_subtarget() -> None:
 
 
 # -----------------------------------------------------------------------------------------------
-# Test FieldSet
+# Test FieldSet. Also see engine/internals/graph_test.py.
 # -----------------------------------------------------------------------------------------------
 
 
@@ -550,122 +520,6 @@ def test_field_set() -> None:
         UnrelatedFieldSet.create(TargetWithOrigin(no_fields_tgt, origin)).unrelated_field.value
         == UnrelatedField.default
     )
-
-
-class TestFindValidFieldSets(TestBase):
-    class InvalidTarget(Target):
-        alias = "invalid_target"
-        core_fields = ()
-
-    @classmethod
-    def target_types(cls):
-        return [FortranTarget, cls.InvalidTarget]
-
-    @union
-    class FieldSetSuperclass(FieldSet):
-        pass
-
-    @dataclass(frozen=True)
-    class FieldSetSubclass1(FieldSetSuperclass):
-        required_fields = (FortranSources,)
-
-        sources: FortranSources
-
-    @dataclass(frozen=True)
-    class FieldSetSubclass2(FieldSetSuperclass):
-        required_fields = (FortranSources,)
-
-        sources: FortranSources
-
-    @union
-    class FieldSetSuperclassWithOrigin(FieldSetWithOrigin):
-        pass
-
-    class FieldSetSubclassWithOrigin(FieldSetSuperclassWithOrigin):
-        required_fields = (FortranSources,)
-
-        sources: FortranSources
-
-    @classmethod
-    def rules(cls):
-        return (
-            *super().rules(),
-            RootRule(TargetsWithOrigins),
-            UnionRule(cls.FieldSetSuperclass, cls.FieldSetSubclass1),
-            UnionRule(cls.FieldSetSuperclass, cls.FieldSetSubclass2),
-            UnionRule(cls.FieldSetSuperclassWithOrigin, cls.FieldSetSubclassWithOrigin),
-        )
-
-    def test_find_valid_field_sets(self) -> None:
-        origin = FilesystemLiteralSpec("f.txt")
-        valid_tgt = FortranTarget({}, address=Address.parse(":valid"))
-        valid_tgt_with_origin = TargetWithOrigin(valid_tgt, origin)
-        invalid_tgt = self.InvalidTarget({}, address=Address.parse(":invalid"))
-        invalid_tgt_with_origin = TargetWithOrigin(invalid_tgt, origin)
-
-        def find_valid_field_sets(
-            superclass: Type,
-            targets_with_origins: Iterable[TargetWithOrigin],
-            *,
-            error_if_no_valid_targets: bool = False,
-            expect_single_config: bool = False,
-        ) -> TargetsToValidFieldSets:
-            request = TargetsToValidFieldSetsRequest(
-                superclass,
-                goal_description="fake",
-                error_if_no_valid_targets=error_if_no_valid_targets,
-                expect_single_field_set=expect_single_config,
-            )
-            return self.request_single_product(
-                TargetsToValidFieldSets, Params(request, TargetsWithOrigins(targets_with_origins),),
-            )
-
-        valid = find_valid_field_sets(
-            self.FieldSetSuperclass, [valid_tgt_with_origin, invalid_tgt_with_origin]
-        )
-        assert valid.targets == (valid_tgt,)
-        assert valid.targets_with_origins == (valid_tgt_with_origin,)
-        assert valid.field_sets == (
-            self.FieldSetSubclass1.create(valid_tgt),
-            self.FieldSetSubclass2.create(valid_tgt),
-        )
-
-        with pytest.raises(ExecutionError) as exc:
-            find_valid_field_sets(
-                self.FieldSetSuperclass, [valid_tgt_with_origin], expect_single_config=True
-            )
-        assert AmbiguousImplementationsException.__name__ in str(exc.value)
-
-        with pytest.raises(ExecutionError) as exc:
-            find_valid_field_sets(
-                self.FieldSetSuperclass,
-                [
-                    valid_tgt_with_origin,
-                    TargetWithOrigin(FortranTarget({}, address=Address.parse(":valid2")), origin),
-                ],
-                expect_single_config=True,
-            )
-        assert TooManyTargetsException.__name__ in str(exc.value)
-
-        no_valid_targets = find_valid_field_sets(self.FieldSetSuperclass, [invalid_tgt_with_origin])
-        assert no_valid_targets.targets == ()
-        assert no_valid_targets.targets_with_origins == ()
-        assert no_valid_targets.field_sets == ()
-
-        with pytest.raises(ExecutionError) as exc:
-            find_valid_field_sets(
-                self.FieldSetSuperclass, [invalid_tgt_with_origin], error_if_no_valid_targets=True
-            )
-        assert NoValidTargetsException.__name__ in str(exc.value)
-
-        valid_with_origin = find_valid_field_sets(
-            self.FieldSetSuperclassWithOrigin, [valid_tgt_with_origin, invalid_tgt_with_origin]
-        )
-        assert valid_with_origin.targets == (valid_tgt,)
-        assert valid_with_origin.targets_with_origins == (valid_tgt_with_origin,)
-        assert valid_with_origin.field_sets == (
-            self.FieldSetSubclassWithOrigin.create(valid_tgt_with_origin),
-        )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -831,446 +685,30 @@ def test_dict_string_to_string_sequence_field() -> None:
 
 
 # -----------------------------------------------------------------------------------------------
-# Test Sources
+# Test Sources and Dependencies. Also see engine/internals/graph_test.py.
 # -----------------------------------------------------------------------------------------------
 
 
-class TestSources(TestBase):
-    @classmethod
-    def rules(cls):
-        return (*super().rules(), RootRule(HydrateSourcesRequest))
-
-    def test_raw_value_sanitation(self) -> None:
-        addr = Address.parse(":test")
-
-        def assert_flexible_constructor(raw_value: Iterable[str]) -> None:
-            assert Sources(raw_value, address=addr).sanitized_raw_value == tuple(raw_value)
-
-        for v in [("f1.txt", "f2.txt"), ["f1.txt", "f2.txt"], OrderedSet(["f1.txt", "f2.txt"])]:
-            assert_flexible_constructor(v)
-
-        def assert_invalid_type(raw_value: Any) -> None:
-            with pytest.raises(InvalidFieldTypeException):
-                Sources(raw_value, address=addr)
-
-        for v in [0, object(), "f1.txt"]:  # type: ignore[assignment]
-            assert_invalid_type(v)
-
-    def test_normal_hydration(self) -> None:
-        addr = Address.parse("src/fortran:lib")
-        self.create_files("src/fortran", files=["f1.f95", "f2.f95", "f1.f03", "ignored.f03"])
-        sources = Sources(["f1.f95", "*.f03", "!ignored.f03", "!**/ignore*"], address=addr)
-        hydrated_sources = self.request_single_product(
-            HydratedSources, HydrateSourcesRequest(sources)
-        )
-        assert hydrated_sources.snapshot.files == ("src/fortran/f1.f03", "src/fortran/f1.f95")
-
-        # Also test that the Filespec is correct. This does not need hydration to be calculated.
-        assert (
-            sources.filespec
-            == {
-                "includes": ["src/fortran/*.f03", "src/fortran/f1.f95"],
-                "excludes": ["src/fortran/**/ignore*", "src/fortran/ignored.f03"],
-            }
-            == hydrated_sources.filespec
-        )
-
-    def test_output_type(self) -> None:
-        class SourcesSubclass(Sources):
-            pass
-
-        addr = Address.parse(":lib")
-        self.create_files("", files=["f1.f95"])
-
-        valid_sources = SourcesSubclass(["*"], address=addr)
-        hydrated_valid_sources = self.request_single_product(
-            HydratedSources,
-            HydrateSourcesRequest(valid_sources, for_sources_types=[SourcesSubclass]),
-        )
-        assert hydrated_valid_sources.snapshot.files == ("f1.f95",)
-        assert hydrated_valid_sources.sources_type == SourcesSubclass
-
-        invalid_sources = Sources(["*"], address=addr)
-        hydrated_invalid_sources = self.request_single_product(
-            HydratedSources,
-            HydrateSourcesRequest(invalid_sources, for_sources_types=[SourcesSubclass]),
-        )
-        assert hydrated_invalid_sources.snapshot.files == ()
-        assert hydrated_invalid_sources.sources_type is None
-
-    def test_unmatched_globs(self) -> None:
-        self.create_files("", files=["f1.f95"])
-        sources = Sources(["non_existent.f95"], address=Address.parse(":lib"))
-        with pytest.raises(ExecutionError) as exc:
-            self.request_single_product(HydratedSources, HydrateSourcesRequest(sources))
-        assert "Unmatched glob" in str(exc.value)
-        assert "//:lib" in str(exc.value)
-        assert "non_existent.f95" in str(exc.value)
-
-    def test_default_globs(self) -> None:
-        class DefaultSources(Sources):
-            default = ("default.f95", "default.f03", "*.f08", "!ignored.f08")
-
-        addr = Address.parse("src/fortran:lib")
-        # NB: Not all globs will be matched with these files, specifically `default.f03` will not
-        # be matched. This is intentional to ensure that we use `any` glob conjunction rather
-        # than the normal `all` conjunction.
-        self.create_files("src/fortran", files=["default.f95", "f1.f08", "ignored.f08"])
-        sources = DefaultSources(None, address=addr)
-        assert set(sources.sanitized_raw_value or ()) == set(DefaultSources.default)
-
-        hydrated_sources = self.request_single_product(
-            HydratedSources, HydrateSourcesRequest(sources)
-        )
-        assert hydrated_sources.snapshot.files == ("src/fortran/default.f95", "src/fortran/f1.f08")
-
-    def test_expected_file_extensions(self) -> None:
-        class ExpectedExtensionsSources(Sources):
-            expected_file_extensions = (".f95", ".f03")
-
-        addr = Address.parse("src/fortran:lib")
-        self.create_files("src/fortran", files=["s.f95", "s.f03", "s.f08"])
-        sources = ExpectedExtensionsSources(["s.f*"], address=addr)
-        with pytest.raises(ExecutionError) as exc:
-            self.request_single_product(HydratedSources, HydrateSourcesRequest(sources))
-        assert "s.f08" in str(exc.value)
-        assert str(addr) in str(exc.value)
-
-        # Also check that we support valid sources
-        valid_sources = ExpectedExtensionsSources(["s.f95"], address=addr)
-        assert self.request_single_product(
-            HydratedSources, HydrateSourcesRequest(valid_sources)
-        ).snapshot.files == ("src/fortran/s.f95",)
-
-    def test_expected_num_files(self) -> None:
-        class ExpectedNumber(Sources):
-            expected_num_files = 2
-
-        class ExpectedRange(Sources):
-            # We allow for 1 or 3 files
-            expected_num_files = range(1, 4, 2)
-
-        self.create_files("", files=["f1.txt", "f2.txt", "f3.txt", "f4.txt"])
-
-        def hydrate(sources_cls: Type[Sources], sources: Iterable[str]) -> HydratedSources:
-            return self.request_single_product(
-                HydratedSources,
-                HydrateSourcesRequest(sources_cls(sources, address=Address.parse(":example"))),
-            )
-
-        with pytest.raises(ExecutionError) as exc:
-            hydrate(ExpectedNumber, [])
-        assert "must have 2 files" in str(exc.value)
-        with pytest.raises(ExecutionError) as exc:
-            hydrate(ExpectedRange, ["f1.txt", "f2.txt"])
-        assert "must have 1 or 3 files" in str(exc.value)
-
-        # Also check that we support valid # files.
-        assert hydrate(ExpectedNumber, ["f1.txt", "f2.txt"]).snapshot.files == ("f1.txt", "f2.txt")
-        assert hydrate(ExpectedRange, ["f1.txt"]).snapshot.files == ("f1.txt",)
-        assert hydrate(ExpectedRange, ["f1.txt", "f2.txt", "f3.txt"]).snapshot.files == (
-            "f1.txt",
-            "f2.txt",
-            "f3.txt",
-        )
-
-
-# -----------------------------------------------------------------------------------------------
-# Test Codegen
-# -----------------------------------------------------------------------------------------------
-
-
-class SmalltalkSources(Sources):
-    pass
-
-
-class AvroSources(Sources):
-    pass
-
-
-class AvroLibrary(Target):
-    alias = "avro_library"
-    core_fields = (AvroSources,)
-
-
-class GenerateSmalltalkFromAvroRequest(GenerateSourcesRequest):
-    input = AvroSources
-    output = SmalltalkSources
-
-
-@rule
-async def generate_smalltalk_from_avro(
-    request: GenerateSmalltalkFromAvroRequest,
-) -> GeneratedSources:
-    protocol_files = request.protocol_sources.files
-
-    def generate_fortran(fp: str) -> FileContent:
-        parent = str(PurePath(fp).parent).replace("src/avro", "src/smalltalk")
-        file_name = f"{PurePath(fp).stem}.st"
-        return FileContent(str(PurePath(parent, file_name)), b"Generated")
-
-    result = await Get(Snapshot, CreateDigest([generate_fortran(fp) for fp in protocol_files]))
-    return GeneratedSources(result)
-
-
-class TestCodegen(TestBase):
-    @classmethod
-    def rules(cls):
-        return (
-            *super().rules(),
-            generate_smalltalk_from_avro,
-            RootRule(GenerateSmalltalkFromAvroRequest),
-            RootRule(HydrateSourcesRequest),
-            UnionRule(GenerateSourcesRequest, GenerateSmalltalkFromAvroRequest),
-        )
-
-    @classmethod
-    def target_types(cls):
-        return [AvroLibrary]
-
-    def setUp(self) -> None:
-        self.address = Address.parse("src/avro:lib")
-        self.create_files("src/avro", files=["f.avro"])
-        self.add_to_build_file("src/avro", "avro_library(name='lib', sources=['*.avro'])")
-        self.union_membership = self.request_single_product(UnionMembership, Params())
-
-    def test_generate_sources(self) -> None:
-        protocol_sources = AvroSources(["*.avro"], address=self.address)
-        assert protocol_sources.can_generate(SmalltalkSources, self.union_membership) is True
-
-        # First, get the original protocol sources.
-        hydrated_protocol_sources = self.request_single_product(
-            HydratedSources, HydrateSourcesRequest(protocol_sources)
-        )
-        assert hydrated_protocol_sources.snapshot.files == ("src/avro/f.avro",)
-
-        # Test directly feeding the protocol sources into the codegen rule.
-        wrapped_tgt = self.request_single_product(WrappedTarget, self.address)
-        generated_sources = self.request_single_product(
-            GeneratedSources,
-            GenerateSmalltalkFromAvroRequest(
-                hydrated_protocol_sources.snapshot, wrapped_tgt.target
-            ),
-        )
-        assert generated_sources.snapshot.files == ("src/smalltalk/f.st",)
-
-        # Test that HydrateSourcesRequest can also be used.
-        generated_via_hydrate_sources = self.request_single_product(
-            HydratedSources,
-            HydrateSourcesRequest(
-                protocol_sources, for_sources_types=[SmalltalkSources], enable_codegen=True
-            ),
-        )
-        assert generated_via_hydrate_sources.snapshot.files == ("src/smalltalk/f.st",)
-        assert generated_via_hydrate_sources.sources_type == SmalltalkSources
-
-    def test_works_with_subclass_fields(self) -> None:
-        class CustomAvroSources(AvroSources):
-            pass
-
-        protocol_sources = CustomAvroSources(["*.avro"], address=self.address)
-        assert protocol_sources.can_generate(SmalltalkSources, self.union_membership) is True
-        generated = self.request_single_product(
-            HydratedSources,
-            HydrateSourcesRequest(
-                protocol_sources, for_sources_types=[SmalltalkSources], enable_codegen=True
-            ),
-        )
-        assert generated.snapshot.files == ("src/smalltalk/f.st",)
-
-    def test_cannot_generate_language(self) -> None:
-        class AdaSources(Sources):
-            pass
-
-        protocol_sources = AvroSources(["*.avro"], address=self.address)
-        assert protocol_sources.can_generate(AdaSources, self.union_membership) is False
-        generated = self.request_single_product(
-            HydratedSources,
-            HydrateSourcesRequest(
-                protocol_sources, for_sources_types=[AdaSources], enable_codegen=True
-            ),
-        )
-        assert generated.snapshot.files == ()
-        assert generated.sources_type is None
-
-    def test_ambiguous_implementations_exception(self) -> None:
-        # This error message is quite complex. We test that it correctly generates the message.
-        class SmalltalkGenerator1(GenerateSourcesRequest):
-            input = AvroSources
-            output = SmalltalkSources
-
-        class SmalltalkGenerator2(GenerateSourcesRequest):
-            input = AvroSources
-            output = SmalltalkSources
-
-        class AdaSources(Sources):
-            pass
-
-        class AdaGenerator(GenerateSourcesRequest):
-            input = AvroSources
-            output = AdaSources
-
-        class IrrelevantSources(Sources):
-            pass
-
-        # Test when all generators have the same input and output.
-        exc = AmbiguousCodegenImplementationsException(
-            [SmalltalkGenerator1, SmalltalkGenerator2], for_sources_types=[SmalltalkSources]
-        )
-        assert "can generate SmalltalkSources from AvroSources" in str(exc)
-        assert "* SmalltalkGenerator1" in str(exc)
-        assert "* SmalltalkGenerator2" in str(exc)
-
-        # Test when the generators have different input and output, which usually happens because
-        # the call site used too expansive of a `for_sources_types` argument.
-        exc = AmbiguousCodegenImplementationsException(
-            [SmalltalkGenerator1, AdaGenerator],
-            for_sources_types=[SmalltalkSources, AdaSources, IrrelevantSources],
-        )
-        assert "can generate one of ['AdaSources', 'SmalltalkSources'] from AvroSources" in str(exc)
-        assert "IrrelevantSources" not in str(exc)
-        assert "* SmalltalkGenerator1 -> SmalltalkSources" in str(exc)
-        assert "* AdaGenerator -> AdaSources" in str(exc)
-
-
-# -----------------------------------------------------------------------------------------------
-# Test Dependencies
-# -----------------------------------------------------------------------------------------------
-
-
-class SmalltalkDependencies(Dependencies):
-    pass
-
-
-class CustomSmalltalkDependencies(SmalltalkDependencies):
-    pass
-
-
-class InjectSmalltalkDependencies(InjectDependenciesRequest):
-    inject_for = SmalltalkDependencies
-
-
-class InjectCustomSmalltalkDependencies(InjectDependenciesRequest):
-    inject_for = CustomSmalltalkDependencies
-
-
-@rule
-def inject_smalltalk_deps(_: InjectSmalltalkDependencies) -> InjectedDependencies:
-    return InjectedDependencies([Address.parse("//:injected")])
-
-
-@rule
-def inject_custom_smalltalk_deps(_: InjectCustomSmalltalkDependencies) -> InjectedDependencies:
-    return InjectedDependencies([Address.parse("//:custom_injected")])
-
-
-# NB: We subclass to ensure that dependency inference works properly with subclasses.
-class SmalltalkLibrarySources(SmalltalkSources):
-    pass
-
-
-class SmalltalkLibrary(Target):
-    alias = "smalltalk"
-    core_fields = (Dependencies, SmalltalkLibrarySources)
-
-
-class InferSmalltalkDependencies(InferDependenciesRequest):
-    infer_from = SmalltalkSources
-
-
-@rule
-async def infer_smalltalk_dependencies(request: InferSmalltalkDependencies) -> InferredDependencies:
-    # To demo an inference rule, we simply treat each `sources` file to contain a list of
-    # addresses, one per line.
-    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.sources_field))
-    digest_contents = await Get(DigestContents, Digest, hydrated_sources.snapshot.digest)
-    all_lines = itertools.chain.from_iterable(
-        file_content.content.decode().splitlines() for file_content in digest_contents
-    )
-    return InferredDependencies(Address.parse(line) for line in all_lines)
-
-
-class TestDependencies(TestBase):
-    @classmethod
-    def rules(cls):
-        return (
-            *super().rules(),
-            RootRule(DependenciesRequest),
-            inject_smalltalk_deps,
-            inject_custom_smalltalk_deps,
-            infer_smalltalk_dependencies,
-            UnionRule(InjectDependenciesRequest, InjectSmalltalkDependencies),
-            UnionRule(InjectDependenciesRequest, InjectCustomSmalltalkDependencies),
-            UnionRule(InferDependenciesRequest, InferSmalltalkDependencies),
-        )
-
-    @classmethod
-    def target_types(cls):
-        return [SmalltalkLibrary]
-
-    def test_normal_resolution(self) -> None:
-        self.add_to_build_file("src/smalltalk", "smalltalk()")
-        addr = Address.parse("src/smalltalk")
-        deps_field = Dependencies(["//:dep1", "//:dep2", ":sibling"], address=addr)
-        assert self.request_single_product(
-            Addresses, Params(DependenciesRequest(deps_field), create_options_bootstrapper())
-        ) == Addresses(
-            [
-                Address.parse("//:dep1"),
-                Address.parse("//:dep2"),
-                Address.parse("src/smalltalk:sibling"),
-            ]
-        )
-
-        # Also test that we handle no dependencies.
-        empty_deps_field = Dependencies(None, address=addr)
-        assert self.request_single_product(
-            Addresses, Params(DependenciesRequest(empty_deps_field), create_options_bootstrapper())
-        ) == Addresses([])
-
-    def test_dependency_injection(self) -> None:
-        self.add_to_build_file("", "smalltalk(name='target')")
-
-        def assert_injected(deps_cls: Type[Dependencies], *, injected: List[str]) -> None:
-            deps_field = deps_cls(["//:provided"], address=Address.parse("//:target"))
-            result = self.request_single_product(
-                Addresses, Params(DependenciesRequest(deps_field), create_options_bootstrapper())
-            )
-            assert result == Addresses(
-                sorted(Address.parse(addr) for addr in (*injected, "//:provided"))
-            )
-
-        assert_injected(Dependencies, injected=[])
-        assert_injected(SmalltalkDependencies, injected=["//:injected"])
-        assert_injected(CustomSmalltalkDependencies, injected=["//:custom_injected", "//:injected"])
-
-    def test_dependency_inference(self) -> None:
-        self.add_to_build_file(
-            "",
-            dedent(
-                """\
-                smalltalk(name='inferred1')
-                smalltalk(name='inferred2')
-                smalltalk(name='inferred3')
-                smalltalk(name='provided')
-                """
-            ),
-        )
-        self.create_file("demo/f1.st", "//:inferred1\n//:inferred2\n")
-        self.create_file("demo/f2.st", "//:inferred3\n")
-        self.add_to_build_file("demo", "smalltalk(sources=['*.st'], dependencies=['//:provided'])")
-
-        deps_field = Dependencies(["//:provided"], address=Address.parse("demo"))
-        result = self.request_single_product(
-            Addresses,
-            Params(
-                DependenciesRequest(deps_field),
-                create_options_bootstrapper(args=["--dependency-inference"]),
-            ),
-        )
-        assert result == Addresses(
-            sorted(
-                Address.parse(addr)
-                for addr in ["//:inferred1", "//:inferred2", "//:inferred3", "//:provided"]
-            )
-        )
+def test_dependencies_and_sources_fields_raw_value_sanitation() -> None:
+    """Ensure that both Sources and Dependencies behave like a StringSequenceField does.
+
+    Normally, we would use StringSequenceField. However, these are both AsyncFields, and
+    StringSequenceField is a PrimitiveField, so we end up replicating that validation logic.
+    """
+    addr = Address.parse(":test")
+
+    def assert_flexible_constructor(raw_value: Iterable[str]) -> None:
+        assert Sources(raw_value, address=addr).sanitized_raw_value == tuple(raw_value)
+        assert Dependencies(raw_value, address=addr).sanitized_raw_value == tuple(raw_value)
+
+    for v in [("f1.txt", "f2.txt"), ["f1.txt", "f2.txt"], OrderedSet(["f1.txt", "f2.txt"])]:
+        assert_flexible_constructor(v)
+
+    def assert_invalid_type(raw_value: Any) -> None:
+        with pytest.raises(InvalidFieldTypeException):
+            Sources(raw_value, address=addr)
+        with pytest.raises(InvalidFieldTypeException):
+            Dependencies(raw_value, address=addr)
+
+    for v in [0, object(), "f1.txt"]:  # type: ignore[assignment]
+        assert_invalid_type(v)

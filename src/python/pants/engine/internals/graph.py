@@ -7,7 +7,7 @@ import os.path
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import DefaultDict, Dict, List, Tuple, Union
+from typing import DefaultDict, Dict, Iterable, List, Tuple, Type, Union
 
 from pants.base.exceptions import ResolveError
 from pants.base.specs import (
@@ -27,27 +27,47 @@ from pants.engine.addresses import (
     BuildFileAddress,
 )
 from pants.engine.collection import Collection
-from pants.engine.fs import MergeDigests, PathGlobs, Snapshot, SourcesSnapshot
+from pants.engine.fs import (
+    EMPTY_SNAPSHOT,
+    GlobExpansionConjunction,
+    GlobMatchErrorBehavior,
+    MergeDigests,
+    PathGlobs,
+    Snapshot,
+    SourcesSnapshot,
+)
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
+    FieldSet,
+    FieldSetWithOrigin,
+    GeneratedSources,
+    GenerateSourcesRequest,
     HydratedSources,
     HydrateSourcesRequest,
+    InferDependenciesRequest,
+    InferredDependencies,
+    InjectDependenciesRequest,
+    InjectedDependencies,
     RegisteredTargetTypes,
     Sources,
     Target,
     Targets,
+    TargetsToValidFieldSets,
+    TargetsToValidFieldSetsRequest,
     TargetsWithOrigins,
     TargetWithOrigin,
     TransitiveTarget,
     TransitiveTargets,
     UnrecognizedTargetTypeException,
     WrappedTarget,
+    _AbstractFieldSet,
     generate_subtarget,
 )
+from pants.engine.unions import UnionMembership
 from pants.option.global_options import GlobalOptions, OwnersNotFoundBehavior
 from pants.source.filespec import matches_filespec
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
@@ -252,7 +272,7 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
 
 
 # -----------------------------------------------------------------------------------------------
-# FilesystemSpecs -> Addresses
+# Specs -> Addresses
 # -----------------------------------------------------------------------------------------------
 
 
@@ -385,18 +405,374 @@ async def resolve_sources_snapshot(specs: Specs, global_options: GlobalOptions) 
     return SourcesSnapshot(result)
 
 
+# -----------------------------------------------------------------------------------------------
+# Resolve the Sources field
+# -----------------------------------------------------------------------------------------------
+
+
+class AmbiguousCodegenImplementationsException(Exception):
+    """Exception for when there are multiple codegen implementations and it is ambiguous which to
+    use."""
+
+    def __init__(
+        self,
+        generators: Iterable[Type["GenerateSourcesRequest"]],
+        *,
+        for_sources_types: Iterable[Type["Sources"]],
+    ) -> None:
+        bulleted_list_sep = "\n  * "
+        all_same_generator_paths = (
+            len(set((generator.input, generator.output) for generator in generators)) == 1
+        )
+        example_generator = list(generators)[0]
+        input = example_generator.input.__name__
+        if all_same_generator_paths:
+            output = example_generator.output.__name__
+            possible_generators = sorted(generator.__name__ for generator in generators)
+            super().__init__(
+                f"Multiple of the registered code generators can generate {output} from {input}. "
+                "It is ambiguous which implementation to use.\n\nPossible implementations:"
+                f"{bulleted_list_sep}{bulleted_list_sep.join(possible_generators)}"
+            )
+        else:
+            possible_output_types = sorted(
+                generator.output.__name__
+                for generator in generators
+                if issubclass(generator.output, tuple(for_sources_types))
+            )
+            possible_generators_with_output = [
+                f"{generator.__name__} -> {generator.output.__name__}"
+                for generator in sorted(generators, key=lambda generator: generator.output.__name__)
+            ]
+            super().__init__(
+                f"Multiple of the registered code generators can generate one of "
+                f"{possible_output_types} from {input}. It is ambiguous which implementation to "
+                f"use. This can happen when the call site requests too many different output types "
+                f"from the same original protocol sources.\n\nPossible implementations with their "
+                f"output type: {bulleted_list_sep}"
+                f"{bulleted_list_sep.join(possible_generators_with_output)}"
+            )
+
+
+@rule
+async def hydrate_sources(
+    request: HydrateSourcesRequest,
+    glob_match_error_behavior: GlobMatchErrorBehavior,
+    union_membership: UnionMembership,
+) -> HydratedSources:
+    sources_field = request.field
+
+    # First, find if there are any code generators for the input `sources_field`. This will be used
+    # to determine if the sources_field is valid or not.
+    # We could alternatively use `sources_field.can_generate()`, but we want to error if there are
+    # 2+ generators due to ambiguity.
+    generate_request_types = union_membership.get(GenerateSourcesRequest)
+    relevant_generate_request_types = [
+        generate_request_type
+        for generate_request_type in generate_request_types
+        if isinstance(sources_field, generate_request_type.input)
+        and issubclass(generate_request_type.output, request.for_sources_types)
+    ]
+    if request.enable_codegen and len(relevant_generate_request_types) > 1:
+        raise AmbiguousCodegenImplementationsException(
+            relevant_generate_request_types, for_sources_types=request.for_sources_types
+        )
+    generate_request_type = next(iter(relevant_generate_request_types), None)
+
+    # Now, determine if any of the `for_sources_types` may be used, either because the
+    # sources_field is a direct subclass or can be generated into one of the valid types.
+    def compatible_with_sources_field(valid_type: Type[Sources]) -> bool:
+        is_instance = isinstance(sources_field, valid_type)
+        can_be_generated = (
+            request.enable_codegen
+            and generate_request_type is not None
+            and issubclass(generate_request_type.output, valid_type)
+        )
+        return is_instance or can_be_generated
+
+    sources_type = next(
+        (
+            valid_type
+            for valid_type in request.for_sources_types
+            if compatible_with_sources_field(valid_type)
+        ),
+        None,
+    )
+    if sources_type is None:
+        return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec, sources_type=None)
+
+    # Now, hydrate the `globs`. Even if we are going to use codegen, we will need the original
+    # protocol sources to be hydrated.
+    globs = sources_field.sanitized_raw_value
+    if globs is None:
+        return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec, sources_type=sources_type)
+
+    conjunction = (
+        GlobExpansionConjunction.all_match
+        if not sources_field.default or (set(globs) != set(sources_field.default))
+        else GlobExpansionConjunction.any_match
+    )
+    snapshot = await Get(
+        Snapshot,
+        PathGlobs(
+            (sources_field.prefix_glob_with_address(glob) for glob in globs),
+            conjunction=conjunction,
+            glob_match_error_behavior=glob_match_error_behavior,
+            # TODO(#9012): add line number referring to the sources field. When doing this, we'll
+            # likely need to `await Get(BuildFileAddress](Address)`.
+            description_of_origin=(
+                f"{sources_field.address}'s `{sources_field.alias}` field"
+                if glob_match_error_behavior != GlobMatchErrorBehavior.ignore
+                else None
+            ),
+        ),
+    )
+    sources_field.validate_snapshot(snapshot)
+
+    # Finally, return if codegen is not in use; otherwise, run the relevant code generator.
+    if not request.enable_codegen or generate_request_type is None:
+        return HydratedSources(snapshot, sources_field.filespec, sources_type=sources_type)
+    wrapped_protocol_target = await Get(WrappedTarget, Address, sources_field.address)
+    generated_sources = await Get(
+        GeneratedSources,
+        GenerateSourcesRequest,
+        generate_request_type(snapshot, wrapped_protocol_target.target),
+    )
+    return HydratedSources(
+        generated_sources.snapshot, sources_field.filespec, sources_type=sources_type
+    )
+
+
+# -----------------------------------------------------------------------------------------------
+# Resolve the Dependencies field
+# -----------------------------------------------------------------------------------------------
+
+
+class AmbiguousDependencyInferenceException(Exception):
+    """Exception for when there are multiple dependency inference implementations and it is
+    ambiguous which to use."""
+
+    def __init__(
+        self,
+        implementations: Iterable[Type["InferDependenciesRequest"]],
+        *,
+        from_sources_type: Type["Sources"],
+    ) -> None:
+        bulleted_list_sep = "\n  * "
+        possible_implementations = sorted(impl.__name__ for impl in implementations)
+        super().__init__(
+            f"Multiple of the registered dependency inference implementations can infer "
+            f"dependencies from {from_sources_type.__name__}. It is ambiguous which "
+            "implementation to use.\n\nPossible implementations:"
+            f"{bulleted_list_sep}{bulleted_list_sep.join(possible_implementations)}"
+        )
+
+
+@rule
+async def resolve_dependencies(
+    request: DependenciesRequest, union_membership: UnionMembership, global_options: GlobalOptions
+) -> Addresses:
+    provided = [
+        Address.parse(
+            dep,
+            relative_to=request.field.address.spec_path,
+            subproject_roots=global_options.options.subproject_roots,
+        )
+        for dep in request.field.sanitized_raw_value or ()
+    ]
+
+    # Inject any dependencies. This is determined by the `request.field` class. For example, if
+    # there is a rule to inject for FortranDependencies, then FortranDependencies and any subclass
+    # of FortranDependencies will use that rule.
+    inject_request_types = union_membership.get(InjectDependenciesRequest)
+    injected = await MultiGet(
+        Get(InjectedDependencies, InjectDependenciesRequest, inject_request_type(request.field))
+        for inject_request_type in inject_request_types
+        if isinstance(request.field, inject_request_type.inject_for)
+    )
+
+    inference_request_types = union_membership.get(InferDependenciesRequest)
+    inferred = InferredDependencies()
+    if global_options.options.dependency_inference and inference_request_types:
+        # Dependency inference is solely determined by the `Sources` field for a Target, so we
+        # re-resolve the original target to inspect its `Sources` field, if any.
+        wrapped_tgt = await Get(WrappedTarget, Address, request.field.address)
+        sources_field = wrapped_tgt.target.get(Sources)
+        relevant_inference_request_types = [
+            inference_request_type
+            for inference_request_type in inference_request_types
+            if isinstance(sources_field, inference_request_type.infer_from)
+        ]
+        if relevant_inference_request_types:
+            if len(relevant_inference_request_types) > 1:
+                raise AmbiguousDependencyInferenceException(
+                    relevant_inference_request_types, from_sources_type=type(sources_field)
+                )
+            inference_request_type = relevant_inference_request_types[0]
+            inferred = await Get(
+                InferredDependencies,
+                InferDependenciesRequest,
+                inference_request_type(sources_field),
+            )
+
+    return Addresses(sorted([*provided, *itertools.chain.from_iterable(injected), *inferred]))
+
+
+# -----------------------------------------------------------------------------------------------
+# Find valid field sets
+# -----------------------------------------------------------------------------------------------
+
+
+class NoValidTargetsException(Exception):
+    def __init__(
+        self,
+        targets_with_origins: TargetsWithOrigins,
+        *,
+        valid_target_types: Iterable[Type[Target]],
+        goal_description: str,
+    ) -> None:
+        valid_target_aliases = sorted({target_type.alias for target_type in valid_target_types})
+        invalid_target_aliases = sorted({tgt.alias for tgt in targets_with_origins.targets})
+        specs = sorted(
+            {
+                target_with_origin.origin.to_spec_string()
+                for target_with_origin in targets_with_origins
+            }
+        )
+        bulleted_list_sep = "\n  * "
+        super().__init__(
+            f"{goal_description.capitalize()} only works with the following target types:"
+            f"{bulleted_list_sep}{bulleted_list_sep.join(valid_target_aliases)}\n\n"
+            f"You specified `{' '.join(specs)}`, which only included the following target types:"
+            f"{bulleted_list_sep}{bulleted_list_sep.join(invalid_target_aliases)}"
+        )
+
+    @classmethod
+    def create_from_field_sets(
+        cls,
+        targets_with_origins: TargetsWithOrigins,
+        *,
+        field_set_types: Iterable[Type[_AbstractFieldSet]],
+        goal_description: str,
+        union_membership: UnionMembership,
+        registered_target_types: RegisteredTargetTypes,
+    ) -> "NoValidTargetsException":
+        valid_target_types = {
+            target_type
+            for field_set_type in field_set_types
+            for target_type in field_set_type.valid_target_types(
+                registered_target_types.types, union_membership=union_membership
+            )
+        }
+        return cls(
+            targets_with_origins,
+            valid_target_types=valid_target_types,
+            goal_description=goal_description,
+        )
+
+
+class TooManyTargetsException(Exception):
+    def __init__(self, targets: Iterable[Target], *, goal_description: str) -> None:
+        bulleted_list_sep = "\n  * "
+        addresses = sorted(tgt.address.spec for tgt in targets)
+        super().__init__(
+            f"{goal_description.capitalize()} only works with one valid target, but was given "
+            f"multiple valid targets:{bulleted_list_sep}{bulleted_list_sep.join(addresses)}\n\n"
+            "Please select one of these targets to run."
+        )
+
+
+class AmbiguousImplementationsException(Exception):
+    """Exception for when a single target has multiple valid FieldSets, but the goal only expects
+    there to be one FieldSet."""
+
+    def __init__(
+        self, target: Target, field_sets: Iterable[_AbstractFieldSet], *, goal_description: str,
+    ) -> None:
+        # TODO: improve this error message. A better error message would explain to users how they
+        #  can resolve the issue.
+        possible_field_sets_types = sorted(field_set.__class__.__name__ for field_set in field_sets)
+        bulleted_list_sep = "\n  * "
+        super().__init__(
+            f"Multiple of the registered implementations for {goal_description} work for "
+            f"{target.address} (target type {repr(target.alias)}). It is ambiguous which "
+            "implementation to use.\n\nPossible implementations:"
+            f"{bulleted_list_sep}{bulleted_list_sep.join(possible_field_sets_types)}"
+        )
+
+
+@rule
+def find_valid_field_sets(
+    request: TargetsToValidFieldSetsRequest,
+    targets_with_origins: TargetsWithOrigins,
+    union_membership: UnionMembership,
+    registered_target_types: RegisteredTargetTypes,
+) -> TargetsToValidFieldSets:
+    field_set_types: Iterable[
+        Union[Type[FieldSet], Type[FieldSetWithOrigin]]
+    ] = union_membership.union_rules[request.field_set_superclass]
+    targets_to_valid_field_sets = {}
+    for tgt_with_origin in targets_with_origins:
+        valid_field_sets = [
+            (
+                field_set_type.create(tgt_with_origin)
+                if issubclass(field_set_type, FieldSetWithOrigin)
+                else field_set_type.create(tgt_with_origin.target)
+            )
+            for field_set_type in field_set_types
+            if field_set_type.is_valid(tgt_with_origin.target)
+        ]
+        if valid_field_sets:
+            targets_to_valid_field_sets[tgt_with_origin] = valid_field_sets
+    if request.error_if_no_valid_targets and not targets_to_valid_field_sets:
+        raise NoValidTargetsException.create_from_field_sets(
+            targets_with_origins,
+            field_set_types=field_set_types,
+            goal_description=request.goal_description,
+            union_membership=union_membership,
+            registered_target_types=registered_target_types,
+        )
+    result = TargetsToValidFieldSets(targets_to_valid_field_sets)
+    if not request.expect_single_field_set:
+        return result
+    if len(result.targets) > 1:
+        raise TooManyTargetsException(result.targets, goal_description=request.goal_description)
+    if len(result.field_sets) > 1:
+        raise AmbiguousImplementationsException(
+            result.targets[0], result.field_sets, goal_description=request.goal_description
+        )
+    return result
+
+
 def rules():
     return [
+        # Address -> Target
         resolve_target,
         resolve_targets,
+        # AddressWithOrigin -> TargetWithOrigin
         resolve_target_with_origin,
         resolve_targets_with_origins,
+        # TransitiveTargets
         transitive_target,
         transitive_targets,
+        # Owners
         find_owners,
+        RootRule(OwnersRequest),
+        # Specs -> AddressesWithOrigins
         addresses_with_origins_from_filesystem_specs,
-        resolve_sources_snapshot,
         resolve_addresses_with_origins,
         RootRule(Specs),
-        RootRule(OwnersRequest),
+        # SourcesSnapshot
+        resolve_sources_snapshot,
+        # Sources field
+        hydrate_sources,
+        RootRule(HydrateSourcesRequest),
+        # Dependencies field
+        resolve_dependencies,
+        RootRule(DependenciesRequest),
+        RootRule(InjectDependenciesRequest),
+        RootRule(InferDependenciesRequest),
+        # FieldSets
+        find_valid_field_sets,
+        RootRule(TargetsToValidFieldSetsRequest),
     ]
