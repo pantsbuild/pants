@@ -46,6 +46,9 @@ Bugfixes
 * Revert modernization of virtualenv to fix pants.pex deploy in CI. (#10343)
   `PR #10343 <https://github.com/pantsbuild/pants/pull/10343>`_
 
+* Pass stream workunit context to all callbacks calls instead of just passing it in the last call. (#10340)
+  `PR #10340 <https://github.com/pantsbuild/pants/pull/10340>`_
+
 * Fix `run_virtualenv` to target the current `$PY`. (#10331)
   `PR #10331 <https://github.com/pantsbuild/pants/pull/10331>`_
 
@@ -63,9 +66,6 @@ Refactoring, Improvements, and Tooling
 
 * Add check for invalid concrete time dates (#10349)
   `PR #10349 <https://github.com/pantsbuild/pants/pull/10349>`_
-
-* Pass stream workunit context to all callbacks calls instead of just passing it in the last call. (#10340)
-  `PR #10340 <https://github.com/pantsbuild/pants/pull/10340>`_
 
 * Explicit error on missing descriptions in the `goals` goal. (#10348)
   `PR #10348 <https://github.com/pantsbuild/pants/pull/10348>`_
