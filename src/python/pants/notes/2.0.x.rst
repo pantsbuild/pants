@@ -5,6 +5,147 @@ This document describes releases leading up to the ``2.0.x`` ``stable`` series.
 
 See https://pants.readme.io/v2.0/docs/release-notes-2-0 for an overview of the changes in this release.
 
+2.0.0.dev3 (7/15/2020)
+----------------------
+
+New Features
+~~~~~~~~~~~~
+
+* Allow specifying address and file arguments at the same time (#10345)
+  `PR #10345 <https://github.com/pantsbuild/pants/pull/10345>`_
+
+* Make help-all dump a JSON blob containing all help info. (#10336)
+  `PR #10336 <https://github.com/pantsbuild/pants/pull/10336>`_
+
+* Integrate option value derivation into help. (#10313)
+  `PR #10313 <https://github.com/pantsbuild/pants/pull/10313>`_
+
+* Generate subtargets with file-level precision for dependency inference (#10305)
+  `PR #10305 <https://github.com/pantsbuild/pants/pull/10305>`_
+
+* Add option for specifying environment variable with concurrency slot (#10297)
+  `PR #10297 <https://github.com/pantsbuild/pants/pull/10297>`_
+
+* Add support for specifying a custom coverage config file (.coveragerc) (#10289)
+  `PR #10289 <https://github.com/pantsbuild/pants/pull/10289>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix generated subtargets not working with `dependees` (#10355)
+  `PR #10355 <https://github.com/pantsbuild/pants/pull/10355>`_
+
+* Ignore dead symlinks on Linux as well as OSX (#10339)
+  `PR #10339 <https://github.com/pantsbuild/pants/pull/10339>`_
+
+* Fix bug where workunit completion was not reported correctly (#10277)
+  `PR #10277 <https://github.com/pantsbuild/pants/pull/10277>`_
+
+* Fix collision in workunit affecting patches. (#10350)
+  `PR #10350 <https://github.com/pantsbuild/pants/pull/10350>`_
+
+* Pass stream workunit context to all callbacks calls instead of just passing it in the last call. (#10340)
+  `PR #10340 <https://github.com/pantsbuild/pants/pull/10340>`_
+
+* Fix awslambda configuration of Pex. (#10323)
+  `PR #10323 <https://github.com/pantsbuild/pants/pull/10323>`_
+
+* Hotfix Bandit breaking from stevedore 3.0 release (#10319)
+  `PR #10319 <https://github.com/pantsbuild/pants/pull/10319>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Render only leaf rule graph errors, and improve error messages (#10311)
+  `PR #10311 <https://github.com/pantsbuild/pants/pull/10311>`_
+
+* Tweak `any_matches_filespec` to return which paths matched (#10358)
+  `PR #10358 <https://github.com/pantsbuild/pants/pull/10358>`_
+
+* Add check for invalid concrete time dates (#10349)
+  `PR #10349 <https://github.com/pantsbuild/pants/pull/10349>`_
+
+* Explicit error on missing descriptions in the `goals` goal. (#10348)
+  `PR #10348 <https://github.com/pantsbuild/pants/pull/10348>`_
+
+* Add module to default rule names. (#10341)
+  `PR #10341 <https://github.com/pantsbuild/pants/pull/10341>`_
+
+* add artifacts infrastructure on relevant types (#10344)
+  `PR #10344 <https://github.com/pantsbuild/pants/pull/10344>`_
+
+* Revert modernization of virtualenv to fix pants.pex deploy in CI. (#10343)
+  `PR #10343 <https://github.com/pantsbuild/pants/pull/10343>`_
+
+* Represent generated subtarget addresses as file names (#10338)
+  `PR #10338 <https://github.com/pantsbuild/pants/pull/10338>`_
+
+* Remove unusued RunTracker code (#10315)
+  `PR #10315 <https://github.com/pantsbuild/pants/pull/10315>`_
+
+* Minor wording change in help message (#10335)
+  `PR #10335 <https://github.com/pantsbuild/pants/pull/10335>`_
+
+* Display whether a scope is a goal or subsystem in help. (#10332)
+  `PR #10332 <https://github.com/pantsbuild/pants/pull/10332>`_
+
+* Fix `run_virtualenv` to target the current `$PY`. (#10331)
+  `PR #10331 <https://github.com/pantsbuild/pants/pull/10331>`_
+
+* Modernize virtualenv. (#10330)
+  `PR #10330 <https://github.com/pantsbuild/pants/pull/10330>`_
+
+* Stop differentiating between constructors and types in FFI. (#10327)
+  `PR #10327 <https://github.com/pantsbuild/pants/pull/10327>`_
+
+* Use generated subtargets internally (#10312)
+  `PR #10312 <https://github.com/pantsbuild/pants/pull/10312>`_
+
+* Remove `Revision` (#10318)
+  `PR #10318 <https://github.com/pantsbuild/pants/pull/10318>`_
+
+* Bump to nails 0.6.0 to lay groundwork for cancelation of pantsd runs. (#10320)
+  `PR #10320 <https://github.com/pantsbuild/pants/pull/10320>`_
+
+* remove polling remote execution client (#10306)
+  `PR #10306 <https://github.com/pantsbuild/pants/pull/10306>`_
+
+* Remove `Struct` and `@addressable` abstractions (#10309)
+  `PR #10309 <https://github.com/pantsbuild/pants/pull/10309>`_
+
+* Move SubprocessProcessHandler near its single use. (#10307)
+  `PR #10307 <https://github.com/pantsbuild/pants/pull/10307>`_
+
+* No longer special case the `dependencies` field with TargetAdaptor (#10303)
+  `PR #10303 <https://github.com/pantsbuild/pants/pull/10303>`_
+
+* Use with_workunit everywhere (#10300)
+  `PR #10300 <https://github.com/pantsbuild/pants/pull/10300>`_
+
+* refactor execution strategy options into separate struct (#10304)
+  `PR #10304 <https://github.com/pantsbuild/pants/pull/10304>`_
+
+* Remove -q from the release run of reversion. (#10301)
+  `PR #10301 <https://github.com/pantsbuild/pants/pull/10301>`_
+
+* Simplify BUILD file parsing (#10298)
+  `PR #10298 <https://github.com/pantsbuild/pants/pull/10298>`_
+
+Testing
+~~~~~~~
+
+* Fix tests that relied on the docsite CNAME file. (#10337)
+  `PR #10337 <https://github.com/pantsbuild/pants/pull/10337>`_
+
+* Run unit tests and integration tests in CI in the same Pants run (#10333)
+  `PR #10333 <https://github.com/pantsbuild/pants/pull/10333>`_
+
+* Merge the unit and integration tests (#10302)
+  `PR #10302 <https://github.com/pantsbuild/pants/pull/10302>`_
+
+* Run code coverage on v2 unit tests. (#9919)
+  `PR #9919 <https://github.com/pantsbuild/pants/pull/9919>`_
+
 2.0.0.dev2 (7/8/2020)
 ---------------------
 
