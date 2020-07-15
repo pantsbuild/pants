@@ -26,6 +26,7 @@ class LoggingTest(TestBase):
             # verbosity as necessary.
             level=LogLevel.ERROR.level,
             log_show_rust_3rdparty=False,
+            use_color=False,
         )
 
     @contextmanager
