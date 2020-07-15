@@ -86,17 +86,26 @@ class PythonDependencyInferenceTest(TestBase):
         )
         self.add_to_build_file("src/python", "python_library()")
 
-        tgt = self.request_single_product(WrappedTarget, Address.parse("src/python")).target
-        result = self.request_single_product(
-            InferredDependencies,
-            Params(InferPythonDependencies(tgt[PythonSources]), options_bootstrapper),
-        )
-        # NB: `src/python:f2.py` does not show up because it is not a dependency of any file in
-        # `src/python:python`.
-        assert result == InferredDependencies(
+        def run_dep_inference(address: Address) -> InferredDependencies:
+            target = self.request_single_product(WrappedTarget, address).target
+            return self.request_single_product(
+                InferredDependencies,
+                Params(InferPythonDependencies(target[PythonSources]), options_bootstrapper),
+            )
+
+        # NB: We do not infer `src/python/app.py`, even though it's used by `src/python/f2.py`,
+        # because it is part of the requested address.
+        normal_address = Address("src/python", "python")
+        assert run_dep_inference(normal_address) == InferredDependencies(
             [
-                Address.parse("3rdparty/python:Django"),
-                Address("src/python", target_name="app.py", generated_base_target_name="python"),
+                Address("3rdparty/python", "Django"),
                 Address("src/python/util", target_name="dep.py", generated_base_target_name="util"),
             ]
+        )
+
+        generated_subtarget_address = Address(
+            "src/python", target_name="f2.py", generated_base_target_name="python"
+        )
+        assert run_dep_inference(generated_subtarget_address) == InferredDependencies(
+            [Address("src/python", target_name="app.py", generated_base_target_name="python")]
         )
