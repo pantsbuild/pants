@@ -26,9 +26,6 @@ New Features
 * Add support for specifying a custom coverage config file (.coveragerc) (#10289)
   `PR #10289 <https://github.com/pantsbuild/pants/pull/10289>`_
 
-* Run code coverage on v2 unit tests. (#9919)
-  `PR #9919 <https://github.com/pantsbuild/pants/pull/9919>`_
-
 Bugfixes
 ~~~~~~~~
 
@@ -60,7 +57,6 @@ Bugfixes
 
 * Remove -q from the release run of reversion. (#10301)
   `PR #10301 <https://github.com/pantsbuild/pants/pull/10301>`_
-
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -142,6 +138,9 @@ Testing
 
 * Merge the unit and integration tests (#10302)
   `PR #10302 <https://github.com/pantsbuild/pants/pull/10302>`_
+
+* Run code coverage on v2 unit tests. (#9919)
+  `PR #9919 <https://github.com/pantsbuild/pants/pull/9919>`_
 
 2.0.0.dev2 (7/8/2020)
 ---------------------
