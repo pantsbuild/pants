@@ -7,7 +7,7 @@ import os.path
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import DefaultDict, List, Tuple, Union
+from typing import DefaultDict, Dict, List, Tuple, Union
 
 from pants.base.exceptions import ResolveError
 from pants.base.specs import (
@@ -26,6 +26,7 @@ from pants.engine.addresses import (
     AddressWithOrigin,
     BuildFileAddress,
 )
+from pants.engine.collection import Collection
 from pants.engine.fs import MergeDigests, PathGlobs, Snapshot, SourcesSnapshot
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import RootRule, rule
@@ -162,9 +163,8 @@ class OwnersRequest:
     sources: Tuple[str, ...]
 
 
-@dataclass(frozen=True)
-class Owners:
-    addresses: Addresses
+class Owners(Collection[Address]):
+    pass
 
 
 @rule
@@ -175,19 +175,80 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
     # Walk up the buildroot looking for targets that would conceivably claim changed sources.
     candidate_specs = tuple(AscendantAddresses(directory=d) for d in dirs_set)
     candidate_targets = await Get(Targets, AddressSpecs(candidate_specs))
+    candidate_target_sources = await MultiGet(
+        Get(HydratedSources, HydrateSourcesRequest(tgt.get(Sources))) for tgt in candidate_targets
+    )
     build_file_addresses = await MultiGet(
         Get(BuildFileAddress, Address, tgt.address) for tgt in candidate_targets
     )
 
-    owners = Addresses(
-        tgt.address
-        for tgt, bfa in zip(candidate_targets, build_file_addresses)
-        if bfa.rel_path in sources_set
-        # NB: Deleted files can only be matched against the 'filespec' (i.e. `PathGlobs`) for a
-        # target, which is why we use `matches_filespec`.
-        or bool(matches_filespec(tgt.get(Sources).filespec, paths=sources_set))
+    # We use this to determine if any of the matched files are deleted or not.
+    all_source_files = set(
+        itertools.chain.from_iterable(
+            sources.snapshot.files for sources in candidate_target_sources
+        )
     )
-    return Owners(owners)
+
+    file_name_to_generated_address: Dict[str, Address] = {}
+    file_names_with_multiple_owners: OrderedSet[str] = OrderedSet()
+    original_addresses_due_to_deleted_files: OrderedSet[Address] = OrderedSet()
+    original_addresses_due_to_multiple_owners: OrderedSet[Address] = OrderedSet()
+    for candidate_tgt, candidate_tgt_sources, bfa in zip(
+        candidate_targets, candidate_target_sources, build_file_addresses
+    ):
+        matching_files = matches_filespec(candidate_tgt.get(Sources).filespec, paths=sources_set)
+        if bfa.rel_path not in sources_set and not matching_files:
+            continue
+        deleted_files_matched = bool(set(matching_files) - all_source_files)
+        if deleted_files_matched:
+            original_addresses_due_to_deleted_files.add(candidate_tgt.address)
+            continue
+        # Else, we generate subtargets for greater precision. We use those subtargets, unless
+        # there are multiple owners of their file.
+        generated_subtargets = tuple(
+            generate_subtarget(candidate_tgt, full_file_name=f)
+            for f in candidate_tgt_sources.snapshot.files
+        )
+        for generated_subtarget, file_name in zip(
+            generated_subtargets, candidate_tgt_sources.snapshot.files
+        ):
+            if bfa.rel_path not in sources_set and not matches_filespec(
+                generated_subtarget.get(Sources).filespec, paths=sources_set
+            ):
+                continue
+
+            if file_name in file_name_to_generated_address:
+                file_names_with_multiple_owners.add(file_name)
+                original_addresses_due_to_multiple_owners.add(candidate_tgt.address)
+                # We also add the original target of the generated address already stored.
+                already_stored_generated_address = file_name_to_generated_address[file_name]
+                original_addresses_due_to_multiple_owners.add(
+                    already_stored_generated_address.maybe_convert_to_base_target()
+                )
+            else:
+                file_name_to_generated_address[file_name] = generated_subtarget.address
+
+    def already_covered_by_original_addresses(file_name: str, generated_address: Address) -> bool:
+        multiple_generated_subtarget_owners = file_name in file_names_with_multiple_owners
+        original_address = generated_address.maybe_convert_to_base_target()
+        return (
+            multiple_generated_subtarget_owners
+            or original_address in original_addresses_due_to_deleted_files
+            or original_address in original_addresses_due_to_multiple_owners
+        )
+
+    remaining_generated_addresses = FrozenOrderedSet(
+        address
+        for file_name, address in file_name_to_generated_address.items()
+        if not already_covered_by_original_addresses(file_name, address)
+    )
+    return Owners(
+        [
+            *original_addresses_due_to_deleted_files,
+            *original_addresses_due_to_multiple_owners,
+            *remaining_generated_addresses,
+        ]
+    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -201,6 +262,9 @@ async def addresses_with_origins_from_filesystem_specs(
 ) -> AddressesWithOrigins:
     """Find the owner(s) for each FilesystemSpec while preserving the original FilesystemSpec those
     owners come from.
+
+    When a file has only one owning target, we generate a subtarget from that owner whose source's
+    field only refers to that one file. Otherwise, we use all the original owning targets.
 
     This will merge FilesystemSpecs that come from the same owning target into a single
     FilesystemMergedSpec.
@@ -226,7 +290,7 @@ async def addresses_with_origins_from_filesystem_specs(
         if (
             global_options.options.owners_not_found_behavior != OwnersNotFoundBehavior.ignore
             and isinstance(spec, FilesystemLiteralSpec)
-            and not owners.addresses
+            and not owners
         ):
             file_path = PurePath(spec.to_spec_string())
             msg = (
@@ -247,7 +311,7 @@ async def addresses_with_origins_from_filesystem_specs(
             if isinstance(spec, FilesystemLiteralSpec)
             else FilesystemResolvedGlobSpec(glob=spec.glob, files=snapshot.files)
         )
-        for address in owners.addresses:
+        for address in owners:
             addresses_to_specs[address].append(origin)
     return AddressesWithOrigins(
         AddressWithOrigin(
