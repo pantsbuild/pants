@@ -1302,18 +1302,28 @@ fn lease_files_in_graph(
   })
 }
 
-fn match_path_globs(py: Python, path_globs: PyObject, paths: Vec<String>) -> CPyResult<bool> {
+fn match_path_globs(
+  py: Python,
+  path_globs: PyObject,
+  paths: Vec<String>,
+) -> CPyResult<Vec<String>> {
   let path_globs = nodes::Snapshot::lift_path_globs(&path_globs.into())
     .map_err(|e| PyErr::new::<exc::ValueError, _>(py, (e,)))?;
-
-  py.allow_threads(|| {
-    Ok(
-      paths
-        .into_iter()
-        .map(PathBuf::from)
-        .any(|s| path_globs.matches(s.as_ref())),
-    )
-  })
+  let matches = py.allow_threads(|| {
+    paths
+      .into_iter()
+      .map(PathBuf::from)
+      .filter(|pb| path_globs.matches(pb.as_ref()))
+      .collect::<Vec<_>>()
+  });
+  matches
+    .into_iter()
+    .map(|pb| {
+      pb.into_os_string().into_string().map_err(|s| {
+        PyErr::new::<exc::Exception, _>(py, (format!("Could not decode {:?} as a string.", s),))
+      })
+    })
+    .collect::<Result<Vec<_>, _>>()
 }
 
 fn capture_snapshots(

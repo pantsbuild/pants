@@ -47,7 +47,7 @@ from pants.engine.target import (
     generate_subtarget,
 )
 from pants.option.global_options import GlobalOptions, OwnersNotFoundBehavior
-from pants.source.filespec import any_matches_filespec
+from pants.source.filespec import matches_filespec
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 logger = logging.getLogger(__name__)
@@ -185,8 +185,8 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
         for tgt, bfa in zip(candidate_targets, build_file_addresses)
         if bfa.rel_path in sources_set
         # NB: Deleted files can only be matched against the 'filespec' (i.e. `PathGlobs`) for a
-        # target, which is why we use `any_matches_filespec`.
-        or any_matches_filespec(tgt.get(Sources).filespec, paths=sources_set)
+        # target, which is why we use `matches_filespec`.
+        or bool(matches_filespec(tgt.get(Sources).filespec, paths=sources_set))
     )
     return Owners(owners)
 
