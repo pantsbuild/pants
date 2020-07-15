@@ -56,6 +56,9 @@ Bugfixes
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+* Render only leaf rule graph errors, and improve error messages (#10311)
+  `PR #10311 <https://github.com/pantsbuild/pants/pull/10311>`_
+
 * Tweak `any_matches_filespec` to return which paths matched (#10358)
   `PR #10358 <https://github.com/pantsbuild/pants/pull/10358>`_
 
