@@ -7,7 +7,7 @@ import unittest
 from dataclasses import dataclass
 from enum import Enum
 from textwrap import dedent
-from typing import Callable, List, Optional, Tuple, Type, Union, get_type_hints
+from typing import Callable, List, Optional, Tuple, Type, Union
 
 import pytest
 
@@ -29,7 +29,6 @@ from pants.testutil.engine.util import (
     assert_equal_with_printing,
     create_scheduler,
     fmt_rule,
-    fmt_rust_function,
     run_rule,
 )
 from pants.testutil.test_base import TestBase
@@ -152,20 +151,6 @@ class RuleVisitorTest(unittest.TestCase):
             self._parse_rule_gets("Get(call(), A('bob'))", A=str)
 
 
-def fmt_graph_rule(rule: Callable, *, gets: Optional[List[Tuple[str, str]]] = None) -> str:
-    type_hints = get_type_hints(rule)
-    product = type_hints.pop("return").__name__
-    params = ", ".join(t.__name__ for t in type_hints.values())
-    gets_str = ""
-    if gets:
-        get_members = ",\n".join(
-            f"Get({product_subject_pair[0]}, {product_subject_pair[1]})"
-            for product_subject_pair in gets
-        )
-        gets_str = f",\ngets=[{get_members}]"
-    return f"@rule({params}) -> {product}{gets_str}\n{fmt_rust_function(rule)}"
-
-
 @dataclass(frozen=True)
 class RuleFormatRequest:
     rule: Callable
@@ -173,7 +158,7 @@ class RuleFormatRequest:
     gets: Optional[List[Tuple[str, str]]] = None
 
     def format(self) -> str:
-        msg = fmt_graph_rule(self.rule, gets=self.gets)
+        msg = fmt_rule(self.rule, gets=self.gets, multiline=True)
         if self.for_param is not None:
             if isinstance(self.for_param, type):
                 msg += f"\nfor {self.for_param.__name__}"
@@ -190,7 +175,7 @@ class RuleFormatRequest:
             return obj.format()
         if isinstance(obj, type):
             return f"Select({obj.__name__})"
-        return fmt_graph_rule(obj)
+        return fmt_rule(obj, multiline=True)
 
 
 def fmt_param_edge(
@@ -517,7 +502,7 @@ class RuleGraphTest(TestBase):
                 Rules with errors: 1
 
                   {fmt_rule(a_from_b)}:
-                    No rule was available to compute B with parameter type SubA
+                    No rule was able to compute B. No installed rules return the type B: Is the rule that you're expecting to run registered? If that type should be provided from outside the rule graph, consider declaring RootRule(B).
                 """
             ).strip(),
             str(cm.exception),
@@ -561,10 +546,8 @@ class RuleGraphTest(TestBase):
 
                   {fmt_rule(d_from_a)}:
                     Ambiguous rules to compute A with parameter types (B, C):
-                      {fmt_graph_rule(a_from_b_and_c)}
-                for (B, C)
-                      {fmt_graph_rule(a_from_c_and_b)}
-                for (B, C)
+                      {fmt_rule(a_from_b_and_c)} for (B, C)
+                      {fmt_rule(a_from_c_and_b)} for (B, C)
                 """
             ),
             str(cm.exception),
@@ -585,8 +568,8 @@ class RuleGraphTest(TestBase):
                 Rules with errors: 1
 
                   {fmt_rule(a_from_b_and_c)}:
-                    No rule was available to compute B with parameter type SubA
-                    No rule was available to compute C with parameter type SubA
+                    No rule was able to compute B. No installed rules return the type B: Is the rule that you're expecting to run registered? If that type should be provided from outside the rule graph, consider declaring RootRule(B).
+                    No rule was able to compute C. No installed rules return the type C: Is the rule that you're expecting to run registered? If that type should be provided from outside the rule graph, consider declaring RootRule(C).
                 """
             ).strip(),
             str(cm.exception),
@@ -620,13 +603,10 @@ class RuleGraphTest(TestBase):
         self.assert_equal_with_printing(
             dedent(
                 f"""\
-                Rules with errors: 2
-
-                  {fmt_rule(a_from_b)}:
-                    No rule was available to compute B with parameter type C
+                Rules with errors: 1
 
                   {fmt_rule(b_from_suba)}:
-                    No rule was available to compute SubA with parameter type C
+                    No rule was able to compute SubA. No installed rules return the type SubA: Is the rule that you're expecting to run registered? If that type should be provided from outside the rule graph, consider declaring RootRule(SubA).
                 """
             ).strip(),
             str(cm.exception),
@@ -657,7 +637,7 @@ class RuleGraphTest(TestBase):
                 Rules with errors: 1
 
                   {fmt_rule(d_from_c)}:
-                    No rule was available to compute C with parameter type A
+                    No rule was able to compute C. No installed rules return the type C: Is the rule that you're expecting to run registered? If that type should be provided from outside the rule graph, consider declaring RootRule(C).
                 """
             ).strip(),
             str(cm.exception),
@@ -692,16 +672,14 @@ class RuleGraphTest(TestBase):
             self,
             dedent(
                 f"""\
-                Rules with errors: 3
+                Rules with errors: 2
 
                   {fmt_rule(a_from_c)}:
                     Was not reachable, either because no rules could produce the params or because it was shadowed by another @rule.
-                  {fmt_rule(b_from_d)}:
 
-                    No rule was available to compute D with parameter type SubA
                   {fmt_rule(d_from_a_and_suba, gets=[("A", "C")])}:
-
-                    No rule was available to compute A with parameter type SubA
+                    No rule was able to compute A.:
+                      {fmt_rule(a_from_c)} for SubA: Was unfulfillable.
                 """
             ).strip(),
             str(cm.exception),

@@ -24,7 +24,7 @@ fn no_root() {
     .validate()
     .err()
     .unwrap()
-    .contains("No rule was available to compute DependencyKey(\"b\", None)."));
+    .contains("No rule was able to compute DependencyKey(\"b\", None)."));
 }
 
 #[test]
@@ -113,7 +113,7 @@ impl super::Rule for Rule {
 }
 
 impl super::DisplayForGraph for Rule {
-  fn fmt_for_graph(&self) -> String {
+  fn fmt_for_graph(&self, _: super::DisplayForGraphArgs) -> String {
     self.to_string()
   }
 }
