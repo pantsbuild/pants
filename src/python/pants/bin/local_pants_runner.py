@@ -275,9 +275,10 @@ class LocalPantsRunner:
                     self.graph_session.goal_consumed_subsystem_scopes,
                 )
                 help_printer = HelpPrinter(
-                    bin_name=self.options.for_global_scope().pants_bin_name,
+                    bin_name=global_options.pants_bin_name,
                     help_request=self.options.help_request,
                     all_help_info=all_help_info,
+                    use_color=global_options.colors,
                 )
                 return help_printer.print_help()
 

@@ -3,7 +3,6 @@
 
 import dataclasses
 import json
-import sys
 import textwrap
 from enum import Enum
 from typing import Dict, cast
@@ -30,12 +29,17 @@ class HelpPrinter:
     """Prints help to the console."""
 
     def __init__(
-        self, *, bin_name: str, help_request: HelpRequest, all_help_info: AllHelpInfo
+        self,
+        *,
+        bin_name: str,
+        help_request: HelpRequest,
+        all_help_info: AllHelpInfo,
+        use_color: bool,
     ) -> None:
         self._bin_name = bin_name
         self._help_request = help_request
         self._all_help_info = all_help_info
-        self._use_color = sys.stdout.isatty()
+        self._use_color = use_color
 
     def print_help(self) -> Literal[0, 1]:
         """Print help to the console."""
