@@ -10,31 +10,32 @@ from pants.testutil.test_base import TestBase
 
 class FilespecTest(TestBase):
     def assert_rule_match(
-        self, glob: str, expected_matches: Tuple[str, ...], negate: bool = False,
+        self, glob: str, paths: Tuple[str, ...], *, should_match: bool = True
     ) -> None:
         # Confirm in-memory behavior.
-        for path in expected_matches:
-            expected = False if negate else True
-            assert matches_filespec({"includes": [glob]}, path=path) is expected
+        matched_filespec = matches_filespec({"includes": [glob]}, paths=paths)
+        if should_match:
+            assert matched_filespec == paths
+        else:
+            assert not matched_filespec
 
         # Confirm on-disk behavior.
-        for expected_match in expected_matches:
+        for expected_match in paths:
             if expected_match.endswith("/"):
                 self.create_dir(expected_match)
             else:
                 self.create_file(expected_match)
         snapshot = self.request_single_product(Snapshot, PathGlobs([glob]))
-        if negate:
-            subset = set(expected_matches).intersection(set(snapshot.files))
-            assert subset == set()
+        if should_match:
+            assert sorted(paths) == sorted(snapshot.files)
         else:
-            assert sorted(expected_matches) == sorted(snapshot.files)
+            assert not snapshot.files
 
     def test_matches_single_star_0(self) -> None:
         self.assert_rule_match("a/b/*/f.py", ("a/b/c/f.py", "a/b/q/f.py"))
 
     def test_matches_single_star_0_neg(self) -> None:
-        self.assert_rule_match("a/b/*/f.py", ("a/b/c/d/f.py", "a/b/f.py"), negate=True)
+        self.assert_rule_match("a/b/*/f.py", ("a/b/c/d/f.py", "a/b/f.py"), should_match=False)
 
     def test_matches_single_star_1(self) -> None:
         self.assert_rule_match("foo/bar/*", ("foo/bar/baz", "foo/bar/bar"))
@@ -43,7 +44,9 @@ class FilespecTest(TestBase):
         self.assert_rule_match("*/bar/b*", ("foo/bar/baz", "foo/bar/bar"))
 
     def test_matches_single_star_2_neg(self) -> None:
-        self.assert_rule_match("*/bar/b*", ("foo/koo/bar/baz", "foo/bar/bar/zoo"), negate=True)
+        self.assert_rule_match(
+            "*/bar/b*", ("foo/koo/bar/baz", "foo/bar/bar/zoo"), should_match=False
+        )
 
     def test_matches_single_star_3(self) -> None:
         self.assert_rule_match("*/[be]*/b*", ("foo/bar/baz", "foo/bar/bar"))
@@ -52,7 +55,7 @@ class FilespecTest(TestBase):
         self.assert_rule_match("foo*/bar", ("foofighters/bar", "foofighters.venv/bar"))
 
     def test_matches_single_star_4_neg(self) -> None:
-        self.assert_rule_match("foo*/bar", ("foofighters/baz/bar",), negate=True)
+        self.assert_rule_match("foo*/bar", ("foofighters/baz/bar",), should_match=False)
 
     def test_matches_double_star_0(self) -> None:
         self.assert_rule_match("**", ("a/b/c", "b"))
@@ -64,7 +67,7 @@ class FilespecTest(TestBase):
         self.assert_rule_match("a/b/**", ("a/b/d", "a/b/c/d/e/f"))
 
     def test_matches_double_star_2_neg(self) -> None:
-        self.assert_rule_match("a/b/**", ("a/b",), negate=True)
+        self.assert_rule_match("a/b/**", ("a/b",), should_match=False)
 
     def test_matches_dots(self) -> None:
         self.assert_rule_match(".*", (".dots", ".dips"))
@@ -82,14 +85,16 @@ class FilespecTest(TestBase):
                 "all/nested/.dot",
                 ".some/hidden/nested/dir/file.py",
             ),
-            negate=True,
+            should_match=False,
         )
 
     def test_matches_dirs(self) -> None:
         self.assert_rule_match("dist/", ("dist",))
 
     def test_matches_dirs_neg(self) -> None:
-        self.assert_rule_match("dist/", ("not_dist", "cdist", "dist.py", "dist/dist"), negate=True)
+        self.assert_rule_match(
+            "dist/", ("not_dist", "cdist", "dist.py", "dist/dist"), should_match=False
+        )
 
     def test_matches_dirs_dots(self) -> None:
         self.assert_rule_match(
@@ -98,7 +103,9 @@ class FilespecTest(TestBase):
 
     def test_matches_dirs_dots_neg(self) -> None:
         self.assert_rule_match(
-            "build-support/*.venv/", ("build-support/rbt.venv.but_actually_a_file",), negate=True
+            "build-support/*.venv/",
+            ("build-support/rbt.venv.but_actually_a_file",),
+            should_match=False,
         )
 
     def test_matches_literals(self) -> None:

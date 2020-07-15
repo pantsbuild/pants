@@ -159,8 +159,9 @@ class Native(metaclass=SingletonMetaclass):
     def override_thread_logging_destination_to_just_stderr(self):
         self.lib.override_thread_logging_destination("stderr")
 
-    def match_path_globs(self, path_globs: PathGlobs, paths: Iterable[str]) -> bool:
-        return cast(bool, self.lib.match_path_globs(path_globs, tuple(paths)))
+    def match_path_globs(self, path_globs: PathGlobs, paths: Iterable[str]) -> Tuple[str, ...]:
+        """Return all paths that match the PathGlobs."""
+        return tuple(self.lib.match_path_globs(path_globs, tuple(paths)))
 
     def nailgun_server_await_shutdown(self, nailgun_server) -> None:
         """Blocks until the server has shut down.
