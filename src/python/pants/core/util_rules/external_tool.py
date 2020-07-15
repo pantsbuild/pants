@@ -1,6 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import textwrap
 from abc import abstractmethod
 from dataclasses import dataclass
 from typing import List
@@ -97,22 +98,32 @@ class ExternalTool(Subsystem):
             fingerprint=True,
             help=f"Use this version of {cls.name}.",
         )
+
+        help_str = textwrap.dedent(
+            f"""
+        Known versions to verify downloads against.
+        Each element is a pipe-separated string of `version|platform|sha256|length`, where:
+
+            - `version` is the version string
+            - `platform` is one of [{','.join(Platform.__members__.keys())}],
+            - `sha256` is the 64-character hex representation of the expected sha256
+              digest of the download file, as emitted by `shasum -a 256`
+            - `length` is the expected length of the download file in bytes
+
+            E.g., '3.1.2|darwin|6d0f18cd84b918c7b3edd0203e75569e0c7caecb1367bbbe409b44e28514f5be|42813'.
+
+            Values are space-stripped, so pipes can be indented for readability if necessary.
+            You can compute the length and sha256 easily with:
+            `curl -L $URL | tee >(wc -c) >(shasum -a 256) >/dev/null`
+        """
+        )
         register(
             "--known-versions",
             type=list,
             member_type=str,
             default=cls.default_known_versions,
             advanced=True,
-            help=f"Known versions to verify downloads against. Each element is a "
-            f"pipe-separated string of version|platform|sha256|length, where `version` is the "
-            f"version string, `platform` is one of [{','.join(Platform.__members__.keys())}], "
-            f"`sha256` is the 64-character hex representation of the expected sha256 digest of the "
-            f"download file, as emitted by `shasum -a 256`, and `length` is the expected length of "
-            f"the download file in bytes. E.g., '3.1.2|darwin|"
-            f"6d0f18cd84b918c7b3edd0203e75569e0c7caecb1367bbbe409b44e28514f5be|42813'. "
-            f"Values are space-stripped, so pipes can be indented for readability if necessary."
-            f"You can compute the length and sha256 easily with:  "
-            f"curl -L $URL | tee >(wc -c) >(shasum -a 256) >/dev/null",
+            help=help_str,
         )
 
     @abstractmethod

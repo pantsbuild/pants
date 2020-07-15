@@ -1,23 +1,6 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-target(
-  name = 'all_directories',
-  dependencies = [
-    ':bad_requirements_directory',
-    ':build_file_imports_function_directory',
-    ':build_file_imports_module_directory',
-    ':coordinated_runs_directory',
-    ':interpreter_selection_directory',
-    ':no_build_file_directory',
-    ':plugins_directory',
-    ':print_env_directory',
-    ':python_targets_directory',
-    ':sources_directory',
-    ':unicode_directory',
-  ],
-)
-
 files(
   name = 'bad_requirements_directory',
   sources = ['bad_requirements/**/*'],
@@ -36,11 +19,6 @@ files(
 files(
   name = 'coordinated_runs_directory',
   sources = ['coordinated_runs/**/*'],
-)
-
-files(
-  name = 'interpreter_selection_directory',
-  sources = ['interpreter_selection/**/*'],
 )
 
 files(

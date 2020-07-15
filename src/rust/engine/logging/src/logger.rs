@@ -3,6 +3,7 @@
 
 use crate::PythonLogLevel;
 
+use colored::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
@@ -31,6 +32,7 @@ lazy_static! {
 pub struct Logger {
   pantsd_log: Mutex<MaybeWriteLogger<File>>,
   stderr_log: Mutex<MaybeWriteLogger<Stderr>>,
+  use_color: AtomicBool,
   show_rust_3rdparty_logs: AtomicBool,
   stderr_handlers: Mutex<HashMap<Uuid, StdioHandler>>,
 }
@@ -41,16 +43,18 @@ impl Logger {
       pantsd_log: Mutex::new(MaybeWriteLogger::empty()),
       stderr_log: Mutex::new(MaybeWriteLogger::empty()),
       show_rust_3rdparty_logs: AtomicBool::new(true),
+      use_color: AtomicBool::new(true),
       stderr_handlers: Mutex::new(HashMap::new()),
     }
   }
 
-  pub fn init(max_level: u64, show_rust_3rdparty_logs: bool) {
+  pub fn init(max_level: u64, show_rust_3rdparty_logs: bool, use_color: bool) {
     let max_python_level: Result<PythonLogLevel, _> = max_level.try_into();
     match max_python_level {
       Ok(python_level) => {
         let level: log::LevelFilter = python_level.into();
         set_max_level(level);
+        LOGGER.use_color.store(use_color, Ordering::SeqCst);
         LOGGER
           .show_rust_3rdparty_logs
           .store(show_rust_3rdparty_logs, Ordering::SeqCst);
@@ -155,6 +159,7 @@ impl Log for Logger {
 
   fn log(&self, record: &Record) {
     use chrono::Timelike;
+    use log::Level;
     let destination = get_destination();
     match destination {
       Destination::Stderr => {
@@ -164,8 +169,20 @@ impl Log for Logger {
           cur_date.format(TIME_FORMAT_STR),
           cur_date.time().nanosecond() / 10_000_000 // two decimal places of precision
         );
+
         let level = record.level();
-        let log_string: String = format!("{} [{}] {}", time_str, level, record.args());
+        let use_color = self.use_color.load(Ordering::SeqCst);
+
+        let level_marker = match level {
+          _ if !use_color => format!("[{}]", level).normal().clear(),
+          Level::Info => format!("[{}]", level).normal(),
+          Level::Error => format!("[{}]", level).red(),
+          Level::Warn => format!("[{}]", level).red(),
+          Level::Debug => format!("[{}]", level).green(),
+          Level::Trace => format!("[{}]", level).magenta(),
+        };
+
+        let log_string = format!("{} {} {}", time_str, level_marker, record.args());
 
         {
           // If there are no handlers, or sending to any of the handlers failed, send to stderr

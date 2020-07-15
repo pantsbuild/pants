@@ -210,7 +210,8 @@ class PantsDaemon(PantsDaemonProcessManager):
         # for further forks.
         with stdio_as(stdin_fd=-1, stdout_fd=-1, stderr_fd=-1):
             # Reinitialize logging for the daemon context.
-            init_rust_logger(self._log_level, self._log_show_rust_3rdparty)
+            use_color = self._bootstrap_options.for_global_scope().colors
+            init_rust_logger(self._log_level, self._log_show_rust_3rdparty, use_color=use_color)
 
             level = self._log_level
             ignores = self._bootstrap_options.for_global_scope().ignore_pants_warnings

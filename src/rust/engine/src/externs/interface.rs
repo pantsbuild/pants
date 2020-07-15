@@ -83,7 +83,7 @@ py_module_initializer!(native_engine, |py, m| {
   m.add(
     py,
     "init_logging",
-    py_fn!(py, init_logging(a: u64, b: bool)),
+    py_fn!(py, init_logging(a: u64, b: bool, c: bool)),
   )?;
   m.add(
     py,
@@ -1659,8 +1659,13 @@ fn materialize_directories(
   })
 }
 
-fn init_logging(_: Python, level: u64, show_rust_3rdparty_logs: bool) -> PyUnitResult {
-  Logger::init(level, show_rust_3rdparty_logs);
+fn init_logging(
+  _: Python,
+  level: u64,
+  show_rust_3rdparty_logs: bool,
+  use_color: bool,
+) -> PyUnitResult {
+  Logger::init(level, show_rust_3rdparty_logs, use_color);
   Ok(None)
 }
 

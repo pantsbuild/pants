@@ -28,7 +28,7 @@ class PexBin(ExternalTool):
     default_version = "v2.1.13"
     default_known_versions = [
         f"v2.1.13|{plat}|240712c75bb7c7cdfe3dd808ad6e6f186182e6aea3efeea5760683bb0fe89198|2633838"
-        for plat in ["darwin", "linux"]
+        for plat in ["darwin", "linux "]
     ]
 
     def generate_url(self, plat: Platform) -> str:
