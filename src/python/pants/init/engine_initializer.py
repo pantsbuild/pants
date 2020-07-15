@@ -10,7 +10,7 @@ from pants.base.build_root import BuildRoot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import Specs
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.engine import interactive_process, process, target
+from pants.engine import interactive_process, process
 from pants.engine.console import Console
 from pants.engine.fs import Workspace, create_fs_rules
 from pants.engine.goal import Goal
@@ -297,7 +297,6 @@ class EngineInitializer:
             *graph.rules(),
             *options_parsing.rules(),
             *process.rules(),
-            *target.rules(),
             *create_fs_rules(),
             *create_platform_rules(),
             *create_graph_rules(address_mapper),
