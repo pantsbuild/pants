@@ -2,9 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import re
+import textwrap
 from dataclasses import dataclass
 from enum import Enum
-from typing import Tuple
+from typing import Any, Dict, Set, Tuple
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.engine.collection import Collection
@@ -14,6 +15,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import SubsystemRule, goal_rule
 from pants.engine.selectors import Get
 from pants.subsystem.subsystem import Subsystem
+from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_method
 
 
@@ -52,6 +54,36 @@ class Validate(Goal):
     subsystem_cls = ValidateOptions
 
 
+@dataclass(frozen=True)
+class PathPattern:
+    name: str
+    pattern: str
+    inverted: bool = False
+    content_encoding: str = "utf8"
+
+
+@dataclass(frozen=True)
+class ContentPattern:
+    name: str
+    pattern: str
+    inverted: bool = False
+
+
+@dataclass(frozen=True)
+class ValidationConfig:
+    path_patterns: Tuple[PathPattern, ...]
+    content_patterns: Tuple[ContentPattern, ...]
+    required_matches: FrozenDict[str, Tuple[str]]  # path pattern name -> content pattern names.
+
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "ValidationConfig":
+        return cls(
+            path_patterns=tuple(PathPattern(**kwargs) for kwargs in d["path_patterns"]),
+            content_patterns=tuple(ContentPattern(**kwargs) for kwargs in d["content_patterns"]),
+            required_matches=FrozenDict({k: tuple(v) for k, v in d["required_matches"].items()}),
+        )
+
+
 class SourceFileValidation(Subsystem):
     """Configuration for source file validation."""
 
@@ -59,45 +91,47 @@ class SourceFileValidation(Subsystem):
 
     @classmethod
     def register_options(cls, register):
+        schema_help = textwrap.dedent(
+            """
+        Config schema is as follows:
+
+        {
+          'path_patterns': [
+            {
+              'name': path_pattern1',
+              'pattern': <path regex pattern>,
+              'inverted': True|False (defaults to False),
+              'content_encoding': <encoding> (defaults to utf8)
+            },
+            ...
+          ],
+          'content_patterns': [
+            {
+              'name': 'content_pattern1',
+              'pattern': <content regex pattern>,
+              'inverted': True|False (defaults to False)
+            }
+            ...
+          ],
+          'required_matches': {
+            'path_pattern1': [content_pattern1, content_pattern2],
+            'path_pattern2': [content_pattern1, content_pattern3],
+            ...
+          }
+        }
+
+        Meaning: if a file matches some path pattern, its content must match all
+        the corresponding content patterns.
+        """
+        )
         super().register_options(register)
-        # Config schema is as follows:
-        #
-        # {
-        #   'path_patterns': {
-        #     'path_pattern1': {
-        #       'pattern': <path regex pattern>,
-        #       'inverted': True|False (defaults to False),
-        #       'content_encoding': <encoding> (defaults to utf8)
-        #     }
-        #     ...
-        #   },
-        #   'content_patterns': {
-        #     'content_pattern1': {
-        #       'pattern': <content regex pattern>,
-        #       'inverted': True|False (defaults to False)
-        #     }
-        #     ...
-        #   },
-        #   'required_matches': {
-        #     'path_pattern1': [content_pattern1, content_pattern2],
-        #     'path_pattern2': [content_pattern1, content_pattern3],
-        #     ...
-        #   }
-        # }
-        #
-        # Meaning: if a file matches some path pattern, its content must match all the corresponding
-        # content patterns.
         register(
-            "--config",
-            type=dict,
-            fromfile=True,
-            # TODO: Replace "See documentation" with actual URL, once we have some.
-            help="Source file regex matching config.  See documentation for config schema.",
+            "--config", type=dict, fromfile=True, help=schema_help,
         )
 
     @memoized_method
     def get_multi_matcher(self):
-        return MultiMatcher(self.get_options().config)
+        return MultiMatcher(ValidationConfig.from_dict(self.options.config))
 
 
 @dataclass(frozen=True)
@@ -134,31 +168,29 @@ class Matcher:
 class PathMatcher(Matcher):
     """A matcher for matching file paths."""
 
-    def __init__(self, pattern, inverted=False, content_encoding="utf8"):
-        super().__init__(pattern, inverted)
+    def __init__(self, path_pattern: PathPattern):
+        super().__init__(path_pattern.pattern, path_pattern.inverted)
         # The expected encoding of the content of files whose paths match this pattern.
-        self.content_encoding = content_encoding
+        self.content_encoding = path_pattern.content_encoding
 
 
 class ContentMatcher(Matcher):
     """A matcher for matching file content."""
 
-    pass
+    def __init__(self, content_pattern: ContentPattern):
+        super().__init__(content_pattern.pattern, content_pattern.inverted)
 
 
 class MultiMatcher:
-    def __init__(self, config):
+    def __init__(self, config: ValidationConfig):
         """Class to check multiple regex matching on files.
 
         :param dict config: Regex matching config (see above).
         """
-        path_patterns = config.get("path_patterns", {})
-        content_patterns = config.get("content_patterns", {})
-        required_matches = config.get("required_matches", {})
         # Validate the pattern names mentioned in required_matches.
-        path_patterns_used = set()
-        content_patterns_used = set()
-        for k, v in required_matches.items():
+        path_patterns_used: Set[str] = set()
+        content_patterns_used: Set[str] = set()
+        for k, v in config.required_matches.items():
             path_patterns_used.add(k)
             if not isinstance(v, (tuple, list)):
                 raise ValueError(
@@ -167,23 +199,27 @@ class MultiMatcher:
                 )
             content_patterns_used.update(v)
 
-        unknown_path_patterns = path_patterns_used.difference(path_patterns.keys())
+        unknown_path_patterns = path_patterns_used.difference(
+            pp.name for pp in config.path_patterns
+        )
         if unknown_path_patterns:
             raise ValueError(
                 "required_matches uses unknown path pattern names: "
                 "{}".format(", ".join(sorted(unknown_path_patterns)))
             )
 
-        unknown_content_patterns = content_patterns_used.difference(content_patterns.keys())
+        unknown_content_patterns = content_patterns_used.difference(
+            cp.name for cp in config.content_patterns
+        )
         if unknown_content_patterns:
             raise ValueError(
                 "required_matches uses unknown content pattern names: "
                 "{}".format(", ".join(sorted(unknown_content_patterns)))
             )
 
-        self._path_matchers = {k: PathMatcher(**v) for k, v in path_patterns.items()}
-        self._content_matchers = {k: ContentMatcher(**v) for k, v in content_patterns.items()}
-        self._required_matches = required_matches
+        self._path_matchers = {pp.name: PathMatcher(pp) for pp in config.path_patterns}
+        self._content_matchers = {cp.name: ContentMatcher(cp) for cp in config.content_patterns}
+        self._required_matches = config.required_matches
 
     def check_source_file(self, path, content):
         content_pattern_names, encoding = self.get_applicable_content_pattern_names(path)
