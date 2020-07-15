@@ -1636,7 +1636,7 @@ dependencies = [
 [[package]]
 name = "notify"
 version = "5.0.0-pre.3"
-source = "git+https://github.com/pantsbuild/notify?rev=0a2d91ca36b5c1162736e87f0b238529374641f1#0a2d91ca36b5c1162736e87f0b238529374641f1"
+source = "git+https://github.com/pantsbuild/notify?rev=64880f0662db2b5ecbf25f1cccdca64bb8fac1bc#64880f0662db2b5ecbf25f1cccdca64bb8fac1bc"
 dependencies = [
  "anymap 0.12.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "bitflags 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3361,7 +3361,7 @@ dependencies = [
  "hashing 0.0.1",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "logging 0.0.1",
- "notify 5.0.0-pre.3 (git+https://github.com/pantsbuild/notify?rev=0a2d91ca36b5c1162736e87f0b238529374641f1)",
+ "notify 5.0.0-pre.3 (git+https://github.com/pantsbuild/notify?rev=64880f0662db2b5ecbf25f1cccdca64bb8fac1bc)",
  "parking_lot 0.11.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "task_executor 0.0.1",
  "tempfile 3.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3635,7 +3635,7 @@ dependencies = [
 "checksum nails 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "730beff5b62ab70260d375993bc1ed6f23fce54ee4ede3d95e2ac93545443c6b"
 "checksum net2 0.2.34 (registry+https://github.com/rust-lang/crates.io-index)" = "2ba7c918ac76704fb42afcbbb43891e72731f3dcca3bef2a19786297baf14af7"
 "checksum nom 5.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "0b471253da97532da4b61552249c521e01e736071f71c1a4f7ebbfbf0a06aad6"
-"checksum notify 5.0.0-pre.3 (git+https://github.com/pantsbuild/notify?rev=0a2d91ca36b5c1162736e87f0b238529374641f1)" = "<none>"
+"checksum notify 5.0.0-pre.3 (git+https://github.com/pantsbuild/notify?rev=64880f0662db2b5ecbf25f1cccdca64bb8fac1bc)" = "<none>"
 "checksum num 0.1.42 (registry+https://github.com/rust-lang/crates.io-index)" = "4703ad64153382334aa8db57c637364c322d3372e097840c72000dabdcf6156e"
 "checksum num-bigint 0.1.44 (registry+https://github.com/rust-lang/crates.io-index)" = "e63899ad0da84ce718c14936262a41cee2c79c981fc0a0e7c7beb47d5a07e8c1"
 "checksum num-complex 0.1.43 (registry+https://github.com/rust-lang/crates.io-index)" = "b288631d7878aaf59442cffd36910ea604ecd7745c36054328595114001c9656"
