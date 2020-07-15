@@ -615,7 +615,14 @@ async def resolve_dependencies(
                 inference_request_type(sources_field),
             )
 
-    return Addresses(sorted([*provided, *itertools.chain.from_iterable(injected), *inferred]))
+    # Typically, dep inference will return generated subtargets. We check that their original base
+    # targets were not explicitly provided because it would be redundant to include the generated
+    # subtargets too.
+    explicitly_provided = {*provided, *itertools.chain.from_iterable(injected)}
+    remaining_inferred = {
+        dep for dep in inferred if dep.maybe_convert_to_base_target() not in explicitly_provided
+    }
+    return Addresses(sorted({*explicitly_provided, *remaining_inferred}))
 
 
 # -----------------------------------------------------------------------------------------------
