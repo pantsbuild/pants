@@ -57,7 +57,7 @@ Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 * Tweak `any_matches_filespec` to return which paths matched (#10358)
-   `PR #10358 <https://github.com/pantsbuild/pants/pull/10358>_
+  `PR #10358 <https://github.com/pantsbuild/pants/pull/10358>`_
 
 * Add check for invalid concrete time dates (#10349)
   `PR #10349 <https://github.com/pantsbuild/pants/pull/10349>`_
