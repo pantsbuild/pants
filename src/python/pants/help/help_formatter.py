@@ -1,13 +1,14 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import json
 from textwrap import wrap
 from typing import List, Optional
 
 from colors import cyan, green, magenta, red
 
 from pants.help.help_info_extracter import OptionHelpInfo, OptionScopeHelpInfo
-from pants.option.ranked_value import Rank
+from pants.option.ranked_value import Rank, RankedValue
 
 
 class HelpFormatter:
@@ -71,21 +72,29 @@ class HelpFormatter:
         def maybe_parens(s: Optional[str]) -> str:
             return f" ({s})" if s else ""
 
+        def format_value(val: RankedValue, prefix: str, left_padding: str) -> List[str]:
+            if isinstance(val.value, (list, dict)):
+                val_lines = json.dumps(val.value, sort_keys=True, indent=4).split("\n")
+            else:
+                val_lines = [f"{val.value}"]
+            val_lines[0] = f"{prefix}{val_lines[0]}"
+            val_lines[-1] = f"{val_lines[-1]}{maybe_parens(val.details)}"
+            val_lines = [self._maybe_cyan(f"{left_padding}{line}") for line in val_lines]
+            return val_lines
+
         indent = "      "
         arg_lines = [f"  {self._maybe_magenta(args)}" for args in ohi.display_args]
         choices = "" if ohi.choices is None else f"one of: [{', '.join(ohi.choices)}]"
         choices_lines = [
             f"{indent}{'  ' if i != 0 else ''}{self._maybe_cyan(s)}"
-            for i, s in enumerate(wrap(f"{choices}", 80))
+            for i, s in enumerate(wrap(f"{choices}", 96))
         ]
-        default_line = self._maybe_cyan(f"{indent}default: {ohi.default}")
+        default_lines = format_value(RankedValue(Rank.HARDCODED, ohi.default), "default: ", indent)
         if not ohi.value_history:
             # Should never happen, but this keeps mypy happy.
             raise ValueError("No value history - options not parsed.")
         final_val = ohi.value_history.final_value
-        curr_value_line = self._maybe_cyan(
-            f"{indent}current value: {ohi.value_history.final_value.value}{maybe_parens(final_val.details)}"
-        )
+        curr_value_lines = format_value(final_val, "current value: ", indent)
 
         interesting_ranked_values = [
             rv
@@ -93,15 +102,20 @@ class HelpFormatter:
             if rv.rank not in (Rank.NONE, Rank.HARDCODED, final_val.rank)
         ]
         value_derivation_lines = [
-            self._maybe_cyan(f"{indent}     overrode: {rv.value}{maybe_parens(rv.details)}")
+            line
             for rv in interesting_ranked_values
+            for line in format_value(rv, "overrode: ", f"{indent}    ")
         ]
-        description_lines = [f"{indent}{s}" for s in wrap(ohi.help, 80)]
+        description_lines = ohi.help.splitlines()
+        # wrap() returns [] for an empty line, but we want to emit those, hence the "or [line]".
+        description_lines = [
+            f"{indent}{s}" for line in description_lines for s in wrap(line, 96) or [line]
+        ]
         lines = [
             *arg_lines,
             *choices_lines,
-            default_line,
-            curr_value_line,
+            *default_lines,
+            *curr_value_lines,
             *value_derivation_lines,
             *description_lines,
         ]
