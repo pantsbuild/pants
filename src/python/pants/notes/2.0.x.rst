@@ -11,6 +11,9 @@ See https://pants.readme.io/v2.0/docs/release-notes-2-0 for an overview of the c
 New Features
 ~~~~~~~~~~~~
 
+* Allow specifying address and file arguments at the same time (#10345)
+  `PR #10345 <https://github.com/pantsbuild/pants/pull/10345>`_
+
 * Make help-all dump a JSON blob containing all help info. (#10336)
   `PR #10336 <https://github.com/pantsbuild/pants/pull/10336>`_
 
@@ -41,23 +44,14 @@ Bugfixes
 * Fix collision in workunit affecting patches. (#10350)
   `PR #10350 <https://github.com/pantsbuild/pants/pull/10350>`_
 
-* Revert modernization of virtualenv to fix pants.pex deploy in CI. (#10343)
-  `PR #10343 <https://github.com/pantsbuild/pants/pull/10343>`_
-
 * Pass stream workunit context to all callbacks calls instead of just passing it in the last call. (#10340)
   `PR #10340 <https://github.com/pantsbuild/pants/pull/10340>`_
-
-* Fix `run_virtualenv` to target the current `$PY`. (#10331)
-  `PR #10331 <https://github.com/pantsbuild/pants/pull/10331>`_
 
 * Fix awslambda configuration of Pex. (#10323)
   `PR #10323 <https://github.com/pantsbuild/pants/pull/10323>`_
 
 * Hotfix Bandit breaking from stevedore 3.0 release (#10319)
   `PR #10319 <https://github.com/pantsbuild/pants/pull/10319>`_
-
-* Remove -q from the release run of reversion. (#10301)
-  `PR #10301 <https://github.com/pantsbuild/pants/pull/10301>`_
 
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -68,14 +62,14 @@ Refactoring, Improvements, and Tooling
 * Explicit error on missing descriptions in the `goals` goal. (#10348)
   `PR #10348 <https://github.com/pantsbuild/pants/pull/10348>`_
 
-* Allow specifying address and file arguments at the same time (#10345)
-  `PR #10345 <https://github.com/pantsbuild/pants/pull/10345>`_
-
 * Add module to default rule names. (#10341)
   `PR #10341 <https://github.com/pantsbuild/pants/pull/10341>`_
 
 * add artifacts infrastructure on relevant types (#10344)
   `PR #10344 <https://github.com/pantsbuild/pants/pull/10344>`_
+
+* Revert modernization of virtualenv to fix pants.pex deploy in CI. (#10343)
+  `PR #10343 <https://github.com/pantsbuild/pants/pull/10343>`_
 
 * Represent generated subtarget addresses as file names (#10338)
   `PR #10338 <https://github.com/pantsbuild/pants/pull/10338>`_
@@ -88,6 +82,9 @@ Refactoring, Improvements, and Tooling
 
 * Display whether a scope is a goal or subsystem in help. (#10332)
   `PR #10332 <https://github.com/pantsbuild/pants/pull/10332>`_
+
+* Fix `run_virtualenv` to target the current `$PY`. (#10331)
+  `PR #10331 <https://github.com/pantsbuild/pants/pull/10331>`_
 
 * Modernize virtualenv. (#10330)
   `PR #10330 <https://github.com/pantsbuild/pants/pull/10330>`_
@@ -121,6 +118,9 @@ Refactoring, Improvements, and Tooling
 
 * refactor execution strategy options into separate struct (#10304)
   `PR #10304 <https://github.com/pantsbuild/pants/pull/10304>`_
+
+* Remove -q from the release run of reversion. (#10301)
+  `PR #10301 <https://github.com/pantsbuild/pants/pull/10301>`_
 
 * Simplify BUILD file parsing (#10298)
   `PR #10298 <https://github.com/pantsbuild/pants/pull/10298>`_
