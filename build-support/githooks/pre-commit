@@ -28,9 +28,6 @@ DIRS_TO_CHECK=(
 # integration test!
 set -e
 
-# WONTFIX: fixing the array expansion is too difficult to be worth it. See https://github.com/koalaman/shellcheck/wiki/SC2207.
-# shellcheck disable=SC2207
-ADDED_FILES=($(./build-support/bin/get_added_files.sh))
 MERGE_BASE="$(git_merge_base)"
 
 # When travis builds a tag, it does so in a shallow clone without master fetched, which
@@ -78,7 +75,7 @@ echo "* Checking packages"
 ./build-support/bin/check_packages.sh "${DIRS_TO_CHECK[@]}" || exit 1
 
 echo "* Checking headers"
-./build-support/bin/check_header.py "${DIRS_TO_CHECK[@]}" --files-added "${ADDED_FILES[@]}" || exit 1
+./pants validate '**' || exit 1
 
 echo "* Checking for banned imports"
 ./build-support/bin/check_banned_imports.py || exit 1

@@ -6,14 +6,6 @@ files(
   sources = ['*.sh'],
 )
 
-# We include this entry, even though the scripts are already covered by individual `python_binary`
-# targets, to ensure that tests are able to treat these files as loose source files, i.e. to avoid
-# stripping the source root from the files.
-files(
-  name = 'python_scripts',
-  sources = ['common.py', 'check_header.py'],
-)
-
 python_binary(
    name = 'bootstrap_and_deploy_ci_pants_pex',
    sources = ['bootstrap_and_deploy_ci_pants_pex.py'],
@@ -22,11 +14,6 @@ python_binary(
 python_binary(
   name = 'check_banned_imports',
   sources = ['check_banned_imports.py'],
-)
-
-python_binary(
-  name = 'check_header',
-  sources = ['check_header.py'],
 )
 
 python_binary(

@@ -4,7 +4,12 @@
 import textwrap
 import unittest
 
-from pants.backend.project_info.source_file_validator import Matcher, MultiMatcher, RegexMatchResult
+from pants.backend.project_info.source_file_validator import (
+    Matcher,
+    MultiMatcher,
+    RegexMatchResult,
+    ValidationConfig,
+)
 
 
 # Note that some parts of these tests are just exercising various capabilities of the regex engine.
@@ -31,15 +36,16 @@ class MatcherTest(unittest.TestCase):
 class MultiMatcherTest(unittest.TestCase):
     def setUp(self):
         config = {
-            "path_patterns": {
-                "python_src": {"pattern": r"\.py$"},
-                "java_src": {"pattern": r"\.java$"},
-                "scala_src": {"pattern": r"\.scala$"},
-                "multi_encodings1": {"pattern": r"\.foo$", "content_encoding": "ascii"},
-                "multi_encodings2": {"pattern": r"\.foo$"},
-            },
-            "content_patterns": {
-                "python_header": {
+            "path_patterns": [
+                {"name": "python_src", "pattern": r"\.py$"},
+                {"name": "java_src", "pattern": r"\.java$"},
+                {"name": "scala_src", "pattern": r"\.scala$"},
+                {"name": "multi_encodings1", "pattern": r"\.foo$", "content_encoding": "ascii"},
+                {"name": "multi_encodings2", "pattern": r"\.foo$"},
+            ],
+            "content_patterns": [
+                {
+                    "name": "python_header",
                     "pattern": textwrap.dedent(
                         r"""
                         ^# coding=utf-8
@@ -48,22 +54,24 @@ class MultiMatcherTest(unittest.TestCase):
 
                         from __future__ import absolute_import, division, print_function, unicode_literals
                         """
-                    ).lstrip()
+                    ).lstrip(),
                 },
-                "no_six": {
+                {
+                    "name": "no_six",
                     "pattern": r"(?m)(^from six(\.\w+)* +import +)|(^import six\s*$)",
                     "inverted": True,
                 },
-                "jvm_header": {
+                {
+                    "name": "jvm_header",
                     "pattern": textwrap.dedent(
                         r"""
                         // Copyright 20\d\d Pants project contributors (see CONTRIBUTORS.md).
                         // Licensed under the Apache License, Version 2.0 (see LICENSE).
                         """
-                    ).lstrip()
+                    ).lstrip(),
                 },
-                "dummy": {"pattern": "dummy"},
-            },
+                {"name": "dummy", "pattern": "dummy"},
+            ],
             "required_matches": {
                 "python_src": ("python_header", "no_six"),
                 "java_src": ("jvm_header",),
@@ -72,7 +80,7 @@ class MultiMatcherTest(unittest.TestCase):
                 "multi_encodings2": ("dummy",),
             },
         }
-        self._rm = MultiMatcher(config)
+        self._rm = MultiMatcher(ValidationConfig.from_dict(config))
 
     def test_get_applicable_content_pattern_names(self):
         def check(expected_content_pattern_names, expected_encoding, path):
@@ -126,21 +134,24 @@ class MultiMatcherTest(unittest.TestCase):
 
     def test_pattern_name_checks(self):
         bad_config1 = {
-            "required_matches": {"unknown_path_pattern1": (), "unknown_path_pattern2": ()}
+            "path_patterns": [],
+            "content_patterns": [],
+            "required_matches": {"unknown_path_pattern1": (), "unknown_path_pattern2": ()},
         }
         with self.assertRaisesRegex(
             ValueError,
             "required_matches uses unknown path pattern names: "
             "unknown_path_pattern1, unknown_path_pattern2",
         ):
-            MultiMatcher(bad_config1)
+            MultiMatcher(ValidationConfig.from_dict(bad_config1))
 
         bad_config2 = {
-            "path_patterns": {"dummy": {"pattern": "dummy"}},
+            "path_patterns": [{"name": "dummy", "pattern": "dummy"}],
+            "content_patterns": [],
             "required_matches": {"dummy": ("unknown_content_pattern1",)},
         }
         with self.assertRaisesRegex(
             ValueError,
             "required_matches uses unknown content " "pattern names: unknown_content_pattern1",
         ):
-            MultiMatcher(bad_config2)
+            MultiMatcher(ValidationConfig.from_dict(bad_config2))

@@ -4,6 +4,5 @@
 python_tests(
   dependencies = [
     'build-support/bin:bash_scripts',
-    'build-support/bin:python_scripts',
   ],
 )
