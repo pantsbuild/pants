@@ -127,9 +127,11 @@ async fn env_is_deterministic() {
 
 #[tokio::test]
 async fn binary_not_found() {
-  run_command_locally(Process::new(owned_string_vec(&["echo", "-n", "foo"])))
+  let err_string = run_command_locally(Process::new(owned_string_vec(&["echo", "-n", "foo"])))
     .await
     .expect_err("Want Err");
+  assert!(err_string.contains("Failed to execute"));
+  assert!(err_string.contains("echo"));
 }
 
 #[tokio::test]
@@ -396,7 +398,7 @@ async fn test_directory_preservation() {
   let script_metadata = std::fs::metadata(&run_script_path).unwrap();
 
   // Ensure the script is executable.
-  assert_eq!(USER_EXECUTABLE_MODE, script_metadata.permissions().mode());
+  assert!(USER_EXECUTABLE_MODE & script_metadata.permissions().mode() != 0);
 
   // Ensure the bash command line is provided.
   let bytes_quoted_command_line = bash::escape(&bash_contents);
