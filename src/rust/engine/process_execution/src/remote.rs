@@ -96,6 +96,7 @@ impl CommandRunner {
   /// Construct a new CommandRunner
   pub fn new(
     address: &str,
+    store_servers: Vec<String>,
     metadata: ProcessMetadata,
     root_ca_certs: Option<Vec<u8>>,
     oauth_bearer_token: Option<String>,
@@ -107,9 +108,9 @@ impl CommandRunner {
     let env = Arc::new(grpcio::EnvBuilder::new().build());
     let channel = {
       let builder = grpcio::ChannelBuilder::new(env.clone());
-      if let Some(root_ca_certs) = root_ca_certs {
+      if let Some(ref root_ca_certs) = root_ca_certs {
         let creds = grpcio::ChannelCredentialsBuilder::new()
-          .root_cert(root_ca_certs)
+          .root_cert(root_ca_certs.clone())
           .build();
         builder.secure_connect(address, creds)
       } else {
@@ -119,8 +120,23 @@ impl CommandRunner {
     let execution_client = Arc::new(bazel_protos::remote_execution_grpc::ExecutionClient::new(
       channel.clone(),
     ));
+
+    let store_channel = {
+      let store_server = store_servers
+        .get(0)
+        .ok_or_else(|| "At least one store_server must be specified".to_owned())?;
+      let builder = grpcio::ChannelBuilder::new(env.clone());
+      if let Some(ref root_ca_certs) = root_ca_certs {
+        let creds = grpcio::ChannelCredentialsBuilder::new()
+          .root_cert(root_ca_certs.clone())
+          .build();
+        builder.secure_connect(&store_server, creds)
+      } else {
+        builder.connect(&store_server)
+      }
+    };
     let action_cache_client = Arc::new(
-      bazel_protos::remote_execution_grpc::ActionCacheClient::new(channel.clone()),
+      bazel_protos::remote_execution_grpc::ActionCacheClient::new(store_channel),
     );
 
     let mut headers = headers;
