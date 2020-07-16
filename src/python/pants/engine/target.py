@@ -1350,7 +1350,13 @@ class GeneratedSources:
 #   await Get(Targets, DependenciesRequest(tgt[Dependencies])
 #   await Get(TransitiveTargets, DependenciesRequest(tgt[Dependencies])
 class Dependencies(AsyncField):
-    """Addresses to other targets that this target depends on, e.g. `['helloworld/subdir:lib']`."""
+    """Addresses to other targets that this target depends on, e.g. ['helloworld/subdir:lib'].
+
+    Alternatively, you may include file names. Pants will find which target owns that file, and
+    create a new target from that which only includes the file in its `sources` field. For files
+    relative to the current BUILD file, prefix with `./`; otherwise, put the full path, e.g.
+    ['./sibling.txt', 'resources/demo.json'].
+    """
 
     alias = "dependencies"
     sanitized_raw_value: Optional[Tuple[str, ...]]
@@ -1449,6 +1455,10 @@ class InferDependenciesRequest:
                 infer_fortran_dependencies,
                 UnionRule(InferDependenciesRequest, InferFortranDependencies),
             ]
+
+    Generally, dependency inference should return generated subtargets created from the original
+    owning targets. If there are multiple owning targets for a file, dependency inference should
+    no-op because the user would need to explicitly disambiguate.
     """
 
     sources_field: Sources

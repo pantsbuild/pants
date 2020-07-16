@@ -7,7 +7,7 @@ import os.path
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import DefaultDict, Dict, Iterable, List, Tuple, Type, Union
+from typing import DefaultDict, Dict, Iterable, List, NamedTuple, Sequence, Tuple, Type, Union
 
 from pants.base.exceptions import ResolveError
 from pants.base.specs import (
@@ -568,18 +568,81 @@ class AmbiguousDependencyInferenceException(Exception):
         )
 
 
+class InvalidFileDependency(Exception):
+    pass
+
+
+class ParsedDependencies(NamedTuple):
+    addresses: List[Address]
+    files: List[str]
+
+
+def parse_dependencies_field(
+    raw_value: Iterable[str], *, spec_path: str, subproject_roots: Sequence[str]
+) -> ParsedDependencies:
+    address_strings = []
+    files = []
+    for v in raw_value:
+        if ":" in v:
+            address_strings.append(v)
+            continue
+        elif v.startswith("./"):
+            files.append(PurePath(spec_path, v).as_posix())
+            continue
+
+        # Address specs for top-level targets take the form `//:foo`, meaning that we will have
+        # already recognized the `:`. Any other use of `//` is unnecessary and only used for
+        # clarity in BUILD files, so can be removed.
+        if v.startswith("//"):
+            v = v[2:]
+
+        if PurePath(v).suffix:
+            files.append(v)
+        else:
+            address_strings.append(v)
+    addresses = [
+        Address.parse(v, relative_to=spec_path, subproject_roots=subproject_roots)
+        for v in address_strings
+    ]
+    return ParsedDependencies(addresses, files)
+
+
+def validate_explicit_file_dep(address: Address, full_file: str, owners: Sequence[Address]) -> None:
+    if len(owners) > 1:
+        original_addresses = sorted(owner.maybe_convert_to_base_target().spec for owner in owners)
+        raise InvalidFileDependency(
+            f"The target {address} included {repr(full_file)} in its `dependencies` "
+            "field, but there are multiple owners of that file so it is ambiguous which one "
+            "Pants should use. Please instead change the `sources` fields of the owning "
+            "targets so that only one target owns this file, or choose which owner you want "
+            f"to use: {original_addresses}"
+        )
+    # If a file does not exist, but it matches the `sources` glob of a target, then it will
+    # have an owning target.
+    file_does_not_exist = len(owners) == 1 and not owners[0].generated_base_target_name
+    if not owners or file_does_not_exist:
+        raise InvalidFileDependency(
+            f"The target {address} included {repr(full_file)} in its `dependencies` "
+            "field, but there are no owners of that file. Please check that the file exists "
+            f"and that you spelled the file correctly."
+        )
+
+
 @rule
 async def resolve_dependencies(
     request: DependenciesRequest, union_membership: UnionMembership, global_options: GlobalOptions
 ) -> Addresses:
-    provided = [
-        Address.parse(
-            dep,
-            relative_to=request.field.address.spec_path,
-            subproject_roots=global_options.options.subproject_roots,
-        )
-        for dep in request.field.sanitized_raw_value or ()
-    ]
+    provided = parse_dependencies_field(
+        request.field.sanitized_raw_value or (),
+        spec_path=request.field.address.spec_path,
+        subproject_roots=global_options.options.subproject_roots,
+    )
+
+    explicit_file_deps_owners = await MultiGet(
+        Get(Owners, OwnersRequest((f,))) for f in provided.files
+    )
+    for f, owners in zip(provided.files, explicit_file_deps_owners):
+        validate_explicit_file_dep(request.field.address, f, owners)
 
     # Inject any dependencies. This is determined by the `request.field` class. For example, if
     # there is a rule to inject for FortranDependencies, then FortranDependencies and any subclass
@@ -615,14 +678,20 @@ async def resolve_dependencies(
                 inference_request_type(sources_field),
             )
 
-    # Typically, dep inference will return generated subtargets. We check that their original base
-    # targets were not explicitly provided because it would be redundant to include the generated
-    # subtargets too.
-    explicitly_provided = {*provided, *itertools.chain.from_iterable(injected)}
-    remaining_inferred = {
-        dep for dep in inferred if dep.maybe_convert_to_base_target() not in explicitly_provided
+    original_addresses = {*provided.addresses, *itertools.chain.from_iterable(injected)}
+    generated_addresses = {*inferred, *itertools.chain.from_iterable(explicit_file_deps_owners)}
+    # If a generated subtarget's original base target is already included, then we leave off the
+    # generated subtarget. We also leave it off if the generated subtarget's original base target
+    # is the target we're resolving dependencies for.
+    remaining_generated_addresses = {
+        addr
+        for addr in generated_addresses
+        if (
+            addr.maybe_convert_to_base_target() not in original_addresses
+            and addr.maybe_convert_to_base_target() != request.field.address
+        )
     }
-    return Addresses(sorted({*explicitly_provided, *remaining_inferred}))
+    return Addresses(sorted({*original_addresses, *remaining_generated_addresses}))
 
 
 # -----------------------------------------------------------------------------------------------
