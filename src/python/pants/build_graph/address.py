@@ -3,7 +3,6 @@
 
 import os
 import re
-from pathlib import PurePath
 from typing import Optional, Sequence, Tuple
 
 from pants.util.dirutil import fast_relpath, longest_dir_prefix
@@ -226,11 +225,7 @@ class Address:
         """
         :API: public
         """
-        # NB: It's possible for the target name of a generated subtarget to be in a subdirectory,
-        # e.g. 'subdir/f.txt'. When this happens, the relative spec is not safe.
-        if self.generated_base_target_name and PurePath(self.target_name).parent.as_posix() != ".":
-            return self.spec
-        prefix = ":" if not self.generated_base_target_name else ""
+        prefix = ":" if not self.generated_base_target_name else "./"
         return f"{prefix}{self._target_name}"
 
     def reference(self, referencing_path: Optional[str] = None) -> str:

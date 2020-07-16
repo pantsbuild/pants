@@ -177,7 +177,7 @@ def test_address_spec() -> None:
 
     generated_addr = Address("a/b", "c.txt", generated_base_target_name="c")
     assert generated_addr.spec == "a/b/c.txt" == str(generated_addr) == generated_addr.reference()
-    assert generated_addr.relative_spec == "c.txt"
+    assert generated_addr.relative_spec == "./c.txt"
     assert generated_addr.path_safe_spec == "a.b.c.txt"
 
     top_level_generated_addr = Address("", "root.txt", generated_base_target_name="root")
@@ -187,7 +187,7 @@ def test_address_spec() -> None:
         == str(top_level_generated_addr)
         == top_level_generated_addr.reference()
     )
-    assert top_level_generated_addr.relative_spec == "root.txt"
+    assert top_level_generated_addr.relative_spec == "./root.txt"
     assert top_level_generated_addr.path_safe_spec == ".root.txt"
 
     generated_subdirectory_addr = Address(
@@ -198,9 +198,8 @@ def test_address_spec() -> None:
         == "a/b/subdir/c.txt"
         == str(generated_subdirectory_addr)
         == generated_subdirectory_addr.reference()
-        # NB: A relative spec is not safe, so we use the full spec.
-        == generated_subdirectory_addr.relative_spec
     )
+    assert generated_subdirectory_addr.relative_spec == "./subdir/c.txt"
     assert generated_subdirectory_addr.path_safe_spec == "a.b.subdir.c.txt"
 
 
