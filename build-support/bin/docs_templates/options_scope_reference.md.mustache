@@ -1,0 +1,27 @@
+{{#is_goal}}```
+./pants {{scope}} [args]
+```{{/is_goal}}
+{{description}}
+
+## Basic options
+
+{{#basic}}
+{{> single_option}}
+{{/basic}}
+{{^basic}}
+None
+{{/basic}}
+
+## Advanced options
+
+{{#advanced}}
+{{> single_option}}
+{{/advanced}}
+{{^advanced}}
+None
+{{/advanced}}
+
+{{#comma_separated_consumed_scopes}}
+## Related subsystems
+{{comma_separated_consumed_scopes}}
+{{/comma_separated_consumed_scopes}}

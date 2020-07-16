@@ -37,6 +37,21 @@ python_binary(
 )
 
 python_binary(
+  name = 'generate_docs',
+  sources = ['generate_docs.py'],
+  dependencies = [
+    '3rdparty/python:pystache',
+    '3rdparty/python:requests',
+    ':docs_templates'
+  ],
+)
+
+resources(
+  name = 'docs_templates',
+  sources = ['docs_templates/*.mustache'],
+)
+
+python_binary(
   name = 'get_rbe_token',
   sources = ['get_rbe_token.py'],
 )

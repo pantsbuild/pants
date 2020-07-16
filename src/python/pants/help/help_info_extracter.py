@@ -3,6 +3,7 @@
 
 import dataclasses
 import inspect
+import json
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Dict, Optional, Tuple, Type, cast
@@ -13,6 +14,32 @@ from pants.engine.unions import UnionMembership
 from pants.option.option_util import is_dict_option, is_list_option
 from pants.option.options import Options
 from pants.option.parser import OptionValueHistory, Parser
+
+
+class HelpJSONEncoder(json.JSONEncoder):
+    """Class for JSON-encoding help data (including option values).
+
+    Note that JSON-encoded data is not intended to be decoded back. It exists purely for terminal
+    and browser help display.
+    """
+
+    def default(self, o):
+        if callable(o):
+            return o.__name__
+        if isinstance(o, type):
+            return type.__name__
+        if isinstance(o, Enum):
+            return o.value
+        return super().default(o)
+
+
+def to_help_str(val) -> str:
+    if isinstance(val, (list, dict)):
+        return json.dumps(val, sort_keys=True, indent=2, cls=HelpJSONEncoder)
+    if isinstance(val, Enum):
+        return str(val.value)
+    else:
+        return str(val)
 
 
 @dataclass(frozen=True)
@@ -49,6 +76,7 @@ class OptionHelpInfo:
     removal_version: Optional[str]
     removal_hint: Optional[str]
     choices: Optional[Tuple[str, ...]]
+    comma_separated_choices: Optional[str]
     value_history: Optional[OptionValueHistory]
 
 
@@ -145,36 +173,13 @@ class HelpInfoExtracter:
         Returns a pair (default, stringified default suitable for display).
         """
         ranked_default = kwargs.get("default")
-        typ = kwargs.get("type", str)
-
+        fallback: Any = None
         if is_list_option(kwargs):
-            default = ranked_default.value if ranked_default else []
-            member_type = kwargs.get("member_type", str)
-            if inspect.isclass(member_type) and issubclass(member_type, Enum):
-                default = []
-
-            def member_str(val):
-                return f"'{val}'" if member_type == str else str(val)
-
-            default_str = (
-                f"\"[{', '.join(member_str(val) for val in default)}]\"" if default else "[]"
-            )
+            fallback = []
         elif is_dict_option(kwargs):
-            default = ranked_default.value if ranked_default else {}
-            if default:
-                items_str = ", ".join(f"'{k}': {v}" for k, v in default.items())
-                default_str = f"{{ {items_str} }}"
-            else:
-                default_str = "{}"
-        else:
-            default = ranked_default.value if ranked_default else None
-            default_str = str(default)
-
-        if typ == str:
-            default_str = default_str.replace("\n", " ")
-        elif isinstance(default, Enum):
-            default_str = default.value
-
+            fallback = {}
+        default = ranked_default.value if ranked_default else fallback
+        default_str = to_help_str(default)
         return default, default_str
 
     @staticmethod
@@ -315,6 +320,7 @@ class HelpInfoExtracter:
             removal_version=removal_version,
             removal_hint=removal_hint,
             choices=choices,
+            comma_separated_choices=None if choices is None else ", ".join(choices),
             value_history=None,
         )
         return ret
