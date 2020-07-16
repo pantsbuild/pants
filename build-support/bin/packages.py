@@ -425,10 +425,12 @@ def list_prebuilt_wheels() -> None:
 def fetch_prebuilt_wheels(destination_dir: str) -> None:
     banner(f"Fetching pre-built wheels for {CONSTANTS.pants_unstable_version}")
     print(f"Saving to {destination_dir}.\n", file=sys.stderr)
+    session = requests.Session()
+    session.mount(CONSTANTS.binary_base_url, requests.adapters.HTTPAdapter(max_retries=4))
     for wheel in determine_prebuilt_wheels():
         full_url = f"{CONSTANTS.binary_base_url}/{wheel.url}"
         print(f"Fetching {full_url}", file=sys.stderr)
-        response = requests.get(full_url)
+        response = session.get(full_url)
         response.raise_for_status()
         print(file=sys.stderr)
 
