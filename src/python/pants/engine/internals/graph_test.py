@@ -892,7 +892,20 @@ async def infer_smalltalk_dependencies(request: InferSmalltalkDependencies) -> I
     all_lines = itertools.chain.from_iterable(
         file_content.content.decode().splitlines() for file_content in digest_contents
     )
-    return InferredDependencies(Address.parse(line) for line in all_lines)
+
+    def infer(line: str) -> Address:
+        # To simulate generated subtargets, we look for the format: `file_name.st from :address`
+        if " from " in line:
+            gen_name, _, base_address_str = line.split()
+            base_address = Address.parse(base_address_str)
+            return Address(
+                spec_path="",
+                target_name=gen_name,
+                generated_base_target_name=base_address.target_name,
+            )
+        return Address.parse(line)
+
+    return InferredDependencies(infer(line) for line in all_lines)
 
 
 class TestDependencies(TestBase):
@@ -913,25 +926,39 @@ class TestDependencies(TestBase):
     def target_types(cls):
         return [SmalltalkLibrary]
 
+    def assert_dependencies_resolved(
+        self,
+        *,
+        requested_address: Address,
+        expected: Iterable[Address],
+        enable_dep_inference: bool = False,
+    ) -> None:
+        target = self.request_single_product(WrappedTarget, requested_address).target
+        args = ["--dependency-inference"] if enable_dep_inference else []
+        result = self.request_single_product(
+            Addresses,
+            Params(
+                DependenciesRequest(target[Dependencies]), create_options_bootstrapper(args=args)
+            ),
+        )
+        assert result == Addresses(sorted(expected))
+
     def test_normal_resolution(self) -> None:
-        self.add_to_build_file("src/smalltalk", "smalltalk()")
-        addr = Address.parse("src/smalltalk")
-        deps_field = Dependencies(["//:dep1", "//:dep2", ":sibling"], address=addr)
-        assert self.request_single_product(
-            Addresses, Params(DependenciesRequest(deps_field), create_options_bootstrapper())
-        ) == Addresses(
-            [
+        self.add_to_build_file(
+            "src/smalltalk", "smalltalk(dependencies=['//:dep1', '//:dep2', ':sibling'])"
+        )
+        self.assert_dependencies_resolved(
+            requested_address=Address.parse("src/smalltalk"),
+            expected=[
                 Address.parse("//:dep1"),
                 Address.parse("//:dep2"),
                 Address.parse("src/smalltalk:sibling"),
-            ]
+            ],
         )
 
         # Also test that we handle no dependencies.
-        empty_deps_field = Dependencies(None, address=addr)
-        assert self.request_single_product(
-            Addresses, Params(DependenciesRequest(empty_deps_field), create_options_bootstrapper())
-        ) == Addresses([])
+        self.add_to_build_file("no_deps", "smalltalk()")
+        self.assert_dependencies_resolved(requested_address=Address.parse("no_deps"), expected=[])
 
     def test_dependency_injection(self) -> None:
         self.add_to_build_file("", "smalltalk(name='target')")
@@ -950,32 +977,60 @@ class TestDependencies(TestBase):
         assert_injected(CustomSmalltalkDependencies, injected=["//:custom_injected", "//:injected"])
 
     def test_dependency_inference(self) -> None:
+        """We test that dependency inference works generally and that we merge it correctly with
+        explicitly provided dependencies.
+
+        If dep inference returns a generated subtarget, but the original owning target was
+        explicitly provided, then we should not use the generated subtarget.
+        """
         self.add_to_build_file(
             "",
             dedent(
                 """\
                 smalltalk(name='inferred1')
                 smalltalk(name='inferred2')
-                smalltalk(name='inferred3')
-                smalltalk(name='provided')
+                smalltalk(name='inferred_and_provided1')
+                smalltalk(name='inferred_and_provided2')
                 """
             ),
         )
-        self.create_file("demo/f1.st", "//:inferred1\n//:inferred2\n")
-        self.create_file("demo/f2.st", "//:inferred3\n")
-        self.add_to_build_file("demo", "smalltalk(sources=['*.st'], dependencies=['//:provided'])")
-
-        deps_field = Dependencies(["//:provided"], address=Address.parse("demo"))
-        result = self.request_single_product(
-            Addresses,
-            Params(
-                DependenciesRequest(deps_field),
-                create_options_bootstrapper(args=["--dependency-inference"]),
+        self.create_file(
+            "demo/f1.st",
+            dedent(
+                """\
+                //:inferred1
+                inferred2.st from //:inferred2
+                """
             ),
         )
-        assert result == Addresses(
-            sorted(
-                Address.parse(addr)
-                for addr in ["//:inferred1", "//:inferred2", "//:inferred3", "//:provided"]
-            )
+        self.create_file(
+            "demo/f2.st",
+            dedent(
+                """\
+                //:inferred_and_provided1
+                inferred_and_provided2.st from //:inferred_and_provided2
+                """
+            ),
+        )
+        self.add_to_build_file(
+            "demo",
+            dedent(
+                """\
+                smalltalk(
+                  sources=['*.st'],
+                  dependencies=['//:inferred_and_provided1', '//:inferred_and_provided2'],
+                )
+                """
+            ),
+        )
+
+        self.assert_dependencies_resolved(
+            requested_address=Address.parse("demo"),
+            enable_dep_inference=True,
+            expected=[
+                Address.parse("//:inferred1"),
+                Address("", target_name="inferred2.st", generated_base_target_name="inferred2"),
+                Address.parse("//:inferred_and_provided1"),
+                Address.parse("//:inferred_and_provided2"),
+            ],
         )
