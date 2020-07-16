@@ -359,6 +359,7 @@ impl CommandRunner {
           time_span,
           parent_id.clone(),
           &workunit_store,
+          WorkunitMetadata::with_level(Level::Debug),
         );
       }
       Err(s) => warn!("{}", s),
@@ -376,6 +377,7 @@ impl CommandRunner {
           time_span,
           parent_id.clone(),
           &workunit_store,
+          WorkunitMetadata::with_level(Level::Debug),
         );
       }
       Err(s) => warn!("{}", s),
@@ -393,6 +395,7 @@ impl CommandRunner {
           time_span,
           parent_id.clone(),
           &workunit_store,
+          WorkunitMetadata::with_level(Level::Debug),
         );
       }
       Err(s) => warn!("{}", s),
@@ -410,6 +413,7 @@ impl CommandRunner {
           time_span,
           parent_id,
           &workunit_store,
+          WorkunitMetadata::with_level(Level::Debug),
         );
       }
       Err(s) => warn!("{}", s),
@@ -823,11 +827,11 @@ fn maybe_add_workunit(
   time_span: concrete_time::TimeSpan,
   parent_id: Option<String>,
   workunit_store: &WorkunitStore,
+  metadata: WorkunitMetadata,
 ) {
   if !result_cached {
     let start_time: SystemTime = SystemTime::UNIX_EPOCH + time_span.start.into();
     let end_time: SystemTime = start_time + time_span.duration.into();
-    let metadata = workunit_store::WorkunitMetadata::new();
     workunit_store.add_completed_workunit(
       name.to_string(),
       start_time,
