@@ -29,7 +29,7 @@ class AncestorFilesRequest:
     dependencies on them.
     """
 
-    name: str  # A glob to match the name component of a file.
+    name: str
     snapshot: Snapshot
     sources_stripped: bool  # True iff snapshot has already had source roots stripped.
 
