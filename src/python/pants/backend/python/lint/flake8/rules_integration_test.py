@@ -9,7 +9,7 @@ from pants.backend.python.target_types import PythonInterpreterCompatibility, Py
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.core.goals.lint import LintResults
 from pants.engine.addresses import Address
-from pants.engine.fs import DigestContents, FileContent, Snapshot
+from pants.engine.fs import DigestContents, FileContent
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.engine.target import TargetWithOrigin
