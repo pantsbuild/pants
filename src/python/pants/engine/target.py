@@ -1356,6 +1356,10 @@ class Dependencies(AsyncField):
     create a new target from that which only includes the file in its `sources` field. For files
     relative to the current BUILD file, prefix with `./`; otherwise, put the full path, e.g.
     ['./sibling.txt', 'resources/demo.json'].
+
+    You may exclude dependencies by prefixing with `!`, e.g. `['!helloworld/subdir:lib',
+    '!./sibling.txt']`. Ignores are intended for false positives with dependency inference;
+    otherwise, simply leave off the dependency from the BUILD file.
     """
 
     alias = "dependencies"

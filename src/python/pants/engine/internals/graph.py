@@ -1,6 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import functools
 import itertools
 import logging
 import os.path
@@ -575,41 +576,56 @@ class InvalidFileDependency(Exception):
 class ParsedDependencies(NamedTuple):
     addresses: List[Address]
     files: List[str]
+    ignored_addresses: List[Address]
+    ignored_files: List[str]
 
 
 def parse_dependencies_field(
     raw_value: Iterable[str], *, spec_path: str, subproject_roots: Sequence[str]
 ) -> ParsedDependencies:
-    address_strings = []
-    files = []
+    parse_as_address = functools.partial(
+        Address.parse, relative_to=spec_path, subproject_roots=subproject_roots
+    )
+
+    def parse(value: str) -> Union[Address, str]:
+        # We allow `//` to specify the value is relative to the build root. This is only actually
+        # necessary for top-level addresses, though, like `//:tgt`. Otherwise, we can strip `//`.
+        if value.startswith("//") and not value.startswith("//:"):
+            value = value[2:]
+        if ":" in value:
+            return parse_as_address(value)
+        if value.startswith("./"):
+            return PurePath(spec_path, value).as_posix()
+        if PurePath(value).suffix:
+            return value
+        return parse_as_address(value)
+
+    addresses: List[Address] = []
+    files: List[str] = []
+    ignored_addresses: List[Address] = []
+    ignored_files: List[str] = []
     for v in raw_value:
-        if ":" in v:
-            address_strings.append(v)
-            continue
-        elif v.startswith("./"):
-            files.append(PurePath(spec_path, v).as_posix())
-            continue
-
-        # Address specs for top-level targets take the form `//:foo`, meaning that we will have
-        # already recognized the `:`. Any other use of `//` is unnecessary and only used for
-        # clarity in BUILD files, so can be removed.
-        if v.startswith("//"):
-            v = v[2:]
-
-        if PurePath(v).suffix:
-            files.append(v)
+        is_ignore = v.startswith("!")
+        if is_ignore:
+            v = v[1:]
+        result = parse(v)
+        if is_ignore:
+            collection = ignored_addresses if isinstance(result, Address) else ignored_files
         else:
-            address_strings.append(v)
-    addresses = [
-        Address.parse(v, relative_to=spec_path, subproject_roots=subproject_roots)
-        for v in address_strings
-    ]
-    return ParsedDependencies(addresses, files)
+            collection = addresses if isinstance(result, Address) else files
+        collection.append(result)  # type: ignore[attr-defined]
+    return ParsedDependencies(addresses, files, ignored_addresses, ignored_files)
 
 
-def validate_explicit_file_dep(address: Address, full_file: str, owners: Sequence[Address]) -> None:
+def validate_explicit_file_dep(
+    address: Address, full_file: str, owners: Sequence[Address], *, is_an_ignore: bool = False
+) -> None:
+    if is_an_ignore:
+        full_file = f"!{full_file}"
     if len(owners) > 1:
         original_addresses = sorted(owner.maybe_convert_to_base_target().spec for owner in owners)
+        if is_an_ignore:
+            original_addresses = [f"!{addr}" for addr in original_addresses]
         raise InvalidFileDependency(
             f"The target {address} included {repr(full_file)} in its `dependencies` "
             "field, but there are multiple owners of that file so it is ambiguous which one "
@@ -623,8 +639,9 @@ def validate_explicit_file_dep(address: Address, full_file: str, owners: Sequenc
     if not owners or file_does_not_exist:
         raise InvalidFileDependency(
             f"The target {address} included {repr(full_file)} in its `dependencies` "
-            "field, but there are no owners of that file. Please check that the file exists "
-            f"and that you spelled the file correctly."
+            "field, but there are no owners of that file. Please check that the file exists, "
+            "that you spelled the file correctly, and that there is a target that includes the "
+            "file in its `sources` field."
         )
 
 
@@ -643,6 +660,12 @@ async def resolve_dependencies(
     )
     for f, owners in zip(provided.files, explicit_file_deps_owners):
         validate_explicit_file_dep(request.field.address, f, owners)
+
+    explicit_file_deps_ignore_owners = await MultiGet(
+        Get(Owners, OwnersRequest((f,))) for f in provided.ignored_files
+    )
+    for f, owners in zip(provided.ignored_files, explicit_file_deps_ignore_owners):
+        validate_explicit_file_dep(request.field.address, f, owners, is_an_ignore=True)
 
     # Inject any dependencies. This is determined by the `request.field` class. For example, if
     # there is a rule to inject for FortranDependencies, then FortranDependencies and any subclass
@@ -678,19 +701,33 @@ async def resolve_dependencies(
                 inference_request_type(sources_field),
             )
 
-    original_addresses = {*provided.addresses, *itertools.chain.from_iterable(injected)}
-    generated_addresses = {*inferred, *itertools.chain.from_iterable(explicit_file_deps_owners)}
+    original_addresses = {
+        addr
+        for addr in (*provided.addresses, *itertools.chain.from_iterable(injected))
+        if addr not in provided.ignored_addresses
+    }
+    flattened_ignore_file_deps_owners = set(
+        itertools.chain.from_iterable(explicit_file_deps_ignore_owners)
+    )
+    generated_addresses = {
+        addr
+        for addr in (*inferred, *itertools.chain.from_iterable(explicit_file_deps_owners))
+        if addr not in flattened_ignore_file_deps_owners
+    }
     # If a generated subtarget's original base target is already included, then we leave off the
     # generated subtarget. We also leave it off if the generated subtarget's original base target
-    # is the target we're resolving dependencies for.
-    remaining_generated_addresses = {
-        addr
-        for addr in generated_addresses
+    # is the target we're resolving dependencies for. Finally, we leave it off if the user said to
+    # ignore the original owning target.
+    remaining_generated_addresses = set()
+    for generated_addr in generated_addresses:
+        base_addr = generated_addr.maybe_convert_to_base_target()
         if (
-            addr.maybe_convert_to_base_target() not in original_addresses
-            and addr.maybe_convert_to_base_target() != request.field.address
-        )
-    }
+            base_addr in original_addresses
+            or base_addr in provided.ignored_addresses
+            or base_addr == request.field.address
+        ):
+            continue
+        remaining_generated_addresses.add(generated_addr)
     return Addresses(sorted({*original_addresses, *remaining_generated_addresses}))
 
 
