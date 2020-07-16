@@ -1,3 +1,8 @@
+use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::convert::TryInto;
+use std::path::{Path, PathBuf};
+use std::time::Duration;
+
 use bazel_protos;
 use bazel_protos::operations::Operation;
 use bazel_protos::remote_execution::ExecutedActionMetadata;
@@ -5,29 +10,25 @@ use bytes::Bytes;
 use futures::compat::Future01CompatExt;
 use grpcio;
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
+use maplit::{btreemap, hashset};
 use mock;
+use mock::execution_server::{ExpectedAPICall, MockOperation};
+use protobuf::well_known_types::Timestamp;
 use protobuf::{self, Message, ProtobufEnum};
+use spectral::prelude::*;
 use spectral::{assert_that, string::StrAssertions};
-use std::convert::TryInto;
 use store::Store;
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory};
 use testutil::owned_string_vec;
+use tokio::runtime::Handle;
+use workunit_store::{Level, Workunit, WorkunitMetadata, WorkunitState, WorkunitStore};
 
 use crate::remote::{digest, CommandRunner, ExecutionError, OperationOrStatus};
 use crate::{
   CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform,
   MultiPlatformProcess, Platform, PlatformConstraint, Process, ProcessMetadata,
 };
-use maplit::{btreemap, hashset};
-use mock::execution_server::{ExpectedAPICall, MockOperation};
-use protobuf::well_known_types::Timestamp;
-use spectral::prelude::*;
-use std::collections::{BTreeMap, BTreeSet, HashSet};
-use std::path::{Path, PathBuf};
-use std::time::Duration;
-use tokio::runtime::Handle;
-use workunit_store::{Level, Workunit, WorkunitMetadata, WorkunitState, WorkunitStore};
 
 const OVERALL_DEADLINE_SECS: Duration = Duration::from_secs(10 * 60);
 
