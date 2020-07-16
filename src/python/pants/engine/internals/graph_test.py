@@ -5,7 +5,7 @@ import itertools
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
-from typing import Iterable, List, Type
+from typing import Iterable, List, Sequence, Type
 
 import pytest
 
@@ -29,10 +29,13 @@ from pants.engine.fs import (
 from pants.engine.internals.graph import (
     AmbiguousCodegenImplementationsException,
     AmbiguousImplementationsException,
+    InvalidFileDependency,
     NoValidTargetsException,
     Owners,
     OwnersRequest,
     TooManyTargetsException,
+    parse_dependencies_field,
+    validate_explicit_file_dep,
 )
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import RootRule, rule
@@ -844,6 +847,72 @@ class TestCodegen(TestBase):
 # -----------------------------------------------------------------------------------------------
 
 
+def test_parse_dependencies_field() -> None:
+    result = parse_dependencies_field(
+        [
+            ":relative",
+            "//:top_level",
+            "demo:tgt",
+            "demo",
+            "./relative.txt",
+            "./child/f.txt",
+            "demo/f.txt",
+            "//top_level.txt",
+            "top_level2.txt",
+            # For files without an extension, you must use `./` There is no way (yet) to reference
+            # a file above you without a file extension.
+            "demo/no_extension",
+            "//demo/no_extension",
+            "./no_extension",
+        ],
+        spec_path="demo/subdir",
+        subproject_roots=[],
+    )
+    assert set(result.addresses) == {
+        Address("demo/subdir", "relative"),
+        Address("", "top_level"),
+        Address("demo", "tgt"),
+        Address("demo", "demo"),
+        Address("demo/no_extension", "no_extension"),
+    }
+    assert set(result.files) == {
+        "demo/subdir/relative.txt",
+        "demo/subdir/child/f.txt",
+        "demo/f.txt",
+        "top_level.txt",
+        "top_level2.txt",
+        "demo/subdir/no_extension",
+    }
+
+
+def test_validate_explicit_file_dep() -> None:
+    addr = Address("demo", "tgt")
+
+    def assert_raises(owners: Sequence[Address], *, expected_snippets: Iterable[str]) -> None:
+        with pytest.raises(InvalidFileDependency) as exc:
+            validate_explicit_file_dep(addr, full_file="f.txt", owners=owners)
+        assert addr.spec in str(exc.value)
+        assert "f.txt" in str(exc.value)
+        for snippet in expected_snippets:
+            assert snippet in str(exc.value)
+
+    assert_raises(owners=[], expected_snippets=["no owners"])
+    # Even if there is one owner, if it was not generated, then we fail. We can assume that the
+    # file in question does not ectually exist.
+    assert_raises(owners=[Address.parse(":t")], expected_snippets=["no owners"])
+    assert_raises(
+        owners=[Address.parse(":t1"), Address.parse(":t2")],
+        expected_snippets=["multiple owners", "//:t1", "//:t2"],
+    )
+
+    # Do not raise if there is one single generated owner.
+    validate_explicit_file_dep(
+        addr,
+        full_file="f.txt",
+        owners=[Address("", target_name="f.txt", generated_base_target_name="demo")],
+    )
+
+
 class SmalltalkDependencies(Dependencies):
     pass
 
@@ -959,6 +1028,24 @@ class TestDependencies(TestBase):
         # Also test that we handle no dependencies.
         self.add_to_build_file("no_deps", "smalltalk()")
         self.assert_dependencies_resolved(requested_address=Address.parse("no_deps"), expected=[])
+
+    def test_explicit_file_dependencies(self) -> None:
+        self.create_files("src/smalltalk/util", ["f1.st", "f2.st"])
+        self.add_to_build_file("src/smalltalk/util", "smalltalk(sources=['*.st'])")
+        self.add_to_build_file(
+            "src/smalltalk", "smalltalk(dependencies=['./util/f1.st', 'src/smalltalk/util/f2.st'])"
+        )
+        self.assert_dependencies_resolved(
+            requested_address=Address.parse("src/smalltalk"),
+            expected=[
+                Address(
+                    "src/smalltalk/util", target_name="f1.st", generated_base_target_name="util"
+                ),
+                Address(
+                    "src/smalltalk/util", target_name="f2.st", generated_base_target_name="util"
+                ),
+            ],
+        )
 
     def test_dependency_injection(self) -> None:
         self.add_to_build_file("", "smalltalk(name='target')")
