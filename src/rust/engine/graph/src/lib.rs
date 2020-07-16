@@ -237,18 +237,16 @@ impl<N: Node> InnerGraph<N> {
     let (weights, paths) =
       petgraph::algo::bellman_ford(&graph, src).expect("The graph must be acyclic");
     if let Some((index, total_duration)) = weights
-      .iter()
-      // INFINITY is used for missing entries. We don't want for this to interfere with our max_by.
-      // Use NEG_INFINITY instead, which has to be the minimum duration.
-      .map(|weight| {
-        if *weight == std::f64::INFINITY {
-          std::f64::NEG_INFINITY
+      .into_iter()
+      .enumerate()
+      .filter_map(|(i, weight)| {
+        // INFINITY is used for missing entries.
+        if weight == std::f64::INFINITY {
+          None
         } else {
-          *weight
+          Some((i, Duration::from_nanos(-weight as u64)))
         }
       })
-      .map(|weight| Duration::from_nanos(-weight as u64))
-      .enumerate()
       .max_by(|(_, left_duration), (_, right_duration)| left_duration.cmp(&right_duration))
     {
       let critical_path = {
