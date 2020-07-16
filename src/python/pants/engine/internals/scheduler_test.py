@@ -147,6 +147,11 @@ async def c_unhashable(_: CollectionType) -> C:
     return C()
 
 
+@rule
+def boolean_and_int(i: int, b: bool) -> A:
+    return A()
+
+
 @contextmanager
 def assert_execution_error(test_case, expected_msg):
     with test_case.assertRaises(ExecutionError) as cm:
@@ -176,6 +181,9 @@ class SchedulerTest(TestBase):
             RootRule(UnionB),
             select_union_b,
             a_union_test,
+            boolean_and_int,
+            RootRule(int),
+            RootRule(bool),
         ]
 
     def test_use_params(self):
@@ -214,6 +222,13 @@ class SchedulerTest(TestBase):
         assert {A, B, C, str} == set(
             self.scheduler.scheduler.rule_graph_consumed_types([A, C], str)
         )
+
+    def test_strict_equals(self):
+        # With the default implementation of `__eq__` for boolean and int, `1 == True`. But in the
+        # engine that behavior would be surprising, and would cause both of these Params to intern
+        # to the same value, triggering an error. Instead, the engine additionally includes the
+        # type of a value in equality.
+        assert A() == self.request_single_product(A, Params(1, True))
 
     @contextmanager
     def _assert_execution_error(self, expected_msg):
