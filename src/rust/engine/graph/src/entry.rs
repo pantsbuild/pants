@@ -25,6 +25,13 @@ impl RunToken {
   fn next(self) -> RunToken {
     RunToken(self.0 + 1)
   }
+
+  ///
+  /// Returns true if "other" is equal to this RunToken, or this RunToken's predecessor.
+  ///
+  pub fn equals_current_or_previous(&self, other: RunToken) -> bool {
+    self.0 == other.0 || other.next().0 == self.0
+  }
 }
 
 ///
@@ -282,6 +289,7 @@ impl<N: Node> Entry<N> {
     previous_result: Option<EntryResult<N>>,
   ) -> EntryState<N> {
     // Increment the RunToken to uniquely identify this work.
+    let previous_run_token = run_token;
     let run_token = run_token.next();
     let context = context_factory.clone_for(entry_id, run_token);
     let node = node.clone();
@@ -299,16 +307,19 @@ impl<N: Node> Entry<N> {
       // match, we can consider the previous result value to be clean for reuse.
       let was_clean = if let Some(previous_dep_generations) = previous_dep_generations {
         trace!("Getting deps to attempt to clean {}", node);
-        match context.graph().dep_generations(entry_id, &context).await {
+        match context
+          .graph()
+          .dep_generations(entry_id, previous_run_token, &context)
+          .await
+        {
           Ok(ref dep_generations) if dep_generations == &previous_dep_generations => {
             trace!("Deps matched: {} is clean.", node);
             // Dependencies have not changed: Node is clean.
             true
           }
           _ => {
-            // If dependency generations mismatched or failed to fetch, clear stale edges and
-            // indicate that it should re-run.
-            context.graph().clear_stale_edges(entry_id, run_token);
+            // If dependency generations mismatched or failed to fetch, indicate that the Node
+            // should re-run.
             trace!("Deps did not match: {} needs to re-run.", node);
             false
           }
@@ -614,17 +625,10 @@ impl<N: Node> Entry<N> {
   ///
   /// Clears the state of this Node, forcing it to be recomputed.
   ///
-  /// # Arguments
-  ///
-  /// * `graph_still_contains_edges` - If the caller has guaranteed that all edges from this Node
-  ///   have been removed from the graph, they should pass false here, else true. We may want to
-  ///   remove this parameter, and force this method to remove the edges, but that would require
-  ///   acquiring the graph lock here, which we currently don't do.
-  ///
-  pub(crate) fn clear(&mut self, graph_still_contains_edges: bool) {
+  pub(crate) fn clear(&mut self) {
     let mut state = self.state.lock();
 
-    let (run_token, generation, mut previous_result) =
+    let (run_token, generation, previous_result) =
       match mem::replace(&mut *state, EntryState::initial()) {
         EntryState::NotStarted {
           run_token,
@@ -652,13 +656,8 @@ impl<N: Node> Entry<N> {
 
     trace!("Clearing node {:?}", self.node);
 
-    if graph_still_contains_edges {
-      if let Some(previous_result) = previous_result.as_mut() {
-        previous_result.dirty();
-      }
-    }
-
-    // Swap in a state with a new RunToken value, which invalidates any outstanding work.
+    // Swap in a state with a new RunToken value, which invalidates any outstanding work and all
+    // edges for the previous run.
     *state = EntryState::NotStarted {
       run_token: run_token.next(),
       generation,

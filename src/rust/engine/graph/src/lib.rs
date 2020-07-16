@@ -356,10 +356,44 @@ impl<N: Node> InnerGraph<N> {
     }
   }
 
+  ///
+  /// A running edge is an edge leaving a Running node with a matching RunToken: ie, an edge that was
+  /// created by the active run of a node. Running edges are not allowed to form cycles, as that could
+  /// cause work to deadlock on itself.
+  ///
+  /// "Running" edges are a subset of "live" edges: see `live_edge_predicate`
+  ///
+  fn running_edge_predicate<'a>(inner: &'a InnerGraph<N>) -> impl Fn(EdgeId) -> bool + 'a {
+    move |edge_id| {
+      let (edge_src_id, _) = inner.pg.edge_endpoints(edge_id).unwrap();
+      if let Some(running_run_token) = inner.unsafe_entry_for_id(edge_src_id).running_run_token() {
+        // Only include the edge if the Node is running, and the edge is for this run.
+        inner.pg[edge_id].1 == running_run_token
+      } else {
+        // Node is not running.
+        false
+      }
+    }
+  }
+
+  ///
+  /// A live edge is an edge for the current RunToken of a Node, regardless of whether the Node is
+  /// currently running.
+  ///
+  /// "Live" edges are a superset of "running" edges: see `running_edge_predicate`
+  ///
+  fn live_edge_predicate<'a>(inner: &'a InnerGraph<N>) -> impl Fn(EdgeId) -> bool + 'a {
+    move |edge_id| {
+      let (edge_src_id, _) = inner.pg.edge_endpoints(edge_id).unwrap();
+      // Only include the edge if it is live.
+      inner.pg[edge_id].1 == inner.unsafe_entry_for_id(edge_src_id).run_token()
+    }
+  }
+
   fn clear(&mut self) {
     for eid in self.nodes.values() {
       if let Some(entry) = self.pg.node_weight_mut(*eid) {
-        entry.clear(true);
+        entry.clear();
       }
     }
   }
@@ -386,12 +420,12 @@ impl<N: Node> InnerGraph<N> {
         }
       })
       .collect();
-    // And their transitive dependencies, which will be dirtied.
+    // And their live transitive dependencies, which will be dirtied.
     let transitive_ids: Vec<_> = self
       .walk(
         root_ids.iter().cloned().collect(),
         Direction::Incoming,
-        |_| true,
+        Self::live_edge_predicate(&self),
       )
       .filter(|eid| !root_ids.contains(eid))
       .collect();
@@ -401,23 +435,16 @@ impl<N: Node> InnerGraph<N> {
       dirtied: transitive_ids.len(),
     };
 
-    // Clear roots and remove their outbound edges.
+    // Clear the roots.
     for id in &root_ids {
       if let Some(entry) = self.pg.node_weight_mut(*id) {
-        entry.clear(false);
+        entry.clear();
       }
     }
-    self.pg.retain_edges(|pg, edge| {
-      if let Some((src, _)) = pg.edge_endpoints(edge) {
-        !root_ids.contains(&src)
-      } else {
-        true
-      }
-    });
 
     // Dirty transitive entries, but do not yet clear their output edges. We wait to clear
     // outbound edges until we decide whether we can clean an entry: if we can, all edges are
-    // preserved; if we can't, they are cleared in `Graph::clear_stale_edges`.
+    // preserved; if we can't, they are eventually cleaned in `Graph::garbage_collect_edges`.
     for id in &transitive_ids {
       if let Some(mut entry) = self.pg.node_weight_mut(*id).cloned() {
         entry.dirty(self);
@@ -490,7 +517,13 @@ impl<N: Node> InnerGraph<N> {
       .cloned()
       .collect();
     self.live_internal(
-      self.walk(root_ids, Direction::Outgoing, |_| true).collect(),
+      self
+        .walk(
+          root_ids,
+          Direction::Outgoing,
+          Self::live_edge_predicate(&self),
+        )
+        .collect(),
       context.clone(),
     )
   }
@@ -559,26 +592,6 @@ impl<N: Node> Graph<N> {
     inner.nodes.len()
   }
 
-  ///
-  /// A live edge is an edge leaving a Running node with a matching RunToken: ie, an edge that was
-  /// created by the active run of a node. Live edges are not allowed to form cycles, as that would
-  /// cause work to deadlock on itself.
-  ///
-  fn live_edge_predicate<'a>(inner: &'a InnerGraph<N>) -> impl Fn(EdgeId) -> bool + 'a {
-    move |edge_id| {
-      let (edge_src_id, _) = inner.pg.edge_endpoints(edge_id).unwrap();
-      // TODO: This means we're acquiring entry locks per edge... not great. Almost better to just
-      // get rid of Entry locks.
-      if let Some(running_run_token) = inner.unsafe_entry_for_id(edge_src_id).running_run_token() {
-        // Only include the edge if it is live.
-        inner.pg[edge_id].1 == running_run_token
-      } else {
-        // Node is not running.
-        false
-      }
-    }
-  }
-
   async fn get_inner(
     &self,
     context: &N::Context,
@@ -595,15 +608,17 @@ impl<N: Node> Graph<N> {
       let dst_id = inner.ensure_entry(dst_node);
       let dst_retry = if let Some((src_id, run_token)) = context.entry_id_and_run_token() {
         // See whether adding this edge would create a cycle.
-        if inner.detect_cycle(src_id, dst_id, Self::live_edge_predicate(&inner)) {
+        if inner.detect_cycle(src_id, dst_id, InnerGraph::running_edge_predicate(&inner)) {
           // If we have detected a cycle, the type of edge becomes relevant: a strong edge will
           // report the cycle as a failure, while a weak edge will go ahead and add the dependency,
           // but return None to indicate that it isn't consumable.
           match edge_type {
             EdgeType::Strong => {
-              if let Some(cycle_path) =
-                inner.detect_and_compute_cycle(src_id, dst_id, Self::live_edge_predicate(&inner))
-              {
+              if let Some(cycle_path) = inner.detect_and_compute_cycle(
+                src_id,
+                dst_id,
+                InnerGraph::running_edge_predicate(&inner),
+              ) {
                 debug!(
                   "Detected cycle considering adding edge from {:?} to {:?}; existing path: {:?}",
                   inner.entry_for_id(src_id).unwrap().node(),
@@ -704,10 +719,22 @@ impl<N: Node> Graph<N> {
   }
 
   ///
-  /// Return the value of the given Node. Synonym for `self.get(context, node)`.
+  /// Return the value of the given Node. This is a synonym for `self.get(context, node)`, but it
+  /// is expected to be used by callers requesting node values from the graph, while `self.get` is
+  /// also used by Nodes to request dependencies..
   ///
   pub async fn create(&self, node: N, context: &N::Context) -> Result<N::Item, N::Error> {
-    self.get(context, node).await
+    let result = self.get(context, node).await;
+    // In the background, garbage collect edges.
+    // NB: This could safely occur at any frequency: if it ever shows up in profiles, we could make
+    // it optional based on how many edges are garbage.
+    context.spawn({
+      let context = context.clone();
+      async move {
+        context.graph().garbage_collect_edges();
+      }
+    });
+    result
   }
 
   ///
@@ -755,12 +782,13 @@ impl<N: Node> Graph<N> {
   }
 
   ///
-  /// Gets the generations of the dependencies of the given EntryId, (re)computing or cleaning
-  /// them first if necessary.
+  /// Gets the generations of the dependencies of the given EntryId at the given RunToken,
+  /// (re)computing or cleaning them first if necessary.
   ///
   async fn dep_generations(
     &self,
     entry_id: EntryId,
+    run_token: RunToken,
     context: &N::Context,
   ) -> Result<Vec<Generation>, N::Error> {
     let dep_nodes = {
@@ -768,12 +796,16 @@ impl<N: Node> Graph<N> {
       inner
         .pg
         .edges_directed(entry_id, Direction::Outgoing)
-        .map(|edge_ref| {
-          let entry = inner
-            .entry_for_id(edge_ref.target())
-            .unwrap_or_else(|| panic!("Dependency not present in Graph."))
-            .clone();
-          (edge_ref.weight().0, entry.node().clone())
+        .filter_map(|edge_ref| {
+          if edge_ref.weight().1 == run_token {
+            let entry = inner
+              .entry_for_id(edge_ref.target())
+              .unwrap_or_else(|| panic!("Dependency not present in Graph."))
+              .clone();
+            Some((edge_ref.weight().0, entry.node().clone()))
+          } else {
+            None
+          }
         })
         .collect::<Vec<_>>()
     };
@@ -797,41 +829,6 @@ impl<N: Node> Graph<N> {
         .filter_map(std::convert::identity)
         .collect(),
     )
-  }
-
-  ///
-  /// Garbage collects the dependency edges of the given EntryId if the RunToken matches.
-  ///
-  fn clear_stale_edges(&self, entry_id: EntryId, run_token: RunToken) {
-    let mut inner = self.inner.lock();
-    // If the RunToken mismatches, return.
-    if let Some(entry) = inner.entry_for_id(entry_id) {
-      if entry.run_token() != run_token {
-        return;
-      }
-    }
-
-    // Collect stale edges.
-    // NB: Because `remove_edge` changes EdgeIndex values, we sort the indices and remove them
-    // back to front to avoid invalidating EdgeIndexes as we go.
-    let descending_stale_edges = {
-      let mut stale_edges = inner
-        .pg
-        .edges_directed(entry_id, Direction::Outgoing)
-        .filter_map(|edge| {
-          if edge.weight().1 == run_token {
-            None
-          } else {
-            Some(edge.id())
-          }
-        })
-        .collect::<Vec<_>>();
-      stale_edges.sort_by(|a, b| a.cmp(b).reverse());
-      stale_edges
-    };
-    for edge in descending_stale_edges {
-      inner.pg.remove_edge(edge);
-    }
   }
 
   ///
@@ -890,6 +887,24 @@ impl<N: Node> Graph<N> {
       has_uncacheable_deps,
       has_weak_deps,
     );
+  }
+
+  ///
+  /// Garbage collects all dependency edges that are not associated with the previous or current run
+  /// of a Node. Node cleaning consumes the previous edges for an operation, so we preserve those.
+  ///
+  /// This is executed as a bulk operation, because individual edge removals take O(n), and bulk
+  /// edge filtering is both more efficient, and possible to do asynchronously.
+  ///
+  pub fn garbage_collect_edges(&self) {
+    let mut inner = self.inner.lock();
+    inner.pg.retain_edges(|pg, edge_index| {
+      let (edge_src_id, _) = pg.edge_endpoints(edge_index).unwrap();
+      // Retain the edge if it is for either the current or previous run of a Node.
+      pg[edge_src_id]
+        .run_token()
+        .equals_current_or_previous(pg[edge_index].1)
+    });
   }
 
   ///
