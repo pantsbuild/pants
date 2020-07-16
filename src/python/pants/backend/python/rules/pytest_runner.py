@@ -12,6 +12,7 @@ from pants.backend.python.rules.coverage import (
     CoverageSubsystem,
     PytestCoverageData,
 )
+from pants.backend.python.rules.inject_ancestor_files import AncestorFiles, AncestorFilesRequest
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
@@ -173,12 +174,18 @@ async def setup_pytest_for_target(
         specified_source_files_request,
     )
 
+    conftest_files = await Get(
+        AncestorFiles,
+        AncestorFilesRequest("conftest.py", prepared_sources.snapshot, sources_stripped=False),
+    )
+
     input_digest = await Get(
         Digest,
         MergeDigests(
             (
                 coverage_config.digest,
                 prepared_sources.snapshot.digest,
+                conftest_files.snapshot.digest,
                 requirements_pex.digest,
                 pytest_pex.digest,
                 test_runner_pex.digest,
