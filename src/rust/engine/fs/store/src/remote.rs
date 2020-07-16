@@ -7,9 +7,10 @@ use std::time::Duration;
 
 use bazel_protos::{self, call_option};
 use bytes::{Bytes, BytesMut};
-use futures::compat::Future01CompatExt;
+use futures::compat::{Future01CompatExt, Sink01CompatExt};
 use futures::future::{FutureExt, TryFutureExt};
-use futures01::{future, Future, Sink, Stream};
+use futures::sink::SinkExt;
+use futures01::{future, Future, Stream};
 use hashing::Digest;
 use log::Level;
 use serverset::{retry, Serverset};
@@ -134,52 +135,56 @@ impl ByteStore {
             )
           })?;
 
+        let mut sender = sender.sink_compat();
+
         let chunk_size_bytes = store.chunk_size_bytes;
         let resource_name = resource_name.clone();
-        let stream = futures01::stream::unfold::<_, _, future::FutureResult<_, grpcio::Error>, _>(
-          (0, false),
-          move |(offset, has_sent_any)| {
-            if offset >= bytes.len() && has_sent_any {
-              None
-            } else {
-              let mut req = bazel_protos::bytestream::WriteRequest::new();
-              req.set_resource_name(resource_name.clone());
-              req.set_write_offset(offset as i64);
-              let next_offset = min(offset + chunk_size_bytes, bytes.len());
-              req.set_finish_write(next_offset == bytes.len());
-              req.set_data(Bytes::from(&bytes[offset..next_offset]));
-              Some(future::ok((
-                (req, grpcio::WriteFlags::default()),
-                (next_offset, true),
-              )))
-            }
-          },
-        );
+        let mut stream = futures::stream::unfold((0, false), move |(offset, has_sent_any)| {
+          if offset >= bytes.len() && has_sent_any {
+            futures::future::ready(None)
+          } else {
+            let mut req = bazel_protos::bytestream::WriteRequest::new();
+            req.set_resource_name(resource_name.clone());
+            req.set_write_offset(offset as i64);
+            let next_offset = min(offset + chunk_size_bytes, bytes.len());
+            req.set_finish_write(next_offset == bytes.len());
+            req.set_data(Bytes::from(&bytes[offset..next_offset]));
+            futures::future::ready(Some((
+              Ok((req, grpcio::WriteFlags::default())),
+              (next_offset, true),
+            )))
+          }
+        });
+
+        sender.send_all(&mut stream).await.or_else(move |e| {
+          match e {
+            // Some implementations of the remote execution API early-return if the blob has
+            // been concurrently uploaded by another client. In this case, they return a
+            // WriteResponse with a committed_size equal to the digest's entire size before
+            // closing the stream.
+            // Because the server then closes the stream, the client gets an RpcFinished
+            // error in this case. We ignore this, and will later on verify that the
+            // committed_size we received from the server is equal to the expected one. If
+            // these are not equal, the upload will be considered a failure at that point.
+            // Whether this type of response will become part of the official API is up for
+            // discussion: see
+            // https://groups.google.com/d/topic/remote-execution-apis/NXUe3ItCw68/discussion.
+            grpcio::Error::RpcFinished(None) => Ok(()),
+            e => Err(format!(
+              "Error attempting to upload digest {:?}: {:?}",
+              digest, e
+            )),
+          }
+        })?;
 
         sender
-          .send_all(stream)
-          .map(|_| ())
-          .or_else(move |e| {
-            match e {
-              // Some implementations of the remote execution API early-return if the blob has
-              // been concurrently uploaded by another client. In this case, they return a
-              // WriteResponse with a committed_size equal to the digest's entire size before
-              // closing the stream.
-              // Because the server then closes the stream, the client gets an RpcFinished
-              // error in this case. We ignore this, and will later on verify that the
-              // committed_size we received from the server is equal to the expected one. If
-              // these are not equal, the upload will be considered a failure at that point.
-              // Whether this type of response will become part of the official API is up for
-              // discussion: see
-              // https://groups.google.com/d/topic/remote-execution-apis/NXUe3ItCw68/discussion.
-              grpcio::Error::RpcFinished(None) => Ok(()),
-              e => Err(format!(
-                "Error attempting to upload digest {:?}: {:?}",
-                digest, e
-              )),
-            }
+          .close()
+          .map_err(|e| {
+            format!(
+              "Error from server when uploading digest {:?}: {:?}",
+              digest, e
+            )
           })
-          .compat()
           .await?;
 
         let received = receiver
