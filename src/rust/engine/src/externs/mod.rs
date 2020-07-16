@@ -57,6 +57,14 @@ pub fn is_union(ty: TypeId) -> bool {
 
 pub fn equals(h1: &PyObject, h2: &PyObject) -> bool {
   let gil = Python::acquire_gil();
+  let py = gil.python();
+  // NB: Although it does not precisely align with Python's definition of equality, we ban matches
+  // between non-equal types to avoid legacy behavior like `assert True == 1`, which is very
+  // surprising in interning, and would likely be surprising anywhere else in the engine where we
+  // compare things.
+  if h1.get_type(py) != h2.get_type(py) {
+    return false;
+  }
   h1.rich_compare(gil.python(), h2, CompareOp::Eq)
     .unwrap()
     .cast_as::<PyBool>(gil.python())
