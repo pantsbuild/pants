@@ -53,7 +53,6 @@ class TestCoverageConfig(TestBase):
         assert resolved_config == dedent(
             """\
                 [run]
-                branch = True
                 relative_files = True
                 omit = 
                 \ttest_runner.pex/*
@@ -97,7 +96,6 @@ class TestCoverageConfig(TestBase):
                 ignore_errors = True
 
                 [run]
-                branch = True
                 relative_files = True
                 omit = 
                 \ttest_runner.pex/*

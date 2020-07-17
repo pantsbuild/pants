@@ -145,18 +145,18 @@ class CoverageIntegrationTest(PantsRunIntegrationTest):
         assert (
             dedent(
                 f"""\
-                Name                                                          Stmts   Miss Branch BrPart  Cover
-                -----------------------------------------------------------------------------------------------
-                {tmpdir_relative}/src/python/project/__init__.py                        0      0      0      0   100%
-                {tmpdir_relative}/src/python/project/lib.py                             6      0      0      0   100%
-                {tmpdir_relative}/src/python/project/lib_test.py                        3      0      0      0   100%
-                {tmpdir_relative}/tests/python/project_test/__init__.py                 0      0      0      0   100%
-                {tmpdir_relative}/tests/python/project_test/no_src/__init__.py          0      0      0      0   100%
-                {tmpdir_relative}/tests/python/project_test/no_src/test_no_src.py       2      0      0      0   100%
-                {tmpdir_relative}/tests/python/project_test/test_arithmetic.py          3      0      0      0   100%
-                {tmpdir_relative}/tests/python/project_test/test_multiply.py            3      0      0      0   100%
-                -----------------------------------------------------------------------------------------------
-                TOTAL                                                            17      0      0      0   100%
+                Name                                                          Stmts   Miss  Cover
+                ---------------------------------------------------------------------------------
+                {tmpdir_relative}/src/python/project/__init__.py                        0      0   100%
+                {tmpdir_relative}/src/python/project/lib.py                             6      0   100%
+                {tmpdir_relative}/src/python/project/lib_test.py                        3      0   100%
+                {tmpdir_relative}/tests/python/project_test/__init__.py                 0      0   100%
+                {tmpdir_relative}/tests/python/project_test/no_src/__init__.py          0      0   100%
+                {tmpdir_relative}/tests/python/project_test/no_src/test_no_src.py       2      0   100%
+                {tmpdir_relative}/tests/python/project_test/test_arithmetic.py          3      0   100%
+                {tmpdir_relative}/tests/python/project_test/test_multiply.py            3      0   100%
+                ---------------------------------------------------------------------------------
+                TOTAL                                                            17      0   100%
                 """
             )
             in result.stderr_data
@@ -172,13 +172,13 @@ class CoverageIntegrationTest(PantsRunIntegrationTest):
         assert (
             dedent(
                 f"""\
-                Name                                                          Stmts   Miss Branch BrPart  Cover
-                -----------------------------------------------------------------------------------------------
-                {tmpdir_relative}/src/python/project/lib.py                             6      0      0      0   100%
-                {tmpdir_relative}/tests/python/project_test/no_src/__init__.py          0      0      0      0   100%
-                {tmpdir_relative}/tests/python/project_test/no_src/test_no_src.py       2      0      0      0   100%
-                -----------------------------------------------------------------------------------------------
-                TOTAL                                                             8      0      0      0   100%
+                Name                                                          Stmts   Miss  Cover
+                ---------------------------------------------------------------------------------
+                {tmpdir_relative}/src/python/project/lib.py                             6      0   100%
+                {tmpdir_relative}/tests/python/project_test/no_src/__init__.py          0      0   100%
+                {tmpdir_relative}/tests/python/project_test/no_src/test_no_src.py       2      0   100%
+                ---------------------------------------------------------------------------------
+                TOTAL                                                             8      0   100%
                 """
             )
             in result.stderr_data
