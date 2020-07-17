@@ -34,7 +34,9 @@ def get_buildroot() -> str:
 
 def get_pants_cachedir() -> str:
     """Return the pants global cache directory."""
-    # Follow the unix XDB base spec: http://standards.freedesktop.org/basedir-spec/latest/index.html.
+    # TODO: Keep in alignment with rust `fs::default_cache_path`. This method
+    # is not used there directly because it would create a cycle for native bootstrap via
+    # BinaryUtil being used to download tools needed to bootstrap.
     cache_home = os.environ.get("XDG_CACHE_HOME")
     if not cache_home:
         cache_home = "~/.cache"
@@ -43,7 +45,9 @@ def get_pants_cachedir() -> str:
 
 def get_pants_configdir() -> str:
     """Return the pants global config directory."""
-    # Follow the unix XDB base spec: http://standards.freedesktop.org/basedir-spec/latest/index.html.
+    # TODO: Keep in alignment with rust `fs::default_config_path`. This method
+    # is not used there directly because it would create a cycle for native bootstrap via
+    # BinaryUtil being used to download tools needed to bootstrap.
     config_home = os.environ.get("XDG_CONFIG_HOME")
     if not config_home:
         config_home = "~/.config"
