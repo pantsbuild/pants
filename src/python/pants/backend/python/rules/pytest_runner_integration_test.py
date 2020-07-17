@@ -42,6 +42,10 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
     bad_source = FileContent(path="test_bad.py", content=b"def test():\n  assert False\n")
     py3_only_source = FileContent(path="test_py3.py", content=b"def test() -> None:\n  pass\n")
     library_source = FileContent(path="library.py", content=b"def add_two(x):\n  return x + 2\n")
+    conftest_source = FileContent(
+        path="conftest.py",
+        content=b"def pytest_runtest_setup(item):\n" b"  print('In conftest!')\n",
+    )
 
     def write_file(self, file_content: FileContent) -> None:
         self.create_file(
@@ -376,6 +380,18 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         assert result.status == Status.SUCCESS
         assert f"{self.package}/test_good.py ." in result.stdout
         assert result.coverage_data is not None
+
+    def test_conftest_injection(self) -> None:
+        self.create_python_test_target([self.good_source])
+        # Note that there's deliberately no target wrapping the conftest.py.
+        self.create_file(
+            relpath=PurePath(self.source_root, self.conftest_source.path).as_posix(),
+            contents=self.conftest_source.content.decode(),
+        )
+
+        result = self.run_pytest(passthrough_args="-s")
+        assert result.status == Status.SUCCESS
+        assert f"{self.package}/test_good.py In conftest!\n." in result.stdout
 
     def test_execution_slot_variable(self) -> None:
         source = FileContent(

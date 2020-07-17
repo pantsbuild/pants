@@ -7,13 +7,13 @@ use std::hash::Hash;
 
 use async_trait::async_trait;
 
-use petgraph::stable_graph;
-
-use crate::entry::Entry;
+use crate::entry::{Entry, RunToken};
 use crate::Graph;
 
 // 2^32 Nodes ought to be more than enough for anyone!
-pub type EntryId = stable_graph::NodeIndex<u32>;
+// TODO: Consider renaming to NodeId.
+pub type EntryId = petgraph::graph::NodeIndex<u32>;
+pub type EdgeId = petgraph::graph::EdgeIndex<u32>;
 
 ///
 /// Defines executing a cacheable/memoizable step within the given NodeContext.
@@ -77,20 +77,28 @@ pub trait NodeContext: Clone + Send + Sync + 'static {
   /// particular: an uncacheable (Node::cacheable) Node will execute once per Run, regardless
   /// of other invalidation.
   ///
-  type RunId: Clone + Debug + Eq + Send;
+  type SessionId: Clone + Debug + Eq + Send;
 
   ///
-  /// Creates a clone of this NodeContext to be used for a different Node.
+  /// Creates a clone of this NodeContext to be used for a different Node, or different run of the
+  /// same Node.
   ///
-  /// To clone a Context for use for the same Node, `Clone` is used directly.
+  /// To clone a Context for use for the same run of the same Node, `Clone` is used directly.
   ///
-  fn clone_for(&self, entry_id: EntryId) -> <Self::Node as Node>::Context;
+  fn clone_for(&self, entry_id: EntryId, run_token: RunToken) -> <Self::Node as Node>::Context;
 
   ///
-  /// Returns the RunId for this Context, which should uniquely identify a caller's run for the
-  /// purposes of "once per Run" behaviour.
+  /// If this Context is associated with a run of a particular Node, returns its EntryId and
+  /// RunToken. A Context used at the root of the Graph will not be associated with any particular
+  /// Node, but all other Contexts are created via `clone_for` for a particular Node's run.
   ///
-  fn run_id(&self) -> &Self::RunId;
+  fn entry_id_and_run_token(&self) -> Option<(EntryId, RunToken)>;
+
+  ///
+  /// Returns the SessionId for this Context, which should uniquely identify a caller's session for
+  /// the purposes of "once per Session" behaviour.
+  ///
+  fn session_id(&self) -> &Self::SessionId;
 
   ///
   /// Returns a reference to the Graph for this Context.

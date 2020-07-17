@@ -14,6 +14,7 @@ from pants.backend.python.python_requirements import PythonRequirements
 from pants.backend.python.rules import (
     coverage,
     download_pex_bin,
+    inject_ancestor_files,
     inject_init,
     pex,
     pex_from_targets,
@@ -53,6 +54,7 @@ def rules():
     return (
         *coverage.rules(),
         *download_pex_bin.rules(),
+        *inject_ancestor_files.rules(),
         *inject_init.rules(),
         *python_sources.rules(),
         *dependency_inference_rules.rules(),

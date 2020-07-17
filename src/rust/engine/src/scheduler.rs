@@ -66,6 +66,8 @@ struct InnerSession {
   // entire Session, but in some cases (in particular, a `--loop`) the caller wants to retain the
   // same Session while still observing new values for uncacheable rules like Goals.
   //
+  // See `impl NodeContext for Context` for more information.
+  //
   // TODO: Figure out how the `--loop` interplays with metrics. It's possible that for metrics
   // purposes, each iteration of a loop should be considered to be a new Session, but for now the
   // Session/build_id would be stable.

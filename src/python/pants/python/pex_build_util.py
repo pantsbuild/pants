@@ -23,14 +23,14 @@ from pants.util.contextutil import temporary_file
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 
-def identify_missing_init_files(sources: Sequence[str]) -> FrozenOrderedSet[str]:
-    """Return the paths to add to ensure that every package has an __init__.py.
+def identify_missing_ancestor_files(name: str, sources: Sequence[str]) -> FrozenOrderedSet[str]:
+    """Return the paths of potentially missing ancestor files.
 
     NB: If the sources have not had their source roots (e.g., 'src/python') stripped, this
-    function will add superfluous __init__.py files at and above the source roots, (e.g.,
-    src/python/__init__.py, src/__init__.py). It is the caller's responsibility to filter these
+    function will consider superfluous files at and above the source roots, (e.g.,
+    src/python/<name>, src/<name>). It is the caller's responsibility to filter these
     out if necessary. If the sources have had their source roots stripped, then this function
-    will only identify missing __init__.py in actual packages.
+    will only identify consider files in actual packages.
     """
     packages: Set[str] = set()
     for source in sources:
@@ -45,7 +45,7 @@ def identify_missing_init_files(sources: Sequence[str]) -> FrozenOrderedSet[str]
             packages.add(package)
 
     return FrozenOrderedSet(
-        sorted({os.path.join(package, "__init__.py") for package in packages} - set(sources))
+        sorted({os.path.join(package, name) for package in packages} - set(sources))
     )
 
 
@@ -169,10 +169,7 @@ class PexBuilderWrapper:
     ) -> None:
         """Multi-platform dependency resolution for PEX files.
 
-        :param builder: Dump the requirements into this builder.
-        :param interpreter: The :class:`PythonInterpreter` to resolve requirements for.
         :param reqs: A list of :class:`PythonRequirement` to resolve.
-        :param log: Use this logger.
         :param platforms: A list of :class:`Platform`s to resolve requirements for.
                                             Defaults to the platforms specified by PythonSetup.
         :param bool override_ipex_build_do_actually_add_distribution: When this PexBuilderWrapper is configured with
@@ -253,9 +250,14 @@ class PexBuilderWrapper:
         return distributions
 
     def _prepare_inits(self) -> Set[str]:
+        # TODO: Is this still necessary? We inject ancestor __init__.py files
+        #  in a principled way, at least for source packages. Unclear what the
+        #  right thing to do with resource packages is. But writing fake
+        #  __init__.py files with a pkg_resources namespace invocaton in them
+        #  is probably not it.
         chroot = self._builder.chroot()
         sources = chroot.get("source") | chroot.get("resource")
-        missing_init_files = identify_missing_init_files(sources)
+        missing_init_files = identify_missing_ancestor_files("__init__.py", sources)
         if missing_init_files:
             with temporary_file(permissions=0o644) as ns_package:
                 ns_package.write(

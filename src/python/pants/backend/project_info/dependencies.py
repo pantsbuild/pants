@@ -43,7 +43,7 @@ class DependenciesOptions(LineOriented, GoalSubsystem):
             default=DependencyType.SOURCE,
             help=(
                 "Which types of dependencies to list, where `source` means source code "
-                "dependencies and `3rdparty` means third-party requirements and JARs."
+                "dependencies and `3rdparty` means third-party requirements."
             ),
         )
 
