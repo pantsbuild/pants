@@ -26,7 +26,7 @@
 #![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
-#![type_length_limit = "1076739"]
+#![type_length_limit = "1076744"]
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryFrom;

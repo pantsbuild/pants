@@ -375,7 +375,7 @@ impl ShardedLmdb {
       .await
   }
 
-  #[allow(clippy::identity_conversion)] // False positive: https://github.com/rust-lang/rust-clippy/issues/3913
+  #[allow(clippy::useless_conversion)] // False positive: https://github.com/rust-lang/rust-clippy/issues/3913
   pub fn compact(&self) -> Result<(), String> {
     for (env, old_dir, _) in ShardedLmdb::envs(&self.root_path, self.max_size)? {
       let new_dir = TempDir::new_in(old_dir.parent().unwrap()).expect("TODO");

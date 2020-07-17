@@ -947,7 +947,7 @@ impl<N: Node> Graph<N> {
     &self,
     roots: &[N],
     context: &N::Context,
-    mut f: impl FnMut(&N, N::Item) -> (),
+    mut f: impl FnMut(&N, N::Item),
   ) {
     let inner = self.inner.lock();
     for (n, v) in inner.live_reachable(roots, context) {
@@ -955,7 +955,7 @@ impl<N: Node> Graph<N> {
     }
   }
 
-  pub fn visit_live(&self, context: &N::Context, mut f: impl FnMut(&N, N::Item) -> ()) {
+  pub fn visit_live(&self, context: &N::Context, mut f: impl FnMut(&N, N::Item)) {
     let inner = self.inner.lock();
     for (n, v) in inner.live(context) {
       f(n, v);
