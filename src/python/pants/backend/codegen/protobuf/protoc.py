@@ -9,7 +9,7 @@ from pants.option.custom_types import target_option
 
 
 class Protoc(ExternalTool):
-    "The protocol buffer compiler (https://developers.google.com/protocol-buffers)."
+    """The protocol buffer compiler (https://developers.google.com/protocol-buffers)."""
 
     options_scope = "protoc"
     default_version = "3.11.4"

@@ -225,6 +225,12 @@ class TestOptions(GoalSubsystem):
             ),
         )
         register(
+            "--force",
+            type=bool,
+            default=False,
+            help="Force pytest to rerun, even if results are available from cache.",
+        )
+        register(
             "--use-coverage",
             type=bool,
             default=False,

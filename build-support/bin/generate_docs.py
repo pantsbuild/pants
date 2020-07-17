@@ -136,7 +136,7 @@ class ReferenceGenerator:
             for opt in shi["advanced"]:
                 munge_option(opt)
 
-        return help_info
+        return cast(Dict, help_info)
 
     @property
     def category_id(self):
@@ -147,7 +147,7 @@ class ReferenceGenerator:
 
     def _render_body(self, scope_help_info: Dict) -> str:
         """Renders the body of a single options help page."""
-        return self._renderer.render("{{> scoped_options}}", scope_help_info)
+        return cast(str, self._renderer.render("{{> scoped_options}}", scope_help_info))
 
     def _access_readme_api(self, url_suffix: str, method: str, payload: str) -> Dict:
         """Sends requests to the readme.io API."""

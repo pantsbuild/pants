@@ -8,7 +8,7 @@ from pants.option.custom_types import file_option, shell_str, target_option
 
 
 class Pylint(PythonToolBase):
-    "The PyLint linter for Python code (https://www.pylint.org/)."
+    """The PyLint linter for Python code (https://www.pylint.org/)."""
 
     options_scope = "pylint"
     default_version = "pylint>=2.4.4,<2.5"

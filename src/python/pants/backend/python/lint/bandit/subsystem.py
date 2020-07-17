@@ -7,7 +7,7 @@ from pants.option.custom_types import file_option, shell_str
 
 
 class Bandit(PythonToolBase):
-    "A tool for finding security issues in Python code (https://bandit.readthedocs.io)."
+    """A tool for finding security issues in Python code (https://bandit.readthedocs.io)."""
 
     options_scope = "bandit"
     default_version = "bandit>=1.6.2,<1.7"
