@@ -1,3 +1,8 @@
+use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::convert::TryInto;
+use std::path::{Path, PathBuf};
+use std::time::Duration;
+
 use bazel_protos;
 use bazel_protos::operations::Operation;
 use bazel_protos::remote_execution::ExecutedActionMetadata;
@@ -5,29 +10,25 @@ use bytes::Bytes;
 use futures::compat::Future01CompatExt;
 use grpcio;
 use hashing::{Digest, Fingerprint, EMPTY_DIGEST};
+use maplit::{btreemap, hashset};
 use mock;
+use mock::execution_server::{ExpectedAPICall, MockOperation};
+use protobuf::well_known_types::Timestamp;
 use protobuf::{self, Message, ProtobufEnum};
+use spectral::prelude::*;
 use spectral::{assert_that, string::StrAssertions};
-use std::convert::TryInto;
 use store::Store;
 use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory};
 use testutil::owned_string_vec;
+use tokio::runtime::Handle;
+use workunit_store::{Level, Workunit, WorkunitMetadata, WorkunitState, WorkunitStore};
 
 use crate::remote::{digest, CommandRunner, ExecutionError, OperationOrStatus};
 use crate::{
   CommandRunner as CommandRunnerTrait, Context, FallibleProcessResultWithPlatform,
   MultiPlatformProcess, Platform, PlatformConstraint, Process, ProcessMetadata,
 };
-use maplit::{btreemap, hashset};
-use mock::execution_server::{ExpectedAPICall, MockOperation};
-use protobuf::well_known_types::Timestamp;
-use spectral::prelude::*;
-use std::collections::{BTreeMap, BTreeSet, HashSet};
-use std::path::{Path, PathBuf};
-use std::time::Duration;
-use tokio::runtime::Handle;
-use workunit_store::{Workunit, WorkunitMetadata, WorkunitState, WorkunitStore};
 
 const OVERALL_DEADLINE_SECS: Duration = Duration::from_secs(10 * 60);
 
@@ -943,6 +944,7 @@ async fn sends_headers() {
 
   let command_runner = CommandRunner::new(
     &mock_server.address(),
+    vec![mock_server.address().clone()],
     empty_request_metadata(),
     None,
     Some(String::from("catnip-will-get-you-anywhere")),
@@ -1149,6 +1151,7 @@ async fn ensure_inline_stdio_is_stored() {
 
   let cmd_runner = CommandRunner::new(
     &mock_server.address(),
+    vec![mock_server.address().clone()],
     empty_request_metadata(),
     None,
     None,
@@ -1431,6 +1434,7 @@ async fn execute_missing_file_uploads_if_known() {
     .expect("Saving directory bytes to store");
   let command_runner = CommandRunner::new(
     &mock_server.address(),
+    vec![mock_server.address().clone()],
     empty_request_metadata(),
     None,
     None,
@@ -1506,6 +1510,7 @@ async fn execute_missing_file_errors_if_unknown() {
 
   let runner = CommandRunner::new(
     &mock_server.address(),
+    vec![mock_server.address().clone()],
     empty_request_metadata(),
     None,
     None,
@@ -1726,7 +1731,7 @@ async fn remote_workunits_are_stored() {
       },
       span_id: String::from("ignore"),
       parent_id: None,
-      metadata: WorkunitMetadata::new(),
+      metadata: WorkunitMetadata::with_level(Level::Debug),
     },
     Workunit {
       name: String::from("remote execution worker input fetching"),
@@ -1738,7 +1743,7 @@ async fn remote_workunits_are_stored() {
       },
       span_id: String::from("ignore"),
       parent_id: None,
-      metadata: WorkunitMetadata::new(),
+      metadata: WorkunitMetadata::with_level(Level::Debug),
     },
     Workunit {
       name: String::from("remote execution worker command executing"),
@@ -1750,7 +1755,7 @@ async fn remote_workunits_are_stored() {
       },
       span_id: String::from("ignore"),
       parent_id: None,
-      metadata: WorkunitMetadata::new(),
+      metadata: WorkunitMetadata::with_level(Level::Debug),
     },
     Workunit {
       name: String::from("remote execution worker output uploading"),
@@ -1762,7 +1767,7 @@ async fn remote_workunits_are_stored() {
       },
       span_id: String::from("ignore"),
       parent_id: None,
-      metadata: WorkunitMetadata::new(),
+      metadata: WorkunitMetadata::with_level(Level::Debug),
     }
   };
 
@@ -2209,6 +2214,7 @@ fn create_command_runner(
   let store = make_store(store_dir.path(), cas, runtime.clone());
   let command_runner = CommandRunner::new(
     &address,
+    vec![address.clone()],
     empty_request_metadata(),
     None,
     None,

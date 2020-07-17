@@ -17,7 +17,7 @@ use crate::tasks::{Rule, Tasks};
 use crate::types::Types;
 
 use fs::{safe_create_dir_all_ioerror, GitignoreStyleExcludes, PosixFS};
-use graph::{EntryId, Graph, InvalidationResult, NodeContext};
+use graph::{EntryId, Graph, InvalidationResult, NodeContext, RunToken};
 use log::info;
 use process_execution::{
   self, speculate::SpeculatingCommandRunner, BoundedCommandRunner, CommandRunner, NamedCaches,
@@ -197,6 +197,7 @@ impl Core {
             // requires the remoting_opts.execution_server be present when
             // remoting_opts.execution_enable is set.
             &remoting_opts.execution_server.unwrap(),
+            remoting_opts.store_servers.clone(),
             process_execution_metadata.clone(),
             root_ca_certs,
             oauth_bearer_token,
@@ -320,20 +321,21 @@ impl Deref for InvalidatableGraph {
 
 #[derive(Clone)]
 pub struct Context {
-  entry_id: Option<EntryId>,
+  entry_id_and_run_token: Option<(EntryId, RunToken)>,
   pub core: Arc<Core>,
   pub session: Session,
-  run_id: Uuid,
+  session_run_id: Uuid,
 }
 
 impl Context {
   pub fn new(core: Arc<Core>, session: Session) -> Context {
-    let run_id = session.run_id();
+    // NB: See `impl NodeContext for Context` for more information on this naming.
+    let session_run_id = session.run_id();
     Context {
-      entry_id: None,
+      entry_id_and_run_token: None,
       core,
       session,
-      run_id,
+      session_run_id,
     }
   }
 
@@ -341,38 +343,52 @@ impl Context {
   /// Get the future value for the given Node implementation.
   ///
   pub async fn get<N: WrappedNode>(&self, node: N) -> Result<N::Item, Failure> {
-    let node_result = self
-      .core
-      .graph
-      .get(self.entry_id, self, node.into())
-      .await?;
+    let node_result = self.core.graph.get(self, node.into()).await?;
     Ok(
       node_result
         .try_into()
         .unwrap_or_else(|_| panic!("A Node implementation was ambiguous.")),
     )
   }
+
+  ///
+  /// Same as for Self::get, but returns None if a cycle would be created.
+  ///
+  pub async fn get_weak<N: WrappedNode>(&self, node: N) -> Result<Option<N::Item>, Failure> {
+    let node_result = self.core.graph.get_weak(self, node.into()).await?;
+    Ok(node_result.map(|v| {
+      v.try_into()
+        .unwrap_or_else(|_| panic!("A Node implementation was ambiguous."))
+    }))
+  }
 }
 
 impl NodeContext for Context {
   type Node = NodeKey;
-  type RunId = Uuid;
+  // NB: The name "Session" is slightly overloaded between the graph crate and the engine: what the
+  // graph crate calls a SessionId we refer to as the "run_id of the Session". See
+  // `scheduler::Session` for more information.
+  type SessionId = Uuid;
 
   ///
-  /// Clones this Context for a new EntryId. Because the Core of the context is an Arc, this
+  /// Clones this Context for a new run of a Node. Because the Core of the context is an Arc, this
   /// is a shallow clone.
   ///
-  fn clone_for(&self, entry_id: EntryId) -> Context {
+  fn clone_for(&self, entry_id: EntryId, run_token: RunToken) -> Context {
     Context {
-      entry_id: Some(entry_id),
+      entry_id_and_run_token: Some((entry_id, run_token)),
       core: self.core.clone(),
       session: self.session.clone(),
-      run_id: self.run_id,
+      session_run_id: self.session_run_id,
     }
   }
 
-  fn run_id(&self) -> &Self::RunId {
-    &self.run_id
+  fn entry_id_and_run_token(&self) -> Option<(EntryId, RunToken)> {
+    self.entry_id_and_run_token
+  }
+
+  fn session_id(&self) -> &Self::SessionId {
+    &self.session_run_id
   }
 
   fn graph(&self) -> &Graph<NodeKey> {

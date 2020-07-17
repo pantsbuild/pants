@@ -177,7 +177,7 @@ class GlobalOptions(Subsystem):
             type=bool,
             default=False,
             advanced=True,
-            help="Whether to show/hide logging done by 3rdparty rust crates used by the pants "
+            help="Whether to show/hide logging done by 3rdparty Rust crates used by the Pants "
             "engine.",
         )
 
@@ -185,7 +185,10 @@ class GlobalOptions(Subsystem):
             "--colors",
             type=bool,
             default=sys.stdout.isatty(),
-            help="Set whether log messages are displayed in color.",
+            help=(
+                "Whether Pants should use colors in output or not. This may also impact whether "
+                "some tools Pants run use color."
+            ),
         )
 
         register(
@@ -239,15 +242,16 @@ class GlobalOptions(Subsystem):
             "is using once the program is already running. This option is useful to set in "
             "your pants.toml, however, and then you can grep the value to select which "
             "version to use for setup scripts (e.g. `./pants`), runner scripts, IDE plugins, "
-            "etc. For example, the setup script we distribute at https://www.pantsbuild.org/install.html#recommended-installation "
-            "uses this value to determine which Python version to run with. You may find the "
-            "version of the pants instance you are running using -v, -V, or --version.",
+            "etc. For example, the setup script we distribute at "
+            "https://www.pantsbuild.org/docs/installation uses this value to determine which Python"
+            "version to run with. You may find the version of the Pants instance you are running "
+            "by using -v, -V, or --version.",
         )
         register(
             "--pants-bin-name",
             advanced=True,
             default="./pants",
-            help="The name of the script or binary used to invoke pants. "
+            help="The name of the script or binary used to invoke Pants. "
             "Useful when printing help messages.",
         )
         register(
@@ -359,7 +363,7 @@ class GlobalOptions(Subsystem):
             daemon=True,
             help="The directory to use for tracking subprocess metadata, if any. This should "
             "live outside of the dir used by `--pants-workdir` to allow for tracking "
-            "subprocesses that outlive the workdir data (e.g. `./pants server`).",
+            "subprocesses that outlive the workdir data.",
         )
         register(
             "--pants-config-files",
@@ -436,7 +440,7 @@ class GlobalOptions(Subsystem):
             help="Paths to ignore for all filesystem operations performed by pants "
             "(e.g. BUILD file scanning, glob matching, etc). "
             "Patterns use the gitignore syntax (https://git-scm.com/docs/gitignore). "
-            "The `--pants-distdir` and `--pants-workdir` locations are inherently ignored."
+            "The `--pants-distdir` and `--pants-workdir` locations are inherently ignored. "
             "--pants-ignore can be used in tandem with --pants-ignore-use-gitignore, and any rules "
             "specified here apply after rules specified in a .gitignore file.",
         )
@@ -446,7 +450,7 @@ class GlobalOptions(Subsystem):
             type=bool,
             default=True,
             help="Make use of a root .gitignore file when determining whether to ignore filesystem "
-            "operations performed by pants. If used together with `--pants-ignore`, any exclude/include "
+            "operations performed by Pants. If used together with `--pants-ignore`, any exclude/include "
             "patterns specified there apply after .gitignore rules.",
         )
         register(
@@ -503,9 +507,9 @@ class GlobalOptions(Subsystem):
             default=True,
             daemon=True,
             help=(
-                "Enables use of the pants daemon (pantsd). pantsd can significantly improve "
+                "Enables use of the Pants daemon (pantsd). pantsd can significantly improve "
                 "runtime performance by lowering per-run startup cost, and by caching filesystem "
-                "operations and @rule execution."
+                "operations and rule execution."
             ),
         )
 
@@ -517,9 +521,9 @@ class GlobalOptions(Subsystem):
             advanced=True,
             type=bool,
             default=False,
-            help="Enable concurrent runs of pants. Without this enabled, pants will "
+            help="Enable concurrent runs of Pants. Without this enabled, Pants will "
             "start up all concurrent invocations (e.g. in other terminals) without pantsd. "
-            "Enabling this option requires parallel pants invocations to block on the first",
+            "Enabling this option requires parallel Pants invocations to block on the first",
         )
 
         # Calling pants command (inner run) from other pants command is unusual behaviour,
@@ -532,7 +536,7 @@ class GlobalOptions(Subsystem):
             "--parent-build-id",
             advanced=True,
             default=None,
-            help="The build ID of the other pants run which spawned this one, if any.",
+            help="The build ID of the other Pants run which spawned this one, if any.",
         )
 
         # NB: We really don't want this option to invalidate the daemon, because different clients might have
@@ -624,7 +628,7 @@ class GlobalOptions(Subsystem):
             type=int,
             default=0,
             daemon=True,
-            help="The port to bind the pants nailgun server to. Defaults to a random port.",
+            help="The port to bind the Pants nailgun server to. Defaults to a random port.",
         )
         # TODO(#7514): Make this default to 1.0 seconds if stdin is a tty!
         register(
@@ -649,7 +653,7 @@ class GlobalOptions(Subsystem):
             default=[],
             daemon=True,
             help="Filesystem events matching any of these globs will trigger a daemon restart. "
-            "Pants' own code, plugins, and `--pants-config-files` are inherently invalidated.",
+            "Pants's own code, plugins, and `--pants-config-files` are inherently invalidated.",
         )
 
         register(
@@ -668,8 +672,9 @@ class GlobalOptions(Subsystem):
             advanced=True,
             help="Directory to use for engine's local file store.",
             # This default is also hard-coded into the engine's rust code in
-            # fs::Store::default_path
-            default=os.path.expanduser("~/.cache/pants/lmdb_store"),
+            # fs::Store::default_path so that tools using a Store outside of pants
+            # are likely to be able to use the same storage location.
+            default=os.path.join(get_pants_cachedir(), "lmdb_store"),
         )
         register(
             "--local-execution-root-dir",
@@ -872,8 +877,7 @@ class GlobalOptions(Subsystem):
             type=list,
             metavar="[+-]tag1,tag2,...",
             help="Include only targets with these tags (optional '+' prefix) or without these "
-            "tags ('-' prefix).  Useful with ::, to find subsets of targets "
-            "(e.g., integration tests.)",
+            "tags ('-' prefix). See https://www.pantsbuild.org/docs/advanced-target-selection.",
         )
         register(
             "--dynamic-ui",
@@ -899,9 +903,7 @@ class GlobalOptions(Subsystem):
 
         loop_flag = "--loop"
         register(
-            loop_flag,
-            type=bool,
-            help="Run v2 @goal_rules continuously as file changes are detected.",
+            loop_flag, type=bool, help="Run goals continuously as file changes are detected.",
         )
         register(
             "--loop-max",
@@ -915,7 +917,7 @@ class GlobalOptions(Subsystem):
             advanced=True,
             type=bool,
             default=True,
-            help="Use a global lock to exclude other versions of pants from running during "
+            help="Use a global lock to exclude other versions of Pants from running during "
             "critical operations.",
         )
         register(

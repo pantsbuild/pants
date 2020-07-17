@@ -3,9 +3,11 @@
 
 from typing import List
 
-from pants.backend.python.rules.inject_ancestor_files import rules as inject_ancestor_files_rules
-from pants.backend.python.rules.inject_init import InitInjectedSnapshot, InjectInitRequest
-from pants.backend.python.rules.inject_init import rules as inject_init_rules
+from pants.backend.python.rules.inject_ancestor_files import (
+    AncestorFiles,
+    AncestorFilesRequest,
+    find_missing_ancestor_files,
+)
 from pants.core.util_rules import strip_source_roots
 from pants.engine.fs import DigestContents
 from pants.engine.rules import RootRule
@@ -14,15 +16,14 @@ from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
 
-class InjectInitTest(TestBase):
+class InjectAncestorFilesTest(TestBase):
     @classmethod
     def rules(cls):
         return (
             *super().rules(),
-            *inject_ancestor_files_rules(),
-            *inject_init_rules(),
+            find_missing_ancestor_files,
             *strip_source_roots.rules(),
-            RootRule(InjectInitRequest),
+            RootRule(AncestorFilesRequest),
         )
 
     def assert_injected(
@@ -35,17 +36,16 @@ class InjectInitTest(TestBase):
     ) -> None:
         for f in original_undeclared_files:
             self.create_file(f, "# undeclared")
-        request = InjectInitRequest(
+        request = AncestorFilesRequest(
+            "__init__.py",
             self.make_snapshot({fp: "# declared" for fp in original_declared_files}),
             sources_stripped=declared_files_stripped,
         )
         bootstrapper = create_options_bootstrapper(
             args=["--source-root-patterns=['src/python', 'tests/python']"]
         )
-        result = self.request_single_product(
-            InitInjectedSnapshot, Params(request, bootstrapper)
-        ).snapshot
-        assert list(result.files) == sorted([*original_declared_files, *expected_discovered])
+        result = self.request_single_product(AncestorFiles, Params(request, bootstrapper)).snapshot
+        assert list(result.files) == sorted(expected_discovered)
 
         materialized_result = self.request_single_product(DigestContents, result.digest)
         for file_content in materialized_result:

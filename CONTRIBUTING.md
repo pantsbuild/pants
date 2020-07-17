@@ -1,3 +1,3 @@
 # Contributing
 
-Please see [pants.readme.io/docs/contributor-overview](https://pants.readme.io/docs/contributor-overview).
+Please see [pantsbuild.org/docs/contributor-overview](https://www.pantsbuild.org/docs/contributor-overview).

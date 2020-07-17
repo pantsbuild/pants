@@ -29,7 +29,7 @@ from pants.engine.fs import (
 from pants.engine.internals.graph import (
     AmbiguousCodegenImplementationsException,
     AmbiguousImplementationsException,
-    InvalidFileDependency,
+    InvalidFileDependencyException,
     NoValidTargetsException,
     Owners,
     OwnersRequest,
@@ -848,34 +848,37 @@ class TestCodegen(TestBase):
 
 
 def test_parse_dependencies_field() -> None:
+    given_values = [
+        ":relative",
+        "//:top_level",
+        "demo:tgt",
+        "demo",
+        "./relative.txt",
+        "./child/f.txt",
+        "demo/f.txt",
+        "//top_level.txt",
+        "top_level2.txt",
+        # For files without an extension, you must use `./` There is no way (yet) to reference
+        # a file above you without a file extension.
+        "demo/no_extension",
+        "//demo/no_extension",
+        "./no_extension",
+    ]
     result = parse_dependencies_field(
-        [
-            ":relative",
-            "//:top_level",
-            "demo:tgt",
-            "demo",
-            "./relative.txt",
-            "./child/f.txt",
-            "demo/f.txt",
-            "//top_level.txt",
-            "top_level2.txt",
-            # For files without an extension, you must use `./` There is no way (yet) to reference
-            # a file above you without a file extension.
-            "demo/no_extension",
-            "//demo/no_extension",
-            "./no_extension",
-        ],
+        [*given_values, *(f"!{v}" for v in given_values)],
         spec_path="demo/subdir",
         subproject_roots=[],
     )
-    assert set(result.addresses) == {
+    expected_addresses = {
         Address("demo/subdir", "relative"),
         Address("", "top_level"),
         Address("demo", "tgt"),
         Address("demo", "demo"),
         Address("demo/no_extension", "no_extension"),
     }
-    assert set(result.files) == {
+    assert set(result.addresses) == expected_addresses
+    assert set(result.ignored_addresses) == expected_addresses
+    expected_files = {
         "demo/subdir/relative.txt",
         "demo/subdir/child/f.txt",
         "demo/f.txt",
@@ -883,26 +886,42 @@ def test_parse_dependencies_field() -> None:
         "top_level2.txt",
         "demo/subdir/no_extension",
     }
+    assert set(result.files) == expected_files
+    assert set(result.ignored_files) == expected_files
 
 
 def test_validate_explicit_file_dep() -> None:
     addr = Address("demo", "tgt")
 
-    def assert_raises(owners: Sequence[Address], *, expected_snippets: Iterable[str]) -> None:
-        with pytest.raises(InvalidFileDependency) as exc:
-            validate_explicit_file_dep(addr, full_file="f.txt", owners=owners)
+    def assert_raises(
+        owners: Sequence[Address], *, expected_snippets: Iterable[str], is_an_ignore: bool = False
+    ) -> None:
+        with pytest.raises(InvalidFileDependencyException) as exc:
+            validate_explicit_file_dep(
+                addr, full_file="f.txt", owners=owners, is_an_ignore=is_an_ignore
+            )
         assert addr.spec in str(exc.value)
-        assert "f.txt" in str(exc.value)
+        if is_an_ignore:
+            assert "!f.txt" in str(exc.value)
+        else:
+            assert "f.txt" in str(exc.value)
         for snippet in expected_snippets:
             assert snippet in str(exc.value)
 
     assert_raises(owners=[], expected_snippets=["no owners"])
-    # Even if there is one owner, if it was not generated, then we fail. We can assume that the
-    # file in question does not ectually exist.
+    assert_raises(owners=[], is_an_ignore=True, expected_snippets=["no owners"])
+    # Even if there is one owner, if it was not generated, then we fail because we can assume that
+    # the file in question does not actually exist.
     assert_raises(owners=[Address.parse(":t")], expected_snippets=["no owners"])
+    assert_raises(owners=[Address.parse(":t")], is_an_ignore=True, expected_snippets=["no owners"])
     assert_raises(
         owners=[Address.parse(":t1"), Address.parse(":t2")],
         expected_snippets=["multiple owners", "//:t1", "//:t2"],
+    )
+    assert_raises(
+        owners=[Address.parse(":t1"), Address.parse(":t2")],
+        is_an_ignore=True,
+        expected_snippets=["multiple owners", "!//:t1", "!//:t2"],
     )
 
     # Do not raise if there is one single generated owner.
@@ -910,6 +929,12 @@ def test_validate_explicit_file_dep() -> None:
         addr,
         full_file="f.txt",
         owners=[Address("", target_name="f.txt", generated_base_target_name="demo")],
+    )
+    validate_explicit_file_dep(
+        addr,
+        full_file="f.txt",
+        owners=[Address("", target_name="f.txt", generated_base_target_name="demo")],
+        is_an_ignore=True,
     )
 
 
@@ -931,7 +956,7 @@ class InjectCustomSmalltalkDependencies(InjectDependenciesRequest):
 
 @rule
 def inject_smalltalk_deps(_: InjectSmalltalkDependencies) -> InjectedDependencies:
-    return InjectedDependencies([Address.parse("//:injected")])
+    return InjectedDependencies([Address.parse("//:injected1"), Address.parse("//:injected2")])
 
 
 @rule
@@ -1029,11 +1054,36 @@ class TestDependencies(TestBase):
         self.add_to_build_file("no_deps", "smalltalk()")
         self.assert_dependencies_resolved(requested_address=Address.parse("no_deps"), expected=[])
 
+        # An ignore should override an include.
+        self.add_to_build_file("ignore", "smalltalk(dependencies=['//:dep', '!//:dep'])")
+        self.assert_dependencies_resolved(requested_address=Address.parse("ignore"), expected=[])
+
+        # Error on unused ignores.
+        self.add_to_build_file("unused", "smalltalk(dependencies=[':sibling', '!:ignore'])")
+        with pytest.raises(ExecutionError) as exc:
+            self.assert_dependencies_resolved(
+                requested_address=Address.parse("unused"), expected=[]
+            )
+        assert "'!unused:ignore'" in str(exc.value)
+        assert "* unused:sibling" in str(exc.value)
+
     def test_explicit_file_dependencies(self) -> None:
-        self.create_files("src/smalltalk/util", ["f1.st", "f2.st"])
+        self.create_files("src/smalltalk/util", ["f1.st", "f2.st", "f3.st"])
         self.add_to_build_file("src/smalltalk/util", "smalltalk(sources=['*.st'])")
         self.add_to_build_file(
-            "src/smalltalk", "smalltalk(dependencies=['./util/f1.st', 'src/smalltalk/util/f2.st'])"
+            "src/smalltalk",
+            dedent(
+                """\
+                smalltalk(
+                  dependencies=[
+                    './util/f1.st',
+                    'src/smalltalk/util/f2.st',
+                    './util/f3.st',
+                    '!./util/f3.st'
+                  ]
+                )
+                """
+            ),
         )
         self.assert_dependencies_resolved(
             requested_address=Address.parse("src/smalltalk"),
@@ -1047,11 +1097,26 @@ class TestDependencies(TestBase):
             ],
         )
 
+        # Error on unused ignores.
+        self.add_to_build_file(
+            "unused",
+            "smalltalk(dependencies=['src/smalltalk/util/f1.st', '!src/smalltalk/util/f2.st'])",
+        )
+        with pytest.raises(ExecutionError) as exc:
+            self.assert_dependencies_resolved(
+                requested_address=Address.parse("unused"), expected=[]
+            )
+            assert "'!src/smalltalk/util/f2.st''" in str(exc.value)
+            assert "* src/smalltalk/util/f1.st" in str(exc.value)
+
     def test_dependency_injection(self) -> None:
         self.add_to_build_file("", "smalltalk(name='target')")
 
         def assert_injected(deps_cls: Type[Dependencies], *, injected: List[str]) -> None:
-            deps_field = deps_cls(["//:provided"], address=Address.parse("//:target"))
+            provided_deps = ["//:provided"]
+            if injected:
+                provided_deps.append("!//:injected2")
+            deps_field = deps_cls(provided_deps, address=Address.parse("//:target"))
             result = self.request_single_product(
                 Addresses, Params(DependenciesRequest(deps_field), create_options_bootstrapper())
             )
@@ -1060,8 +1125,10 @@ class TestDependencies(TestBase):
             )
 
         assert_injected(Dependencies, injected=[])
-        assert_injected(SmalltalkDependencies, injected=["//:injected"])
-        assert_injected(CustomSmalltalkDependencies, injected=["//:custom_injected", "//:injected"])
+        assert_injected(SmalltalkDependencies, injected=["//:injected1"])
+        assert_injected(
+            CustomSmalltalkDependencies, injected=["//:custom_injected", "//:injected1"]
+        )
 
     def test_dependency_inference(self) -> None:
         """We test that dependency inference works generally and that we merge it correctly with
@@ -1070,12 +1137,15 @@ class TestDependencies(TestBase):
         If dep inference returns a generated subtarget, but the original owning target was
         explicitly provided, then we should not use the generated subtarget.
         """
+        self.create_files("", ["inferred_but_ignored1.st", "inferred_but_ignored2.st"])
         self.add_to_build_file(
             "",
             dedent(
                 """\
                 smalltalk(name='inferred1')
                 smalltalk(name='inferred2')
+                smalltalk(name='inferred_but_ignored1', sources=['inferred_but_ignored1.st'])
+                smalltalk(name='inferred_but_ignored2', sources=['inferred_but_ignored2.st'])
                 smalltalk(name='inferred_and_provided1')
                 smalltalk(name='inferred_and_provided2')
                 """
@@ -1096,6 +1166,8 @@ class TestDependencies(TestBase):
                 """\
                 //:inferred_and_provided1
                 inferred_and_provided2.st from //:inferred_and_provided2
+                inferred_but_ignored1.st from //:inferred_but_ignored1
+                //:inferred_but_ignored2
                 """
             ),
         )
@@ -1105,7 +1177,12 @@ class TestDependencies(TestBase):
                 """\
                 smalltalk(
                   sources=['*.st'],
-                  dependencies=['//:inferred_and_provided1', '//:inferred_and_provided2'],
+                  dependencies=[
+                    '//:inferred_and_provided1',
+                    '//:inferred_and_provided2',
+                    '!inferred_but_ignored1.st',
+                    '!//:inferred_but_ignored2',
+                  ],
                 )
                 """
             ),

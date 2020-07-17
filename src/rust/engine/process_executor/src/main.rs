@@ -28,18 +28,19 @@
 #![allow(clippy::mutex_atomic)]
 #![type_length_limit = "1076739"]
 
-use clap::{value_t, App, AppSettings, Arg};
-use futures::compat::Future01CompatExt;
-use hashing::{Digest, Fingerprint};
-use process_execution::{
-  Context, NamedCaches, Platform, PlatformConstraint, ProcessMetadata, RelativePath,
-};
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryFrom;
 use std::iter::{FromIterator, Iterator};
 use std::path::PathBuf;
 use std::process::exit;
 use std::time::Duration;
+
+use clap::{value_t, App, AppSettings, Arg};
+use futures::compat::Future01CompatExt;
+use hashing::{Digest, Fingerprint};
+use process_execution::{
+  Context, NamedCaches, Platform, PlatformConstraint, ProcessMetadata, RelativePath,
+};
 use store::{BackoffConfig, Store};
 use tokio::runtime::Handle;
 
@@ -269,8 +270,7 @@ async fn main() {
   let named_cache_path = args
     .value_of("named-cache-path")
     .map(PathBuf::from)
-    .or_else(|| dirs::home_dir().map(|home| home.join(".cache")))
-    .expect("Unable to locate a home directory, and no named-cache-path provided.");
+    .unwrap_or_else(NamedCaches::default_path);
   let server_arg = args.value_of("server");
   let remote_instance_arg = args.value_of("remote-instance-name").map(str::to_owned);
   let output_files = if let Some(values) = args.values_of("output-file-path") {
@@ -384,6 +384,7 @@ async fn main() {
         Box::new(
           process_execution::remote::CommandRunner::new(
             address,
+            vec![address.to_owned()],
             ProcessMetadata {
               instance_name: remote_instance_arg,
               cache_key_gen_version: args.value_of("cache-key-gen-version").map(str::to_owned),

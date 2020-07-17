@@ -151,7 +151,6 @@ def _validate_and_update_config(
 ) -> None:
     if not coverage_config.has_section("run"):
         coverage_config.add_section("run")
-        coverage_config.set("run", "branch", "True")
     run_section = coverage_config["run"]
     relative_files_str = run_section.get("relative_files", "True")
     if relative_files_str.lower() != "true":

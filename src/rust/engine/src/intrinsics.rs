@@ -16,6 +16,16 @@ use std::path::PathBuf;
 type IntrinsicFn =
   Box<dyn Fn(Context, Vec<Value>) -> BoxFuture<'static, NodeResult<Value>> + Send + Sync>;
 
+///
+/// Native "rule" implementations.
+///
+/// On a case by case basis, intrinsics might have associated Nodes in the Graph in order to memoize
+/// their results. For example: `multi_platform_process_request_to_process_result` and
+/// `path_globs_to_snapshot` take a while to run because they run a process and capture filesystem
+/// state (respectively) and have small in-memory outputs. On the other hand, `digest_to_snapshot`
+/// runs a relatively cheap operation (loading a Snapshot from the mmap'ed database) on a small
+/// input, and produces a larger output: it is thus not memoized.
+///
 pub struct Intrinsics {
   intrinsics: IndexMap<Intrinsic, IntrinsicFn>,
 }

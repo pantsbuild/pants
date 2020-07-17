@@ -25,6 +25,13 @@ impl RunToken {
   fn next(self) -> RunToken {
     RunToken(self.0 + 1)
   }
+
+  ///
+  /// Returns true if "other" is equal to this RunToken, or this RunToken's predecessor.
+  ///
+  pub fn equals_current_or_previous(&self, other: RunToken) -> bool {
+    self.0 == other.0 || other.next().0 == self.0
+  }
 }
 
 ///
@@ -52,33 +59,29 @@ impl Generation {
 ///
 /// A result from running a Node.
 ///
-/// If the value is Dirty, the consumer should check whether the dependencies of the Node have the
-/// same values as they did when this Node was last run; if so, the value can be re-used
-/// (and should be marked "Clean").
-///
-/// If the value is Uncacheable it may only be consumed in the same Run that produced it, and should
-/// be recomputed in a new Run.
-///
-/// A value of type UncacheableDependencies has Uncacheable dependencies, and is treated as
-/// equivalent to Dirty in all cases except when `poll`d: since `poll` requests are waiting for
-/// meaningful work to do, they need to differentiate between a truly invalidated/changed (Dirty)
-/// Node and a Node that would be re-cleaned once per session.
-///
-/// If the value is Clean, the consumer can simply use the value as-is.
-///
 #[derive(Clone, Debug)]
 pub enum EntryResult<N: Node> {
+  // The value is Clean, and the consumer can simply use it as-is.
   Clean(N::Item),
-  UncacheableDependencies(N::Item),
+  // If the value is Dirty, the consumer should check whether the dependencies of the Node have the
+  // same values as they did when this Node was last run; if so, the value can be re-used
+  // (and should be marked "Clean").
   Dirty(N::Item),
-  Uncacheable(N::Item, <<N as Node>::Context as NodeContext>::RunId),
+  // Uncacheable values may only be consumed in the same Session that produced them, and should
+  // be recomputed in a new Session.
+  Uncacheable(N::Item, <<N as Node>::Context as NodeContext>::SessionId),
+  // A value of type UncacheableDependencies has Uncacheable dependencies, and is treated as
+  // equivalent to Dirty in all cases except when `poll`d: since `poll` requests are waiting for
+  // meaningful work to do, they need to differentiate between a truly invalidated/changed (Dirty)
+  // Node and a Node that would be re-cleaned once per session.
+  UncacheableDependencies(N::Item),
 }
 
 impl<N: Node> EntryResult<N> {
   fn is_clean(&self, context: &N::Context) -> bool {
     match self {
       EntryResult::Clean(..) => true,
-      EntryResult::Uncacheable(_, run_id) => context.run_id() == run_id,
+      EntryResult::Uncacheable(_, session_id) => context.session_id() == session_id,
       EntryResult::Dirty(..) => false,
       EntryResult::UncacheableDependencies(..) => false,
     }
@@ -95,7 +98,7 @@ impl<N: Node> EntryResult<N> {
   /// currently to clean it).
   fn poll_should_wait(&self, context: &N::Context) -> bool {
     match self {
-      EntryResult::Uncacheable(_, run_id) => context.run_id() == run_id,
+      EntryResult::Uncacheable(_, session_id) => context.session_id() == session_id,
       EntryResult::Dirty(..) => false,
       EntryResult::UncacheableDependencies(_) | EntryResult::Clean(..) => true,
     }
@@ -286,25 +289,38 @@ impl<N: Node> Entry<N> {
     previous_result: Option<EntryResult<N>>,
   ) -> EntryState<N> {
     // Increment the RunToken to uniquely identify this work.
+    let previous_run_token = run_token;
     let run_token = run_token.next();
-    let context = context_factory.clone_for(entry_id);
+    let context = context_factory.clone_for(entry_id, run_token);
     let node = node.clone();
     let (abort_handle, abort_registration) = AbortHandle::new_pair();
+    trace!(
+      "Running node {:?} with {:?}. It was: previous_result={:?}",
+      node,
+      run_token,
+      previous_result,
+    );
 
     context_factory.spawn(async move {
       // If we have previous result generations, compare them to all current dependency
       // generations (which, if they are dirty, will cause recursive cleaning). If they
       // match, we can consider the previous result value to be clean for reuse.
       let was_clean = if let Some(previous_dep_generations) = previous_dep_generations {
-        match context.graph().dep_generations(entry_id, &context).await {
+        trace!("Getting deps to attempt to clean {}", node);
+        match context
+          .graph()
+          .dep_generations(entry_id, previous_run_token, &context)
+          .await
+        {
           Ok(ref dep_generations) if dep_generations == &previous_dep_generations => {
+            trace!("Deps matched: {} is clean.", node);
             // Dependencies have not changed: Node is clean.
             true
           }
           _ => {
-            // If dependency generations mismatched or failed to fetch, clear its
-            // dependencies and indicate that it should re-run.
-            context.graph().clear_deps(entry_id, run_token);
+            // If dependency generations mismatched or failed to fetch, indicate that the Node
+            // should re-run.
+            trace!("Deps did not match: {} needs to re-run.", node);
             false
           }
         }
@@ -403,11 +419,6 @@ impl<N: Node> Entry<N> {
           result,
           dep_generations,
         } => {
-          trace!(
-            "Re-starting node {:?}. It was: previous_result={:?}",
-            self.node,
-            result,
-          );
           assert!(
             !result.is_clean(context),
             "A clean Node should not reach this point: {:?}",
@@ -453,20 +464,14 @@ impl<N: Node> Entry<N> {
   /// result should be used. This special case exists to avoid 1) cloning the result to call this
   /// method, and 2) comparing the current/previous results unnecessarily.
   ///
-  /// Takes a &mut InnerGraph to ensure that completing nodes doesn't race with dirtying them.
-  /// The important relationship being guaranteed here is that if the Graph is calling
-  /// invalidate_from_roots, it may mark us, or our dependencies, as dirty. We don't want to
-  /// complete _while_ a batch of nodes are being marked as dirty, and this exclusive access ensures
-  /// that can't happen.
-  ///
   pub(crate) fn complete(
-    &mut self,
+    &self,
     context: &N::Context,
     result_run_token: RunToken,
     dep_generations: Vec<Generation>,
     result: Option<Result<N::Item, N::Error>>,
     has_uncacheable_deps: bool,
-    _graph: &mut super::InnerGraph<N>,
+    has_weak_deps: bool,
   ) {
     let mut state = self.state.lock();
 
@@ -481,7 +486,6 @@ impl<N: Node> Entry<N> {
           "Not completing node {:?} because it was invalidated.",
           self.node
         );
-        return;
       }
     }
 
@@ -506,19 +510,22 @@ impl<N: Node> Entry<N> {
             }
           }
           Some(Ok(result)) => {
-            // If the new result does not match the previous result, the generation increments.
             let next_result: EntryResult<N> = if !self.node.cacheable() {
-              EntryResult::Uncacheable(result, context.run_id().clone())
+              EntryResult::Uncacheable(result, context.session_id().clone())
+            } else if has_weak_deps {
+              EntryResult::Dirty(result)
             } else if has_uncacheable_deps {
               EntryResult::UncacheableDependencies(result)
             } else {
               EntryResult::Clean(result)
             };
+            // If the new result does not match the previous result, the generation increments.
             if Some(next_result.as_ref()) != previous_result.as_ref().map(EntryResult::as_ref) {
               // Node was re-executed (ie not cleaned) and had a different result value.
               generation = generation.next()
             };
             self.notify_waiters(waiters, Ok((next_result.as_ref().clone(), generation)));
+
             EntryState::Completed {
               result: next_result,
               pollers: Vec::new(),
@@ -595,10 +602,7 @@ impl<N: Node> Entry<N> {
   }
 
   ///
-  /// Get the current RunToken of this entry.
-  ///
-  /// TODO: Consider moving the Generation and RunToken out of the EntryState once we decide what
-  /// we want the per-Entry locking strategy to be.
+  /// Get the RunToken of this entry regardless of whether it is running.
   ///
   pub(crate) fn run_token(&self) -> RunToken {
     match *self.state.lock() {
@@ -609,19 +613,22 @@ impl<N: Node> Entry<N> {
   }
 
   ///
+  /// Get the current RunToken of this entry iff it is currently running.
+  ///
+  pub(crate) fn running_run_token(&self) -> Option<RunToken> {
+    match *self.state.lock() {
+      EntryState::Running { run_token, .. } => Some(run_token),
+      _ => None,
+    }
+  }
+
+  ///
   /// Clears the state of this Node, forcing it to be recomputed.
   ///
-  /// # Arguments
-  ///
-  /// * `graph_still_contains_edges` - If the caller has guaranteed that all edges from this Node
-  ///   have been removed from the graph, they should pass false here, else true. We may want to
-  ///   remove this parameter, and force this method to remove the edges, but that would require
-  ///   acquiring the graph lock here, which we currently don't do.
-  ///
-  pub(crate) fn clear(&mut self, graph_still_contains_edges: bool) {
+  pub(crate) fn clear(&mut self) {
     let mut state = self.state.lock();
 
-    let (run_token, generation, mut previous_result) =
+    let (run_token, generation, previous_result) =
       match mem::replace(&mut *state, EntryState::initial()) {
         EntryState::NotStarted {
           run_token,
@@ -649,13 +656,8 @@ impl<N: Node> Entry<N> {
 
     trace!("Clearing node {:?}", self.node);
 
-    if graph_still_contains_edges {
-      if let Some(previous_result) = previous_result.as_mut() {
-        previous_result.dirty();
-      }
-    }
-
-    // Swap in a state with a new RunToken value, which invalidates any outstanding work.
+    // Swap in a state with a new RunToken value, which invalidates any outstanding work and all
+    // edges for the previous run.
     *state = EntryState::NotStarted {
       run_token: run_token.next(),
       generation,

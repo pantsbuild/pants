@@ -69,14 +69,14 @@ class Externs:
             if isinstance(res, Get):
                 # Get.
                 return PyGeneratorResponseGet(
-                    res.product_type, res.subject_declared_type, res.subject,
+                    res.product_type, res.subject_declared_type, res.subject, res.weak,
                 )
             elif type(res) in (tuple, list):
                 # GetMulti.
                 return PyGeneratorResponseGetMulti(
                     tuple(
                         PyGeneratorResponseGet(
-                            get.product_type, get.subject_declared_type, get.subject,
+                            get.product_type, get.subject_declared_type, get.subject, get.weak,
                         )
                         for get in res
                     )
@@ -126,6 +126,12 @@ class Native(metaclass=SingletonMetaclass):
 
     def init_rust_logging(self, level, log_show_rust_3rdparty: bool, use_color: bool):
         return self.lib.init_logging(level, log_show_rust_3rdparty, use_color)
+
+    def default_cache_path(self) -> str:
+        return cast(str, self.lib.default_cache_path())
+
+    def default_config_path(self) -> str:
+        return cast(str, self.lib.default_config_path())
 
     def setup_pantsd_logger(self, log_file_path, level):
         return self.lib.setup_pantsd_logger(log_file_path, level)

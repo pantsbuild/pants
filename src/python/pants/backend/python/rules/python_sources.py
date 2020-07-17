@@ -4,6 +4,7 @@
 from dataclasses import dataclass
 from typing import Iterable, List, Tuple, Type
 
+from pants.backend.python.rules.inject_ancestor_files import rules as inject_ancestor_rules
 from pants.backend.python.rules.inject_init import InitInjectedSnapshot, InjectInitRequest
 from pants.backend.python.rules.inject_init import rules as inject_init_rules
 from pants.backend.python.target_types import PythonSources
@@ -105,7 +106,7 @@ async def prepare_stripped_python_sources(
         ),
     )
     init_injected = await Get(
-        InitInjectedSnapshot, InjectInitRequest(stripped_sources.snapshot, sources_stripped=True)
+        InitInjectedSnapshot, InjectInitRequest(stripped_sources.snapshot, sources_stripped=True),
     )
     return StrippedPythonSources(init_injected.snapshot)
 
@@ -145,6 +146,7 @@ def rules():
         prepare_stripped_python_sources,
         prepare_unstripped_python_sources,
         *determine_source_files.rules(),
+        *inject_ancestor_rules(),
         *inject_init_rules(),
         # TODO: remove this as soon as we have a usage of it.
         RootRule(UnstrippedPythonSourcesRequest),
