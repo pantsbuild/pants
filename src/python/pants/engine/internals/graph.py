@@ -8,7 +8,7 @@ import os.path
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import DefaultDict, Dict, Iterable, List, Set, NamedTuple, Sequence, Tuple, Type, Union
+from typing import DefaultDict, Dict, Iterable, List, NamedTuple, Sequence, Set, Tuple, Type, Union
 
 from pants.base.exceptions import ResolveError
 from pants.base.specs import (
