@@ -43,7 +43,8 @@ class NativeHandler(StreamHandler):
         super().__init__(stream)
         self.native = Native()
         self.native_filename = native_filename
-        self.setLevel(log_level.level)
+        # Set to most granular level - rust logging code will take care of the filtering
+        self.setLevel(pants_logging.TRACE)
 
         if stream:
             try:
