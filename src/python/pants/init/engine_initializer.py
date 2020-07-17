@@ -3,6 +3,7 @@
 
 import logging
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Iterable, List, Optional, Set, Tuple, Type, cast
 
 from pants.base.build_environment import get_buildroot
@@ -308,14 +309,17 @@ class EngineInitializer:
 
         union_rules = build_configuration.union_rules()
 
+        def ensure_absolute_path(v: str) -> str:
+            return Path(v).resolve().as_posix()
+
         scheduler = Scheduler(
             native=native,
             ignore_patterns=pants_ignore_patterns,
             use_gitignore=use_gitignore,
             build_root=build_root,
-            local_store_dir=local_store_dir,
-            local_execution_root_dir=local_execution_root_dir,
-            named_caches_dir=named_caches_dir,
+            local_store_dir=ensure_absolute_path(local_store_dir),
+            local_execution_root_dir=ensure_absolute_path(local_execution_root_dir),
+            named_caches_dir=ensure_absolute_path(named_caches_dir),
             rules=rules,
             union_rules=union_rules,
             execution_options=execution_options,

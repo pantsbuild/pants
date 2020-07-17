@@ -667,10 +667,17 @@ class GlobalOptions(Subsystem):
             "other, or override symbols from each other.",
         )
 
+        cache_instructions = (
+            "The path may be absolute or relative. If the directory is within the build root, be "
+            "sure to include it in `--pants-ignore`."
+        )
         register(
             "--local-store-dir",
             advanced=True,
-            help="Directory to use for engine's local file store.",
+            help=(
+                f"Directory to use for the local file store, which stores the results of "
+                f"subprocesses run by Pants. {cache_instructions}"
+            ),
             # This default is also hard-coded into the engine's rust code in
             # fs::Store::default_path so that tools using a Store outside of pants
             # are likely to be able to use the same storage location.
@@ -679,14 +686,19 @@ class GlobalOptions(Subsystem):
         register(
             "--local-execution-root-dir",
             advanced=True,
-            help="Directory to use for engine's local process execution sandboxing.",
+            help=(
+                "Directory to use for local process execution sandboxing. "
+                f"{cache_instructions}"
+            ),
             default=tempfile.gettempdir(),
         )
         register(
             "--named-caches-dir",
             advanced=True,
-            help="Directory to use as the base for named global caches for processes with "
-            "trusted, concurrency-safe caches.",
+            help=(
+                "Directory to use for named global caches for tools and processes with trusted, "
+                f"concurrency-safe caches. {cache_instructions}"
+            ),
             default=os.path.join(get_pants_cachedir(), "named_caches"),
         )
         register(
