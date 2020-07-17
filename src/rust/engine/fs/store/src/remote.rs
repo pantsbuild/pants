@@ -177,6 +177,9 @@ impl ByteStore {
           }
         })?;
 
+        // The gRPC library cancels streams on drop; closes must be explicit. Not closing
+        // the stream caused the BuildGrid CAS server to generate errors on writes
+        // when the stream was cancelled.
         sender
           .close()
           .map_err(|e| {
