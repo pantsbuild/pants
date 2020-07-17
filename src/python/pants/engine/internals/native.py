@@ -69,14 +69,14 @@ class Externs:
             if isinstance(res, Get):
                 # Get.
                 return PyGeneratorResponseGet(
-                    res.product_type, res.subject_declared_type, res.subject,
+                    res.product_type, res.subject_declared_type, res.subject, res.weak,
                 )
             elif type(res) in (tuple, list):
                 # GetMulti.
                 return PyGeneratorResponseGetMulti(
                     tuple(
                         PyGeneratorResponseGet(
-                            get.product_type, get.subject_declared_type, get.subject,
+                            get.product_type, get.subject_declared_type, get.subject, get.weak,
                         )
                         for get in res
                     )
