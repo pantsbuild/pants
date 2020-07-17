@@ -902,9 +902,7 @@ class GlobalOptions(Subsystem):
 
         loop_flag = "--loop"
         register(
-            loop_flag,
-            type=bool,
-            help="Run goals continuously as file changes are detected.",
+            loop_flag, type=bool, help="Run goals continuously as file changes are detected.",
         )
         register(
             "--loop-max",
