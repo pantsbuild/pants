@@ -5,7 +5,18 @@ import os
 import re
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    Union,
+    cast,
+)
 
 from pants.engine.collection import Collection
 from pants.engine.fs import PathGlobs
@@ -16,6 +27,9 @@ from pants.util.dirutil import fast_relpath_optional, recursive_dirname
 from pants.util.filtering import and_filters, create_filters
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
+
+if TYPE_CHECKING:
+    from pants.engine.internals.mapper import AddressFamily, AddressMapper
 
 
 class Spec(ABC):
@@ -40,7 +54,9 @@ class AddressSpec(Spec, metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def matching_address_families(self, address_families_dict: Dict[str, Any]) -> List[Any]:
+    def matching_address_families(
+        self, address_families_dict: Dict[str, "AddressFamily"]
+    ) -> List["AddressFamily"]:
         """Given a dict of (namespace path) -> AddressFamily, return the values matching this
         address spec.
 
@@ -49,8 +65,8 @@ class AddressSpec(Spec, metaclass=ABCMeta):
 
     @classmethod
     def address_families_for_dir(
-        cls, address_families_dict: Dict[str, Any], spec_dir_path: str
-    ) -> List[Any]:
+        cls, address_families_dict: Dict[str, "AddressFamily"], spec_dir_path: str
+    ) -> List["AddressFamily"]:
         """Implementation of `matching_address_families()` for address specs matching at most one
         directory."""
         maybe_af = address_families_dict.get(spec_dir_path, None)
@@ -64,7 +80,7 @@ class AddressSpec(Spec, metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    def address_target_pairs_from_address_families(self, address_families: List[Any]):
+    def address_target_pairs_from_address_families(self, address_families: List["AddressFamily"]):
         """Given a list of AddressFamily, return (address, target) pairs matching this address spec.
 
         :raises: :class:`SingleAddress._SingleAddressResolutionError` for resolution errors with a
@@ -84,11 +100,11 @@ class AddressSpec(Spec, metaclass=ABCMeta):
         return addr_tgt_pairs
 
     @abstractmethod
-    def make_glob_patterns(self, address_mapper: Any) -> List[str]:
+    def make_glob_patterns(self, address_mapper: "AddressMapper") -> List[str]:
         """Generate glob patterns matching exactly all the BUILD files this address spec covers."""
 
     @classmethod
-    def globs_in_single_dir(cls, spec_dir_path: str, address_mapper: Any) -> List[str]:
+    def globs_in_single_dir(cls, spec_dir_path: str, address_mapper: "AddressMapper") -> List[str]:
         """Implementation of `make_glob_patterns()` which only allows a single base directory."""
         return [os.path.join(spec_dir_path, pat) for pat in address_mapper.build_patterns]
 
@@ -109,16 +125,20 @@ class SingleAddress(AddressSpec):
     def to_spec_string(self) -> str:
         return "{}:{}".format(self.directory, self.name)
 
-    def matching_address_families(self, address_families_dict: Dict[str, Any]) -> List[Any]:
+    def matching_address_families(
+        self, address_families_dict: Dict[str, "AddressFamily"]
+    ) -> List["AddressFamily"]:
         return self.address_families_for_dir(address_families_dict, self.directory)
 
     class _SingleAddressResolutionError(Exception):
-        def __init__(self, single_address_family: Any, name: str) -> None:
+        def __init__(self, single_address_family: "AddressFamily", name: str) -> None:
             super().__init__()
             self.single_address_family = single_address_family
             self.name = name
 
-    def address_target_pairs_from_address_families(self, address_families: Sequence[Any]):
+    def address_target_pairs_from_address_families(
+        self, address_families: Sequence["AddressFamily"]
+    ):
         """Return the pair for the single target matching the single AddressFamily, or error.
 
         :raises: :class:`SingleAddress._SingleAddressResolutionError` if no targets could be found for a
@@ -137,7 +157,7 @@ class SingleAddress(AddressSpec):
         assert len(addr_tgt_pairs) == 1
         return addr_tgt_pairs
 
-    def make_glob_patterns(self, address_mapper: Any) -> List[str]:
+    def make_glob_patterns(self, address_mapper: "AddressMapper") -> List[str]:
         return self.globs_in_single_dir(self.directory, address_mapper)
 
 
@@ -150,13 +170,17 @@ class SiblingAddresses(AddressSpec):
     def to_spec_string(self) -> str:
         return f"{self.directory}:"
 
-    def matching_address_families(self, address_families_dict: Dict[str, Any]) -> List[Any]:
+    def matching_address_families(
+        self, address_families_dict: Dict[str, "AddressFamily"]
+    ) -> List["AddressFamily"]:
         return self.address_families_for_dir(address_families_dict, self.directory)
 
-    def address_target_pairs_from_address_families(self, address_families: Sequence[Any]):
+    def address_target_pairs_from_address_families(
+        self, address_families: Sequence["AddressFamily"]
+    ):
         return self.all_address_target_pairs(address_families)
 
-    def make_glob_patterns(self, address_mapper: Any) -> List[str]:
+    def make_glob_patterns(self, address_mapper: "AddressMapper") -> List[str]:
         return self.globs_in_single_dir(self.directory, address_mapper)
 
 
@@ -170,14 +194,18 @@ class DescendantAddresses(AddressSpec):
     def to_spec_string(self) -> str:
         return f"{self.directory}::"
 
-    def matching_address_families(self, address_families_dict: Dict[str, Any]) -> List[Any]:
+    def matching_address_families(
+        self, address_families_dict: Dict[str, "AddressFamily"]
+    ) -> List["AddressFamily"]:
         return [
             af
             for ns, af in address_families_dict.items()
             if fast_relpath_optional(ns, self.directory) is not None
         ]
 
-    def address_target_pairs_from_address_families(self, address_families: Sequence[Any]):
+    def address_target_pairs_from_address_families(
+        self, address_families: Sequence["AddressFamily"]
+    ):
         addr_tgt_pairs = self.all_address_target_pairs(address_families)
         if self.error_if_no_matches and len(addr_tgt_pairs) == 0:
             raise self.AddressResolutionError(
@@ -185,7 +213,7 @@ class DescendantAddresses(AddressSpec):
             )
         return addr_tgt_pairs
 
-    def make_glob_patterns(self, address_mapper: Any) -> List[str]:
+    def make_glob_patterns(self, address_mapper: "AddressMapper") -> List[str]:
         return [os.path.join(self.directory, "**", pat) for pat in address_mapper.build_patterns]
 
 
@@ -198,17 +226,21 @@ class AscendantAddresses(AddressSpec):
     def to_spec_string(self) -> str:
         return f"{self.directory}^"
 
-    def matching_address_families(self, address_families_dict: Dict[str, Any]) -> List[Any]:
+    def matching_address_families(
+        self, address_families_dict: Dict[str, "AddressFamily"]
+    ) -> List["AddressFamily"]:
         return [
             af
             for ns, af in address_families_dict.items()
             if fast_relpath_optional(self.directory, ns) is not None
         ]
 
-    def address_target_pairs_from_address_families(self, address_families):
+    def address_target_pairs_from_address_families(
+        self, address_families: Sequence["AddressFamily"]
+    ):
         return self.all_address_target_pairs(address_families)
 
-    def make_glob_patterns(self, address_mapper: Any) -> List[str]:
+    def make_glob_patterns(self, address_mapper: "AddressMapper") -> List[str]:
         return [
             os.path.join(f, pattern)
             for pattern in address_mapper.build_patterns
