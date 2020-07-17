@@ -1,9 +1,6 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pathlib import Path
-from typing import Optional
-
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.option.custom_types import file_option, shell_str
 
@@ -37,16 +34,3 @@ class Flake8(PythonToolBase):
             advanced=True,
             help="Path to `.flake8` or alternative Flake8 config file",
         )
-        register(
-            "--output-file",
-            type=str,
-            metavar="filename",
-            default=None,
-            advanced=True,
-            help="Redirect report to a file.",
-        )
-
-    @property
-    def output_file_path(self) -> Optional[Path]:
-        output_file = self.options.output_file
-        return Path(output_file) if output_file else None

@@ -110,6 +110,19 @@ class LintOptions(GoalSubsystem):
                 "faster than `--no-per-target-caching` for your use case."
             ),
         )
+        register(
+            "--reports-dir",
+            type=str,
+            metavar="<DIR>",
+            default=None,
+            advanced=True,
+            help="Specifying a directory causes linter that support it to write report files into this directory",
+        )
+
+    @property
+    def output_dir(self) -> Optional[Path]:
+        reports_dir = self.values.reports_dir
+        return Path(reports_dir) if reports_dir else None
 
 
 class Lint(Goal):
