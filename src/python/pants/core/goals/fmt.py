@@ -104,17 +104,6 @@ class FmtOptions(GoalSubsystem):
     def register_options(cls, register) -> None:
         super().register_options(register)
         register(
-            "--only",
-            type=str,
-            default=None,
-            fingerprint=True,
-            advanced=True,
-            help=(
-                "Only run the specified formatter. Currently the only accepted values are "
-                "`scalafix` or not setting any value."
-            ),
-        )
-        register(
             "--per-target-caching",
             advanced=True,
             type=bool,
