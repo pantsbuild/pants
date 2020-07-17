@@ -29,7 +29,7 @@ from pants.engine.fs import (
 from pants.engine.internals.graph import (
     AmbiguousCodegenImplementationsException,
     AmbiguousImplementationsException,
-    InvalidFileDependency,
+    InvalidFileDependencyException,
     NoValidTargetsException,
     Owners,
     OwnersRequest,
@@ -896,7 +896,7 @@ def test_validate_explicit_file_dep() -> None:
     def assert_raises(
         owners: Sequence[Address], *, expected_snippets: Iterable[str], is_an_ignore: bool = False
     ) -> None:
-        with pytest.raises(InvalidFileDependency) as exc:
+        with pytest.raises(InvalidFileDependencyException) as exc:
             validate_explicit_file_dep(
                 addr, full_file="f.txt", owners=owners, is_an_ignore=is_an_ignore
             )
@@ -1058,6 +1058,15 @@ class TestDependencies(TestBase):
         self.add_to_build_file("ignore", "smalltalk(dependencies=['//:dep', '!//:dep'])")
         self.assert_dependencies_resolved(requested_address=Address.parse("ignore"), expected=[])
 
+        # Error on unused ignores.
+        self.add_to_build_file("unused", "smalltalk(dependencies=[':sibling', '!:ignore'])")
+        with pytest.raises(ExecutionError) as exc:
+            self.assert_dependencies_resolved(
+                requested_address=Address.parse("unused"), expected=[]
+            )
+        assert "'!unused:ignore'" in str(exc.value)
+        assert "* unused:sibling" in str(exc.value)
+
     def test_explicit_file_dependencies(self) -> None:
         self.create_files("src/smalltalk/util", ["f1.st", "f2.st", "f3.st"])
         self.add_to_build_file("src/smalltalk/util", "smalltalk(sources=['*.st'])")
@@ -1088,13 +1097,26 @@ class TestDependencies(TestBase):
             ],
         )
 
+        # Error on unused ignores.
+        self.add_to_build_file(
+            "unused",
+            "smalltalk(dependencies=['src/smalltalk/util/f1.st', '!src/smalltalk/util/f2.st'])",
+        )
+        with pytest.raises(ExecutionError) as exc:
+            self.assert_dependencies_resolved(
+                requested_address=Address.parse("unused"), expected=[]
+            )
+            assert "'!src/smalltalk/util/f2.st''" in str(exc.value)
+            assert "* src/smalltalk/util/f1.st" in str(exc.value)
+
     def test_dependency_injection(self) -> None:
         self.add_to_build_file("", "smalltalk(name='target')")
 
         def assert_injected(deps_cls: Type[Dependencies], *, injected: List[str]) -> None:
-            deps_field = deps_cls(
-                ["//:provided", "!//:injected2"], address=Address.parse("//:target")
-            )
+            provided_deps = ["//:provided"]
+            if injected:
+                provided_deps.append("!//:injected2")
+            deps_field = deps_cls(provided_deps, address=Address.parse("//:target"))
             result = self.request_single_product(
                 Addresses, Params(DependenciesRequest(deps_field), create_options_bootstrapper())
             )
@@ -1145,7 +1167,7 @@ class TestDependencies(TestBase):
                 //:inferred_and_provided1
                 inferred_and_provided2.st from //:inferred_and_provided2
                 inferred_but_ignored1.st from //:inferred_but_ignored1
-                inferred_but_ignored2.st from //:inferred_but_ignored2
+                //:inferred_but_ignored2
                 """
             ),
         )

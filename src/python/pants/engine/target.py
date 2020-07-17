@@ -1459,10 +1459,6 @@ class InferDependenciesRequest:
                 infer_fortran_dependencies,
                 UnionRule(InferDependenciesRequest, InferFortranDependencies),
             ]
-
-    Generally, dependency inference should return generated subtargets created from the original
-    owning targets. If there are multiple owning targets for a file, dependency inference should
-    no-op because the user would need to explicitly disambiguate.
     """
 
     sources_field: Sources

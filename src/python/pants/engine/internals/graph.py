@@ -8,7 +8,7 @@ import os.path
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import DefaultDict, Dict, Iterable, List, NamedTuple, Sequence, Tuple, Type, Union
+from typing import DefaultDict, Dict, Iterable, List, Set, NamedTuple, Sequence, Tuple, Type, Union
 
 from pants.base.exceptions import ResolveError
 from pants.base.specs import (
@@ -569,8 +569,31 @@ class AmbiguousDependencyInferenceException(Exception):
         )
 
 
-class InvalidFileDependency(Exception):
+class InvalidFileDependencyException(Exception):
     pass
+
+
+class UnusedDependencyIgnoresException(Exception):
+    def __init__(
+        self, address: Address, *, unused_ignores: Iterable[Address], result: Iterable[Address]
+    ) -> None:
+        # If the address was generated, we convert back to the original base target to correspond to
+        # what users actually put in BUILD files.
+        address = address.maybe_convert_to_base_target()
+        sorted_unused_ignores = sorted([f"!{addr}" for addr in unused_ignores])
+        formatted_unused_ignores = (
+            repr(sorted_unused_ignores[0])
+            if len(sorted_unused_ignores) == 1
+            else str(sorted_unused_ignores)
+        )
+        bulleted_list_sep = "\n  * "
+        possible_deps = sorted(addr.spec for addr in result)
+        super().__init__(
+            f"The target {address} includes {formatted_unused_ignores} in its `dependencies` field, "
+            f"but {'it does' if len(sorted_unused_ignores) == 1 else 'they do'} not match any of "
+            f"the resolved dependencies. Instead, please choose from the dependencies that are "
+            f"being used:\n\n{bulleted_list_sep}{bulleted_list_sep.join(possible_deps)}"
+        )
 
 
 class ParsedDependencies(NamedTuple):
@@ -622,12 +645,15 @@ def validate_explicit_file_dep(
 ) -> None:
     if is_an_ignore:
         full_file = f"!{full_file}"
+    # If the address was generated, we convert back to the original base target to correspond to
+    # what users actually put in BUILD files.
+    address = address.maybe_convert_to_base_target()
     if len(owners) > 1:
         original_addresses = sorted(owner.maybe_convert_to_base_target().spec for owner in owners)
         if is_an_ignore:
             original_addresses = [f"!{addr}" for addr in original_addresses]
-        raise InvalidFileDependency(
-            f"The target {address} included {repr(full_file)} in its `dependencies` "
+        raise InvalidFileDependencyException(
+            f"The target {address} includes {repr(full_file)} in its `dependencies` "
             "field, but there are multiple owners of that file so it is ambiguous which one "
             "Pants should use. Please instead change the `sources` fields of the owning "
             "targets so that only one target owns this file, or choose which owner you want "
@@ -637,8 +663,8 @@ def validate_explicit_file_dep(
     # have an owning target.
     file_does_not_exist = len(owners) == 1 and not owners[0].generated_base_target_name
     if not owners or file_does_not_exist:
-        raise InvalidFileDependency(
-            f"The target {address} included {repr(full_file)} in its `dependencies` "
+        raise InvalidFileDependencyException(
+            f"The target {address} includes {repr(full_file)} in its `dependencies` "
             "field, but there are no owners of that file. Please check that the file exists, "
             "that you spelled the file correctly, and that there is a target that includes the "
             "file in its `sources` field."
@@ -701,34 +727,54 @@ async def resolve_dependencies(
                 inference_request_type(sources_field),
             )
 
-    original_addresses = {
-        addr
-        for addr in (*provided.addresses, *itertools.chain.from_iterable(injected))
-        if addr not in provided.ignored_addresses
-    }
     flattened_ignore_file_deps_owners = set(
         itertools.chain.from_iterable(explicit_file_deps_ignore_owners)
     )
-    generated_addresses = {
-        addr
-        for addr in (*inferred, *itertools.chain.from_iterable(explicit_file_deps_owners))
-        if addr not in flattened_ignore_file_deps_owners
-    }
-    # If a generated subtarget's original base target is already included, then we leave off the
-    # generated subtarget. We also leave it off if the generated subtarget's original base target
-    # is the target we're resolving dependencies for. Finally, we leave it off if the user said to
-    # ignore the original owning target.
+
+    original_addresses: Set[Address] = set()
+    all_generated_addresses: Set[Address] = set()
+    used_ignored_addresses: Set[Address] = set()
+    used_ignored_file_deps: Set[Address] = set()
+    for addr in (
+        *provided.addresses,
+        *itertools.chain.from_iterable(explicit_file_deps_owners),
+        *itertools.chain.from_iterable(injected),
+        *inferred,
+    ):
+        if addr.generated_base_target_name:
+            collection = (
+                used_ignored_file_deps
+                if addr in flattened_ignore_file_deps_owners
+                else all_generated_addresses
+            )
+        else:
+            collection = (
+                used_ignored_addresses if addr in provided.ignored_addresses else original_addresses
+            )
+        collection.add(addr)
+
+    # We check if a generated subtarget's original base target is already included or if ts base
+    # target is the target that we're resolving dependencies for. In either of these cases, it
+    # would be redundant to include the generated subtarget.
     remaining_generated_addresses = set()
-    for generated_addr in generated_addresses:
+    for generated_addr in all_generated_addresses:
         base_addr = generated_addr.maybe_convert_to_base_target()
-        if (
-            base_addr in original_addresses
-            or base_addr in provided.ignored_addresses
-            or base_addr == request.field.address
-        ):
+        if base_addr in original_addresses or base_addr == request.field.address:
             continue
         remaining_generated_addresses.add(generated_addr)
-    return Addresses(sorted({*original_addresses, *remaining_generated_addresses}))
+
+    result = sorted({*original_addresses, *remaining_generated_addresses})
+
+    unused_ignores = {*provided.ignored_addresses, *flattened_ignore_file_deps_owners} - {
+        *used_ignored_addresses,
+        *used_ignored_file_deps,
+    }
+    if unused_ignores:
+        raise UnusedDependencyIgnoresException(
+            request.field.address, unused_ignores=unused_ignores, result=result
+        )
+
+    return Addresses(result)
 
 
 # -----------------------------------------------------------------------------------------------
