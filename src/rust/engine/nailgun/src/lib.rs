@@ -196,7 +196,7 @@ impl Server {
     self
       .exited_receiver
       .await
-      .or_else(|_| Err("Server exited uncleanly.".to_owned()))?
+      .map_err(|_| "Server exited uncleanly.".to_owned())?
   }
 }
 
