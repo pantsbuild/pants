@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+use fs::default_cache_path;
+
 use crate::RelativePath;
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
@@ -52,6 +54,11 @@ pub struct NamedCaches {
 impl NamedCaches {
   pub fn new(local_base: PathBuf) -> NamedCaches {
     NamedCaches { local_base }
+  }
+
+  // This default suffix is also hard-coded into the Python options code in global_options.py
+  pub fn default_path() -> PathBuf {
+    default_cache_path().join("named_caches")
   }
 
   ///

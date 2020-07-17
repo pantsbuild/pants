@@ -667,11 +667,7 @@ pub fn mount<'a, P: AsRef<Path>>(
 async fn main() {
   env_logger::init();
 
-  let default_store_path = dirs::home_dir()
-    .expect("Couldn't find homedir")
-    .join(".cache")
-    .join("pants")
-    .join("lmdb_store");
+  let default_store_path = Store::default_path();
 
   let args = clap::App::new("brfs")
     .arg(

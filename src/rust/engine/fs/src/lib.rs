@@ -60,6 +60,32 @@ lazy_static! {
 
 const TARGET_NOFILE_LIMIT: u64 = 10000;
 
+const XDG_CACHE_HOME: &str = "XDG_CACHE_HOME";
+const XDG_CONFIG_HOME: &str = "XDG_CONFIG_HOME";
+
+/// Follows the unix XDB base spec: http://standards.freedesktop.org/basedir-spec/latest/index.html.
+pub fn default_cache_path() -> PathBuf {
+  // TODO: Keep in alignment with `pants.base.build_environment.get_pants_cachedir`. This method
+  // is not used there directly because of a cycle.
+  let cache_path = std::env::var(XDG_CACHE_HOME)
+    .ok()
+    .map(PathBuf::from)
+    .or_else(|| dirs::home_dir().map(|home| home.join(".cache")))
+    .unwrap_or_else(|| panic!("Could not find home dir or {}.", XDG_CACHE_HOME));
+  cache_path.join("pants")
+}
+
+/// Follows the unix XDB base spec: http://standards.freedesktop.org/basedir-spec/latest/index.html.
+pub fn default_config_path() -> PathBuf {
+  // TODO: Keep in alignment with `pants.base.build_environment.get_pants_configdir`.
+  let config_path = std::env::var(XDG_CONFIG_HOME)
+    .ok()
+    .map(PathBuf::from)
+    .or_else(|| dirs::home_dir().map(|home| home.join(".config")))
+    .unwrap_or_else(|| panic!("Could not find home dir or {}.", XDG_CONFIG_HOME));
+  config_path.join("pants")
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum Stat {
   Link(Link),

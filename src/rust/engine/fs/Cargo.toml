@@ -8,6 +8,7 @@ publish = false
 [dependencies]
 async-trait = "0.1"
 bytes = "0.4.5"
+dirs = "1"
 futures = "0.3"
 glob = "0.2.11"
 ignore = "0.4.11"
