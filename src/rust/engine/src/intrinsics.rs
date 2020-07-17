@@ -19,7 +19,7 @@ type IntrinsicFn =
 ///
 /// Native "rule" implementations.
 ///
-/// On a case by case basis, intrinsics might have associated Nodes in the Graph order to memoize
+/// On a case by case basis, intrinsics might have associated Nodes in the Graph in order to memoize
 /// their results. For example: `multi_platform_process_request_to_process_result` and
 /// `path_globs_to_snapshot` take a while to run because they run a process and capture filesystem
 /// state (respectively) and have small in-memory outputs. On the other hand, `digest_to_snapshot`

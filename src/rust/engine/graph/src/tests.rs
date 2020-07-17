@@ -500,7 +500,7 @@ async fn cyclic_strong_weak_with_strong_first() {
 #[ignore]
 async fn cyclic_strong_weak_with_weak_first() {
   // A cycle between two nodes with a strong dep from top to bottom and a weak dep from bottom
-  // to top, where we enter from the top first.
+  // to top, where we enter from the bottom first.
   let (graph, context) = cyclic_references(vec![TNode::new(1)]);
   assert_eq!(
     graph.create(TNode::new(0), &context).await,
