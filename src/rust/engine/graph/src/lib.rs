@@ -894,17 +894,29 @@ impl<N: Node> Graph<N> {
   /// of a Node. Node cleaning consumes the previous edges for an operation, so we preserve those.
   ///
   /// This is executed as a bulk operation, because individual edge removals take O(n), and bulk
-  /// edge filtering is both more efficient, and possible to do asynchronously.
+  /// edge filtering is both more efficient, and possible to do asynchronously. This method also
+  /// avoids the `retain_edges` method, which as of petgraph `0.4.5` uses individual edge removals
+  /// under the hood, and is thus not much faster than removing them one by one.
+  ///
+  ///   See https://github.com/petgraph/petgraph/issues/299.
   ///
   pub fn garbage_collect_edges(&self) {
     let mut inner = self.inner.lock();
-    inner.pg.retain_edges(|pg, edge_index| {
-      let (edge_src_id, _) = pg.edge_endpoints(edge_index).unwrap();
-      // Retain the edge if it is for either the current or previous run of a Node.
-      pg[edge_src_id]
-        .run_token()
-        .equals_current_or_previous(pg[edge_index].1)
-    });
+    inner.pg = inner.pg.filter_map(
+      |_entry_id, node| Some(node.clone()),
+      |edge_index, edge_weight| {
+        let (edge_src_id, _) = inner.pg.edge_endpoints(edge_index).unwrap();
+        // Retain the edge if it is for either the current or previous run of a Node.
+        if inner.pg[edge_src_id]
+          .run_token()
+          .equals_current_or_previous(edge_weight.1)
+        {
+          Some(*edge_weight)
+        } else {
+          None
+        }
+      },
+    );
   }
 
   ///
