@@ -178,7 +178,11 @@ class HelpInfoExtracter:
             fallback = []
         elif is_dict_option(kwargs):
             fallback = {}
-        default = ranked_default.value if ranked_default else fallback
+        default = (
+            ranked_default.value
+            if ranked_default and ranked_default.value is not None
+            else fallback
+        )
         default_str = to_help_str(default)
         return default, default_str
 

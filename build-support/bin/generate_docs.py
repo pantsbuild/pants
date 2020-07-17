@@ -9,7 +9,7 @@ import os
 import pkgutil
 import sys
 from pathlib import Path, PosixPath
-from typing import Dict, cast
+from typing import Dict, Optional, cast
 
 import pystache
 import requests
@@ -23,7 +23,9 @@ class ReferenceGenerator:
     To run use:
 
     ./pants \
-      --backend-packages="-['internal_backend.rules_for_testing','internal_backend.utilities']" \
+      --backend-packages="-['internal_backend.rules_for_testing', 'internal_backend.utilities']" \
+      --backend-packages="+['pants.backend.python.lint.bandit', \
+        'pants.backend.python.lint.pylint', 'pants.backend.codegen.protobuf.python']" \
       --no-verify-config help-all > /tmp/help_info
 
     to generate the data, and then:
@@ -89,14 +91,13 @@ class ReferenceGenerator:
 
         # Load the data.
         if self._args.input is None:
-            json_str = sys.stdin.read()
+            json_bytes = sys.stdin.read()
         else:
-            with open(self._args.input, "r") as fp:
-                json_str = fp.read()
-        self._help_info = self.process_input(json_str, self._args.sync)
+            json_bytes = Path(self._args.input).read_bytes()
+        self._help_info = self.process_input(json_bytes.encode(), self._args.sync)
 
     @staticmethod
-    def process_input(json_str: str, sync: bool):
+    def process_input(json_str: str, sync: bool) -> Dict:
         """Process the input, to make it easier to work with in the mustache template."""
 
         help_info = json.loads(json_str)
@@ -105,11 +106,13 @@ class ReferenceGenerator:
         # Process the list of consumed_scopes into a comma-separated list, and add it to the option
         # info for the goal's scope, to make it easy to render in the goal's options page.
 
-        # docsite pages link to the slug, local pages to the .md source.
-        link_suffix = "-reference" if sync else ".md"
+        def link(scope: str) -> str:
+            # docsite pages link to the slug, local pages to the .md source.
+            return f"reference-{scope}" if sync else f"{scope}.md"
+
         for goal, goal_info in help_info["name_to_goal_info"].items():
             consumed_scopes = sorted(goal_info["consumed_scopes"])
-            linked_consumed_scopes = [f"[{cs}]({cs}{link_suffix})" for cs in consumed_scopes if cs]
+            linked_consumed_scopes = [f"[{cs}]({link(cs)})" for cs in consumed_scopes if cs]
             comma_separated_consumed_scopes = ", ".join(linked_consumed_scopes)
             scope_to_help_info[goal][
                 "comma_separated_consumed_scopes"
@@ -142,7 +145,7 @@ class ReferenceGenerator:
             self._category_id = self._get_id("categories/reference")
         return self._category_id
 
-    def _render_body(self, scope_help_info):
+    def _render_body(self, scope_help_info: Dict) -> str:
         """Renders the body of a single options help page."""
         return self._renderer.render("{{> scoped_options}}", scope_help_info)
 
@@ -158,7 +161,7 @@ class ReferenceGenerator:
         response.raise_for_status()
         return cast(Dict, response.json()) if response.text else {}
 
-    def _create(self, parent_doc_id, slug, title, body):
+    def _create(self, parent_doc_id: Optional[str], slug: str, title: str, body: str) -> None:
         """Create a new docsite reference page.
 
         Operates by creating a placeholder page, and then populating it via _update().
@@ -172,7 +175,7 @@ class ReferenceGenerator:
         This is a problem if you want the slug to be different than the human-readable title,
         as we do in this case. Specifically, we want the human-readable page title to be just
         the scope name, e.g., `test` (so it appears that way in the sidebar). But we want the
-        slug to be `test-reference`, so that it doesn't collide with any other, non-generated page
+        slug to be `reference-test`, so that it doesn't collide with any other, non-generated page
         that happens to occupy the slug `test`.
 
         To solve this we create the placeholder page with a title from which to derive the slug,
@@ -214,7 +217,7 @@ class ReferenceGenerator:
         payload = json.dumps(page)
         self._access_readme_api(f"docs/{slug}", "PUT", payload)
 
-    def _delete(self, slug):
+    def _delete(self, slug: str) -> None:
         """Delete an existing page."""
 
         logger.warning(f"Deleting {slug}")
@@ -269,23 +272,23 @@ class ReferenceGenerator:
         # Create the top-level docs in order.
         self._create(
             parent_doc_id=None,
-            slug="global-reference",
+            slug="reference-global",
             title="Global",
             body=self._render_body(self._help_info["scope_to_help_info"][""]),
         )
-        self._create(parent_doc_id=None, slug="all-goals-reference", title="Goals", body="")
+        self._create(parent_doc_id=None, slug="reference-all-goals", title="Goals", body="")
         self._create(
-            parent_doc_id=None, slug="all-subsystems-reference", title="Subsystems", body=""
+            parent_doc_id=None, slug="reference-all-subsystems", title="Subsystems", body=""
         )
 
         # Create the individual goal/subsystem docs.
-        all_goals_doc_id = self._get_id("docs/all-goals-reference")
-        all_subsystems_doc_id = self._get_id("docs/all-subsystems-reference")
+        all_goals_doc_id = self._get_id("docs/reference-all-goals")
+        all_subsystems_doc_id = self._get_id("docs/reference-all-subsystems")
         for scope, shi in sorted(self._help_info["scope_to_help_info"].items()):
             if scope == "":
                 continue  # We've already handled the global scope.
             parent_doc_id = all_goals_doc_id if shi["is_goal"] else all_subsystems_doc_id
-            slug = f"{scope}-reference"
+            slug = f"reference-{scope}"
             body = self._render_body(shi)
             self._create(parent_doc_id=parent_doc_id, slug=slug, title=scope, body=body)
 
