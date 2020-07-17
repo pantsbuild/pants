@@ -164,7 +164,19 @@ class GlobalOptions(Subsystem):
         default_rel_distdir = f"/{default_distdir_name}/"
 
         register(
-            "-l", "--level", type=LogLevel, default=LogLevel.INFO, help="Set the logging level.",
+            "-l",
+            "--level",
+            type=LogLevel,
+            default=LogLevel.INFO,
+            help="Set the global logging level.",
+        )
+
+        register(
+            "--log-domain-levels",
+            type=dict,
+            advanced=True,
+            help="Set a more specific logging level for one or more logging domains. A logging domain is "
+            "a particular subsection of Pants functionality.",
         )
 
         register(
