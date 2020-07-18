@@ -180,15 +180,17 @@ impl ByteStore {
         // The gRPC library cancels streams on drop; closes must be explicit. Not closing
         // the stream caused the BuildGrid CAS server to generate errors on writes
         // when the stream was cancelled.
-        sender
-          .close()
-          .map_err(|e| {
-            format!(
+        sender.close().await.or_else(|err| {
+          match err {
+            // Some servers (e.g., RBE) may return RpcFinished with no status code as a
+            // result of closing the stream. Treat this condition as success.
+            grpcio::Error::RpcFinished(None) => Ok(()),
+            e => Err(format!(
               "Error from server when uploading digest during close {:?}: {:?}",
               digest, e
-            )
-          })
-          .await?;
+            )),
+          }
+        })?;
 
         let received = receiver
           .map_err(move |e| {
