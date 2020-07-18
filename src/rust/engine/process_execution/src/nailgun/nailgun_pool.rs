@@ -242,10 +242,10 @@ impl NailgunPool {
       nailgun_server_fingerprint,
       build_id,
     )
-    .and_then(move |process| {
+    .map(move |process| {
       let port = process.port;
       processes.insert(name.clone(), process);
-      Ok(port)
+      port
     })
   }
 }
@@ -316,19 +316,19 @@ impl NailgunProcess {
         let port = read_port(&mut child);
         port.map(|port| (child, port))
       })
-      .and_then(|(child, port)| {
+      .map(|(child, port)| {
         debug!(
           "Created nailgun server process with pid {} and port {}",
           child.id(),
           port
         );
-        Ok(NailgunProcess {
+        NailgunProcess {
           port,
           fingerprint: nailgun_server_fingerprint,
           name,
           handle: Arc::new(Mutex::new(child)),
           build_id,
-        })
+        }
       })
   }
 }

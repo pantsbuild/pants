@@ -392,6 +392,8 @@ jobs:
         - shellcheck
     after_failure:
     - ./build-support/bin/ci-failure.sh
+    after_success:
+    - ./build-support/bin/upload_coverage.sh
     before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
     - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete
@@ -452,6 +454,8 @@ jobs:
         - shellcheck
     after_failure:
     - ./build-support/bin/ci-failure.sh
+    after_success:
+    - ./build-support/bin/upload_coverage.sh
     before_cache:
     - sudo chown -R travis:travis "${HOME}" "${TRAVIS_BUILD_DIR}"
     - find ${HOME}/.ivy2/pants -type f -name "ivydata-*.properties" -delete

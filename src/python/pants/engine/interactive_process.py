@@ -3,12 +3,15 @@
 
 import itertools
 from dataclasses import dataclass
-from typing import Any, Iterable, Mapping, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Iterable, Mapping, Optional, Tuple
 
 from pants.base.exception_sink import ExceptionSink
 from pants.engine.fs import EMPTY_DIGEST, Digest
 from pants.engine.rules import RootRule, side_effecting
 from pants.util.meta import frozen_after_init
+
+if TYPE_CHECKING:
+    from pants.engine.internals.scheduler import SchedulerSession
 
 
 @dataclass(frozen=True)
@@ -56,13 +59,11 @@ class InteractiveProcess:
 @side_effecting
 @dataclass(frozen=True)
 class InteractiveRunner:
-    _scheduler: Any
+    _scheduler: "SchedulerSession"
 
     def run_process(self, request: InteractiveProcess) -> InteractiveProcessResult:
         ExceptionSink.toggle_ignoring_sigint_v2_engine(True)
-        return cast(
-            InteractiveProcessResult, self._scheduler.run_local_interactive_process(request)
-        )
+        return self._scheduler.run_local_interactive_process(request)
 
 
 def rules():
