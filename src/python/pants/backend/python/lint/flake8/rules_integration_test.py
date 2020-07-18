@@ -7,12 +7,13 @@ from pants.backend.python.lint.flake8.rules import Flake8FieldSet, Flake8Request
 from pants.backend.python.lint.flake8.rules import rules as flake8_rules
 from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonLibrary
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
-from pants.core.goals.lint import LintResults
+from pants.core.goals.lint import LintOptions, LintResults
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, FileContent
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.engine.target import TargetWithOrigin
+from pants.testutil.engine.util import create_subsystem
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.interpreter_selection_utils import skip_unless_python27_and_python3_present
 from pants.testutil.option.util import create_options_bootstrapper
@@ -53,6 +54,7 @@ class Flake8IntegrationTest(ExternalToolTestBase):
         passthrough_args: Optional[str] = None,
         skip: bool = False,
         additional_args: Optional[List[str]] = None,
+        lint_options: Optional[LintOptions] = None,
     ) -> LintResults:
         args = ["--backend-packages=pants.backend.python.lint.flake8"]
         if config:
@@ -64,10 +66,12 @@ class Flake8IntegrationTest(ExternalToolTestBase):
             args.append("--flake8-skip")
         if additional_args:
             args.extend(additional_args)
+        lint_options = lint_options or create_subsystem(LintOptions)
         return self.request_single_product(
             LintResults,
             Params(
                 Flake8Request(Flake8FieldSet.create(tgt) for tgt in targets),
+                lint_options,
                 create_options_bootstrapper(args=args),
             ),
         )
@@ -178,7 +182,7 @@ class Flake8IntegrationTest(ExternalToolTestBase):
 
     def test_output_file(self) -> None:
         target = self.make_target_with_origin([self.bad_source])
-        result = self.run_flake8([target], additional_args=["--flake8-output-file=report.txt"])
+        result = self.run_flake8([target], additional_args=["--lint-report-dir=."])
         assert len(result) == 1
         assert result[0].exit_code == 1
         assert result[0].stdout.strip() == ""
