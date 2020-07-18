@@ -133,35 +133,6 @@ class GraphTest(TestBase):
         assert transitive_targets.dependencies == FrozenOrderedSet([d1, d2, d3, t2, t1])
         assert transitive_targets.closure == FrozenOrderedSet([root, d2, d1, d3, t2, t1])
 
-    def test_transitive_targets_tolerates_cycles(self) -> None:
-        """For generated subtargets, we should tolerate cycles between targets.
-
-        This only works with generated subtargets, so we use explicit file dependencies in this
-        test.
-        """
-        self.create_files("", ["dep.txt", "t1.txt", "t2.txt"])
-        self.add_to_build_file(
-            "",
-            dedent(
-                """\
-                target(name='dep', sources=['dep.txt'])
-                target(name='t1', sources=['t1.txt'], dependencies=['dep.txt', 't2.txt'])
-                target(name='t2', sources=['t2.txt'], dependencies=['t1.txt'])
-                """
-            ),
-        )
-        result = self.request_single_product(
-            TransitiveTargets,
-            Params(Addresses([Address.parse("//:t2")]), create_options_bootstrapper()),
-        )
-        assert len(result.roots) == 1
-        assert result.roots[0].address == Address.parse("//:t2")
-        assert [tgt.address for tgt in result.dependencies] == [
-            Address("", target_name="t1.txt", generated_base_target_name="t1"),
-            Address("", target_name="dep.txt", generated_base_target_name="dep"),
-            Address("", target_name="t2.txt", generated_base_target_name="t2"),
-        ]
-
     def test_resolve_generated_subtarget(self) -> None:
         self.add_to_build_file("demo", "target(sources=['f1.txt', 'f2.txt'])")
         generated_target_addresss = Address(

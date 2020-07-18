@@ -141,32 +141,8 @@ async def transitive_target(wrapped_root: WrappedTarget) -> TransitiveTarget:
     if not root.has_field(Dependencies):
         return TransitiveTarget(root, ())
     dependency_addresses = await Get(Addresses, DependenciesRequest(root[Dependencies]))
-
-    # For generated subtargets, we use a weak Get, which means that any dependency cycles will
-    # return None, rather than TransitiveTarget.
-    transitive_dependencies = await MultiGet(
-        Get(TransitiveTarget, Address, addr, weak=bool(addr.generated_base_target_name))
-        for addr in dependency_addresses
-    )
-    non_cyclic_dependencies = []
-    cyclic_addresses = []
-    for transitive_dep, address in zip(transitive_dependencies, dependency_addresses):
-        if transitive_dep:
-            non_cyclic_dependencies.append(transitive_dep)
-        else:
-            cyclic_addresses.append(address)
-    cyclic_dependencies = await MultiGet(
-        Get(WrappedTarget, Address, addr) for addr in cyclic_addresses
-    )
-
-    all_dependencies = (
-        *non_cyclic_dependencies,
-        *(
-            TransitiveTarget(wrapped_tgt.target, dependencies=())
-            for wrapped_tgt in cyclic_dependencies
-        ),
-    )
-    return TransitiveTarget(root, tuple(all_dependencies))
+    dependencies = await MultiGet(Get(TransitiveTarget, Address, d) for d in dependency_addresses)
+    return TransitiveTarget(root, dependencies)
 
 
 @rule
