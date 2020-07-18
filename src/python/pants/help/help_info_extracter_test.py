@@ -134,7 +134,7 @@ def test_compute_default():
     do_test(42, "42", type=int, default=42)
     do_test("foo", "foo", type=str, default="foo")
     do_test(None, "None", type=str, default=None)
-    do_test([1, 2, 3], '"[1, 2, 3]"', type=list, member_type=int, default=[1, 2, 3])
+    do_test([1, 2, 3], "[\n  1,\n  2,\n  3\n]", type=list, member_type=int, default=[1, 2, 3])
     do_test(LogLevel.INFO, "info", type=LogLevel, default=LogLevel.INFO)
 
 
@@ -264,6 +264,7 @@ def test_get_all_help_info():
                         "removal_version": None,
                         "removal_hint": None,
                         "choices": None,
+                        "comma_separated_choices": None,
                     },
                 ),
                 "advanced": tuple(),
@@ -293,6 +294,7 @@ def test_get_all_help_info():
                         "removal_version": None,
                         "removal_hint": None,
                         "choices": None,
+                        "comma_separated_choices": None,
                     },
                 ),
                 "advanced": (
@@ -312,6 +314,7 @@ def test_get_all_help_info():
                         "removal_version": None,
                         "removal_hint": None,
                         "choices": ("a", "b", "c"),
+                        "comma_separated_choices": "a, b, c",
                     },
                 ),
                 "deprecated": tuple(),

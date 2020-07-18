@@ -4,7 +4,6 @@
 import dataclasses
 import json
 import textwrap
-from enum import Enum
 from typing import Dict, cast
 
 from colors import cyan, green
@@ -12,7 +11,7 @@ from typing_extensions import Literal
 
 from pants.base.build_environment import pants_release, pants_version
 from pants.help.help_formatter import HelpFormatter
-from pants.help.help_info_extracter import AllHelpInfo
+from pants.help.help_info_extracter import AllHelpInfo, HelpJSONEncoder
 from pants.option.arg_splitter import (
     AllHelp,
     GoalsHelp,
@@ -185,18 +184,8 @@ class HelpPrinter:
                 formatted_lines.append("")
         return "\n".join(formatted_lines)
 
-    class Encoder(json.JSONEncoder):
-        def default(self, o):
-            if callable(o):
-                return o.__name__
-            if isinstance(o, type):
-                return type.__name__
-            if isinstance(o, Enum):
-                return o.value
-            return super().default(o)
-
     def _get_help_json(self) -> str:
         """Return a JSON object containing all the help info we have, for every scope."""
         return json.dumps(
-            dataclasses.asdict(self._all_help_info), sort_keys=True, indent=2, cls=self.Encoder
+            dataclasses.asdict(self._all_help_info), sort_keys=True, indent=2, cls=HelpJSONEncoder
         )

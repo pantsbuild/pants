@@ -29,6 +29,7 @@ class OptionHelpFormatterTest(unittest.TestCase):
             removal_version=None,
             removal_hint=None,
             choices=None,
+            comma_separated_choices=None,
             value_history=OptionValueHistory((RankedValue(Rank.HARDCODED, None),)),
         )
         ohi = replace(ohi, **kwargs)

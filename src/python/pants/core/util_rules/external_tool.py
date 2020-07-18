@@ -102,21 +102,22 @@ class ExternalTool(Subsystem):
         help_str = textwrap.dedent(
             f"""
         Known versions to verify downloads against.
+
         Each element is a pipe-separated string of `version|platform|sha256|length`, where:
 
-            - `version` is the version string
-            - `platform` is one of [{','.join(Platform.__members__.keys())}],
-            - `sha256` is the 64-character hex representation of the expected sha256
-              digest of the download file, as emitted by `shasum -a 256`
-            - `length` is the expected length of the download file in bytes
+          - `version` is the version string
+          - `platform` is one of [{','.join(Platform.__members__.keys())}],
+          - `sha256` is the 64-character hex representation of the expected sha256
+            digest of the download file, as emitted by `shasum -a 256`
+          - `length` is the expected length of the download file in bytes
 
-            E.g., '3.1.2|darwin|6d0f18cd84b918c7b3edd0203e75569e0c7caecb1367bbbe409b44e28514f5be|42813'.
+        E.g., `3.1.2|darwin|6d0f18cd84b918c7b3edd0203e75569e0c7caecb1367bbbe409b44e28514f5be|42813`.
 
-            Values are space-stripped, so pipes can be indented for readability if necessary.
-            You can compute the length and sha256 easily with:
-            `curl -L $URL | tee >(wc -c) >(shasum -a 256) >/dev/null`
+        Values are space-stripped, so pipes can be indented for readability if necessary.
         """
         )
+        # Note that you can compute the length and sha256 conveniently with:
+        #   `curl -L $URL | tee >(wc -c) >(shasum -a 256) >/dev/null`
         register(
             "--known-versions",
             type=list,

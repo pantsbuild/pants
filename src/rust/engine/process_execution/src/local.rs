@@ -174,7 +174,7 @@ impl StreamedHermeticCommand {
       .stderr(Stdio::piped())
       .spawn()
       .map_err(|e| format!("Error launching process: {:?}", e))
-      .and_then(|mut child| {
+      .map(|mut child| {
         debug!("spawned local process as {} for {:?}", child.id(), req);
         let stdout_stream = FramedRead::new(child.stdout.take().unwrap(), BytesCodec::new())
           .map_ok(|bytes| ChildOutput::Stdout(bytes.into()))
@@ -194,11 +194,9 @@ impl StreamedHermeticCommand {
           })
           .boxed();
 
-        Ok(
-          futures::stream::select_all(vec![stdout_stream, stderr_stream, exit_stream])
-            .map_err(|e| format!("Failed to consume process outputs: {:?}", e))
-            .boxed(),
-        )
+        futures::stream::select_all(vec![stdout_stream, stderr_stream, exit_stream])
+          .map_err(|e| format!("Failed to consume process outputs: {:?}", e))
+          .boxed()
       })
   }
 }
