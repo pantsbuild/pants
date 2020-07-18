@@ -184,7 +184,7 @@ impl ByteStore {
           .close()
           .map_err(|e| {
             format!(
-              "Error from server when uploading digest {:?}: {:?}",
+              "Error from server when uploading digest during close {:?}: {:?}",
               digest, e
             )
           })
@@ -193,7 +193,7 @@ impl ByteStore {
         let received = receiver
           .map_err(move |e| {
             format!(
-              "Error from server when uploading digest {:?}: {:?}",
+              "Error from server when uploading digest while receiving response {:?}: {:?}",
               digest, e
             )
           })
