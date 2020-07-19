@@ -15,7 +15,7 @@ from pants.engine.console import Console
 from pants.engine.fs import Workspace, create_fs_rules
 from pants.engine.goal import Goal
 from pants.engine.interactive_process import InteractiveRunner
-from pants.engine.internals import graph, options_parsing
+from pants.engine.internals import graph, options_parsing, uuid
 from pants.engine.internals.build_files import create_graph_rules
 from pants.engine.internals.mapper import AddressMapper
 from pants.engine.internals.native import Native
@@ -295,6 +295,7 @@ class EngineInitializer:
             build_root_singleton,
             *interactive_process.rules(),
             *graph.rules(),
+            *uuid.rules(),
             *options_parsing.rules(),
             *process.rules(),
             *create_fs_rules(),

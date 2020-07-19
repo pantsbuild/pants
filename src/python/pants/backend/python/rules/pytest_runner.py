@@ -6,6 +6,7 @@ import itertools
 import logging
 from dataclasses import dataclass
 from typing import Optional, Tuple
+from uuid import UUID
 
 from pants.backend.python.rules.coverage import (
     CoverageConfig,
@@ -36,6 +37,7 @@ from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedS
 from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, Digest, MergeDigests, PathGlobs, Snapshot, SnapshotSubset
 from pants.engine.interactive_process import InteractiveProcess
+from pants.engine.internals.uuid import UUIDRequest
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get, MultiGet
@@ -245,6 +247,17 @@ async def run_python_test(
         "PYTEST_ADDOPTS": " ".join(add_opts),
         "PEX_EXTRA_SYS_PATH": ":".join(test_setup.source_roots),
     }
+
+    if test_options.values.force:
+        # This is a slightly hacky way to force the process to run: since the env var
+        #  value is unique, this input combination will never have been seen before,
+        #  and therefore never cached. The two downsides are:
+        #  1. This leaks into the test's environment, albeit with a funky var name that is
+        #     unlikely to cause problems in practice.
+        #  2. This run will be cached even though it can never be re-used.
+        # TODO: A more principled way of forcing rules to run?
+        uuid = await Get(UUID, UUIDRequest())
+        env["__PANTS_FORCE_TEST_RUN__"] = str(uuid)
 
     process = test_setup.test_runner_pex.create_process(
         python_setup=python_setup,
