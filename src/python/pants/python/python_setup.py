@@ -51,6 +51,24 @@ class PythonSetup(Subsystem):
             ),
         )
         register(
+            "--use-all-requirements",
+            advanced=True,
+            # TODO: Should this default to True? Seems like a better initial experience for most
+            #  users (although they still require at least a trivial lockfile to get any benefit).
+            default=False,
+            type=bool,
+            help=(
+                "If set, all requirements will be resolved once and the result will be used by "
+                "any work that requires any subset of the requirements.  If unset, each "
+                "subset will be indepdendently resolved as needed, which is more correct - work "
+                "is only invalidated if a requirement it actually depends on changes - but also a "
+                "lot slower, due to the extra resolving.  You may wish to leave this option "
+                "set for normal work, such as running tests, but selectively turn it off via "
+                "command-line-flag when building deployable binaries, so that you only deploy the "
+                "requirements you actually need for a given binary."
+            ),
+        )
+        register(
             "--platforms",
             advanced=True,
             type=list,

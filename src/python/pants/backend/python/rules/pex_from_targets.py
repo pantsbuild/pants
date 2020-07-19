@@ -112,18 +112,32 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         python_setup,
     )
 
-    requirements = PexRequirements.create_from_requirement_fields(
-        (
-            tgt[PythonRequirementsField]
-            for tgt in all_targets
-            if tgt.has_field(PythonRequirementsField)
-        ),
-        additional_requirements=request.additional_requirements,
-    )
+    if python_setup.options.use_all_requirements:
+        if python_setup.requirement_constraints is None:
+            raise ValueError(
+                "--python-setup-use-all-requirements is set, so "
+                "--python-setup-requirement-constraints must be provided, e.g., using the "
+                "requirement_constraints key under the [python-setup] section of your config file."
+            )
+        # Resolve the entire constraints file.
+        requirements = PexRequirements()
+        requirements_files = [python_setup.requirement_constraints]
+    else:
+        # Resolve just the specific requirements needed.
+        requirements = PexRequirements.create_from_requirement_fields(
+            (
+                tgt[PythonRequirementsField]
+                for tgt in all_targets
+                if tgt.has_field(PythonRequirementsField)
+            ),
+            additional_requirements=request.additional_requirements,
+        )
+        requirements_files = []
 
     return PexRequest(
         output_filename=request.output_filename,
         requirements=requirements,
+        requirements_files=requirements_files,
         interpreter_constraints=interpreter_constraints,
         platforms=request.platforms,
         entry_point=request.entry_point,

@@ -70,7 +70,7 @@ class PathGlobs:
         :param globs: globs to match, e.g. `foo.txt` or `**/*.txt`. To exclude something, prefix it
                       with `!`, e.g. `!ignore.py`.
         :param glob_match_error_behavior: whether to warn or error upon match failures
-        :param conjunction: whether all `include`s must match or only at least one must match
+        :param conjunction: whether all `globs` must match or only at least one must match
         :param description_of_origin: a human-friendly description of where this PathGlobs request
                                       is coming from, used to improve the error message for
                                       unmatched globs. For example, this might be the text string
