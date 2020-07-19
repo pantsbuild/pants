@@ -11,7 +11,7 @@ class MyPy(PythonToolBase):
     """The MyPy Python type checker (http://mypy-lang.org/)."""
 
     options_scope = "mypy"
-    default_version = "mypy==0.781"
+    default_version = "mypy==0.782"
     default_entry_point = "mypy"
     default_interpreter_constraints = ["CPython>=3.5"]
 

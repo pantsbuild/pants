@@ -347,7 +347,7 @@ class ContextutilTest(unittest.TestCase):
 
         with self.assertRaises(AssertionError):
             with exception_logging(fake_logger, "error!"):
-                assert True is False  # type: ignore[comparison-overlap] # intended to fail type check
+                assert True is False
 
         fake_logger.exception.assert_called_once_with("error!")
 
