@@ -156,7 +156,7 @@ def _get_starting_indent(source):
 class RuleType(Enum):
     rule = "rule"
     goal_rule = "goal_rule"
-    uncacheable_rule = "uncacheable_rule"
+    uncacheable_rule = "_uncacheable_rule"
 
 
 def _make_rule(
@@ -369,7 +369,7 @@ def validate_parameter_types(
     if cacheable:
         for ty in parameter_types:
             if side_effecting.is_instance(ty):
-                # TODO: Technically this will also fire for an @uncacheable_rule, but we don't
+                # TODO: Technically this will also fire for an @_uncacheable_rule, but we don't
                 #  expose those as part of the API, so it's OK for this error not to mention them.
                 raise ValueError(
                     f"A `@rule` that was not a @goal_rule ({func_id}) has a side-effecting parameter: {ty}"
@@ -395,7 +395,9 @@ def goal_rule(*args, **kwargs) -> Callable:
     return inner_rule(*args, **kwargs, rule_type=RuleType.goal_rule, cacheable=False)
 
 
-def uncacheable_rule(*args, **kwargs) -> Callable:
+# This has a "private" name, as we don't (yet?) want it to be part of the rule API, at least
+# until we figure out the implications, and have a handle on the semantics and use-cases.
+def _uncacheable_rule(*args, **kwargs) -> Callable:
     return inner_rule(*args, **kwargs, rule_type=RuleType.uncacheable_rule, cacheable=False)
 
 
