@@ -51,10 +51,8 @@ class PythonSetup(Subsystem):
             ),
         )
         register(
-            "--use-all-requirements",
+            "--resolve-all-constraints",
             advanced=True,
-            # TODO: Should this default to True? Seems like a better initial experience for most
-            #  users (although they still require at least a trivial lockfile to get any benefit).
             default=False,
             type=bool,
             help=(

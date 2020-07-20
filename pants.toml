@@ -54,9 +54,8 @@ root_patterns = [
 ]
 
 [python-setup]
-# TODO: Set up an actual lockfile. For now we just "lock" our requirements.txt
-#  to itself, so we can use --python-setup-use-all-requirements (which requires
-#  a lockfile).
+# TODO: Set up an actual lockfile. For now we just "lock" our requirements.txt to itself,
+#  so we can use --python-setup-resolve-all-constraints (which requires a lockfile).
 requirement_constraints = "3rdparty/python/requirements.txt"
 
 [black]

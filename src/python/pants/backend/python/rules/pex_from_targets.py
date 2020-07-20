@@ -1,9 +1,13 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import itertools
+
 import dataclasses
 from dataclasses import dataclass
 from typing import Iterable, Optional, Tuple
+
+from pkg_resources import parse_requirements
 
 from pants.backend.python.rules.pex import (
     PexInterpreterConstraints,
@@ -21,10 +25,12 @@ from pants.backend.python.target_types import (
     PythonRequirementsField,
 )
 from pants.engine.addresses import Addresses
-from pants.engine.fs import Digest, MergeDigests
+from pants.engine.fs import Digest, MergeDigests, PathGlobs, DigestContents, Snapshot
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
 from pants.engine.target import TransitiveTargets
+from pants.option.custom_types import GlobExpansionConjunction
+from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
 from pants.util.meta import frozen_after_init
 
@@ -112,16 +118,38 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         python_setup,
     )
 
-    if python_setup.options.use_all_requirements:
+    requirements = PexRequirements.create_from_requirement_fields(
+        (
+            tgt[PythonRequirementsField]
+            for tgt in all_targets
+            if tgt.has_field(PythonRequirementsField)
+        ),
+        additional_requirements=request.additional_requirements,
+    )
+
+    if python_setup.options.resolve_all_constraints:
         if python_setup.requirement_constraints is None:
             raise ValueError(
-                "--python-setup-use-all-requirements is set, so "
-                "--python-setup-requirement-constraints must be provided, e.g., using the "
-                "requirement_constraints key under the [python-setup] section of your config file."
+                "resolve_all_constraints in the [python-setup] scope is set, so "
+                "requirement_constraints in [python-setup] must also be provided."
             )
-        # Resolve the entire constraints file.
-        requirements = PexRequirements()
-        requirements_files = [python_setup.requirement_constraints]
+        # Add the requirements from the constraint file. Note that this only guarantees
+        # a single resolve if the constraint file covers all the individual requirements
+        # of individual targets. This may be defeated by, e.g., inline requirements.
+        # However we will still do the right thing in that case, it's just the performance
+        # will be impacted by extra resolves.
+        constraint_file_snapshot = await Get(
+            Snapshot,
+            PathGlobs(
+                [python_setup.requirement_constraints],
+                glob_match_error_behavior=GlobMatchErrorBehavior.error,
+                conjunction=GlobExpansionConjunction.all_match,
+                description_of_origin="the option `--python-setup-requirement-constraints`",
+            ),
+        )
+        constraints_file_contents = await Get(DigestContents, Digest, constraint_file_snapshot.digest)
+        constraints_file_reqs_iter = parse_requirements(next(iter(constraints_file_contents)).content.decode())
+        requirements = PexRequirements(itertools.chain(requirements, (str(req) for req in constraints_file_reqs_iter)))
     else:
         # Resolve just the specific requirements needed.
         requirements = PexRequirements.create_from_requirement_fields(
@@ -132,12 +160,10 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
             ),
             additional_requirements=request.additional_requirements,
         )
-        requirements_files = []
 
     return PexRequest(
         output_filename=request.output_filename,
         requirements=requirements,
-        requirements_files=requirements_files,
         interpreter_constraints=interpreter_constraints,
         platforms=request.platforms,
         entry_point=request.entry_point,

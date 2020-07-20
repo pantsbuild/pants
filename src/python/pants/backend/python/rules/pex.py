@@ -207,7 +207,6 @@ class PexRequest:
 
     output_filename: str
     requirements: PexRequirements
-    requirements_files: Tuple[str, ...]
     interpreter_constraints: PexInterpreterConstraints
     platforms: PexPlatforms
     sources: Optional[Digest]
@@ -223,7 +222,6 @@ class PexRequest:
         *,
         output_filename: str,
         requirements: PexRequirements = PexRequirements(),
-        requirements_files: Iterable[str] = (),
         interpreter_constraints=PexInterpreterConstraints(),
         platforms=PexPlatforms(),
         sources: Optional[Digest] = None,
@@ -234,7 +232,6 @@ class PexRequest:
     ) -> None:
         self.output_filename = output_filename
         self.requirements = requirements
-        self.requirements_files = tuple(requirements_files)
         self.interpreter_constraints = interpreter_constraints
         self.platforms = platforms
         self.sources = sources
@@ -365,12 +362,6 @@ async def create_pex(
     argv.append(f"--sources-directory={source_dir_name}")
 
     argv.extend(request.requirements)
-    for req_file in request.requirements_files:
-        argv.extend(("-r", req_file))
-
-    req_files_snapshot = EMPTY_SNAPSHOT
-    if request.requirements_files:
-        req_files_snapshot = await Get(Snapshot, PathGlobs(request.requirements_files))
 
     constraint_file_snapshot = EMPTY_SNAPSHOT
     if python_setup.requirement_constraints is not None:
@@ -397,7 +388,6 @@ async def create_pex(
                 sources_digest_as_subdir,
                 additional_inputs_digest,
                 constraint_file_snapshot.digest,
-                req_files_snapshot.digest,
             )
         ),
     )
@@ -413,18 +403,11 @@ async def create_pex(
     # constraint`".
     description = request.description
     if description is None:
-        # Note that if a request has both requirements and requirements_files, the description
-        # will only mention the requirements. However we have no such case today anyway.
         if request.requirements:
             description = (
                 f"Building {request.output_filename} with "
                 f"{pluralize(len(request.requirements), 'requirement')}: "
                 f"{', '.join(request.requirements)}"
-            )
-        elif request.requirements_files:
-            description = (
-                f"Building {request.output_filename} from "
-                f"{', '.join(request.requirements_files)}"
             )
         else:
             description = f"Building {request.output_filename}"
