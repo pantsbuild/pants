@@ -66,10 +66,7 @@ class CountLinesOfCodeOptions(GoalSubsystem):
     def register_options(cls, register) -> None:
         super().register_options(register)
         register(
-            "--ignored",
-            type=bool,
-            fingerprint=True,
-            help="Show information about files ignored by cloc.",
+            "--ignored", type=bool, help="Show information about files ignored by cloc.",
         )
 
 

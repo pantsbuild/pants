@@ -19,20 +19,15 @@ class PyTest(Subsystem):
             "--args",
             type=list,
             member_type=shell_str,
-            fingerprint=True,
             passthrough=True,
             help='Arguments to pass directly to Pytest, e.g. `--pytest-args="-k test_foo --quiet"`',
         )
         register(
-            "--version",
-            default="pytest>=5.3.5,<5.4",
-            fingerprint=True,
-            help="Requirement string for Pytest.",
+            "--version", default="pytest>=5.3.5,<5.4", help="Requirement string for Pytest.",
         )
         register(
             "--pytest-plugins",
             type=list,
-            fingerprint=True,
             default=[
                 "pytest-timeout>=1.3.4,<1.4",
                 "pytest-cov>=2.8.1,<2.9",

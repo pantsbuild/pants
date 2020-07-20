@@ -48,7 +48,6 @@ class ReplOptions(GoalSubsystem):
             "--shell",
             type=str,
             default=None,
-            fingerprint=True,
             help="Override the automatically-detected REPL program for the target(s) specified. ",
         )
 

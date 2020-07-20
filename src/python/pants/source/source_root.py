@@ -152,7 +152,6 @@ class SourceRootConfig(Subsystem):
             choices=["create", "fail"],
             default="create",
             advanced=True,
-            fingerprint=True,
             help="Configures the behavior when sources are defined outside of any configured "
             "source root. `create` will cause a source root to be implicitly created at "
             "the definition location of the sources; `fail` will trigger an error.",
@@ -162,7 +161,6 @@ class SourceRootConfig(Subsystem):
             "--root-patterns",
             metavar='["pattern1", "pattern2", ...]',
             type=list,
-            fingerprint=True,
             default=cls.DEFAULT_ROOT_PATTERNS,
             advanced=True,
             help="A list of source root suffixes. A directory with this suffix will be considered "
@@ -180,7 +178,6 @@ class SourceRootConfig(Subsystem):
             metavar="filename",
             type=list,
             member_type=str,
-            fingerprint=True,
             default=None,
             advanced=True,
             help="The presence of a file of this name in a directory indicates that the directory "

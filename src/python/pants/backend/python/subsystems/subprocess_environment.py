@@ -22,14 +22,12 @@ class SubprocessEnvironment(Subsystem):
         register(
             "--lang",
             default=os.environ.get("LANG"),
-            fingerprint=True,
             advanced=True,
             help="Override the `LANG` environment variable for any forked subprocesses.",
         )
         register(
             "--lc-all",
             default=os.environ.get("LC_ALL"),
-            fingerprint=True,
             advanced=True,
             help="Override the `LC_ALL` environment variable for any forked subprocesses.",
         )
