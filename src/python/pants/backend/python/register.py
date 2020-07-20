@@ -13,13 +13,13 @@ from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.python_requirements import PythonRequirements
 from pants.backend.python.rules import (
     coverage,
+    create_python_binary,
     download_pex_bin,
     inject_ancestor_files,
     inject_init,
     pex,
     pex_from_targets,
     pytest_runner,
-    python_create_binary,
     python_sources,
     repl,
     run_setup_py,
@@ -62,7 +62,7 @@ def rules():
         *pex.rules(),
         *pex_from_targets.rules(),
         *pytest_runner.rules(),
-        *python_create_binary.rules(),
+        *create_python_binary.rules(),
         *python_native_code.rules(),
         *repl.rules(),
         *run_setup_py.rules(),
