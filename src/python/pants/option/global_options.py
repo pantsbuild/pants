@@ -687,8 +687,7 @@ class GlobalOptions(Subsystem):
             "--local-execution-root-dir",
             advanced=True,
             help=(
-                "Directory to use for local process execution sandboxing. "
-                f"{cache_instructions}"
+                f"Directory to use for local process execution sandboxing. {cache_instructions}"
             ),
             default=tempfile.gettempdir(),
         )
