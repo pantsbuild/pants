@@ -769,7 +769,11 @@ async def resolve_dependencies(
         *used_ignored_addresses,
         *used_ignored_file_deps,
     }
-    if unused_ignores:
+    # If there are unused ignores and this is not a generated subtarget, we eagerly error so that
+    # the user isn't falsely led to believe the ignore is working. We do not do this for generated
+    # subtargets because we cannot guarantee that the ignore specified in the original owning
+    # target would be used for all generated subtargets.
+    if unused_ignores and not request.field.address.generated_base_target_name:
         raise UnusedDependencyIgnoresException(
             request.field.address, unused_ignores=unused_ignores, result=result
         )

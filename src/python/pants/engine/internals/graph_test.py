@@ -1198,3 +1198,27 @@ class TestDependencies(TestBase):
                 Address.parse("//:inferred_and_provided2"),
             ],
         )
+
+        self.assert_dependencies_resolved(
+            requested_address=Address(
+                "demo", target_name="f1.st", generated_base_target_name="demo"
+            ),
+            enable_dep_inference=True,
+            expected=[
+                Address.parse("//:inferred1"),
+                Address("", target_name="inferred2.st", generated_base_target_name="inferred2"),
+                Address.parse("//:inferred_and_provided1"),
+                Address.parse("//:inferred_and_provided2"),
+            ],
+        )
+
+        self.assert_dependencies_resolved(
+            requested_address=Address(
+                "demo", target_name="f2.st", generated_base_target_name="demo"
+            ),
+            enable_dep_inference=True,
+            expected=[
+                Address.parse("//:inferred_and_provided1"),
+                Address.parse("//:inferred_and_provided2"),
+            ],
+        )
