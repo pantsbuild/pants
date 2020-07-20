@@ -7,6 +7,7 @@ import itertools
 import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Type, Union, get_type_hints
 
 from pants.engine.goal import Goal
@@ -152,7 +153,14 @@ def _get_starting_indent(source):
     return 0
 
 
+class RuleType(Enum):
+    rule = "rule"
+    goal_rule = "goal_rule"
+    uncacheable_rule = "_uncacheable_rule"
+
+
 def _make_rule(
+    rule_type: RuleType,
     return_type: Type,
     parameter_types: Iterable[Type],
     *,
@@ -166,6 +174,7 @@ def _make_rule(
     As a special case, if the output_type is a subclass of `Goal`, the `Goal.Options` for the `Goal`
     are registered as dependency Optionables.
 
+    :param rule_type: The specific decorator used to declare the rule.
     :param return_type: The return/output type for the Rule. This must be a concrete Python type.
     :param parameter_types: A sequence of types that matches the number and order of arguments to the
                             decorated function.
@@ -174,11 +183,11 @@ def _make_rule(
     """
 
     is_goal_cls = issubclass(return_type, Goal)
-    if cacheable and is_goal_cls:
+    if rule_type == RuleType.rule and is_goal_cls:
         raise TypeError(
             "An `@rule` that returns a `Goal` must instead be declared with `@goal_rule`."
         )
-    if not cacheable and not is_goal_cls:
+    if rule_type == RuleType.goal_rule and not is_goal_cls:
         raise TypeError("An `@goal_rule` must return a subclass of `engine.goal.Goal`.")
 
     def wrapper(func):
@@ -282,10 +291,10 @@ def _ensure_type_annotation(
 
 
 PUBLIC_RULE_DECORATOR_ARGUMENTS = {"canonical_name", "desc", "level"}
-# We don't want @rule-writers to use 'cacheable' as a kwarg directly, but rather
-# set it implicitly based on whether the rule annotation is @rule or @goal_rule.
+# We don't want @rule-writers to use 'rule_type' or 'cacheable' as kwargs directly,
+# but rather set them implicitly based on the rule annotation.
 # So we leave it out of PUBLIC_RULE_DECORATOR_ARGUMENTS.
-IMPLICIT_PRIVATE_RULE_DECORATOR_ARGUMENTS = {"cacheable"}
+IMPLICIT_PRIVATE_RULE_DECORATOR_ARGUMENTS = {"rule_type", "cacheable"}
 
 
 def rule_decorator(func, **kwargs) -> Callable:
@@ -304,6 +313,7 @@ def rule_decorator(func, **kwargs) -> Callable:
             f"`@rule`s and `@goal_rule`s only accept the following keyword arguments: {PUBLIC_RULE_DECORATOR_ARGUMENTS}"
         )
 
+    rule_type: RuleType = kwargs["rule_type"]
     cacheable: bool = kwargs["cacheable"]
 
     func_id = f"@rule {func.__module__}:{func.__name__}"
@@ -343,6 +353,7 @@ def rule_decorator(func, **kwargs) -> Callable:
         )
 
     return _make_rule(
+        rule_type,
         return_type,
         parameter_types,
         cacheable=cacheable,
@@ -358,6 +369,8 @@ def validate_parameter_types(
     if cacheable:
         for ty in parameter_types:
             if side_effecting.is_instance(ty):
+                # TODO: Technically this will also fire for an @_uncacheable_rule, but we don't
+                #  expose those as part of the API, so it's OK for this error not to mention them.
                 raise ValueError(
                     f"A `@rule` that was not a @goal_rule ({func_id}) has a side-effecting parameter: {ty}"
                 )
@@ -375,11 +388,17 @@ def inner_rule(*args, **kwargs) -> Callable:
 
 
 def rule(*args, **kwargs) -> Callable:
-    return inner_rule(*args, **kwargs, cacheable=True)
+    return inner_rule(*args, **kwargs, rule_type=RuleType.rule, cacheable=True)
 
 
 def goal_rule(*args, **kwargs) -> Callable:
-    return inner_rule(*args, **kwargs, cacheable=False)
+    return inner_rule(*args, **kwargs, rule_type=RuleType.goal_rule, cacheable=False)
+
+
+# This has a "private" name, as we don't (yet?) want it to be part of the rule API, at least
+# until we figure out the implications, and have a handle on the semantics and use-cases.
+def _uncacheable_rule(*args, **kwargs) -> Callable:
+    return inner_rule(*args, **kwargs, rule_type=RuleType.uncacheable_rule, cacheable=False)
 
 
 class Rule(ABC):
