@@ -225,6 +225,12 @@ class TestOptions(GoalSubsystem):
             ),
         )
         register(
+            "--force",
+            type=bool,
+            default=False,
+            help="Force the tests to run, even if they could be satisfied from cache.",
+        )
+        register(
             "--use-coverage",
             type=bool,
             default=False,

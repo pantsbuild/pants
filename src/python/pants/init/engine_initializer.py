@@ -3,6 +3,7 @@
 
 import logging
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Iterable, List, Optional, Set, Tuple, Type, cast
 
 from pants.base.build_environment import get_buildroot
@@ -15,7 +16,7 @@ from pants.engine.console import Console
 from pants.engine.fs import Workspace, create_fs_rules
 from pants.engine.goal import Goal
 from pants.engine.interactive_process import InteractiveRunner
-from pants.engine.internals import graph, options_parsing
+from pants.engine.internals import graph, options_parsing, uuid
 from pants.engine.internals.build_files import create_graph_rules
 from pants.engine.internals.mapper import AddressMapper
 from pants.engine.internals.native import Native
@@ -295,6 +296,7 @@ class EngineInitializer:
             build_root_singleton,
             *interactive_process.rules(),
             *graph.rules(),
+            *uuid.rules(),
             *options_parsing.rules(),
             *process.rules(),
             *create_fs_rules(),
@@ -308,14 +310,17 @@ class EngineInitializer:
 
         union_rules = build_configuration.union_rules()
 
+        def ensure_absolute_path(v: str) -> str:
+            return Path(v).resolve().as_posix()
+
         scheduler = Scheduler(
             native=native,
             ignore_patterns=pants_ignore_patterns,
             use_gitignore=use_gitignore,
             build_root=build_root,
-            local_store_dir=local_store_dir,
-            local_execution_root_dir=local_execution_root_dir,
-            named_caches_dir=named_caches_dir,
+            local_store_dir=ensure_absolute_path(local_store_dir),
+            local_execution_root_dir=ensure_absolute_path(local_execution_root_dir),
+            named_caches_dir=ensure_absolute_path(named_caches_dir),
             rules=rules,
             union_rules=union_rules,
             execution_options=execution_options,

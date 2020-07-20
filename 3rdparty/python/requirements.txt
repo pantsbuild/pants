@@ -13,7 +13,7 @@ fasteners==0.15.0
 #         --name=version \
 #     | jq -r '."mypy.version".value'
 #
-mypy==0.781
+mypy==0.782
 
 packaging==20.4
 pathspec==0.8.0
