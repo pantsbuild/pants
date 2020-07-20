@@ -56,14 +56,16 @@ class PythonSetup(Subsystem):
             default=False,
             type=bool,
             help=(
-                "If set, all requirements will be resolved once and the result will be used by "
-                "any work that requires any subset of the requirements.  If unset, each "
-                "subset will be indepdendently resolved as needed, which is more correct - work "
-                "is only invalidated if a requirement it actually depends on changes - but also a "
-                "lot slower, due to the extra resolving.  You may wish to leave this option "
-                "set for normal work, such as running tests, but selectively turn it off via "
-                "command-line-flag when building deployable binaries, so that you only deploy the "
-                "requirements you actually need for a given binary."
+                "If set, and the requirements of the code being operated on are a subset of the "
+                "constraints file, then the entire constraints file will be used instead of the "
+                "subset. If unset, or any requirement of the code being operated on is not in the "
+                "constraints file, each subset will be indepdendently resolved as needed, which is "
+                "more correct - work is only invalidated if a requirement it actually depends on "
+                "changes - but also a lot slower, due to the extra resolving.  "
+                "You may wish to leave this option set for normal work, such as running tests, "
+                "but selectively turn it off via command-line-flag when building deployable "
+                "binaries, so that you only deploy the requirements you actually need for a "
+                "given binary."
             ),
         )
         register(

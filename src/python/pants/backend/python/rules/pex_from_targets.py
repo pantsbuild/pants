@@ -1,13 +1,11 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import itertools
-
 import dataclasses
 from dataclasses import dataclass
 from typing import Iterable, Optional, Tuple
 
-from pkg_resources import parse_requirements
+from pkg_resources import Requirement, parse_requirements
 
 from pants.backend.python.rules.pex import (
     PexInterpreterConstraints,
@@ -25,7 +23,7 @@ from pants.backend.python.target_types import (
     PythonRequirementsField,
 )
 from pants.engine.addresses import Addresses
-from pants.engine.fs import Digest, MergeDigests, PathGlobs, DigestContents, Snapshot
+from pants.engine.fs import Digest, DigestContents, MergeDigests, PathGlobs, Snapshot
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
 from pants.engine.target import TransitiveTargets
@@ -118,7 +116,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         python_setup,
     )
 
-    requirements = PexRequirements.create_from_requirement_fields(
+    exact_reqs = PexRequirements.create_from_requirement_fields(
         (
             tgt[PythonRequirementsField]
             for tgt in all_targets
@@ -133,6 +131,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
                 "resolve_all_constraints in the [python-setup] scope is set, so "
                 "requirement_constraints in [python-setup] must also be provided."
             )
+        exact_req_projects = {Requirement.parse(req).project_name for req in exact_reqs}
         # Add the requirements from the constraint file. Note that this only guarantees
         # a single resolve if the constraint file covers all the individual requirements
         # of individual targets. This may be defeated by, e.g., inline requirements.
@@ -147,19 +146,21 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
                 description_of_origin="the option `--python-setup-requirement-constraints`",
             ),
         )
-        constraints_file_contents = await Get(DigestContents, Digest, constraint_file_snapshot.digest)
-        constraints_file_reqs_iter = parse_requirements(next(iter(constraints_file_contents)).content.decode())
-        requirements = PexRequirements(itertools.chain(requirements, (str(req) for req in constraints_file_reqs_iter)))
-    else:
-        # Resolve just the specific requirements needed.
-        requirements = PexRequirements.create_from_requirement_fields(
-            (
-                tgt[PythonRequirementsField]
-                for tgt in all_targets
-                if tgt.has_field(PythonRequirementsField)
-            ),
-            additional_requirements=request.additional_requirements,
+        constraints_file_contents = await Get(
+            DigestContents, Digest, constraint_file_snapshot.digest
         )
+        constraints_file_reqs = set(
+            parse_requirements(next(iter(constraints_file_contents)).content.decode())
+        )
+        constraint_file_projects = {req.project_name for req in constraints_file_reqs}
+
+        if exact_req_projects.issubset(constraint_file_projects):
+            requirements = PexRequirements(str(req) for req in constraints_file_reqs)
+        else:
+            requirements = exact_reqs
+
+    else:
+        requirements = exact_reqs
 
     return PexRequest(
         output_filename=request.output_filename,
