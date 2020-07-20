@@ -61,7 +61,6 @@ from pants.engine.target import (
     TargetsToValidFieldSetsRequest,
     TargetsWithOrigins,
     TargetWithOrigin,
-    TransitiveTarget,
     TransitiveTargets,
     WrappedTarget,
 )
@@ -116,14 +115,6 @@ class GraphTest(TestBase):
         )
         assert direct_deps == Targets([d1, d2, d3])
 
-        transitive_target = self.request_single_product(
-            TransitiveTarget, Params(WrappedTarget(root), create_options_bootstrapper())
-        )
-        assert transitive_target.root == root
-        assert {
-            dep_transitive_target.root for dep_transitive_target in transitive_target.dependencies
-        } == {d1, d2, d3}
-
         transitive_targets = self.request_single_product(
             TransitiveTargets,
             Params(Addresses([root.address, d2.address]), create_options_bootstrapper()),
@@ -132,6 +123,83 @@ class GraphTest(TestBase):
         # NB: `//:d2` is both a target root and a dependency of `//:root`.
         assert transitive_targets.dependencies == FrozenOrderedSet([d1, d2, d3, t2, t1])
         assert transitive_targets.closure == FrozenOrderedSet([root, d2, d1, d3, t2, t1])
+
+    def test_transitive_targets_tolerates_subtarget_cycles(self) -> None:
+        """For generated subtargets, we should tolerate cycles between targets.
+
+        This only works with generated subtargets, so we use explicit file dependencies in this
+        test.
+        """
+        self.create_files("", ["dep.txt", "t1.txt", "t2.txt"])
+        self.add_to_build_file(
+            "",
+            dedent(
+                """\
+                target(name='dep', sources=['dep.txt'])
+                target(name='t1', sources=['t1.txt'], dependencies=['dep.txt', 't2.txt'])
+                target(name='t2', sources=['t2.txt'], dependencies=['t1.txt'])
+                """
+            ),
+        )
+        result = self.request_single_product(
+            TransitiveTargets,
+            Params(Addresses([Address.parse("//:t2")]), create_options_bootstrapper()),
+        )
+        assert len(result.roots) == 1
+        assert result.roots[0].address == Address.parse("//:t2")
+        assert [tgt.address for tgt in result.dependencies] == [
+            Address("", target_name="t1.txt", generated_base_target_name="t1"),
+            Address("", target_name="dep.txt", generated_base_target_name="dep"),
+            Address("", target_name="t2.txt", generated_base_target_name="t2"),
+        ]
+
+    def do_test_failed_cycle(self, address_str: str, cyclic_address_str: str) -> None:
+        with self.assertRaisesRegex(
+            Exception,
+            f"(?ms)Dependency graph contained a cycle:.*-> {cyclic_address_str}.*-> {cyclic_address_str}.*",
+        ):
+            self.request_single_product(
+                TransitiveTargets,
+                Params(Addresses([Address.parse(address_str)]), create_options_bootstrapper()),
+            )
+
+    def test_cycle_self(self) -> None:
+        self.add_to_build_file(
+            "",
+            dedent(
+                """\
+                target(name='t1', dependencies=[':t1'])
+                """
+            ),
+        )
+        self.do_test_failed_cycle("//:t1", "//:t1")
+
+    def test_cycle_direct(self) -> None:
+        self.add_to_build_file(
+            "",
+            dedent(
+                """\
+                target(name='t1', dependencies=[':t2'])
+                target(name='t2', dependencies=[':t1'])
+                """
+            ),
+        )
+        self.do_test_failed_cycle("//:t1", "//:t1")
+        self.do_test_failed_cycle("//:t2", "//:t2")
+
+    def test_cycle_indirect(self) -> None:
+        self.add_to_build_file(
+            "",
+            dedent(
+                """\
+                target(name='t1', dependencies=[':t2'])
+                target(name='t2', dependencies=[':t3'])
+                target(name='t3', dependencies=[':t2'])
+                """
+            ),
+        )
+        self.do_test_failed_cycle("//:t1", "//:t2")
+        self.do_test_failed_cycle("//:t2", "//:t2")
 
     def test_resolve_generated_subtarget(self) -> None:
         self.add_to_build_file("demo", "target(sources=['f1.txt', 'f2.txt'])")

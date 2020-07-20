@@ -5,7 +5,7 @@ import functools
 import itertools
 import logging
 import os.path
-from collections import defaultdict, deque
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import DefaultDict, Dict, Iterable, List, NamedTuple, Sequence, Set, Tuple, Type, Union
@@ -61,7 +61,6 @@ from pants.engine.target import (
     TargetsToValidFieldSetsRequest,
     TargetsWithOrigins,
     TargetWithOrigin,
-    TransitiveTarget,
     TransitiveTargets,
     UnrecognizedTargetTypeException,
     WrappedTarget,
@@ -135,37 +134,74 @@ async def resolve_targets_with_origins(
 # -----------------------------------------------------------------------------------------------
 
 
-@rule
-async def transitive_target(wrapped_root: WrappedTarget) -> TransitiveTarget:
-    root = wrapped_root.target
-    if not root.has_field(Dependencies):
-        return TransitiveTarget(root, ())
-    dependency_addresses = await Get(Addresses, DependenciesRequest(root[Dependencies]))
-    dependencies = await MultiGet(Get(TransitiveTarget, Address, d) for d in dependency_addresses)
-    return TransitiveTarget(root, dependencies)
+class CycleException(Exception):
+    def __init__(self, subject: Address, path: Tuple[Address, ...]) -> None:
+        path_string = "\n".join((f"-> {a}" if a == subject else f"   {a}") for a in path)
+        super().__init__(f"Dependency graph contained a cycle:\n{path_string}")
+        self.subject = subject
+        self.path = path
+
+
+def _detect_cycles(
+    roots: Tuple[Address, ...], dependencies: Dict[Address, Tuple[Address, ...]]
+) -> None:
+    path_stack: OrderedSet[Address] = OrderedSet()
+    visited: Set[Address] = set()
+
+    def visit(address: Address):
+        if address in visited:
+            # NB: File-level dependencies are cycle tolerant.
+            if not address.generated_base_target_name and address in path_stack:
+                raise CycleException(address, tuple(path_stack) + (address,))
+            return
+        path_stack.add(address)
+        visited.add(address)
+
+        for dep_address in dependencies[address]:
+            visit(dep_address)
+
+        path_stack.remove(address)
+
+    for root in roots:
+        visit(root)
+        if path_stack:
+            raise AssertionError(
+                f"The stack of visited nodes should have been empty at the end of recursion, "
+                f"but it still contained: {path_stack}"
+            )
 
 
 @rule
-async def transitive_targets(addresses: Addresses) -> TransitiveTargets:
-    """Given Addresses, kicks off recursion on expansion of TransitiveTargets.
+async def transitive_targets(targets: Targets) -> TransitiveTargets:
+    """Find all the targets transitively depended upon by the target roots.
 
-    The TransitiveTarget dataclass represents a structure-shared graph, which we walk and flatten
-    here. The engine memoizes the computation of TransitiveTarget, so when multiple
-    TransitiveTargets objects are being constructed for multiple roots, their structure will be
-    shared.
+    This uses iteration, rather than recursion, so that we can tolerate dependency cycles. Unlike a
+    traditional BFS algorithm, we batch each round of traversals via `MultiGet` for improved
+    performance / concurrency.
     """
-    tts = await MultiGet(Get(TransitiveTarget, Address, a) for a in addresses)
+    visited: OrderedSet[Target] = OrderedSet()
+    queued = FrozenOrderedSet(targets)
+    dependency_mapping: Dict[Address, Tuple[Address, ...]] = {}
+    while queued:
+        direct_dependencies = await MultiGet(
+            Get(Targets, DependenciesRequest(tgt.get(Dependencies))) for tgt in queued
+        )
 
-    dependencies: OrderedSet[Target] = OrderedSet()
-    to_visit = deque(itertools.chain.from_iterable(tt.dependencies for tt in tts))
-    while to_visit:
-        tt = to_visit.popleft()
-        if tt.root in dependencies:
-            continue
-        dependencies.add(tt.root)
-        to_visit.extend(tt.dependencies)
+        dependency_mapping.update(
+            zip(
+                (t.address for t in queued),
+                (tuple(t.address for t in deps) for deps in direct_dependencies),
+            )
+        )
 
-    return TransitiveTargets(tuple(tt.root for tt in tts), FrozenOrderedSet(dependencies))
+        queued = FrozenOrderedSet(itertools.chain.from_iterable(direct_dependencies)).difference(
+            visited
+        )
+        visited.update(queued)
+
+    transitive_targets = TransitiveTargets(tuple(targets), FrozenOrderedSet(visited))
+    _detect_cycles(tuple(t.address for t in targets), dependency_mapping)
+    return transitive_targets
 
 
 # -----------------------------------------------------------------------------------------------
@@ -916,7 +952,6 @@ def rules():
         resolve_target_with_origin,
         resolve_targets_with_origins,
         # TransitiveTargets
-        transitive_target,
         transitive_targets,
         # Owners
         find_owners,
