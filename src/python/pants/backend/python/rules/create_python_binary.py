@@ -23,7 +23,6 @@ from pants.backend.python.target_types import (
 from pants.backend.python.target_types import PythonPlatforms as PythonPlatformsField
 from pants.core.goals.binary import BinaryFieldSet, CreatedBinary
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
-from pants.engine.addresses import Addresses
 from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get
 from pants.engine.unions import UnionRule
@@ -79,7 +78,7 @@ async def create_python_binary(
         TwoStepPex,
         TwoStepPexFromTargetsRequest(
             PexFromTargetsRequest(
-                addresses=Addresses([field_set.address]),
+                addresses=[field_set.address],
                 entry_point=entry_point,
                 platforms=PexPlatforms.create_from_platforms_field(field_set.platforms),
                 output_filename=output_filename,

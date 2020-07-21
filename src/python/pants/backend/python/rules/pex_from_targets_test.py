@@ -11,7 +11,6 @@ from pants.backend.python.rules.python_sources import StrippedPythonSourcesReque
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.engine.addresses import Addresses
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import RootRule, SubsystemRule
 from pants.engine.selectors import Params
@@ -79,9 +78,7 @@ class PexTest(TestBase):
             ),
         )
 
-        request = PexFromTargetsRequest(
-            Addresses((Address.parse("//:tgt"),)), output_filename="dummy.pex"
-        )
+        request = PexFromTargetsRequest([Address.parse("//:tgt")], output_filename="dummy.pex")
 
         def get_pex_request(constraints_file: Optional[str], resolve_all: bool) -> PexRequest:
             args = [

@@ -10,7 +10,6 @@ from pants.backend.python.rules.python_sources import (
 from pants.backend.python.subsystems.ipython import IPython
 from pants.backend.python.target_types import PythonSources
 from pants.core.goals.repl import ReplImplementation, ReplRequest
-from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get, MultiGet
@@ -24,11 +23,12 @@ class PythonRepl(ReplImplementation):
 
 @rule
 async def create_python_repl_request(repl: PythonRepl) -> ReplRequest:
-    addresses = Addresses(tgt.address for tgt in repl.targets)
     pex_request = Get(
         Pex,
         PexFromTargetsRequest(
-            addresses=addresses, output_filename="python.pex", include_source_files=False
+            (tgt.address for tgt in repl.targets),
+            output_filename="python.pex",
+            include_source_files=False,
         ),
     )
     source_files_request = Get(
@@ -50,11 +50,10 @@ class IPythonRepl(ReplImplementation):
 
 @rule
 async def create_ipython_repl_request(repl: IPythonRepl, ipython: IPython) -> ReplRequest:
-    addresses = Addresses(tgt.address for tgt in repl.targets)
     pex_request = Get(
         Pex,
         PexFromTargetsRequest(
-            addresses=addresses,
+            (tgt.address for tgt in repl.targets),
             output_filename="ipython.pex",
             entry_point=ipython.get_entry_point(),
             additional_requirements=ipython.get_requirement_specs(),
