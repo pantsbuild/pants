@@ -288,7 +288,7 @@ pub trait Invalidatable: Send + Sync + 'static {
 ///
 /// If on Linux, attempt to report the relevant inotify limit(s).
 ///
-pub fn maybe_enrich_notify_error(path: &Path, e: notify::Error) -> String {
+fn maybe_enrich_notify_error(path: &Path, e: notify::Error) -> String {
   let hint = match &e.kind {
     notify::ErrorKind::Io(e) if cfg!(target_os = "linux") && e.raw_os_error() == Some(28) => {
       // In the context of an attempt to watch a path, an ENOSPC error indicates that you've bumped
