@@ -235,6 +235,7 @@ impl<W: Write + Send + 'static> MaybeWriteLogger<W> {
 
     let config = ConfigBuilder::new()
       .set_time_format_str(TIME_FORMAT_STR)
+      .set_time_to_local(true)
       .set_thread_level(LevelFilter::Off)
       .set_level_padding(LevelPadding::Off)
       .build();
