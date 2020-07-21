@@ -23,7 +23,7 @@ from pants.backend.python.target_types import (
     PythonInterpreterCompatibility,
     PythonRequirementsField,
 )
-from pants.engine.addresses import Addresses
+from pants.engine.addresses import Address, Addresses
 from pants.engine.fs import Digest, DigestContents, MergeDigests, PathGlobs, Snapshot
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
@@ -56,7 +56,7 @@ class PexFromTargetsRequest:
 
     def __init__(
         self,
-        addresses: Addresses,
+        addresses: Iterable[Address],
         *,
         output_filename: str,
         entry_point: Optional[str] = None,
@@ -68,7 +68,7 @@ class PexFromTargetsRequest:
         additional_inputs: Optional[Digest] = None,
         description: Optional[str] = None,
     ) -> None:
-        self.addresses = addresses
+        self.addresses = Addresses(addresses)
         self.output_filename = output_filename
         self.entry_point = entry_point
         self.platforms = platforms
