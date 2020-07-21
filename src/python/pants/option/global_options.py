@@ -168,7 +168,6 @@ class GlobalOptions(Subsystem):
             "--level",
             type=LogLevel,
             default=LogLevel.INFO,
-            recursive=True,
             help="Set the logging level.",
         )
 
