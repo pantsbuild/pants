@@ -5,8 +5,8 @@ from typing import cast
 
 from pants.base.build_root import BuildRoot
 from pants.base.specs import SingleAddress
-from pants.core.goals.binary import BinaryFieldSet, CreatedBinary
-from pants.core.goals.run import Run, RunOptions, run
+from pants.core.goals.binary import BinaryFieldSet
+from pants.core.goals.run import Run, RunOptions, RunRequest, run
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent, Workspace
 from pants.engine.interactive_process import InteractiveProcess, InteractiveRunner
@@ -28,14 +28,14 @@ from pants.testutil.test_base import TestBase
 
 
 class RunTest(TestBase):
-    def create_mock_binary(self, program_text: bytes) -> CreatedBinary:
+    def create_mock_run_request(self, program_text: bytes) -> RunRequest:
         digest = self.request_single_product(
             Digest,
             CreateDigest(
                 [FileContent(path="program.py", content=program_text, is_executable=True)]
             ),
         )
-        return CreatedBinary(binary_name="program.py", digest=digest)
+        return RunRequest(digest=digest, binary_name="program.py")
 
     def single_target_run(
         self, *, console: MockConsole, program_text: bytes, address_spec: str,
@@ -74,9 +74,9 @@ class RunTest(TestBase):
                     mock=lambda _: TargetsToValidFieldSets({target_with_origin: [field_set]}),
                 ),
                 MockGet(
-                    product_type=CreatedBinary,
+                    product_type=RunRequest,
                     subject_type=TestBinaryFieldSet,
-                    mock=lambda _: self.create_mock_binary(program_text),
+                    mock=lambda _: self.create_mock_run_request(program_text),
                 ),
             ],
         )
@@ -92,7 +92,7 @@ class RunTest(TestBase):
 
     def test_materialize_input_files(self) -> None:
         program_text = b'#!/usr/bin/python\nprint("hello")'
-        binary = self.create_mock_binary(program_text)
+        binary = self.create_mock_run_request(program_text)
         interactive_runner = InteractiveRunner(self.scheduler)
         process = InteractiveProcess(
             argv=("./program.py",), run_in_workspace=False, input_digest=binary.digest,
