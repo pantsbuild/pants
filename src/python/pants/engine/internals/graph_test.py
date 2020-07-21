@@ -1058,15 +1058,6 @@ class TestDependencies(TestBase):
         self.add_to_build_file("ignore", "smalltalk(dependencies=['//:dep', '!//:dep'])")
         self.assert_dependencies_resolved(requested_address=Address.parse("ignore"), expected=[])
 
-        # Error on unused ignores.
-        self.add_to_build_file("unused", "smalltalk(dependencies=[':sibling', '!:ignore'])")
-        with pytest.raises(ExecutionError) as exc:
-            self.assert_dependencies_resolved(
-                requested_address=Address.parse("unused"), expected=[]
-            )
-        assert "'!unused:ignore'" in str(exc.value)
-        assert "* unused:sibling" in str(exc.value)
-
     def test_explicit_file_dependencies(self) -> None:
         self.create_files("src/smalltalk/util", ["f1.st", "f2.st", "f3.st"])
         self.add_to_build_file("src/smalltalk/util", "smalltalk(sources=['*.st'])")
@@ -1096,18 +1087,6 @@ class TestDependencies(TestBase):
                 ),
             ],
         )
-
-        # Error on unused ignores.
-        self.add_to_build_file(
-            "unused",
-            "smalltalk(dependencies=['src/smalltalk/util/f1.st', '!src/smalltalk/util/f2.st'])",
-        )
-        with pytest.raises(ExecutionError) as exc:
-            self.assert_dependencies_resolved(
-                requested_address=Address.parse("unused"), expected=[]
-            )
-            assert "'!src/smalltalk/util/f2.st''" in str(exc.value)
-            assert "* src/smalltalk/util/f1.st" in str(exc.value)
 
     def test_dependency_injection(self) -> None:
         self.add_to_build_file("", "smalltalk(name='target')")

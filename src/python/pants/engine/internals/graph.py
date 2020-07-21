@@ -573,29 +573,6 @@ class InvalidFileDependencyException(Exception):
     pass
 
 
-class UnusedDependencyIgnoresException(Exception):
-    def __init__(
-        self, address: Address, *, unused_ignores: Iterable[Address], result: Iterable[Address]
-    ) -> None:
-        # If the address was generated, we convert back to the original base target to correspond to
-        # what users actually put in BUILD files.
-        address = address.maybe_convert_to_base_target()
-        sorted_unused_ignores = sorted([f"!{addr}" for addr in unused_ignores])
-        formatted_unused_ignores = (
-            repr(sorted_unused_ignores[0])
-            if len(sorted_unused_ignores) == 1
-            else str(sorted_unused_ignores)
-        )
-        bulleted_list_sep = "\n  * "
-        possible_deps = sorted(addr.spec for addr in result)
-        super().__init__(
-            f"The target {address} includes {formatted_unused_ignores} in its `dependencies` field, "
-            f"but {'it does' if len(sorted_unused_ignores) == 1 else 'they do'} not match any of "
-            f"the resolved dependencies. Instead, please choose from the dependencies that are "
-            f"being used:\n\n{bulleted_list_sep}{bulleted_list_sep.join(possible_deps)}"
-        )
-
-
 class ParsedDependencies(NamedTuple):
     addresses: List[Address]
     files: List[str]
@@ -764,20 +741,6 @@ async def resolve_dependencies(
         remaining_generated_addresses.add(generated_addr)
 
     result = sorted({*original_addresses, *remaining_generated_addresses})
-
-    unused_ignores = {*provided.ignored_addresses, *flattened_ignore_file_deps_owners} - {
-        *used_ignored_addresses,
-        *used_ignored_file_deps,
-    }
-    # If there are unused ignores and this is not a generated subtarget, we eagerly error so that
-    # the user isn't falsely led to believe the ignore is working. We do not do this for generated
-    # subtargets because we cannot guarantee that the ignore specified in the original owning
-    # target would be used for all generated subtargets.
-    if unused_ignores and not request.field.address.generated_base_target_name:
-        raise UnusedDependencyIgnoresException(
-            request.field.address, unused_ignores=unused_ignores, result=result
-        )
-
     return Addresses(result)
 
 
