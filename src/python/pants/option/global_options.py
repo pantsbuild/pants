@@ -172,6 +172,14 @@ class GlobalOptions(Subsystem):
         )
 
         register(
+            "--show-log-domain",
+            type=bool,
+            default=False,
+            advanced=True,
+            help="Display the log domain where a log message originates in that log message's output.",
+        )
+
+        register(
             "--log-domain-levels",
             type=dict,
             advanced=True,

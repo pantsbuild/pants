@@ -87,7 +87,7 @@ py_module_initializer!(native_engine, |py, m| {
   m.add(
     py,
     "init_logging",
-    py_fn!(py, init_logging(a: u64, b: bool, c: bool)),
+    py_fn!(py, init_logging(a: u64, b: bool, c: bool, d: bool)),
   )?;
   m.add(
     py,
@@ -1649,8 +1649,9 @@ fn init_logging(
   level: u64,
   show_rust_3rdparty_logs: bool,
   use_color: bool,
+  show_log_domain: bool,
 ) -> PyUnitResult {
-  Logger::init(level, show_rust_3rdparty_logs, use_color);
+  Logger::init(level, show_rust_3rdparty_logs, use_color, show_log_domain);
   Ok(None)
 }
 

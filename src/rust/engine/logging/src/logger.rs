@@ -34,6 +34,7 @@ pub struct PantsLogger {
   stderr_log: Mutex<MaybeWriteLogger<Stderr>>,
   use_color: AtomicBool,
   show_rust_3rdparty_logs: AtomicBool,
+  show_log_domain: AtomicBool,
   stderr_handlers: Mutex<HashMap<Uuid, StdioHandler>>,
 }
 
@@ -43,18 +44,27 @@ impl PantsLogger {
       pantsd_log: Mutex::new(MaybeWriteLogger::empty()),
       stderr_log: Mutex::new(MaybeWriteLogger::empty()),
       show_rust_3rdparty_logs: AtomicBool::new(true),
-      use_color: AtomicBool::new(false),
+      use_color: AtomicBool::new(true),
+      show_log_domain: AtomicBool::new(false),
       stderr_handlers: Mutex::new(HashMap::new()),
     }
   }
 
-  pub fn init(max_level: u64, show_rust_3rdparty_logs: bool, use_color: bool) {
+  pub fn init(
+    max_level: u64,
+    show_rust_3rdparty_logs: bool,
+    use_color: bool,
+    show_log_domain: bool,
+  ) {
     let max_python_level: Result<PythonLogLevel, _> = max_level.try_into();
     match max_python_level {
       Ok(python_level) => {
         let level: log::LevelFilter = python_level.into();
         set_max_level(level);
         PANTS_LOGGER.use_color.store(use_color, Ordering::SeqCst);
+        PANTS_LOGGER
+          .show_log_domain
+          .store(show_log_domain, Ordering::SeqCst);
         PANTS_LOGGER
           .show_rust_3rdparty_logs
           .store(show_rust_3rdparty_logs, Ordering::SeqCst);
@@ -78,7 +88,12 @@ impl PantsLogger {
       .map_err(|err| format!("{}", err))
       .map(|level: PythonLogLevel| {
         self.maybe_increase_global_verbosity(level.into());
-        *self.stderr_log.lock() = MaybeWriteLogger::new(stderr(), level.into())
+        *self.stderr_log.lock() = MaybeWriteLogger::new(
+          stderr(),
+          level.into(),
+          self.show_rust_3rdparty_logs.load(Ordering::SeqCst),
+          self.show_log_domain.load(Ordering::SeqCst),
+        )
       })
   }
 
@@ -108,7 +123,12 @@ impl PantsLogger {
           .map(|file| {
             let fd = file.as_raw_fd();
             self.maybe_increase_global_verbosity(level.into());
-            *self.pantsd_log.lock() = MaybeWriteLogger::new(file, level.into());
+            *self.pantsd_log.lock() = MaybeWriteLogger::new(
+              file,
+              level.into(),
+              self.show_rust_3rdparty_logs.load(Ordering::SeqCst),
+              self.show_log_domain.load(Ordering::SeqCst),
+            );
             fd
           })
           .map_err(|err| format!("Error opening pantsd logfile: {}", err))
@@ -181,6 +201,7 @@ impl Log for PantsLogger {
         );
 
         let level = record.level();
+        let show_log_domain = self.show_log_domain.load(Ordering::SeqCst);
         let use_color = self.use_color.load(Ordering::SeqCst);
 
         let level_marker = match level {
@@ -192,7 +213,17 @@ impl Log for PantsLogger {
           Level::Trace => format!("[{}]", level).magenta(),
         };
 
-        let log_string = format!("{} {} {} {}", time_str, level_marker, record.target(), record.args());
+        let log_string = if show_log_domain {
+          format!(
+            "{} {} {} {}",
+            time_str,
+            level_marker,
+            record.target(),
+            record.args()
+          )
+        } else {
+          format!("{} {} {}", time_str, level_marker, record.args())
+        };
 
         {
           // We first try to output to all registered handlers. If there are none, or any of them
@@ -233,7 +264,12 @@ impl<W: Write + Send + 'static> MaybeWriteLogger<W> {
     }
   }
 
-  pub fn new(writable: W, level: LevelFilter) -> MaybeWriteLogger<W> {
+  pub fn new(
+    writable: W,
+    level: LevelFilter,
+    show_rust_3rdparty_logs: bool,
+    show_log_domain: bool,
+  ) -> MaybeWriteLogger<W> {
     // We initialize the inner WriteLogger with no filters so that we don't
     // have to create a new one every time we change the level of the outer
     // MaybeWriteLogger.
@@ -241,6 +277,11 @@ impl<W: Write + Send + 'static> MaybeWriteLogger<W> {
     let config = ConfigBuilder::new()
       .set_time_format_str(TIME_FORMAT_STR)
       .set_time_to_local(true)
+      .set_target_level(if show_log_domain {
+        LevelFilter::Error
+      } else {
+        LevelFilter::Off
+      })
       .set_thread_level(LevelFilter::Off)
       .set_level_padding(LevelPadding::Off)
       .build();

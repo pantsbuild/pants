@@ -124,8 +124,10 @@ class Native(metaclass=SingletonMetaclass):
     def decompress_tarball(self, tarfile_path, dest_dir):
         return self.lib.decompress_tarball(tarfile_path, dest_dir)
 
-    def init_rust_logging(self, level, log_show_rust_3rdparty: bool, use_color: bool):
-        return self.lib.init_logging(level, log_show_rust_3rdparty, use_color)
+    def init_rust_logging(
+        self, level, log_show_rust_3rdparty: bool, use_color: bool, show_log_domain: bool
+    ):
+        return self.lib.init_logging(level, log_show_rust_3rdparty, use_color, show_log_domain)
 
     def default_cache_path(self) -> str:
         return cast(str, self.lib.default_cache_path())
