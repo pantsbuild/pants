@@ -1160,13 +1160,7 @@ impl Node for NodeKey {
           .core
           .watcher
           .watch(abs_path)
-          .map_err(|e| {
-            Context::mk_error(&format!(
-              "Failed to watch filesystem for `{}`: {:?}",
-              path.display(),
-              e
-            ))
-          })
+          .map_err(|e| Context::mk_error(&e))
           .await
       } else {
         Ok(())
