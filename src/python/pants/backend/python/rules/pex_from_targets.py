@@ -150,13 +150,19 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         constraint_file_projects = {req.project_name for req in constraints_file_reqs}
         unconstrained_projects = exact_req_projects - constraint_file_projects
         if unconstrained_projects:
-            raise ValueError(
+            logger.warning(
                 f"The constraints file {python_setup.requirement_constraints} does not contain "
                 f"entries for the following requirements: {', '.join(unconstrained_projects)}"
             )
 
         if python_setup.options.resolve_all_constraints:
-            requirements = PexRequirements(str(req) for req in constraints_file_reqs)
+            if unconstrained_projects:
+                logger.warning(
+                    "Ignoring resolve_all_constraints setting in [python_setup] scope"
+                    "Because constraints file does not cover all requirements."
+                )
+            else:
+                requirements = PexRequirements(str(req) for req in constraints_file_reqs)
     elif python_setup.options.resolve_all_constraints:
         raise ValueError(
             "resolve_all_constraints in the [python-setup] scope is set, so "
