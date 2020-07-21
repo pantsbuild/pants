@@ -101,7 +101,6 @@ class PythonBinaryDefaults(Subsystem):
             advanced=True,
             type=bool,
             default=True,
-            fingerprint=True,
             help=(
                 "Whether built PEX binaries should emit pex warnings at runtime by default. "
                 "Can be over-ridden by specifying the `emit_warnings` parameter of individual "

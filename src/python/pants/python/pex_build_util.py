@@ -64,7 +64,6 @@ class PexBuilderWrapper:
                 "--setuptools-version",
                 advanced=True,
                 default="40.6.3",
-                fingerprint=True,
                 help="The setuptools version to include in the pex if namespace packages need "
                 "to be injected.",
             )
@@ -72,7 +71,6 @@ class PexBuilderWrapper:
                 "--pex-version",
                 advanced=True,
                 default=pex_version,
-                fingerprint=True,
                 help="The pex version to include in any generated ipex files. "
                 "NOTE: This should ideally be the same as the pex version which pants "
                 f"itself depends on, which right now is {pex_version}.",

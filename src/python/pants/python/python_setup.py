@@ -28,7 +28,6 @@ class PythonSetup(Subsystem):
         register(
             "--interpreter-constraints",
             advanced=True,
-            fingerprint=True,
             type=list,
             default=["CPython>=3.6"],
             metavar="<requirement>",
@@ -41,7 +40,6 @@ class PythonSetup(Subsystem):
         register(
             "--requirement-constraints",
             advanced=True,
-            fingerprint=True,
             type=file_option,
             help=(
                 "When resolving third-party requirements, use this "
@@ -74,7 +72,6 @@ class PythonSetup(Subsystem):
             type=list,
             metavar="<platform>",
             default=["current"],
-            fingerprint=True,
             help="A list of platforms to be supported by this Python environment. Each platform"
             "is a string, as returned by pkg_resources.get_supported_platform().",
         )
@@ -107,7 +104,6 @@ class PythonSetup(Subsystem):
             advanced=True,
             type=bool,
             default=UnsetBool,
-            fingerprint=True,
             help="Whether to include pre-releases when resolving requirements.",
         )
         register(
@@ -128,7 +124,6 @@ class PythonSetup(Subsystem):
             advanced=True,
             type=str,
             default="manylinux2014",
-            fingerprint=True,
             help="Whether to allow resolution of manylinux wheels when resolving requirements for "
             "foreign linux platforms. The value should be a manylinux platform upper bound, "
             "e.g.: manylinux2010, or else [Ff]alse, [Nn]o or [Nn]one to disallow.",
@@ -138,7 +133,6 @@ class PythonSetup(Subsystem):
             type=int,
             default=None,
             advanced=True,
-            fingerprint=True,
             help="The maximum number of concurrent jobs to resolve wheels with.",
         )
 

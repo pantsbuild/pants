@@ -46,7 +46,6 @@ class LibcDev(Subsystem):
             "--enable-libc-search",
             type=bool,
             default=False,
-            fingerprint=True,
             advanced=True,
             help="Whether to search for the host's libc installation. Set to False if the host "
             "does not have a libc install with crti.o -- this file is necessary to create "
@@ -56,7 +55,6 @@ class LibcDev(Subsystem):
             "--libc-dir",
             type=dir_option,
             default=None,
-            fingerprint=True,
             advanced=True,
             help="A directory containing a host-specific crti.o from libc.",
         )
@@ -64,7 +62,6 @@ class LibcDev(Subsystem):
             "--host-compiler",
             type=str,
             default="gcc",
-            fingerprint=True,
             advanced=True,
             help="The host compiler to invoke with -print-search-dirs to find the host libc.",
         )

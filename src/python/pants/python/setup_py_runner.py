@@ -33,14 +33,12 @@ class SetupPyRunner:
             register(
                 "--setuptools-version",
                 advanced=True,
-                fingerprint=True,
                 default="44.0.0",
                 help="The setuptools version to use when executing `setup.py` scripts.",
             )
             register(
                 "--wheel-version",
                 advanced=True,
-                fingerprint=True,
                 default="0.34.2",
                 help="The wheel version to use when executing `setup.py` scripts.",
             )

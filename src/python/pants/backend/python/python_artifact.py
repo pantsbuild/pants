@@ -1,11 +1,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.base.hash_utils import stable_json_sha1
-from pants.base.payload_field import PayloadField
 
-
-class PythonArtifact(PayloadField):
+class PythonArtifact:
     """Represents a Python setup.py-based project."""
 
     class MissingArgument(Exception):
@@ -65,9 +62,6 @@ class PythonArtifact(PayloadField):
 
     def __str__(self):
         return self.name
-
-    def _compute_fingerprint(self):
-        return stable_json_sha1((self._kw, self._binaries))
 
     def with_binaries(self, *args, **kw):
         """Add binaries tagged to this artifact.
