@@ -192,7 +192,7 @@ impl Log for PantsLogger {
           Level::Trace => format!("[{}]", level).magenta(),
         };
 
-        let log_string = format!("{} {} {}", time_str, level_marker, record.args());
+        let log_string = format!("{} {} {} {}", time_str, level_marker, record.target(), record.args());
 
         {
           // We first try to output to all registered handlers. If there are none, or any of them
