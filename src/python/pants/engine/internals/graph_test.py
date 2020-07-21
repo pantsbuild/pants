@@ -153,7 +153,7 @@ class GraphTest(TestBase):
             Address("", target_name="t2.txt", generated_base_target_name="t2"),
         ]
 
-    def do_test_failed_cycle(self, address_str: str, cyclic_address_str: str) -> None:
+    def assert_failed_cycle(self, address_str: str, cyclic_address_str: str) -> None:
         with self.assertRaisesRegex(
             Exception,
             f"(?ms)Dependency graph contained a cycle:.*-> {cyclic_address_str}.*-> {cyclic_address_str}.*",
@@ -172,7 +172,7 @@ class GraphTest(TestBase):
                 """
             ),
         )
-        self.do_test_failed_cycle("//:t1", "//:t1")
+        self.assert_failed_cycle("//:t1", "//:t1")
 
     def test_cycle_direct(self) -> None:
         self.add_to_build_file(
@@ -184,8 +184,8 @@ class GraphTest(TestBase):
                 """
             ),
         )
-        self.do_test_failed_cycle("//:t1", "//:t1")
-        self.do_test_failed_cycle("//:t2", "//:t2")
+        self.assert_failed_cycle("//:t1", "//:t1")
+        self.assert_failed_cycle("//:t2", "//:t2")
 
     def test_cycle_indirect(self) -> None:
         self.add_to_build_file(
@@ -198,8 +198,8 @@ class GraphTest(TestBase):
                 """
             ),
         )
-        self.do_test_failed_cycle("//:t1", "//:t2")
-        self.do_test_failed_cycle("//:t2", "//:t2")
+        self.assert_failed_cycle("//:t1", "//:t2")
+        self.assert_failed_cycle("//:t2", "//:t2")
 
     def test_resolve_generated_subtarget(self) -> None:
         self.add_to_build_file("demo", "target(sources=['f1.txt', 'f2.txt'])")
