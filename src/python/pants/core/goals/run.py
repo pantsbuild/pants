@@ -26,7 +26,7 @@ from pants.util.meta import frozen_after_init
 class RunRequest:
     digest: Digest
     binary_name: str
-    extra_args: Tuple[str, ...]
+    prefix_args: Tuple[str, ...]
     env: FrozenDict[str, str]
 
     def __init__(
@@ -34,12 +34,12 @@ class RunRequest:
         *,
         digest: Digest,
         binary_name: str,
-        extra_args: Optional[Iterable[str]] = None,
+        prefix_args: Optional[Iterable[str]] = None,
         env: Optional[Mapping[str, str]] = None,
     ) -> None:
         self.digest = digest
         self.binary_name = binary_name
-        self.extra_args = tuple(extra_args or ())
+        self.prefix_args = tuple(prefix_args or ())
         self.env = FrozenDict(env or {})
 
 
@@ -102,7 +102,7 @@ async def run(
 
         full_path = PurePath(tmpdir, request.binary_name).as_posix()
         process = InteractiveProcess(
-            argv=(full_path, *request.extra_args, *options.values.args),
+            argv=(full_path, *request.prefix_args, *options.values.args),
             env=request.env,
             run_in_workspace=True,
         )

@@ -21,7 +21,7 @@ from pants.engine.unions import UnionRule
 
 
 @rule
-async def run_python_binary(
+async def create_python_binary_run_request(
     field_set: PythonBinaryFieldSet, python_binary_defaults: PythonBinaryDefaults
 ) -> RunRequest:
     entry_point = field_set.entry_point.value
@@ -32,7 +32,7 @@ async def run_python_binary(
         entry_point = PythonBinarySources.translate_source_file_to_entry_point(binary_sources.files)
     if entry_point is None:
         raise InvalidFieldException(
-            "You must either specify `sources` or `entry_point` for the `python_binary` target "
+            "You must either specify `sources` or `entry_point` for the target "
             f"{repr(field_set.address)} in order to run it, but both fields were undefined."
         )
 
@@ -59,14 +59,14 @@ async def run_python_binary(
     return RunRequest(
         digest=merged_digest,
         binary_name=pex.output_filename,
-        extra_args=("-m", entry_point),
+        prefix_args=("-m", entry_point),
         env={"PEX_EXTRA_SYS_PATH": ":".join(source_files.source_roots)},
     )
 
 
 def rules():
     return [
-        run_python_binary,
+        create_python_binary_run_request,
         UnionRule(BinaryFieldSet, PythonBinaryFieldSet),
         SubsystemRule(PythonBinaryDefaults),
     ]
