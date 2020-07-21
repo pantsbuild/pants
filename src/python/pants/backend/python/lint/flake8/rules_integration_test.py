@@ -7,12 +7,13 @@ from pants.backend.python.lint.flake8.rules import Flake8FieldSet, Flake8Request
 from pants.backend.python.lint.flake8.rules import rules as flake8_rules
 from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonLibrary
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
-from pants.core.goals.lint import LintResults
+from pants.core.goals.lint import LintOptions, LintResults
 from pants.engine.addresses import Address
-from pants.engine.fs import FileContent
+from pants.engine.fs import DigestContents, FileContent
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.engine.target import TargetWithOrigin
+from pants.testutil.engine.util import create_subsystem
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.interpreter_selection_utils import skip_unless_python27_and_python3_present
 from pants.testutil.option.util import create_options_bootstrapper
@@ -26,7 +27,7 @@ class Flake8IntegrationTest(ExternalToolTestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *flake8_rules(), RootRule(Flake8Request))
+        return (*super().rules(), *flake8_rules(), RootRule(Flake8Request), RootRule(LintOptions))
 
     def make_target_with_origin(
         self,
@@ -53,6 +54,7 @@ class Flake8IntegrationTest(ExternalToolTestBase):
         passthrough_args: Optional[str] = None,
         skip: bool = False,
         additional_args: Optional[List[str]] = None,
+        reports_dir: Optional[str] = None,
     ) -> LintResults:
         args = ["--backend-packages=pants.backend.python.lint.flake8"]
         if config:
@@ -68,6 +70,7 @@ class Flake8IntegrationTest(ExternalToolTestBase):
             LintResults,
             Params(
                 Flake8Request(Flake8FieldSet.create(tgt) for tgt in targets),
+                create_subsystem(LintOptions, reports_dir=reports_dir),  # type: ignore[type-var]
                 create_options_bootstrapper(args=args),
             ),
         )
@@ -78,6 +81,7 @@ class Flake8IntegrationTest(ExternalToolTestBase):
         assert len(result) == 1
         assert result[0].exit_code == 0
         assert result[0].stdout.strip() == ""
+        assert result[0].results_file is None
 
     def test_failing_source(self) -> None:
         target = self.make_target_with_origin([self.bad_source])
@@ -85,6 +89,7 @@ class Flake8IntegrationTest(ExternalToolTestBase):
         assert len(result) == 1
         assert result[0].exit_code == 1
         assert "bad.py:1:1: F401" in result[0].stdout
+        assert result[0].results_file is None
 
     def test_mixed_sources(self) -> None:
         target = self.make_target_with_origin([self.good_source, self.bad_source])
@@ -173,3 +178,14 @@ class Flake8IntegrationTest(ExternalToolTestBase):
         assert len(result) == 1
         assert result[0].exit_code == 1
         assert "bad.py:1:1: PB11" in result[0].stdout
+
+    def test_output_file(self) -> None:
+        target = self.make_target_with_origin([self.bad_source])
+        result = self.run_flake8([target], reports_dir=".")
+        assert len(result) == 1
+        assert result[0].exit_code == 1
+        assert result[0].stdout.strip() == ""
+        assert result[0].results_file is not None
+        output_files = self.request_single_product(DigestContents, result[0].results_file.digest)
+        assert len(output_files) == 1
+        assert "bad.py:1:1: F401" in output_files[0].content.decode()

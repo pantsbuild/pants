@@ -3,7 +3,8 @@
 
 import itertools
 from dataclasses import dataclass
-from typing import Iterable
+from pathlib import Path
+from typing import Iterable, Optional
 
 from pants.core.goals.style_request import StyleRequest
 from pants.core.util_rules.filter_empty_sources import (
@@ -12,6 +13,7 @@ from pants.core.util_rules.filter_empty_sources import (
 )
 from pants.engine.collection import Collection
 from pants.engine.console import Console
+from pants.engine.fs import Digest, DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import goal_rule
@@ -22,15 +24,26 @@ from pants.util.strutil import strip_v2_chroot_path
 
 
 @dataclass(frozen=True)
+class LintResultFile:
+    output_path: Path
+    digest: Digest
+
+
+@dataclass(frozen=True)
 class LintResult:
     exit_code: int
     stdout: str
     stderr: str
     linter_name: str
+    results_file: Optional[LintResultFile]
 
     @staticmethod
     def from_fallible_process_result(
-        process_result: FallibleProcessResult, *, linter_name: str, strip_chroot_path: bool = False
+        process_result: FallibleProcessResult,
+        *,
+        linter_name: str,
+        strip_chroot_path: bool = False,
+        results_file: Optional[LintResultFile] = None,
     ) -> "LintResult":
         def prep_output(s: bytes) -> str:
             return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
@@ -40,7 +53,19 @@ class LintResult:
             stdout=prep_output(process_result.stdout),
             stderr=prep_output(process_result.stderr),
             linter_name=linter_name,
+            results_file=results_file,
         )
+
+    def materialize(self, console: Console, workspace: Workspace) -> None:
+        if not self.results_file:
+            return
+        output_path = self.results_file.output_path
+        workspace.materialize_directory(
+            DirectoryToMaterialize(
+                self.results_file.digest, path_prefix=output_path.parent.as_posix(),
+            )
+        )
+        console.print_stdout(f"Wrote {self.linter_name} report to: {output_path.as_posix()}")
 
 
 class LintResults(Collection[LintResult]):
@@ -85,6 +110,19 @@ class LintOptions(GoalSubsystem):
                 "faster than `--no-per-target-caching` for your use case."
             ),
         )
+        register(
+            "--reports-dir",
+            type=str,
+            metavar="<DIR>",
+            default=None,
+            advanced=True,
+            help="Specifying a directory causes linter that support it to write report files into this directory",
+        )
+
+    @property
+    def output_dir(self) -> Optional[Path]:
+        reports_dir = self.values.reports_dir
+        return Path(reports_dir) if reports_dir else None
 
 
 class Lint(Goal):
@@ -94,6 +132,7 @@ class Lint(Goal):
 @goal_rule
 async def lint(
     console: Console,
+    workspace: Workspace,
     targets_with_origins: TargetsWithOrigins,
     options: LintOptions,
     union_membership: UnionMembership,
@@ -145,6 +184,7 @@ async def lint(
             console.print_stderr(result.stderr)
         if result != sorted_results[-1]:
             console.print_stderr("")
+        result.materialize(console, workspace)
         if result.exit_code != 0:
             exit_code = result.exit_code
 
