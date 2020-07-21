@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import dataclasses
+import logging
 from dataclasses import dataclass
 from typing import Iterable, Optional, Tuple
 
@@ -31,6 +32,8 @@ from pants.option.custom_types import GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
 from pants.util.meta import frozen_after_init
+
+logger = logging.getLogger(__name__)
 
 
 @frozen_after_init
@@ -63,7 +66,7 @@ class PexFromTargetsRequest:
         include_source_files: bool = True,
         additional_sources: Optional[Digest] = None,
         additional_inputs: Optional[Digest] = None,
-        description: Optional[str] = None
+        description: Optional[str] = None,
     ) -> None:
         self.addresses = addresses
         self.output_filename = output_filename
@@ -125,18 +128,10 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         additional_requirements=request.additional_requirements,
     )
 
-    if python_setup.options.resolve_all_constraints:
-        if python_setup.requirement_constraints is None:
-            raise ValueError(
-                "resolve_all_constraints in the [python-setup] scope is set, so "
-                "requirement_constraints in [python-setup] must also be provided."
-            )
+    requirements = exact_reqs
+
+    if python_setup.requirement_constraints:
         exact_req_projects = {Requirement.parse(req).project_name for req in exact_reqs}
-        # Add the requirements from the constraint file. Note that this only guarantees
-        # a single resolve if the constraint file covers all the individual requirements
-        # of individual targets. This may be defeated by, e.g., inline requirements.
-        # However we will still do the right thing in that case, it's just the performance
-        # will be impacted by extra resolves.
         constraint_file_snapshot = await Get(
             Snapshot,
             PathGlobs(
@@ -153,14 +148,20 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
             parse_requirements(next(iter(constraints_file_contents)).content.decode())
         )
         constraint_file_projects = {req.project_name for req in constraints_file_reqs}
+        unconstrained_projects = exact_req_projects - constraint_file_projects
+        if unconstrained_projects:
+            raise ValueError(
+                f"The constraints file {python_setup.requirement_constraints} does not contain "
+                f"entries for the following requirements: {', '.join(unconstrained_projects)}"
+            )
 
-        if exact_req_projects.issubset(constraint_file_projects):
+        if python_setup.options.resolve_all_constraints:
             requirements = PexRequirements(str(req) for req in constraints_file_reqs)
-        else:
-            requirements = exact_reqs
-
-    else:
-        requirements = exact_reqs
+    elif python_setup.options.resolve_all_constraints:
+        raise ValueError(
+            "resolve_all_constraints in the [python-setup] scope is set, so "
+            "requirement_constraints in [python-setup] must also be provided."
+        )
 
     return PexRequest(
         output_filename=request.output_filename,
