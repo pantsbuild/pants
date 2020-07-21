@@ -13,11 +13,13 @@ import java.io.PrintStream;
 import java.io.Reader;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
-
 import javax.annotation.Nullable;
 
 import com.google.common.base.Charsets;
+import com.google.common.base.Joiner;
 import com.google.common.io.CharStreams;
 import com.google.common.io.Closeables;
 
@@ -176,6 +178,15 @@ public class PantsRunnerTest {
       throws Exception {
     ByteArrayOutputStream replacementStream = new ByteArrayOutputStream();
     PrintStream originalStream = System.out;
+
+    String originalClasspathProperty = System.getProperty("java.class.path");
+    List<String> classpathElements = new ArrayList<>();
+    for (URL url : classpath) {
+      classpathElements.add(url.toURI().getPath());
+    }
+    System.setProperty("java.class.path",
+            Joiner.on(File.pathSeparatorChar).join(classpathElements));
+
     System.setOut(new PrintStream(replacementStream));
     try {
       final AtomicReference<Exception> exceptionRef = new AtomicReference<Exception>();
@@ -197,6 +208,7 @@ public class PantsRunnerTest {
         throw exceptionRef.get();
       }
     } finally {
+      System.setProperty("java.class.path", originalClasspathProperty);
       System.setOut(originalStream);
     }
 
