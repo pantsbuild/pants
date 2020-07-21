@@ -43,7 +43,6 @@ function bootstrap_rust() {
     curl --fail https://sh.rustup.rs -sS | sh -s -- -y --no-modify-path --default-toolchain none 1>&2
   fi
 
-  local -r cargo="${CARGO_HOME}/bin/cargo"
   local -r cargo_components_fp=$(echo "${RUST_COMPONENTS[@]}" | fingerprint_data)
   local -r cargo_versioned="cargo-${RUST_TOOLCHAIN}-${cargo_components_fp}"
   if [[ ! -x "${rust_toolchain_root}/${cargo_versioned}" || "${RUST_TOOLCHAIN}" == "nightly" ]]; then
@@ -56,11 +55,6 @@ function bootstrap_rust() {
     symlink_target="$(python -c 'import os, sys; print(os.path.relpath(*sys.argv[1:]))' "$(RUSTUP_TOOLCHAIN="${RUST_TOOLCHAIN}" cargo_bin)" "${rust_toolchain_root}")"
     ln -fs "${symlink_target}" "${rust_toolchain_root}/${cargo_versioned}"
   fi
-
-  if [[ ! -x "${CARGO_HOME}/bin/cargo-ensure-installed" ]]; then
-    "${cargo}" install cargo-ensure-installed
-  fi
-  "${cargo}" ensure-installed --package cargo-ensure-installed --version 0.2.1
 
   local -r symlink_farm_root="${REPO_ROOT}/build-support/bin/native"
   if [[ ! -x "${symlink_farm_root}/.${cargo_versioned}" ]]; then
