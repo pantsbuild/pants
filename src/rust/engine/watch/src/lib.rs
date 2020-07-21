@@ -31,7 +31,7 @@
 mod tests;
 
 use std::collections::HashSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Weak};
 use std::thread;
 use std::time::Duration;
@@ -256,7 +256,7 @@ impl InvalidationWatcher {
   ///
   /// Add a path to the set of paths being watched by this invalidation watcher, non-recursively.
   ///
-  pub async fn watch(self: &Arc<Self>, path: PathBuf) -> Result<(), notify::Error> {
+  pub async fn watch(self: &Arc<Self>, path: PathBuf) -> Result<(), String> {
     if cfg!(target_os = "macos") {
       // Short circuit here if we are on a Darwin platform because we should be watching
       // the entire build root recursively already.
@@ -272,7 +272,10 @@ impl InvalidationWatcher {
     executor
       .spawn_blocking(move || {
         let mut inner = watcher.0.lock();
-        inner.watcher.watch(path, RecursiveMode::NonRecursive)
+        inner
+          .watcher
+          .watch(&path, RecursiveMode::NonRecursive)
+          .map_err(|e| maybe_enrich_notify_error(&path, e))
       })
       .await
   }
@@ -280,4 +283,33 @@ impl InvalidationWatcher {
 
 pub trait Invalidatable: Send + Sync + 'static {
   fn invalidate(&self, paths: &HashSet<PathBuf>, caller: &str) -> usize;
+}
+
+///
+/// If on Linux, attempt to report the relevant inotify limit(s).
+///
+fn maybe_enrich_notify_error(path: &Path, e: notify::Error) -> String {
+  let hint = match &e.kind {
+    notify::ErrorKind::Io(e) if cfg!(target_os = "linux") && e.raw_os_error() == Some(28) => {
+      // In the context of an attempt to watch a path, an ENOSPC error indicates that you've bumped
+      // into the limit on max watches.
+      let limit_value =
+        if let Ok(limit) = std::fs::read_to_string("/proc/sys/fs/inotify/max_user_watches") {
+          format!("yours is set to {}", limit.trim())
+        } else {
+          "unable to read limit value".to_string()
+        };
+      format!("\n\nOn Linux, this can be caused by a `max_user_watches` setting that is lower \
+              than the number of files and directories in your repository ({}). Please see \
+              https://www.pantsbuild.org/docs/troubleshooting#no-space-left-on-device-error-while-watching-files \
+              for more information.", limit_value)
+    }
+    _ => "".to_string(),
+  };
+  format!(
+    "Failed to watch filesystem for `{}`: {:?}{}",
+    path.display(),
+    e,
+    hint
+  )
 }
