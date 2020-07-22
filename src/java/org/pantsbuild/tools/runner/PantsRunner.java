@@ -3,20 +3,21 @@
 
 package org.pantsbuild.tools.runner;
 
-import com.google.common.base.Joiner;
-
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.net.MalformedURLException;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
+
+import com.google.common.base.Joiner;
+import com.google.common.base.Splitter;
+import com.google.common.collect.Lists;
 
 /**
  * Helper class for running java code using synthetic jar.
@@ -25,6 +26,9 @@ import java.util.jar.Manifest;
  * most likely fix all problems with classloaders.
  */
 public class PantsRunner {
+
+  private static final String JAVA_CLASS_PATH = "java.class.path";
+
   public static void main(String[] args) throws Exception {
     if (args.length == 0) {
       System.out.println("Usage: java -cp synthetic_jar " +
@@ -36,19 +40,19 @@ public class PantsRunner {
     }
     List<File> classpath = readClasspath();
     updateClassPathProperty(classpath);
-    updateClassLoader(getClassLoader(), classpath);
+    updateClassLoader(classpath);
     String[] mainArgs = new String[args.length - 1];
     System.arraycopy(args, 1, mainArgs, 0, args.length - 1);
     runMainMethod(args[0], mainArgs);
   }
 
-  private static List<File> readClasspath() throws IOException, URISyntaxException {
-    URL[] urls = getClassLoader().getURLs();
-    if (urls.length != 1 || !urls[0].getProtocol().equals("file") ||
-        !urls[0].toString().endsWith(".jar")) {
+  private static List<File> readClasspath() throws IOException {
+    List<String> paths = Lists.newArrayList(Splitter.on(File.pathSeparatorChar)
+            .split(System.getProperty(JAVA_CLASS_PATH)));
+    if (paths.size() != 1 || !paths.get(0).endsWith(".jar")) {
       throw new IllegalArgumentException("Should be exactly one jar file in the classpath.");
     }
-    File jarFile = new File(urls[0].toURI());
+    File jarFile = new File(paths.get(0));
     JarFile jar = new JarFile(jarFile);
     Manifest manifest = jar.getManifest();
     if (manifest == null) {
@@ -60,32 +64,34 @@ public class PantsRunner {
       throw new IllegalArgumentException("Supplied jar file's manifest " +
           "doesn't contains Class-Path section.");
     }
-    List<File> classpathFiles = new ArrayList<File>();
+    List<File> classpathURLs = new ArrayList<>();
+    classpathURLs.add(jarFile);
     for (String path : classpath.split("\\s")) {
-      classpathFiles.add(new File(jarFile.getParent(), path));
+      classpathURLs.add(new File(jarFile.getParent(), path));
     }
-    return classpathFiles;
+    return classpathURLs;
   }
 
-  private static URLClassLoader getClassLoader() {
+  private static ClassLoader getClassLoader() {
     // Using context classloader here as it should be application one on the startup and
     // because it's simple to mock context class loader in tests.
-    return (URLClassLoader) Thread.currentThread().getContextClassLoader();
+    return Thread.currentThread().getContextClassLoader();
   }
 
   private static void updateClassPathProperty(List<File> classpath) {
-    System.setProperty("java.class.path",
-        System.getProperty("java.class.path") + File.pathSeparator +
-            Joiner.on(':').join(classpath));
+    System.setProperty(JAVA_CLASS_PATH,
+            System.getProperty(JAVA_CLASS_PATH) + File.pathSeparator +
+                    Joiner.on(File.pathSeparatorChar).join(classpath));
   }
 
-  private static void updateClassLoader(URLClassLoader classLoader, List<File> classpath)
-      throws ReflectiveOperationException, MalformedURLException {
-    Method addUrl = URLClassLoader.class.getDeclaredMethod("addURL", URL.class);
-    addUrl.setAccessible(true);
-    for (File entry : classpath) {
-      addUrl.invoke(classLoader, entry.toURI().toURL());
+  private static void updateClassLoader(List<File> classpath)
+          throws MalformedURLException {
+    List<URL> classpathUrls = new ArrayList<>();
+    for (File file : classpath) {
+      classpathUrls.add(file.toURI().toURL());
     }
+    Thread.currentThread().setContextClassLoader(
+            URLClassLoader.newInstance(classpathUrls.toArray(new URL[0])));
   }
 
   private static void runMainMethod(String mainClass, String[] args)
