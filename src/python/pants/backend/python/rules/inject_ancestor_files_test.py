@@ -7,6 +7,7 @@ from pants.backend.python.rules.inject_ancestor_files import (
     AncestorFiles,
     AncestorFilesRequest,
     find_missing_ancestor_files,
+    identify_missing_ancestor_files,
 )
 from pants.core.util_rules import strip_source_roots
 from pants.engine.fs import DigestContents
@@ -89,3 +90,29 @@ class InjectAncestorFilesTest(TestBase):
             ],
             expected_discovered=["project/__init__.py"],
         )
+
+
+def test_identify_missing_ancestor_files() -> None:
+    assert {"a/__init__.py", "a/b/__init__.py", "a/b/c/d/__init__.py"} == set(
+        identify_missing_ancestor_files(
+            "__init__.py", ["a/b/foo.py", "a/b/c/__init__.py", "a/b/c/d/bar.py", "a/e/__init__.py"]
+        )
+    )
+
+    assert {
+        "src/__init__.py",
+        "src/python/__init__.py",
+        "src/python/a/__init__.py",
+        "src/python/a/b/__init__.py",
+        "src/python/a/b/c/d/__init__.py",
+    } == set(
+        identify_missing_ancestor_files(
+            "__init__.py",
+            [
+                "src/python/a/b/foo.py",
+                "src/python/a/b/c/__init__.py",
+                "src/python/a/b/c/d/bar.py",
+                "src/python/a/e/__init__.py",
+            ],
+        )
+    )
