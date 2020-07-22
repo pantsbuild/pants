@@ -5,7 +5,7 @@ import itertools
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
-from typing import Iterable, List, Sequence, Type
+from typing import Iterable, List, Sequence, Tuple, Type
 
 import pytest
 
@@ -29,6 +29,7 @@ from pants.engine.fs import (
 from pants.engine.internals.graph import (
     AmbiguousCodegenImplementationsException,
     AmbiguousImplementationsException,
+    CycleException,
     InvalidFileDependencyException,
     NoValidTargetsException,
     Owners,
@@ -153,15 +154,18 @@ class GraphTest(TestBase):
             Address("", target_name="t2.txt", generated_base_target_name="t2"),
         ]
 
-    def assert_failed_cycle(self, address_str: str, cyclic_address_str: str) -> None:
-        with self.assertRaisesRegex(
-            Exception,
-            f"(?ms)Dependency graph contained a cycle:.*-> {cyclic_address_str}.*-> {cyclic_address_str}.*",
-        ):
+    def assert_failed_cycle(
+        self, root_addr: str, subject_addr: str, path_addrs: Tuple[str, ...]
+    ) -> None:
+        with self.assertRaises(ExecutionError) as e:
             self.request_single_product(
                 TransitiveTargets,
-                Params(Addresses([Address.parse(address_str)]), create_options_bootstrapper()),
+                Params(Addresses([Address.parse(root_addr)]), create_options_bootstrapper()),
             )
+        (cycle_exception,) = e.exception.wrapped_exceptions
+        assert isinstance(cycle_exception, CycleException)
+        assert cycle_exception.subject == Address.parse(subject_addr)
+        assert cycle_exception.path == tuple(Address.parse(p) for p in path_addrs)
 
     def test_cycle_self(self) -> None:
         self.add_to_build_file(
@@ -172,7 +176,7 @@ class GraphTest(TestBase):
                 """
             ),
         )
-        self.assert_failed_cycle("//:t1", "//:t1")
+        self.assert_failed_cycle("//:t1", "//:t1", ("//:t1", "//:t1"))
 
     def test_cycle_direct(self) -> None:
         self.add_to_build_file(
@@ -184,8 +188,8 @@ class GraphTest(TestBase):
                 """
             ),
         )
-        self.assert_failed_cycle("//:t1", "//:t1")
-        self.assert_failed_cycle("//:t2", "//:t2")
+        self.assert_failed_cycle("//:t1", "//:t1", ("//:t1", "//:t2", "//:t1"))
+        self.assert_failed_cycle("//:t2", "//:t2", ("//:t2", "//:t1", "//:t2"))
 
     def test_cycle_indirect(self) -> None:
         self.add_to_build_file(
@@ -198,8 +202,8 @@ class GraphTest(TestBase):
                 """
             ),
         )
-        self.assert_failed_cycle("//:t1", "//:t2")
-        self.assert_failed_cycle("//:t2", "//:t2")
+        self.assert_failed_cycle("//:t1", "//:t2", ("//:t1", "//:t2", "//:t3", "//:t2"))
+        self.assert_failed_cycle("//:t2", "//:t2", ("//:t2", "//:t3", "//:t2"))
 
     def test_resolve_generated_subtarget(self) -> None:
         self.add_to_build_file("demo", "target(sources=['f1.txt', 'f2.txt'])")

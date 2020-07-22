@@ -143,7 +143,7 @@ class CycleException(Exception):
 
 
 def _detect_cycles(
-    roots: Tuple[Address, ...], dependencies: Dict[Address, Tuple[Address, ...]]
+    roots: Tuple[Address, ...], dependency_mapping: Dict[Address, Tuple[Address, ...]]
 ) -> None:
     path_stack: OrderedSet[Address] = OrderedSet()
     visited: Set[Address] = set()
@@ -152,12 +152,12 @@ def _detect_cycles(
         if address in visited:
             # NB: File-level dependencies are cycle tolerant.
             if not address.generated_base_target_name and address in path_stack:
-                raise CycleException(address, tuple(path_stack) + (address,))
+                raise CycleException(address, (*path_stack, address))
             return
         path_stack.add(address)
         visited.add(address)
 
-        for dep_address in dependencies[address]:
+        for dep_address in dependency_mapping[address]:
             visit(dep_address)
 
         path_stack.remove(address)
