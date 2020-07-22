@@ -3,4 +3,5 @@
 
 python_integration_tests(
   uses_pants_run=True,
+  timeout=150,
 )
