@@ -32,7 +32,7 @@ pub trait Node: Clone + Debug + Display + Eq + Hash + Send + 'static {
   ///
   /// If the node result is cacheable, return true.
   ///
-  fn cacheable(&self) -> bool;
+  fn cacheable(&self, result: Option<&Self::Item>) -> bool;
 }
 
 pub trait NodeError: Clone + Debug + Eq + Send {

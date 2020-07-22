@@ -644,7 +644,7 @@ impl<N: Node> Graph<N> {
 
         // We can retry the dst Node if the src Node is not cacheable. If the src is not cacheable,
         // it only be allowed to run once, and so Node invalidation does not pass through it.
-        !inner.entry_for_id(src_id).unwrap().node().cacheable()
+        !inner.entry_for_id(src_id).unwrap().node().cacheable(None)
       } else {
         // Otherwise, this is an external request: always retry.
         trace!(
@@ -863,7 +863,11 @@ impl<N: Node> Graph<N> {
             // This is to allow for the behaviour that an uncacheable Node should always have "dirty"
             // (marked as UncacheableDependencies) dependents, transitively.
             let entry = inner.entry_for_id(edge_ref.target()).unwrap();
-            if !entry.node().cacheable() || entry.has_uncacheable_deps() {
+            let result_item = match result {
+              Some(Ok(ref item)) => Some(item),
+              _ => None,
+            };
+            if !entry.node().cacheable(result_item) || entry.has_uncacheable_deps() {
               has_uncacheable_deps = true;
             }
 

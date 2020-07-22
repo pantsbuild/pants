@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::{BTreeMap, HashSet};
 use std::convert::TryInto;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -88,6 +88,7 @@ async fn make_execute_request() {
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
     execution_slot_variable: None,
+    cache_failures: true,
   };
 
   let mut want_command = bazel_protos::remote_execution::Command::new();
@@ -172,6 +173,7 @@ async fn make_execute_request_with_instance_name() {
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
     execution_slot_variable: None,
+    cache_failures: true,
   };
 
   let mut want_command = bazel_protos::remote_execution::Command::new();
@@ -264,6 +266,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
     execution_slot_variable: None,
+    cache_failures: true,
   };
 
   let mut want_command = bazel_protos::remote_execution::Command::new();
@@ -396,21 +399,10 @@ async fn make_execute_request_with_jdk() {
 #[tokio::test]
 async fn make_execute_request_with_jdk_and_extra_platform_properties() {
   let input_directory = TestDirectory::containing_roland();
-  let req = Process {
-    argv: owned_string_vec(&["/bin/echo", "yo"]),
-    env: BTreeMap::new(),
-    working_directory: None,
-    input_files: input_directory.digest(),
-    output_files: BTreeSet::new(),
-    output_directories: BTreeSet::new(),
-    timeout: None,
-    description: "some description".to_owned(),
-    append_only_caches: BTreeMap::new(),
-    jdk_home: Some(PathBuf::from("/tmp")),
-    target_platform: PlatformConstraint::None,
-    is_nailgunnable: false,
-    execution_slot_variable: None,
-  };
+  let mut req = Process::new(owned_string_vec(&["/bin/echo", "yo"]));
+  req.input_files = input_directory.digest();
+  req.description = "some description".to_owned();
+  req.jdk_home = Some(PathBuf::from("/tmp"));
 
   let mut want_command = bazel_protos::remote_execution::Command::new();
   want_command.mut_arguments().push("/bin/echo".to_owned());
@@ -521,6 +513,7 @@ async fn make_execute_request_with_timeout() {
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
     execution_slot_variable: None,
+    cache_failures: true,
   };
 
   let mut want_command = bazel_protos::remote_execution::Command::new();
@@ -2009,21 +2002,9 @@ pub(crate) fn workunits_with_constant_span_id(
 }
 
 pub fn echo_foo_request() -> MultiPlatformProcess {
-  let req = Process {
-    argv: owned_string_vec(&["/bin/echo", "-n", "foo"]),
-    env: BTreeMap::new(),
-    working_directory: None,
-    input_files: EMPTY_DIGEST,
-    output_files: BTreeSet::new(),
-    output_directories: BTreeSet::new(),
-    timeout: Some(Duration::from_millis(5000)),
-    description: "echo a foo".to_string(),
-    append_only_caches: BTreeMap::new(),
-    jdk_home: None,
-    target_platform: PlatformConstraint::None,
-    is_nailgunnable: false,
-    execution_slot_variable: None,
-  };
+  let mut req = Process::new(owned_string_vec(&["/bin/echo", "-n", "foo"]));
+  req.timeout = Some(Duration::from_millis(5000));
+  req.description = "echo a foo".to_string();
   req.into()
 }
 
@@ -2358,22 +2339,12 @@ pub(crate) fn assert_contains(haystack: &str, needle: &str) {
 }
 
 pub(crate) fn cat_roland_request() -> MultiPlatformProcess {
-  let req = Process {
-    argv: owned_string_vec(&["/bin/cat", "roland"]),
-    env: BTreeMap::new(),
-    working_directory: None,
-    input_files: TestDirectory::containing_roland().digest(),
-    output_files: BTreeSet::new(),
-    output_directories: BTreeSet::new(),
-    timeout: one_second(),
-    description: "cat a roland".to_string(),
-    append_only_caches: BTreeMap::new(),
-    jdk_home: None,
-    target_platform: PlatformConstraint::None,
-    is_nailgunnable: false,
-    execution_slot_variable: None,
-  };
-  req.into()
+  let argv = owned_string_vec(&["/bin/cat", "roland"]);
+  let mut process = Process::new(argv);
+  process.input_files = TestDirectory::containing_roland().digest();
+  process.timeout = one_second();
+  process.description = "cat a roland".to_string();
+  process.into()
 }
 
 pub(crate) fn echo_roland_request() -> MultiPlatformProcess {

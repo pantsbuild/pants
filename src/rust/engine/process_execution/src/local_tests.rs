@@ -3,14 +3,13 @@ use testutil;
 
 use crate::{
   local::USER_EXECUTABLE_MODE, CacheDest, CacheName, CommandRunner as CommandRunnerTrait, Context,
-  FallibleProcessResultWithPlatform, NamedCaches, Platform, PlatformConstraint, Process,
-  RelativePath,
+  FallibleProcessResultWithPlatform, NamedCaches, Platform, Process, RelativePath,
 };
 use hashing::EMPTY_DIGEST;
 use shell_quote::bash;
 use spectral::{assert_that, string::StrAssertions};
 use std;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::str;
@@ -338,23 +337,13 @@ async fn jdk_symlink() {
   let roland = TestData::roland().bytes();
   std::fs::write(preserved_work_tmpdir.path().join("roland"), roland.clone())
     .expect("Writing temporary file");
-  let result = run_command_locally(Process {
-    argv: vec!["/bin/cat".to_owned(), ".jdk/roland".to_owned()],
-    env: BTreeMap::new(),
-    working_directory: None,
-    input_files: EMPTY_DIGEST,
-    output_files: BTreeSet::new(),
-    output_directories: BTreeSet::new(),
-    timeout: one_second(),
-    description: "cat roland".to_string(),
-    append_only_caches: BTreeMap::new(),
-    jdk_home: Some(preserved_work_tmpdir.path().to_path_buf()),
-    target_platform: PlatformConstraint::None,
-    is_nailgunnable: false,
-    execution_slot_variable: None,
-  })
-  .await
-  .unwrap();
+
+  let mut process = Process::new(vec!["/bin/cat".to_owned(), ".jdk/roland".to_owned()]);
+  process.timeout = one_second();
+  process.description = "cat roland".to_string();
+  process.jdk_home = Some(preserved_work_tmpdir.path().to_path_buf());
+
+  let result = run_command_locally(process).await.unwrap();
 
   assert_eq!(result.stdout_bytes, roland);
   assert_eq!(result.stderr_bytes, "".as_bytes());
@@ -486,27 +475,17 @@ async fn output_empty_dir() {
 
 #[tokio::test]
 async fn timeout() {
-  let result = run_command_locally(Process {
-    argv: vec![
-      find_bash(),
-      "-c".to_owned(),
-      "/bin/sleep 0.2; /bin/echo -n 'European Burmese'".to_string(),
-    ],
-    env: BTreeMap::new(),
-    working_directory: None,
-    input_files: EMPTY_DIGEST,
-    output_files: BTreeSet::new(),
-    output_directories: BTreeSet::new(),
-    timeout: Some(Duration::from_millis(100)),
-    description: "sleepy-cat".to_string(),
-    append_only_caches: BTreeMap::new(),
-    jdk_home: None,
-    target_platform: PlatformConstraint::None,
-    is_nailgunnable: false,
-    execution_slot_variable: None,
-  })
-  .await
-  .unwrap();
+  let argv = vec![
+    find_bash(),
+    "-c".to_owned(),
+    "/bin/sleep 0.2; /bin/echo -n 'European Burmese'".to_string(),
+  ];
+
+  let mut process = Process::new(argv);
+  process.timeout = Some(Duration::from_millis(100));
+  process.description = "sleepy-cat".to_string();
+
+  let result = run_command_locally(process).await.unwrap();
 
   assert_eq!(result.original.exit_code, -15);
   let error_msg = String::from_utf8(result.stdout_bytes.to_vec()).unwrap();
@@ -536,22 +515,15 @@ async fn working_directory() {
     .expect("Error saving directory");
 
   let work_dir = TempDir::new().unwrap();
+
+  let mut process = Process::new(vec![find_bash(), "-c".to_owned(), "/bin/ls".to_string()]);
+  process.working_directory = Some(RelativePath::new("cats").unwrap());
+  process.input_files = TestDirectory::nested().digest();
+  process.timeout = one_second();
+  process.description = "confused-cat".to_string();
+
   let result = run_command_locally_in_dir(
-    Process {
-      argv: vec![find_bash(), "-c".to_owned(), "/bin/ls".to_string()],
-      env: BTreeMap::new(),
-      working_directory: Some(RelativePath::new("cats").unwrap()),
-      input_files: TestDirectory::nested().digest(),
-      output_files: BTreeSet::new(),
-      output_directories: BTreeSet::new(),
-      timeout: one_second(),
-      description: "confused-cat".to_string(),
-      append_only_caches: BTreeMap::new(),
-      jdk_home: None,
-      target_platform: PlatformConstraint::None,
-      is_nailgunnable: false,
-      execution_slot_variable: None,
-    },
+    process,
     work_dir.path().to_owned(),
     true,
     Some(store),

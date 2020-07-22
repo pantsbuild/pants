@@ -260,6 +260,8 @@ pub struct Process {
   pub target_platform: PlatformConstraint,
 
   pub is_nailgunnable: bool,
+
+  pub cache_failures: bool,
 }
 
 impl Process {
@@ -288,6 +290,7 @@ impl Process {
       target_platform: PlatformConstraint::None,
       is_nailgunnable: false,
       execution_slot_variable: None,
+      cache_failures: true,
     }
   }
 
