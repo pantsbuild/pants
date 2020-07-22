@@ -2,14 +2,15 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
+import os
 from dataclasses import dataclass
 from pathlib import PurePath
+from typing import Sequence, Set
 
 from pants.core.util_rules.strip_source_roots import SourceRootStrippedSources, StripSnapshotRequest
 from pants.engine.fs import EMPTY_SNAPSHOT, PathGlobs, Snapshot
 from pants.engine.rules import rule
 from pants.engine.selectors import Get
-from pants.python.pex_build_util import identify_missing_ancestor_files
 from pants.source.source_root import AllSourceRoots
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -39,6 +40,32 @@ class AncestorFiles:
     """Any ancestor files found."""
 
     snapshot: Snapshot
+
+
+def identify_missing_ancestor_files(name: str, sources: Sequence[str]) -> FrozenOrderedSet[str]:
+    """Return the paths of potentially missing ancestor files.
+
+    NB: If the sources have not had their source roots (e.g., 'src/python') stripped, this
+    function will consider superfluous files at and above the source roots, (e.g.,
+    src/python/<name>, src/<name>). It is the caller's responsibility to filter these
+    out if necessary. If the sources have had their source roots stripped, then this function
+    will only identify consider files in actual packages.
+    """
+    packages: Set[str] = set()
+    for source in sources:
+        if not source.endswith(".py"):
+            continue
+        pkg_dir = os.path.dirname(source)
+        if not pkg_dir or pkg_dir in packages:
+            continue
+        package = ""
+        for component in pkg_dir.split(os.sep):
+            package = os.path.join(package, component)
+            packages.add(package)
+
+    return FrozenOrderedSet(
+        sorted({os.path.join(package, name) for package in packages} - set(sources))
+    )
 
 
 @rule
