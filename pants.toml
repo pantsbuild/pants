@@ -7,11 +7,14 @@ pythonpath = ["%(buildroot)s/pants-plugins/src/python"]
 
 backend_packages.add = [
   "pants.backend.awslambda.python",
+  "pants.backend.codegen.protobuf.python",
   "pants.backend.python",
+  "pants.backend.python.lint.bandit",
   "pants.backend.python.lint.black",
   "pants.backend.python.lint.docformatter",
   "pants.backend.python.lint.flake8",
   "pants.backend.python.lint.isort",
+  "pants.backend.python.lint.pylint",
   "pants.backend.python.typecheck.mypy",
   "internal_backend.rules_for_testing",
   "internal_backend.utilities",
@@ -58,6 +61,9 @@ root_patterns = [
 #  so we can use --python-setup-resolve-all-constraints (which requires a lockfile).
 requirement_constraints = "3rdparty/python/requirements.txt"
 
+[bandit]
+skip = true
+
 [black]
 config = "pyproject.toml"
 
@@ -76,6 +82,9 @@ config = [".isort.cfg", "examples/.isort.cfg"]
 
 [mypy]
 config = "build-support/mypy/mypy.ini"
+
+[pylint]
+skip = true
 
 [pants-releases]
 branch_notes = """
