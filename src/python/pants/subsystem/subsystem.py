@@ -47,10 +47,7 @@ class Subsystem(SubsystemClientMixin, Optionable):
 
     class UninitializedSubsystemError(SubsystemError):
         def __init__(self, class_name, scope):
-            super().__init__(
-                f'Subsystem "{class_name}" not initialized for scope "{scope}". Is subsystem missing '
-                "from subsystem_dependencies() in a task? "
-            )
+            super().__init__(f'Subsystem "{class_name}" not initialized for scope "{scope}"')
 
     @classmethod
     def is_subsystem_type(cls, obj):

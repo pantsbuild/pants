@@ -314,11 +314,10 @@ async def run_setup_pys(
         exported_targets = list(FrozenOrderedSet(owners))
 
     py2 = is_python2(
-        (
+        python_setup.compatibilities_or_constraints(
             target_with_origin.target.get(PythonInterpreterCompatibility).value
             for target_with_origin in targets_with_origins
-        ),
-        python_setup,
+        )
     )
     chroots = await MultiGet(
         Get(SetupPyChroot, SetupPyChrootRequest(exported_target, py2))
