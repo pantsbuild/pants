@@ -5,6 +5,49 @@ This document describes releases leading up to the ``2.0.x`` ``stable`` series.
 
 See https://pants.readme.io/v2.0/docs/release-notes-2-0 for an overview of the changes in this release.
 
+2.0.0.dev5 (7/22/2020)
+----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Use isort v5.x as the default version (#10258)
+  `PR #10258 <https://github.com/pantsbuild/pants/pull/10258>`_
+
+* Don't register any options as recursive. (#10415)
+  `PR #10415 <https://github.com/pantsbuild/pants/pull/10415>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Speed up `repl` to no longer rebuild a Pex on source file changes (#10418)
+  `Issue #10406 <https://github.com/pantsbuild/pants/issues/10406>`_
+  `PR #10418 <https://github.com/pantsbuild/pants/pull/10418>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Implement cycle detection in transitive_targets, and tolerate cycles in file-addresses. (#10409)
+  `PR #10409 <https://github.com/pantsbuild/pants/pull/10409>`_
+
+* Stop using cargo-ensure-installed (#10400)
+  `PR #10400 <https://github.com/pantsbuild/pants/pull/10400>`_
+
+* Remove use of "quiet" in logging init (#10417)
+  `PR #10417 <https://github.com/pantsbuild/pants/pull/10417>`_
+
+Testing
+~~~~~~~
+
+* Port the plugin resolver test to v2 test style. (#10424)
+  `PR #10424 <https://github.com/pantsbuild/pants/pull/10424>`_
+
+* Refactor flake8 integration test to use create_options_bootstrapper (#10422)
+  `PR #10422 <https://github.com/pantsbuild/pants/pull/10422>`_
+
+* Increase timeout on project_info tests. (#10421)
+  `PR #10421 <https://github.com/pantsbuild/pants/pull/10421>`_
+
 2.0.0.dev4 (7/21/2020)
 ----------------------
 
