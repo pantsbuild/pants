@@ -111,7 +111,8 @@ class JvmTaskTest(JvmTaskTestBase):
             )
 
             self.assertEqual(
-                [JvmPlatform.default_runtime_platform], self.task.runtime_platforms_for_targets([])
+                [JvmPlatform.global_instance().default_runtime_platform],
+                self.task.runtime_platforms_for_targets([]),
             )
 
     def java8_platform(self):

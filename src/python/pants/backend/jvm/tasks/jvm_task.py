@@ -105,7 +105,7 @@ class JvmTask(Task):
             if isinstance(target, JvmTarget)
         ]
         if not target_platforms:
-            return [JvmPlatform.default_runtime_platform]
+            return [JvmPlatform.global_instance().default_runtime_platform]
         else:
             return target_platforms
 
