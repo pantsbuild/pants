@@ -8,10 +8,6 @@ from pants.backend.python.rules.util import (
     distutils_repr,
     is_python2,
 )
-from pants.option.ranked_value import Rank, RankedValue
-from pants.python.python_setup import PythonSetup
-from pants.subsystem.subsystem import Subsystem
-from pants.testutil.subsystem.util import init_subsystem
 
 testdata = {
     "foo": "bar",
@@ -80,49 +76,29 @@ def test_does_not_declare_pkg_resources_namespace_package(python_src: str) -> No
 
 
 @pytest.mark.parametrize(
-    ["constraints", "compatibilities"],
+    "constraints",
     [
-        ([], [["CPython>=2.7,<3"]]),
-        (["CPython>=2.7,<3"], [None]),
-        (["CPython>=2.7,<3"], [["CPython>=2.7,<3"], ["CPython>=3.6"]]),
-        (["CPython>=2.7.13"], [None]),
-        (["CPython>=2.7.13,<2.7.16"], [None]),
-        (["CPython>=2.7.13,!=2.7.16"], [None]),
-        (["PyPy>=2.7,<3"], [None]),
+        ["CPython>=2.7,<3"],
+        ["CPython>=2.7,<3", "CPython>=3.6"],
+        ["CPython>=2.7.13"],
+        ["CPython>=2.7.13,<2.7.16"],
+        ["CPython>=2.7.13,!=2.7.16"],
+        ["PyPy>=2.7,<3"],
     ],
 )
-def test_is_python2(constraints, compatibilities):
-    Subsystem.reset()
-    init_subsystem(
-        PythonSetup,
-        {
-            PythonSetup.options_scope: {
-                "interpreter_constraints": RankedValue(Rank.CONFIG, constraints)
-            }
-        },
-    )
-    assert is_python2(compatibilities, PythonSetup.global_instance())
+def test_is_python2(constraints):
+    assert is_python2(constraints)
 
 
 @pytest.mark.parametrize(
-    ["constraints", "compatibilities"],
+    "constraints",
     [
-        ([], [["CPython>=3.6"]]),
-        (["CPython>=3.6"], [None]),
-        (["CPython>=3.7"], [["CPython>=3.6"]]),
-        (["CPython>=3.7"], [["CPython>=3.6"], ["CPython>=3.8"]]),
-        (["CPython!=2.7.*"], [None]),
-        (["PyPy>=3.6"], [None]),
+        ["CPython>=3.6"],
+        ["CPython>=3.7"],
+        ["CPython>=3.6", "CPython>=3.8"],
+        ["CPython!=2.7.*"],
+        ["PyPy>=3.6"],
     ],
 )
-def test_is_not_python2(constraints, compatibilities):
-    Subsystem.reset()
-    init_subsystem(
-        PythonSetup,
-        {
-            PythonSetup.options_scope: {
-                "interpreter_constraints": RankedValue(Rank.CONFIG, constraints)
-            }
-        },
-    )
-    assert not is_python2(compatibilities, PythonSetup.global_instance())
+def test_is_not_python2(constraints):
+    assert not is_python2(constraints)

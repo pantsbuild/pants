@@ -9,7 +9,6 @@ python_library(
     ':int-test-for-export',
     'src/python/pants/testutil/engine',
     'src/python/pants/testutil/option',
-    'src/python/pants/testutil/subsystem',
   ],
   provides=pants_setup_py(
     name='pantsbuild.pants.testutil',

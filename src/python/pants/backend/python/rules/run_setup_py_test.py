@@ -45,7 +45,6 @@ from pants.engine.target import Target, Targets, WrappedTarget
 from pants.python.python_requirement import PythonRequirement
 from pants.source.source_root import SourceRootConfig
 from pants.testutil.option.util import create_options_bootstrapper
-from pants.testutil.subsystem.util import init_subsystem
 from pants.testutil.test_base import TestBase
 
 _namespace_decl = "__import__('pkg_resources').declare_namespace(__name__)"
@@ -64,10 +63,6 @@ class TestSetupPyBase(TestBase):
 
     def tgt(self, addr: str) -> Target:
         return self.request_single_product(WrappedTarget, Params(Address.parse(addr))).target
-
-
-def init_source_root():
-    init_subsystem(SourceRootConfig, options={"source": {"root_patterns": ["src/python"]}})
 
 
 class TestGenerateChroot(TestSetupPyBase):
@@ -112,7 +107,6 @@ class TestGenerateChroot(TestSetupPyBase):
         assert type(ex.wrapped_exceptions[0]) == exc_cls
 
     def test_generate_chroot(self) -> None:
-        init_source_root()
         self.create_file(
             "src/python/foo/bar/baz/BUILD",
             "python_library(provides=setup_py(name='baz', version='1.1.1'))",
@@ -176,7 +170,6 @@ class TestGenerateChroot(TestSetupPyBase):
         )
 
     def test_invalid_binary(self) -> None:
-        init_source_root()
         self.create_file(
             "src/python/invalid_binary/BUILD",
             textwrap.dedent(
@@ -229,7 +222,7 @@ class TestGetSources(TestSetupPyBase):
             SetupPySources,
             Params(
                 SetupPySourcesRequest(Targets([self.tgt(addr) for addr in addrs]), py2=False),
-                SourceRootConfig.global_instance(),
+                create_options_bootstrapper(args=["--source-root-patterns=src/python"]),
             ),
         )
         chroot_snapshot = self.request_single_product(Snapshot, Params(srcs.digest))
@@ -240,7 +233,6 @@ class TestGetSources(TestSetupPyBase):
         assert expected_package_data == dict(srcs.package_data)
 
     def test_get_sources(self) -> None:
-        init_source_root()
         self.create_file(
             "src/python/foo/bar/baz/BUILD",
             textwrap.dedent(
@@ -411,7 +403,8 @@ class TestGetAncestorInitPy(TestSetupPyBase):
         ancestor_init_py_files = self.request_single_product(
             AncestorInitPyFiles,
             Params(
-                Targets([self.tgt(addr) for addr in addrs]), SourceRootConfig.global_instance(),
+                Targets([self.tgt(addr) for addr in addrs]),
+                create_options_bootstrapper(args=["--source-root-patterns=src/python"]),
             ),
         )
         snapshots = [
@@ -423,7 +416,6 @@ class TestGetAncestorInitPy(TestSetupPyBase):
         assert sorted(expected_init_pys) == sorted(init_py_files_found)
 
     def test_get_ancestor_init_py(self) -> None:
-        init_source_root()
         # NB: src/python/foo/bar/baz/qux/__init__.py is a target's source.
         self.create_file("src/python/foo/bar/baz/qux/BUILD", "python_library()")
         self.create_file("src/python/foo/bar/baz/qux/qux.py", "")

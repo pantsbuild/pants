@@ -4,7 +4,7 @@
 import io
 import os
 from collections import abc, defaultdict
-from typing import Dict, Iterable, List, Optional, Set, Tuple, cast
+from typing import Dict, Iterable, List, Set, Tuple, cast
 
 from pkg_resources import Requirement
 
@@ -13,7 +13,6 @@ from pants.core.target_types import ResourcesSources
 from pants.core.util_rules.strip_source_roots import SourceRootStrippedSources
 from pants.engine.fs import DigestContents
 from pants.engine.target import Target
-from pants.python.python_setup import PythonSetup
 from pants.source.source_root import SourceRootError
 from pants.util.strutil import ensure_text
 
@@ -216,15 +215,12 @@ def declares_pkg_resources_namespace_package(python_src: str) -> bool:
     return False
 
 
-def is_python2(
-    compatibilities: Iterable[Optional[Iterable[str]]], python_setup: PythonSetup
-) -> bool:
+def is_python2(compatibilities_or_constraints: Iterable[str]) -> bool:
     """Checks if we should assume python2 code."""
 
     def iter_reqs():
-        for compatibility in compatibilities:
-            for constraint in python_setup.compatibility_or_constraints(compatibility):
-                yield parse_interpreter_constraint(constraint)
+        for constraint in compatibilities_or_constraints:
+            yield parse_interpreter_constraint(constraint)
 
     for req in iter_reqs():
         for python_27_ver in range(0, 18):  # The last python 2.7 version was 2.7.18.

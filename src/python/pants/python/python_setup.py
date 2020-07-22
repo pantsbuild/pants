@@ -195,6 +195,15 @@ class PythonSetup(Subsystem):
             return self.interpreter_constraints
         return tuple(compatibility or self.interpreter_constraints)
 
+    def compatibilities_or_constraints(
+        self, compatibilities: Iterable[Optional[Iterable[str]]]
+    ) -> Tuple[str, ...]:
+        return tuple(
+            constraint
+            for compatibility in compatibilities
+            for constraint in self.compatibility_or_constraints(compatibility)
+        )
+
     @classmethod
     def expand_interpreter_search_paths(cls, interpreter_search_paths, pyenv_root_func=None):
         special_strings = {
