@@ -525,14 +525,6 @@ class TargetsWithOrigins(Collection[TargetWithOrigin]):
 
 
 @dataclass(frozen=True)
-class TransitiveTarget:
-    """A recursive structure wrapping a Target root and TransitiveTarget deps."""
-
-    root: Target
-    dependencies: Tuple["TransitiveTarget", ...]
-
-
-@dataclass(frozen=True)
 class TransitiveTargets:
     """A set of Target roots, and their transitive, flattened, de-duped dependencies.
 
