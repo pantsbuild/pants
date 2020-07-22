@@ -5,5 +5,5 @@ python_library()
 
 python_tests(
   name = "tests",
-  timeout = 90,
+  timeout = 180,
 )
