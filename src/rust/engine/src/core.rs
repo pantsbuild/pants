@@ -17,8 +17,7 @@ pub type FNV = hash::BuildHasherDefault<FnvHasher>;
 ///
 /// Params represent a TypeId->Key map.
 ///
-/// For efficiency and hashability, they're stored as sorted Keys (with distinct TypeIds), and
-/// wrapped in an `Arc` that allows us to copy-on-write for param contents.
+/// For efficiency and hashability, they're stored as sorted Keys (with distinct TypeIds).
 ///
 #[repr(C)]
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
