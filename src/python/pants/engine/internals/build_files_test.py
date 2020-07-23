@@ -280,19 +280,6 @@ class BuildFileIntegrationTest(TestBase):
         bfas = self.request_single_product(BuildFileAddresses, Addresses([addr]))
         assert bfas == BuildFileAddresses([bfa])
 
-    def test_build_file_address_generated_subtarget(self) -> None:
-        self.create_file("helloworld/BUILD.ext", "mock_tgt(name='original')")
-        addr = Address("helloworld", target_name="generated", generated_base_target_name="original")
-        expected_bfa = BuildFileAddress(
-            rel_path="helloworld/BUILD.ext",
-            target_name="generated",
-            generated_base_target_name="original",
-        )
-        bfa = self.request_single_product(BuildFileAddress, addr)
-        assert bfa == expected_bfa
-        bfas = self.request_single_product(BuildFileAddresses, Addresses([addr]))
-        assert bfas == BuildFileAddresses([bfa])
-
     def test_address_not_found(self) -> None:
         with pytest.raises(ExecutionError) as exc:
             self.request_single_product(TargetAdaptor, Address.parse("helloworld"))

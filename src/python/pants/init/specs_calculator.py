@@ -2,15 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-from pathlib import PurePath
-from typing import Iterable, Optional, cast
+from typing import Iterable, Optional
 
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.specs import (
     AddressSpec,
     AddressSpecs,
-    FilesystemLiteralSpec,
     FilesystemSpec,
     FilesystemSpecs,
     SingleAddress,
@@ -117,17 +115,10 @@ class SpecsCalculator:
         )
         logger.debug("changed addresses: %s", changed_addresses)
 
-        address_specs = []
-        filesystem_specs = []
-        for address in cast(ChangedAddresses, changed_addresses):
-            if address.generated_base_target_name:
-                file_name = PurePath(address.spec_path, address.target_name).as_posix()
-                filesystem_specs.append(FilesystemLiteralSpec(file_name))
-            else:
-                address_specs.append(SingleAddress(address.spec_path, address.target_name))
+        address_specs = tuple(
+            SingleAddress(address.spec_path, address.target_name) for address in changed_addresses
+        )
         return Specs(
-            address_specs=AddressSpecs(
-                address_specs, exclude_patterns=exclude_patterns, tags=tags,
-            ),
-            filesystem_specs=FilesystemSpecs(filesystem_specs),
+            address_specs=AddressSpecs(address_specs, exclude_patterns=exclude_patterns, tags=tags),
+            filesystem_specs=FilesystemSpecs(),
         )

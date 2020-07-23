@@ -1,7 +1,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import functools
 import itertools
 import logging
 import os.path
@@ -65,7 +64,6 @@ from pants.engine.target import (
     UnrecognizedTargetTypeException,
     WrappedTarget,
     _AbstractFieldSet,
-    generate_subtarget,
 )
 from pants.engine.unions import UnionMembership
 from pants.option.global_options import GlobalOptions, OwnersNotFoundBehavior
@@ -83,14 +81,6 @@ logger = logging.getLogger(__name__)
 async def resolve_target(
     address: Address, registered_target_types: RegisteredTargetTypes
 ) -> WrappedTarget:
-    if address.generated_base_target_name:
-        base_target = await Get(WrappedTarget, Address, address.maybe_convert_to_base_target())
-        subtarget = generate_subtarget(
-            base_target.target,
-            full_file_name=PurePath(address.spec_path, address.target_name).as_posix(),
-        )
-        return WrappedTarget(subtarget)
-
     target_adaptor = await Get(TargetAdaptor, Address, address)
     target_type = registered_target_types.aliases_to_types.get(target_adaptor.type_alias, None)
     if target_type is None:
@@ -148,10 +138,9 @@ def _detect_cycles(
     path_stack: OrderedSet[Address] = OrderedSet()
     visited: Set[Address] = set()
 
-    def visit(address: Address):
+    def visit(address: Address) -> None:
         if address in visited:
-            # NB: File-level dependencies are cycle tolerant.
-            if not address.generated_base_target_name and address in path_stack:
+            if address in path_stack:
                 raise CycleException(address, (*path_stack, address))
             return
         path_stack.add(address)
@@ -232,79 +221,17 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
     # Walk up the buildroot looking for targets that would conceivably claim changed sources.
     candidate_specs = tuple(AscendantAddresses(directory=d) for d in dirs_set)
     candidate_targets = await Get(Targets, AddressSpecs(candidate_specs))
-    candidate_target_sources = await MultiGet(
-        Get(HydratedSources, HydrateSourcesRequest(tgt.get(Sources))) for tgt in candidate_targets
-    )
     build_file_addresses = await MultiGet(
         Get(BuildFileAddress, Address, tgt.address) for tgt in candidate_targets
     )
 
-    # We use this to determine if any of the matched files are deleted or not.
-    all_source_files = set(
-        itertools.chain.from_iterable(
-            sources.snapshot.files for sources in candidate_target_sources
-        )
-    )
-
-    file_name_to_generated_address: Dict[str, Address] = {}
-    file_names_with_multiple_owners: OrderedSet[str] = OrderedSet()
-    original_addresses_due_to_deleted_files: OrderedSet[Address] = OrderedSet()
-    original_addresses_due_to_multiple_owners: OrderedSet[Address] = OrderedSet()
-    for candidate_tgt, candidate_tgt_sources, bfa in zip(
-        candidate_targets, candidate_target_sources, build_file_addresses
-    ):
-        matching_files = matches_filespec(candidate_tgt.get(Sources).filespec, paths=sources_set)
-        if bfa.rel_path not in sources_set and not matching_files:
-            continue
-        deleted_files_matched = bool(set(matching_files) - all_source_files)
-        if deleted_files_matched:
-            original_addresses_due_to_deleted_files.add(candidate_tgt.address)
-            continue
-        # Else, we generate subtargets for greater precision. We use those subtargets, unless
-        # there are multiple owners of their file.
-        generated_subtargets = tuple(
-            generate_subtarget(candidate_tgt, full_file_name=f)
-            for f in candidate_tgt_sources.snapshot.files
-        )
-        for generated_subtarget, file_name in zip(
-            generated_subtargets, candidate_tgt_sources.snapshot.files
-        ):
-            if bfa.rel_path not in sources_set and not matches_filespec(
-                generated_subtarget.get(Sources).filespec, paths=sources_set
-            ):
-                continue
-
-            if file_name in file_name_to_generated_address:
-                file_names_with_multiple_owners.add(file_name)
-                original_addresses_due_to_multiple_owners.add(candidate_tgt.address)
-                # We also add the original target of the generated address already stored.
-                already_stored_generated_address = file_name_to_generated_address[file_name]
-                original_addresses_due_to_multiple_owners.add(
-                    already_stored_generated_address.maybe_convert_to_base_target()
-                )
-            else:
-                file_name_to_generated_address[file_name] = generated_subtarget.address
-
-    def already_covered_by_original_addresses(file_name: str, generated_address: Address) -> bool:
-        multiple_generated_subtarget_owners = file_name in file_names_with_multiple_owners
-        original_address = generated_address.maybe_convert_to_base_target()
-        return (
-            multiple_generated_subtarget_owners
-            or original_address in original_addresses_due_to_deleted_files
-            or original_address in original_addresses_due_to_multiple_owners
-        )
-
-    remaining_generated_addresses = FrozenOrderedSet(
-        address
-        for file_name, address in file_name_to_generated_address.items()
-        if not already_covered_by_original_addresses(file_name, address)
-    )
     return Owners(
-        [
-            *original_addresses_due_to_deleted_files,
-            *original_addresses_due_to_multiple_owners,
-            *remaining_generated_addresses,
-        ]
+        tgt.address
+        for tgt, bfa in zip(candidate_targets, build_file_addresses)
+        if (
+            bfa.rel_path in sources_set
+            or bool(matches_filespec(tgt.get(Sources).filespec, paths=sources_set))
+        )
     )
 
 
@@ -386,18 +313,12 @@ async def resolve_addresses_with_origins(specs: Specs) -> AddressesWithOrigins:
     )
     # It's possible to resolve the same address both with filesystem specs and address specs. We
     # dedupe, but must go through some ceremony for the equality check because the OriginSpec will
-    # differ. We must also consider that the filesystem spec may have resulted in a generated
-    # subtarget; if the user explicitly specified the original owning target, we should use the
-    # original target rather than its generated subtarget.
+    # differ.
     address_spec_addresses = FrozenOrderedSet(awo.address for awo in from_address_specs)
     return AddressesWithOrigins(
         [
             *from_address_specs,
-            *(
-                awo
-                for awo in from_filesystem_specs
-                if awo.address.maybe_convert_to_base_target() not in address_spec_addresses
-            ),
+            *(awo for awo in from_filesystem_specs if awo.address not in address_spec_addresses),
         ]
     )
 
@@ -605,17 +526,11 @@ class AmbiguousDependencyInferenceException(Exception):
         )
 
 
-class InvalidFileDependencyException(Exception):
-    pass
-
-
 class UnusedDependencyIgnoresException(Exception):
     def __init__(
         self, address: Address, *, unused_ignores: Iterable[Address], result: Iterable[Address]
     ) -> None:
-        # If the address was generated, we convert back to the original base target to correspond to
-        # what users actually put in BUILD files.
-        address = address.maybe_convert_to_base_target()
+        address = address
         sorted_unused_ignores = sorted([f"!{addr}" for addr in unused_ignores])
         formatted_unused_ignores = (
             repr(sorted_unused_ignores[0])
@@ -634,77 +549,24 @@ class UnusedDependencyIgnoresException(Exception):
 
 class ParsedDependencies(NamedTuple):
     addresses: List[Address]
-    files: List[str]
-    ignored_addresses: List[Address]
-    ignored_files: List[str]
+    ignored: List[Address]
 
 
 def parse_dependencies_field(
     raw_value: Iterable[str], *, spec_path: str, subproject_roots: Sequence[str]
 ) -> ParsedDependencies:
-    parse_as_address = functools.partial(
-        Address.parse, relative_to=spec_path, subproject_roots=subproject_roots
-    )
-
-    def parse(value: str) -> Union[Address, str]:
-        # We allow `//` to specify the value is relative to the build root. This is only actually
-        # necessary for top-level addresses, though, like `//:tgt`. Otherwise, we can strip `//`.
-        if value.startswith("//") and not value.startswith("//:"):
-            value = value[2:]
-        if ":" in value:
-            return parse_as_address(value)
-        if value.startswith("./"):
-            return PurePath(spec_path, value).as_posix()
-        if PurePath(value).suffix:
-            return value
-        return parse_as_address(value)
-
     addresses: List[Address] = []
-    files: List[str] = []
-    ignored_addresses: List[Address] = []
-    ignored_files: List[str] = []
+    ignored: List[Address] = []
     for v in raw_value:
         is_ignore = v.startswith("!")
         if is_ignore:
             v = v[1:]
-        result = parse(v)
+        result = Address.parse(v, relative_to=spec_path, subproject_roots=subproject_roots)
         if is_ignore:
-            collection = ignored_addresses if isinstance(result, Address) else ignored_files
+            ignored.append(result)
         else:
-            collection = addresses if isinstance(result, Address) else files
-        collection.append(result)  # type: ignore[attr-defined]
-    return ParsedDependencies(addresses, files, ignored_addresses, ignored_files)
-
-
-def validate_explicit_file_dep(
-    address: Address, full_file: str, owners: Sequence[Address], *, is_an_ignore: bool = False
-) -> None:
-    if is_an_ignore:
-        full_file = f"!{full_file}"
-    # If the address was generated, we convert back to the original base target to correspond to
-    # what users actually put in BUILD files.
-    address = address.maybe_convert_to_base_target()
-    if len(owners) > 1:
-        original_addresses = sorted(owner.maybe_convert_to_base_target().spec for owner in owners)
-        if is_an_ignore:
-            original_addresses = [f"!{addr}" for addr in original_addresses]
-        raise InvalidFileDependencyException(
-            f"The target {address} includes {repr(full_file)} in its `dependencies` "
-            "field, but there are multiple owners of that file so it is ambiguous which one "
-            "Pants should use. Please instead change the `sources` fields of the owning "
-            "targets so that only one target owns this file, or choose which owner you want "
-            f"to use: {original_addresses}"
-        )
-    # If a file does not exist, but it matches the `sources` glob of a target, then it will
-    # have an owning target.
-    file_does_not_exist = len(owners) == 1 and not owners[0].generated_base_target_name
-    if not owners or file_does_not_exist:
-        raise InvalidFileDependencyException(
-            f"The target {address} includes {repr(full_file)} in its `dependencies` "
-            "field, but there are no owners of that file. Please check that the file exists, "
-            "that you spelled the file correctly, and that there is a target that includes the "
-            "file in its `sources` field."
-        )
+            addresses.append(result)
+    return ParsedDependencies(addresses, ignored)
 
 
 @rule
@@ -716,18 +578,6 @@ async def resolve_dependencies(
         spec_path=request.field.address.spec_path,
         subproject_roots=global_options.options.subproject_roots,
     )
-
-    explicit_file_deps_owners = await MultiGet(
-        Get(Owners, OwnersRequest((f,))) for f in provided.files
-    )
-    for f, owners in zip(provided.files, explicit_file_deps_owners):
-        validate_explicit_file_dep(request.field.address, f, owners)
-
-    explicit_file_deps_ignore_owners = await MultiGet(
-        Get(Owners, OwnersRequest((f,))) for f in provided.ignored_files
-    )
-    for f, owners in zip(provided.ignored_files, explicit_file_deps_ignore_owners):
-        validate_explicit_file_dep(request.field.address, f, owners, is_an_ignore=True)
 
     # Inject any dependencies. This is determined by the `request.field` class. For example, if
     # there is a rule to inject for FortranDependencies, then FortranDependencies and any subclass
@@ -763,58 +613,21 @@ async def resolve_dependencies(
                 inference_request_type(sources_field),
             )
 
-    flattened_ignore_file_deps_owners = set(
-        itertools.chain.from_iterable(explicit_file_deps_ignore_owners)
-    )
-
-    original_addresses: Set[Address] = set()
-    all_generated_addresses: Set[Address] = set()
-    used_ignored_addresses: Set[Address] = set()
-    used_ignored_file_deps: Set[Address] = set()
-    for addr in (
-        *provided.addresses,
-        *itertools.chain.from_iterable(explicit_file_deps_owners),
-        *itertools.chain.from_iterable(injected),
-        *inferred,
-    ):
-        if addr.generated_base_target_name:
-            collection = (
-                used_ignored_file_deps
-                if addr in flattened_ignore_file_deps_owners
-                else all_generated_addresses
-            )
+    result: Set[Address] = set()
+    used_ignored: Set[Address] = set()
+    for addr in (*provided.addresses, *itertools.chain.from_iterable(injected), *inferred):
+        if addr in provided.ignored:
+            used_ignored.add(addr)
         else:
-            collection = (
-                used_ignored_addresses if addr in provided.ignored_addresses else original_addresses
-            )
-        collection.add(addr)
+            result.add(addr)
 
-    # We check if a generated subtarget's original base target is already included or if ts base
-    # target is the target that we're resolving dependencies for. In either of these cases, it
-    # would be redundant to include the generated subtarget.
-    remaining_generated_addresses = set()
-    for generated_addr in all_generated_addresses:
-        base_addr = generated_addr.maybe_convert_to_base_target()
-        if base_addr in original_addresses or base_addr == request.field.address:
-            continue
-        remaining_generated_addresses.add(generated_addr)
-
-    result = sorted({*original_addresses, *remaining_generated_addresses})
-
-    unused_ignores = {*provided.ignored_addresses, *flattened_ignore_file_deps_owners} - {
-        *used_ignored_addresses,
-        *used_ignored_file_deps,
-    }
-    # If there are unused ignores and this is not a generated subtarget, we eagerly error so that
-    # the user isn't falsely led to believe the ignore is working. We do not do this for generated
-    # subtargets because we cannot guarantee that the ignore specified in the original owning
-    # target would be used for all generated subtargets.
-    if unused_ignores and not request.field.address.generated_base_target_name:
+    unused_ignores = set(provided.ignored) - used_ignored
+    if unused_ignores:
         raise UnusedDependencyIgnoresException(
             request.field.address, unused_ignores=unused_ignores, result=result
         )
 
-    return Addresses(result)
+    return Addresses(sorted(result))
 
 
 # -----------------------------------------------------------------------------------------------

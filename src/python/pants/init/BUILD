@@ -2,9 +2,15 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
+  sources=["*.py", "!engine_initializer.py"],
   dependencies=[
     ':plugins',
   ],
+)
+
+python_library(
+  name="engine_initializer",
+  sources=["engine_initializer.py"],
 )
 
 target(
@@ -23,6 +29,6 @@ target(
     'src/python/pants/backend/python/lint/pylint',
     'src/python/pants/backend/python/typecheck/mypy',
     'src/python/pants/backend/native',
-    'src/python/pants/core',
+    'src/python/pants/core:plugin',
   ],
 )

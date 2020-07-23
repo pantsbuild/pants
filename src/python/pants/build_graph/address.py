@@ -121,10 +121,6 @@ class Address:
     def parse(cls, spec: str, relative_to: str = "", subproject_roots=None) -> "Address":
         """Parses an address from its serialized form.
 
-        Note that this does not work properly with generated subtargets, e.g. the address
-        `helloworld/app.py`. We would not be able to calculate the `generated_base_target_name`, so
-        we treat this like a normal target address.
-
         :param spec: An address in string form <path>:<name>.
         :param relative_to: For sibling specs, ie: ':another_in_same_build_family', interprets
                             the missing spec_path part as `relative_to`.
@@ -167,21 +163,16 @@ class Address:
                 f"name: {name}"
             )
 
-    def __init__(
-        self, spec_path: str, target_name: str, *, generated_base_target_name: Optional[str] = None
-    ) -> None:
+    def __init__(self, spec_path: str, target_name: str) -> None:
         """
         :param spec_path: The path from the root of the repo to this target.
         :param target_name: The name of a target this Address refers to.
-        :param generated_base_target_name: If this Address refers to a generated subtarget, this
-                                           stores the target_name of the original base target.
         """
         self.validate_path(spec_path)
         self.check_target_name(spec_path, target_name)
         self._spec_path = spec_path
         self._target_name = target_name
-        self.generated_base_target_name = generated_base_target_name
-        self._hash = hash((self._spec_path, self._target_name, self.generated_base_target_name))
+        self._hash = hash((self._spec_path, self._target_name))
 
     @property
     def spec_path(self) -> str:
@@ -208,9 +199,6 @@ class Address:
         :API: public
         """
         prefix = "//" if not self._spec_path else ""
-        if self.generated_base_target_name:
-            path = os.path.join(self._spec_path, self._target_name)
-            return f"{prefix}{path}"
         return f"{prefix}{self._spec_path}:{self._target_name}"
 
     @property
@@ -225,8 +213,7 @@ class Address:
         """
         :API: public
         """
-        prefix = ":" if not self.generated_base_target_name else "./"
-        return f"{prefix}{self._target_name}"
+        return f":{self._target_name}"
 
     def reference(self, referencing_path: Optional[str] = None) -> str:
         """How to reference this address in a BUILD file.
@@ -239,44 +226,22 @@ class Address:
             return self.spec
         return self._spec_path
 
-    def maybe_convert_to_base_target(self) -> "Address":
-        """If this address is a generated subtarget, convert it back into its original base target.
-
-        Otherwise, return itself unmodified.
-        """
-        if not self.generated_base_target_name:
-            return self
-        return self.__class__(self._spec_path, target_name=self.generated_base_target_name)
-
     def __eq__(self, other):
         if not isinstance(other, Address):
             return False
-        return (
-            self._spec_path == other._spec_path
-            and self._target_name == other._target_name
-            and self.generated_base_target_name == other.generated_base_target_name
-        )
+        return self._spec_path == other._spec_path and self._target_name == other._target_name
 
     def __hash__(self):
         return self._hash
 
     def __repr__(self) -> str:
-        prefix = f"Address({self.spec_path}, {self.target_name}"
-        return (
-            f"{prefix})"
-            if not self.generated_base_target_name
-            else f"{prefix}, generated_base_target_name={self.generated_base_target_name})"
-        )
+        return f"Address({self.spec_path}, {self.target_name})"
 
     def __str__(self) -> str:
         return self.spec
 
     def __lt__(self, other):
-        return (self._spec_path, self._target_name, self.generated_base_target_name) < (
-            other._spec_path,
-            other._target_name,
-            other.generated_base_target_name,
-        )
+        return (self._spec_path, self._target_name) < (other._spec_path, other._target_name)
 
 
 class BuildFileAddress(Address):
@@ -285,27 +250,17 @@ class BuildFileAddress(Address):
     :API: public
     """
 
-    def __init__(
-        self,
-        *,
-        rel_path: str,
-        target_name: Optional[str] = None,
-        generated_base_target_name: Optional[str] = None,
-    ) -> None:
+    def __init__(self, *, rel_path: str, target_name: Optional[str] = None,) -> None:
         """
         :param rel_path: The BUILD files' path, relative to the root_dir.
         :param target_name: The name of the target within the BUILD file; defaults to the default
                             target, aka the name of the BUILD file parent dir.
-        :param generated_base_target_name: If this Address refers to a generated subtarget, this
-                                           stores the target_name of the original base target.
 
         :API: public
         """
         spec_path = os.path.dirname(rel_path)
         super().__init__(
-            spec_path=spec_path,
-            target_name=target_name or os.path.basename(spec_path),
-            generated_base_target_name=generated_base_target_name,
+            spec_path=spec_path, target_name=target_name or os.path.basename(spec_path),
         )
         self.rel_path = rel_path
 
@@ -317,24 +272,10 @@ class BuildFileAddress(Address):
         #  is weird to subclass `Address` but break Liskov substitution in many places, like the
         #  constructor. The blocker is that this type is used widely by V1 and it can't be cleanly
         #  deprecated.
-        return Address(
-            spec_path=self.spec_path,
-            target_name=self.target_name,
-            generated_base_target_name=self.generated_base_target_name,
-        )
-
-    def maybe_convert_to_base_target(self) -> "BuildFileAddress":
-        if not self.generated_base_target_name:
-            return self
-        return self.__class__(rel_path=self.rel_path, target_name=self.generated_base_target_name)
+        return Address(spec_path=self.spec_path, target_name=self.target_name,)
 
     def __repr__(self) -> str:
-        prefix = f"BuildFileAddress({self.rel_path}, {self.target_name}"
-        return (
-            f"{prefix})"
-            if not self.generated_base_target_name
-            else f"{prefix}, generated_base_target_name={self.generated_base_target_name})"
-        )
+        return f"BuildFileAddress({self.rel_path}, {self.target_name})"
 
 
 def _is_build_file_name(name: str) -> bool:

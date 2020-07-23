@@ -45,10 +45,7 @@ async def infer_python_dependencies(request: InferPythonDependencies) -> Inferre
     return InferredDependencies(
         owner.address
         for owner in owner_per_import
-        if (
-            owner.address
-            and owner.address.maybe_convert_to_base_target() != request.sources_field.address
-        )
+        if (owner.address and owner.address != request.sources_field.address)
     )
 
 

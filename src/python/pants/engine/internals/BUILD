@@ -1,10 +1,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-python_library(
-  sources=['*.py', '!native.py', '!*_test.py']
-)
-
 python_tests(
   name='tests',
   sources=['*_test.py', '!*_integration_test.py'],
@@ -16,6 +12,21 @@ python_integration_tests(
   dependencies=[
     'examples/src/python/example:hello_directory',
   ],
+)
+
+python_library(
+  name='build_files',
+  sources=['build_files.py'],
+)
+
+python_library(
+  name='graph',
+  sources=['graph.py'],
+)
+
+python_library(
+  name="mapper",
+  sources=["mapper.py"],
 )
 
 python_library(
@@ -32,4 +43,39 @@ resources(
     'native_engine.so',
     'native_engine.so.metadata',
   ],
+)
+
+python_library(
+  name='nodes',
+  sources=['nodes.py']
+)
+
+python_library(
+  name='options_parsing',
+  sources=['options_parsing.py'],
+)
+
+python_library(
+  name='parser',
+  sources=['parser.py'],
+)
+
+python_library(
+  name='scheduler',
+  sources=['scheduler.py'],
+)
+
+python_library(
+  name='scheduler_test_base',
+  sources=['scheduler_test_base.py'],
+)
+
+python_library(
+  name='target_adaptor',
+  sources=['target_adaptor.py']
+)
+
+python_library(
+  name='uuid',
+  sources=['uuid.py']
 )

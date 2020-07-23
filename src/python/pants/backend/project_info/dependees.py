@@ -36,8 +36,6 @@ async def map_addresses_to_dependees() -> AddressToDependees:
     address_to_dependees = defaultdict(set)
     for tgt, dependencies in zip(all_explicit_targets, dependencies_per_target):
         for dependency in dependencies:
-            # TODO(#10354): teach dependees how to work with generated subtargets.
-            dependency = dependency.maybe_convert_to_base_target()
             address_to_dependees[dependency].add(tgt.address)
     return AddressToDependees(
         FrozenDict(
@@ -56,7 +54,7 @@ class DependeesRequest:
     def __init__(
         self, addresses: Iterable[Address], *, transitive: bool, include_roots: bool
     ) -> None:
-        self.addresses = FrozenOrderedSet(addr.maybe_convert_to_base_target() for addr in addresses)
+        self.addresses = FrozenOrderedSet(addr for addr in addresses)
         self.transitive = transitive
         self.include_roots = include_roots
 

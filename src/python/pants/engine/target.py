@@ -568,64 +568,6 @@ class RegisteredTargetTypes:
 
 
 # -----------------------------------------------------------------------------------------------
-# Generated subtargets
-# -----------------------------------------------------------------------------------------------
-
-
-def generate_subtarget_address(base_target_address: Address, *, full_file_name: str) -> Address:
-    """Return the address for a new target based on the original target, but with a more precise
-    `sources` field.
-
-    The address's target name will be the relativized file, such as `:app.json`, or `:subdir/f.txt`.
-
-    See generate_subtarget().
-    """
-    original_spec_path = base_target_address.spec_path
-    relativized_file_name = PurePath(full_file_name).relative_to(original_spec_path).as_posix()
-    return Address(
-        spec_path=original_spec_path,
-        target_name=relativized_file_name,
-        generated_base_target_name=base_target_address.target_name,
-    )
-
-
-_Tgt = TypeVar("_Tgt", bound=Target)
-
-
-def generate_subtarget(base_target: _Tgt, *, full_file_name: str) -> _Tgt:
-    """Generate a new target with the exact same metadata as the original, except for the `sources`
-    field only referring to the single file `full_file_name` and with a new address.
-
-    This is used for greater precision when using dependency inference and file arguments. When we
-    are able to deduce specifically which files are being used, we can use only the files we care
-    about, rather than the entire `sources` field.
-    """
-    relativized_file_name = (
-        PurePath(full_file_name).relative_to(base_target.address.spec_path).as_posix()
-    )
-
-    base_target_field_values = {
-        field.alias: (
-            field.value
-            if isinstance(field, PrimitiveField)
-            else field.sanitized_raw_value  # type: ignore[attr-defined]
-        )
-        for field in base_target.field_values.values()
-    }
-    generated_target_fields = (
-        {**base_target_field_values, Sources.alias: (relativized_file_name,)}
-        if base_target.has_field(Sources)
-        else base_target_field_values
-    )
-
-    target_cls = type(base_target)
-    return target_cls(
-        generated_target_fields,
-        address=generate_subtarget_address(base_target.address, full_file_name=full_file_name),
-    )
-
-
-# -----------------------------------------------------------------------------------------------
 # FieldSet
 # -----------------------------------------------------------------------------------------------
 
@@ -1344,14 +1286,9 @@ class GeneratedSources:
 class Dependencies(AsyncField):
     """Addresses to other targets that this target depends on, e.g. ['helloworld/subdir:lib'].
 
-    Alternatively, you may include file names. Pants will find which target owns that file, and
-    create a new target from that which only includes the file in its `sources` field. For files
-    relative to the current BUILD file, prefix with `./`; otherwise, put the full path, e.g.
-    ['./sibling.txt', 'resources/demo.json'].
-
-    You may exclude dependencies by prefixing with `!`, e.g. `['!helloworld/subdir:lib',
-    '!./sibling.txt']`. Ignores are intended for false positives with dependency inference;
-    otherwise, simply leave off the dependency from the BUILD file.
+    You may exclude dependencies by prefixing with `!`, e.g. `['!helloworld/subdir:lib']`. Ignores
+    are intended for false positives with dependency inference; otherwise, simply leave off the
+    dependency from the BUILD file.
     """
 
     alias = "dependencies"

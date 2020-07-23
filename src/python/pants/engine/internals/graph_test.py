@@ -5,7 +5,7 @@ import itertools
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
-from typing import Iterable, List, Sequence, Tuple, Type
+from typing import Iterable, List, Tuple, Type
 
 import pytest
 
@@ -30,13 +30,11 @@ from pants.engine.internals.graph import (
     AmbiguousCodegenImplementationsException,
     AmbiguousImplementationsException,
     CycleException,
-    InvalidFileDependencyException,
     NoValidTargetsException,
     Owners,
     OwnersRequest,
     TooManyTargetsException,
     parse_dependencies_field,
-    validate_explicit_file_dep,
 )
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import RootRule, rule
@@ -125,35 +123,6 @@ class GraphTest(TestBase):
         assert transitive_targets.dependencies == FrozenOrderedSet([d1, d2, d3, t2, t1])
         assert transitive_targets.closure == FrozenOrderedSet([root, d2, d1, d3, t2, t1])
 
-    def test_transitive_targets_tolerates_subtarget_cycles(self) -> None:
-        """For generated subtargets, we should tolerate cycles between targets.
-
-        This only works with generated subtargets, so we use explicit file dependencies in this
-        test.
-        """
-        self.create_files("", ["dep.txt", "t1.txt", "t2.txt"])
-        self.add_to_build_file(
-            "",
-            dedent(
-                """\
-                target(name='dep', sources=['dep.txt'])
-                target(name='t1', sources=['t1.txt'], dependencies=['dep.txt', 't2.txt'])
-                target(name='t2', sources=['t2.txt'], dependencies=['t1.txt'])
-                """
-            ),
-        )
-        result = self.request_single_product(
-            TransitiveTargets,
-            Params(Addresses([Address.parse("//:t2")]), create_options_bootstrapper()),
-        )
-        assert len(result.roots) == 1
-        assert result.roots[0].address == Address.parse("//:t2")
-        assert [tgt.address for tgt in result.dependencies] == [
-            Address("", target_name="t1.txt", generated_base_target_name="t1"),
-            Address("", target_name="dep.txt", generated_base_target_name="dep"),
-            Address("", target_name="t2.txt", generated_base_target_name="t2"),
-        ]
-
     def assert_failed_cycle(
         self, root_addr: str, subject_addr: str, path_addrs: Tuple[str, ...]
     ) -> None:
@@ -205,18 +174,6 @@ class GraphTest(TestBase):
         self.assert_failed_cycle("//:t1", "//:t2", ("//:t1", "//:t2", "//:t3", "//:t2"))
         self.assert_failed_cycle("//:t2", "//:t2", ("//:t2", "//:t3", "//:t2"))
 
-    def test_resolve_generated_subtarget(self) -> None:
-        self.add_to_build_file("demo", "target(sources=['f1.txt', 'f2.txt'])")
-        generated_target_addresss = Address(
-            "demo", target_name="f1.txt", generated_base_target_name="demo"
-        )
-        generated_target = self.request_single_product(
-            WrappedTarget, generated_target_addresss
-        ).target
-        assert generated_target == MockTarget(
-            {Sources.alias: ["f1.txt"]}, address=generated_target_addresss
-        )
-
     def test_resolve_sources_snapshot(self) -> None:
         """This tests that convert filesystem specs and/or address specs into a single snapshot.
 
@@ -245,34 +202,13 @@ class TestOwners(TestBase):
         exist.
 
         This happens, for example, when the file is deleted and we're computing `--changed-since`.
-        In this case, we should not attempt to generate a subtarget and should use the original
-        target.
         """
         self.create_file("demo/f.txt")
         self.add_to_build_file("demo", "target(sources=['*.txt'])")
         result = self.request_single_product(Owners, OwnersRequest(("demo/deleted.txt",)))
         assert result == Owners([Address("demo", "demo")])
-        # For files that do exist, we should still use a generated subtarget, though.
-        result = self.request_single_product(Owners, OwnersRequest(("demo/f.txt",)))
-        assert result == Owners(
-            [Address("demo", target_name="f.txt", generated_base_target_name="demo")]
-        )
-        # However, if a sibling file must use the original target, then we should always use
-        # the original target to avoid redundancy.
-        result = self.request_single_product(
-            Owners, OwnersRequest(("demo/f.txt", "demo/deleted.txt"))
-        )
-        assert result == Owners([Address("demo", "demo")])
 
     def test_owners_multiple_owners(self) -> None:
-        """This tests that we do not use generated subtargets when there are multiple owners.
-
-        There are two edge cases:
-        - There are >1 owners of the file in question.
-        - The file in question only has one owner, but its sibling from the same target does have
-          >1 owner. In this case, we use the original owning target because it would be
-          redundant to include the generated subtarget.
-        """
         self.create_files("demo", ["f1.txt", "f2.txt"])
         self.add_to_build_file(
             "demo",
@@ -285,26 +221,20 @@ class TestOwners(TestBase):
         )
 
         one_owner_result = self.request_single_product(Owners, OwnersRequest(("demo/f1.txt",)))
-        assert one_owner_result == Owners(
-            [Address("demo", target_name="f1.txt", generated_base_target_name="all")]
-        )
+        assert one_owner_result == Owners([Address("demo", "all")])
 
         two_owners_result = self.request_single_product(Owners, OwnersRequest(("demo/f2.txt",)))
-        assert two_owners_result == Owners([Address("demo", "f2"), Address("demo", "all")])
+        assert two_owners_result == Owners([Address("demo", "all"), Address("demo", "f2")])
 
         sibling_has_two_owners_result = self.request_single_product(
             Owners, OwnersRequest(("demo/f1.txt", "demo/f2.txt"))
         )
         assert sibling_has_two_owners_result == Owners(
-            [Address("demo", "f2"), Address("demo", "all")]
+            [Address("demo", "all"), Address("demo", "f2")]
         )
 
     def test_owners_build_file(self) -> None:
-        """A BUILD file owns every target defined in it.
-
-        This must also respect the general rules for when to use generated subtargets vs. the
-        original owning target. See `test_owners_multiple_owners`.
-        """
+        """A BUILD file owns every target defined in it."""
         self.create_files("demo", ["f1.txt", "f2.txt"])
         self.add_to_build_file(
             "demo",
@@ -318,7 +248,7 @@ class TestOwners(TestBase):
         )
         result = self.request_single_product(Owners, OwnersRequest(("demo/BUILD",)))
         assert set(result) == {
-            Address("demo", target_name="f1.txt", generated_base_target_name="f1"),
+            Address("demo", "f1"),
             Address("demo", "f2_first"),
             Address("demo", "f2_second"),
         }
@@ -341,9 +271,7 @@ class TestSpecsToAddresses(TestBase):
             AddressesWithOrigins, Params(FilesystemSpecs([spec]), create_options_bootstrapper())
         )
         assert len(result) == 1
-        assert result[0] == AddressWithOrigin(
-            Address("demo", target_name="f1.txt", generated_base_target_name="demo"), origin=spec
-        )
+        assert result[0] == AddressWithOrigin(Address("demo", "demo"), origin=spec)
 
     def test_filesystem_specs_glob(self) -> None:
         self.create_files("demo", ["f1.txt", "f2.txt"])
@@ -354,49 +282,25 @@ class TestSpecsToAddresses(TestBase):
                 FilesystemSpecs([FilesystemGlobSpec("demo/*.txt")]), create_options_bootstrapper()
             ),
         )
-        expected_origin = FilesystemResolvedGlobSpec(
-            glob="demo/*.txt", files=("demo/f1.txt", "demo/f2.txt")
-        )
-        assert result == AddressesWithOrigins(
-            [
-                AddressWithOrigin(
-                    Address("demo", target_name="f1.txt", generated_base_target_name="demo"),
-                    origin=expected_origin,
-                ),
-                AddressWithOrigin(
-                    Address("demo", target_name="f2.txt", generated_base_target_name="demo"),
-                    origin=expected_origin,
-                ),
-            ]
-        )
-
-    def test_filesystem_specs_merge_when_same_address(self) -> None:
-        """Test that two filesystem specs resulting in the same address will merge into one result.
-
-        This is a tricky edge case to trigger. First, we must be using the original owning targets,
-        rather than generated subtargets, which means that there must be multiple owning targets.
-        Then, we must have two specs that resulted in the same original address.
-        """
-        self.create_files("demo", ["f1.txt", "f2.txt"])
-        self.add_to_build_file(
-            "demo",
-            dedent(
-                """\
-                target(name='one', sources=['*.txt'])
-                target(name='two', sources=['*.txt'])
-                """
+        expected = AddressWithOrigin(
+            Address("demo", "demo"),
+            origin=FilesystemResolvedGlobSpec(
+                glob="demo/*.txt", files=("demo/f1.txt", "demo/f2.txt")
             ),
         )
+        assert result == AddressesWithOrigins([expected])
+
+    def test_filesystem_specs_merge_when_same_address(self) -> None:
+        """Test that two filesystem specs resulting in the same address will merge into one
+        result."""
+        self.create_files("demo", ["f1.txt", "f2.txt"])
+        self.add_to_build_file("demo", "target(sources=['*.txt'])")
         specs = [FilesystemLiteralSpec("demo/f1.txt"), FilesystemLiteralSpec("demo/f2.txt")]
         result = self.request_single_product(
             AddressesWithOrigins, Params(FilesystemSpecs(specs), create_options_bootstrapper())
         )
-        expected_origin = FilesystemMergedSpec.create(specs)
         assert result == AddressesWithOrigins(
-            [
-                AddressWithOrigin(Address("demo", "two"), expected_origin),
-                AddressWithOrigin(Address("demo", "one"), expected_origin),
-            ]
+            [AddressWithOrigin(Address("demo", "demo"), FilesystemMergedSpec.create(specs)),]
         )
 
     def test_filesystem_specs_nonexistent_file(self) -> None:
@@ -437,25 +341,15 @@ class TestSpecsToAddresses(TestBase):
 
     def test_resolve_addresses(self) -> None:
         """This tests that we correctly merge addresses resolved from address specs with those
-        resolved from filesystem specs.
-
-        Some important edge cases:
-        - If a filesystem spec resulted in a normal target, and that target is already in the
-          address specs, then we should deduplicate to only use the target one time.
-        - If a filesystem spec resulted in a generated subtarget, and that subtarget is generated
-          from an original target that is already in the address specs, then we should not use the
-          generated subtarget.
-        """
+        resolved from filesystem specs."""
         self.create_file("fs_spec/f.txt")
         self.add_to_build_file("fs_spec", "target(sources=['f.txt'])")
         self.create_file("address_spec/f.txt")
         self.add_to_build_file("address_spec", "target(sources=['f.txt'])")
         no_interaction_specs = ["fs_spec/f.txt", "address_spec:address_spec"]
 
-        # Because there are two owners, using a filesystem spec on this should result in both
-        # original targets being used, rather than generated subtargets. If we also use an address
-        # spec on one of those two owners, then we should properly dedupe with the filesystem spec
-        # result.
+        # If we use an address spec on one of the two owners, then we should properly dedupe with
+        # the filesystem spec result.
         self.create_file("two_owners/f.txt")
         self.add_to_build_file(
             "two_owners",
@@ -468,8 +362,6 @@ class TestSpecsToAddresses(TestBase):
         )
         two_owners_specs = ["two_owners/f.txt", "two_owners:one"]
 
-        # If a generated subtarget's original base target is already included via an address spec,
-        # then we should not include the generated subtarget because it would be redundant.
         self.create_files("multiple_files", ["f1.txt", "f2.txt"])
         self.add_to_build_file("multiple_files", "target(sources=['*.txt'])")
         multiple_files_specs = ["multiple_files/f2.txt", "multiple_files:multiple_files"]
@@ -482,8 +374,7 @@ class TestSpecsToAddresses(TestBase):
         )
         assert set(result) == {
             AddressWithOrigin(
-                Address("fs_spec", target_name="f.txt", generated_base_target_name="fs_spec"),
-                origin=FilesystemLiteralSpec("fs_spec/f.txt"),
+                Address("fs_spec", "fs_spec"), origin=FilesystemLiteralSpec("fs_spec/f.txt"),
             ),
             AddressWithOrigin(
                 Address("address_spec", "address_spec"),
@@ -925,89 +816,20 @@ def test_parse_dependencies_field() -> None:
         "//:top_level",
         "demo:tgt",
         "demo",
-        "./relative.txt",
-        "./child/f.txt",
-        "demo/f.txt",
-        "//top_level.txt",
-        "top_level2.txt",
-        # For files without an extension, you must use `./` There is no way (yet) to reference
-        # a file above you without a file extension.
-        "demo/no_extension",
-        "//demo/no_extension",
-        "./no_extension",
     ]
     result = parse_dependencies_field(
         [*given_values, *(f"!{v}" for v in given_values)],
         spec_path="demo/subdir",
         subproject_roots=[],
     )
-    expected_addresses = {
+    expected = {
         Address("demo/subdir", "relative"),
         Address("", "top_level"),
         Address("demo", "tgt"),
         Address("demo", "demo"),
-        Address("demo/no_extension", "no_extension"),
     }
-    assert set(result.addresses) == expected_addresses
-    assert set(result.ignored_addresses) == expected_addresses
-    expected_files = {
-        "demo/subdir/relative.txt",
-        "demo/subdir/child/f.txt",
-        "demo/f.txt",
-        "top_level.txt",
-        "top_level2.txt",
-        "demo/subdir/no_extension",
-    }
-    assert set(result.files) == expected_files
-    assert set(result.ignored_files) == expected_files
-
-
-def test_validate_explicit_file_dep() -> None:
-    addr = Address("demo", "tgt")
-
-    def assert_raises(
-        owners: Sequence[Address], *, expected_snippets: Iterable[str], is_an_ignore: bool = False
-    ) -> None:
-        with pytest.raises(InvalidFileDependencyException) as exc:
-            validate_explicit_file_dep(
-                addr, full_file="f.txt", owners=owners, is_an_ignore=is_an_ignore
-            )
-        assert addr.spec in str(exc.value)
-        if is_an_ignore:
-            assert "!f.txt" in str(exc.value)
-        else:
-            assert "f.txt" in str(exc.value)
-        for snippet in expected_snippets:
-            assert snippet in str(exc.value)
-
-    assert_raises(owners=[], expected_snippets=["no owners"])
-    assert_raises(owners=[], is_an_ignore=True, expected_snippets=["no owners"])
-    # Even if there is one owner, if it was not generated, then we fail because we can assume that
-    # the file in question does not actually exist.
-    assert_raises(owners=[Address.parse(":t")], expected_snippets=["no owners"])
-    assert_raises(owners=[Address.parse(":t")], is_an_ignore=True, expected_snippets=["no owners"])
-    assert_raises(
-        owners=[Address.parse(":t1"), Address.parse(":t2")],
-        expected_snippets=["multiple owners", "//:t1", "//:t2"],
-    )
-    assert_raises(
-        owners=[Address.parse(":t1"), Address.parse(":t2")],
-        is_an_ignore=True,
-        expected_snippets=["multiple owners", "!//:t1", "!//:t2"],
-    )
-
-    # Do not raise if there is one single generated owner.
-    validate_explicit_file_dep(
-        addr,
-        full_file="f.txt",
-        owners=[Address("", target_name="f.txt", generated_base_target_name="demo")],
-    )
-    validate_explicit_file_dep(
-        addr,
-        full_file="f.txt",
-        owners=[Address("", target_name="f.txt", generated_base_target_name="demo")],
-        is_an_ignore=True,
-    )
+    assert set(result.addresses) == expected
+    assert set(result.ignored) == expected
 
 
 class SmalltalkDependencies(Dependencies):
@@ -1058,20 +880,7 @@ async def infer_smalltalk_dependencies(request: InferSmalltalkDependencies) -> I
     all_lines = itertools.chain.from_iterable(
         file_content.content.decode().splitlines() for file_content in digest_contents
     )
-
-    def infer(line: str) -> Address:
-        # To simulate generated subtargets, we look for the format: `file_name.st from :address`
-        if " from " in line:
-            gen_name, _, base_address_str = line.split()
-            base_address = Address.parse(base_address_str)
-            return Address(
-                spec_path="",
-                target_name=gen_name,
-                generated_base_target_name=base_address.target_name,
-            )
-        return Address.parse(line)
-
-    return InferredDependencies(infer(line) for line in all_lines)
+    return InferredDependencies(Address.parse(line) for line in all_lines)
 
 
 class TestDependencies(TestBase):
@@ -1139,48 +948,6 @@ class TestDependencies(TestBase):
         assert "'!unused:ignore'" in str(exc.value)
         assert "* unused:sibling" in str(exc.value)
 
-    def test_explicit_file_dependencies(self) -> None:
-        self.create_files("src/smalltalk/util", ["f1.st", "f2.st", "f3.st"])
-        self.add_to_build_file("src/smalltalk/util", "smalltalk(sources=['*.st'])")
-        self.add_to_build_file(
-            "src/smalltalk",
-            dedent(
-                """\
-                smalltalk(
-                  dependencies=[
-                    './util/f1.st',
-                    'src/smalltalk/util/f2.st',
-                    './util/f3.st',
-                    '!./util/f3.st'
-                  ]
-                )
-                """
-            ),
-        )
-        self.assert_dependencies_resolved(
-            requested_address=Address.parse("src/smalltalk"),
-            expected=[
-                Address(
-                    "src/smalltalk/util", target_name="f1.st", generated_base_target_name="util"
-                ),
-                Address(
-                    "src/smalltalk/util", target_name="f2.st", generated_base_target_name="util"
-                ),
-            ],
-        )
-
-        # Error on unused ignores.
-        self.add_to_build_file(
-            "unused",
-            "smalltalk(dependencies=['src/smalltalk/util/f1.st', '!src/smalltalk/util/f2.st'])",
-        )
-        with pytest.raises(ExecutionError) as exc:
-            self.assert_dependencies_resolved(
-                requested_address=Address.parse("unused"), expected=[]
-            )
-            assert "'!src/smalltalk/util/f2.st''" in str(exc.value)
-            assert "* src/smalltalk/util/f1.st" in str(exc.value)
-
     def test_dependency_injection(self) -> None:
         self.add_to_build_file("", "smalltalk(name='target')")
 
@@ -1204,22 +971,15 @@ class TestDependencies(TestBase):
 
     def test_dependency_inference(self) -> None:
         """We test that dependency inference works generally and that we merge it correctly with
-        explicitly provided dependencies.
-
-        If dep inference returns a generated subtarget, but the original owning target was
-        explicitly provided, then we should not use the generated subtarget.
-        """
-        self.create_files("", ["inferred_but_ignored1.st", "inferred_but_ignored2.st"])
+        explicitly provided dependencies."""
         self.add_to_build_file(
             "",
             dedent(
                 """\
-                smalltalk(name='inferred1')
-                smalltalk(name='inferred2')
-                smalltalk(name='inferred_but_ignored1', sources=['inferred_but_ignored1.st'])
-                smalltalk(name='inferred_but_ignored2', sources=['inferred_but_ignored2.st'])
-                smalltalk(name='inferred_and_provided1')
-                smalltalk(name='inferred_and_provided2')
+                smalltalk(name='provided')
+                smalltalk(name='inferred')
+                smalltalk(name='inferred_but_ignored')
+                smalltalk(name='inferred_and_provided')
                 """
             ),
         )
@@ -1227,8 +987,7 @@ class TestDependencies(TestBase):
             "demo/f1.st",
             dedent(
                 """\
-                //:inferred1
-                inferred2.st from //:inferred2
+                //:inferred
                 """
             ),
         )
@@ -1236,10 +995,8 @@ class TestDependencies(TestBase):
             "demo/f2.st",
             dedent(
                 """\
-                //:inferred_and_provided1
-                inferred_and_provided2.st from //:inferred_and_provided2
-                inferred_but_ignored1.st from //:inferred_but_ignored1
-                //:inferred_but_ignored2
+                //:inferred_and_provided
+                //:inferred_but_ignored
                 """
             ),
         )
@@ -1250,10 +1007,9 @@ class TestDependencies(TestBase):
                 smalltalk(
                   sources=['*.st'],
                   dependencies=[
-                    '//:inferred_and_provided1',
-                    '//:inferred_and_provided2',
-                    '!inferred_but_ignored1.st',
-                    '!//:inferred_but_ignored2',
+                    '//:provided',
+                    '//:inferred_and_provided',
+                    '!//:inferred_but_ignored',
                   ],
                 )
                 """
@@ -1264,33 +1020,8 @@ class TestDependencies(TestBase):
             requested_address=Address.parse("demo"),
             enable_dep_inference=True,
             expected=[
-                Address.parse("//:inferred1"),
-                Address("", target_name="inferred2.st", generated_base_target_name="inferred2"),
-                Address.parse("//:inferred_and_provided1"),
-                Address.parse("//:inferred_and_provided2"),
-            ],
-        )
-
-        self.assert_dependencies_resolved(
-            requested_address=Address(
-                "demo", target_name="f1.st", generated_base_target_name="demo"
-            ),
-            enable_dep_inference=True,
-            expected=[
-                Address.parse("//:inferred1"),
-                Address("", target_name="inferred2.st", generated_base_target_name="inferred2"),
-                Address.parse("//:inferred_and_provided1"),
-                Address.parse("//:inferred_and_provided2"),
-            ],
-        )
-
-        self.assert_dependencies_resolved(
-            requested_address=Address(
-                "demo", target_name="f2.st", generated_base_target_name="demo"
-            ),
-            enable_dep_inference=True,
-            expected=[
-                Address.parse("//:inferred_and_provided1"),
-                Address.parse("//:inferred_and_provided2"),
+                Address.parse("//:provided"),
+                Address.parse("//:inferred"),
+                Address.parse("//:inferred_and_provided"),
             ],
         )

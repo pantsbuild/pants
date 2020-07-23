@@ -2,7 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_library(
-  sources=["*.py", "!pants_exe.py", "!pants_loader.py"],
+  name="daemon_pants_runner",
+  sources=["daemon_pants_runner.py"],
+)
+
+python_library(
+  name="local_pants_runner",
+  sources=["local_pants_runner.py"],
 )
 
 python_library(
@@ -16,6 +22,16 @@ python_library(
   dependencies=[
     ":pants_exe",  # NB: This is not inferred.
   ],
+)
+
+python_library(
+  name="pants_runner",
+  sources=["pants_runner.py"],
+)
+
+python_library(
+  name="remote_pants_runner",
+  sources=["remote_pants_runner.py"],
 )
 
 # This binary's entry_point is used by the pantsbuild.pants sdist to setup a binary for
