@@ -21,12 +21,14 @@ from pants.python.python_setup import PythonSetup
 
 
 class PexBin(ExternalTool):
+    """The PEX (Python EXecutable) tool (https://github.com/pantsbuild/pex)."""
+
     options_scope = "download-pex-bin"
     name = "pex"
-    default_version = "v2.1.12"
+    default_version = "v2.1.14"
     default_known_versions = [
-        f"v2.1.12|{plat}|98cee30e00bfad8279159390139844f9154d9505f98cdbf35733f92412e26910|2631935"
-        for plat in ["darwin", "linux"]
+        f"v2.1.14|{plat}|12937da9ad5ad2c60564aa35cb4b3992ba3cc5ef7efedd44159332873da6fe46|2637138"
+        for plat in ["darwin", "linux "]
     ]
 
     def generate_url(self, plat: Platform) -> str:
@@ -97,8 +99,8 @@ class DownloadedPexBin(HermeticPex):
 
 @rule
 async def download_pex_bin(pex_binary_tool: PexBin) -> DownloadedPexBin:
-    downloaded_tool = await Get[DownloadedExternalTool](
-        ExternalToolRequest, pex_binary_tool.get_request(Platform.current)
+    downloaded_tool = await Get(
+        DownloadedExternalTool, ExternalToolRequest, pex_binary_tool.get_request(Platform.current)
     )
     return DownloadedPexBin(downloaded_tool)
 
