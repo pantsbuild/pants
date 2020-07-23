@@ -13,7 +13,6 @@ from pants.backend.python.rules.coverage import (
     CoverageSubsystem,
     PytestCoverageData,
 )
-from pants.backend.python.rules.inject_ancestor_files import AncestorFiles, AncestorFilesRequest
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,

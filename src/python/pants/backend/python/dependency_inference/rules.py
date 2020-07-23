@@ -13,7 +13,7 @@ from pants.core.util_rules.strip_source_roots import (
     StripSourcesFieldRequest,
 )
 from pants.engine.fs import Digest, DigestContents
-from pants.engine.internals.graph import Owners, OwnersRequest
+from pants.engine.internals.graph import Owners, OwnersNotFoundBehavior, OwnersRequest
 from pants.engine.rules import rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
@@ -73,7 +73,11 @@ async def infer_python_init_dependencies(request: InferInitDependencies) -> Infe
     )
 
     # And add dependencies on their owners.
-    return InferredDependencies(await Get(Owners, OwnersRequest(extra_init_files.snapshot.files)))
+    return InferredDependencies(
+        await Get(
+            Owners, OwnersRequest(extra_init_files.snapshot.files, OwnersNotFoundBehavior.error)
+        )
+    )
 
 
 class InferConftestDependencies(InferDependenciesRequest):
@@ -93,7 +97,9 @@ async def infer_python_conftest_dependencies(
 
     # And add dependencies on their owners.
     return InferredDependencies(
-        await Get(Owners, OwnersRequest(extra_conftest_files.snapshot.files))
+        await Get(
+            Owners, OwnersRequest(extra_conftest_files.snapshot.files, OwnersNotFoundBehavior.error)
+        )
     )
 
 

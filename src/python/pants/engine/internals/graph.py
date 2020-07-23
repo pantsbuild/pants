@@ -218,6 +218,7 @@ class OwnersRequest:
     """A request for the owners of a set of file paths."""
 
     sources: Tuple[str, ...]
+    owners_not_found_behavior: OwnersNotFoundBehavior = OwnersNotFoundBehavior.ignore
 
 
 class Owners(Collection[Address]):
@@ -250,13 +251,17 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
     file_names_with_multiple_owners: OrderedSet[str] = OrderedSet()
     original_addresses_due_to_deleted_files: OrderedSet[Address] = OrderedSet()
     original_addresses_due_to_multiple_owners: OrderedSet[Address] = OrderedSet()
+    unmatched_sources = set(sources_set)
     for candidate_tgt, candidate_tgt_sources, bfa in zip(
         candidate_targets, candidate_target_sources, build_file_addresses
     ):
-        matching_files = matches_filespec(candidate_tgt.get(Sources).filespec, paths=sources_set)
+        matching_files = set(
+            matches_filespec(candidate_tgt.get(Sources).filespec, paths=sources_set)
+        )
         if bfa.rel_path not in sources_set and not matching_files:
             continue
-        deleted_files_matched = bool(set(matching_files) - all_source_files)
+        unmatched_sources -= matching_files
+        deleted_files_matched = bool(matching_files - all_source_files)
         if deleted_files_matched:
             original_addresses_due_to_deleted_files.add(candidate_tgt.address)
             continue
@@ -294,6 +299,14 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
             or original_address in original_addresses_due_to_multiple_owners
         )
 
+    if (
+        unmatched_sources
+        and owners_request.owners_not_found_behavior != OwnersNotFoundBehavior.ignore
+    ):
+        _log_or_raise_unmatched_owners(
+            [PurePath(path) for path in unmatched_sources], owners_request.owners_not_found_behavior
+        )
+
     remaining_generated_addresses = FrozenOrderedSet(
         address
         for file_name, address in file_name_to_generated_address.items()
@@ -311,6 +324,26 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
 # -----------------------------------------------------------------------------------------------
 # Specs -> Addresses
 # -----------------------------------------------------------------------------------------------
+
+
+def _log_or_raise_unmatched_owners(
+    file_paths: Sequence[PurePath], owners_not_found_behavior: OwnersNotFoundBehavior
+) -> None:
+    msgs = []
+    for file_path in file_paths:
+        msgs.append(
+            f"No owning targets could be found for the file `{file_path}`.\n\nPlease check "
+            f"that there is a BUILD file in `{file_path.parent}` with a target whose `sources` "
+            f"field includes `{file_path}`. See https://www.pantsbuild.org/docs/targets for more "
+            "information on target definitions.\nIf you would like to ignore un-owned files, "
+            "please pass `--owners-not-found-behavior=ignore`."
+        )
+
+    if owners_not_found_behavior == OwnersNotFoundBehavior.warn:
+        for msg in msgs:
+            logger.warning(msg)
+    else:
+        raise ResolveError("\n\n".join(msgs))
 
 
 @rule
@@ -349,18 +382,9 @@ async def addresses_with_origins_from_filesystem_specs(
             and isinstance(spec, FilesystemLiteralSpec)
             and not owners
         ):
-            file_path = PurePath(spec.to_spec_string())
-            msg = (
-                f"No owning targets could be found for the file `{file_path}`.\n\nPlease check "
-                f"that there is a BUILD file in `{file_path.parent}` with a target whose `sources` "
-                f"field includes `{file_path}`. See https://pants.readme.io/docs/targets for more "
-                "information on target definitions.\nIf you would like to ignore un-owned files, "
-                "please pass `--owners-not-found-behavior=ignore`."
+            _log_or_raise_unmatched_owners(
+                [PurePath(spec.to_spec_string())], global_options.options.owners_not_found_behavior
             )
-            if global_options.options.owners_not_found_behavior == OwnersNotFoundBehavior.warn:
-                logger.warning(msg)
-            else:
-                raise ResolveError(msg)
         # We preserve what literal files any globs resolved to. This allows downstream goals to be
         # more precise in which files they operate on.
         origin: Union[FilesystemLiteralSpec, FilesystemResolvedGlobSpec] = (
