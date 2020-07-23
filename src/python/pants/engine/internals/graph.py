@@ -585,26 +585,6 @@ async def hydrate_sources(
 # -----------------------------------------------------------------------------------------------
 
 
-class AmbiguousDependencyInferenceException(Exception):
-    """Exception for when there are multiple dependency inference implementations and it is
-    ambiguous which to use."""
-
-    def __init__(
-        self,
-        implementations: Iterable[Type["InferDependenciesRequest"]],
-        *,
-        from_sources_type: Type["Sources"],
-    ) -> None:
-        bulleted_list_sep = "\n  * "
-        possible_implementations = sorted(impl.__name__ for impl in implementations)
-        super().__init__(
-            f"Multiple of the registered dependency inference implementations can infer "
-            f"dependencies from {from_sources_type.__name__}. It is ambiguous which "
-            "implementation to use.\n\nPossible implementations:"
-            f"{bulleted_list_sep}{bulleted_list_sep.join(possible_implementations)}"
-        )
-
-
 class InvalidFileDependencyException(Exception):
     pass
 
@@ -740,7 +720,7 @@ async def resolve_dependencies(
     )
 
     inference_request_types = union_membership.get(InferDependenciesRequest)
-    inferred = InferredDependencies()
+    inferred = [InferredDependencies()]
     if global_options.options.dependency_inference and inference_request_types:
         # Dependency inference is solely determined by the `Sources` field for a Target, so we
         # re-resolve the original target to inspect its `Sources` field, if any.
@@ -751,17 +731,14 @@ async def resolve_dependencies(
             for inference_request_type in inference_request_types
             if isinstance(sources_field, inference_request_type.infer_from)
         ]
-        if relevant_inference_request_types:
-            if len(relevant_inference_request_types) > 1:
-                raise AmbiguousDependencyInferenceException(
-                    relevant_inference_request_types, from_sources_type=type(sources_field)
-                )
-            inference_request_type = relevant_inference_request_types[0]
-            inferred = await Get(
+        inferred = await MultiGet(
+            Get(
                 InferredDependencies,
                 InferDependenciesRequest,
                 inference_request_type(sources_field),
             )
+            for inference_request_type in relevant_inference_request_types
+        )
 
     flattened_ignore_file_deps_owners = set(
         itertools.chain.from_iterable(explicit_file_deps_ignore_owners)
@@ -775,7 +752,7 @@ async def resolve_dependencies(
         *provided.addresses,
         *itertools.chain.from_iterable(explicit_file_deps_owners),
         *itertools.chain.from_iterable(injected),
-        *inferred,
+        *itertools.chain.from_iterable(inferred),
     ):
         if addr.generated_base_target_name:
             collection = (

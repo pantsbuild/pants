@@ -6,15 +6,22 @@ from pathlib import PurePath
 from pants.backend.python.dependency_inference.import_parser import find_python_imports
 from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwner
 from pants.backend.python.dependency_inference.python_stdlib.combined import combined_stdlib
-from pants.backend.python.target_types import PythonSources
+from pants.backend.python.rules.inject_ancestor_files import AncestorFiles, AncestorFilesRequest
+from pants.backend.python.target_types import PythonSources, PythonTestsSources
 from pants.core.util_rules.strip_source_roots import (
     SourceRootStrippedSources,
     StripSourcesFieldRequest,
 )
 from pants.engine.fs import Digest, DigestContents
+from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.rules import rule
 from pants.engine.selectors import Get, MultiGet
-from pants.engine.target import InferDependenciesRequest, InferredDependencies
+from pants.engine.target import (
+    HydratedSources,
+    HydrateSourcesRequest,
+    InferDependenciesRequest,
+    InferredDependencies,
+)
 from pants.engine.unions import UnionRule
 
 
@@ -52,5 +59,50 @@ async def infer_python_dependencies(request: InferPythonDependencies) -> Inferre
     )
 
 
+class InferInitDependencies(InferDependenciesRequest):
+    infer_from = PythonSources
+
+
+@rule
+async def infer_python_init_dependencies(request: InferInitDependencies) -> InferredDependencies:
+    # Locate __init__.py files not already in the Snapshot.
+    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.sources_field))
+    extra_init_files = await Get(
+        AncestorFiles,
+        AncestorFilesRequest("__init__.py", hydrated_sources.snapshot, sources_stripped=False),
+    )
+
+    # And add dependencies on their owners.
+    return InferredDependencies(await Get(Owners, OwnersRequest(extra_init_files.snapshot.files)))
+
+
+class InferConftestDependencies(InferDependenciesRequest):
+    infer_from = PythonTestsSources
+
+
+@rule
+async def infer_python_conftest_dependencies(
+    request: InferConftestDependencies,
+) -> InferredDependencies:
+    # Locate conftest.py files not already in the Snapshot.
+    hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.sources_field))
+    extra_conftest_files = await Get(
+        AncestorFiles,
+        AncestorFilesRequest("conftest.py", hydrated_sources.snapshot, sources_stripped=False),
+    )
+
+    # And add dependencies on their owners.
+    return InferredDependencies(
+        await Get(Owners, OwnersRequest(extra_conftest_files.snapshot.files))
+    )
+
+
 def rules():
-    return [infer_python_dependencies, UnionRule(InferDependenciesRequest, InferPythonDependencies)]
+    return [
+        infer_python_dependencies,
+        infer_python_init_dependencies,
+        infer_python_conftest_dependencies,
+        UnionRule(InferDependenciesRequest, InferPythonDependencies),
+        UnionRule(InferDependenciesRequest, InferInitDependencies),
+        UnionRule(InferDependenciesRequest, InferConftestDependencies),
+    ]
