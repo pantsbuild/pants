@@ -43,6 +43,7 @@ use process_execution::{
 };
 use store::{BackoffConfig, Store};
 use tokio::runtime::Handle;
+use workunit_store::WorkunitStore;
 
 /// A binary which takes args of format:
 ///  process_executor --env=FOO=bar --env=SOME=value --input-digest=abc123 --input-digest-length=80
@@ -54,6 +55,8 @@ use tokio::runtime::Handle;
 #[tokio::main]
 async fn main() {
   env_logger::init();
+  let workunit_store = WorkunitStore::new(false);
+  workunit_store.init_thread_state(None);
 
   let args = App::new("process_executor")
     .arg(

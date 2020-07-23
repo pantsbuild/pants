@@ -143,7 +143,7 @@ impl CommandRunner {
     if let Some(oauth_bearer_token) = oauth_bearer_token {
       headers.insert(
         String::from("authorization"),
-        format!("Bearer {}", oauth_bearer_token),
+        format!("Bearer {}", oauth_bearer_token.trim()),
       );
     }
 
