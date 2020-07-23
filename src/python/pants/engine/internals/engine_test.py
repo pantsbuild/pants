@@ -333,7 +333,7 @@ class WorkunitTracker:
     started_workunit_chunks: List[List[dict]] = field(default_factory=list)
     finished: bool = False
 
-    def add(self, workunits, **kwargs) -> None:
+    def add(self, **kwargs) -> None:
         if kwargs["finished"] is True:
             self.finished = True
 
@@ -341,8 +341,9 @@ class WorkunitTracker:
         if started_workunits:
             self.started_workunit_chunks.append(started_workunits)
 
-        if workunits:
-            self.finished_workunit_chunks.append(workunits)
+        completed_workunits = kwargs.get("completed_workunits")
+        if completed_workunits:
+            self.finished_workunit_chunks.append(completed_workunits)
 
 
 class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
@@ -723,11 +724,12 @@ class StreamingWorkunitProcessTests(TestBase):
     def test_context_object(self):
         scheduler = self.scheduler
 
-        def callback(workunits, **kwargs) -> None:
+        def callback(**kwargs) -> None:
             context = kwargs["context"]
             assert isinstance(context, StreamingWorkunitContext)
 
-            for workunit in workunits:
+            completed_workunits = kwargs["completed_workunits"]
+            for workunit in completed_workunits:
                 if "artifacts" in workunit and "stdout_digest" in workunit["artifacts"]:
                     digest = workunit["artifacts"]["stdout_digest"]
                     output = context.digests_to_bytes([digest])
