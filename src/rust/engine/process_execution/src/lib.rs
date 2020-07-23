@@ -531,6 +531,11 @@ impl CommandRunner for BoundedCommandRunner {
       let name = format!("{}-running", req.workunit_name());
 
       semaphore.with_acquired(move |concurrency_id| {
+        log::debug!(
+          "Running {} under semaphor with concurrency id: {}",
+          desc,
+          concurrency_id
+        );
         let mut metadata = WorkunitMetadata::with_level(Level::Info);
         metadata.desc = Some(desc);
 
