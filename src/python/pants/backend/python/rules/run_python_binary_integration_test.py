@@ -52,7 +52,7 @@ class RunPythonBinaryIntegrationTest(PantsRunIntegrationTest):
             (src_root2 / "BUILD").write_text("python_library()")
             result = self.run_pants(
                 [
-                    "--dependency-inference",
+                    "--python-infer-imports",
                     (
                         f"--source-root-patterns=['/{tmpdir_relative}/src_root1', "
                         f"'/{tmpdir_relative}/src_root2']"

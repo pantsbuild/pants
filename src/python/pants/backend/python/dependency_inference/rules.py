@@ -14,7 +14,7 @@ from pants.core.util_rules.strip_source_roots import (
 )
 from pants.engine.fs import Digest, DigestContents
 from pants.engine.internals.graph import Owners, OwnersNotFoundBehavior, OwnersRequest
-from pants.engine.rules import rule
+from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
     HydratedSources,
@@ -23,6 +23,40 @@ from pants.engine.target import (
     InferredDependencies,
 )
 from pants.engine.unions import UnionRule
+from pants.subsystem.subsystem import Subsystem
+
+
+class PythonInference(Subsystem):
+    """Options controlling which dependencies will be inferred for Python targets."""
+
+    options_scope = "python-infer"
+
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
+
+        register(
+            "--imports",
+            default=False,
+            help=(
+                "Infer a target's imported dependencies by parsing import statements from sources."
+            ),
+        )
+        register(
+            "--inits",
+            default=True,
+            help=(
+                "Infer a target's dependencies on any __init__.py files existing for the packages "
+                "it is located in (recursively upward in the directory structure)."
+            ),
+        )
+        register(
+            "--conftests",
+            default=True,
+            help=(
+                "Infer a test target's dependencies on any conftest.py files in parent directories."
+            ),
+        )
 
 
 class InferPythonDependencies(InferDependenciesRequest):
@@ -30,7 +64,12 @@ class InferPythonDependencies(InferDependenciesRequest):
 
 
 @rule(desc="Inferring Python dependencies.")
-async def infer_python_dependencies(request: InferPythonDependencies) -> InferredDependencies:
+async def infer_python_dependencies(
+    request: InferPythonDependencies, python_inference: PythonInference
+) -> InferredDependencies:
+    if not python_inference.get_options().imports:
+        return InferredDependencies()
+
     stripped_sources = await Get(
         SourceRootStrippedSources, StripSourcesFieldRequest(request.sources_field)
     )
@@ -64,7 +103,12 @@ class InferInitDependencies(InferDependenciesRequest):
 
 
 @rule
-async def infer_python_init_dependencies(request: InferInitDependencies) -> InferredDependencies:
+async def infer_python_init_dependencies(
+    request: InferInitDependencies, python_inference: PythonInference
+) -> InferredDependencies:
+    if not python_inference.get_options().inits:
+        return InferredDependencies()
+
     # Locate __init__.py files not already in the Snapshot.
     hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.sources_field))
     extra_init_files = await Get(
@@ -86,8 +130,11 @@ class InferConftestDependencies(InferDependenciesRequest):
 
 @rule
 async def infer_python_conftest_dependencies(
-    request: InferConftestDependencies,
+    request: InferConftestDependencies, python_inference: PythonInference,
 ) -> InferredDependencies:
+    if not python_inference.get_options().conftests:
+        return InferredDependencies()
+
     # Locate conftest.py files not already in the Snapshot.
     hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.sources_field))
     extra_conftest_files = await Get(
@@ -111,4 +158,5 @@ def rules():
         UnionRule(InferDependenciesRequest, InferPythonDependencies),
         UnionRule(InferDependenciesRequest, InferInitDependencies),
         UnionRule(InferDependenciesRequest, InferConftestDependencies),
+        SubsystemRule(PythonInference),
     ]

@@ -8,7 +8,19 @@ import os.path
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import DefaultDict, Dict, Iterable, List, NamedTuple, Sequence, Set, Tuple, Type, Union
+from typing import (
+    DefaultDict,
+    Dict,
+    Iterable,
+    List,
+    NamedTuple,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Type,
+    Union,
+)
 
 from pants.base.exceptions import ResolveError
 from pants.base.specs import (
@@ -327,16 +339,21 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
 
 
 def _log_or_raise_unmatched_owners(
-    file_paths: Sequence[PurePath], owners_not_found_behavior: OwnersNotFoundBehavior
+    file_paths: Sequence[PurePath],
+    owners_not_found_behavior: OwnersNotFoundBehavior,
+    ignore_option: Optional[str] = None,
 ) -> None:
     msgs = []
+    if ignore_option:
+        option_msg = "\nIf you would like to ignore un-owned files, please pass `ignore_option`."
+    else:
+        option_msg = ""
     for file_path in file_paths:
         msgs.append(
             f"No owning targets could be found for the file `{file_path}`.\n\nPlease check "
             f"that there is a BUILD file in `{file_path.parent}` with a target whose `sources` "
             f"field includes `{file_path}`. See https://www.pantsbuild.org/docs/targets for more "
-            "information on target definitions.\nIf you would like to ignore un-owned files, "
-            "please pass `--owners-not-found-behavior=ignore`."
+            f"information on target definitions.{option_msg}"
         )
 
     if owners_not_found_behavior == OwnersNotFoundBehavior.warn:
@@ -383,7 +400,9 @@ async def addresses_with_origins_from_filesystem_specs(
             and not owners
         ):
             _log_or_raise_unmatched_owners(
-                [PurePath(spec.to_spec_string())], global_options.options.owners_not_found_behavior
+                [PurePath(spec.to_spec_string())],
+                global_options.options.owners_not_found_behavior,
+                ignore_option="--owners-not-found-behavior=ignore",
             )
         # We preserve what literal files any globs resolved to. This allows downstream goals to be
         # more precise in which files they operate on.
@@ -745,7 +764,7 @@ async def resolve_dependencies(
 
     inference_request_types = union_membership.get(InferDependenciesRequest)
     inferred = [InferredDependencies()]
-    if global_options.options.dependency_inference and inference_request_types:
+    if inference_request_types:
         # Dependency inference is solely determined by the `Sources` field for a Target, so we
         # re-resolve the original target to inspect its `Sources` field, if any.
         wrapped_tgt = await Get(WrappedTarget, Address, request.field.address)
