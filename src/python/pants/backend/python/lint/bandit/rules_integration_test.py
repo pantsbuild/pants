@@ -10,7 +10,7 @@ from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.core.goals.lint import LintOptions, LintResults
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, FileContent
-from pants.engine.rules import RootRule
+from pants.engine.rules import RootRule, SubsystemRule
 from pants.engine.selectors import Params
 from pants.engine.target import TargetWithOrigin
 from pants.testutil.engine.util import create_subsystem
@@ -28,7 +28,7 @@ class BanditIntegrationTest(ExternalToolTestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *bandit_rules(), RootRule(BanditRequest), RootRule(LintOptions))
+        return (*super().rules(), *bandit_rules(), RootRule(BanditRequest), SubsystemRule(LintOptions))
 
     def make_target_with_origin(
         self,
@@ -55,7 +55,6 @@ class BanditIntegrationTest(ExternalToolTestBase):
         passthrough_args: Optional[str] = None,
         skip: bool = False,
         additional_args: Optional[List[str]] = None,
-        reports_dir: Optional[str] = None,
     ) -> LintResults:
         args = ["--backend-packages=pants.backend.python.lint.bandit"]
         if config:
@@ -71,7 +70,6 @@ class BanditIntegrationTest(ExternalToolTestBase):
             LintResults,
             Params(
                 BanditRequest(BanditFieldSet.create(tgt) for tgt in targets),
-                create_subsystem(LintOptions, reports_dir=reports_dir),  # type: ignore[type-var]
                 create_options_bootstrapper(args=args),
             ),
         )
@@ -189,7 +187,7 @@ class BanditIntegrationTest(ExternalToolTestBase):
 
     def test_output_file(self) -> None:
         target = self.make_target_with_origin([self.bad_source])
-        result = self.run_bandit([target], reports_dir=".")
+        result = self.run_bandit([target], additional_args=["--lint-reports-dir='.'"])
         assert len(result) == 1
         assert result[0].exit_code == 1
         assert result[0].stdout.strip() == ""

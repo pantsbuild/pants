@@ -147,7 +147,7 @@ async def bandit_lint_partition(
             Snapshot, SnapshotSubset(result.output_digest, PathGlobs([output_path.name]))
         )
         if report_file_snapshot.is_empty or len(report_file_snapshot.files) != 1:
-            raise Exception(f"Unexpected report file snapshot: {report_file_snapshot}")
+            raise Exception(f"Unexpected report file snapshot: {report_file_snapshot.files}")
         results_file = LintResultFile(output_path=output_path, digest=report_file_snapshot.digest)
 
     return LintResult.from_fallible_process_result(
