@@ -6,6 +6,8 @@ import logging
 from dataclasses import dataclass
 from typing import Iterable, Optional, Tuple
 
+from pkg_resources import Requirement, parse_requirements
+
 from pants.backend.python.rules.pex import (
     PexInterpreterConstraints,
     PexPlatforms,
@@ -30,7 +32,6 @@ from pants.option.custom_types import GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
 from pants.util.meta import frozen_after_init
-from pkg_resources import Requirement, parse_requirements
 
 logger = logging.getLogger(__name__)
 

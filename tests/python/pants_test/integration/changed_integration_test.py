@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from textwrap import dedent
 
 import pytest
+
 from pants.base.build_environment import get_buildroot
 from pants.testutil.git_util import initialize_repo
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon

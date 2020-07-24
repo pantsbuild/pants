@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from typing import Dict, Iterable, Iterator, List, Optional, Tuple, cast
 
 import pytest
+from pkg_resources import Requirement
+
 from pants.backend.python.rules import download_pex_bin
 from pants.backend.python.rules.pex import (
     Pex,
@@ -30,7 +32,6 @@ from pants.testutil.engine.util import create_subsystem
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.util.frozendict import FrozenDict
-from pkg_resources import Requirement
 
 
 def test_merge_interpreter_constraints() -> None:

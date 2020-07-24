@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import pytest
+
 from pants.backend.python.pants_requirement import PantsRequirement
 from pants.backend.python.target_types import PythonRequirementLibrary, PythonRequirementsField
 from pants.base.build_environment import pants_version

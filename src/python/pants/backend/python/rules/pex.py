@@ -18,6 +18,8 @@ from typing import (
     TypeVar,
 )
 
+from typing_extensions import Protocol
+
 from pants.backend.python.rules.download_pex_bin import DownloadedPexBin
 from pants.backend.python.rules.hermetic_pex import HermeticPex
 from pants.backend.python.rules.util import parse_interpreter_constraint
@@ -50,7 +52,6 @@ from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
 from pants.util.strutil import pluralize
-from typing_extensions import Protocol
 
 
 class PexRequirements(DeduplicatedCollection[str]):

@@ -5,6 +5,7 @@ from textwrap import dedent
 from typing import Tuple
 
 import pytest
+
 from pants.backend.python.target_types import PythonRequirementLibrary, PythonRequirementsField
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.addresses import Address

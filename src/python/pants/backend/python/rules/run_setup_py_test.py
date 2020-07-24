@@ -6,6 +6,7 @@ import textwrap
 from typing import Iterable, Type
 
 import pytest
+
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.rules.run_setup_py import (
     AmbiguousOwnerError,

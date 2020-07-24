@@ -11,6 +11,7 @@ from contextlib import contextmanager
 
 import psutil
 import pytest
+
 from pants.pantsd.process_manager import (
     ProcessGroup,
     ProcessManager,

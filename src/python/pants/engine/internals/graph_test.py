@@ -8,6 +8,7 @@ from textwrap import dedent
 from typing import Iterable, List, Sequence, Tuple, Type
 
 import pytest
+
 from pants.base.specs import (
     FilesystemGlobSpec,
     FilesystemLiteralSpec,

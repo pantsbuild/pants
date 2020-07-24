@@ -9,6 +9,15 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any
 
+from pkg_resources import (
+    Distribution,
+    EmptyProvider,
+    VersionConflict,
+    WorkingSet,
+    working_set,
+    yield_lines,
+)
+
 from pants.base.exceptions import BuildConfigurationError
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -23,14 +32,6 @@ from pants.init.extension_loader import (
 )
 from pants.subsystem.subsystem import Subsystem
 from pants.util.ordered_set import FrozenOrderedSet
-from pkg_resources import (
-    Distribution,
-    EmptyProvider,
-    VersionConflict,
-    WorkingSet,
-    working_set,
-    yield_lines,
-)
 
 
 class MockMetadata(EmptyProvider):

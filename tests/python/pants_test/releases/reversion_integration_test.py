@@ -5,9 +5,10 @@ import os
 import shutil
 
 import requests
+from pex.bin import pex as pex_main
+
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import temporary_dir
-from pex.bin import pex as pex_main
 
 
 class ReversionTest(PantsRunIntegrationTest):

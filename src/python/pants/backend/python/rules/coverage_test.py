@@ -5,6 +5,7 @@ from textwrap import dedent
 from typing import List, Optional
 
 import pytest
+
 from pants.backend.python.rules.coverage import CoverageSubsystem, create_coverage_config
 from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, PathGlobs, Snapshot
 from pants.testutil.engine.util import MockGet, create_subsystem, run_rule

@@ -6,6 +6,7 @@ from textwrap import dedent
 from typing import Optional
 
 import pytest
+
 from pants.backend.python.dependency_inference.module_mapper import (
     FirstPartyModuleToAddressMapping,
     PythonModule,

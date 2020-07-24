@@ -13,6 +13,7 @@ from io import BytesIO
 from threading import Thread
 
 import requests
+
 from pants.net.http.fetcher import Fetcher
 from pants.util.contextutil import temporary_dir, temporary_file
 from pants.util.dirutil import safe_open, touch

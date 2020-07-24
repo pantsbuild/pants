@@ -8,6 +8,7 @@ from functools import partial
 
 import pytest
 from packaging.version import Version
+
 from pants.base.deprecated import (
     BadDecoratorNestingError,
     BadSemanticVersionError,
