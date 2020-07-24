@@ -4,7 +4,7 @@
 import os
 import shutil
 from contextlib import contextmanager
-from pathlib import Path
+from pathlib import Path, PurePath
 from textwrap import dedent
 from typing import Iterable
 
@@ -106,7 +106,7 @@ class PluginResolverTest(TestBase):
         self.scheduler.write_digest(result.output_digest, path_prefix="output")
         safe_mkdir(install_dir)
         for path in result_snapshot.files:
-            shutil.copy(path, install_dir)
+            shutil.copy(PurePath(self.build_root, "output", path), install_dir)
 
     @contextmanager
     def plugin_resolution(self, *, interpreter=None, chroot=None, plugins=None, sdist=True):
