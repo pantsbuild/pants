@@ -10,12 +10,7 @@ from pants.engine.collection import Collection
 from pants.engine.rules import RootRule, side_effecting
 from pants.option.custom_types import GlobExpansionConjunction as GlobExpansionConjunction
 from pants.option.global_options import GlobMatchErrorBehavior as GlobMatchErrorBehavior
-from pants.util.dirutil import (
-    ensure_relative_file_name,
-    maybe_read_file,
-    safe_delete,
-    safe_file_dump,
-)
+from pants.util.dirutil import maybe_read_file, safe_delete, safe_file_dump
 from pants.util.meta import frozen_after_init
 
 
@@ -306,35 +301,6 @@ _EMPTY_FINGERPRINT = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b78
 
 EMPTY_DIGEST = Digest(fingerprint=_EMPTY_FINGERPRINT, serialized_bytes_length=0)
 EMPTY_SNAPSHOT = Snapshot(EMPTY_DIGEST, files=(), dirs=())
-
-
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class SingleFileExecutable:
-    """Wraps a `Snapshot` and ensures that it only contains a single file."""
-
-    _exe_filename: Path
-    digest: Digest
-
-    @property
-    def exe_filename(self) -> str:
-        return ensure_relative_file_name(self._exe_filename)
-
-    class ValidationError(ValueError):
-        pass
-
-    @classmethod
-    def _raise_validation_error(cls, snapshot: Snapshot, should_message: str) -> None:
-        raise cls.ValidationError(f"snapshot {snapshot} used for {cls} should {should_message}")
-
-    def __init__(self, snapshot: Snapshot) -> None:
-        if len(snapshot.files) != 1:
-            self._raise_validation_error(snapshot, "have exactly 1 file!")
-        if snapshot.digest == EMPTY_DIGEST:
-            self._raise_validation_error(snapshot, "have a non-empty digest!")
-
-        self._exe_filename = Path(snapshot.files[0])
-        self.digest = snapshot.digest
 
 
 @dataclass(frozen=True)
