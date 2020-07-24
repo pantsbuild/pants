@@ -76,6 +76,7 @@ async def flake8_lint_partition(
         Pex,
         PexRequest(
             output_filename="flake8.pex",
+            distributed_to_users=False,
             requirements=PexRequirements(flake8.get_requirement_specs()),
             interpreter_constraints=(
                 partition.interpreter_constraints

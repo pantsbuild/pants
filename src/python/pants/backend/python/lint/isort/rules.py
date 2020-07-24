@@ -83,6 +83,7 @@ async def setup(
         Pex,
         PexRequest(
             output_filename="isort.pex",
+            distributed_to_users=False,
             requirements=PexRequirements(isort.get_requirement_specs()),
             interpreter_constraints=PexInterpreterConstraints(
                 isort.default_interpreter_constraints

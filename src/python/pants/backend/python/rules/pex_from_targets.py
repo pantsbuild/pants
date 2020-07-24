@@ -43,6 +43,7 @@ class PexFromTargetsRequest:
 
     addresses: Addresses
     output_filename: str
+    distributed_to_users: bool
     entry_point: Optional[str]
     platforms: PexPlatforms
     additional_args: Tuple[str, ...]
@@ -59,6 +60,7 @@ class PexFromTargetsRequest:
         addresses: Iterable[Address],
         *,
         output_filename: str,
+        distributed_to_users: bool,
         entry_point: Optional[str] = None,
         platforms: PexPlatforms = PexPlatforms(),
         additional_args: Iterable[str] = (),
@@ -70,6 +72,7 @@ class PexFromTargetsRequest:
     ) -> None:
         self.addresses = Addresses(addresses)
         self.output_filename = output_filename
+        self.distributed_to_users = distributed_to_users
         self.entry_point = entry_point
         self.platforms = platforms
         self.additional_args = tuple(additional_args)
@@ -171,6 +174,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
 
     return PexRequest(
         output_filename=request.output_filename,
+        distributed_to_users=request.distributed_to_users,
         requirements=requirements,
         interpreter_constraints=interpreter_constraints,
         platforms=request.platforms,

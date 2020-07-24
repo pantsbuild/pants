@@ -90,6 +90,7 @@ async def setup(
         Pex,
         PexRequest(
             output_filename="black.pex",
+            distributed_to_users=False,
             requirements=PexRequirements(black.get_requirement_specs()),
             interpreter_constraints=PexInterpreterConstraints(
                 black.default_interpreter_constraints

@@ -71,6 +71,7 @@ async def bandit_lint_partition(
         Pex,
         PexRequest(
             output_filename="bandit.pex",
+            distributed_to_users=False,
             requirements=PexRequirements(bandit.get_requirement_specs()),
             interpreter_constraints=(
                 partition.interpreter_constraints

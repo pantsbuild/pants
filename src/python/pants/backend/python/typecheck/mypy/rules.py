@@ -77,6 +77,7 @@ async def mypy_lint(
         Pex,
         PexRequest(
             output_filename="mypy.pex",
+            distributed_to_users=False,
             requirements=PexRequirements(mypy.get_requirement_specs()),
             # NB: This only determines what MyPy is run with. The user can specify what version
             # their code is with `--python-version`. See

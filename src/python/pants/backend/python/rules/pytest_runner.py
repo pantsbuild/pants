@@ -98,7 +98,9 @@ async def setup_pytest_for_target(
     # Ensure all pexes we merge via PEX_PATH to form the test runner use the interpreter constraints
     # of the tests. This is handled by CreatePexFromTargetClosure, but we must pass this through for
     # CreatePex requests.
-    pex_request = functools.partial(PexRequest, interpreter_constraints=interpreter_constraints)
+    pex_request = functools.partial(
+        PexRequest, interpreter_constraints=interpreter_constraints, distributed_to_users=False
+    )
 
     # NB: We set `--not-zip-safe` because Pytest plugin discovery, which uses
     # `importlib_metadata` and thus `zipp`, does not play nicely when doing import magic directly
@@ -123,6 +125,7 @@ async def setup_pytest_for_target(
         PexFromTargetsRequest(
             addresses=test_addresses,
             output_filename="requirements.pex",
+            distributed_to_users=False,
             include_source_files=False,
             additional_args=additional_args_for_pytest,
         ),

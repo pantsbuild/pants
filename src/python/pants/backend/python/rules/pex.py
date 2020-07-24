@@ -206,6 +206,7 @@ class PexRequest:
     """A generic request to create a PEX from its inputs."""
 
     output_filename: str
+    distributed_to_users: bool
     requirements: PexRequirements
     interpreter_constraints: PexInterpreterConstraints
     platforms: PexPlatforms
@@ -221,6 +222,7 @@ class PexRequest:
         self,
         *,
         output_filename: str,
+        distributed_to_users: bool,
         requirements: PexRequirements = PexRequirements(),
         interpreter_constraints=PexInterpreterConstraints(),
         platforms=PexPlatforms(),
@@ -231,6 +233,7 @@ class PexRequest:
         description: Optional[str] = None,
     ) -> None:
         self.output_filename = output_filename
+        self.distributed_to_users = distributed_to_users
         self.requirements = requirements
         self.interpreter_constraints = interpreter_constraints
         self.platforms = platforms
@@ -330,6 +333,10 @@ async def create_pex(
         *(f"--repo={repo}" for repo in python_repos.repos),
         *request.additional_args,
     ]
+
+    if not request.distributed_to_users:
+        # This will result in a faster build, but worse compatibility at runtime.
+        argv.append("--use-first-matching-interpreter")
 
     # NB: If `--platform` is specified, this signals that the PEX should not be built locally.
     # `--interpreter-constraint` only makes sense in the context of building locally. These two
@@ -452,6 +459,7 @@ async def two_step_create_pex(two_step_pex_request: TwoStepPexRequest) -> TwoSte
     if request.requirements:
         requirements_pex_request = PexRequest(
             output_filename=req_pex_name,
+            distributed_to_users=request.distributed_to_users,
             requirements=request.requirements,
             interpreter_constraints=request.interpreter_constraints,
             platforms=request.platforms,

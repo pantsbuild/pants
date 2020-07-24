@@ -71,6 +71,7 @@ async def create_python_awslambda(
     pex_request = TwoStepPexFromTargetsRequest(
         PexFromTargetsRequest(
             addresses=[field_set.address],
+            distributed_to_users=True,
             entry_point=None,
             output_filename=pex_filename,
             platforms=PexPlatforms([platform]),
@@ -117,6 +118,7 @@ async def setup_lambdex(lambdex: Lambdex) -> LambdexSetup:
         Pex,
         PexRequest(
             output_filename="lambdex.pex",
+            distributed_to_users=False,
             requirements=PexRequirements(lambdex.get_requirement_specs()),
             interpreter_constraints=PexInterpreterConstraints(
                 lambdex.default_interpreter_constraints
