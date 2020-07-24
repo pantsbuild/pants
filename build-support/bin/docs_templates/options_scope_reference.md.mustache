@@ -3,6 +3,8 @@
 ```{{/is_goal}}
 {{description}}
 
+Config section: <span style="color: purple"><code>{{scope}}{{^scope}}GLOBAL{{/scope}}</code></span>
+
 ## Basic options
 
 {{#basic}}
@@ -20,6 +22,16 @@ None
 {{^advanced}}
 None
 {{/advanced}}
+
+## Deprecated options
+
+{{#deprecated}}
+{{> single_option}}
+{{/deprecated}}
+{{^deprecated}}
+None
+{{/deprecated}}
+
 
 {{#comma_separated_consumed_scopes}}
 ## Related subsystems

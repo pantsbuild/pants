@@ -9,7 +9,7 @@ import os
 import pkgutil
 import sys
 from pathlib import Path, PosixPath
-from typing import Dict, Optional, cast
+from typing import Dict, Iterable, Optional, cast
 
 import pystache
 import requests
@@ -77,7 +77,8 @@ class ReferenceGenerator:
         self._args = args
 
         def get_tpl(name: str) -> str:
-            buf = pkgutil.get_data(__name__, f"docs_templates/{name}")
+            # Note that loading relative to __name__ may not always work when __name__=='__main__'.
+            buf = pkgutil.get_data("generate_docs", f"docs_templates/{name}")
             if buf is None:
                 raise ValueError(f"No such template: {name}")
             return buf.decode()
@@ -94,10 +95,15 @@ class ReferenceGenerator:
             json_bytes = sys.stdin.read()
         else:
             json_bytes = Path(self._args.input).read_bytes()
-        self._help_info = self.process_input(json_bytes.encode(), self._args.sync)
+        self._help_info = self.process_input(json_bytes.decode(), self._args.sync)
 
     @staticmethod
-    def process_input(json_str: str, sync: bool) -> Dict:
+    def _link(scope: str, sync: bool) -> str:
+        # docsite pages link to the slug, local pages to the .md source.
+        return f"reference-{scope}" if sync else f"{scope}.md"
+
+    @classmethod
+    def process_input(cls, json_str: str, sync: bool) -> Dict:
         """Process the input, to make it easier to work with in the mustache template."""
 
         help_info = json.loads(json_str)
@@ -106,13 +112,11 @@ class ReferenceGenerator:
         # Process the list of consumed_scopes into a comma-separated list, and add it to the option
         # info for the goal's scope, to make it easy to render in the goal's options page.
 
-        def link(scope: str) -> str:
-            # docsite pages link to the slug, local pages to the .md source.
-            return f"reference-{scope}" if sync else f"{scope}.md"
-
         for goal, goal_info in help_info["name_to_goal_info"].items():
             consumed_scopes = sorted(goal_info["consumed_scopes"])
-            linked_consumed_scopes = [f"[{cs}]({link(cs)})" for cs in consumed_scopes if cs]
+            linked_consumed_scopes = [
+                f"[{cs}]({cls._link(cs, sync)})" for cs in consumed_scopes if cs
+            ]
             comma_separated_consumed_scopes = ", ".join(linked_consumed_scopes)
             scope_to_help_info[goal][
                 "comma_separated_consumed_scopes"
@@ -134,6 +138,8 @@ class ReferenceGenerator:
             for opt in shi["basic"]:
                 munge_option(opt)
             for opt in shi["advanced"]:
+                munge_option(opt)
+            for opt in shi["deprecated"]:
                 munge_option(opt)
 
         return cast(Dict, help_info)
@@ -161,7 +167,9 @@ class ReferenceGenerator:
         response.raise_for_status()
         return cast(Dict, response.json()) if response.text else {}
 
-    def _create(self, parent_doc_id: Optional[str], slug: str, title: str, body: str) -> None:
+    def _create(
+        self, parent_doc_id: Optional[str], slug_suffix: str, title: str, body: str
+    ) -> None:
         """Create a new docsite reference page.
 
         Operates by creating a placeholder page, and then populating it via _update().
@@ -182,6 +190,7 @@ class ReferenceGenerator:
         and when we update the page to set its content, we update the title to be the
         one we want humans to see (this will not change the slug, see above).
         """
+        slug = f"reference-{slug_suffix}"
 
         logger.info(f"Creating {slug}")
 
@@ -227,6 +236,13 @@ class ReferenceGenerator:
         """Returns the id of the entity at the specified readme.io API url."""
         return cast(str, self._access_readme_api(url, "GET", "")["_id"])
 
+    @classmethod
+    def _render_parent_page_body(cls, items: Iterable[str], sync: bool) -> str:
+        """Returns the body of a parent page for the given items."""
+        # The page just lists the items, with links to the page for each one.
+        lines = [f"**[{item}]({cls._link(item, sync)})**\n" for item in items]
+        return "\n".join(lines)
+
     def render(self):
         """Renders the pages to local disk.
 
@@ -235,12 +251,25 @@ class ReferenceGenerator:
         output_dir = Path(self._args.output)
         os.makedirs(output_dir, exist_ok=True)
 
-        for shi in self._help_info["scope_to_help_info"].values():
-            body = self._render_body(shi)
-            path = output_dir / f"{shi['scope'] or 'GLOBAL'}.md"
+        goals = [
+            scope for scope, shi in self._help_info["scope_to_help_info"].items() if shi["is_goal"]
+        ]
+        subsystems = [
+            scope
+            for scope, shi in self._help_info["scope_to_help_info"].items()
+            if scope and not shi["is_goal"]
+        ]
+
+        def write(filename, content):
+            path = output_dir / filename
             with open(str(path), "w") as fp:
-                fp.write(body)
+                fp.write(content)
             logger.info(f"Wrote {path}")
+
+        write("goals-index.md", self._render_parent_page_body(sorted(goals), sync=False))
+        write("subsystems-index.md", self._render_parent_page_body(sorted(subsystems), sync=False))
+        for shi in self._help_info["scope_to_help_info"].values():
+            write(f"{shi['scope'] or 'GLOBAL'}.md", self._render_body(shi))
 
     def sync(self):
         """Render the pages and sync them to the live docsite.
@@ -269,28 +298,57 @@ class ReferenceGenerator:
         for doc in docs:
             do_delete(doc)
 
+        # Partition the scopes into goals and subsystems.
+        goals = {}
+        subsystems = {}
+        for scope, shi in self._help_info["scope_to_help_info"].items():
+            if scope == "":
+                continue  # We handle the global scope separately.
+            if shi["is_goal"]:
+                goals[scope] = shi
+            else:
+                subsystems[scope] = shi
+
         # Create the top-level docs in order.
         self._create(
             parent_doc_id=None,
-            slug="reference-global",
+            slug_suffix="global",
             title="Global",
             body=self._render_body(self._help_info["scope_to_help_info"][""]),
         )
-        self._create(parent_doc_id=None, slug="reference-all-goals", title="Goals", body="")
         self._create(
-            parent_doc_id=None, slug="reference-all-subsystems", title="Subsystems", body=""
+            parent_doc_id=None,
+            slug_suffix="all-goals",
+            title="Goals",
+            body=self._render_parent_page_body(sorted(scope for scope in goals.keys()), sync=True),
+        )
+        self._create(
+            parent_doc_id=None,
+            slug_suffix="all-subsystems",
+            title="Subsystems",
+            body=self._render_parent_page_body(
+                sorted(scope for scope in subsystems.keys()), sync=True
+            ),
         )
 
         # Create the individual goal/subsystem docs.
         all_goals_doc_id = self._get_id("docs/reference-all-goals")
+        for scope, shi in sorted(goals.items()):
+            self._create(
+                parent_doc_id=all_goals_doc_id,
+                slug_suffix=scope,
+                title=scope,
+                body=self._render_body(shi),
+            )
+
         all_subsystems_doc_id = self._get_id("docs/reference-all-subsystems")
-        for scope, shi in sorted(self._help_info["scope_to_help_info"].items()):
-            if scope == "":
-                continue  # We've already handled the global scope.
-            parent_doc_id = all_goals_doc_id if shi["is_goal"] else all_subsystems_doc_id
-            slug = f"reference-{scope}"
-            body = self._render_body(shi)
-            self._create(parent_doc_id=parent_doc_id, slug=slug, title=scope, body=body)
+        for scope, shi in sorted(subsystems.items()):
+            self._create(
+                parent_doc_id=all_subsystems_doc_id,
+                slug_suffix=scope,
+                title=scope,
+                body=self._render_body(shi),
+            )
 
     def main(self):
         if self._args.sync:

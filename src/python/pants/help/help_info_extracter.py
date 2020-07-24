@@ -54,6 +54,9 @@ class OptionHelpInfo:
                           (e.g., [--scope-baz, --no-scope-baz, --scope-qux])
     unscoped_cmd_line_args: The unscoped raw flag names allowed on the cmd line in this option's
                             scope context (e.g., [--baz, --no-baz, --qux])
+    env_var: The environment variable that set's the option.
+    config_key: The config key for this option (in the section named for its scope).
+
     typ: The type of the option.
     default: The value of this option if no flags are specified (derived from config and env vars).
     help: The help message registered for this option.
@@ -68,6 +71,8 @@ class OptionHelpInfo:
     comma_separated_display_args: str
     scoped_cmd_line_args: Tuple[str, ...]
     unscoped_cmd_line_args: Tuple[str, ...]
+    env_var: str
+    config_key: str
     typ: Type
     default: Any
     default_str: str
@@ -311,11 +316,17 @@ class HelpInfoExtracter:
         removal_hint = kwargs.get("removal_hint")
         choices = self.compute_choices(kwargs)
 
+        dest = Parser.parse_dest(*args, **kwargs)
+        # Global options have three env var variants. The last one is the most human-friendly.
+        env_var = Parser.get_env_var_names(self._scope, dest)[-1]
+
         ret = OptionHelpInfo(
             display_args=tuple(display_args),
             comma_separated_display_args=", ".join(display_args),
             scoped_cmd_line_args=tuple(scoped_cmd_line_args),
             unscoped_cmd_line_args=tuple(unscoped_cmd_line_args),
+            env_var=env_var,
+            config_key=dest,
             typ=typ,
             default=default,
             default_str=default_str,
