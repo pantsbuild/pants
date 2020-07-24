@@ -28,7 +28,12 @@ class BanditIntegrationTest(ExternalToolTestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *bandit_rules(), RootRule(BanditRequest), SubsystemRule(LintOptions))
+        return (
+            *super().rules(),
+            *bandit_rules(),
+            RootRule(BanditRequest),
+            SubsystemRule(LintOptions),
+        )
 
     def make_target_with_origin(
         self,
