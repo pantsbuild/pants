@@ -3,8 +3,7 @@
 
 import os
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Any, Iterable, Optional, Tuple
+from typing import TYPE_CHECKING, Iterable, Optional, Tuple
 
 from pants.engine.collection import Collection
 from pants.engine.rules import RootRule, side_effecting
@@ -12,6 +11,9 @@ from pants.option.custom_types import GlobExpansionConjunction as GlobExpansionC
 from pants.option.global_options import GlobMatchErrorBehavior as GlobMatchErrorBehavior
 from pants.util.dirutil import maybe_read_file, safe_delete, safe_file_dump
 from pants.util.meta import frozen_after_init
+
+if TYPE_CHECKING:
+    from pants.engine.internals.scheduler import SchedulerSession
 
 
 @dataclass(frozen=True)
@@ -236,37 +238,6 @@ class AddPrefix:
 
 
 @dataclass(frozen=True)
-class DirectoryToMaterialize:
-    """A request to materialize the contents of a directory digest at the build root, optionally
-    with a path prefix (relative to the build root)."""
-
-    digest: Digest
-    path_prefix: str = ""  # i.e., we default to the root level of the build root
-
-    def __post_init__(self) -> None:
-        if Path(self.path_prefix).is_absolute():
-            raise ValueError(
-                f"The path_prefix must be relative for {self}, as the engine materializes directories "
-                f"relative to the build root."
-            )
-
-
-class DirectoriesToMaterialize(Collection[DirectoryToMaterialize]):
-    pass
-
-
-@dataclass(frozen=True)
-class MaterializeDirectoryResult:
-    """Result of materializing a directory, contains the full output paths."""
-
-    output_paths: Tuple[str, ...]
-
-
-class MaterializeDirectoriesResult(Collection[MaterializeDirectoryResult]):
-    pass
-
-
-@dataclass(frozen=True)
 class UrlToFetch:
     url: str
     digest: Digest
@@ -275,30 +246,20 @@ class UrlToFetch:
 @side_effecting
 @dataclass(frozen=True)
 class Workspace:
-    """Abstract handle for operations that touch the real local filesystem."""
+    """A handle for operations that mutate the local filesystem."""
 
-    # TODO: SchedulerSession. Untyped because `fs.py` and `scheduler.py` have a cycle.
-    _scheduler: Any
+    _scheduler: "SchedulerSession"
 
-    def materialize_directory(self, directory_to_materialize: DirectoryToMaterialize):
-        """Materialize one single directory digest to disk.
+    def write_digest(self, digest: Digest, *, path_prefix: Optional[str] = None) -> None:
+        """Write a digest to disk, relative to the build root.
 
-        If you need to materialize multiple, you should use the parallel materialize_directories()
-        instead.
+        You should not use this in a `for` loop due to slow performance. Instead, call `await
+        Get(Digest, MergeDigests)` beforehand.
         """
-        return self._scheduler.materialize_directory(directory_to_materialize)
-
-    def materialize_directories(
-        self, directories_to_materialize: Tuple[DirectoryToMaterialize, ...]
-    ):
-        """Materialize multiple directory digests to disk in parallel."""
-        return self._scheduler.materialize_directories(directories_to_materialize)
+        self._scheduler.write_digest(digest, path_prefix=path_prefix)
 
 
-# TODO: don't recreate this in python, get this from fs::EMPTY_DIGEST somehow.
 _EMPTY_FINGERPRINT = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-
-
 EMPTY_DIGEST = Digest(fingerprint=_EMPTY_FINGERPRINT, serialized_bytes_length=0)
 EMPTY_SNAPSHOT = Snapshot(EMPTY_DIGEST, files=(), dirs=())
 

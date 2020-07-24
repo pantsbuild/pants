@@ -5,6 +5,7 @@ import logging
 import os
 import time
 from dataclasses import dataclass
+from pathlib import PurePath
 from types import CoroutineType
 from typing import Any, Dict, List, NoReturn, Optional, Sequence, Tuple, Type, Union, cast
 
@@ -20,10 +21,7 @@ from pants.engine.fs import (
     CreateDigest,
     Digest,
     DigestContents,
-    DirectoryToMaterialize,
     FileContent,
-    MaterializeDirectoriesResult,
-    MaterializeDirectoryResult,
     MergeDigests,
     PathGlobs,
     PathGlobsAndRoot,
@@ -42,7 +40,6 @@ from pants.engine.selectors import Params
 from pants.engine.unions import union
 from pants.option.global_options import ExecutionOptions
 from pants.util.contextutil import temporary_file_path
-from pants.util.dirutil import check_no_overlapping_paths
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
@@ -133,8 +130,6 @@ class Scheduler:
             snapshot=Snapshot,
             file_content=FileContent,
             digest_contents=DigestContents,
-            materialize_directories_results=MaterializeDirectoriesResult,
-            materialize_directory_result=MaterializeDirectoryResult,
             address=Address,
             path_globs=PathGlobs,
             merge_digests=MergeDigests,
@@ -359,10 +354,6 @@ class _PathGlobsAndRootCollection(Collection[PathGlobsAndRoot]):
 
 
 class _DirectoryDigests(Collection[Digest]):
-    pass
-
-
-class _DirectoriesToMaterialize(Collection[DirectoryToMaterialize]):
     pass
 
 
@@ -632,31 +623,16 @@ class SchedulerSession:
         )
         return result
 
-    def materialize_directory(
-        self, directory_to_materialize: DirectoryToMaterialize
-    ) -> MaterializeDirectoryResult:
-        """Materialize one single directory digest to disk.
-
-        If you need to materialize multiple, you should use the parallel materialize_directories()
-        instead.
-        """
-        return self.materialize_directories((directory_to_materialize,)).dependencies[0]
-
-    def materialize_directories(
-        self, directories_to_materialize: Tuple[DirectoryToMaterialize, ...]
-    ) -> MaterializeDirectoriesResult:
-        """Materialize multiple directory digests to disk in parallel."""
-        # Ensure that there isn't more than one of the same directory paths and paths do not have the
-        # same prefix.
-        dir_list = [dtm.path_prefix for dtm in directories_to_materialize]
-        check_no_overlapping_paths(dir_list)
-
-        result: MaterializeDirectoriesResult = self._scheduler._native.lib.materialize_directories(
-            self._scheduler._scheduler,
-            self._session,
-            _DirectoriesToMaterialize(directories_to_materialize),
+    def write_digest(self, digest: Digest, *, path_prefix: Optional[str] = None) -> None:
+        """Write a digest to disk, relative to the build root."""
+        if path_prefix and PurePath(path_prefix).is_absolute():
+            raise ValueError(
+                f"The `path_prefix` {path_prefix} must be a relative path, as the engine writes "
+                "the digest relative to the build root."
+            )
+        self._scheduler._native.lib.write_digest(
+            self._scheduler._scheduler, self._session, digest, path_prefix or ""
         )
-        return result
 
     def lease_files_in_graph(self):
         self._scheduler.lease_files_in_graph(self._session)

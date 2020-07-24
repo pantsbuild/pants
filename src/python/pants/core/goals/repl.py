@@ -8,7 +8,7 @@ from typing import ClassVar, Dict, Mapping, Optional, Tuple, Type, cast
 
 from pants.base.build_root import BuildRoot
 from pants.engine.console import Console
-from pants.engine.fs import Digest, DirectoryToMaterialize, Workspace
+from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.interactive_process import InteractiveProcess, InteractiveRunner
 from pants.engine.rules import goal_rule
@@ -107,15 +107,13 @@ async def run_repl(
     request = await Get(ReplRequest, ReplImplementation, repl_impl)
 
     with temporary_dir(root_dir=global_options.options.pants_workdir, cleanup=False) as tmpdir:
-        path_relative_to_build_root = PurePath(tmpdir).relative_to(build_root.path).as_posix()
-        workspace.materialize_directory(
-            DirectoryToMaterialize(request.digest, path_prefix=path_relative_to_build_root)
+        tmpdir_relative_path = PurePath(tmpdir).relative_to(build_root.path).as_posix()
+        exe_path = PurePath(tmpdir, request.binary_name).as_posix()
+        workspace.write_digest(request.digest, path_prefix=tmpdir_relative_path)
+        result = interactive_runner.run_process(
+            InteractiveProcess(argv=(exe_path,), env=request.env, run_in_workspace=True)
         )
 
-        full_path = PurePath(tmpdir, request.binary_name).as_posix()
-        process = InteractiveProcess(argv=(full_path,), env=request.env, run_in_workspace=True)
-
-    result = interactive_runner.run_process(process)
     return Repl(result.exit_code)
 
 

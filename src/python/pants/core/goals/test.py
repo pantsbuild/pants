@@ -18,7 +18,7 @@ from pants.engine.addresses import Address
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAware
-from pants.engine.fs import Digest, DirectoryToMaterialize, Workspace
+from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.interactive_process import InteractiveProcess, InteractiveRunner
 from pants.engine.process import FallibleProcessResult
@@ -178,10 +178,8 @@ class FilesystemCoverageReport(CoverageReport):
     report_type: CoverageReportType
 
     def materialize(self, console: Console, workspace: Workspace) -> Optional[PurePath]:
-        workspace.materialize_directory(
-            DirectoryToMaterialize(
-                self.result_digest, path_prefix=str(self.directory_to_materialize_to),
-            )
+        workspace.write_digest(
+            self.result_digest, path_prefix=str(self.directory_to_materialize_to)
         )
         console.print_stderr(
             f"\nWrote {self.report_type.report_name} coverage report to `{self.directory_to_materialize_to}`"
@@ -321,11 +319,13 @@ async def run_tests(
                 f"{result.address.reference():80}.....{result.test_result.status.value:>10}"
             )
 
-    for result in results:
-        xml_results = result.test_result.xml_results
-        if not xml_results:
-            continue
-        workspace.materialize_directory(DirectoryToMaterialize(xml_results))
+    merged_xml_results = await Get(
+        Digest,
+        MergeDigests(
+            result.test_result.xml_results for result in results if result.test_result.xml_results
+        ),
+    )
+    workspace.write_digest(merged_xml_results)
 
     if options.values.use_coverage:
         all_coverage_data: Iterable[CoverageData] = [

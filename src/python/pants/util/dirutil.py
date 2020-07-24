@@ -619,20 +619,6 @@ def split_basename_and_dirname(path: str) -> Tuple[str, str]:
     return os.path.dirname(path), os.path.basename(path)
 
 
-def check_no_overlapping_paths(paths: Iterable[str]) -> None:
-    """Given a list of paths, ensure that all are unique and do not have the same prefix."""
-    for path in paths:
-        list_copy_without_path = list(paths)
-        list_copy_without_path.remove(path)
-        if path in list_copy_without_path:
-            raise ValueError(f"{path} appeared more than once. All paths must be unique.")
-        for p in list_copy_without_path:
-            if path in p:
-                raise ValueError(
-                    f"{path} and {p} have the same prefix. All paths must be unique and cannot overlap."
-                )
-
-
 def is_executable(path: str) -> bool:
     """Returns whether a path names an existing executable file."""
     return os.path.isfile(path) and os.access(path, os.X_OK)

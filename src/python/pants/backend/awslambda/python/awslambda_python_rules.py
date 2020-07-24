@@ -101,12 +101,12 @@ async def create_python_awslambda(
         description=f"Setting up handler in {pex_filename}",
     )
     result = await Get(ProcessResult, Process, process)
-    # Note that the AWS-facing handler function is always lambdex_handler.handler, which
-    # is the wrapper injected by lambdex that manages invocation of the actual handler.
     return CreatedAWSLambda(
         digest=result.output_digest,
-        name=pex_filename,
+        zip_file_relpath=pex_filename,
         runtime=field_set.runtime.value,
+        # The AWS-facing handler function is always lambdex_handler.handler, which is the wrapper
+        # injected by lambdex that manages invocation of the actual handler.
         handler="lambdex_handler.handler",
     )
 

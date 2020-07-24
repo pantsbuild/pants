@@ -7,7 +7,7 @@ from typing import ClassVar, Iterable, List, Tuple, Type
 
 from pants.core.util_rules.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
 from pants.engine.console import Console
-from pants.engine.fs import EMPTY_DIGEST, Digest, DirectoryToMaterialize, MergeDigests, Workspace
+from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import ProcessResult
 from pants.engine.rules import goal_rule
@@ -205,7 +205,7 @@ async def fmt(
         # than silently having one result override the other. In practicality, this should never
         # happen due to us grouping each language's formatters into a single digest.
         merged_formatted_digest = await Get(Digest, MergeDigests(changed_digests))
-        workspace.materialize_directory(DirectoryToMaterialize(merged_formatted_digest))
+        workspace.write_digest(merged_formatted_digest)
 
     sorted_results = sorted(individual_results, key=lambda res: res.formatter_name)
     for result in sorted_results:
