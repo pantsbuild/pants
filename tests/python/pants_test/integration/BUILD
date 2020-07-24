@@ -8,6 +8,7 @@ python_integration_tests(
     'src/python/pants/testutil:int-test',
   ],
   uses_pants_run=True,
+  timeout = 120,
 )
 
 python_integration_tests(

@@ -9,10 +9,6 @@ from textwrap import dedent
 from typing import Iterable
 
 import pytest
-from pex.interpreter import PythonInterpreter
-from pex.resolver import Unsatisfiable
-from pkg_resources import Requirement, WorkingSet
-
 from pants.backend.python.rules import download_pex_bin, pex
 from pants.backend.python.rules.pex import Pex, PexRequest, PexRequirements
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
@@ -35,6 +31,9 @@ from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_rmtree, touch
+from pex.interpreter import PythonInterpreter
+from pex.resolver import Unsatisfiable
+from pkg_resources import Requirement, WorkingSet
 
 DEFAULT_VERSION = "0.0.0"
 

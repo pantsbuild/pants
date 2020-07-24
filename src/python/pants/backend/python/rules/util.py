@@ -6,8 +6,6 @@ import os
 from collections import abc, defaultdict
 from typing import Dict, Iterable, List, Set, Tuple, cast
 
-from pkg_resources import Requirement
-
 from pants.backend.python.target_types import PythonSources
 from pants.core.target_types import ResourcesSources
 from pants.core.util_rules.strip_source_roots import SourceRootStrippedSources
@@ -15,6 +13,7 @@ from pants.engine.fs import DigestContents
 from pants.engine.target import Target
 from pants.source.source_root import SourceRootError
 from pants.util.strutil import ensure_text
+from pkg_resources import Requirement
 
 # Convenient type alias for the pair (package name, data files in the package).
 PackageDatum = Tuple[str, Tuple[str, ...]]

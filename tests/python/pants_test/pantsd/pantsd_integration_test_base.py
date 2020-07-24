@@ -10,7 +10,6 @@ from typing import Any, Callable, Dict, Iterator, Optional, Tuple
 
 import psutil
 from colors import bold, cyan, magenta
-
 from pants.pantsd.process_manager import ProcessManager
 from pants.testutil.pants_run_integration_test import (
     PantsRunIntegrationTest,

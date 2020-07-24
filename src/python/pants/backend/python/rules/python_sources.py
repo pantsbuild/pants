@@ -138,7 +138,6 @@ def rules():
         prepare_stripped_python_sources,
         prepare_unstripped_python_sources,
         *determine_source_files.rules(),
-        *inject_ancestor_rules(),
         # TODO: remove this as soon as we have a usage of it.
         RootRule(UnstrippedPythonSourcesRequest),
     ]

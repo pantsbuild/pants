@@ -4,8 +4,15 @@
 from pathlib import PurePath
 
 from pants.backend.python.dependency_inference.import_parser import find_python_imports
-from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwner
+from pants.backend.python.dependency_inference.module_mapper import (
+    PythonModule,
+    PythonModuleOwner,
+    map_first_party_modules_to_addresses,
+    map_module_to_address,
+    map_third_party_modules_to_addresses,
+)
 from pants.backend.python.dependency_inference.python_stdlib.combined import combined_stdlib
+from pants.backend.python.rules import inject_ancestor_files
 from pants.backend.python.rules.inject_ancestor_files import AncestorFiles, AncestorFilesRequest
 from pants.backend.python.target_types import PythonSources, PythonTestsSources
 from pants.core.util_rules.strip_source_roots import (
@@ -38,6 +45,7 @@ class PythonInference(Subsystem):
         register(
             "--imports",
             default=False,
+            type=bool,
             help=(
                 "Infer a target's imported dependencies by parsing import statements from sources."
             ),
@@ -45,6 +53,7 @@ class PythonInference(Subsystem):
         register(
             "--inits",
             default=True,
+            type=bool,
             help=(
                 "Infer a target's dependencies on any __init__.py files existing for the packages "
                 "it is located in (recursively upward in the directory structure)."
@@ -53,6 +62,7 @@ class PythonInference(Subsystem):
         register(
             "--conftests",
             default=True,
+            type=bool,
             help=(
                 "Infer a test target's dependencies on any conftest.py files in parent directories."
             ),
@@ -152,6 +162,7 @@ async def infer_python_conftest_dependencies(
 
 def rules():
     return [
+        *inject_ancestor_files.rules(),
         infer_python_dependencies,
         infer_python_init_dependencies,
         infer_python_conftest_dependencies,
@@ -159,4 +170,7 @@ def rules():
         UnionRule(InferDependenciesRequest, InferInitDependencies),
         UnionRule(InferDependenciesRequest, InferConftestDependencies),
         SubsystemRule(PythonInference),
+        map_first_party_modules_to_addresses,
+        map_third_party_modules_to_addresses,
+        map_module_to_address,
     ]

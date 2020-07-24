@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import pytest
-
 from pants.backend.python.rules.util import (
     declares_pkg_resources_namespace_package,
     distutils_repr,

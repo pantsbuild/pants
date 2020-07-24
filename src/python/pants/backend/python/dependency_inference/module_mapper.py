@@ -163,11 +163,3 @@ async def map_module_to_address(
     if first_party_address:
         return PythonModuleOwner(first_party_address)
     return PythonModuleOwner(address=None)
-
-
-def rules():
-    return [
-        map_first_party_modules_to_addresses,
-        map_third_party_modules_to_addresses,
-        map_module_to_address,
-    ]

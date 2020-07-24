@@ -8,7 +8,6 @@ from textwrap import dedent
 from typing import Iterable, List, Sequence, Tuple, Type
 
 import pytest
-
 from pants.base.specs import (
     FilesystemGlobSpec,
     FilesystemLiteralSpec,
@@ -1100,7 +1099,11 @@ class TestDependencies(TestBase):
         enable_dep_inference: bool = False,
     ) -> None:
         target = self.request_single_product(WrappedTarget, requested_address).target
-        args = ["--python-infer-imports"] if enable_dep_inference else []
+        args = (
+            ["--python-infer-imports", "--backend-packages=pants.backend.python"]
+            if enable_dep_inference
+            else []
+        )
         result = self.request_single_product(
             Addresses,
             Params(

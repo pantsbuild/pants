@@ -6,14 +6,15 @@ from textwrap import dedent
 from typing import Optional
 
 import pytest
-
 from pants.backend.python.dependency_inference.module_mapper import (
     FirstPartyModuleToAddressMapping,
     PythonModule,
     PythonModuleOwner,
     ThirdPartyModuleToAddressMapping,
+    map_first_party_modules_to_addresses,
+    map_module_to_address,
+    map_third_party_modules_to_addresses,
 )
-from pants.backend.python.dependency_inference.module_mapper import rules as module_mapper_rules
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.util_rules import strip_source_roots
@@ -82,7 +83,9 @@ class ModuleMapperTest(TestBase):
         return (
             *super().rules(),
             *strip_source_roots.rules(),
-            *module_mapper_rules(),
+            map_first_party_modules_to_addresses,
+            map_module_to_address,
+            map_third_party_modules_to_addresses,
             RootRule(PythonModule),
         )
 

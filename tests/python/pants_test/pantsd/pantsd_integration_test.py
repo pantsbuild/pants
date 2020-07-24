@@ -11,7 +11,6 @@ import unittest
 from textwrap import dedent
 
 import pytest
-
 from pants.testutil.pants_run_integration_test import read_pantsd_log
 from pants.util.contextutil import environment_as, temporary_dir, temporary_file
 from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, safe_open, touch

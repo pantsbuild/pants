@@ -5,10 +5,9 @@ import os
 import shutil
 
 import requests
-from pex.bin import pex as pex_main
-
 from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
 from pants.util.contextutil import temporary_dir
+from pex.bin import pex as pex_main
 
 
 class ReversionTest(PantsRunIntegrationTest):
@@ -41,7 +40,10 @@ class ReversionTest(PantsRunIntegrationTest):
                 dest_dir,
                 output_version,
             ]
-            self.assert_success(self.run_pants(command))
+
+            # NB: Pulling in the real BUILD file requires too many dependencies.
+            with self.temporary_file_content("src/python/pants/BUILD", b"python_library()"):
+                self.assert_success(self.run_pants(command))
             self.assertTrue(os.path.isfile(output_whl_file))
 
             # Confirm that it can be consumed.
