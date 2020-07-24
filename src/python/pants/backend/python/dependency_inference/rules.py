@@ -3,14 +3,9 @@
 
 from pathlib import PurePath
 
+from pants.backend.python.dependency_inference import module_mapper
 from pants.backend.python.dependency_inference.import_parser import find_python_imports
-from pants.backend.python.dependency_inference.module_mapper import (
-    PythonModule,
-    PythonModuleOwner,
-    map_first_party_modules_to_addresses,
-    map_module_to_address,
-    map_third_party_modules_to_addresses,
-)
+from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwner
 from pants.backend.python.dependency_inference.python_stdlib.combined import combined_stdlib
 from pants.backend.python.rules import inject_ancestor_files
 from pants.backend.python.rules.inject_ancestor_files import AncestorFiles, AncestorFilesRequest
@@ -20,7 +15,7 @@ from pants.core.util_rules.strip_source_roots import (
     StripSourcesFieldRequest,
 )
 from pants.engine.fs import Digest, DigestContents
-from pants.engine.internals.graph import Owners, OwnersNotFoundBehavior, OwnersRequest
+from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
@@ -30,6 +25,7 @@ from pants.engine.target import (
     InferredDependencies,
 )
 from pants.engine.unions import UnionRule
+from pants.option.global_options import OwnersNotFoundBehavior
 from pants.subsystem.subsystem import Subsystem
 
 
@@ -163,6 +159,7 @@ async def infer_python_conftest_dependencies(
 def rules():
     return [
         *inject_ancestor_files.rules(),
+        *module_mapper.rules(),
         infer_python_dependencies,
         infer_python_init_dependencies,
         infer_python_conftest_dependencies,
@@ -170,7 +167,4 @@ def rules():
         UnionRule(InferDependenciesRequest, InferInitDependencies),
         UnionRule(InferDependenciesRequest, InferConftestDependencies),
         SubsystemRule(PythonInference),
-        map_first_party_modules_to_addresses,
-        map_third_party_modules_to_addresses,
-        map_module_to_address,
     ]

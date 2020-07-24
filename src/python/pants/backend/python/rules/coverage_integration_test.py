@@ -120,7 +120,7 @@ class CoverageIntegrationTest(PantsRunIntegrationTest):
         (no_src_folder / "test_no_src.py").write_text("def test_true():\n\tassert True is True\n")
         (no_src_folder / "BUILD").write_text(
             dedent(
-                f"""\
+                """\
                 python_tests()
 
                 python_library(name='lib')

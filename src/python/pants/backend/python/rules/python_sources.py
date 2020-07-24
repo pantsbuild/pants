@@ -4,7 +4,6 @@
 from dataclasses import dataclass
 from typing import Iterable, List, Tuple, Type
 
-from pants.backend.python.rules.inject_ancestor_files import rules as inject_ancestor_rules
 from pants.backend.python.target_types import PythonSources
 from pants.core.target_types import FilesSources, ResourcesSources
 from pants.core.util_rules import determine_source_files

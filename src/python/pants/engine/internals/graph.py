@@ -345,7 +345,7 @@ def _log_or_raise_unmatched_owners(
 ) -> None:
     msgs = []
     if ignore_option:
-        option_msg = "\nIf you would like to ignore un-owned files, please pass `ignore_option`."
+        option_msg = f"\nIf you would like to ignore un-owned files, please pass `{ignore_option}`."
     else:
         option_msg = ""
     for file_path in file_paths:
@@ -763,7 +763,7 @@ async def resolve_dependencies(
     )
 
     inference_request_types = union_membership.get(InferDependenciesRequest)
-    inferred = [InferredDependencies()]
+    inferred: Tuple[InferredDependencies, ...] = (InferredDependencies(),)
     if inference_request_types:
         # Dependency inference is solely determined by the `Sources` field for a Target, so we
         # re-resolve the original target to inspect its `Sources` field, if any.
