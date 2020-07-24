@@ -11,9 +11,9 @@ from pants.base.build_root import BuildRoot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import Specs
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.engine import interactive_process, process
+from pants.engine import fs, interactive_process, process
 from pants.engine.console import Console
-from pants.engine.fs import Workspace, create_fs_rules
+from pants.engine.fs import GlobMatchErrorBehavior, Workspace
 from pants.engine.goal import Goal
 from pants.engine.interactive_process import InteractiveRunner
 from pants.engine.internals import graph, options_parsing, uuid
@@ -29,11 +29,7 @@ from pants.engine.selectors import Params
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
-from pants.option.global_options import (
-    DEFAULT_EXECUTION_OPTIONS,
-    ExecutionOptions,
-    GlobMatchErrorBehavior,
-)
+from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, ExecutionOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.scm.subsystems.changed import rules as changed_rules
 from pants.subsystem.subsystem import Subsystem
@@ -294,12 +290,12 @@ class EngineInitializer:
             registered_target_types_singleton,
             union_membership_singleton,
             build_root_singleton,
+            *fs.rules(),
             *interactive_process.rules(),
             *graph.rules(),
             *uuid.rules(),
             *options_parsing.rules(),
             *process.rules(),
-            *create_fs_rules(),
             *create_platform_rules(),
             *create_graph_rules(address_mapper),
             *changed_rules(),

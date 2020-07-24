@@ -24,16 +24,16 @@ from pants.engine.fs import (
     DigestSubset,
     DownloadFile,
     FileContent,
+    GlobMatchErrorBehavior,
     MergeDigests,
     PathGlobs,
     PathGlobsAndRoot,
     RemovePrefix,
     Snapshot,
-    create_fs_rules,
 )
+from pants.engine.fs import rules as fs_rules
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.scheduler_test_base import SchedulerTestBase
-from pants.option.global_options import GlobMatchErrorBehavior
 from pants.testutil.test_base import TestBase
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import http_server, temporary_dir
@@ -79,7 +79,7 @@ class FSTest(TestBase, SchedulerTestBase):
         self, field, filespecs_or_globs, paths, ignore_patterns=None, prepare=None
     ):
         with self.mk_project_tree(ignore_patterns=ignore_patterns) as project_tree:
-            scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree)
+            scheduler = self.mk_scheduler(rules=fs_rules(), project_tree=project_tree)
             if prepare:
                 prepare(project_tree)
             result = self.execute(scheduler, Snapshot, self.path_globs(filespecs_or_globs))[0]
@@ -87,13 +87,13 @@ class FSTest(TestBase, SchedulerTestBase):
 
     def assert_content(self, filespecs_or_globs, expected_content):
         with self.mk_project_tree() as project_tree:
-            scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree)
+            scheduler = self.mk_scheduler(rules=fs_rules(), project_tree=project_tree)
             actual_content = self.read_digest_contents(scheduler, filespecs_or_globs)
             assert expected_content == actual_content
 
     def assert_digest(self, filespecs_or_globs, expected_files):
         with self.mk_project_tree() as project_tree:
-            scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree)
+            scheduler = self.mk_scheduler(rules=fs_rules(), project_tree=project_tree)
             result = self.execute(scheduler, Snapshot, self.path_globs(filespecs_or_globs))[0]
             # Confirm all expected files were digested.
             assert set(expected_files) == set(result.files)
@@ -283,7 +283,7 @@ class FSTest(TestBase, SchedulerTestBase):
         with temporary_dir() as temp_dir:
             Path(temp_dir, "roland").write_text("European Burmese")
             Path(temp_dir, "susannah").write_text("I don't know")
-            scheduler = self.mk_scheduler(rules=create_fs_rules())
+            scheduler = self.mk_scheduler(rules=fs_rules())
             snapshots = scheduler.capture_snapshots(
                 (
                     PathGlobsAndRoot(PathGlobs(["roland"]), temp_dir),
@@ -743,7 +743,7 @@ class FSTest(TestBase, SchedulerTestBase):
         on those files."""
 
         with self.mk_project_tree() as project_tree:
-            scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree,)
+            scheduler = self.mk_scheduler(rules=fs_rules(), project_tree=project_tree,)
             fname = "4.txt"
             new_data = "rouf"
             # read the original file so we have a cached value.
@@ -769,7 +769,7 @@ class FSTest(TestBase, SchedulerTestBase):
         """Test that FileContent is invalidated after deleting parent directory."""
 
         with self.mk_project_tree() as project_tree:
-            scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree,)
+            scheduler = self.mk_scheduler(rules=fs_rules(), project_tree=project_tree,)
             fname = "a/b/1.txt"
             # read the original file so we have nodes to invalidate.
             original_content = self.read_digest_contents(scheduler, [fname])
@@ -792,7 +792,7 @@ class FSTest(TestBase, SchedulerTestBase):
         self, mutation_function: Callable[[FileSystemProjectTree, str], Exception]
     ) -> None:
         with self.mk_project_tree() as project_tree:
-            scheduler = self.mk_scheduler(rules=create_fs_rules(), project_tree=project_tree,)
+            scheduler = self.mk_scheduler(rules=fs_rules(), project_tree=project_tree,)
             dir_path = "a/"
             dir_glob = f"{dir_path}/*"
             initial_snapshot = self.execute_expecting_one_result(
