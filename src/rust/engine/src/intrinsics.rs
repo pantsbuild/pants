@@ -49,10 +49,10 @@ impl Intrinsics {
     );
     intrinsics.insert(
       Intrinsic {
-        product: types.snapshot,
+        product: types.directory_digest,
         inputs: vec![types.url_to_fetch],
       },
-      Box::new(url_to_fetch_to_snapshot),
+      Box::new(url_to_fetch_to_digest),
     );
     intrinsics.insert(
       Intrinsic {
@@ -280,19 +280,21 @@ fn merge_digests_request_to_digest(
   .boxed()
 }
 
-fn url_to_fetch_to_snapshot(
+fn url_to_fetch_to_digest(
   context: Context,
   mut args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
   let core = context.core.clone();
   async move {
+    let key = externs::acquire_key_for(args.pop().unwrap()).map_err(|e| format!("{:?}", e))?;
     let snapshot = context
-      .get(DownloadedFile(externs::acquire_key_for(
-        args.pop().unwrap(),
-      )?))
-      .await?;
-    Ok(Snapshot::store_snapshot(&core, &snapshot).map_err(|err| throw(&err))?)
+      .get(DownloadedFile(key))
+      .await
+      .map_err(|e| format!("{:?}", e))?;
+    let res: Result<_, String> = Ok(Snapshot::store_directory(&core, &snapshot.digest));
+    res
   }
+  .map_err(|err: String| throw(&err))
   .boxed()
 }
 

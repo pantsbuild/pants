@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import List
 
 from pants.core.util_rules.archive import ExtractedDigest, MaybeExtractable
-from pants.engine.fs import Digest, Snapshot, UrlToFetch
+from pants.engine.fs import Digest, UrlToFetch
 from pants.engine.platform import Platform
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
@@ -172,8 +172,8 @@ class ExternalTool(Subsystem):
 
 @rule
 async def download_external_tool(request: ExternalToolRequest) -> DownloadedExternalTool:
-    snapshot = await Get(Snapshot, UrlToFetch, request.url_to_fetch)
-    extracted_digest = await Get(ExtractedDigest, MaybeExtractable(snapshot.digest))
+    digest = await Get(Digest, UrlToFetch, request.url_to_fetch)
+    extracted_digest = await Get(ExtractedDigest, MaybeExtractable(digest))
     return DownloadedExternalTool(extracted_digest.digest, request.exe)
 
 
