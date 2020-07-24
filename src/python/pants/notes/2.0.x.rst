@@ -5,6 +5,195 @@ This document describes releases leading up to the ``2.0.x`` ``stable`` series.
 
 See https://pants.readme.io/v2.0/docs/release-notes-2-0 for an overview of the changes in this release.
 
+2.0.0.dev5 (7/22/2020)
+----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Use isort v5.x as the default version (#10258)
+  `PR #10258 <https://github.com/pantsbuild/pants/pull/10258>`_
+
+* Don't register any options as recursive. (#10415)
+  `PR #10415 <https://github.com/pantsbuild/pants/pull/10415>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Speed up `repl` to no longer rebuild a Pex on source file changes (#10418)
+  `Issue #10406 <https://github.com/pantsbuild/pants/issues/10406>`_
+  `PR #10418 <https://github.com/pantsbuild/pants/pull/10418>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Implement cycle detection in transitive_targets, and tolerate cycles in file-addresses. (#10409)
+  `PR #10409 <https://github.com/pantsbuild/pants/pull/10409>`_
+
+* Stop using cargo-ensure-installed (#10400)
+  `PR #10400 <https://github.com/pantsbuild/pants/pull/10400>`_
+
+* Remove use of "quiet" in logging init (#10417)
+  `PR #10417 <https://github.com/pantsbuild/pants/pull/10417>`_
+
+Testing
+~~~~~~~
+
+* Port the plugin resolver test to v2 test style. (#10424)
+  `PR #10424 <https://github.com/pantsbuild/pants/pull/10424>`_
+
+* Refactor flake8 integration test to use create_options_bootstrapper (#10422)
+  `PR #10422 <https://github.com/pantsbuild/pants/pull/10422>`_
+
+* Increase timeout on project_info tests. (#10421)
+  `PR #10421 <https://github.com/pantsbuild/pants/pull/10421>`_
+
+2.0.0.dev4 (7/21/2020)
+----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Upgrade default mypy from 0.781 to 0.782 (#10404)
+  `PR #10404 <https://github.com/pantsbuild/pants/pull/10404>`_
+
+* Remove unused `--fmt-only` option (#10388)
+  `PR #10388 <https://github.com/pantsbuild/pants/pull/10388>`_
+
+* Don't turn on branch coverage by default. (#10386)
+  `PR #10386 <https://github.com/pantsbuild/pants/pull/10386>`_
+
+* access store server for action cache (#10329)
+  `Issue #10317 <https://github.com/pantsbuild/pants/issues/10317>`_
+  `PR #10329 <https://github.com/pantsbuild/pants/pull/10329>`_
+
+* Upgrade setuptools from 49.1.0 to 49.2.0 (#10347)
+  `PR #10347 <https://github.com/pantsbuild/pants/pull/10347>`_
+
+* Move `target.py` rules to `engine/internals/graph.py` (#10372)
+  `PR #10372 <https://github.com/pantsbuild/pants/pull/10372>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Speed up `run` to no longer rebuild a Pex on source file changes (#10410)
+  `Issue #10406 <https://github.com/pantsbuild/pants/issues/10406>`_
+  `PR #10410 <https://github.com/pantsbuild/pants/pull/10410>`_
+
+* Support for using a single global resolve. (#10405)
+  `PR #10405 <https://github.com/pantsbuild/pants/pull/10405>`_
+
+* Flake8 output file support. (#10371)
+  `PR #10371 <https://github.com/pantsbuild/pants/pull/10371>`_
+
+* A flag to force rerunning tests, bypassing the cache. (#10403)
+  `PR #10403 <https://github.com/pantsbuild/pants/pull/10403>`_
+
+* Support for injecting ancestor conftest.py files. (#10378)
+  `PR #10378 <https://github.com/pantsbuild/pants/pull/10378>`_
+
+* Allow ignoring dependencies with `!` (#10385)
+  `PR #10385 <https://github.com/pantsbuild/pants/pull/10385>`_
+
+* Allow dependencies on files in BUILD files (#10381)
+  `PR #10381 <https://github.com/pantsbuild/pants/pull/10381>`_
+
+* Unify generated subtargets with file arguments and `--changed-since` (#10356)
+  `PR #10356 <https://github.com/pantsbuild/pants/pull/10356>`_
+
+* Use colors for log messages (#10278)
+  `PR #10278 <https://github.com/pantsbuild/pants/pull/10278>`_
+
+Bugfixes
+~~~~~~~~
+
+* Print initial logs from pantsd using local time format
+  `Issue #10128 <https://github.com/pantsbuild/pants/issues/10128>`_
+
+* Fix using relative paths with `--local-cache-dir` and `--named-caches-dir` (#10398)
+  `PR #10398 <https://github.com/pantsbuild/pants/pull/10398>`_
+
+* Fix validation of dependencies ignores breaking with generated subtargets (#10407)
+  `PR #10407 <https://github.com/pantsbuild/pants/pull/10407>`_
+
+* close write stream for CAS writes via ByteStream API (#10395)
+  `PR #10395 <https://github.com/pantsbuild/pants/pull/10395>`_
+
+* Fix recently added n^2 edge collection. (#10392)
+  `PR #10392 <https://github.com/pantsbuild/pants/pull/10392>`_
+
+* Align cache directory calculation so that the LMDB store location is uniformly configurable. (#10391)
+  `PR #10391 <https://github.com/pantsbuild/pants/pull/10391>`_
+
+* remoting: use debug level for RE client workunits saved from remote (#10382)
+  `PR #10382 <https://github.com/pantsbuild/pants/pull/10382>`_
+
+* Always include types in the engine's definition of equality. (#10377)
+  `PR #10377 <https://github.com/pantsbuild/pants/pull/10377>`_
+
+* Have help respond to color (#10357)
+  `PR #10357 <https://github.com/pantsbuild/pants/pull/10357>`_
+
+* Display multiline help nicely. (#10366)
+  `PR #10366 <https://github.com/pantsbuild/pants/pull/10366>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Add a hint about adjusting max_user_watches on Linux. (#10413)
+  `PR #10413 <https://github.com/pantsbuild/pants/pull/10413>`_
+
+* Delete unused v1 sources. (#10411)
+  `PR #10411 <https://github.com/pantsbuild/pants/pull/10411>`_
+
+* upgrade to Rust 1.45.0 (#10396)
+  `PR #10396 <https://github.com/pantsbuild/pants/pull/10396>`_
+
+* Tolerate target cycles when using dependency inference (#10393)
+  `Issue #10059 <https://github.com/pantsbuild/pants/issues/10059>`_
+  `PR #10393 <https://github.com/pantsbuild/pants/pull/10393>`_
+
+* Revert "Tolerate target cycles when using dependency inference (#10393)" (#10401)
+  `PR #10393 <https://github.com/pantsbuild/pants/pull/10393>`_
+  `PR #10401 <https://github.com/pantsbuild/pants/pull/10401>`_
+
+* Add support for cycle-tolerant "weak" Gets (#10230)
+  `PR #10230 <https://github.com/pantsbuild/pants/pull/10230>`_
+
+* Make fetching wheels more resilient to network errors. (#10376)
+  `PR #10376 <https://github.com/pantsbuild/pants/pull/10376>`_
+
+* Avoid undefined behaviour around f64/u64 casts (#10374)
+  `PR #10374 <https://github.com/pantsbuild/pants/pull/10374>`_
+
+* Fix when an explicitly provided dependency supersedes an inferred dependency (#10375)
+  `PR #10375 <https://github.com/pantsbuild/pants/pull/10375>`_
+
+* Fix dependency inference handling of dependencies on self (#10373)
+  `PR #10373 <https://github.com/pantsbuild/pants/pull/10373>`_
+
+* Render local process infrastructure errors more verbosely. (#10368)
+  `PR #10368 <https://github.com/pantsbuild/pants/pull/10368>`_
+
+* Use our validate goal instead of the custom header check. (#10361)
+  `PR #10361 <https://github.com/pantsbuild/pants/pull/10361>`_
+
+* Delete some unused testprojects code. (#10364)
+  `PR #10364 <https://github.com/pantsbuild/pants/pull/10364>`_
+
+Testing
+~~~~~~~
+
+* Upload coverage data to coveralls (#10299)
+  `PR #10299 <https://github.com/pantsbuild/pants/pull/10299>`_
+  `PR #9919 <https://github.com/pantsbuild/pants/pull/9919>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* A script to generate options reference pages for the docsite. (#10387)
+  `PR #10387 <https://github.com/pantsbuild/pants/pull/10387>`_
+
 2.0.0.dev3 (7/15/2020)
 ----------------------
 

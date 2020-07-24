@@ -28,7 +28,6 @@ class PythonSetup(Subsystem):
         register(
             "--interpreter-constraints",
             advanced=True,
-            fingerprint=True,
             type=list,
             default=["CPython>=3.6"],
             metavar="<requirement>",
@@ -41,7 +40,6 @@ class PythonSetup(Subsystem):
         register(
             "--requirement-constraints",
             advanced=True,
-            fingerprint=True,
             type=file_option,
             help=(
                 "When resolving third-party requirements, use this "
@@ -51,12 +49,29 @@ class PythonSetup(Subsystem):
             ),
         )
         register(
+            "--resolve-all-constraints",
+            advanced=True,
+            default=False,
+            type=bool,
+            help=(
+                "If set, and the requirements of the code being operated on are a subset of the "
+                "constraints file, then the entire constraints file will be used instead of the "
+                "subset. If unset, or any requirement of the code being operated on is not in the "
+                "constraints file, each subset will be independently resolved as needed, which is "
+                "more correct - work is only invalidated if a requirement it actually depends on "
+                "changes - but also a lot slower, due to the extra resolving. "
+                "You may wish to leave this option set for normal work, such as running tests, "
+                "but selectively turn it off via command-line-flag when building deployable "
+                "binaries, so that you only deploy the requirements you actually need for a "
+                "given binary."
+            ),
+        )
+        register(
             "--platforms",
             advanced=True,
             type=list,
             metavar="<platform>",
             default=["current"],
-            fingerprint=True,
             help="A list of platforms to be supported by this Python environment. Each platform"
             "is a string, as returned by pkg_resources.get_supported_platform().",
         )
@@ -89,7 +104,6 @@ class PythonSetup(Subsystem):
             advanced=True,
             type=bool,
             default=UnsetBool,
-            fingerprint=True,
             help="Whether to include pre-releases when resolving requirements.",
         )
         register(
@@ -110,7 +124,6 @@ class PythonSetup(Subsystem):
             advanced=True,
             type=str,
             default="manylinux2014",
-            fingerprint=True,
             help="Whether to allow resolution of manylinux wheels when resolving requirements for "
             "foreign linux platforms. The value should be a manylinux platform upper bound, "
             "e.g.: manylinux2010, or else [Ff]alse, [Nn]o or [Nn]one to disallow.",
@@ -120,7 +133,6 @@ class PythonSetup(Subsystem):
             type=int,
             default=None,
             advanced=True,
-            fingerprint=True,
             help="The maximum number of concurrent jobs to resolve wheels with.",
         )
 
@@ -182,6 +194,15 @@ class PythonSetup(Subsystem):
         if self.get_options().is_flagged("interpreter_constraints"):
             return self.interpreter_constraints
         return tuple(compatibility or self.interpreter_constraints)
+
+    def compatibilities_or_constraints(
+        self, compatibilities: Iterable[Optional[Iterable[str]]]
+    ) -> Tuple[str, ...]:
+        return tuple(
+            constraint
+            for compatibility in compatibilities
+            for constraint in self.compatibility_or_constraints(compatibility)
+        )
 
     @classmethod
     def expand_interpreter_search_paths(cls, interpreter_search_paths, pyenv_root_func=None):

@@ -4,7 +4,7 @@
 from abc import ABC
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import ClassVar, Dict, Tuple, Type, cast
+from typing import ClassVar, Dict, Mapping, Optional, Tuple, Type, cast
 
 from pants.base.build_root import BuildRoot
 from pants.engine.console import Console
@@ -17,6 +17,8 @@ from pants.engine.target import Field, Target, Targets, TransitiveTargets
 from pants.engine.unions import UnionMembership, union
 from pants.option.global_options import GlobalOptions
 from pants.util.contextutil import temporary_dir
+from pants.util.frozendict import FrozenDict
+from pants.util.meta import frozen_after_init
 
 
 @union
@@ -48,7 +50,6 @@ class ReplOptions(GoalSubsystem):
             "--shell",
             type=str,
             default=None,
-            fingerprint=True,
             help="Override the automatically-detected REPL program for the target(s) specified. ",
         )
 
@@ -57,10 +58,19 @@ class Repl(Goal):
     subsystem_cls = ReplOptions
 
 
-@dataclass(frozen=True)
-class ReplBinary:
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class ReplRequest:
     digest: Digest
     binary_name: str
+    env: FrozenDict[str, str]
+
+    def __init__(
+        self, *, digest: Digest, binary_name: str, env: Optional[Mapping[str, str]] = None,
+    ) -> None:
+        self.digest = digest
+        self.binary_name = binary_name
+        self.env = FrozenDict(env or {})
 
 
 @goal_rule
@@ -94,16 +104,16 @@ async def run_repl(
             tgt for tgt in transitive_targets.closure if repl_implementation_cls.is_valid(tgt)
         )
     )
-    repl_binary = await Get(ReplBinary, ReplImplementation, repl_impl)
+    request = await Get(ReplRequest, ReplImplementation, repl_impl)
 
     with temporary_dir(root_dir=global_options.options.pants_workdir, cleanup=False) as tmpdir:
         path_relative_to_build_root = PurePath(tmpdir).relative_to(build_root.path).as_posix()
         workspace.materialize_directory(
-            DirectoryToMaterialize(repl_binary.digest, path_prefix=path_relative_to_build_root)
+            DirectoryToMaterialize(request.digest, path_prefix=path_relative_to_build_root)
         )
 
-        full_path = PurePath(tmpdir, repl_binary.binary_name).as_posix()
-        process = InteractiveProcess(argv=[full_path], run_in_workspace=True)
+        full_path = PurePath(tmpdir, request.binary_name).as_posix()
+        process = InteractiveProcess(argv=(full_path,), env=request.env, run_in_workspace=True)
 
     result = interactive_runner.run_process(process)
     return Repl(result.exit_code)

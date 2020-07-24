@@ -6,15 +6,12 @@ from pathlib import Path
 
 from pants.engine.console import Console
 from pants.engine.fs import (
-    EMPTY_DIGEST,
     CreateDigest,
     Digest,
     DirectoryToMaterialize,
     FileContent,
     MaterializeDirectoriesResult,
     MaterializeDirectoryResult,
-    SingleFileExecutable,
-    Snapshot,
     Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
@@ -115,44 +112,3 @@ class IsChildOfTest(TestBase):
 
         assert not is_child_of(Path("/other/random/directory/root/dist/dir"), mock_build_root)
         assert not is_child_of(Path("../not_root/dist/dir"), mock_build_root)
-
-
-class SingleFileExecutableTest(TestBase):
-    def test_raises_with_multiple_files(self):
-        snapshot = self.request_single_product(
-            Snapshot,
-            CreateDigest(
-                [
-                    FileContent(path="a.txt", content=b"test file contents"),
-                    FileContent(path="b.txt", content=b"more test file contents"),
-                ]
-            ),
-        )
-
-        with self.assertRaisesWithMessage(
-            SingleFileExecutable.ValidationError,
-            f"snapshot {snapshot} used for {SingleFileExecutable} should have exactly 1 file!",
-        ):
-            SingleFileExecutable(snapshot)
-
-    def test_raises_empty_digest(self):
-        snapshot = Snapshot(EMPTY_DIGEST, files=("a.txt",), dirs=())
-
-        with self.assertRaisesWithMessage(
-            SingleFileExecutable.ValidationError,
-            f"snapshot {snapshot} used for {SingleFileExecutable} should have a non-empty digest!",
-        ):
-            SingleFileExecutable(snapshot)
-
-    def test_accepts_single_file_snapshot(self):
-        snapshot = self.request_single_product(
-            Snapshot,
-            CreateDigest([FileContent(path="subdir/a.txt", content=b"test file contents")]),
-        )
-        assert SingleFileExecutable(snapshot).exe_filename == "./subdir/a.txt"
-
-        snapshot = self.request_single_product(
-            Snapshot,
-            CreateDigest([FileContent(path="some_silly_file_name", content=b"test file contents")]),
-        )
-        assert SingleFileExecutable(snapshot).exe_filename == "./some_silly_file_name"

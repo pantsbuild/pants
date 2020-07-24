@@ -60,7 +60,6 @@ class XCodeCLITools(Subsystem):
             "--install-prefixes",
             type=list,
             default=cls.INSTALL_PREFIXES_DEFAULT,
-            fingerprint=True,
             advanced=True,
             help="Locations to search for resources from the XCode CLI tools, including a "
             "compiler, linker, header files, and some libraries. "

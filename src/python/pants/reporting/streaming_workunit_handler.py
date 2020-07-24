@@ -71,6 +71,7 @@ class StreamingWorkunitHandler:
             callback(
                 workunits=workunits["completed"],
                 started_workunits=workunits["started"],
+                completed_workunits=workunits["completed"],
                 finished=True,
                 context=self._context,
             )
@@ -109,8 +110,8 @@ class _InnerHandler(threading.Thread):
             workunits = self.scheduler.poll_workunits(self.max_workunit_verbosity)
             for callback in self.callbacks:
                 callback(
-                    workunits=workunits["completed"],
                     started_workunits=workunits["started"],
+                    completed_workunits=workunits["completed"],
                     finished=False,
                     context=self._context,
                 )

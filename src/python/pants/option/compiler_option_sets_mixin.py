@@ -18,7 +18,6 @@ class CompilerOptionSetsMixin:
             "--compiler-option-sets-enabled-args",
             advanced=True,
             type=dict,
-            fingerprint=True,
             default=cls.get_compiler_option_sets_enabled_default_value,
             help="Extra compiler args to use for each enabled option set.",
         )
@@ -26,7 +25,6 @@ class CompilerOptionSetsMixin:
             "--compiler-option-sets-disabled-args",
             advanced=True,
             type=dict,
-            fingerprint=True,
             default=cls.get_compiler_option_sets_disabled_default_value,
             help="Extra compiler args to use for each disabled option set.",
         )
@@ -34,7 +32,6 @@ class CompilerOptionSetsMixin:
             "--default-compiler-option-sets",
             advanced=True,
             type=list,
-            fingerprint=True,
             default=cls.get_default_compiler_option_sets,
             help="The compiler_option_sets to use for targets which don't declare any.",
         )

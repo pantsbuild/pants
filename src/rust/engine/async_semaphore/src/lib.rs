@@ -42,6 +42,7 @@ struct Waiter {
 
 struct Inner {
   waiters: VecDeque<Waiter>,
+  available_ids: VecDeque<usize>,
   available_permits: usize,
   // Used as the source of id in Waiters's because
   // it is monotonically increasing, and only incremented under the mutex lock.
@@ -55,9 +56,15 @@ pub struct AsyncSemaphore {
 
 impl AsyncSemaphore {
   pub fn new(permits: usize) -> AsyncSemaphore {
+    let mut available_ids = VecDeque::new();
+    for id in 1..=permits {
+      available_ids.push_back(id);
+    }
+
     AsyncSemaphore {
       inner: Arc::new(Mutex::new(Inner {
         waiters: VecDeque::new(),
+        available_ids,
         available_permits: permits,
         next_waiter_id: 0,
       })),
@@ -99,10 +106,11 @@ pub struct Permit {
 impl Drop for Permit {
   fn drop(&mut self) {
     let mut inner = self.inner.lock();
-    inner.available_permits += 1;
-    if let Some(waiter) = inner.waiters.front() {
+    inner.available_ids.push_back(self.id);
+    if let Some(waiter) = inner.waiters.get(inner.available_permits) {
       waiter.waker.wake_by_ref()
     }
+    inner.available_permits += 1;
   }
 }
 
@@ -158,7 +166,8 @@ impl Future for PermitFuture {
               // queue, so we don't have to waste time searching for it in the Drop
               // handler.
               self.waiter_id = None;
-              Some(inner.available_permits)
+              let id = inner.available_ids.pop_front().unwrap_or(0); // The unwrap_or case should never happen.
+              Some(id)
             } else {
               // Don't issue a permit to this task if it isn't at the head of the line,
               // we added it as a waiter above.

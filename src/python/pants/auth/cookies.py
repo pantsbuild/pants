@@ -21,7 +21,6 @@ class Cookies(Subsystem):
         register(
             "--path",
             advanced=True,
-            fingerprint=True,
             default=os.path.join(register.bootstrap.pants_bootstrapdir, "auth", "cookies"),
             help="Path to file that stores persistent cookies. "
             "Defaults to <pants bootstrap dir>/auth/cookies.",

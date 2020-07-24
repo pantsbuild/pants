@@ -74,7 +74,12 @@ impl ByteStore {
       serverset,
       headers: oauth_bearer_token
         .iter()
-        .map(|t| (String::from("authorization"), format!("Bearer {}", t)))
+        .map(|t| {
+          (
+            String::from("authorization"),
+            format!("Bearer {}", t.trim()),
+          )
+        })
         .collect(),
     })
   }

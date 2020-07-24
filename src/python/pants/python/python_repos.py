@@ -22,7 +22,6 @@ class PythonRepos(Subsystem):
             advanced=True,
             type=list,
             default=[],
-            fingerprint=True,
             help=(
                 "URLs of code repositories to look for requirements. In Pip and Pex, this option "
                 "corresponds to the `--find-links` option."
@@ -32,7 +31,6 @@ class PythonRepos(Subsystem):
             "--indexes",
             advanced=True,
             type=list,
-            fingerprint=True,
             default=["https://pypi.org/simple/"],
             help=(
                 "URLs of code repository indexes to look for requirements. If set to an empty "

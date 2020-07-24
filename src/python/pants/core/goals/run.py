@@ -1,12 +1,14 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from dataclasses import dataclass
 from pathlib import PurePath
+from typing import Iterable, Mapping, Optional, Tuple
 
 from pants.base.build_root import BuildRoot
-from pants.core.goals.binary import BinaryFieldSet, CreatedBinary
+from pants.core.goals.binary import BinaryFieldSet
 from pants.engine.console import Console
-from pants.engine.fs import DirectoryToMaterialize, Workspace
+from pants.engine.fs import Digest, DirectoryToMaterialize, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.interactive_process import InteractiveProcess, InteractiveRunner
 from pants.engine.rules import goal_rule
@@ -15,6 +17,30 @@ from pants.engine.target import TargetsToValidFieldSets, TargetsToValidFieldSets
 from pants.option.custom_types import shell_str
 from pants.option.global_options import GlobalOptions
 from pants.util.contextutil import temporary_dir
+from pants.util.frozendict import FrozenDict
+from pants.util.meta import frozen_after_init
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class RunRequest:
+    digest: Digest
+    binary_name: str
+    prefix_args: Tuple[str, ...]
+    env: FrozenDict[str, str]
+
+    def __init__(
+        self,
+        *,
+        digest: Digest,
+        binary_name: str,
+        prefix_args: Optional[Iterable[str]] = None,
+        env: Optional[Mapping[str, str]] = None,
+    ) -> None:
+        self.digest = digest
+        self.binary_name = binary_name
+        self.prefix_args = tuple(prefix_args or ())
+        self.env = FrozenDict(env or {})
 
 
 class RunOptions(GoalSubsystem):
@@ -36,7 +62,6 @@ class RunOptions(GoalSubsystem):
             "--args",
             type=list,
             member_type=shell_str,
-            fingerprint=True,
             passthrough=True,
             help="Arguments to pass directly to the executed target, e.g. "
             '`--run-args="val1 val2 --debug"`',
@@ -66,17 +91,21 @@ async def run(
         ),
     )
     field_set = targets_to_valid_field_sets.field_sets[0]
-    binary = await Get(CreatedBinary, BinaryFieldSet, field_set)
+    request = await Get(RunRequest, BinaryFieldSet, field_set)
 
     workdir = global_options.options.pants_workdir
     with temporary_dir(root_dir=workdir, cleanup=True) as tmpdir:
         path_relative_to_build_root = PurePath(tmpdir).relative_to(build_root.path).as_posix()
         workspace.materialize_directory(
-            DirectoryToMaterialize(binary.digest, path_prefix=path_relative_to_build_root)
+            DirectoryToMaterialize(request.digest, path_prefix=path_relative_to_build_root)
         )
 
-        full_path = PurePath(tmpdir, binary.binary_name).as_posix()
-        process = InteractiveProcess(argv=(full_path, *options.values.args), run_in_workspace=True)
+        full_path = PurePath(tmpdir, request.binary_name).as_posix()
+        process = InteractiveProcess(
+            argv=(full_path, *request.prefix_args, *options.values.args),
+            env=request.env,
+            run_in_workspace=True,
+        )
         try:
             result = interactive_runner.run_process(process)
             exit_code = result.exit_code

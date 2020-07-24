@@ -48,7 +48,6 @@ from pants.option.custom_types import file_option
 from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
 
-
 """
 An overview:
 

@@ -16,7 +16,7 @@ async fn acquire_and_release() {
 }
 
 #[tokio::test]
-async fn correct_semaphor_slot_ids() {
+async fn correct_semaphore_slot_ids() {
   let sema = AsyncSemaphore::new(2);
   let (tx1, rx1) = oneshot::channel();
   let (tx2, rx2) = oneshot::channel();
@@ -56,13 +56,91 @@ async fn correct_semaphor_slot_ids() {
   let id3 = rx3.await.unwrap();
   let id4 = rx4.await.unwrap();
 
-  // Process 1 should get ID 2, then process 2 should run with id 1 and complete, then process 3
-  // should run in the same "slot" as process 2 and get the same id. Process 4 is scheduled
-  // later and gets put into "slot" 2.
-  assert_eq!(id1, 2);
-  assert_eq!(id2, 1);
-  assert_eq!(id3, 1);
-  assert_eq!(id4, 2);
+  // Process 1 should get ID 1, then process 2 should run with id 2 and complete, then process 3
+  // should run in the same "slot" as process 2 and get the same id (2). Process 4 is scheduled
+  // later and gets put into "slot" 1.
+  assert_eq!(id1, 1);
+  assert_eq!(id2, 2);
+  assert_eq!(id3, 2);
+  assert_eq!(id4, 1);
+}
+
+#[tokio::test]
+async fn correct_semaphore_slot_ids_2() {
+  let sema = AsyncSemaphore::new(4);
+  let (tx1, rx1) = oneshot::channel();
+  let (tx2, rx2) = oneshot::channel();
+  let (tx3, rx3) = oneshot::channel();
+  let (tx4, rx4) = oneshot::channel();
+  let (tx5, rx5) = oneshot::channel();
+  let (tx6, rx6) = oneshot::channel();
+  let (tx7, rx7) = oneshot::channel();
+
+  println!("Spawning process 1");
+  tokio::spawn(sema.clone().with_acquired(move |id| async move {
+    println!("Exec process 1");
+    tx1.send(id).unwrap();
+    delay_for(Duration::from_millis(20)).await;
+    future::ready(())
+  }));
+  println!("Spawning process 2");
+  tokio::spawn(sema.clone().with_acquired(move |id| async move {
+    println!("Exec process 2");
+    tx2.send(id).unwrap();
+    delay_for(Duration::from_millis(20)).await;
+    future::ready(())
+  }));
+  println!("Spawning process 3");
+  tokio::spawn(sema.clone().with_acquired(move |id| async move {
+    println!("Exec process 3");
+    tx3.send(id).unwrap();
+    delay_for(Duration::from_millis(20)).await;
+    future::ready(())
+  }));
+  println!("Spawning process 4");
+  tokio::spawn(sema.clone().with_acquired(move |id| async move {
+    println!("Exec process 4");
+    tx4.send(id).unwrap();
+    delay_for(Duration::from_millis(20)).await;
+    future::ready(())
+  }));
+  println!("Spawning process 5");
+  tokio::spawn(sema.clone().with_acquired(move |id| async move {
+    println!("Exec process 5");
+    tx5.send(id).unwrap();
+    delay_for(Duration::from_millis(20)).await;
+    future::ready(())
+  }));
+  println!("Spawning process 6");
+  tokio::spawn(sema.clone().with_acquired(move |id| async move {
+    println!("Exec process 6");
+    tx6.send(id).unwrap();
+    delay_for(Duration::from_millis(20)).await;
+    future::ready(())
+  }));
+  println!("Spawning process 7");
+  tokio::spawn(sema.clone().with_acquired(move |id| async move {
+    println!("Exec process 7");
+    tx7.send(id).unwrap();
+    delay_for(Duration::from_millis(20)).await;
+    future::ready(())
+  }));
+
+  let id1 = rx1.await.unwrap();
+  let id2 = rx2.await.unwrap();
+  let id3 = rx3.await.unwrap();
+  let id4 = rx4.await.unwrap();
+  let id5 = rx5.await.unwrap();
+  let id6 = rx6.await.unwrap();
+  let id7 = rx7.await.unwrap();
+
+  assert_eq!(id1, 1);
+  assert_eq!(id2, 2);
+  assert_eq!(id3, 3);
+  assert_eq!(id4, 4);
+  assert_eq!(id5, 1);
+  assert_eq!(id6, 2);
+  assert_eq!(id7, 3);
 }
 
 #[tokio::test]

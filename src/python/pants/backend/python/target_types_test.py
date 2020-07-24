@@ -8,12 +8,17 @@ import pytest
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.target_types import PythonBinarySources, PythonTestsTimeout
 from pants.engine.addresses import Address
+from pants.engine.rules import SubsystemRule
 from pants.engine.target import InvalidFieldException
-from pants.testutil.subsystem.util import global_subsystem_instance
+from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
 
 class TestTimeout(TestBase):
+    @classmethod
+    def rules(cls):
+        return [*super().rules(), SubsystemRule(PyTest)]
+
     def test_timeout_validation(self) -> None:
         with pytest.raises(InvalidFieldException):
             PythonTestsTimeout(-100, address=Address.parse(":tests"))
@@ -28,18 +33,14 @@ class TestTimeout(TestBase):
         expected: Optional[int],
         global_default: Optional[int] = None,
         global_max: Optional[int] = None,
-        timeouts_enabled: bool = True
+        timeouts_enabled: bool = True,
     ) -> None:
-        pytest = global_subsystem_instance(
-            PyTest,
-            options={
-                PyTest.options_scope: {
-                    "timeouts": timeouts_enabled,
-                    "timeout_default": global_default,
-                    "timeout_maximum": global_max,
-                }
-            },
-        )
+        args = ["--backend-packages=pants.backend.python", f"--pytest-timeouts={timeouts_enabled}"]
+        if global_default is not None:
+            args.append(f"--pytest-timeout-default={global_default}")
+        if global_max is not None:
+            args.append(f"--pytest-timeout-maximum={global_max}")
+        pytest = self.request_single_product(PyTest, create_options_bootstrapper(args=args))
         field = PythonTestsTimeout(field_value, address=Address.parse(":tests"))
         assert field.calculate_from_global_options(pytest) == expected
 

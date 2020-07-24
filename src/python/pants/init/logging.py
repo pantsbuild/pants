@@ -128,14 +128,13 @@ def setup_logging(global_bootstrap_options):
 
     ignores = global_bootstrap_options.ignore_pants_warnings
     global_level = global_bootstrap_options.level
-    level = LogLevel.ERROR if getattr(global_bootstrap_options, "quiet", False) else global_level
     log_dir = global_bootstrap_options.logdir
 
     log_show_rust_3rdparty = global_bootstrap_options.log_show_rust_3rdparty
     use_color = global_bootstrap_options.colors
 
-    init_rust_logger(level, log_show_rust_3rdparty, use_color)
-    setup_logging_to_stderr(level, warnings_filter_regexes=ignores)
+    init_rust_logger(global_level, log_show_rust_3rdparty, use_color)
+    setup_logging_to_stderr(global_level, warnings_filter_regexes=ignores)
     if log_dir:
         setup_logging_to_file(global_level, log_dir=log_dir, warnings_filter_regexes=ignores)
 

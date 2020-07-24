@@ -23,7 +23,6 @@ class PythonToolBase(Subsystem):
             "--version",
             type=str,
             advanced=True,
-            fingerprint=True,
             default=cls.default_version,
             help="Requirement string for the tool.",
         )
@@ -32,7 +31,6 @@ class PythonToolBase(Subsystem):
             type=list,
             member_type=str,
             advanced=True,
-            fingerprint=True,
             default=cls.default_extra_requirements,
             help="Any additional requirement strings to use with the tool. This is useful if the "
             "tool allows you to install plugins or if you need to constrain a dependency to "
@@ -42,7 +40,6 @@ class PythonToolBase(Subsystem):
             "--interpreter-constraints",
             type=list,
             advanced=True,
-            fingerprint=True,
             default=cls.default_interpreter_constraints,
             help="Python interpreter constraints for this tool. An empty list uses the default "
             "interpreter constraints for the repo.",
@@ -51,7 +48,6 @@ class PythonToolBase(Subsystem):
             "--entry-point",
             type=str,
             advanced=True,
-            fingerprint=True,
             default=cls.default_entry_point,
             help="The main module for the tool. If unspecified, the code using this tool "
             "must provide it explicitly on invocation, or it can use the tool as a "

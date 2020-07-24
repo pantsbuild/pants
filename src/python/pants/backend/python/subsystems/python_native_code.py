@@ -23,7 +23,6 @@ class PythonNativeCode(Subsystem):
             "--cpp-flags",
             type=list,
             default=safe_shlex_split(os.environ.get("CPPFLAGS", "")),
-            fingerprint=True,
             advanced=True,
             help="Override the `CPPFLAGS` environment variable for any forked subprocesses.",
         )
@@ -31,7 +30,6 @@ class PythonNativeCode(Subsystem):
             "--ld-flags",
             type=list,
             default=safe_shlex_split(os.environ.get("LDFLAGS", "")),
-            fingerprint=True,
             advanced=True,
             help="Override the `LDFLAGS` environment variable for any forked subprocesses.",
         )

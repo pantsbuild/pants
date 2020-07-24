@@ -1,8 +1,6 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from dataclasses import dataclass
-
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
     ExternalTool,
@@ -15,7 +13,6 @@ from pants.engine.fs import (
     DigestContents,
     FileContent,
     MergeDigests,
-    SingleFileExecutable,
     SourcesSnapshot,
 )
 from pants.engine.goal import Goal, GoalSubsystem
@@ -42,21 +39,6 @@ class ClocBinary(ExternalTool):
         return f"https://github.com/AlDanial/cloc/releases/download/{version}/cloc-{version}.pl"
 
 
-@dataclass(frozen=True)
-class DownloadedClocScript:
-    """Cloc script as downloaded from the pantsbuild binaries repo."""
-
-    exe: SingleFileExecutable
-
-    @property
-    def script_path(self) -> str:
-        return self.exe.exe_filename
-
-    @property
-    def digest(self) -> Digest:
-        return self.exe.digest
-
-
 class CountLinesOfCodeOptions(GoalSubsystem):
     """Count lines of code."""
 
@@ -66,10 +48,7 @@ class CountLinesOfCodeOptions(GoalSubsystem):
     def register_options(cls, register) -> None:
         super().register_options(register)
         register(
-            "--ignored",
-            type=bool,
-            fingerprint=True,
-            help="Show information about files ignored by cloc.",
+            "--ignored", type=bool, help="Show information about files ignored by cloc.",
         )
 
 

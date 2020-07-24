@@ -95,7 +95,6 @@ class ExternalTool(Subsystem):
             type=str,
             default=cls.default_version,
             advanced=True,
-            fingerprint=True,
             help=f"Use this version of {cls.name}.",
         )
 
