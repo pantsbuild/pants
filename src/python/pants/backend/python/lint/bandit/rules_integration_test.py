@@ -13,7 +13,6 @@ from pants.engine.fs import DigestContents, FileContent
 from pants.engine.rules import RootRule, SubsystemRule
 from pants.engine.selectors import Params
 from pants.engine.target import TargetWithOrigin
-from pants.testutil.engine.util import create_subsystem
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.interpreter_selection_utils import skip_unless_python27_and_python3_present
 from pants.testutil.option.util import create_options_bootstrapper
