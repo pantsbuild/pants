@@ -532,7 +532,7 @@ impl CommandRunner for BoundedCommandRunner {
 
       semaphore.with_acquired(move |concurrency_id| {
         log::debug!(
-          "Running {} under semaphor with concurrency id: {}",
+          "Running {} under semaphore with concurrency id: {}",
           desc,
           concurrency_id
         );

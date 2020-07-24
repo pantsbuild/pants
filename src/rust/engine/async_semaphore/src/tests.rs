@@ -16,7 +16,7 @@ async fn acquire_and_release() {
 }
 
 #[tokio::test]
-async fn correct_semaphor_slot_ids() {
+async fn correct_semaphore_slot_ids() {
   let sema = AsyncSemaphore::new(2);
   let (tx1, rx1) = oneshot::channel();
   let (tx2, rx2) = oneshot::channel();
@@ -66,7 +66,7 @@ async fn correct_semaphor_slot_ids() {
 }
 
 #[tokio::test]
-async fn correct_semaphor_slot_ids_2() {
+async fn correct_semaphore_slot_ids_2() {
   let sema = AsyncSemaphore::new(4);
   let (tx1, rx1) = oneshot::channel();
   let (tx2, rx2) = oneshot::channel();
