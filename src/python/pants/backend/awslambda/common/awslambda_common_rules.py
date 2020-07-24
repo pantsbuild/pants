@@ -1,14 +1,13 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import os
 from abc import ABCMeta
 from dataclasses import dataclass
+from textwrap import dedent
 
-from pants.base.build_root import BuildRoot
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.console import Console
-from pants.engine.fs import Digest, DirectoryToMaterialize, MergeDigests, Workspace
+from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import goal_rule
 from pants.engine.selectors import Get, MultiGet
@@ -23,7 +22,7 @@ class AWSLambdaError(Exception):
 @dataclass(frozen=True)
 class CreatedAWSLambda:
     digest: Digest
-    name: str
+    zip_file_relpath: str
     runtime: str
     handler: str
 
@@ -45,11 +44,7 @@ class AWSLambdaGoal(Goal):
 
 @goal_rule
 async def create_awslambda(
-    console: Console,
-    options: AWSLambdaOptions,
-    distdir: DistDir,
-    buildroot: BuildRoot,
-    workspace: Workspace,
+    console: Console, options: AWSLambdaOptions, distdir: DistDir, workspace: Workspace,
 ) -> AWSLambdaGoal:
     targets_to_valid_field_sets = await Get(
         TargetsToValidFieldSets,
@@ -64,15 +59,19 @@ async def create_awslambda(
         for field_set in targets_to_valid_field_sets.field_sets
     )
     merged_digest = await Get(Digest, MergeDigests(awslambda.digest for awslambda in awslambdas))
-    result = workspace.materialize_directory(
-        DirectoryToMaterialize(merged_digest, path_prefix=str(distdir.relpath))
-    )
+    workspace.write_digest(merged_digest, path_prefix=str(distdir.relpath))
     with options.line_oriented(console) as print_stdout:
-        for awslambda, path in zip(awslambdas, result.output_paths):
-            print_stdout(f"Wrote code bundle to {os.path.relpath(path, buildroot.path)}")
-            print_stdout(f"  Runtime: {awslambda.runtime}")
-            print_stdout(f"  Handler: {awslambda.handler}")
-            print_stdout("")
+        for awslambda in awslambdas:
+            output_path = distdir.relpath / awslambda.zip_file_relpath
+            print_stdout(
+                dedent(
+                    f"""\
+                    Wrote code bundle to {output_path}
+                      Runtime: {awslambda.runtime}
+                      Handler: {awslambda.handler}
+                    """
+                )
+            )
     return AWSLambdaGoal(exit_code=0)
 
 

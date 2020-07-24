@@ -5,15 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from pants.engine.console import Console
-from pants.engine.fs import (
-    CreateDigest,
-    Digest,
-    DirectoryToMaterialize,
-    FileContent,
-    MaterializeDirectoriesResult,
-    MaterializeDirectoryResult,
-    Workspace,
-)
+from pants.engine.fs import CreateDigest, Digest, FileContent, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.rules import RootRule, goal_rule
 from pants.engine.selectors import Get
@@ -39,9 +31,9 @@ class MockWorkspaceGoal(Goal):
 async def workspace_goal_rule(
     console: Console, workspace: Workspace, msg: MessageToGoalRule
 ) -> MockWorkspaceGoal:
-    digest = await Get(Digest, CreateDigest, msg.create_digest)
-    output = workspace.materialize_directory(DirectoryToMaterialize(digest))
-    console.print_stdout(output.output_paths[0], end="")
+    snapshot = await Get(Snapshot, CreateDigest, msg.create_digest)
+    workspace.write_digest(snapshot.digest)
+    console.print_stdout(snapshot.files[0], end="")
     return MockWorkspaceGoal(exit_code=0)
 
 
@@ -60,43 +52,32 @@ class WorkspaceInGoalRuleTest(GoalRuleTestBase):
         msg = MessageToGoalRule(
             create_digest=CreateDigest([FileContent(path="a.txt", content=b"hello")])
         )
-        output_path = Path(self.build_root, "a.txt")
-        self.assert_console_output_contains(str(output_path), additional_params=[msg])
-        assert output_path.read_text() == "hello"
+        self.assert_console_output_contains("a.txt", additional_params=[msg])
+        assert Path(self.build_root, "a.txt").read_text() == "hello"
 
 
-# TODO(gshuflin) - it would be nice if this test, which tests that the MaterializeDirectoryResults value
-# is valid, could be subsumed into the above @goal_rule-based test, but it's a bit awkward
-# to get the MaterializeDirectoriesResult out of a @goal_rule at the moment.
-class FileSystemTest(TestBase):
-    def test_workspace_materialize_directories_result(self):
-        # TODO(#8336): at some point, this test should require that Workspace only be invoked from an @goal_rule
+class WorkspaceTest(TestBase):
+    def test_write_digest(self):
+        # TODO(#8336): at some point, this test should require that Workspace only be invoked from
+        #  an @goal_rule
         workspace = Workspace(self.scheduler)
-
         digest = self.request_single_product(
             Digest,
-            CreateDigest(
-                [
-                    FileContent(path="a.txt", content=b"hello"),
-                    FileContent(path="subdir/b.txt", content=b"goodbye"),
-                ]
-            ),
+            CreateDigest([FileContent("a.txt", b"hello"), FileContent("subdir/b.txt", b"goodbye")]),
         )
 
-        path1 = Path("a.txt")
-        path2 = Path("subdir/b.txt")
-
+        path1 = Path(self.build_root, "a.txt")
+        path2 = Path(self.build_root, "subdir/b.txt")
         assert not path1.is_file()
         assert not path2.is_file()
 
-        output = workspace.materialize_directories((DirectoryToMaterialize(digest),))
+        workspace.write_digest(digest)
+        assert path1.is_file()
+        assert path2.is_file()
 
-        assert type(output) == MaterializeDirectoriesResult
-        materialize_result = output[0]
-        assert type(materialize_result) == MaterializeDirectoryResult
-        assert materialize_result.output_paths == tuple(
-            str(Path(self.build_root, p)) for p in [path1, path2]
-        )
+        workspace.write_digest(digest, path_prefix="prefix")
+        assert Path(self.build_root, "prefix", path1).is_file()
+        assert Path(self.build_root, "prefix", path2).is_file()
 
 
 class IsChildOfTest(TestBase):

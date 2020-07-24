@@ -19,7 +19,7 @@ from pants.backend.python.subsystems import python_native_code, subprocess_envir
 from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.core.util_rules import archive, external_tool
-from pants.engine.fs import CreateDigest, Digest, DirectoryToMaterialize, FileContent, MergeDigests
+from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Snapshot
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
@@ -102,11 +102,10 @@ class PluginResolverTest(TestBase):
             output_directories=("dist/",),
         )
         result = self.request_single_product(ProcessResult, process)
-        output_paths = self.scheduler.materialize_directory(
-            DirectoryToMaterialize(result.output_digest, path_prefix="output")
-        ).output_paths
+        result_snapshot = self.request_single_product(Snapshot, result.output_digest)
+        self.scheduler.write_digest(result.output_digest, path_prefix="output")
         safe_mkdir(install_dir)
-        for path in output_paths:
+        for path in result_snapshot.files:
             shutil.copy(path, install_dir)
 
     @contextmanager
