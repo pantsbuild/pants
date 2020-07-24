@@ -42,10 +42,10 @@ impl Intrinsics {
     );
     intrinsics.insert(
       Intrinsic {
-        product: types.snapshot,
+        product: types.directory_digest,
         inputs: vec![types.path_globs],
       },
-      Box::new(path_globs_to_snapshot),
+      Box::new(path_globs_to_digest),
     );
     intrinsics.insert(
       Intrinsic {
@@ -296,17 +296,21 @@ fn url_to_fetch_to_snapshot(
   .boxed()
 }
 
-fn path_globs_to_snapshot(
+fn path_globs_to_digest(
   context: Context,
   mut args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
   let core = context.core.clone();
   async move {
+    let key = externs::acquire_key_for(args.pop().unwrap()).map_err(|e| format!("{:?}", e))?;
     let snapshot = context
-      .get(Snapshot(externs::acquire_key_for(args.pop().unwrap())?))
-      .await?;
-    Ok(Snapshot::store_snapshot(&core, &snapshot).map_err(|err| throw(&err))?)
+      .get(Snapshot(key))
+      .await
+      .map_err(|e| format!("{:?}", e))?;
+    let res: Result<_, String> = Ok(Snapshot::store_directory(&core, &snapshot.digest));
+    res
   }
+  .map_err(|err: String| throw(&err))
   .boxed()
 }
 

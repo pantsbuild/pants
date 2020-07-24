@@ -23,7 +23,7 @@ from pants.backend.python.typecheck.mypy.subsystem import MyPy
 from pants.core.goals.typecheck import TypecheckRequest, TypecheckResult, TypecheckResults
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.engine.addresses import Addresses
-from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, PathGlobs, Snapshot
+from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, PathGlobs
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get, MultiGet
@@ -87,16 +87,16 @@ async def mypy_lint(
             entry_point=mypy.get_entry_point(),
         ),
     )
-    config_snapshot_request = Get(
-        Snapshot,
+    config_digest_request = Get(
+        Digest,
         PathGlobs(
             globs=[mypy.config] if mypy.config else [],
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
             description_of_origin="the option `--mypy-config`",
         ),
     )
-    prepared_sources, pex, config_snapshot = await MultiGet(
-        prepared_sources_request, pex_request, config_snapshot_request
+    prepared_sources, pex, config_digest = await MultiGet(
+        prepared_sources_request, pex_request, config_digest_request
     )
 
     file_list_path = "__files.txt"
@@ -108,7 +108,7 @@ async def mypy_lint(
     merged_input_files = await Get(
         Digest,
         MergeDigests(
-            [file_list_digest, prepared_sources.snapshot.digest, pex.digest, config_snapshot.digest]
+            [file_list_digest, prepared_sources.snapshot.digest, pex.digest, config_digest]
         ),
     )
 

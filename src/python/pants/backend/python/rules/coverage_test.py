@@ -7,7 +7,7 @@ from typing import List, Optional
 import pytest
 
 from pants.backend.python.rules.coverage import CoverageSubsystem, create_coverage_config
-from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, PathGlobs, Snapshot
+from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, PathGlobs
 from pants.testutil.engine.util import MockGet, create_subsystem, run_rule
 from pants.testutil.test_base import TestBase
 
@@ -19,28 +19,23 @@ class TestCoverageConfig(TestBase):
         )
         resolved_config: List[str] = []
 
-        def fake_handle_config(fcs):
-            assert len(fcs) == 1
-            assert fcs[0].path == ".coveragerc"
-            assert fcs[0].is_executable is False
-            resolved_config.append(fcs[0].content.decode())
+        def mock_handle_config(request: CreateDigest) -> Digest:
+            assert len(request) == 1
+            assert request[0].path == ".coveragerc"
+            assert request[0].is_executable is False
+            resolved_config.append(request[0].content.decode())
             return Digest("jerry", 30)
 
-        def fake_read_config(digest):
-            # fake_read_config shouldn't get called if no config file provided
+        def mock_read_config(_: PathGlobs) -> DigestContents:
+            # This shouldn't be called if no config file provided.
             assert coverage_config is not None
             return DigestContents(
                 [FileContent(path="/dev/null/prelude", content=coverage_config.encode())]
             )
 
         mock_gets = [
-            MockGet(
-                product_type=Snapshot,
-                subject_type=PathGlobs,
-                mock=lambda _: Snapshot(Digest("bosco", 30), ("/dev/null/someconfig",), ()),
-            ),
-            MockGet(product_type=DigestContents, subject_type=Digest, mock=fake_read_config,),
-            MockGet(product_type=Digest, subject_type=CreateDigest, mock=fake_handle_config),
+            MockGet(product_type=DigestContents, subject_type=PathGlobs, mock=mock_read_config),
+            MockGet(product_type=Digest, subject_type=CreateDigest, mock=mock_handle_config),
         ]
 
         result = run_rule(create_coverage_config, rule_args=[coverage], mock_gets=mock_gets)

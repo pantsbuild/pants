@@ -37,7 +37,6 @@ from pants.engine.fs import (
     FileContent,
     MergeDigests,
     PathGlobs,
-    Snapshot,
 )
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import SubsystemRule, rule
@@ -168,15 +167,14 @@ async def create_coverage_config(coverage: CoverageSubsystem) -> CoverageConfig:
     config_path: Optional[str] = coverage.options.config
     coverage_config = configparser.ConfigParser()
     if config_path:
-        config_snapshot = await Get(
-            Snapshot,
+        config_contents = await Get(
+            DigestContents,
             PathGlobs(
                 globs=config_path,
                 glob_match_error_behavior=GlobMatchErrorBehavior.error,
                 description_of_origin=f"the option `--{coverage.options_scope}-config`",
             ),
         )
-        config_contents = await Get(DigestContents, Digest, config_snapshot.digest)
         coverage_config.read_string(config_contents[0].content.decode())
     _validate_and_update_config(coverage_config, config_path)
     config_stream = StringIO()

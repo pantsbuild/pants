@@ -31,7 +31,7 @@ from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.engine.addresses import Address, Addresses
-from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests, PathGlobs, Snapshot
+from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests, PathGlobs
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get, MultiGet
@@ -152,8 +152,8 @@ async def pylint_lint_partition(
         ),
     )
 
-    config_snapshot_request = Get(
-        Snapshot,
+    config_digest_request = Get(
+        Digest,
         PathGlobs(
             globs=[pylint.config] if pylint.config else [],
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
@@ -179,7 +179,7 @@ async def pylint_lint_partition(
         pylint_pex,
         requirements_pex,
         pylint_runner_pex,
-        config_snapshot,
+        config_digest,
         prepared_plugin_sources,
         prepared_python_sources,
         specified_source_files,
@@ -187,7 +187,7 @@ async def pylint_lint_partition(
         pylint_pex_request,
         requirements_pex_request,
         pylint_runner_pex_request,
-        config_snapshot_request,
+        config_digest_request,
         prepare_plugin_sources_request,
         prepare_python_sources_request,
         specified_source_files_request,
@@ -215,7 +215,7 @@ async def pylint_lint_partition(
                 pylint_pex.digest,
                 requirements_pex.digest,
                 pylint_runner_pex.digest,
-                config_snapshot.digest,
+                config_digest,
                 prefixed_plugin_sources,
                 prepared_python_sources.snapshot.digest,
             )

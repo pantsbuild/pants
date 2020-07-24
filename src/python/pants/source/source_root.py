@@ -249,7 +249,7 @@ async def get_source_root(
                 )
         # TODO: An intrinsic to check file existence at a fixed path?
         snapshot = await Get(Snapshot, PathGlobs([str(path / mf) for mf in marker_filenames]))
-        if len(snapshot.files) > 0:
+        if snapshot.is_empty:
             return OptionalSourceRoot(SourceRoot(str(path)))
 
     # The requested path itself is not a source root, but maybe its parent is.

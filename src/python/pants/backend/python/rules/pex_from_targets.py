@@ -24,7 +24,7 @@ from pants.backend.python.target_types import (
     PythonRequirementsField,
 )
 from pants.engine.addresses import Address, Addresses
-from pants.engine.fs import Digest, DigestContents, MergeDigests, PathGlobs, Snapshot
+from pants.engine.fs import Digest, DigestContents, MergeDigests, PathGlobs
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
 from pants.engine.target import TransitiveTargets
@@ -132,17 +132,14 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
 
     if python_setup.requirement_constraints:
         exact_req_projects = {Requirement.parse(req).project_name for req in exact_reqs}
-        constraint_file_snapshot = await Get(
-            Snapshot,
+        constraints_file_contents = await Get(
+            DigestContents,
             PathGlobs(
                 [python_setup.requirement_constraints],
                 glob_match_error_behavior=GlobMatchErrorBehavior.error,
                 conjunction=GlobExpansionConjunction.all_match,
                 description_of_origin="the option `--python-setup-requirement-constraints`",
             ),
-        )
-        constraints_file_contents = await Get(
-            DigestContents, Digest, constraint_file_snapshot.digest
         )
         constraints_file_reqs = set(
             parse_requirements(next(iter(constraints_file_contents)).content.decode())

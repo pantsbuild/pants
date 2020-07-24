@@ -86,8 +86,8 @@ async def flake8_lint_partition(
     )
 
     config_path: Optional[str] = flake8.options.config
-    config_snapshot_request = Get(
-        Snapshot,
+    config_digest_request = Get(
+        Digest,
         PathGlobs(
             globs=[config_path] if config_path else [],
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
@@ -105,18 +105,16 @@ async def flake8_lint_partition(
         ),
     )
 
-    requirements_pex, config_snapshot, all_source_files, specified_source_files = await MultiGet(
+    requirements_pex, config_digest, all_source_files, specified_source_files = await MultiGet(
         requirements_pex_request,
-        config_snapshot_request,
+        config_digest_request,
         all_source_files_request,
         specified_source_files_request,
     )
 
     input_digest = await Get(
         Digest,
-        MergeDigests(
-            (all_source_files.snapshot.digest, requirements_pex.digest, config_snapshot.digest)
-        ),
+        MergeDigests((all_source_files.snapshot.digest, requirements_pex.digest, config_digest)),
     )
 
     address_references = ", ".join(
