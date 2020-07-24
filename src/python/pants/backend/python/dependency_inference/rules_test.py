@@ -50,7 +50,11 @@ class PythonDependencyInferenceTest(TestBase):
 
     def test_infer_python_imports(self) -> None:
         options_bootstrapper = create_options_bootstrapper(
-            args=["--backend-packages=pants.backend.python", "--source-root-patterns=src/python",]
+            args=[
+                "--backend-packages=pants.backend.python",
+                "--source-root-patterns=src/python",
+                "--python-infer-imports",
+            ]
         )
         self.add_to_build_file(
             "3rdparty/python",
