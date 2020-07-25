@@ -1,14 +1,14 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Any, ClassVar, Iterable, Sequence, TypeVar, Union, overload
+from typing import Any, ClassVar, Iterable, Tuple, TypeVar, Union, cast, overload
 
 from pants.util.ordered_set import FrozenOrderedSet
 
 T = TypeVar("T")
 
 
-class Collection(Sequence[T]):
+class Collection(Tuple[T, ...]):
     """A light newtype around immutable sequences for use with the V2 engine.
 
     This should be subclassed when you want to create a distinct collection type, such as:
@@ -21,11 +21,6 @@ class Collection(Sequence[T]):
             pass
     """
 
-    def __init__(self, dependencies: Iterable[T] = ()) -> None:
-        # TODO: rename to `items`, `elements`, or even make this private. Python consumers should
-        #  not directly access this.
-        self.dependencies = tuple(dependencies)
-
     @overload  # noqa: F811
     def __getitem__(self, index: int) -> T:
         ...
@@ -35,23 +30,28 @@ class Collection(Sequence[T]):
         ...
 
     def __getitem__(self, index: Union[int, slice]) -> Union[T, "Collection[T]"]:  # noqa: F811
+        result = super().__getitem__(index)
         if isinstance(index, int):
-            return self.dependencies[index]
-        return self.__class__(self.dependencies[index])
+            return cast(T, result)
+        return self.__class__(cast(Tuple[T, ...], result))
 
-    def __len__(self) -> int:
-        return len(self.dependencies)
-
-    def __eq__(self, other: Union[Any, "Collection"]) -> bool:
+    def __eq__(self, other: Any) -> bool:
         if not isinstance(other, self.__class__):
             return NotImplemented
-        return self.dependencies == other.dependencies
+        return super().__eq__(other)
 
-    def __hash__(self) -> int:
-        return hash(self.dependencies)
+    def __ne__(self, other: Any) -> bool:
+        # We must explicitly override to provide the inverse of _our_ __eq__ and not get the
+        # inverse of tuple.__eq__.
+        return not self == other
+
+    # Unlike in Python 2 we must explicitly implement __hash__ since we explicitly implement __eq__
+    # per the Python 3 data model.
+    # See: https://docs.python.org/3/reference/datamodel.html#object.__hash__
+    __hash__ = Tuple.__hash__
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({list(self.dependencies)})"
+        return f"{self.__class__.__name__}({list(self)})"
 
 
 # NB: This name is clunky. It would be more appropriate to call it `Set`, but that is claimed by
