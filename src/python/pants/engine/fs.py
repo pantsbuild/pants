@@ -167,10 +167,6 @@ class Snapshot:
     files: Tuple[str, ...]
     dirs: Tuple[str, ...]
 
-    @property
-    def is_empty(self):
-        return self == EMPTY_SNAPSHOT
-
 
 @dataclass(frozen=True)
 class DigestSubset:

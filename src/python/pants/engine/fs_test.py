@@ -16,6 +16,7 @@ from typing import Callable, List
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.fs import (
     EMPTY_DIGEST,
+    EMPTY_SNAPSHOT,
     AddPrefix,
     CreateDigest,
     Digest,
@@ -789,14 +790,14 @@ class FSTest(TestBase, SchedulerTestBase):
             initial_snapshot = self.execute_expecting_one_result(
                 scheduler, Snapshot, PathGlobs([dir_glob])
             ).value
-            assert not initial_snapshot.is_empty
+            assert initial_snapshot != EMPTY_SNAPSHOT
             assertion_error = mutation_function(project_tree, dir_path)
 
             def assertion_fn() -> bool:
                 new_snapshot = self.execute_expecting_one_result(
                     scheduler, Snapshot, PathGlobs([dir_glob])
                 ).value
-                assert not new_snapshot.is_empty
+                assert new_snapshot != EMPTY_SNAPSHOT
                 if initial_snapshot.digest != new_snapshot.digest:
                     # successfully invalidated snapshot and got a new digest
                     return True
