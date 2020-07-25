@@ -10,7 +10,7 @@ from pants.core.util_rules.strip_source_roots import (
     SourceRootStrippedSources,
     StripSourcesFieldRequest,
 )
-from pants.engine.fs import MergeDigests, PathGlobs, Snapshot, SnapshotSubset
+from pants.engine.fs import DigestSubset, MergeDigests, PathGlobs, Snapshot
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import HydratedSources, HydrateSourcesRequest
@@ -77,7 +77,7 @@ class SpecifiedSourceFilesRequest:
 
 def calculate_specified_sources(
     sources_snapshot: Snapshot, origin: OriginSpec
-) -> Union[Snapshot, SnapshotSubset]:
+) -> Union[Snapshot, DigestSubset]:
     # AddressSpecs simply use the entire `sources` field.
     if isinstance(origin, AddressSpec):
         return sources_snapshot
@@ -85,7 +85,7 @@ def calculate_specified_sources(
     # It's possible when given a glob filesystem spec that the spec will have
     # resolved files not belonging to this target - those must be filtered out.
     precise_files_specified = set(sources_snapshot.files).intersection(origin.resolved_files)
-    return SnapshotSubset(sources_snapshot.digest, PathGlobs(sorted(precise_files_specified)))
+    return DigestSubset(sources_snapshot.digest, PathGlobs(sorted(precise_files_specified)))
 
 
 @rule
@@ -142,7 +142,7 @@ async def determine_specified_source_files(request: SpecifiedSourceFilesRequest)
     )
 
     full_snapshots = {}
-    snapshot_subset_requests = {}
+    digest_subset_requests = {}
     for hydrated_sources, sources_field_with_origin in zip(
         all_hydrated_sources, request.sources_fields_with_origins
     ):
@@ -153,17 +153,17 @@ async def determine_specified_source_files(request: SpecifiedSourceFilesRequest)
         if isinstance(specified_sources, Snapshot):
             full_snapshots[sources_field] = specified_sources
         else:
-            snapshot_subset_requests[sources_field] = specified_sources
+            digest_subset_requests[sources_field] = specified_sources
 
     snapshot_subsets: Tuple[Snapshot, ...] = ()
-    if snapshot_subset_requests:
+    if digest_subset_requests:
         snapshot_subsets = await MultiGet(
-            Get(Snapshot, SnapshotSubset, request) for request in snapshot_subset_requests.values()
+            Get(Snapshot, DigestSubset, request) for request in digest_subset_requests.values()
         )
 
     all_snapshots: Iterable[Snapshot] = (*full_snapshots.values(), *snapshot_subsets)
     if request.strip_source_roots:
-        all_sources_fields = (*full_snapshots.keys(), *snapshot_subset_requests.keys())
+        all_sources_fields = (*full_snapshots.keys(), *digest_subset_requests.keys())
         stripped_snapshots = await MultiGet(
             Get(
                 SourceRootStrippedSources,

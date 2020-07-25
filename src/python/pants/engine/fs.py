@@ -173,12 +173,12 @@ class Snapshot:
 
 
 @dataclass(frozen=True)
-class SnapshotSubset:
-    """A request to get a subset of a directory digest.
+class DigestSubset:
+    """A request to get a subset of a digest.
 
     Example:
 
-        result = await Get(Snapshot, DigestSubset(original_digest, PathGlobs(["subdir1", "f.txt"]))
+        result = await Get(Digest, DigestSubset(original_digest, PathGlobs(["subdir1", "f.txt"]))
     """
 
     digest: Digest
@@ -286,5 +286,5 @@ def create_fs_rules():
         RootRule(RemovePrefix),
         RootRule(AddPrefix),
         RootRule(UrlToFetch),
-        RootRule(SnapshotSubset),
+        RootRule(DigestSubset),
     ]

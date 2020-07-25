@@ -21,13 +21,13 @@ from pants.engine.fs import (
     CreateDigest,
     Digest,
     DigestContents,
+    DigestSubset,
     FileContent,
     MergeDigests,
     PathGlobs,
     PathGlobsAndRoot,
     RemovePrefix,
     Snapshot,
-    SnapshotSubset,
     UrlToFetch,
 )
 from pants.engine.interactive_process import InteractiveProcess, InteractiveProcessResult
@@ -148,7 +148,7 @@ class Scheduler:
             bytes=bytes,
             interactive_process=InteractiveProcess,
             interactive_process_result=InteractiveProcessResult,
-            snapshot_subset=SnapshotSubset,
+            digest_subset=DigestSubset,
         )
 
         self._scheduler = native.new_scheduler(

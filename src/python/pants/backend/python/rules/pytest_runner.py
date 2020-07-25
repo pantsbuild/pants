@@ -35,7 +35,7 @@ from pants.backend.python.target_types import (
 from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestOptions, TestResult
 from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.engine.addresses import Addresses
-from pants.engine.fs import AddPrefix, Digest, MergeDigests, PathGlobs, Snapshot, SnapshotSubset
+from pants.engine.fs import AddPrefix, Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
 from pants.engine.interactive_process import InteractiveProcess
 from pants.engine.internals.uuid import UUIDRequest
 from pants.engine.process import FallibleProcessResult, Process
@@ -276,7 +276,7 @@ async def run_python_test(
     coverage_data = None
     if use_coverage:
         coverage_snapshot = await Get(
-            Snapshot, SnapshotSubset(result.output_digest, PathGlobs([".coverage"]))
+            Snapshot, DigestSubset(result.output_digest, PathGlobs([".coverage"]))
         )
         if coverage_snapshot.files == (".coverage",):
             coverage_data = PytestCoverageData(field_set.address, coverage_snapshot.digest)
@@ -286,7 +286,7 @@ async def run_python_test(
     xml_results_digest = None
     if test_results_file:
         xml_results_snapshot = await Get(
-            Snapshot, SnapshotSubset(result.output_digest, PathGlobs([test_results_file]))
+            Snapshot, DigestSubset(result.output_digest, PathGlobs([test_results_file]))
         )
         if xml_results_snapshot.files == (test_results_file,):
             xml_results_digest = await Get(

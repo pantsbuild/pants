@@ -26,5 +26,5 @@ pub struct Types {
   pub bytes: TypeId,
   pub interactive_process: TypeId,
   pub interactive_process_result: TypeId,
-  pub snapshot_subset: TypeId,
+  pub digest_subset: TypeId,
 }

@@ -41,12 +41,11 @@ from pants.engine.fs import (
     CreateDigest,
     Digest,
     DigestContents,
+    DigestSubset,
     FileContent,
     MergeDigests,
     PathGlobs,
     RemovePrefix,
-    Snapshot,
-    SnapshotSubset,
     Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
@@ -485,10 +484,9 @@ async def get_sources(request: SetupPySourcesRequest) -> SetupPySources:
     sources_digest = await Get(
         Digest, MergeDigests((*stripped_srcs_digests, *ancestor_init_pys.digests))
     )
-    init_pys_snapshot = await Get(
-        Snapshot, SnapshotSubset(sources_digest, PathGlobs(["**/__init__.py"]))
+    init_py_digest_contents = await Get(
+        DigestContents, DigestSubset(sources_digest, PathGlobs(["**/__init__.py"]))
     )
-    init_py_digest_contents = await Get(DigestContents, Digest, init_pys_snapshot.digest)
 
     packages, namespace_packages, package_data = find_packages(
         tgts_and_stripped_srcs=list(zip(targets, stripped_srcs_list)),

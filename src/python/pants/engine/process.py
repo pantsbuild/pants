@@ -64,7 +64,7 @@ class Process:
         Often, you will want to capture the files/directories created in the process. To do this, you
         can either set `output_files` or `output_directories`. The specified paths will then be used to
         populate `output_digest` on the `ProcessResult`. If you want to split up this output digest
-        into multiple digests, use `await Get(Snapshot, SnapshotSubset)` on the `output_digest`.
+        into multiple digests, use `await Get(Digest, DigestSubset)` on the `output_digest`.
 
         To actually run the process, use `await Get(ProcessResult, Process)` or
         `await Get(FallibleProcessResult, Process)`.

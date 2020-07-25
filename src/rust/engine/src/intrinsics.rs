@@ -98,10 +98,10 @@ impl Intrinsics {
     );
     intrinsics.insert(
       Intrinsic {
-        product: types.snapshot,
-        inputs: vec![types.snapshot_subset],
+        product: types.directory_digest,
+        inputs: vec![types.digest_subset],
       },
-      Box::new(snapshot_subset_to_snapshot),
+      Box::new(digest_subset_to_digest),
     );
     Intrinsics { intrinsics }
   }
@@ -352,7 +352,7 @@ fn create_digest_to_digest(
   .boxed()
 }
 
-fn snapshot_subset_to_snapshot(
+fn digest_subset_to_digest(
   context: Context,
   args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
@@ -368,11 +368,9 @@ fn snapshot_subset_to_snapshot(
       .subset(original_digest, subset_params)
       .await
       .map_err(|e| format!("{:?}", e))?;
-    let snapshot = store::Snapshot::from_digest(store, digest)
-      .await
-      .map_err(|e| format!("{:?}", e))?;
 
-    Ok(Snapshot::store_snapshot(&context.core, &snapshot)?)
+    let res: Result<_, String> = Ok(Snapshot::store_directory(&context.core, &digest));
+    res
   }
   .map_err(|err: String| throw(&err))
   .boxed()
