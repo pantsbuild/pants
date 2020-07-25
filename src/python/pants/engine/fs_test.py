@@ -110,9 +110,9 @@ class FSTest(TestBase, SchedulerTestBase):
     def test_walk_literal_directory(self) -> None:
         self.assert_walk_dirs(["c.ln"], ["c.ln"])
         self.assert_walk_dirs(["a"], ["a"])
-        self.assert_walk_dirs(["a/b"], ["a/b"])
+        self.assert_walk_dirs(["a/b"], ["a", "a/b"])
         self.assert_walk_dirs(["z"], [])
-        self.assert_walk_dirs(["4.txt", "a/3.txt"], [])
+        self.assert_walk_dirs(["4.txt", "a/3.txt"], ["a"])
 
     def test_walk_siblings(self) -> None:
         self.assert_walk_files(["*.txt"], ["4.txt"])
@@ -216,7 +216,7 @@ class FSTest(TestBase, SchedulerTestBase):
         self.assert_walk_files(
             ["d.ln/**"], ["d.ln/3.txt", "d.ln/4.txt.ln", "d.ln/b/1.txt", "d.ln/b/2"]
         )
-        self.assert_walk_dirs(["a/**"], ["a/b"])
+        self.assert_walk_dirs(["a/**"], ["a", "a/b"])
 
     def test_walk_recursive_slash_doublestar_slash(self) -> None:
         self.assert_walk_files(["a/**/3.txt"], ["a/3.txt"])
@@ -225,9 +225,9 @@ class FSTest(TestBase, SchedulerTestBase):
 
     def test_walk_recursive_directory(self) -> None:
         self.assert_walk_dirs(["*"], ["a", "c.ln", "d.ln"])
-        self.assert_walk_dirs(["*/*"], ["a/b", "d.ln/b"])
+        self.assert_walk_dirs(["*/*"], ["a", "a/b", "c.ln", "d.ln", "d.ln/b"])
         self.assert_walk_dirs(["**/*"], ["a", "c.ln", "d.ln", "a/b", "d.ln/b"])
-        self.assert_walk_dirs(["*/*/*"], [])
+        self.assert_walk_dirs(["*/*/*"], ["a", "a/b", "d.ln", "d.ln/b"])
 
     def test_remove_duplicates(self) -> None:
         self.assert_walk_files(
