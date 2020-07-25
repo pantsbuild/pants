@@ -13,7 +13,7 @@ from pants.core.util_rules.filter_empty_sources import (
 )
 from pants.engine.collection import Collection
 from pants.engine.console import Console
-from pants.engine.fs import Digest, DirectoryToMaterialize, Workspace
+from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import goal_rule
@@ -60,11 +60,7 @@ class LintResult:
         if not self.results_file:
             return
         output_path = self.results_file.output_path
-        workspace.materialize_directory(
-            DirectoryToMaterialize(
-                self.results_file.digest, path_prefix=output_path.parent.as_posix(),
-            )
-        )
+        workspace.write_digest(self.results_file.digest, path_prefix=output_path.parent.as_posix())
         console.print_stdout(f"Wrote {self.linter_name} report to: {output_path.as_posix()}")
 
 

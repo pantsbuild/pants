@@ -27,7 +27,7 @@ from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSourcesRequest,
 )
 from pants.engine.addresses import Address
-from pants.engine.fs import CreateDigest, Digest, FileContent, Workspace
+from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, MergeDigests, Workspace
 from pants.engine.interactive_process import InteractiveProcess, InteractiveRunner
 from pants.engine.target import (
     Sources,
@@ -202,6 +202,10 @@ class TestTest(TestBase):
                     mock=lambda field_sets: FieldSetsWithSources(
                         field_sets if include_sources else ()
                     ),
+                ),
+                # Merge XML results.
+                MockGet(
+                    product_type=Digest, subject_type=MergeDigests, mock=lambda _: EMPTY_DIGEST,
                 ),
                 MockGet(
                     product_type=CoverageReports,

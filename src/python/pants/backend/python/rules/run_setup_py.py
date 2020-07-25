@@ -41,7 +41,6 @@ from pants.engine.fs import (
     CreateDigest,
     Digest,
     DigestContents,
-    DirectoryToMaterialize,
     FileContent,
     MergeDigests,
     PathGlobs,
@@ -334,9 +333,7 @@ async def run_setup_pys(
         for exported_target, setup_py_result in zip(exported_targets, setup_py_results):
             addr = exported_target.target.address.reference()
             console.print_stderr(f"Writing dist for {addr} under {distdir.relpath}/.")
-            workspace.materialize_directory(
-                DirectoryToMaterialize(setup_py_result.output, path_prefix=str(distdir.relpath))
-            )
+            workspace.write_digest(setup_py_result.output, path_prefix=str(distdir.relpath))
     else:
         # Just dump the chroot.
         for exported_target, chroot in zip(exported_targets, chroots):
@@ -344,9 +341,7 @@ async def run_setup_pys(
             provides = exported_target.provides
             setup_py_dir = distdir.relpath / f"{provides.name}-{provides.version}"
             console.print_stderr(f"Writing setup.py chroot for {addr} to {setup_py_dir}")
-            workspace.materialize_directory(
-                DirectoryToMaterialize(chroot.digest, path_prefix=str(setup_py_dir))
-            )
+            workspace.write_digest(chroot.digest, path_prefix=str(setup_py_dir))
 
     return SetupPy(0)
 

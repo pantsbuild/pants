@@ -8,8 +8,6 @@ pub struct Types {
   pub snapshot: TypeId,
   pub file_content: TypeId,
   pub digest_contents: TypeId,
-  pub materialize_directories_results: TypeId,
-  pub materialize_directory_result: TypeId,
   pub address: TypeId,
   pub path_globs: TypeId,
   pub merge_digests: TypeId,
