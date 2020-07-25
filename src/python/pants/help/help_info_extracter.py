@@ -311,7 +311,7 @@ class HelpInfoExtracter:
         if removal_version:
             deprecated_tense = deprecated.get_deprecated_tense(removal_version)
             deprecated_message = (
-                f"DEPRECATED. {deprecated_tense} removed in version: {removal_version}"
+                f"Deprecated, {deprecated_tense} removed in version: {removal_version}."
             )
         removal_hint = kwargs.get("removal_hint")
         choices = self.compute_choices(kwargs)

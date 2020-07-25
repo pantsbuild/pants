@@ -240,7 +240,7 @@ class ReferenceGenerator:
     def _render_parent_page_body(cls, items: Iterable[str], sync: bool) -> str:
         """Returns the body of a parent page for the given items."""
         # The page just lists the items, with links to the page for each one.
-        lines = [f"**[{item}]({cls._link(item, sync)})**\n" for item in items]
+        lines = [f"- [{item}]({cls._link(item, sync)})\n" for item in items]
         return "\n".join(lines)
 
     def render(self):
