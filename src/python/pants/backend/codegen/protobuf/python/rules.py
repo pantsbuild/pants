@@ -6,14 +6,16 @@ from pants.backend.codegen.protobuf.target_types import ProtobufSources
 from pants.backend.python.target_types import PythonSources
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
+from pants.core.util_rules.strip_source_roots import representative_path_from_address
 from pants.engine.addresses import Addresses
-from pants.engine.fs import Digest, MergeDigests, RemovePrefix, Snapshot
+from pants.engine.fs import AddPrefix, Digest, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import GeneratedSources, GenerateSourcesRequest, Sources, TransitiveTargets
 from pants.engine.unions import UnionRule
+from pants.source.source_root import SourceRoot, SourceRootRequest
 
 
 class GeneratePythonFromProtobufRequest(GenerateSourcesRequest):
@@ -96,8 +98,25 @@ async def generate_python_from_protobuf(
             output_directories=(output_dir,),
         ),
     )
-    normalized_snapshot = await Get(Snapshot, RemovePrefix(result.output_digest, output_dir))
-    return GeneratedSources(normalized_snapshot)
+
+    # We must do some path manipulation on the output digest for it to look like normal sources,
+    # including adding back the original source root.
+    normalized_digest, source_root = await MultiGet(
+        Get(Digest, RemovePrefix(result.output_digest, output_dir)),
+        Get(
+            SourceRoot,
+            SourceRootRequest,
+            SourceRootRequest.for_file(
+                representative_path_from_address(request.protocol_target.address)
+            ),
+        ),
+    )
+    source_root_restored = (
+        await Get(Snapshot, AddPrefix(normalized_digest, source_root.path))
+        if source_root.path != "."
+        else await Get(Snapshot, Digest, normalized_digest)
+    )
+    return GeneratedSources(source_root_restored)
 
 
 def rules():
