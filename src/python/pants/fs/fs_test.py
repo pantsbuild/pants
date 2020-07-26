@@ -19,12 +19,12 @@ class MessageToGoalRule:
     create_digest: CreateDigest
 
 
-class MockWorkspaceGoalOptions(GoalSubsystem):
+class MockWorkspaceGoalSubsystem(GoalSubsystem):
     name = "mock-workspace-goal"
 
 
 class MockWorkspaceGoal(Goal):
-    subsystem_cls = MockWorkspaceGoalOptions
+    subsystem_cls = MockWorkspaceGoalSubsystem
 
 
 @goal_rule

@@ -9,8 +9,8 @@ from typing import ClassVar, Iterable, List, Optional, Type, cast
 from pants.base.specs import SingleAddress
 from pants.core.goals.fmt import (
     Fmt,
-    FmtOptions,
     FmtResult,
+    FmtSubsystem,
     LanguageFmtResults,
     LanguageFmtTargets,
     fmt,
@@ -139,7 +139,7 @@ class FmtTest(TestBase):
             rule_args=[
                 console,
                 TargetsWithOrigins(targets),
-                create_goal_subsystem(FmtOptions, per_target_caching=per_target_caching),
+                create_goal_subsystem(FmtSubsystem, per_target_caching=per_target_caching),
                 Workspace(self.scheduler),
                 union_membership,
             ],

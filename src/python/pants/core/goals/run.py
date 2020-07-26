@@ -43,7 +43,7 @@ class RunRequest:
         self.env = FrozenDict(env or {})
 
 
-class RunOptions(GoalSubsystem):
+class RunSubsystem(GoalSubsystem):
     """Runs a binary target.
 
     This goal propagates the return code of the underlying executable. Run `echo $?` to inspect the
@@ -67,14 +67,18 @@ class RunOptions(GoalSubsystem):
             '`--run-args="val1 val2 --debug"`',
         )
 
+    @property
+    def args(self) -> Tuple[str, ...]:
+        return tuple(self.options.args)
+
 
 class Run(Goal):
-    subsystem_cls = RunOptions
+    subsystem_cls = RunSubsystem
 
 
 @goal_rule
 async def run(
-    options: RunOptions,
+    run_subsystem: RunSubsystem,
     global_options: GlobalOptions,
     console: Console,
     interactive_runner: InteractiveRunner,
@@ -85,7 +89,7 @@ async def run(
         TargetsToValidFieldSets,
         TargetsToValidFieldSetsRequest(
             BinaryFieldSet,
-            goal_description=f"the `{options.name}` goal",
+            goal_description="the `run` goal",
             error_if_no_valid_targets=True,
             expect_single_field_set=True,
         ),
@@ -93,14 +97,13 @@ async def run(
     field_set = targets_to_valid_field_sets.field_sets[0]
     request = await Get(RunRequest, BinaryFieldSet, field_set)
 
-    workdir = global_options.options.pants_workdir
-    with temporary_dir(root_dir=workdir, cleanup=True) as tmpdir:
+    with temporary_dir(root_dir=global_options.options.pants_workdir, cleanup=True) as tmpdir:
         tmpdir_relative_path = PurePath(tmpdir).relative_to(build_root.path).as_posix()
         workspace.write_digest(request.digest, path_prefix=tmpdir_relative_path)
 
         exe_path = PurePath(tmpdir, request.binary_name).as_posix()
         process = InteractiveProcess(
-            argv=(exe_path, *request.prefix_args, *options.values.args),
+            argv=(exe_path, *request.prefix_args, *run_subsystem.args),
             env=request.env,
             run_in_workspace=True,
         )

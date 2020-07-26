@@ -20,7 +20,7 @@ from pants.backend.python.subsystems import python_native_code, subprocess_envir
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary, PythonTests
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.core.goals.test import Status, TestDebugRequest, TestOptions, TestResult
+from pants.core.goals.test import Status, TestDebugRequest, TestResult, TestSubsystem
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, FileContent
@@ -134,7 +134,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
             *python_native_code.rules(),
             *strip_source_roots.rules(),
             *subprocess_environment.rules(),
-            SubsystemRule(TestOptions),
+            SubsystemRule(TestSubsystem),
             RootRule(PythonTestFieldSet),
         )
 
