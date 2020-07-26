@@ -314,7 +314,7 @@ fn create_digest_to_digest(
   context: Context,
   args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
-  let file_values = externs::project_multi(&args[0], "dependencies");
+  let file_values = externs::project_iterable(&args[0]);
   let digests: Vec<_> = file_values
     .iter()
     .map(|file| {
