@@ -3,7 +3,7 @@
 
 import itertools
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import PurePath
 from typing import Iterable, Optional, cast
 
 from pants.core.goals.style_request import StyleRequest
@@ -25,7 +25,7 @@ from pants.util.strutil import strip_v2_chroot_path
 
 @dataclass(frozen=True)
 class LintResultFile:
-    output_path: Path
+    output_path: PurePath
     digest: Digest
 
 
@@ -120,9 +120,9 @@ class LintSubsystem(GoalSubsystem):
         return cast(bool, self.options.per_target_caching)
 
     @property
-    def output_dir(self) -> Optional[Path]:
-        reports_dir = self.options.reports_dir
-        return Path(reports_dir) if reports_dir else None
+    def reports_dir(self) -> Optional[PurePath]:
+        v = self.options.reports_dir
+        return PurePath(v) if v else None
 
 
 class Lint(Goal):
