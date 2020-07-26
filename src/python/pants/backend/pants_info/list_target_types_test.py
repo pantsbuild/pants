@@ -8,13 +8,7 @@ from typing import Optional, cast
 from pants.backend.pants_info.list_target_types import TargetTypesSubsystem, list_target_types
 from pants.engine.target import BoolField, IntField, RegisteredTargetTypes, StringField, Target
 from pants.engine.unions import UnionMembership
-from pants.option.global_options import GlobalOptions
-from pants.testutil.engine.util import (
-    MockConsole,
-    create_goal_subsystem,
-    create_subsystem,
-    run_rule,
-)
+from pants.testutil.engine.util import MockConsole, create_goal_subsystem, run_rule
 
 
 # Note no docstring.
@@ -86,7 +80,6 @@ def run_goal(
             create_goal_subsystem(
                 TargetTypesSubsystem, sep="\\n", output_file=None, details=details_target
             ),
-            create_subsystem(GlobalOptions, v1=False),
             console,
         ],
     )
