@@ -572,7 +572,8 @@ class GlobalOptions(Subsystem):
             "--print-exception-stacktrace",
             advanced=True,
             type=bool,
-            fingerprint=False,
+            default=False,
+            daemon=True,
             help="Print to console the full exception stack trace if encountered.",
         )
 
