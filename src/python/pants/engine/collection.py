@@ -19,6 +19,8 @@ class Collection(Tuple[T, ...]):
 
         class Examples(Collection[Example]):
             pass
+
+    N.B: Collection instances are only considered equal if both their types and contents are equal.
     """
 
     @overload  # noqa: F811
@@ -36,9 +38,7 @@ class Collection(Tuple[T, ...]):
         return self.__class__(cast(Tuple[T, ...], result))
 
     def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, self.__class__):
-            return NotImplemented
-        return super().__eq__(other)
+        return type(self) == type(other) and super().__eq__(other)
 
     def __ne__(self, other: Any) -> bool:
         # We must explicitly override to provide the inverse of _our_ __eq__ and not get the
