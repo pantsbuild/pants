@@ -261,7 +261,7 @@ class Parser:
                 continue
 
             self._validate(args, kwargs)
-            name, dest = self.parse_name_and_dest(*args, **kwargs)
+            dest = self.parse_dest(*args, **kwargs)
 
             # Compute the values provided on the command line for this option.  Note that there may be
             # multiple values, for any combination of the following reasons:
@@ -323,7 +323,7 @@ class Parser:
 
             # If the option is explicitly given, check deprecation and mutual exclusion.
             if val.rank > Rank.HARDCODED:
-                self._check_deprecated(name, kwargs)
+                self._check_deprecated(dest, kwargs)
 
                 mutex_dest = kwargs.get("mutually_exclusive_group")
                 if mutex_dest:
@@ -460,7 +460,7 @@ class Parser:
 
         def normalize_kwargs(orig_args, orig_kwargs):
             nkwargs = copy.copy(orig_kwargs)
-            _, dest = self.parse_name_and_dest(*orig_args, **nkwargs)
+            dest = self.parse_dest(*orig_args, **nkwargs)
             nkwargs["dest"] = dest
             if not ("default" in nkwargs and isinstance(nkwargs["default"], RankedValue)):
                 type_arg = nkwargs.get("type", str)
@@ -523,8 +523,8 @@ class Parser:
     def register(self, *args, **kwargs) -> None:
         """Register an option."""
         if args:
-            name, dest = self.parse_name_and_dest(*args, **kwargs)
-            self._check_deprecated(name, kwargs, print_warning=False)
+            dest = self.parse_dest(*args, **kwargs)
+            self._check_deprecated(dest, kwargs, print_warning=False)
 
         if kwargs.get("type") == bool:
             default = kwargs.get("default")
@@ -552,13 +552,13 @@ class Parser:
                 raise OptionAlreadyRegistered(self.scope, arg)
         self._known_args.update(args)
 
-    def _check_deprecated(self, name: str, kwargs, print_warning: bool = True) -> None:
+    def _check_deprecated(self, dest: str, kwargs, print_warning: bool = True) -> None:
         """Checks option for deprecation and issues a warning/error if necessary."""
         removal_version = kwargs.get("removal_version", None)
         if removal_version is not None:
             warn_or_error(
                 removal_version=removal_version,
-                deprecated_entity_description=f"option '{name}' in {self._scope_str()}",
+                deprecated_entity_description=f"option '{dest}' in {self._scope_str()}",
                 deprecation_start_version=kwargs.get("deprecation_start_version", None),
                 hint=kwargs.get("removal_hint", None),
                 stacklevel=9999,  # Out of range stacklevel to suppress printing src line.
@@ -666,17 +666,24 @@ class Parser:
     _ENV_SANITIZER_RE = re.compile(r"[.-]")
 
     @staticmethod
-    def parse_name_and_dest(*args, **kwargs):
-        """Return the name and dest for an option registration.
+    def parse_dest(*args, **kwargs):
+        """Return the dest for an option registration.
 
         If an explicit `dest` is specified, returns that and otherwise derives a default from the
         option flags where '--foo-bar' -> 'foo_bar' and '-x' -> 'x'.
-        """
-        arg = next((a for a in args if a.startswith("--")), args[0])
-        name = arg.lstrip("-").replace("-", "_")
 
+        The dest is used for:
+          - The name of the field containing the option value.
+          - The key in the config file.
+          - Computing the name of the env var used to set the option name.
+        """
         dest = kwargs.get("dest")
-        return name, dest if dest else name
+        if dest:
+            return dest
+        # No explicit dest, so compute one based on the first long arg, or the short arg
+        # if that's all there is.
+        arg = next((a for a in args if a.startswith("--")), args[0])
+        return arg.lstrip("-").replace("-", "_")
 
     @staticmethod
     def _convert_member_type(member_type, value):
@@ -704,6 +711,25 @@ class Parser:
                 f"Error applying type '{type_arg.__name__}' to option value '{val_str}', "
                 f"for option '--{dest}' in {self._scope_str()}: {e}"
             )
+
+    @classmethod
+    def get_env_var_names(cls, scope: str, dest: str):
+        # Get value from environment, and capture details about its derivation.
+        udest = dest.upper()
+        if scope == GLOBAL_SCOPE:
+            # For convenience, we allow three forms of env var for global scope options.
+            # The fully-specified env var is PANTS_GLOBAL_FOO, which is uniform with PANTS_<SCOPE>_FOO
+            # for all the other scopes.  However we also allow simply PANTS_FOO. And if the option name
+            # itself starts with 'pants-' then we also allow simply FOO. E.g., PANTS_WORKDIR instead of
+            # PANTS_PANTS_WORKDIR or PANTS_GLOBAL_PANTS_WORKDIR. We take the first specified value we
+            # find, in this order: PANTS_GLOBAL_FOO, PANTS_FOO, FOO.
+            env_vars = [f"PANTS_GLOBAL_{udest}", f"PANTS_{udest}"]
+            if udest.startswith("PANTS_"):
+                env_vars.append(udest)
+        else:
+            sanitized_env_var_scope = cls._ENV_SANITIZER_RE.sub("_", scope.upper())
+            env_vars = [f"PANTS_{sanitized_env_var_scope}_{udest}"]
+        return env_vars
 
     def _compute_value(self, dest, kwargs, flag_val_strs):
         """Compute the value to use for an option.
@@ -759,21 +785,7 @@ class Parser:
             config_details = f"from {config_source_file}"
 
         # Get value from environment, and capture details about its derivation.
-        udest = dest.upper()
-        if self._scope == GLOBAL_SCOPE:
-            # For convenience, we allow three forms of env var for global scope options.
-            # The fully-specified env var is PANTS_GLOBAL_FOO, which is uniform with PANTS_<SCOPE>_FOO
-            # for all the other scopes.  However we also allow simply PANTS_FOO. And if the option name
-            # itself starts with 'pants-' then we also allow simply FOO. E.g., PANTS_WORKDIR instead of
-            # PANTS_PANTS_WORKDIR or PANTS_GLOBAL_PANTS_WORKDIR. We take the first specified value we
-            # find, in this order: PANTS_GLOBAL_FOO, PANTS_FOO, FOO.
-            env_vars = [f"PANTS_GLOBAL_{udest}", f"PANTS_{udest}"]
-            if udest.startswith("PANTS_"):
-                env_vars.append(udest)
-        else:
-            sanitized_env_var_scope = self._ENV_SANITIZER_RE.sub("_", self._scope.upper())
-            env_vars = [f"PANTS_{sanitized_env_var_scope}_{udest}"]
-
+        env_vars = self.get_env_var_names(self._scope, dest)
         env_val_or_str = None
         env_details = None
         if self._env:
