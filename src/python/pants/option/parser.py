@@ -23,7 +23,6 @@ from typing import (
     Mapping,
     NoReturn,
     Optional,
-    Protocol,
     Sequence,
     Set,
     Tuple,
@@ -33,6 +32,7 @@ from typing import (
 
 import Levenshtein
 import yaml
+from typing_extensions import Protocol
 
 from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import validate_deprecation_semver, warn_or_error
