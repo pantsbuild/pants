@@ -234,9 +234,16 @@ class AddPrefix:
 
 
 @dataclass(frozen=True)
-class UrlToFetch:
+class DownloadFile:
+    """Download an asset via a GET request.
+
+    To compute the `expected_digest`, manually download the file, then run `shasum -a 256` to
+    compute the fingerprint and `wc -c` to compute the expected length of the downloaded file in
+    bytes.
+    """
+
     url: str
-    digest: Digest
+    expected_digest: Digest
 
 
 @side_effecting
@@ -281,6 +288,6 @@ def create_fs_rules():
         RootRule(PathGlobs),
         RootRule(RemovePrefix),
         RootRule(AddPrefix),
-        RootRule(UrlToFetch),
+        RootRule(DownloadFile),
         RootRule(DigestSubset),
     ]

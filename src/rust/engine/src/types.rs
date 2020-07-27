@@ -21,7 +21,7 @@ pub struct Types {
   pub multi_platform_process: TypeId,
   pub process_result: TypeId,
   pub coroutine: TypeId,
-  pub url_to_fetch: TypeId,
+  pub download_file: TypeId,
   pub string: TypeId,
   pub bytes: TypeId,
   pub interactive_process: TypeId,

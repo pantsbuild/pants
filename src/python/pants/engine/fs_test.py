@@ -22,13 +22,13 @@ from pants.engine.fs import (
     Digest,
     DigestContents,
     DigestSubset,
+    DownloadFile,
     FileContent,
     MergeDigests,
     PathGlobs,
     PathGlobsAndRoot,
     RemovePrefix,
     Snapshot,
-    UrlToFetch,
     create_fs_rules,
 )
 from pants.engine.internals.scheduler import ExecutionError
@@ -591,10 +591,12 @@ class FSTest(TestBase, SchedulerTestBase):
     def test_download(self) -> None:
         with self.isolated_local_store():
             with http_server(StubHandler) as port:
-                url = UrlToFetch(
-                    f"http://localhost:{port}/do_not_remove_or_edit.txt", self.pantsbuild_digest
+                snapshot = self.request_single_product(
+                    Snapshot,
+                    DownloadFile(
+                        f"http://localhost:{port}/do_not_remove_or_edit.txt", self.pantsbuild_digest
+                    ),
                 )
-                snapshot = self.request_single_product(Snapshot, url)
                 self.assert_snapshot_equals(
                     snapshot,
                     ["do_not_remove_or_edit.txt"],
@@ -604,33 +606,39 @@ class FSTest(TestBase, SchedulerTestBase):
     def test_download_missing_file(self) -> None:
         with self.isolated_local_store():
             with http_server(StubHandler) as port:
-                url = UrlToFetch(f"http://localhost:{port}/notfound", self.pantsbuild_digest)
                 with self.assertRaises(ExecutionError) as cm:
-                    self.request_single_product(Snapshot, url)
+                    self.request_single_product(
+                        Snapshot,
+                        DownloadFile(f"http://localhost:{port}/notfound", self.pantsbuild_digest),
+                    )
                 assert "404" in str(cm.exception)
 
     def test_download_wrong_digest(self) -> None:
         with self.isolated_local_store():
             with http_server(StubHandler) as port:
-                url = UrlToFetch(
-                    f"http://localhost:{port}/do_not_remove_or_edit.txt",
-                    Digest(
-                        self.pantsbuild_digest.fingerprint,
-                        self.pantsbuild_digest.serialized_bytes_length + 1,
-                    ),
-                )
                 with self.assertRaises(ExecutionError) as cm:
-                    self.request_single_product(Snapshot, url)
+                    self.request_single_product(
+                        Snapshot,
+                        DownloadFile(
+                            f"http://localhost:{port}/do_not_remove_or_edit.txt",
+                            Digest(
+                                self.pantsbuild_digest.fingerprint,
+                                self.pantsbuild_digest.serialized_bytes_length + 1,
+                            ),
+                        ),
+                    )
                 assert "wrong digest" in str(cm.exception).lower()
 
     # It's a shame that this isn't hermetic, but setting up valid local HTTPS certificates is a pain.
     def test_download_https(self) -> None:
         with self.isolated_local_store():
-            url = UrlToFetch(
-                "https://binaries.pantsbuild.org/do_not_remove_or_edit.txt",
-                Digest("f461fc99bcbe18e667687cf672c2dc68dc5c5db77c5bd426c9690e5c9cec4e3b", 184,),
+            snapshot = self.request_single_product(
+                Snapshot,
+                DownloadFile(
+                    "https://binaries.pantsbuild.org/do_not_remove_or_edit.txt",
+                    Digest("f461fc99bcbe18e667687cf672c2dc68dc5c5db77c5bd426c9690e5c9cec4e3b", 184),
+                ),
             )
-            snapshot = self.request_single_product(Snapshot, url)
             self.assert_snapshot_equals(
                 snapshot,
                 ["do_not_remove_or_edit.txt"],
@@ -645,7 +653,7 @@ class FSTest(TestBase, SchedulerTestBase):
                 # This would error if we hit the HTTP server, because 404,
                 # but we're not going to hit the HTTP server because it's cached,
                 # so we shouldn't see an error...
-                url = UrlToFetch(
+                url = DownloadFile(
                     f"http://localhost:{port}/roland",
                     Digest("693d8db7b05e99c6b7a7c0616456039d89c555029026936248085193559a0b5d", 16),
                 )

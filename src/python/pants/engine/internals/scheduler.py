@@ -22,13 +22,13 @@ from pants.engine.fs import (
     Digest,
     DigestContents,
     DigestSubset,
+    DownloadFile,
     FileContent,
     MergeDigests,
     PathGlobs,
     PathGlobsAndRoot,
     RemovePrefix,
     Snapshot,
-    UrlToFetch,
 )
 from pants.engine.interactive_process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.internals.native_engine import PyTypes
@@ -143,7 +143,7 @@ class Scheduler:
             multi_platform_process=MultiPlatformProcess,
             process_result=FallibleProcessResultWithPlatform,
             coroutine=CoroutineType,
-            url_to_fetch=UrlToFetch,
+            download_file=DownloadFile,
             string=str,
             bytes=bytes,
             interactive_process=InteractiveProcess,
