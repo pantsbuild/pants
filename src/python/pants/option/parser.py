@@ -82,6 +82,40 @@ class OptionValueHistory:
         return self.ranked_values[-1]
 
 
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class ScopedFlagNameForFuzzyMatching:
+    """Specify how a registered option would look like on the command line.
+
+    This information enables fuzzy matching to suggest correct option names when a user specifies an
+    unregistered option on the command line.
+
+    scope: the 'scope' component of a command-line flag.
+    arg: the unscoped flag name as it would appear on the command line.
+    normalized_arg: the fully-scoped option name, without any leading dashes.
+    scoped_arg: the fully-scoped option as it would appear on the command line.
+    """
+
+    scope: str
+    arg: str
+    normalized_arg: str
+    scoped_arg: str
+
+    def __init__(self, scope: str, arg: str) -> None:
+        self.scope = scope
+        self.arg = arg
+        self.normalized_arg = re.sub("^-+", "", arg)
+        if scope == GLOBAL_SCOPE:
+            self.scoped_arg = arg
+        else:
+            dashed_scope = scope.replace(".", "-")
+            self.scoped_arg = f"--{dashed_scope}-{self.normalized_arg}"
+
+    @property
+    def normalized_scoped_arg(self):
+        return re.sub(r"^-+", "", self.scoped_arg)
+
+
 class Parser:
     """An argument parser in a hierarchy.
 
@@ -185,7 +219,7 @@ class Parser:
         # N.B.: We use this callable protocol instead of Callable directly to work around the
         # dataclass-specific issue described here: https://github.com/python/mypy/issues/6910
         class FlagNameProvider(Protocol):
-            def __call__(self) -> Iterable:
+            def __call__(self) -> Iterable[ScopedFlagNameForFuzzyMatching]:
                 ...
 
         flag_value_map: Dict[str, List[Any]]
@@ -355,7 +389,10 @@ class Parser:
         return namespace
 
     def _raise_error_for_invalid_flag_names(
-        self, flags: Sequence[str], all_scoped_flag_names: Iterable, max_edit_distance: int,
+        self,
+        flags: Sequence[str],
+        all_scoped_flag_names: Iterable[ScopedFlagNameForFuzzyMatching],
+        max_edit_distance: int,
     ) -> NoReturn:
         """Identify similar option names to unconsumed flags and raise a ParseError with those
         names."""
