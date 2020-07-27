@@ -21,14 +21,19 @@ class Black(PythonToolBase):
             "--skip",
             type=bool,
             default=False,
-            help="Don't use Black when running `./pants fmt` and `./pants lint`",
+            help=(
+                f"Don't use Black when running `{register.bootstrap.pants_bin_name} fmt` and "
+                f"`{register.bootstrap.pants_bin_name} lint`"
+            ),
         )
         register(
             "--args",
             type=list,
             member_type=shell_str,
-            help="Arguments to pass directly to Black, e.g. "
-            '`--black-args="--target-version=py37 --quiet"`',
+            help=(
+                "Arguments to pass directly to Black, e.g. "
+                f'`--{cls.options_scope}-args="--target-version=py37 --quiet"`'
+            ),
         )
         register(
             "--config",
