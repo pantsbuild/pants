@@ -290,7 +290,7 @@ impl Process {
       target_platform: PlatformConstraint::None,
       is_nailgunnable: false,
       execution_slot_variable: None,
-      cache_failures: true,
+      cache_failures: false,
     }
   }
 

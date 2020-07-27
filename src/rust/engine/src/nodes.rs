@@ -1253,11 +1253,17 @@ impl Node for NodeKey {
     .0
   }
 
-  fn cacheable(&self, output: Option<&NodeOutput>) -> bool {
+  fn cacheable(&self) -> bool {
     match self {
       &NodeKey::Task(ref s) => s.task.cacheable,
-      &NodeKey::MultiPlatformExecuteProcess(ref mp) => match output {
-        Some(NodeOutput::ProcessResult(ref process_result)) => {
+      _ => true,
+    }
+  }
+
+  fn cacheable_item(&self, output: &NodeOutput) -> bool {
+    match self {
+      NodeKey::MultiPlatformExecuteProcess(ref mp) => match output {
+        NodeOutput::ProcessResult(ref process_result) => {
           let process_succeeded = process_result.0.exit_code == 0;
           if mp.cache_failures {
             true

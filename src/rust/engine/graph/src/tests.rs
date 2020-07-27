@@ -690,7 +690,7 @@ impl Node for TNode {
     res
   }
 
-  fn cacheable(&self, _: Option<&Vec<T>>) -> bool {
+  fn cacheable(&self) -> bool {
     self.1
   }
 }

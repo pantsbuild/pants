@@ -88,7 +88,7 @@ async fn make_execute_request() {
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
     execution_slot_variable: None,
-    cache_failures: true,
+    cache_failures: false,
   };
 
   let mut want_command = bazel_protos::remote_execution::Command::new();
@@ -173,7 +173,7 @@ async fn make_execute_request_with_instance_name() {
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
     execution_slot_variable: None,
-    cache_failures: true,
+    cache_failures: false,
   };
 
   let mut want_command = bazel_protos::remote_execution::Command::new();
@@ -266,7 +266,7 @@ async fn make_execute_request_with_cache_key_gen_version() {
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
     execution_slot_variable: None,
-    cache_failures: true,
+    cache_failures: false,
   };
 
   let mut want_command = bazel_protos::remote_execution::Command::new();
@@ -513,7 +513,7 @@ async fn make_execute_request_with_timeout() {
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
     execution_slot_variable: None,
-    cache_failures: true,
+    cache_failures: false,
   };
 
   let mut want_command = bazel_protos::remote_execution::Command::new();

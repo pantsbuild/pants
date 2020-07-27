@@ -78,14 +78,6 @@ pub enum EntryResult<N: Node> {
 }
 
 impl<N: Node> EntryResult<N> {
-  fn get_item(&self) -> &N::Item {
-    match self {
-      EntryResult::Clean(ref item) => item,
-      EntryResult::Dirty(ref item) => item,
-      EntryResult::Uncacheable(ref item, _) => item,
-      EntryResult::UncacheableDependencies(ref item) => item,
-    }
-  }
   fn is_clean(&self, context: &N::Context) -> bool {
     match self {
       EntryResult::Clean(..) => true,
@@ -236,6 +228,14 @@ impl<N: Node> Entry<N> {
 
   pub fn node(&self) -> &N {
     &self.node
+  }
+
+  pub(crate) fn cacheable_with_output(&self, output: Option<&N::Item>) -> bool {
+    (if let Some(item) = output {
+      self.node.cacheable_item(item)
+    } else {
+      false
+    }) && self.node.cacheable()
   }
 
   ///
@@ -440,14 +440,13 @@ impl<N: Node> Entry<N> {
           //
           // On the other hand, if the Node is uncacheable, we store the previous result as
           // Uncacheable, which allows its value to be used only within the current Run.
-          let item = result.get_item();
           Self::run(
             context,
             &self.node,
             entry_id,
             run_token,
             generation,
-            if self.node.cacheable(Some(item)) {
+            if self.cacheable_with_output(Some(result.as_ref())) {
               Some(dep_generations)
             } else {
               None
@@ -519,7 +518,7 @@ impl<N: Node> Entry<N> {
             }
           }
           Some(Ok(result)) => {
-            let next_result: EntryResult<N> = if !self.node.cacheable(Some(&result)) {
+            let next_result: EntryResult<N> = if !self.cacheable_with_output(Some(&result)) {
               EntryResult::Uncacheable(result, context.session_id().clone())
             } else if has_weak_deps {
               EntryResult::Dirty(result)
@@ -697,7 +696,7 @@ impl<N: Node> Entry<N> {
         return;
       }
       &mut EntryState::NotStarted { .. } => return,
-      &mut EntryState::Running { .. } if !self.node.cacheable(None) => {
+      &mut EntryState::Running { .. } if !self.node.cacheable() => {
         // An uncacheable node cannot be interrupted.
         return;
       }
