@@ -8,6 +8,7 @@ from dataclasses import asdict
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.internals.nodes import Throw
 from pants.engine.internals.scheduler import Scheduler
+from pants.engine.unions import UnionMembership
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, ExecutionOptions
 from pants.testutil.engine.util import init_native
 from pants.util.contextutil import temporary_file_path
@@ -44,7 +45,6 @@ class SchedulerTestBase:
     def mk_scheduler(
         self,
         rules=None,
-        union_rules=None,
         project_tree=None,
         work_dir=None,
         include_trace_on_error=True,
@@ -71,7 +71,7 @@ class SchedulerTestBase:
             local_execution_root_dir=local_execution_root_dir,
             named_caches_dir=named_caches_dir,
             rules=rules,
-            union_rules=union_rules,
+            union_membership=UnionMembership({}),
             execution_options=execution_options or DEFAULT_EXECUTION_OPTIONS,
             include_trace_on_error=include_trace_on_error,
         )

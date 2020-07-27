@@ -12,7 +12,7 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Type, U
 
 from pants.engine.goal import Goal
 from pants.engine.selectors import GetConstraints
-from pants.engine.unions import UnionRule, union
+from pants.engine.unions import UnionRule
 from pants.option.optionable import Optionable, OptionableFactory
 from pants.util.collections import assert_single_element
 from pants.util.logging import LogLevel
@@ -525,25 +525,19 @@ class RootRule(Rule):
 
 
 @dataclass(frozen=True)
-class NormalizedRules:
-    rules: FrozenOrderedSet
-    union_rules: Dict[Type, OrderedSet[Type]]
-
-
-@dataclass(frozen=True)
 class RuleIndex:
     """Holds a normalized index of Rules used to instantiate Nodes."""
 
-    rules: Dict
-    roots: FrozenOrderedSet
-    union_rules: Dict[Type, OrderedSet[Type]]
+    rules: Dict[Type, OrderedSet[Rule]]
+    roots: FrozenOrderedSet[RootRule]
+    union_rules: FrozenOrderedSet[UnionRule]
 
     @classmethod
-    def create(cls, rule_entries, union_rules=None) -> "RuleIndex":
+    def create(cls, rule_entries) -> "RuleIndex":
         """Creates a RuleIndex with tasks indexed by their output type."""
-        serializable_rules: Dict = {}
-        serializable_roots: OrderedSet = OrderedSet()
-        union_rules = dict(union_rules or ())
+        serializable_rules: Dict[Type, OrderedSet[Rule]] = {}
+        serializable_roots: OrderedSet[RootRule] = OrderedSet()
+        union_rules: OrderedSet[UnionRule] = OrderedSet()
 
         def add_rule(rule: Rule) -> None:
             if isinstance(rule, RootRule):
@@ -556,48 +550,33 @@ class RuleIndex:
             for dep_rule in rule.dependency_rules:
                 add_rule(dep_rule)
 
-        def add_type_transition_rule(union_rule: UnionRule) -> None:
-            # NB: This does not require that union bases be supplied to `def rules():`, as the union type
-            # is never instantiated!
-            union_base = union_rule.union_base
-            assert union.is_instance(union_base)
-            union_member = union_rule.union_member
-            if union_base not in union_rules:
-                union_rules[union_base] = OrderedSet()
-            union_rules[union_base].add(union_member)
-
         for entry in rule_entries:
             if isinstance(entry, Rule):
                 add_rule(entry)
             elif isinstance(entry, UnionRule):
-                add_type_transition_rule(entry)
+                union_rules.add(entry)
             elif hasattr(entry, "__call__"):
                 rule = getattr(entry, "rule", None)
                 if rule is None:
-                    raise TypeError(
-                        "Expected callable {} to be decorated with @rule.".format(entry)
-                    )
+                    raise TypeError(f"Expected function {entry} to be decorated with @rule.")
                 add_rule(rule)
             else:
                 raise TypeError(
-                    """\
-Rule entry {} had an unexpected type: {}. Rules either extend Rule or UnionRule, or are static \
-functions decorated with @rule.""".format(
-                        entry, type(entry)
-                    )
+                    f"Rule entry {entry} had an unexpected type: {type(entry)}. Rules either "
+                    "extend Rule or UnionRule, or are static functions decorated with @rule."
                 )
 
         return RuleIndex(
             rules=serializable_rules,
             roots=FrozenOrderedSet(serializable_roots),
-            union_rules=union_rules,
+            union_rules=FrozenOrderedSet(union_rules),
         )
 
-    def normalized_rules(self) -> NormalizedRules:
+    def normalized_rules(self) -> Tuple[FrozenOrderedSet[Rule], FrozenOrderedSet[UnionRule]]:
         rules = FrozenOrderedSet(
             (
                 *itertools.chain.from_iterable(ruleset for ruleset in self.rules.values()),
                 *self.roots,
             )
         )
-        return NormalizedRules(rules, self.union_rules)
+        return rules, self.union_rules

@@ -39,7 +39,7 @@ from pants.engine.target import (
     generate_subtarget,
     generate_subtarget_address,
 )
-from pants.engine.unions import UnionMembership
+from pants.engine.unions import UnionMembership, UnionRule
 from pants.testutil.engine.util import MockGet, run_rule
 from pants.util.collections import ensure_str_list
 from pants.util.frozendict import FrozenDict
@@ -262,7 +262,9 @@ def test_add_custom_fields() -> None:
         alias = "custom_field"
         default = False
 
-    union_membership = UnionMembership({FortranTarget.PluginField: [CustomField]})
+    union_membership = UnionMembership.from_rules(
+        [UnionRule(FortranTarget.PluginField, CustomField)]
+    )
     tgt_values = {CustomField.alias: True}
     tgt = FortranTarget(
         tgt_values, address=Address.parse(":lib"), union_membership=union_membership
