@@ -164,7 +164,7 @@ pub fn store_bool(val: bool) -> Value {
 ///
 /// Gets an attribute of the given value as the given type.
 ///
-pub fn getattr<T>(value: &Value, field: &str) -> Result<T, String>
+fn getattr<T>(value: &Value, field: &str) -> Result<T, String>
 where
   for<'a> T: FromPyObject<'a>,
 {
@@ -185,10 +185,42 @@ where
 }
 
 ///
+/// Collect the Values contained within an outer Python Iterable Value.
+///
+fn collect_iterable(value: &Value) -> Result<Vec<Value>, String> {
+  let gil = Python::acquire_gil();
+  let py = gil.python();
+  match value.iter(py) {
+    Ok(py_iter) => py_iter
+      .enumerate()
+      .map(|(i, py_res)| {
+        py_res.map(Value::from).map_err(|py_err| {
+          format!(
+            "Could not iterate {}, failed to extract {}th item: {:?}",
+            val_to_str(value),
+            i,
+            py_err
+          )
+        })
+      })
+      .collect(),
+    Err(py_err) => Err(format!(
+      "Could not iterate {}: {:?}",
+      val_to_str(value),
+      py_err
+    )),
+  }
+}
+
+///
 /// Pulls out the value specified by the field name from a given Value
 ///
 pub fn project_ignoring_type(value: &Value, field: &str) -> Value {
   getattr(value, field).unwrap()
+}
+
+pub fn project_iterable(value: &Value) -> Vec<Value> {
+  collect_iterable(value).unwrap()
 }
 
 pub fn project_multi(value: &Value, field: &str) -> Vec<Value> {

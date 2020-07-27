@@ -1339,7 +1339,7 @@ fn capture_snapshots(
   session_ptr: PySession,
   path_globs_and_root_tuple_wrapper: PyObject,
 ) -> CPyResult<PyObject> {
-  let values = externs::project_multi(&path_globs_and_root_tuple_wrapper.into(), "dependencies");
+  let values = externs::project_iterable(&path_globs_and_root_tuple_wrapper.into());
   let path_globs_and_roots = values
     .iter()
     .map(|value| {
@@ -1398,7 +1398,7 @@ fn merge_directories(
   session_ptr: PySession,
   directories_value: PyObject,
 ) -> CPyResult<PyObject> {
-  let digests = externs::project_multi(&directories_value.into(), "dependencies")
+  let digests = externs::project_iterable(&directories_value.into())
     .iter()
     .map(|v| nodes::lift_digest(v))
     .collect::<Result<Vec<_>, _>>()

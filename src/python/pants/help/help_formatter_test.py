@@ -21,6 +21,8 @@ class OptionHelpFormatterTest(unittest.TestCase):
             comma_separated_display_args="--foo",
             scoped_cmd_line_args=("--foo",),
             unscoped_cmd_line_args=("--foo",),
+            env_var="PANTS_FOO",
+            config_key="foo",
             typ=bool,
             default=None,
             default_str="None",
@@ -37,11 +39,11 @@ class OptionHelpFormatterTest(unittest.TestCase):
             show_advanced=False, show_deprecated=False, color=False
         ).format_option(ohi)
         choices = kwargs.get("choices")
-        assert len(lines) == 5 if choices else 4
+        assert len(lines) == 7 if choices else 6
         if choices:
-            assert f"one of: [{', '.join(choices)}]" == lines[1].strip()
-        assert "help for foo" in lines[4 if choices else 3]
-        return lines[2] if choices else lines[1]
+            assert f"one of: [{', '.join(choices)}]" == lines[3].strip()
+        assert "help for foo" in lines[6 if choices else 5]
+        return lines[4] if choices else lines[3]
 
     def test_format_help(self):
         default_line = self._format_for_single_option(default="MYDEFAULT")
@@ -73,16 +75,16 @@ class OptionHelpFormatterTest(unittest.TestCase):
         args = ["--foo"]
         kwargs = {"advanced": True}
         lines = self._format_for_global_scope(False, False, args, kwargs)
-        assert len(lines) == 5
+        assert len(lines) == 7
         assert not any("--foo" in line for line in lines)
         lines = self._format_for_global_scope(True, False, args, kwargs)
-        assert len(lines) == 13
+        assert len(lines) == 17
 
     def test_suppress_deprecated(self):
         args = ["--foo"]
         kwargs = {"removal_version": "33.44.55.dev0"}
         lines = self._format_for_global_scope(False, False, args, kwargs)
-        assert len(lines) == 5
+        assert len(lines) == 7
         assert not any("--foo" in line for line in lines)
         lines = self._format_for_global_scope(True, True, args, kwargs)
-        assert len(lines) == 18
+        assert len(lines) == 22

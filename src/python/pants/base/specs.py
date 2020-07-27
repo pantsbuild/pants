@@ -414,14 +414,12 @@ class FilesystemSpecs(Collection[FilesystemSpec]):
     @memoized_property
     def includes(self) -> Tuple[Union[FilesystemLiteralSpec, FilesystemGlobSpec], ...]:
         return tuple(
-            spec
-            for spec in self.dependencies
-            if isinstance(spec, (FilesystemGlobSpec, FilesystemLiteralSpec))
+            spec for spec in self if isinstance(spec, (FilesystemGlobSpec, FilesystemLiteralSpec))
         )
 
     @memoized_property
     def ignores(self) -> Tuple[FilesystemIgnoreSpec, ...]:
-        return tuple(spec for spec in self.dependencies if isinstance(spec, FilesystemIgnoreSpec))
+        return tuple(spec for spec in self if isinstance(spec, FilesystemIgnoreSpec))
 
     @staticmethod
     def _generate_path_globs(

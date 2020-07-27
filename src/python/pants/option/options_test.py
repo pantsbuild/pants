@@ -744,11 +744,9 @@ class OptionsTest(TestBase):
         options = self._parse(flags="--int-choices=42 --int-choices=99")
         self.assertEqual([42, 99], options.for_global_scope().int_choices)
 
-    def test_parse_name_and_dest(self) -> None:
-        self.assertEqual(("thing", "thing"), Parser.parse_name_and_dest("--thing"))
-        self.assertEqual(
-            ("thing", "other_thing"), Parser.parse_name_and_dest("--thing", dest="other_thing")
-        )
+    def test_parse_dest(self) -> None:
+        self.assertEqual("thing", Parser.parse_dest("--thing"))
+        self.assertEqual("other_thing", Parser.parse_dest("--thing", dest="other_thing"))
 
     def test_validation(self) -> None:
         def assertError(expected_error, *args, **kwargs):
