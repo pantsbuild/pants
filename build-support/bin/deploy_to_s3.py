@@ -49,6 +49,11 @@ def deploy() -> None:
         check=True,
     )
 
+    # Create/update the index file in S3.  After running on both the MacOS and Linux shards
+    # the index file will contain the wheels for both.
+    for sha in os.listdir("dist/deploy/wheels/pantsbuild.pants/"):
+        subprocess.run(["./build-support/bin/create_s3_index_file.sh", sha])
+
 
 if __name__ == "__main__":
     main()
