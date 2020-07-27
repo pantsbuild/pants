@@ -12,7 +12,7 @@ from pants.core.util_rules.strip_source_roots import (
     StripSourcesFieldRequest,
 )
 from pants.engine.addresses import Address
-from pants.engine.rules import rule
+from pants.engine.rules import register_rules, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
     HydratedSources,
@@ -166,8 +166,4 @@ async def map_module_to_address(
 
 
 def rules():
-    return [
-        map_first_party_modules_to_addresses,
-        map_third_party_modules_to_addresses,
-        map_module_to_address,
-    ]
+    return register_rules()

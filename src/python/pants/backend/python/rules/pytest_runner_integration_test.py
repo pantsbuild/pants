@@ -21,12 +21,12 @@ from pants.backend.python.subsystems import python_native_code, subprocess_envir
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary, PythonTests
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.core.goals.test import Status, TestDebugRequest, TestResult, TestSubsystem
+from pants.core.goals.test import Status, TestDebugRequest, TestResult
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, FileContent
 from pants.engine.interactive_process import InteractiveRunner
-from pants.engine.rules import RootRule, SubsystemRule
+from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.engine.target import TargetWithOrigin
 from pants.python.python_requirement import PythonRequirement
@@ -137,7 +137,6 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
             *python_native_code.rules(),
             *strip_source_roots.rules(),
             *subprocess_environment.rules(),
-            SubsystemRule(TestSubsystem),
             RootRule(PythonTestFieldSet),
             # For conftest detection.
             *dependency_inference_rules.rules(),

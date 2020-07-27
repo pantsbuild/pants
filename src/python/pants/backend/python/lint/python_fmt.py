@@ -9,7 +9,7 @@ from pants.core.goals.fmt import FmtResult, LanguageFmtResults, LanguageFmtTarge
 from pants.core.goals.style_request import StyleRequest
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
 from pants.engine.fs import Digest, Snapshot
-from pants.engine.rules import rule
+from pants.engine.rules import register_rules, rule
 from pants.engine.selectors import Get
 from pants.engine.unions import UnionMembership, UnionRule, union
 
@@ -66,4 +66,4 @@ async def format_python_target(
 
 
 def rules():
-    return [format_python_target, UnionRule(LanguageFmtTargets, PythonFmtTargets)]
+    return [*register_rules(), UnionRule(LanguageFmtTargets, PythonFmtTargets)]

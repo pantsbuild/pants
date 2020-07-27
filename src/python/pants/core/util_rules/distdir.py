@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from pants.base.build_root import BuildRoot
-from pants.engine.rules import rule
+from pants.engine.rules import register_rules, rule
 from pants.fs.fs import is_child_of
 from pants.option.options_bootstrapper import OptionsBootstrapper
 
@@ -39,6 +39,4 @@ def validate_distdir(distdir: Path, buildroot: Path) -> DistDir:
 
 
 def rules():
-    return [
-        get_distdir,
-    ]
+    return register_rules()

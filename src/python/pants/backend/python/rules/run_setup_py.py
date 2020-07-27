@@ -50,7 +50,7 @@ from pants.engine.fs import (
 )
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import SubsystemRule, goal_rule, rule
+from pants.engine.rules import goal_rule, register_rules, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
     Dependencies,
@@ -705,15 +705,4 @@ def is_ownable_target(tgt: Target, union_membership: UnionMembership) -> bool:
 
 
 def rules():
-    return [
-        run_setup_pys,
-        run_setup_py,
-        generate_chroot,
-        get_sources,
-        get_requirements,
-        get_ancestor_init_py,
-        get_owned_dependencies,
-        get_exporting_owner,
-        setup_setuptools,
-        SubsystemRule(Setuptools),
-    ]
+    return register_rules()

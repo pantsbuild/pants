@@ -23,7 +23,7 @@ from pants.backend.python.target_types import (
 from pants.backend.python.target_types import PythonPlatforms as PythonPlatformsField
 from pants.core.goals.binary import BinaryFieldSet, CreatedBinary
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
-from pants.engine.rules import SubsystemRule, rule
+from pants.engine.rules import register_rules, rule
 from pants.engine.selectors import Get
 from pants.engine.unions import UnionRule
 
@@ -92,7 +92,6 @@ async def create_python_binary(
 
 def rules():
     return [
-        create_python_binary,
+        *register_rules(),
         UnionRule(BinaryFieldSet, PythonBinaryFieldSet),
-        SubsystemRule(PythonBinaryDefaults),
     ]

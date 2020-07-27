@@ -16,7 +16,7 @@ from pants.engine.console import Console
 from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import goal_rule
+from pants.engine.rules import goal_rule, register_rules
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import TargetsWithOrigins
 from pants.engine.unions import UnionMembership, union
@@ -192,4 +192,4 @@ async def lint(
 
 
 def rules():
-    return [lint]
+    return register_rules()

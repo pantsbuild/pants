@@ -40,7 +40,7 @@ from pants.engine.fs import (
     PathGlobs,
 )
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import SubsystemRule, rule
+from pants.engine.rules import register_rules, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import TransitiveTargets
 from pants.engine.unions import UnionRule
@@ -335,10 +335,6 @@ def _get_coverage_reports(
 
 def rules():
     return [
-        create_coverage_config,
-        generate_coverage_reports,
-        merge_coverage_data,
-        setup_coverage,
-        SubsystemRule(CoverageSubsystem),
+        *register_rules(),
         UnionRule(CoverageDataCollection, PytestCoverageDataCollection),
     ]

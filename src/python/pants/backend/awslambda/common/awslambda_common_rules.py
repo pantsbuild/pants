@@ -9,7 +9,7 @@ from pants.core.util_rules.distdir import DistDir
 from pants.engine.console import Console
 from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
-from pants.engine.rules import goal_rule
+from pants.engine.rules import goal_rule, register_rules
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import FieldSet, TargetsToValidFieldSets, TargetsToValidFieldSetsRequest
 from pants.engine.unions import union
@@ -79,4 +79,4 @@ async def create_awslambda(
 
 
 def rules():
-    return [create_awslambda]
+    return register_rules()

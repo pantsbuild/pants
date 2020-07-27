@@ -9,7 +9,7 @@ from typing import List
 from pants.core.util_rules.archive import ExtractedDigest, MaybeExtractable
 from pants.engine.fs import Digest, DownloadFile
 from pants.engine.platform import Platform
-from pants.engine.rules import RootRule, rule
+from pants.engine.rules import RootRule, register_rules, rule
 from pants.engine.selectors import Get
 from pants.subsystem.subsystem import Subsystem
 from pants.util.meta import classproperty
@@ -178,4 +178,4 @@ async def download_external_tool(request: ExternalToolRequest) -> DownloadedExte
 
 
 def rules():
-    return [download_external_tool, RootRule(ExternalToolRequest)]
+    return [*register_rules(), RootRule(ExternalToolRequest)]

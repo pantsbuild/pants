@@ -6,7 +6,7 @@ import os
 from pants.base.deprecated import warn_or_error
 from pants.base.exception_sink import ExceptionSink
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.rules import goal_rule
+from pants.engine.rules import goal_rule, register_rules
 from pants.option.custom_types import file_option
 
 
@@ -58,7 +58,7 @@ async def run_lifecycle_stubs(opts: LifecycleStubsSubsystem) -> LifecycleStubsGo
 
 
 def rules():
-    return [show_warning, run_lifecycle_stubs]
+    return register_rules()
 
 
 if os.environ.get("_RAISE_KEYBOARDINTERRUPT_ON_IMPORT", False):

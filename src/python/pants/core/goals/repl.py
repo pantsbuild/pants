@@ -11,7 +11,7 @@ from pants.engine.console import Console
 from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.interactive_process import InteractiveProcess, InteractiveRunner
-from pants.engine.rules import goal_rule
+from pants.engine.rules import goal_rule, register_rules
 from pants.engine.selectors import Get
 from pants.engine.target import Field, Target, Targets, TransitiveTargets
 from pants.engine.unions import UnionMembership, union
@@ -121,4 +121,4 @@ async def run_repl(
 
 
 def rules():
-    return [run_repl]
+    return register_rules()

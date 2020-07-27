@@ -30,7 +30,7 @@ from pants.backend.python.subsystems.subprocess_environment import SubprocessEnc
 from pants.core.util_rules import strip_source_roots
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import SubsystemRule, rule
+from pants.engine.rules import register_rules, rule
 from pants.engine.selectors import Get
 from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
@@ -129,10 +129,8 @@ async def setup_lambdex(lambdex: Lambdex) -> LambdexSetup:
 
 def rules():
     return [
-        create_python_awslambda,
-        setup_lambdex,
+        *register_rules(),
         UnionRule(AWSLambdaFieldSet, PythonAwsLambdaFieldSet),
-        SubsystemRule(Lambdex),
         *download_pex_bin.rules(),
         *python_sources.rules(),
         *pex.rules(),

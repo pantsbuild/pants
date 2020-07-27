@@ -9,7 +9,7 @@ from pants.backend.python.target_types import PythonRequirementsField
 from pants.engine.addresses import Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
-from pants.engine.rules import goal_rule
+from pants.engine.rules import goal_rule, register_rules
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Dependencies as DependenciesField
 from pants.engine.target import DependenciesRequest, Targets, TransitiveTargets
@@ -104,4 +104,4 @@ async def dependencies(
 
 
 def rules():
-    return [dependencies]
+    return register_rules()

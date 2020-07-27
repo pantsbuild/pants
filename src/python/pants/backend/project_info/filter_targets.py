@@ -8,7 +8,7 @@ from typing import Callable, Pattern
 from pants.base.deprecated import resolve_conflicting_options
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
-from pants.engine.rules import goal_rule
+from pants.engine.rules import goal_rule, register_rules
 from pants.engine.target import (
     RegisteredTargetTypes,
     Tags,
@@ -162,4 +162,4 @@ def filter_targets(
 
 
 def rules():
-    return [filter_targets]
+    return register_rules()

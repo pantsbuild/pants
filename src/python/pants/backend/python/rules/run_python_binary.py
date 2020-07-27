@@ -14,7 +14,7 @@ from pants.core.goals.run import RunRequest
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, MergeDigests
-from pants.engine.rules import SubsystemRule, rule
+from pants.engine.rules import register_rules, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import InvalidFieldException, TransitiveTargets
 from pants.engine.unions import UnionRule
@@ -66,7 +66,6 @@ async def create_python_binary_run_request(
 
 def rules():
     return [
-        create_python_binary_run_request,
+        *register_rules(),
         UnionRule(BinaryFieldSet, PythonBinaryFieldSet),
-        SubsystemRule(PythonBinaryDefaults),
     ]

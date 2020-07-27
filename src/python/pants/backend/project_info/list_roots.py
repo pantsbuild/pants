@@ -3,7 +3,7 @@
 
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
-from pants.engine.rules import goal_rule
+from pants.engine.rules import goal_rule, register_rules
 from pants.source.source_root import AllSourceRoots
 
 
@@ -28,4 +28,4 @@ async def list_roots(
 
 
 def rules():
-    return [list_roots]
+    return register_rules()
