@@ -303,13 +303,11 @@ class Parser:
                         add_flag_val(v)
                     del flag_value_map[arg]
 
-            # If the arg is marked passthrough, additionally apply the collected passthrough_args.
-            if kwargs.get("passthrough"):
-                flag_vals.extend(parse_args_request.passthrough_args)
-
             # Get the value for this option, falling back to defaults as needed.
             try:
-                value_history = self._compute_value(dest, kwargs, flag_vals)
+                value_history = self._compute_value(
+                    dest, kwargs, flag_vals, parse_args_request.passthrough_args
+                )
                 self._history[dest] = value_history
                 val = value_history.final_value
             except ParseError as e:
@@ -731,7 +729,7 @@ class Parser:
             env_vars = [f"PANTS_{sanitized_env_var_scope}_{udest}"]
         return env_vars
 
-    def _compute_value(self, dest, kwargs, flag_val_strs):
+    def _compute_value(self, dest, kwargs, flag_val_strs, passthru_arg_strs):
         """Compute the value to use for an option.
 
         The source of the value is chosen according to the ranking in Rank.
@@ -797,6 +795,9 @@ class Parser:
 
         # Get value from cmd-line flags.
         flag_vals = [to_value_type(expand(x)) for x in flag_val_strs]
+        if kwargs.get("passthrough"):
+            flag_vals.extend(to_value_type(x) for x in passthru_arg_strs)
+
         if is_list_option(kwargs):
             # Note: It's important to set flag_val to None if no flags were specified, so we can
             # distinguish between no flags set vs. explicit setting of the value to [].
