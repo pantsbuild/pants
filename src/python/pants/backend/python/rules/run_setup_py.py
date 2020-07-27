@@ -218,7 +218,7 @@ class SetuptoolsSetup:
     requirements_pex: Pex
 
 
-class SetupPyOptions(GoalSubsystem):
+class SetupPySubsystem(GoalSubsystem):
     """Run setup.py commands."""
 
     name = "setup-py"
@@ -245,9 +245,17 @@ class SetupPyOptions(GoalSubsystem):
             "before it.",
         )
 
+    @property
+    def args(self) -> Tuple[str, ...]:
+        return tuple(self.options.args)
+
+    @property
+    def transitive(self) -> bool:
+        return cast(bool, self.options.transitive)
+
 
 class SetupPy(Goal):
-    subsystem_cls = SetupPyOptions
+    subsystem_cls = SetupPySubsystem
 
 
 def validate_args(args: Tuple[str, ...]):
@@ -271,7 +279,7 @@ def validate_args(args: Tuple[str, ...]):
 @goal_rule
 async def run_setup_pys(
     targets_with_origins: TargetsWithOrigins,
-    options: SetupPyOptions,
+    setup_py_subsystem: SetupPySubsystem,
     console: Console,
     python_setup: PythonSetup,
     distdir: DistDir,
@@ -279,8 +287,7 @@ async def run_setup_pys(
     union_membership: UnionMembership,
 ) -> SetupPy:
     """Run setup.py commands on all exported targets addressed."""
-    args = tuple(options.values.args)
-    validate_args(args)
+    validate_args(setup_py_subsystem.args)
 
     # Get all exported targets, ignoring any non-exported targets that happened to be
     # globbed over, but erroring on any explicitly-requested non-exported targets.
@@ -300,7 +307,7 @@ async def run_setup_pys(
             f'{", ".join(so.address.reference() for so in explicit_nonexported_targets)}'
         )
 
-    if options.values.transitive:
+    if setup_py_subsystem.transitive:
         # Expand out to all owners of the entire dep closure.
         transitive_targets = await Get(
             TransitiveTargets, Addresses(et.target.address for et in exported_targets)
@@ -324,9 +331,12 @@ async def run_setup_pys(
     )
 
     # If args were provided, run setup.py with them; Otherwise just dump chroots.
-    if args:
+    if setup_py_subsystem.args:
         setup_py_results = await MultiGet(
-            Get(RunSetupPyResult, RunSetupPyRequest(exported_target, chroot, tuple(args)))
+            Get(
+                RunSetupPyResult,
+                RunSetupPyRequest(exported_target, chroot, setup_py_subsystem.args),
+            )
             for exported_target, chroot in zip(exported_targets, chroots)
         )
 

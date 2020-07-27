@@ -6,7 +6,7 @@ from abc import ABC, ABCMeta
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import Dict, Iterable, List, Optional, Tuple, Type, TypeVar
+from typing import Dict, Iterable, List, Optional, Tuple, Type, TypeVar, cast
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.core.util_rules.filter_empty_sources import (
@@ -200,8 +200,8 @@ class CoverageReports:
         return tuple(report_paths)
 
 
-class TestOptions(GoalSubsystem):
-    """Runs tests."""
+class TestSubsystem(GoalSubsystem):
+    """Run tests."""
 
     name = "test"
 
@@ -244,9 +244,25 @@ class TestOptions(GoalSubsystem):
             ),
         )
 
+    @property
+    def debug(self) -> bool:
+        return cast(bool, self.options.debug)
+
+    @property
+    def force(self) -> bool:
+        return cast(bool, self.options.force)
+
+    @property
+    def use_coverage(self) -> bool:
+        return cast(bool, self.options.use_coverage)
+
+    @property
+    def open_coverage(self) -> bool:
+        return cast(bool, self.options.open_coverage)
+
 
 class Test(Goal):
-    subsystem_cls = TestOptions
+    subsystem_cls = TestSubsystem
 
     __test__ = False
 
@@ -254,12 +270,12 @@ class Test(Goal):
 @goal_rule
 async def run_tests(
     console: Console,
-    options: TestOptions,
+    test_subsystem: TestSubsystem,
     interactive_runner: InteractiveRunner,
     workspace: Workspace,
     union_membership: UnionMembership,
 ) -> Test:
-    if options.values.debug:
+    if test_subsystem.debug:
         targets_to_valid_field_sets = await Get(
             TargetsToValidFieldSets,
             TargetsToValidFieldSetsRequest(
@@ -278,7 +294,7 @@ async def run_tests(
         TargetsToValidFieldSets,
         TargetsToValidFieldSetsRequest(
             TestFieldSet,
-            goal_description=f"the `{options.name}` goal",
+            goal_description=f"the `{test_subsystem.name}` goal",
             error_if_no_valid_targets=False,
         ),
     )
@@ -327,7 +343,7 @@ async def run_tests(
     )
     workspace.write_digest(merged_xml_results)
 
-    if options.values.use_coverage:
+    if test_subsystem.use_coverage:
         all_coverage_data: Iterable[CoverageData] = [
             result.test_result.coverage_data
             for result in results
@@ -355,7 +371,7 @@ async def run_tests(
             report_files = coverage_reports.materialize(console, workspace)
             coverage_report_files.extend(report_files)
 
-        if coverage_report_files and options.values.open_coverage:
+        if coverage_report_files and test_subsystem.open_coverage:
             desktop.ui_open(console, interactive_runner, coverage_report_files)
 
     return Test(exit_code)

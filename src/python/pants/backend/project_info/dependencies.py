@@ -3,7 +3,7 @@
 
 import itertools
 from enum import Enum
-from typing import Set
+from typing import Set, cast
 
 from pants.backend.python.target_types import PythonRequirementsField
 from pants.engine.addresses import Addresses
@@ -21,7 +21,7 @@ class DependencyType(Enum):
     SOURCE_AND_THIRD_PARTY = "source-and-3rdparty"
 
 
-class DependenciesOptions(LineOriented, GoalSubsystem):
+class DependenciesSubsystem(LineOriented, GoalSubsystem):
     """List the dependencies of the input targets."""
 
     name = "dependencies"
@@ -47,16 +47,24 @@ class DependenciesOptions(LineOriented, GoalSubsystem):
             ),
         )
 
+    @property
+    def transitive(self) -> bool:
+        return cast(bool, self.options.transitive)
+
+    @property
+    def type(self) -> DependencyType:
+        return cast(DependencyType, self.options.type)
+
 
 class Dependencies(Goal):
-    subsystem_cls = DependenciesOptions
+    subsystem_cls = DependenciesSubsystem
 
 
 @goal_rule
 async def dependencies(
-    console: Console, addresses: Addresses, options: DependenciesOptions,
+    console: Console, addresses: Addresses, dependencies_subsystem: DependenciesSubsystem,
 ) -> Dependencies:
-    if options.values.transitive:
+    if dependencies_subsystem.transitive:
         transitive_targets = await Get(TransitiveTargets, Addresses, addresses)
         targets = Targets(transitive_targets.dependencies)
     else:
@@ -66,12 +74,12 @@ async def dependencies(
         )
         targets = Targets(itertools.chain.from_iterable(dependencies_per_target_root))
 
-    include_3rdparty = options.values.type in [
-        DependencyType.THIRD_PARTY,
+    include_source = dependencies_subsystem.type in [
+        DependencyType.SOURCE,
         DependencyType.SOURCE_AND_THIRD_PARTY,
     ]
-    include_source = options.values.type in [
-        DependencyType.SOURCE,
+    include_3rdparty = dependencies_subsystem.type in [
+        DependencyType.THIRD_PARTY,
         DependencyType.SOURCE_AND_THIRD_PARTY,
     ]
 
@@ -86,7 +94,7 @@ async def dependencies(
                     str(python_req.requirement) for python_req in tgt[PythonRequirementsField].value
                 )
 
-    with options.line_oriented(console) as print_stdout:
+    with dependencies_subsystem.line_oriented(console) as print_stdout:
         for address in sorted(address_strings):
             print_stdout(address)
         for requirement_string in sorted(third_party_requirements):

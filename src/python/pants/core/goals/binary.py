@@ -28,7 +28,7 @@ class CreatedBinary:
     binary_name: str
 
 
-class BinaryOptions(GoalSubsystem):
+class BinarySubsystem(GoalSubsystem):
     """Create a runnable binary."""
 
     name = "binary"
@@ -37,7 +37,7 @@ class BinaryOptions(GoalSubsystem):
 
 
 class Binary(Goal):
-    subsystem_cls = BinaryOptions
+    subsystem_cls = BinarySubsystem
 
 
 @goal_rule

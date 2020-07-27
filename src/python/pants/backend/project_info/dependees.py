@@ -5,7 +5,7 @@ import json
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
-from typing import Iterable, Set
+from typing import Iterable, Set, cast
 
 from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.engine.addresses import Address, Addresses
@@ -92,7 +92,7 @@ class DependeesOutputFormat(Enum):
     json = "json"
 
 
-class DependeesOptions(LineOriented, GoalSubsystem):
+class DependeesSubsystem(LineOriented, GoalSubsystem):
     """List all targets that depend on any of the input targets."""
 
     name = "dependees"
@@ -126,24 +126,35 @@ class DependeesOptions(LineOriented, GoalSubsystem):
             ),
         )
 
+    @property
+    def transitive(self) -> bool:
+        return cast(bool, self.options.transitive)
+
+    @property
+    def closed(self) -> bool:
+        return cast(bool, self.options.closed)
+
+    @property
+    def output_format(self) -> DependeesOutputFormat:
+        return cast(DependeesOutputFormat, self.options.output_format)
+
 
 class DependeesGoal(Goal):
-    subsystem_cls = DependeesOptions
+    subsystem_cls = DependeesSubsystem
 
 
 @goal_rule
 async def dependees_goal(
-    specified_addresses: Addresses, options: DependeesOptions, console: Console
+    specified_addresses: Addresses, dependees_subsystem: DependeesSubsystem, console: Console
 ) -> DependeesGoal:
-    transitive = options.values.transitive
-    include_roots = options.values.closed
-
-    if options.values.output_format == DependeesOutputFormat.json:
+    if dependees_subsystem.output_format == DependeesOutputFormat.json:
         dependees_per_target = await MultiGet(
             Get(
                 Dependees,
                 DependeesRequest(
-                    [specified_address], transitive=transitive, include_roots=include_roots
+                    [specified_address],
+                    transitive=dependees_subsystem.transitive,
+                    include_roots=dependees_subsystem.closed,
                 ),
             )
             for specified_address in specified_addresses
@@ -152,15 +163,19 @@ async def dependees_goal(
             specified_address.spec: [dependee.spec for dependee in dependees]
             for specified_address, dependees in zip(specified_addresses, dependees_per_target)
         }
-        with options.line_oriented(console) as print_stdout:
+        with dependees_subsystem.line_oriented(console) as print_stdout:
             print_stdout(json.dumps(json_result, indent=4, separators=(",", ": "), sort_keys=True))
         return DependeesGoal(exit_code=0)
 
     dependees = await Get(
         Dependees,
-        DependeesRequest(specified_addresses, transitive=transitive, include_roots=include_roots),
+        DependeesRequest(
+            specified_addresses,
+            transitive=dependees_subsystem.transitive,
+            include_roots=dependees_subsystem.closed,
+        ),
     )
-    with options.line_oriented(console) as print_stdout:
+    with dependees_subsystem.line_oriented(console) as print_stdout:
         for address in dependees:
             print_stdout(address.spec)
     return DependeesGoal(exit_code=0)

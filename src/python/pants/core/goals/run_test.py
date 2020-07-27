@@ -6,7 +6,7 @@ from typing import cast
 from pants.base.build_root import BuildRoot
 from pants.base.specs import SingleAddress
 from pants.core.goals.binary import BinaryFieldSet
-from pants.core.goals.run import Run, RunOptions, RunRequest, run
+from pants.core.goals.run import Run, RunRequest, RunSubsystem, run
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent, Workspace
 from pants.engine.interactive_process import InteractiveProcess, InteractiveRunner
@@ -60,7 +60,7 @@ class RunTest(TestBase):
         res = run_rule(
             run,
             rule_args=[
-                create_goal_subsystem(RunOptions, args=[]),
+                create_goal_subsystem(RunSubsystem, args=[]),
                 create_subsystem(GlobalOptions, pants_workdir=self.pants_workdir),
                 console,
                 interactive_runner,

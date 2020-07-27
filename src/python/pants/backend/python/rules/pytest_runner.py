@@ -32,7 +32,7 @@ from pants.backend.python.target_types import (
     PythonTestsSources,
     PythonTestsTimeout,
 )
-from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestOptions, TestResult
+from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
 from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, Digest, MergeDigests, PathGlobs, Snapshot, SnapshotSubset
@@ -76,7 +76,7 @@ class TestTargetSetup:
 async def setup_pytest_for_target(
     field_set: PythonTestFieldSet,
     pytest: PyTest,
-    test_options: TestOptions,
+    test_subsystem: TestSubsystem,
     python_setup: PythonSetup,
     coverage_config: CoverageConfig,
     coverage_subsystem: CoverageSubsystem,
@@ -195,9 +195,8 @@ async def setup_pytest_for_target(
         ),
     )
 
-    use_coverage = test_options.values.use_coverage
     coverage_args = []
-    if use_coverage:
+    if test_subsystem.use_coverage:
         cov_paths = coverage_subsystem.filter if coverage_subsystem.filter else (".",)
         coverage_args = [
             "--cov-report=",  # Turn off output.
@@ -222,7 +221,7 @@ async def run_python_test(
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
     global_options: GlobalOptions,
-    test_options: TestOptions,
+    test_subsystem: TestSubsystem,
 ) -> TestResult:
     """Runs pytest for one target."""
     output_files = []
@@ -239,8 +238,7 @@ async def run_python_test(
         output_files.append(test_results_file)
 
     # Configure generation of a coverage report.
-    use_coverage = test_options.values.use_coverage
-    if use_coverage:
+    if test_subsystem.use_coverage:
         output_files.append(".coverage")
 
     env = {
@@ -248,7 +246,7 @@ async def run_python_test(
         "PEX_EXTRA_SYS_PATH": ":".join(test_setup.source_roots),
     }
 
-    if test_options.values.force:
+    if test_subsystem.force:
         # This is a slightly hacky way to force the process to run: since the env var
         #  value is unique, this input combination will never have been seen before,
         #  and therefore never cached. The two downsides are:
@@ -274,7 +272,7 @@ async def run_python_test(
     result = await Get(FallibleProcessResult, Process, process)
 
     coverage_data = None
-    if use_coverage:
+    if test_subsystem.use_coverage:
         coverage_snapshot = await Get(
             Snapshot, SnapshotSubset(result.output_digest, PathGlobs([".coverage"]))
         )

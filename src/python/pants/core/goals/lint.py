@@ -3,8 +3,8 @@
 
 import itertools
 from dataclasses import dataclass
-from pathlib import Path
-from typing import Iterable, Optional
+from pathlib import PurePath
+from typing import Iterable, Optional, cast
 
 from pants.core.goals.style_request import StyleRequest
 from pants.core.util_rules.filter_empty_sources import (
@@ -25,7 +25,7 @@ from pants.util.strutil import strip_v2_chroot_path
 
 @dataclass(frozen=True)
 class LintResultFile:
-    output_path: Path
+    output_path: PurePath
     digest: Digest
 
 
@@ -81,7 +81,7 @@ class LintRequest(StyleRequest):
     """
 
 
-class LintOptions(GoalSubsystem):
+class LintSubsystem(GoalSubsystem):
     """Lint source code."""
 
     name = "lint"
@@ -116,13 +116,17 @@ class LintOptions(GoalSubsystem):
         )
 
     @property
-    def output_dir(self) -> Optional[Path]:
-        reports_dir = self.values.reports_dir
-        return Path(reports_dir) if reports_dir else None
+    def per_target_caching(self) -> bool:
+        return cast(bool, self.options.per_target_caching)
+
+    @property
+    def reports_dir(self) -> Optional[PurePath]:
+        v = self.options.reports_dir
+        return PurePath(v) if v else None
 
 
 class Lint(Goal):
-    subsystem_cls = LintOptions
+    subsystem_cls = LintSubsystem
 
 
 @goal_rule
@@ -130,7 +134,7 @@ async def lint(
     console: Console,
     workspace: Workspace,
     targets_with_origins: TargetsWithOrigins,
-    options: LintOptions,
+    lint_subsystem: LintSubsystem,
     union_membership: UnionMembership,
 ) -> Lint:
     request_types = union_membership[LintRequest]
@@ -152,7 +156,7 @@ async def lint(
         if request
     )
 
-    if options.values.per_target_caching:
+    if lint_subsystem.per_target_caching:
         results = await MultiGet(
             Get(LintResults, LintRequest, request.__class__([field_set]))
             for request in valid_requests

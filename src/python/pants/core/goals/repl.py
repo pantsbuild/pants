@@ -37,7 +37,7 @@ class ReplImplementation(ABC):
         return tgt.has_fields(cls.required_fields)
 
 
-class ReplOptions(GoalSubsystem):
+class ReplSubsystem(GoalSubsystem):
     """Opens a REPL."""
 
     name = "repl"
@@ -53,9 +53,13 @@ class ReplOptions(GoalSubsystem):
             help="Override the automatically-detected REPL program for the target(s) specified. ",
         )
 
+    @property
+    def shell(self) -> Optional[str]:
+        return cast(Optional[str], self.options.shell)
+
 
 class Repl(Goal):
-    subsystem_cls = ReplOptions
+    subsystem_cls = ReplSubsystem
 
 
 @frozen_after_init
@@ -78,14 +82,13 @@ async def run_repl(
     console: Console,
     workspace: Workspace,
     interactive_runner: InteractiveRunner,
-    options: ReplOptions,
+    repl_subsystem: ReplSubsystem,
     transitive_targets: TransitiveTargets,
     build_root: BuildRoot,
     union_membership: UnionMembership,
     global_options: GlobalOptions,
 ) -> Repl:
-    default_repl = "python"
-    repl_shell_name = cast(str, options.values.shell) or default_repl
+    repl_shell_name = repl_subsystem.shell or "python"
 
     implementations: Dict[str, Type[ReplImplementation]] = {
         impl.name: impl for impl in union_membership[ReplImplementation]

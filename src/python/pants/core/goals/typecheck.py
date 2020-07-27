@@ -63,7 +63,7 @@ class TypecheckRequest(StyleRequest):
     """
 
 
-class TypecheckOptions(GoalSubsystem):
+class TypecheckSubsystem(GoalSubsystem):
     """Run type checkers."""
 
     name = "typecheck"
@@ -72,7 +72,7 @@ class TypecheckOptions(GoalSubsystem):
 
 
 class Typecheck(Goal):
-    subsystem_cls = TypecheckOptions
+    subsystem_cls = TypecheckSubsystem
 
 
 @goal_rule

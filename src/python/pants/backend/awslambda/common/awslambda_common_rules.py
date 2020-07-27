@@ -32,25 +32,28 @@ class AWSLambdaFieldSet(FieldSet, metaclass=ABCMeta):
     """The fields necessary to create an AWS Lambda from a target."""
 
 
-class AWSLambdaOptions(LineOriented, GoalSubsystem):
+class AWSLambdaSubsystem(LineOriented, GoalSubsystem):
     """Generate an AWS Lambda."""
 
     name = "awslambda"
 
 
 class AWSLambdaGoal(Goal):
-    subsystem_cls = AWSLambdaOptions
+    subsystem_cls = AWSLambdaSubsystem
 
 
 @goal_rule
 async def create_awslambda(
-    console: Console, options: AWSLambdaOptions, distdir: DistDir, workspace: Workspace,
+    console: Console,
+    awslambda_subsystem: AWSLambdaSubsystem,
+    distdir: DistDir,
+    workspace: Workspace,
 ) -> AWSLambdaGoal:
     targets_to_valid_field_sets = await Get(
         TargetsToValidFieldSets,
         TargetsToValidFieldSetsRequest(
             AWSLambdaFieldSet,
-            goal_description=f"the `{options.name}` goal",
+            goal_description="the `awslambda` goal",
             error_if_no_valid_targets=True,
         ),
     )
@@ -60,7 +63,7 @@ async def create_awslambda(
     )
     merged_digest = await Get(Digest, MergeDigests(awslambda.digest for awslambda in awslambdas))
     workspace.write_digest(merged_digest, path_prefix=str(distdir.relpath))
-    with options.line_oriented(console) as print_stdout:
+    with awslambda_subsystem.line_oriented(console) as print_stdout:
         for awslambda in awslambdas:
             output_path = distdir.relpath / awslambda.zip_file_relpath
             print_stdout(
