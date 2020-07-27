@@ -120,7 +120,7 @@ class LocalPantsRunner:
         if global_bootstrap_options.verify_config:
             options.verify_configs(options_bootstrapper.config)
 
-        union_membership = UnionMembership(build_config.union_rules())
+        union_membership = UnionMembership.from_rules(build_config.union_rules)
 
         # If we're running with the daemon, we'll be handed a warmed Scheduler, which we use
         # to initialize a session here.

@@ -10,8 +10,8 @@ from typing import Any, Callable, Dict, Type, Union
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.rules import Rule, RuleIndex
 from pants.engine.target import Target
+from pants.engine.unions import UnionRule
 from pants.option.optionable import Optionable
-from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 logger = logging.getLogger(__name__)
@@ -21,34 +21,11 @@ logger = logging.getLogger(__name__)
 class BuildConfiguration:
     """Stores the types and helper functions exposed to BUILD files."""
 
-    _registered_aliases: BuildFileAliases
-    _optionables: FrozenOrderedSet[Optionable]
-    _rules: FrozenOrderedSet[Union[Rule, Callable]]
-    _union_rules: FrozenDict[Type, FrozenOrderedSet[Type]]
-    _target_types: FrozenOrderedSet[Type[Target]]
-
-    def registered_aliases(self) -> BuildFileAliases:
-        """Return the registered aliases exposed in BUILD files.
-
-        These returned aliases aren't so useful for actually parsing BUILD files. They are useful
-        for generating things like http://pantsbuild.github.io/build_dictionary.html.
-        """
-        return self._registered_aliases
-
-    def optionables(self) -> FrozenOrderedSet[Optionable]:
-        """Returns the registered Optionable types."""
-        return self._optionables
-
-    def rules(self) -> FrozenOrderedSet[Union[Callable, Rule]]:
-        """Returns the registered rules."""
-        return self._rules
-
-    def union_rules(self) -> FrozenDict[Type, FrozenOrderedSet[Type]]:
-        """Returns a mapping of registered union base types to the types of the union members."""
-        return self._union_rules
-
-    def target_types(self) -> FrozenOrderedSet[Type[Target]]:
-        return self._target_types
+    registered_aliases: BuildFileAliases
+    optionables: FrozenOrderedSet[Optionable]
+    rules: FrozenOrderedSet[Union[Rule, Callable]]
+    union_rules: FrozenOrderedSet[UnionRule]
+    target_types: FrozenOrderedSet[Type[Target]]
 
     @dataclass
     class Builder:
@@ -56,7 +33,7 @@ class BuildConfiguration:
         _exposed_context_aware_object_factory_by_alias: Dict[Any, Any] = field(default_factory=dict)
         _optionables: OrderedSet = field(default_factory=OrderedSet)
         _rules: OrderedSet = field(default_factory=OrderedSet)
-        _union_rules: Dict[Type, OrderedSet[Type]] = field(default_factory=dict)
+        _union_rules: OrderedSet = field(default_factory=OrderedSet)
         _target_types: OrderedSet[Type[Target]] = field(default_factory=OrderedSet)
 
         def registered_aliases(self) -> BuildFileAliases:
@@ -152,25 +129,17 @@ class BuildConfiguration:
                 raise TypeError("The rules must be an iterable, given {!r}".format(rules))
 
             # "Index" the rules to normalize them and expand their dependencies.
-            normalized_rules = RuleIndex.create(rules).normalized_rules()
-            indexed_rules = normalized_rules.rules
-            union_rules = normalized_rules.union_rules
-
-            # Store the rules and record their dependency Optionables.
-            self._rules.update(indexed_rules)
-            for union_base, new_members in union_rules.items():
-                existing_members = self._union_rules.get(union_base, None)
-                if existing_members is None:
-                    self._union_rules[union_base] = new_members
-                else:
-                    existing_members.update(new_members)
-            dependency_optionables = {
-                do
-                for rule in indexed_rules
-                for do in rule.dependency_optionables
-                if rule.dependency_optionables
-            }
-            self.register_optionables(dependency_optionables)
+            rules, union_rules = RuleIndex.create(rules).normalized_rules()
+            self._rules.update(rules)
+            self._union_rules.update(union_rules)
+            self.register_optionables(
+                {
+                    do
+                    for rule in rules
+                    for do in rule.dependency_optionables
+                    if rule.dependency_optionables
+                }
+            )
 
         # NB: We expect the parameter to be Iterable[Type[Target]], but we can't be confident in this
         # because we pass whatever people put in their `register.py`s to this function; i.e., this is
@@ -202,12 +171,9 @@ class BuildConfiguration:
                 context_aware_object_factories=self._exposed_context_aware_object_factory_by_alias.copy(),
             )
             return BuildConfiguration(
-                _registered_aliases=registered_aliases,
-                _optionables=FrozenOrderedSet(self._optionables),
-                _rules=FrozenOrderedSet(self._rules),
-                _union_rules=FrozenDict(
-                    (union_base, FrozenOrderedSet(union_members))
-                    for union_base, union_members in self._union_rules.items()
-                ),
-                _target_types=FrozenOrderedSet(self._target_types),
+                registered_aliases=registered_aliases,
+                optionables=FrozenOrderedSet(self._optionables),
+                rules=FrozenOrderedSet(self._rules),
+                union_rules=FrozenOrderedSet(self._union_rules),
+                target_types=FrozenOrderedSet(self._target_types),
             )
