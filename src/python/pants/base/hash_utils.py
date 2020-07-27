@@ -117,29 +117,10 @@ class CoercingEncoder(json.JSONEncoder):
         return super().encode(self.default(o))
 
 
-def json_hash(obj: Any, encoder: Optional[Type[json.JSONEncoder]] = None) -> str:
+def json_hash(obj: Any, encoder: Optional[Type[json.JSONEncoder]] = CoercingEncoder) -> str:
     """Hashes `obj` by dumping to JSON.
-
-    :param obj: An object that can be rendered to json using the given `encoder`.
-    :param encoder: An optional custom json encoder.
-    :type encoder: :class:`json.JSONEncoder`
-    :returns: A hash of the given `obj` according to the given `encoder`.
-    :rtype: str
 
     :API: public
     """
     json_str = json.dumps(obj, ensure_ascii=True, allow_nan=False, sort_keys=True, cls=encoder)
     return hash_all([json_str])
-
-
-# TODO(#6513): something like python 3's @lru_cache decorator could be useful here!
-def stable_json_sha1(obj: Any) -> str:
-    """Hashes `obj` stably; ie repeated calls with the same inputs will produce the same hash.
-
-    :param obj: An object that can be rendered to json using a :class:`CoercingEncoder`.
-    :returns: A stable hash of the given `obj`.
-    :rtype: str
-
-    :API: public
-    """
-    return json_hash(obj, encoder=CoercingEncoder)

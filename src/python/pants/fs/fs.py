@@ -64,14 +64,6 @@ def safe_filename_from_path(path, **kwargs):
     return safe_filename(path.strip(os.path.sep).replace(os.path.sep, "."), **kwargs)
 
 
-def expand_path(path):
-    """Returns ``path`` as an absolute path with ~user and env var expansion applied.
-
-    :API: public
-    """
-    return os.path.abspath(os.path.expandvars(os.path.expanduser(path)))
-
-
 def is_child_of(path: Path, directory: Path) -> bool:
     abs_path = path if path.is_absolute() else directory.joinpath(path).resolve()
     return directory == abs_path or directory in abs_path.parents
