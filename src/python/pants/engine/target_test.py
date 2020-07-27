@@ -287,6 +287,15 @@ def test_add_custom_fields() -> None:
     )
     assert default_tgt[CustomField].value is False
 
+    # Ensure that the `PluginField` is not being registered on other target types.
+    class OtherTarget(Target):
+        alias = "other_target"
+        core_fields = ()
+
+    other_tgt = OtherTarget({}, address=Address.parse(":other"))
+    assert other_tgt.plugin_fields == ()
+    assert other_tgt.has_field(CustomField) is False
+
 
 def test_override_preexisting_field_via_new_target() -> None:
     # To change the behavior of a pre-existing field, you must create a new target as it would not
