@@ -13,6 +13,7 @@ from pants.engine.fs import Snapshot
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Sources, Target
+from pants.engine.unions import UnionMembership
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.meta import frozen_after_init
 
@@ -107,7 +108,7 @@ async def prepare_stripped_python_sources(
 
 @rule
 async def prepare_unstripped_python_sources(
-    request: UnstrippedPythonSourcesRequest,
+    request: UnstrippedPythonSourcesRequest, union_membership: UnionMembership
 ) -> UnstrippedPythonSources:
     sources = await Get(
         SourceFiles,
@@ -126,7 +127,12 @@ async def prepare_unstripped_python_sources(
             SourceRootRequest.for_file(representative_path_from_address(tgt.address)),
         )
         for tgt in request.targets
-        if tgt.has_field(PythonSources) or tgt.has_field(ResourcesSources)
+        if (
+            tgt.has_field(PythonSources)
+            or tgt.has_field(ResourcesSources)
+            or tgt.get(Sources).can_generate(PythonSources, union_membership)
+            or tgt.get(Sources).can_generate(ResourcesSources, union_membership)
+        )
     )
     source_root_paths = {source_root_obj.path for source_root_obj in source_root_objs}
     return UnstrippedPythonSources(sources.snapshot, tuple(sorted(source_root_paths)))
@@ -137,6 +143,5 @@ def rules():
         prepare_stripped_python_sources,
         prepare_unstripped_python_sources,
         *determine_source_files.rules(),
-        # TODO: remove this as soon as we have a usage of it.
         RootRule(UnstrippedPythonSourcesRequest),
     ]

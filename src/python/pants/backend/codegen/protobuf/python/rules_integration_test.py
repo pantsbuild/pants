@@ -35,12 +35,34 @@ class ProtobufPythonIntegrationTest(ExternalToolTestBase):
             RootRule(GeneratePythonFromProtobufRequest),
         )
 
+    def assert_files_generated(
+        self, spec: str, *, expected_files: List[str], source_roots: List[str]
+    ) -> None:
+        tgt = self.request_single_product(WrappedTarget, Address.parse(spec)).target
+        protocol_sources = self.request_single_product(
+            HydratedSources,
+            Params(HydrateSourcesRequest(tgt[ProtobufSources]), create_options_bootstrapper()),
+        )
+        generated_sources = self.request_single_product(
+            GeneratedSources,
+            Params(
+                GeneratePythonFromProtobufRequest(protocol_sources.snapshot, tgt),
+                create_options_bootstrapper(
+                    args=[
+                        "--backend-packages=pants.backend.codegen.protobuf.python",
+                        f"--source-root-patterns={repr(source_roots)}",
+                    ]
+                ),
+            ),
+        )
+        assert set(generated_sources.snapshot.files) == set(expected_files)
+
     def test_generates_python(self) -> None:
         # This tests a few things:
         #  * We generate the correct file names.
         #  * Protobuf files can import other protobuf files, and those can import others
         #    (transitive dependencies). We'll only generate the requested target, though.
-        #  * We can handle multiple source roots, which need to be stripped in the final output.
+        #  * We can handle multiple source roots, which need to be preserved in the final output.
 
         self.create_file(
             "src/protobuf/dir1/f.proto",
@@ -103,31 +125,35 @@ class ProtobufPythonIntegrationTest(ExternalToolTestBase):
             "tests/protobuf/test_protos", "protobuf_library(dependencies=['src/protobuf/dir2'])"
         )
 
-        def assert_files_generated(spec: str, *, expected_files: List[str]) -> None:
-            tgt = self.request_single_product(WrappedTarget, Address.parse(spec)).target
-            protocol_sources = self.request_single_product(
-                HydratedSources,
-                Params(HydrateSourcesRequest(tgt[ProtobufSources]), create_options_bootstrapper()),
-            )
-            generated_sources = self.request_single_product(
-                GeneratedSources,
-                Params(
-                    GeneratePythonFromProtobufRequest(protocol_sources.snapshot, tgt),
-                    create_options_bootstrapper(
-                        args=[
-                            "--backend-packages=pants.backend.codegen.protobuf.python",
-                            "--source-root-patterns=src/protobuf",
-                            "--source-root-patterns=tests/protobuf",
-                        ]
-                    ),
-                ),
-            )
-            assert set(generated_sources.snapshot.files) == set(expected_files)
-
-        assert_files_generated(
-            "src/protobuf/dir1", expected_files=["dir1/f_pb2.py", "dir1/f2_pb2.py"]
+        source_roots = ["/src/protobuf", "/tests/protobuf"]
+        self.assert_files_generated(
+            "src/protobuf/dir1",
+            source_roots=source_roots,
+            expected_files=["src/protobuf/dir1/f_pb2.py", "src/protobuf/dir1/f2_pb2.py"],
         )
-        assert_files_generated("src/protobuf/dir2", expected_files=["dir2/f_pb2.py"])
-        assert_files_generated(
-            "tests/protobuf/test_protos", expected_files=["test_protos/f_pb2.py"]
+        self.assert_files_generated(
+            "src/protobuf/dir2",
+            source_roots=source_roots,
+            expected_files=["src/protobuf/dir2/f_pb2.py"],
+        )
+        self.assert_files_generated(
+            "tests/protobuf/test_protos",
+            source_roots=source_roots,
+            expected_files=["tests/protobuf/test_protos/f_pb2.py"],
+        )
+
+    def test_top_level_source_root(self) -> None:
+        self.create_file(
+            "protos/f.proto",
+            dedent(
+                """\
+                syntax = "proto2";
+
+                package protos;
+                """
+            ),
+        )
+        self.add_to_build_file("protos", "protobuf_library()")
+        self.assert_files_generated(
+            "protos", source_roots=["/"], expected_files=["protos/f_pb2.py"]
         )
