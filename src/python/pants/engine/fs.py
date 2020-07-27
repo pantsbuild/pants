@@ -1,19 +1,44 @@
-# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import os
 from dataclasses import dataclass
+from enum import Enum
 from typing import TYPE_CHECKING, Iterable, Optional, Tuple
 
 from pants.engine.collection import Collection
 from pants.engine.rules import RootRule, side_effecting
-from pants.option.custom_types import GlobExpansionConjunction as GlobExpansionConjunction
-from pants.option.global_options import GlobMatchErrorBehavior as GlobMatchErrorBehavior
-from pants.util.dirutil import maybe_read_file, safe_delete, safe_file_dump
 from pants.util.meta import frozen_after_init
 
 if TYPE_CHECKING:
     from pants.engine.internals.scheduler import SchedulerSession
+
+
+@dataclass(frozen=True)
+class Digest:
+    """A Digest is a content-digest fingerprint, and a length of underlying content.
+
+    Typically, this is used as a lightweight reference to a set of files known about by the engine.
+    You can use `await Get(Snapshot, Digest)` to set the file names referred to, or use
+    `await Get(DigestContents, Digest)` to see the actual file content.
+
+    Occasionally, a Digest is a reference for other types of strings/bytes/content.
+    """
+
+    fingerprint: str
+    serialized_bytes_length: int
+
+
+@dataclass(frozen=True)
+class Snapshot:
+    """A Snapshot is a collection of sorted file paths and dir paths fingerprinted by their
+    names/content.
+
+    You can lift a `Digest` to a `Snapshot` with `await Get(Snapshot, Digest, my_digest)`.
+    """
+
+    digest: Digest
+    files: Tuple[str, ...]
+    dirs: Tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -25,7 +50,10 @@ class FileContent:
     is_executable: bool = False
 
     def __repr__(self) -> str:
-        return f"FileContent(path={self.path}, content=(len:{len(self.content)}), is_executable={self.is_executable})"
+        return (
+            f"FileContent(path={self.path}, content=(len:{len(self.content)}), "
+            f"is_executable={self.is_executable})"
+        )
 
 
 class DigestContents(Collection[FileContent]):
@@ -40,17 +68,32 @@ class CreateDigest(Collection[FileContent]):
     """
 
 
+class GlobMatchErrorBehavior(Enum):
+    """Describe the action to perform when matching globs in BUILD files to source files.
+
+    NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
+    be aware of any changes to this object's definition.
+    """
+
+    ignore = "ignore"
+    warn = "warn"
+    error = "error"
+
+
+class GlobExpansionConjunction(Enum):
+    """Describe whether to require that only some or all glob strings match in a target's sources.
+
+    NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
+    be aware of any changes to this object's definition.
+    """
+
+    any_match = "any_match"
+    all_match = "all_match"
+
+
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class PathGlobs:
-    """A wrapper around sets of filespecs to include and exclude.
-
-    The syntax supported is roughly Git's glob syntax.
-
-    NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need
-    to be aware of any changes to this object's definition.
-    """
-
     globs: Tuple[str, ...]
     glob_match_error_behavior: GlobMatchErrorBehavior
     conjunction: GlobExpansionConjunction
@@ -63,16 +106,22 @@ class PathGlobs:
         conjunction: GlobExpansionConjunction = GlobExpansionConjunction.any_match,
         description_of_origin: Optional[str] = None,
     ) -> None:
-        """
+        """A request to find files given a set of globs.
+
+        The syntax supported is roughly Git's glob syntax. Use `*` for globs, `**` for recursive
+        globs, and `!` for ignores.
+
         :param globs: globs to match, e.g. `foo.txt` or `**/*.txt`. To exclude something, prefix it
-                      with `!`, e.g. `!ignore.py`.
+            with `!`, e.g. `!ignore.py`.
         :param glob_match_error_behavior: whether to warn or error upon match failures
         :param conjunction: whether all `globs` must match or only at least one must match
         :param description_of_origin: a human-friendly description of where this PathGlobs request
-                                      is coming from, used to improve the error message for
-                                      unmatched globs. For example, this might be the text string
-                                      "the option `--isort-config`".
+            is coming from, used to improve the error message for unmatched globs. For example,
+            this might be the text string "the option `--isort-config`".
         """
+
+        # NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method
+        # will need to be aware of any changes to this object's definition.
         self.globs = tuple(sorted(globs))
         self.glob_match_error_behavior = glob_match_error_behavior
         self.conjunction = conjunction
@@ -83,60 +132,19 @@ class PathGlobs:
         if self.glob_match_error_behavior == GlobMatchErrorBehavior.ignore:
             if self.description_of_origin:
                 raise ValueError(
-                    "You provided a `description_of_origin` value when `glob_match_error_behavior` is set to "
-                    "`ignore`. The `ignore` value means that the engine will never generate an error when "
-                    "the globs are generated, so `description_of_origin` won't end up ever being used. "
-                    "Please either change `glob_match_error_behavior` to `warn` or `error`, or remove "
+                    "You provided a `description_of_origin` value when `glob_match_error_behavior` "
+                    "is set to `ignore`. The `ignore` value means that the engine will never "
+                    "generate an error when the globs are generated, so `description_of_origin` "
+                    "won't end up ever being used. Please either change "
+                    "`glob_match_error_behavior` to `warn` or `error`, or remove "
                     "`description_of_origin`."
                 )
         else:
             if not self.description_of_origin:
                 raise ValueError(
-                    "Please provide a `description_of_origin` so that the error message is more helpful to "
-                    "users when their globs fail to match."
+                    "Please provide a `description_of_origin` so that the error message is more "
+                    "helpful to users when their globs fail to match."
                 )
-
-
-@dataclass(frozen=True)
-class Digest:
-    """A Digest is a content-digest fingerprint, and a length of underlying content.
-
-    These are used both to reference digests of strings/bytes/content, and as an opaque handle to a
-    set of files known about by the engine.
-
-    The contents of file sets referenced opaquely can be inspected by requesting a FilesContent for
-    it.
-    """
-
-    fingerprint: str
-    serialized_bytes_length: int
-
-    @classmethod
-    def _path(cls, digested_path):
-        return f"{digested_path.rstrip(os.sep)}.digest"
-
-    @classmethod
-    def clear(cls, digested_path):
-        """Clear any existing Digest file adjacent to the given digested_path."""
-        safe_delete(cls._path(digested_path))
-
-    @classmethod
-    def load(cls, digested_path):
-        """Load a Digest from a `.digest` file adjacent to the given digested_path.
-
-        :return: A Digest, or None if the Digest did not exist.
-        """
-        read_file = maybe_read_file(cls._path(digested_path))
-        if read_file:
-            fingerprint, length = read_file.split(":")
-            return Digest(fingerprint, int(length))
-        else:
-            return None
-
-    def dump(self, digested_path):
-        """Dump this Digest object adjacent to the given digested_path."""
-        payload = f"{self.fingerprint}:{self.serialized_bytes_length}"
-        safe_file_dump(self._path(digested_path), payload=payload)
 
 
 @dataclass(frozen=True)
@@ -153,19 +161,6 @@ class PathGlobsAndRoot:
     path_globs: PathGlobs
     root: str
     digest_hint: Optional[Digest] = None
-
-
-@dataclass(frozen=True)
-class Snapshot:
-    """A Snapshot is a collection of file paths and dir paths fingerprinted by their names/content.
-
-    Snapshots are used to make it easier to isolate process execution by fixing the contents of the
-    files being operated on and easing their movement to and from isolated execution sandboxes.
-    """
-
-    digest: Digest
-    files: Tuple[str, ...]
-    dirs: Tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -196,12 +191,6 @@ class MergeDigests:
             result = await Get(Digest, MergeDigests([digest1, digest2])
         """
         self.digests = tuple(digests)
-
-    def __post_init__(self) -> None:
-        non_digests = [v for v in self.digests if not isinstance(v, Digest)]  # type: ignore[unreachable]
-        if non_digests:
-            formatted_non_digests = "\n".join(f"* {v}" for v in non_digests)
-            raise ValueError(f"Not all arguments are digests:\n\n{formatted_non_digests}")
 
 
 @dataclass(frozen=True)
@@ -278,8 +267,7 @@ class SourcesSnapshot:
     snapshot: Snapshot
 
 
-def create_fs_rules():
-    """Creates rules that consume the intrinsic filesystem types."""
+def rules():
     return [
         RootRule(Workspace),
         RootRule(CreateDigest),

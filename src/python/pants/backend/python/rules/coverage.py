@@ -35,6 +35,7 @@ from pants.engine.fs import (
     Digest,
     DigestContents,
     FileContent,
+    GlobMatchErrorBehavior,
     MergeDigests,
     PathGlobs,
 )
@@ -44,7 +45,6 @@ from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import TransitiveTargets
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import file_option
-from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
 
 
