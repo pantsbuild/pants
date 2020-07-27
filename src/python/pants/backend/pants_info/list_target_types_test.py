@@ -120,7 +120,7 @@ def test_list_single() -> None:
         required = True
 
     tests_target_stdout = run_goal(
-        union_membership=UnionMembership({FortranTests.PluginField: [CustomField]}),
+        union_membership=UnionMembership({FortranTests._anonymous_plugin_field_cls: [CustomField]}),
         details_target=FortranTests.alias,
     )
     assert tests_target_stdout == dedent(

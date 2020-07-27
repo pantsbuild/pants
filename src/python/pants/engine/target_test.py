@@ -262,7 +262,7 @@ def test_add_custom_fields() -> None:
         alias = "custom_field"
         default = False
 
-    union_membership = UnionMembership({FortranTarget.PluginField: [CustomField]})
+    union_membership = UnionMembership({FortranTarget._anonymous_plugin_field_cls: [CustomField]})
     tgt_values = {CustomField.alias: True}
     tgt = FortranTarget(
         tgt_values, address=Address.parse(":lib"), union_membership=union_membership
