@@ -36,6 +36,7 @@ use process_execution::{
 use graph::{Entry, Node, NodeError, NodeVisualizer};
 use store::{self, StoreFileByDigest};
 use workunit_store::{with_workunit, Level, WorkunitMetadata};
+use hashing::Digest;
 
 pub type NodeResult<T> = Result<T, Failure>;
 
@@ -596,13 +597,13 @@ impl Snapshot {
 
 #[async_trait]
 impl WrappedNode for Snapshot {
-  type Item = Arc<store::Snapshot>;
+  type Item = Digest;
 
-  async fn run_wrapped_node(self, context: Context) -> NodeResult<Arc<store::Snapshot>> {
+  async fn run_wrapped_node(self, context: Context) -> NodeResult<Digest> {
     let path_globs = Self::lift_path_globs(&externs::val_for(&self.0))
       .map_err(|e| throw(&format!("Failed to parse PathGlobs: {}", e)))?;
     let snapshot = Self::create(context, path_globs).await?;
-    Ok(Arc::new(snapshot))
+    Ok(snapshot.digest)
   }
 }
 
@@ -1194,7 +1195,7 @@ impl Node for NodeKey {
         NodeKey::Select(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Value).await,
         NodeKey::Snapshot(n) => {
           n.run_wrapped_node(context)
-            .map_ok(NodeOutput::Snapshot)
+            .map_ok(NodeOutput::Digest)
             .await
         }
         NodeKey::Task(n) => {

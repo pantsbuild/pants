@@ -305,11 +305,11 @@ fn path_globs_to_digest(
   let core = context.core.clone();
   async move {
     let key = externs::acquire_key_for(args.pop().unwrap()).map_err(|e| format!("{:?}", e))?;
-    let snapshot = context
+    let digest = context
       .get(Snapshot(key))
       .await
       .map_err(|e| format!("{:?}", e))?;
-    let res: Result<_, String> = Ok(Snapshot::store_directory(&core, &snapshot.digest));
+    let res: Result<_, String> = Ok(Snapshot::store_directory(&core, &digest));
     res
   }
   .map_err(|err: String| throw(&err))
