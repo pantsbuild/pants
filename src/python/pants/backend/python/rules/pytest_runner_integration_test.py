@@ -7,6 +7,7 @@ from pathlib import Path, PurePath
 from textwrap import dedent
 from typing import List, Optional
 
+from pants.backend.python.dependency_inference import rules as dependency_inference_rules
 from pants.backend.python.rules import (
     download_pex_bin,
     pex,
@@ -62,7 +63,9 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
     ) -> None:
         for source_file in source_files:
             self.write_file(source_file)
-        source_globs = [PurePath(source_file.path).name for source_file in source_files]
+        source_globs = [PurePath(source_file.path).name for source_file in source_files] + [
+            "__init__.py"
+        ]
         self.add_to_build_file(
             self.package,
             dedent(
@@ -136,6 +139,8 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
             *subprocess_environment.rules(),
             SubsystemRule(TestSubsystem),
             RootRule(PythonTestFieldSet),
+            # For conftest detection.
+            *dependency_inference_rules.rules(),
         )
 
     def run_pytest(
@@ -383,10 +388,14 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
 
     def test_conftest_injection(self) -> None:
         self.create_python_test_target([self.good_source])
-        # Note that there's deliberately no target wrapping the conftest.py.
+
         self.create_file(
             relpath=PurePath(self.source_root, self.conftest_source.path).as_posix(),
             contents=self.conftest_source.content.decode(),
+        )
+
+        self.create_file(
+            relpath=PurePath(self.source_root, "BUILD").as_posix(), contents="python_tests()",
         )
 
         result = self.run_pytest(passthrough_args="-s")

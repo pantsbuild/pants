@@ -31,9 +31,9 @@ class LogOutputIntegrationTest(PantsRunIntegrationTest):
                 """\
                 python_tests(
                     name="fake",
-                    sources=["fake_test.py"],
-                    dependencies=[],
                 )
+
+                python_library()
                 """
             )
         )

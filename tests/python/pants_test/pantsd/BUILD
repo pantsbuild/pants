@@ -1,4 +1,4 @@
-# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 python_tests(
@@ -7,7 +7,6 @@ python_tests(
 
 python_library(
   name = 'pantsd_integration_test_base',
-  sources = ['pantsd_integration_test_base.py'],
 )
 
 python_integration_tests(

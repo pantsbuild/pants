@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 from typing import Tuple
 
-from pants.backend.python.rules import download_pex_bin, inject_ancestor_files, inject_init, pex
+from pants.backend.python.rules import download_pex_bin, pex
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
@@ -135,8 +135,6 @@ def rules():
         UnionRule(TypecheckRequest, MyPyRequest),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),
-        *inject_ancestor_files.rules(),
-        *inject_init.rules(),
         *pants_bin.rules(),
         *pex.rules(),
         *python_native_code.rules(),

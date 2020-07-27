@@ -105,6 +105,8 @@ class CoverageIntegrationTest(PantsRunIntegrationTest):
                     sources=["test_arithmetic.py"],
                     dependencies=['{tmpdir_relative}/src/python/project'],
                 )
+
+                python_library()
                 """
             )
         )
@@ -116,7 +118,15 @@ class CoverageIntegrationTest(PantsRunIntegrationTest):
         no_src_folder.mkdir()
         (no_src_folder / "__init__.py").touch()
         (no_src_folder / "test_no_src.py").write_text("def test_true():\n\tassert True is True\n")
-        (no_src_folder / "BUILD").write_text("python_tests()")
+        (no_src_folder / "BUILD").write_text(
+            dedent(
+                """\
+                python_tests()
+
+                python_library(name='lib')
+                """
+            )
+        )
         return tmpdir_relative
 
     def _run_tests(self, tmpdir_relative, *more_args: str) -> PantsResult:

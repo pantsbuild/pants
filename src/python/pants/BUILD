@@ -11,6 +11,11 @@ python_library(
 )
 
 python_library(
+  name='init',
+  sources=['__init__.py'],
+)
+
+python_library(
   name='pants-packaged',
   sources=[],
   dependencies=[
