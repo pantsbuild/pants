@@ -14,6 +14,8 @@ import pytest
 
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.internals.native import Native
+from pants.engine.internals.scheduler import Scheduler
 from pants.engine.rules import (
     MissingParameterTypeAnnotation,
     MissingReturnTypeAnnotation,
@@ -26,17 +28,10 @@ from pants.engine.rules import (
 )
 from pants.engine.selectors import Get, GetConstraints
 from pants.engine.unions import UnionMembership
-from pants.testutil.engine.util import (
-    MockGet,
-    assert_equal_with_printing,
-    fmt_rule,
-    run_rule,
-)
-from pants.engine.internals.native import Native
-from pants.engine.internals.scheduler import Scheduler
+from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS
+from pants.testutil.engine.util import MockGet, assert_equal_with_printing, fmt_rule, run_rule
 from pants.testutil.test_base import TestBase
 from pants.util.enums import match
-from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS
 from pants.util.logging import LogLevel
 
 

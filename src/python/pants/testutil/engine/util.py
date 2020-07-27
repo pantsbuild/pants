@@ -4,7 +4,6 @@
 import re
 from dataclasses import dataclass
 from io import StringIO
-from pathlib import Path
 from types import CoroutineType, GeneratorType
 from typing import (
     Any,
@@ -26,7 +25,6 @@ from pants.engine.goal import GoalSubsystem
 from pants.engine.internals.native import Native
 from pants.engine.selectors import Get
 from pants.engine.unions import UnionMembership
-
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.ranked_value import Rank, RankedValue, Value
 from pants.subsystem.subsystem import Subsystem
