@@ -24,10 +24,9 @@ from colors import blue, cyan, green, magenta, red
 
 from pants.engine.goal import GoalSubsystem
 from pants.engine.internals.native import Native
-from pants.engine.internals.scheduler import Scheduler
 from pants.engine.selectors import Get
 from pants.engine.unions import UnionMembership
-from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS
+
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.ranked_value import Rank, RankedValue, Value
 from pants.subsystem.subsystem import Subsystem
@@ -196,24 +195,6 @@ def run_rule(
 def init_native():
     """Return the `Native` instance."""
     return Native()
-
-
-def create_scheduler(rules, union_rules=None, validate=True, native=None):
-    """Create a Scheduler."""
-    native = native or init_native()
-    return Scheduler(
-        native=native,
-        ignore_patterns=[],
-        use_gitignore=False,
-        build_root=str(Path.cwd()),
-        local_store_dir="./.pants.d/lmdb_store",
-        local_execution_root_dir="./.pants.d",
-        named_caches_dir="./.pants.d/named_caches",
-        rules=rules,
-        union_rules=union_rules,
-        execution_options=DEFAULT_EXECUTION_OPTIONS,
-        validate=validate,
-    )
 
 
 def assert_equal_with_printing(

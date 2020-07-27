@@ -813,7 +813,7 @@ class TestCodegen(TestBase):
         self.address = Address.parse("src/avro:lib")
         self.create_files("src/avro", files=["f.avro"])
         self.add_to_build_file("src/avro", "avro_library(name='lib', sources=['*.avro'])")
-        self.union_membership = UnionMembership.from_rules(self.rules())
+        self.union_membership = self.request_single_product(UnionMembership, Params())
 
     def test_generate_sources(self) -> None:
         protocol_sources = AvroSources(["*.avro"], address=self.address)
