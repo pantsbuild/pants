@@ -28,7 +28,6 @@ from pants.init.options_initializer import BuildConfigInitializer, OptionsInitia
 from pants.init.specs_calculator import SpecsCalculator
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.reporting.reporting import Reporting
 from pants.reporting.streaming_workunit_handler import StreamingWorkunitHandler
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import maybe_profiled
@@ -58,7 +57,6 @@ class LocalPantsRunner:
     union_membership: UnionMembership
     profile_path: Optional[str]
     _run_tracker: RunTracker
-    _reporting: Optional[Reporting] = None
 
     @staticmethod
     def parse_options(
@@ -158,8 +156,7 @@ class LocalPantsRunner:
         # Propagates parent_build_id to pants runs that may be called from this pants run.
         os.environ["PANTS_PARENT_BUILD_ID"] = self._run_tracker.run_id
 
-        self._reporting = Reporting.global_instance()
-        self._reporting.initialize(self._run_tracker, self.options, start_time=start_time)
+        self._run_tracker.start(self.options, run_start_time=start_time)
 
         spec_parser = CmdLineSpecParser(get_buildroot())
         specs = [spec_parser.parse_spec(spec).to_spec_string() for spec in self.options.specs]
