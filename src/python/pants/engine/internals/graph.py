@@ -30,6 +30,7 @@ from pants.engine.addresses import (
 from pants.engine.collection import Collection
 from pants.engine.fs import (
     EMPTY_SNAPSHOT,
+    Digest,
     GlobExpansionConjunction,
     GlobMatchErrorBehavior,
     MergeDigests,
@@ -421,9 +422,9 @@ async def resolve_sources_snapshot(specs: Specs, global_options: GlobalOptions) 
         if tgt.has_field(Sources)
     )
 
-    filesystem_specs_snapshot = (
+    filesystem_specs_digest = (
         await Get(
-            Snapshot,
+            Digest,
             PathGlobs,
             specs.filesystem_specs.to_path_globs(
                 global_options.options.owners_not_found_behavior.to_glob_match_error_behavior()
@@ -436,8 +437,8 @@ async def resolve_sources_snapshot(specs: Specs, global_options: GlobalOptions) 
     # NB: We merge into a single snapshot to avoid the same files being duplicated if they were
     # covered both by address specs and filesystem specs.
     digests = [hydrated_sources.snapshot.digest for hydrated_sources in all_hydrated_sources]
-    if filesystem_specs_snapshot:
-        digests.append(filesystem_specs_snapshot.digest)
+    if filesystem_specs_digest:
+        digests.append(filesystem_specs_digest)
     result = await Get(Snapshot, MergeDigests(digests))
     return SourcesSnapshot(result)
 

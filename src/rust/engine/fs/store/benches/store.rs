@@ -83,7 +83,7 @@ pub fn criterion_benchmark_subset_wildcard(c: &mut Criterion) {
   // NB: We use a much larger snapshot size compared to the materialize benchmark!
   let (store, _tempdir, digest) = large_snapshot(&executor, 1000);
 
-  let mut cgroup = c.benchmark_group("snapshot_subset");
+  let mut cgroup = c.benchmark_group("digest_subset");
 
   cgroup
     .sample_size(10)

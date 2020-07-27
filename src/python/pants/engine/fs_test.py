@@ -16,17 +16,18 @@ from typing import Callable, List
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.fs import (
     EMPTY_DIGEST,
+    EMPTY_SNAPSHOT,
     AddPrefix,
     CreateDigest,
     Digest,
     DigestContents,
+    DigestSubset,
     FileContent,
     MergeDigests,
     PathGlobs,
     PathGlobsAndRoot,
     RemovePrefix,
     Snapshot,
-    SnapshotSubset,
     UrlToFetch,
     create_fs_rules,
 )
@@ -109,9 +110,9 @@ class FSTest(TestBase, SchedulerTestBase):
     def test_walk_literal_directory(self) -> None:
         self.assert_walk_dirs(["c.ln"], ["c.ln"])
         self.assert_walk_dirs(["a"], ["a"])
-        self.assert_walk_dirs(["a/b"], ["a/b"])
+        self.assert_walk_dirs(["a/b"], ["a", "a/b"])
         self.assert_walk_dirs(["z"], [])
-        self.assert_walk_dirs(["4.txt", "a/3.txt"], [])
+        self.assert_walk_dirs(["4.txt", "a/3.txt"], ["a"])
 
     def test_walk_siblings(self) -> None:
         self.assert_walk_files(["*.txt"], ["4.txt"])
@@ -215,7 +216,7 @@ class FSTest(TestBase, SchedulerTestBase):
         self.assert_walk_files(
             ["d.ln/**"], ["d.ln/3.txt", "d.ln/4.txt.ln", "d.ln/b/1.txt", "d.ln/b/2"]
         )
-        self.assert_walk_dirs(["a/**"], ["a/b"])
+        self.assert_walk_dirs(["a/**"], ["a", "a/b"])
 
     def test_walk_recursive_slash_doublestar_slash(self) -> None:
         self.assert_walk_files(["a/**/3.txt"], ["a/3.txt"])
@@ -224,9 +225,9 @@ class FSTest(TestBase, SchedulerTestBase):
 
     def test_walk_recursive_directory(self) -> None:
         self.assert_walk_dirs(["*"], ["a", "c.ln", "d.ln"])
-        self.assert_walk_dirs(["*/*"], ["a/b", "d.ln/b"])
+        self.assert_walk_dirs(["*/*"], ["a", "a/b", "c.ln", "d.ln", "d.ln/b"])
         self.assert_walk_dirs(["**/*"], ["a", "c.ln", "d.ln", "a/b", "d.ln/b"])
-        self.assert_walk_dirs(["*/*/*"], [])
+        self.assert_walk_dirs(["*/*/*"], ["a", "a/b", "d.ln", "d.ln/b"])
 
     def test_remove_duplicates(self) -> None:
         self.assert_walk_files(
@@ -672,19 +673,19 @@ class FSTest(TestBase, SchedulerTestBase):
             ),
         )
 
-    def test_empty_snapshot_subset(self) -> None:
-        ss = SnapshotSubset(self.generate_original_digest(), PathGlobs(()),)
-        subset_snapshot = self.request_single_product(Snapshot, ss)
+    def test_empty_digest_subset(self) -> None:
+        ds = DigestSubset(self.generate_original_digest(), PathGlobs(()))
+        subset_snapshot = self.request_single_product(Snapshot, ds)
         assert subset_snapshot.digest == EMPTY_DIGEST
         assert subset_snapshot.files == ()
         assert subset_snapshot.dirs == ()
 
-    def test_snapshot_subset_globs(self) -> None:
-        ss = SnapshotSubset(
+    def test_digest_subset_globs(self) -> None:
+        ds = DigestSubset(
             self.generate_original_digest(), PathGlobs(("a.txt", "c.txt", "subdir2/**")),
         )
 
-        subset_snapshot = self.request_single_product(Snapshot, ss)
+        subset_snapshot = self.request_single_product(Snapshot, ds)
         assert set(subset_snapshot.files) == {
             "a.txt",
             "c.txt",
@@ -705,22 +706,22 @@ class FSTest(TestBase, SchedulerTestBase):
         subset_digest = self.request_single_product(Digest, subset_input)
         assert subset_snapshot.digest == subset_digest
 
-    def test_snapshot_subset_globs_2(self) -> None:
-        ss = SnapshotSubset(
+    def test_digest_subset_globs_2(self) -> None:
+        ds = DigestSubset(
             self.generate_original_digest(), PathGlobs(("a.txt", "c.txt", "subdir2/*"))
         )
 
-        subset_snapshot = self.request_single_product(Snapshot, ss)
+        subset_snapshot = self.request_single_product(Snapshot, ds)
         assert set(subset_snapshot.files) == {"a.txt", "c.txt", "subdir2/a.txt"}
         assert set(subset_snapshot.dirs) == {"subdir2", "subdir2/nested_subdir"}
 
     def test_nonexistent_filename_globs(self) -> None:
         # We expect to ignore, rather than error, on files that don't exist in the original snapshot.
-        ss = SnapshotSubset(
+        ds = DigestSubset(
             self.generate_original_digest(), PathGlobs(("some_file_not_in_snapshot.txt", "a.txt")),
         )
 
-        subset_snapshot = self.request_single_product(Snapshot, ss)
+        subset_snapshot = self.request_single_product(Snapshot, ds)
         assert set(subset_snapshot.files) == {"a.txt"}
 
         content = b"dummy content"
@@ -789,14 +790,14 @@ class FSTest(TestBase, SchedulerTestBase):
             initial_snapshot = self.execute_expecting_one_result(
                 scheduler, Snapshot, PathGlobs([dir_glob])
             ).value
-            assert not initial_snapshot.is_empty
+            assert initial_snapshot != EMPTY_SNAPSHOT
             assertion_error = mutation_function(project_tree, dir_path)
 
             def assertion_fn() -> bool:
                 new_snapshot = self.execute_expecting_one_result(
                     scheduler, Snapshot, PathGlobs([dir_glob])
                 ).value
-                assert not new_snapshot.is_empty
+                assert new_snapshot != EMPTY_SNAPSHOT
                 if initial_snapshot.digest != new_snapshot.digest:
                     # successfully invalidated snapshot and got a new digest
                     return True

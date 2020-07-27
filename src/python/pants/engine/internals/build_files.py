@@ -17,7 +17,7 @@ from pants.engine.addresses import (
     BuildFileAddress,
     BuildFileAddresses,
 )
-from pants.engine.fs import Digest, DigestContents, PathGlobs, Snapshot
+from pants.engine.fs import DigestContents, PathGlobs, Snapshot
 from pants.engine.internals.mapper import AddressFamily, AddressMap, AddressMapper
 from pants.engine.internals.parser import BuildFilePreludeSymbols, error_on_imports
 from pants.engine.internals.target_adaptor import TargetAdaptor
@@ -34,14 +34,13 @@ class ResolvedTypeMismatchError(ResolveError):
 
 @rule
 async def evaluate_preludes(address_mapper: AddressMapper) -> BuildFilePreludeSymbols:
-    snapshot = await Get(
-        Snapshot,
+    prelude_digest_contents = await Get(
+        DigestContents,
         PathGlobs(
             address_mapper.prelude_glob_patterns,
             glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
         ),
     )
-    prelude_digest_contents = await Get(DigestContents, Digest, snapshot.digest)
     values: Dict[str, Any] = {}
     for file_content in prelude_digest_contents:
         try:
@@ -66,14 +65,15 @@ async def parse_address_family(
 
     The AddressFamily may be empty, but it will not be None.
     """
-    path_globs = PathGlobs(
-        globs=(
-            *(os.path.join(directory.path, p) for p in address_mapper.build_patterns),
-            *(f"!{p}" for p in address_mapper.build_ignore_patterns),
-        )
+    digest_contents = await Get(
+        DigestContents,
+        PathGlobs(
+            globs=(
+                *(os.path.join(directory.path, p) for p in address_mapper.build_patterns),
+                *(f"!{p}" for p in address_mapper.build_ignore_patterns),
+            )
+        ),
     )
-    snapshot = await Get(Snapshot, PathGlobs, path_globs)
-    digest_contents = await Get(DigestContents, Digest, snapshot.digest)
     if not digest_contents:
         raise ResolveError(f"Directory '{directory.path}' does not contain any BUILD files.")
 

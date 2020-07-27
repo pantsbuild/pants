@@ -32,14 +32,12 @@ from pants.engine.addresses import Address
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import (
     EMPTY_DIGEST,
-    EMPTY_SNAPSHOT,
     AddPrefix,
     Digest,
     GlobExpansionConjunction,
     GlobMatchErrorBehavior,
     MergeDigests,
     PathGlobs,
-    Snapshot,
 )
 from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.process import MultiPlatformProcess, ProcessResult
@@ -363,10 +361,10 @@ async def create_pex(
 
     argv.extend(request.requirements)
 
-    constraint_file_snapshot = EMPTY_SNAPSHOT
+    constraint_file_digest = EMPTY_DIGEST
     if python_setup.requirement_constraints is not None:
-        constraint_file_snapshot = await Get(
-            Snapshot,
+        constraint_file_digest = await Get(
+            Digest,
             PathGlobs(
                 [python_setup.requirement_constraints],
                 glob_match_error_behavior=GlobMatchErrorBehavior.error,
@@ -387,7 +385,7 @@ async def create_pex(
                 pex_bin.digest,
                 sources_digest_as_subdir,
                 additional_inputs_digest,
-                constraint_file_snapshot.digest,
+                constraint_file_digest,
             )
         ),
     )
