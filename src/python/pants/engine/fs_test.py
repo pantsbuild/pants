@@ -16,18 +16,19 @@ from typing import Callable, List
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.fs import (
     EMPTY_DIGEST,
+    EMPTY_SNAPSHOT,
     AddPrefix,
     CreateDigest,
     Digest,
     DigestContents,
+    DigestSubset,
+    DownloadFile,
     FileContent,
     MergeDigests,
     PathGlobs,
     PathGlobsAndRoot,
     RemovePrefix,
     Snapshot,
-    SnapshotSubset,
-    UrlToFetch,
     create_fs_rules,
 )
 from pants.engine.internals.scheduler import ExecutionError
@@ -109,9 +110,9 @@ class FSTest(TestBase, SchedulerTestBase):
     def test_walk_literal_directory(self) -> None:
         self.assert_walk_dirs(["c.ln"], ["c.ln"])
         self.assert_walk_dirs(["a"], ["a"])
-        self.assert_walk_dirs(["a/b"], ["a/b"])
+        self.assert_walk_dirs(["a/b"], ["a", "a/b"])
         self.assert_walk_dirs(["z"], [])
-        self.assert_walk_dirs(["4.txt", "a/3.txt"], [])
+        self.assert_walk_dirs(["4.txt", "a/3.txt"], ["a"])
 
     def test_walk_siblings(self) -> None:
         self.assert_walk_files(["*.txt"], ["4.txt"])
@@ -215,7 +216,7 @@ class FSTest(TestBase, SchedulerTestBase):
         self.assert_walk_files(
             ["d.ln/**"], ["d.ln/3.txt", "d.ln/4.txt.ln", "d.ln/b/1.txt", "d.ln/b/2"]
         )
-        self.assert_walk_dirs(["a/**"], ["a/b"])
+        self.assert_walk_dirs(["a/**"], ["a", "a/b"])
 
     def test_walk_recursive_slash_doublestar_slash(self) -> None:
         self.assert_walk_files(["a/**/3.txt"], ["a/3.txt"])
@@ -224,9 +225,9 @@ class FSTest(TestBase, SchedulerTestBase):
 
     def test_walk_recursive_directory(self) -> None:
         self.assert_walk_dirs(["*"], ["a", "c.ln", "d.ln"])
-        self.assert_walk_dirs(["*/*"], ["a/b", "d.ln/b"])
+        self.assert_walk_dirs(["*/*"], ["a", "a/b", "c.ln", "d.ln", "d.ln/b"])
         self.assert_walk_dirs(["**/*"], ["a", "c.ln", "d.ln", "a/b", "d.ln/b"])
-        self.assert_walk_dirs(["*/*/*"], [])
+        self.assert_walk_dirs(["*/*/*"], ["a", "a/b", "d.ln", "d.ln/b"])
 
     def test_remove_duplicates(self) -> None:
         self.assert_walk_files(
@@ -590,10 +591,12 @@ class FSTest(TestBase, SchedulerTestBase):
     def test_download(self) -> None:
         with self.isolated_local_store():
             with http_server(StubHandler) as port:
-                url = UrlToFetch(
-                    f"http://localhost:{port}/do_not_remove_or_edit.txt", self.pantsbuild_digest
+                snapshot = self.request_single_product(
+                    Snapshot,
+                    DownloadFile(
+                        f"http://localhost:{port}/do_not_remove_or_edit.txt", self.pantsbuild_digest
+                    ),
                 )
-                snapshot = self.request_single_product(Snapshot, url)
                 self.assert_snapshot_equals(
                     snapshot,
                     ["do_not_remove_or_edit.txt"],
@@ -603,33 +606,39 @@ class FSTest(TestBase, SchedulerTestBase):
     def test_download_missing_file(self) -> None:
         with self.isolated_local_store():
             with http_server(StubHandler) as port:
-                url = UrlToFetch(f"http://localhost:{port}/notfound", self.pantsbuild_digest)
                 with self.assertRaises(ExecutionError) as cm:
-                    self.request_single_product(Snapshot, url)
+                    self.request_single_product(
+                        Snapshot,
+                        DownloadFile(f"http://localhost:{port}/notfound", self.pantsbuild_digest),
+                    )
                 assert "404" in str(cm.exception)
 
     def test_download_wrong_digest(self) -> None:
         with self.isolated_local_store():
             with http_server(StubHandler) as port:
-                url = UrlToFetch(
-                    f"http://localhost:{port}/do_not_remove_or_edit.txt",
-                    Digest(
-                        self.pantsbuild_digest.fingerprint,
-                        self.pantsbuild_digest.serialized_bytes_length + 1,
-                    ),
-                )
                 with self.assertRaises(ExecutionError) as cm:
-                    self.request_single_product(Snapshot, url)
+                    self.request_single_product(
+                        Snapshot,
+                        DownloadFile(
+                            f"http://localhost:{port}/do_not_remove_or_edit.txt",
+                            Digest(
+                                self.pantsbuild_digest.fingerprint,
+                                self.pantsbuild_digest.serialized_bytes_length + 1,
+                            ),
+                        ),
+                    )
                 assert "wrong digest" in str(cm.exception).lower()
 
     # It's a shame that this isn't hermetic, but setting up valid local HTTPS certificates is a pain.
     def test_download_https(self) -> None:
         with self.isolated_local_store():
-            url = UrlToFetch(
-                "https://binaries.pantsbuild.org/do_not_remove_or_edit.txt",
-                Digest("f461fc99bcbe18e667687cf672c2dc68dc5c5db77c5bd426c9690e5c9cec4e3b", 184,),
+            snapshot = self.request_single_product(
+                Snapshot,
+                DownloadFile(
+                    "https://binaries.pantsbuild.org/do_not_remove_or_edit.txt",
+                    Digest("f461fc99bcbe18e667687cf672c2dc68dc5c5db77c5bd426c9690e5c9cec4e3b", 184),
+                ),
             )
-            snapshot = self.request_single_product(Snapshot, url)
             self.assert_snapshot_equals(
                 snapshot,
                 ["do_not_remove_or_edit.txt"],
@@ -644,7 +653,7 @@ class FSTest(TestBase, SchedulerTestBase):
                 # This would error if we hit the HTTP server, because 404,
                 # but we're not going to hit the HTTP server because it's cached,
                 # so we shouldn't see an error...
-                url = UrlToFetch(
+                url = DownloadFile(
                     f"http://localhost:{port}/roland",
                     Digest("693d8db7b05e99c6b7a7c0616456039d89c555029026936248085193559a0b5d", 16),
                 )
@@ -672,19 +681,19 @@ class FSTest(TestBase, SchedulerTestBase):
             ),
         )
 
-    def test_empty_snapshot_subset(self) -> None:
-        ss = SnapshotSubset(self.generate_original_digest(), PathGlobs(()),)
-        subset_snapshot = self.request_single_product(Snapshot, ss)
+    def test_empty_digest_subset(self) -> None:
+        ds = DigestSubset(self.generate_original_digest(), PathGlobs(()))
+        subset_snapshot = self.request_single_product(Snapshot, ds)
         assert subset_snapshot.digest == EMPTY_DIGEST
         assert subset_snapshot.files == ()
         assert subset_snapshot.dirs == ()
 
-    def test_snapshot_subset_globs(self) -> None:
-        ss = SnapshotSubset(
+    def test_digest_subset_globs(self) -> None:
+        ds = DigestSubset(
             self.generate_original_digest(), PathGlobs(("a.txt", "c.txt", "subdir2/**")),
         )
 
-        subset_snapshot = self.request_single_product(Snapshot, ss)
+        subset_snapshot = self.request_single_product(Snapshot, ds)
         assert set(subset_snapshot.files) == {
             "a.txt",
             "c.txt",
@@ -705,22 +714,22 @@ class FSTest(TestBase, SchedulerTestBase):
         subset_digest = self.request_single_product(Digest, subset_input)
         assert subset_snapshot.digest == subset_digest
 
-    def test_snapshot_subset_globs_2(self) -> None:
-        ss = SnapshotSubset(
+    def test_digest_subset_globs_2(self) -> None:
+        ds = DigestSubset(
             self.generate_original_digest(), PathGlobs(("a.txt", "c.txt", "subdir2/*"))
         )
 
-        subset_snapshot = self.request_single_product(Snapshot, ss)
+        subset_snapshot = self.request_single_product(Snapshot, ds)
         assert set(subset_snapshot.files) == {"a.txt", "c.txt", "subdir2/a.txt"}
         assert set(subset_snapshot.dirs) == {"subdir2", "subdir2/nested_subdir"}
 
     def test_nonexistent_filename_globs(self) -> None:
         # We expect to ignore, rather than error, on files that don't exist in the original snapshot.
-        ss = SnapshotSubset(
+        ds = DigestSubset(
             self.generate_original_digest(), PathGlobs(("some_file_not_in_snapshot.txt", "a.txt")),
         )
 
-        subset_snapshot = self.request_single_product(Snapshot, ss)
+        subset_snapshot = self.request_single_product(Snapshot, ds)
         assert set(subset_snapshot.files) == {"a.txt"}
 
         content = b"dummy content"
@@ -789,14 +798,14 @@ class FSTest(TestBase, SchedulerTestBase):
             initial_snapshot = self.execute_expecting_one_result(
                 scheduler, Snapshot, PathGlobs([dir_glob])
             ).value
-            assert not initial_snapshot.is_empty
+            assert initial_snapshot != EMPTY_SNAPSHOT
             assertion_error = mutation_function(project_tree, dir_path)
 
             def assertion_fn() -> bool:
                 new_snapshot = self.execute_expecting_one_result(
                     scheduler, Snapshot, PathGlobs([dir_glob])
                 ).value
-                assert not new_snapshot.is_empty
+                assert new_snapshot != EMPTY_SNAPSHOT
                 if initial_snapshot.digest != new_snapshot.digest:
                     # successfully invalidated snapshot and got a new digest
                     return True

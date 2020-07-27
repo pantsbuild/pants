@@ -167,18 +167,14 @@ class Snapshot:
     files: Tuple[str, ...]
     dirs: Tuple[str, ...]
 
-    @property
-    def is_empty(self):
-        return self == EMPTY_SNAPSHOT
-
 
 @dataclass(frozen=True)
-class SnapshotSubset:
-    """A request to get a subset of a directory digest.
+class DigestSubset:
+    """A request to get a subset of a digest.
 
     Example:
 
-        result = await Get(Snapshot, DigestSubset(original_digest, PathGlobs(["subdir1", "f.txt"]))
+        result = await Get(Digest, DigestSubset(original_digest, PathGlobs(["subdir1", "f.txt"]))
     """
 
     digest: Digest
@@ -238,9 +234,16 @@ class AddPrefix:
 
 
 @dataclass(frozen=True)
-class UrlToFetch:
+class DownloadFile:
+    """Download an asset via a GET request.
+
+    To compute the `expected_digest`, manually download the file, then run `shasum -a 256` to
+    compute the fingerprint and `wc -c` to compute the expected length of the downloaded file in
+    bytes.
+    """
+
     url: str
-    digest: Digest
+    expected_digest: Digest
 
 
 @side_effecting
@@ -285,6 +288,6 @@ def create_fs_rules():
         RootRule(PathGlobs),
         RootRule(RemovePrefix),
         RootRule(AddPrefix),
-        RootRule(UrlToFetch),
-        RootRule(SnapshotSubset),
+        RootRule(DownloadFile),
+        RootRule(DigestSubset),
     ]

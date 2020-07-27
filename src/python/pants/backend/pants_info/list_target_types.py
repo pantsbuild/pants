@@ -5,6 +5,7 @@ import textwrap
 from dataclasses import dataclass
 from typing import Generic, Optional, Sequence, Type, cast, get_type_hints
 
+from pants.core.util_rules.pants_bin import PantsBin
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import goal_rule
@@ -203,6 +204,7 @@ def list_target_types(
     union_membership: UnionMembership,
     target_types_subsystem: TargetTypesSubsystem,
     console: Console,
+    pants_bin: PantsBin,
 ) -> TargetTypes:
     with target_types_subsystem.line_oriented(console) as print_stdout:
         if target_types_subsystem.details:
@@ -231,8 +233,8 @@ def list_target_types(
             lines = [
                 f"\n{title}\n",
                 textwrap.fill(
-                    "Use `./pants target-types --details=$target_type` to get detailed "
-                    "information for a particular target type.",
+                    f"Use `{pants_bin.render_command('target-types', '--details=$target_type')}` "
+                    "to get detailed information for a particular target type.",
                     80,
                 ),
                 "\n",

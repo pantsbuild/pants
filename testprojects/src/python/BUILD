@@ -49,4 +49,5 @@ files(
 files(
   name = 'unicode_directory',
   sources = ['unicode/**/*'],
+  tags = {'nolint'},
 )

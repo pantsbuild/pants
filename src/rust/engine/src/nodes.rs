@@ -34,6 +34,7 @@ use process_execution::{
 };
 
 use graph::{Entry, Node, NodeError, NodeVisualizer};
+use hashing::Digest;
 use store::{self, StoreFileByDigest};
 use workunit_store::{with_workunit, Level, WorkunitMetadata};
 
@@ -596,13 +597,13 @@ impl Snapshot {
 
 #[async_trait]
 impl WrappedNode for Snapshot {
-  type Item = Arc<store::Snapshot>;
+  type Item = Digest;
 
-  async fn run_wrapped_node(self, context: Context) -> NodeResult<Arc<store::Snapshot>> {
+  async fn run_wrapped_node(self, context: Context) -> NodeResult<Digest> {
     let path_globs = Self::lift_path_globs(&externs::val_for(&self.0))
       .map_err(|e| throw(&format!("Failed to parse PathGlobs: {}", e)))?;
     let snapshot = Self::create(context, path_globs).await?;
-    Ok(Arc::new(snapshot))
+    Ok(snapshot.digest)
   }
 }
 
@@ -732,13 +733,13 @@ impl WrappedNode for DownloadedFile {
 
   async fn run_wrapped_node(self, context: Context) -> NodeResult<Arc<store::Snapshot>> {
     let value = externs::val_for(&self.0);
-    let url_to_fetch = externs::project_str(&value, "url");
+    let url_str = externs::project_str(&value, "url");
 
-    let url = Url::parse(&url_to_fetch)
-      .map_err(|err| throw(&format!("Error parsing URL {}: {}", url_to_fetch, err)))?;
+    let url = Url::parse(&url_str)
+      .map_err(|err| throw(&format!("Error parsing URL {}: {}", url_str, err)))?;
 
-    let expected_digest =
-      lift_digest(&externs::project_ignoring_type(&value, "digest")).map_err(|s| throw(&s))?;
+    let expected_digest = lift_digest(&externs::project_ignoring_type(&value, "expected_digest"))
+      .map_err(|s| throw(&s))?;
 
     let snapshot = self
       .load_or_download(context.core, url, expected_digest)
@@ -1192,11 +1193,7 @@ impl Node for NodeKey {
             .await
         }
         NodeKey::Select(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Value).await,
-        NodeKey::Snapshot(n) => {
-          n.run_wrapped_node(context)
-            .map_ok(NodeOutput::Snapshot)
-            .await
-        }
+        NodeKey::Snapshot(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Digest).await,
         NodeKey::Task(n) => {
           n.run_wrapped_node(context)
             .map_ok(|python_rule_output| {

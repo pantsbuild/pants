@@ -28,7 +28,7 @@ from pants.core.util_rules.determine_source_files import (
     SourceFiles,
     SpecifiedSourceFilesRequest,
 )
-from pants.engine.fs import Digest, MergeDigests, PathGlobs, Snapshot, SnapshotSubset
+from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get, MultiGet
@@ -92,8 +92,8 @@ async def flake8_lint_partition(
     )
 
     config_path: Optional[str] = flake8.options.config
-    config_snapshot_request = Get(
-        Snapshot,
+    config_digest_request = Get(
+        Digest,
         PathGlobs(
             globs=[config_path] if config_path else [],
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
@@ -111,18 +111,16 @@ async def flake8_lint_partition(
         ),
     )
 
-    requirements_pex, config_snapshot, all_source_files, specified_source_files = await MultiGet(
+    requirements_pex, config_digest, all_source_files, specified_source_files = await MultiGet(
         requirements_pex_request,
-        config_snapshot_request,
+        config_digest_request,
         all_source_files_request,
         specified_source_files_request,
     )
 
     input_digest = await Get(
         Digest,
-        MergeDigests(
-            (all_source_files.snapshot.digest, requirements_pex.digest, config_snapshot.digest)
-        ),
+        MergeDigests((all_source_files.snapshot.digest, requirements_pex.digest, config_digest)),
     )
 
     address_references = ", ".join(
@@ -152,10 +150,10 @@ async def flake8_lint_partition(
     results_file = None
     if report_path:
         report_file_snapshot = await Get(
-            Snapshot, SnapshotSubset(result.output_digest, PathGlobs([report_path.name]))
+            Snapshot, DigestSubset(result.output_digest, PathGlobs([report_path.name]))
         )
-        if report_file_snapshot.is_empty or len(report_file_snapshot.files) != 1:
-            raise Exception(f"Unexpected report file snapshot: {report_file_snapshot}")
+        if len(report_file_snapshot.files) != 1:
+            raise Exception(f"Unexpected report file snapshot: {report_file_snapshot.files}")
         results_file = LintResultFile(output_path=report_path, digest=report_file_snapshot.digest)
 
     return LintResult.from_fallible_process_result(

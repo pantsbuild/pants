@@ -416,12 +416,12 @@ py_class!(class PyTypes |py| {
       multi_platform_process: PyType,
       process_result: PyType,
       coroutine: PyType,
-      url_to_fetch: PyType,
+      download_file: PyType,
       string: PyType,
       bytes: PyType,
       interactive_process: PyType,
       interactive_process_result: PyType,
-      snapshot_subset: PyType
+      digest_subset: PyType
   ) -> CPyResult<Self> {
     Self::create_instance(
         py,
@@ -443,12 +443,12 @@ py_class!(class PyTypes |py| {
         multi_platform_process: externs::type_for(multi_platform_process),
         process_result: externs::type_for(process_result),
         coroutine: externs::type_for(coroutine),
-        url_to_fetch: externs::type_for(url_to_fetch),
+        download_file: externs::type_for(download_file),
         string: externs::type_for(string),
         bytes: externs::type_for(bytes),
         interactive_process: externs::type_for(interactive_process),
         interactive_process_result: externs::type_for(interactive_process_result),
-        snapshot_subset: externs::type_for(snapshot_subset),
+        digest_subset: externs::type_for(digest_subset),
     })),
     )
   }

@@ -14,6 +14,7 @@ from pants.core.util_rules import (
     distdir,
     external_tool,
     filter_empty_sources,
+    pants_bin,
     strip_source_roots,
 )
 from pants.source import source_root
@@ -33,6 +34,7 @@ def rules():
         *determine_source_files.rules(),
         *distdir.rules(),
         *filter_empty_sources.rules(),
+        *pants_bin.rules(),
         *strip_source_roots.rules(),
         *archive.rules(),
         *external_tool.rules(),

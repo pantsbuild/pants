@@ -232,13 +232,10 @@ class RunTracker(Subsystem):
     def is_background_root_workunit(self, workunit):
         return workunit is self._background_root_workunit
 
-    def initialize(self, all_options):
-        """Create run_info and relevant directories, and return the run id.
-
-        Must be called before `start`.
-        """
+    def start(self, all_options, run_start_time=None):
+        """Start tracking this pants run."""
         if self.run_info:
-            raise AssertionError("RunTracker.initialize must not be called multiple times.")
+            raise AssertionError("RunTracker.start must not be called multiple times.")
 
         # Initialize the run.
 
@@ -267,27 +264,13 @@ class RunTracker(Subsystem):
 
         self._all_options = all_options
 
-        return (self.run_id, self.run_uuid)
-
-    def start(self, report, run_start_time=None):
-        """Start tracking this pants run using the given Report.
-
-        `RunTracker.initialize` must have been called first to create the run_info_dir and
-        run_info. TODO: This lifecycle represents a delicate dance with the `Reporting.initialize`
-        method, and portions of the `RunTracker` should likely move to `Reporting` instead.
-
-        report: an instance of pants.reporting.Report.
-        """
-        if not self.run_info:
-            raise AssertionError("RunTracker.initialize must be called before RunTracker.start.")
-
-        self.report = report
+        self.report = Report()
 
         # Set up the JsonReporter for V2 stats.
         if self._stats_version == 2:
             json_reporter_settings = JsonReporter.Settings(log_level=Report.INFO)
             self.json_reporter = JsonReporter(self, json_reporter_settings)
-            report.add_reporter("json", self.json_reporter)
+            self.report.add_reporter("json", self.json_reporter)
 
         self.report.open()
 
@@ -299,13 +282,6 @@ class RunTracker(Subsystem):
         # Set the true start time in the case of e.g. the daemon.
         self._main_root_workunit.start(run_start_time)
         self.report.start_workunit(self._main_root_workunit)
-
-        # Log reporting details.
-        url = self.run_info.get_info("report_url")
-        if url:
-            self.log(Report.INFO, f"See a report at: {url}")
-        else:
-            self.log(Report.INFO, "(To run a reporting server: ./pants server)")
 
     def set_root_outcome(self, outcome):
         """Useful for setup code that doesn't have a reference to a workunit."""

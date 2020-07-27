@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import List
 
 from pants.core.util_rules.archive import ExtractedDigest, MaybeExtractable
-from pants.engine.fs import Digest, Snapshot, UrlToFetch
+from pants.engine.fs import Digest, DownloadFile
 from pants.engine.platform import Platform
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
@@ -25,7 +25,7 @@ class ExternalToolError(Exception):
 
 @dataclass(frozen=True)
 class ExternalToolRequest:
-    url_to_fetch: UrlToFetch
+    download_file_request: DownloadFile
     exe: str
 
 
@@ -152,7 +152,7 @@ class ExternalTool(Subsystem):
                 ver, plat_val, sha256, length = (x.strip() for x in known_version.split("|"))
             except ValueError:
                 raise ExternalToolError(
-                    f"Bad value for --known-versions (see ./pants "
+                    f"Bad value for --known-versions (see {self.get_options().pants_bin_name} "
                     f"help-advanced {self.options_scope}): {known_version}"
                 )
             if plat_val == plat.value and ver == version:
@@ -164,7 +164,7 @@ class ExternalTool(Subsystem):
                     raise ExternalToolError(
                         f"Couldn't find {self.name} version {version} on {plat.value}"
                     ) from e
-                return ExternalToolRequest(UrlToFetch(url=url, digest=digest), exe)
+                return ExternalToolRequest(DownloadFile(url=url, expected_digest=digest), exe)
         raise UnknownVersion(
             f"No known version of {self.name} {version} for {plat.value} found in {known_versions}"
         )
@@ -172,8 +172,8 @@ class ExternalTool(Subsystem):
 
 @rule
 async def download_external_tool(request: ExternalToolRequest) -> DownloadedExternalTool:
-    snapshot = await Get(Snapshot, UrlToFetch, request.url_to_fetch)
-    extracted_digest = await Get(ExtractedDigest, MaybeExtractable(snapshot.digest))
+    digest = await Get(Digest, DownloadFile, request.download_file_request)
+    extracted_digest = await Get(ExtractedDigest, MaybeExtractable(digest))
     return DownloadedExternalTool(extracted_digest.digest, request.exe)
 
 

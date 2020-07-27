@@ -47,58 +47,6 @@ class PythonSourcesTest(TestBase):
         address = Address(spec_path=parent_directory, target_name="target")
         return target_cls({Sources.alias: files}, address=address)
 
-    def test_adds_missing_inits(self) -> None:
-        target_with_init = self.create_target(
-            parent_directory="src/python/project", files=["lib.py", "__init__.py"]
-        )
-        # Create an __init__.py not included in any targets. This should be automatically added.
-        self.create_file("src/python/test_project/__init__.py")
-        target_with_undeclared_init = self.create_target(
-            parent_directory="src/python/test_project", files=["f1.py", "f2.py"]
-        )
-        files_target = self.create_target(
-            parent_directory="src/python/project/resources",
-            files=["loose_file.txt"],
-            target_cls=Files,
-        )
-        targets = [target_with_init, target_with_undeclared_init, files_target]
-
-        stripped_result = self.request_single_product(
-            StrippedPythonSources,
-            Params(
-                StrippedPythonSourcesRequest(targets, include_files=True),
-                create_options_bootstrapper(),
-            ),
-        )
-        assert sorted(stripped_result.snapshot.files) == sorted(
-            [
-                "project/lib.py",
-                "project/__init__.py",
-                "test_project/f1.py",
-                "test_project/f2.py",
-                "test_project/__init__.py",
-                "src/python/project/resources/loose_file.txt",
-            ]
-        )
-
-        unstripped_result = self.request_single_product(
-            UnstrippedPythonSources,
-            Params(
-                UnstrippedPythonSourcesRequest(targets, include_files=True),
-                create_options_bootstrapper(),
-            ),
-        )
-        assert sorted(unstripped_result.snapshot.files) == sorted(
-            [
-                "src/python/project/lib.py",
-                "src/python/project/__init__.py",
-                "src/python/test_project/f1.py",
-                "src/python/test_project/f2.py",
-                "src/python/test_project/__init__.py",
-                "src/python/project/resources/loose_file.txt",
-            ]
-        )
-
     def test_filters_out_irrelevant_targets(self) -> None:
         targets = [
             self.create_target(

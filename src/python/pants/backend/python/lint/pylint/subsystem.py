@@ -19,14 +19,19 @@ class Pylint(PythonToolBase):
     def register_options(cls, register):
         super().register_options(register)
         register(
-            "--skip", type=bool, default=False, help="Don't use Pylint when running `./pants lint`"
+            "--skip",
+            type=bool,
+            default=False,
+            help=f"Don't use Pylint when running `{register.bootstrap.pants_bin_name} lint`",
         )
         register(
             "--args",
             type=list,
             member_type=shell_str,
-            help="Arguments to pass directly to Pylint, e.g. "
-            '`--pylint-args="--ignore=foo.py,bar.py --disable=C0330,W0311"`',
+            help=(
+                "Arguments to pass directly to Pylint, e.g. "
+                f'`--{cls.options_scope}-args="--ignore=foo.py,bar.py --disable=C0330,W0311"`'
+            ),
         )
         register(
             "--config",

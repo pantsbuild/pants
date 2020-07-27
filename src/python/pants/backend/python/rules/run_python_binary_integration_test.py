@@ -52,17 +52,18 @@ class RunPythonBinaryIntegrationTest(PantsRunIntegrationTest):
             (src_root2 / "BUILD").write_text("python_library()")
             result = self.run_pants(
                 [
-                    "--dependency-inference",
+                    "--python-infer-imports",
                     (
                         f"--source-root-patterns=['/{tmpdir_relative}/src_root1', "
                         f"'/{tmpdir_relative}/src_root2']"
                     ),
                     "--pants-ignore=__pycache__",
+                    "--pants-ignore=/src/python",
                     "run",
                     f"{tmpdir_relative}/src_root1/project/app.py",
                 ]
             )
 
-        assert result.returncode == 23
-        assert result.stdout_data == "HELLO WORLD.\n"
         assert "Hola, mundo.\n" in result.stderr_data
+        assert result.stdout_data == "HELLO WORLD.\n"
+        assert result.returncode == 23

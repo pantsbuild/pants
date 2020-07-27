@@ -265,6 +265,7 @@ class OptionsTest(TestBase):
         options.register("fromfile", "--intvalue", type=int)
         options.register("fromfile", "--dictvalue", type=dict)
         options.register("fromfile", "--listvalue", type=list)
+        options.register("fromfile", "--passthru-listvalue", type=list, passthrough=True)
         options.register("fromfile", "--appendvalue", type=list, member_type=int)
 
         # For fingerprint tests
@@ -886,18 +887,20 @@ class OptionsTest(TestBase):
 
     def test_passthru_args_subsystems_and_goals(self):
         # Test that passthrough args are applied.
-        options = self._parse(flags="")
         options = Options.create(
             env={},
             config=self._create_config(),
             known_scope_infos=[global_scope(), task("test"), subsystem("passconsumer")],
-            args=["./pants", "test", "target", "--", "bar", "--baz"],
+            args=["./pants", "test", "target", "--", "bar", "--baz", "@dont_fromfile_expand_me"],
         )
         options.register(
             "passconsumer", "--passthing", passthrough=True, type=list, member_type=str
         )
 
-        self.assertEqual(["bar", "--baz"], options.for_scope("passconsumer").passthing)
+        self.assertEqual(
+            ["bar", "--baz", "@dont_fromfile_expand_me"],
+            options.for_scope("passconsumer").passthing,
+        )
 
     def test_at_most_one_goal_with_passthru_args(self):
         with self.assertRaisesWithMessageContaining(
@@ -1289,11 +1292,11 @@ class OptionsTest(TestBase):
         self.assertNotIn((str, "shant_be_fingerprinted"), pairs)
 
     def assert_fromfile(self, parse_func, expected_append=None, append_contents=None):
-        def _do_assert_fromfile(dest, expected, contents):
+        def _do_assert_fromfile(dest, expected, contents, passthru_flags=""):
             with temporary_file(binary_mode=False) as fp:
                 fp.write(contents)
                 fp.close()
-                options = parse_func(dest, fp.name)
+                options = parse_func(dest, fp.name, passthru_flags)
                 self.assertEqual(expected, options.for_scope("fromfile")[dest])
 
         _do_assert_fromfile(dest="string", expected="jake", contents="jake")
@@ -1324,6 +1327,18 @@ class OptionsTest(TestBase):
                 """
             ),
         )
+        _do_assert_fromfile(
+            dest="passthru_listvalue",
+            expected=["a", "1", "2", "bob", "@jake"],
+            contents=dedent(
+                """
+                ['a',
+                 1,
+                 2]
+                """
+            ),
+            passthru_flags="bob @jake",
+        )
 
         expected_append = expected_append or [1, 2, 42]
         append_contents = append_contents or dedent(
@@ -1338,8 +1353,10 @@ class OptionsTest(TestBase):
         _do_assert_fromfile(dest="appendvalue", expected=expected_append, contents=append_contents)
 
     def test_fromfile_flags(self) -> None:
-        def parse_func(dest, fromfile):
-            return self._parse(flags=f"fromfile --{dest.replace('_', '-')}=@{fromfile}")
+        def parse_func(dest, fromfile, passthru_flags):
+            return self._parse(
+                flags=f"fromfile --{dest.replace('_', '-')}=@{fromfile} -- {passthru_flags}"
+            )
 
         # You can only append a single item at a time with append flags, ie: we don't override the
         # default list like we do with env of config.  As such, send in a single append value here
@@ -1347,15 +1364,18 @@ class OptionsTest(TestBase):
         self.assert_fromfile(parse_func, expected_append=[42], append_contents="42")
 
     def test_fromfile_config(self) -> None:
-        def parse_func(dest, fromfile):
-            return self._parse(flags="fromfile", config={"fromfile": {dest: f"@{fromfile}"}})
+        def parse_func(dest, fromfile, passthru_flags):
+            return self._parse(
+                flags=f"fromfile -- {passthru_flags}", config={"fromfile": {dest: f"@{fromfile}"}}
+            )
 
         self.assert_fromfile(parse_func)
 
     def test_fromfile_env(self) -> None:
-        def parse_func(dest, fromfile):
+        def parse_func(dest, fromfile, passthru_flags):
             return self._parse(
-                flags="fromfile", env={f"PANTS_FROMFILE_{dest.upper()}": f"@{fromfile}"}
+                flags=f"fromfile -- {passthru_flags}",
+                env={f"PANTS_FROMFILE_{dest.upper()}": f"@{fromfile}"},
             )
 
         self.assert_fromfile(parse_func)

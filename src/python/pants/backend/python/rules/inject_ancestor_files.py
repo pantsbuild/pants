@@ -99,4 +99,6 @@ async def find_missing_ancestor_files(
 
 
 def rules():
-    return [find_missing_ancestor_files]
+    return [
+        find_missing_ancestor_files,
+    ]
