@@ -12,11 +12,11 @@ from pants.engine.addresses import Address
 from pants.engine.fs import (
     EMPTY_SNAPSHOT,
     Digest,
+    DigestSubset,
     MergeDigests,
     PathGlobs,
     RemovePrefix,
     Snapshot,
-    SnapshotSubset,
 )
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
@@ -137,13 +137,13 @@ async def strip_source_roots_from_snapshot(
         resulting_snapshot = await Get(Snapshot, RemovePrefix(request.snapshot.digest, source_root))
         return SourceRootStrippedSources.for_single_source_root(resulting_snapshot, source_root)
 
-    snapshot_subsets = await MultiGet(
-        Get(Snapshot, SnapshotSubset(request.snapshot.digest, PathGlobs(files)))
+    digest_subsets = await MultiGet(
+        Get(Digest, DigestSubset(request.snapshot.digest, PathGlobs(files)))
         for files in files_grouped_by_source_root.values()
     )
     resulting_digests = await MultiGet(
-        Get(Digest, RemovePrefix(snapshot.digest, source_root))
-        for snapshot, source_root in zip(snapshot_subsets, files_grouped_by_source_root.keys())
+        Get(Digest, RemovePrefix(digest, source_root))
+        for digest, source_root in zip(digest_subsets, files_grouped_by_source_root.keys())
     )
 
     resulting_snapshot = await Get(Snapshot, MergeDigests(resulting_digests))

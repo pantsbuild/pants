@@ -47,13 +47,8 @@ def test_parse_address_family_empty() -> None:
         rule_args=[address_mapper, BuildFilePreludeSymbols(FrozenDict()), Dir("/dev/null")],
         mock_gets=[
             MockGet(
-                product_type=Snapshot,
-                subject_type=PathGlobs,
-                mock=lambda _: Snapshot(Digest("abc", 10), ("/dev/null/BUILD",), ()),
-            ),
-            MockGet(
                 product_type=DigestContents,
-                subject_type=Digest,
+                subject_type=PathGlobs,
                 mock=lambda _: DigestContents([FileContent(path="/dev/null/BUILD", content=b"")]),
             ),
         ],
@@ -172,13 +167,8 @@ def run_prelude_parsing_rule(prelude_content: str) -> BuildFilePreludeSymbols:
         rule_args=[address_mapper],
         mock_gets=[
             MockGet(
-                product_type=Snapshot,
-                subject_type=PathGlobs,
-                mock=lambda _: Snapshot(Digest("abc", 10), ("/dev/null/prelude",), ()),
-            ),
-            MockGet(
                 product_type=DigestContents,
-                subject_type=Digest,
+                subject_type=PathGlobs,
                 mock=lambda _: DigestContents(
                     [FileContent(path="/dev/null/prelude", content=prelude_content.encode())]
                 ),

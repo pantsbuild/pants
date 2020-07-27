@@ -24,7 +24,7 @@ from pants.core.util_rules.determine_source_files import (
     SourceFiles,
     SpecifiedSourceFilesRequest,
 )
-from pants.engine.fs import EMPTY_SNAPSHOT, Digest, MergeDigests, PathGlobs, Snapshot
+from pants.engine.fs import EMPTY_SNAPSHOT, Digest, MergeDigests, PathGlobs
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get, MultiGet
@@ -92,8 +92,8 @@ async def setup(
     )
 
     config_path: Optional[List[str]] = isort.options.config
-    config_snapshot_request = Get(
-        Snapshot,
+    config_digest_request = Get(
+        Digest,
         PathGlobs(
             globs=config_path or (),
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
@@ -115,10 +115,10 @@ async def setup(
 
     requests = (
         requirements_pex_request,
-        config_snapshot_request,
+        config_digest_request,
         specified_source_files_request,
     )
-    all_source_files, requirements_pex, config_snapshot, specified_source_files = (
+    all_source_files, requirements_pex, config_digest, specified_source_files = (
         await MultiGet(all_source_files_request, *requests)
         if setup_request.request.prior_formatter_result is None
         else (SourceFiles(EMPTY_SNAPSHOT), *await MultiGet(*requests))
@@ -131,9 +131,7 @@ async def setup(
 
     input_digest = await Get(
         Digest,
-        MergeDigests(
-            (all_source_files_snapshot.digest, requirements_pex.digest, config_snapshot.digest)
-        ),
+        MergeDigests((all_source_files_snapshot.digest, requirements_pex.digest, config_digest)),
     )
 
     address_references = ", ".join(

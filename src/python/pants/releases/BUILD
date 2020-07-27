@@ -3,5 +3,8 @@
 
 python_binary(
   name = 'reversion',
-  sources = ['reversion.py'],
+  entry_point='pants.releases.reversion',
+  dependencies = [':releases'],
 )
+
+python_library()
