@@ -6,6 +6,7 @@ from textwrap import dedent
 from typing import Optional, cast
 
 from pants.backend.pants_info.list_target_types import TargetTypesSubsystem, list_target_types
+from pants.core.util_rules.pants_bin import PantsBin
 from pants.engine.target import BoolField, IntField, RegisteredTargetTypes, StringField, Target
 from pants.engine.unions import UnionMembership
 from pants.testutil.engine.util import MockConsole, create_goal_subsystem, run_rule
@@ -81,6 +82,7 @@ def run_goal(
                 TargetTypesSubsystem, sep="\\n", output_file=None, details=details_target
             ),
             console,
+            PantsBin(name="./BNF"),
         ],
     )
     return cast(str, console.stdout.getvalue())
@@ -94,8 +96,8 @@ def test_list_all() -> None:
         Target types
         ------------
 
-        Use `./pants target-types --details=$target_type` to get detailed information
-        for a particular target type.
+        Use `./BNF target-types --details=$target_type` to get detailed information for
+        a particular target type.
 
 
         fortran_binary   <no description>

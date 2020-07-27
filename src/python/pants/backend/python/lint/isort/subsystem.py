@@ -20,14 +20,19 @@ class Isort(PythonToolBase):
             "--skip",
             type=bool,
             default=False,
-            help="Don't use isort when running `./pants fmt` and `./pants lint`",
+            help=(
+                f"Don't use isort when running `{register.bootstrap.pants_bin_name} fmt` and "
+                f"`{register.bootstrap.pants_bin_name} lint`"
+            ),
         )
         register(
             "--args",
             type=list,
             member_type=shell_str,
-            help="Arguments to pass directly to isort, e.g. "
-            '`--isort-args="--case-sensitive --trailing-comma"`',
+            help=(
+                "Arguments to pass directly to isort, e.g. "
+                f'`--{cls.options_scope}-args="--case-sensitive --trailing-comma"`'
+            ),
         )
         register(
             "--config",
