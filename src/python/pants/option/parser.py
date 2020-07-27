@@ -32,6 +32,7 @@ from typing import (
 
 import Levenshtein
 import yaml
+from typing_extensions import Protocol
 
 from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import validate_deprecation_semver, warn_or_error
@@ -181,9 +182,15 @@ class Parser:
     @frozen_after_init
     @dataclass(unsafe_hash=True)
     class ParseArgsRequest:
-        flag_value_map: Dict
+        # N.B.: We use this callable protocol instead of Callable directly to work around the
+        # dataclass-specific issue described here: https://github.com/python/mypy/issues/6910
+        class FlagNameProvider(Protocol):
+            def __call__(self) -> Iterable:
+                ...
+
+        flag_value_map: Dict[str, List[Any]]
         namespace: OptionValueContainer
-        get_all_scoped_flag_names: Callable[["Parser.ParseArgsRequest"], Sequence]
+        get_all_scoped_flag_names: FlagNameProvider
         levenshtein_max_distance: int
         passthrough_args: List[str]
         # A passive option is one that doesn't affect functionality, or appear in help messages, but
@@ -197,7 +204,7 @@ class Parser:
             self,
             flags_in_scope: Iterable[str],
             namespace: OptionValueContainer,
-            get_all_scoped_flag_names: Callable[[], Sequence],
+            get_all_scoped_flag_names: FlagNameProvider,
             levenshtein_max_distance: int,
             passthrough_args: List[str],
             include_passive_options: bool = False,
@@ -215,7 +222,7 @@ class Parser:
             """
             self.flag_value_map = self._create_flag_value_map(flags_in_scope)
             self.namespace = namespace
-            self.get_all_scoped_flag_names = get_all_scoped_flag_names  # type: ignore[assignment]  # cannot assign a method
+            self.get_all_scoped_flag_names = get_all_scoped_flag_names
             self.levenshtein_max_distance = levenshtein_max_distance
             self.passthrough_args = passthrough_args
             self.include_passive_options = include_passive_options
@@ -348,7 +355,7 @@ class Parser:
         return namespace
 
     def _raise_error_for_invalid_flag_names(
-        self, flags: Sequence[str], all_scoped_flag_names: Sequence, max_edit_distance: int,
+        self, flags: Sequence[str], all_scoped_flag_names: Iterable, max_edit_distance: int,
     ) -> NoReturn:
         """Identify similar option names to unconsumed flags and raise a ParseError with those
         names."""
