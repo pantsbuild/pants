@@ -142,7 +142,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
 
 
 class GlobalOptions(Subsystem):
-    """Global options."""
+    """Options to control the overall behavior of Pants."""
 
     options_scope = GLOBAL_SCOPE
 
@@ -401,13 +401,12 @@ class GlobalOptions(Subsystem):
             help="Add these directories to PYTHONPATH to search for plugins.",
         )
         register(
-            "--spec-file",
+            "--spec-files",
             type=list,
-            dest="spec_files",
             # NB: See `--pants-config-files`.
             fingerprint=False,
-            help="Read additional specs from this file (e.g. target addresses or file names). "
-            "Each spec should be one per line.",
+            help="Read additional specs (e.g., target addresses or file names), one per line,"
+            "from these files.",
         )
         register(
             "--verify-config",
