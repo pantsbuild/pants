@@ -900,6 +900,12 @@ class GlobalOptions(Subsystem):
             default=False,
             type=bool,
             advanced=True,
+            removal_version="2.1.0.dev0",
+            removal_hint=(
+                "This option is now a noop: individual inference providers can be independently "
+                "enabled or disabled on their relevant subsystems. For Python, see "
+                "`./pants help python-infer`."
+            ),
             help=(
                 "Enable dependency inference, meaning that Pants will read your source code to "
                 "infer the `dependencies` field for you in BUILD files. You can check what Pants "

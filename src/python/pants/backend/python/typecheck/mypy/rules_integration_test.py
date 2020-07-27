@@ -5,6 +5,8 @@ from pathlib import PurePath
 from textwrap import dedent
 from typing import List, Optional
 
+from pants.backend.python.dependency_inference import rules as dependency_inference_rules
+from pants.backend.python.rules import inject_ancestor_files
 from pants.backend.python.target_types import PythonLibrary
 from pants.backend.python.typecheck.mypy.rules import MyPyFieldSet, MyPyRequest
 from pants.backend.python.typecheck.mypy.rules import rules as mypy_rules
@@ -58,7 +60,14 @@ class MyPyIntegrationTest(ExternalToolTestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *mypy_rules(), RootRule(MyPyRequest))
+        return (
+            *super().rules(),
+            *mypy_rules(),
+            RootRule(MyPyRequest),
+            # mypy needs __init__.py files in many cases: we pull in inference to avoid boilerplate.
+            *dependency_inference_rules.rules(),
+            *inject_ancestor_files.rules(),
+        )
 
     @classmethod
     def target_types(cls):
@@ -70,7 +79,6 @@ class MyPyIntegrationTest(ExternalToolTestBase):
         *,
         package: Optional[str] = None,
         name: str = "target",
-        dependencies: Optional[List[Address]] = None,
     ) -> TargetWithOrigin:
         if not package:
             package = self.package
@@ -84,7 +92,6 @@ class MyPyIntegrationTest(ExternalToolTestBase):
                 python_library(
                     name={repr(name)},
                     sources={source_globs},
-                    dependencies={[str(dep) for dep in dependencies or ()]},
                 )
                 """
             ),
@@ -103,8 +110,10 @@ class MyPyIntegrationTest(ExternalToolTestBase):
         additional_args: Optional[List[str]] = None,
     ) -> TypecheckResults:
         args = [
+            "--backend-packages=pants.backend.python",
             "--backend-packages=pants.backend.python.typecheck.mypy",
             "--source-root-patterns=['src/python', 'tests/python']",
+            "--python-infer-imports",
         ]
         if config:
             self.create_file(relpath="mypy.ini", contents=config)
@@ -178,9 +187,7 @@ class MyPyIntegrationTest(ExternalToolTestBase):
         assert not result
 
     def test_transitive_dependencies(self) -> None:
-        self.create_file(f"{self.package}/__init__.py")
         self.create_file(f"{self.package}/util/__init__.py")
-        self.create_file(f"{self.package}/math/__init__.py")
         self.create_file(
             f"{self.package}/util/lib.py",
             dedent(
@@ -191,6 +198,8 @@ class MyPyIntegrationTest(ExternalToolTestBase):
             ),
         )
         self.add_to_build_file(f"{self.package}/util", "python_library()")
+
+        self.create_file(f"{self.package}/math/__init__.py")
         self.create_file(
             f"{self.package}/math/add.py",
             dedent(
@@ -204,21 +213,23 @@ class MyPyIntegrationTest(ExternalToolTestBase):
             ),
         )
         self.add_to_build_file(
-            f"{self.package}/math", f"python_library(dependencies=['{self.package}/util'])",
+            f"{self.package}/math", "python_library()",
         )
-        source_content = FileContent(
-            f"{self.package}/app.py",
-            dedent(
-                """\
-                from project.math.add import add
 
-                print(add(2, 4))
-                """
-            ).encode(),
-        )
-        target = self.make_target_with_origin(
-            [source_content], dependencies=[Address.parse(f"{self.package}/math")]
-        )
+        sources_content = [
+            FileContent(
+                f"{self.package}/app.py",
+                dedent(
+                    """\
+                        from project.math.add import add
+
+                        print(add(2, 4))
+                        """
+                ).encode(),
+            ),
+            FileContent(f"{self.package}/__init__.py", b""),
+        ]
+        target = self.make_target_with_origin(sources_content)
         result = self.run_mypy([target])
         assert len(result) == 1
         assert result[0].exit_code == 1

@@ -6,7 +6,6 @@
 See https://pants.readme.io/docs/python-backend.
 """
 
-from pants.backend.python.dependency_inference import module_mapper
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
 from pants.backend.python.pants_requirement import PantsRequirement
 from pants.backend.python.python_artifact import PythonArtifact
@@ -16,7 +15,6 @@ from pants.backend.python.rules import (
     create_python_binary,
     download_pex_bin,
     inject_ancestor_files,
-    inject_init,
     pex,
     pex_from_targets,
     pytest_runner,
@@ -56,10 +54,8 @@ def rules():
         *coverage.rules(),
         *download_pex_bin.rules(),
         *inject_ancestor_files.rules(),
-        *inject_init.rules(),
         *python_sources.rules(),
         *dependency_inference_rules.rules(),
-        *module_mapper.rules(),
         *pex.rules(),
         *pex_from_targets.rules(),
         *pytest_runner.rules(),

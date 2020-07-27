@@ -3,12 +3,18 @@
 
 from textwrap import dedent
 
-from pants.backend.python.dependency_inference.module_mapper import rules as module_mapper_rules
 from pants.backend.python.dependency_inference.rules import (
+    InferConftestDependencies,
+    InferInitDependencies,
     InferPythonDependencies,
-    infer_python_dependencies,
 )
-from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary, PythonSources
+from pants.backend.python.dependency_inference.rules import rules as dependency_inference_rules
+from pants.backend.python.target_types import (
+    PythonLibrary,
+    PythonRequirementLibrary,
+    PythonSources,
+    PythonTests,
+)
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.util_rules import strip_source_roots
 from pants.engine.addresses import Address
@@ -31,19 +37,24 @@ class PythonDependencyInferenceTest(TestBase):
         return (
             *super().rules(),
             *strip_source_roots.rules(),
-            infer_python_dependencies,
-            *module_mapper_rules(),
+            *dependency_inference_rules(),
             all_roots,
             RootRule(InferPythonDependencies),
+            RootRule(InferInitDependencies),
+            RootRule(InferConftestDependencies),
         )
 
     @classmethod
     def target_types(cls):
-        return [PythonLibrary, PythonRequirementLibrary]
+        return [PythonLibrary, PythonRequirementLibrary, PythonTests]
 
-    def test_infer_python_dependencies(self) -> None:
+    def test_infer_python_imports(self) -> None:
         options_bootstrapper = create_options_bootstrapper(
-            args=["--source-root-patterns=src/python"]
+            args=[
+                "--backend-packages=pants.backend.python",
+                "--source-root-patterns=src/python",
+                "--python-infer-imports",
+            ]
         )
         self.add_to_build_file(
             "3rdparty/python",
@@ -108,4 +119,61 @@ class PythonDependencyInferenceTest(TestBase):
         )
         assert run_dep_inference(generated_subtarget_address) == InferredDependencies(
             [Address("src/python", target_name="app.py", generated_base_target_name="python")]
+        )
+
+    def test_infer_python_inits(self) -> None:
+        options_bootstrapper = create_options_bootstrapper(
+            args=["--backend-packages=pants.backend.python", "--source-root-patterns=src/python",]
+        )
+
+        self.create_file("src/python/root/__init__.py")
+        self.add_to_build_file("src/python/root", "python_library()")
+
+        self.create_file("src/python/root/mid/__init__.py")
+        self.add_to_build_file("src/python/root/mid", "python_library()")
+
+        self.create_file("src/python/root/mid/leaf/__init__.py")
+        self.add_to_build_file("src/python/root/mid/leaf", "python_library()")
+
+        def run_dep_inference(address: Address) -> InferredDependencies:
+            target = self.request_single_product(WrappedTarget, address).target
+            return self.request_single_product(
+                InferredDependencies,
+                Params(InferInitDependencies(target[PythonSources]), options_bootstrapper),
+            )
+
+        assert run_dep_inference(Address.parse("src/python/root/mid/leaf")) == InferredDependencies(
+            [
+                Address("src/python/root", "__init__.py", generated_base_target_name="root"),
+                Address("src/python/root/mid", "__init__.py", generated_base_target_name="mid"),
+            ]
+        )
+
+    def test_infer_python_conftests(self) -> None:
+        options_bootstrapper = create_options_bootstrapper(
+            args=["--backend-packages=pants.backend.python", "--source-root-patterns=src/python",]
+        )
+
+        self.create_file("src/python/root/conftest.py")
+        self.add_to_build_file("src/python/root", "python_library(sources=['conftest.py'])")
+
+        self.create_file("src/python/root/mid/conftest.py")
+        self.add_to_build_file("src/python/root/mid", "python_library(sources=['conftest.py'])")
+
+        self.create_file("src/python/root/mid/leaf/conftest.py")
+        self.create_file("src/python/root/mid/leaf/this_is_a_test.py")
+        self.add_to_build_file("src/python/root/mid/leaf", "python_tests()")
+
+        def run_dep_inference(address: Address) -> InferredDependencies:
+            target = self.request_single_product(WrappedTarget, address).target
+            return self.request_single_product(
+                InferredDependencies,
+                Params(InferConftestDependencies(target[PythonSources]), options_bootstrapper),
+            )
+
+        assert run_dep_inference(Address.parse("src/python/root/mid/leaf")) == InferredDependencies(
+            [
+                Address("src/python/root", "conftest.py", generated_base_target_name="root"),
+                Address("src/python/root/mid", "conftest.py", generated_base_target_name="mid"),
+            ]
         )

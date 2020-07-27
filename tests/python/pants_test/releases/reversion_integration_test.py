@@ -41,7 +41,10 @@ class ReversionTest(PantsRunIntegrationTest):
                 dest_dir,
                 output_version,
             ]
-            self.assert_success(self.run_pants(command))
+
+            # NB: Pulling in the real BUILD file requires too many dependencies.
+            with self.temporary_file_content("src/python/pants/BUILD", b"python_library()"):
+                self.assert_success(self.run_pants(command))
             self.assertTrue(os.path.isfile(output_whl_file))
 
             # Confirm that it can be consumed.

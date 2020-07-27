@@ -1093,19 +1093,12 @@ class TestDependencies(TestBase):
         return [SmalltalkLibrary]
 
     def assert_dependencies_resolved(
-        self,
-        *,
-        requested_address: Address,
-        expected: Iterable[Address],
-        enable_dep_inference: bool = False,
+        self, *, requested_address: Address, expected: Iterable[Address],
     ) -> None:
         target = self.request_single_product(WrappedTarget, requested_address).target
-        args = ["--dependency-inference"] if enable_dep_inference else []
         result = self.request_single_product(
             Addresses,
-            Params(
-                DependenciesRequest(target[Dependencies]), create_options_bootstrapper(args=args)
-            ),
+            Params(DependenciesRequest(target[Dependencies]), create_options_bootstrapper()),
         )
         assert result == Addresses(sorted(expected))
 
@@ -1262,7 +1255,6 @@ class TestDependencies(TestBase):
 
         self.assert_dependencies_resolved(
             requested_address=Address.parse("demo"),
-            enable_dep_inference=True,
             expected=[
                 Address.parse("//:inferred1"),
                 Address("", target_name="inferred2.st", generated_base_target_name="inferred2"),
@@ -1275,7 +1267,6 @@ class TestDependencies(TestBase):
             requested_address=Address(
                 "demo", target_name="f1.st", generated_base_target_name="demo"
             ),
-            enable_dep_inference=True,
             expected=[
                 Address.parse("//:inferred1"),
                 Address("", target_name="inferred2.st", generated_base_target_name="inferred2"),
@@ -1288,7 +1279,6 @@ class TestDependencies(TestBase):
             requested_address=Address(
                 "demo", target_name="f2.st", generated_base_target_name="demo"
             ),
-            enable_dep_inference=True,
             expected=[
                 Address.parse("//:inferred_and_provided1"),
                 Address.parse("//:inferred_and_provided2"),

@@ -4,9 +4,6 @@
 from dataclasses import dataclass
 from typing import Iterable, List, Tuple, Type
 
-from pants.backend.python.rules.inject_ancestor_files import rules as inject_ancestor_rules
-from pants.backend.python.rules.inject_init import InitInjectedSnapshot, InjectInitRequest
-from pants.backend.python.rules.inject_init import rules as inject_init_rules
 from pants.backend.python.target_types import PythonSources
 from pants.core.target_types import FilesSources, ResourcesSources
 from pants.core.util_rules import determine_source_files
@@ -105,10 +102,7 @@ async def prepare_stripped_python_sources(
             strip_source_roots=True,
         ),
     )
-    init_injected = await Get(
-        InitInjectedSnapshot, InjectInitRequest(stripped_sources.snapshot, sources_stripped=True),
-    )
-    return StrippedPythonSources(init_injected.snapshot)
+    return StrippedPythonSources(stripped_sources.snapshot)
 
 
 @rule
@@ -124,9 +118,6 @@ async def prepare_unstripped_python_sources(
             strip_source_roots=False,
         ),
     )
-    init_injected = await Get(
-        InitInjectedSnapshot, InjectInitRequest(sources.snapshot, sources_stripped=False)
-    )
 
     source_root_objs = await MultiGet(
         Get(
@@ -138,7 +129,7 @@ async def prepare_unstripped_python_sources(
         if tgt.has_field(PythonSources) or tgt.has_field(ResourcesSources)
     )
     source_root_paths = {source_root_obj.path for source_root_obj in source_root_objs}
-    return UnstrippedPythonSources(init_injected.snapshot, tuple(sorted(source_root_paths)))
+    return UnstrippedPythonSources(sources.snapshot, tuple(sorted(source_root_paths)))
 
 
 def rules():
@@ -146,8 +137,6 @@ def rules():
         prepare_stripped_python_sources,
         prepare_unstripped_python_sources,
         *determine_source_files.rules(),
-        *inject_ancestor_rules(),
-        *inject_init_rules(),
         # TODO: remove this as soon as we have a usage of it.
         RootRule(UnstrippedPythonSourcesRequest),
     ]
