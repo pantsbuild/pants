@@ -500,7 +500,6 @@ class GlobalOptions(Subsystem):
             advanced=True,
             type=bool,
             default=True,
-            daemon=True,
             help=(
                 "Enables use of the Pants daemon (pantsd). pantsd can significantly improve "
                 "runtime performance by lowering per-run startup cost, and by caching filesystem "
