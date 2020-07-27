@@ -3,151 +3,35 @@
 
 import hashlib
 import json
-import math
 import re
 import unittest
 from collections import OrderedDict
 from enum import Enum
-from pathlib import Path
 
-from pants.base.hash_utils import (
-    CoercingEncoder,
-    Sharder,
-    hash_all,
-    hash_dir,
-    hash_file,
-    stable_json_sha1,
-)
-from pants.util.contextutil import temporary_dir, temporary_file, temporary_file_path
+from pants.base.hash_utils import CoercingEncoder, hash_all, hash_file, stable_json_sha1
+from pants.util.contextutil import temporary_file
 from pants.util.ordered_set import OrderedSet
 
 
 class TestHashUtils(unittest.TestCase):
     def test_hash_all(self):
-        expected_hash = hashlib.md5()
+        expected_hash = hashlib.sha1()
         expected_hash.update(b"jakejones")
-        self.assertEqual(
-            expected_hash.hexdigest(), hash_all(["jake", "jones"], digest=hashlib.md5())
-        )
+        self.assertEqual(expected_hash.hexdigest(), hash_all(["jake", "jones"]))
 
     def test_hash_file(self):
-        expected_hash = hashlib.md5()
+        expected_hash = hashlib.sha1()
         expected_hash.update(b"jake jones")
 
         with temporary_file() as fd:
             fd.write(b"jake jones")
             fd.close()
 
-            self.assertEqual(expected_hash.hexdigest(), hash_file(fd.name, digest=hashlib.md5()))
-
-    def test_hash_dir_invalid(self):
-        with temporary_file_path() as path:
-            with self.assertRaises(TypeError):
-                hash_dir(path)
-            with self.assertRaises(ValueError):
-                hash_dir(Path(path))
-
-    def test_hash_dir(self):
-        with temporary_dir() as root:
-            root1_path = Path(root)
-            root1_path.joinpath("a").write_text("jake jones")
-            root1_path.joinpath("b").write_text("jane george")
-            hash1 = hash_dir(root1_path)
-
-        with temporary_dir() as root:
-            root2_path = Path(root)
-            root2_path.joinpath("a").write_text("jake jones")
-            root2_path.joinpath("b").write_text("jane george")
-            hash2 = hash_dir(root2_path)
-
-        self.assertNotEqual(
-            root1_path,
-            root2_path,
-            "The path of the directory being hashed should not factor into the hash.",
-        )
-        self.assertEqual(hash1, hash2)
-
-        with temporary_dir() as root:
-            root_path = Path(root)
-            root_path.joinpath("a1").write_text("jake jones")
-            root_path.joinpath("b").write_text("jane george")
-            hash3 = hash_dir(root_path)
-
-        self.assertNotEqual(hash1, hash3, "File names should be included in the hash.")
-
-        with temporary_dir() as root:
-            root_path = Path(root)
-            root_path.joinpath("a").write_text("jake jones")
-            root_path.joinpath("b").write_text("jane george")
-            root_path.joinpath("c").mkdir()
-            hash4 = hash_dir(root_path)
-
-        self.assertNotEqual(hash1, hash4, "Directory names should be included in the hash.")
-
-        with temporary_dir() as root:
-            root_path = Path(root)
-            root_path.joinpath("a").write_text("jake jones II")
-            root_path.joinpath("b").write_text("jane george")
-            hash5 = hash_dir(root_path)
-
-        self.assertNotEqual(hash1, hash5, "File content should be included in the hash.")
-
-    def test_compute_shard(self):
-        # Spot-check a couple of values, to make sure compute_shard doesn't do something
-        # completely degenerate.
-        self.assertEqual(31, Sharder.compute_shard("", 42))
-        self.assertEqual(35, Sharder.compute_shard("foo", 42))
-        self.assertEqual(5, Sharder.compute_shard("bar", 42))
-
-    def test_compute_shard_distribution(self):
-        # Check that shard distribution isn't obviously broken.
-        nshards = 7
-        mean_samples_per_shard = 10000
-        nsamples = nshards * mean_samples_per_shard
-
-        distribution = [0] * nshards
-        for n in range(0, nsamples):
-            shard = Sharder.compute_shard(str(n), nshards)
-            distribution[shard] += 1
-
-        variance = sum([(x - mean_samples_per_shard) ** 2 for x in distribution]) / nshards
-        stddev = math.sqrt(variance)
-
-        # We arbitrarily assert that a stddev of less than 1% of the mean is good enough
-        # for sanity-checking purposes.
-        self.assertLess(stddev, 100)
-
-    def test_sharder(self):
-        def check(spec, expected_shard, expected_nshards):
-            sharder = Sharder(spec)
-            self.assertEqual(expected_shard, sharder.shard)
-            self.assertEqual(expected_nshards, sharder.nshards)
-
-        def check_bad_spec(spec):
-            self.assertRaises(Sharder.InvalidShardSpec, lambda: Sharder(spec))
-
-        check("0/1", 0, 1)
-        check("0/2", 0, 2)
-        check("1/2", 1, 2)
-        check("0/100", 0, 100)
-        check("99/100", 99, 100)
-
-        check_bad_spec("0/0")
-        check_bad_spec("-1/0")
-        check_bad_spec("0/-1")
-        check_bad_spec("1/1")
-        check_bad_spec("2/1")
-        check_bad_spec("100/100")
-        check_bad_spec("1/2/3")
-        check_bad_spec("/1")
-        check_bad_spec("1/")
-        check_bad_spec("/")
-        check_bad_spec("foo/1")
-        check_bad_spec("1/foo")
+            self.assertEqual(expected_hash.hexdigest(), hash_file(fd.name))
 
 
 class CoercingJsonEncodingTest(unittest.TestCase):
-    def _coercing_json_encode(self, o, digest=None):
+    def _coercing_json_encode(self, o):
         return json.dumps(o, cls=CoercingEncoder)
 
     def test_normal_object_encoding(self):

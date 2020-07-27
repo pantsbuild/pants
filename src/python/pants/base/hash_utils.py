@@ -11,67 +11,30 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Optional, Type, Union
 
-from typing_extensions import Protocol
-
 from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import ensure_binary
 
 logger = logging.getLogger(__name__)
 
 
-class Digest(Protocol):
-    """A post-hoc type stub for hashlib digest objects."""
-
-    def update(self, data: bytes) -> None:
-        ...
-
-    def hexdigest(self) -> str:
-        ...
-
-
-def hash_all(strs: typing.Iterable[Union[bytes, str]], digest: Optional[Digest] = None) -> str:
-    """Returns a hash of the concatenation of all the strings in strs.
-
-    If a hashlib message digest is not supplied a new sha1 message digest is used.
-    """
-    digest = digest or hashlib.sha1()
+def hash_all(strs: typing.Iterable[Union[bytes, str]]) -> str:
+    """Returns a hash of the concatenation of all the strings in strs using sha1."""
+    digest = hashlib.sha1()
     for s in strs:
         s = ensure_binary(s)
         digest.update(s)
     return digest.hexdigest()
 
 
-def hash_file(path: Union[str, Path], digest: Optional[Digest] = None) -> str:
-    """Hashes the contents of the file at the given path and returns the hash digest in hex form.
-
-    If a hashlib message digest is not supplied a new sha1 message digest is used.
-    """
-    digest = digest or hashlib.sha1()
+def hash_file(path: Union[str, Path]) -> str:
+    """Hashes the contents of the file at the given path and returns the hash digest in hex form
+    using sha1."""
+    digest = hashlib.sha1()
     with open(path, "rb") as fd:
         s = fd.read(8192)
         while s:
             digest.update(s)
             s = fd.read(8192)
-    return digest.hexdigest()
-
-
-def hash_dir(path: Path, *, digest: Optional[Digest] = None) -> str:
-    """Hashes the recursive contents under the given directory path.
-
-    If a hashlib message digest is not supplied a new sha1 message digest is used.
-    """
-    if not isinstance(path, Path):
-        raise TypeError(f"Expected path to be a pathlib.Path, given a: {type(path)}")
-
-    if not path.is_dir():
-        raise ValueError(f"Expected path to de a directory, given: {path}")
-
-    digest = digest or hashlib.sha1()
-    root = path.resolve()
-    for pth in sorted(p for p in root.rglob("*")):
-        digest.update(bytes(pth.relative_to(root)))
-        if not pth.is_dir():
-            hash_file(pth, digest=digest)
     return digest.hexdigest()
 
 
@@ -154,13 +117,10 @@ class CoercingEncoder(json.JSONEncoder):
         return super().encode(self.default(o))
 
 
-def json_hash(
-    obj: Any, digest: Optional[Digest] = None, encoder: Optional[Type[json.JSONEncoder]] = None
-) -> str:
+def json_hash(obj: Any, encoder: Optional[Type[json.JSONEncoder]] = None) -> str:
     """Hashes `obj` by dumping to JSON.
 
     :param obj: An object that can be rendered to json using the given `encoder`.
-    :param digest: An optional `hashlib` compatible message digest. Defaults to `hashlib.sha1`.
     :param encoder: An optional custom json encoder.
     :type encoder: :class:`json.JSONEncoder`
     :returns: A hash of the given `obj` according to the given `encoder`.
@@ -169,77 +129,17 @@ def json_hash(
     :API: public
     """
     json_str = json.dumps(obj, ensure_ascii=True, allow_nan=False, sort_keys=True, cls=encoder)
-    return hash_all([json_str], digest=digest)
+    return hash_all([json_str])
 
 
 # TODO(#6513): something like python 3's @lru_cache decorator could be useful here!
-def stable_json_sha1(obj: Any, digest: Optional[Digest] = None) -> str:
+def stable_json_sha1(obj: Any) -> str:
     """Hashes `obj` stably; ie repeated calls with the same inputs will produce the same hash.
 
     :param obj: An object that can be rendered to json using a :class:`CoercingEncoder`.
-    :param digest: An optional `hashlib` compatible message digest. Defaults to `hashlib.sha1`.
     :returns: A stable hash of the given `obj`.
     :rtype: str
 
     :API: public
     """
-    return json_hash(obj, digest=digest, encoder=CoercingEncoder)
-
-
-class Sharder:
-    """Assigns strings to shards pseudo-randomly, but stably."""
-
-    class InvalidShardSpec(Exception):
-        """Indicates an invalid shard spec."""
-
-        def __init__(self, shard_spec):
-            """
-            :param string shard_spec: A string of the form M/N where M, N are ints and 0 <= M < N.
-            """
-            super(Sharder.InvalidShardSpec, self).__init__(
-                "Invalid shard spec '{}', should be of the form M/N, where M, N are ints "
-                "and 0 <= M < N.".format(shard_spec)
-            )
-
-    @staticmethod
-    def compute_shard(s, mod):
-        """Computes the mod-hash of the given string, using a sha1 hash.
-
-        :param string s: The string to compute a shard for.
-        """
-        return int(hash_all([s]), 16) % mod
-
-    def __init__(self, shard_spec):
-        """
-        :param string shard_spec: A string of the form M/N where M, N are ints and 0 <= M < N.
-        """
-
-        def ensure_int(s):
-            try:
-                return int(s)
-            except ValueError:
-                raise self.InvalidShardSpec(shard_spec)
-
-        if shard_spec is None:
-            raise self.InvalidShardSpec("None")
-        shard_str, _, nshards_str = shard_spec.partition("/")
-        self._shard = ensure_int(shard_str)
-        self._nshards = ensure_int(nshards_str)
-
-        if self._shard < 0 or self._shard >= self._nshards:
-            raise self.InvalidShardSpec(shard_spec)
-
-    def is_in_shard(self, s):
-        """Returns True iff the string s is in this shard.
-
-        :param string s: The string to check.
-        """
-        return self.compute_shard(s, self._nshards) == self._shard
-
-    @property
-    def shard(self):
-        return self._shard
-
-    @property
-    def nshards(self):
-        return self._nshards
+    return json_hash(obj, encoder=CoercingEncoder)

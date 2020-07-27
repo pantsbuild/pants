@@ -5,7 +5,6 @@ import unittest
 from textwrap import dedent
 
 from pants.util.strutil import (
-    camelcase,
     ensure_binary,
     ensure_text,
     pluralize,
@@ -16,23 +15,6 @@ from pants.util.strutil import (
 
 # TODO(Eric Ayers): Backfill tests for other methods in strutil.py
 class StrutilTest(unittest.TestCase):
-    def test_camelcase(self) -> None:
-
-        self.assertEqual("Foo", camelcase("foo"))
-        self.assertEqual("Foo", camelcase("_foo"))
-        self.assertEqual("Foo", camelcase("foo_"))
-        self.assertEqual("FooBar", camelcase("foo_bar"))
-        self.assertEqual("FooBar", camelcase("foo_bar_"))
-        self.assertEqual("FooBar", camelcase("_foo_bar"))
-        self.assertEqual("FooBar", camelcase("foo__bar"))
-        self.assertEqual("Foo", camelcase("-foo"))
-        self.assertEqual("Foo", camelcase("foo-"))
-        self.assertEqual("FooBar", camelcase("foo-bar"))
-        self.assertEqual("FooBar", camelcase("foo-bar-"))
-        self.assertEqual("FooBar", camelcase("-foo-bar"))
-        self.assertEqual("FooBar", camelcase("foo--bar"))
-        self.assertEqual("FooBar", camelcase("foo-_bar"))
-
     def test_pluralize(self) -> None:
         self.assertEqual("1 bat", pluralize(1, "bat"))
         self.assertEqual("1 boss", pluralize(1, "boss"))

@@ -9,7 +9,7 @@ from typing import Dict, cast
 from colors import cyan, green
 from typing_extensions import Literal
 
-from pants.base.build_environment import pants_release, pants_version
+from pants.base.build_environment import pants_version
 from pants.help.help_formatter import HelpFormatter
 from pants.help.help_info_extracter import AllHelpInfo, HelpJSONEncoder
 from pants.option.arg_splitter import (
@@ -127,7 +127,7 @@ class HelpPrinter:
             self._print_global_help(help_request.advanced)
 
     def _print_global_help(self, advanced: bool):
-        print(pants_release())
+        print(f"Pants {pants_version()} https://pypi.org/pypi/pantsbuild.pants/{pants_version()}")
         print("\nUsage:")
         print(
             f"  {self._bin_name} [option ...] [goal ...] [target/file ...]  Attempt the specified goals."
