@@ -8,12 +8,25 @@ import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Type, Union, get_type_hints
+from types import FrameType, ModuleType
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Tuple,
+    Type,
+    Union,
+    get_type_hints,
+)
 
 from pants.engine.goal import Goal
 from pants.engine.selectors import GetConstraints
 from pants.engine.unions import UnionRule
-from pants.option.optionable import Optionable, OptionableFactory
+from pants.option.optionable import OptionableFactory
 from pants.util.collections import assert_single_element
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
@@ -235,9 +248,6 @@ def _make_rule(
 
         gets = FrozenOrderedSet(rule_visitor.gets)
 
-        # Register dependencies for @goal_rule/Goal.
-        dependency_rules = (SubsystemRule(return_type.subsystem_cls),) if is_goal_cls else None
-
         # Set our own custom `__line_number__` dunder so that the engine may visualize the line number.
         func.__line_number__ = func.__code__.co_firstlineno
 
@@ -249,7 +259,6 @@ def _make_rule(
             canonical_name=canonical_name,
             desc=desc,
             level=level,
-            dependency_rules=dependency_rules,
             cacheable=cacheable,
         )
 
@@ -413,21 +422,36 @@ class Rule(ABC):
     def output_type(self):
         """An output `type` for the rule."""
 
-    @property
-    @abstractmethod
-    def dependency_rules(self):
-        """A tuple of @rules that are known to be necessary to run this rule.
 
-        Note that installing @rules as flat lists is generally preferable, as Rules already
-        implicitly form a loosely coupled RuleGraph: this facility exists only to assist with
-        boilerplate removal.
-        """
+def register_rules(*namespaces: Union[ModuleType, Mapping[str, Any]]) -> Iterable[Rule]:
+    """Registers all @rules in the given namespaces.
 
-    @property
-    @abstractmethod
-    def dependency_optionables(self):
-        """A tuple of Optionable classes that are known to be necessary to run this rule."""
-        return ()
+    If no namespaces are given, registers all the @rules in the caller's module namespace.
+    """
+    if not namespaces:
+        currentframe = inspect.currentframe()
+        assert isinstance(currentframe, FrameType)
+        caller_frame = currentframe.f_back
+        caller_module = inspect.getmodule(caller_frame)
+        assert isinstance(caller_module, ModuleType)
+        namespaces = (caller_module,)
+
+    def iter_rules():
+        for namespace in namespaces:
+            mapping = namespace.__dict__ if isinstance(namespace, ModuleType) else namespace
+            for name, item in mapping.items():
+                if not callable(item):
+                    continue
+                rule = getattr(item, "rule", None)
+                if isinstance(rule, TaskRule):
+                    for input in rule.input_selectors:
+                        if issubclass(input, OptionableFactory):
+                            yield SubsystemRule(input)
+                    if issubclass(rule.output_type, Goal):
+                        yield SubsystemRule(rule.output_type.subsystem_cls)
+                    yield rule
+
+    return list(iter_rules())
 
 
 @frozen_after_init
@@ -443,8 +467,6 @@ class TaskRule(Rule):
     input_selectors: Tuple[Type, ...]
     input_gets: Tuple[GetConstraints, ...]
     func: Callable
-    _dependency_rules: Tuple["TaskRule", ...]
-    _dependency_optionables: Tuple[Type[Optionable], ...]
     cacheable: bool
     canonical_name: str
     desc: Optional[str]
@@ -459,42 +481,29 @@ class TaskRule(Rule):
         canonical_name: str,
         desc: Optional[str] = None,
         level: LogLevel = LogLevel.DEBUG,
-        dependency_rules: Optional[Iterable["TaskRule"]] = None,
-        dependency_optionables: Optional[Iterable[Type[Optionable]]] = None,
         cacheable: bool = True,
     ):
         self._output_type = output_type
         self.input_selectors = tuple(input_selectors)
         self.input_gets = tuple(input_gets)
         self.func = func  # type: ignore[assignment] # cannot assign to a method
-        self._dependency_rules = tuple(dependency_rules or ())
-        self._dependency_optionables = tuple(dependency_optionables or ())
         self.cacheable = cacheable
         self.canonical_name = canonical_name
         self.desc = desc
         self.level = level
 
     def __str__(self):
-        return "(name={}, {}, {!r}, {}, gets={}, opts={})".format(
+        return "(name={}, {}, {!r}, {}, gets={})".format(
             getattr(self, "name", "<not defined>"),
             self.output_type.__name__,
             self.input_selectors,
             self.func.__name__,
             self.input_gets,
-            self.dependency_optionables,
         )
 
     @property
     def output_type(self):
         return self._output_type
-
-    @property
-    def dependency_rules(self):
-        return self._dependency_rules
-
-    @property
-    def dependency_optionables(self):
-        return self._dependency_optionables
 
 
 @frozen_after_init
@@ -514,14 +523,6 @@ class RootRule(Rule):
     @property
     def output_type(self):
         return self._output_type
-
-    @property
-    def dependency_rules(self):
-        return tuple()
-
-    @property
-    def dependency_optionables(self):
-        return tuple()
 
 
 @dataclass(frozen=True)
@@ -547,8 +548,6 @@ class RuleIndex:
                 if output_type not in serializable_rules:
                     serializable_rules[output_type] = OrderedSet()
                 serializable_rules[output_type].add(rule)
-            for dep_rule in rule.dependency_rules:
-                add_rule(dep_rule)
 
         for entry in rule_entries:
             if isinstance(entry, Rule):
