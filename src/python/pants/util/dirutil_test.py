@@ -18,7 +18,6 @@ from pants.util.dirutil import (
     ExistingFileError,
     _mkdtemp_unregister_cleaner,
     absolute_symlink,
-    check_no_overlapping_paths,
     ensure_relative_file_name,
     fast_relpath,
     get_basedir,
@@ -596,18 +595,3 @@ class AbsoluteSymlinkTest(unittest.TestCase):
     def test_overwrite_dir(self) -> None:
         os.makedirs(os.path.join(self.link, "a", "b", "c"))
         self._create_and_check_link(self.source, self.link)
-
-    def test_check_no_overlapping_paths_two_same(self) -> None:
-        paths = ["/path/to/file", "/path/to/file", "/no/path/to/file"]
-        with self.assertRaises(ValueError):
-            check_no_overlapping_paths(paths)
-
-    def test_check_no_overlapping_paths_prefix(self) -> None:
-        paths = ["/path/to", "/path/to/file", "/no/path/to/file"]
-        with self.assertRaises(ValueError):
-            check_no_overlapping_paths(paths)
-
-    def test_check_no_overlapping_paths_unique_paths(self) -> None:
-        paths = ["/he/went/to/the/store", "/she/saw/a/movie", "/no/one/knew/where/to/go"]
-        # This test is successful if nothing happens when calling check_no_overlapping_paths(paths)
-        check_no_overlapping_paths(paths)

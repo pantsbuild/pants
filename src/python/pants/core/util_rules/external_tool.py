@@ -152,7 +152,7 @@ class ExternalTool(Subsystem):
                 ver, plat_val, sha256, length = (x.strip() for x in known_version.split("|"))
             except ValueError:
                 raise ExternalToolError(
-                    f"Bad value for --known-versions (see ./pants "
+                    f"Bad value for --known-versions (see {self.get_options().pants_bin_name} "
                     f"help-advanced {self.options_scope}): {known_version}"
                 )
             if plat_val == plat.value and ver == version:

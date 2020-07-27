@@ -6,7 +6,7 @@ from textwrap import dedent
 from typing import ClassVar, Iterable, List, Optional, Tuple, Type
 
 from pants.base.specs import SingleAddress
-from pants.core.goals.lint import Lint, LintOptions, LintRequest, LintResult, LintResults, lint
+from pants.core.goals.lint import Lint, LintRequest, LintResult, LintResults, LintSubsystem, lint
 from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSources,
     FieldSetsWithSourcesRequest,
@@ -150,7 +150,7 @@ class LintTest(TestBase):
                 console,
                 workspace,
                 TargetsWithOrigins(targets),
-                create_goal_subsystem(LintOptions, per_target_caching=per_target_caching),
+                create_goal_subsystem(LintSubsystem, per_target_caching=per_target_caching),
                 union_membership,
             ],
             mock_gets=[

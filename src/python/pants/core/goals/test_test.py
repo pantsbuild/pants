@@ -17,8 +17,8 @@ from pants.core.goals.test import (
     Test,
     TestDebugRequest,
     TestFieldSet,
-    TestOptions,
     TestResult,
+    TestSubsystem,
     WrappedTestFieldSet,
     run_tests,
 )
@@ -27,7 +27,7 @@ from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSourcesRequest,
 )
 from pants.engine.addresses import Address
-from pants.engine.fs import CreateDigest, Digest, FileContent, Workspace
+from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, MergeDigests, Workspace
 from pants.engine.interactive_process import InteractiveProcess, InteractiveRunner
 from pants.engine.target import (
     Sources,
@@ -141,7 +141,9 @@ class TestTest(TestBase):
         valid_targets: bool = True,
     ) -> Tuple[int, str]:
         console = MockConsole(use_colors=False)
-        options = create_goal_subsystem(TestOptions, debug=debug, use_coverage=use_coverage)
+        test_subsystem = create_goal_subsystem(
+            TestSubsystem, debug=debug, use_coverage=use_coverage
+        )
         interactive_runner = InteractiveRunner(self.scheduler)
         workspace = Workspace(self.scheduler)
         union_membership = UnionMembership(
@@ -179,7 +181,7 @@ class TestTest(TestBase):
 
         result: Test = run_rule(
             run_tests,
-            rule_args=[console, options, interactive_runner, workspace, union_membership],
+            rule_args=[console, test_subsystem, interactive_runner, workspace, union_membership],
             mock_gets=[
                 MockGet(
                     product_type=TargetsToValidFieldSets,
@@ -202,6 +204,10 @@ class TestTest(TestBase):
                     mock=lambda field_sets: FieldSetsWithSources(
                         field_sets if include_sources else ()
                     ),
+                ),
+                # Merge XML results.
+                MockGet(
+                    product_type=Digest, subject_type=MergeDigests, mock=lambda _: EMPTY_DIGEST,
                 ),
                 MockGet(
                     product_type=CoverageReports,

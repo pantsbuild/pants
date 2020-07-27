@@ -41,7 +41,6 @@ from pants.engine.fs import (
     CreateDigest,
     Digest,
     DigestContents,
-    DirectoryToMaterialize,
     FileContent,
     MergeDigests,
     PathGlobs,
@@ -219,7 +218,7 @@ class SetuptoolsSetup:
     requirements_pex: Pex
 
 
-class SetupPyOptions(GoalSubsystem):
+class SetupPySubsystem(GoalSubsystem):
     """Run setup.py commands."""
 
     name = "setup-py"
@@ -246,9 +245,17 @@ class SetupPyOptions(GoalSubsystem):
             "before it.",
         )
 
+    @property
+    def args(self) -> Tuple[str, ...]:
+        return tuple(self.options.args)
+
+    @property
+    def transitive(self) -> bool:
+        return cast(bool, self.options.transitive)
+
 
 class SetupPy(Goal):
-    subsystem_cls = SetupPyOptions
+    subsystem_cls = SetupPySubsystem
 
 
 def validate_args(args: Tuple[str, ...]):
@@ -272,7 +279,7 @@ def validate_args(args: Tuple[str, ...]):
 @goal_rule
 async def run_setup_pys(
     targets_with_origins: TargetsWithOrigins,
-    options: SetupPyOptions,
+    setup_py_subsystem: SetupPySubsystem,
     console: Console,
     python_setup: PythonSetup,
     distdir: DistDir,
@@ -280,8 +287,7 @@ async def run_setup_pys(
     union_membership: UnionMembership,
 ) -> SetupPy:
     """Run setup.py commands on all exported targets addressed."""
-    args = tuple(options.values.args)
-    validate_args(args)
+    validate_args(setup_py_subsystem.args)
 
     # Get all exported targets, ignoring any non-exported targets that happened to be
     # globbed over, but erroring on any explicitly-requested non-exported targets.
@@ -301,7 +307,7 @@ async def run_setup_pys(
             f'{", ".join(so.address.reference() for so in explicit_nonexported_targets)}'
         )
 
-    if options.values.transitive:
+    if setup_py_subsystem.transitive:
         # Expand out to all owners of the entire dep closure.
         transitive_targets = await Get(
             TransitiveTargets, Addresses(et.target.address for et in exported_targets)
@@ -325,18 +331,19 @@ async def run_setup_pys(
     )
 
     # If args were provided, run setup.py with them; Otherwise just dump chroots.
-    if args:
+    if setup_py_subsystem.args:
         setup_py_results = await MultiGet(
-            Get(RunSetupPyResult, RunSetupPyRequest(exported_target, chroot, tuple(args)))
+            Get(
+                RunSetupPyResult,
+                RunSetupPyRequest(exported_target, chroot, setup_py_subsystem.args),
+            )
             for exported_target, chroot in zip(exported_targets, chroots)
         )
 
         for exported_target, setup_py_result in zip(exported_targets, setup_py_results):
             addr = exported_target.target.address.reference()
             console.print_stderr(f"Writing dist for {addr} under {distdir.relpath}/.")
-            workspace.materialize_directory(
-                DirectoryToMaterialize(setup_py_result.output, path_prefix=str(distdir.relpath))
-            )
+            workspace.write_digest(setup_py_result.output, path_prefix=str(distdir.relpath))
     else:
         # Just dump the chroot.
         for exported_target, chroot in zip(exported_targets, chroots):
@@ -344,9 +351,7 @@ async def run_setup_pys(
             provides = exported_target.provides
             setup_py_dir = distdir.relpath / f"{provides.name}-{provides.version}"
             console.print_stderr(f"Writing setup.py chroot for {addr} to {setup_py_dir}")
-            workspace.materialize_directory(
-                DirectoryToMaterialize(chroot.digest, path_prefix=str(setup_py_dir))
-            )
+            workspace.write_digest(chroot.digest, path_prefix=str(setup_py_dir))
 
     return SetupPy(0)
 

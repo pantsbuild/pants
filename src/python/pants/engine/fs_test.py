@@ -20,7 +20,6 @@ from pants.engine.fs import (
     CreateDigest,
     Digest,
     DigestContents,
-    DirectoryToMaterialize,
     FileContent,
     MergeDigests,
     PathGlobs,
@@ -384,10 +383,10 @@ class FSTest(TestBase, SchedulerTestBase):
             )
             assert both_snapshot.digest == both_merged
 
-    def test_materialize_directories(self) -> None:
+    def test_write_digest(self) -> None:
         self.prime_store_with_roland_digest()
         digest = Digest("63949aa823baf765eff07b946050d76ec0033144c785a94d3ebd82baa931cd16", 80)
-        self.scheduler.materialize_directory(DirectoryToMaterialize(digest, path_prefix="test/"))
+        self.scheduler.write_digest(digest, path_prefix="test/")
         assert Path(self.build_root, "test/roland").read_text() == "European Burmese"
 
     def test_add_prefix(self) -> None:

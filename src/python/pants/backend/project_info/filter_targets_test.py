@@ -7,7 +7,7 @@ from typing import List, Optional, Sequence, cast
 
 import pytest
 
-from pants.backend.project_info.filter_targets import FilterOptions, filter_targets
+from pants.backend.project_info.filter_targets import FilterSubsystem, filter_targets
 from pants.engine.addresses import Address
 from pants.engine.target import (
     RegisteredTargetTypes,
@@ -37,7 +37,7 @@ def run_goal(
         rule_args=[
             Targets(targets),
             create_goal_subsystem(
-                FilterOptions,
+                FilterSubsystem,
                 sep="\\n",
                 output_file=None,
                 target_type=target_type or [],

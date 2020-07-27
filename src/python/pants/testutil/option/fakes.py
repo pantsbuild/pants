@@ -51,7 +51,7 @@ class _FakeOptionValues(object):
 
 def _options_registration_function(defaults, fingerprintables):
     def register(*args, **kwargs):
-        _, option_dest = Parser.parse_name_and_dest(*args, **kwargs)
+        option_dest = Parser.parse_dest(*args, **kwargs)
 
         default = kwargs.get("default")
         if default is None:

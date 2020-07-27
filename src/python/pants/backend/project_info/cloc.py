@@ -1,7 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from dataclasses import dataclass
+from typing import cast
 
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
@@ -15,7 +15,6 @@ from pants.engine.fs import (
     DigestContents,
     FileContent,
     MergeDigests,
-    SingleFileExecutable,
     SourcesSnapshot,
 )
 from pants.engine.goal import Goal, GoalSubsystem
@@ -42,22 +41,7 @@ class ClocBinary(ExternalTool):
         return f"https://github.com/AlDanial/cloc/releases/download/{version}/cloc-{version}.pl"
 
 
-@dataclass(frozen=True)
-class DownloadedClocScript:
-    """Cloc script as downloaded from the pantsbuild binaries repo."""
-
-    exe: SingleFileExecutable
-
-    @property
-    def script_path(self) -> str:
-        return self.exe.exe_filename
-
-    @property
-    def digest(self) -> Digest:
-        return self.exe.digest
-
-
-class CountLinesOfCodeOptions(GoalSubsystem):
+class CountLinesOfCodeSubsystem(GoalSubsystem):
     """Count lines of code."""
 
     name = "cloc"
@@ -66,18 +50,25 @@ class CountLinesOfCodeOptions(GoalSubsystem):
     def register_options(cls, register) -> None:
         super().register_options(register)
         register(
-            "--ignored", type=bool, help="Show information about files ignored by cloc.",
+            "--ignored",
+            type=bool,
+            default=False,
+            help="Show information about files ignored by cloc.",
         )
+
+    @property
+    def ignored(self) -> bool:
+        return cast(bool, self.options.ignored)
 
 
 class CountLinesOfCode(Goal):
-    subsystem_cls = CountLinesOfCodeOptions
+    subsystem_cls = CountLinesOfCodeSubsystem
 
 
 @goal_rule
 async def run_cloc(
     console: Console,
-    options: CountLinesOfCodeOptions,
+    cloc_subsystem: CountLinesOfCodeSubsystem,
     cloc_binary: ClocBinary,
     sources_snapshot: SourcesSnapshot,
 ) -> CountLinesOfCode:
@@ -131,7 +122,7 @@ async def run_cloc(
     for line in reports[report_filename].splitlines():
         console.print_stdout(line)
 
-    if options.values.ignored:
+    if cloc_subsystem.ignored:
         console.print_stderr("\nIgnored the following files:")
         for line in reports[ignore_filename].splitlines():
             console.print_stderr(line)

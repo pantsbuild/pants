@@ -325,14 +325,14 @@ class SubA(A):
 _suba_root_rules = [RootRule(SubA)]
 
 
-class ExampleOptions(GoalSubsystem):
+class ExampleSubsystem(GoalSubsystem):
     """An example."""
 
     name = "example"
 
 
 class Example(Goal):
-    subsystem_cls = ExampleOptions
+    subsystem_cls = ExampleSubsystem
 
 
 @goal_rule

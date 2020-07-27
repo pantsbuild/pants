@@ -572,7 +572,11 @@ class GlobalOptions(Subsystem):
             "--print-exception-stacktrace",
             advanced=True,
             type=bool,
-            fingerprint=False,
+            default=False,
+            # TODO: We must restart the daemon because of global mutable state in `init/logging.py`
+            #  from `ExceptionSink.should_print_exception_stacktrace`. Fix this and only use
+            #  `fingerprint=True` instead.
+            daemon=True,
             help="Print to console the full exception stack trace if encountered.",
         )
 

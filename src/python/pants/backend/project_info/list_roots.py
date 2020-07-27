@@ -7,19 +7,21 @@ from pants.engine.rules import goal_rule
 from pants.source.source_root import AllSourceRoots
 
 
-class RootsOptions(LineOriented, GoalSubsystem):
+class RootsSubsystem(LineOriented, GoalSubsystem):
     """List the repo's registered source roots."""
 
     name = "roots"
 
 
 class Roots(Goal):
-    subsystem_cls = RootsOptions
+    subsystem_cls = RootsSubsystem
 
 
 @goal_rule
-async def list_roots(console: Console, options: RootsOptions, asr: AllSourceRoots) -> Roots:
-    with options.line_oriented(console) as print_stdout:
+async def list_roots(
+    console: Console, roots_subsystem: RootsSubsystem, asr: AllSourceRoots
+) -> Roots:
+    with roots_subsystem.line_oriented(console) as print_stdout:
         for src_root in asr:
             print_stdout(src_root.path or ".")
     return Roots(exit_code=0)

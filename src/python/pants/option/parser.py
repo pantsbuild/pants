@@ -32,6 +32,7 @@ from typing import (
 
 import Levenshtein
 import yaml
+from typing_extensions import Protocol
 
 from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import validate_deprecation_semver, warn_or_error
@@ -79,6 +80,40 @@ class OptionValueHistory:
     @property
     def final_value(self) -> RankedValue:
         return self.ranked_values[-1]
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class ScopedFlagNameForFuzzyMatching:
+    """Specify how a registered option would look like on the command line.
+
+    This information enables fuzzy matching to suggest correct option names when a user specifies an
+    unregistered option on the command line.
+
+    scope: the 'scope' component of a command-line flag.
+    arg: the unscoped flag name as it would appear on the command line.
+    normalized_arg: the fully-scoped option name, without any leading dashes.
+    scoped_arg: the fully-scoped option as it would appear on the command line.
+    """
+
+    scope: str
+    arg: str
+    normalized_arg: str
+    scoped_arg: str
+
+    def __init__(self, scope: str, arg: str) -> None:
+        self.scope = scope
+        self.arg = arg
+        self.normalized_arg = re.sub("^-+", "", arg)
+        if scope == GLOBAL_SCOPE:
+            self.scoped_arg = arg
+        else:
+            dashed_scope = scope.replace(".", "-")
+            self.scoped_arg = f"--{dashed_scope}-{self.normalized_arg}"
+
+    @property
+    def normalized_scoped_arg(self):
+        return re.sub(r"^-+", "", self.scoped_arg)
 
 
 class Parser:
@@ -181,9 +216,15 @@ class Parser:
     @frozen_after_init
     @dataclass(unsafe_hash=True)
     class ParseArgsRequest:
-        flag_value_map: Dict
+        # N.B.: We use this callable protocol instead of Callable directly to work around the
+        # dataclass-specific issue described here: https://github.com/python/mypy/issues/6910
+        class FlagNameProvider(Protocol):
+            def __call__(self) -> Iterable[ScopedFlagNameForFuzzyMatching]:
+                ...
+
+        flag_value_map: Dict[str, List[Any]]
         namespace: OptionValueContainer
-        get_all_scoped_flag_names: Callable[["Parser.ParseArgsRequest"], Sequence]
+        get_all_scoped_flag_names: FlagNameProvider
         levenshtein_max_distance: int
         passthrough_args: List[str]
         # A passive option is one that doesn't affect functionality, or appear in help messages, but
@@ -197,7 +238,7 @@ class Parser:
             self,
             flags_in_scope: Iterable[str],
             namespace: OptionValueContainer,
-            get_all_scoped_flag_names: Callable[[], Sequence],
+            get_all_scoped_flag_names: FlagNameProvider,
             levenshtein_max_distance: int,
             passthrough_args: List[str],
             include_passive_options: bool = False,
@@ -215,7 +256,7 @@ class Parser:
             """
             self.flag_value_map = self._create_flag_value_map(flags_in_scope)
             self.namespace = namespace
-            self.get_all_scoped_flag_names = get_all_scoped_flag_names  # type: ignore[assignment]  # cannot assign a method
+            self.get_all_scoped_flag_names = get_all_scoped_flag_names
             self.levenshtein_max_distance = levenshtein_max_distance
             self.passthrough_args = passthrough_args
             self.include_passive_options = include_passive_options
@@ -261,7 +302,7 @@ class Parser:
                 continue
 
             self._validate(args, kwargs)
-            name, dest = self.parse_name_and_dest(*args, **kwargs)
+            dest = self.parse_dest(*args, **kwargs)
 
             # Compute the values provided on the command line for this option.  Note that there may be
             # multiple values, for any combination of the following reasons:
@@ -303,13 +344,11 @@ class Parser:
                         add_flag_val(v)
                     del flag_value_map[arg]
 
-            # If the arg is marked passthrough, additionally apply the collected passthrough_args.
-            if kwargs.get("passthrough"):
-                flag_vals.extend(parse_args_request.passthrough_args)
-
             # Get the value for this option, falling back to defaults as needed.
             try:
-                value_history = self._compute_value(dest, kwargs, flag_vals)
+                value_history = self._compute_value(
+                    dest, kwargs, flag_vals, parse_args_request.passthrough_args
+                )
                 self._history[dest] = value_history
                 val = value_history.final_value
             except ParseError as e:
@@ -323,7 +362,7 @@ class Parser:
 
             # If the option is explicitly given, check deprecation and mutual exclusion.
             if val.rank > Rank.HARDCODED:
-                self._check_deprecated(name, kwargs)
+                self._check_deprecated(dest, kwargs)
 
                 mutex_dest = kwargs.get("mutually_exclusive_group")
                 if mutex_dest:
@@ -350,7 +389,10 @@ class Parser:
         return namespace
 
     def _raise_error_for_invalid_flag_names(
-        self, flags: Sequence[str], all_scoped_flag_names: Sequence, max_edit_distance: int,
+        self,
+        flags: Sequence[str],
+        all_scoped_flag_names: Iterable[ScopedFlagNameForFuzzyMatching],
+        max_edit_distance: int,
     ) -> NoReturn:
         """Identify similar option names to unconsumed flags and raise a ParseError with those
         names."""
@@ -460,7 +502,7 @@ class Parser:
 
         def normalize_kwargs(orig_args, orig_kwargs):
             nkwargs = copy.copy(orig_kwargs)
-            _, dest = self.parse_name_and_dest(*orig_args, **nkwargs)
+            dest = self.parse_dest(*orig_args, **nkwargs)
             nkwargs["dest"] = dest
             if not ("default" in nkwargs and isinstance(nkwargs["default"], RankedValue)):
                 type_arg = nkwargs.get("type", str)
@@ -523,8 +565,8 @@ class Parser:
     def register(self, *args, **kwargs) -> None:
         """Register an option."""
         if args:
-            name, dest = self.parse_name_and_dest(*args, **kwargs)
-            self._check_deprecated(name, kwargs, print_warning=False)
+            dest = self.parse_dest(*args, **kwargs)
+            self._check_deprecated(dest, kwargs, print_warning=False)
 
         if kwargs.get("type") == bool:
             default = kwargs.get("default")
@@ -552,13 +594,13 @@ class Parser:
                 raise OptionAlreadyRegistered(self.scope, arg)
         self._known_args.update(args)
 
-    def _check_deprecated(self, name: str, kwargs, print_warning: bool = True) -> None:
+    def _check_deprecated(self, dest: str, kwargs, print_warning: bool = True) -> None:
         """Checks option for deprecation and issues a warning/error if necessary."""
         removal_version = kwargs.get("removal_version", None)
         if removal_version is not None:
             warn_or_error(
                 removal_version=removal_version,
-                deprecated_entity_description=f"option '{name}' in {self._scope_str()}",
+                deprecated_entity_description=f"option '{dest}' in {self._scope_str()}",
                 deprecation_start_version=kwargs.get("deprecation_start_version", None),
                 hint=kwargs.get("removal_hint", None),
                 stacklevel=9999,  # Out of range stacklevel to suppress printing src line.
@@ -666,17 +708,24 @@ class Parser:
     _ENV_SANITIZER_RE = re.compile(r"[.-]")
 
     @staticmethod
-    def parse_name_and_dest(*args, **kwargs):
-        """Return the name and dest for an option registration.
+    def parse_dest(*args, **kwargs):
+        """Return the dest for an option registration.
 
         If an explicit `dest` is specified, returns that and otherwise derives a default from the
         option flags where '--foo-bar' -> 'foo_bar' and '-x' -> 'x'.
-        """
-        arg = next((a for a in args if a.startswith("--")), args[0])
-        name = arg.lstrip("-").replace("-", "_")
 
+        The dest is used for:
+          - The name of the field containing the option value.
+          - The key in the config file.
+          - Computing the name of the env var used to set the option name.
+        """
         dest = kwargs.get("dest")
-        return name, dest if dest else name
+        if dest:
+            return dest
+        # No explicit dest, so compute one based on the first long arg, or the short arg
+        # if that's all there is.
+        arg = next((a for a in args if a.startswith("--")), args[0])
+        return arg.lstrip("-").replace("-", "_")
 
     @staticmethod
     def _convert_member_type(member_type, value):
@@ -705,7 +754,26 @@ class Parser:
                 f"for option '--{dest}' in {self._scope_str()}: {e}"
             )
 
-    def _compute_value(self, dest, kwargs, flag_val_strs):
+    @classmethod
+    def get_env_var_names(cls, scope: str, dest: str):
+        # Get value from environment, and capture details about its derivation.
+        udest = dest.upper()
+        if scope == GLOBAL_SCOPE:
+            # For convenience, we allow three forms of env var for global scope options.
+            # The fully-specified env var is PANTS_GLOBAL_FOO, which is uniform with PANTS_<SCOPE>_FOO
+            # for all the other scopes.  However we also allow simply PANTS_FOO. And if the option name
+            # itself starts with 'pants-' then we also allow simply FOO. E.g., PANTS_WORKDIR instead of
+            # PANTS_PANTS_WORKDIR or PANTS_GLOBAL_PANTS_WORKDIR. We take the first specified value we
+            # find, in this order: PANTS_GLOBAL_FOO, PANTS_FOO, FOO.
+            env_vars = [f"PANTS_GLOBAL_{udest}", f"PANTS_{udest}"]
+            if udest.startswith("PANTS_"):
+                env_vars.append(udest)
+        else:
+            sanitized_env_var_scope = cls._ENV_SANITIZER_RE.sub("_", scope.upper())
+            env_vars = [f"PANTS_{sanitized_env_var_scope}_{udest}"]
+        return env_vars
+
+    def _compute_value(self, dest, kwargs, flag_val_strs, passthru_arg_strs):
         """Compute the value to use for an option.
 
         The source of the value is chosen according to the ranking in Rank.
@@ -759,21 +827,7 @@ class Parser:
             config_details = f"from {config_source_file}"
 
         # Get value from environment, and capture details about its derivation.
-        udest = dest.upper()
-        if self._scope == GLOBAL_SCOPE:
-            # For convenience, we allow three forms of env var for global scope options.
-            # The fully-specified env var is PANTS_GLOBAL_FOO, which is uniform with PANTS_<SCOPE>_FOO
-            # for all the other scopes.  However we also allow simply PANTS_FOO. And if the option name
-            # itself starts with 'pants-' then we also allow simply FOO. E.g., PANTS_WORKDIR instead of
-            # PANTS_PANTS_WORKDIR or PANTS_GLOBAL_PANTS_WORKDIR. We take the first specified value we
-            # find, in this order: PANTS_GLOBAL_FOO, PANTS_FOO, FOO.
-            env_vars = [f"PANTS_GLOBAL_{udest}", f"PANTS_{udest}"]
-            if udest.startswith("PANTS_"):
-                env_vars.append(udest)
-        else:
-            sanitized_env_var_scope = self._ENV_SANITIZER_RE.sub("_", self._scope.upper())
-            env_vars = [f"PANTS_{sanitized_env_var_scope}_{udest}"]
-
+        env_vars = self.get_env_var_names(self._scope, dest)
         env_val_or_str = None
         env_details = None
         if self._env:
@@ -785,6 +839,9 @@ class Parser:
 
         # Get value from cmd-line flags.
         flag_vals = [to_value_type(expand(x)) for x in flag_val_strs]
+        if kwargs.get("passthrough"):
+            flag_vals.extend(to_value_type(x) for x in passthru_arg_strs)
+
         if is_list_option(kwargs):
             # Note: It's important to set flag_val to None if no flags were specified, so we can
             # distinguish between no flags set vs. explicit setting of the value to [].

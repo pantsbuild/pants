@@ -6,7 +6,7 @@ from abc import ABC, ABCMeta
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import Dict, Iterable, List, Optional, Tuple, Type, TypeVar
+from typing import Dict, Iterable, List, Optional, Tuple, Type, TypeVar, cast
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.core.util_rules.filter_empty_sources import (
@@ -18,7 +18,7 @@ from pants.engine.addresses import Address
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAware
-from pants.engine.fs import Digest, DirectoryToMaterialize, Workspace
+from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.interactive_process import InteractiveProcess, InteractiveRunner
 from pants.engine.process import FallibleProcessResult
@@ -178,10 +178,8 @@ class FilesystemCoverageReport(CoverageReport):
     report_type: CoverageReportType
 
     def materialize(self, console: Console, workspace: Workspace) -> Optional[PurePath]:
-        workspace.materialize_directory(
-            DirectoryToMaterialize(
-                self.result_digest, path_prefix=str(self.directory_to_materialize_to),
-            )
+        workspace.write_digest(
+            self.result_digest, path_prefix=str(self.directory_to_materialize_to)
         )
         console.print_stderr(
             f"\nWrote {self.report_type.report_name} coverage report to `{self.directory_to_materialize_to}`"
@@ -202,8 +200,8 @@ class CoverageReports:
         return tuple(report_paths)
 
 
-class TestOptions(GoalSubsystem):
-    """Runs tests."""
+class TestSubsystem(GoalSubsystem):
+    """Run tests."""
 
     name = "test"
 
@@ -246,9 +244,25 @@ class TestOptions(GoalSubsystem):
             ),
         )
 
+    @property
+    def debug(self) -> bool:
+        return cast(bool, self.options.debug)
+
+    @property
+    def force(self) -> bool:
+        return cast(bool, self.options.force)
+
+    @property
+    def use_coverage(self) -> bool:
+        return cast(bool, self.options.use_coverage)
+
+    @property
+    def open_coverage(self) -> bool:
+        return cast(bool, self.options.open_coverage)
+
 
 class Test(Goal):
-    subsystem_cls = TestOptions
+    subsystem_cls = TestSubsystem
 
     __test__ = False
 
@@ -256,12 +270,12 @@ class Test(Goal):
 @goal_rule
 async def run_tests(
     console: Console,
-    options: TestOptions,
+    test_subsystem: TestSubsystem,
     interactive_runner: InteractiveRunner,
     workspace: Workspace,
     union_membership: UnionMembership,
 ) -> Test:
-    if options.values.debug:
+    if test_subsystem.debug:
         targets_to_valid_field_sets = await Get(
             TargetsToValidFieldSets,
             TargetsToValidFieldSetsRequest(
@@ -280,7 +294,7 @@ async def run_tests(
         TargetsToValidFieldSets,
         TargetsToValidFieldSetsRequest(
             TestFieldSet,
-            goal_description=f"the `{options.name}` goal",
+            goal_description=f"the `{test_subsystem.name}` goal",
             error_if_no_valid_targets=False,
         ),
     )
@@ -321,13 +335,15 @@ async def run_tests(
                 f"{result.address.reference():80}.....{result.test_result.status.value:>10}"
             )
 
-    for result in results:
-        xml_results = result.test_result.xml_results
-        if not xml_results:
-            continue
-        workspace.materialize_directory(DirectoryToMaterialize(xml_results))
+    merged_xml_results = await Get(
+        Digest,
+        MergeDigests(
+            result.test_result.xml_results for result in results if result.test_result.xml_results
+        ),
+    )
+    workspace.write_digest(merged_xml_results)
 
-    if options.values.use_coverage:
+    if test_subsystem.use_coverage:
         all_coverage_data: Iterable[CoverageData] = [
             result.test_result.coverage_data
             for result in results
@@ -355,7 +371,7 @@ async def run_tests(
             report_files = coverage_reports.materialize(console, workspace)
             coverage_report_files.extend(report_files)
 
-        if coverage_report_files and options.values.open_coverage:
+        if coverage_report_files and test_subsystem.open_coverage:
             desktop.ui_open(console, interactive_runner, coverage_report_files)
 
     return Test(exit_code)

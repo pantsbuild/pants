@@ -15,7 +15,13 @@ from pants.backend.python.rules.pex import (
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonSources
-from pants.core.goals.lint import LintOptions, LintRequest, LintResult, LintResultFile, LintResults
+from pants.core.goals.lint import (
+    LintRequest,
+    LintResult,
+    LintResultFile,
+    LintResults,
+    LintSubsystem,
+)
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.core.util_rules.determine_source_files import (
     AllSourceFilesRequest,
@@ -68,7 +74,7 @@ def generate_args(
 async def flake8_lint_partition(
     partition: Flake8Partition,
     flake8: Flake8,
-    lint_options: LintOptions,
+    lint_subsystem: LintSubsystem,
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> LintResult:
@@ -122,34 +128,35 @@ async def flake8_lint_partition(
     address_references = ", ".join(
         sorted(field_set.address.reference() for field_set in partition.field_sets)
     )
-    output_dir = lint_options.output_dir
-    output_path = output_dir / "flake8_report.txt" if output_dir else None
+    report_path = (
+        lint_subsystem.reports_dir / "flake8_report.txt" if lint_subsystem.reports_dir else None
+    )
     flake8_args = generate_args(
         specified_source_files=specified_source_files,
         flake8=flake8,
-        output_file=output_path.name if output_path else None,
+        output_file=report_path.name if report_path else None,
     )
     process = requirements_pex.create_process(
         python_setup=python_setup,
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path="./flake8.pex",
         pex_args=flake8_args,
-        output_files=(output_path.name,) if output_path else None,
+        output_files=(report_path.name,) if report_path else None,
         input_digest=input_digest,
         description=(
             f"Run Flake8 on {pluralize(len(partition.field_sets), 'target')}: {address_references}."
         ),
     )
     result = await Get(FallibleProcessResult, Process, process)
-    results_file = None
 
-    if output_path:
+    results_file = None
+    if report_path:
         report_file_snapshot = await Get(
-            Snapshot, SnapshotSubset(result.output_digest, PathGlobs([output_path.name]))
+            Snapshot, SnapshotSubset(result.output_digest, PathGlobs([report_path.name]))
         )
         if report_file_snapshot.is_empty or len(report_file_snapshot.files) != 1:
             raise Exception(f"Unexpected report file snapshot: {report_file_snapshot}")
-        results_file = LintResultFile(output_path=output_path, digest=report_file_snapshot.digest)
+        results_file = LintResultFile(output_path=report_path, digest=report_file_snapshot.digest)
 
     return LintResult.from_fallible_process_result(
         result, linter_name="Flake8", results_file=results_file

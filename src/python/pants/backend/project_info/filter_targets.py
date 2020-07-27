@@ -28,7 +28,7 @@ ANCESTOR_REMOVAL_MSG = (
 )
 
 
-class FilterOptions(LineOriented, GoalSubsystem):
+class FilterSubsystem(LineOriented, GoalSubsystem):
     """Filter the input targets based on various criteria.
 
     Each of the filtering options below is a comma-separated list of filtering criteria, with an
@@ -98,7 +98,7 @@ class FilterOptions(LineOriented, GoalSubsystem):
 
 
 class FilterGoal(Goal):
-    subsystem_cls = FilterOptions
+    subsystem_cls = FilterSubsystem
 
 
 def compile_regex(regex: str) -> Pattern:
@@ -114,13 +114,13 @@ TargetFilter = Callable[[Target], bool]
 @goal_rule
 def filter_targets(
     targets: Targets,
-    options: FilterOptions,
+    filter_subsystem: FilterSubsystem,
     console: Console,
     registered_target_types: RegisteredTargetTypes,
 ) -> FilterGoal:
-    if not options.values.is_default("target"):
+    if not filter_subsystem.options.is_default("target"):
         raise ValueError(TARGET_REMOVAL_MSG)
-    if not options.values.is_default("ancestor"):
+    if not filter_subsystem.options.is_default("ancestor"):
         raise ValueError(ANCESTOR_REMOVAL_MSG)
 
     def filter_target_type(target_type: str) -> TargetFilter:
@@ -140,8 +140,8 @@ def filter_targets(
         resolve_conflicting_options,
         old_scope="filter",
         new_scope="filter",
-        old_container=options.values,
-        new_container=options.values,
+        old_container=filter_subsystem.options,
+        new_container=filter_subsystem.options,
     )
     target_type = resolve_option(old_option="type", new_option="target_type")
     address_regex = resolve_option(old_option="regex", new_option="address_regex")
@@ -150,14 +150,14 @@ def filter_targets(
         [
             *(create_filters(target_type, filter_target_type)),
             *(create_filters(address_regex, filter_address_regex)),
-            *(create_filters(options.values.tag_regex, filter_tag_regex)),
+            *(create_filters(filter_subsystem.options.tag_regex, filter_tag_regex)),
         ]
     )
     addresses = sorted(target.address for target in targets if anded_filter(target))
 
-    with options.line_oriented(console) as print_stdout:
+    with filter_subsystem.line_oriented(console) as print_stdout:
         for address in addresses:
-            print_stdout(address)
+            print_stdout(address.spec)
     return FilterGoal(exit_code=0)
 
 

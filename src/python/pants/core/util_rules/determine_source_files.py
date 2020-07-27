@@ -10,6 +10,7 @@ from pants.core.util_rules.strip_source_roots import (
     SourceRootStrippedSources,
     StripSourcesFieldRequest,
 )
+from pants.engine.addresses import Address
 from pants.engine.fs import MergeDigests, PathGlobs, Snapshot, SnapshotSubset
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
@@ -76,10 +77,11 @@ class SpecifiedSourceFilesRequest:
 
 
 def calculate_specified_sources(
-    sources_snapshot: Snapshot, origin: OriginSpec
+    sources_snapshot: Snapshot, address: Address, origin: OriginSpec
 ) -> Union[Snapshot, SnapshotSubset]:
-    # AddressSpecs simply use the entire `sources` field.
-    if isinstance(origin, AddressSpec):
+    # AddressSpecs simply use the entire `sources` field. If it's a generated subtarget, we also
+    # know we're as precise as we can get (1 file), so use the whole snapshot.
+    if isinstance(origin, AddressSpec) or address.generated_base_target_name:
         return sources_snapshot
     # NB: we ensure that `precise_files_specified` is a subset of the original `sources` field.
     # It's possible when given a glob filesystem spec that the spec will have
@@ -149,7 +151,9 @@ async def determine_specified_source_files(request: SpecifiedSourceFilesRequest)
         sources_field, origin = sources_field_with_origin
         if not hydrated_sources.snapshot.files:
             continue
-        specified_sources = calculate_specified_sources(hydrated_sources.snapshot, origin)
+        specified_sources = calculate_specified_sources(
+            hydrated_sources.snapshot, sources_field.address, origin
+        )
         if isinstance(specified_sources, Snapshot):
             full_snapshots[sources_field] = specified_sources
         else:

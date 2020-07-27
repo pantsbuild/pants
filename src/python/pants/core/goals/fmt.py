@@ -3,11 +3,11 @@
 
 import itertools
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, List, Tuple, Type
+from typing import ClassVar, Iterable, List, Tuple, Type, cast
 
 from pants.core.util_rules.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
 from pants.engine.console import Console
-from pants.engine.fs import EMPTY_DIGEST, Digest, DirectoryToMaterialize, MergeDigests, Workspace
+from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import ProcessResult
 from pants.engine.rules import goal_rule
@@ -93,7 +93,7 @@ class LanguageFmtResults:
         return self.input != self.output
 
 
-class FmtOptions(GoalSubsystem):
+class FmtSubsystem(GoalSubsystem):
     """Autoformat source code."""
 
     name = "fmt"
@@ -119,16 +119,20 @@ class FmtOptions(GoalSubsystem):
             ),
         )
 
+    @property
+    def per_target_caching(self) -> bool:
+        return cast(bool, self.options.per_target_caching)
+
 
 class Fmt(Goal):
-    subsystem_cls = FmtOptions
+    subsystem_cls = FmtSubsystem
 
 
 @goal_rule
 async def fmt(
     console: Console,
     targets_with_origins: TargetsWithOrigins,
-    options: FmtOptions,
+    fmt_subsystem: FmtSubsystem,
     workspace: Workspace,
     union_membership: UnionMembership,
 ) -> Fmt:
@@ -170,7 +174,7 @@ async def fmt(
         if language_targets_with_sources
     )
 
-    if options.values.per_target_caching:
+    if fmt_subsystem.per_target_caching:
         per_language_results = await MultiGet(
             Get(
                 LanguageFmtResults,
@@ -205,7 +209,7 @@ async def fmt(
         # than silently having one result override the other. In practicality, this should never
         # happen due to us grouping each language's formatters into a single digest.
         merged_formatted_digest = await Get(Digest, MergeDigests(changed_digests))
-        workspace.materialize_directory(DirectoryToMaterialize(merged_formatted_digest))
+        workspace.write_digest(merged_formatted_digest)
 
     sorted_results = sorted(individual_results, key=lambda res: res.formatter_name)
     for result in sorted_results:

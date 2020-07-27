@@ -5,7 +5,7 @@ import re
 import textwrap
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Set, Tuple
+from typing import Any, Dict, Set, Tuple, cast
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.engine.collection import Collection
@@ -36,7 +36,7 @@ class DetailLevel(Enum):
     all = "all"
 
 
-class ValidateOptions(GoalSubsystem):
+class ValidateSubsystem(GoalSubsystem):
     """Validate sources against regexes."""
 
     name = "validate"
@@ -51,9 +51,13 @@ class ValidateOptions(GoalSubsystem):
             help="How much detail to emit to the console.",
         )
 
+    @property
+    def detail_level(self) -> DetailLevel:
+        return cast(DetailLevel, self.options.detail_level)
+
 
 class Validate(Goal):
-    subsystem_cls = ValidateOptions
+    subsystem_cls = ValidateSubsystem
 
 
 @dataclass(frozen=True)
@@ -280,7 +284,7 @@ class MultiMatcher:
 async def validate(
     console: Console,
     sources_snapshot: SourcesSnapshot,
-    validate_options: ValidateOptions,
+    validate_subsystem: ValidateSubsystem,
     source_file_validation: SourceFileValidation,
 ) -> Validate:
     multi_matcher = source_file_validation.get_multi_matcher()
@@ -290,7 +294,7 @@ async def validate(
         for file_content in sorted(digest_contents, key=lambda fc: fc.path)
     )
 
-    detail_level = validate_options.values.detail_level
+    detail_level = validate_subsystem.detail_level
     num_matched_all = 0
     num_nonmatched_some = 0
     for rmr in regex_match_results:

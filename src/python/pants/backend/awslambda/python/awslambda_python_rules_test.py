@@ -51,7 +51,7 @@ class TestPythonAWSLambdaCreation(ExternalToolTestBase):
             DigestContents, created_awslambda.digest
         )
         assert len(created_awslambda_digest_contents) == 1
-        return created_awslambda.name, created_awslambda_digest_contents[0].content
+        return created_awslambda.zip_file_relpath, created_awslambda_digest_contents[0].content
 
     def test_create_hello_world_lambda(self) -> None:
         self.create_file(
@@ -83,8 +83,10 @@ class TestPythonAWSLambdaCreation(ExternalToolTestBase):
             ),
         )
 
-        name, content = self.create_python_awslambda("src/python/foo/bar:hello_world_lambda")
-        assert "hello_world_lambda.zip" == name
+        zip_file_relpath, content = self.create_python_awslambda(
+            "src/python/foo/bar:hello_world_lambda"
+        )
+        assert "hello_world_lambda.zip" == zip_file_relpath
         zipfile = ZipFile(BytesIO(content))
         names = set(zipfile.namelist())
         assert "lambdex_handler.py" in names
