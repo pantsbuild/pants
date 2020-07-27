@@ -182,8 +182,8 @@ class Parser:
     @frozen_after_init
     @dataclass(unsafe_hash=True)
     class ParseArgsRequest:
-        # N.B.: We use this callable protool instead of Callable directly to work around
-        # Work around https://github.com/python/mypy/issues/6910
+        # N.B.: We use this callable protool instead of Callable directly to work around the
+        # dataclass-specific issue described here: https://github.com/python/mypy/issues/6910
         class FlagNameProvider(Protocol):
             def __call__(self) -> Iterable:
                 ...
