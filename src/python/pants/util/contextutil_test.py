@@ -4,10 +4,8 @@
 import os
 import pstats
 import shutil
-import signal
 import subprocess
 import sys
-import unittest
 import unittest.mock
 import uuid
 import zipfile
@@ -16,20 +14,15 @@ from typing import Iterator
 
 from pants.util.contextutil import (
     InvalidZipPath,
-    Timer,
     environment_as,
-    exception_logging,
     hermetic_environment_as,
     maybe_profiled,
     open_zip,
     pushd,
-    signal_handler_as,
     stdio_as,
     temporary_dir,
     temporary_file,
 )
-
-PATCH_OPTS = dict(autospec=True, spec_set=True)
 
 
 class ContextutilTest(unittest.TestCase):
@@ -178,35 +171,6 @@ class ContextutilTest(unittest.TestCase):
                     "Nested temporary dir should be created within outer dir.",
                 )
 
-    def test_timer(self) -> None:
-        class FakeClock:
-            def __init__(self):
-                self._time = 0.0
-
-            def time(self) -> float:
-                ret: float = self._time
-                self._time += 0.0001  # Force a little time to elapse.
-                return ret
-
-            def sleep(self, duration: float) -> None:
-                self._time += duration
-
-        clock = FakeClock()
-
-        # Note: to test with the real system clock, use this instead:
-        # import time
-        # clock = time
-
-        with Timer(clock=clock) as t:
-            self.assertLess(t.start, clock.time())
-            self.assertGreater(t.elapsed, 0)
-            clock.sleep(0.1)
-            self.assertGreater(t.elapsed, 0.1)
-            clock.sleep(0.1)
-            self.assertTrue(t.finish is None)
-        self.assertGreater(t.elapsed, 0.2)
-        self.assertLess(t.finish, clock.time())
-
     def test_open_zipDefault(self) -> None:
         with temporary_dir() as tempdir:
             with open_zip(os.path.join(tempdir, "test"), "w") as zf:
@@ -317,39 +281,12 @@ class ContextutilTest(unittest.TestCase):
                 print("garbage", file=sys.stdout)
                 print("garbage", file=sys.stderr)
 
-    def test_signal_handler_as(self) -> None:
-        mock_initial_handler = 1
-        mock_new_handler = 2
-        with unittest.mock.patch("signal.signal", **PATCH_OPTS) as mock_signal:
-            mock_signal.return_value = mock_initial_handler
-            try:
-                with signal_handler_as(signal.SIGUSR2, mock_new_handler):
-                    raise NotImplementedError("blah")
-            except NotImplementedError:
-                pass
-        self.assertEqual(mock_signal.call_count, 2)
-        mock_signal.assert_has_calls(
-            [
-                unittest.mock.call(signal.SIGUSR2, mock_new_handler),
-                unittest.mock.call(signal.SIGUSR2, mock_initial_handler),
-            ]
-        )
-
     def test_permissions(self) -> None:
         with temporary_file(permissions=0o700) as f:
             self.assertEqual(0o700, os.stat(f.name)[0] & 0o777)
 
         with temporary_dir(permissions=0o644) as path:
             self.assertEqual(0o644, os.stat(path)[0] & 0o777)
-
-    def test_exception_logging(self) -> None:
-        fake_logger = unittest.mock.Mock()
-
-        with self.assertRaises(AssertionError):
-            with exception_logging(fake_logger, "error!"):
-                assert True is False
-
-        fake_logger.exception.assert_called_once_with("error!")
 
     def test_maybe_profiled(self) -> None:
         with temporary_dir() as td:

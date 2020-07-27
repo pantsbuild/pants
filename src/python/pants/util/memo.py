@@ -6,7 +6,7 @@ import inspect
 from contextlib import contextmanager
 from typing import Any, Callable, Optional, TypeVar
 
-from pants.util.meta import T, classproperty, staticproperty
+from pants.util.meta import T, classproperty
 
 FuncType = Callable[..., Any]
 F = TypeVar("F", bound=FuncType)
@@ -266,22 +266,6 @@ def memoized_classproperty(
 ) -> T:
     return classproperty(
         memoized_classmethod(func, key_factory=key_factory, cache_factory=cache_factory)
-    )
-
-
-def memoized_staticmethod(
-    func: Optional[F] = None, key_factory=equal_args, cache_factory=dict,
-) -> F:
-    return staticmethod(  # type: ignore[return-value]
-        memoized(func, key_factory=key_factory, cache_factory=cache_factory)
-    )
-
-
-def memoized_staticproperty(
-    func: Optional[Callable[..., T]] = None, key_factory=equal_args, cache_factory=dict,
-) -> T:
-    return staticproperty(
-        memoized_staticmethod(func, key_factory=key_factory, cache_factory=cache_factory)
     )
 
 

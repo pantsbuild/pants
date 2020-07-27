@@ -3,38 +3,7 @@
 
 import collections
 import collections.abc
-from typing import Any, Callable, DefaultDict, Iterable, List, MutableMapping, Type, TypeVar, Union
-
-_K = TypeVar("_K")
-_V = TypeVar("_V")
-
-
-def factory_dict(value_factory: Callable[[_K], _V], *args, **kwargs) -> DefaultDict:
-    """A dict whose values are computed by `value_factory` when a `__getitem__` key is missing.
-
-    Note that values retrieved by any other method will not be lazily computed; eg: via `get`.
-
-    :param value_factory:
-    :param *args: Any positional args to pass through to `dict`.
-    :param **kwrags: Any kwargs to pass through to `dict`.
-    """
-
-    class FactoryDict(collections.defaultdict):
-        @staticmethod
-        def __never_called():
-            raise AssertionError(
-                "The default factory should never be called since we override " "__missing__."
-            )
-
-        def __init__(self):
-            super().__init__(self.__never_called, *args, **kwargs)
-
-        def __missing__(self, key):
-            value = value_factory(key)
-            self[key] = value
-            return value
-
-    return FactoryDict()
+from typing import Any, Iterable, List, MutableMapping, Type, TypeVar, Union
 
 
 def recursively_update(d: MutableMapping, d2: MutableMapping) -> None:

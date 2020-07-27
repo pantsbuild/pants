@@ -3,15 +3,12 @@
 
 from collections import defaultdict
 
-from pants.option.global_options import GlobalOptions
-from pants.option.option_util import is_list_option
-from pants.option.parser import Parser
 from pants.option.parser_hierarchy import enclosing_scope
 from pants.option.ranked_value import Rank, RankedValue
 from pants.option.scope import GLOBAL_SCOPE
 
 
-class _FakeOptionValues(object):
+class _FakeOptionValues:
     def __init__(self, option_values):
         self._option_values = option_values
 
@@ -47,29 +44,6 @@ class _FakeOptionValues(object):
     @property
     def option_values(self):
         return self._option_values
-
-
-def _options_registration_function(defaults, fingerprintables):
-    def register(*args, **kwargs):
-        option_dest = Parser.parse_dest(*args, **kwargs)
-
-        default = kwargs.get("default")
-        if default is None:
-            if kwargs.get("type") == bool:
-                default = False
-            if kwargs.get("type") == list:
-                default = []
-        defaults[option_dest] = RankedValue(Rank.HARDCODED, default)
-
-        fingerprint = kwargs.get("fingerprint", False)
-        if fingerprint:
-            if is_list_option(kwargs):
-                val_type = kwargs.get("member_type", str)
-            else:
-                val_type = kwargs.get("type", str)
-            fingerprintables[option_dest] = val_type
-
-    return register
 
 
 def create_options(options, passthru_args=None, fingerprintable_options=None):
@@ -142,57 +116,3 @@ def create_options(options, passthru_args=None, fingerprintable_options=None):
             return self.for_scope(scope)
 
     return FakeOptions()
-
-
-def create_options_for_optionables(
-    optionables, options=None, options_fingerprintable=None, passthru_args=None
-):
-    """Create a fake Options object for testing with appropriate defaults for the given optionables.
-
-    Any scoped `options` provided will override defaults, behaving as-if set on the command line.
-
-    :param iterable optionables: A series of `Optionable` types to register default options for.
-    :param dict options: A dict of scope -> (dict of option name -> value) representing option values
-                         explicitly set via the command line.
-    :param dict options_fingerprintable: A dict of scope -> (dict of option name -> option type)
-                                         representing the fingerprintable options
-                                         and the scopes they are registered for.
-    :param list passthru_args: A list of passthrough args (specified after `--` on the command line).
-    :returns: A fake `Options` object with defaults populated for the given `optionables` and any
-              explicitly set `options` overlayed.
-    """
-    all_options = defaultdict(dict)
-    fingerprintable_options = defaultdict(dict)
-    bootstrap_option_values = None
-
-    if options_fingerprintable:
-        for scope, opts in options_fingerprintable.items():
-            fingerprintable_options[scope].update(opts)
-
-    def register_func(on_scope):
-        scoped_options = all_options[on_scope]
-        scoped_fingerprintables = fingerprintable_options[on_scope]
-        register = _options_registration_function(scoped_options, scoped_fingerprintables)
-        register.bootstrap = bootstrap_option_values
-        register.scope = on_scope
-        return register
-
-    # TODO: This sequence is a bit repetitive of the real registration sequence.
-
-    # Register bootstrap options and grab their default values for use in subsequent registration.
-    GlobalOptions.register_bootstrap_options(register_func(GLOBAL_SCOPE))
-    bootstrap_option_values = _FakeOptionValues(all_options[GLOBAL_SCOPE].copy())
-
-    # Now register the full global scope options.
-    GlobalOptions.register_options(register_func(GLOBAL_SCOPE))
-
-    for optionable in optionables:
-        optionable.register_options(register_func(optionable.options_scope))
-
-    if options:
-        for scope, opts in options.items():
-            all_options[scope].update(opts)
-
-    return create_options(
-        all_options, passthru_args=passthru_args, fingerprintable_options=fingerprintable_options
-    )

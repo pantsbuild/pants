@@ -17,13 +17,6 @@ def pants_version() -> str:
     return _VERSION
 
 
-def pants_release() -> str:
-    """Returns a user-friendly release label."""
-    return "Pants {version} https://pypi.org/pypi/pantsbuild.pants/{version}".format(
-        version=pants_version()
-    )
-
-
 def get_buildroot() -> str:
     """Returns the Pants build root, calculating it if needed.
 

@@ -3,7 +3,7 @@
 
 import re
 import shlex
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Union
+from typing import Dict, Iterable, List, Optional, Sequence, Union
 
 
 def ensure_binary(text_or_binary: Union[bytes, str]) -> bytes:
@@ -22,10 +22,6 @@ def ensure_text(text_or_binary: Union[bytes, str]) -> str:
         return text_or_binary
     else:
         raise TypeError(f"Argument is neither text nor binary type ({type(text_or_binary)})")
-
-
-def is_text_or_binary(obj: Any) -> bool:
-    return isinstance(obj, (str, bytes))
 
 
 def safe_shlex_split(text_or_binary: Union[bytes, str]) -> List[str]:
@@ -87,16 +83,6 @@ def create_path_env_var(
         path_dirs += new_entries_list
 
     return delimiter.join(path_dirs)
-
-
-def module_dirname(module_path: str) -> str:
-    """Return the import path for the parent module of `module_path`."""
-    return ".".join(module_path.split(".")[:-1])
-
-
-def camelcase(string: str) -> str:
-    """Convert snake casing (containing - or _ characters) to camel casing."""
-    return "".join(word.capitalize() for word in re.split("[-_]", string))
 
 
 def pluralize(count: int, item_type: str) -> str:
