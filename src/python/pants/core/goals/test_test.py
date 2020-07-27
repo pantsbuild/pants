@@ -17,8 +17,8 @@ from pants.core.goals.test import (
     Test,
     TestDebugRequest,
     TestFieldSet,
-    TestOptions,
     TestResult,
+    TestSubsystem,
     WrappedTestFieldSet,
     run_tests,
 )
@@ -141,7 +141,9 @@ class TestTest(TestBase):
         valid_targets: bool = True,
     ) -> Tuple[int, str]:
         console = MockConsole(use_colors=False)
-        options = create_goal_subsystem(TestOptions, debug=debug, use_coverage=use_coverage)
+        test_subsystem = create_goal_subsystem(
+            TestSubsystem, debug=debug, use_coverage=use_coverage
+        )
         interactive_runner = InteractiveRunner(self.scheduler)
         workspace = Workspace(self.scheduler)
         union_membership = UnionMembership(
@@ -179,7 +181,7 @@ class TestTest(TestBase):
 
         result: Test = run_rule(
             run_tests,
-            rule_args=[console, options, interactive_runner, workspace, union_membership],
+            rule_args=[console, test_subsystem, interactive_runner, workspace, union_membership],
             mock_gets=[
                 MockGet(
                     product_type=TargetsToValidFieldSets,

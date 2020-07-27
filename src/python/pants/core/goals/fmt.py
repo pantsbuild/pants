@@ -3,7 +3,7 @@
 
 import itertools
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, List, Tuple, Type
+from typing import ClassVar, Iterable, List, Tuple, Type, cast
 
 from pants.core.util_rules.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
 from pants.engine.console import Console
@@ -93,7 +93,7 @@ class LanguageFmtResults:
         return self.input != self.output
 
 
-class FmtOptions(GoalSubsystem):
+class FmtSubsystem(GoalSubsystem):
     """Autoformat source code."""
 
     name = "fmt"
@@ -119,16 +119,20 @@ class FmtOptions(GoalSubsystem):
             ),
         )
 
+    @property
+    def per_target_caching(self) -> bool:
+        return cast(bool, self.options.per_target_caching)
+
 
 class Fmt(Goal):
-    subsystem_cls = FmtOptions
+    subsystem_cls = FmtSubsystem
 
 
 @goal_rule
 async def fmt(
     console: Console,
     targets_with_origins: TargetsWithOrigins,
-    options: FmtOptions,
+    fmt_subsystem: FmtSubsystem,
     workspace: Workspace,
     union_membership: UnionMembership,
 ) -> Fmt:
@@ -170,7 +174,7 @@ async def fmt(
         if language_targets_with_sources
     )
 
-    if options.values.per_target_caching:
+    if fmt_subsystem.per_target_caching:
         per_language_results = await MultiGet(
             Get(
                 LanguageFmtResults,

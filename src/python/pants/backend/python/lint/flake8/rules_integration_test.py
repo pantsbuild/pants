@@ -7,7 +7,7 @@ from pants.backend.python.lint.flake8.rules import Flake8FieldSet, Flake8Request
 from pants.backend.python.lint.flake8.rules import rules as flake8_rules
 from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonLibrary
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
-from pants.core.goals.lint import LintOptions, LintResults
+from pants.core.goals.lint import LintResults, LintSubsystem
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, FileContent
 from pants.engine.rules import RootRule, SubsystemRule
@@ -30,7 +30,7 @@ class Flake8IntegrationTest(ExternalToolTestBase):
             *super().rules(),
             *flake8_rules(),
             RootRule(Flake8Request),
-            SubsystemRule(LintOptions),
+            SubsystemRule(LintSubsystem),
         )
 
     def make_target_with_origin(

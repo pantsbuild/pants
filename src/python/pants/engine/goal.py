@@ -4,11 +4,17 @@
 from abc import abstractmethod
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import ClassVar, Tuple, Type
+from typing import TYPE_CHECKING, Callable, ClassVar, Iterator, Tuple, Type, cast
 
+from typing_extensions import final
+
+from pants.option.option_value_container import OptionValueContainer
 from pants.option.optionable import Optionable
 from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 from pants.util.meta import classproperty
+
+if TYPE_CHECKING:
+    from pants.engine.console import Console
 
 
 class GoalSubsystem(SubsystemClientMixin, Optionable):
@@ -22,9 +28,9 @@ class GoalSubsystem(SubsystemClientMixin, Optionable):
 
     ```
     @rule
-    def list(console: Console, options: ListOptions) -> List:
-      transitive = options.values.transitive
-      documented = options.values.documented
+    def list(console: Console, list_subsystem: ListSubsystem) -> List:
+      transitive = list_subsystem.options.transitive
+      documented = list_subsystem.options.documented
       ...
     ```
     """
@@ -40,17 +46,19 @@ class GoalSubsystem(SubsystemClientMixin, Optionable):
         for its options."""
 
     @classproperty
-    def options_scope(cls):
-        return cls.name
+    def options_scope(cls) -> str:  # type: ignore[override]
+        return cast(str, cls.name)
 
-    def __init__(self, scope, scoped_options):
+    @final
+    def __init__(self, scope: str, scoped_options: OptionValueContainer) -> None:
         # NB: This constructor is shaped to meet the contract of `Optionable(Factory).signature`.
         super().__init__()
         self._scope = scope
         self._scoped_options = scoped_options
 
+    @final
     @property
-    def values(self):
+    def options(self) -> OptionValueContainer:
         """Returns the option values."""
         return self._scoped_options
 
@@ -62,12 +70,12 @@ class Goal:
     This class should be subclassed and linked to a corresponding `GoalSubsystem`:
 
     ```
-    class ListOptions(GoalSubsystem):
+    class ListSubsystem(GoalSubsystem):
       '''List targets.'''
       name = "list"
 
     class List(Goal):
-      subsystem_cls = ListOptions
+      subsystem_cls = ListSubsystem
     ```
 
     Since `@goal_rules` always run in order to produce side effects (generally: console output),
@@ -78,9 +86,10 @@ class Goal:
     exit_code: int
     subsystem_cls: ClassVar[Type[GoalSubsystem]]
 
+    @final
     @classproperty
-    def name(cls):
-        return cls.subsystem_cls.name
+    def name(cls) -> str:
+        return cast(str, cls.subsystem_cls.name)
 
 
 class Outputting:
@@ -100,20 +109,22 @@ class Outputting:
             help="Output to this file.  If unspecified, outputs to stdout.",
         )
 
+    @final
     @contextmanager
-    def output(self, console):
+    def output(self, console: "Console") -> Iterator[Callable[[str], None]]:
         """Given a Console, yields a function for writing data to stdout, or a file.
 
         The passed options instance will generally be the `Goal.Options` of an `Outputting` `Goal`.
         """
         with self.output_sink(console) as output_sink:
-            yield lambda msg: output_sink.write(msg)
+            yield lambda msg: output_sink.write(msg)  # type: ignore[no-any-return]
 
+    @final
     @contextmanager
-    def output_sink(self, console):
+    def output_sink(self, console: "Console") -> Iterator:
         stdout_file = None
-        if self.values.output_file:
-            stdout_file = open(self.values.output_file, "w")
+        if self.options.output_file:  # type: ignore[attr-defined]
+            stdout_file = open(self.options.output_file, "w")  # type: ignore[attr-defined]
             output_sink = stdout_file
         else:
             output_sink = console.stdout
@@ -136,12 +147,13 @@ class LineOriented(Outputting):
             help="String to use to separate lines in line-oriented output.",
         )
 
+    @final
     @contextmanager
-    def line_oriented(self, console):
+    def line_oriented(self, console: "Console") -> Iterator[Callable[[str], None]]:
         """Given a Console, yields a function for printing lines to stdout or a file.
 
         The passed options instance will generally be the `Goal.Options` of an `Outputting` `Goal`.
         """
-        sep = self.values.sep.encode().decode("unicode_escape")
+        sep = self.options.sep.encode().decode("unicode_escape")  # type: ignore[attr-defined]
         with self.output_sink(console) as output_sink:
             yield lambda msg: print(msg, file=output_sink, end=sep)
