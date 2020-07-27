@@ -4,9 +4,6 @@
 from dataclasses import dataclass
 from typing import Iterable, List, Tuple, Type
 
-from pants.backend.python.rules.inject_ancestor_files import rules as inject_ancestor_rules
-from pants.backend.python.rules.inject_init import InitInjectedSnapshot, InjectInitRequest
-from pants.backend.python.rules.inject_init import rules as inject_init_rules
 from pants.backend.python.target_types import PythonSources
 from pants.core.target_types import FilesSources, ResourcesSources
 from pants.core.util_rules import determine_source_files
@@ -16,6 +13,7 @@ from pants.engine.fs import Snapshot
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Sources, Target
+from pants.engine.unions import UnionMembership
 from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.meta import frozen_after_init
 
@@ -105,15 +103,12 @@ async def prepare_stripped_python_sources(
             strip_source_roots=True,
         ),
     )
-    init_injected = await Get(
-        InitInjectedSnapshot, InjectInitRequest(stripped_sources.snapshot, sources_stripped=True),
-    )
-    return StrippedPythonSources(init_injected.snapshot)
+    return StrippedPythonSources(stripped_sources.snapshot)
 
 
 @rule
 async def prepare_unstripped_python_sources(
-    request: UnstrippedPythonSourcesRequest,
+    request: UnstrippedPythonSourcesRequest, union_membership: UnionMembership
 ) -> UnstrippedPythonSources:
     sources = await Get(
         SourceFiles,
@@ -124,9 +119,6 @@ async def prepare_unstripped_python_sources(
             strip_source_roots=False,
         ),
     )
-    init_injected = await Get(
-        InitInjectedSnapshot, InjectInitRequest(sources.snapshot, sources_stripped=False)
-    )
 
     source_root_objs = await MultiGet(
         Get(
@@ -135,10 +127,15 @@ async def prepare_unstripped_python_sources(
             SourceRootRequest.for_file(representative_path_from_address(tgt.address)),
         )
         for tgt in request.targets
-        if tgt.has_field(PythonSources) or tgt.has_field(ResourcesSources)
+        if (
+            tgt.has_field(PythonSources)
+            or tgt.has_field(ResourcesSources)
+            or tgt.get(Sources).can_generate(PythonSources, union_membership)
+            or tgt.get(Sources).can_generate(ResourcesSources, union_membership)
+        )
     )
     source_root_paths = {source_root_obj.path for source_root_obj in source_root_objs}
-    return UnstrippedPythonSources(init_injected.snapshot, tuple(sorted(source_root_paths)))
+    return UnstrippedPythonSources(sources.snapshot, tuple(sorted(source_root_paths)))
 
 
 def rules():
@@ -146,8 +143,5 @@ def rules():
         prepare_stripped_python_sources,
         prepare_unstripped_python_sources,
         *determine_source_files.rules(),
-        *inject_ancestor_rules(),
-        *inject_init_rules(),
-        # TODO: remove this as soon as we have a usage of it.
         RootRule(UnstrippedPythonSourcesRequest),
     ]

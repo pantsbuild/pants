@@ -1,12 +1,13 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from collections import defaultdict
 from dataclasses import dataclass
-from typing import Iterable, Mapping, Type, TypeVar
+from typing import DefaultDict, Iterable, Mapping, Type, TypeVar
 
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import decorated_type_checkable, frozen_after_init
-from pants.util.ordered_set import FrozenOrderedSet
+from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 
 @decorated_type_checkable
@@ -48,6 +49,22 @@ def union(cls):
     )
 
 
+@dataclass(frozen=True)
+class UnionRule:
+    """Specify that an instance of `union_member` can be substituted wherever `union_base` is
+    used."""
+
+    union_base: Type
+    union_member: Type
+
+    def __post_init__(self) -> None:
+        if not union.is_instance(self.union_base):
+            raise ValueError(
+                f"union_base must be a type annotated with @union: was {self.union_base} "
+                f"(type {type(self.union_base).__name__})"
+            )
+
+
 _T = TypeVar("_T")
 
 
@@ -55,6 +72,13 @@ _T = TypeVar("_T")
 @dataclass(unsafe_hash=True)
 class UnionMembership:
     union_rules: FrozenDict[Type, FrozenOrderedSet[Type]]
+
+    @classmethod
+    def from_rules(cls, rules: Iterable[UnionRule]) -> "UnionMembership":
+        mapping: DefaultDict[Type, OrderedSet[Type]] = defaultdict(OrderedSet)
+        for rule in rules:
+            mapping[rule.union_base].add(rule.union_member)
+        return cls(mapping)
 
     def __init__(self, union_rules: Mapping[Type, Iterable[Type]]) -> None:
         self.union_rules = FrozenDict(
@@ -98,19 +122,3 @@ class UnionMembership:
     def has_members_for_all(self, union_types: Iterable[Type]) -> bool:
         """Check whether every union given has an implementation or not."""
         return all(self.has_members(union_type) for union_type in union_types)
-
-
-@dataclass(frozen=True)
-class UnionRule:
-    """Specify that an instance of `union_member` can be substituted wherever `union_base` is
-    used."""
-
-    union_base: Type
-    union_member: Type
-
-    def __post_init__(self) -> None:
-        if not union.is_instance(self.union_base):
-            raise ValueError(
-                f"union_base must be a type annotated with @union: was {self.union_base} "
-                f"(type {type(self.union_base).__name__})"
-            )

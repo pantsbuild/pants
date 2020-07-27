@@ -244,10 +244,11 @@ class EngineInitializer:
         bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
         execution_options = execution_options or DEFAULT_EXECUTION_OPTIONS
 
-        build_file_aliases = build_configuration.registered_aliases()
-        rules = build_configuration.rules()
+        build_file_aliases = build_configuration.registered_aliases
+        rules = build_configuration.rules
+        union_membership = UnionMembership.from_rules(build_configuration.union_rules)
 
-        registered_target_types = RegisteredTargetTypes.create(build_configuration.target_types())
+        registered_target_types = RegisteredTargetTypes.create(build_configuration.target_types)
         symbol_table_from_registered_targets = SymbolTable(
             {target_type.alias: TargetAdaptor for target_type in registered_target_types.types}
         )
@@ -278,14 +279,13 @@ class EngineInitializer:
 
         @rule
         def union_membership_singleton() -> UnionMembership:
-            return UnionMembership(build_configuration.union_rules())
+            return union_membership
 
         @rule
         def build_root_singleton() -> BuildRoot:
             return cast(BuildRoot, BuildRoot.instance)
 
-        # Create a Scheduler containing graph and filesystem rules, with no installed goals. The
-        # LegacyBuildGraph will explicitly request the products it needs.
+        # Create a Scheduler containing graph and filesystem rules, with no installed goals.
         rules = (
             RootRule(Console),
             glob_match_error_behavior_singleton,
@@ -308,8 +308,6 @@ class EngineInitializer:
 
         goal_map = EngineInitializer._make_goal_map_from_rules(rules)
 
-        union_rules = build_configuration.union_rules()
-
         def ensure_absolute_path(v: str) -> str:
             return Path(v).resolve().as_posix()
 
@@ -322,7 +320,7 @@ class EngineInitializer:
             local_execution_root_dir=ensure_absolute_path(local_execution_root_dir),
             named_caches_dir=ensure_absolute_path(named_caches_dir),
             rules=rules,
-            union_rules=union_rules,
+            union_membership=union_membership,
             execution_options=execution_options,
             include_trace_on_error=include_trace_on_error,
             visualize_to_dir=bootstrap_options.native_engine_visualize_to,

@@ -1,8 +1,11 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import List, Type, Union, cast
+from textwrap import dedent
+from typing import Iterable, List, Optional, Type
 
+from pants.backend.codegen.protobuf.python.rules import rules as protobuf_rules
+from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
 from pants.backend.python.rules.python_sources import (
     StrippedPythonSources,
     StrippedPythonSourcesRequest,
@@ -16,8 +19,8 @@ from pants.engine.addresses import Address
 from pants.engine.rules import RootRule
 from pants.engine.selectors import Params
 from pants.engine.target import Sources, Target
+from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option.util import create_options_bootstrapper
-from pants.testutil.test_base import TestBase
 
 
 class PythonTarget(Target):
@@ -30,15 +33,20 @@ class NonPythonTarget(Target):
     core_fields = (Sources,)
 
 
-class PythonSourcesTest(TestBase):
+class PythonSourcesTest(ExternalToolTestBase):
     @classmethod
     def rules(cls):
         return (
             *super().rules(),
             *python_sources_rules(),
+            *protobuf_rules(),
             RootRule(StrippedPythonSourcesRequest),
             RootRule(UnstrippedPythonSourcesRequest),
         )
+
+    @classmethod
+    def target_types(cls):
+        return [PythonTarget, NonPythonTarget, ProtobufLibrary]
 
     def create_target(
         self, *, parent_directory: str, files: List[str], target_cls: Type[Target] = PythonTarget
@@ -47,56 +55,52 @@ class PythonSourcesTest(TestBase):
         address = Address(spec_path=parent_directory, target_name="target")
         return target_cls({Sources.alias: files}, address=address)
 
-    def test_adds_missing_inits(self) -> None:
-        target_with_init = self.create_target(
-            parent_directory="src/python/project", files=["lib.py", "__init__.py"]
-        )
-        # Create an __init__.py not included in any targets. This should be automatically added.
-        self.create_file("src/python/test_project/__init__.py")
-        target_with_undeclared_init = self.create_target(
-            parent_directory="src/python/test_project", files=["f1.py", "f2.py"]
-        )
-        files_target = self.create_target(
-            parent_directory="src/python/project/resources",
-            files=["loose_file.txt"],
-            target_cls=Files,
-        )
-        targets = [target_with_init, target_with_undeclared_init, files_target]
-
-        stripped_result = self.request_single_product(
+    def get_stripped_sources(
+        self,
+        targets: Iterable[Target],
+        *,
+        include_resources: bool = True,
+        include_files: bool = False,
+        source_roots: Optional[List[str]] = None,
+        extra_args: Optional[List[str]] = None,
+    ) -> StrippedPythonSources:
+        return self.request_single_product(
             StrippedPythonSources,
             Params(
-                StrippedPythonSourcesRequest(targets, include_files=True),
-                create_options_bootstrapper(),
+                StrippedPythonSourcesRequest(
+                    targets, include_resources=include_resources, include_files=include_files
+                ),
+                create_options_bootstrapper(
+                    args=[
+                        f"--source-root-patterns={source_roots or ['src/python']}",
+                        *(extra_args or []),
+                    ]
+                ),
             ),
-        )
-        assert sorted(stripped_result.snapshot.files) == sorted(
-            [
-                "project/lib.py",
-                "project/__init__.py",
-                "test_project/f1.py",
-                "test_project/f2.py",
-                "test_project/__init__.py",
-                "src/python/project/resources/loose_file.txt",
-            ]
         )
 
-        unstripped_result = self.request_single_product(
+    def get_unstripped_sources(
+        self,
+        targets: Iterable[Target],
+        *,
+        include_resources: bool = True,
+        include_files: bool = False,
+        source_roots: Optional[List[str]] = None,
+        extra_args: Optional[List[str]] = None,
+    ) -> UnstrippedPythonSources:
+        return self.request_single_product(
             UnstrippedPythonSources,
             Params(
-                UnstrippedPythonSourcesRequest(targets, include_files=True),
-                create_options_bootstrapper(),
+                UnstrippedPythonSourcesRequest(
+                    targets, include_resources=include_resources, include_files=include_files
+                ),
+                create_options_bootstrapper(
+                    args=[
+                        f"--source-root-patterns={source_roots or ['src/python']}",
+                        *(extra_args or []),
+                    ]
+                ),
             ),
-        )
-        assert sorted(unstripped_result.snapshot.files) == sorted(
-            [
-                "src/python/project/lib.py",
-                "src/python/project/__init__.py",
-                "src/python/test_project/f1.py",
-                "src/python/test_project/f2.py",
-                "src/python/test_project/__init__.py",
-                "src/python/project/resources/loose_file.txt",
-            ]
         )
 
     def test_filters_out_irrelevant_targets(self) -> None:
@@ -113,74 +117,96 @@ class PythonSourcesTest(TestBase):
             ),
         ]
 
-        def assert_has_files(
-            *, include_resources: bool, include_files: bool, is_stripped: bool, expected: List[str],
+        def assert_stripped(
+            *, include_resources: bool, include_files: bool, expected: List[str],
         ) -> None:
-            product = StrippedPythonSources if is_stripped else UnstrippedPythonSources
-            subject = (
-                StrippedPythonSourcesRequest if is_stripped else UnstrippedPythonSourcesRequest
-            )
-            result = cast(
-                Union[StrippedPythonSources, UnstrippedPythonSources],
-                self.request_single_product(
-                    product,
-                    Params(
-                        subject(
-                            targets,
-                            include_resources=include_resources,
-                            include_files=include_files,
-                        ),
-                        create_options_bootstrapper(),
-                    ),
-                ),
+            result = self.get_stripped_sources(
+                targets, include_resources=include_resources, include_files=include_files
             )
             assert result.snapshot.files == tuple(expected)
 
-        assert_has_files(
+        def assert_unstripped(
+            *, include_resources: bool, include_files: bool, expected: List[str]
+        ) -> None:
+            result = self.get_unstripped_sources(
+                targets, include_resources=include_resources, include_files=include_files
+            )
+            assert result.snapshot.files == tuple(expected)
+            assert result.source_roots == ("src/python",)
+
+        assert_stripped(
             include_resources=True,
             include_files=True,
-            is_stripped=True,
             expected=["p.py", "r.txt", "src/python/f.txt"],
         )
-        assert_has_files(
+        assert_unstripped(
             include_resources=True,
             include_files=True,
-            is_stripped=False,
             expected=["src/python/f.txt", "src/python/p.py", "src/python/r.txt"],
         )
 
-        assert_has_files(
+        assert_stripped(include_resources=True, include_files=False, expected=["p.py", "r.txt"])
+        assert_unstripped(
             include_resources=True,
             include_files=False,
-            is_stripped=True,
-            expected=["p.py", "r.txt"],
-        )
-        assert_has_files(
-            include_resources=True,
-            include_files=False,
-            is_stripped=False,
             expected=["src/python/p.py", "src/python/r.txt"],
         )
 
-        assert_has_files(
-            include_resources=False,
-            include_files=True,
-            is_stripped=True,
-            expected=["p.py", "src/python/f.txt"],
+        assert_stripped(
+            include_resources=False, include_files=True, expected=["p.py", "src/python/f.txt"]
         )
-        assert_has_files(
+        assert_unstripped(
             include_resources=False,
             include_files=True,
-            is_stripped=False,
             expected=["src/python/f.txt", "src/python/p.py"],
         )
 
-        assert_has_files(
-            include_resources=False, include_files=False, is_stripped=True, expected=["p.py"]
+        assert_stripped(include_resources=False, include_files=False, expected=["p.py"])
+        assert_unstripped(
+            include_resources=False, include_files=False, expected=["src/python/p.py"],
         )
-        assert_has_files(
-            include_resources=False,
-            include_files=False,
-            is_stripped=False,
-            expected=["src/python/p.py"],
+
+    def test_top_level_source_root(self) -> None:
+        targets = [self.create_target(parent_directory="", files=["f1.py", "f2.py"])]
+
+        stripped_result = self.get_stripped_sources(targets, source_roots=["/"])
+        assert stripped_result.snapshot.files == ("f1.py", "f2.py")
+
+        unstripped_result = self.get_unstripped_sources(targets, source_roots=["/"])
+        assert unstripped_result.snapshot.files == ("f1.py", "f2.py")
+        assert unstripped_result.source_roots == (".",)
+
+    def test_files_not_used_for_source_roots(self) -> None:
+        targets = [
+            self.create_target(parent_directory="src/py", files=["f.py"], target_cls=PythonTarget),
+            self.create_target(parent_directory="src/files", files=["f.txt"], target_cls=Files),
+        ]
+        assert self.get_unstripped_sources(
+            targets, include_files=True, source_roots=["src/py", "src/files"]
+        ).source_roots == ("src/py",)
+
+    def test_python_protobuf(self) -> None:
+        self.create_file(
+            "src/protobuf/dir/f.proto",
+            dedent(
+                """\
+                syntax = "proto2";
+
+                package dir;
+                """
+            ),
         )
+        self.add_to_build_file("src/protobuf/dir", "protobuf_library()")
+        targets = [ProtobufLibrary({}, address=Address("src/protobuf/dir", "dir"))]
+        backend_args = ["--backend-packages=pants.backend.codegen.protobuf.python"]
+
+        stripped_result = self.get_stripped_sources(
+            targets, source_roots=["src/protobuf"], extra_args=backend_args
+        )
+        assert stripped_result.snapshot.files == ("dir/f_pb2.py",)
+
+        unstripped_result = self.get_unstripped_sources(
+            targets, source_roots=["src/protobuf"], extra_args=backend_args
+        )
+        assert unstripped_result.snapshot.files == ("src/protobuf/dir/f_pb2.py",)
+        assert unstripped_result.source_roots == ("src/protobuf",)

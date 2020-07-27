@@ -50,9 +50,9 @@ impl Intrinsics {
     intrinsics.insert(
       Intrinsic {
         product: types.directory_digest,
-        inputs: vec![types.url_to_fetch],
+        inputs: vec![types.download_file],
       },
-      Box::new(url_to_fetch_to_digest),
+      Box::new(download_file_to_digest),
     );
     intrinsics.insert(
       Intrinsic {
@@ -280,7 +280,7 @@ fn merge_digests_request_to_digest(
   .boxed()
 }
 
-fn url_to_fetch_to_digest(
+fn download_file_to_digest(
   context: Context,
   mut args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {

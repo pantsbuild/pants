@@ -79,7 +79,7 @@ class OptionsInitializer:
 
         :returns: An Options object representing the full set of runtime options.
         """
-        optionables = {GlobalOptions, *GlobalSubsystems.get(), *build_configuration.optionables()}
+        optionables = {GlobalOptions, *GlobalSubsystems.get(), *build_configuration.optionables}
         known_scope_infos = [
             si for optionable in optionables for si in optionable.known_scope_infos()
         ]

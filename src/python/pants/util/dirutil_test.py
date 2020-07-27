@@ -3,36 +3,27 @@
 
 import errno
 import os
-import time
 import unittest
 import unittest.mock
 from contextlib import contextmanager
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Iterator, Tuple, Union
 
 from pants.util import dirutil
 from pants.util.contextutil import pushd, temporary_dir
 from pants.util.dirutil import (
-    ExistingDirError,
-    ExistingFileError,
     _mkdtemp_unregister_cleaner,
     absolute_symlink,
-    ensure_relative_file_name,
     fast_relpath,
-    get_basedir,
     longest_dir_prefix,
-    mergetree,
     read_file,
     relative_symlink,
-    relativize_paths,
     rm_rf,
     safe_concurrent_creation,
     safe_file_dump,
     safe_mkdir,
     safe_mkdtemp,
     safe_open,
-    safe_rm_oldest_items_in_dir,
     safe_rmtree,
     touch,
 )
@@ -84,20 +75,6 @@ class DirutilTest(unittest.TestCase):
             fast_relpath("/a/b", "/a/baseball")
         with self.assertRaises(ValueError):
             fast_relpath("/a/baseball", "/a/b")
-
-    def test_ensure_relative_file_name(self) -> None:
-        path = Path("./subdir/a.txt")
-        assert str(path) == "subdir/a.txt"
-        assert ensure_relative_file_name(path) == "./subdir/a.txt"
-
-        path = Path("./a.txt")
-        assert ensure_relative_file_name(path) == "./a.txt"
-
-        path = Path("some_exe")
-        assert ensure_relative_file_name(path) == "./some_exe"
-
-        path = Path("./leading_slash")
-        assert ensure_relative_file_name(path) == "./leading_slash"
 
     @strict_patch("atexit.register")
     @strict_patch("os.getpid")
@@ -211,121 +188,6 @@ class DirutilTest(unittest.TestCase):
 
         self.assertEqual(frozenset(expected), frozenset(collect_tree()))
 
-    def test_mergetree_existing(self) -> None:
-        with self.tree() as (src, dst):
-            # Existing empty files
-            touch(os.path.join(dst, "c", "1"))
-            touch(os.path.join(dst, "a", "b", "1"))
-
-            mergetree(src, dst)
-
-            self.assert_tree(
-                dst,
-                self.Dir("a"),
-                self.File.empty("a/2"),
-                self.Dir("a/b"),
-                # Existing overlapping file should be overlayed.
-                self.File("a/b/1", contents="1"),
-                self.File.empty("a/b/2"),
-                self.Dir("b"),
-                self.File("b/1", contents="1"),
-                self.File.empty("b/2"),
-                self.Dir("c"),
-                # Existing non-overlapping file should be preserved.
-                self.File.empty("c/1"),
-            )
-
-    def test_mergetree_existing_file_mismatch(self) -> None:
-        with self.tree() as (src, dst):
-            touch(os.path.join(dst, "a"))
-            with self.assertRaises(ExistingFileError):
-                mergetree(src, dst)
-
-    def test_mergetree_existing_dir_mismatch(self) -> None:
-        with self.tree() as (src, dst):
-            os.makedirs(os.path.join(dst, "b", "1"))
-            with self.assertRaises(ExistingDirError):
-                mergetree(src, dst)
-
-    def test_mergetree_new(self) -> None:
-        with self.tree() as (src, dst_root):
-            dst = os.path.join(dst_root, "dst")
-
-            mergetree(src, dst)
-
-            self.assert_tree(
-                dst,
-                self.Dir("a"),
-                self.File.empty("a/2"),
-                self.Dir("a/b"),
-                self.File("a/b/1", contents="1"),
-                self.File.empty("a/b/2"),
-                self.Dir("b"),
-                self.File("b/1", contents="1"),
-                self.File.empty("b/2"),
-            )
-
-    def test_mergetree_ignore_files(self) -> None:
-        with self.tree() as (src, dst):
-
-            def ignore(root, names):
-                if root == os.path.join(src, "a", "b"):
-                    return ["1", "2"]
-
-            mergetree(src, dst, ignore=ignore)
-
-            self.assert_tree(
-                dst,
-                self.Dir("a"),
-                self.File.empty("a/2"),
-                self.Dir("a/b"),
-                self.Dir("b"),
-                self.File("b/1", contents="1"),
-                self.File.empty("b/2"),
-            )
-
-    def test_mergetree_ignore_dirs(self) -> None:
-        with self.tree() as (src, dst):
-
-            def ignore(root, names):
-                if root == os.path.join(src, "a"):
-                    return ["b"]
-
-            mergetree(src, dst, ignore=ignore)
-
-            self.assert_tree(
-                dst,
-                self.Dir("a"),
-                self.File.empty("a/2"),
-                self.Dir("b"),
-                self.File("b/1", contents="1"),
-                self.File.empty("b/2"),
-            )
-
-    def test_mergetree_symlink(self) -> None:
-        with self.tree() as (src, dst):
-            mergetree(src, dst, symlinks=True)
-
-            self.assert_tree(
-                dst,
-                self.Dir("a"),
-                self.Symlink("a/2"),
-                self.Dir("a/b"),
-                self.File("a/b/1", contents="1"),
-                self.File.empty("a/b/2"),
-                # NB: assert_tree does not follow symlinks and so does not descend into the
-                # symlinked b/ dir to find b/1 and b/2
-                self.Symlink("b"),
-            )
-
-    def test_relativize_paths(self) -> None:
-        build_root = "/build-root"
-        jar_outside_build_root = os.path.join("/outside-build-root", "bar.jar")
-        classpath = [os.path.join(build_root, "foo.jar"), jar_outside_build_root]
-        relativized_classpath = relativize_paths(classpath, build_root)
-        jar_relpath = os.path.relpath(jar_outside_build_root, build_root)
-        self.assertEqual(["foo.jar", jar_relpath], relativized_classpath)
-
     def test_relative_symlink(self) -> None:
         with temporary_dir() as tmpdir_1:  # source and link in same dir
             source = os.path.join(tmpdir_1, "source")
@@ -395,11 +257,6 @@ class DirutilTest(unittest.TestCase):
                 ValueError, r"Path for link.*overwrite an existing directory*"
             ):
                 relative_symlink(source, link_path)
-
-    def test_get_basedir(self) -> None:
-        self.assertEqual(get_basedir("foo/bar/baz"), "foo")
-        self.assertEqual(get_basedir("/foo/bar/baz"), "")
-        self.assertEqual(get_basedir("foo"), "foo")
 
     def test_rm_rf_file(self, file_name="./foo") -> None:
         with temporary_dir() as td, pushd(td):
@@ -485,49 +342,6 @@ class DirutilTest(unittest.TestCase):
 
             self.assertFalse(os.path.exists(safe_path))
             self.assertFalse(os.path.exists(expected_file))
-
-    def test_safe_rm_oldest_items_in_dir(self) -> None:
-        with temporary_dir() as td:
-            touch(os.path.join(td, "file1"))
-            safe_mkdir(os.path.join(td, "file2"))
-            # Time modified is only accurate to second.
-            time.sleep(1.1)
-            touch(os.path.join(td, "file3"))
-            touch(os.path.join(td, "file4"))
-            safe_mkdir(os.path.join(td, "file5"))
-
-            safe_rm_oldest_items_in_dir(td, 3)
-
-            self.assertFalse(os.path.exists(os.path.join(td, "file1")))
-            self.assertFalse(os.path.exists(os.path.join(td, "file2")))
-
-            self.assertTrue(os.path.exists(os.path.join(td, "file3")))
-            self.assertTrue(os.path.exists(os.path.join(td, "file4")))
-            self.assertTrue(os.path.exists(os.path.join(td, "file5")))
-
-    def test_safe_rm_oldest_items_in_dir_with_excludes(self) -> None:
-        with temporary_dir() as td:
-            touch(os.path.join(td, "file1"))
-            touch(os.path.join(td, "file2"))
-            touch(os.path.join(td, "file3"))
-            # Time modified is only accurate to second.
-            time.sleep(1.1)
-            touch(os.path.join(td, "file4"))
-
-            excludes = [os.path.join(td, "file1"), os.path.join(td, "file2")]
-            safe_rm_oldest_items_in_dir(td, 1, excludes)
-
-            self.assertTrue(os.path.exists(os.path.join(td, "file1")))
-            self.assertTrue(os.path.exists(os.path.join(td, "file2")))
-            self.assertTrue(os.path.exists(os.path.join(td, "file4")))
-
-            self.assertFalse(os.path.exists(os.path.join(td, "file3")))
-
-    def test_safe_rm_oldest_items_in_dir_noop(self) -> None:
-        with temporary_dir() as td:
-            safe_rm_oldest_items_in_dir(td, 1)
-            touch(os.path.join(td, "file1"))
-            self.assertEqual(len(os.listdir(td)), 1)
 
     def test_safe_rmtree_link(self):
         with temporary_dir() as td:

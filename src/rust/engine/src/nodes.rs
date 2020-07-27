@@ -733,13 +733,13 @@ impl WrappedNode for DownloadedFile {
 
   async fn run_wrapped_node(self, context: Context) -> NodeResult<Arc<store::Snapshot>> {
     let value = externs::val_for(&self.0);
-    let url_to_fetch = externs::project_str(&value, "url");
+    let url_str = externs::project_str(&value, "url");
 
-    let url = Url::parse(&url_to_fetch)
-      .map_err(|err| throw(&format!("Error parsing URL {}: {}", url_to_fetch, err)))?;
+    let url = Url::parse(&url_str)
+      .map_err(|err| throw(&format!("Error parsing URL {}: {}", url_str, err)))?;
 
-    let expected_digest =
-      lift_digest(&externs::project_ignoring_type(&value, "digest")).map_err(|s| throw(&s))?;
+    let expected_digest = lift_digest(&externs::project_ignoring_type(&value, "expected_digest"))
+      .map_err(|s| throw(&s))?;
 
     let snapshot = self
       .load_or_download(context.core, url, expected_digest)

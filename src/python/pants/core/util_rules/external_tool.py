@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import List
 
 from pants.core.util_rules.archive import ExtractedDigest, MaybeExtractable
-from pants.engine.fs import Digest, UrlToFetch
+from pants.engine.fs import Digest, DownloadFile
 from pants.engine.platform import Platform
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
@@ -25,7 +25,7 @@ class ExternalToolError(Exception):
 
 @dataclass(frozen=True)
 class ExternalToolRequest:
-    url_to_fetch: UrlToFetch
+    download_file_request: DownloadFile
     exe: str
 
 
@@ -164,7 +164,7 @@ class ExternalTool(Subsystem):
                     raise ExternalToolError(
                         f"Couldn't find {self.name} version {version} on {plat.value}"
                     ) from e
-                return ExternalToolRequest(UrlToFetch(url=url, digest=digest), exe)
+                return ExternalToolRequest(DownloadFile(url=url, expected_digest=digest), exe)
         raise UnknownVersion(
             f"No known version of {self.name} {version} for {plat.value} found in {known_versions}"
         )
@@ -172,7 +172,7 @@ class ExternalTool(Subsystem):
 
 @rule
 async def download_external_tool(request: ExternalToolRequest) -> DownloadedExternalTool:
-    digest = await Get(Digest, UrlToFetch, request.url_to_fetch)
+    digest = await Get(Digest, DownloadFile, request.download_file_request)
     extracted_digest = await Get(ExtractedDigest, MaybeExtractable(digest))
     return DownloadedExternalTool(extracted_digest.digest, request.exe)
 
