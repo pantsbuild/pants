@@ -10,7 +10,7 @@ from pants.core.util_rules import determine_source_files
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
 from pants.core.util_rules.strip_source_roots import representative_path_from_address
 from pants.engine.fs import Snapshot
-from pants.engine.rules import RootRule, rule
+from pants.engine.rules import rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import Sources, Target
 from pants.source.source_root import SourceRoot, SourceRootRequest
@@ -126,7 +126,7 @@ async def prepare_unstripped_python_sources(
             SourceRootRequest.for_file(representative_path_from_address(tgt.address)),
         )
         for tgt in request.targets
-        if tgt.has_field(PythonSources) or tgt.has_field(ResourcesSources)
+        if not tgt.has_field(FilesSources)
     )
     source_root_paths = {source_root_obj.path for source_root_obj in source_root_objs}
     return UnstrippedPythonSources(sources.snapshot, tuple(sorted(source_root_paths)))
@@ -137,6 +137,4 @@ def rules():
         prepare_stripped_python_sources,
         prepare_unstripped_python_sources,
         *determine_source_files.rules(),
-        # TODO: remove this as soon as we have a usage of it.
-        RootRule(UnstrippedPythonSourcesRequest),
     ]
