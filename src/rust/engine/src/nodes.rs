@@ -34,9 +34,9 @@ use process_execution::{
 };
 
 use graph::{Entry, Node, NodeError, NodeVisualizer};
+use hashing::Digest;
 use store::{self, StoreFileByDigest};
 use workunit_store::{with_workunit, Level, WorkunitMetadata};
-use hashing::Digest;
 
 pub type NodeResult<T> = Result<T, Failure>;
 
@@ -1193,11 +1193,7 @@ impl Node for NodeKey {
             .await
         }
         NodeKey::Select(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Value).await,
-        NodeKey::Snapshot(n) => {
-          n.run_wrapped_node(context)
-            .map_ok(NodeOutput::Digest)
-            .await
-        }
+        NodeKey::Snapshot(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Digest).await,
         NodeKey::Task(n) => {
           n.run_wrapped_node(context)
             .map_ok(|python_rule_output| {
