@@ -1739,7 +1739,7 @@ class OptionsTest(TestBase):
                 global_scope(),
                 DummyOptionable1.get_scope_info(),
                 # A deprecated, scoped dependency on `DummyOptionable1`. This
-                # imitates the construction of SubsystemClientMixin.known_scope_infos.
+                # imitates the construction of Subsystem.known_scope_infos.
                 ScopeInfo(
                     DummyOptionable1.subscope("sub"),
                     DummyOptionable1,

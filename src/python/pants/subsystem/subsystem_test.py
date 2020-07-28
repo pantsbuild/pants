@@ -6,7 +6,6 @@ import logging
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
 from pants.subsystem.subsystem import Subsystem
-from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
 from pants.testutil.test_base import TestBase
 
 
@@ -146,7 +145,7 @@ class SubsystemTest(TestBase):
                 return (SubsystemB,)
 
         for root in SubsystemA, SubsystemB, SubsystemC:
-            with self.assertRaises(SubsystemClientMixin.CycleException):
+            with self.assertRaises(Subsystem.CycleException):
                 root.known_scope_infos()
 
     def test_scoping_complex(self) -> None:
@@ -299,7 +298,7 @@ class SubsystemTest(TestBase):
             def subsystem_dependencies(cls):
                 return (SubsystemA,)
 
-        with self.assertRaises(SubsystemClientMixin.CycleException):
+        with self.assertRaises(Subsystem.CycleException):
             list(SubsystemB.subsystem_closure_iter())
 
     def test_get_streaming_workunit_callbacks(self) -> None:
