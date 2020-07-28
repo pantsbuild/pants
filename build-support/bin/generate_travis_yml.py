@@ -435,7 +435,10 @@ def osx_shard(
 
 
 # See https://docs.travis-ci.com/user/conditions-v1.
-SKIP_RUST_CONDITION = r"commit_message !~ /\[ci skip-rust-tests\]/"
+SKIP_RUST_CONDITION = r"commit_message !~ /\[ci skip-rust\]/"
+SKIP_WHEELS_CONDITION = (
+    r"commit_message !~ /\[ci skip-build-wheels\]/ OR type NOT IN (pull_request, cron)"
+)
 
 # ----------------------------------------------------------------------
 # Bootstrap engine
@@ -592,6 +595,7 @@ def build_wheels_linux() -> Dict:
         **linux_shard(use_docker=True),
         "name": "Build Linux wheels and fs_util",
         "script": [docker_build_travis_ci_image(), docker_run_travis_ci_image(command)],
+        "if": SKIP_WHEELS_CONDITION,
     }
     safe_extend(shard, "env", _build_wheels_env(platform=Platform.linux))
     return shard
@@ -607,6 +611,7 @@ def build_wheels_osx() -> Dict:
             python_versions=[PythonVersion.py36, PythonVersion.py37, PythonVersion.py38],
             install_py27=False,
         ),
+        "if": SKIP_WHEELS_CONDITION,
     }
     safe_extend(shard, "env", _build_wheels_env(platform=Platform.osx))
     return shard

@@ -307,14 +307,3 @@ class DictValueComponent:
 
     def __repr__(self) -> str:
         return f"{self.action} {self.val}"
-
-
-class GlobExpansionConjunction(Enum):
-    """Describe whether to require that only some or all glob strings match in a target's sources.
-
-    NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
-    be aware of any changes to this object's definition.
-    """
-
-    any_match = "any_match"
-    all_match = "all_match"

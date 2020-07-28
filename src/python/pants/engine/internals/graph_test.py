@@ -39,8 +39,7 @@ from pants.engine.internals.graph import (
     validate_explicit_file_dep,
 )
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.rules import RootRule, rule
-from pants.engine.selectors import Get, Params
+from pants.engine.rules import Get, RootRule, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
@@ -67,6 +66,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.init.specs_calculator import SpecsCalculator
+from pants.testutil.engine.util import Params
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 from pants.util.ordered_set import FrozenOrderedSet
@@ -204,6 +204,28 @@ class GraphTest(TestBase):
         )
         self.assert_failed_cycle("//:t1", "//:t2", ("//:t1", "//:t2", "//:t3", "//:t2"))
         self.assert_failed_cycle("//:t2", "//:t2", ("//:t2", "//:t3", "//:t2"))
+
+    def test_nocycle_indirect(self) -> None:
+        self.create_files("", ["t2.txt"])
+        self.add_to_build_file(
+            "",
+            dedent(
+                """\
+                target(name='t1', dependencies=['t2.txt'])
+                target(name='t2', dependencies=[':t1'], sources=['t2.txt'])
+                """
+            ),
+        )
+        result = self.request_single_product(
+            TransitiveTargets,
+            Params(Addresses([Address.parse("//:t1")]), create_options_bootstrapper()),
+        )
+        assert len(result.roots) == 1
+        assert result.roots[0].address == Address.parse("//:t1")
+        assert {tgt.address for tgt in result.dependencies} == {
+            Address.parse("//:t1"),
+            Address("", target_name="t2.txt", generated_base_target_name="t2"),
+        }
 
     def test_resolve_generated_subtarget(self) -> None:
         self.add_to_build_file("demo", "target(sources=['f1.txt', 'f2.txt'])")
@@ -1093,19 +1115,12 @@ class TestDependencies(TestBase):
         return [SmalltalkLibrary]
 
     def assert_dependencies_resolved(
-        self,
-        *,
-        requested_address: Address,
-        expected: Iterable[Address],
-        enable_dep_inference: bool = False,
+        self, *, requested_address: Address, expected: Iterable[Address],
     ) -> None:
         target = self.request_single_product(WrappedTarget, requested_address).target
-        args = ["--dependency-inference"] if enable_dep_inference else []
         result = self.request_single_product(
             Addresses,
-            Params(
-                DependenciesRequest(target[Dependencies]), create_options_bootstrapper(args=args)
-            ),
+            Params(DependenciesRequest(target[Dependencies]), create_options_bootstrapper()),
         )
         assert result == Addresses(sorted(expected))
 
@@ -1262,7 +1277,6 @@ class TestDependencies(TestBase):
 
         self.assert_dependencies_resolved(
             requested_address=Address.parse("demo"),
-            enable_dep_inference=True,
             expected=[
                 Address.parse("//:inferred1"),
                 Address("", target_name="inferred2.st", generated_base_target_name="inferred2"),
@@ -1275,7 +1289,6 @@ class TestDependencies(TestBase):
             requested_address=Address(
                 "demo", target_name="f1.st", generated_base_target_name="demo"
             ),
-            enable_dep_inference=True,
             expected=[
                 Address.parse("//:inferred1"),
                 Address("", target_name="inferred2.st", generated_base_target_name="inferred2"),
@@ -1288,7 +1301,6 @@ class TestDependencies(TestBase):
             requested_address=Address(
                 "demo", target_name="f2.st", generated_base_target_name="demo"
             ),
-            enable_dep_inference=True,
             expected=[
                 Address.parse("//:inferred_and_provided1"),
                 Address.parse("//:inferred_and_provided2"),

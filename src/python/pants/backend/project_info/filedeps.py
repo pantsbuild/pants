@@ -3,14 +3,13 @@
 
 import itertools
 from pathlib import PurePath
-from typing import Iterable
+from typing import Iterable, cast
 
 from pants.base.build_root import BuildRoot
 from pants.engine.addresses import Address, Addresses, BuildFileAddress
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
-from pants.engine.rules import goal_rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import (
     HydratedSources,
     HydrateSourcesRequest,
@@ -21,7 +20,7 @@ from pants.engine.target import (
 )
 
 
-class FiledepsOptions(LineOriented, GoalSubsystem):
+class FiledepsSubsystem(LineOriented, GoalSubsystem):
     """List all source and BUILD files a target depends on."""
 
     name = "filedeps"
@@ -57,17 +56,32 @@ class FiledepsOptions(LineOriented, GoalSubsystem):
             ),
         )
 
+    @property
+    def absolute(self) -> bool:
+        return cast(bool, self.options.absolute)
+
+    @property
+    def globs(self) -> bool:
+        return cast(bool, self.options.globs)
+
+    @property
+    def transitive(self) -> bool:
+        return cast(bool, self.options.transitive)
+
 
 class Filedeps(Goal):
-    subsystem_cls = FiledepsOptions
+    subsystem_cls = FiledepsSubsystem
 
 
 @goal_rule
 async def file_deps(
-    console: Console, options: FiledepsOptions, build_root: BuildRoot, addresses: Addresses,
+    console: Console,
+    filedeps_subsystem: FiledepsSubsystem,
+    build_root: BuildRoot,
+    addresses: Addresses,
 ) -> Filedeps:
     targets: Iterable[Target]
-    if options.values.transitive:
+    if filedeps_subsystem.transitive:
         transitive_targets = await Get(TransitiveTargets, Addresses, addresses)
         targets = transitive_targets.closure
     else:
@@ -78,7 +92,7 @@ async def file_deps(
     )
     unique_rel_paths = {bfa.rel_path for bfa in build_file_addresses}
 
-    if options.values.globs:
+    if filedeps_subsystem.globs:
         unique_rel_paths.update(
             itertools.chain.from_iterable(tgt.get(Sources).filespec["includes"] for tgt in targets)
         )
@@ -92,11 +106,11 @@ async def file_deps(
             )
         )
 
-    with options.line_oriented(console) as print_stdout:
+    with filedeps_subsystem.line_oriented(console) as print_stdout:
         for rel_path in sorted(unique_rel_paths):
             final_path = (
                 PurePath(build_root.path, rel_path).as_posix()
-                if options.values.absolute
+                if filedeps_subsystem.absolute
                 else rel_path
             )
             print_stdout(final_path)
@@ -105,4 +119,4 @@ async def file_deps(
 
 
 def rules():
-    return [file_deps]
+    return collect_rules()

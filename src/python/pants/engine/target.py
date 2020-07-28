@@ -29,11 +29,11 @@ from pants.base.specs import OriginSpec
 from pants.engine.addresses import Address, assert_single_address
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.fs import Snapshot
-from pants.engine.unions import UnionMembership, union
+from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.source.filespec import Filespec
 from pants.util.collections import ensure_list, ensure_str_list
 from pants.util.frozendict import FrozenDict
-from pants.util.memo import memoized_property
+from pants.util.memo import memoized_classproperty, memoized_property
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import pluralize
@@ -294,16 +294,17 @@ class Target(ABC):
     def field_types(self) -> Tuple[Type[Field], ...]:
         return (*self.core_fields, *self.plugin_fields)
 
-    @union
     @final
-    class PluginField:
-        """A sentinel class to allow plugin authors to add additional fields to this target type.
+    @memoized_classproperty
+    def _plugin_field_cls(cls) -> Type:
+        # NB: We ensure that each Target subtype has its own `PluginField` class so that
+        # registering a plugin field doesn't leak across target types.
 
-        Plugin authors may add additional fields by simply registering UnionRules between the
-        `Target.PluginField` and the custom field, e.g. `UnionRule(PythonLibrary.PluginField,
-        TypeChecked)`. The `Target` will then treat `TypeChecked` as a first-class citizen and
-        plugins can use that Field like any other Field.
-        """
+        @union
+        class PluginField:
+            pass
+
+        return PluginField
 
     def __repr__(self) -> str:
         fields = ", ".join(str(field) for field in self.field_values.values())
@@ -322,9 +323,7 @@ class Target(ABC):
     @final
     @classmethod
     def _find_plugin_fields(cls, union_membership: UnionMembership) -> Tuple[Type[Field], ...]:
-        return cast(
-            Tuple[Type[Field], ...], tuple(union_membership.union_rules.get(cls.PluginField, ()))
-        )
+        return cast(Tuple[Type[Field], ...], tuple(union_membership.get(cls._plugin_field_cls)))
 
     @final
     @classmethod
@@ -468,6 +467,17 @@ class Target(ABC):
         return cls._has_fields(
             fields, registered_fields=cls.class_field_types(union_membership=union_membership)
         )
+
+    @final
+    @classmethod
+    def register_plugin_field(cls, field: Type[Field]) -> UnionRule:
+        """Register a new field on the target type.
+
+        In the `rules()` register.py entry-point, include
+        `MyTarget.register_plugin_field(NewField)`. This will register `NewField` as a first-class
+        citizen. Plugins can use this new field like any other.
+        """
+        return UnionRule(cls._plugin_field_cls, field)
 
 
 @dataclass(frozen=True)

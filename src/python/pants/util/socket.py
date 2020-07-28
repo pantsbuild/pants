@@ -6,16 +6,6 @@ import selectors
 import socket
 
 
-def teardown_socket(s):
-    """Shuts down and closes a socket."""
-    try:
-        s.shutdown(socket.SHUT_WR)
-    except socket.error:
-        pass
-    finally:
-        s.close()
-
-
 def is_readable(fileobj, *, timeout=None):
     """Check that the file-like resource is readable within the given timeout via polling.
 

@@ -30,8 +30,7 @@ from pants.backend.python.subsystems.subprocess_environment import SubprocessEnc
 from pants.core.util_rules import strip_source_roots
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import SubsystemRule, rule
-from pants.engine.selectors import Get
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
 
@@ -102,12 +101,12 @@ async def create_python_awslambda(
         description=f"Setting up handler in {pex_filename}",
     )
     result = await Get(ProcessResult, Process, process)
-    # Note that the AWS-facing handler function is always lambdex_handler.handler, which
-    # is the wrapper injected by lambdex that manages invocation of the actual handler.
     return CreatedAWSLambda(
         digest=result.output_digest,
-        name=pex_filename,
+        zip_file_relpath=pex_filename,
         runtime=field_set.runtime.value,
+        # The AWS-facing handler function is always lambdex_handler.handler, which is the wrapper
+        # injected by lambdex that manages invocation of the actual handler.
         handler="lambdex_handler.handler",
     )
 
@@ -131,10 +130,8 @@ async def setup_lambdex(lambdex: Lambdex) -> LambdexSetup:
 
 def rules():
     return [
-        create_python_awslambda,
-        setup_lambdex,
+        *collect_rules(),
         UnionRule(AWSLambdaFieldSet, PythonAwsLambdaFieldSet),
-        SubsystemRule(Lambdex),
         *download_pex_bin.rules(),
         *python_sources.rules(),
         *pex.rules(),

@@ -142,12 +142,12 @@ class LoaderTest(unittest.TestCase):
 
     def assert_empty(self):
         build_configuration = self.bc_builder.create()
-        registered_aliases = build_configuration.registered_aliases()
+        registered_aliases = build_configuration.registered_aliases
         self.assertEqual(0, len(registered_aliases.objects))
         self.assertEqual(0, len(registered_aliases.context_aware_object_factories))
-        self.assertEqual(build_configuration.optionables(), FrozenOrderedSet())
-        self.assertEqual(0, len(build_configuration.rules()))
-        self.assertEqual(0, len(build_configuration.target_types()))
+        self.assertEqual(build_configuration.optionables, FrozenOrderedSet())
+        self.assertEqual(0, len(build_configuration.rules))
+        self.assertEqual(0, len(build_configuration.target_types))
 
     def test_load_valid_empty(self):
         with self.create_register() as backend_package:
@@ -159,11 +159,11 @@ class LoaderTest(unittest.TestCase):
         with self.create_register(build_file_aliases=lambda: aliases) as backend_package:
             load_backend(self.bc_builder, backend_package)
             build_configuration = self.bc_builder.create()
-            registered_aliases = build_configuration.registered_aliases()
+            registered_aliases = build_configuration.registered_aliases
             self.assertEqual(DummyObject1, registered_aliases.objects["obj1"])
             self.assertEqual(DummyObject2, registered_aliases.objects["obj2"])
             self.assertEqual(
-                build_configuration.optionables(), FrozenOrderedSet([DummySubsystem]),
+                build_configuration.optionables, FrozenOrderedSet([DummySubsystem]),
             )
 
     def test_load_invalid_entrypoint(self):
@@ -283,10 +283,10 @@ class LoaderTest(unittest.TestCase):
 
         # Aliases now exist.
         build_configuration = self.bc_builder.create()
-        registered_aliases = build_configuration.registered_aliases()
+        registered_aliases = build_configuration.registered_aliases
         self.assertEqual(DummyObject1, registered_aliases.objects["FROMPLUGIN1"])
         self.assertEqual(DummyObject2, registered_aliases.objects["FROMPLUGIN2"])
-        self.assertEqual(build_configuration.optionables(), FrozenOrderedSet([DummySubsystem]))
+        self.assertEqual(build_configuration.optionables, FrozenOrderedSet([DummySubsystem]))
 
     def test_rules(self):
         def backend_rules():
@@ -295,7 +295,7 @@ class LoaderTest(unittest.TestCase):
         with self.create_register(rules=backend_rules) as backend_package:
             load_backend(self.bc_builder, backend_package)
             self.assertEqual(
-                self.bc_builder.create().rules(),
+                self.bc_builder.create().rules,
                 FrozenOrderedSet([example_rule.rule, RootRule(RootType)]),
             )
 
@@ -305,7 +305,7 @@ class LoaderTest(unittest.TestCase):
         self.working_set.add(self.get_mock_plugin("this-plugin-rules", "0.0.1", rules=plugin_rules))
         self.load_plugins(["this-plugin-rules"])
         self.assertEqual(
-            self.bc_builder.create().rules(),
+            self.bc_builder.create().rules,
             FrozenOrderedSet([example_rule.rule, RootRule(RootType), example_plugin_rule.rule]),
         )
 
@@ -315,7 +315,7 @@ class LoaderTest(unittest.TestCase):
 
         with self.create_register(target_types=target_types) as backend_package:
             load_backend(self.bc_builder, backend_package)
-            assert self.bc_builder.create().target_types() == FrozenOrderedSet(
+            assert self.bc_builder.create().target_types == FrozenOrderedSet(
                 [DummyTarget, DummyTarget2]
             )
 
@@ -330,7 +330,7 @@ class LoaderTest(unittest.TestCase):
             self.get_mock_plugin("new-targets", "0.0.1", target_types=plugin_targets)
         )
         self.load_plugins(["new-targets"])
-        assert self.bc_builder.create().target_types() == FrozenOrderedSet(
+        assert self.bc_builder.create().target_types == FrozenOrderedSet(
             [DummyTarget, DummyTarget2, PluginTarget]
         )
 
@@ -348,5 +348,5 @@ class LoaderTest(unittest.TestCase):
             )
         # The backend should load first, then the plugins, therefore the alias registered in
         # the plugin will override the alias registered by the backend
-        registered_aliases = build_configuration.registered_aliases()
+        registered_aliases = build_configuration.registered_aliases
         self.assertEqual(DummyObject2, registered_aliases.objects["override-alias"])

@@ -28,7 +28,6 @@ from pants.init.options_initializer import BuildConfigInitializer, OptionsInitia
 from pants.init.specs_calculator import SpecsCalculator
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.reporting.reporting import Reporting
 from pants.reporting.streaming_workunit_handler import StreamingWorkunitHandler
 from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import maybe_profiled
@@ -58,7 +57,6 @@ class LocalPantsRunner:
     union_membership: UnionMembership
     profile_path: Optional[str]
     _run_tracker: RunTracker
-    _reporting: Optional[Reporting] = None
 
     @staticmethod
     def parse_options(
@@ -122,7 +120,7 @@ class LocalPantsRunner:
         if global_bootstrap_options.verify_config:
             options.verify_configs(options_bootstrapper.config)
 
-        union_membership = UnionMembership(build_config.union_rules())
+        union_membership = UnionMembership.from_rules(build_config.union_rules)
 
         # If we're running with the daemon, we'll be handed a warmed Scheduler, which we use
         # to initialize a session here.
@@ -158,8 +156,7 @@ class LocalPantsRunner:
         # Propagates parent_build_id to pants runs that may be called from this pants run.
         os.environ["PANTS_PARENT_BUILD_ID"] = self._run_tracker.run_id
 
-        self._reporting = Reporting.global_instance()
-        self._reporting.initialize(self._run_tracker, self.options, start_time=start_time)
+        self._run_tracker.start(self.options, run_start_time=start_time)
 
         spec_parser = CmdLineSpecParser(get_buildroot())
         specs = [spec_parser.parse_spec(spec).to_spec_string() for spec in self.options.specs]
@@ -218,39 +215,16 @@ class LocalPantsRunner:
         run_tracker_result = PANTS_SUCCEEDED_EXIT_CODE
         scheduler_session = self.graph_session.scheduler_session
 
-        # These strings are prepended to the existing exit message when calling the superclass .exit().
-        additional_messages = []
         try:
             metrics = scheduler_session.metrics()
             self._run_tracker.pantsd_stats.set_scheduler_metrics(metrics)
-
-            if code == PANTS_SUCCEEDED_EXIT_CODE:
-                outcome = WorkUnit.SUCCESS
-            elif code == PANTS_FAILED_EXIT_CODE:
-                outcome = WorkUnit.FAILURE
-            else:
-                run_tracker_msg = (
-                    "unrecognized exit code {} provided to {}.exit() -- "
-                    "interpreting as a failure in the run tracker".format(code, type(self).__name__)
-                )
-                # Log the unrecognized exit code to the fatal exception log.
-                ExceptionSink.log_exception(exc=Exception(run_tracker_msg))
-                # Ensure the unrecognized exit code message is also logged to the terminal.
-                additional_messages.append(run_tracker_msg)
-                outcome = WorkUnit.FAILURE
-
+            outcome = WorkUnit.SUCCESS if code == PANTS_SUCCEEDED_EXIT_CODE else WorkUnit.FAILURE
             self._run_tracker.set_root_outcome(outcome)
             run_tracker_result = self._run_tracker.end()
         except ValueError as e:
-            # If we have been interrupted by a signal, calling .end() sometimes writes to a closed file,
-            # so we just log that fact here and keep going.
+            # If we have been interrupted by a signal, calling .end() sometimes writes to a closed
+            # file, so we just log that fact here and keep going.
             ExceptionSink.log_exception(exc=e)
-
-        if additional_messages:
-            # NB: We do not log to the exceptions log in this case, because we expect that these are
-            # higher level unstructured errors: structured versions will already have been written at
-            # various places.
-            logger.error("\n".join(additional_messages))
 
         return run_tracker_result
 

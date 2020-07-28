@@ -6,7 +6,7 @@ from abc import ABC, ABCMeta
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import Dict, Iterable, List, Optional, Tuple, Type, TypeVar
+from typing import Dict, Iterable, List, Optional, Tuple, Type, TypeVar, cast
 
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.core.util_rules.filter_empty_sources import (
@@ -18,12 +18,10 @@ from pants.engine.addresses import Address
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAware
-from pants.engine.fs import Digest, DirectoryToMaterialize, Workspace
+from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.interactive_process import InteractiveProcess, InteractiveRunner
-from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import goal_rule, rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.process import FallibleProcessResult, InteractiveProcess, InteractiveRunner
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSetWithOrigin,
     Sources,
@@ -178,10 +176,8 @@ class FilesystemCoverageReport(CoverageReport):
     report_type: CoverageReportType
 
     def materialize(self, console: Console, workspace: Workspace) -> Optional[PurePath]:
-        workspace.materialize_directory(
-            DirectoryToMaterialize(
-                self.result_digest, path_prefix=str(self.directory_to_materialize_to),
-            )
+        workspace.write_digest(
+            self.result_digest, path_prefix=str(self.directory_to_materialize_to)
         )
         console.print_stderr(
             f"\nWrote {self.report_type.report_name} coverage report to `{self.directory_to_materialize_to}`"
@@ -202,8 +198,16 @@ class CoverageReports:
         return tuple(report_paths)
 
 
-class TestOptions(GoalSubsystem):
-    """Runs tests."""
+class ShowOutput(Enum):
+    """Which tests to emit detailed output for."""
+
+    ALL = "all"
+    FAILED = "failed"
+    NONE = "none"
+
+
+class TestSubsystem(GoalSubsystem):
+    """Run tests."""
 
     name = "test"
 
@@ -231,6 +235,12 @@ class TestOptions(GoalSubsystem):
             help="Force the tests to run, even if they could be satisfied from cache.",
         )
         register(
+            "--output",
+            type=ShowOutput,
+            default=ShowOutput.FAILED,
+            help="Show stdout/stderr for these tests.",
+        )
+        register(
             "--use-coverage",
             type=bool,
             default=False,
@@ -246,9 +256,29 @@ class TestOptions(GoalSubsystem):
             ),
         )
 
+    @property
+    def debug(self) -> bool:
+        return cast(bool, self.options.debug)
+
+    @property
+    def force(self) -> bool:
+        return cast(bool, self.options.force)
+
+    @property
+    def output(self) -> ShowOutput:
+        return cast(ShowOutput, self.options.output)
+
+    @property
+    def use_coverage(self) -> bool:
+        return cast(bool, self.options.use_coverage)
+
+    @property
+    def open_coverage(self) -> bool:
+        return cast(bool, self.options.open_coverage)
+
 
 class Test(Goal):
-    subsystem_cls = TestOptions
+    subsystem_cls = TestSubsystem
 
     __test__ = False
 
@@ -256,12 +286,12 @@ class Test(Goal):
 @goal_rule
 async def run_tests(
     console: Console,
-    options: TestOptions,
+    test_subsystem: TestSubsystem,
     interactive_runner: InteractiveRunner,
     workspace: Workspace,
     union_membership: UnionMembership,
 ) -> Test:
-    if options.values.debug:
+    if test_subsystem.debug:
         targets_to_valid_field_sets = await Get(
             TargetsToValidFieldSets,
             TargetsToValidFieldSetsRequest(
@@ -273,14 +303,14 @@ async def run_tests(
         )
         field_set = targets_to_valid_field_sets.field_sets[0]
         request = await Get(TestDebugRequest, TestFieldSet, field_set)
-        debug_result = interactive_runner.run_process(request.process)
+        debug_result = interactive_runner.run(request.process)
         return Test(debug_result.exit_code)
 
     targets_to_valid_field_sets = await Get(
         TargetsToValidFieldSets,
         TargetsToValidFieldSetsRequest(
             TestFieldSet,
-            goal_description=f"the `{options.name}` goal",
+            goal_description=f"the `{test_subsystem.name}` goal",
             error_if_no_valid_targets=False,
         ),
     )
@@ -293,11 +323,13 @@ async def run_tests(
         for field_set in field_sets_with_sources
     )
 
-    exit_code = PANTS_SUCCEEDED_EXIT_CODE
-
+    # Print details.
     for result in results:
-        if result.test_result.status == Status.FAILURE:
-            exit_code = PANTS_FAILED_EXIT_CODE
+        if test_subsystem.options.output == ShowOutput.NONE or (
+            test_subsystem.options.output == ShowOutput.FAILED
+            and result.test_result.status == Status.SUCCESS
+        ):
+            continue
         has_output = result.test_result.stdout or result.test_result.stderr
         if has_output:
             status = (
@@ -314,20 +346,29 @@ async def run_tests(
             console.print_stderr("")
 
     # Print summary
-    if len(results) > 1:
-        console.print_stderr("")
-        for result in results:
-            console.print_stderr(
-                f"{result.address.reference():80}.....{result.test_result.status.value:>10}"
-            )
-
+    console.print_stderr("")
     for result in results:
-        xml_results = result.test_result.xml_results
-        if not xml_results:
-            continue
-        workspace.materialize_directory(DirectoryToMaterialize(xml_results))
+        color = console.green if result.test_result.status == Status.SUCCESS else console.red
+        # The right-align logic sees the color control codes as characters, so we have
+        # to account for that. In f-strings the alignment field widths must be literals,
+        # so we have to indirect via a call to .format().
+        right_align = 19 if console.use_colors else 10
+        format_str = f"{{addr:80}}.....{{result:>{right_align}}}"
+        console.print_stderr(
+            format_str.format(
+                addr=result.address.reference(), result=color(result.test_result.status.value)
+            )
+        )
 
-    if options.values.use_coverage:
+    merged_xml_results = await Get(
+        Digest,
+        MergeDigests(
+            result.test_result.xml_results for result in results if result.test_result.xml_results
+        ),
+    )
+    workspace.write_digest(merged_xml_results)
+
+    if test_subsystem.use_coverage:
         all_coverage_data: Iterable[CoverageData] = [
             result.test_result.coverage_data
             for result in results
@@ -355,8 +396,14 @@ async def run_tests(
             report_files = coverage_reports.materialize(console, workspace)
             coverage_report_files.extend(report_files)
 
-        if coverage_report_files and options.values.open_coverage:
+        if coverage_report_files and test_subsystem.open_coverage:
             desktop.ui_open(console, interactive_runner, coverage_report_files)
+
+    exit_code = (
+        PANTS_FAILED_EXIT_CODE
+        if any(res.test_result.status == Status.FAILURE for res in results)
+        else PANTS_SUCCEEDED_EXIT_CODE
+    )
 
     return Test(exit_code)
 
@@ -369,4 +416,4 @@ async def coordinator_of_tests(wrapped_field_set: WrappedTestFieldSet) -> Addres
 
 
 def rules():
-    return [coordinator_of_tests, run_tests]
+    return collect_rules()

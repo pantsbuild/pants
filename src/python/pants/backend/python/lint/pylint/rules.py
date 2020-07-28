@@ -31,10 +31,16 @@ from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.engine.addresses import Address, Addresses
-from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests, PathGlobs, Snapshot
+from pants.engine.fs import (
+    EMPTY_DIGEST,
+    AddPrefix,
+    Digest,
+    GlobMatchErrorBehavior,
+    MergeDigests,
+    PathGlobs,
+)
 from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import SubsystemRule, rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
@@ -44,7 +50,6 @@ from pants.engine.target import (
     TransitiveTargets,
 )
 from pants.engine.unions import UnionRule
-from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
 from pants.util.meta import frozen_after_init
 from pants.util.strutil import pluralize
@@ -155,8 +160,8 @@ async def pylint_lint_partition(
         ),
     )
 
-    config_snapshot_request = Get(
-        Snapshot,
+    config_digest_request = Get(
+        Digest,
         PathGlobs(
             globs=[pylint.config] if pylint.config else [],
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
@@ -182,7 +187,7 @@ async def pylint_lint_partition(
         pylint_pex,
         requirements_pex,
         pylint_runner_pex,
-        config_snapshot,
+        config_digest,
         prepared_plugin_sources,
         prepared_python_sources,
         specified_source_files,
@@ -190,7 +195,7 @@ async def pylint_lint_partition(
         pylint_pex_request,
         requirements_pex_request,
         pylint_runner_pex_request,
-        config_snapshot_request,
+        config_digest_request,
         prepare_plugin_sources_request,
         prepare_python_sources_request,
         specified_source_files_request,
@@ -218,7 +223,7 @@ async def pylint_lint_partition(
                 pylint_pex.digest,
                 requirements_pex.digest,
                 pylint_runner_pex.digest,
-                config_snapshot.digest,
+                config_digest,
                 prefixed_plugin_sources,
                 prepared_python_sources.snapshot.digest,
             )
@@ -307,9 +312,7 @@ async def pylint_lint(
 
 def rules():
     return [
-        pylint_lint,
-        pylint_lint_partition,
-        SubsystemRule(Pylint),
+        *collect_rules(),
         UnionRule(LintRequest, PylintRequest),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),

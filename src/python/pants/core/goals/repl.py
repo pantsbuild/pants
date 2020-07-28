@@ -8,11 +8,10 @@ from typing import ClassVar, Dict, Mapping, Optional, Tuple, Type, cast
 
 from pants.base.build_root import BuildRoot
 from pants.engine.console import Console
-from pants.engine.fs import Digest, DirectoryToMaterialize, Workspace
+from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.interactive_process import InteractiveProcess, InteractiveRunner
-from pants.engine.rules import goal_rule
-from pants.engine.selectors import Get
+from pants.engine.process import InteractiveProcess, InteractiveRunner
+from pants.engine.rules import Get, collect_rules, goal_rule
 from pants.engine.target import Field, Target, Targets, TransitiveTargets
 from pants.engine.unions import UnionMembership, union
 from pants.option.global_options import GlobalOptions
@@ -37,7 +36,7 @@ class ReplImplementation(ABC):
         return tgt.has_fields(cls.required_fields)
 
 
-class ReplOptions(GoalSubsystem):
+class ReplSubsystem(GoalSubsystem):
     """Opens a REPL."""
 
     name = "repl"
@@ -53,9 +52,13 @@ class ReplOptions(GoalSubsystem):
             help="Override the automatically-detected REPL program for the target(s) specified. ",
         )
 
+    @property
+    def shell(self) -> Optional[str]:
+        return cast(Optional[str], self.options.shell)
+
 
 class Repl(Goal):
-    subsystem_cls = ReplOptions
+    subsystem_cls = ReplSubsystem
 
 
 @frozen_after_init
@@ -78,14 +81,13 @@ async def run_repl(
     console: Console,
     workspace: Workspace,
     interactive_runner: InteractiveRunner,
-    options: ReplOptions,
+    repl_subsystem: ReplSubsystem,
     transitive_targets: TransitiveTargets,
     build_root: BuildRoot,
     union_membership: UnionMembership,
     global_options: GlobalOptions,
 ) -> Repl:
-    default_repl = "python"
-    repl_shell_name = cast(str, options.values.shell) or default_repl
+    repl_shell_name = repl_subsystem.shell or "python"
 
     implementations: Dict[str, Type[ReplImplementation]] = {
         impl.name: impl for impl in union_membership[ReplImplementation]
@@ -107,17 +109,15 @@ async def run_repl(
     request = await Get(ReplRequest, ReplImplementation, repl_impl)
 
     with temporary_dir(root_dir=global_options.options.pants_workdir, cleanup=False) as tmpdir:
-        path_relative_to_build_root = PurePath(tmpdir).relative_to(build_root.path).as_posix()
-        workspace.materialize_directory(
-            DirectoryToMaterialize(request.digest, path_prefix=path_relative_to_build_root)
+        tmpdir_relative_path = PurePath(tmpdir).relative_to(build_root.path).as_posix()
+        exe_path = PurePath(tmpdir, request.binary_name).as_posix()
+        workspace.write_digest(request.digest, path_prefix=tmpdir_relative_path)
+        result = interactive_runner.run(
+            InteractiveProcess(argv=(exe_path,), env=request.env, run_in_workspace=True)
         )
 
-        full_path = PurePath(tmpdir, request.binary_name).as_posix()
-        process = InteractiveProcess(argv=(full_path,), env=request.env, run_in_workspace=True)
-
-    result = interactive_runner.run_process(process)
     return Repl(result.exit_code)
 
 
 def rules():
-    return [run_repl]
+    return collect_rules()

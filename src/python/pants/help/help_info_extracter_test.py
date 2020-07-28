@@ -140,7 +140,7 @@ def test_compute_default():
 
 def test_deprecated():
     kwargs = {"removal_version": "999.99.9", "removal_hint": "do not use this"}
-    ohi = HelpInfoExtracter("").get_option_help_info([], kwargs)
+    ohi = HelpInfoExtracter("").get_option_help_info(["--foo"], kwargs)
     assert "999.99.9" == ohi.removal_version
     assert "do not use this" == ohi.removal_hint
     assert ohi.deprecated_message is not None
@@ -156,19 +156,19 @@ def test_passthrough():
 
 def test_choices() -> None:
     kwargs = {"choices": ["info", "debug"]}
-    ohi = HelpInfoExtracter("").get_option_help_info([], kwargs)
+    ohi = HelpInfoExtracter("").get_option_help_info(["--foo"], kwargs)
     assert ohi.choices == ("info", "debug")
 
 
 def test_choices_enum() -> None:
     kwargs = {"type": LogLevel}
-    ohi = HelpInfoExtracter("").get_option_help_info([], kwargs)
+    ohi = HelpInfoExtracter("").get_option_help_info(["--foo"], kwargs)
     assert ohi.choices == ("info", "debug")
 
 
 def test_list_of_enum() -> None:
     kwargs = {"type": list, "member_type": LogLevel}
-    ohi = HelpInfoExtracter("").get_option_help_info([], kwargs)
+    ohi = HelpInfoExtracter("").get_option_help_info(["--foo"], kwargs)
     assert ohi.choices == ("info", "debug")
 
 
@@ -250,6 +250,8 @@ def test_get_all_help_info():
                         "comma_separated_display_args": "-o=<int>, --opt1=<int>",
                         "scoped_cmd_line_args": ("-o", "--opt1"),
                         "unscoped_cmd_line_args": ("-o", "--opt1"),
+                        "config_key": "opt1",
+                        "env_var": "PANTS_OPT1",
                         "value_history": {
                             "ranked_values": (
                                 {"rank": Rank.NONE, "value": None, "details": None},
@@ -280,6 +282,8 @@ def test_get_all_help_info():
                         "comma_separated_display_args": "--[no-]foo-opt2",
                         "scoped_cmd_line_args": ("--foo-opt2", "--no-foo-opt2"),
                         "unscoped_cmd_line_args": ("--opt2", "--no-opt2"),
+                        "config_key": "opt2",
+                        "env_var": "PANTS_FOO_OPT2",
                         "value_history": {
                             "ranked_values": (
                                 {"rank": Rank.NONE, "value": None, "details": None},
@@ -303,6 +307,8 @@ def test_get_all_help_info():
                         "comma_separated_display_args": "--foo-opt3=<str>",
                         "scoped_cmd_line_args": ("--foo-opt3",),
                         "unscoped_cmd_line_args": ("--opt3",),
+                        "config_key": "opt3",
+                        "env_var": "PANTS_FOO_OPT3",
                         "value_history": {
                             "ranked_values": ({"rank": Rank.NONE, "value": None, "details": None},),
                         },

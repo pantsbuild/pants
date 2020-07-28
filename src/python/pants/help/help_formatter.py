@@ -44,13 +44,18 @@ class HelpFormatter:
                 title = f"{display_scope} {category} options"
                 lines.append(self._maybe_green(f"{title}\n{'-' * len(title)}"))
             else:
+                # The basic options section gets the description and options scope info.
+                # No need to repeat those in the advanced section.
                 title = f"{display_scope} options"
                 lines.append(self._maybe_green(f"{title}\n{'-' * len(title)}"))
                 if oshi.description:
                     lines.append(f"\n{oshi.description}")
+                lines.append(" ")
+                config_section = f"[{oshi.scope or 'GLOBAL'}]"
+                lines.append(f"Config section: {self._maybe_magenta(config_section)}")
             lines.append(" ")
             if not ohis:
-                lines.append("No options available.")
+                lines.append("None available.")
                 return
             for ohi in ohis:
                 lines.extend([*self.format_option(ohi), ""])
@@ -84,6 +89,8 @@ class HelpFormatter:
 
         indent = "      "
         arg_lines = [f"  {self._maybe_magenta(args)}" for args in ohi.display_args]
+        arg_lines.append(self._maybe_magenta(f"  {ohi.env_var}"))
+        arg_lines.append(self._maybe_magenta(f"  {ohi.config_key}"))
         choices = "" if ohi.choices is None else f"one of: [{', '.join(ohi.choices)}]"
         choices_lines = [
             f"{indent}{'  ' if i != 0 else ''}{self._maybe_cyan(s)}"

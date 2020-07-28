@@ -16,23 +16,12 @@ from pants.base.build_environment import (
     get_pants_configdir,
     pants_version,
 )
+from pants.engine.fs import GlobMatchErrorBehavior
 from pants.option.custom_types import dir_option
 from pants.option.errors import OptionsError
 from pants.option.scope import GLOBAL_SCOPE
 from pants.subsystem.subsystem import Subsystem
 from pants.util.logging import LogLevel
-
-
-class GlobMatchErrorBehavior(Enum):
-    """Describe the action to perform when matching globs in BUILD files to source files.
-
-    NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
-    be aware of any changes to this object's definition.
-    """
-
-    ignore = "ignore"
-    warn = "warn"
-    error = "error"
 
 
 class FileNotFoundBehavior(Enum):
@@ -142,7 +131,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
 
 
 class GlobalOptions(Subsystem):
-    """Global options."""
+    """Options to control the overall behavior of Pants."""
 
     options_scope = GLOBAL_SCOPE
 
@@ -401,10 +390,18 @@ class GlobalOptions(Subsystem):
             help="Add these directories to PYTHONPATH to search for plugins.",
         )
         register(
+            "--spec-files",
+            type=list,
+            # NB: See `--pants-config-files`.
+            fingerprint=False,
+            help="Read additional specs (e.g., target addresses or file names), one per line,"
+            "from these files.",
+        )
+        register(
             "--spec-file",
             type=list,
-            dest="spec_files",
-            # NB: See `--pants-config-files`.
+            removal_version="2.1.0.dev0",
+            removal_hint="Use --spec-files",
             fingerprint=False,
             help="Read additional specs from this file (e.g. target addresses or file names). "
             "Each spec should be one per line.",
@@ -572,7 +569,11 @@ class GlobalOptions(Subsystem):
             "--print-exception-stacktrace",
             advanced=True,
             type=bool,
-            fingerprint=False,
+            default=False,
+            # TODO: We must restart the daemon because of global mutable state in `init/logging.py`
+            #  from `ExceptionSink.should_print_exception_stacktrace`. Fix this and only use
+            #  `fingerprint=True` instead.
+            daemon=True,
             help="Print to console the full exception stack trace if encountered.",
         )
 
@@ -897,6 +898,12 @@ class GlobalOptions(Subsystem):
             default=False,
             type=bool,
             advanced=True,
+            removal_version="2.1.0.dev0",
+            removal_hint=(
+                "This option is now a noop: individual inference providers can be independently "
+                "enabled or disabled on their relevant subsystems. For Python, see "
+                "`./pants help python-infer`."
+            ),
             help=(
                 "Enable dependency inference, meaning that Pants will read your source code to "
                 "infer the `dependencies` field for you in BUILD files. You can check what Pants "

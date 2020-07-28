@@ -5,6 +5,7 @@ import logging
 import os
 import time
 from dataclasses import dataclass
+from pathlib import PurePath
 from types import CoroutineType
 from typing import Any, Dict, List, NoReturn, Optional, Sequence, Tuple, Type, Union, cast
 
@@ -20,32 +21,31 @@ from pants.engine.fs import (
     CreateDigest,
     Digest,
     DigestContents,
-    DirectoryToMaterialize,
+    DigestSubset,
+    DownloadFile,
     FileContent,
-    MaterializeDirectoriesResult,
-    MaterializeDirectoryResult,
     MergeDigests,
     PathGlobs,
     PathGlobsAndRoot,
     RemovePrefix,
     Snapshot,
-    SnapshotSubset,
-    UrlToFetch,
 )
-from pants.engine.interactive_process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.internals.native_engine import PyTypes
 from pants.engine.internals.nodes import Return, Throw
+from pants.engine.internals.selectors import Params
 from pants.engine.platform import Platform
-from pants.engine.process import FallibleProcessResultWithPlatform, MultiPlatformProcess
+from pants.engine.process import (
+    FallibleProcessResultWithPlatform,
+    InteractiveProcess,
+    InteractiveProcessResult,
+    MultiPlatformProcess,
+)
 from pants.engine.rules import Rule, RuleIndex, TaskRule
-from pants.engine.selectors import Params
-from pants.engine.unions import union
+from pants.engine.unions import UnionMembership, union
 from pants.option.global_options import ExecutionOptions
 from pants.util.contextutil import temporary_file_path
-from pants.util.dirutil import check_no_overlapping_paths
-from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+from pants.util.ordered_set import FrozenOrderedSet
 from pants.util.strutil import pluralize
 
 logger = logging.getLogger(__name__)
@@ -94,8 +94,8 @@ class Scheduler:
         local_store_dir: str,
         local_execution_root_dir: str,
         named_caches_dir: str,
-        rules: Tuple[Rule, ...],
-        union_rules: FrozenDict[Type, FrozenOrderedSet[Type]],
+        rules: FrozenOrderedSet[Rule],
+        union_membership: UnionMembership,
         execution_options: ExecutionOptions,
         include_trace_on_error: bool = True,
         visualize_to_dir: Optional[str] = None,
@@ -111,8 +111,7 @@ class Scheduler:
         :param local_execution_root_dir: The directory to use for local execution sandboxes.
         :param named_caches_dir: The directory to use as the root for named mutable caches.
         :param rules: A set of Rules which is used to compute values in the graph.
-        :param union_rules: A dict mapping union base types to member types so that rules can be written
-                            against abstract union types without knowledge of downstream rulesets.
+        :param union_membership: All the registered and normalized union rules.
         :param execution_options: Execution options for (remote) processes.
         :param include_trace_on_error: Include the trace through the graph upon encountering errors.
         :type include_trace_on_error: bool
@@ -122,19 +121,17 @@ class Scheduler:
         self.include_trace_on_error = include_trace_on_error
         self._visualize_to_dir = visualize_to_dir
         # Validate and register all provided and intrinsic tasks.
-        rule_index = RuleIndex.create(list(rules), union_rules)
+        rule_index = RuleIndex.create(rules)
         self._root_subject_types = [r.output_type for r in rule_index.roots]
 
         # Create the native Scheduler and Session.
-        tasks = self._register_rules(rule_index)
+        tasks = self._register_rules(rule_index, union_membership)
 
         types = PyTypes(
             directory_digest=Digest,
             snapshot=Snapshot,
             file_content=FileContent,
             digest_contents=DigestContents,
-            materialize_directories_results=MaterializeDirectoriesResult,
-            materialize_directory_result=MaterializeDirectoryResult,
             address=Address,
             path_globs=PathGlobs,
             merge_digests=MergeDigests,
@@ -148,12 +145,12 @@ class Scheduler:
             multi_platform_process=MultiPlatformProcess,
             process_result=FallibleProcessResultWithPlatform,
             coroutine=CoroutineType,
-            url_to_fetch=UrlToFetch,
+            download_file=DownloadFile,
             string=str,
             bytes=bytes,
             interactive_process=InteractiveProcess,
             interactive_process_result=InteractiveProcessResult,
-            snapshot_subset=SnapshotSubset,
+            digest_subset=DigestSubset,
         )
 
         self._scheduler = native.new_scheduler(
@@ -192,21 +189,21 @@ class Scheduler:
             return subject_or_params.params
         return [subject_or_params]
 
-    def _register_rules(self, rule_index: RuleIndex):
+    def _register_rules(self, rule_index: RuleIndex, union_membership: UnionMembership):
         """Create a native Tasks object, and record the given RuleIndex on it."""
 
         tasks = self._native.new_tasks()
 
         for output_type, rules in rule_index.rules.items():
             for rule in rules:
-                if type(rule) is TaskRule:
-                    self._register_task(tasks, output_type, rule, rule_index.union_rules)
+                if isinstance(rule, TaskRule):
+                    self._register_task(tasks, output_type, rule, union_membership)
                 else:
-                    raise ValueError("Unexpected Rule type: {}".format(rule))
+                    raise ValueError(f"Unexpected Rule type: {rule}")
         return tasks
 
     def _register_task(
-        self, tasks, output_type: Type, rule: TaskRule, union_rules: Dict[Type, OrderedSet[Type]]
+        self, tasks, output_type: Type, rule: TaskRule, union_membership: UnionMembership
     ) -> None:
         """Register the given TaskRule with the native scheduler."""
         self._native.lib.tasks_task_begin(
@@ -227,8 +224,9 @@ class Scheduler:
 
         for the_get in rule.input_gets:
             if union.is_instance(the_get.subject_declared_type):
-                # If the registered subject type is a union, add Get edges to all registered union members.
-                for union_member in union_rules.get(the_get.subject_declared_type, []):
+                # If the registered subject type is a union, add Get edges to all registered
+                # union members.
+                for union_member in union_membership.get(the_get.subject_declared_type):
                     add_get_edge(the_get.product_type, union_member)
             else:
                 # Otherwise, the Get subject is a "concrete" type, so add a single Get edge.
@@ -359,10 +357,6 @@ class _PathGlobsAndRootCollection(Collection[PathGlobsAndRoot]):
 
 
 class _DirectoryDigests(Collection[Digest]):
-    pass
-
-
-class _DirectoriesToMaterialize(Collection[DirectoryToMaterialize]):
     pass
 
 
@@ -632,31 +626,16 @@ class SchedulerSession:
         )
         return result
 
-    def materialize_directory(
-        self, directory_to_materialize: DirectoryToMaterialize
-    ) -> MaterializeDirectoryResult:
-        """Materialize one single directory digest to disk.
-
-        If you need to materialize multiple, you should use the parallel materialize_directories()
-        instead.
-        """
-        return self.materialize_directories((directory_to_materialize,)).dependencies[0]
-
-    def materialize_directories(
-        self, directories_to_materialize: Tuple[DirectoryToMaterialize, ...]
-    ) -> MaterializeDirectoriesResult:
-        """Materialize multiple directory digests to disk in parallel."""
-        # Ensure that there isn't more than one of the same directory paths and paths do not have the
-        # same prefix.
-        dir_list = [dtm.path_prefix for dtm in directories_to_materialize]
-        check_no_overlapping_paths(dir_list)
-
-        result: MaterializeDirectoriesResult = self._scheduler._native.lib.materialize_directories(
-            self._scheduler._scheduler,
-            self._session,
-            _DirectoriesToMaterialize(directories_to_materialize),
+    def write_digest(self, digest: Digest, *, path_prefix: Optional[str] = None) -> None:
+        """Write a digest to disk, relative to the build root."""
+        if path_prefix and PurePath(path_prefix).is_absolute():
+            raise ValueError(
+                f"The `path_prefix` {path_prefix} must be a relative path, as the engine writes "
+                "the digest relative to the build root."
+            )
+        self._scheduler._native.lib.write_digest(
+            self._scheduler._scheduler, self._session, digest, path_prefix or ""
         )
-        return result
 
     def lease_files_in_graph(self):
         self._scheduler.lease_files_in_graph(self._session)

@@ -15,9 +15,9 @@ from pants.core.goals.lint import LintResults
 from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
 from pants.engine.rules import RootRule
-from pants.engine.selectors import Params
 from pants.engine.target import TargetWithOrigin, WrappedTarget
 from pants.python.python_requirement import PythonRequirement
+from pants.testutil.engine.util import Params
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.interpreter_selection_utils import skip_unless_python27_and_python3_present
 from pants.testutil.option.util import create_options_bootstrapper

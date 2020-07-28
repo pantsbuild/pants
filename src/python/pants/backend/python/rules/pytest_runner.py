@@ -13,7 +13,6 @@ from pants.backend.python.rules.coverage import (
     CoverageSubsystem,
     PytestCoverageData,
 )
-from pants.backend.python.rules.inject_ancestor_files import AncestorFiles, AncestorFilesRequest
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
@@ -32,15 +31,13 @@ from pants.backend.python.target_types import (
     PythonTestsSources,
     PythonTestsTimeout,
 )
-from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestOptions, TestResult
+from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
 from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.engine.addresses import Addresses
-from pants.engine.fs import AddPrefix, Digest, MergeDigests, PathGlobs, Snapshot, SnapshotSubset
-from pants.engine.interactive_process import InteractiveProcess
+from pants.engine.fs import AddPrefix, Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
 from pants.engine.internals.uuid import UUIDRequest
-from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import SubsystemRule, rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.process import FallibleProcessResult, InteractiveProcess, Process
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import TransitiveTargets
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
@@ -76,7 +73,7 @@ class TestTargetSetup:
 async def setup_pytest_for_target(
     field_set: PythonTestFieldSet,
     pytest: PyTest,
-    test_options: TestOptions,
+    test_subsystem: TestSubsystem,
     python_setup: PythonSetup,
     coverage_config: CoverageConfig,
     coverage_subsystem: CoverageSubsystem,
@@ -179,18 +176,12 @@ async def setup_pytest_for_target(
         specified_source_files_request,
     )
 
-    conftest_files = await Get(
-        AncestorFiles,
-        AncestorFilesRequest("conftest.py", prepared_sources.snapshot, sources_stripped=False),
-    )
-
     input_digest = await Get(
         Digest,
         MergeDigests(
             (
                 coverage_config.digest,
                 prepared_sources.snapshot.digest,
-                conftest_files.snapshot.digest,
                 requirements_pex.digest,
                 pytest_pex.digest,
                 test_runner_pex.digest,
@@ -198,9 +189,8 @@ async def setup_pytest_for_target(
         ),
     )
 
-    use_coverage = test_options.values.use_coverage
     coverage_args = []
-    if use_coverage:
+    if test_subsystem.use_coverage:
         cov_paths = coverage_subsystem.filter if coverage_subsystem.filter else (".",)
         coverage_args = [
             "--cov-report=",  # Turn off output.
@@ -225,7 +215,7 @@ async def run_python_test(
     python_setup: PythonSetup,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
     global_options: GlobalOptions,
-    test_options: TestOptions,
+    test_subsystem: TestSubsystem,
 ) -> TestResult:
     """Runs pytest for one target."""
     output_files = []
@@ -242,8 +232,7 @@ async def run_python_test(
         output_files.append(test_results_file)
 
     # Configure generation of a coverage report.
-    use_coverage = test_options.values.use_coverage
-    if use_coverage:
+    if test_subsystem.use_coverage:
         output_files.append(".coverage")
 
     env = {
@@ -251,7 +240,7 @@ async def run_python_test(
         "PEX_EXTRA_SYS_PATH": ":".join(test_setup.source_roots),
     }
 
-    if test_options.values.force:
+    if test_subsystem.force:
         # This is a slightly hacky way to force the process to run: since the env var
         #  value is unique, this input combination will never have been seen before,
         #  and therefore never cached. The two downsides are:
@@ -277,9 +266,9 @@ async def run_python_test(
     result = await Get(FallibleProcessResult, Process, process)
 
     coverage_data = None
-    if use_coverage:
+    if test_subsystem.use_coverage:
         coverage_snapshot = await Get(
-            Snapshot, SnapshotSubset(result.output_digest, PathGlobs([".coverage"]))
+            Snapshot, DigestSubset(result.output_digest, PathGlobs([".coverage"]))
         )
         if coverage_snapshot.files == (".coverage",):
             coverage_data = PytestCoverageData(field_set.address, coverage_snapshot.digest)
@@ -289,7 +278,7 @@ async def run_python_test(
     xml_results_digest = None
     if test_results_file:
         xml_results_snapshot = await Get(
-            Snapshot, SnapshotSubset(result.output_digest, PathGlobs([test_results_file]))
+            Snapshot, DigestSubset(result.output_digest, PathGlobs([test_results_file]))
         )
         if xml_results_snapshot.files == (test_results_file,):
             xml_results_digest = await Get(
@@ -318,11 +307,6 @@ async def debug_python_test(test_setup: TestTargetSetup) -> TestDebugRequest:
 
 def rules():
     return [
-        run_python_test,
-        debug_python_test,
-        setup_pytest_for_target,
+        *collect_rules(),
         UnionRule(TestFieldSet, PythonTestFieldSet),
-        SubsystemRule(PyTest),
-        SubsystemRule(PythonSetup),
-        SubsystemRule(CoverageSubsystem),
     ]

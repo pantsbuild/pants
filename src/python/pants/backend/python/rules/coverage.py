@@ -35,18 +35,17 @@ from pants.engine.fs import (
     Digest,
     DigestContents,
     FileContent,
+    GlobMatchErrorBehavior,
     MergeDigests,
     PathGlobs,
-    Snapshot,
 )
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import SubsystemRule, rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import TransitiveTargets
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import file_option
-from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
+
 
 """
 An overview:
@@ -168,15 +167,14 @@ async def create_coverage_config(coverage: CoverageSubsystem) -> CoverageConfig:
     config_path: Optional[str] = coverage.options.config
     coverage_config = configparser.ConfigParser()
     if config_path:
-        config_snapshot = await Get(
-            Snapshot,
+        config_contents = await Get(
+            DigestContents,
             PathGlobs(
                 globs=config_path,
                 glob_match_error_behavior=GlobMatchErrorBehavior.error,
                 description_of_origin=f"the option `--{coverage.options_scope}-config`",
             ),
         )
-        config_contents = await Get(DigestContents, Digest, config_snapshot.digest)
         coverage_config.read_string(config_contents[0].content.decode())
     _validate_and_update_config(coverage_config, config_path)
     config_stream = StringIO()
@@ -337,10 +335,6 @@ def _get_coverage_reports(
 
 def rules():
     return [
-        create_coverage_config,
-        generate_coverage_reports,
-        merge_coverage_data,
-        setup_coverage,
-        SubsystemRule(CoverageSubsystem),
+        *collect_rules(),
         UnionRule(CoverageDataCollection, PytestCoverageDataCollection),
     ]

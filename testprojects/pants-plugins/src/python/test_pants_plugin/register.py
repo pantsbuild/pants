@@ -6,18 +6,18 @@ import os
 from pants.base.deprecated import warn_or_error
 from pants.base.exception_sink import ExceptionSink
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.rules import goal_rule
+from pants.engine.rules import collect_rules, goal_rule
 from pants.option.custom_types import file_option
 
 
-class DeprecationWarningOptions(GoalSubsystem):
+class DeprecationWarningSubsystem(GoalSubsystem):
     """Make a deprecation warning so that warning filters can be integration tested."""
 
     name = "deprecation-warning"
 
 
 class DeprecationWarningGoal(Goal):
-    subsystem_cls = DeprecationWarningOptions
+    subsystem_cls = DeprecationWarningSubsystem
 
 
 @goal_rule
@@ -28,7 +28,7 @@ async def show_warning() -> DeprecationWarningGoal:
     return DeprecationWarningGoal(0)
 
 
-class LifecycleStubsOptions(GoalSubsystem):
+class LifecycleStubsSubsystem(GoalSubsystem):
     """Configure workflows for lifecycle tests (Pants stopping and starting)."""
 
     name = "lifecycle-stub-goal"
@@ -45,12 +45,12 @@ class LifecycleStubsOptions(GoalSubsystem):
 
 
 class LifecycleStubsGoal(Goal):
-    subsystem_cls = LifecycleStubsOptions
+    subsystem_cls = LifecycleStubsSubsystem
 
 
 @goal_rule
-async def run_lifecycle_stubs(opts: LifecycleStubsOptions) -> LifecycleStubsGoal:
-    output_file = opts.values.new_interactive_stream_output_file
+async def run_lifecycle_stubs(opts: LifecycleStubsSubsystem) -> LifecycleStubsGoal:
+    output_file = opts.options.new_interactive_stream_output_file
     if output_file:
         file_stream = open(output_file, "wb")
         ExceptionSink.reset_interactive_output_stream(file_stream, output_file)
@@ -58,7 +58,7 @@ async def run_lifecycle_stubs(opts: LifecycleStubsOptions) -> LifecycleStubsGoal
 
 
 def rules():
-    return [show_warning, run_lifecycle_stubs]
+    return collect_rules()
 
 
 if os.environ.get("_RAISE_KEYBOARDINTERRUPT_ON_IMPORT", False):

@@ -17,7 +17,7 @@ from pants.base.specs import (
     Specs,
 )
 from pants.engine.internals.scheduler import SchedulerSession
-from pants.engine.selectors import Params
+from pants.engine.internals.selectors import Params
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.scm.subsystems.changed import ChangedAddresses, ChangedOptions, ChangedRequest

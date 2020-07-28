@@ -8,7 +8,19 @@ import os.path
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import DefaultDict, Dict, Iterable, List, NamedTuple, Sequence, Set, Tuple, Type, Union
+from typing import (
+    DefaultDict,
+    Dict,
+    Iterable,
+    List,
+    NamedTuple,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Type,
+    Union,
+)
 
 from pants.base.exceptions import ResolveError
 from pants.base.specs import (
@@ -30,6 +42,7 @@ from pants.engine.addresses import (
 from pants.engine.collection import Collection
 from pants.engine.fs import (
     EMPTY_SNAPSHOT,
+    Digest,
     GlobExpansionConjunction,
     GlobMatchErrorBehavior,
     MergeDigests,
@@ -38,8 +51,7 @@ from pants.engine.fs import (
     SourcesSnapshot,
 )
 from pants.engine.internals.target_adaptor import TargetAdaptor
-from pants.engine.rules import RootRule, rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.rules import Get, MultiGet, RootRule, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
@@ -81,7 +93,9 @@ logger = logging.getLogger(__name__)
 
 @rule
 async def resolve_target(
-    address: Address, registered_target_types: RegisteredTargetTypes
+    address: Address,
+    registered_target_types: RegisteredTargetTypes,
+    union_membership: UnionMembership,
 ) -> WrappedTarget:
     if address.generated_base_target_name:
         base_target = await Get(WrappedTarget, Address, address.maybe_convert_to_base_target())
@@ -97,7 +111,7 @@ async def resolve_target(
         raise UnrecognizedTargetTypeException(
             target_adaptor.type_alias, registered_target_types, address=address
         )
-    target = target_type(target_adaptor.kwargs, address=address)
+    target = target_type(target_adaptor.kwargs, address=address, union_membership=union_membership)
     return WrappedTarget(target)
 
 
@@ -148,11 +162,31 @@ def _detect_cycles(
     path_stack: OrderedSet[Address] = OrderedSet()
     visited: Set[Address] = set()
 
+    def maybe_report_cycle(address: Address) -> None:
+        # NB: File-level dependencies are cycle tolerant.
+        if address.generated_base_target_name or address not in path_stack:
+            return
+
+        # The path of the cycle is shorter than the entire path to the cycle: if the suffix of
+        # the path representing the cycle contains a file dep, it is ignored.
+        in_cycle = False
+        for path_address in path_stack:
+            if in_cycle and path_address.generated_base_target_name:
+                # There is a file address inside the cycle: do not report it.
+                return
+            elif in_cycle:
+                # Not a file address.
+                continue
+            else:
+                # We're entering the suffix of the path that contains the cycle if we've reached
+                # the address in question.
+                in_cycle = path_address == address
+        # If we did not break out early, it's because there were no file addresses in the cycle.
+        raise CycleException(address, (*path_stack, address))
+
     def visit(address: Address):
         if address in visited:
-            # NB: File-level dependencies are cycle tolerant.
-            if not address.generated_base_target_name and address in path_stack:
-                raise CycleException(address, (*path_stack, address))
+            maybe_report_cycle(address)
             return
         path_stack.add(address)
         visited.add(address)
@@ -218,6 +252,7 @@ class OwnersRequest:
     """A request for the owners of a set of file paths."""
 
     sources: Tuple[str, ...]
+    owners_not_found_behavior: OwnersNotFoundBehavior = OwnersNotFoundBehavior.ignore
 
 
 class Owners(Collection[Address]):
@@ -250,13 +285,17 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
     file_names_with_multiple_owners: OrderedSet[str] = OrderedSet()
     original_addresses_due_to_deleted_files: OrderedSet[Address] = OrderedSet()
     original_addresses_due_to_multiple_owners: OrderedSet[Address] = OrderedSet()
+    unmatched_sources = set(sources_set)
     for candidate_tgt, candidate_tgt_sources, bfa in zip(
         candidate_targets, candidate_target_sources, build_file_addresses
     ):
-        matching_files = matches_filespec(candidate_tgt.get(Sources).filespec, paths=sources_set)
+        matching_files = set(
+            matches_filespec(candidate_tgt.get(Sources).filespec, paths=sources_set)
+        )
         if bfa.rel_path not in sources_set and not matching_files:
             continue
-        deleted_files_matched = bool(set(matching_files) - all_source_files)
+        unmatched_sources -= matching_files
+        deleted_files_matched = bool(matching_files - all_source_files)
         if deleted_files_matched:
             original_addresses_due_to_deleted_files.add(candidate_tgt.address)
             continue
@@ -294,6 +333,14 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
             or original_address in original_addresses_due_to_multiple_owners
         )
 
+    if (
+        unmatched_sources
+        and owners_request.owners_not_found_behavior != OwnersNotFoundBehavior.ignore
+    ):
+        _log_or_raise_unmatched_owners(
+            [PurePath(path) for path in unmatched_sources], owners_request.owners_not_found_behavior
+        )
+
     remaining_generated_addresses = FrozenOrderedSet(
         address
         for file_name, address in file_name_to_generated_address.items()
@@ -311,6 +358,31 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
 # -----------------------------------------------------------------------------------------------
 # Specs -> Addresses
 # -----------------------------------------------------------------------------------------------
+
+
+def _log_or_raise_unmatched_owners(
+    file_paths: Sequence[PurePath],
+    owners_not_found_behavior: OwnersNotFoundBehavior,
+    ignore_option: Optional[str] = None,
+) -> None:
+    msgs = []
+    if ignore_option:
+        option_msg = f"\nIf you would like to ignore un-owned files, please pass `{ignore_option}`."
+    else:
+        option_msg = ""
+    for file_path in file_paths:
+        msgs.append(
+            f"No owning targets could be found for the file `{file_path}`.\n\nPlease check "
+            f"that there is a BUILD file in `{file_path.parent}` with a target whose `sources` "
+            f"field includes `{file_path}`. See https://www.pantsbuild.org/docs/targets for more "
+            f"information on target definitions.{option_msg}"
+        )
+
+    if owners_not_found_behavior == OwnersNotFoundBehavior.warn:
+        for msg in msgs:
+            logger.warning(msg)
+    else:
+        raise ResolveError("\n\n".join(msgs))
 
 
 @rule
@@ -349,18 +421,11 @@ async def addresses_with_origins_from_filesystem_specs(
             and isinstance(spec, FilesystemLiteralSpec)
             and not owners
         ):
-            file_path = PurePath(spec.to_spec_string())
-            msg = (
-                f"No owning targets could be found for the file `{file_path}`.\n\nPlease check "
-                f"that there is a BUILD file in `{file_path.parent}` with a target whose `sources` "
-                f"field includes `{file_path}`. See https://pants.readme.io/docs/targets for more "
-                "information on target definitions.\nIf you would like to ignore un-owned files, "
-                "please pass `--owners-not-found-behavior=ignore`."
+            _log_or_raise_unmatched_owners(
+                [PurePath(spec.to_spec_string())],
+                global_options.options.owners_not_found_behavior,
+                ignore_option="--owners-not-found-behavior=ignore",
             )
-            if global_options.options.owners_not_found_behavior == OwnersNotFoundBehavior.warn:
-                logger.warning(msg)
-            else:
-                raise ResolveError(msg)
         # We preserve what literal files any globs resolved to. This allows downstream goals to be
         # more precise in which files they operate on.
         origin: Union[FilesystemLiteralSpec, FilesystemResolvedGlobSpec] = (
@@ -421,9 +486,9 @@ async def resolve_sources_snapshot(specs: Specs, global_options: GlobalOptions) 
         if tgt.has_field(Sources)
     )
 
-    filesystem_specs_snapshot = (
+    filesystem_specs_digest = (
         await Get(
-            Snapshot,
+            Digest,
             PathGlobs,
             specs.filesystem_specs.to_path_globs(
                 global_options.options.owners_not_found_behavior.to_glob_match_error_behavior()
@@ -436,8 +501,8 @@ async def resolve_sources_snapshot(specs: Specs, global_options: GlobalOptions) 
     # NB: We merge into a single snapshot to avoid the same files being duplicated if they were
     # covered both by address specs and filesystem specs.
     digests = [hydrated_sources.snapshot.digest for hydrated_sources in all_hydrated_sources]
-    if filesystem_specs_snapshot:
-        digests.append(filesystem_specs_snapshot.digest)
+    if filesystem_specs_digest:
+        digests.append(filesystem_specs_digest)
     result = await Get(Snapshot, MergeDigests(digests))
     return SourcesSnapshot(result)
 
@@ -585,26 +650,6 @@ async def hydrate_sources(
 # -----------------------------------------------------------------------------------------------
 
 
-class AmbiguousDependencyInferenceException(Exception):
-    """Exception for when there are multiple dependency inference implementations and it is
-    ambiguous which to use."""
-
-    def __init__(
-        self,
-        implementations: Iterable[Type["InferDependenciesRequest"]],
-        *,
-        from_sources_type: Type["Sources"],
-    ) -> None:
-        bulleted_list_sep = "\n  * "
-        possible_implementations = sorted(impl.__name__ for impl in implementations)
-        super().__init__(
-            f"Multiple of the registered dependency inference implementations can infer "
-            f"dependencies from {from_sources_type.__name__}. It is ambiguous which "
-            "implementation to use.\n\nPossible implementations:"
-            f"{bulleted_list_sep}{bulleted_list_sep.join(possible_implementations)}"
-        )
-
-
 class InvalidFileDependencyException(Exception):
     pass
 
@@ -740,8 +785,8 @@ async def resolve_dependencies(
     )
 
     inference_request_types = union_membership.get(InferDependenciesRequest)
-    inferred = InferredDependencies()
-    if global_options.options.dependency_inference and inference_request_types:
+    inferred: Tuple[InferredDependencies, ...] = (InferredDependencies(),)
+    if inference_request_types:
         # Dependency inference is solely determined by the `Sources` field for a Target, so we
         # re-resolve the original target to inspect its `Sources` field, if any.
         wrapped_tgt = await Get(WrappedTarget, Address, request.field.address)
@@ -751,17 +796,14 @@ async def resolve_dependencies(
             for inference_request_type in inference_request_types
             if isinstance(sources_field, inference_request_type.infer_from)
         ]
-        if relevant_inference_request_types:
-            if len(relevant_inference_request_types) > 1:
-                raise AmbiguousDependencyInferenceException(
-                    relevant_inference_request_types, from_sources_type=type(sources_field)
-                )
-            inference_request_type = relevant_inference_request_types[0]
-            inferred = await Get(
+        inferred = await MultiGet(
+            Get(
                 InferredDependencies,
                 InferDependenciesRequest,
                 inference_request_type(sources_field),
             )
+            for inference_request_type in relevant_inference_request_types
+        )
 
     flattened_ignore_file_deps_owners = set(
         itertools.chain.from_iterable(explicit_file_deps_ignore_owners)
@@ -775,7 +817,7 @@ async def resolve_dependencies(
         *provided.addresses,
         *itertools.chain.from_iterable(explicit_file_deps_owners),
         *itertools.chain.from_iterable(injected),
-        *inferred,
+        *itertools.chain.from_iterable(inferred),
     ):
         if addr.generated_base_target_name:
             collection = (
@@ -945,32 +987,12 @@ def find_valid_field_sets(
 
 def rules():
     return [
-        # Address -> Target
-        resolve_target,
-        resolve_targets,
-        # AddressWithOrigin -> TargetWithOrigin
-        resolve_target_with_origin,
-        resolve_targets_with_origins,
-        # TransitiveTargets
-        transitive_targets,
-        # Owners
-        find_owners,
-        RootRule(OwnersRequest),
-        # Specs -> AddressesWithOrigins
-        addresses_with_origins_from_filesystem_specs,
-        resolve_addresses_with_origins,
-        RootRule(Specs),
-        # SourcesSnapshot
-        resolve_sources_snapshot,
-        # Sources field
-        hydrate_sources,
-        RootRule(HydrateSourcesRequest),
-        # Dependencies field
-        resolve_dependencies,
+        *collect_rules(),
         RootRule(DependenciesRequest),
-        RootRule(InjectDependenciesRequest),
+        RootRule(HydrateSourcesRequest),
         RootRule(InferDependenciesRequest),
-        # FieldSets
-        find_valid_field_sets,
+        RootRule(InjectDependenciesRequest),
+        RootRule(OwnersRequest),
+        RootRule(Specs),
         RootRule(TargetsToValidFieldSetsRequest),
     ]

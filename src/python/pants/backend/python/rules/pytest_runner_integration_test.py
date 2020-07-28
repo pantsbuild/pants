@@ -7,6 +7,7 @@ from pathlib import Path, PurePath
 from textwrap import dedent
 from typing import List, Optional
 
+from pants.backend.python.dependency_inference import rules as dependency_inference_rules
 from pants.backend.python.rules import (
     download_pex_bin,
     pex,
@@ -20,15 +21,15 @@ from pants.backend.python.subsystems import python_native_code, subprocess_envir
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary, PythonTests
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.core.goals.test import Status, TestDebugRequest, TestOptions, TestResult
+from pants.core.goals.test import Status, TestDebugRequest, TestResult
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, FileContent
-from pants.engine.interactive_process import InteractiveRunner
-from pants.engine.rules import RootRule, SubsystemRule
-from pants.engine.selectors import Params
+from pants.engine.process import InteractiveRunner
+from pants.engine.rules import RootRule
 from pants.engine.target import TargetWithOrigin
 from pants.python.python_requirement import PythonRequirement
+from pants.testutil.engine.util import Params
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.interpreter_selection_utils import skip_unless_python27_and_python3_present
 from pants.testutil.option.util import create_options_bootstrapper
@@ -62,7 +63,9 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
     ) -> None:
         for source_file in source_files:
             self.write_file(source_file)
-        source_globs = [PurePath(source_file.path).name for source_file in source_files]
+        source_globs = [PurePath(source_file.path).name for source_file in source_files] + [
+            "__init__.py"
+        ]
         self.add_to_build_file(
             self.package,
             dedent(
@@ -134,8 +137,9 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
             *python_native_code.rules(),
             *strip_source_roots.rules(),
             *subprocess_environment.rules(),
-            SubsystemRule(TestOptions),
             RootRule(PythonTestFieldSet),
+            # For conftest detection.
+            *dependency_inference_rules.rules(),
         )
 
     def run_pytest(
@@ -173,7 +177,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         )
         test_result = self.request_single_product(TestResult, params)
         debug_request = self.request_single_product(TestDebugRequest, params)
-        debug_result = InteractiveRunner(self.scheduler).run_process(debug_request.process)
+        debug_result = InteractiveRunner(self.scheduler).run(debug_request.process)
         if test_result.status == Status.SUCCESS:
             assert debug_result.exit_code == 0
         else:
@@ -383,10 +387,14 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
 
     def test_conftest_injection(self) -> None:
         self.create_python_test_target([self.good_source])
-        # Note that there's deliberately no target wrapping the conftest.py.
+
         self.create_file(
             relpath=PurePath(self.source_root, self.conftest_source.path).as_posix(),
             contents=self.conftest_source.content.decode(),
+        )
+
+        self.create_file(
+            relpath=PurePath(self.source_root, "BUILD").as_posix(), contents="python_tests()",
         )
 
         result = self.run_pytest(passthrough_args="-s")

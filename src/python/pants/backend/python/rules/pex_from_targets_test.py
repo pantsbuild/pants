@@ -13,9 +13,9 @@ from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import RootRule, SubsystemRule
-from pants.engine.selectors import Params
 from pants.python.python_requirement import PythonRequirement
 from pants.python.python_setup import PythonSetup
+from pants.testutil.engine.util import Params
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 

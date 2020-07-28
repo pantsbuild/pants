@@ -2,16 +2,13 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-import os
 from abc import ABCMeta
 from dataclasses import dataclass
 
-from pants.base.build_root import BuildRoot
 from pants.core.util_rules.distdir import DistDir
-from pants.engine.fs import Digest, DirectoryToMaterialize, MergeDigests, Workspace
+from pants.engine.fs import Digest, MergeDigests, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.rules import goal_rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import FieldSet, TargetsToValidFieldSets, TargetsToValidFieldSetsRequest
 from pants.engine.unions import union
 
@@ -30,7 +27,7 @@ class CreatedBinary:
     binary_name: str
 
 
-class BinaryOptions(GoalSubsystem):
+class BinarySubsystem(GoalSubsystem):
     """Create a runnable binary."""
 
     name = "binary"
@@ -39,11 +36,11 @@ class BinaryOptions(GoalSubsystem):
 
 
 class Binary(Goal):
-    subsystem_cls = BinaryOptions
+    subsystem_cls = BinarySubsystem
 
 
 @goal_rule
-async def create_binary(workspace: Workspace, dist_dir: DistDir, build_root: BuildRoot) -> Binary:
+async def create_binary(workspace: Workspace, dist_dir: DistDir) -> Binary:
     targets_to_valid_field_sets = await Get(
         TargetsToValidFieldSets,
         TargetsToValidFieldSetsRequest(
@@ -54,14 +51,12 @@ async def create_binary(workspace: Workspace, dist_dir: DistDir, build_root: Bui
         Get(CreatedBinary, BinaryFieldSet, field_set)
         for field_set in targets_to_valid_field_sets.field_sets
     )
-    merged_digest = await Get(Digest, MergeDigests(binary.digest for binary in binaries))
-    result = workspace.materialize_directory(
-        DirectoryToMaterialize(merged_digest, path_prefix=str(dist_dir.relpath))
-    )
-    for path in result.output_paths:
-        logger.info(f"Wrote {os.path.relpath(path, build_root.path)}")
+    merged_snapshot = await Get(Snapshot, MergeDigests(binary.digest for binary in binaries))
+    workspace.write_digest(merged_snapshot.digest, path_prefix=str(dist_dir.relpath))
+    for path in merged_snapshot.files:
+        logger.info(f"Wrote {path}")
     return Binary(exit_code=0)
 
 
 def rules():
-    return [create_binary]
+    return collect_rules()

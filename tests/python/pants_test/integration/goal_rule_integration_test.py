@@ -4,6 +4,8 @@
 import os
 import time
 
+import pytest
+
 from pants.base.build_environment import get_buildroot
 from pants.testutil.pants_run_integration_test import ensure_daemon
 from pants.util.contextutil import temporary_dir
@@ -11,6 +13,7 @@ from pants.util.dirutil import fast_relpath, safe_file_dump
 from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
 
 
+@pytest.mark.skip(reason="Flaky test. https://github.com/pantsbuild/pants/issues/10478")
 class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
 
     target = "examples/src/python/example/hello::"
@@ -19,7 +22,7 @@ class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
     def test_list(self):
         result = self.do_command("list", self.target, success=True)
         output_lines = result.stdout_data.splitlines()
-        self.assertEqual(len(output_lines), 2)
+        self.assertEqual(len(output_lines), 4)
         self.assertIn("examples/src/python/example/hello/main:main", output_lines)
 
     def test_list_does_not_cache(self):

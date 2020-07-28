@@ -6,8 +6,7 @@ from typing import Optional, Tuple
 
 from pants.engine.fs import Digest, RemovePrefix, Snapshot
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import RootRule, rule
-from pants.engine.selectors import Get
+from pants.engine.rules import Get, RootRule, collect_rules, rule
 
 
 @dataclass(frozen=True)
@@ -62,4 +61,4 @@ async def maybe_extract(extractable: MaybeExtractable) -> ExtractedDigest:
 
 
 def rules():
-    return [maybe_extract, RootRule(MaybeExtractable)]
+    return [*collect_rules(), RootRule(MaybeExtractable)]

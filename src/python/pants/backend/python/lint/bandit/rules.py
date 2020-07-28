@@ -22,13 +22,11 @@ from pants.core.util_rules.determine_source_files import (
     SourceFiles,
     SpecifiedSourceFilesRequest,
 )
-from pants.engine.fs import Digest, MergeDigests, PathGlobs, Snapshot
+from pants.engine.fs import Digest, GlobMatchErrorBehavior, MergeDigests, PathGlobs
 from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import SubsystemRule, rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSetWithOrigin
 from pants.engine.unions import UnionRule
-from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
 from pants.util.strutil import pluralize
 
@@ -82,8 +80,8 @@ async def bandit_lint_partition(
     )
 
     config_path: Optional[str] = bandit.options.config
-    config_snapshot_request = Get(
-        Snapshot,
+    config_digest_request = Get(
+        Digest,
         PathGlobs(
             globs=[config_path] if config_path else [],
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
@@ -101,18 +99,16 @@ async def bandit_lint_partition(
         ),
     )
 
-    requirements_pex, config_snapshot, all_source_files, specified_source_files = await MultiGet(
+    requirements_pex, config_digest, all_source_files, specified_source_files = await MultiGet(
         requirements_pex_request,
-        config_snapshot_request,
+        config_digest_request,
         all_source_files_request,
         specified_source_files_request,
     )
 
     input_digest = await Get(
         Digest,
-        MergeDigests(
-            (all_source_files.snapshot.digest, requirements_pex.digest, config_snapshot.digest)
-        ),
+        MergeDigests((all_source_files.snapshot.digest, requirements_pex.digest, config_digest)),
     )
 
     address_references = ", ".join(
@@ -156,9 +152,7 @@ async def bandit_lint(
 
 def rules():
     return [
-        bandit_lint,
-        bandit_lint_partition,
-        SubsystemRule(Bandit),
+        *collect_rules(),
         UnionRule(LintRequest, BanditRequest),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),

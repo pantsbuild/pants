@@ -14,8 +14,8 @@ from pants.core.goals.fmt import LanguageFmtResults
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.rules import RootRule
-from pants.engine.selectors import Params
 from pants.engine.target import TargetsWithOrigins, TargetWithOrigin
+from pants.testutil.engine.util import Params
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option.util import create_options_bootstrapper
 

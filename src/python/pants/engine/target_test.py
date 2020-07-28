@@ -12,8 +12,7 @@ from typing_extensions import final
 from pants.base.specs import FilesystemLiteralSpec
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, PathGlobs, Snapshot
-from pants.engine.rules import rule
-from pants.engine.selectors import Get
+from pants.engine.rules import Get, rule
 from pants.engine.target import (
     AsyncField,
     BoolField,
@@ -262,7 +261,9 @@ def test_add_custom_fields() -> None:
         alias = "custom_field"
         default = False
 
-    union_membership = UnionMembership({FortranTarget.PluginField: [CustomField]})
+    union_membership = UnionMembership.from_rules(
+        [FortranTarget.register_plugin_field(CustomField)]
+    )
     tgt_values = {CustomField.alias: True}
     tgt = FortranTarget(
         tgt_values, address=Address.parse(":lib"), union_membership=union_membership
@@ -286,6 +287,15 @@ def test_add_custom_fields() -> None:
         {}, address=Address.parse(":default"), union_membership=union_membership
     )
     assert default_tgt[CustomField].value is False
+
+    # Ensure that the `PluginField` is not being registered on other target types.
+    class OtherTarget(Target):
+        alias = "other_target"
+        core_fields = ()
+
+    other_tgt = OtherTarget({}, address=Address.parse(":other"))
+    assert other_tgt.plugin_fields == ()
+    assert other_tgt.has_field(CustomField) is False
 
 
 def test_override_preexisting_field_via_new_target() -> None:

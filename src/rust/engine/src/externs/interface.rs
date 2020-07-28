@@ -58,7 +58,7 @@ use cpython::{
 use futures::compat::Future01CompatExt;
 use futures::future::FutureExt;
 use futures::future::{self as future03, TryFutureExt};
-use futures01::{future, Future};
+use futures01::Future;
 use hashing::{Digest, EMPTY_DIGEST};
 use log::{self, debug, error, warn, Log};
 use logging::logger::LOGGER;
@@ -137,10 +137,10 @@ py_module_initializer!(native_engine, |py, m| {
   )?;
   m.add(
     py,
-    "materialize_directories",
+    "write_digest",
     py_fn!(
       py,
-      materialize_directories(a: PyScheduler, b: PySession, c: PyObject)
+      write_digest(a: PyScheduler, b: PySession, c: PyObject, d: String)
     ),
   )?;
   m.add(
@@ -403,8 +403,6 @@ py_class!(class PyTypes |py| {
       snapshot: PyType,
       file_content: PyType,
       digest_contents: PyType,
-      materialize_directories_results: PyType,
-      materialize_directory_result: PyType,
       address: PyType,
       path_globs: PyType,
       merge_digests: PyType,
@@ -418,12 +416,12 @@ py_class!(class PyTypes |py| {
       multi_platform_process: PyType,
       process_result: PyType,
       coroutine: PyType,
-      url_to_fetch: PyType,
+      download_file: PyType,
       string: PyType,
       bytes: PyType,
       interactive_process: PyType,
       interactive_process_result: PyType,
-      snapshot_subset: PyType
+      digest_subset: PyType
   ) -> CPyResult<Self> {
     Self::create_instance(
         py,
@@ -432,8 +430,6 @@ py_class!(class PyTypes |py| {
         snapshot: externs::type_for(snapshot),
         file_content: externs::type_for(file_content),
         digest_contents: externs::type_for(digest_contents),
-        materialize_directories_results: externs::type_for(materialize_directories_results),
-        materialize_directory_result: externs::type_for(materialize_directory_result),
         address: externs::type_for(address),
         path_globs: externs::type_for(path_globs),
         merge_digests: externs::type_for(merge_digests),
@@ -447,12 +443,12 @@ py_class!(class PyTypes |py| {
         multi_platform_process: externs::type_for(multi_platform_process),
         process_result: externs::type_for(process_result),
         coroutine: externs::type_for(coroutine),
-        url_to_fetch: externs::type_for(url_to_fetch),
+        download_file: externs::type_for(download_file),
         string: externs::type_for(string),
         bytes: externs::type_for(bytes),
         interactive_process: externs::type_for(interactive_process),
         interactive_process_result: externs::type_for(interactive_process_result),
-        snapshot_subset: externs::type_for(snapshot_subset),
+        digest_subset: externs::type_for(digest_subset),
     })),
     )
   }
@@ -1343,7 +1339,7 @@ fn capture_snapshots(
   session_ptr: PySession,
   path_globs_and_root_tuple_wrapper: PyObject,
 ) -> CPyResult<PyObject> {
-  let values = externs::project_multi(&path_globs_and_root_tuple_wrapper.into(), "dependencies");
+  let values = externs::project_iterable(&path_globs_and_root_tuple_wrapper.into());
   let path_globs_and_roots = values
     .iter()
     .map(|value| {
@@ -1402,7 +1398,7 @@ fn merge_directories(
   session_ptr: PySession,
   directories_value: PyObject,
 ) -> CPyResult<PyObject> {
-  let digests = externs::project_multi(&directories_value.into(), "dependencies")
+  let digests = externs::project_iterable(&directories_value.into())
     .iter()
     .map(|v| nodes::lift_digest(v))
     .collect::<Result<Vec<_>, _>>()
@@ -1582,83 +1578,33 @@ fn run_local_interactive_process(
   .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))
 }
 
-fn materialize_directories(
+fn write_digest(
   py: Python,
   scheduler_ptr: PyScheduler,
   session_ptr: PySession,
-  directories_digests_and_path_prefixes_value: PyObject,
-) -> CPyResult<PyObject> {
-  let digests_and_path_prefixes = externs::project_multi(
-    &directories_digests_and_path_prefixes_value.into(),
-    "dependencies",
-  )
-  .into_iter()
-  .map(|value| {
-    let dir_digest = nodes::lift_digest(&externs::project_ignoring_type(&value, "digest"));
-    let path_prefix = PathBuf::from(externs::project_str(&value, "path_prefix"));
-    dir_digest.map(|dir_digest| (dir_digest, path_prefix))
-  })
-  .collect::<Result<Vec<_>, _>>()
-  .map_err(|e| PyErr::new::<exc::ValueError, _>(py, (e,)))?;
-
+  digest: PyObject,
+  path_prefix: String,
+) -> PyUnitResult {
+  let lifted_digest =
+    nodes::lift_digest(&digest.into()).map_err(|e| PyErr::new::<exc::ValueError, _>(py, (e,)))?;
   with_scheduler(py, scheduler_ptr, |scheduler| {
     with_session(py, session_ptr, |session| {
       // TODO: A parent_id should be an explicit argument.
       session.workunit_store().init_thread_state(None);
-      let types = &scheduler.core.types;
-      let materialize_directories_results = types.materialize_directories_results;
-      let materialize_directory_result = types.materialize_directory_result;
+
+      // Python will have already validated that path_prefix is a relative path.
+      let mut destination = PathBuf::new();
+      destination.push(scheduler.core.build_root.clone());
+      destination.push(path_prefix);
 
       block_in_place_and_wait(py, || {
-        future::join_all(
-          digests_and_path_prefixes
-            .into_iter()
-            .map(|(digest, path_prefix)| {
-              // NB: all DirectoryToMaterialize paths are validated in Python to be relative paths.
-              // Here, we join them with the build root.
-              let mut destination = PathBuf::new();
-              destination.push(scheduler.core.build_root.clone());
-              destination.push(path_prefix);
-              let metadata = scheduler
-                .core
-                .store()
-                .materialize_directory(destination.clone(), digest);
-              metadata.map(|m| (destination, m))
-            })
-            .collect::<Vec<_>>(),
-        )
+        scheduler
+          .core
+          .store()
+          .materialize_directory(destination.clone(), lifted_digest)
       })
-      .map(move |metadata_list| {
-        let entries: Vec<Value> = metadata_list
-          .iter()
-          .map(
-            |(output_dir, metadata): &(PathBuf, store::DirectoryMaterializeMetadata)| {
-              let path_list = metadata.to_path_list();
-              let path_values: Vec<Value> = path_list
-                .into_iter()
-                .map(|rel_path: String| {
-                  let mut path = PathBuf::new();
-                  path.push(output_dir);
-                  path.push(rel_path);
-                  externs::store_utf8(&path.to_string_lossy())
-                })
-                .collect();
-
-              externs::unsafe_call(
-                materialize_directory_result,
-                &[externs::store_tuple(path_values)],
-              )
-            },
-          )
-          .collect();
-
-        externs::unsafe_call(
-          materialize_directories_results,
-          &[externs::store_tuple(entries)],
-        )
-        .into()
-      })
-      .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))
+      .map_err(|e| PyErr::new::<exc::ValueError, _>(py, (e,)))?;
+      Ok(None)
     })
   })
 }
@@ -1792,7 +1738,7 @@ fn write_to_file(path: &Path, graph: &RuleGraph<Rule>) -> io::Result<()> {
 ///   see https://github.com/pantsbuild/pants/issues/9476
 ///
 /// TODO: The alternative to blocking the runtime would be to have the Python code `await` special
-/// methods for things like `materialize_directories` and etc.
+/// methods for things like `write_digest` and etc.
 ///
 fn block_in_place_and_wait<T, E, F>(py: Python, f: impl FnOnce() -> F + Sync + Send) -> Result<T, E>
 where

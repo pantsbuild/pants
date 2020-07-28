@@ -4,19 +4,15 @@
 import logging
 import os
 import shutil
-import signal
 import sys
 import tempfile
 import termios
 import threading
-import time
-import uuid
 import zipfile
 from contextlib import closing, contextmanager
 from queue import Queue
 from socketserver import TCPServer
-from types import FrameType
-from typing import IO, Any, Callable, Iterator, Mapping, Optional, Tuple, Type, Union, cast
+from typing import IO, Any, Iterator, Mapping, Optional, Tuple, Type, Union, cast
 
 from colors import green
 
@@ -151,22 +147,6 @@ def stdio_as(stdout_fd: int, stderr_fd: int, stdin_fd: int) -> Iterator[None]:
 
 
 @contextmanager
-def signal_handler_as(
-    sig: int, handler: Union[int, Callable[[int, FrameType], None]]
-) -> Iterator[None]:
-    """Temporarily replaces a signal handler for the given signal and restores the old handler.
-
-    :param sig: The target signal to replace the handler for (e.g. signal.SIGINT).
-    :param handler: The new temporary handler.
-    """
-    old_handler = signal.signal(sig, handler)
-    try:
-        yield
-    finally:
-        signal.signal(sig, old_handler)
-
-
-@contextmanager
 def temporary_dir(
     root_dir: Optional[str] = None,
     cleanup: bool = True,
@@ -247,29 +227,6 @@ def temporary_file(
 
 
 @contextmanager
-def safe_file(path: str, suffix: Optional[str] = None, cleanup: bool = True) -> Iterator[str]:
-    """A with-context that copies a file, and copies the copy back to the original file on success.
-
-    This is useful for doing work on a file but only changing its state on success.
-
-    :param suffix: Use this suffix to create the copy. Otherwise use a random string.
-    :param cleanup: Whether or not to clean up the copy.
-    """
-    safe_path = f"{path}.{(suffix or uuid.uuid4())}"
-    if os.path.exists(path):
-        shutil.copy(path, safe_path)
-    try:
-        yield safe_path
-        if cleanup:
-            shutil.move(safe_path, path)
-        else:
-            shutil.copy(safe_path, path)
-    finally:
-        if cleanup:
-            safe_delete(safe_path)
-
-
-@contextmanager
 def pushd(directory: str) -> Iterator[str]:
     """A with-context that encapsulates pushd/popd."""
     cwd = os.getcwd()
@@ -323,49 +280,6 @@ def open_tar(path_or_file: Union[str, Any], *args, **kwargs) -> Iterator[TarFile
         # We must cast the normal tarfile.TarFile to our custom pants.util.tarutil.TarFile.
         typed_tar = cast(TarFile, tar)
         yield typed_tar
-
-
-class Timer:
-    """Very basic with-context to time operations.
-
-  Example usage:
-    >>> from pants.util.contextutil import Timer
-    >>> with Timer() as timer:
-    ...   time.sleep(2)
-    ...
-    >>> timer.elapsed
-    2.0020849704742432
-    """
-
-    def __init__(self, clock=time) -> None:
-        self._clock = clock
-
-    def __enter__(self) -> "Timer":
-        self.start: float = self._clock.time()
-        self.finish: Optional[float] = None
-        return self
-
-    @property
-    def elapsed(self) -> float:
-        end_time: float = self.finish if self.finish is not None else self._clock.time()
-        return end_time - self.start
-
-    def __exit__(self, typ, val, traceback):
-        self.finish = self._clock.time()
-
-
-@contextmanager
-def exception_logging(logger: logging.Logger, msg: str) -> Iterator[None]:
-    """Provides exception logging via `logger.exception` for a given block of code.
-
-    :param logger: The `Logger` instance to use for logging.
-    :param msg: The message to emit before `logger.exception` emits the traceback.
-    """
-    try:
-        yield
-    except Exception:
-        logger.exception(msg)
-        raise
 
 
 @contextmanager
