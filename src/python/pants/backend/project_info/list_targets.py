@@ -6,7 +6,7 @@ from typing import Dict, cast
 from pants.engine.addresses import Address, Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
-from pants.engine.rules import goal_rule
+from pants.engine.rules import collect_rules, goal_rule
 from pants.engine.selectors import Get
 from pants.engine.target import DescriptionField, ProvidesField, Targets
 
@@ -111,4 +111,4 @@ async def list_targets(
 
 
 def rules():
-    return [list_targets]
+    return collect_rules()

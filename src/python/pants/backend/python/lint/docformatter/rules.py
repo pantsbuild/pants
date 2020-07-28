@@ -26,7 +26,7 @@ from pants.core.util_rules.determine_source_files import (
 )
 from pants.engine.fs import EMPTY_SNAPSHOT, Digest, MergeDigests
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
-from pants.engine.rules import SubsystemRule, rule
+from pants.engine.rules import collect_rules, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import FieldSetWithOrigin
 from pants.engine.unions import UnionRule
@@ -162,10 +162,7 @@ async def docformatter_lint(
 
 def rules():
     return [
-        setup,
-        docformatter_fmt,
-        docformatter_lint,
-        SubsystemRule(Docformatter),
+        *collect_rules(),
         UnionRule(PythonFmtRequest, DocformatterRequest),
         UnionRule(LintRequest, DocformatterRequest),
         *download_pex_bin.rules(),

@@ -61,7 +61,6 @@ class OptionableFactory(ABC):
             func=partial_construct_optionable,
             input_gets=(GetConstraints(product_type=ScopedOptions, subject_declared_type=Scope),),
             canonical_name=name,
-            dependency_optionables=(cls.optionable_cls,),
         )
 
 

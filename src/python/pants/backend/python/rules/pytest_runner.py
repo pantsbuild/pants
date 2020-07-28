@@ -38,7 +38,7 @@ from pants.engine.fs import AddPrefix, Digest, DigestSubset, MergeDigests, PathG
 from pants.engine.interactive_process import InteractiveProcess
 from pants.engine.internals.uuid import UUIDRequest
 from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import SubsystemRule, rule
+from pants.engine.rules import collect_rules, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import TransitiveTargets
 from pants.engine.unions import UnionRule
@@ -306,11 +306,6 @@ async def debug_python_test(test_setup: TestTargetSetup) -> TestDebugRequest:
 
 def rules():
     return [
-        run_python_test,
-        debug_python_test,
-        setup_pytest_for_target,
+        *collect_rules(),
         UnionRule(TestFieldSet, PythonTestFieldSet),
-        SubsystemRule(PyTest),
-        SubsystemRule(PythonSetup),
-        SubsystemRule(CoverageSubsystem),
     ]

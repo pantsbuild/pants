@@ -14,7 +14,7 @@ from functools import reduce
 from typing import Any, List, Optional, Tuple, cast
 
 from pants.base.build_environment import get_buildroot
-from pants.engine.rules import rule
+from pants.engine.rules import collect_rules, rule
 from pants.fs.archive import archiver_for_path
 from pants.net.http.fetcher import Fetcher
 from pants.option.global_options import GlobalOptions
@@ -579,6 +579,4 @@ def provide_binary_util() -> BinaryUtil:
 
 
 def rules():
-    return [
-        provide_binary_util,
-    ]
+    return collect_rules()

@@ -24,7 +24,7 @@ from pants.core.util_rules.determine_source_files import (
 )
 from pants.engine.fs import Digest, GlobMatchErrorBehavior, MergeDigests, PathGlobs
 from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import SubsystemRule, rule
+from pants.engine.rules import collect_rules, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import FieldSetWithOrigin
 from pants.engine.unions import UnionRule
@@ -152,9 +152,7 @@ async def bandit_lint(
 
 def rules():
     return [
-        bandit_lint,
-        bandit_lint_partition,
-        SubsystemRule(Bandit),
+        *collect_rules(),
         UnionRule(LintRequest, BanditRequest),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),

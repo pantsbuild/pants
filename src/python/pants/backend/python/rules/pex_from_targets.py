@@ -32,7 +32,7 @@ from pants.engine.fs import (
     MergeDigests,
     PathGlobs,
 )
-from pants.engine.rules import RootRule, rule
+from pants.engine.rules import RootRule, collect_rules, rule
 from pants.engine.selectors import Get
 from pants.engine.target import TransitiveTargets
 from pants.python.python_setup import PythonSetup
@@ -192,8 +192,7 @@ async def two_step_pex_from_targets(req: TwoStepPexFromTargetsRequest) -> TwoSte
 
 def rules():
     return [
-        pex_from_targets,
-        two_step_pex_from_targets,
+        *collect_rules(),
         RootRule(PexFromTargetsRequest),
         RootRule(TwoStepPexFromTargetsRequest),
     ]

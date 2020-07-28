@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 from typing import Tuple
 
-from pants.backend.python.rules import download_pex_bin, pex
+from pants.backend.python.rules import download_pex_bin, pex, python_sources
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
@@ -14,7 +14,6 @@ from pants.backend.python.rules.pex import (
 from pants.backend.python.rules.python_sources import (
     UnstrippedPythonSources,
     UnstrippedPythonSourcesRequest,
-    prepare_unstripped_python_sources,
 )
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
@@ -32,7 +31,7 @@ from pants.engine.fs import (
     PathGlobs,
 )
 from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import SubsystemRule, rule
+from pants.engine.rules import collect_rules, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import FieldSetWithOrigin, TransitiveTargets
 from pants.engine.unions import UnionRule
@@ -135,14 +134,13 @@ async def mypy_lint(
 
 def rules():
     return [
-        mypy_lint,
-        prepare_unstripped_python_sources,
-        SubsystemRule(MyPy),
+        *collect_rules(),
         UnionRule(TypecheckRequest, MyPyRequest),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),
         *pants_bin.rules(),
         *pex.rules(),
+        *python_sources.rules(),
         *python_native_code.rules(),
         *strip_source_roots.rules(),
         *subprocess_environment.rules(),

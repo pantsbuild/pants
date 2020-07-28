@@ -5,7 +5,7 @@ import logging
 import typing
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Type, Union
+from typing import Any, Dict, Type, Union
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.rules import Rule, RuleIndex
@@ -23,7 +23,7 @@ class BuildConfiguration:
 
     registered_aliases: BuildFileAliases
     optionables: FrozenOrderedSet[Optionable]
-    rules: FrozenOrderedSet[Union[Rule, Callable]]
+    rules: FrozenOrderedSet[Rule]
     union_rules: FrozenOrderedSet[UnionRule]
     target_types: FrozenOrderedSet[Type[Target]]
 
@@ -133,12 +133,7 @@ class BuildConfiguration:
             self._rules.update(rules)
             self._union_rules.update(union_rules)
             self.register_optionables(
-                {
-                    do
-                    for rule in rules
-                    for do in rule.dependency_optionables
-                    if rule.dependency_optionables
-                }
+                rule.output_type for rule in self._rules if issubclass(rule.output_type, Optionable)
             )
 
         # NB: We expect the parameter to be Iterable[Type[Target]], but we can't be confident in this

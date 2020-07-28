@@ -51,7 +51,7 @@ from pants.engine.fs import (
     SourcesSnapshot,
 )
 from pants.engine.internals.target_adaptor import TargetAdaptor
-from pants.engine.rules import RootRule, rule
+from pants.engine.rules import RootRule, collect_rules, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
     Dependencies,
@@ -986,32 +986,12 @@ def find_valid_field_sets(
 
 def rules():
     return [
-        # Address -> Target
-        resolve_target,
-        resolve_targets,
-        # AddressWithOrigin -> TargetWithOrigin
-        resolve_target_with_origin,
-        resolve_targets_with_origins,
-        # TransitiveTargets
-        transitive_targets,
-        # Owners
-        find_owners,
-        RootRule(OwnersRequest),
-        # Specs -> AddressesWithOrigins
-        addresses_with_origins_from_filesystem_specs,
-        resolve_addresses_with_origins,
-        RootRule(Specs),
-        # SourcesSnapshot
-        resolve_sources_snapshot,
-        # Sources field
-        hydrate_sources,
-        RootRule(HydrateSourcesRequest),
-        # Dependencies field
-        resolve_dependencies,
+        *collect_rules(),
         RootRule(DependenciesRequest),
-        RootRule(InjectDependenciesRequest),
+        RootRule(HydrateSourcesRequest),
         RootRule(InferDependenciesRequest),
-        # FieldSets
-        find_valid_field_sets,
+        RootRule(InjectDependenciesRequest),
+        RootRule(OwnersRequest),
+        RootRule(Specs),
         RootRule(TargetsToValidFieldSetsRequest),
     ]

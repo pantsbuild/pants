@@ -24,7 +24,7 @@ from pants.engine.internals.parser import Parser, SymbolTable
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.platform import create_platform_rules
-from pants.engine.rules import RootRule, rule
+from pants.engine.rules import RootRule, collect_rules, rule
 from pants.engine.selectors import Params
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
@@ -33,6 +33,7 @@ from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, ExecutionOpti
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.scm.subsystems.changed import rules as changed_rules
 from pants.subsystem.subsystem import Subsystem
+from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)
 
@@ -282,24 +283,21 @@ class EngineInitializer:
             return cast(BuildRoot, BuildRoot.instance)
 
         # Create a Scheduler containing graph and filesystem rules, with no installed goals.
-        rules = (
-            RootRule(Console),
-            glob_match_error_behavior_singleton,
-            build_configuration_singleton,
-            symbol_table_singleton,
-            registered_target_types_singleton,
-            union_membership_singleton,
-            build_root_singleton,
-            *fs.rules(),
-            *interactive_process.rules(),
-            *graph.rules(),
-            *uuid.rules(),
-            *options_parsing.rules(),
-            *process.rules(),
-            *create_platform_rules(),
-            *create_graph_rules(address_mapper),
-            *changed_rules(),
-            *rules,
+        rules = FrozenOrderedSet(
+            (
+                *collect_rules(locals()),
+                RootRule(Console),
+                *fs.rules(),
+                *interactive_process.rules(),
+                *graph.rules(),
+                *uuid.rules(),
+                *options_parsing.rules(),
+                *process.rules(),
+                *create_platform_rules(),
+                *create_graph_rules(address_mapper),
+                *changed_rules(),
+                *rules,
+            )
         )
 
         goal_map = EngineInitializer._make_goal_map_from_rules(rules)
