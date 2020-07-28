@@ -245,8 +245,7 @@ class HelpInfoExtracter:
         basic_options = []
         advanced_options = []
         deprecated_options = []
-        # Sort the arguments, so we display the help in alphabetical order.
-        for args, kwargs in sorted(parser.option_registrations_iter()):
+        for args, kwargs in parser.option_registrations_iter():
             if kwargs.get("passive"):
                 continue
             history = parser.history(kwargs["dest"])
