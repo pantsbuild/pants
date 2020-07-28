@@ -220,22 +220,7 @@ class LocalPantsRunner:
         try:
             metrics = scheduler_session.metrics()
             self._run_tracker.pantsd_stats.set_scheduler_metrics(metrics)
-
-            if code == PANTS_SUCCEEDED_EXIT_CODE:
-                outcome = WorkUnit.SUCCESS
-            elif code == PANTS_FAILED_EXIT_CODE:
-                outcome = WorkUnit.FAILURE
-            else:
-                run_tracker_msg = (
-                    "unrecognized exit code {} provided to {}.exit() -- "
-                    "interpreting as a failure in the run tracker".format(code, type(self).__name__)
-                )
-                # Log the unrecognized exit code to the fatal exception log.
-                ExceptionSink.log_exception(exc=Exception(run_tracker_msg))
-                # Ensure the unrecognized exit code message is also logged to the terminal.
-                additional_messages.append(run_tracker_msg)
-                outcome = WorkUnit.FAILURE
-
+            outcome = WorkUnit.SUCCESS if code == PANTS_SUCCEEDED_EXIT_CODE else WorkUnit.FAILURE
             self._run_tracker.set_root_outcome(outcome)
             run_tracker_result = self._run_tracker.end()
         except ValueError as e:
