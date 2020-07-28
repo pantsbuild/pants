@@ -10,7 +10,7 @@ from pants.base.build_root import BuildRoot
 from pants.engine.console import Console
 from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.interactive_process import InteractiveProcess, InteractiveRunner
+from pants.engine.process import InteractiveProcess, InteractiveRunner
 from pants.engine.rules import Get, collect_rules, goal_rule
 from pants.engine.target import Field, Target, Targets, TransitiveTargets
 from pants.engine.unions import UnionMembership, union
@@ -112,7 +112,7 @@ async def run_repl(
         tmpdir_relative_path = PurePath(tmpdir).relative_to(build_root.path).as_posix()
         exe_path = PurePath(tmpdir, request.binary_name).as_posix()
         workspace.write_digest(request.digest, path_prefix=tmpdir_relative_path)
-        result = interactive_runner.run_process(
+        result = interactive_runner.run(
             InteractiveProcess(argv=(exe_path,), env=request.env, run_in_workspace=True)
         )
 

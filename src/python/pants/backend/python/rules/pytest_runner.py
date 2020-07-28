@@ -35,9 +35,8 @@ from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, Te
 from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
-from pants.engine.interactive_process import InteractiveProcess
 from pants.engine.internals.uuid import UUIDRequest
-from pants.engine.process import FallibleProcessResult, Process
+from pants.engine.process import FallibleProcessResult, InteractiveProcess, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import TransitiveTargets
 from pants.engine.unions import UnionRule

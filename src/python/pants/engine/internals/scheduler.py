@@ -30,12 +30,16 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
 )
-from pants.engine.interactive_process import InteractiveProcess, InteractiveProcessResult
 from pants.engine.internals.native_engine import PyTypes
 from pants.engine.internals.nodes import Return, Throw
 from pants.engine.internals.selectors import Params
 from pants.engine.platform import Platform
-from pants.engine.process import FallibleProcessResultWithPlatform, MultiPlatformProcess
+from pants.engine.process import (
+    FallibleProcessResultWithPlatform,
+    InteractiveProcess,
+    InteractiveProcessResult,
+    MultiPlatformProcess,
+)
 from pants.engine.rules import Rule, RuleIndex, TaskRule
 from pants.engine.unions import UnionMembership, union
 from pants.option.global_options import ExecutionOptions
