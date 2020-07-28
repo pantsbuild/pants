@@ -34,6 +34,7 @@ use process_execution::{
 };
 
 use graph::{Entry, Node, NodeError, NodeVisualizer};
+use hashing::Digest;
 use store::{self, StoreFileByDigest};
 use workunit_store::{with_workunit, Level, WorkunitMetadata};
 
@@ -233,7 +234,10 @@ pub fn lift_digest(digest: &Value) -> Result<hashing::Digest, String> {
 /// A Node that represents a set of processes to execute on specific platforms.
 ///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct MultiPlatformExecuteProcess(MultiPlatformProcess);
+pub struct MultiPlatformExecuteProcess {
+  cache_failures: bool,
+  process: MultiPlatformProcess,
+}
 
 impl MultiPlatformExecuteProcess {
   fn lift_execute_process(
@@ -299,6 +303,8 @@ impl MultiPlatformExecuteProcess {
       }
     };
 
+    let cache_failures = externs::project_bool(&value, "cache_failures");
+
     Ok(process_execution::Process {
       argv: externs::project_multi_strs(&value, "argv"),
       env,
@@ -313,6 +319,7 @@ impl MultiPlatformExecuteProcess {
       target_platform,
       is_nailgunnable,
       execution_slot_variable,
+      cache_failures,
     })
   }
 
@@ -339,16 +346,22 @@ impl MultiPlatformExecuteProcess {
       ));
     }
 
+    let mut cache_failures = true;
+
     let mut request_by_constraint: BTreeMap<(PlatformConstraint, PlatformConstraint), Process> =
       BTreeMap::new();
     for (constraint_key, execute_process) in constraint_key_pairs.iter().zip(processes.iter()) {
       let underlying_req =
         MultiPlatformExecuteProcess::lift_execute_process(execute_process, constraint_key.1)?;
+      if !underlying_req.cache_failures {
+        cache_failures = false;
+      }
       request_by_constraint.insert(*constraint_key, underlying_req.clone());
     }
-    Ok(MultiPlatformExecuteProcess(MultiPlatformProcess(
-      request_by_constraint,
-    )))
+    Ok(MultiPlatformExecuteProcess {
+      cache_failures,
+      process: MultiPlatformProcess(request_by_constraint),
+    })
   }
 }
 
@@ -363,7 +376,7 @@ impl WrappedNode for MultiPlatformExecuteProcess {
   type Item = ProcessResult;
 
   async fn run_wrapped_node(self, context: Context) -> NodeResult<ProcessResult> {
-    let request = self.0;
+    let request = self.process;
     let execution_context = process_execution::Context::new(
       context.session.workunit_store(),
       context.session.build_id().to_string(),
@@ -596,13 +609,13 @@ impl Snapshot {
 
 #[async_trait]
 impl WrappedNode for Snapshot {
-  type Item = Arc<store::Snapshot>;
+  type Item = Digest;
 
-  async fn run_wrapped_node(self, context: Context) -> NodeResult<Arc<store::Snapshot>> {
+  async fn run_wrapped_node(self, context: Context) -> NodeResult<Digest> {
     let path_globs = Self::lift_path_globs(&externs::val_for(&self.0))
       .map_err(|e| throw(&format!("Failed to parse PathGlobs: {}", e)))?;
     let snapshot = Self::create(context, path_globs).await?;
-    Ok(Arc::new(snapshot))
+    Ok(snapshot.digest)
   }
 }
 
@@ -732,13 +745,13 @@ impl WrappedNode for DownloadedFile {
 
   async fn run_wrapped_node(self, context: Context) -> NodeResult<Arc<store::Snapshot>> {
     let value = externs::val_for(&self.0);
-    let url_to_fetch = externs::project_str(&value, "url");
+    let url_str = externs::project_str(&value, "url");
 
-    let url = Url::parse(&url_to_fetch)
-      .map_err(|err| throw(&format!("Error parsing URL {}: {}", url_to_fetch, err)))?;
+    let url = Url::parse(&url_str)
+      .map_err(|err| throw(&format!("Error parsing URL {}: {}", url_str, err)))?;
 
-    let expected_digest =
-      lift_digest(&externs::project_ignoring_type(&value, "digest")).map_err(|s| throw(&s))?;
+    let expected_digest = lift_digest(&externs::project_ignoring_type(&value, "expected_digest"))
+      .map_err(|s| throw(&s))?;
 
     let snapshot = self
       .load_or_download(context.core, url, expected_digest)
@@ -1090,7 +1103,7 @@ impl NodeKey {
   fn workunit_name(&self) -> String {
     match self {
       NodeKey::Task(ref task) => task.task.display_info.name.clone(),
-      NodeKey::MultiPlatformExecuteProcess(mp_epr) => mp_epr.0.workunit_name(),
+      NodeKey::MultiPlatformExecuteProcess(mp_epr) => mp_epr.process.workunit_name(),
       NodeKey::Snapshot(..) => "snapshot".to_string(),
       NodeKey::DigestFile(..) => "digest_file".to_string(),
       NodeKey::DownloadedFile(..) => "downloaded_file".to_string(),
@@ -1111,7 +1124,7 @@ impl NodeKey {
     match self {
       NodeKey::Task(ref task) => task.task.display_info.desc.as_ref().map(|s| s.to_owned()),
       NodeKey::Snapshot(ref s) => Some(format!("Snapshotting: {}", s.0)),
-      NodeKey::MultiPlatformExecuteProcess(mp_epr) => mp_epr.0.user_facing_name(),
+      NodeKey::MultiPlatformExecuteProcess(mp_epr) => mp_epr.process.user_facing_name(),
       NodeKey::DigestFile(DigestFile(File { path, .. })) => {
         Some(format!("Fingerprinting: {}", path.display()))
       }
@@ -1192,11 +1205,7 @@ impl Node for NodeKey {
             .await
         }
         NodeKey::Select(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Value).await,
-        NodeKey::Snapshot(n) => {
-          n.run_wrapped_node(context)
-            .map_ok(NodeOutput::Snapshot)
-            .await
-        }
+        NodeKey::Snapshot(n) => n.run_wrapped_node(context).map_ok(NodeOutput::Digest).await,
         NodeKey::Task(n) => {
           n.run_wrapped_node(context)
             .map_ok(|python_rule_output| {
@@ -1250,6 +1259,23 @@ impl Node for NodeKey {
       _ => true,
     }
   }
+
+  fn cacheable_item(&self, output: &NodeOutput) -> bool {
+    match self {
+      NodeKey::MultiPlatformExecuteProcess(ref mp) => match output {
+        NodeOutput::ProcessResult(ref process_result) => {
+          let process_succeeded = process_result.0.exit_code == 0;
+          if mp.cache_failures {
+            true
+          } else {
+            process_succeeded
+          }
+        }
+        _ => true,
+      },
+      _ => true,
+    }
+  }
 }
 
 impl Display for NodeKey {
@@ -1258,7 +1284,7 @@ impl Display for NodeKey {
       &NodeKey::DigestFile(ref s) => write!(f, "DigestFile({})", s.0.path.display()),
       &NodeKey::DownloadedFile(ref s) => write!(f, "DownloadedFile({})", s.0),
       &NodeKey::MultiPlatformExecuteProcess(ref s) => {
-        if let Some(name) = s.0.user_facing_name() {
+        if let Some(name) = s.process.user_facing_name() {
           write!(f, "Process({})", name)
         } else {
           write!(f, "Process({:?})", s)

@@ -3,20 +3,17 @@
 
 import copy
 import logging
-import re
-from dataclasses import dataclass
 from typing import Dict, Iterable, List, Mapping, Optional, Sequence
 
-from pants.base.deprecated import warn_or_error
+from pants.base.deprecated import resolve_conflicting_options, warn_or_error
 from pants.option.arg_splitter import ArgSplitter, HelpRequest
 from pants.option.config import Config
 from pants.option.option_util import is_list_option
 from pants.option.option_value_container import OptionValueContainer
-from pants.option.parser import Parser
+from pants.option.parser import Parser, ScopedFlagNameForFuzzyMatching
 from pants.option.parser_hierarchy import ParserHierarchy, all_enclosing_scopes, enclosing_scope
 from pants.option.scope import GLOBAL_SCOPE, GLOBAL_SCOPE_CONFIG_SECTION, ScopeInfo
 from pants.util.memo import memoized_method, memoized_property
-from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 logger = logging.getLogger(__name__)
@@ -141,7 +138,17 @@ class Options:
             )
 
         if bootstrap_option_values:
-            spec_files = bootstrap_option_values.spec_files
+            spec_files = resolve_conflicting_options(
+                old_option="spec_file",
+                new_option="spec_files",
+                old_scope="",
+                new_scope="",
+                old_container=bootstrap_option_values,
+                new_container=bootstrap_option_values,
+            )
+            # TODO: After --spec-file is removed, replace the above with:
+            # spec_files = bootstrap_option_values.spec_files
+
             if spec_files:
                 for spec_file in spec_files:
                     with open(spec_file, "r") as f:
@@ -382,43 +389,8 @@ class Options:
                     hint=f"Use scope {scope} instead (options: {', '.join(explicit_keys)})",
                 )
 
-    @frozen_after_init
-    @dataclass(unsafe_hash=True)
-    class ScopedFlagNameForFuzzyMatching:
-        """Specify how a registered option would look like on the command line.
-
-        This information enables fuzzy matching to suggest correct option names when a user specifies an
-        unregistered option on the command line.
-
-        scope: the 'scope' component of a command-line flag.
-        arg: the unscoped flag name as it would appear on the command line.
-        normalized_arg: the fully-scoped option name, without any leading dashes.
-        scoped_arg: the fully-scoped option as it would appear on the command line.
-        """
-
-        scope: str
-        arg: str
-        normalized_arg: str
-        scoped_arg: str
-
-        def __init__(self, scope: str, arg: str) -> None:
-            self.scope = scope
-            self.arg = arg
-            self.normalized_arg = re.sub("^-+", "", arg)
-            if scope == GLOBAL_SCOPE:
-                self.scoped_arg = arg
-            else:
-                dashed_scope = scope.replace(".", "-")
-                self.scoped_arg = f"--{dashed_scope}-{self.normalized_arg}"
-
-        @property
-        def normalized_scoped_arg(self):
-            return re.sub(r"^-+", "", self.scoped_arg)
-
     @memoized_property
-    def _all_scoped_flag_names_for_fuzzy_matching(
-        self,
-    ) -> List["Options.ScopedFlagNameForFuzzyMatching"]:
+    def _all_scoped_flag_names_for_fuzzy_matching(self) -> Iterable[ScopedFlagNameForFuzzyMatching]:
         """A list of all registered flags in all their registered scopes.
 
         This list is used for fuzzy matching against unrecognized option names across registered
@@ -430,7 +402,7 @@ class Options:
             scope = parser.scope
             known_args = parser.known_args
             for arg in known_args:
-                scoped_flag = self.ScopedFlagNameForFuzzyMatching(scope=scope, arg=arg,)
+                scoped_flag = ScopedFlagNameForFuzzyMatching(scope=scope, arg=arg,)
                 all_scoped_flag_names.append(scoped_flag)
 
         self.walk_parsers(register_all_scoped_names)

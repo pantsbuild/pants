@@ -7,12 +7,12 @@ from pants.backend.python.lint.bandit.rules import BanditFieldSet, BanditRequest
 from pants.backend.python.lint.bandit.rules import rules as bandit_rules
 from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonLibrary
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
-from pants.core.goals.lint import LintOptions, LintResults
+from pants.core.goals.lint import LintResults
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, FileContent
-from pants.engine.rules import RootRule, SubsystemRule
-from pants.engine.selectors import Params
+from pants.engine.rules import RootRule
 from pants.engine.target import TargetWithOrigin
+from pants.testutil.engine.util import Params
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.interpreter_selection_utils import skip_unless_python27_and_python3_present
 from pants.testutil.option.util import create_options_bootstrapper
@@ -27,12 +27,7 @@ class BanditIntegrationTest(ExternalToolTestBase):
 
     @classmethod
     def rules(cls):
-        return (
-            *super().rules(),
-            *bandit_rules(),
-            RootRule(BanditRequest),
-            SubsystemRule(LintOptions),
-        )
+        return (*super().rules(), *bandit_rules(), RootRule(BanditRequest))
 
     def make_target_with_origin(
         self,

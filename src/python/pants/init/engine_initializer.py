@@ -11,32 +11,29 @@ from pants.base.build_root import BuildRoot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import Specs
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.engine import interactive_process, process
+from pants.engine import fs, process
 from pants.engine.console import Console
-from pants.engine.fs import Workspace, create_fs_rules
+from pants.engine.fs import GlobMatchErrorBehavior, Workspace
 from pants.engine.goal import Goal
-from pants.engine.interactive_process import InteractiveRunner
 from pants.engine.internals import graph, options_parsing, uuid
 from pants.engine.internals.build_files import create_graph_rules
 from pants.engine.internals.mapper import AddressMapper
 from pants.engine.internals.native import Native
 from pants.engine.internals.parser import Parser, SymbolTable
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
+from pants.engine.internals.selectors import Params
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.platform import create_platform_rules
-from pants.engine.rules import RootRule, rule
-from pants.engine.selectors import Params
+from pants.engine.process import InteractiveRunner
+from pants.engine.rules import RootRule, collect_rules, rule
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
-from pants.option.global_options import (
-    DEFAULT_EXECUTION_OPTIONS,
-    ExecutionOptions,
-    GlobMatchErrorBehavior,
-)
+from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, ExecutionOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.scm.subsystems.changed import rules as changed_rules
 from pants.subsystem.subsystem import Subsystem
+from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)
 
@@ -244,10 +241,11 @@ class EngineInitializer:
         bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
         execution_options = execution_options or DEFAULT_EXECUTION_OPTIONS
 
-        build_file_aliases = build_configuration.registered_aliases()
-        rules = build_configuration.rules()
+        build_file_aliases = build_configuration.registered_aliases
+        rules = build_configuration.rules
+        union_membership = UnionMembership.from_rules(build_configuration.union_rules)
 
-        registered_target_types = RegisteredTargetTypes.create(build_configuration.target_types())
+        registered_target_types = RegisteredTargetTypes.create(build_configuration.target_types)
         symbol_table_from_registered_targets = SymbolTable(
             {target_type.alias: TargetAdaptor for target_type in registered_target_types.types}
         )
@@ -278,37 +276,30 @@ class EngineInitializer:
 
         @rule
         def union_membership_singleton() -> UnionMembership:
-            return UnionMembership(build_configuration.union_rules())
+            return union_membership
 
         @rule
         def build_root_singleton() -> BuildRoot:
             return cast(BuildRoot, BuildRoot.instance)
 
-        # Create a Scheduler containing graph and filesystem rules, with no installed goals. The
-        # LegacyBuildGraph will explicitly request the products it needs.
-        rules = (
-            RootRule(Console),
-            glob_match_error_behavior_singleton,
-            build_configuration_singleton,
-            symbol_table_singleton,
-            registered_target_types_singleton,
-            union_membership_singleton,
-            build_root_singleton,
-            *interactive_process.rules(),
-            *graph.rules(),
-            *uuid.rules(),
-            *options_parsing.rules(),
-            *process.rules(),
-            *create_fs_rules(),
-            *create_platform_rules(),
-            *create_graph_rules(address_mapper),
-            *changed_rules(),
-            *rules,
+        # Create a Scheduler containing graph and filesystem rules, with no installed goals.
+        rules = FrozenOrderedSet(
+            (
+                *collect_rules(locals()),
+                RootRule(Console),
+                *fs.rules(),
+                *graph.rules(),
+                *uuid.rules(),
+                *options_parsing.rules(),
+                *process.rules(),
+                *create_platform_rules(),
+                *create_graph_rules(address_mapper),
+                *changed_rules(),
+                *rules,
+            )
         )
 
         goal_map = EngineInitializer._make_goal_map_from_rules(rules)
-
-        union_rules = build_configuration.union_rules()
 
         def ensure_absolute_path(v: str) -> str:
             return Path(v).resolve().as_posix()
@@ -322,7 +313,7 @@ class EngineInitializer:
             local_execution_root_dir=ensure_absolute_path(local_execution_root_dir),
             named_caches_dir=ensure_absolute_path(named_caches_dir),
             rules=rules,
-            union_rules=union_rules,
+            union_membership=union_membership,
             execution_options=execution_options,
             include_trace_on_error=include_trace_on_error,
             visualize_to_dir=bootstrap_options.native_engine_visualize_to,

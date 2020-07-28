@@ -73,7 +73,7 @@ class LibcDev(Subsystem):
 
     def _get_host_libc_from_host_compiler(self):
         """Locate the host's libc-dev installation using a specified host compiler's search dirs."""
-        compiler_exe = self.get_options().host_compiler
+        compiler_exe = self.options.host_compiler
 
         # Implicitly, we are passing in the environment of the executing pants process to
         # `get_compiler_library_dirs()`.
@@ -102,7 +102,7 @@ class LibcDev(Subsystem):
     def _host_libc(self):
         """Use the --libc-dir option if provided, otherwise invoke a host compiler to find libc
         dev."""
-        libc_dir_option = self.get_options().libc_dir
+        libc_dir_option = self.options.libc_dir
         if libc_dir_option:
             maybe_libc_crti = os.path.join(libc_dir_option, self._LIBC_INIT_OBJECT_FILE)
             if os.path.isfile(maybe_libc_crti):
@@ -118,4 +118,4 @@ class LibcDev(Subsystem):
 
     @memoized_method
     def get_libc_objects(self):
-        return [self._host_libc.crti_object] if self.get_options().enable_libc_search else []
+        return [self._host_libc.crti_object] if self.options.enable_libc_search else []

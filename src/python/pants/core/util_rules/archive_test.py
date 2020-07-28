@@ -9,7 +9,7 @@ from pants.core.util_rules.archive import ExtractedDigest, MaybeExtractable
 from pants.core.util_rules.archive import rules as archive_rules
 from pants.engine.fs import DigestContents, FileContent, Snapshot
 from pants.engine.rules import RootRule
-from pants.engine.selectors import Params
+from pants.testutil.engine.util import Params
 from pants.testutil.test_base import TestBase
 
 

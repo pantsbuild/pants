@@ -19,14 +19,19 @@ class MyPy(PythonToolBase):
     def register_options(cls, register):
         super().register_options(register)
         register(
-            "--skip", type=bool, default=False, help="Don't use MyPy when running `./pants lint`."
+            "--skip",
+            type=bool,
+            default=False,
+            help=f"Don't use MyPy when running `{register.bootstrap.pants_bin_name} lint`.",
         )
         register(
             "--args",
             type=list,
             member_type=shell_str,
-            help="Arguments to pass directly to mypy, e.g. "
-            '`--mypy-args="--python-version 3.7 --disallow-any-expr"`',
+            help=(
+                "Arguments to pass directly to mypy, e.g. "
+                f'`--{cls.options_scope}-args="--python-version 3.7 --disallow-any-expr"`'
+            ),
         )
         register(
             "--config",

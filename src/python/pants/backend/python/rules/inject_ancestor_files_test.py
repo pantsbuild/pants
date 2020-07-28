@@ -12,7 +12,7 @@ from pants.backend.python.rules.inject_ancestor_files import (
 from pants.core.util_rules import strip_source_roots
 from pants.engine.fs import DigestContents
 from pants.engine.rules import RootRule
-from pants.engine.selectors import Params
+from pants.testutil.engine.util import Params
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 

@@ -13,22 +13,33 @@ from pants.backend.python.rules.pex import (
     PexRequirements,
 )
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
-from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
 from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonSources
-from pants.core.goals.lint import LintOptions, LintRequest, LintResult, LintResultFile, LintResults
+from pants.core.goals.lint import (
+    LintRequest,
+    LintResult,
+    LintResultFile,
+    LintResults,
+    LintSubsystem,
+)
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.core.util_rules.determine_source_files import (
     AllSourceFilesRequest,
     SourceFiles,
     SpecifiedSourceFilesRequest,
 )
-from pants.engine.fs import Digest, MergeDigests, PathGlobs, Snapshot, SnapshotSubset
+from pants.engine.fs import (
+    Digest,
+    DigestSubset,
+    GlobMatchErrorBehavior,
+    MergeDigests,
+    PathGlobs,
+    Snapshot,
+)
 from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import SubsystemRule, rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSetWithOrigin
 from pants.engine.unions import UnionRule
-from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
 from pants.util.strutil import pluralize
 
@@ -55,11 +66,11 @@ def generate_args(
     *, specified_source_files: SourceFiles, bandit: Bandit, output_file: Optional[str]
 ) -> Tuple[str, ...]:
     args = []
-    if bandit.options.config is not None:
-        args.append(f"--config={bandit.options.config}")
+    if bandit.config is not None:
+        args.append(f"--config={bandit.config}")
     if output_file:
         args.append(f"--output={output_file}")
-    args.extend(bandit.options.args)
+    args.extend(bandit.args)
     args.extend(specified_source_files.files)
     return tuple(args)
 
@@ -67,29 +78,28 @@ def generate_args(
 @rule
 async def bandit_lint_partition(
     partition: BanditPartition,
-    lint_options: LintOptions,
     bandit: Bandit,
+    lint_subsystem: LintSubsystem,
     python_setup: PythonSetup,
-    subprocess_encoding_environment: SubprocessEncodingEnvironment,
+    subprocess_environment: SubprocessEnvironment,
 ) -> LintResult:
     requirements_pex_request = Get(
         Pex,
         PexRequest(
             output_filename="bandit.pex",
-            requirements=PexRequirements(bandit.get_requirement_specs()),
+            requirements=PexRequirements(bandit.all_requirements),
             interpreter_constraints=(
                 partition.interpreter_constraints
-                or PexInterpreterConstraints(bandit.default_interpreter_constraints)
+                or PexInterpreterConstraints(bandit.interpreter_constraints)
             ),
-            entry_point=bandit.get_entry_point(),
+            entry_point=bandit.entry_point,
         ),
     )
 
-    config_path: Optional[str] = bandit.options.config
-    config_snapshot_request = Get(
-        Snapshot,
+    config_digest_request = Get(
+        Digest,
         PathGlobs(
-            globs=[config_path] if config_path else [],
+            globs=[bandit.config] if bandit.config else [],
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
             description_of_origin="the option `--bandit-config`",
         ),
@@ -105,50 +115,50 @@ async def bandit_lint_partition(
         ),
     )
 
-    requirements_pex, config_snapshot, all_source_files, specified_source_files = await MultiGet(
+    requirements_pex, config_digest, all_source_files, specified_source_files = await MultiGet(
         requirements_pex_request,
-        config_snapshot_request,
+        config_digest_request,
         all_source_files_request,
         specified_source_files_request,
     )
 
     input_digest = await Get(
         Digest,
-        MergeDigests(
-            (all_source_files.snapshot.digest, requirements_pex.digest, config_snapshot.digest)
-        ),
+        MergeDigests((all_source_files.snapshot.digest, requirements_pex.digest, config_digest)),
     )
 
     address_references = ", ".join(
         sorted(field_set.address.reference() for field_set in partition.field_sets)
     )
-    output_dir = lint_options.output_dir
-    output_path = output_dir / "bandit_report.txt" if output_dir else None
-    bandit_args = generate_args(
+    report_path = (
+        lint_subsystem.reports_dir / "bandit_report.txt" if lint_subsystem.reports_dir else None
+    )
+    args = generate_args(
         specified_source_files=specified_source_files,
         bandit=bandit,
-        output_file=output_path.name if output_path else None,
+        output_file=report_path.name if report_path else None,
     )
     process = requirements_pex.create_process(
         python_setup=python_setup,
-        subprocess_encoding_environment=subprocess_encoding_environment,
+        subprocess_environment=subprocess_environment,
         pex_path="./bandit.pex",
-        pex_args=bandit_args,
-        output_files=(output_path.name,) if output_path else None,
+        pex_args=args,
+        output_files=(report_path.name,) if report_path else None,
         input_digest=input_digest,
         description=(
             f"Run Bandit on {pluralize(len(partition.field_sets), 'target')}: {address_references}."
         ),
     )
     result = await Get(FallibleProcessResult, Process, process)
+
     results_file = None
-    if output_path:
+    if report_path:
         report_file_snapshot = await Get(
-            Snapshot, SnapshotSubset(result.output_digest, PathGlobs([output_path.name]))
+            Snapshot, DigestSubset(result.output_digest, PathGlobs([report_path.name]))
         )
-        if report_file_snapshot.is_empty or len(report_file_snapshot.files) != 1:
+        if len(report_file_snapshot.files) != 1:
             raise Exception(f"Unexpected report file snapshot: {report_file_snapshot.files}")
-        results_file = LintResultFile(output_path=output_path, digest=report_file_snapshot.digest)
+        results_file = LintResultFile(output_path=report_path, digest=report_file_snapshot.digest)
 
     return LintResult.from_fallible_process_result(
         result, linter_name="Bandit", results_file=results_file
@@ -159,7 +169,7 @@ async def bandit_lint_partition(
 async def bandit_lint(
     request: BanditRequest, bandit: Bandit, python_setup: PythonSetup
 ) -> LintResults:
-    if bandit.options.skip:
+    if bandit.skip:
         return LintResults()
 
     # NB: Bandit output depends upon which Python interpreter version it's run with
@@ -178,9 +188,7 @@ async def bandit_lint(
 
 def rules():
     return [
-        bandit_lint,
-        bandit_lint_partition,
-        SubsystemRule(Bandit),
+        *collect_rules(),
         UnionRule(LintRequest, BanditRequest),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),

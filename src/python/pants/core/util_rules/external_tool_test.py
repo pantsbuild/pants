@@ -9,7 +9,7 @@ from pants.core.util_rules.external_tool import (
     ExternalToolRequest,
     UnknownVersion,
 )
-from pants.engine.fs import Digest, UrlToFetch
+from pants.engine.fs import Digest, DownloadFile
 from pants.engine.platform import Platform
 from pants.testutil.engine.util import create_subsystem
 
@@ -33,11 +33,10 @@ class FooBar(ExternalTool):
             plat_str = "linux-x86_64"
         else:
             raise ExternalToolError()
-        version = self.get_options().version
-        return f"https://foobar.org/bin/v{version}/foobar-{version}-{plat_str}.tgz"
+        return f"https://foobar.org/bin/v{self.version}/foobar-{self.version}-{plat_str}.tgz"
 
     def generate_exe(self, plat: Platform) -> str:
-        return f"foobar-{self.get_options().version}/bin/foobar"
+        return f"foobar-{self.version}/bin/foobar"
 
 
 def test_generate_request() -> None:
@@ -48,7 +47,9 @@ def test_generate_request() -> None:
             FooBar, version=version, known_versions=FooBar.default_known_versions
         )
         assert ExternalToolRequest(
-            UrlToFetch(url=expected_url, digest=Digest(expected_sha256, expected_length)),
+            DownloadFile(
+                url=expected_url, expected_digest=Digest(expected_sha256, expected_length)
+            ),
             f"foobar-{version}/bin/foobar",
         ) == foobar.get_request(plat)
 

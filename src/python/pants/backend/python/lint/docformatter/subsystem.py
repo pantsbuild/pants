@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from typing import Tuple, cast
+
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.option.custom_types import shell_str
 
@@ -19,12 +21,25 @@ class Docformatter(PythonToolBase):
             "--skip",
             type=bool,
             default=False,
-            help="Don't use docformatter when running `./pants fmt` and `./pants lint`.",
+            help=(
+                f"Don't use docformatter when running `{register.bootstrap.pants_bin_name} fmt` "
+                f"and `{register.bootstrap.pants_bin_name} lint`."
+            ),
         )
         register(
             "--args",
             type=list,
             member_type=shell_str,
-            help="Arguments to pass directly to docformatter, e.g. "
-            '`--docformatter-args="--wrap-summaries=100 --pre-summary-newline"`.',
+            help=(
+                "Arguments to pass directly to docformatter, e.g. "
+                f'`--{cls.options_scope}-args="--wrap-summaries=100 --pre-summary-newline"`.'
+            ),
         )
+
+    @property
+    def skip(self) -> bool:
+        return cast(bool, self.options.skip)
+
+    @property
+    def args(self) -> Tuple[str, ...]:
+        return tuple(self.options.args)

@@ -4,17 +4,17 @@
 from pants.engine.addresses import Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.rules import goal_rule
+from pants.engine.rules import collect_rules, goal_rule
 
 
-class ListAndDieForTestingOptions(GoalSubsystem):
+class ListAndDieForTestingSubsystem(GoalSubsystem):
     """A fast and deadly variant of `./pants list`."""
 
     name = "list-and-die-for-testing"
 
 
 class ListAndDieForTesting(Goal):
-    subsystem_cls = ListAndDieForTestingOptions
+    subsystem_cls = ListAndDieForTestingSubsystem
 
 
 @goal_rule
@@ -25,6 +25,4 @@ def fast_list_and_die_for_testing(console: Console, addresses: Addresses) -> Lis
 
 
 def rules():
-    return [
-        fast_list_and_die_for_testing,
-    ]
+    return collect_rules()

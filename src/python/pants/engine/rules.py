@@ -8,12 +8,27 @@ import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Type, Union, get_type_hints
+from types import FrameType, ModuleType
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Tuple,
+    Type,
+    Union,
+    get_type_hints,
+)
 
 from pants.engine.goal import Goal
-from pants.engine.selectors import GetConstraints
-from pants.engine.unions import UnionRule, union
-from pants.option.optionable import Optionable, OptionableFactory
+from pants.engine.internals.selectors import Get as Get  # noqa: F401
+from pants.engine.internals.selectors import GetConstraints
+from pants.engine.internals.selectors import MultiGet as MultiGet  # noqa: F401
+from pants.engine.unions import UnionRule
+from pants.option.optionable import OptionableFactory
 from pants.util.collections import assert_single_element
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized
@@ -235,9 +250,6 @@ def _make_rule(
 
         gets = FrozenOrderedSet(rule_visitor.gets)
 
-        # Register dependencies for @goal_rule/Goal.
-        dependency_rules = (SubsystemRule(return_type.subsystem_cls),) if is_goal_cls else None
-
         # Set our own custom `__line_number__` dunder so that the engine may visualize the line number.
         func.__line_number__ = func.__code__.co_firstlineno
 
@@ -249,7 +261,6 @@ def _make_rule(
             canonical_name=canonical_name,
             desc=desc,
             level=level,
-            dependency_rules=dependency_rules,
             cacheable=cacheable,
         )
 
@@ -413,21 +424,36 @@ class Rule(ABC):
     def output_type(self):
         """An output `type` for the rule."""
 
-    @property
-    @abstractmethod
-    def dependency_rules(self):
-        """A tuple of @rules that are known to be necessary to run this rule.
 
-        Note that installing @rules as flat lists is generally preferable, as Rules already
-        implicitly form a loosely coupled RuleGraph: this facility exists only to assist with
-        boilerplate removal.
-        """
+def collect_rules(*namespaces: Union[ModuleType, Mapping[str, Any]]) -> Iterable[Rule]:
+    """Collects all @rules in the given namespaces.
 
-    @property
-    @abstractmethod
-    def dependency_optionables(self):
-        """A tuple of Optionable classes that are known to be necessary to run this rule."""
-        return ()
+    If no namespaces are given, collects all the @rules in the caller's module namespace.
+    """
+    if not namespaces:
+        currentframe = inspect.currentframe()
+        assert isinstance(currentframe, FrameType)
+        caller_frame = currentframe.f_back
+        caller_module = inspect.getmodule(caller_frame)
+        assert isinstance(caller_module, ModuleType)
+        namespaces = (caller_module,)
+
+    def iter_rules():
+        for namespace in namespaces:
+            mapping = namespace.__dict__ if isinstance(namespace, ModuleType) else namespace
+            for name, item in mapping.items():
+                if not callable(item):
+                    continue
+                rule = getattr(item, "rule", None)
+                if isinstance(rule, TaskRule):
+                    for input in rule.input_selectors:
+                        if issubclass(input, OptionableFactory):
+                            yield SubsystemRule(input)
+                    if issubclass(rule.output_type, Goal):
+                        yield SubsystemRule(rule.output_type.subsystem_cls)
+                    yield rule
+
+    return list(iter_rules())
 
 
 @frozen_after_init
@@ -443,8 +469,6 @@ class TaskRule(Rule):
     input_selectors: Tuple[Type, ...]
     input_gets: Tuple[GetConstraints, ...]
     func: Callable
-    _dependency_rules: Tuple["TaskRule", ...]
-    _dependency_optionables: Tuple[Type[Optionable], ...]
     cacheable: bool
     canonical_name: str
     desc: Optional[str]
@@ -459,42 +483,29 @@ class TaskRule(Rule):
         canonical_name: str,
         desc: Optional[str] = None,
         level: LogLevel = LogLevel.DEBUG,
-        dependency_rules: Optional[Iterable["TaskRule"]] = None,
-        dependency_optionables: Optional[Iterable[Type[Optionable]]] = None,
         cacheable: bool = True,
     ):
         self._output_type = output_type
         self.input_selectors = tuple(input_selectors)
         self.input_gets = tuple(input_gets)
         self.func = func  # type: ignore[assignment] # cannot assign to a method
-        self._dependency_rules = tuple(dependency_rules or ())
-        self._dependency_optionables = tuple(dependency_optionables or ())
         self.cacheable = cacheable
         self.canonical_name = canonical_name
         self.desc = desc
         self.level = level
 
     def __str__(self):
-        return "(name={}, {}, {!r}, {}, gets={}, opts={})".format(
+        return "(name={}, {}, {!r}, {}, gets={})".format(
             getattr(self, "name", "<not defined>"),
             self.output_type.__name__,
             self.input_selectors,
             self.func.__name__,
             self.input_gets,
-            self.dependency_optionables,
         )
 
     @property
     def output_type(self):
         return self._output_type
-
-    @property
-    def dependency_rules(self):
-        return self._dependency_rules
-
-    @property
-    def dependency_optionables(self):
-        return self._dependency_optionables
 
 
 @frozen_after_init
@@ -515,35 +526,21 @@ class RootRule(Rule):
     def output_type(self):
         return self._output_type
 
-    @property
-    def dependency_rules(self):
-        return tuple()
-
-    @property
-    def dependency_optionables(self):
-        return tuple()
-
-
-@dataclass(frozen=True)
-class NormalizedRules:
-    rules: FrozenOrderedSet
-    union_rules: Dict[Type, OrderedSet[Type]]
-
 
 @dataclass(frozen=True)
 class RuleIndex:
     """Holds a normalized index of Rules used to instantiate Nodes."""
 
-    rules: Dict
-    roots: FrozenOrderedSet
-    union_rules: Dict[Type, OrderedSet[Type]]
+    rules: Dict[Type, OrderedSet[Rule]]
+    roots: FrozenOrderedSet[RootRule]
+    union_rules: FrozenOrderedSet[UnionRule]
 
     @classmethod
-    def create(cls, rule_entries, union_rules=None) -> "RuleIndex":
+    def create(cls, rule_entries) -> "RuleIndex":
         """Creates a RuleIndex with tasks indexed by their output type."""
-        serializable_rules: Dict = {}
-        serializable_roots: OrderedSet = OrderedSet()
-        union_rules = dict(union_rules or ())
+        serializable_rules: Dict[Type, OrderedSet[Rule]] = {}
+        serializable_roots: OrderedSet[RootRule] = OrderedSet()
+        union_rules: OrderedSet[UnionRule] = OrderedSet()
 
         def add_rule(rule: Rule) -> None:
             if isinstance(rule, RootRule):
@@ -553,51 +550,34 @@ class RuleIndex:
                 if output_type not in serializable_rules:
                     serializable_rules[output_type] = OrderedSet()
                 serializable_rules[output_type].add(rule)
-            for dep_rule in rule.dependency_rules:
-                add_rule(dep_rule)
-
-        def add_type_transition_rule(union_rule: UnionRule) -> None:
-            # NB: This does not require that union bases be supplied to `def rules():`, as the union type
-            # is never instantiated!
-            union_base = union_rule.union_base
-            assert union.is_instance(union_base)
-            union_member = union_rule.union_member
-            if union_base not in union_rules:
-                union_rules[union_base] = OrderedSet()
-            union_rules[union_base].add(union_member)
 
         for entry in rule_entries:
             if isinstance(entry, Rule):
                 add_rule(entry)
             elif isinstance(entry, UnionRule):
-                add_type_transition_rule(entry)
+                union_rules.add(entry)
             elif hasattr(entry, "__call__"):
                 rule = getattr(entry, "rule", None)
                 if rule is None:
-                    raise TypeError(
-                        "Expected callable {} to be decorated with @rule.".format(entry)
-                    )
+                    raise TypeError(f"Expected function {entry} to be decorated with @rule.")
                 add_rule(rule)
             else:
                 raise TypeError(
-                    """\
-Rule entry {} had an unexpected type: {}. Rules either extend Rule or UnionRule, or are static \
-functions decorated with @rule.""".format(
-                        entry, type(entry)
-                    )
+                    f"Rule entry {entry} had an unexpected type: {type(entry)}. Rules either "
+                    "extend Rule or UnionRule, or are static functions decorated with @rule."
                 )
 
         return RuleIndex(
             rules=serializable_rules,
             roots=FrozenOrderedSet(serializable_roots),
-            union_rules=union_rules,
+            union_rules=FrozenOrderedSet(union_rules),
         )
 
-    def normalized_rules(self) -> NormalizedRules:
+    def normalized_rules(self) -> Tuple[FrozenOrderedSet[Rule], FrozenOrderedSet[UnionRule]]:
         rules = FrozenOrderedSet(
             (
                 *itertools.chain.from_iterable(ruleset for ruleset in self.rules.values()),
                 *self.roots,
             )
         )
-        return NormalizedRules(rules, self.union_rules)
+        return rules, self.union_rules

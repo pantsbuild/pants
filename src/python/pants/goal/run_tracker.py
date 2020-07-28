@@ -174,10 +174,10 @@ class RunTracker(Subsystem):
         self.outcomes = {}
 
         # Number of threads for foreground work.
-        self._num_foreground_workers = self.get_options().num_foreground_workers
+        self._num_foreground_workers = self.options.num_foreground_workers
 
         # Number of threads for background work.
-        self._num_background_workers = self.get_options().num_background_workers
+        self._num_background_workers = self.options.num_background_workers
 
         # self._threadlocal.current_workunit contains the current workunit for the calling thread.
         # Note that multiple threads may share a name (e.g., all the threads in a pool).
@@ -232,23 +232,20 @@ class RunTracker(Subsystem):
     def is_background_root_workunit(self, workunit):
         return workunit is self._background_root_workunit
 
-    def initialize(self, all_options):
-        """Create run_info and relevant directories, and return the run id.
-
-        Must be called before `start`.
-        """
+    def start(self, all_options, run_start_time=None):
+        """Start tracking this pants run."""
         if self.run_info:
-            raise AssertionError("RunTracker.initialize must not be called multiple times.")
+            raise AssertionError("RunTracker.start must not be called multiple times.")
 
         # Initialize the run.
 
-        info_dir = os.path.join(self.get_options().pants_workdir, self.options_scope)
+        info_dir = os.path.join(self.options.pants_workdir, self.options_scope)
         self.run_info_dir = os.path.join(info_dir, self.run_id)
         self.run_info = RunInfo(os.path.join(self.run_info_dir, "info"))
         self.run_info.add_basic_info(self.run_id, self._run_timestamp)
         self.run_info.add_info("cmd_line", self._cmd_line)
-        if self.get_options().parent_build_id:
-            self.run_info.add_info("parent_build_id", self.get_options().parent_build_id)
+        if self.options.parent_build_id:
+            self.run_info.add_info("parent_build_id", self.options.parent_build_id)
 
         # Create a 'latest' symlink, after we add_infos, so we're guaranteed that the file exists.
         link_to_latest = os.path.join(os.path.dirname(self.run_info_dir), "latest")
@@ -267,27 +264,13 @@ class RunTracker(Subsystem):
 
         self._all_options = all_options
 
-        return (self.run_id, self.run_uuid)
-
-    def start(self, report, run_start_time=None):
-        """Start tracking this pants run using the given Report.
-
-        `RunTracker.initialize` must have been called first to create the run_info_dir and
-        run_info. TODO: This lifecycle represents a delicate dance with the `Reporting.initialize`
-        method, and portions of the `RunTracker` should likely move to `Reporting` instead.
-
-        report: an instance of pants.reporting.Report.
-        """
-        if not self.run_info:
-            raise AssertionError("RunTracker.initialize must be called before RunTracker.start.")
-
-        self.report = report
+        self.report = Report()
 
         # Set up the JsonReporter for V2 stats.
         if self._stats_version == 2:
             json_reporter_settings = JsonReporter.Settings(log_level=Report.INFO)
             self.json_reporter = JsonReporter(self, json_reporter_settings)
-            report.add_reporter("json", self.json_reporter)
+            self.report.add_reporter("json", self.json_reporter)
 
         self.report.open()
 
@@ -299,13 +282,6 @@ class RunTracker(Subsystem):
         # Set the true start time in the case of e.g. the daemon.
         self._main_root_workunit.start(run_start_time)
         self.report.start_workunit(self._main_root_workunit)
-
-        # Log reporting details.
-        url = self.run_info.get_info("report_url")
-        if url:
-            self.log(Report.INFO, f"See a report at: {url}")
-        else:
-            self.log(Report.INFO, "(To run a reporting server: ./pants server)")
 
     def set_root_outcome(self, outcome):
         """Useful for setup code that doesn't have a reference to a workunit."""
@@ -389,7 +365,7 @@ class RunTracker(Subsystem):
 
     @property
     def _stats_version(self) -> int:
-        stats_version: int = self.get_options().stats_version
+        stats_version: int = self.options.stats_version
         return stats_version
 
     def log(self, level, *msg_elements):
@@ -523,13 +499,13 @@ class RunTracker(Subsystem):
         stats = self._stats()
 
         # Write stats to user-defined json file.
-        stats_json_file_name = self.get_options().stats_local_json_file
+        stats_json_file_name = self.options.stats_local_json_file
         if stats_json_file_name:
             self.write_stats_to_json(stats_json_file_name, stats)
 
         # Upload to remote stats db.
-        stats_upload_urls = copy.copy(self.get_options().stats_upload_urls)
-        timeout = self.get_options().stats_upload_timeout
+        stats_upload_urls = copy.copy(self.options.stats_upload_urls)
+        timeout = self.options.stats_upload_timeout
         for stats_url, auth_provider in stats_upload_urls.items():
             self.post_stats(
                 stats_url,
@@ -634,7 +610,7 @@ class RunTracker(Subsystem):
 
     def _get_options_to_record(self) -> dict:
         recorded_options = {}
-        for scope in self.get_options().stats_option_scopes_to_record:
+        for scope in self.options.stats_option_scopes_to_record:
             scope_and_maybe_option = scope.split("^")
             recorded_options[scope] = self._get_option_to_record(*scope_and_maybe_option)
         return recorded_options

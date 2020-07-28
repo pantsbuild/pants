@@ -22,13 +22,12 @@ from pants.backend.python.rules.pex import rules as pex_rules
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.target_types import PythonInterpreterCompatibility
 from pants.engine.addresses import Address
-from pants.engine.fs import CreateDigest, Digest, DirectoryToMaterialize, FileContent
+from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import RootRule
-from pants.engine.selectors import Params
 from pants.engine.target import FieldSet
 from pants.python.python_setup import PythonSetup
-from pants.testutil.engine.util import create_subsystem
+from pants.testutil.engine.util import Params, create_subsystem
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.util.frozendict import FrozenDict
@@ -225,7 +224,7 @@ class PexTest(ExternalToolTestBase):
                 ),
             ),
         )
-        self.scheduler.materialize_directory(DirectoryToMaterialize(pex.digest))
+        self.scheduler.write_digest(pex.digest)
         pex_path = os.path.join(self.build_root, "test.pex")
         with zipfile.ZipFile(pex_path, "r") as zipfp:
             with zipfp.open("PEX-INFO", "r") as pex_info:

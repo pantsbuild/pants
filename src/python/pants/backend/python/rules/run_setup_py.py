@@ -17,7 +17,7 @@ from pants.backend.python.rules.pex import (
 )
 from pants.backend.python.rules.setuptools import Setuptools
 from pants.backend.python.rules.util import PackageDatum, distutils_repr, find_packages, is_python2
-from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
 from pants.backend.python.target_types import (
     PythonEntryPoint,
     PythonInterpreterCompatibility,
@@ -41,19 +41,16 @@ from pants.engine.fs import (
     CreateDigest,
     Digest,
     DigestContents,
-    DirectoryToMaterialize,
+    DigestSubset,
     FileContent,
     MergeDigests,
     PathGlobs,
     RemovePrefix,
-    Snapshot,
-    SnapshotSubset,
     Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import SubsystemRule, goal_rule, rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
@@ -219,7 +216,7 @@ class SetuptoolsSetup:
     requirements_pex: Pex
 
 
-class SetupPyOptions(GoalSubsystem):
+class SetupPySubsystem(GoalSubsystem):
     """Run setup.py commands."""
 
     name = "setup-py"
@@ -246,9 +243,17 @@ class SetupPyOptions(GoalSubsystem):
             "before it.",
         )
 
+    @property
+    def args(self) -> Tuple[str, ...]:
+        return tuple(self.options.args)
+
+    @property
+    def transitive(self) -> bool:
+        return cast(bool, self.options.transitive)
+
 
 class SetupPy(Goal):
-    subsystem_cls = SetupPyOptions
+    subsystem_cls = SetupPySubsystem
 
 
 def validate_args(args: Tuple[str, ...]):
@@ -272,7 +277,7 @@ def validate_args(args: Tuple[str, ...]):
 @goal_rule
 async def run_setup_pys(
     targets_with_origins: TargetsWithOrigins,
-    options: SetupPyOptions,
+    setup_py_subsystem: SetupPySubsystem,
     console: Console,
     python_setup: PythonSetup,
     distdir: DistDir,
@@ -280,8 +285,7 @@ async def run_setup_pys(
     union_membership: UnionMembership,
 ) -> SetupPy:
     """Run setup.py commands on all exported targets addressed."""
-    args = tuple(options.values.args)
-    validate_args(args)
+    validate_args(setup_py_subsystem.args)
 
     # Get all exported targets, ignoring any non-exported targets that happened to be
     # globbed over, but erroring on any explicitly-requested non-exported targets.
@@ -301,7 +305,7 @@ async def run_setup_pys(
             f'{", ".join(so.address.reference() for so in explicit_nonexported_targets)}'
         )
 
-    if options.values.transitive:
+    if setup_py_subsystem.transitive:
         # Expand out to all owners of the entire dep closure.
         transitive_targets = await Get(
             TransitiveTargets, Addresses(et.target.address for et in exported_targets)
@@ -325,18 +329,19 @@ async def run_setup_pys(
     )
 
     # If args were provided, run setup.py with them; Otherwise just dump chroots.
-    if args:
+    if setup_py_subsystem.args:
         setup_py_results = await MultiGet(
-            Get(RunSetupPyResult, RunSetupPyRequest(exported_target, chroot, tuple(args)))
+            Get(
+                RunSetupPyResult,
+                RunSetupPyRequest(exported_target, chroot, setup_py_subsystem.args),
+            )
             for exported_target, chroot in zip(exported_targets, chroots)
         )
 
         for exported_target, setup_py_result in zip(exported_targets, setup_py_results):
             addr = exported_target.target.address.reference()
             console.print_stderr(f"Writing dist for {addr} under {distdir.relpath}/.")
-            workspace.materialize_directory(
-                DirectoryToMaterialize(setup_py_result.output, path_prefix=str(distdir.relpath))
-            )
+            workspace.write_digest(setup_py_result.output, path_prefix=str(distdir.relpath))
     else:
         # Just dump the chroot.
         for exported_target, chroot in zip(exported_targets, chroots):
@@ -344,9 +349,7 @@ async def run_setup_pys(
             provides = exported_target.provides
             setup_py_dir = distdir.relpath / f"{provides.name}-{provides.version}"
             console.print_stderr(f"Writing setup.py chroot for {addr} to {setup_py_dir}")
-            workspace.materialize_directory(
-                DirectoryToMaterialize(chroot.digest, path_prefix=str(setup_py_dir))
-            )
+            workspace.write_digest(chroot.digest, path_prefix=str(setup_py_dir))
 
     return SetupPy(0)
 
@@ -370,7 +373,7 @@ async def run_setup_py(
     req: RunSetupPyRequest,
     setuptools_setup: SetuptoolsSetup,
     python_setup: PythonSetup,
-    subprocess_encoding_environment: SubprocessEncodingEnvironment,
+    subprocess_environment: SubprocessEnvironment,
 ) -> RunSetupPyResult:
     """Run a setup.py command on a single exported target."""
     input_digest = await Get(
@@ -381,7 +384,7 @@ async def run_setup_py(
     dist_dir = "dist/"
     process = setuptools_setup.requirements_pex.create_process(
         python_setup=python_setup,
-        subprocess_encoding_environment=subprocess_encoding_environment,
+        subprocess_environment=subprocess_environment,
         pex_path="./setuptools.pex",
         pex_args=("setup.py", *req.args),
         input_digest=input_digest,
@@ -490,10 +493,9 @@ async def get_sources(request: SetupPySourcesRequest) -> SetupPySources:
     sources_digest = await Get(
         Digest, MergeDigests((*stripped_srcs_digests, *ancestor_init_pys.digests))
     )
-    init_pys_snapshot = await Get(
-        Snapshot, SnapshotSubset(sources_digest, PathGlobs(["**/__init__.py"]))
+    init_py_digest_contents = await Get(
+        DigestContents, DigestSubset(sources_digest, PathGlobs(["**/__init__.py"]))
     )
-    init_py_digest_contents = await Get(DigestContents, Digest, init_pys_snapshot.digest)
 
     packages, namespace_packages, package_data = find_packages(
         tgts_and_stripped_srcs=list(zip(targets, stripped_srcs_list)),
@@ -539,16 +541,14 @@ async def get_ancestor_init_py(targets: Targets) -> AncestorInitPyFiles:
 
     # Note that we must MultiGet single globs instead of a a single Get for all the globs, because
     # we match each result to its originating glob (see use of zip below).
-    ancestor_init_py_snapshots = await MultiGet(
-        Get(Snapshot, PathGlobs, PathGlobs([os.path.join(source_dir_ancestor[1], "__init__.py")]))
+    ancestor_init_py_digests = await MultiGet(
+        Get(Digest, PathGlobs, PathGlobs([os.path.join(source_dir_ancestor[1], "__init__.py")]))
         for source_dir_ancestor in source_dir_ancestors_list
     )
 
     source_root_stripped_ancestor_init_pys = await MultiGet(
-        Get(Digest, RemovePrefix(snapshot.digest, source_dir_ancestor[0]))
-        for snapshot, source_dir_ancestor in zip(
-            ancestor_init_py_snapshots, source_dir_ancestors_list
-        )
+        Get(Digest, RemovePrefix(digest, source_dir_ancestor[0]))
+        for digest, source_dir_ancestor in zip(ancestor_init_py_digests, source_dir_ancestors_list)
     )
 
     return AncestorInitPyFiles(source_root_stripped_ancestor_init_pys)
@@ -686,10 +686,8 @@ async def setup_setuptools(setuptools: Setuptools) -> SetuptoolsSetup:
         Pex,
         PexRequest(
             output_filename="setuptools.pex",
-            requirements=PexRequirements(setuptools.get_requirement_specs()),
-            interpreter_constraints=PexInterpreterConstraints(
-                setuptools.default_interpreter_constraints
-            ),
+            requirements=PexRequirements(setuptools.all_requirements),
+            interpreter_constraints=PexInterpreterConstraints(setuptools.interpreter_constraints),
         ),
     )
     return SetuptoolsSetup(requirements_pex=requirements_pex,)
@@ -704,15 +702,4 @@ def is_ownable_target(tgt: Target, union_membership: UnionMembership) -> bool:
 
 
 def rules():
-    return [
-        run_setup_pys,
-        run_setup_py,
-        generate_chroot,
-        get_sources,
-        get_requirements,
-        get_ancestor_init_py,
-        get_owned_dependencies,
-        get_exporting_owner,
-        setup_setuptools,
-        SubsystemRule(Setuptools),
-    ]
+    return collect_rules()

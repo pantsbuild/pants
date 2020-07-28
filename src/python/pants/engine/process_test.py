@@ -5,16 +5,18 @@ import os
 from dataclasses import dataclass
 from typing import ClassVar, Tuple
 
+import pytest
+
 from pants.engine.fs import CreateDigest, Digest, DigestContents, FileContent, PathGlobs, Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.process import (
     FallibleProcessResult,
+    InteractiveProcess,
     Process,
     ProcessExecutionFailure,
     ProcessResult,
 )
-from pants.engine.rules import RootRule, rule
-from pants.engine.selectors import Get
+from pants.engine.rules import Get, RootRule, rule
 from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
 
@@ -403,3 +405,9 @@ class Broken {
         with self.assertRaises(ExecutionError) as cm:
             self.request_single_product(ProcessResult, request)
         assert "Process 'one-cat' failed with exit code 1." in str(cm.exception)
+
+
+def test_running_interactive_process_in_workspace_cannot_have_input_files() -> None:
+    mock_digest = Digest("fake", 1)
+    with pytest.raises(ValueError):
+        InteractiveProcess(argv=["/bin/echo"], input_digest=mock_digest, run_in_workspace=True)

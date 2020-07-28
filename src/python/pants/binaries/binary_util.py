@@ -14,8 +14,7 @@ from functools import reduce
 from typing import Any, List, Optional, Tuple, cast
 
 from pants.base.build_environment import get_buildroot
-from pants.base.exceptions import TaskError
-from pants.engine.rules import rule
+from pants.engine.rules import collect_rules, rule
 from pants.fs.archive import archiver_for_path
 from pants.net.http.fetcher import Fetcher
 from pants.option.global_options import GlobalOptions
@@ -195,9 +194,9 @@ class BinaryToolFetcher:
         self._fetcher = fetcher or self._default_http_fetcher()
         self._ignore_cached_download = ignore_cached_download
 
-    class BinaryNotFound(TaskError):
+    class BinaryNotFound(Exception):
         def __init__(self, name, accumulated_errors):
-            super(BinaryToolFetcher.BinaryNotFound, self).__init__(
+            super().__init__(
                 "Failed to fetch {name} binary from any source: ({error_msgs})".format(
                     name=name, error_msgs=", ".join(accumulated_errors)
                 )
@@ -288,7 +287,7 @@ class BinaryUtil:
         @classmethod
         def _create_for_cls(cls, binary_util_cls):
             # NB: We read global bootstrap options, but through our own scoped options instance.
-            options = cls.global_instance().get_options()
+            options = cls.global_instance().options
             binary_tool_fetcher = BinaryToolFetcher(
                 bootstrap_dir=options.pants_bootstrapdir,
                 timeout_secs=options.binaries_fetch_timeout_secs,
@@ -300,21 +299,21 @@ class BinaryUtil:
                 allow_external_binary_tool_downloads=options.allow_external_binary_tool_downloads,
             )
 
-    class MissingMachineInfo(TaskError):
+    class MissingMachineInfo(Exception):
         """Indicates that pants was unable to map this machine's OS to a binary path prefix."""
 
         pass
 
-    class NoBaseUrlsError(TaskError):
+    class NoBaseUrlsError(Exception):
         """Indicates that no URLs were specified in pants.toml."""
 
         pass
 
-    class BinaryResolutionError(TaskError):
+    class BinaryResolutionError(Exception):
         """Raised to wrap other exceptions raised in the select() method to provide context."""
 
         def __init__(self, binary_request, base_exception):
-            super(BinaryUtil.BinaryResolutionError, self).__init__(
+            super().__init__(
                 "Error resolving binary request {}: {}".format(binary_request, base_exception),
                 base_exception,
             )
@@ -580,6 +579,4 @@ def provide_binary_util() -> BinaryUtil:
 
 
 def rules():
-    return [
-        provide_binary_util,
-    ]
+    return collect_rules()

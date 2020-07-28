@@ -21,7 +21,7 @@ from pants.backend.python.rules.python_sources import (
     UnstrippedPythonSourcesRequest,
 )
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
-from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
 from pants.backend.python.target_types import (
     PythonInterpreterCompatibility,
     PythonRequirementsField,
@@ -31,10 +31,16 @@ from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.engine.addresses import Address, Addresses
-from pants.engine.fs import EMPTY_DIGEST, AddPrefix, Digest, MergeDigests, PathGlobs, Snapshot
+from pants.engine.fs import (
+    EMPTY_DIGEST,
+    AddPrefix,
+    Digest,
+    GlobMatchErrorBehavior,
+    MergeDigests,
+    PathGlobs,
+)
 from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import SubsystemRule, rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
@@ -44,7 +50,6 @@ from pants.engine.target import (
     TransitiveTargets,
 )
 from pants.engine.unions import UnionRule
-from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
 from pants.util.meta import frozen_after_init
 from pants.util.strutil import pluralize
@@ -106,7 +111,7 @@ async def pylint_lint_partition(
     partition: PylintPartition,
     pylint: Pylint,
     python_setup: PythonSetup,
-    subprocess_encoding_environment: SubprocessEncodingEnvironment,
+    subprocess_environment: SubprocessEnvironment,
 ) -> LintResult:
     # We build one PEX with Pylint requirements and another with all direct 3rd-party dependencies.
     # Splitting this into two PEXes gives us finer-grained caching. We then merge via `--pex-path`.
@@ -124,9 +129,8 @@ async def pylint_lint_partition(
         Pex,
         PexRequest(
             output_filename="pylint.pex",
-            requirements=PexRequirements([*pylint.get_requirement_specs(), *plugin_requirements]),
+            requirements=PexRequirements([*pylint.all_requirements, *plugin_requirements]),
             interpreter_constraints=partition.interpreter_constraints,
-            entry_point=pylint.get_entry_point(),
         ),
     )
     requirements_pex_request = Get(
@@ -146,14 +150,14 @@ async def pylint_lint_partition(
         Pex,
         PexRequest(
             output_filename="pylint_runner.pex",
-            entry_point=pylint.get_entry_point(),
+            entry_point=pylint.entry_point,
             interpreter_constraints=partition.interpreter_constraints,
             additional_args=pylint_runner_pex_args,
         ),
     )
 
-    config_snapshot_request = Get(
-        Snapshot,
+    config_digest_request = Get(
+        Digest,
         PathGlobs(
             globs=[pylint.config] if pylint.config else [],
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
@@ -179,7 +183,7 @@ async def pylint_lint_partition(
         pylint_pex,
         requirements_pex,
         pylint_runner_pex,
-        config_snapshot,
+        config_digest,
         prepared_plugin_sources,
         prepared_python_sources,
         specified_source_files,
@@ -187,7 +191,7 @@ async def pylint_lint_partition(
         pylint_pex_request,
         requirements_pex_request,
         pylint_runner_pex_request,
-        config_snapshot_request,
+        config_digest_request,
         prepare_plugin_sources_request,
         prepare_python_sources_request,
         specified_source_files_request,
@@ -215,7 +219,7 @@ async def pylint_lint_partition(
                 pylint_pex.digest,
                 requirements_pex.digest,
                 pylint_runner_pex.digest,
-                config_snapshot.digest,
+                config_digest,
                 prefixed_plugin_sources,
                 prepared_python_sources.snapshot.digest,
             )
@@ -228,7 +232,7 @@ async def pylint_lint_partition(
 
     process = pylint_runner_pex.create_process(
         python_setup=python_setup,
-        subprocess_encoding_environment=subprocess_encoding_environment,
+        subprocess_environment=subprocess_environment,
         pex_path="./pylint_runner.pex",
         env={"PEX_EXTRA_SYS_PATH": ":".join(pythonpath)},
         pex_args=generate_args(specified_source_files=specified_source_files, pylint=pylint),
@@ -283,7 +287,7 @@ async def pylint_lint(
                 *plugin_targets_compatibility_fields,
             ),
             python_setup,
-        ) or PexInterpreterConstraints(pylint.default_interpreter_constraints)
+        ) or PexInterpreterConstraints(pylint.interpreter_constraints)
         interpreter_constraints_to_target_setup[interpreter_constraints].add(target_setup)
 
     partitions = (
@@ -304,9 +308,7 @@ async def pylint_lint(
 
 def rules():
     return [
-        pylint_lint,
-        pylint_lint_partition,
-        SubsystemRule(Pylint),
+        *collect_rules(),
         UnionRule(LintRequest, PylintRequest),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),

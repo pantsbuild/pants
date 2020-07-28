@@ -13,12 +13,13 @@ from pants.core.goals.test import (
     CoverageData,
     CoverageDataCollection,
     CoverageReports,
+    ShowOutput,
     Status,
     Test,
     TestDebugRequest,
     TestFieldSet,
-    TestOptions,
     TestResult,
+    TestSubsystem,
     WrappedTestFieldSet,
     run_tests,
 )
@@ -27,8 +28,8 @@ from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSourcesRequest,
 )
 from pants.engine.addresses import Address
-from pants.engine.fs import CreateDigest, Digest, FileContent, Workspace
-from pants.engine.interactive_process import InteractiveProcess, InteractiveRunner
+from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, MergeDigests, Workspace
+from pants.engine.process import InteractiveProcess, InteractiveRunner
 from pants.engine.target import (
     Sources,
     Target,
@@ -137,11 +138,14 @@ class TestTest(TestBase):
         targets: List[TargetWithOrigin],
         debug: bool = False,
         use_coverage: bool = False,
+        output: ShowOutput = ShowOutput.ALL,
         include_sources: bool = True,
         valid_targets: bool = True,
     ) -> Tuple[int, str]:
         console = MockConsole(use_colors=False)
-        options = create_goal_subsystem(TestOptions, debug=debug, use_coverage=use_coverage)
+        test_subsystem = create_goal_subsystem(
+            TestSubsystem, debug=debug, use_coverage=use_coverage, output=output,
+        )
         interactive_runner = InteractiveRunner(self.scheduler)
         workspace = Workspace(self.scheduler)
         union_membership = UnionMembership(
@@ -179,7 +183,7 @@ class TestTest(TestBase):
 
         result: Test = run_rule(
             run_tests,
-            rule_args=[console, options, interactive_runner, workspace, union_membership],
+            rule_args=[console, test_subsystem, interactive_runner, workspace, union_membership],
             mock_gets=[
                 MockGet(
                     product_type=TargetsToValidFieldSets,
@@ -202,6 +206,10 @@ class TestTest(TestBase):
                     mock=lambda field_sets: FieldSetsWithSources(
                         field_sets if include_sources else ()
                     ),
+                ),
+                # Merge XML results.
+                MockGet(
+                    product_type=Digest, subject_type=MergeDigests, mock=lambda _: EMPTY_DIGEST,
                 ),
                 MockGet(
                     product_type=CoverageReports,
@@ -238,11 +246,12 @@ class TestTest(TestBase):
             field_set=SuccessfulFieldSet, targets=[self.make_target_with_origin(address)]
         )
         assert exit_code == 0
-        # NB: We don't render a summary when only running one target.
         assert stderr == dedent(
             f"""\
             ✓ {address}
             {SuccessfulFieldSet.stdout(address)}
+
+            {address}                                                                        .....   SUCCESS
             """
         )
 
@@ -269,6 +278,50 @@ class TestTest(TestBase):
             {good_address}                                                                         .....   SUCCESS
             {bad_address}                                                                          .....   FAILURE
             """
+        )
+
+    def test_output_failed(self) -> None:
+        good_address = Address.parse(":good")
+        bad_address = Address.parse(":bad")
+
+        exit_code, stderr = self.run_test_rule(
+            field_set=ConditionallySucceedsFieldSet,
+            targets=[
+                self.make_target_with_origin(good_address),
+                self.make_target_with_origin(bad_address),
+            ],
+            output=ShowOutput.FAILED,
+        )
+        assert exit_code == 1
+        assert stderr == dedent(
+            f"""\
+                𐄂 {bad_address}
+                {ConditionallySucceedsFieldSet.stderr(bad_address)}
+
+                {good_address}                                                                         .....   SUCCESS
+                {bad_address}                                                                          .....   FAILURE
+                """
+        )
+
+    def test_output_none(self) -> None:
+        good_address = Address.parse(":good")
+        bad_address = Address.parse(":bad")
+
+        exit_code, stderr = self.run_test_rule(
+            field_set=ConditionallySucceedsFieldSet,
+            targets=[
+                self.make_target_with_origin(good_address),
+                self.make_target_with_origin(bad_address),
+            ],
+            output=ShowOutput.NONE,
+        )
+        assert exit_code == 1
+        assert stderr == dedent(
+            f"""\
+
+                    {good_address}                                                                         .....   SUCCESS
+                    {bad_address}                                                                          .....   FAILURE
+                    """
         )
 
     def test_debug_target(self) -> None:

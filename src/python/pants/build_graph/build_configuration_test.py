@@ -23,9 +23,9 @@ class BuildConfigurationTest(unittest.TestCase):
 
     def test_register_exposed_object(self):
         self._register_aliases(objects={"jane": 42})
-        aliases = self.bc_builder.create().registered_aliases()
-        self.assertEqual(FrozenDict(), aliases.context_aware_object_factories)
-        self.assertEqual(FrozenDict(jane=42), aliases.objects)
+        aliases = self.bc_builder.create().registered_aliases
+        assert FrozenDict() == aliases.context_aware_object_factories
+        assert FrozenDict(jane=42) == aliases.objects
 
     def test_register_exposed_context_aware_object_factory(self):
         def caof_function(parse_context):
@@ -41,15 +41,14 @@ class BuildConfigurationTest(unittest.TestCase):
         self._register_aliases(
             context_aware_object_factories={"func": caof_function, "cls": CaofClass}
         )
-        aliases = self.bc_builder.create().registered_aliases()
-        self.assertEqual(FrozenDict(), aliases.objects)
-        self.assertEqual(
-            FrozenDict({"func": caof_function, "cls": CaofClass}),
-            aliases.context_aware_object_factories,
+        aliases = self.bc_builder.create().registered_aliases
+        assert FrozenDict() == aliases.objects
+        assert (
+            FrozenDict({"func": caof_function, "cls": CaofClass})
+            == aliases.context_aware_object_factories
         )
 
     def test_register_union_rules(self) -> None:
-        # Two calls to register_rules should merge relevant unions.
         @union
         class Base:
             pass
@@ -60,6 +59,8 @@ class BuildConfigurationTest(unittest.TestCase):
         class B:
             pass
 
-        self.bc_builder.register_rules([UnionRule(Base, A)])
-        self.bc_builder.register_rules([UnionRule(Base, B)])
-        self.assertEqual(self.bc_builder.create().union_rules()[Base], FrozenOrderedSet([A, B]))
+        union_a = UnionRule(Base, A)
+        union_b = UnionRule(Base, B)
+        self.bc_builder.register_rules([union_a])
+        self.bc_builder.register_rules([union_b])
+        assert self.bc_builder.create().union_rules == FrozenOrderedSet([union_a, union_b])

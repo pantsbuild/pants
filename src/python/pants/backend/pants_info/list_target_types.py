@@ -3,11 +3,12 @@
 
 import textwrap
 from dataclasses import dataclass
-from typing import Generic, Optional, Sequence, Type, get_type_hints
+from typing import Generic, Optional, Sequence, Type, cast, get_type_hints
 
+from pants.core.util_rules.pants_bin import PantsBin
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
-from pants.engine.rules import goal_rule
+from pants.engine.rules import collect_rules, goal_rule
 from pants.engine.target import (
     AsyncField,
     BoolField,
@@ -26,11 +27,10 @@ from pants.engine.target import (
     Target,
 )
 from pants.engine.unions import UnionMembership
-from pants.option.global_options import GlobalOptions
 from pants.util.objects import get_docstring, get_docstring_summary, pretty_print_type_hint
 
 
-class TargetTypesOptions(LineOriented, GoalSubsystem):
+class TargetTypesSubsystem(LineOriented, GoalSubsystem):
     """List all the registered target types, including custom plugin types."""
 
     name = "target-types"
@@ -45,9 +45,13 @@ class TargetTypesOptions(LineOriented, GoalSubsystem):
             help="List all of the target type's registered fields.",
         )
 
+    @property
+    def details(self) -> Optional[str]:
+        return cast(Optional[str], self.options.details)
+
 
 class TargetTypes(Goal):
-    subsystem_cls = TargetTypesOptions
+    subsystem_cls = TargetTypesSubsystem
 
 
 @dataclass(frozen=True)
@@ -181,7 +185,7 @@ class VerboseTargetInfo:
             ],
         )
 
-    def format_for_cli(self, console: Console, *, v1_disabled: bool) -> str:
+    def format_for_cli(self, console: Console) -> str:
         output = [console.green(f"{self.alias}\n{'-' * len(self.alias)}\n")]
         if self.description:
             output.append(f"{self.description}\n")
@@ -198,14 +202,13 @@ class VerboseTargetInfo:
 def list_target_types(
     registered_target_types: RegisteredTargetTypes,
     union_membership: UnionMembership,
-    target_types_options: TargetTypesOptions,
-    global_options: GlobalOptions,
+    target_types_subsystem: TargetTypesSubsystem,
     console: Console,
+    pants_bin: PantsBin,
 ) -> TargetTypes:
-    v1_disabled = not global_options.options.v1
-    with target_types_options.line_oriented(console) as print_stdout:
-        if target_types_options.values.details:
-            alias = target_types_options.values.details
+    with target_types_subsystem.line_oriented(console) as print_stdout:
+        if target_types_subsystem.details:
+            alias = target_types_subsystem.details
             target_type = registered_target_types.aliases_to_types.get(alias)
             if target_type is None:
                 raise ValueError(
@@ -216,7 +219,7 @@ def list_target_types(
                 target_type, union_membership=union_membership
             )
             print_stdout("")
-            print_stdout(verbose_target_info.format_for_cli(console, v1_disabled=v1_disabled))
+            print_stdout(verbose_target_info.format_for_cli(console))
         else:
             title_text = "Target types"
             title = console.green(f"{title_text}\n{'-' * len(title_text)}")
@@ -230,8 +233,8 @@ def list_target_types(
             lines = [
                 f"\n{title}\n",
                 textwrap.fill(
-                    "Use `./pants target-types --details=$target_type` to get detailed "
-                    "information for a particular target type.",
+                    f"Use `{pants_bin.render_command('target-types', '--details=$target_type')}` "
+                    "to get detailed information for a particular target type.",
                     80,
                 ),
                 "\n",
@@ -246,4 +249,4 @@ def list_target_types(
 
 
 def rules():
-    return [list_target_types]
+    return collect_rules()

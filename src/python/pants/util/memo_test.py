@@ -9,8 +9,6 @@ from pants.util.memo import (
     memoized_classproperty,
     memoized_method,
     memoized_property,
-    memoized_staticmethod,
-    memoized_staticproperty,
     per_instance,
     testable_memoized_property,
 )
@@ -244,8 +242,6 @@ class MemoizeTest(unittest.TestCase):
         self.assertEqual("x1y1", foo.method("y1"))
 
     def test_memoized_class_methods(self):
-        externally_scoped_value = "e0"
-
         class Foo:
             _x = "x0"
 
@@ -257,18 +253,8 @@ class MemoizeTest(unittest.TestCase):
             def class_property(cls):
                 return cls._x
 
-            @memoized_staticmethod
-            def static_method(z):
-                return externally_scoped_value + z
-
-            @memoized_staticproperty
-            def static_property():
-                return externally_scoped_value
-
         self.assertEqual("x0", Foo.class_property)
         self.assertEqual("x0y0", Foo.class_method("y0"))
-        self.assertEqual("e0", Foo.static_property)
-        self.assertEqual("e0z0", Foo.static_method("z0"))
 
         Foo._x = "x1"
         # The property is cached.
@@ -276,11 +262,6 @@ class MemoizeTest(unittest.TestCase):
         # The method is cached for previously made calls only.
         self.assertEqual("x0y0", Foo.class_method("y0"))
         self.assertEqual("x1y1", Foo.class_method("y1"))
-
-        externally_scoped_value = "e1"
-        self.assertEqual("e0", Foo.static_property)
-        self.assertEqual("e0z0", Foo.static_method("z0"))
-        self.assertEqual("e1z1", Foo.static_method("z1"))
 
     def test_descriptor_application_valid(self):
         class Foo(self._Called):

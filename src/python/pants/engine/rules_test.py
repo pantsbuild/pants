@@ -6,6 +6,7 @@ import re
 import unittest
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 from textwrap import dedent
 from typing import Callable, List, Optional, Tuple, Type, Union
 
@@ -13,7 +14,11 @@ import pytest
 
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
+from pants.engine.internals.native import Native
+from pants.engine.internals.scheduler import Scheduler
+from pants.engine.internals.selectors import GetConstraints
 from pants.engine.rules import (
+    Get,
     MissingParameterTypeAnnotation,
     MissingReturnTypeAnnotation,
     RootRule,
@@ -23,17 +28,30 @@ from pants.engine.rules import (
     goal_rule,
     rule,
 )
-from pants.engine.selectors import Get, GetConstraints
-from pants.testutil.engine.util import (
-    MockGet,
-    assert_equal_with_printing,
-    create_scheduler,
-    fmt_rule,
-    run_rule,
-)
+from pants.engine.unions import UnionMembership
+from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS
+from pants.testutil.engine.util import MockGet, assert_equal_with_printing, fmt_rule, run_rule
 from pants.testutil.test_base import TestBase
 from pants.util.enums import match
 from pants.util.logging import LogLevel
+
+
+def create_scheduler(rules, validate=True, native=None):
+    """Create a Scheduler."""
+    native = native or Native()
+    return Scheduler(
+        native=native,
+        ignore_patterns=[],
+        use_gitignore=False,
+        build_root=str(Path.cwd()),
+        local_store_dir="./.pants.d/lmdb_store",
+        local_execution_root_dir="./.pants.d",
+        named_caches_dir="./.pants.d/named_caches",
+        rules=rules,
+        union_membership=UnionMembership({}),
+        execution_options=DEFAULT_EXECUTION_OPTIONS,
+        validate=validate,
+    )
 
 
 class RuleVisitorTest(unittest.TestCase):
@@ -325,14 +343,14 @@ class SubA(A):
 _suba_root_rules = [RootRule(SubA)]
 
 
-class ExampleOptions(GoalSubsystem):
+class ExampleSubsystem(GoalSubsystem):
     """An example."""
 
     name = "example"
 
 
 class Example(Goal):
-    subsystem_cls = ExampleOptions
+    subsystem_cls = ExampleSubsystem
 
 
 @goal_rule

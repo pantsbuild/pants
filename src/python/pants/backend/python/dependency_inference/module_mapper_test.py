@@ -12,15 +12,17 @@ from pants.backend.python.dependency_inference.module_mapper import (
     PythonModule,
     PythonModuleOwner,
     ThirdPartyModuleToAddressMapping,
+    map_first_party_modules_to_addresses,
+    map_module_to_address,
+    map_third_party_modules_to_addresses,
 )
-from pants.backend.python.dependency_inference.module_mapper import rules as module_mapper_rules
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.util_rules import strip_source_roots
 from pants.engine.addresses import Address
 from pants.engine.rules import RootRule
-from pants.engine.selectors import Params
 from pants.python.python_requirement import PythonRequirement
+from pants.testutil.engine.util import Params
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 from pants.util.frozendict import FrozenDict
@@ -82,7 +84,9 @@ class ModuleMapperTest(TestBase):
         return (
             *super().rules(),
             *strip_source_roots.rules(),
-            *module_mapper_rules(),
+            map_first_party_modules_to_addresses,
+            map_module_to_address,
+            map_third_party_modules_to_addresses,
             RootRule(PythonModule),
         )
 

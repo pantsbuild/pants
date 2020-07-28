@@ -7,7 +7,7 @@ from pathlib import PurePath
 from typing import ClassVar, Iterable, Iterator
 
 from pants.engine.console import Console
-from pants.engine.interactive_process import InteractiveProcess, InteractiveRunner
+from pants.engine.process import InteractiveProcess, InteractiveRunner
 from pants.util.osutil import get_os_name
 from pants.util.strutil import safe_shlex_join
 
@@ -28,7 +28,7 @@ class _Opener(ABC):
         for request in self._iter_openers(files):
             open_command = safe_shlex_join(request.argv)
             try:
-                result = self.runner.run_process(request)
+                result = self.runner.run(request)
                 if result.exit_code != 0:
                     self.console.print_stderr(
                         f"Failed to open files for viewing using `{open_command}` - received exit "

@@ -46,6 +46,9 @@ def test_collection_reversed() -> None:
 
 
 def test_collection_equality() -> None:
+    assert () != Collection()
+    assert Collection() != ()
+
     assert Collection([]) == Collection([])
     c1 = Collection([1, 2, 3])
     assert c1 == Collection([1, 2, 3])

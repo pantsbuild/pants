@@ -10,8 +10,7 @@ from typing import Iterable, Optional, Set, Tuple, Union
 
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import PathGlobs, Snapshot
-from pants.engine.rules import RootRule, SubsystemRule, rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.rules import Get, MultiGet, RootRule, collect_rules, rule
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method
 
@@ -326,9 +325,6 @@ async def all_roots(source_root_config: SourceRootConfig) -> AllSourceRoots:
 
 def rules():
     return [
-        get_source_root,
-        get_source_root_strict,
-        all_roots,
-        SubsystemRule(SourceRootConfig),
+        *collect_rules(),
         RootRule(SourceRootRequest),
     ]

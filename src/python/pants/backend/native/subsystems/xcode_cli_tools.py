@@ -69,7 +69,7 @@ class XCodeCLITools(Subsystem):
 
     @memoized_property
     def _all_existing_install_prefixes(self):
-        return [pfx for pfx in self.get_options().install_prefixes if is_readable_dir(pfx)]
+        return [pfx for pfx in self.options.install_prefixes if is_readable_dir(pfx)]
 
     # NB: We use @memoized_method in this file for methods which may raise.
     @memoized_method

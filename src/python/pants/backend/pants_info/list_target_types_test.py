@@ -5,16 +5,11 @@ from enum import Enum
 from textwrap import dedent
 from typing import Optional, cast
 
-from pants.backend.pants_info.list_target_types import TargetTypesOptions, list_target_types
+from pants.backend.pants_info.list_target_types import TargetTypesSubsystem, list_target_types
+from pants.core.util_rules.pants_bin import PantsBin
 from pants.engine.target import BoolField, IntField, RegisteredTargetTypes, StringField, Target
 from pants.engine.unions import UnionMembership
-from pants.option.global_options import GlobalOptions
-from pants.testutil.engine.util import (
-    MockConsole,
-    create_goal_subsystem,
-    create_subsystem,
-    run_rule,
-)
+from pants.testutil.engine.util import MockConsole, create_goal_subsystem, run_rule
 
 
 # Note no docstring.
@@ -84,10 +79,10 @@ def run_goal(
             RegisteredTargetTypes.create([FortranBinary, FortranLibrary, FortranTests]),
             union_membership or UnionMembership({}),
             create_goal_subsystem(
-                TargetTypesOptions, sep="\\n", output_file=None, details=details_target
+                TargetTypesSubsystem, sep="\\n", output_file=None, details=details_target
             ),
-            create_subsystem(GlobalOptions, v1=False),
             console,
+            PantsBin(name="./BNF"),
         ],
     )
     return cast(str, console.stdout.getvalue())
@@ -101,8 +96,8 @@ def test_list_all() -> None:
         Target types
         ------------
 
-        Use `./pants target-types --details=$target_type` to get detailed information
-        for a particular target type.
+        Use `./BNF target-types --details=$target_type` to get detailed information for
+        a particular target type.
 
 
         fortran_binary   <no description>
@@ -125,7 +120,9 @@ def test_list_single() -> None:
         required = True
 
     tests_target_stdout = run_goal(
-        union_membership=UnionMembership({FortranTests.PluginField: [CustomField]}),
+        union_membership=UnionMembership.from_rules(
+            [FortranTests.register_plugin_field(CustomField)]
+        ),
         details_target=FortranTests.alias,
     )
     assert tests_target_stdout == dedent(

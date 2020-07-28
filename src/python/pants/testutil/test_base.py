@@ -18,7 +18,6 @@ from pants.engine.addresses import Address
 from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, PathGlobsAndRoot, Snapshot
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.rules import RootRule
-from pants.engine.selectors import Params
 from pants.engine.target import Target
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.util import clean_global_runtime_state
@@ -26,7 +25,7 @@ from pants.option.global_options import ExecutionOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source import source_root
 from pants.subsystem.subsystem import Subsystem
-from pants.testutil.engine.util import init_native
+from pants.testutil.engine.util import Params, init_native
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import (

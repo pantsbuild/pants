@@ -77,8 +77,10 @@ impl crate::CommandRunner for CommandRunner {
       }
     }
 
+    let cache_failures = req.0.values().any(|process| process.cache_failures);
+
     let result = command_runner.underlying.run(req, context).await?;
-    if result.exit_code == 0 {
+    if result.exit_code == 0 || cache_failures {
       if let Err(err) = command_runner.store(key, &result).await {
         debug!(
           "Error storing process execution result to local cache: {} - ignoring and continuing",

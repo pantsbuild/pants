@@ -14,8 +14,7 @@ from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import goal_rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import TargetsWithOrigins
 from pants.engine.unions import UnionMembership, union
 from pants.util.strutil import strip_v2_chroot_path
@@ -63,7 +62,7 @@ class TypecheckRequest(StyleRequest):
     """
 
 
-class TypecheckOptions(GoalSubsystem):
+class TypecheckSubsystem(GoalSubsystem):
     """Run type checkers."""
 
     name = "typecheck"
@@ -72,7 +71,7 @@ class TypecheckOptions(GoalSubsystem):
 
 
 class Typecheck(Goal):
-    subsystem_cls = TypecheckOptions
+    subsystem_cls = TypecheckSubsystem
 
 
 @goal_rule
@@ -127,4 +126,4 @@ async def typecheck(
 
 
 def rules():
-    return [typecheck]
+    return collect_rules()

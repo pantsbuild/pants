@@ -42,17 +42,17 @@ impl Intrinsics {
     );
     intrinsics.insert(
       Intrinsic {
-        product: types.snapshot,
+        product: types.directory_digest,
         inputs: vec![types.path_globs],
       },
-      Box::new(path_globs_to_snapshot),
+      Box::new(path_globs_to_digest),
     );
     intrinsics.insert(
       Intrinsic {
-        product: types.snapshot,
-        inputs: vec![types.url_to_fetch],
+        product: types.directory_digest,
+        inputs: vec![types.download_file],
       },
-      Box::new(url_to_fetch_to_snapshot),
+      Box::new(download_file_to_digest),
     );
     intrinsics.insert(
       Intrinsic {
@@ -98,10 +98,10 @@ impl Intrinsics {
     );
     intrinsics.insert(
       Intrinsic {
-        product: types.snapshot,
-        inputs: vec![types.snapshot_subset],
+        product: types.directory_digest,
+        inputs: vec![types.digest_subset],
       },
-      Box::new(snapshot_subset_to_snapshot),
+      Box::new(digest_subset_to_digest),
     );
     Intrinsics { intrinsics }
   }
@@ -280,33 +280,39 @@ fn merge_digests_request_to_digest(
   .boxed()
 }
 
-fn url_to_fetch_to_snapshot(
+fn download_file_to_digest(
   context: Context,
   mut args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
   let core = context.core.clone();
   async move {
+    let key = externs::acquire_key_for(args.pop().unwrap()).map_err(|e| format!("{:?}", e))?;
     let snapshot = context
-      .get(DownloadedFile(externs::acquire_key_for(
-        args.pop().unwrap(),
-      )?))
-      .await?;
-    Ok(Snapshot::store_snapshot(&core, &snapshot).map_err(|err| throw(&err))?)
+      .get(DownloadedFile(key))
+      .await
+      .map_err(|e| format!("{:?}", e))?;
+    let res: Result<_, String> = Ok(Snapshot::store_directory(&core, &snapshot.digest));
+    res
   }
+  .map_err(|err: String| throw(&err))
   .boxed()
 }
 
-fn path_globs_to_snapshot(
+fn path_globs_to_digest(
   context: Context,
   mut args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
   let core = context.core.clone();
   async move {
-    let snapshot = context
-      .get(Snapshot(externs::acquire_key_for(args.pop().unwrap())?))
-      .await?;
-    Ok(Snapshot::store_snapshot(&core, &snapshot).map_err(|err| throw(&err))?)
+    let key = externs::acquire_key_for(args.pop().unwrap()).map_err(|e| format!("{:?}", e))?;
+    let digest = context
+      .get(Snapshot(key))
+      .await
+      .map_err(|e| format!("{:?}", e))?;
+    let res: Result<_, String> = Ok(Snapshot::store_directory(&core, &digest));
+    res
   }
+  .map_err(|err: String| throw(&err))
   .boxed()
 }
 
@@ -314,7 +320,7 @@ fn create_digest_to_digest(
   context: Context,
   args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
-  let file_values = externs::project_multi(&args[0], "dependencies");
+  let file_values = externs::project_iterable(&args[0]);
   let digests: Vec<_> = file_values
     .iter()
     .map(|file| {
@@ -346,7 +352,7 @@ fn create_digest_to_digest(
   .boxed()
 }
 
-fn snapshot_subset_to_snapshot(
+fn digest_subset_to_digest(
   context: Context,
   args: Vec<Value>,
 ) -> BoxFuture<'static, NodeResult<Value>> {
@@ -362,11 +368,9 @@ fn snapshot_subset_to_snapshot(
       .subset(original_digest, subset_params)
       .await
       .map_err(|e| format!("{:?}", e))?;
-    let snapshot = store::Snapshot::from_digest(store, digest)
-      .await
-      .map_err(|e| format!("{:?}", e))?;
 
-    Ok(Snapshot::store_snapshot(&context.core, &snapshot)?)
+    let res: Result<_, String> = Ok(Snapshot::store_directory(&context.core, &digest));
+    res
   }
   .map_err(|err: String| throw(&err))
   .boxed()

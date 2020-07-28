@@ -366,6 +366,7 @@ async fn main() {
     .expect("invalid value for `target-platform"),
     is_nailgunnable,
     execution_slot_variable: None,
+    cache_failures: false,
   };
 
   let runner: Box<dyn process_execution::CommandRunner> = match server_arg {

@@ -23,8 +23,8 @@ from typing_extensions import Protocol
 from pants.backend.python.rules.download_pex_bin import DownloadedPexBin
 from pants.backend.python.rules.hermetic_pex import HermeticPex
 from pants.backend.python.rules.util import parse_interpreter_constraint
-from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment
-from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.backend.python.subsystems.python_native_code import PythonNativeCode
+from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
 from pants.backend.python.target_types import PythonInterpreterCompatibility
 from pants.backend.python.target_types import PythonPlatforms as PythonPlatformsField
 from pants.backend.python.target_types import PythonRequirementsField
@@ -32,19 +32,16 @@ from pants.engine.addresses import Address
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import (
     EMPTY_DIGEST,
-    EMPTY_SNAPSHOT,
     AddPrefix,
     Digest,
     GlobExpansionConjunction,
     GlobMatchErrorBehavior,
     MergeDigests,
     PathGlobs,
-    Snapshot,
 )
 from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.process import MultiPlatformProcess, ProcessResult
-from pants.engine.rules import RootRule, SubsystemRule, rule
-from pants.engine.selectors import Get
+from pants.engine.rules import Get, RootRule, collect_rules, rule
 from pants.python.python_repos import PythonRepos
 from pants.python.python_setup import PythonSetup
 from pants.util.frozendict import FrozenDict
@@ -310,8 +307,8 @@ async def create_pex(
     pex_bin: DownloadedPexBin,
     python_setup: PythonSetup,
     python_repos: PythonRepos,
-    subprocess_encoding_environment: SubprocessEncodingEnvironment,
-    pex_build_environment: PexBuildEnvironment,
+    subprocess_environment: SubprocessEnvironment,
+    python_native_code: PythonNativeCode,
     platform: Platform,
     log_level: LogLevel,
 ) -> Pex:
@@ -363,10 +360,10 @@ async def create_pex(
 
     argv.extend(request.requirements)
 
-    constraint_file_snapshot = EMPTY_SNAPSHOT
+    constraint_file_digest = EMPTY_DIGEST
     if python_setup.requirement_constraints is not None:
-        constraint_file_snapshot = await Get(
-            Snapshot,
+        constraint_file_digest = await Get(
+            Digest,
             PathGlobs(
                 [python_setup.requirement_constraints],
                 glob_match_error_behavior=GlobMatchErrorBehavior.error,
@@ -387,7 +384,7 @@ async def create_pex(
                 pex_bin.digest,
                 sources_digest_as_subdir,
                 additional_inputs_digest,
-                constraint_file_snapshot.digest,
+                constraint_file_digest,
             )
         ),
     )
@@ -418,8 +415,8 @@ async def create_pex(
                 PlatformConstraint(platform.value),
             ): pex_bin.create_process(
                 python_setup=python_setup,
-                subprocess_encoding_environment=subprocess_encoding_environment,
-                pex_build_environment=pex_build_environment,
+                subprocess_environment=subprocess_environment,
+                python_native_code=python_native_code,
                 pex_args=argv,
                 input_digest=merged_digest,
                 description=description,
@@ -484,10 +481,7 @@ async def two_step_create_pex(two_step_pex_request: TwoStepPexRequest) -> TwoSte
 
 def rules():
     return [
-        create_pex,
-        two_step_create_pex,
+        *collect_rules(),
         RootRule(PexRequest),
         RootRule(TwoStepPexRequest),
-        SubsystemRule(PythonSetup),
-        SubsystemRule(PythonRepos),
     ]
