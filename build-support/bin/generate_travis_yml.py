@@ -436,7 +436,9 @@ def osx_shard(
 
 # See https://docs.travis-ci.com/user/conditions-v1.
 SKIP_RUST_CONDITION = r"commit_message !~ /\[ci skip-rust\]/"
-SKIP_WHEELS_CONDITION = r"commit_message !~ /\[ci skip-build-wheels\]/"
+SKIP_WHEELS_CONDITION = (
+    r"commit_message !~ /\[ci skip-build-wheels\]/ AND type NOT IN (pull_request, cron)"
+)
 
 # ----------------------------------------------------------------------
 # Bootstrap engine

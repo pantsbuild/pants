@@ -615,7 +615,8 @@ jobs:
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PREPARE_DEPLOY=1
     - CACHE_NAME=wheels.linux
-    if: commit_message !~ /\[ci skip-build-wheels\]/
+    if: commit_message !~ /\[ci skip-build-wheels\]/ AND type NOT IN (pull_request,
+      cron)
     language: python
     name: Build Linux wheels and fs_util
     os: linux
@@ -668,7 +669,8 @@ jobs:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
     - PREPARE_DEPLOY=1
     - CACHE_NAME=wheels.osx
-    if: commit_message !~ /\[ci skip-build-wheels\]/
+    if: commit_message !~ /\[ci skip-build-wheels\]/ AND type NOT IN (pull_request,
+      cron)
     language: generic
     name: Build macOS wheels and fs_util
     os: osx
