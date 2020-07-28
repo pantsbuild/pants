@@ -19,6 +19,11 @@ python_binary(
 )
 
 python_binary(
+  name = 'check_inits',
+  sources = ['check_inits.py'],
+)
+
+python_binary(
   name = 'ci',
   sources = ['ci.py'],
 )

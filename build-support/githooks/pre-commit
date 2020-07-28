@@ -59,7 +59,7 @@ echo "* Checking shell scripts via our custom linter"
 ./build-support/bin/check_shell.sh || exit 1
 
 echo "* Checking __init__.py files"
-./build-support/bin/check_init_py.sh || exit 1
+./build-support/bin/check_inits.py || exit 1
 
 echo "* Checking headers"
 ./pants validate '**' || exit 1
