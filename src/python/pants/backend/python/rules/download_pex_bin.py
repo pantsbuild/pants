@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping, Optional
 
-from pants.backend.python.rules.hermetic_pex import HermeticPex
+from pants.backend.python.rules.hermetic_pex import HermeticPex, PexEnvironment
 from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.core.util_rules.external_tool import (
@@ -17,7 +17,6 @@ from pants.engine.platform import Platform
 from pants.engine.process import Process
 from pants.engine.rules import collect_rules, rule
 from pants.engine.selectors import Get
-from pants.python.python_setup import PythonSetup
 
 
 class PexBin(ExternalTool):
@@ -50,7 +49,7 @@ class DownloadedPexBin(HermeticPex):
 
     def create_process(  # type: ignore[override]
         self,
-        python_setup: PythonSetup,
+        pex_environment: PexEnvironment,
         subprocess_encoding_environment: SubprocessEncodingEnvironment,
         pex_build_environment: PexBuildEnvironment,
         *,
@@ -62,8 +61,7 @@ class DownloadedPexBin(HermeticPex):
     ) -> Process:
         """Creates an Process that will run the pex CLI tool hermetically.
 
-        :param python_setup: The parameters for selecting python interpreters to use when invoking
-                             the pex tool.
+        :param pex_environment: The environment needed to bootstrap the PEX runtime.
         :param subprocess_encoding_environment: The locale settings to use for the pex tool
                                                 invocation.
         :param pex_build_environment: The build environment for the pex tool.
@@ -85,7 +83,7 @@ class DownloadedPexBin(HermeticPex):
         pex_args = ("--pex-root", pex_root_path) + tuple(pex_args)
 
         return super().create_process(
-            python_setup=python_setup,
+            pex_environment=pex_environment,
             subprocess_encoding_environment=subprocess_encoding_environment,
             pex_path=self.executable,
             pex_args=pex_args,

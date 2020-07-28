@@ -6,6 +6,7 @@ from typing import Optional, Tuple
 
 from pants.backend.python.lint.bandit.subsystem import Bandit
 from pants.backend.python.rules import download_pex_bin, pex
+from pants.backend.python.rules.hermetic_pex import PexEnvironment
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
@@ -63,7 +64,7 @@ def generate_args(*, specified_source_files: SourceFiles, bandit: Bandit) -> Tup
 async def bandit_lint_partition(
     partition: BanditPartition,
     bandit: Bandit,
-    python_setup: PythonSetup,
+    pex_environment: PexEnvironment,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> LintResult:
     requirements_pex_request = Get(
@@ -116,7 +117,7 @@ async def bandit_lint_partition(
     )
 
     process = requirements_pex.create_process(
-        python_setup=python_setup,
+        pex_environment=pex_environment,
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path="./bandit.pex",
         pex_args=generate_args(specified_source_files=specified_source_files, bandit=bandit),

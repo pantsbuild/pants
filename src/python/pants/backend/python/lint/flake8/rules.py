@@ -6,6 +6,7 @@ from typing import Optional, Tuple
 
 from pants.backend.python.lint.flake8.subsystem import Flake8
 from pants.backend.python.rules import download_pex_bin, pex
+from pants.backend.python.rules.hermetic_pex import PexEnvironment
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
@@ -81,7 +82,7 @@ async def flake8_lint_partition(
     partition: Flake8Partition,
     flake8: Flake8,
     lint_subsystem: LintSubsystem,
-    python_setup: PythonSetup,
+    pex_environment: PexEnvironment,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> LintResult:
     requirements_pex_request = Get(
@@ -141,7 +142,7 @@ async def flake8_lint_partition(
         output_file=report_path.name if report_path else None,
     )
     process = requirements_pex.create_process(
-        python_setup=python_setup,
+        pex_environment=pex_environment,
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path="./flake8.pex",
         pex_args=flake8_args,

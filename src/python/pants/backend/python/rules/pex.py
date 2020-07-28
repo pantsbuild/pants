@@ -20,8 +20,9 @@ from typing import (
 
 from typing_extensions import Protocol
 
+from pants.backend.python.rules import hermetic_pex
 from pants.backend.python.rules.download_pex_bin import DownloadedPexBin
-from pants.backend.python.rules.hermetic_pex import HermeticPex
+from pants.backend.python.rules.hermetic_pex import HermeticPex, PexEnvironment
 from pants.backend.python.rules.util import parse_interpreter_constraint
 from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
@@ -306,6 +307,7 @@ class PexDebug:
 async def create_pex(
     request: PexRequest,
     pex_bin: DownloadedPexBin,
+    pex_environment: PexEnvironment,
     python_setup: PythonSetup,
     python_repos: PythonRepos,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
@@ -415,7 +417,7 @@ async def create_pex(
                 PlatformConstraint(platform.value),
                 PlatformConstraint(platform.value),
             ): pex_bin.create_process(
-                python_setup=python_setup,
+                pex_environment=pex_environment,
                 subprocess_encoding_environment=subprocess_encoding_environment,
                 pex_build_environment=pex_build_environment,
                 pex_args=argv,
@@ -483,6 +485,7 @@ async def two_step_create_pex(two_step_pex_request: TwoStepPexRequest) -> TwoSte
 def rules():
     return [
         *collect_rules(),
+        *hermetic_pex.rules(),
         RootRule(PexRequest),
         RootRule(TwoStepPexRequest),
     ]

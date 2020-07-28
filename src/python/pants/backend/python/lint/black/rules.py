@@ -9,6 +9,7 @@ from typing import Optional, Tuple
 from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.lint.python_fmt import PythonFmtRequest
 from pants.backend.python.rules import download_pex_bin, pex
+from pants.backend.python.rules.hermetic_pex import PexEnvironment
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
@@ -32,7 +33,6 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import FieldSetWithOrigin
 from pants.engine.unions import UnionRule
-from pants.python.python_setup import PythonSetup
 from pants.util.strutil import pluralize
 
 
@@ -82,7 +82,7 @@ def generate_args(
 async def setup(
     setup_request: SetupRequest,
     black: Black,
-    python_setup: PythonSetup,
+    pex_environment: PexEnvironment,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> Setup:
     requirements_pex_request = Get(
@@ -140,7 +140,7 @@ async def setup(
     )
 
     process = requirements_pex.create_process(
-        python_setup=python_setup,
+        pex_environment=pex_environment,
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path="./black.pex",
         pex_args=generate_args(

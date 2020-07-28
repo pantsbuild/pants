@@ -1,15 +1,20 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
 import itertools
 import logging
 from dataclasses import dataclass
+from textwrap import dedent
 from typing import Dict, Iterable, Mapping, Optional, Tuple, Union
 
-from pants.engine.fs import EMPTY_DIGEST, Digest
+from pants.engine.engine_aware import EngineAware
+from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent
 from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.rules import RootRule, collect_rules, rule
+from pants.engine.selectors import Get
+from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
+from pants.util.ordered_set import OrderedSet
+from pants.util.strutil import create_path_env_var, pluralize
 
 logger = logging.getLogger(__name__)
 
@@ -228,6 +233,86 @@ def remove_platform_information(res: FallibleProcessResultWithPlatform,) -> Fall
         stderr=res.stderr,
         output_digest=res.output_digest,
     )
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class BinaryPathRequest:
+    search_path: Tuple[str, ...]
+    binary_name: str
+
+    def __init__(self, search_path: Iterable[str], binary_name: str):
+        self.search_path = tuple(OrderedSet(search_path))
+        self.binary_name = binary_name
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class BinaryPaths(EngineAware):
+    binary_name: str
+    paths: Tuple[str, ...]
+
+    def __init__(self, binary_name: str, paths: Iterable[str]):
+        self.binary_name = binary_name
+        self.paths = tuple(OrderedSet(paths))
+
+    def level(self) -> Optional[LogLevel]:
+        return LogLevel.DEBUG if self.paths else LogLevel.WARN
+
+    def message(self) -> Optional[str]:
+        if not self.paths:
+            return f"failed to find {self.binary_name}"
+        found_msg = f"found {self.binary_name} at {self.paths[0]}"
+        if len(self.paths) > 1:
+            found_msg = f"{found_msg} and {pluralize(len(self.paths) - 1, 'other location')}"
+        return found_msg
+
+
+@rule(desc="Find binary path")
+async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
+    # TODO(John Sirois): Replace this script with a statically linked native binary so we don't
+    #  depend on either /usr/bin/env or bash being available on the Process host.
+    script_path = "./script.sh"
+    script_digest = await Get(
+        Digest,
+        CreateDigest(
+            [
+                FileContent(
+                    script_path,
+                    content=dedent(
+                        """
+                        #!/usr/bin/env bash
+
+                        set -euo pipefail
+
+                        if command -v which > /dev/null; then
+                            command which -a $1
+                        else
+                            command -v $1
+                        fi
+                        """
+                    ).encode(),
+                    is_executable=True,
+                )
+            ]
+        ),
+    )
+
+    paths = []
+    search_path = create_path_env_var(request.search_path)
+    result = await Get(
+        FallibleProcessResult,
+        Process(
+            description=f"Searching for `{request.binary_name}` on PATH={search_path}",
+            input_digest=script_digest,
+            argv=[script_path, request.binary_name],
+            env={"PATH": search_path},
+        ),
+    )
+    if result.exit_code == 0:
+        paths.extend(result.stdout.decode().splitlines())
+
+    return BinaryPaths(binary_name=request.binary_name, paths=paths)
 
 
 def rules():

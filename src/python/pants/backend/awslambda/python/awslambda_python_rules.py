@@ -13,6 +13,7 @@ from pants.backend.awslambda.python.target_types import (
     PythonAwsLambdaRuntime,
 )
 from pants.backend.python.rules import download_pex_bin, pex, pex_from_targets, python_sources
+from pants.backend.python.rules.hermetic_pex import PexEnvironment
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
@@ -33,7 +34,6 @@ from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.selectors import Get
 from pants.engine.unions import UnionRule
-from pants.python.python_setup import PythonSetup
 
 
 @dataclass(frozen=True)
@@ -53,7 +53,7 @@ class LambdexSetup:
 async def create_python_awslambda(
     field_set: PythonAwsLambdaFieldSet,
     lambdex_setup: LambdexSetup,
-    python_setup: PythonSetup,
+    pex_environment: PexEnvironment,
     subprocess_encoding_environment: SubprocessEncodingEnvironment,
 ) -> CreatedAWSLambda:
     # Lambdas typically use the .zip suffix, so we use that instead of .pex.
@@ -92,7 +92,7 @@ async def create_python_awslambda(
     # NB: Lambdex modifies its input pex in-place, so the input file is also the output file.
     lambdex_args = ("build", "-e", field_set.handler.value, pex_filename)
     process = lambdex_setup.requirements_pex.create_process(
-        python_setup=python_setup,
+        pex_environment=pex_environment,
         subprocess_encoding_environment=subprocess_encoding_environment,
         pex_path="./lambdex.pex",
         pex_args=lambdex_args,
