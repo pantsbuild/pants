@@ -987,16 +987,11 @@ def find_valid_field_sets(
 def rules():
     return [
         *register_rules(),
-        # Owners
-        RootRule(OwnersRequest),
-        # Specs -> AddressesWithOrigins
-        RootRule(Specs),
-        # Sources field
-        RootRule(HydrateSourcesRequest),
-        # Dependencies field
         RootRule(DependenciesRequest),
-        RootRule(InjectDependenciesRequest),
+        RootRule(HydrateSourcesRequest),
         RootRule(InferDependenciesRequest),
-        # FieldSets
+        RootRule(InjectDependenciesRequest),
+        RootRule(OwnersRequest),
+        RootRule(Specs),
         RootRule(TargetsToValidFieldSetsRequest),
     ]
