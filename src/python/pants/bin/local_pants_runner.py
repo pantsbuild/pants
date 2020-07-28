@@ -215,8 +215,6 @@ class LocalPantsRunner:
         run_tracker_result = PANTS_SUCCEEDED_EXIT_CODE
         scheduler_session = self.graph_session.scheduler_session
 
-        # These strings are prepended to the existing exit message when calling the superclass .exit().
-        additional_messages = []
         try:
             metrics = scheduler_session.metrics()
             self._run_tracker.pantsd_stats.set_scheduler_metrics(metrics)
@@ -224,15 +222,9 @@ class LocalPantsRunner:
             self._run_tracker.set_root_outcome(outcome)
             run_tracker_result = self._run_tracker.end()
         except ValueError as e:
-            # If we have been interrupted by a signal, calling .end() sometimes writes to a closed file,
-            # so we just log that fact here and keep going.
+            # If we have been interrupted by a signal, calling .end() sometimes writes to a closed
+            # file, so we just log that fact here and keep going.
             ExceptionSink.log_exception(exc=e)
-
-        if additional_messages:
-            # NB: We do not log to the exceptions log in this case, because we expect that these are
-            # higher level unstructured errors: structured versions will already have been written at
-            # various places.
-            logger.error("\n".join(additional_messages))
 
         return run_tracker_result
 
