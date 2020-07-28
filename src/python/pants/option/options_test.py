@@ -878,7 +878,7 @@ class OptionsTest(TestBase):
             )
             tmp.flush()
             # Note that we prevent loading a real pants.toml during get_bootstrap_options().
-            flags = f'--spec-file={tmp.name} --pants-config-files="[]" compile morx:tgt fleem:tgt'
+            flags = f'--spec-files={tmp.name} --pants-config-files="[]" compile morx:tgt fleem:tgt'
             bootstrapper = OptionsBootstrapper.create(env={}, args=shlex.split(f"./pants {flags}"))
             bootstrap_options = bootstrapper.bootstrap_options.for_global_scope()
             options = self._parse(flags=flags, bootstrap_option_values=bootstrap_options)
@@ -1453,6 +1453,7 @@ class OptionsTest(TestBase):
                         "option_name_check_distance": 2,
                         # If bootstrap option values are provided, this option is accessed and must be provided.
                         "spec_files": [],
+                        "spec_file": RankedValue(Rank.HARDCODED, []),
                     },
                 }
             )
