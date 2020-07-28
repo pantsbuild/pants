@@ -20,8 +20,7 @@ from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAware
 from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.interactive_process import InteractiveProcess, InteractiveRunner
-from pants.engine.process import FallibleProcessResult
+from pants.engine.process import FallibleProcessResult, InteractiveProcess, InteractiveRunner
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSetWithOrigin,
@@ -304,7 +303,7 @@ async def run_tests(
         )
         field_set = targets_to_valid_field_sets.field_sets[0]
         request = await Get(TestDebugRequest, TestFieldSet, field_set)
-        debug_result = interactive_runner.run_process(request.process)
+        debug_result = interactive_runner.run(request.process)
         return Test(debug_result.exit_code)
 
     targets_to_valid_field_sets = await Get(

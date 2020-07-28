@@ -25,7 +25,7 @@ from pants.core.goals.test import Status, TestDebugRequest, TestResult
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, FileContent
-from pants.engine.interactive_process import InteractiveRunner
+from pants.engine.process import InteractiveRunner
 from pants.engine.rules import RootRule
 from pants.engine.target import TargetWithOrigin
 from pants.python.python_requirement import PythonRequirement
@@ -177,7 +177,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         )
         test_result = self.request_single_product(TestResult, params)
         debug_request = self.request_single_product(TestDebugRequest, params)
-        debug_result = InteractiveRunner(self.scheduler).run_process(debug_request.process)
+        debug_result = InteractiveRunner(self.scheduler).run(debug_request.process)
         if test_result.status == Status.SUCCESS:
             assert debug_result.exit_code == 0
         else:

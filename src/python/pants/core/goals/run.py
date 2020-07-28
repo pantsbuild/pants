@@ -10,7 +10,7 @@ from pants.core.goals.binary import BinaryFieldSet
 from pants.engine.console import Console
 from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.interactive_process import InteractiveProcess, InteractiveRunner
+from pants.engine.process import InteractiveProcess, InteractiveRunner
 from pants.engine.rules import Get, collect_rules, goal_rule
 from pants.engine.target import TargetsToValidFieldSets, TargetsToValidFieldSetsRequest
 from pants.option.custom_types import shell_str
@@ -107,7 +107,7 @@ async def run(
             run_in_workspace=True,
         )
         try:
-            result = interactive_runner.run_process(process)
+            result = interactive_runner.run(process)
             exit_code = result.exit_code
         except Exception as e:
             console.print_stderr(f"Exception when attempting to run {field_set.address}: {e!r}")
