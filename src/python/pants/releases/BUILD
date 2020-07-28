@@ -1,10 +1,20 @@
 # Copyright 2017 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-python_binary(
-  name = 'reversion',
-  entry_point='pants.releases.reversion',
-  dependencies = [':releases'],
+python_library(
+  name="init",
+  sources=["__init__.py"],
 )
 
-python_library()
+python_binary(
+  name='reversion',
+  sources=["reversion.py"],
+)
+
+python_integration_tests(
+  name='tests',
+  dependencies=[
+    'src/python/pants:reversion_file_with_dependencies',
+  ],
+  uses_pants_run=True,
+)
