@@ -1,6 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import itertools
 from pathlib import PurePath
 
 from pants.backend.python.dependency_inference import module_mapper
@@ -123,11 +124,11 @@ async def infer_python_init_dependencies(
     )
 
     # And add dependencies on their owners.
-    return InferredDependencies(
-        await Get(
-            Owners, OwnersRequest(extra_init_files.snapshot.files, OwnersNotFoundBehavior.error)
-        )
+    owners = await MultiGet(
+        Get(Owners, OwnersRequest((f,), OwnersNotFoundBehavior.error))
+        for f in extra_init_files.snapshot.files
     )
+    return InferredDependencies(itertools.chain.from_iterable(owners))
 
 
 class InferConftestDependencies(InferDependenciesRequest):
@@ -149,11 +150,11 @@ async def infer_python_conftest_dependencies(
     )
 
     # And add dependencies on their owners.
-    return InferredDependencies(
-        await Get(
-            Owners, OwnersRequest(extra_conftest_files.snapshot.files, OwnersNotFoundBehavior.error)
-        )
+    owners = await MultiGet(
+        Get(Owners, OwnersRequest((f,), OwnersNotFoundBehavior.error))
+        for f in extra_conftest_files.snapshot.files
     )
+    return InferredDependencies(itertools.chain.from_iterable(owners))
 
 
 def rules():
