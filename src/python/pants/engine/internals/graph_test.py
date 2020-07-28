@@ -205,6 +205,28 @@ class GraphTest(TestBase):
         self.assert_failed_cycle("//:t1", "//:t2", ("//:t1", "//:t2", "//:t3", "//:t2"))
         self.assert_failed_cycle("//:t2", "//:t2", ("//:t2", "//:t3", "//:t2"))
 
+    def test_nocycle_indirect(self) -> None:
+        self.create_files("", ["t2.txt"])
+        self.add_to_build_file(
+            "",
+            dedent(
+                """\
+                target(name='t1', dependencies=['t2.txt'])
+                target(name='t2', dependencies=[':t1'], sources=['t2.txt'])
+                """
+            ),
+        )
+        result = self.request_single_product(
+            TransitiveTargets,
+            Params(Addresses([Address.parse("//:t1")]), create_options_bootstrapper()),
+        )
+        assert len(result.roots) == 1
+        assert result.roots[0].address == Address.parse("//:t1")
+        assert {tgt.address for tgt in result.dependencies} == {
+            Address.parse("//:t1"),
+            Address("", target_name="t2.txt", generated_base_target_name="t2"),
+        }
+
     def test_resolve_generated_subtarget(self) -> None:
         self.add_to_build_file("demo", "target(sources=['f1.txt', 'f2.txt'])")
         generated_target_addresss = Address(
