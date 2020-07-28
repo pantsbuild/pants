@@ -15,8 +15,7 @@ from pants.core.util_rules.external_tool import (
 from pants.engine.fs import Digest
 from pants.engine.platform import Platform
 from pants.engine.process import Process
-from pants.engine.rules import collect_rules, rule
-from pants.engine.selectors import Get
+from pants.engine.rules import Get, collect_rules, rule
 from pants.python.python_setup import PythonSetup
 
 

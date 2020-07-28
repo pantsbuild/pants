@@ -10,8 +10,7 @@ from pants.core.util_rules import determine_source_files
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
 from pants.core.util_rules.strip_source_roots import representative_path_from_address
 from pants.engine.fs import Snapshot
-from pants.engine.rules import RootRule, collect_rules, rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.rules import Get, MultiGet, RootRule, collect_rules, rule
 from pants.engine.target import Sources, Target
 from pants.engine.unions import UnionMembership
 from pants.source.source_root import SourceRoot, SourceRootRequest

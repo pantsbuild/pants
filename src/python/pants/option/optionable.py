@@ -7,7 +7,7 @@ import re
 from abc import ABC, ABCMeta, abstractmethod
 from typing import Optional, Type
 
-from pants.engine.selectors import Get, GetConstraints
+from pants.engine.internals.selectors import Get, GetConstraints
 from pants.option.errors import OptionsError
 from pants.option.scope import Scope, ScopedOptions, ScopeInfo
 from pants.util.meta import classproperty

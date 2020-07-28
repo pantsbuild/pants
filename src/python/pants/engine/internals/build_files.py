@@ -21,8 +21,7 @@ from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, S
 from pants.engine.internals.mapper import AddressFamily, AddressMap, AddressMapper
 from pants.engine.internals.parser import BuildFilePreludeSymbols, error_on_imports
 from pants.engine.internals.target_adaptor import TargetAdaptor
-from pants.engine.rules import rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.rules import Get, MultiGet, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import OrderedSet
 

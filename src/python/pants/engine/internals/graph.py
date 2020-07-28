@@ -51,8 +51,7 @@ from pants.engine.fs import (
     SourcesSnapshot,
 )
 from pants.engine.internals.target_adaptor import TargetAdaptor
-from pants.engine.rules import RootRule, collect_rules, rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.rules import Get, MultiGet, RootRule, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,

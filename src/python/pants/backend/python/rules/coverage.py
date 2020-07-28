@@ -40,8 +40,7 @@ from pants.engine.fs import (
     PathGlobs,
 )
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import collect_rules, rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import TransitiveTargets
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import file_option

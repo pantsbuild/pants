@@ -38,8 +38,7 @@ from pants.engine.fs import AddPrefix, Digest, DigestSubset, MergeDigests, PathG
 from pants.engine.interactive_process import InteractiveProcess
 from pants.engine.internals.uuid import UUIDRequest
 from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import collect_rules, rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import TransitiveTargets
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions

@@ -15,8 +15,8 @@ from pants.core.goals.typecheck import TypecheckResults
 from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
 from pants.engine.rules import RootRule
-from pants.engine.selectors import Params
 from pants.engine.target import TargetWithOrigin, WrappedTarget
+from pants.testutil.engine.util import Params
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option.util import create_options_bootstrapper
 

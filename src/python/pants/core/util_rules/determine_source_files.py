@@ -12,8 +12,7 @@ from pants.core.util_rules.strip_source_roots import (
 )
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestSubset, MergeDigests, PathGlobs, Snapshot
-from pants.engine.rules import RootRule, collect_rules, rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.rules import Get, MultiGet, RootRule, collect_rules, rule
 from pants.engine.target import HydratedSources, HydrateSourcesRequest
 from pants.engine.target import Sources as SourcesField
 from pants.util.meta import frozen_after_init

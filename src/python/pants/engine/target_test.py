@@ -12,8 +12,7 @@ from typing_extensions import final
 from pants.base.specs import FilesystemLiteralSpec
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, PathGlobs, Snapshot
-from pants.engine.rules import rule
-from pants.engine.selectors import Get
+from pants.engine.rules import Get, rule
 from pants.engine.target import (
     AsyncField,
     BoolField,

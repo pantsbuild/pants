@@ -9,8 +9,7 @@ from pants.core.util_rules.distdir import DistDir
 from pants.engine.console import Console
 from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
-from pants.engine.rules import collect_rules, goal_rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import FieldSet, TargetsToValidFieldSets, TargetsToValidFieldSetsRequest
 from pants.engine.unions import union
 

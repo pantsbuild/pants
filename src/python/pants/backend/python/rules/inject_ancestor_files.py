@@ -9,8 +9,7 @@ from typing import Sequence, Set
 
 from pants.core.util_rules.strip_source_roots import SourceRootStrippedSources, StripSnapshotRequest
 from pants.engine.fs import EMPTY_SNAPSHOT, PathGlobs, Snapshot
-from pants.engine.rules import collect_rules, rule
-from pants.engine.selectors import Get
+from pants.engine.rules import Get, collect_rules, rule
 from pants.source.source_root import AllSourceRoots
 from pants.util.ordered_set import FrozenOrderedSet
 

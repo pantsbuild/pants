@@ -9,8 +9,7 @@ from pants.core.goals.fmt import FmtResult, LanguageFmtResults, LanguageFmtTarge
 from pants.core.goals.style_request import StyleRequest
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
 from pants.engine.fs import Digest, Snapshot
-from pants.engine.rules import collect_rules, rule
-from pants.engine.selectors import Get
+from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionMembership, UnionRule, union
 
 

@@ -11,8 +11,7 @@ from pants.backend.python.subsystems.ipython import IPython
 from pants.backend.python.target_types import PythonSources
 from pants.core.goals.repl import ReplImplementation, ReplRequest
 from pants.engine.fs import Digest, MergeDigests
-from pants.engine.rules import collect_rules, rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
 
 

@@ -22,9 +22,9 @@ from pants.core.util_rules import archive, external_tool
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Snapshot
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import RootRule
-from pants.engine.selectors import Params
 from pants.init.plugin_resolver import PluginResolver
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.testutil.engine.util import Params
 from pants.testutil.interpreter_selection_utils import (
     PY_36,
     PY_37,
