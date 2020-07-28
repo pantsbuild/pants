@@ -11,39 +11,14 @@ See https://pants.readme.io/v2.0/docs/release-notes-2-0 for an overview of the c
 API Changes
 ~~~~~~~~~~~
 
-* Eliminate most rule registration boilerplate. (#10477)
-  `PR #10477 <https://github.com/pantsbuild/pants/pull/10477>`_
-
-* Remove unused `util/` and `base/` code (#10462)
-  `PR #10462 <https://github.com/pantsbuild/pants/pull/10462>`_
-
-* Rename `UrlToFetch` to `DownloadFile` (#10468)
-  `PR #10468 <https://github.com/pantsbuild/pants/pull/10468>`_
-
-* Change the `PathGlobs`, `SnapshotSubset`, and `UrlToFetch` intrinsics to return `Digest` (#10449)
-  `PR #10449 <https://github.com/pantsbuild/pants/pull/10449>`_
-
-* Unify accessing options for a `GoalSubsystem` with `Subsystem` (#10456)
-  `PR #10456 <https://github.com/pantsbuild/pants/pull/10456>`_
-
-* Rename `Workspace.materialize_directory()` to `Workspace.write_digest()` (#10448)
-  `PR #10448 <https://github.com/pantsbuild/pants/pull/10448>`_
-
-* Remove unused `SingleFileExecutable` (#10443)
-  `PR #10443 <https://github.com/pantsbuild/pants/pull/10443>`_
-
-* Remove support for Protoc 2 (#10439)
-  `PR #10439 <https://github.com/pantsbuild/pants/pull/10439>`_
-
 * Upgrade to Pex 2.1.14 (#10437)
   `PR #10437 <https://github.com/pantsbuild/pants/pull/10437>`_
-
-* Rename argument in streaming workunit callback (#10432)
-  `PR #10432 <https://github.com/pantsbuild/pants/pull/10432>`_
 
 New Features
 ~~~~~~~~~~~~
 
+* Improve test output and allow it be configured. (#10484)
+  `PR #10484 <https://github.com/pantsbuild/pants/pull/10484>`_
 
 Bugfixes
 ~~~~~~~~
@@ -72,8 +47,29 @@ Bugfixes
 Refactoring, Improvements, and Tooling
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-* Improve test output. (#10484)
-  `PR #10484 <https://github.com/pantsbuild/pants/pull/10484>`_
+* Eliminate most rule registration boilerplate. (#10477)
+  `PR #10477 <https://github.com/pantsbuild/pants/pull/10477>`_
+
+* Remove unused `util/` and `base/` code (#10462)
+  `PR #10462 <https://github.com/pantsbuild/pants/pull/10462>`_
+
+* Rename `UrlToFetch` to `DownloadFile` (#10468)
+  `PR #10468 <https://github.com/pantsbuild/pants/pull/10468>`_
+
+* Change the `PathGlobs`, `SnapshotSubset`, and `UrlToFetch` intrinsics to return `Digest` (#10449)
+  `PR #10449 <https://github.com/pantsbuild/pants/pull/10449>`_
+
+* Unify accessing options for a `GoalSubsystem` with `Subsystem` (#10456)
+  `PR #10456 <https://github.com/pantsbuild/pants/pull/10456>`_
+
+* Rename `Workspace.materialize_directory()` to `Workspace.write_digest()` (#10448)
+  `PR #10448 <https://github.com/pantsbuild/pants/pull/10448>`_
+
+* Remove unused `SingleFileExecutable` (#10443)
+  `PR #10443 <https://github.com/pantsbuild/pants/pull/10443>`_
+
+* Remove support for Protoc 2 (#10439)
+  `PR #10439 <https://github.com/pantsbuild/pants/pull/10439>`_
 
 * Make GoalSubsystem subclass Subsystem. (#10483)
   `PR #10483 <https://github.com/pantsbuild/pants/pull/10483>`_
@@ -117,6 +113,9 @@ Refactoring, Improvements, and Tooling
 * Fixes to get the process_executor CLI tool working again. (#10435)
   `PR #10435 <https://github.com/pantsbuild/pants/pull/10435>`_
 
+* Rename argument in streaming workunit callback (#10432)
+  `PR #10432 <https://github.com/pantsbuild/pants/pull/10432>`_
+
 Testing
 ~~~~~~~
 
@@ -135,10 +134,6 @@ Testing
 
 * Get rid of remaining uses of init_subsystem. (#10427)
   `PR #10427 <https://github.com/pantsbuild/pants/pull/10427>`_
-
-Documentation
-~~~~~~~~~~~~~
-
 
 2.0.0.dev5 (7/22/2020)
 ----------------------
