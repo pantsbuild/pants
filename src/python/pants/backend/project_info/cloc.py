@@ -37,8 +37,10 @@ class ClocBinary(ExternalTool):
     ]
 
     def generate_url(self, plat: Platform) -> str:
-        version = self.get_options().version
-        return f"https://github.com/AlDanial/cloc/releases/download/{version}/cloc-{version}.pl"
+        return (
+            f"https://github.com/AlDanial/cloc/releases/download/{self.version}/"
+            f"cloc-{self.version}.pl"
+        )
 
 
 class CountLinesOfCodeSubsystem(GoalSubsystem):

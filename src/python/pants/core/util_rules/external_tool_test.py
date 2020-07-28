@@ -33,11 +33,10 @@ class FooBar(ExternalTool):
             plat_str = "linux-x86_64"
         else:
             raise ExternalToolError()
-        version = self.get_options().version
-        return f"https://foobar.org/bin/v{version}/foobar-{version}-{plat_str}.tgz"
+        return f"https://foobar.org/bin/v{self.version}/foobar-{self.version}-{plat_str}.tgz"
 
     def generate_exe(self, plat: Platform) -> str:
-        return f"foobar-{self.get_options().version}/bin/foobar"
+        return f"foobar-{self.version}/bin/foobar"
 
 
 def test_generate_request() -> None:

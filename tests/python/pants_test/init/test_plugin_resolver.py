@@ -16,8 +16,6 @@ from pkg_resources import Requirement, WorkingSet
 from pants.backend.python.rules import download_pex_bin, pex
 from pants.backend.python.rules.pex import Pex, PexRequest, PexRequirements
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
-from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment
-from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
 from pants.core.util_rules import archive, external_tool
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Snapshot
 from pants.engine.process import Process, ProcessResult
@@ -62,8 +60,6 @@ class PluginResolverTest(TestBase):
                     requirements=PexRequirements(["setuptools==44.0.0", "wheel==0.34.2"]),
                 ),
                 create_options_bootstrapper(args=["--backend-packages=pants.backend.python"]),
-                SubprocessEncodingEnvironment(None, None),
-                PexBuildEnvironment(tuple(), tuple()),
             ),
         )
 

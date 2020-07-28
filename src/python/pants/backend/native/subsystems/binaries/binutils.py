@@ -15,4 +15,4 @@ class Binutils(ExternalTool):
     def generate_url(self, plat: Platform) -> str:
         if plat != Platform.linux:
             raise ExternalToolError()
-        return f"https://binaries.pantsbuild.org/bin/binutils/linux/x86_64/{self.options.version}/binutils.tar.gz"
+        return f"https://binaries.pantsbuild.org/bin/binutils/linux/x86_64/{self.version}/binutils.tar.gz"
