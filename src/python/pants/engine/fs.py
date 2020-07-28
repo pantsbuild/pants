@@ -15,13 +15,10 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class Digest:
-    """A Digest is a content-digest fingerprint, and a length of underlying content.
+    """A Digest is a lightweight reference to a set of files known about by the engine.
 
-    Typically, this is used as a lightweight reference to a set of files known about by the engine.
-    You can use `await Get(Snapshot, Digest)` to set the file names referred to, or use
-    `await Get(DigestContents, Digest)` to see the actual file content.
-
-    Occasionally, a Digest is a reference for other types of strings/bytes/content.
+    You can use `await Get(Snapshot, Digest)` to set the file names referred to, or use `await
+    Get(DigestContents, Digest)` to see the actual file content.
     """
 
     fingerprint: str

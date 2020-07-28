@@ -39,7 +39,7 @@ from pants.engine.target import (
     generate_subtarget,
     generate_subtarget_address,
 )
-from pants.engine.unions import UnionMembership, UnionRule
+from pants.engine.unions import UnionMembership
 from pants.testutil.engine.util import MockGet, run_rule
 from pants.util.collections import ensure_str_list
 from pants.util.frozendict import FrozenDict
@@ -263,7 +263,7 @@ def test_add_custom_fields() -> None:
         default = False
 
     union_membership = UnionMembership.from_rules(
-        [UnionRule(FortranTarget.PluginField, CustomField)]
+        [FortranTarget.register_plugin_field(CustomField)]
     )
     tgt_values = {CustomField.alias: True}
     tgt = FortranTarget(
@@ -288,6 +288,15 @@ def test_add_custom_fields() -> None:
         {}, address=Address.parse(":default"), union_membership=union_membership
     )
     assert default_tgt[CustomField].value is False
+
+    # Ensure that the `PluginField` is not being registered on other target types.
+    class OtherTarget(Target):
+        alias = "other_target"
+        core_fields = ()
+
+    other_tgt = OtherTarget({}, address=Address.parse(":other"))
+    assert other_tgt.plugin_fields == ()
+    assert other_tgt.has_field(CustomField) is False
 
 
 def test_override_preexisting_field_via_new_target() -> None:

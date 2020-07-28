@@ -94,7 +94,9 @@ logger = logging.getLogger(__name__)
 
 @rule
 async def resolve_target(
-    address: Address, registered_target_types: RegisteredTargetTypes
+    address: Address,
+    registered_target_types: RegisteredTargetTypes,
+    union_membership: UnionMembership,
 ) -> WrappedTarget:
     if address.generated_base_target_name:
         base_target = await Get(WrappedTarget, Address, address.maybe_convert_to_base_target())
@@ -110,7 +112,7 @@ async def resolve_target(
         raise UnrecognizedTargetTypeException(
             target_adaptor.type_alias, registered_target_types, address=address
         )
-    target = target_type(target_adaptor.kwargs, address=address)
+    target = target_type(target_adaptor.kwargs, address=address, union_membership=union_membership)
     return WrappedTarget(target)
 
 

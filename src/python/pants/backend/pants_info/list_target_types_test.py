@@ -8,7 +8,7 @@ from typing import Optional, cast
 from pants.backend.pants_info.list_target_types import TargetTypesSubsystem, list_target_types
 from pants.core.util_rules.pants_bin import PantsBin
 from pants.engine.target import BoolField, IntField, RegisteredTargetTypes, StringField, Target
-from pants.engine.unions import UnionMembership, UnionRule
+from pants.engine.unions import UnionMembership
 from pants.testutil.engine.util import MockConsole, create_goal_subsystem, run_rule
 
 
@@ -121,7 +121,7 @@ def test_list_single() -> None:
 
     tests_target_stdout = run_goal(
         union_membership=UnionMembership.from_rules(
-            [UnionRule(FortranTests.PluginField, CustomField)]
+            [FortranTests.register_plugin_field(CustomField)]
         ),
         details_target=FortranTests.alias,
     )
