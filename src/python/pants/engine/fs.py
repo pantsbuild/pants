@@ -17,8 +17,8 @@ if TYPE_CHECKING:
 class Digest:
     """A Digest is a lightweight reference to a set of files known about by the engine.
 
-    You can use `await Get(Snapshot, Digest)` to set the file names referred to, or use
-    `await Get(DigestContents, Digest)` to see the actual file content.
+    You can use `await Get(Snapshot, Digest)` to set the file names referred to, or use `await
+    Get(DigestContents, Digest)` to see the actual file content.
     """
 
     fingerprint: str
