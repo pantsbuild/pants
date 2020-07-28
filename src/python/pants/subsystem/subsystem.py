@@ -7,6 +7,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Type, TypeVar, Union, cast
 
+from pants.base.deprecated import deprecated
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.optionable import Optionable, OptionableFactory
 from pants.option.options import Options
@@ -203,6 +204,9 @@ class Subsystem(Optionable):
         """
         return self._scoped_options
 
+    @deprecated(
+        removal_version="2.1.0.dev0", hint_message="Use the property `self.options` instead."
+    )
     def get_options(self) -> OptionValueContainer:
         """Returns the option values for this subsystem's scope.
 

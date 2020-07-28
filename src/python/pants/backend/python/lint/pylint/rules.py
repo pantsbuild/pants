@@ -21,7 +21,7 @@ from pants.backend.python.rules.python_sources import (
     UnstrippedPythonSourcesRequest,
 )
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
-from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
 from pants.backend.python.target_types import (
     PythonInterpreterCompatibility,
     PythonRequirementsField,
@@ -111,7 +111,7 @@ async def pylint_lint_partition(
     partition: PylintPartition,
     pylint: Pylint,
     python_setup: PythonSetup,
-    subprocess_encoding_environment: SubprocessEncodingEnvironment,
+    subprocess_environment: SubprocessEnvironment,
 ) -> LintResult:
     # We build one PEX with Pylint requirements and another with all direct 3rd-party dependencies.
     # Splitting this into two PEXes gives us finer-grained caching. We then merge via `--pex-path`.
@@ -129,9 +129,8 @@ async def pylint_lint_partition(
         Pex,
         PexRequest(
             output_filename="pylint.pex",
-            requirements=PexRequirements([*pylint.get_requirement_specs(), *plugin_requirements]),
+            requirements=PexRequirements([*pylint.all_requirements, *plugin_requirements]),
             interpreter_constraints=partition.interpreter_constraints,
-            entry_point=pylint.get_entry_point(),
         ),
     )
     requirements_pex_request = Get(
@@ -151,7 +150,7 @@ async def pylint_lint_partition(
         Pex,
         PexRequest(
             output_filename="pylint_runner.pex",
-            entry_point=pylint.get_entry_point(),
+            entry_point=pylint.entry_point,
             interpreter_constraints=partition.interpreter_constraints,
             additional_args=pylint_runner_pex_args,
         ),
@@ -233,7 +232,7 @@ async def pylint_lint_partition(
 
     process = pylint_runner_pex.create_process(
         python_setup=python_setup,
-        subprocess_encoding_environment=subprocess_encoding_environment,
+        subprocess_environment=subprocess_environment,
         pex_path="./pylint_runner.pex",
         env={"PEX_EXTRA_SYS_PATH": ":".join(pythonpath)},
         pex_args=generate_args(specified_source_files=specified_source_files, pylint=pylint),
@@ -288,7 +287,7 @@ async def pylint_lint(
                 *plugin_targets_compatibility_fields,
             ),
             python_setup,
-        ) or PexInterpreterConstraints(pylint.default_interpreter_constraints)
+        ) or PexInterpreterConstraints(pylint.interpreter_constraints)
         interpreter_constraints_to_target_setup[interpreter_constraints].add(target_setup)
 
     partitions = (

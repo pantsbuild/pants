@@ -1,6 +1,8 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from typing import Tuple, cast
+
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.option.custom_types import file_option, shell_str
 
@@ -38,5 +40,18 @@ class Isort(PythonToolBase):
             "--config",
             type=list,
             member_type=file_option,
+            advanced=True,
             help="Path to `isort.cfg` or alternative isort config file(s)",
         )
+
+    @property
+    def skip(self) -> bool:
+        return cast(bool, self.options.skip)
+
+    @property
+    def args(self) -> Tuple[str, ...]:
+        return tuple(self.options.args)
+
+    @property
+    def config(self) -> Tuple[str, ...]:
+        return tuple(self.options.config)

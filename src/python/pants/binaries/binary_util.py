@@ -287,7 +287,7 @@ class BinaryUtil:
         @classmethod
         def _create_for_cls(cls, binary_util_cls):
             # NB: We read global bootstrap options, but through our own scoped options instance.
-            options = cls.global_instance().get_options()
+            options = cls.global_instance().options
             binary_tool_fetcher = BinaryToolFetcher(
                 bootstrap_dir=options.pants_bootstrapdir,
                 timeout_secs=options.binaries_fetch_timeout_secs,

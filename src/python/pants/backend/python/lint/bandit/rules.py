@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Tuple
 
 from pants.backend.python.lint.bandit.subsystem import Bandit
 from pants.backend.python.rules import download_pex_bin, pex
@@ -13,7 +13,7 @@ from pants.backend.python.rules.pex import (
     PexRequirements,
 )
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
-from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
 from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonSources
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules import determine_source_files, strip_source_roots
@@ -51,9 +51,9 @@ class BanditPartition:
 
 def generate_args(*, specified_source_files: SourceFiles, bandit: Bandit) -> Tuple[str, ...]:
     args = []
-    if bandit.options.config is not None:
-        args.append(f"--config={bandit.options.config}")
-    args.extend(bandit.options.args)
+    if bandit.config is not None:
+        args.append(f"--config={bandit.config}")
+    args.extend(bandit.args)
     args.extend(specified_source_files.files)
     return tuple(args)
 
@@ -63,26 +63,25 @@ async def bandit_lint_partition(
     partition: BanditPartition,
     bandit: Bandit,
     python_setup: PythonSetup,
-    subprocess_encoding_environment: SubprocessEncodingEnvironment,
+    subprocess_environment: SubprocessEnvironment,
 ) -> LintResult:
     requirements_pex_request = Get(
         Pex,
         PexRequest(
             output_filename="bandit.pex",
-            requirements=PexRequirements(bandit.get_requirement_specs()),
+            requirements=PexRequirements(bandit.all_requirements),
             interpreter_constraints=(
                 partition.interpreter_constraints
-                or PexInterpreterConstraints(bandit.default_interpreter_constraints)
+                or PexInterpreterConstraints(bandit.interpreter_constraints)
             ),
-            entry_point=bandit.get_entry_point(),
+            entry_point=bandit.entry_point,
         ),
     )
 
-    config_path: Optional[str] = bandit.options.config
     config_digest_request = Get(
         Digest,
         PathGlobs(
-            globs=[config_path] if config_path else [],
+            globs=[bandit.config] if bandit.config else [],
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
             description_of_origin="the option `--bandit-config`",
         ),
@@ -116,7 +115,7 @@ async def bandit_lint_partition(
 
     process = requirements_pex.create_process(
         python_setup=python_setup,
-        subprocess_encoding_environment=subprocess_encoding_environment,
+        subprocess_environment=subprocess_environment,
         pex_path="./bandit.pex",
         pex_args=generate_args(specified_source_files=specified_source_files, bandit=bandit),
         input_digest=input_digest,
@@ -132,7 +131,7 @@ async def bandit_lint_partition(
 async def bandit_lint(
     request: BanditRequest, bandit: Bandit, python_setup: PythonSetup
 ) -> LintResults:
-    if bandit.options.skip:
+    if bandit.skip:
         return LintResults()
 
     # NB: Bandit output depends upon which Python interpreter version it's run with

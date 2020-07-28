@@ -3,7 +3,7 @@
 
 from typing import Any, Iterable, Mapping, Optional
 
-from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
 from pants.engine.fs import Digest
 from pants.engine.process import Process
 from pants.python.python_setup import PythonSetup
@@ -16,7 +16,7 @@ class HermeticPex:
     def create_process(
         self,
         python_setup: PythonSetup,
-        subprocess_encoding_environment: SubprocessEncodingEnvironment,
+        subprocess_environment: SubprocessEnvironment,
         *,
         pex_path: str,
         pex_args: Iterable[str],
@@ -29,7 +29,7 @@ class HermeticPex:
 
         :param python_setup: The parameters for selecting python interpreters to use when invoking
                              the PEX.
-        :param subprocess_encoding_environment: The locale settings to use for the PEX invocation.
+        :param subprocess_environment: The locale settings to use for the PEX invocation.
         :param pex_path: The path within `input_files` of the PEX file (or directory if a loose
                          pex).
         :param pex_args: The arguments to pass to the PEX executable.
@@ -53,7 +53,7 @@ class HermeticPex:
             PATH=create_path_env_var(python_setup.interpreter_search_paths),
             PEX_INHERIT_PATH="false",
             PEX_IGNORE_RCFILES="true",
-            **subprocess_encoding_environment.invocation_environment_dict,
+            **subprocess_environment.invocation_environment,
         )
         if env:
             hermetic_env.update(env)

@@ -54,8 +54,8 @@ async def create_ipython_repl_request(repl: IPythonRepl, ipython: IPython) -> Re
         PexFromTargetsRequest(
             (tgt.address for tgt in repl.targets),
             output_filename="ipython.pex",
-            entry_point=ipython.get_entry_point(),
-            additional_requirements=ipython.get_requirement_specs(),
+            entry_point=ipython.entry_point,
+            additional_requirements=ipython.all_requirements,
             include_source_files=True,
         ),
     )

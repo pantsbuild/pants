@@ -37,7 +37,7 @@ def scope_options(scope: Scope, options: _Options) -> ScopedOptions:
 
 @rule
 def log_level(global_options: GlobalOptions) -> LogLevel:
-    log_level: LogLevel = global_options.get_options().level
+    log_level: LogLevel = global_options.options.level
     return log_level
 
 

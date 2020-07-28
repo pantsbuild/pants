@@ -23,8 +23,8 @@ from typing_extensions import Protocol
 from pants.backend.python.rules.download_pex_bin import DownloadedPexBin
 from pants.backend.python.rules.hermetic_pex import HermeticPex
 from pants.backend.python.rules.util import parse_interpreter_constraint
-from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment
-from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.backend.python.subsystems.python_native_code import PythonNativeCode
+from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
 from pants.backend.python.target_types import PythonInterpreterCompatibility
 from pants.backend.python.target_types import PythonPlatforms as PythonPlatformsField
 from pants.backend.python.target_types import PythonRequirementsField
@@ -307,8 +307,8 @@ async def create_pex(
     pex_bin: DownloadedPexBin,
     python_setup: PythonSetup,
     python_repos: PythonRepos,
-    subprocess_encoding_environment: SubprocessEncodingEnvironment,
-    pex_build_environment: PexBuildEnvironment,
+    subprocess_environment: SubprocessEnvironment,
+    python_native_code: PythonNativeCode,
     platform: Platform,
     log_level: LogLevel,
 ) -> Pex:
@@ -415,8 +415,8 @@ async def create_pex(
                 PlatformConstraint(platform.value),
             ): pex_bin.create_process(
                 python_setup=python_setup,
-                subprocess_encoding_environment=subprocess_encoding_environment,
-                pex_build_environment=pex_build_environment,
+                subprocess_environment=subprocess_environment,
+                python_native_code=python_native_code,
                 pex_args=argv,
                 input_digest=merged_digest,
                 description=description,

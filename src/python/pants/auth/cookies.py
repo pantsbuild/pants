@@ -53,7 +53,7 @@ class Cookies(Subsystem):
 
     def _get_cookie_file(self):
         # We expanduser to make it easy for the user to config the cookies into their homedir.
-        return os.path.realpath(os.path.expanduser(self.get_options().path))
+        return os.path.realpath(os.path.expanduser(self.options.path))
 
     @memoized_property
     def _lock(self):

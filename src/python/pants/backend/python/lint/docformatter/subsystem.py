@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from typing import Tuple, cast
+
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.option.custom_types import shell_str
 
@@ -33,3 +35,11 @@ class Docformatter(PythonToolBase):
                 f'`--{cls.options_scope}-args="--wrap-summaries=100 --pre-summary-newline"`.'
             ),
         )
+
+    @property
+    def skip(self) -> bool:
+        return cast(bool, self.options.skip)
+
+    @property
+    def args(self) -> Tuple[str, ...]:
+        return tuple(self.options.args)

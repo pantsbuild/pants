@@ -5,7 +5,7 @@ import configparser
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import PurePath
-from typing import List, Optional, Sequence, Tuple
+from typing import List, Optional, Sequence, Tuple, cast
 
 from pants.backend.python.rules.pex import (
     Pex,
@@ -18,7 +18,7 @@ from pants.backend.python.rules.python_sources import (
     UnstrippedPythonSourcesRequest,
 )
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
-from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
 from pants.core.goals.test import (
     ConsoleCoverageReport,
     CoverageData,
@@ -128,6 +128,10 @@ class CoverageSubsystem(PythonToolBase):
     def output_dir(self) -> PurePath:
         return PurePath(self.options.output_dir)
 
+    @property
+    def config(self) -> Optional[str]:
+        return cast(Optional[str], self.options.config)
+
 
 @dataclass(frozen=True)
 class PytestCoverageData(CoverageData):
@@ -164,19 +168,18 @@ def _validate_and_update_config(
 
 @rule
 async def create_coverage_config(coverage: CoverageSubsystem) -> CoverageConfig:
-    config_path: Optional[str] = coverage.options.config
     coverage_config = configparser.ConfigParser()
-    if config_path:
+    if coverage.config:
         config_contents = await Get(
             DigestContents,
             PathGlobs(
-                globs=config_path,
+                globs=coverage.config,
                 glob_match_error_behavior=GlobMatchErrorBehavior.error,
                 description_of_origin=f"the option `--{coverage.options_scope}-config`",
             ),
         )
         coverage_config.read_string(config_contents[0].content.decode())
-    _validate_and_update_config(coverage_config, config_path)
+    _validate_and_update_config(coverage_config, coverage.config)
     config_stream = StringIO()
     coverage_config.write(config_stream)
     config_content = config_stream.getvalue()
@@ -195,11 +198,9 @@ async def setup_coverage(coverage: CoverageSubsystem) -> CoverageSetup:
         Pex,
         PexRequest(
             output_filename="coverage.pex",
-            requirements=PexRequirements(coverage.get_requirement_specs()),
-            interpreter_constraints=PexInterpreterConstraints(
-                coverage.default_interpreter_constraints
-            ),
-            entry_point=coverage.get_entry_point(),
+            requirements=PexRequirements(coverage.all_requirements),
+            interpreter_constraints=PexInterpreterConstraints(coverage.interpreter_constraints),
+            entry_point=coverage.entry_point,
         ),
     )
     return CoverageSetup(pex)
@@ -215,7 +216,7 @@ async def merge_coverage_data(
     data_collection: PytestCoverageDataCollection,
     coverage_setup: CoverageSetup,
     python_setup: PythonSetup,
-    subprocess_encoding_environment: SubprocessEncodingEnvironment,
+    subprocess_environment: SubprocessEnvironment,
 ) -> MergedCoverageData:
     if len(data_collection) == 1:
         return MergedCoverageData(data_collection[0].digest)
@@ -233,7 +234,7 @@ async def merge_coverage_data(
         output_files=(".coverage",),
         description=f"Merge {len(prefixes)} Pytest coverage reports.",
         python_setup=python_setup,
-        subprocess_encoding_environment=subprocess_encoding_environment,
+        subprocess_environment=subprocess_environment,
     )
     result = await Get(ProcessResult, Process, process)
     return MergedCoverageData(result.output_digest)
@@ -247,7 +248,7 @@ async def generate_coverage_reports(
     coverage_subsystem: CoverageSubsystem,
     transitive_targets: TransitiveTargets,
     python_setup: PythonSetup,
-    subprocess_encoding_environment: SubprocessEncodingEnvironment,
+    subprocess_environment: SubprocessEnvironment,
 ) -> CoverageReports:
     """Takes all Python test results and generates a single coverage report."""
     sources = await Get(
@@ -292,7 +293,7 @@ async def generate_coverage_reports(
                 output_files=("coverage.xml",) if report_type == CoverageReportType.XML else None,
                 description=f"Generate Pytest {report_type.report_name} coverage report.",
                 python_setup=python_setup,
-                subprocess_encoding_environment=subprocess_encoding_environment,
+                subprocess_environment=subprocess_environment,
             )
         )
     results = await MultiGet(Get(ProcessResult, Process, process) for process in processes)

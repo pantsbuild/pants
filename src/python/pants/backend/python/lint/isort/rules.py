@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from typing import Tuple
 
 from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.lint.python_fmt import PythonFmtRequest
@@ -14,7 +14,7 @@ from pants.backend.python.rules.pex import (
     PexRequirements,
 )
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
-from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
 from pants.backend.python.target_types import PythonSources
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
@@ -71,7 +71,7 @@ def generate_args(
     args = []
     if check_only:
         args.append("--check-only")
-    args.extend(isort.options.args)
+    args.extend(isort.args)
     args.extend(specified_source_files.files)
     return tuple(args)
 
@@ -81,25 +81,22 @@ async def setup(
     setup_request: SetupRequest,
     isort: Isort,
     python_setup: PythonSetup,
-    subprocess_encoding_environment: SubprocessEncodingEnvironment,
+    subprocess_environment: SubprocessEnvironment,
 ) -> Setup:
     requirements_pex_request = Get(
         Pex,
         PexRequest(
             output_filename="isort.pex",
-            requirements=PexRequirements(isort.get_requirement_specs()),
-            interpreter_constraints=PexInterpreterConstraints(
-                isort.default_interpreter_constraints
-            ),
-            entry_point=isort.get_entry_point(),
+            requirements=PexRequirements(isort.all_requirements),
+            interpreter_constraints=PexInterpreterConstraints(isort.interpreter_constraints),
+            entry_point=isort.entry_point,
         ),
     )
 
-    config_path: Optional[List[str]] = isort.options.config
     config_digest_request = Get(
         Digest,
         PathGlobs(
-            globs=config_path or (),
+            globs=isort.config,
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
             conjunction=GlobExpansionConjunction.all_match,
             description_of_origin="the option `--isort-config`",
@@ -144,7 +141,7 @@ async def setup(
 
     process = requirements_pex.create_process(
         python_setup=python_setup,
-        subprocess_encoding_environment=subprocess_encoding_environment,
+        subprocess_environment=subprocess_environment,
         pex_path="./isort.pex",
         pex_args=generate_args(
             specified_source_files=specified_source_files,
@@ -162,7 +159,7 @@ async def setup(
 
 @rule(desc="Format using isort")
 async def isort_fmt(request: IsortRequest, isort: Isort) -> FmtResult:
-    if isort.options.skip:
+    if isort.skip:
         return FmtResult.noop()
     setup = await Get(Setup, SetupRequest(request, check_only=False))
     result = await Get(ProcessResult, Process, setup.process)
@@ -176,7 +173,7 @@ async def isort_fmt(request: IsortRequest, isort: Isort) -> FmtResult:
 
 @rule(desc="Lint using isort")
 async def isort_lint(request: IsortRequest, isort: Isort) -> LintResults:
-    if isort.options.skip:
+    if isort.skip:
         return LintResults()
     setup = await Get(Setup, SetupRequest(request, check_only=True))
     result = await Get(FallibleProcessResult, Process, setup.process)
