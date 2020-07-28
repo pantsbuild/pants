@@ -235,7 +235,7 @@ class MockConsole:
     def __init__(self, use_colors=True):
         self.stdout = StringIO()
         self.stderr = StringIO()
-        self._use_colors = use_colors
+        self.use_colors = use_colors
 
     def write_stdout(self, payload):
         self.stdout.write(payload)
@@ -250,7 +250,7 @@ class MockConsole:
         print(payload, file=self.stderr)
 
     def _safe_color(self, text: str, color: Callable[[str], str]) -> str:
-        return color(text) if self._use_colors else text
+        return color(text) if self.use_colors else text
 
     def blue(self, text: str) -> str:
         return self._safe_color(text, blue)

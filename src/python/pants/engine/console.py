@@ -95,6 +95,10 @@ class Console:
         self.stdout.flush()
         self.stderr.flush()
 
+    @property
+    def use_colors(self):
+        return self._use_colors
+
     def _safe_color(self, text: str, color: Callable[[str], str]) -> str:
         """We should only output color when the global flag --colors is enabled."""
         return color(text) if self._use_colors else text

@@ -13,6 +13,7 @@ from pants.core.goals.test import (
     CoverageData,
     CoverageDataCollection,
     CoverageReports,
+    ShowOutput,
     Status,
     Test,
     TestDebugRequest,
@@ -137,12 +138,13 @@ class TestTest(TestBase):
         targets: List[TargetWithOrigin],
         debug: bool = False,
         use_coverage: bool = False,
+        output: ShowOutput = ShowOutput.ALL,
         include_sources: bool = True,
         valid_targets: bool = True,
     ) -> Tuple[int, str]:
         console = MockConsole(use_colors=False)
         test_subsystem = create_goal_subsystem(
-            TestSubsystem, debug=debug, use_coverage=use_coverage
+            TestSubsystem, debug=debug, use_coverage=use_coverage, output=output,
         )
         interactive_runner = InteractiveRunner(self.scheduler)
         workspace = Workspace(self.scheduler)
@@ -244,11 +246,12 @@ class TestTest(TestBase):
             field_set=SuccessfulFieldSet, targets=[self.make_target_with_origin(address)]
         )
         assert exit_code == 0
-        # NB: We don't render a summary when only running one target.
         assert stderr == dedent(
             f"""\
             ✓ {address}
             {SuccessfulFieldSet.stdout(address)}
+
+            {address}                                                                        .....   SUCCESS
             """
         )
 
@@ -275,6 +278,50 @@ class TestTest(TestBase):
             {good_address}                                                                         .....   SUCCESS
             {bad_address}                                                                          .....   FAILURE
             """
+        )
+
+    def test_output_failed(self) -> None:
+        good_address = Address.parse(":good")
+        bad_address = Address.parse(":bad")
+
+        exit_code, stderr = self.run_test_rule(
+            field_set=ConditionallySucceedsFieldSet,
+            targets=[
+                self.make_target_with_origin(good_address),
+                self.make_target_with_origin(bad_address),
+            ],
+            output=ShowOutput.FAILED,
+        )
+        assert exit_code == 1
+        assert stderr == dedent(
+            f"""\
+                𐄂 {bad_address}
+                {ConditionallySucceedsFieldSet.stderr(bad_address)}
+
+                {good_address}                                                                         .....   SUCCESS
+                {bad_address}                                                                          .....   FAILURE
+                """
+        )
+
+    def test_output_none(self) -> None:
+        good_address = Address.parse(":good")
+        bad_address = Address.parse(":bad")
+
+        exit_code, stderr = self.run_test_rule(
+            field_set=ConditionallySucceedsFieldSet,
+            targets=[
+                self.make_target_with_origin(good_address),
+                self.make_target_with_origin(bad_address),
+            ],
+            output=ShowOutput.NONE,
+        )
+        assert exit_code == 1
+        assert stderr == dedent(
+            f"""\
+
+                    {good_address}                                                                         .....   SUCCESS
+                    {bad_address}                                                                          .....   FAILURE
+                    """
         )
 
     def test_debug_target(self) -> None:
