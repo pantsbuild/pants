@@ -58,7 +58,9 @@ cat <<EOF >> "${COMMIT_MSG_FILEPATH}"
 EOF
 fi
 
-if [[ "${HAS_WHEELS_SKIP}" -eq 1 ]] && [ "${NUM_RELEASE_FILES}" -eq 0 ]; then
+# We only skip building wheels if on a PR build, even if the user put the skip label in the merged
+# commit message.
+if [[ "${TRAVIS_PULL_REQUEST}" -ne false ]] && [[ "${HAS_WHEELS_SKIP}" -eq 1 ]] && [ "${NUM_RELEASE_FILES}" -eq 0 ]; then
 cat <<EOF >> "${COMMIT_MSG_FILEPATH}"
 
 # Building wheels and fs_util will be skipped. Delete if not intended.
