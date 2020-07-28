@@ -5,7 +5,7 @@ import random
 import uuid
 from dataclasses import dataclass, field
 
-from pants.engine.rules import RootRule, _uncacheable_rule, register_rules
+from pants.engine.rules import RootRule, _uncacheable_rule, collect_rules
 
 
 @dataclass(frozen=True)
@@ -28,4 +28,4 @@ async def generate_uuid(_: UUIDRequest) -> uuid.UUID:
 
 
 def rules():
-    return [*register_rules(), RootRule(UUIDRequest)]
+    return [*collect_rules(), RootRule(UUIDRequest)]

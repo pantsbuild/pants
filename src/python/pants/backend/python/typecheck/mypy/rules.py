@@ -31,7 +31,7 @@ from pants.engine.fs import (
     PathGlobs,
 )
 from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import register_rules, rule
+from pants.engine.rules import collect_rules, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import FieldSetWithOrigin, TransitiveTargets
 from pants.engine.unions import UnionRule
@@ -134,7 +134,7 @@ async def mypy_lint(
 
 def rules():
     return [
-        *register_rules(),
+        *collect_rules(),
         UnionRule(TypecheckRequest, MyPyRequest),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),

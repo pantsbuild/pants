@@ -18,7 +18,7 @@ from pants.engine.fs import (
     RemovePrefix,
     Snapshot,
 )
-from pants.engine.rules import RootRule, register_rules, rule
+from pants.engine.rules import RootRule, collect_rules, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import HydratedSources, HydrateSourcesRequest
 from pants.engine.target import Sources as SourcesField
@@ -206,7 +206,7 @@ async def strip_source_roots_from_sources_field(
 
 def rules():
     return [
-        *register_rules(),
+        *collect_rules(),
         RootRule(StripSnapshotRequest),
         RootRule(StripSourcesFieldRequest),
     ]

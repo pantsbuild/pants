@@ -24,7 +24,7 @@ from pants.engine.internals.parser import Parser, SymbolTable
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.platform import create_platform_rules
-from pants.engine.rules import RootRule, register_rules, rule
+from pants.engine.rules import RootRule, collect_rules, rule
 from pants.engine.selectors import Params
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
@@ -285,7 +285,7 @@ class EngineInitializer:
         # Create a Scheduler containing graph and filesystem rules, with no installed goals.
         rules = FrozenOrderedSet(
             (
-                *register_rules(locals()),
+                *collect_rules(locals()),
                 RootRule(Console),
                 *fs.rules(),
                 *interactive_process.rules(),

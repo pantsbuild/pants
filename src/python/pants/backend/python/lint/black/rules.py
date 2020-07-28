@@ -28,7 +28,7 @@ from pants.core.util_rules.determine_source_files import (
 )
 from pants.engine.fs import EMPTY_SNAPSHOT, Digest, GlobMatchErrorBehavior, MergeDigests, PathGlobs
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
-from pants.engine.rules import register_rules, rule
+from pants.engine.rules import collect_rules, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import FieldSetWithOrigin
 from pants.engine.unions import UnionRule
@@ -188,7 +188,7 @@ async def black_lint(field_sets: BlackRequest, black: Black) -> LintResults:
 
 def rules():
     return [
-        *register_rules(),
+        *collect_rules(),
         UnionRule(PythonFmtRequest, BlackRequest),
         UnionRule(LintRequest, BlackRequest),
         *download_pex_bin.rules(),

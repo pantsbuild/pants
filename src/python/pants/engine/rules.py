@@ -423,10 +423,10 @@ class Rule(ABC):
         """An output `type` for the rule."""
 
 
-def register_rules(*namespaces: Union[ModuleType, Mapping[str, Any]]) -> Iterable[Rule]:
-    """Registers all @rules in the given namespaces.
+def collect_rules(*namespaces: Union[ModuleType, Mapping[str, Any]]) -> Iterable[Rule]:
+    """Collects all @rules in the given namespaces.
 
-    If no namespaces are given, registers all the @rules in the caller's module namespace.
+    If no namespaces are given, collects all the @rules in the caller's module namespace.
     """
     if not namespaces:
         currentframe = inspect.currentframe()

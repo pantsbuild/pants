@@ -11,7 +11,7 @@ from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, Digest, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import register_rules, rule
+from pants.engine.rules import collect_rules, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import GeneratedSources, GenerateSourcesRequest, Sources, TransitiveTargets
 from pants.engine.unions import UnionRule
@@ -121,6 +121,6 @@ async def generate_python_from_protobuf(
 
 def rules():
     return [
-        *register_rules(),
+        *collect_rules(),
         UnionRule(GenerateSourcesRequest, GeneratePythonFromProtobufRequest),
     ]

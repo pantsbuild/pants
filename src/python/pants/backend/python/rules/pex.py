@@ -41,7 +41,7 @@ from pants.engine.fs import (
 )
 from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.process import MultiPlatformProcess, ProcessResult
-from pants.engine.rules import RootRule, register_rules, rule
+from pants.engine.rules import RootRule, collect_rules, rule
 from pants.engine.selectors import Get
 from pants.python.python_repos import PythonRepos
 from pants.python.python_setup import PythonSetup
@@ -482,7 +482,7 @@ async def two_step_create_pex(two_step_pex_request: TwoStepPexRequest) -> TwoSte
 
 def rules():
     return [
-        *register_rules(),
+        *collect_rules(),
         RootRule(PexRequest),
         RootRule(TwoStepPexRequest),
     ]

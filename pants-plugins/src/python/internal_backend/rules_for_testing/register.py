@@ -4,7 +4,7 @@
 from pants.engine.addresses import Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.rules import goal_rule, register_rules
+from pants.engine.rules import collect_rules, goal_rule
 
 
 class ListAndDieForTestingSubsystem(GoalSubsystem):
@@ -25,4 +25,4 @@ def fast_list_and_die_for_testing(console: Console, addresses: Addresses) -> Lis
 
 
 def rules():
-    return register_rules()
+    return collect_rules()

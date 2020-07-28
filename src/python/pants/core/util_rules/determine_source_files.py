@@ -12,7 +12,7 @@ from pants.core.util_rules.strip_source_roots import (
 )
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestSubset, MergeDigests, PathGlobs, Snapshot
-from pants.engine.rules import RootRule, register_rules, rule
+from pants.engine.rules import RootRule, collect_rules, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import HydratedSources, HydrateSourcesRequest
 from pants.engine.target import Sources as SourcesField
@@ -187,7 +187,7 @@ async def determine_specified_source_files(request: SpecifiedSourceFilesRequest)
 
 def rules():
     return [
-        *register_rules(),
+        *collect_rules(),
         RootRule(AllSourceFilesRequest),
         RootRule(SpecifiedSourceFilesRequest),
         *strip_source_roots.rules(),

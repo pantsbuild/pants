@@ -33,7 +33,7 @@ from pants.engine.fs import (
     PathGlobs,
 )
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
-from pants.engine.rules import register_rules, rule
+from pants.engine.rules import collect_rules, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import FieldSetWithOrigin
 from pants.engine.unions import UnionRule
@@ -192,7 +192,7 @@ async def isort_lint(request: IsortRequest, isort: Isort) -> LintResults:
 
 def rules():
     return [
-        *register_rules(),
+        *collect_rules(),
         UnionRule(PythonFmtRequest, IsortRequest),
         UnionRule(LintRequest, IsortRequest),
         *download_pex_bin.rules(),

@@ -5,7 +5,7 @@ import os
 from dataclasses import dataclass
 from typing import Dict, Tuple
 
-from pants.engine.rules import register_rules, rule
+from pants.engine.rules import collect_rules, rule
 from pants.subsystem.subsystem import Subsystem
 from pants.util.strutil import safe_shlex_join, safe_shlex_split
 
@@ -59,4 +59,4 @@ def create_pex_native_build_environment(
 
 
 def rules():
-    return register_rules()
+    return collect_rules()

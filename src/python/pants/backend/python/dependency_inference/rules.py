@@ -16,7 +16,7 @@ from pants.core.util_rules.strip_source_roots import (
 )
 from pants.engine.fs import Digest, DigestContents
 from pants.engine.internals.graph import Owners, OwnersRequest
-from pants.engine.rules import register_rules, rule
+from pants.engine.rules import collect_rules, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
     HydratedSources,
@@ -158,7 +158,7 @@ async def infer_python_conftest_dependencies(
 
 def rules():
     return [
-        *register_rules(),
+        *collect_rules(),
         *inject_ancestor_files.rules(),
         *module_mapper.rules(),
         UnionRule(InferDependenciesRequest, InferPythonDependencies),

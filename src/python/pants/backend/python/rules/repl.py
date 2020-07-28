@@ -11,7 +11,7 @@ from pants.backend.python.subsystems.ipython import IPython
 from pants.backend.python.target_types import PythonSources
 from pants.core.goals.repl import ReplImplementation, ReplRequest
 from pants.engine.fs import Digest, MergeDigests
-from pants.engine.rules import register_rules, rule
+from pants.engine.rules import collect_rules, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.unions import UnionRule
 
@@ -74,7 +74,7 @@ async def create_ipython_repl_request(repl: IPythonRepl, ipython: IPython) -> Re
 
 def rules():
     return [
-        *register_rules(),
+        *collect_rules(),
         UnionRule(ReplImplementation, PythonRepl),
         UnionRule(ReplImplementation, IPythonRepl),
     ]

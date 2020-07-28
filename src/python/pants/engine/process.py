@@ -8,7 +8,7 @@ from typing import Dict, Iterable, Mapping, Optional, Tuple, Union
 
 from pants.engine.fs import EMPTY_DIGEST, Digest
 from pants.engine.platform import Platform, PlatformConstraint
-from pants.engine.rules import RootRule, register_rules, rule
+from pants.engine.rules import RootRule, collect_rules, rule
 from pants.util.meta import frozen_after_init
 
 logger = logging.getLogger(__name__)
@@ -233,7 +233,7 @@ def remove_platform_information(res: FallibleProcessResultWithPlatform,) -> Fall
 def rules():
     """Creates rules that consume the intrinsic filesystem types."""
     return [
-        *register_rules(),
+        *collect_rules(),
         RootRule(Process),
         RootRule(MultiPlatformProcess),
     ]

@@ -37,7 +37,7 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import register_rules, rule
+from pants.engine.rules import collect_rules, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import FieldSetWithOrigin
 from pants.engine.unions import UnionRule
@@ -190,7 +190,7 @@ async def flake8_lint(
 
 def rules():
     return [
-        *register_rules(),
+        *collect_rules(),
         UnionRule(LintRequest, Flake8Request),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),

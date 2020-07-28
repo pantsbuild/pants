@@ -20,7 +20,7 @@ from pants.engine.fs import (
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import goal_rule, register_rules
+from pants.engine.rules import collect_rules, goal_rule
 from pants.engine.selectors import Get
 from pants.util.strutil import pluralize
 
@@ -131,4 +131,4 @@ async def run_cloc(
 
 
 def rules():
-    return register_rules()
+    return collect_rules()

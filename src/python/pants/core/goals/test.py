@@ -22,7 +22,7 @@ from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.interactive_process import InteractiveProcess, InteractiveRunner
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import goal_rule, register_rules, rule
+from pants.engine.rules import collect_rules, goal_rule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
     FieldSetWithOrigin,
@@ -385,4 +385,4 @@ async def coordinator_of_tests(wrapped_field_set: WrappedTestFieldSet) -> Addres
 
 
 def rules():
-    return register_rules()
+    return collect_rules()

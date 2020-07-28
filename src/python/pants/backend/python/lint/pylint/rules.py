@@ -40,7 +40,7 @@ from pants.engine.fs import (
     PathGlobs,
 )
 from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import register_rules, rule
+from pants.engine.rules import collect_rules, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import (
     Dependencies,
@@ -310,7 +310,7 @@ async def pylint_lint(
 
 def rules():
     return [
-        *register_rules(),
+        *collect_rules(),
         UnionRule(LintRequest, PylintRequest),
         *download_pex_bin.rules(),
         *determine_source_files.rules(),

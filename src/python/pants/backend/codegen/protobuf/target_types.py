@@ -3,7 +3,7 @@
 
 from pants.backend.codegen.protobuf.protoc import Protoc
 from pants.engine.addresses import Address
-from pants.engine.rules import register_rules, rule
+from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     Dependencies,
@@ -51,6 +51,6 @@ def inject_dependencies(_: InjectProtobufDependencies, protoc: Protoc) -> Inject
 
 def rules():
     return [
-        *register_rules(),
+        *collect_rules(),
         UnionRule(InjectDependenciesRequest, InjectProtobufDependencies),
     ]

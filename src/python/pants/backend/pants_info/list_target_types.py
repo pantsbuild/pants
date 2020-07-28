@@ -8,7 +8,7 @@ from typing import Generic, Optional, Sequence, Type, cast, get_type_hints
 from pants.core.util_rules.pants_bin import PantsBin
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
-from pants.engine.rules import goal_rule, register_rules
+from pants.engine.rules import collect_rules, goal_rule
 from pants.engine.target import (
     AsyncField,
     BoolField,
@@ -249,4 +249,4 @@ def list_target_types(
 
 
 def rules():
-    return register_rules()
+    return collect_rules()
