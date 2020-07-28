@@ -23,13 +23,19 @@ from pants.backend.python.typecheck.mypy.subsystem import MyPy
 from pants.core.goals.typecheck import TypecheckRequest, TypecheckResult, TypecheckResults
 from pants.core.util_rules import determine_source_files, pants_bin, strip_source_roots
 from pants.engine.addresses import Addresses
-from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, PathGlobs
+from pants.engine.fs import (
+    CreateDigest,
+    Digest,
+    FileContent,
+    GlobMatchErrorBehavior,
+    MergeDigests,
+    PathGlobs,
+)
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import SubsystemRule, rule
 from pants.engine.selectors import Get, MultiGet
 from pants.engine.target import FieldSetWithOrigin, TransitiveTargets
 from pants.engine.unions import UnionRule
-from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
 from pants.util.strutil import pluralize
 

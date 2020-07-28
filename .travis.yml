@@ -370,7 +370,7 @@ jobs:
     dist: xenial
     env:
     - CACHE_NAME=clippy
-    if: commit_message !~ /\[ci skip-rust-tests\]/
+    if: commit_message !~ /\[ci skip-rust\]/
     name: Clippy (Rust linter)
     os: linux
     script:
@@ -530,7 +530,7 @@ jobs:
     env:
     - CACHE_NAME=rust_tests.linux
     - LD_LIBRARY_PATH="/opt/python/3.6.7/lib:${LD_LIBRARY_PATH}"
-    if: commit_message !~ /\[ci skip-rust-tests\]/
+    if: commit_message !~ /\[ci skip-rust\]/
     name: Rust tests - Linux
     os: linux
     script:
@@ -563,7 +563,7 @@ jobs:
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY37_VERSION}/bin:${PATH}"
     - PATH="${PYENV_ROOT}/versions/${PYENV_PY38_VERSION}/bin:${PATH}"
     - CACHE_NAME=rust_tests.osx
-    if: commit_message !~ /\[ci skip-rust-tests\]/
+    if: commit_message !~ /\[ci skip-rust\]/
     name: Rust tests - OSX
     os: osx
     osx_image: xcode8
@@ -615,6 +615,7 @@ jobs:
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
     - PREPARE_DEPLOY=1
     - CACHE_NAME=wheels.linux
+    if: commit_message !~ /\[ci skip-build-wheels\]/
     language: python
     name: Build Linux wheels and fs_util
     os: linux
@@ -667,6 +668,7 @@ jobs:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py36.osx
     - PREPARE_DEPLOY=1
     - CACHE_NAME=wheels.osx
+    if: commit_message !~ /\[ci skip-build-wheels\]/
     language: generic
     name: Build macOS wheels and fs_util
     os: osx

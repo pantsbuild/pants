@@ -163,11 +163,31 @@ def _detect_cycles(
     path_stack: OrderedSet[Address] = OrderedSet()
     visited: Set[Address] = set()
 
+    def maybe_report_cycle(address: Address) -> None:
+        # NB: File-level dependencies are cycle tolerant.
+        if address.generated_base_target_name or address not in path_stack:
+            return
+
+        # The path of the cycle is shorter than the entire path to the cycle: if the suffix of
+        # the path representing the cycle contains a file dep, it is ignored.
+        in_cycle = False
+        for path_address in path_stack:
+            if in_cycle and path_address.generated_base_target_name:
+                # There is a file address inside the cycle: do not report it.
+                return
+            elif in_cycle:
+                # Not a file address.
+                continue
+            else:
+                # We're entering the suffix of the path that contains the cycle if we've reached
+                # the address in question.
+                in_cycle = path_address == address
+        # If we did not break out early, it's because there were no file addresses in the cycle.
+        raise CycleException(address, (*path_stack, address))
+
     def visit(address: Address):
         if address in visited:
-            # NB: File-level dependencies are cycle tolerant.
-            if not address.generated_base_target_name and address in path_stack:
-                raise CycleException(address, (*path_stack, address))
+            maybe_report_cycle(address)
             return
         path_stack.add(address)
         visited.add(address)

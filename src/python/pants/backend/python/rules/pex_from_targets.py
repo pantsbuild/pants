@@ -24,12 +24,17 @@ from pants.backend.python.target_types import (
     PythonRequirementsField,
 )
 from pants.engine.addresses import Address, Addresses
-from pants.engine.fs import Digest, DigestContents, MergeDigests, PathGlobs
+from pants.engine.fs import (
+    Digest,
+    DigestContents,
+    GlobExpansionConjunction,
+    GlobMatchErrorBehavior,
+    MergeDigests,
+    PathGlobs,
+)
 from pants.engine.rules import RootRule, rule
 from pants.engine.selectors import Get
 from pants.engine.target import TransitiveTargets
-from pants.option.custom_types import GlobExpansionConjunction
-from pants.option.global_options import GlobMatchErrorBehavior
 from pants.python.python_setup import PythonSetup
 from pants.util.meta import frozen_after_init
 

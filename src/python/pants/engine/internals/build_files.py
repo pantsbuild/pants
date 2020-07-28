@@ -17,13 +17,12 @@ from pants.engine.addresses import (
     BuildFileAddress,
     BuildFileAddresses,
 )
-from pants.engine.fs import DigestContents, PathGlobs, Snapshot
+from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, Snapshot
 from pants.engine.internals.mapper import AddressFamily, AddressMap, AddressMapper
 from pants.engine.internals.parser import BuildFilePreludeSymbols, error_on_imports
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import rule
 from pants.engine.selectors import Get, MultiGet
-from pants.option.global_options import GlobMatchErrorBehavior
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import OrderedSet
 

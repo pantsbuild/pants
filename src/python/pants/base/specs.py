@@ -8,9 +8,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple, Union, cast
 
 from pants.engine.collection import Collection
-from pants.engine.fs import PathGlobs
-from pants.option.custom_types import GlobExpansionConjunction
-from pants.option.global_options import GlobMatchErrorBehavior
+from pants.engine.fs import GlobExpansionConjunction, GlobMatchErrorBehavior, PathGlobs
 from pants.util.collections import assert_single_element
 from pants.util.dirutil import fast_relpath_optional, recursive_dirname
 from pants.util.filtering import and_filters, create_filters
