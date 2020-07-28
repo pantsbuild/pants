@@ -14,9 +14,7 @@ DIRS_TO_CHECK=(
 )
 
 non_empty_files=$(find "${DIRS_TO_CHECK[@]}" -type f -name "__init__.py" -not -empty)
-
-if (( ${#non_empty_files[@]} > 0 ))
-then
+if [[ ${non_empty_files[@]} > 0 ]]; then
   echo "ERROR: All '__init__.py' files should be empty, but the following contain code:"
   echo "---"
   echo "${non_empty_files[*]}"
