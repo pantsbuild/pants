@@ -82,7 +82,7 @@ Bugfixes
 * Fix dependency cycle between `backend/native/subsystems` and `backend/python/subsystems` (#7793)
   `PR #7793 <https://github.com/pantsbuild/pants/pull/7793>`_
 
-* Fix `create_subprocess_environment` rule. (#7789)
+* Fix `create_subprocess_encoding_environment` rule. (#7789)
   `PR #7789 <https://github.com/pantsbuild/pants/pull/7789>`_
 
 New Features
