@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 from typing import Tuple
 
-from pants.backend.python.rules import download_pex_bin, pex
+from pants.backend.python.rules import download_pex_bin, pex, python_sources
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
@@ -140,6 +140,7 @@ def rules():
         *determine_source_files.rules(),
         *pants_bin.rules(),
         *pex.rules(),
+        *python_sources.rules(),
         *python_native_code.rules(),
         *strip_source_roots.rules(),
         *subprocess_environment.rules(),

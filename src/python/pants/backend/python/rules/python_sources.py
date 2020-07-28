@@ -142,5 +142,6 @@ def rules():
     return [
         *collect_rules(),
         *determine_source_files.rules(),
+        RootRule(StrippedPythonSourcesRequest),
         RootRule(UnstrippedPythonSourcesRequest),
     ]
