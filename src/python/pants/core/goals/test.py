@@ -200,6 +200,14 @@ class CoverageReports:
         return tuple(report_paths)
 
 
+class ShowOutput(Enum):
+    """Which tests to emit detailed output for."""
+
+    ALL = "all"
+    FAILED = "failed"
+    NONE = "none"
+
+
 class TestSubsystem(GoalSubsystem):
     """Run tests."""
 
@@ -227,6 +235,12 @@ class TestSubsystem(GoalSubsystem):
             type=bool,
             default=False,
             help="Force the tests to run, even if they could be satisfied from cache.",
+        )
+        register(
+            "--show-output",
+            type=ShowOutput,
+            default=ShowOutput.FAILED,
+            help="Show stdout/stderr for these tests.",
         )
         register(
             "--use-coverage",
@@ -307,11 +321,13 @@ async def run_tests(
         for field_set in field_sets_with_sources
     )
 
-    exit_code = PANTS_SUCCEEDED_EXIT_CODE
-
+    # Print details.
     for result in results:
-        if result.test_result.status == Status.FAILURE:
-            exit_code = PANTS_FAILED_EXIT_CODE
+        if test_subsystem.options.show_output == ShowOutput.NONE or (
+            test_subsystem.options.show_output == ShowOutput.FAILED
+            and result.test_result.status == Status.SUCCESS
+        ):
+            continue
         has_output = result.test_result.stdout or result.test_result.stderr
         if has_output:
             status = (
@@ -328,12 +344,11 @@ async def run_tests(
             console.print_stderr("")
 
     # Print summary
-    if len(results) > 1:
-        console.print_stderr("")
-        for result in results:
-            console.print_stderr(
-                f"{result.address.reference():80}.....{result.test_result.status.value:>10}"
-            )
+    console.print_stderr("")
+    for result in results:
+        console.print_stderr(
+            f"{result.address.reference():80}.....{result.test_result.status.value:>10}"
+        )
 
     merged_xml_results = await Get(
         Digest,
@@ -373,6 +388,12 @@ async def run_tests(
 
         if coverage_report_files and test_subsystem.open_coverage:
             desktop.ui_open(console, interactive_runner, coverage_report_files)
+
+    exit_code = (
+        PANTS_FAILED_EXIT_CODE
+        if any(res.test_result.status == Status.FAILURE for res in results)
+        else PANTS_SUCCEEDED_EXIT_CODE
+    )
 
     return Test(exit_code)
 
