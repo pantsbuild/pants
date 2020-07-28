@@ -1453,6 +1453,7 @@ class OptionsTest(TestBase):
                         "option_name_check_distance": 2,
                         # If bootstrap option values are provided, this option is accessed and must be provided.
                         "spec_files": [],
+                        "spec_file": RankedValue(Rank.HARDCODED, []),
                     },
                 }
             )
