@@ -138,13 +138,13 @@ class TestTest(TestBase):
         targets: List[TargetWithOrigin],
         debug: bool = False,
         use_coverage: bool = False,
-        show_output: ShowOutput = ShowOutput.ALL,
+        output: ShowOutput = ShowOutput.ALL,
         include_sources: bool = True,
         valid_targets: bool = True,
     ) -> Tuple[int, str]:
         console = MockConsole(use_colors=False)
         test_subsystem = create_goal_subsystem(
-            TestSubsystem, debug=debug, use_coverage=use_coverage, show_output=show_output,
+            TestSubsystem, debug=debug, use_coverage=use_coverage, output=output,
         )
         interactive_runner = InteractiveRunner(self.scheduler)
         workspace = Workspace(self.scheduler)
@@ -280,7 +280,7 @@ class TestTest(TestBase):
             """
         )
 
-    def test_show_output_failed(self) -> None:
+    def test_output_failed(self) -> None:
         good_address = Address.parse(":good")
         bad_address = Address.parse(":bad")
 
@@ -290,7 +290,7 @@ class TestTest(TestBase):
                 self.make_target_with_origin(good_address),
                 self.make_target_with_origin(bad_address),
             ],
-            show_output=ShowOutput.FAILED,
+            output=ShowOutput.FAILED,
         )
         assert exit_code == 1
         assert stderr == dedent(
@@ -303,7 +303,7 @@ class TestTest(TestBase):
                 """
         )
 
-    def test_show_output_none(self) -> None:
+    def test_output_none(self) -> None:
         good_address = Address.parse(":good")
         bad_address = Address.parse(":bad")
 
@@ -313,7 +313,7 @@ class TestTest(TestBase):
                 self.make_target_with_origin(good_address),
                 self.make_target_with_origin(bad_address),
             ],
-            show_output=ShowOutput.NONE,
+            output=ShowOutput.NONE,
         )
         assert exit_code == 1
         assert stderr == dedent(

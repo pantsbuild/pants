@@ -237,7 +237,7 @@ class TestSubsystem(GoalSubsystem):
             help="Force the tests to run, even if they could be satisfied from cache.",
         )
         register(
-            "--show-output",
+            "--output",
             type=ShowOutput,
             default=ShowOutput.FAILED,
             help="Show stdout/stderr for these tests.",
@@ -265,6 +265,10 @@ class TestSubsystem(GoalSubsystem):
     @property
     def force(self) -> bool:
         return cast(bool, self.options.force)
+
+    @property
+    def output(self) -> ShowOutput:
+        return cast(ShowOutput, self.options.output)
 
     @property
     def use_coverage(self) -> bool:
@@ -323,8 +327,8 @@ async def run_tests(
 
     # Print details.
     for result in results:
-        if test_subsystem.options.show_output == ShowOutput.NONE or (
-            test_subsystem.options.show_output == ShowOutput.FAILED
+        if test_subsystem.options.output == ShowOutput.NONE or (
+            test_subsystem.options.output == ShowOutput.FAILED
             and result.test_result.status == Status.SUCCESS
         ):
             continue
@@ -346,8 +350,16 @@ async def run_tests(
     # Print summary
     console.print_stderr("")
     for result in results:
+        color = console.green if result.test_result.status == Status.SUCCESS else console.red
+        # The right-align logic sees the color control codes as characters, so we have
+        # to account for that. In f-strings the alignment field widths must be literals,
+        # so we have to indirect via a call to .format().
+        right_align = 19 if console.use_colors else 10
+        format_str = f"{{addr:80}}.....{{result:>{right_align}}}"
         console.print_stderr(
-            f"{result.address.reference():80}.....{result.test_result.status.value:>10}"
+            format_str.format(
+                addr=result.address.reference(), result=color(result.test_result.status.value)
+            )
         )
 
     merged_xml_results = await Get(
