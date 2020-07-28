@@ -296,10 +296,9 @@ class Target(ABC):
 
     @final
     @memoized_classproperty
-    def _anonymous_plugin_field_cls(cls) -> Type:
-        # NB: We make this a method, rather than using a static class, to ensure that every
-        # subclass has a distinct `.PluginField` class. This ensures that registering a plugin
-        # field on one target won't register it on other unrelated targets.
+    def _plugin_field_cls(cls) -> Type:
+        # NB: We ensure that each Target subtype has its own `PluginField` class so that
+        # registering a plugin field doesn't leak across target types.
 
         @union
         class PluginField:
@@ -324,9 +323,7 @@ class Target(ABC):
     @final
     @classmethod
     def _find_plugin_fields(cls, union_membership: UnionMembership) -> Tuple[Type[Field], ...]:
-        return cast(
-            Tuple[Type[Field], ...], tuple(union_membership.get(cls._anonymous_plugin_field_cls))
-        )
+        return cast(Tuple[Type[Field], ...], tuple(union_membership.get(cls._plugin_field_cls)))
 
     @final
     @classmethod
@@ -480,7 +477,7 @@ class Target(ABC):
         `MyTarget.register_plugin_field(NewField)`. This will register `NewField` as a first-class
         citizen. Plugins can use this new field like any other.
         """
-        return UnionRule(cls._anonymous_plugin_field_cls, field)
+        return UnionRule(cls._plugin_field_cls, field)
 
 
 @dataclass(frozen=True)
