@@ -41,8 +41,7 @@ from pants.engine.fs import (
 )
 from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.process import MultiPlatformProcess, ProcessResult
-from pants.engine.rules import RootRule, collect_rules, rule
-from pants.engine.selectors import Get
+from pants.engine.rules import Get, RootRule, collect_rules, rule
 from pants.python.python_repos import PythonRepos
 from pants.python.python_setup import PythonSetup
 from pants.util.frozendict import FrozenDict

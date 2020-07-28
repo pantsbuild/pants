@@ -32,8 +32,7 @@ from pants.engine.fs import (
     MergeDigests,
     PathGlobs,
 )
-from pants.engine.rules import RootRule, collect_rules, rule
-from pants.engine.selectors import Get
+from pants.engine.rules import Get, RootRule, collect_rules, rule
 from pants.engine.target import TransitiveTargets
 from pants.python.python_setup import PythonSetup
 from pants.util.meta import frozen_after_init

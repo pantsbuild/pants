@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.internals.selectors import Get, MultiGet
 
 
 class AClass:

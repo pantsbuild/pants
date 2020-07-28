@@ -40,10 +40,10 @@ from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import RootRule
-from pants.engine.selectors import Params
 from pants.engine.target import Target, Targets, WrappedTarget
 from pants.python.python_requirement import PythonRequirement
 from pants.source.source_root import SourceRootConfig
+from pants.testutil.engine.util import Params
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 

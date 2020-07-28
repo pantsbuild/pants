@@ -10,13 +10,13 @@ from pants.backend.codegen.protobuf.target_types import ProtobufLibrary, Protobu
 from pants.core.util_rules import determine_source_files
 from pants.engine.addresses import Address
 from pants.engine.rules import RootRule
-from pants.engine.selectors import Params
 from pants.engine.target import (
     GeneratedSources,
     HydratedSources,
     HydrateSourcesRequest,
     WrappedTarget,
 )
+from pants.testutil.engine.util import Params
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option.util import create_options_bootstrapper
 

@@ -10,8 +10,7 @@ from pants.engine.console import Console
 from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import ProcessResult
-from pants.engine.rules import collect_rules, goal_rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import Field, Target, TargetsWithOrigins
 from pants.engine.unions import UnionMembership, union
 from pants.util.strutil import strip_v2_chroot_path

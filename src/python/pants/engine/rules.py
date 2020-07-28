@@ -24,7 +24,9 @@ from typing import (
 )
 
 from pants.engine.goal import Goal
-from pants.engine.selectors import GetConstraints
+from pants.engine.internals.selectors import Get as Get  # noqa: F401
+from pants.engine.internals.selectors import GetConstraints
+from pants.engine.internals.selectors import MultiGet as MultiGet  # noqa: F401
 from pants.engine.unions import UnionRule
 from pants.option.optionable import OptionableFactory
 from pants.util.collections import assert_single_element

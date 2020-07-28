@@ -23,7 +23,8 @@ from colors import blue, cyan, green, magenta, red
 
 from pants.engine.goal import GoalSubsystem
 from pants.engine.internals.native import Native
-from pants.engine.selectors import Get
+from pants.engine.internals.selectors import Params as Params  # noqa: F401
+from pants.engine.rules import Get
 from pants.engine.unions import UnionMembership
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.ranked_value import Rank, RankedValue, Value

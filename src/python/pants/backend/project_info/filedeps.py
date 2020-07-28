@@ -9,8 +9,7 @@ from pants.base.build_root import BuildRoot
 from pants.engine.addresses import Address, Addresses, BuildFileAddress
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
-from pants.engine.rules import collect_rules, goal_rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import (
     HydratedSources,
     HydrateSourcesRequest,

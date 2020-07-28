@@ -13,8 +13,7 @@ from pants.engine.process import (
     ProcessExecutionFailure,
     ProcessResult,
 )
-from pants.engine.rules import RootRule, rule
-from pants.engine.selectors import Get
+from pants.engine.rules import Get, RootRule, rule
 from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
 

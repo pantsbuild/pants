@@ -9,8 +9,7 @@ from typing import List
 from pants.core.util_rules.archive import ExtractedDigest, MaybeExtractable
 from pants.engine.fs import Digest, DownloadFile
 from pants.engine.platform import Platform
-from pants.engine.rules import RootRule, collect_rules, rule
-from pants.engine.selectors import Get
+from pants.engine.rules import Get, RootRule, collect_rules, rule
 from pants.subsystem.subsystem import Subsystem
 from pants.util.meta import classproperty
 
