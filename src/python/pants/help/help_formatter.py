@@ -96,9 +96,7 @@ class HelpFormatter:
             f"{indent}{'  ' if i != 0 else ''}{self._maybe_cyan(s)}"
             for i, s in enumerate(wrap(f"{choices}", 96))
         ]
-        default_lines = format_value(
-            RankedValue(Rank.HARDCODED, ohi.default_str), "default: ", indent
-        )
+        default_lines = format_value(RankedValue(Rank.HARDCODED, ohi.default), "default: ", indent)
         if not ohi.value_history:
             # Should never happen, but this keeps mypy happy.
             raise ValueError("No value history - options not parsed.")

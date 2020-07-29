@@ -14,6 +14,8 @@ from typing import Dict, Iterable, Optional, cast
 import pystache
 import requests
 
+from pants.help.help_info_extracter import to_help_str
+
 logger = logging.getLogger(__name__)
 
 
@@ -125,9 +127,9 @@ class ReferenceGenerator:
         # Process the option data.
 
         def munge_option(option_data):
-            # Munge the default str so we can display it nicely when it's multiline, while
+            # Munge the default so we can display it nicely when it's multiline, while
             # still displaying it inline if it's not.
-            default_str = option_data["default_str"]
+            default_str = to_help_str(option_data["default"])
             escaped_default_str = html.escape(default_str, quote=False)
             if "\n" in default_str:
                 option_data["marked_up_default"] = f"<pre>{escaped_default_str}</pre>"
