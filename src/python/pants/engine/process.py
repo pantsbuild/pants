@@ -331,31 +331,25 @@ class BinaryPaths(EngineAware):
 @rule(desc="Find binary path")
 async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
     # TODO(John Sirois): Replace this script with a statically linked native binary so we don't
-    #  depend on either /usr/bin/env or bash being available on the Process host.
+    #  depend on either /bin/bash being available on the Process host.
+    # TODO: Once we stop using Google RBE, add a shebang to the script `/usr/bin/env bash`, rather
+    #  than running the binary `/bin/bash`. We hit a 26 "Text File Busy" error, which we suspect is
+    #  from RBE not having fsynced the ./script.sh file.
     script_path = "./script.sh"
+    script_content = dedent(
+        """
+        set -euo pipefail
+
+        if command -v which > /dev/null; then
+            command which -a $1
+        else
+            command -v $1
+        fi
+        """
+    )
     script_digest = await Get(
         Digest,
-        CreateDigest(
-            [
-                FileContent(
-                    script_path,
-                    content=dedent(
-                        """
-                        #!/usr/bin/env bash
-
-                        set -euo pipefail
-
-                        if command -v which > /dev/null; then
-                            command which -a $1
-                        else
-                            command -v $1
-                        fi
-                        """
-                    ).encode(),
-                    is_executable=True,
-                )
-            ]
-        ),
+        CreateDigest([FileContent(script_path, script_content.encode(), is_executable=True)]),
     )
 
     paths = []
@@ -365,7 +359,7 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
         Process(
             description=f"Searching for `{request.binary_name}` on PATH={search_path}",
             input_digest=script_digest,
-            argv=[script_path, request.binary_name],
+            argv=["/bin/bash", script_path, request.binary_name],
             env={"PATH": search_path},
         ),
     )
