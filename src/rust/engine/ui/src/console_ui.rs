@@ -42,14 +42,16 @@ use workunit_store::WorkunitStore;
 
 pub struct ConsoleUI {
   workunit_store: WorkunitStore,
+  local_parallelism: usize,
   // While the UI is running, there will be an Instance present.
   instance: Option<Instance>,
 }
 
 impl ConsoleUI {
-  pub fn new(workunit_store: WorkunitStore) -> ConsoleUI {
+  pub fn new(workunit_store: WorkunitStore, local_parallelism: usize) -> ConsoleUI {
     ConsoleUI {
       workunit_store,
+      local_parallelism,
       instance: None,
     }
   }
@@ -180,7 +182,7 @@ impl ConsoleUI {
     }
 
     // Setup bars, and then spawning rendering of the bars into a background task.
-    let (multi_progress, bars) = Self::setup_bars(num_cpus::get());
+    let (multi_progress, bars) = Self::setup_bars(self.local_parallelism);
     let multi_progress_task = {
       executor
         .spawn_blocking(move || multi_progress.join())
