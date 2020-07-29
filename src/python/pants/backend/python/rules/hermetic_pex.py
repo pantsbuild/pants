@@ -49,8 +49,7 @@ class PexEnvironment(EngineAware):
                 "No bootstrap python executable could be found. "
                 "Will attempt to run PEXes directly."
             )
-        else:
-            return f"Selected {self.bootstrap_python} to bootstrap PEXes with."
+        return f"Selected {self.bootstrap_python} to bootstrap PEXes with."
 
 
 class PexRuntimeEnvironment(Subsystem):
@@ -91,6 +90,8 @@ class PexRuntimeEnvironment(Subsystem):
         def iter_path_entries():
             for entry in self.options.binary_search_path:
                 if entry == "<PATH>":
+                    # TODO(#9760): This is not very robust. We want to be able to read an env var
+                    #  safely via the engine.
                     path = os.environ.get("PATH")
                     if path:
                         for path_entry in os.pathsep.split(path):
@@ -111,7 +112,7 @@ async def find_pex_python(
 ) -> PexEnvironment:
     # PEX files are compatible with bootstrapping via python2.7 or python 3.5+. The bootstrap
     # code will then re-exec itself if the underlying PEX user code needs a more specific python
-    # interpreter. As such, we look for many pythons usable by the PEX bootstrap code here for
+    # interpreter. As such, we look for many Pythons usable by the PEX bootstrap code here for
     # maximum flexibility.
     all_python_binary_paths = await MultiGet(
         [
@@ -125,10 +126,11 @@ async def find_pex_python(
         ]
     )
 
-    def first_python_binary():
+    def first_python_binary() -> Optional[str]:
         for binary_paths in all_python_binary_paths:
-            for binary_path in binary_paths.paths:
-                return binary_path
+            first_path = next(iter(binary_paths.paths), None)
+            if first_path:
+                return first_path
         return None
 
     return PexEnvironment(
@@ -175,7 +177,7 @@ class HermeticPex:
             PEX_INHERIT_PATH="false",
             PEX_IGNORE_RCFILES="true",
             **pex_environment.environment_dict,
-            **subprocess_environment.invocation_environment,
+            **subprocess_environment.environment_dict,
         )
         if env:
             hermetic_env.update(env)

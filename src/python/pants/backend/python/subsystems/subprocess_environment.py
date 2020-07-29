@@ -41,7 +41,7 @@ class SubprocessEnvironment(Subsystem):
         return cast(Optional[str], self.options.lc_all)
 
     @property
-    def invocation_environment(self) -> Dict[str, str]:
+    def environment_dict(self) -> Dict[str, str]:
         return {"LANG": self.lang or "", "LC_ALL": self.lc_all or ""}
 
 

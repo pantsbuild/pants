@@ -75,7 +75,7 @@ class DownloadedPexBin(HermeticPex):
         """
 
         pex_root_path = ".cache/pex_root"
-        env = {**(env or {}), **python_native_code.invocation_environment}
+        env = {**(env or {}), **python_native_code.environment_dict}
         if "--pex-root" in pex_args:
             raise ValueError("--pex-root flag not allowed. We set its value for you.")
         pex_args = ("--pex-root", pex_root_path) + tuple(pex_args)

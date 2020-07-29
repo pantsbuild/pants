@@ -301,7 +301,7 @@ class BinaryPathRequest:
     search_path: Tuple[str, ...]
     binary_name: str
 
-    def __init__(self, search_path: Iterable[str], binary_name: str):
+    def __init__(self, *, search_path: Iterable[str], binary_name: str) -> None:
         self.search_path = tuple(OrderedSet(search_path))
         self.binary_name = binary_name
 
