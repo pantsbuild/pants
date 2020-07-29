@@ -75,7 +75,6 @@ class OptionHelpInfo:
     config_key: str
     typ: Type
     default: Any
-    default_str: str
     help: str
     deprecated_message: Optional[str]
     removal_version: Optional[str]
@@ -172,7 +171,7 @@ class HelpInfoExtracter:
         )
 
     @staticmethod
-    def compute_default(**kwargs) -> Tuple[Any, str]:
+    def compute_default(**kwargs) -> Any:
         """Compute the default val for help display for an option registered with these kwargs.
 
         Returns a pair (default, stringified default suitable for display).
@@ -188,8 +187,7 @@ class HelpInfoExtracter:
             if ranked_default and ranked_default.value is not None
             else fallback
         )
-        default_str = to_help_str(default)
-        return default, default_str
+        return default
 
     @staticmethod
     def stringify_type(t: Type) -> str:
@@ -303,7 +301,7 @@ class HelpInfoExtracter:
                     display_args.append(f"... -- [{type_str} [{type_str} [...]]]")
 
         typ = kwargs.get("type", str)
-        default, default_str = self.compute_default(**kwargs)
+        default = self.compute_default(**kwargs)
         help_msg = kwargs.get("help", "No help available.")
         removal_version = kwargs.get("removal_version")
         deprecated_message = None
@@ -328,7 +326,6 @@ class HelpInfoExtracter:
             config_key=dest,
             typ=typ,
             default=default,
-            default_str=default_str,
             help=help_msg,
             deprecated_message=deprecated_message,
             removal_version=removal_version,
