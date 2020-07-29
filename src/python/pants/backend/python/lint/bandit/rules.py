@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Tuple
+from typing import Optional, Tuple
 
 from pants.backend.python.lint.bandit.subsystem import Bandit
 from pants.backend.python.rules import download_pex_bin, pex
@@ -15,14 +15,27 @@ from pants.backend.python.rules.pex import (
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
 from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonSources
-from pants.core.goals.lint import LintRequest, LintResult, LintResults
+from pants.core.goals.lint import (
+    LintRequest,
+    LintResult,
+    LintResultFile,
+    LintResults,
+    LintSubsystem,
+)
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.core.util_rules.determine_source_files import (
     AllSourceFilesRequest,
     SourceFiles,
     SpecifiedSourceFilesRequest,
 )
-from pants.engine.fs import Digest, GlobMatchErrorBehavior, MergeDigests, PathGlobs
+from pants.engine.fs import (
+    Digest,
+    DigestSubset,
+    GlobMatchErrorBehavior,
+    MergeDigests,
+    PathGlobs,
+    Snapshot,
+)
 from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSetWithOrigin
@@ -49,10 +62,14 @@ class BanditPartition:
     interpreter_constraints: PexInterpreterConstraints
 
 
-def generate_args(*, specified_source_files: SourceFiles, bandit: Bandit) -> Tuple[str, ...]:
+def generate_args(
+    *, specified_source_files: SourceFiles, bandit: Bandit, output_file: Optional[str]
+) -> Tuple[str, ...]:
     args = []
     if bandit.config is not None:
         args.append(f"--config={bandit.config}")
+    if output_file:
+        args.append(f"--output={output_file}")
     args.extend(bandit.args)
     args.extend(specified_source_files.files)
     return tuple(args)
@@ -62,6 +79,7 @@ def generate_args(*, specified_source_files: SourceFiles, bandit: Bandit) -> Tup
 async def bandit_lint_partition(
     partition: BanditPartition,
     bandit: Bandit,
+    lint_subsystem: LintSubsystem,
     python_setup: PythonSetup,
     subprocess_environment: SubprocessEnvironment,
 ) -> LintResult:
@@ -112,19 +130,39 @@ async def bandit_lint_partition(
     address_references = ", ".join(
         sorted(field_set.address.reference() for field_set in partition.field_sets)
     )
-
+    report_path = (
+        lint_subsystem.reports_dir / "bandit_report.txt" if lint_subsystem.reports_dir else None
+    )
+    args = generate_args(
+        specified_source_files=specified_source_files,
+        bandit=bandit,
+        output_file=report_path.name if report_path else None,
+    )
     process = requirements_pex.create_process(
         python_setup=python_setup,
         subprocess_environment=subprocess_environment,
         pex_path="./bandit.pex",
-        pex_args=generate_args(specified_source_files=specified_source_files, bandit=bandit),
+        pex_args=args,
+        output_files=(report_path.name,) if report_path else None,
         input_digest=input_digest,
         description=(
             f"Run Bandit on {pluralize(len(partition.field_sets), 'target')}: {address_references}."
         ),
     )
     result = await Get(FallibleProcessResult, Process, process)
-    return LintResult.from_fallible_process_result(result, linter_name="Bandit")
+
+    results_file = None
+    if report_path:
+        report_file_snapshot = await Get(
+            Snapshot, DigestSubset(result.output_digest, PathGlobs([report_path.name]))
+        )
+        if len(report_file_snapshot.files) != 1:
+            raise Exception(f"Unexpected report file snapshot: {report_file_snapshot.files}")
+        results_file = LintResultFile(output_path=report_path, digest=report_file_snapshot.digest)
+
+    return LintResult.from_fallible_process_result(
+        result, linter_name="Bandit", results_file=results_file
+    )
 
 
 @rule(desc="Lint using Bandit")

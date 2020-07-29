@@ -133,7 +133,7 @@ async def flake8_lint_partition(
     report_path = (
         lint_subsystem.reports_dir / "flake8_report.txt" if lint_subsystem.reports_dir else None
     )
-    flake8_args = generate_args(
+    args = generate_args(
         specified_source_files=specified_source_files,
         flake8=flake8,
         output_file=report_path.name if report_path else None,
@@ -142,7 +142,7 @@ async def flake8_lint_partition(
         python_setup=python_setup,
         subprocess_environment=subprocess_environment,
         pex_path="./flake8.pex",
-        pex_args=flake8_args,
+        pex_args=args,
         output_files=(report_path.name,) if report_path else None,
         input_digest=input_digest,
         description=(
