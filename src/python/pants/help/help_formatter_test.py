@@ -25,7 +25,6 @@ class OptionHelpFormatterTest(unittest.TestCase):
             config_key="foo",
             typ=bool,
             default=None,
-            default_str="None",
             help="help for foo",
             deprecated_message=None,
             removal_version=None,
@@ -46,12 +45,12 @@ class OptionHelpFormatterTest(unittest.TestCase):
         return lines[4] if choices else lines[3]
 
     def test_format_help(self):
-        default_line = self._format_for_single_option(default="MYDEFAULT", default_str="MYDEFAULT")
+        default_line = self._format_for_single_option(default="MYDEFAULT")
         assert default_line.lstrip() == "default: MYDEFAULT"
 
     def test_format_help_choices(self):
         default_line = self._format_for_single_option(
-            typ=str, default="kiwi", default_str="kiwi", choices=["apple", "banana", "kiwi"]
+            typ=str, default="kiwi", choices=["apple", "banana", "kiwi"]
         )
         assert default_line.lstrip() == "default: kiwi"
 

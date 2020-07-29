@@ -7,7 +7,7 @@ from typing import Tuple
 
 from pants.engine.goal import GoalSubsystem
 from pants.engine.unions import UnionMembership
-from pants.help.help_info_extracter import HelpInfoExtracter
+from pants.help.help_info_extracter import HelpInfoExtracter, to_help_str
 from pants.option.config import Config
 from pants.option.global_options import GlobalOptions
 from pants.option.options import Options
@@ -108,7 +108,7 @@ def test_default() -> None:
         assert oshi.description == "description"
         assert len(oshi.basic) == 1
         ohi = oshi.basic[0]
-        assert ohi.default_str == expected_default_str
+        assert to_help_str(ohi.default) == expected_default_str
 
     do_test(["--foo"], {"type": bool}, "False")
     do_test(["--foo"], {"type": bool, "default": True}, "True")
@@ -124,18 +124,16 @@ def test_default() -> None:
 
 
 def test_compute_default():
-    def do_test(expected_default, expected_default_str, **kwargs):
+    def do_test(expected_default, **kwargs):
         kwargs["default"] = RankedValue(Rank.HARDCODED, kwargs["default"])
-        assert (expected_default, expected_default_str) == HelpInfoExtracter.compute_default(
-            **kwargs
-        )
+        assert expected_default == HelpInfoExtracter.compute_default(**kwargs)
 
-    do_test(False, "False", type=bool, default=False)
-    do_test(42, "42", type=int, default=42)
-    do_test("foo", "foo", type=str, default="foo")
-    do_test(None, "None", type=str, default=None)
-    do_test([1, 2, 3], "[\n  1,\n  2,\n  3\n]", type=list, member_type=int, default=[1, 2, 3])
-    do_test(LogLevel.INFO, "info", type=LogLevel, default=LogLevel.INFO)
+    do_test(False, type=bool, default=False)
+    do_test(42, type=int, default=42)
+    do_test("foo", type=str, default="foo")
+    do_test(None, type=str, default=None)
+    do_test([1, 2, 3], type=list, member_type=int, default=[1, 2, 3])
+    do_test(LogLevel.INFO, type=LogLevel, default=LogLevel.INFO)
 
 
 def test_deprecated():
@@ -260,7 +258,6 @@ def test_get_all_help_info():
                         },
                         "typ": int,
                         "default": 42,
-                        "default_str": "42",
                         "help": "Option 1",
                         "deprecated_message": None,
                         "removal_version": None,
@@ -292,7 +289,6 @@ def test_get_all_help_info():
                         },
                         "typ": bool,
                         "default": True,
-                        "default_str": "True",
                         "help": "Option 2",
                         "deprecated_message": None,
                         "removal_version": None,
@@ -314,7 +310,6 @@ def test_get_all_help_info():
                         },
                         "typ": str,
                         "default": None,
-                        "default_str": "None",
                         "help": "No help available.",
                         "deprecated_message": None,
                         "removal_version": None,
