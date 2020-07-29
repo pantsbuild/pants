@@ -7,7 +7,7 @@ from pants.backend.native.config.environment import HostLibcDev
 from pants.backend.native.subsystems.utils.parse_search_dirs import ParseSearchDirs
 from pants.base.hash_utils import hash_file
 from pants.option.custom_types import dir_option
-from pants.subsystem.subsystem import Subsystem
+from pants.option.subsystem import Subsystem
 from pants.util.memo import memoized_method, memoized_property
 
 

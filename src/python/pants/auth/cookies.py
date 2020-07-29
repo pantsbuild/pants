@@ -4,8 +4,8 @@
 import os
 from http.cookiejar import LWPCookieJar
 
+from pants.option.subsystem import Subsystem
 from pants.process.lock import OwnerPrintingInterProcessFileLock
-from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import safe_mkdir_for
 from pants.util.memo import memoized_property
 

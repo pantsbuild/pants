@@ -9,7 +9,7 @@ from packaging.version import Version
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.rules import SubsystemRule
-from pants.subsystem.subsystem import Subsystem
+from pants.option.subsystem import Subsystem
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.version import PANTS_SEMVER, VERSION
 

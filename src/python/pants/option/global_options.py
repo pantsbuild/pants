@@ -20,7 +20,7 @@ from pants.engine.fs import GlobMatchErrorBehavior
 from pants.option.custom_types import dir_option
 from pants.option.errors import OptionsError
 from pants.option.scope import GLOBAL_SCOPE
-from pants.subsystem.subsystem import Subsystem
+from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
 
 

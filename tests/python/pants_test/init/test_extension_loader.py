@@ -30,7 +30,7 @@ from pants.init.extension_loader import (
     load_backends_and_plugins,
     load_plugins,
 )
-from pants.subsystem.subsystem import Subsystem
+from pants.option.subsystem import Subsystem
 from pants.util.ordered_set import FrozenOrderedSet
 
 

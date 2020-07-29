@@ -5,7 +5,7 @@ import os
 
 from pants.backend.native.config.environment import Assembler, CCompiler, CppCompiler, Linker
 from pants.engine.rules import rule
-from pants.subsystem.subsystem import Subsystem
+from pants.option.subsystem import Subsystem
 from pants.util.dirutil import is_readable_dir
 from pants.util.memo import memoized_method, memoized_property
 

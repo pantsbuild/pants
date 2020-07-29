@@ -28,8 +28,8 @@ from pants.init.options_initializer import BuildConfigInitializer, OptionsInitia
 from pants.init.specs_calculator import SpecsCalculator
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.option.subsystem import Subsystem
 from pants.reporting.streaming_workunit_handler import StreamingWorkunitHandler
-from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import maybe_profiled
 
 logger = logging.getLogger(__name__)

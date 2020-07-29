@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Callable, ClassVar, Iterator, Tuple, Type, cas
 
 from typing_extensions import final
 
-from pants.subsystem.subsystem import Subsystem
+from pants.option.subsystem import Subsystem
 from pants.util.meta import classproperty
 
 if TYPE_CHECKING:
