@@ -54,6 +54,7 @@ from pants.engine.target import (
     InjectedDependencies,
     RegisteredTargetTypes,
     Sources,
+    Subtargets,
     Target,
     Targets,
     TargetsToValidFieldSets,
@@ -69,6 +70,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership
 from pants.option.global_options import GlobalOptions, OwnersNotFoundBehavior
 from pants.source.filespec import matches_filespec
+from pants.util.dirutil import fast_relpath
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 logger = logging.getLogger(__name__)
@@ -79,24 +81,77 @@ logger = logging.getLogger(__name__)
 
 
 @rule
-async def resolve_target(
+async def generate_subtargets(
     address: Address,
     registered_target_types: RegisteredTargetTypes,
     union_membership: UnionMembership,
-) -> WrappedTarget:
+) -> Subtargets:
     if not address.is_base_target:
-        base_target = await Get(WrappedTarget, Address, address.maybe_convert_to_base_target())
-        subtarget = generate_subtarget(base_target.target, full_file_name=address.filename)
-        return WrappedTarget(subtarget)
-
+        raise ValueError(f"Cannot generate file Targets for a file Address: {address}")
     target_adaptor = await Get(TargetAdaptor, Address, address)
     target_type = registered_target_types.aliases_to_types.get(target_adaptor.type_alias, None)
     if target_type is None:
         raise UnrecognizedTargetTypeException(
             target_adaptor.type_alias, registered_target_types, address=address
         )
-    target = target_type(target_adaptor.kwargs, address=address, union_membership=union_membership)
-    return WrappedTarget(target)
+    # TODO: We should avoid (re)constructing the base target.
+    base_target = target_type(
+        target_adaptor.kwargs, address=address, union_membership=union_membership
+    )
+
+    if not base_target.has_field(Dependencies):
+        # If a target type does not support dependencies, we do not split it, as that would prevent
+        # the base target from depending on its splits.
+        return Subtargets(base_target, {})
+
+    # Create subtargets for the sources matched by each sources field type.
+    sources_field_types = [
+        ft for ft in target_type.class_field_types(union_membership) if issubclass(ft, Sources)
+    ]
+    hydrated_sources_collection = await MultiGet(
+        Get(HydratedSources, HydrateSourcesRequest(base_target.get(sft)))
+        for sft in sources_field_types
+    )
+    subtargets = {}
+    for hydrated_sources in hydrated_sources_collection:
+        # For each field type, generate a subtarget per source.
+        # TODO: Handle overlapping Sources globs.
+        for source in hydrated_sources.snapshot.files:
+            subtarget = generate_subtarget(base_target, full_file_name=source)
+            subtargets[fast_relpath(source, address.spec_path)] = subtarget
+
+    if not subtargets:
+        # If this target supports sources but does not own any, use it verbatim: otherwise we would
+        # have nowhere to propagate its dependencies to.
+        return Subtargets(base_target, {})
+
+    # Finally, re-construct the base target as an alias with dependencies on the subtargets, and
+    # its original explicit dependencies for clarity of introspection.
+    base_dependencies = set(target_adaptor.kwargs.get(Dependencies.alias, ()))
+    base_dependencies.update(st.address.spec for st in subtargets.values())
+    base_target = TargetAlias(
+        {Dependencies.alias: list(base_dependencies)},
+        address=address,
+        union_membership=union_membership,
+    )
+    return Subtargets(base_target, subtargets)
+
+
+@rule
+async def resolve_target(address: Address) -> WrappedTarget:
+    base_address = address.maybe_convert_to_base_target()
+    subtargets = await Get(Subtargets, Address, base_address)
+    if not address.is_base_target:
+        name = fast_relpath(address.filename, base_address.spec_path)
+        subtarget = subtargets.subtargets.get(name)
+        if not subtarget:
+            names = sorted(subtargets.subtargets.keys())
+            raise ResolveError(
+                f"The target at {base_address} did not own `{name}`: instead, it owns {names}."
+            )
+        return WrappedTarget(subtarget)
+    else:
+        return WrappedTarget(subtargets.base)
 
 
 @rule
@@ -251,53 +306,21 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
     # Walk up the buildroot looking for targets that would conceivably claim changed sources.
     candidate_specs = tuple(AscendantAddresses(directory=d) for d in dirs_set)
     candidate_targets = await Get(Targets, AddressSpecs(candidate_specs))
-    candidate_target_sources = await MultiGet(
-        Get(HydratedSources, HydrateSourcesRequest(tgt.get(Sources))) for tgt in candidate_targets
-    )
     build_file_addresses = await MultiGet(
         Get(BuildFileAddress, Address, tgt.address) for tgt in candidate_targets
     )
 
-    # We use this to determine if any of the matched files are deleted or not.
-    all_source_files = set(
-        itertools.chain.from_iterable(
-            sources.snapshot.files for sources in candidate_target_sources
-        )
-    )
-
-    original_addresses_due_to_deleted_files: OrderedSet[Address] = OrderedSet()
-    generated_addresses: OrderedSet[Address] = OrderedSet()
+    matching_addresses = set()
     unmatched_sources = set(sources_set)
-    for candidate_tgt, candidate_tgt_sources, bfa in zip(
-        candidate_targets, candidate_target_sources, build_file_addresses
-    ):
+    for candidate_tgt, bfa in zip(candidate_targets, build_file_addresses):
         matching_files = set(
             matches_filespec(candidate_tgt.get(Sources).filespec, paths=sources_set)
         )
-        if bfa.rel_path not in sources_set and not matching_files:
+        if not matching_files and bfa.rel_path not in sources_set:
             continue
-        unmatched_sources -= matching_files
-        deleted_files_matched = bool(matching_files - all_source_files)
-        if deleted_files_matched:
-            original_addresses_due_to_deleted_files.add(candidate_tgt.address)
-            continue
-        # Else, we generate subtargets for greater precision.
-        generated_subtargets = tuple(
-            generate_subtarget(candidate_tgt, full_file_name=f)
-            for f in candidate_tgt_sources.snapshot.files
-        )
-        for generated_subtarget, file_name in zip(
-            generated_subtargets, candidate_tgt_sources.snapshot.files
-        ):
-            if bfa.rel_path not in sources_set and not matches_filespec(
-                generated_subtarget.get(Sources).filespec, paths=sources_set
-            ):
-                continue
-            generated_addresses.add(generated_subtarget.address)
 
-    def already_covered_by_original_addresses(generated_address: Address) -> bool:
-        original_address = generated_address.maybe_convert_to_base_target()
-        return original_address in original_addresses_due_to_deleted_files
+        unmatched_sources -= matching_files
+        matching_addresses.add(candidate_tgt.address)
 
     if (
         unmatched_sources
@@ -307,12 +330,7 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
             [PurePath(path) for path in unmatched_sources], owners_request.owners_not_found_behavior
         )
 
-    remaining_generated_addresses = FrozenOrderedSet(
-        address
-        for address in generated_addresses
-        if not already_covered_by_original_addresses(address)
-    )
-    return Owners([*original_addresses_due_to_deleted_files, *remaining_generated_addresses])
+    return Owners(matching_addresses)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -689,39 +707,24 @@ async def resolve_dependencies(
         )
 
     literal_addresses = await MultiGet(Get(Address, AddressInput, ai) for ai in provided.addresses)
-    literal_ignored_addresses = await MultiGet(
-        Get(Address, AddressInput, ai) for ai in provided.ignored_addresses
+    literal_ignored_addresses = set(
+        await MultiGet(Get(Address, AddressInput, ai) for ai in provided.ignored_addresses)
     )
 
-    base_addresses = set()
-    all_generated_addresses = set()
-    used_ignored_addresses = set()
-    for addr in (
+    addresses: Set[Address] = set()
+    used_ignored_addresses: Set[Address] = set()
+    for addr in [
         *literal_addresses,
         *itertools.chain.from_iterable(injected),
         *itertools.chain.from_iterable(inferred),
-    ):
+    ]:
         if addr in literal_ignored_addresses:
             used_ignored_addresses.add(addr)
         else:
-            if addr.is_base_target:
-                base_addresses.add(addr)
-            else:
-                all_generated_addresses.add(addr)
+            addresses.add(addr)
+    result = sorted(addresses)
 
-    # We check if a generated subtarget's original base target is already included or if ts base
-    # target is the target that we're resolving dependencies for. In either of these cases, it
-    # would be redundant to include the generated subtarget.
-    remaining_generated_addresses = set()
-    for generated_addr in all_generated_addresses:
-        base_addr = generated_addr.maybe_convert_to_base_target()
-        if base_addr in base_addresses or base_addr == request.field.address:
-            continue
-        remaining_generated_addresses.add(generated_addr)
-
-    result = sorted({*base_addresses, *remaining_generated_addresses})
-
-    unused_ignores = set(literal_ignored_addresses) - set(used_ignored_addresses)
+    unused_ignores = literal_ignored_addresses - used_ignored_addresses
     # If there are unused ignores and this is not a generated subtarget, we eagerly error so that
     # the user isn't falsely led to believe the ignore is working. We do not do this for generated
     # subtargets because we cannot guarantee that the ignore specified in the original owning

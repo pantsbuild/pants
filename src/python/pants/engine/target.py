@@ -481,6 +481,15 @@ class Target(ABC):
 
 
 @dataclass(frozen=True)
+class Subtargets:
+    # The base target from which the subtargets were extracted. Depends on all of its subtargets.
+    base: Target
+    # The subtargets, one per file that was owned by the base target, with filenames relative to
+    # the spec_path of the base target.
+    subtargets: Dict[str, Target]
+
+
+@dataclass(frozen=True)
 class WrappedTarget:
     """A light wrapper to encapsulate all the distinct `Target` subclasses into a single type.
 
@@ -590,6 +599,8 @@ def generate_subtarget_address(base_target_address: Address, *, full_file_name: 
 
     See generate_subtarget().
     """
+    if not base_target_address.is_base_target:
+        raise ValueError(f"Cannot generate file targets for a file Address: {base_target_address}")
     original_spec_path = base_target_address.spec_path
     relative_file_path = PurePath(full_file_name).relative_to(original_spec_path).as_posix()
     return Address(
