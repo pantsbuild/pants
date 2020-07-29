@@ -43,7 +43,7 @@ class Protoc(ExternalTool):
         )
 
     def generate_exe(self, plat: Platform) -> str:
-        return "bin/protoc"
+        return "./bin/protoc"
 
     @property
     def runtime_targets(self) -> List[str]:
