@@ -53,6 +53,8 @@ class PexEnvironment(EngineAware):
 
 
 class PexRuntimeEnvironment(Subsystem):
+    """How Pants uses Pex to run Python subprocesses."""
+
     options_scope = "pex"
 
     @classmethod

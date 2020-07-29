@@ -67,6 +67,7 @@ class Stage(Enum):
 
 GLOBAL_ENV_VARS = [
     'PANTS_CONFIG_FILES="${TRAVIS_BUILD_DIR}/pants.travis-ci.toml"',
+    'PANTS_DYNAMIC_UI=false',
     'LC_ALL="en_US.UTF-8"',
     "AWS_BUCKET=ci-public.pantsbuild.org",
     # The ci-public.pantsbuild.org bucket has expiration policies set up for key prefixes
@@ -355,11 +356,6 @@ def linux_shard(
             "PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem",
         ]
         setup = {**setup, **CACHE_PANTS_RUN}
-        if python_version.is_py37:
-            # 3.7.2 for Linux uses the new C++ ABI, which may be an error.
-            setup["env"].append(
-                'PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"'
-            )
     if use_docker:
         setup["services"] = ["docker"]
     return setup

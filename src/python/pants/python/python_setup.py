@@ -84,7 +84,7 @@ class PythonSetup(Subsystem):
             "If unspecified, a standard path under the workdir is used.",
             removal_version="2.1.0.dev0",
             removal_hint=(
-                "The option `--python-setup-interpreter-cache-dir` does not anything anymore."
+                "The option `--python-setup-interpreter-cache-dir` does not do anything anymore."
             ),
         )
         register(
@@ -96,7 +96,7 @@ class PythonSetup(Subsystem):
             "If unspecified, a standard path under the workdir is used.",
             removal_version="2.1.0.dev0",
             removal_hint=(
-                "The option `--python-setup-resolver-cache-dir` does not anything anymore."
+                "The option `--python-setup-resolver-cache-dir` does not do anything anymore."
             ),
         )
         register(
