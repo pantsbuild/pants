@@ -36,6 +36,9 @@ process_execution_speculation_delay = 15
 # TODO(#7735): This config is not ideal, that we must specify the PATH for both local and remote
 # platforms. This should be replaced by a proper mechanism to differentiate between the two.
 binary_search_path = [
+  # These are the interpreter paths we set up on the remote container. We need to specify these
+  # because many of our tests for the Python backend need to discover Python interpreters.
+  "/pyenv-docker-build/versions/3.7.3/bin:/pyenv-docker-build/versions/3.6.8/bin:/pyenv-docker-build/versions/2.7.15/bin",
   # The remote container has binaries like `ld` and `gcc` in /usr/bin.
   "/usr/bin",
   # We include the host PATH so that speculation still works.
