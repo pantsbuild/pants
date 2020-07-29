@@ -127,9 +127,8 @@ async def find_pex_python(
 
     def first_python_binary() -> Optional[str]:
         for binary_paths in all_python_binary_paths:
-            first_path = next(iter(binary_paths.paths), None)
-            if first_path:
-                return first_path
+            if binary_paths.first_path:
+                return binary_paths.first_path
         return None
 
     return PexEnvironment(

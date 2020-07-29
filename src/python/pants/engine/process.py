@@ -327,6 +327,11 @@ class BinaryPaths(EngineAware):
             found_msg = f"{found_msg} and {pluralize(len(self.paths) - 1, 'other location')}"
         return found_msg
 
+    @property
+    def first_path(self) -> Optional[str]:
+        """Return the first path to the binary that was discovered, if any."""
+        return next(iter(self.paths), None)
+
 
 @rule(desc="Find binary path")
 async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
