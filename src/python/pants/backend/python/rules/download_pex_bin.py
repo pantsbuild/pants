@@ -39,7 +39,7 @@ class DownloadedPexBin(HermeticPex):
 
     @property
     def executable(self) -> str:
-        return self.downloaded_tool.exe
+        return f"./{self.downloaded_tool.exe}"
 
     @property
     def digest(self) -> Digest:
