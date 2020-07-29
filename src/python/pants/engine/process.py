@@ -372,6 +372,7 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
 def rules():
     return [
         *collect_rules(),
+        RootRule(BinaryPathRequest),
         RootRule(Process),
         RootRule(InteractiveRunner),
         RootRule(MultiPlatformProcess),
