@@ -24,7 +24,7 @@ from pants.engine.internals.native_engine import (
     PyTasks,
     PyTypes,
 )
-from pants.engine.selectors import Get
+from pants.engine.rules import Get
 from pants.engine.unions import union
 from pants.util.memo import memoized_property
 from pants.util.meta import SingletonMetaclass

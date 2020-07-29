@@ -8,16 +8,14 @@ from typing import TYPE_CHECKING, Callable, ClassVar, Iterator, Tuple, Type, cas
 
 from typing_extensions import final
 
-from pants.option.option_value_container import OptionValueContainer
-from pants.option.optionable import Optionable
-from pants.subsystem.subsystem_client_mixin import SubsystemClientMixin
+from pants.subsystem.subsystem import Subsystem
 from pants.util.meta import classproperty
 
 if TYPE_CHECKING:
     from pants.engine.console import Console
 
 
-class GoalSubsystem(SubsystemClientMixin, Optionable):
+class GoalSubsystem(Subsystem):
     """The Subsystem used by `Goal`s to register the external API, meaning the goal name, the help
     message, and any options.
 
@@ -48,19 +46,6 @@ class GoalSubsystem(SubsystemClientMixin, Optionable):
     @classproperty
     def options_scope(cls) -> str:  # type: ignore[override]
         return cast(str, cls.name)
-
-    @final
-    def __init__(self, scope: str, scoped_options: OptionValueContainer) -> None:
-        # NB: This constructor is shaped to meet the contract of `Optionable(Factory).signature`.
-        super().__init__()
-        self._scope = scope
-        self._scoped_options = scoped_options
-
-    @final
-    @property
-    def options(self) -> OptionValueContainer:
-        """Returns the option values."""
-        return self._scoped_options
 
 
 @dataclass(frozen=True)

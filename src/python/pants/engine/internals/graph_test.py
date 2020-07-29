@@ -39,8 +39,7 @@ from pants.engine.internals.graph import (
     validate_explicit_file_dep,
 )
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.rules import RootRule, rule
-from pants.engine.selectors import Get, Params
+from pants.engine.rules import Get, RootRule, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
@@ -67,6 +66,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.init.specs_calculator import SpecsCalculator
+from pants.testutil.engine.util import Params
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 from pants.util.ordered_set import FrozenOrderedSet

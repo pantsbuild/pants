@@ -14,7 +14,7 @@ from pants.backend.python.rules.pex import (
     PexRequirements,
 )
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
-from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
 from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonSources
 from pants.core.goals.lint import (
     LintRequest,
@@ -38,8 +38,7 @@ from pants.engine.fs import (
     Snapshot,
 )
 from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import collect_rules, rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSetWithOrigin
 from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
@@ -68,11 +67,11 @@ def generate_args(
     *, specified_source_files: SourceFiles, flake8: Flake8, output_file: Optional[str]
 ) -> Tuple[str, ...]:
     args = []
-    if flake8.options.config is not None:
-        args.append(f"--config={flake8.options.config}")
+    if flake8.config:
+        args.append(f"--config={flake8.config}")
     if output_file:
         args.append(f"--output-file={output_file}")
-    args.extend(flake8.options.args)
+    args.extend(flake8.args)
     args.extend(specified_source_files.files)
     return tuple(args)
 
@@ -83,26 +82,25 @@ async def flake8_lint_partition(
     flake8: Flake8,
     lint_subsystem: LintSubsystem,
     pex_environment: PexEnvironment,
-    subprocess_encoding_environment: SubprocessEncodingEnvironment,
+    subprocess_environment: SubprocessEnvironment,
 ) -> LintResult:
     requirements_pex_request = Get(
         Pex,
         PexRequest(
             output_filename="flake8.pex",
-            requirements=PexRequirements(flake8.get_requirement_specs()),
+            requirements=PexRequirements(flake8.all_requirements),
             interpreter_constraints=(
                 partition.interpreter_constraints
-                or PexInterpreterConstraints(flake8.default_interpreter_constraints)
+                or PexInterpreterConstraints(flake8.interpreter_constraints)
             ),
-            entry_point=flake8.get_entry_point(),
+            entry_point=flake8.entry_point,
         ),
     )
 
-    config_path: Optional[str] = flake8.options.config
     config_digest_request = Get(
         Digest,
         PathGlobs(
-            globs=[config_path] if config_path else [],
+            globs=[flake8.config] if flake8.config else [],
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
             description_of_origin="the option `--flake8-config`",
         ),
@@ -136,16 +134,16 @@ async def flake8_lint_partition(
     report_path = (
         lint_subsystem.reports_dir / "flake8_report.txt" if lint_subsystem.reports_dir else None
     )
-    flake8_args = generate_args(
+    args = generate_args(
         specified_source_files=specified_source_files,
         flake8=flake8,
         output_file=report_path.name if report_path else None,
     )
     process = requirements_pex.create_process(
         pex_environment=pex_environment,
-        subprocess_encoding_environment=subprocess_encoding_environment,
+        subprocess_environment=subprocess_environment,
         pex_path="./flake8.pex",
-        pex_args=flake8_args,
+        pex_args=args,
         output_files=(report_path.name,) if report_path else None,
         input_digest=input_digest,
         description=(
@@ -172,7 +170,7 @@ async def flake8_lint_partition(
 async def flake8_lint(
     request: Flake8Request, flake8: Flake8, python_setup: PythonSetup
 ) -> LintResults:
-    if flake8.options.skip:
+    if flake8.skip:
         return LintResults()
 
     # NB: Flake8 output depends upon which Python interpreter version it's run with

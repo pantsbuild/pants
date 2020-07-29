@@ -26,5 +26,5 @@ class LLVM(ExternalTool):
 
     def generate_url(self, plat: Platform) -> str:
         system_id = "apple-darwin" if plat == Platform.darwin else "linux-gnu-ubuntu-16.04"
-        archive_basename = f"clang+llvm-{self.options.version}-x86_64-{system_id}"
-        return f"https://releases.llvm.org/{self.options.version}/{archive_basename}.tar.xz"
+        archive_basename = f"clang+llvm-{self.version}-x86_64-{system_id}"
+        return f"https://releases.llvm.org/{self.version}/{archive_basename}.tar.xz"

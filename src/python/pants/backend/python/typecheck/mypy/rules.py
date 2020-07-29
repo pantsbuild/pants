@@ -17,7 +17,7 @@ from pants.backend.python.rules.python_sources import (
     UnstrippedPythonSourcesRequest,
 )
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
-from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
 from pants.backend.python.target_types import PythonSources
 from pants.backend.python.typecheck.mypy.subsystem import MyPy
 from pants.core.goals.typecheck import TypecheckRequest, TypecheckResult, TypecheckResults
@@ -32,8 +32,7 @@ from pants.engine.fs import (
     PathGlobs,
 )
 from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import collect_rules, rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSetWithOrigin, TransitiveTargets
 from pants.engine.unions import UnionRule
 from pants.util.strutil import pluralize
@@ -66,7 +65,7 @@ async def mypy_lint(
     request: MyPyRequest,
     mypy: MyPy,
     pex_environment: PexEnvironment,
-    subprocess_encoding_environment: SubprocessEncodingEnvironment,
+    subprocess_environment: SubprocessEnvironment,
 ) -> TypecheckResults:
     if mypy.skip:
         return TypecheckResults()
@@ -82,14 +81,14 @@ async def mypy_lint(
         Pex,
         PexRequest(
             output_filename="mypy.pex",
-            requirements=PexRequirements(mypy.get_requirement_specs()),
+            requirements=PexRequirements(mypy.all_requirements),
             # NB: This only determines what MyPy is run with. The user can specify what version
             # their code is with `--python-version`. See
             # https://mypy.readthedocs.io/en/stable/config_file.html#platform-configuration. We do
             # not auto-configure this for simplicity and to avoid Pants magically setting values for
             # users.
-            interpreter_constraints=PexInterpreterConstraints(mypy.default_interpreter_constraints),
-            entry_point=mypy.get_entry_point(),
+            interpreter_constraints=PexInterpreterConstraints(mypy.interpreter_constraints),
+            entry_point=mypy.entry_point,
         ),
     )
     config_digest_request = Get(
@@ -119,7 +118,7 @@ async def mypy_lint(
 
     process = pex.create_process(
         pex_environment=pex_environment,
-        subprocess_encoding_environment=subprocess_encoding_environment,
+        subprocess_environment=subprocess_environment,
         pex_path=pex.output_filename,
         pex_args=generate_args(mypy, file_list_path=file_list_path),
         input_digest=merged_input_files,

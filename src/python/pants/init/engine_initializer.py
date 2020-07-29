@@ -11,21 +11,21 @@ from pants.base.build_root import BuildRoot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.base.specs import Specs
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.engine import fs, interactive_process, process
+from pants.engine import fs, process
 from pants.engine.console import Console
 from pants.engine.fs import GlobMatchErrorBehavior, Workspace
 from pants.engine.goal import Goal
-from pants.engine.interactive_process import InteractiveRunner
 from pants.engine.internals import graph, options_parsing, uuid
 from pants.engine.internals.build_files import create_graph_rules
 from pants.engine.internals.mapper import AddressMapper
 from pants.engine.internals.native import Native
 from pants.engine.internals.parser import Parser, SymbolTable
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
+from pants.engine.internals.selectors import Params
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.platform import create_platform_rules
+from pants.engine.process import InteractiveRunner
 from pants.engine.rules import RootRule, collect_rules, rule
-from pants.engine.selectors import Params
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
@@ -288,7 +288,6 @@ class EngineInitializer:
                 *collect_rules(locals()),
                 RootRule(Console),
                 *fs.rules(),
-                *interactive_process.rules(),
                 *graph.rules(),
                 *uuid.rules(),
                 *options_parsing.rules(),

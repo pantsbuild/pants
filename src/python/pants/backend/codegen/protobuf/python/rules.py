@@ -11,8 +11,7 @@ from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, Digest, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import collect_rules, rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import GeneratedSources, GenerateSourcesRequest, Sources, TransitiveTargets
 from pants.engine.unions import UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest

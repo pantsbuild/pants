@@ -1,6 +1,5 @@
-use crate::{PlatformConstraint, Process, RelativePath};
+use crate::{Process, RelativePath};
 use std::collections::hash_map::DefaultHasher;
-use std::collections::{BTreeMap, BTreeSet};
 use std::hash::{Hash, Hasher};
 use std::time::Duration;
 
@@ -8,20 +7,11 @@ use std::time::Duration;
 fn process_equality() {
   // TODO: Tests like these would be cleaner with the builder pattern for the rust-side Process API.
 
-  let process_generator = |description: String, timeout: Option<Duration>| Process {
-    argv: vec![],
-    env: BTreeMap::new(),
-    working_directory: None,
-    input_files: hashing::EMPTY_DIGEST,
-    output_files: BTreeSet::new(),
-    output_directories: BTreeSet::new(),
-    timeout,
-    description,
-    append_only_caches: BTreeMap::new(),
-    jdk_home: None,
-    target_platform: PlatformConstraint::None,
-    is_nailgunnable: false,
-    execution_slot_variable: None,
+  let process_generator = |description: String, timeout: Option<Duration>| {
+    let mut p = Process::new(vec![]);
+    p.description = description;
+    p.timeout = timeout;
+    p
   };
 
   fn hash<Hashable: Hash>(hashable: &Hashable) -> u64 {

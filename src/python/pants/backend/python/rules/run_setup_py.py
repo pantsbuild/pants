@@ -18,7 +18,7 @@ from pants.backend.python.rules.pex import (
 )
 from pants.backend.python.rules.setuptools import Setuptools
 from pants.backend.python.rules.util import PackageDatum, distutils_repr, find_packages, is_python2
-from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
 from pants.backend.python.target_types import (
     PythonEntryPoint,
     PythonInterpreterCompatibility,
@@ -51,8 +51,7 @@ from pants.engine.fs import (
 )
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import collect_rules, goal_rule, rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
@@ -375,7 +374,7 @@ async def run_setup_py(
     req: RunSetupPyRequest,
     setuptools_setup: SetuptoolsSetup,
     pex_environment: PexEnvironment,
-    subprocess_encoding_environment: SubprocessEncodingEnvironment,
+    subprocess_environment: SubprocessEnvironment,
 ) -> RunSetupPyResult:
     """Run a setup.py command on a single exported target."""
     input_digest = await Get(
@@ -386,7 +385,7 @@ async def run_setup_py(
     dist_dir = "dist/"
     process = setuptools_setup.requirements_pex.create_process(
         pex_environment=pex_environment,
-        subprocess_encoding_environment=subprocess_encoding_environment,
+        subprocess_environment=subprocess_environment,
         pex_path="./setuptools.pex",
         pex_args=("setup.py", *req.args),
         input_digest=input_digest,
@@ -688,10 +687,8 @@ async def setup_setuptools(setuptools: Setuptools) -> SetuptoolsSetup:
         Pex,
         PexRequest(
             output_filename="setuptools.pex",
-            requirements=PexRequirements(setuptools.get_requirement_specs()),
-            interpreter_constraints=PexInterpreterConstraints(
-                setuptools.default_interpreter_constraints
-            ),
+            requirements=PexRequirements(setuptools.all_requirements),
+            interpreter_constraints=PexInterpreterConstraints(setuptools.interpreter_constraints),
         ),
     )
     return SetuptoolsSetup(requirements_pex=requirements_pex,)

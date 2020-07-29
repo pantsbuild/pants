@@ -39,21 +39,11 @@ fn unique_temp_dir(base_dir: PathBuf, prefix: Option<String>) -> TempDir {
 }
 
 fn mock_nailgunnable_request(jdk_home: Option<PathBuf>) -> Process {
-  Process {
-    argv: vec![],
-    env: Default::default(),
-    working_directory: None,
-    input_files: EMPTY_DIGEST,
-    output_files: Default::default(),
-    output_directories: Default::default(),
-    timeout: Default::default(),
-    description: "".to_string(),
-    append_only_caches: Default::default(),
-    jdk_home: jdk_home,
-    target_platform: PlatformConstraint::Darwin,
-    is_nailgunnable: true,
-    execution_slot_variable: None,
-  }
+  let mut process = Process::new(vec![]);
+  process.jdk_home = jdk_home;
+  process.is_nailgunnable = true;
+  process.target_platform = PlatformConstraint::Darwin;
+  process
 }
 
 #[tokio::test]

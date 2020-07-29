@@ -10,8 +10,7 @@ from typing import Iterable, Optional, Set, Tuple, Union
 
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import PathGlobs, Snapshot
-from pants.engine.rules import RootRule, collect_rules, rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.rules import Get, MultiGet, RootRule, collect_rules, rule
 from pants.subsystem.subsystem import Subsystem
 from pants.util.memo import memoized_method
 

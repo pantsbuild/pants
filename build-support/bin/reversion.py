@@ -152,12 +152,7 @@ def reversion(args):
         print("Wrote whl with version {} to {}.\n".format(args.target_version, dst_whl_file))
 
 
-def main():
-    """Given an input whl file and target version, create a copy of the whl with that version.
-
-    This is accomplished via string replacement in files matching a list of globs. Pass the optional
-    `--glob` argument to add additional globs: ie  `--glob='thing-to-match*.txt'`.
-    """
+def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     parser.add_argument("whl_file", help="The input whl file.")
     parser.add_argument("dest_dir", help="The destination directory for the output whl.")
@@ -168,7 +163,16 @@ def main():
         default=["*.dist-info/*", "*-nspkg.pth"],
         help="Globs (fnmatch) to rewrite within the whl: may be specified multiple times.",
     )
-    args = parser.parse_args()
+    return parser
+
+
+def main():
+    """Given an input whl file and target version, create a copy of the whl with that version.
+
+    This is accomplished via string replacement in files matching a list of globs. Pass the optional
+    `--glob` argument to add additional globs: ie  `--glob='thing-to-match*.txt'`.
+    """
+    args = create_parser().parse_args()
     reversion(args)
 
 

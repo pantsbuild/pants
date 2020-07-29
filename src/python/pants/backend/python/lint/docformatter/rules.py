@@ -15,7 +15,7 @@ from pants.backend.python.rules.pex import (
     PexRequirements,
 )
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
-from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
 from pants.backend.python.target_types import PythonSources
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
@@ -27,8 +27,7 @@ from pants.core.util_rules.determine_source_files import (
 )
 from pants.engine.fs import EMPTY_SNAPSHOT, Digest, MergeDigests
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
-from pants.engine.rules import collect_rules, rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSetWithOrigin
 from pants.engine.unions import UnionRule
 from pants.util.strutil import pluralize
@@ -62,7 +61,7 @@ def generate_args(
 ) -> Tuple[str, ...]:
     return (
         "--check" if check_only else "--in-place",
-        *docformatter.options.args,
+        *docformatter.args,
         *specified_source_files.files,
     )
 
@@ -72,17 +71,15 @@ async def setup(
     setup_request: SetupRequest,
     docformatter: Docformatter,
     pex_environment: PexEnvironment,
-    subprocess_encoding_environment: SubprocessEncodingEnvironment,
+    subprocess_environment: SubprocessEnvironment,
 ) -> Setup:
     requirements_pex_request = Get(
         Pex,
         PexRequest(
             output_filename="docformatter.pex",
-            requirements=PexRequirements(docformatter.get_requirement_specs()),
-            interpreter_constraints=PexInterpreterConstraints(
-                docformatter.default_interpreter_constraints
-            ),
-            entry_point=docformatter.get_entry_point(),
+            requirements=PexRequirements(docformatter.all_requirements),
+            interpreter_constraints=PexInterpreterConstraints(docformatter.interpreter_constraints),
+            entry_point=docformatter.entry_point,
         ),
     )
 
@@ -119,7 +116,7 @@ async def setup(
 
     process = requirements_pex.create_process(
         pex_environment=pex_environment,
-        subprocess_encoding_environment=subprocess_encoding_environment,
+        subprocess_environment=subprocess_environment,
         pex_path="./docformatter.pex",
         pex_args=generate_args(
             specified_source_files=specified_source_files,
@@ -138,7 +135,7 @@ async def setup(
 
 @rule(desc="Format Python docstrings with docformatter")
 async def docformatter_fmt(request: DocformatterRequest, docformatter: Docformatter) -> FmtResult:
-    if docformatter.options.skip:
+    if docformatter.skip:
         return FmtResult.noop()
     setup = await Get(Setup, SetupRequest(request, check_only=False))
     result = await Get(ProcessResult, Process, setup.process)
@@ -151,7 +148,7 @@ async def docformatter_fmt(request: DocformatterRequest, docformatter: Docformat
 async def docformatter_lint(
     request: DocformatterRequest, docformatter: Docformatter
 ) -> LintResults:
-    if docformatter.options.skip:
+    if docformatter.skip:
         return LintResults()
     setup = await Get(Setup, SetupRequest(request, check_only=True))
     result = await Get(FallibleProcessResult, Process, setup.process)

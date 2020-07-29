@@ -17,8 +17,8 @@ from pants.backend.python.target_types import PythonSources
 from pants.core.target_types import Files, Resources
 from pants.engine.addresses import Address
 from pants.engine.rules import RootRule
-from pants.engine.selectors import Params
 from pants.engine.target import Sources, Target
+from pants.testutil.engine.util import Params
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option.util import create_options_bootstrapper
 

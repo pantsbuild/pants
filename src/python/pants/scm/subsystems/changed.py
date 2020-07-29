@@ -12,8 +12,7 @@ from pants.base.deprecated import resolve_conflicting_options
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
 from pants.engine.internals.graph import Owners, OwnersRequest
-from pants.engine.rules import RootRule, collect_rules, rule
-from pants.engine.selectors import Get
+from pants.engine.rules import Get, RootRule, collect_rules, rule
 from pants.option.option_value_container import OptionValueContainer
 from pants.scm.scm import Scm
 from pants.subsystem.subsystem import Subsystem

@@ -13,8 +13,7 @@ from pants.engine.fs import EMPTY_DIGEST
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.scheduler_test_base import SchedulerTestBase
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import RootRule, rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.rules import Get, MultiGet, RootRule, rule
 from pants.reporting.streaming_workunit_handler import (
     StreamingWorkunitContext,
     StreamingWorkunitHandler,

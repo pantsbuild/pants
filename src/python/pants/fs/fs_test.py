@@ -7,8 +7,7 @@ from pathlib import Path
 from pants.engine.console import Console
 from pants.engine.fs import CreateDigest, Digest, FileContent, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.rules import RootRule, goal_rule
-from pants.engine.selectors import Get
+from pants.engine.rules import Get, RootRule, goal_rule
 from pants.fs.fs import is_child_of
 from pants.testutil.goal_rule_test_base import GoalRuleTestBase
 from pants.testutil.test_base import TestBase

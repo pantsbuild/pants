@@ -12,8 +12,7 @@ from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.fs import Digest, DigestContents, SourcesSnapshot
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.rules import collect_rules, goal_rule
-from pants.engine.selectors import Get
+from pants.engine.rules import Get, collect_rules, goal_rule
 from pants.subsystem.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_method

@@ -89,14 +89,16 @@ GLOBAL_ENV_VARS = [
     # NB: We use this verbose name so that AWS does not pick up the env var $AWS_ACCESS_KEY_ID on
     # pull request builds. We only want this value to be populated on branch builds. Users of this
     # env var (i.e. `deploy_to_s3.py`) are expected to re-export the env var as $AWS_ACCESS_KEY_ID.
-    "AWS_ACCESS_KEY_ID__TO_BE_REEXPORTED_ON_DEPLOYS=AKIAV6A6G7RQWPRUWIXR",
+    "AWS_ACCESS_KEY_ID__TO_BE_REEXPORTED_ON_DEPLOYS=AKIAV6A6G7RQ2HFZ5KP7",
     # This stores the encrypted AWS secret access key with the env var AWS_SECRET_ACCESS_KEY.
     # Travis converts it back into its original decrypted value when ran in CI, per
     # https://docs.travis-ci.com/user/environment-variables#defining-encrypted-variables-in-travisyml.
+    # To generate a new value, use:
+    # travis encrypt --pro AWS_SECRET_ACCESS_KEY=<secret access key>
     {
         "secure": (
-            "hFVAQGLVkexzTd3f9NF+JoG1dE+CPICKqOcdvQYv8+YB2rwwqu0/J6MnqKUZSmec4AM4ZvyPUBIHnSw8aMJysY"
-            "s+GZ6iG/8ZRRmdbmo2WBPbSZ+ThRZxx/F6AjmovUmf8Zt366ZAZXpc9NHKREkTUGl6UL7FFe9+ouVnb90asdw="
+            "oEmZoB4oP4ygCMRZp86AhB40ppH87pduS0p3zVVAnTLFLkrnA4qP0TvEOqwzc6DFceQuJ6telJOGUnB4ouFIl8"
+            "aBoRW7KaIuudjVWxcBLEUDdoXlA9hGSY+BOTiBmMVX5g7Wdhfngy4nygrk01cG2UWvfm62VrexeV+48twaBJE="
         )
     },
     'RUST_BACKTRACE="all"',

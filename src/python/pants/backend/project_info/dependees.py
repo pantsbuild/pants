@@ -12,8 +12,7 @@ from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
-from pants.engine.rules import collect_rules, goal_rule, rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import Dependencies, DependenciesRequest, Targets
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init

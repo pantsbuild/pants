@@ -26,7 +26,7 @@ from pants.backend.python.rules.python_sources import (
     UnstrippedPythonSourcesRequest,
 )
 from pants.backend.python.subsystems.pytest import PyTest
-from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
 from pants.backend.python.target_types import (
     PythonInterpreterCompatibility,
     PythonTestsSources,
@@ -36,11 +36,9 @@ from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, Te
 from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
 from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
-from pants.engine.interactive_process import InteractiveProcess
 from pants.engine.internals.uuid import UUIDRequest
-from pants.engine.process import FallibleProcessResult, Process
-from pants.engine.rules import collect_rules, rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.process import FallibleProcessResult, InteractiveProcess, Process
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import TransitiveTargets
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
@@ -213,7 +211,7 @@ async def run_python_test(
     field_set: PythonTestFieldSet,
     test_setup: TestTargetSetup,
     pex_environment: PexEnvironment,
-    subprocess_encoding_environment: SubprocessEncodingEnvironment,
+    subprocess_environment: SubprocessEnvironment,
     global_options: GlobalOptions,
     test_subsystem: TestSubsystem,
 ) -> TestResult:
@@ -253,7 +251,7 @@ async def run_python_test(
 
     process = test_setup.test_runner_pex.create_process(
         pex_environment=pex_environment,
-        subprocess_encoding_environment=subprocess_encoding_environment,
+        subprocess_environment=subprocess_environment,
         pex_path=f"./{test_setup.test_runner_pex.output_filename}",
         pex_args=test_setup.args,
         input_digest=test_setup.input_digest,

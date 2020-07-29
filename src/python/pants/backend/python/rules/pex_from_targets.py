@@ -32,8 +32,7 @@ from pants.engine.fs import (
     MergeDigests,
     PathGlobs,
 )
-from pants.engine.rules import RootRule, collect_rules, rule
-from pants.engine.selectors import Get
+from pants.engine.rules import Get, RootRule, collect_rules, rule
 from pants.engine.target import TransitiveTargets
 from pants.python.python_setup import PythonSetup
 from pants.util.meta import frozen_after_init
@@ -157,7 +156,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
                 f"entries for the following requirements: {', '.join(unconstrained_projects)}"
             )
 
-        if python_setup.options.resolve_all_constraints:
+        if python_setup.resolve_all_constraints:
             if unconstrained_projects:
                 logger.warning(
                     "Ignoring resolve_all_constraints setting in [python_setup] scope"
@@ -165,7 +164,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
                 )
             else:
                 requirements = PexRequirements(str(req) for req in constraints_file_reqs)
-    elif python_setup.options.resolve_all_constraints:
+    elif python_setup.resolve_all_constraints:
         raise ValueError(
             "resolve_all_constraints in the [python-setup] scope is set, so "
             "requirement_constraints in [python-setup] must also be provided."

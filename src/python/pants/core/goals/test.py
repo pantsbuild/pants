@@ -20,10 +20,8 @@ from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAware
 from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.interactive_process import InteractiveProcess, InteractiveRunner
-from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import collect_rules, goal_rule, rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.process import FallibleProcessResult, InteractiveProcess, InteractiveRunner
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSetWithOrigin,
     Sources,
@@ -200,6 +198,14 @@ class CoverageReports:
         return tuple(report_paths)
 
 
+class ShowOutput(Enum):
+    """Which tests to emit detailed output for."""
+
+    ALL = "all"
+    FAILED = "failed"
+    NONE = "none"
+
+
 class TestSubsystem(GoalSubsystem):
     """Run tests."""
 
@@ -229,6 +235,12 @@ class TestSubsystem(GoalSubsystem):
             help="Force the tests to run, even if they could be satisfied from cache.",
         )
         register(
+            "--output",
+            type=ShowOutput,
+            default=ShowOutput.FAILED,
+            help="Show stdout/stderr for these tests.",
+        )
+        register(
             "--use-coverage",
             type=bool,
             default=False,
@@ -251,6 +263,10 @@ class TestSubsystem(GoalSubsystem):
     @property
     def force(self) -> bool:
         return cast(bool, self.options.force)
+
+    @property
+    def output(self) -> ShowOutput:
+        return cast(ShowOutput, self.options.output)
 
     @property
     def use_coverage(self) -> bool:
@@ -287,7 +303,7 @@ async def run_tests(
         )
         field_set = targets_to_valid_field_sets.field_sets[0]
         request = await Get(TestDebugRequest, TestFieldSet, field_set)
-        debug_result = interactive_runner.run_process(request.process)
+        debug_result = interactive_runner.run(request.process)
         return Test(debug_result.exit_code)
 
     targets_to_valid_field_sets = await Get(
@@ -307,11 +323,13 @@ async def run_tests(
         for field_set in field_sets_with_sources
     )
 
-    exit_code = PANTS_SUCCEEDED_EXIT_CODE
-
+    # Print details.
     for result in results:
-        if result.test_result.status == Status.FAILURE:
-            exit_code = PANTS_FAILED_EXIT_CODE
+        if test_subsystem.options.output == ShowOutput.NONE or (
+            test_subsystem.options.output == ShowOutput.FAILED
+            and result.test_result.status == Status.SUCCESS
+        ):
+            continue
         has_output = result.test_result.stdout or result.test_result.stderr
         if has_output:
             status = (
@@ -328,12 +346,19 @@ async def run_tests(
             console.print_stderr("")
 
     # Print summary
-    if len(results) > 1:
-        console.print_stderr("")
-        for result in results:
-            console.print_stderr(
-                f"{result.address.reference():80}.....{result.test_result.status.value:>10}"
+    console.print_stderr("")
+    for result in results:
+        color = console.green if result.test_result.status == Status.SUCCESS else console.red
+        # The right-align logic sees the color control codes as characters, so we have
+        # to account for that. In f-strings the alignment field widths must be literals,
+        # so we have to indirect via a call to .format().
+        right_align = 19 if console.use_colors else 10
+        format_str = f"{{addr:80}}.....{{result:>{right_align}}}"
+        console.print_stderr(
+            format_str.format(
+                addr=result.address.reference(), result=color(result.test_result.status.value)
             )
+        )
 
     merged_xml_results = await Get(
         Digest,
@@ -373,6 +398,12 @@ async def run_tests(
 
         if coverage_report_files and test_subsystem.open_coverage:
             desktop.ui_open(console, interactive_runner, coverage_report_files)
+
+    exit_code = (
+        PANTS_FAILED_EXIT_CODE
+        if any(res.test_result.status == Status.FAILURE for res in results)
+        else PANTS_SUCCEEDED_EXIT_CODE
+    )
 
     return Test(exit_code)
 

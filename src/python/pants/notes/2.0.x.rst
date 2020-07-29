@@ -5,6 +5,136 @@ This document describes releases leading up to the ``2.0.x`` ``stable`` series.
 
 See https://pants.readme.io/v2.0/docs/release-notes-2-0 for an overview of the changes in this release.
 
+2.0.0.dev6 (7/28/2020)
+----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Upgrade to Pex 2.1.14 (#10437)
+  `PR #10437 <https://github.com/pantsbuild/pants/pull/10437>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Improve test output and allow it be configured. (#10484)
+  `PR #10484 <https://github.com/pantsbuild/pants/pull/10484>`_
+
+Bugfixes
+~~~~~~~~
+
+* Make independent owners requests per file to improve memoization (#10491)
+  `PR #10491 <https://github.com/pantsbuild/pants/pull/10491>`_
+
+* Fix `PluginField` not working in production (#10469)
+  `PR #10469 <https://github.com/pantsbuild/pants/pull/10469>`_
+
+* Allow for more cyclic cases with file dependencies (#10475)
+  `PR #10475 <https://github.com/pantsbuild/pants/pull/10475>`_
+
+* Fix Protobuf when using source roots (#10453)
+  `PR #10453 <https://github.com/pantsbuild/pants/pull/10453>`_
+
+* Fix fromfile expansion to skip passthrough args. (#10457)
+  `PR #10457 <https://github.com/pantsbuild/pants/pull/10457>`_
+
+* Fix `--print-exception-stacktrace` not invalidating pantsd (#10451)
+  `PR #10451 <https://github.com/pantsbuild/pants/pull/10451>`_
+
+* fixes in async_semaphore for concurrency ID calculation (#10436)
+  `PR #10436 <https://github.com/pantsbuild/pants/pull/10436>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Eliminate most rule registration boilerplate. (#10477)
+  `PR #10477 <https://github.com/pantsbuild/pants/pull/10477>`_
+
+* Remove unused `util/` and `base/` code (#10462)
+  `PR #10462 <https://github.com/pantsbuild/pants/pull/10462>`_
+
+* Rename `UrlToFetch` to `DownloadFile` (#10468)
+  `PR #10468 <https://github.com/pantsbuild/pants/pull/10468>`_
+
+* Change the `PathGlobs`, `SnapshotSubset`, and `UrlToFetch` intrinsics to return `Digest` (#10449)
+  `PR #10449 <https://github.com/pantsbuild/pants/pull/10449>`_
+
+* Unify accessing options for a `GoalSubsystem` with `Subsystem` (#10456)
+  `PR #10456 <https://github.com/pantsbuild/pants/pull/10456>`_
+
+* Rename `Workspace.materialize_directory()` to `Workspace.write_digest()` (#10448)
+  `PR #10448 <https://github.com/pantsbuild/pants/pull/10448>`_
+
+* Remove unused `SingleFileExecutable` (#10443)
+  `PR #10443 <https://github.com/pantsbuild/pants/pull/10443>`_
+
+* Remove support for Protoc 2 (#10439)
+  `PR #10439 <https://github.com/pantsbuild/pants/pull/10439>`_
+
+* Make GoalSubsystem subclass Subsystem. (#10483)
+  `PR #10483 <https://github.com/pantsbuild/pants/pull/10483>`_
+
+* Tweaks to help output: (#10466)
+  `PR #10466 <https://github.com/pantsbuild/pants/pull/10466>`_
+
+* Cleanup `fs.py` (#10474)
+  `PR #10474 <https://github.com/pantsbuild/pants/pull/10474>`_
+
+* Add `UnionMembership.from_rules()` (#10472)
+  `PR #10472 <https://github.com/pantsbuild/pants/pull/10472>`_
+
+* Kill Reporting (mostly). (#10463)
+  `PR #10463 <https://github.com/pantsbuild/pants/pull/10463>`_
+
+* Add dependencies on conftest and init files via inference (#10441)
+  `PR #10441 <https://github.com/pantsbuild/pants/pull/10441>`_
+
+* Kill ./pants literals. (#10465)
+  `PR #10465 <https://github.com/pantsbuild/pants/pull/10465>`_
+
+* Remove Options <-> Parser cycle. (#10464)
+  `PR #10464 <https://github.com/pantsbuild/pants/pull/10464>`_
+
+* Revert "Use isort v5.x as the default version (#10258)" (#10460)
+  `PR #10460 <https://github.com/pantsbuild/pants/pull/10460>`_
+
+* Demystify get_all_scoped_flag_names mypy kludges. (#10459)
+  `PR #10459 <https://github.com/pantsbuild/pants/pull/10459>`_
+
+* Optimize generated subtargets' interaction with `SpecifiedSourceFiles` (#10454)
+  `PR #10454 <https://github.com/pantsbuild/pants/pull/10454>`_
+
+* Simplify Collection. (#10450)
+  `PR #10450 <https://github.com/pantsbuild/pants/pull/10450>`_
+
+* Improvements to help output. (#10444)
+  `PR #10444 <https://github.com/pantsbuild/pants/pull/10444>`_
+
+* Fixes to get the process_executor CLI tool working again. (#10435)
+  `PR #10435 <https://github.com/pantsbuild/pants/pull/10435>`_
+
+* Rename argument in streaming workunit callback (#10432)
+  `PR #10432 <https://github.com/pantsbuild/pants/pull/10432>`_
+
+Testing
+~~~~~~~
+
+* Only skip building wheels on PR builds (#10482)
+  `PR #10482 <https://github.com/pantsbuild/pants/pull/10482>`_
+
+* Skip building wheels if no release files have changed (#10481)
+  `PR #10481 <https://github.com/pantsbuild/pants/pull/10481>`_
+
+* Skip flaky GoalRuleIntegrationTest (#10479)
+  `Issue #10478 <https://github.com/pantsbuild/pants/issues/10478>`_
+  `PR #10479 <https://github.com/pantsbuild/pants/pull/10479>`_
+
+* A script to create an index.html for pants wheels on S3. (#10458)
+  `PR #10458 <https://github.com/pantsbuild/pants/pull/10458>`_
+
+* Get rid of remaining uses of init_subsystem. (#10427)
+  `PR #10427 <https://github.com/pantsbuild/pants/pull/10427>`_
+
 2.0.0.dev5 (7/22/2020)
 ----------------------
 

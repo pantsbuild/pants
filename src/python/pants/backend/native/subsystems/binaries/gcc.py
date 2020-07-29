@@ -25,6 +25,4 @@ class GCC(ExternalTool):
 
     def generate_url(self, plat: Platform) -> str:
         plat_str = "mac/10.13" if plat == Platform.darwin else "linux/x86_64"
-        return (
-            f"https://binaries.pantsbuild.org/bin/gcc/{plat_str}/{self.options.version}/gcc.tar.gz"
-        )
+        return f"https://binaries.pantsbuild.org/bin/gcc/{plat_str}/{self.version}/gcc.tar.gz"

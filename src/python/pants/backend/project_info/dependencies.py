@@ -9,8 +9,7 @@ from pants.backend.python.target_types import PythonRequirementsField
 from pants.engine.addresses import Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
-from pants.engine.rules import collect_rules, goal_rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import Dependencies as DependenciesField
 from pants.engine.target import DependenciesRequest, Targets, TransitiveTargets
 

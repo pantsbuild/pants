@@ -20,8 +20,7 @@ from pants.engine.fs import (
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import collect_rules, goal_rule
-from pants.engine.selectors import Get
+from pants.engine.rules import Get, collect_rules, goal_rule
 from pants.util.strutil import pluralize
 
 
@@ -37,8 +36,10 @@ class ClocBinary(ExternalTool):
     ]
 
     def generate_url(self, plat: Platform) -> str:
-        version = self.get_options().version
-        return f"https://github.com/AlDanial/cloc/releases/download/{version}/cloc-{version}.pl"
+        return (
+            f"https://github.com/AlDanial/cloc/releases/download/{self.version}/"
+            f"cloc-{self.version}.pl"
+        )
 
 
 class CountLinesOfCodeSubsystem(GoalSubsystem):

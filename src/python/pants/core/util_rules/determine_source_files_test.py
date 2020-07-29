@@ -22,8 +22,8 @@ from pants.core.util_rules.determine_source_files import (
 from pants.core.util_rules.determine_source_files import rules as determine_source_files_rules
 from pants.core.util_rules.strip_source_roots import rules as strip_source_roots_rules
 from pants.engine.addresses import Address
-from pants.engine.selectors import Params
 from pants.engine.target import Sources as SourcesField
+from pants.testutil.engine.util import Params
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 

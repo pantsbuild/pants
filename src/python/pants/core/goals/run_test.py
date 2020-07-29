@@ -9,7 +9,7 @@ from pants.core.goals.binary import BinaryFieldSet
 from pants.core.goals.run import Run, RunRequest, RunSubsystem, run
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent, Workspace
-from pants.engine.interactive_process import InteractiveProcess, InteractiveRunner
+from pants.engine.process import InteractiveProcess, InteractiveRunner
 from pants.engine.target import (
     Target,
     TargetsToValidFieldSets,
@@ -97,7 +97,7 @@ class RunTest(TestBase):
         process = InteractiveProcess(
             argv=("./program.py",), run_in_workspace=False, input_digest=binary.digest,
         )
-        result = interactive_runner.run_process(process)
+        result = interactive_runner.run(process)
         assert result.exit_code == 0
 
     def test_failed_run(self) -> None:

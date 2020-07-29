@@ -1,17 +1,17 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+
 import logging
 import os
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping, Optional, Tuple
 
-from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
 from pants.engine import process
 from pants.engine.engine_aware import EngineAware
 from pants.engine.fs import Digest
 from pants.engine.process import BinaryPathRequest, BinaryPaths, Process
-from pants.engine.rules import collect_rules, rule
-from pants.engine.selectors import Get, MultiGet
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.python.python_setup import PythonSetup
 from pants.subsystem.subsystem import Subsystem
 from pants.util.logging import LogLevel
@@ -144,7 +144,7 @@ class HermeticPex:
     def create_process(
         self,
         pex_environment: PexEnvironment,
-        subprocess_encoding_environment: SubprocessEncodingEnvironment,
+        subprocess_environment: SubprocessEnvironment,
         *,
         pex_path: str,
         pex_args: Iterable[str],
@@ -156,7 +156,7 @@ class HermeticPex:
         """Creates an Process that will run a PEX hermetically.
 
         :param pex_environment: The environment needed to bootstrap the PEX runtime.
-        :param subprocess_encoding_environment: The locale settings to use for the PEX invocation.
+        :param subprocess_environment: The locale settings to use for the PEX invocation.
         :param pex_path: The path within `input_files` of the PEX file (or directory if a loose
                          pex).
         :param pex_args: The arguments to pass to the PEX executable.
@@ -175,7 +175,7 @@ class HermeticPex:
             PEX_INHERIT_PATH="false",
             PEX_IGNORE_RCFILES="true",
             **pex_environment.environment_dict,
-            **subprocess_encoding_environment.invocation_environment_dict,
+            **subprocess_environment.invocation_environment,
         )
         if env:
             hermetic_env.update(env)
