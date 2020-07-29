@@ -54,23 +54,16 @@ class ExternalTool(Subsystem):
             ...
 
         def generate_exe(self, plat: Platform) -> str:
-            ...
+            return "./path-to/binary
 
     @rule
-    def my_rule(my_external_tool: MyExternalTool):
-      downloaded_tool = await Get(
-        DownloadedExternalTool,
-        ExternalToolRequest,
-        my_external_tool.get_request(Platform.current)
-      )
-
-    ...
-    def rules():
-      return [my_rule, SubsystemRule(MyExternalTool)]
-
-
-    A lightweight replacement for the code in binary_tool.py and binary_util.py,
-    which can be deprecated in favor of this.
+    def my_rule(my_external_tool: MyExternalTool) -> Foo:
+        downloaded_tool = await Get(
+            DownloadedExternalTool,
+            ExternalToolRequest,
+            my_external_tool.get_request(Platform.current)
+        )
+        ...
     """
 
     # The default values for --version and --known-versions.
@@ -140,15 +133,13 @@ class ExternalTool(Subsystem):
         os and arch default to those of the current system.
 
         Implementations should raise ExternalToolError if they cannot resolve the arguments
-        to a URL.  The raised exception need not have a message - a sensible one will be generated.
+        to a URL. The raised exception need not have a message - a sensible one will be generated.
         """
 
+    @abstractmethod
     def generate_exe(self, plat: Platform) -> str:
-        """Returns the archive path to the given version of the tool.
-
-        If the tool is downloaded directly, not in an archive, this can be left unimplemented.
-        """
-        return ""
+        """Returns the relative path in the downloaded archive to the given version of the tool,
+        e.g. `./bin/protoc`."""
 
     def get_request(self, plat: Platform) -> ExternalToolRequest:
         """Generate a request for this tool."""
@@ -164,7 +155,7 @@ class ExternalTool(Subsystem):
                 digest = Digest(fingerprint=sha256, serialized_bytes_length=int(length))
                 try:
                     url = self.generate_url(plat)
-                    exe = self.generate_exe(plat) or url.rsplit("/", 1)[-1]
+                    exe = self.generate_exe(plat)
                 except ExternalToolError as e:
                     raise ExternalToolError(
                         f"Couldn't find {self.name} version {self.version} on {plat.value}"

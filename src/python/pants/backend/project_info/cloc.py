@@ -35,11 +35,14 @@ class ClocBinary(ExternalTool):
         "1.80|linux |2b23012b1c3c53bd6b9dd43cd6aa75715eed4feb2cb6db56ac3fbbd2dffeac9d|546279",
     ]
 
-    def generate_url(self, plat: Platform) -> str:
+    def generate_url(self, _: Platform) -> str:
         return (
             f"https://github.com/AlDanial/cloc/releases/download/{self.version}/"
             f"cloc-{self.version}.pl"
         )
+
+    def generate_exe(self, _: Platform) -> str:
+        return f"./cloc-{self.version}.pl"
 
 
 class CountLinesOfCodeSubsystem(GoalSubsystem):

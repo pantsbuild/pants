@@ -30,8 +30,11 @@ class PexBin(ExternalTool):
         for plat in ["darwin", "linux "]
     ]
 
-    def generate_url(self, plat: Platform) -> str:
+    def generate_url(self, _: Platform) -> str:
         return f"https://github.com/pantsbuild/pex/releases/download/{self.version}/pex"
+
+    def generate_exe(self, _: Platform) -> str:
+        return "./pex"
 
 
 @dataclass(frozen=True)
