@@ -25,9 +25,9 @@ from pants.goal.aggregated_timings import AggregatedTimings
 from pants.goal.pantsd_stats import PantsDaemonStats
 from pants.option.config import Config
 from pants.option.options_fingerprinter import CoercingOptionEncoder
+from pants.option.subsystem import Subsystem
 from pants.reporting.json_reporter import JsonReporter
 from pants.reporting.report import Report
-from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import relative_symlink, safe_file_dump
 from pants.version import VERSION
 

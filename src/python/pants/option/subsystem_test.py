@@ -5,7 +5,7 @@ import logging
 
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
-from pants.subsystem.subsystem import Subsystem
+from pants.option.subsystem import Subsystem
 from pants.testutil.test_base import TestBase
 
 
@@ -302,7 +302,7 @@ class SubsystemTest(TestBase):
             list(SubsystemB.subsystem_closure_iter())
 
     def test_get_streaming_workunit_callbacks(self) -> None:
-        import_str = "pants.subsystem.subsystem_test.WorkunitSubscriptableSubsystem"
+        import_str = "pants.option.subsystem_test.WorkunitSubscriptableSubsystem"
         callables_list = Subsystem.get_streaming_workunit_callbacks([import_str])
         assert len(callables_list) == 1
 
@@ -316,19 +316,19 @@ class SubsystemTest(TestBase):
             assert "No module named 'nonexistent_module'" in warnings[0]
 
     def test_streaming_workunit_callbacks_good_module_bad_class(self) -> None:
-        import_str = "pants.subsystem.subsystem_test.ANonexistentClass"
+        import_str = "pants.option.subsystem_test.ANonexistentClass"
         with self.captured_logging(level=logging.WARNING) as captured:
             callables_list = Subsystem.get_streaming_workunit_callbacks([import_str])
             warnings = captured.warnings()
             assert len(warnings) == 1
             assert len(callables_list) == 0
             assert (
-                "module 'pants.subsystem.subsystem_test' has no attribute 'ANonexistentClass'"
+                "module 'pants.option.subsystem_test' has no attribute 'ANonexistentClass'"
                 in warnings[0]
             )
 
     def test_streaming_workunit_callbacks_with_invalid_subsystem(self) -> None:
-        import_str = "pants.subsystem.subsystem_test.DummySubsystem"
+        import_str = "pants.option.subsystem_test.DummySubsystem"
         with self.captured_logging(level=logging.WARNING) as captured:
             callables_list = Subsystem.get_streaming_workunit_callbacks([import_str])
             warnings = captured.warnings()

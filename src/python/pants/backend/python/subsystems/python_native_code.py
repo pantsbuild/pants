@@ -5,7 +5,7 @@ import os
 from typing import Dict, Tuple
 
 from pants.engine.rules import collect_rules
-from pants.subsystem.subsystem import Subsystem
+from pants.option.subsystem import Subsystem
 from pants.util.strutil import safe_shlex_join, safe_shlex_split
 
 

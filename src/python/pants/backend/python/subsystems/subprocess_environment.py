@@ -5,7 +5,7 @@ import os
 from typing import Dict, Optional, cast
 
 from pants.engine.rules import collect_rules
-from pants.subsystem.subsystem import Subsystem
+from pants.option.subsystem import Subsystem
 
 
 class SubprocessEnvironment(Subsystem):

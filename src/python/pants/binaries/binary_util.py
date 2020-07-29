@@ -19,7 +19,7 @@ from pants.fs.archive import archiver_for_path
 from pants.net.http.fetcher import Fetcher
 from pants.option.global_options import GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.subsystem.subsystem import Subsystem
+from pants.option.subsystem import Subsystem
 from pants.util.contextutil import temporary_file
 from pants.util.dirutil import chmod_plus_x, safe_concurrent_creation, safe_open
 from pants.util.memo import memoized_classproperty, memoized_method, memoized_property

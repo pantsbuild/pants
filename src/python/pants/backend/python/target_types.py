@@ -21,9 +21,9 @@ from pants.engine.target import (
     StringOrStringSequenceField,
     Target,
 )
+from pants.option.subsystem import Subsystem
 from pants.python.python_requirement import PythonRequirement
 from pants.python.python_setup import PythonSetup
-from pants.subsystem.subsystem import Subsystem
 
 # -----------------------------------------------------------------------------------------------
 # Common fields

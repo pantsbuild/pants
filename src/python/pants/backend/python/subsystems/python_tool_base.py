@@ -3,7 +3,7 @@
 
 from typing import Optional, Sequence, Tuple, cast
 
-from pants.subsystem.subsystem import Subsystem
+from pants.option.subsystem import Subsystem
 
 
 class PythonToolBase(Subsystem):
