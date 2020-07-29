@@ -22,7 +22,6 @@ target(
     'src/python/pants/backend/python/lint/isort',
     'src/python/pants/backend/python/lint/pylint',
     'src/python/pants/backend/python/typecheck/mypy',
-    'src/python/pants/backend/native',
     'src/python/pants/core',
   ],
 )
