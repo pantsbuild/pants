@@ -973,7 +973,3 @@ stages:
   name: Deploy Pants Pex
 - if: tag IS NOT present AND type NOT IN (pull_request, cron)
   name: Deploy Pants Pex Unstable
-
-HERE
-['/Users/eric/DocsLocal/code/projects/pants/build-support/virtualenvs/Darwin/pants_dev_deps.py36.venv/bin/python', 'pex', '--pex-root', '.cache/pex_root', '--output-file', 'generate_travis_yml.pex', '--no-pypi', '--index=https://pypi.org/simple/', '--interpreter-constraint', 'CPython>=3.6', '--no-emit-warnings', '--manylinux', 'manylinux2014', '--constraints', '3rdparty/python/requirements.txt', '--sources-directory=source_files', 'PyYAML<5.4,>=5.3.1']
-{'PEX_INHERIT_PATH': 'false', 'PEX_IGNORE_RCFILES': 'true', 'PATH': ':', 'PEX_PYTHON_PATH': '/Users/eric/DocsLocal/code/projects/pants/build-support/virtualenvs/Darwin/pants_dev_deps.py36.venv/bin:/Users/eric/.pyenv/shims:/usr/local/opt/openssl/bin:/Users/eric/.pyenv/shims:/Users/eric/.poetry/bin:/Users/eric/.cargo/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Library/TeX/texbin:/Users/eric/.local/bin', 'LANG': 'en_US.UTF-8', 'LC_ALL': '', 'CPPFLAGS': '-I/usr/local/opt/openssl/include', 'LDFLAGS': '-L/usr/local/opt/openssl/lib'}
