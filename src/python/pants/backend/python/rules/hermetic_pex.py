@@ -183,9 +183,6 @@ class HermeticPex:
         if env:
             hermetic_env.update(env)
 
-        print("HERE")
-        print(argv)
-        print(hermetic_env)
         return Process(
             argv=argv,
             input_digest=input_digest,
