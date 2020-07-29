@@ -16,7 +16,7 @@ from pants.init.global_subsystems import GlobalSubsystems
 from pants.init.plugin_resolver import PluginResolver
 from pants.option.global_options import GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.subsystem.subsystem import Subsystem
+from pants.option.subsystem import Subsystem
 from pants.util.dirutil import fast_relpath_optional
 from pants.util.ordered_set import OrderedSet
 

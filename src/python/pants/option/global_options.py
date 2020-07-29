@@ -20,7 +20,7 @@ from pants.engine.fs import GlobMatchErrorBehavior
 from pants.option.custom_types import dir_option
 from pants.option.errors import OptionsError
 from pants.option.scope import GLOBAL_SCOPE
-from pants.subsystem.subsystem import Subsystem
+from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
 
 
@@ -113,7 +113,7 @@ DEFAULT_EXECUTION_OPTIONS = ExecutionOptions(
     remote_store_chunk_upload_timeout_seconds=60,
     remote_store_rpc_retries=2,
     remote_store_connection_limit=5,
-    process_execution_local_parallelism=multiprocessing.cpu_count() * 2,
+    process_execution_local_parallelism=multiprocessing.cpu_count(),
     process_execution_remote_parallelism=128,
     process_execution_cleanup_local_dirs=True,
     process_execution_speculation_delay=1,

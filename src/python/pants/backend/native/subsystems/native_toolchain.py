@@ -20,7 +20,7 @@ from pants.backend.native.subsystems.libc_dev import LibcDev
 from pants.backend.native.subsystems.xcode_cli_tools import XCodeCLITools
 from pants.engine.platform import Platform
 from pants.engine.rules import Get, RootRule, rule
-from pants.subsystem.subsystem import Subsystem
+from pants.option.subsystem import Subsystem
 from pants.util.enums import match
 from pants.util.memo import memoized_property
 

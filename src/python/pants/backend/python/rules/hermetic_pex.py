@@ -13,7 +13,7 @@ from pants.engine.fs import Digest
 from pants.engine.process import BinaryPathRequest, BinaryPaths, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.python.python_setup import PythonSetup
-from pants.subsystem.subsystem import Subsystem
+from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.ordered_set import OrderedSet

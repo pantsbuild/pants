@@ -18,8 +18,8 @@ from pants.option.global_options import GlobalOptions
 from pants.option.optionable import Optionable
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.scope import ScopeInfo
+from pants.option.subsystem import Subsystem
 from pants.python.python_repos import PythonRepos
-from pants.subsystem.subsystem import Subsystem
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_concurrent_rename, safe_delete, safe_open
 from pants.util.memo import memoized_property

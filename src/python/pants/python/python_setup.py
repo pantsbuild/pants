@@ -11,7 +11,7 @@ from pex.variables import Variables
 
 from pants.base.build_environment import get_buildroot
 from pants.option.custom_types import UnsetBool, file_option
-from pants.subsystem.subsystem import Subsystem
+from pants.option.subsystem import Subsystem
 from pants.util.memo import memoized_property
 
 logger = logging.getLogger(__name__)

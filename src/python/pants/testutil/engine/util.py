@@ -28,7 +28,7 @@ from pants.engine.rules import Get
 from pants.engine.unions import UnionMembership
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.ranked_value import Rank, RankedValue, Value
-from pants.subsystem.subsystem import Subsystem
+from pants.option.subsystem import Subsystem
 
 
 # TODO(#6742): Improve the type signature by using generics and type vars. `mock` should be

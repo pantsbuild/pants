@@ -6,7 +6,7 @@ import os
 import re
 import subprocess
 
-from pants.subsystem.subsystem import Subsystem
+from pants.option.subsystem import Subsystem
 from pants.util.dirutil import is_readable_dir
 from pants.util.memo import memoized_classproperty
 from pants.util.ordered_set import OrderedSet

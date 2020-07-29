@@ -31,8 +31,8 @@ from pants.engine.unions import UnionMembership
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, ExecutionOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.option.subsystem import Subsystem
 from pants.scm.subsystems.changed import rules as changed_rules
-from pants.subsystem.subsystem import Subsystem
 from pants.util.ordered_set import FrozenOrderedSet
 
 logger = logging.getLogger(__name__)
