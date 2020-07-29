@@ -67,7 +67,7 @@ class Stage(Enum):
 
 GLOBAL_ENV_VARS = [
     'PANTS_CONFIG_FILES="${TRAVIS_BUILD_DIR}/pants.travis-ci.toml"',
-    'PANTS_DYNAMIC_UI=false',
+    "PANTS_DYNAMIC_UI=false",
     'LC_ALL="en_US.UTF-8"',
     "AWS_BUCKET=ci-public.pantsbuild.org",
     # The ci-public.pantsbuild.org bucket has expiration policies set up for key prefixes

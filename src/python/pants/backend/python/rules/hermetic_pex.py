@@ -11,8 +11,8 @@ from pants.engine.engine_aware import EngineAware
 from pants.engine.fs import Digest
 from pants.engine.process import BinaryPathRequest, BinaryPaths, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.python.python_setup import PythonSetup
 from pants.option.subsystem import Subsystem
+from pants.python.python_setup import PythonSetup
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.ordered_set import OrderedSet
@@ -97,6 +97,7 @@ class PexRuntimeEnvironment(Subsystem):
                             yield path_entry
                 else:
                     yield entry
+
         return tuple(OrderedSet(iter_path_entries()))
 
     @property
