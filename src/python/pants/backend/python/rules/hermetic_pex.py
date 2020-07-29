@@ -1,7 +1,6 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import logging
 import os
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping, Optional, Tuple
@@ -18,8 +17,6 @@ from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import create_path_env_var
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
