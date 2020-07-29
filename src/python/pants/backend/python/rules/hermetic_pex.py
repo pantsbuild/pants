@@ -96,11 +96,10 @@ class PexRuntimeEnvironment(Subsystem):
                     #  safely via the engine.
                     path = os.environ.get("PATH")
                     if path:
-                        for path_entry in os.pathsep.split(path):
+                        for path_entry in path.split(os.pathsep):
                             yield path_entry
                 else:
                     yield entry
-
         return tuple(OrderedSet(iter_path_entries()))
 
     @property
