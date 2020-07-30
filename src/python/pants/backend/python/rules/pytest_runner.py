@@ -96,7 +96,7 @@ async def setup_pytest_for_target(
     # of the tests. This is handled by CreatePexFromTargetClosure, but we must pass this through for
     # CreatePex requests.
     pex_request = functools.partial(
-        PexRequest, interpreter_constraints=interpreter_constraints, distributed_to_users=False
+        PexRequest, interpreter_constraints=interpreter_constraints, internal_only=True
     )
 
     # NB: We set `--not-zip-safe` because Pytest plugin discovery, which uses
@@ -122,7 +122,7 @@ async def setup_pytest_for_target(
         PexFromTargetsRequest(
             addresses=test_addresses,
             output_filename="requirements.pex",
-            distributed_to_users=False,
+            internal_only=True,
             include_source_files=False,
             additional_args=additional_args_for_pytest,
         ),

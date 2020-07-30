@@ -123,7 +123,7 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
         Pex,
         PexRequest(
             output_filename="pylint.pex",
-            distributed_to_users=False,
+            internal_only=True,
             requirements=PexRequirements([*pylint.all_requirements, *plugin_requirements]),
             interpreter_constraints=partition.interpreter_constraints,
         ),
@@ -132,7 +132,7 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
         Pex,
         PexRequest(
             output_filename="requirements.pex",
-            distributed_to_users=False,
+            internal_only=True,
             requirements=target_requirements,
             interpreter_constraints=partition.interpreter_constraints,
         ),
@@ -146,7 +146,7 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
         Pex,
         PexRequest(
             output_filename="pylint_runner.pex",
-            distributed_to_users=False,
+            internal_only=True,
             entry_point=pylint.entry_point,
             interpreter_constraints=partition.interpreter_constraints,
             additional_args=pylint_runner_pex_args,

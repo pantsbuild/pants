@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 class PexFromTargetsRequest:
     addresses: Addresses
     output_filename: str
-    distributed_to_users: bool
+    internal_only: bool
     entry_point: Optional[str]
     platforms: PexPlatforms
     additional_args: Tuple[str, ...]
@@ -62,7 +62,7 @@ class PexFromTargetsRequest:
         addresses: Iterable[Address],
         *,
         output_filename: str,
-        distributed_to_users: bool,
+        internal_only: bool,
         entry_point: Optional[str] = None,
         platforms: PexPlatforms = PexPlatforms(),
         additional_args: Iterable[str] = (),
@@ -78,9 +78,9 @@ class PexFromTargetsRequest:
             transitive closure of these addresses will be used; you only need to specify the roots.
         :param output_filename: The name of the built Pex file, which typically should end in
             `.pex`.
-        :param distributed_to_users: Whether we ever materialize the Pex and distribute it directly
+        :param internal_only: Whether we ever materialize the Pex and distribute it directly
             to end users, such as with the `binary` goal. Typically, instead, the user never
-            directly uses the Pex, e.g. with `lint` and `test`. If False, we will use a Pex setting
+            directly uses the Pex, e.g. with `lint` and `test`. If True, we will use a Pex setting
             that results in faster build time but compatibility with fewer interpreters at runtime.
         :param entry_point: The entry-point for the built Pex, equivalent to Pex's `-m` flag. If
             left off, the Pex will open up as a REPL.
@@ -102,7 +102,7 @@ class PexFromTargetsRequest:
         """
         self.addresses = Addresses(addresses)
         self.output_filename = output_filename
-        self.distributed_to_users = distributed_to_users
+        self.internal_only = internal_only
         self.entry_point = entry_point
         self.platforms = platforms
         self.additional_args = tuple(additional_args)
@@ -201,7 +201,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
 
     return PexRequest(
         output_filename=request.output_filename,
-        distributed_to_users=request.distributed_to_users,
+        internal_only=request.internal_only,
         requirements=requirements,
         interpreter_constraints=interpreter_constraints,
         platforms=request.platforms,

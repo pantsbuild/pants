@@ -79,7 +79,7 @@ class PexTest(TestBase):
         )
 
         request = PexFromTargetsRequest(
-            [Address.parse("//:tgt")], output_filename="demo.pex", distributed_to_users=True
+            [Address.parse("//:tgt")], output_filename="demo.pex", internal_only=True
         )
 
         def get_pex_request(constraints_file: Optional[str], resolve_all: bool) -> PexRequest:

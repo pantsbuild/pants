@@ -27,7 +27,7 @@ async def create_python_repl_request(repl: PythonRepl) -> ReplRequest:
         PexFromTargetsRequest(
             (tgt.address for tgt in repl.targets),
             output_filename="python.pex",
-            distributed_to_users=False,
+            internal_only=True,
             include_source_files=False,
         ),
     )
@@ -55,7 +55,7 @@ async def create_ipython_repl_request(repl: IPythonRepl, ipython: IPython) -> Re
         PexFromTargetsRequest(
             (tgt.address for tgt in repl.targets),
             output_filename="ipython.pex",
-            distributed_to_users=False,
+            internal_only=True,
             entry_point=ipython.entry_point,
             additional_requirements=ipython.all_requirements,
             include_source_files=True,

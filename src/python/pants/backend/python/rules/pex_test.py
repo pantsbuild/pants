@@ -202,7 +202,7 @@ class PexTest(ExternalToolTestBase):
     ) -> Dict:
         request = PexRequest(
             output_filename="test.pex",
-            distributed_to_users=True,
+            internal_only=True,
             requirements=requirements,
             interpreter_constraints=interpreter_constraints,
             platforms=platforms,

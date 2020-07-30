@@ -201,7 +201,7 @@ class PexPlatforms(DeduplicatedCollection[str]):
 @dataclass(unsafe_hash=True)
 class PexRequest:
     output_filename: str
-    distributed_to_users: bool
+    internal_only: bool
     requirements: PexRequirements
     interpreter_constraints: PexInterpreterConstraints
     platforms: PexPlatforms
@@ -215,7 +215,7 @@ class PexRequest:
         self,
         *,
         output_filename: str,
-        distributed_to_users: bool,
+        internal_only: bool,
         requirements: PexRequirements = PexRequirements(),
         interpreter_constraints=PexInterpreterConstraints(),
         platforms=PexPlatforms(),
@@ -229,9 +229,9 @@ class PexRequest:
 
         :param output_filename: The name of the built Pex file, which typically should end in
             `.pex`.
-        :param distributed_to_users: Whether we ever materialize the Pex and distribute it directly
+        :param internal_only: Whether we ever materialize the Pex and distribute it directly
             to end users, such as with the `binary` goal. Typically, instead, the user never
-            directly uses the Pex, e.g. with `lint` and `test`. If False, we will use a Pex setting
+            directly uses the Pex, e.g. with `lint` and `test`. If True, we will use a Pex setting
             that results in faster build time but compatibility with fewer interpreters at runtime.
         :param requirements: The requirements to install.
         :param interpreter_constraints: Any constraints on which Python versions may be used.
@@ -248,7 +248,7 @@ class PexRequest:
             the Pex.
         """
         self.output_filename = output_filename
-        self.distributed_to_users = distributed_to_users
+        self.internal_only = internal_only
         self.requirements = requirements
         self.interpreter_constraints = interpreter_constraints
         self.platforms = platforms
@@ -280,7 +280,7 @@ class Pex:
 
     digest: Digest
     name: str
-    distributed_to_users: bool
+    internal_only: bool
 
 
 @dataclass(frozen=True)
@@ -347,7 +347,7 @@ async def create_pex(
         *request.additional_args,
     ]
 
-    if not request.distributed_to_users:
+    if request.internal_only:
         # This will result in a faster build, but worse compatibility at runtime.
         argv.append("--use-first-matching-interpreter")
 
@@ -446,7 +446,7 @@ async def create_pex(
     return Pex(
         digest=result.output_digest,
         name=request.output_filename,
-        distributed_to_users=request.distributed_to_users,
+        internal_only=request.internal_only,
     )
 
 
@@ -462,7 +462,7 @@ async def two_step_create_pex(two_step_pex_request: TwoStepPexRequest) -> TwoSte
     if request.requirements:
         requirements_pex_request = PexRequest(
             output_filename=req_pex_name,
-            distributed_to_users=request.distributed_to_users,
+            internal_only=request.internal_only,
             requirements=request.requirements,
             interpreter_constraints=request.interpreter_constraints,
             platforms=request.platforms,
@@ -537,7 +537,7 @@ async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment
         *request.argv,
         # If the Pex isn't distributed to users, then we must use the shebang because we will have
         # used the flag `--use-first-matching-interpreter`, which requires running via shebang.
-        always_use_shebang=request.pex.distributed_to_users is False,
+        always_use_shebang=request.pex.internal_only,
     )
     env = {**pex_environment.environment_dict, **(request.extra_env or {})}
     return Process(

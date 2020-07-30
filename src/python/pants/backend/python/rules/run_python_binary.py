@@ -42,7 +42,7 @@ async def create_python_binary_run_request(
         Pex,
         PexFromTargetsRequest(
             addresses=Addresses([field_set.address]),
-            distributed_to_users=False,
+            internal_only=True,
             platforms=PexPlatforms.create_from_platforms_field(field_set.platforms),
             output_filename=output_filename,
             additional_args=field_set.generate_additional_args(python_binary_defaults),

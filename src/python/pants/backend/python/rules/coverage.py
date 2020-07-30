@@ -197,7 +197,7 @@ async def setup_coverage(coverage: CoverageSubsystem) -> CoverageSetup:
         Pex,
         PexRequest(
             output_filename="coverage.pex",
-            distributed_to_users=False,
+            internal_only=True,
             requirements=PexRequirements(coverage.all_requirements),
             interpreter_constraints=PexInterpreterConstraints(coverage.interpreter_constraints),
             entry_point=coverage.entry_point,

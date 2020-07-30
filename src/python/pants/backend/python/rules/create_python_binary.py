@@ -78,7 +78,7 @@ async def create_python_binary(
         TwoStepPexFromTargetsRequest(
             PexFromTargetsRequest(
                 addresses=[field_set.address],
-                distributed_to_users=True,
+                internal_only=False,
                 entry_point=entry_point,
                 platforms=PexPlatforms.create_from_platforms_field(field_set.platforms),
                 output_filename=output_filename,
