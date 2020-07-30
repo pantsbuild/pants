@@ -1,4 +1,3 @@
-# Overrides for TravisCI runs.
 [DEFAULT]
 # If we use typical default process parallelism tied to core count, we see too many cores under
 # travis and either get oomkilled from launching too many processes with too much total memory
@@ -25,4 +24,4 @@ resolver_jobs = 2
 use_coverage = true
 
 [coverage-py]
-report=["raw"]
+report = ["raw"]

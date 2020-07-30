@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import List, Set, Tuple, cast
 
 from pants.backend.python.python_artifact import PythonArtifact
+from pants.backend.python.rules.hermetic_pex import PexEnvironment
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
@@ -372,7 +373,7 @@ setup(**{setup_kwargs_str})
 async def run_setup_py(
     req: RunSetupPyRequest,
     setuptools_setup: SetuptoolsSetup,
-    python_setup: PythonSetup,
+    pex_environment: PexEnvironment,
     subprocess_environment: SubprocessEnvironment,
 ) -> RunSetupPyResult:
     """Run a setup.py command on a single exported target."""
@@ -383,7 +384,7 @@ async def run_setup_py(
     # pants's own dist dir, at the buildroot).
     dist_dir = "dist/"
     process = setuptools_setup.requirements_pex.create_process(
-        python_setup=python_setup,
+        pex_environment=pex_environment,
         subprocess_environment=subprocess_environment,
         pex_path="./setuptools.pex",
         pex_args=("setup.py", *req.args),

@@ -7,6 +7,7 @@ from typing import Tuple
 from pants.backend.python.lint.isort.subsystem import Isort
 from pants.backend.python.lint.python_fmt import PythonFmtRequest
 from pants.backend.python.rules import download_pex_bin, pex
+from pants.backend.python.rules.hermetic_pex import PexEnvironment
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
@@ -36,7 +37,6 @@ from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSetWithOrigin
 from pants.engine.unions import UnionRule
-from pants.python.python_setup import PythonSetup
 from pants.util.strutil import pluralize
 
 
@@ -80,7 +80,7 @@ def generate_args(
 async def setup(
     setup_request: SetupRequest,
     isort: Isort,
-    python_setup: PythonSetup,
+    pex_environment: PexEnvironment,
     subprocess_environment: SubprocessEnvironment,
 ) -> Setup:
     requirements_pex_request = Get(
@@ -140,7 +140,7 @@ async def setup(
     )
 
     process = requirements_pex.create_process(
-        python_setup=python_setup,
+        pex_environment=pex_environment,
         subprocess_environment=subprocess_environment,
         pex_path="./isort.pex",
         pex_args=generate_args(

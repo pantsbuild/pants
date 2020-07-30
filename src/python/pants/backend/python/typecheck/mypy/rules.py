@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Tuple
 
 from pants.backend.python.rules import download_pex_bin, pex, python_sources
+from pants.backend.python.rules.hermetic_pex import PexEnvironment
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
@@ -34,7 +35,6 @@ from pants.engine.process import FallibleProcessResult, Process
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSetWithOrigin, TransitiveTargets
 from pants.engine.unions import UnionRule
-from pants.python.python_setup import PythonSetup
 from pants.util.strutil import pluralize
 
 
@@ -64,7 +64,7 @@ def generate_args(mypy: MyPy, *, file_list_path: str) -> Tuple[str, ...]:
 async def mypy_lint(
     request: MyPyRequest,
     mypy: MyPy,
-    python_setup: PythonSetup,
+    pex_environment: PexEnvironment,
     subprocess_environment: SubprocessEnvironment,
 ) -> TypecheckResults:
     if mypy.skip:
@@ -117,7 +117,7 @@ async def mypy_lint(
     )
 
     process = pex.create_process(
-        python_setup=python_setup,
+        pex_environment=pex_environment,
         subprocess_environment=subprocess_environment,
         pex_path=pex.output_filename,
         pex_args=generate_args(mypy, file_list_path=file_list_path),

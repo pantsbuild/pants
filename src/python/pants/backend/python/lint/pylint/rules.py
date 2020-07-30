@@ -8,6 +8,7 @@ from typing import Iterable, Tuple
 
 from pants.backend.python.lint.pylint.subsystem import Pylint
 from pants.backend.python.rules import download_pex_bin, pex, python_sources
+from pants.backend.python.rules.hermetic_pex import PexEnvironment
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
@@ -110,7 +111,7 @@ def generate_args(*, specified_source_files: SourceFiles, pylint: Pylint) -> Tup
 async def pylint_lint_partition(
     partition: PylintPartition,
     pylint: Pylint,
-    python_setup: PythonSetup,
+    pex_environment: PexEnvironment,
     subprocess_environment: SubprocessEnvironment,
 ) -> LintResult:
     # We build one PEX with Pylint requirements and another with all direct 3rd-party dependencies.
@@ -231,7 +232,7 @@ async def pylint_lint_partition(
     )
 
     process = pylint_runner_pex.create_process(
-        python_setup=python_setup,
+        pex_environment=pex_environment,
         subprocess_environment=subprocess_environment,
         pex_path="./pylint_runner.pex",
         env={"PEX_EXTRA_SYS_PATH": ":".join(pythonpath)},

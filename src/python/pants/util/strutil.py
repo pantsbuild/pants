@@ -3,7 +3,7 @@
 
 import re
 import shlex
-from typing import Dict, Iterable, List, Optional, Sequence, Union
+from typing import Dict, Iterable, List, Optional, Union
 
 
 def ensure_binary(text_or_binary: Union[bytes, str]) -> bytes:
@@ -59,7 +59,7 @@ def safe_shlex_join(arg_list: Iterable[str]) -> str:
 
 
 def create_path_env_var(
-    new_entries: Sequence[str],
+    new_entries: Iterable[str],
     env: Optional[Dict[str, str]] = None,
     env_var: str = "PATH",
     delimiter: str = ":",

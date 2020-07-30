@@ -7,6 +7,7 @@ from io import StringIO
 from pathlib import PurePath
 from typing import List, Optional, Sequence, Tuple, cast
 
+from pants.backend.python.rules.hermetic_pex import PexEnvironment
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
@@ -44,7 +45,6 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import TransitiveTargets
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import file_option
-from pants.python.python_setup import PythonSetup
 
 
 """
@@ -215,7 +215,7 @@ class MergedCoverageData:
 async def merge_coverage_data(
     data_collection: PytestCoverageDataCollection,
     coverage_setup: CoverageSetup,
-    python_setup: PythonSetup,
+    pex_environment: PexEnvironment,
     subprocess_environment: SubprocessEnvironment,
 ) -> MergedCoverageData:
     if len(data_collection) == 1:
@@ -233,7 +233,7 @@ async def merge_coverage_data(
         input_digest=input_digest,
         output_files=(".coverage",),
         description=f"Merge {len(prefixes)} Pytest coverage reports.",
-        python_setup=python_setup,
+        pex_environment=pex_environment,
         subprocess_environment=subprocess_environment,
     )
     result = await Get(ProcessResult, Process, process)
@@ -247,7 +247,7 @@ async def generate_coverage_reports(
     coverage_config: CoverageConfig,
     coverage_subsystem: CoverageSubsystem,
     transitive_targets: TransitiveTargets,
-    python_setup: PythonSetup,
+    pex_environment: PexEnvironment,
     subprocess_environment: SubprocessEnvironment,
 ) -> CoverageReports:
     """Takes all Python test results and generates a single coverage report."""
@@ -292,7 +292,7 @@ async def generate_coverage_reports(
                 output_directories=("htmlcov",) if report_type == CoverageReportType.HTML else None,
                 output_files=("coverage.xml",) if report_type == CoverageReportType.XML else None,
                 description=f"Generate Pytest {report_type.report_name} coverage report.",
-                python_setup=python_setup,
+                pex_environment=pex_environment,
                 subprocess_environment=subprocess_environment,
             )
         )

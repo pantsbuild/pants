@@ -42,7 +42,7 @@ class PythonNativeCode(Subsystem):
         return tuple(self.options.ld_flags)
 
     @property
-    def invocation_environment(self) -> Dict[str, str]:
+    def environment_dict(self) -> Dict[str, str]:
         return {
             "CPPFLAGS": safe_shlex_join(self.cpp_flags),
             "LDFLAGS": safe_shlex_join(self.ld_flags),
