@@ -27,7 +27,7 @@ class PantsBin:
 
 @rule
 def pants_bin(global_options: GlobalOptions) -> PantsBin:
-    pants_bin_name = cast(str, global_options.get_options().pants_bin_name)
+    pants_bin_name = cast(str, global_options.options.pants_bin_name)
     return PantsBin(name=pants_bin_name)
 
 

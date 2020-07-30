@@ -3,6 +3,7 @@
 
 import itertools
 from pathlib import PurePath
+from typing import cast
 
 from pants.backend.python.dependency_inference import module_mapper
 from pants.backend.python.dependency_inference.import_parser import find_python_imports
@@ -26,7 +27,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.option.global_options import OwnersNotFoundBehavior
-from pants.subsystem.subsystem import Subsystem
+from pants.option.subsystem import Subsystem
 
 
 class PythonInference(Subsystem):
@@ -37,7 +38,6 @@ class PythonInference(Subsystem):
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
-
         register(
             "--imports",
             default=False,
@@ -64,6 +64,18 @@ class PythonInference(Subsystem):
             ),
         )
 
+    @property
+    def imports(self) -> bool:
+        return cast(bool, self.options.imports)
+
+    @property
+    def inits(self) -> bool:
+        return cast(bool, self.options.inits)
+
+    @property
+    def conftests(self) -> bool:
+        return cast(bool, self.options.conftests)
+
 
 class InferPythonDependencies(InferDependenciesRequest):
     infer_from = PythonSources
@@ -73,7 +85,7 @@ class InferPythonDependencies(InferDependenciesRequest):
 async def infer_python_dependencies(
     request: InferPythonDependencies, python_inference: PythonInference
 ) -> InferredDependencies:
-    if not python_inference.get_options().imports:
+    if not python_inference.imports:
         return InferredDependencies()
 
     stripped_sources = await Get(
@@ -112,7 +124,7 @@ class InferInitDependencies(InferDependenciesRequest):
 async def infer_python_init_dependencies(
     request: InferInitDependencies, python_inference: PythonInference
 ) -> InferredDependencies:
-    if not python_inference.get_options().inits:
+    if not python_inference.inits:
         return InferredDependencies()
 
     # Locate __init__.py files not already in the Snapshot.
@@ -138,7 +150,7 @@ class InferConftestDependencies(InferDependenciesRequest):
 async def infer_python_conftest_dependencies(
     request: InferConftestDependencies, python_inference: PythonInference,
 ) -> InferredDependencies:
-    if not python_inference.get_options().conftests:
+    if not python_inference.conftests:
         return InferredDependencies()
 
     # Locate conftest.py files not already in the Snapshot.

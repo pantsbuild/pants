@@ -8,6 +8,7 @@ python_library(
 python_tests(
   name='tests',
   sources=['*_test.py', '!*_integration_test.py'],
+  timeout=90,
 )
 
 python_integration_tests(
@@ -16,6 +17,7 @@ python_integration_tests(
   dependencies=[
     'examples/src/python/example:hello_directory',
   ],
+  timeout=90,
 )
 
 python_library(

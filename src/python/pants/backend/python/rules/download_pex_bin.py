@@ -4,9 +4,9 @@
 from dataclasses import dataclass
 from typing import Any, Iterable, Mapping, Optional
 
-from pants.backend.python.rules.hermetic_pex import HermeticPex
-from pants.backend.python.subsystems.python_native_code import PexBuildEnvironment
-from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.backend.python.rules.hermetic_pex import HermeticPex, PexEnvironment
+from pants.backend.python.subsystems.python_native_code import PythonNativeCode
+from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
 from pants.core.util_rules.external_tool import (
     DownloadedExternalTool,
     ExternalTool,
@@ -16,7 +16,6 @@ from pants.engine.fs import Digest
 from pants.engine.platform import Platform
 from pants.engine.process import Process
 from pants.engine.rules import Get, collect_rules, rule
-from pants.python.python_setup import PythonSetup
 
 
 class PexBin(ExternalTool):
@@ -30,8 +29,11 @@ class PexBin(ExternalTool):
         for plat in ["darwin", "linux "]
     ]
 
-    def generate_url(self, plat: Platform) -> str:
-        return f"https://github.com/pantsbuild/pex/releases/download/{self.options.version}/pex"
+    def generate_url(self, _: Platform) -> str:
+        return f"https://github.com/pantsbuild/pex/releases/download/{self.version}/pex"
+
+    def generate_exe(self, _: Platform) -> str:
+        return "./pex"
 
 
 @dataclass(frozen=True)
@@ -40,7 +42,7 @@ class DownloadedPexBin(HermeticPex):
 
     @property
     def executable(self) -> str:
-        return self.downloaded_tool.exe
+        return f"{self.downloaded_tool.exe}"
 
     @property
     def digest(self) -> Digest:
@@ -49,9 +51,9 @@ class DownloadedPexBin(HermeticPex):
 
     def create_process(  # type: ignore[override]
         self,
-        python_setup: PythonSetup,
-        subprocess_encoding_environment: SubprocessEncodingEnvironment,
-        pex_build_environment: PexBuildEnvironment,
+        pex_environment: PexEnvironment,
+        subprocess_environment: SubprocessEnvironment,
+        python_native_code: PythonNativeCode,
         *,
         pex_args: Iterable[str],
         description: str,
@@ -61,31 +63,29 @@ class DownloadedPexBin(HermeticPex):
     ) -> Process:
         """Creates an Process that will run the pex CLI tool hermetically.
 
-        :param python_setup: The parameters for selecting python interpreters to use when invoking
-                             the pex tool.
-        :param subprocess_encoding_environment: The locale settings to use for the pex tool
-                                                invocation.
-        :param pex_build_environment: The build environment for the pex tool.
+        :param pex_environment: The environment needed to bootstrap the PEX runtime.
+        :param subprocess_environment: The locale settings to use for the pex tool
+            invocation.
+        :param python_native_code: The build environment for the pex tool.
         :param pex_args: The arguments to pass to the pex CLI tool.
         :param description: A description of the process execution to be performed.
         :param input_digest: The directory digest that contain the PEX CLI tool itself and any
-                             input files it needs to run against. By default, this is just the
-                             files that contain the PEX CLI tool itself. To merge in additional
-                             files, include `self.digest` in a `MergeDigests` request.
+            input files it needs to run against. By default, this is just the files that contain
+            the PEX CLI tool itself. To merge in additional files, include `self.digest` in a
+            `MergeDigests` request.
         :param env: The environment to run the PEX in.
         :param kwargs: Any additional :class:`Process` kwargs to pass through.
         """
 
         pex_root_path = ".cache/pex_root"
-        env = dict(env) if env else {}
-        env.update(**pex_build_environment.invocation_environment_dict,)
+        env = {**(env or {}), **python_native_code.environment_dict}
         if "--pex-root" in pex_args:
             raise ValueError("--pex-root flag not allowed. We set its value for you.")
         pex_args = ("--pex-root", pex_root_path) + tuple(pex_args)
 
         return super().create_process(
-            python_setup=python_setup,
-            subprocess_encoding_environment=subprocess_encoding_environment,
+            pex_environment=pex_environment,
+            subprocess_environment=subprocess_environment,
             pex_path=self.executable,
             pex_args=pex_args,
             description=description,

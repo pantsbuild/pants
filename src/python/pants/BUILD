@@ -59,21 +59,3 @@ resources(
   name='version-resource',
   sources=['VERSION'],
 )
-
-# NB: This is used for the integration test `test_reversion.py`. It includes all transitive
-# dependencies to ensure that the chroot can run `src/python/pants/releases:reversion` properly.
-files(
-  name='reversion_file_with_dependencies',
-  sources=[
-    '__init__.py',
-    'releases/BUILD',
-    'releases/__init__.py',
-    'releases/reversion.py',
-    'util/BUILD',
-    'util/__init__.py',
-    'util/contextutil.py',
-    'util/dirutil.py',
-    'util/strutil.py',
-    'util/tarutil.py',
-  ],
-)

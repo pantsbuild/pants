@@ -87,7 +87,10 @@ impl Session {
   ) -> Session {
     let workunit_store = WorkunitStore::new(should_render_ui);
     let display = if should_render_ui {
-      Some(Mutex::new(ConsoleUI::new(workunit_store.clone())))
+      Some(Mutex::new(ConsoleUI::new(
+        workunit_store.clone(),
+        scheduler.core.local_parallelism,
+      )))
     } else {
       None
     };

@@ -13,6 +13,7 @@ from pants.backend.awslambda.python.target_types import (
     PythonAwsLambdaRuntime,
 )
 from pants.backend.python.rules import download_pex_bin, pex, pex_from_targets, python_sources
+from pants.backend.python.rules.hermetic_pex import PexEnvironment
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
@@ -26,13 +27,12 @@ from pants.backend.python.rules.pex_from_targets import (
     TwoStepPexFromTargetsRequest,
 )
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
-from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
 from pants.core.util_rules import strip_source_roots
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.python.python_setup import PythonSetup
 
 
 @dataclass(frozen=True)
@@ -52,8 +52,8 @@ class LambdexSetup:
 async def create_python_awslambda(
     field_set: PythonAwsLambdaFieldSet,
     lambdex_setup: LambdexSetup,
-    python_setup: PythonSetup,
-    subprocess_encoding_environment: SubprocessEncodingEnvironment,
+    pex_environment: PexEnvironment,
+    subprocess_environment: SubprocessEnvironment,
 ) -> CreatedAWSLambda:
     # Lambdas typically use the .zip suffix, so we use that instead of .pex.
     pex_filename = f"{field_set.address.target_name}.zip"
@@ -92,8 +92,8 @@ async def create_python_awslambda(
     # NB: Lambdex modifies its input pex in-place, so the input file is also the output file.
     lambdex_args = ("build", "-e", field_set.handler.value, pex_filename)
     process = lambdex_setup.requirements_pex.create_process(
-        python_setup=python_setup,
-        subprocess_encoding_environment=subprocess_encoding_environment,
+        pex_environment=pex_environment,
+        subprocess_environment=subprocess_environment,
         pex_path="./lambdex.pex",
         pex_args=lambdex_args,
         input_digest=input_digest,
@@ -118,11 +118,9 @@ async def setup_lambdex(lambdex: Lambdex) -> LambdexSetup:
         PexRequest(
             output_filename="lambdex.pex",
             distributed_to_users=False,
-            requirements=PexRequirements(lambdex.get_requirement_specs()),
-            interpreter_constraints=PexInterpreterConstraints(
-                lambdex.default_interpreter_constraints
-            ),
-            entry_point=lambdex.get_entry_point(),
+            requirements=PexRequirements(lambdex.all_requirements),
+            interpreter_constraints=PexInterpreterConstraints(lambdex.interpreter_constraints),
+            entry_point=lambdex.entry_point,
         ),
     )
     return LambdexSetup(requirements_pex=requirements_pex,)

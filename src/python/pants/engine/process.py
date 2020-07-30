@@ -4,13 +4,18 @@
 import itertools
 import logging
 from dataclasses import dataclass
+from textwrap import dedent
 from typing import TYPE_CHECKING, Dict, Iterable, Mapping, Optional, Tuple, Union
 
 from pants.base.exception_sink import ExceptionSink
-from pants.engine.fs import EMPTY_DIGEST, Digest
+from pants.engine.engine_aware import EngineAware
+from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent
 from pants.engine.platform import Platform, PlatformConstraint
-from pants.engine.rules import RootRule, collect_rules, rule, side_effecting
+from pants.engine.rules import Get, RootRule, collect_rules, rule, side_effecting
+from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
+from pants.util.ordered_set import OrderedSet
+from pants.util.strutil import create_path_env_var, pluralize
 
 if TYPE_CHECKING:
     from pants.engine.internals.scheduler import SchedulerSession
@@ -39,6 +44,7 @@ class Process:
     jdk_home: Optional[str]
     is_nailgunnable: bool
     execution_slot_variable: Optional[str]
+    cache_failures: bool
 
     def __init__(
         self,
@@ -55,6 +61,7 @@ class Process:
         jdk_home: Optional[str] = None,
         is_nailgunnable: bool = False,
         execution_slot_variable: Optional[str] = None,
+        cache_failures: bool = False,
     ) -> None:
         """Request to run a subprocess, similar to subprocess.Popen.
 
@@ -94,6 +101,7 @@ class Process:
         self.jdk_home = jdk_home
         self.is_nailgunnable = is_nailgunnable
         self.execution_slot_variable = execution_slot_variable
+        self.cache_failures = cache_failures
 
 
 @frozen_after_init
@@ -226,7 +234,7 @@ def fallible_to_exec_result_or_raise(
 
 
 @rule
-def remove_platform_information(res: FallibleProcessResultWithPlatform,) -> FallibleProcessResult:
+def remove_platform_information(res: FallibleProcessResultWithPlatform) -> FallibleProcessResult:
     return FallibleProcessResult(
         exit_code=res.exit_code,
         stdout=res.stdout,
@@ -287,9 +295,88 @@ class InteractiveRunner:
         return self._scheduler.run_local_interactive_process(request)
 
 
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class BinaryPathRequest:
+    search_path: Tuple[str, ...]
+    binary_name: str
+
+    def __init__(self, *, search_path: Iterable[str], binary_name: str) -> None:
+        self.search_path = tuple(OrderedSet(search_path))
+        self.binary_name = binary_name
+
+
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class BinaryPaths(EngineAware):
+    binary_name: str
+    paths: Tuple[str, ...]
+
+    def __init__(self, binary_name: str, paths: Iterable[str]):
+        self.binary_name = binary_name
+        self.paths = tuple(OrderedSet(paths))
+
+    def level(self) -> Optional[LogLevel]:
+        return LogLevel.DEBUG if self.paths else LogLevel.WARN
+
+    def message(self) -> Optional[str]:
+        if not self.paths:
+            return f"failed to find {self.binary_name}"
+        found_msg = f"found {self.binary_name} at {self.paths[0]}"
+        if len(self.paths) > 1:
+            found_msg = f"{found_msg} and {pluralize(len(self.paths) - 1, 'other location')}"
+        return found_msg
+
+    @property
+    def first_path(self) -> Optional[str]:
+        """Return the first path to the binary that was discovered, if any."""
+        return next(iter(self.paths), None)
+
+
+@rule(desc="Find binary path")
+async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
+    # TODO(John Sirois): Replace this script with a statically linked native binary so we don't
+    #  depend on either /bin/bash being available on the Process host.
+    # TODO(#10507): Running the script directly from a shebang sometimes results in a "Text file
+    #  busy" error.
+    script_path = "./script.sh"
+    script_content = dedent(
+        """
+        set -euo pipefail
+
+        if command -v which > /dev/null; then
+            command which -a $1
+        else
+            command -v $1
+        fi
+        """
+    )
+    script_digest = await Get(
+        Digest,
+        CreateDigest([FileContent(script_path, script_content.encode(), is_executable=True)]),
+    )
+
+    paths = []
+    search_path = create_path_env_var(request.search_path)
+    result = await Get(
+        FallibleProcessResult,
+        Process(
+            description=f"Searching for `{request.binary_name}` on PATH={search_path}",
+            input_digest=script_digest,
+            argv=["/bin/bash", script_path, request.binary_name],
+            env={"PATH": search_path},
+        ),
+    )
+    if result.exit_code == 0:
+        paths.extend(result.stdout.decode().splitlines())
+
+    return BinaryPaths(binary_name=request.binary_name, paths=paths)
+
+
 def rules():
     return [
         *collect_rules(),
+        RootRule(BinaryPathRequest),
         RootRule(Process),
         RootRule(InteractiveRunner),
         RootRule(MultiPlatformProcess),

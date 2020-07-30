@@ -9,7 +9,7 @@ import requests
 import www_authenticate
 
 from pants.auth.cookies import Cookies
-from pants.subsystem.subsystem import Subsystem
+from pants.option.subsystem import Subsystem
 from pants.version import VERSION
 
 
@@ -87,14 +87,14 @@ class BasicAuth(Subsystem):
         if not provider:
             raise BasicAuthException("No basic auth provider specified.")
 
-        provider_config = self.get_options().providers.get(provider)
+        provider_config = self.options.providers.get(provider)
         if not provider_config:
             raise BasicAuthException(f"No config found for provider {provider}.")
 
         url = provider_config.get("url")
         if not url:
             raise BasicAuthException(f"No url found in config for provider {provider}.")
-        if not self.get_options().allow_insecure_urls and not url.startswith("https://"):
+        if not self.options.allow_insecure_urls and not url.startswith("https://"):
             raise BasicAuthException(f"Auth url for provider {provider} is not secure: {url}.")
 
         auth = requests.auth.HTTPBasicAuth(creds.username, creds.password) if creds else None

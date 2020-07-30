@@ -2,11 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from dataclasses import dataclass
 from typing import Dict, Tuple
 
-from pants.engine.rules import collect_rules, rule
-from pants.subsystem.subsystem import Subsystem
+from pants.engine.rules import collect_rules
+from pants.option.subsystem import Subsystem
 from pants.util.strutil import safe_shlex_join, safe_shlex_split
 
 
@@ -34,28 +33,20 @@ class PythonNativeCode(Subsystem):
             help="Override the `LDFLAGS` environment variable for any forked subprocesses.",
         )
 
-
-@dataclass(frozen=True)
-class PexBuildEnvironment:
-    cpp_flags: Tuple[str, ...]
-    ld_flags: Tuple[str, ...]
+    @property
+    def cpp_flags(self) -> Tuple[str, ...]:
+        return tuple(self.options.cpp_flags)
 
     @property
-    def invocation_environment_dict(self) -> Dict[str, str]:
+    def ld_flags(self) -> Tuple[str, ...]:
+        return tuple(self.options.ld_flags)
+
+    @property
+    def environment_dict(self) -> Dict[str, str]:
         return {
             "CPPFLAGS": safe_shlex_join(self.cpp_flags),
             "LDFLAGS": safe_shlex_join(self.ld_flags),
         }
-
-
-@rule
-def create_pex_native_build_environment(
-    python_native_code: PythonNativeCode,
-) -> PexBuildEnvironment:
-    return PexBuildEnvironment(
-        cpp_flags=python_native_code.get_options().cpp_flags,
-        ld_flags=python_native_code.get_options().ld_flags,
-    )
 
 
 def rules():

@@ -13,6 +13,7 @@ from pants.backend.python.rules.coverage import (
     CoverageSubsystem,
     PytestCoverageData,
 )
+from pants.backend.python.rules.hermetic_pex import PexEnvironment
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
@@ -25,7 +26,7 @@ from pants.backend.python.rules.python_sources import (
     UnstrippedPythonSourcesRequest,
 )
 from pants.backend.python.subsystems.pytest import PyTest
-from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
 from pants.backend.python.target_types import (
     PythonInterpreterCompatibility,
     PythonTestsSources,
@@ -212,8 +213,8 @@ async def setup_pytest_for_target(
 async def run_python_test(
     field_set: PythonTestFieldSet,
     test_setup: TestTargetSetup,
-    python_setup: PythonSetup,
-    subprocess_encoding_environment: SubprocessEncodingEnvironment,
+    pex_environment: PexEnvironment,
+    subprocess_environment: SubprocessEnvironment,
     global_options: GlobalOptions,
     test_subsystem: TestSubsystem,
 ) -> TestResult:
@@ -252,8 +253,8 @@ async def run_python_test(
         env["__PANTS_FORCE_TEST_RUN__"] = str(uuid)
 
     process = test_setup.test_runner_pex.create_process(
-        python_setup=python_setup,
-        subprocess_encoding_environment=subprocess_encoding_environment,
+        pex_environment=pex_environment,
+        subprocess_environment=subprocess_environment,
         pex_path=f"./{test_setup.test_runner_pex.output_filename}",
         pex_args=test_setup.args,
         input_digest=test_setup.input_digest,

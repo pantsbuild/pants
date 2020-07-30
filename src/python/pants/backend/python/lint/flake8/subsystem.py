@@ -1,6 +1,8 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from typing import Optional, Tuple, cast
+
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.option.custom_types import file_option, shell_str
 
@@ -39,3 +41,15 @@ class Flake8(PythonToolBase):
             advanced=True,
             help="Path to `.flake8` or alternative Flake8 config file",
         )
+
+    @property
+    def skip(self) -> bool:
+        return cast(bool, self.options.skip)
+
+    @property
+    def args(self) -> Tuple[str, ...]:
+        return tuple(self.options.args)
+
+    @property
+    def config(self) -> Optional[str]:
+        return cast(Optional[str], self.options.config)

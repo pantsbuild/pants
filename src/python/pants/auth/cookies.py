@@ -4,8 +4,8 @@
 import os
 from http.cookiejar import LWPCookieJar
 
+from pants.option.subsystem import Subsystem
 from pants.process.lock import OwnerPrintingInterProcessFileLock
-from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import safe_mkdir_for
 from pants.util.memo import memoized_property
 
@@ -53,7 +53,7 @@ class Cookies(Subsystem):
 
     def _get_cookie_file(self):
         # We expanduser to make it easy for the user to config the cookies into their homedir.
-        return os.path.realpath(os.path.expanduser(self.get_options().path))
+        return os.path.realpath(os.path.expanduser(self.options.path))
 
     @memoized_property
     def _lock(self):

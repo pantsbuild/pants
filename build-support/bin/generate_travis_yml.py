@@ -67,6 +67,7 @@ class Stage(Enum):
 
 GLOBAL_ENV_VARS = [
     'PANTS_CONFIG_FILES="${TRAVIS_BUILD_DIR}/pants.travis-ci.toml"',
+    "PANTS_DYNAMIC_UI=false",
     'LC_ALL="en_US.UTF-8"',
     "AWS_BUCKET=ci-public.pantsbuild.org",
     # The ci-public.pantsbuild.org bucket has expiration policies set up for key prefixes
@@ -89,14 +90,16 @@ GLOBAL_ENV_VARS = [
     # NB: We use this verbose name so that AWS does not pick up the env var $AWS_ACCESS_KEY_ID on
     # pull request builds. We only want this value to be populated on branch builds. Users of this
     # env var (i.e. `deploy_to_s3.py`) are expected to re-export the env var as $AWS_ACCESS_KEY_ID.
-    "AWS_ACCESS_KEY_ID__TO_BE_REEXPORTED_ON_DEPLOYS=AKIAV6A6G7RQWPRUWIXR",
+    "AWS_ACCESS_KEY_ID__TO_BE_REEXPORTED_ON_DEPLOYS=AKIAV6A6G7RQ2HFZ5KP7",
     # This stores the encrypted AWS secret access key with the env var AWS_SECRET_ACCESS_KEY.
     # Travis converts it back into its original decrypted value when ran in CI, per
     # https://docs.travis-ci.com/user/environment-variables#defining-encrypted-variables-in-travisyml.
+    # To generate a new value, use:
+    # travis encrypt --pro AWS_SECRET_ACCESS_KEY=<secret access key>
     {
         "secure": (
-            "hFVAQGLVkexzTd3f9NF+JoG1dE+CPICKqOcdvQYv8+YB2rwwqu0/J6MnqKUZSmec4AM4ZvyPUBIHnSw8aMJysY"
-            "s+GZ6iG/8ZRRmdbmo2WBPbSZ+ThRZxx/F6AjmovUmf8Zt366ZAZXpc9NHKREkTUGl6UL7FFe9+ouVnb90asdw="
+            "oEmZoB4oP4ygCMRZp86AhB40ppH87pduS0p3zVVAnTLFLkrnA4qP0TvEOqwzc6DFceQuJ6telJOGUnB4ouFIl8"
+            "aBoRW7KaIuudjVWxcBLEUDdoXlA9hGSY+BOTiBmMVX5g7Wdhfngy4nygrk01cG2UWvfm62VrexeV+48twaBJE="
         )
     },
     'RUST_BACKTRACE="all"',
@@ -353,11 +356,6 @@ def linux_shard(
             "PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem",
         ]
         setup = {**setup, **CACHE_PANTS_RUN}
-        if python_version.is_py37:
-            # 3.7.2 for Linux uses the new C++ ABI, which may be an error.
-            setup["env"].append(
-                'PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"'
-            )
     if use_docker:
         setup["services"] = ["docker"]
     return setup
@@ -447,7 +445,7 @@ SKIP_WHEELS_CONDITION = (
 
 def _bootstrap_command(*, python_version: PythonVersion) -> str:
     return (
-        f"./build-support/bin/bootstrap_and_deploy_ci_pants_pex.py --python-version "
+        "./build-support/bin/bootstrap_and_deploy_ci_pants_pex.py --python-version "
         f"{python_version.decimal} --aws-bucket ${{AWS_BUCKET}} --native-engine-so-key-prefix "
         "${NATIVE_ENGINE_SO_KEY_PREFIX} --pex-key "
         "${BOOTSTRAPPED_PEX_KEY_PREFIX}.${BOOTSTRAPPED_PEX_KEY_SUFFIX}"

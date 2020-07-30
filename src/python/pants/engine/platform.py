@@ -2,9 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from enum import Enum
-from typing import Callable, List
+from typing import Iterable
 
-from pants.engine.rules import rule
+from pants.engine.rules import Rule, collect_rules, rule
 from pants.util.memo import memoized_classproperty
 from pants.util.osutil import get_normalized_os_name
 
@@ -36,5 +36,5 @@ def materialize_platform() -> Platform:
     return Platform.current
 
 
-def create_platform_rules() -> List[Callable]:
-    return [materialize_platform]
+def create_platform_rules() -> Iterable[Rule]:
+    return collect_rules()

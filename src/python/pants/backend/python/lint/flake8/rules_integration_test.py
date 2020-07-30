@@ -26,11 +26,7 @@ class Flake8IntegrationTest(ExternalToolTestBase):
 
     @classmethod
     def rules(cls):
-        return (
-            *super().rules(),
-            *flake8_rules(),
-            RootRule(Flake8Request),
-        )
+        return (*super().rules(), *flake8_rules(), RootRule(Flake8Request))
 
     def make_target_with_origin(
         self,

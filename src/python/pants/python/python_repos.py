@@ -3,7 +3,7 @@
 
 from typing import List, cast
 
-from pants.subsystem.subsystem import Subsystem
+from pants.option.subsystem import Subsystem
 
 
 class PythonRepos(Subsystem):

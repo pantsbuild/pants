@@ -54,7 +54,7 @@ async def create_binary(workspace: Workspace, dist_dir: DistDir) -> Binary:
     merged_snapshot = await Get(Snapshot, MergeDigests(binary.digest for binary in binaries))
     workspace.write_digest(merged_snapshot.digest, path_prefix=str(dist_dir.relpath))
     for path in merged_snapshot.files:
-        logger.info(f"Wrote {path}")
+        logger.info(f"Wrote {dist_dir.relpath / path}")
     return Binary(exit_code=0)
 
 

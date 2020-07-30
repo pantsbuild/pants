@@ -50,6 +50,7 @@ pub struct Core {
   pub vfs: PosixFS,
   pub watcher: Arc<InvalidationWatcher>,
   pub build_root: PathBuf,
+  pub local_parallelism: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -284,6 +285,7 @@ impl Core {
         .map_err(|e| format!("Could not initialize VFS: {:?}", e))?,
       build_root,
       watcher,
+      local_parallelism: exec_strategy_opts.local_parallelism,
     })
   }
 

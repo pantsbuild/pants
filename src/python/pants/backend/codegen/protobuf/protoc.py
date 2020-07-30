@@ -36,15 +36,14 @@ class Protoc(ExternalTool):
         )
 
     def generate_url(self, plat: Platform) -> str:
-        version = self.options.version
         plat_str = match(plat, {Platform.darwin: "osx", Platform.linux: "linux"})
         return (
             f"https://github.com/protocolbuffers/protobuf/releases/download/"
-            f"v{version}/protoc-{version}-{plat_str}-x86_64.zip"
+            f"v{self.version}/protoc-{self.version}-{plat_str}-x86_64.zip"
         )
 
     def generate_exe(self, plat: Platform) -> str:
-        return "bin/protoc"
+        return "./bin/protoc"
 
     @property
     def runtime_targets(self) -> List[str]:

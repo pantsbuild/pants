@@ -11,7 +11,7 @@ from pex.variables import Variables
 
 from pants.base.build_environment import get_buildroot
 from pants.option.custom_types import UnsetBool, file_option
-from pants.subsystem.subsystem import Subsystem
+from pants.option.subsystem import Subsystem
 from pants.util.memo import memoized_property
 
 logger = logging.getLogger(__name__)
@@ -84,7 +84,7 @@ class PythonSetup(Subsystem):
             "If unspecified, a standard path under the workdir is used.",
             removal_version="2.1.0.dev0",
             removal_hint=(
-                "The option `--python-setup-interpreter-cache-dir` does not anything anymore."
+                "The option `--python-setup-interpreter-cache-dir` does not do anything anymore."
             ),
         )
         register(
@@ -96,7 +96,7 @@ class PythonSetup(Subsystem):
             "If unspecified, a standard path under the workdir is used.",
             removal_version="2.1.0.dev0",
             removal_hint=(
-                "The option `--python-setup-resolver-cache-dir` does not anything anymore."
+                "The option `--python-setup-resolver-cache-dir` does not do anything anymore."
             ),
         )
         register(
@@ -145,44 +145,46 @@ class PythonSetup(Subsystem):
         """Path to constraint file."""
         return cast(Optional[str], self.options.requirement_constraints)
 
+    @property
+    def resolve_all_constraints(self) -> bool:
+        return cast(bool, self.options.resolve_all_constraints)
+
     @memoized_property
     def interpreter_search_paths(self):
-        return self.expand_interpreter_search_paths(self.get_options().interpreter_search_paths)
+        return self.expand_interpreter_search_paths(self.options.interpreter_search_paths)
 
     @property
     def platforms(self):
-        return self.get_options().platforms
+        return self.options.platforms
 
     @property
     def interpreter_cache_dir(self):
-        return self.get_options().interpreter_cache_dir or os.path.join(
-            self.scratch_dir, "interpreters"
-        )
+        return self.options.interpreter_cache_dir or os.path.join(self.scratch_dir, "interpreters")
 
     @property
     def resolver_cache_dir(self):
-        return self.get_options().resolver_cache_dir or os.path.join(
+        return self.options.resolver_cache_dir or os.path.join(
             self.scratch_dir, "resolved_requirements"
         )
 
     @property
     def resolver_allow_prereleases(self):
-        return self.get_options().resolver_allow_prereleases
+        return self.options.resolver_allow_prereleases
 
     @property
     def manylinux(self):
-        manylinux = self.get_options().resolver_manylinux
+        manylinux = self.options.resolver_manylinux
         if manylinux is None or manylinux.lower() in ("false", "no", "none"):
             return None
         return manylinux
 
     @property
     def resolver_jobs(self):
-        return self.get_options().resolver_jobs
+        return self.options.resolver_jobs
 
     @property
     def scratch_dir(self):
-        return os.path.join(self.get_options().pants_workdir, *self.options_scope.split("."))
+        return os.path.join(self.options.pants_workdir, *self.options_scope.split("."))
 
     def compatibility_or_constraints(
         self, compatibility: Optional[Iterable[str]]
@@ -191,7 +193,7 @@ class PythonSetup(Subsystem):
 
         If interpreter constraints are supplied by the CLI flag, return those only.
         """
-        if self.get_options().is_flagged("interpreter_constraints"):
+        if self.options.is_flagged("interpreter_constraints"):
             return self.interpreter_constraints
         return tuple(compatibility or self.interpreter_constraints)
 

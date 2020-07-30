@@ -4,7 +4,7 @@
 from typing import Optional, Tuple, cast
 
 from pants.option.custom_types import shell_str
-from pants.subsystem.subsystem import Subsystem
+from pants.option.subsystem import Subsystem
 
 
 class PyTest(Subsystem):

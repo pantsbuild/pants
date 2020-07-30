@@ -6,6 +6,8 @@ files(
   sources = ['*.sh'],
 )
 
+python_tests(name="tests")
+
 python_binary(
    name = 'bootstrap_and_deploy_ci_pants_pex',
    sources = ['bootstrap_and_deploy_ci_pants_pex.py'],
@@ -14,6 +16,11 @@ python_binary(
 python_binary(
   name = 'check_banned_imports',
   sources = ['check_banned_imports.py'],
+)
+
+python_binary(
+  name = 'check_inits',
+  sources = ['check_inits.py'],
 )
 
 python_binary(
@@ -52,6 +59,11 @@ resources(
 python_binary(
   name = 'get_rbe_token',
   sources = ['get_rbe_token.py'],
+)
+
+python_binary(
+  name='reversion',
+  sources=["reversion.py"],
 )
 
 python_binary(

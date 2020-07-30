@@ -1,9 +1,9 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Optional, Sequence, Tuple
+from typing import Optional, Sequence, Tuple, cast
 
-from pants.subsystem.subsystem import Subsystem
+from pants.option.subsystem import Subsystem
 
 
 class PythonToolBase(Subsystem):
@@ -54,11 +54,22 @@ class PythonToolBase(Subsystem):
             "library, invoked by a wrapper script.",
         )
 
-    def get_interpreter_constraints(self):
-        return self.get_options().interpreter_constraints
+    @property
+    def version(self) -> Optional[str]:
+        return cast(Optional[str], self.options.version)
 
-    def get_requirement_specs(self) -> Tuple[str, ...]:
+    @property
+    def extra_requirements(self) -> Tuple[str, ...]:
+        return tuple(self.options.extra_requirements)
+
+    @property
+    def all_requirements(self) -> Tuple[str, ...]:
         return (self.options.version, *self.options.extra_requirements)
 
-    def get_entry_point(self):
-        return self.get_options().entry_point
+    @property
+    def interpreter_constraints(self) -> Tuple[str, ...]:
+        return tuple(self.options.interpreter_constraints)
+
+    @property
+    def entry_point(self) -> Optional[str]:
+        return cast(Optional[str], self.options.entry_point)

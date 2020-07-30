@@ -1,7 +1,7 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.subsystem.subsystem import Subsystem
+from pants.option.subsystem import Subsystem
 from pants.engine.rules import SubsystemRule
 
 

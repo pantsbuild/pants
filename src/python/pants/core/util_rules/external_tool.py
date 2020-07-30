@@ -4,13 +4,13 @@
 import textwrap
 from abc import abstractmethod
 from dataclasses import dataclass
-from typing import List
+from typing import List, Tuple, cast
 
 from pants.core.util_rules.archive import ExtractedDigest, MaybeExtractable
 from pants.engine.fs import Digest, DownloadFile
 from pants.engine.platform import Platform
 from pants.engine.rules import Get, RootRule, collect_rules, rule
-from pants.subsystem.subsystem import Subsystem
+from pants.option.subsystem import Subsystem
 from pants.util.meta import classproperty
 
 
@@ -54,23 +54,16 @@ class ExternalTool(Subsystem):
             ...
 
         def generate_exe(self, plat: Platform) -> str:
-            ...
+            return "./path-to/binary
 
     @rule
-    def my_rule(my_external_tool: MyExternalTool):
-      downloaded_tool = await Get(
-        DownloadedExternalTool,
-        ExternalToolRequest,
-        my_external_tool.get_request(Platform.current)
-      )
-
-    ...
-    def rules():
-      return [my_rule, SubsystemRule(MyExternalTool)]
-
-
-    A lightweight replacement for the code in binary_tool.py and binary_util.py,
-    which can be deprecated in favor of this.
+    def my_rule(my_external_tool: MyExternalTool) -> Foo:
+        downloaded_tool = await Get(
+            DownloadedExternalTool,
+            ExternalToolRequest,
+            my_external_tool.get_request(Platform.current)
+        )
+        ...
     """
 
     # The default values for --version and --known-versions.
@@ -99,20 +92,20 @@ class ExternalTool(Subsystem):
 
         help_str = textwrap.dedent(
             f"""
-        Known versions to verify downloads against.
+            Known versions to verify downloads against.
 
-        Each element is a pipe-separated string of `version|platform|sha256|length`, where:
+            Each element is a pipe-separated string of `version|platform|sha256|length`, where:
 
-          - `version` is the version string
-          - `platform` is one of [{','.join(Platform.__members__.keys())}],
-          - `sha256` is the 64-character hex representation of the expected sha256
-            digest of the download file, as emitted by `shasum -a 256`
-          - `length` is the expected length of the download file in bytes
+              - `version` is the version string
+              - `platform` is one of [{','.join(Platform.__members__.keys())}],
+              - `sha256` is the 64-character hex representation of the expected sha256
+                digest of the download file, as emitted by `shasum -a 256`
+              - `length` is the expected length of the download file in bytes
 
-        E.g., `3.1.2|darwin|6d0f18cd84b918c7b3edd0203e75569e0c7caecb1367bbbe409b44e28514f5be|42813`.
+            E.g., `3.1.2|darwin|6d0f18cd84b918c7b3edd0203e75569e0c7caecb1367bbbe409b44e28514f5be|42813`.
 
-        Values are space-stripped, so pipes can be indented for readability if necessary.
-        """
+            Values are space-stripped, so pipes can be indented for readability if necessary.
+            """
         )
         # Note that you can compute the length and sha256 conveniently with:
         #   `curl -L $URL | tee >(wc -c) >(shasum -a 256) >/dev/null`
@@ -125,6 +118,14 @@ class ExternalTool(Subsystem):
             help=help_str,
         )
 
+    @property
+    def version(self) -> str:
+        return cast(str, self.options.version)
+
+    @property
+    def known_versions(self) -> Tuple[str, ...]:
+        return tuple(self.options.known_versions)
+
     @abstractmethod
     def generate_url(self, plat: Platform) -> str:
         """Returns the URL for the given version of the tool, runnable on the given os+arch.
@@ -132,40 +133,37 @@ class ExternalTool(Subsystem):
         os and arch default to those of the current system.
 
         Implementations should raise ExternalToolError if they cannot resolve the arguments
-        to a URL.  The raised exception need not have a message - a sensible one will be generated.
+        to a URL. The raised exception need not have a message - a sensible one will be generated.
         """
 
+    @abstractmethod
     def generate_exe(self, plat: Platform) -> str:
-        """Returns the archive path to the given version of the tool.
-
-        If the tool is downloaded directly, not in an archive, this can be left unimplemented.
-        """
-        return ""
+        """Returns the relative path in the downloaded archive to the given version of the tool,
+        e.g. `./bin/protoc`."""
 
     def get_request(self, plat: Platform) -> ExternalToolRequest:
         """Generate a request for this tool."""
-        version = self.get_options().version
-        known_versions = self.get_options().known_versions
-        for known_version in known_versions:
+        for known_version in self.known_versions:
             try:
                 ver, plat_val, sha256, length = (x.strip() for x in known_version.split("|"))
             except ValueError:
                 raise ExternalToolError(
-                    f"Bad value for --known-versions (see {self.get_options().pants_bin_name} "
+                    f"Bad value for --known-versions (see {self.options.pants_bin_name} "
                     f"help-advanced {self.options_scope}): {known_version}"
                 )
-            if plat_val == plat.value and ver == version:
+            if plat_val == plat.value and ver == self.version:
                 digest = Digest(fingerprint=sha256, serialized_bytes_length=int(length))
                 try:
                     url = self.generate_url(plat)
-                    exe = self.generate_exe(plat) or url.rsplit("/", 1)[-1]
+                    exe = self.generate_exe(plat)
                 except ExternalToolError as e:
                     raise ExternalToolError(
-                        f"Couldn't find {self.name} version {version} on {plat.value}"
+                        f"Couldn't find {self.name} version {self.version} on {plat.value}"
                     ) from e
                 return ExternalToolRequest(DownloadFile(url=url, expected_digest=digest), exe)
         raise UnknownVersion(
-            f"No known version of {self.name} {version} for {plat.value} found in {known_versions}"
+            f"No known version of {self.name} {self.version} for {plat.value} found in "
+            f"{self.known_versions}"
         )
 
 

@@ -25,7 +25,6 @@ class OptionHelpFormatterTest(unittest.TestCase):
             config_key="foo",
             typ=bool,
             default=None,
-            default_str="None",
             help="help for foo",
             deprecated_message=None,
             removal_version=None,

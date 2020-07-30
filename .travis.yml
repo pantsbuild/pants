@@ -15,6 +15,7 @@ deploy:
 env:
   global:
   - PANTS_CONFIG_FILES="${TRAVIS_BUILD_DIR}/pants.travis-ci.toml"
+  - PANTS_DYNAMIC_UI=false
   - LC_ALL="en_US.UTF-8"
   - AWS_BUCKET=ci-public.pantsbuild.org
   - BOOTSTRAPPED_PEX_KEY_PREFIX=daily/${TRAVIS_BUILD_NUMBER}/${TRAVIS_BUILD_ID}/pants.pex
@@ -27,8 +28,8 @@ env:
   - PYENV_ROOT="${PYENV_ROOT:-${PYENV_ROOT_OSX}}"
   - PATH="${PYENV_ROOT}/shims:${PATH}"
   - AWS_CLI_ROOT="${HOME}/.aws_cli"
-  - AWS_ACCESS_KEY_ID__TO_BE_REEXPORTED_ON_DEPLOYS=AKIAV6A6G7RQWPRUWIXR
-  - secure: hFVAQGLVkexzTd3f9NF+JoG1dE+CPICKqOcdvQYv8+YB2rwwqu0/J6MnqKUZSmec4AM4ZvyPUBIHnSw8aMJysYs+GZ6iG/8ZRRmdbmo2WBPbSZ+ThRZxx/F6AjmovUmf8Zt366ZAZXpc9NHKREkTUGl6UL7FFe9+ouVnb90asdw=
+  - AWS_ACCESS_KEY_ID__TO_BE_REEXPORTED_ON_DEPLOYS=AKIAV6A6G7RQ2HFZ5KP7
+  - secure: oEmZoB4oP4ygCMRZp86AhB40ppH87pduS0p3zVVAnTLFLkrnA4qP0TvEOqwzc6DFceQuJ6telJOGUnB4ouFIl8aBoRW7KaIuudjVWxcBLEUDdoXlA9hGSY+BOTiBmMVX5g7Wdhfngy4nygrk01cG2UWvfm62VrexeV+48twaBJE=
   - RUST_BACKTRACE="all"
 jobs:
   include:
@@ -327,7 +328,6 @@ jobs:
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
-    - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
     - CACHE_NAME=lint.py37
     language: python
     name: Self-checks and lint (Python 3.7)
@@ -487,7 +487,6 @@ jobs:
     env:
     - BOOTSTRAPPED_PEX_KEY_SUFFIX=py37.linux
     - PANTS_REMOTE_CA_CERTS_PATH=/usr/lib/google-cloud-sdk/lib/third_party/grpc/_cython/_credentials/roots.pem
-    - PANTS_NATIVE_BUILD_STEP_CPP_COMPILE_SETTINGS_DEFAULT_COMPILER_OPTION_SETS="[]"
     - CACHE_NAME=python_tests.py37
     language: python
     name: Python tests (Python 3.7)

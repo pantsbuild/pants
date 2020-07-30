@@ -2,11 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-from dataclasses import dataclass
-from typing import Dict, Optional
+from typing import Dict, Optional, cast
 
-from pants.engine.rules import collect_rules, rule
-from pants.subsystem.subsystem import Subsystem
+from pants.engine.rules import collect_rules
+from pants.option.subsystem import Subsystem
 
 
 class SubprocessEnvironment(Subsystem):
@@ -17,43 +16,33 @@ class SubprocessEnvironment(Subsystem):
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
-
         # TODO(#7735): move the --lang and --lc-all flags to a general subprocess support subsystem.
         register(
             "--lang",
+            type=str,
             default=os.environ.get("LANG"),
             advanced=True,
             help="Override the `LANG` environment variable for any forked subprocesses.",
         )
         register(
             "--lc-all",
+            type=str,
             default=os.environ.get("LC_ALL"),
             advanced=True,
             help="Override the `LC_ALL` environment variable for any forked subprocesses.",
         )
 
-
-@dataclass(frozen=True)
-class SubprocessEncodingEnvironment:
-    lang: Optional[str]
-    lc_all: Optional[str]
+    @property
+    def lang(self) -> Optional[str]:
+        return cast(Optional[str], self.options.lang)
 
     @property
-    def invocation_environment_dict(self) -> Dict[str, str]:
-        return {
-            "LANG": self.lang or "",
-            "LC_ALL": self.lc_all or "",
-        }
+    def lc_all(self) -> Optional[str]:
+        return cast(Optional[str], self.options.lc_all)
 
-
-@rule
-def create_subprocess_encoding_environment(
-    subprocess_environment: SubprocessEnvironment,
-) -> SubprocessEncodingEnvironment:
-    return SubprocessEncodingEnvironment(
-        lang=subprocess_environment.get_options().lang,
-        lc_all=subprocess_environment.get_options().lc_all,
-    )
+    @property
+    def environment_dict(self) -> Dict[str, str]:
+        return {"LANG": self.lang or "", "LC_ALL": self.lc_all or ""}
 
 
 def rules():

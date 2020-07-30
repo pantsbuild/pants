@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 
-from pants.subsystem.subsystem import Subsystem
+from pants.option.subsystem import Subsystem
 
 
 class Subprocess:
@@ -17,8 +17,7 @@ class Subprocess:
         options_scope = "subprocess"
 
         def create(self):
-            options = self.global_instance().get_options()
-            return Subprocess(options.pants_subprocessdir)
+            return Subprocess(self.global_instance().options.pants_subprocessdir)
 
     def __init__(self, pants_subprocess_dir):
         self._pants_subprocess_dir = pants_subprocess_dir

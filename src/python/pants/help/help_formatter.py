@@ -7,7 +7,7 @@ from typing import List, Optional
 
 from colors import cyan, green, magenta, red
 
-from pants.help.help_info_extracter import OptionHelpInfo, OptionScopeHelpInfo
+from pants.help.help_info_extracter import OptionHelpInfo, OptionScopeHelpInfo, to_help_str
 from pants.option.ranked_value import Rank, RankedValue
 
 
@@ -81,7 +81,7 @@ class HelpFormatter:
             if isinstance(val.value, (list, dict)):
                 val_lines = json.dumps(val.value, sort_keys=True, indent=4).split("\n")
             else:
-                val_lines = [f"{val.value}"]
+                val_lines = [to_help_str(val.value)]
             val_lines[0] = f"{prefix}{val_lines[0]}"
             val_lines[-1] = f"{val_lines[-1]}{maybe_parens(val.details)}"
             val_lines = [self._maybe_cyan(f"{left_padding}{line}") for line in val_lines]

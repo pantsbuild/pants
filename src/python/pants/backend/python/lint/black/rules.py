@@ -4,11 +4,12 @@
 import re
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Optional, Tuple
+from typing import Tuple
 
 from pants.backend.python.lint.black.subsystem import Black
 from pants.backend.python.lint.python_fmt import PythonFmtRequest
 from pants.backend.python.rules import download_pex_bin, pex
+from pants.backend.python.rules.hermetic_pex import PexEnvironment
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
@@ -16,7 +17,7 @@ from pants.backend.python.rules.pex import (
     PexRequirements,
 )
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
-from pants.backend.python.subsystems.subprocess_environment import SubprocessEncodingEnvironment
+from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
 from pants.backend.python.target_types import PythonSources
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
@@ -31,7 +32,6 @@ from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSetWithOrigin
 from pants.engine.unions import UnionRule
-from pants.python.python_setup import PythonSetup
 from pants.util.strutil import pluralize
 
 
@@ -64,9 +64,9 @@ def generate_args(
     args = []
     if check_only:
         args.append("--check")
-    if black.options.config is not None:
-        args.extend(["--config", black.options.config])
-    args.extend(black.options.args)
+    if black.config:
+        args.extend(["--config", black.config])
+    args.extend(black.args)
     # NB: For some reason, Black's --exclude option only works on recursive invocations, meaning
     # calling Black on a directory(s) and letting it auto-discover files. However, we don't want
     # Black to run over everything recursively under the directory of our target, as Black should
@@ -81,27 +81,24 @@ def generate_args(
 async def setup(
     setup_request: SetupRequest,
     black: Black,
-    python_setup: PythonSetup,
-    subprocess_encoding_environment: SubprocessEncodingEnvironment,
+    pex_environment: PexEnvironment,
+    subprocess_environment: SubprocessEnvironment,
 ) -> Setup:
     requirements_pex_request = Get(
         Pex,
         PexRequest(
             output_filename="black.pex",
             distributed_to_users=False,
-            requirements=PexRequirements(black.get_requirement_specs()),
-            interpreter_constraints=PexInterpreterConstraints(
-                black.default_interpreter_constraints
-            ),
-            entry_point=black.get_entry_point(),
+            requirements=PexRequirements(black.all_requirements),
+            interpreter_constraints=PexInterpreterConstraints(black.interpreter_constraints),
+            entry_point=black.entry_point,
         ),
     )
 
-    config_path: Optional[str] = black.options.config
     config_digest_request = Get(
         Digest,
         PathGlobs(
-            globs=[config_path] if config_path else [],
+            globs=[black.config] if black.config else [],
             glob_match_error_behavior=GlobMatchErrorBehavior.error,
             description_of_origin="the option `--black-config`",
         ),
@@ -140,8 +137,8 @@ async def setup(
     )
 
     process = requirements_pex.create_process(
-        python_setup=python_setup,
-        subprocess_encoding_environment=subprocess_encoding_environment,
+        pex_environment=pex_environment,
+        subprocess_environment=subprocess_environment,
         pex_path="./black.pex",
         pex_args=generate_args(
             specified_source_files=specified_source_files,
@@ -159,7 +156,7 @@ async def setup(
 
 @rule(desc="Format using Black")
 async def black_fmt(field_sets: BlackRequest, black: Black) -> FmtResult:
-    if black.options.skip:
+    if black.skip:
         return FmtResult.noop()
     setup = await Get(Setup, SetupRequest(field_sets, check_only=False))
     result = await Get(ProcessResult, Process, setup.process)
@@ -173,7 +170,7 @@ async def black_fmt(field_sets: BlackRequest, black: Black) -> FmtResult:
 
 @rule(desc="Lint using Black")
 async def black_lint(field_sets: BlackRequest, black: Black) -> LintResults:
-    if black.options.skip:
+    if black.skip:
         return LintResults()
     setup = await Get(Setup, SetupRequest(field_sets, check_only=True))
     result = await Get(FallibleProcessResult, Process, setup.process)

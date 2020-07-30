@@ -14,8 +14,8 @@ from pants.engine.collection import Collection
 from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.rules import Get, RootRule, collect_rules, rule
 from pants.option.option_value_container import OptionValueContainer
+from pants.option.subsystem import Subsystem
 from pants.scm.scm import Scm
-from pants.subsystem.subsystem import Subsystem
 
 
 class DependeesOption(Enum):

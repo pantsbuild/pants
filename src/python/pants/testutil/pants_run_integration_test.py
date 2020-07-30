@@ -18,8 +18,8 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.option.config import TomlSerializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.option.subsystem import Subsystem
 from pants.pantsd.pants_daemon_client import PantsDaemonClient
-from pants.subsystem.subsystem import Subsystem
 from pants.testutil.process_handler import SubprocessProcessHandler
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import fast_relpath, safe_mkdir, safe_open

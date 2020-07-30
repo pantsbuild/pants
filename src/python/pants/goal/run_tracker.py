@@ -25,9 +25,9 @@ from pants.goal.aggregated_timings import AggregatedTimings
 from pants.goal.pantsd_stats import PantsDaemonStats
 from pants.option.config import Config
 from pants.option.options_fingerprinter import CoercingOptionEncoder
+from pants.option.subsystem import Subsystem
 from pants.reporting.json_reporter import JsonReporter
 from pants.reporting.report import Report
-from pants.subsystem.subsystem import Subsystem
 from pants.util.dirutil import relative_symlink, safe_file_dump
 from pants.version import VERSION
 
@@ -174,10 +174,10 @@ class RunTracker(Subsystem):
         self.outcomes = {}
 
         # Number of threads for foreground work.
-        self._num_foreground_workers = self.get_options().num_foreground_workers
+        self._num_foreground_workers = self.options.num_foreground_workers
 
         # Number of threads for background work.
-        self._num_background_workers = self.get_options().num_background_workers
+        self._num_background_workers = self.options.num_background_workers
 
         # self._threadlocal.current_workunit contains the current workunit for the calling thread.
         # Note that multiple threads may share a name (e.g., all the threads in a pool).
@@ -239,13 +239,13 @@ class RunTracker(Subsystem):
 
         # Initialize the run.
 
-        info_dir = os.path.join(self.get_options().pants_workdir, self.options_scope)
+        info_dir = os.path.join(self.options.pants_workdir, self.options_scope)
         self.run_info_dir = os.path.join(info_dir, self.run_id)
         self.run_info = RunInfo(os.path.join(self.run_info_dir, "info"))
         self.run_info.add_basic_info(self.run_id, self._run_timestamp)
         self.run_info.add_info("cmd_line", self._cmd_line)
-        if self.get_options().parent_build_id:
-            self.run_info.add_info("parent_build_id", self.get_options().parent_build_id)
+        if self.options.parent_build_id:
+            self.run_info.add_info("parent_build_id", self.options.parent_build_id)
 
         # Create a 'latest' symlink, after we add_infos, so we're guaranteed that the file exists.
         link_to_latest = os.path.join(os.path.dirname(self.run_info_dir), "latest")
@@ -365,7 +365,7 @@ class RunTracker(Subsystem):
 
     @property
     def _stats_version(self) -> int:
-        stats_version: int = self.get_options().stats_version
+        stats_version: int = self.options.stats_version
         return stats_version
 
     def log(self, level, *msg_elements):
@@ -499,13 +499,13 @@ class RunTracker(Subsystem):
         stats = self._stats()
 
         # Write stats to user-defined json file.
-        stats_json_file_name = self.get_options().stats_local_json_file
+        stats_json_file_name = self.options.stats_local_json_file
         if stats_json_file_name:
             self.write_stats_to_json(stats_json_file_name, stats)
 
         # Upload to remote stats db.
-        stats_upload_urls = copy.copy(self.get_options().stats_upload_urls)
-        timeout = self.get_options().stats_upload_timeout
+        stats_upload_urls = copy.copy(self.options.stats_upload_urls)
+        timeout = self.options.stats_upload_timeout
         for stats_url, auth_provider in stats_upload_urls.items():
             self.post_stats(
                 stats_url,
@@ -610,7 +610,7 @@ class RunTracker(Subsystem):
 
     def _get_options_to_record(self) -> dict:
         recorded_options = {}
-        for scope in self.get_options().stats_option_scopes_to_record:
+        for scope in self.options.stats_option_scopes_to_record:
             scope_and_maybe_option = scope.split("^")
             recorded_options[scope] = self._get_option_to_record(*scope_and_maybe_option)
         return recorded_options
