@@ -337,9 +337,8 @@ class BinaryPaths(EngineAware):
 async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
     # TODO(John Sirois): Replace this script with a statically linked native binary so we don't
     #  depend on either /bin/bash being available on the Process host.
-    # TODO: Once we stop using Google RBE, add a shebang to the script `/usr/bin/env bash`, rather
-    #  than running the binary `/bin/bash`. We hit a 26 "Text File Busy" error, which we suspect is
-    #  from RBE not having fsynced the ./script.sh file.
+    # TODO(#10507): Running the script directly from a shebang sometimes results in a "Text file
+    #  busy" error.
     script_path = "./script.sh"
     script_content = dedent(
         """

@@ -38,12 +38,12 @@ class PexEnvironment(EngineAware):
         )
 
     def level(self) -> Optional[LogLevel]:
-        return LogLevel.INFO if self.bootstrap_python else LogLevel.WARN
+        return LogLevel.DEBUG if self.bootstrap_python else LogLevel.WARN
 
     def message(self) -> Optional[str]:
         if not self.bootstrap_python:
             return (
-                "No bootstrap python executable could be found. "
+                "No bootstrap Python executable could be found. "
                 "Will attempt to run PEXes directly."
             )
         return f"Selected {self.bootstrap_python} to bootstrap PEXes with."
@@ -57,15 +57,18 @@ class PexRuntimeEnvironment(Subsystem):
     @classmethod
     def register_options(cls, register):
         super().register_options(register)
+        # TODO(#9760): We'll want to deprecate this in favor of a global option which allows for a
+        #  per-process override.
         register(
-            "--binary-search-path",
+            "--executable-search-paths",
             advanced=True,
             type=list,
             default=["<PATH>"],
             metavar="<binary-paths>",
             help=(
-                "A list of paths to search for binaries needed by PEX subprocess. The special "
-                'string "<PATH>" will expand to the contents of the PATH env var.'
+                "The PATH value that will be used by the PEX subprocess and any subprocesses it "
+                'spawns. The special string "<PATH>" will expand to the contents of the PATH env '
+                "var."
             ),
         )
         register(
@@ -75,22 +78,18 @@ class PexRuntimeEnvironment(Subsystem):
             default=["python", "python3", "python2"],
             metavar="<bootstrap-python-names>",
             help=(
-                "The names of python binaries to search for to bootstrap PEX files with. Earlier "
-                "names in the list will be preferred over later names and the first matching "
-                "interpreter found will be used to execute the PEX bootstrap stage. If no matching "
-                "interpreters are found, PEXes will be executed directly relying on their embedded "
-                "shebang and the $PATH (see --binary-search-path) to locate a bootstrap "
-                "interpreter."
+                "The names of Python binaries to search for to bootstrap PEX files with. This does "
+                "not impact which Python interpreter is used to run your code, only what is used "
+                "to run the PEX tool. See the `interpreter_search_paths` option in "
+                "`[python-setup]` to influence where interpreters are searched for."
             ),
         )
 
     @memoized_property
     def path(self) -> Tuple[str, ...]:
         def iter_path_entries():
-            for entry in self.options.binary_search_path:
+            for entry in self.options.executable_search_paths:
                 if entry == "<PATH>":
-                    # TODO(#9760): This is not very robust. We want to be able to read an env var
-                    #  safely via the engine.
                     path = os.environ.get("PATH")
                     if path:
                         for path_entry in path.split(os.pathsep):
