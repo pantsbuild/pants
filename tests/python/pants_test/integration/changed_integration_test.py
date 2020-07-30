@@ -135,24 +135,30 @@ def create_isolated_git_repo():
 
 class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
 
-    # TODO(#10355): Once we teach `dependees` to understand generated subtargets, some of these
-    #  should change to be generated subtargets.
     TEST_MAPPING = {
         # A `python_binary` with `sources=['file.name']`.
         "src/python/python_targets/test_binary.py": dict(
             none=["src/python/python_targets/test_binary.py:test"],
-            direct=["src/python/python_targets:test"],
-            transitive=["src/python/python_targets:test"],
+            direct=[
+                "src/python/python_targets/test_binary.py:test",
+                "src/python/python_targets:test",
+            ],
+            transitive=[
+                "src/python/python_targets/test_binary.py:test",
+                "src/python/python_targets:test",
+            ],
         ),
         # A `python_library` with `sources=['file.name']`.
         "src/python/python_targets/test_library.py": dict(
             none=["src/python/python_targets/test_library.py:test_library"],
             direct=[
-                "src/python/python_targets:test",
+                "src/python/python_targets/test_binary.py:test",
+                "src/python/python_targets/test_library.py:test_library",
                 "src/python/python_targets:test_library",
-                "src/python/python_targets:test_library_direct_dependee",
             ],
             transitive=[
+                "src/python/python_targets/test_binary.py:test",
+                "src/python/python_targets/test_library.py:test_library",
                 "src/python/python_targets:test",
                 "src/python/python_targets:test_library",
                 "src/python/python_targets:test_library_direct_dependee",
@@ -165,8 +171,8 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
         # A `python_library` with `sources=['file.name'] .
         "src/python/sources/sources.py": dict(
             none=["src/python/sources/sources.py"],
-            direct=["src/python/sources"],
-            transitive=["src/python/sources"],
+            direct=["src/python/sources", "src/python/sources/sources.py",],
+            transitive=["src/python/sources", "src/python/sources/sources.py",],
         ),
         # An unclaimed source file.
         "src/python/python_targets/test_unclaimed_src.py": dict(none=[], direct=[], transitive=[]),

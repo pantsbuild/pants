@@ -101,21 +101,9 @@ class PythonDependencyInferenceTest(TestBase):
                 Params(InferPythonDependencies(target[PythonSources]), options_bootstrapper),
             )
 
-        # NB: We do not infer `src/python/app.py`, even though it's used by `src/python/f2.py`,
-        # because it is part of the requested address.
-        normal_address = Address("src/python")
-        assert run_dep_inference(normal_address) == InferredDependencies(
-            [
-                Address("3rdparty/python", target_name="Django"),
-                Address("src/python/util", relative_file_path="dep.py", target_name="util"),
-            ]
-        )
-
-        generated_subtarget_address = Address(
-            "src/python", relative_file_path="f2.py", target_name="python"
-        )
+        generated_subtarget_address = Address("src/python", relative_file_path="f2.py")
         assert run_dep_inference(generated_subtarget_address) == InferredDependencies(
-            [Address("src/python", relative_file_path="app.py", target_name="python")]
+            [Address("src/python", relative_file_path="app.py")]
         )
 
     def test_infer_python_inits(self) -> None:
@@ -139,10 +127,12 @@ class PythonDependencyInferenceTest(TestBase):
                 Params(InferInitDependencies(target[PythonSources]), options_bootstrapper),
             )
 
-        assert run_dep_inference(Address.parse("src/python/root/mid/leaf")) == InferredDependencies(
+        assert run_dep_inference(
+            Address("src/python/root/mid/leaf", relative_file_path="__init__.py")
+        ) == InferredDependencies(
             [
-                Address("src/python/root", relative_file_path="__init__.py", target_name="root"),
-                Address("src/python/root/mid", relative_file_path="__init__.py", target_name="mid"),
+                Address("src/python/root", relative_file_path="__init__.py"),
+                Address("src/python/root/mid", relative_file_path="__init__.py"),
             ]
         )
 
@@ -168,9 +158,12 @@ class PythonDependencyInferenceTest(TestBase):
                 Params(InferConftestDependencies(target[PythonSources]), options_bootstrapper),
             )
 
-        assert run_dep_inference(Address.parse("src/python/root/mid/leaf")) == InferredDependencies(
+        assert run_dep_inference(
+            Address("src/python/root/mid/leaf", relative_file_path="this_is_a_test.py")
+        ) == InferredDependencies(
             [
-                Address("src/python/root", relative_file_path="conftest.py", target_name="root"),
-                Address("src/python/root/mid", relative_file_path="conftest.py", target_name="mid"),
+                Address("src/python/root", relative_file_path="conftest.py"),
+                Address("src/python/root/mid", relative_file_path="conftest.py"),
+                Address("src/python/root/mid/leaf", relative_file_path="conftest.py"),
             ]
         )
