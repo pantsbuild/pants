@@ -26,7 +26,7 @@ use hashing::{Digest, Fingerprint};
 use log::{debug, trace, warn, Level};
 use protobuf::{self, Message, ProtobufEnum};
 use store::{Snapshot, SnapshotOps, Store, StoreFileByDigest};
-use workunit_store::{with_workunit, WorkunitMetadata, WorkunitStore};
+use workunit_store::{with_workunit, SpanId, WorkunitMetadata, WorkunitStore};
 
 use crate::{
   Context, ExecutionStats, FallibleProcessResultWithPlatform, MultiPlatformProcess, Platform,
@@ -841,7 +841,7 @@ fn maybe_add_workunit(
   result_cached: bool,
   name: &str,
   time_span: concrete_time::TimeSpan,
-  parent_id: Option<String>,
+  parent_id: Option<SpanId>,
   workunit_store: &WorkunitStore,
   metadata: WorkunitMetadata,
 ) {

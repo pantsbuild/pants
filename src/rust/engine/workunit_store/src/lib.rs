@@ -43,7 +43,21 @@ use std::future::Future;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
-pub type SpanId = String;
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Ord, PartialOrd)]
+pub struct SpanId(u64);
+
+impl SpanId {
+  pub fn new() -> SpanId {
+    let mut rng = thread_rng();
+    SpanId(rng.gen())
+  }
+}
+
+impl std::fmt::Display for SpanId {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{:016.x}", self.0)
+  }
+}
 
 type WorkunitGraph = DiGraph<SpanId, (), u32>;
 
@@ -51,7 +65,7 @@ type WorkunitGraph = DiGraph<SpanId, (), u32>;
 pub struct Workunit {
   pub name: String,
   pub span_id: SpanId,
-  pub parent_id: Option<String>,
+  pub parent_id: Option<SpanId>,
   pub state: WorkunitState,
   pub metadata: WorkunitMetadata,
 }
@@ -422,7 +436,7 @@ impl WorkunitStore {
     }
   }
 
-  pub fn init_thread_state(&self, parent_id: Option<String>) {
+  pub fn init_thread_state(&self, parent_id: Option<SpanId>) {
     set_thread_workunit_state(Some(WorkUnitState {
       store: self.clone(),
       parent_id,
@@ -505,7 +519,7 @@ impl WorkunitStore {
     parent_id: Option<SpanId>,
     metadata: WorkunitMetadata,
   ) {
-    let span_id = new_span_id();
+    let span_id = SpanId::new();
 
     let workunit = Workunit {
       name,
@@ -537,23 +551,13 @@ impl WorkunitStore {
   }
 }
 
-pub fn new_span_id() -> String {
-  let mut rng = thread_rng();
-  let random_u64: u64 = rng.gen();
-  hex_16_digit_string(random_u64)
-}
-
-fn hex_16_digit_string(number: u64) -> String {
-  format!("{:016.x}", number)
-}
-
 ///
 /// The per-thread/task state that tracks the current workunit store, and workunit parent id.
 ///
 #[derive(Clone)]
 pub struct WorkUnitState {
   pub store: WorkunitStore,
-  pub parent_id: Option<String>,
+  pub parent_id: Option<SpanId>,
 }
 
 thread_local! {
@@ -600,7 +604,7 @@ where
   M: for<'a> FnOnce(&'a F::Output, WorkunitMetadata) -> WorkunitMetadata,
 {
   let mut workunit_state = expect_workunit_state();
-  let span_id = new_span_id();
+  let span_id = SpanId::new();
   let parent_id = std::mem::replace(&mut workunit_state.parent_id, Some(span_id.clone()));
   let mut workunit =
     workunit_store.start_workunit(span_id, name, parent_id, initial_metadata.clone());

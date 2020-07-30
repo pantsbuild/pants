@@ -804,17 +804,17 @@ fn workunit_to_py_value(workunit: &Workunit, core: &Arc<Core>) -> CPyResult<Valu
     ),
     (
       externs::store_utf8("span_id"),
-      externs::store_utf8(&workunit.span_id),
+      externs::store_utf8(&format!("{}", workunit.span_id)),
     ),
     (
       externs::store_utf8("level"),
       externs::store_utf8(&workunit.metadata.level.to_string()),
     ),
   ];
-  if let Some(parent_id) = &workunit.parent_id {
+  if let Some(parent_id) = workunit.parent_id {
     dict_entries.push((
       externs::store_utf8("parent_id"),
-      externs::store_utf8(parent_id),
+      externs::store_utf8(&format!("{}", parent_id)),
     ));
   }
 
