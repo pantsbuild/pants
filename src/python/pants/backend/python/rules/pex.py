@@ -279,7 +279,8 @@ class Pex:
     """Wrapper for a digest containing a pex file created with some filename."""
 
     digest: Digest
-    output_filename: str
+    name: str
+    distributed_to_users: bool
 
 
 @dataclass(frozen=True)
@@ -442,7 +443,11 @@ async def create_pex(
             for line in lines:
                 pex_debug.log(line)
 
-    return Pex(digest=result.output_digest, output_filename=request.output_filename)
+    return Pex(
+        digest=result.output_digest,
+        name=request.output_filename,
+        distributed_to_users=request.distributed_to_users,
+    )
 
 
 @rule
@@ -527,7 +532,13 @@ class PexProcess:
 
 @rule
 async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment) -> Process:
-    argv = pex_environment.create_argv(f"./{request.pex.output_filename}", *request.argv)
+    argv = pex_environment.create_argv(
+        f"./{request.pex.name}",
+        *request.argv,
+        # If the Pex isn't distributed to users, then we must use the shebang because we will have
+        # used the flag `--use-first-matching-interpreter`, which requires running via shebang.
+        always_use_shebang=request.pex.distributed_to_users is False,
+    )
     env = {**pex_environment.environment_dict, **(request.extra_env or {})}
     return Process(
         argv,

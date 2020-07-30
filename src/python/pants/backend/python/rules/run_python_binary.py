@@ -58,7 +58,7 @@ async def create_python_binary_run_request(
     merged_digest = await Get(Digest, MergeDigests([pex.digest, source_files.snapshot.digest]))
     return RunRequest(
         digest=merged_digest,
-        binary_name=pex.output_filename,
+        binary_name=pex.name,
         prefix_args=("-m", entry_point),
         env={"PEX_EXTRA_SYS_PATH": ":".join(source_files.source_roots)},
     )

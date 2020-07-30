@@ -38,7 +38,7 @@ async def create_python_repl_request(repl: PythonRepl) -> ReplRequest:
     merged_digest = await Get(Digest, MergeDigests((pex.digest, source_files.snapshot.digest)))
     return ReplRequest(
         digest=merged_digest,
-        binary_name=pex.output_filename,
+        binary_name=pex.name,
         env={"PEX_EXTRA_SYS_PATH": ":".join(source_files.source_roots)},
     )
 
@@ -68,7 +68,7 @@ async def create_ipython_repl_request(repl: IPythonRepl, ipython: IPython) -> Re
     merged_digest = await Get(Digest, MergeDigests((pex.digest, source_files.snapshot.digest)))
     return ReplRequest(
         digest=merged_digest,
-        binary_name=pex.output_filename,
+        binary_name=pex.name,
         env={"PEX_EXTRA_SYS_PATH": ":".join(source_files.source_roots)},
     )
 

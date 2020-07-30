@@ -87,7 +87,7 @@ async def create_python_binary(
         ),
     )
     pex = two_step_pex.pex
-    return CreatedBinary(digest=pex.digest, binary_name=pex.output_filename)
+    return CreatedBinary(digest=pex.digest, binary_name=pex.name)
 
 
 def rules():
