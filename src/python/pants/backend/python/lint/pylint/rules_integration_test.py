@@ -8,6 +8,7 @@ from typing import List, Optional
 from pants.backend.python.lint.pylint.plugin_target_type import PylintSourcePlugin
 from pants.backend.python.lint.pylint.rules import PylintFieldSet, PylintRequest
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
+from pants.backend.python.rules import ancestor_files, missing_init
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -42,7 +43,13 @@ class PylintIntegrationTest(ExternalToolTestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *pylint_rules(), RootRule(PylintRequest))
+        return (
+            *super().rules(),
+            *pylint_rules(),
+            *ancestor_files.rules(),
+            *missing_init.rules(),
+            RootRule(PylintRequest),
+        )
 
     def make_target_with_origin(
         self,

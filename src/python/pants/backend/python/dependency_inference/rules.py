@@ -9,8 +9,8 @@ from pants.backend.python.dependency_inference import module_mapper
 from pants.backend.python.dependency_inference.import_parser import find_python_imports
 from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwner
 from pants.backend.python.dependency_inference.python_stdlib.combined import combined_stdlib
-from pants.backend.python.rules import inject_ancestor_files
-from pants.backend.python.rules.inject_ancestor_files import AncestorFiles, AncestorFilesRequest
+from pants.backend.python.rules import ancestor_files
+from pants.backend.python.rules.ancestor_files import AncestorFiles, AncestorFilesRequest
 from pants.backend.python.target_types import PythonSources, PythonTestsSources
 from pants.core.util_rules.strip_source_roots import (
     SourceRootStrippedSources,
@@ -171,7 +171,7 @@ async def infer_python_conftest_dependencies(
 def rules():
     return [
         *collect_rules(),
-        *inject_ancestor_files.rules(),
+        *ancestor_files.rules(),
         *module_mapper.rules(),
         UnionRule(InferDependenciesRequest, InferPythonDependencies),
         UnionRule(InferDependenciesRequest, InferInitDependencies),

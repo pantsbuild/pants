@@ -38,6 +38,7 @@ class AncestorFilesRequest:
 class AncestorFiles:
     """Any ancestor files found."""
 
+    # Files in the snapshot are stripped iff the request had sources_stripped=True.
     snapshot: Snapshot
 
 
@@ -87,6 +88,7 @@ async def find_missing_ancestor_files(
 
     # NB: This will intentionally _not_ error on any unmatched globs.
     discovered_ancestors_snapshot = await Get(Snapshot, PathGlobs(missing_ancestor_files))
+
     if request.sources_stripped:
         # We must now strip all discovered paths.
         stripped_snapshot = await Get(

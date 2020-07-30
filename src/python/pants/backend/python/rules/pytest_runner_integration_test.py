@@ -8,7 +8,14 @@ from textwrap import dedent
 from typing import List, Optional
 
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
-from pants.backend.python.rules import pex, pex_from_targets, pytest_runner, python_sources
+from pants.backend.python.rules import (
+    ancestor_files,
+    missing_init,
+    pex,
+    pex_from_targets,
+    pytest_runner,
+    python_sources,
+)
 from pants.backend.python.rules.coverage import create_coverage_config
 from pants.backend.python.rules.pytest_runner import PythonTestFieldSet
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary, PythonTests
@@ -127,6 +134,8 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
             *pex.rules(),
             *pex_from_targets.rules(),
             *strip_source_roots.rules(),
+            *ancestor_files.rules(),
+            *missing_init.rules(),
             RootRule(PythonTestFieldSet),
             # For conftest detection.
             *dependency_inference_rules.rules(),

@@ -4,12 +4,13 @@
 from dataclasses import dataclass
 from typing import Iterable, List, Tuple, Type
 
+from pants.backend.python.rules.missing_init import MissingInit, MissingInitRequest
 from pants.backend.python.target_types import PythonSources
 from pants.core.target_types import FilesSources, ResourcesSources
 from pants.core.util_rules import determine_source_files
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
 from pants.core.util_rules.strip_source_roots import representative_path_from_address
-from pants.engine.fs import Snapshot
+from pants.engine.fs import MergeDigests, Snapshot
 from pants.engine.rules import Get, MultiGet, RootRule, collect_rules, rule
 from pants.engine.target import Sources, Target
 from pants.engine.unions import UnionMembership
@@ -102,7 +103,15 @@ async def prepare_stripped_python_sources(
             strip_source_roots=True,
         ),
     )
-    return StrippedPythonSources(stripped_sources.snapshot)
+
+    missing_init = await Get(
+        MissingInit, MissingInitRequest(stripped_sources.snapshot, sources_stripped=True),
+    )
+    init_injected = await Get(
+        Snapshot, MergeDigests((stripped_sources.snapshot.digest, missing_init.snapshot.digest)),
+    )
+
+    return StrippedPythonSources(init_injected)
 
 
 @rule
@@ -117,6 +126,14 @@ async def prepare_unstripped_python_sources(
             enable_codegen=True,
             strip_source_roots=False,
         ),
+    )
+
+    missing_init = await Get(
+        MissingInit, MissingInitRequest(sources.snapshot, sources_stripped=False)
+    )
+
+    init_injected = await Get(
+        Snapshot, MergeDigests((sources.snapshot.digest, missing_init.snapshot.digest)),
     )
 
     source_root_objs = await MultiGet(
@@ -134,7 +151,7 @@ async def prepare_unstripped_python_sources(
         )
     )
     source_root_paths = {source_root_obj.path for source_root_obj in source_root_objs}
-    return UnstrippedPythonSources(sources.snapshot, tuple(sorted(source_root_paths)))
+    return UnstrippedPythonSources(init_injected, tuple(sorted(source_root_paths)))
 
 
 def rules():

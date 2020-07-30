@@ -4,7 +4,12 @@
 from textwrap import dedent
 from typing import Optional
 
-from pants.backend.python.rules import pex_from_targets, python_sources
+from pants.backend.python.rules import (
+    ancestor_files,
+    missing_init,
+    pex_from_targets,
+    python_sources,
+)
 from pants.backend.python.rules.pex import PexRequest, PexRequirements
 from pants.backend.python.rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.rules.python_sources import StrippedPythonSourcesRequest
@@ -27,6 +32,8 @@ class PexTest(TestBase):
             *super().rules(),
             *pex_from_targets.rules(),
             *python_sources.rules(),
+            *ancestor_files.rules(),
+            *missing_init.rules(),
             RootRule(PexFromTargetsRequest),
             RootRule(StrippedPythonSourcesRequest),
             SubsystemRule(PythonSetup),

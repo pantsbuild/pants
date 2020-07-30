@@ -6,6 +6,7 @@ from typing import Iterable, List, Optional, Type
 
 from pants.backend.codegen.protobuf.python.rules import rules as protobuf_rules
 from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
+from pants.backend.python.rules import ancestor_files, missing_init
 from pants.backend.python.rules.python_sources import (
     StrippedPythonSources,
     StrippedPythonSourcesRequest,
@@ -39,6 +40,8 @@ class PythonSourcesTest(ExternalToolTestBase):
         return (
             *super().rules(),
             *python_sources_rules(),
+            *ancestor_files.rules(),
+            *missing_init.rules(),
             *protobuf_rules(),
             RootRule(StrippedPythonSourcesRequest),
             RootRule(UnstrippedPythonSourcesRequest),
