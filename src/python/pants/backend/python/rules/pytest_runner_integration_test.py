@@ -8,16 +8,9 @@ from textwrap import dedent
 from typing import List, Optional
 
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
-from pants.backend.python.rules import (
-    download_pex_bin,
-    pex,
-    pex_from_targets,
-    pytest_runner,
-    python_sources,
-)
+from pants.backend.python.rules import pex, pex_from_targets, pytest_runner, python_sources
 from pants.backend.python.rules.coverage import create_coverage_config
 from pants.backend.python.rules.pytest_runner import PythonTestFieldSet
-from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary, PythonTests
 from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -129,14 +122,11 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
             *super().rules(),
             create_coverage_config,
             *pytest_runner.rules(),
-            *download_pex_bin.rules(),
             *determine_source_files.rules(),
             *python_sources.rules(),
             *pex.rules(),
             *pex_from_targets.rules(),
-            *python_native_code.rules(),
             *strip_source_roots.rules(),
-            *subprocess_environment.rules(),
             RootRule(PythonTestFieldSet),
             # For conftest detection.
             *dependency_inference_rules.rules(),

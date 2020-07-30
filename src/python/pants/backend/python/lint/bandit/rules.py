@@ -5,16 +5,14 @@ from dataclasses import dataclass
 from typing import Optional, Tuple
 
 from pants.backend.python.lint.bandit.subsystem import Bandit
-from pants.backend.python.rules import download_pex_bin, pex
-from pants.backend.python.rules.hermetic_pex import PexEnvironment
+from pants.backend.python.rules import pex
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
+    PexProcess,
     PexRequest,
     PexRequirements,
 )
-from pants.backend.python.subsystems import python_native_code, subprocess_environment
-from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
 from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonSources
 from pants.core.goals.lint import (
     LintRequest,
@@ -37,7 +35,7 @@ from pants.engine.fs import (
     PathGlobs,
     Snapshot,
 )
-from pants.engine.process import FallibleProcessResult, Process
+from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSetWithOrigin
 from pants.engine.unions import UnionRule
@@ -78,11 +76,7 @@ def generate_args(
 
 @rule
 async def bandit_lint_partition(
-    partition: BanditPartition,
-    bandit: Bandit,
-    lint_subsystem: LintSubsystem,
-    pex_environment: PexEnvironment,
-    subprocess_environment: SubprocessEnvironment,
+    partition: BanditPartition, bandit: Bandit, lint_subsystem: LintSubsystem
 ) -> LintResult:
     requirements_pex_request = Get(
         Pex,
@@ -139,18 +133,20 @@ async def bandit_lint_partition(
         bandit=bandit,
         output_file=report_path.name if report_path else None,
     )
-    process = requirements_pex.create_process(
-        pex_environment=pex_environment,
-        subprocess_environment=subprocess_environment,
-        pex_path="./bandit.pex",
-        pex_args=args,
-        output_files=(report_path.name,) if report_path else None,
-        input_digest=input_digest,
-        description=(
-            f"Run Bandit on {pluralize(len(partition.field_sets), 'target')}: {address_references}."
+
+    result = await Get(
+        FallibleProcessResult,
+        PexProcess(
+            requirements_pex,
+            argv=args,
+            input_digest=input_digest,
+            description=(
+                f"Run Bandit on {pluralize(len(partition.field_sets), 'target')}: "
+                f"{address_references}."
+            ),
+            output_files=(report_path.name,) if report_path else None,
         ),
     )
-    result = await Get(FallibleProcessResult, Process, process)
 
     results_file = None
     if report_path:
@@ -191,10 +187,7 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(LintRequest, BanditRequest),
-        *download_pex_bin.rules(),
         *determine_source_files.rules(),
         *pex.rules(),
-        *python_native_code.rules(),
         *strip_source_roots.rules(),
-        *subprocess_environment.rules(),
     ]

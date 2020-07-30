@@ -9,16 +9,15 @@ from dataclasses import dataclass
 from typing import List, Set, Tuple, cast
 
 from pants.backend.python.python_artifact import PythonArtifact
-from pants.backend.python.rules.hermetic_pex import PexEnvironment
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
+    PexProcess,
     PexRequest,
     PexRequirements,
 )
 from pants.backend.python.rules.setuptools import Setuptools
 from pants.backend.python.rules.util import PackageDatum, distutils_repr, find_packages, is_python2
-from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
 from pants.backend.python.target_types import (
     PythonEntryPoint,
     PythonInterpreterCompatibility,
@@ -50,7 +49,7 @@ from pants.engine.fs import (
     Workspace,
 )
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.process import Process, ProcessResult
+from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     Dependencies,
@@ -371,10 +370,7 @@ setup(**{setup_kwargs_str})
 
 @rule
 async def run_setup_py(
-    req: RunSetupPyRequest,
-    setuptools_setup: SetuptoolsSetup,
-    pex_environment: PexEnvironment,
-    subprocess_environment: SubprocessEnvironment,
+    req: RunSetupPyRequest, setuptools_setup: SetuptoolsSetup
 ) -> RunSetupPyResult:
     """Run a setup.py command on a single exported target."""
     input_digest = await Get(
@@ -383,18 +379,18 @@ async def run_setup_py(
     # The setuptools dist dir, created by it under the chroot (not to be confused with
     # pants's own dist dir, at the buildroot).
     dist_dir = "dist/"
-    process = setuptools_setup.requirements_pex.create_process(
-        pex_environment=pex_environment,
-        subprocess_environment=subprocess_environment,
-        pex_path="./setuptools.pex",
-        pex_args=("setup.py", *req.args),
-        input_digest=input_digest,
-        # setuptools commands that create dists write them to the distdir.
-        # TODO: Could there be other useful files to capture?
-        output_directories=(dist_dir,),
-        description=f"Run setuptools for {req.exported_target.target.address.reference()}",
+    result = await Get(
+        ProcessResult,
+        PexProcess(
+            setuptools_setup.requirements_pex,
+            argv=("setup.py", *req.args),
+            input_digest=input_digest,
+            # setuptools commands that create dists write them to the distdir.
+            # TODO: Could there be other useful files to capture?
+            output_directories=(dist_dir,),
+            description=f"Run setuptools for {req.exported_target.target.address.reference()}",
+        ),
     )
-    result = await Get(ProcessResult, Process, process)
     output_digest = await Get(Digest, RemovePrefix(result.output_digest, dist_dir))
     return RunSetupPyResult(output_digest)
 

@@ -13,9 +13,8 @@ from pex.interpreter import PythonInterpreter
 from pex.resolver import Unsatisfiable
 from pkg_resources import Requirement, WorkingSet
 
-from pants.backend.python.rules import download_pex_bin, pex
+from pants.backend.python.rules import pex
 from pants.backend.python.rules.pex import Pex, PexRequest, PexRequirements
-from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.core.util_rules import archive, external_tool
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Snapshot
 from pants.engine.process import Process, ProcessResult
@@ -43,9 +42,6 @@ class PluginResolverTest(TestBase):
         return (
             *super().rules(),
             *pex.rules(),
-            *download_pex_bin.rules(),
-            *python_native_code.rules(),
-            *subprocess_environment.rules(),
             *external_tool.rules(),
             *archive.rules(),
             RootRule(PexRequest),

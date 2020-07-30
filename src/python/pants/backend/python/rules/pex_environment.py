@@ -3,50 +3,21 @@
 
 import os
 from dataclasses import dataclass
-from typing import Any, Iterable, Mapping, Optional, Tuple
+from typing import Iterable, Mapping, Optional, Tuple
 
+from pants.backend.python.subsystems import subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
 from pants.engine import process
 from pants.engine.engine_aware import EngineAware
-from pants.engine.fs import Digest
-from pants.engine.process import BinaryPathRequest, BinaryPaths, Process
+from pants.engine.process import BinaryPathRequest, BinaryPaths
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.option.subsystem import Subsystem
 from pants.python.python_setup import PythonSetup
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.ordered_set import OrderedSet
 from pants.util.strutil import create_path_env_var
-
-
-@dataclass(frozen=True)
-class PexEnvironment(EngineAware):
-    path: Iterable[str]
-    interpreter_search_paths: Iterable[str]
-    bootstrap_python: Optional[str] = None
-
-    def create_argv(self, pex_path: str, *args: str) -> Iterable[str]:
-        argv = [self.bootstrap_python] if self.bootstrap_python else []
-        argv.extend((pex_path, *args))
-        return argv
-
-    @property
-    def environment_dict(self) -> Mapping[str, str]:
-        return dict(
-            PATH=create_path_env_var(self.path),
-            PEX_PYTHON_PATH=create_path_env_var(self.interpreter_search_paths),
-        )
-
-    def level(self) -> Optional[LogLevel]:
-        return LogLevel.DEBUG if self.bootstrap_python else LogLevel.WARN
-
-    def message(self) -> Optional[str]:
-        if not self.bootstrap_python:
-            return (
-                "No bootstrap Python executable could be found. "
-                "Will attempt to run PEXes directly."
-            )
-        return f"Selected {self.bootstrap_python} to bootstrap PEXes with."
 
 
 class PexRuntimeEnvironment(Subsystem):
@@ -104,9 +75,45 @@ class PexRuntimeEnvironment(Subsystem):
         return tuple(self.options.bootstrap_interpreter_names)
 
 
+@dataclass(frozen=True)
+class PexEnvironment(EngineAware):
+    path: Tuple[str, ...]
+    interpreter_search_paths: Tuple[str, ...]
+    subprocess_environment_dict: FrozenDict[str, str]
+    bootstrap_python: Optional[str] = None
+
+    def create_argv(self, pex_path: str, *args: str) -> Iterable[str]:
+        argv = [self.bootstrap_python] if self.bootstrap_python else []
+        argv.extend((pex_path, *args))
+        return argv
+
+    @property
+    def environment_dict(self) -> Mapping[str, str]:
+        return dict(
+            PATH=create_path_env_var(self.path),
+            PEX_PYTHON_PATH=create_path_env_var(self.interpreter_search_paths),
+            PEX_INHERIT_PATH="false",
+            PEX_IGNORE_RCFILES="true",
+            **self.subprocess_environment_dict,
+        )
+
+    def level(self) -> Optional[LogLevel]:
+        return LogLevel.DEBUG if self.bootstrap_python else LogLevel.WARN
+
+    def message(self) -> Optional[str]:
+        if not self.bootstrap_python:
+            return (
+                "No bootstrap Python executable could be found. "
+                "Will attempt to run PEXes directly."
+            )
+        return f"Selected {self.bootstrap_python} to bootstrap PEXes with."
+
+
 @rule(desc="Find PEX Python")
 async def find_pex_python(
-    python_setup: PythonSetup, pex_runtime_environment: PexRuntimeEnvironment
+    python_setup: PythonSetup,
+    pex_runtime_environment: PexRuntimeEnvironment,
+    subprocess_environment: SubprocessEnvironment,
 ) -> PexEnvironment:
     # PEX files are compatible with bootstrapping via python2.7 or python 3.5+. The bootstrap
     # code will then re-exec itself if the underlying PEX user code needs a more specific python
@@ -132,61 +139,11 @@ async def find_pex_python(
 
     return PexEnvironment(
         path=pex_runtime_environment.path,
-        interpreter_search_paths=python_setup.interpreter_search_paths,
+        interpreter_search_paths=tuple(python_setup.interpreter_search_paths),
+        subprocess_environment_dict=FrozenDict(subprocess_environment.environment_dict),
         bootstrap_python=first_python_binary(),
     )
 
 
-class HermeticPex:
-    """A mixin for types that provide an executable Pex that should be executed hermetically."""
-
-    def create_process(
-        self,
-        pex_environment: PexEnvironment,
-        subprocess_environment: SubprocessEnvironment,
-        *,
-        pex_path: str,
-        pex_args: Iterable[str],
-        description: str,
-        input_digest: Digest,
-        env: Optional[Mapping[str, str]] = None,
-        **kwargs: Any,
-    ) -> Process:
-        """Creates an Process that will run a PEX hermetically.
-
-        :param pex_environment: The environment needed to bootstrap the PEX runtime.
-        :param subprocess_environment: The locale settings to use for the PEX invocation.
-        :param pex_path: The path within `input_files` of the PEX file (or directory if a loose
-                         pex).
-        :param pex_args: The arguments to pass to the PEX executable.
-        :param description: A description of the process execution to be performed.
-        :param input_digest: The directory digest that contains the PEX itself and any input files
-                             it needs to run against.
-        :param env: The environment to run the PEX in.
-        :param **kwargs: Any additional :class:`Process` kwargs to pass through.
-        """
-
-        # TODO(#7735): Set --python-setup-interpreter-search-paths differently for the host and target
-        # platforms, when we introduce platforms in https://github.com/pantsbuild/pants/issues/7735.
-        argv = pex_environment.create_argv(pex_path, *pex_args)
-
-        hermetic_env = dict(
-            PEX_INHERIT_PATH="false",
-            PEX_IGNORE_RCFILES="true",
-            **pex_environment.environment_dict,
-            **subprocess_environment.environment_dict,
-        )
-        if env:
-            hermetic_env.update(env)
-
-        return Process(
-            argv=argv,
-            input_digest=input_digest,
-            description=description,
-            env=hermetic_env,
-            **kwargs,
-        )
-
-
 def rules():
-    return [*collect_rules(), *process.rules()]
+    return [*collect_rules(), *process.rules(), *subprocess_environment.rules()]

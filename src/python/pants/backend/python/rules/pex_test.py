@@ -10,7 +10,6 @@ from typing import Dict, Iterable, Iterator, List, Optional, Tuple, cast
 import pytest
 from pkg_resources import Requirement
 
-from pants.backend.python.rules import download_pex_bin
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
@@ -19,7 +18,6 @@ from pants.backend.python.rules.pex import (
     PexRequirements,
 )
 from pants.backend.python.rules.pex import rules as pex_rules
-from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.target_types import PythonInterpreterCompatibility
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
@@ -187,9 +185,6 @@ class PexTest(ExternalToolTestBase):
         return (
             *super().rules(),
             *pex_rules(),
-            *download_pex_bin.rules(),
-            *python_native_code.rules(),
-            *subprocess_environment.rules(),
             RootRule(PexRequest),
         )
 

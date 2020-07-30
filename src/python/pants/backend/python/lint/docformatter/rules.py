@@ -6,16 +6,14 @@ from typing import Tuple
 
 from pants.backend.python.lint.docformatter.subsystem import Docformatter
 from pants.backend.python.lint.python_fmt import PythonFmtRequest
-from pants.backend.python.rules import download_pex_bin, pex
-from pants.backend.python.rules.hermetic_pex import PexEnvironment
+from pants.backend.python.rules import pex
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
+    PexProcess,
     PexRequest,
     PexRequirements,
 )
-from pants.backend.python.subsystems import python_native_code, subprocess_environment
-from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
 from pants.backend.python.target_types import PythonSources
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
@@ -67,12 +65,7 @@ def generate_args(
 
 
 @rule
-async def setup(
-    setup_request: SetupRequest,
-    docformatter: Docformatter,
-    pex_environment: PexEnvironment,
-    subprocess_environment: SubprocessEnvironment,
-) -> Setup:
+async def setup(setup_request: SetupRequest, docformatter: Docformatter) -> Setup:
     requirements_pex_request = Get(
         Pex,
         PexRequest(
@@ -114,20 +107,21 @@ async def setup(
         sorted(field_set.address.reference() for field_set in setup_request.request.field_sets)
     )
 
-    process = requirements_pex.create_process(
-        pex_environment=pex_environment,
-        subprocess_environment=subprocess_environment,
-        pex_path="./docformatter.pex",
-        pex_args=generate_args(
-            specified_source_files=specified_source_files,
-            docformatter=docformatter,
-            check_only=setup_request.check_only,
-        ),
-        input_digest=input_digest,
-        output_files=all_source_files_snapshot.files,
-        description=(
-            f"Run Docformatter on {pluralize(len(setup_request.request.field_sets), 'target')}: "
-            f"{address_references}."
+    process = await Get(
+        Process,
+        PexProcess(
+            requirements_pex,
+            argv=generate_args(
+                specified_source_files=specified_source_files,
+                docformatter=docformatter,
+                check_only=setup_request.check_only,
+            ),
+            input_digest=input_digest,
+            output_files=all_source_files_snapshot.files,
+            description=(
+                f"Run Docformatter on {pluralize(len(setup_request.request.field_sets), 'target')}: "
+                f"{address_references}."
+            ),
         ),
     )
     return Setup(process, original_digest=all_source_files_snapshot.digest)
@@ -162,10 +156,7 @@ def rules():
         *collect_rules(),
         UnionRule(PythonFmtRequest, DocformatterRequest),
         UnionRule(LintRequest, DocformatterRequest),
-        *download_pex_bin.rules(),
         *determine_source_files.rules(),
         *pex.rules(),
-        *python_native_code.rules(),
         *strip_source_roots.rules(),
-        *subprocess_environment.rules(),
     ]
