@@ -90,7 +90,4 @@ async def create_python_binary(
 
 
 def rules():
-    return [
-        *collect_rules(),
-        UnionRule(BinaryFieldSet, PythonBinaryFieldSet),
-    ]
+    return [*collect_rules(), UnionRule(BinaryFieldSet, PythonBinaryFieldSet)]

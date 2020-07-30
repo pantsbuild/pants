@@ -7,10 +7,10 @@ from io import StringIO
 from pathlib import PurePath
 from typing import List, Optional, Sequence, Tuple, cast
 
-from pants.backend.python.rules.hermetic_pex import PexEnvironment
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
+    PexProcess,
     PexRequest,
     PexRequirements,
 )
@@ -19,7 +19,6 @@ from pants.backend.python.rules.python_sources import (
     UnstrippedPythonSourcesRequest,
 )
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
-from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
 from pants.core.goals.test import (
     ConsoleCoverageReport,
     CoverageData,
@@ -40,7 +39,7 @@ from pants.engine.fs import (
     MergeDigests,
     PathGlobs,
 )
-from pants.engine.process import Process, ProcessResult
+from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import TransitiveTargets
 from pants.engine.unions import UnionRule
@@ -213,10 +212,7 @@ class MergedCoverageData:
 
 @rule(desc="Merge Pytest coverage data")
 async def merge_coverage_data(
-    data_collection: PytestCoverageDataCollection,
-    coverage_setup: CoverageSetup,
-    pex_environment: PexEnvironment,
-    subprocess_environment: SubprocessEnvironment,
+    data_collection: PytestCoverageDataCollection, coverage_setup: CoverageSetup
 ) -> MergedCoverageData:
     if len(data_collection) == 1:
         return MergedCoverageData(data_collection[0].digest)
@@ -227,16 +223,16 @@ async def merge_coverage_data(
     )
     input_digest = await Get(Digest, MergeDigests((*coverage_digests, coverage_setup.pex.digest)))
     prefixes = sorted(f"{data.address.path_safe_spec}/.coverage" for data in data_collection)
-    process = coverage_setup.pex.create_process(
-        pex_path=f"./{coverage_setup.pex.output_filename}",
-        pex_args=("combine", *prefixes),
-        input_digest=input_digest,
-        output_files=(".coverage",),
-        description=f"Merge {len(prefixes)} Pytest coverage reports.",
-        pex_environment=pex_environment,
-        subprocess_environment=subprocess_environment,
+    result = await Get(
+        ProcessResult,
+        PexProcess(
+            coverage_setup.pex,
+            argv=("combine", *prefixes),
+            input_digest=input_digest,
+            output_files=(".coverage",),
+            description=f"Merge {len(prefixes)} Pytest coverage reports.",
+        ),
     )
-    result = await Get(ProcessResult, Process, process)
     return MergedCoverageData(result.output_digest)
 
 
@@ -247,8 +243,6 @@ async def generate_coverage_reports(
     coverage_config: CoverageConfig,
     coverage_subsystem: CoverageSubsystem,
     transitive_targets: TransitiveTargets,
-    pex_environment: PexEnvironment,
-    subprocess_environment: SubprocessEnvironment,
 ) -> CoverageReports:
     """Takes all Python test results and generates a single coverage report."""
     sources = await Get(
@@ -267,7 +261,7 @@ async def generate_coverage_reports(
         ),
     )
 
-    processes = []
+    pex_processes = []
     report_types = []
     coverage_reports: List[CoverageReport] = []
     for report_type in coverage_subsystem.reports:
@@ -282,21 +276,19 @@ async def generate_coverage_reports(
             )
             continue
         report_types.append(report_type)
-        processes.append(
-            coverage_setup.pex.create_process(
-                pex_path=f"./{coverage_setup.pex.output_filename}",
-                # We pass `--ignore-errors` because Pants dynamically injects missing `__init__.py` files
-                # and this will cause Coverage to fail.
-                pex_args=(report_type.report_name, "--ignore-errors"),
+        pex_processes.append(
+            PexProcess(
+                coverage_setup.pex,
+                # We pass `--ignore-errors` because Pants dynamically injects missing `__init__.py`
+                # files and this will cause Coverage to fail.
+                argv=(report_type.report_name, "--ignore-errors"),
                 input_digest=input_digest,
                 output_directories=("htmlcov",) if report_type == CoverageReportType.HTML else None,
                 output_files=("coverage.xml",) if report_type == CoverageReportType.XML else None,
                 description=f"Generate Pytest {report_type.report_name} coverage report.",
-                pex_environment=pex_environment,
-                subprocess_environment=subprocess_environment,
             )
         )
-    results = await MultiGet(Get(ProcessResult, Process, process) for process in processes)
+    results = await MultiGet(Get(ProcessResult, PexProcess, process) for process in pex_processes)
     coverage_reports.extend(
         _get_coverage_reports(coverage_subsystem.output_dir, report_types, results)
     )
@@ -334,7 +326,4 @@ def _get_coverage_reports(
 
 
 def rules():
-    return [
-        *collect_rules(),
-        UnionRule(CoverageDataCollection, PytestCoverageDataCollection),
-    ]
+    return [*collect_rules(), UnionRule(CoverageDataCollection, PytestCoverageDataCollection)]

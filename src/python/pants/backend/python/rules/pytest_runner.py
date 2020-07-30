@@ -13,10 +13,10 @@ from pants.backend.python.rules.coverage import (
     CoverageSubsystem,
     PytestCoverageData,
 )
-from pants.backend.python.rules.hermetic_pex import PexEnvironment
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
+    PexProcess,
     PexRequest,
     PexRequirements,
 )
@@ -26,7 +26,6 @@ from pants.backend.python.rules.python_sources import (
     UnstrippedPythonSourcesRequest,
 )
 from pants.backend.python.subsystems.pytest import PyTest
-from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
 from pants.backend.python.target_types import (
     PythonInterpreterCompatibility,
     PythonTestsSources,
@@ -37,7 +36,7 @@ from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedS
 from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
 from pants.engine.internals.uuid import UUIDRequest
-from pants.engine.process import FallibleProcessResult, InteractiveProcess, Process
+from pants.engine.process import FallibleProcessResult, InteractiveProcess
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import TransitiveTargets
 from pants.engine.unions import UnionRule
@@ -210,8 +209,6 @@ async def setup_pytest_for_target(
 async def run_python_test(
     field_set: PythonTestFieldSet,
     test_setup: TestTargetSetup,
-    pex_environment: PexEnvironment,
-    subprocess_environment: SubprocessEnvironment,
     global_options: GlobalOptions,
     test_subsystem: TestSubsystem,
 ) -> TestResult:
@@ -249,19 +246,19 @@ async def run_python_test(
         uuid = await Get(UUID, UUIDRequest())
         env["__PANTS_FORCE_TEST_RUN__"] = str(uuid)
 
-    process = test_setup.test_runner_pex.create_process(
-        pex_environment=pex_environment,
-        subprocess_environment=subprocess_environment,
-        pex_path=f"./{test_setup.test_runner_pex.output_filename}",
-        pex_args=test_setup.args,
-        input_digest=test_setup.input_digest,
-        output_files=tuple(output_files) if output_files else None,
-        description=f"Run Pytest for {field_set.address.reference()}",
-        timeout_seconds=test_setup.timeout_seconds,
-        env=env,
-        execution_slot_variable=test_setup.execution_slot_variable,
+    result = await Get(
+        FallibleProcessResult,
+        PexProcess(
+            test_setup.test_runner_pex,
+            argv=test_setup.args,
+            input_digest=test_setup.input_digest,
+            output_files=tuple(output_files) if output_files else None,
+            description=f"Run Pytest for {field_set.address.reference()}",
+            timeout_seconds=test_setup.timeout_seconds,
+            extra_env=env,
+            execution_slot_variable=test_setup.execution_slot_variable,
+        ),
     )
-    result = await Get(FallibleProcessResult, Process, process)
 
     coverage_data = None
     if test_subsystem.use_coverage:
