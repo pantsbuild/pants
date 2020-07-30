@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import json
+import os
 import textwrap
 from typing import Iterable, Type
 
@@ -398,8 +399,9 @@ class TestGetAncestorInitPy(TestSetupPyBase):
         ]
 
     def assert_ancestor_init_py(
-        self, expected_init_pys: Iterable[str], addrs: Iterable[str]
+        self, src_root: str, expected_init_pys: Iterable[str], addr_suffixes: Iterable[str]
     ) -> None:
+        addrs = [os.path.join(src_root, addr_suffix) for addr_suffix in addr_suffixes]
         ancestor_init_py_files = self.request_single_product(
             AncestorInitPyFiles,
             Params(
@@ -415,45 +417,56 @@ class TestGetAncestorInitPy(TestSetupPyBase):
         # NB: Doesn't include the root __init__.py or the missing src/python/foo/bar/__init__.py.
         assert sorted(expected_init_pys) == sorted(init_py_files_found)
 
-    def test_get_ancestor_init_py(self) -> None:
-        # NB: src/python/foo/bar/baz/qux/__init__.py is a target's source.
-        self.create_file("src/python/foo/bar/baz/qux/BUILD", "python_library()")
-        self.create_file("src/python/foo/bar/baz/qux/qux.py", "")
-        self.create_file("src/python/foo/bar/baz/qux/__init__.py", "")
-        self.create_file("src/python/foo/bar/baz/__init__.py", "")
-        # NB: No src/python/foo/bar/__init__.py.
-        # NB: src/python/foo/corge/__init__.py is not any target's source.
-        self.create_file("src/python/foo/corge/BUILD", 'python_library(sources=["corge.py"])')
-        self.create_file("src/python/foo/corge/corge.py", "")
-        self.create_file("src/python/foo/corge/__init__.py", "")
-        self.create_file("src/python/foo/__init__.py", "")
-        self.create_file("src/python/__init__.py", "")
-        self.create_file("src/python/foo/resources/BUILD", 'resources(sources=["style.css"])')
-        self.create_file("src/python/foo/resources/style.css", "")
+    def do_test_get_ancestor_init_py(self, src_root: str) -> None:
+        def create_file(relpath: str, content: str):
+            self.create_file(os.path.join(src_root, relpath), content)
+
+        # NB: foo/bar/baz/qux/__init__.py is a target's source.
+        create_file("foo/bar/baz/qux/BUILD", "python_library()")
+        create_file("foo/bar/baz/qux/qux.py", "")
+        create_file("foo/bar/baz/qux/__init__.py", "")
+        create_file("foo/bar/baz/__init__.py", "")
+        # NB: No foo/bar/__init__.py.
+        # NB: foo/corge/__init__.py is not any target's source.
+        create_file("foo/corge/BUILD", 'python_library(sources=["corge.py"])')
+        create_file("foo/corge/corge.py", "")
+        create_file("foo/corge/__init__.py", "")
+        create_file("foo/__init__.py", "")
+        create_file("__init__.py", "")
+        create_file("foo/resources/BUILD", 'resources(sources=["style.css"])')
+        create_file("foo/resources/style.css", "")
         # NB: A stray __init__.py in a resources-only dir.
-        self.create_file("src/python/foo/resources/__init__.py", "")
+        create_file("foo/resources/__init__.py", "")
 
-        # NB: None of these should include the root src/python/__init__.py, the missing
-        # src/python/foo/bar/__init__.py, or the stray src/python/foo/resources/__init__.py.
-        self.assert_ancestor_init_py(
+        def assert_ancestor_init_py(expected_init_pys: Iterable[str], addr_suffixes: Iterable[str]):
+            self.assert_ancestor_init_py(src_root, expected_init_pys, addr_suffixes)
+
+        # NB: None of these should include the root __init__.py, the missing
+        # foo/bar/__init__.py, or the stray foo/resources/__init__.py.
+        assert_ancestor_init_py(
             ["foo/bar/baz/qux/__init__.py", "foo/bar/baz/__init__.py", "foo/__init__.py"],
-            ["src/python/foo/bar/baz/qux"],
+            ["foo/bar/baz/qux"],
         )
-        self.assert_ancestor_init_py([], ["src/python/foo/resources"])
-        self.assert_ancestor_init_py(
-            ["foo/corge/__init__.py", "foo/__init__.py"],
-            ["src/python/foo/corge", "src/python/foo/resources"],
+        assert_ancestor_init_py([], ["foo/resources"])
+        assert_ancestor_init_py(
+            ["foo/corge/__init__.py", "foo/__init__.py"], ["foo/corge", "foo/resources"],
         )
 
-        self.assert_ancestor_init_py(
+        assert_ancestor_init_py(
             [
                 "foo/bar/baz/qux/__init__.py",
                 "foo/bar/baz/__init__.py",
                 "foo/corge/__init__.py",
                 "foo/__init__.py",
             ],
-            ["src/python/foo/bar/baz/qux", "src/python/foo/corge"],
+            ["foo/bar/baz/qux", "foo/corge"],
         )
+
+    def test_get_ancestor_init_py(self) -> None:
+        self.do_test_get_ancestor_init_py("src/python")
+
+    def test_get_ancestor_init_py_with_trivial_src_root(self) -> None:
+        self.do_test_get_ancestor_init_py("")
 
 
 class TestGetOwnedDependencies(TestSetupPyBase):
