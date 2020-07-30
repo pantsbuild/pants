@@ -21,6 +21,12 @@ logger = logging.getLogger(__name__)
 class SourceRoot:
     path: str  # Relative path from the repo root.
 
+    @classmethod
+    def from_purepath_obj(cls, path: PurePath):
+        # The empty Path object's str representation is, unfortunately, ".", not "", so
+        # we correct for that here.
+        return cls(str(path) if path.name else "")
+
 
 class SourceRootError(Exception):
     """An error related to SourceRoot computation."""
@@ -232,7 +238,7 @@ async def get_source_root(
 
     # A) Does it match a pattern?
     if pattern_matcher.matches_root_patterns(path):
-        return OptionalSourceRoot(SourceRoot(str(path)))
+        return OptionalSourceRoot(SourceRoot.from_purepath_obj(path))
 
     # B) Does it contain a marker file?
     marker_filenames = source_root_config.options.marker_filenames
@@ -249,7 +255,7 @@ async def get_source_root(
         # TODO: An intrinsic to check file existence at a fixed path?
         snapshot = await Get(Snapshot, PathGlobs([str(path / mf) for mf in marker_filenames]))
         if len(snapshot.files) > 0:
-            return OptionalSourceRoot(SourceRoot(str(path)))
+            return OptionalSourceRoot(SourceRoot.from_purepath_obj(path))
 
     # The requested path itself is not a source root, but maybe its parent is.
     if str(path) != ".":
