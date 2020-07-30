@@ -18,6 +18,7 @@ from pants.base.specs import (
     FilesystemSpecs,
     Specs,
 )
+from pants.core.target_types import TargetAlias
 from pants.engine.addresses import (
     Address,
     Addresses,
@@ -62,6 +63,8 @@ from pants.engine.target import (
     TargetsWithOrigins,
     TargetWithOrigin,
     TransitiveTargets,
+    UnexpandedTargets,
+    UnexpandedTargetsWithOrigins,
     UnrecognizedTargetTypeException,
     WrappedTarget,
     _AbstractFieldSet,
@@ -94,7 +97,8 @@ async def generate_subtargets(
         raise UnrecognizedTargetTypeException(
             target_adaptor.type_alias, registered_target_types, address=address
         )
-    # TODO: We should avoid (re)constructing the base target.
+    # TODO: We could avoid (re)constructing the base target by extracting just the relevant
+    # sources fields for hydration.
     base_target = target_type(
         target_adaptor.kwargs, address=address, union_membership=union_membership
     )
@@ -156,8 +160,30 @@ async def resolve_target(address: Address) -> WrappedTarget:
 
 @rule
 async def resolve_targets(addresses: Addresses) -> Targets:
+    # TODO: This method implements alias expansion independent of `resolve_targets_with_origins`,
+    # because direct expansion of `Addresses` to `Targets` is common in a few places: we can't
+    # always assume that we have `AddressesWithOrigins`. One way to dedupe these two methods would
+    # be to fake some origins, and then strip them afterward.
     wrapped_targets = await MultiGet(Get(WrappedTarget, Address, a) for a in addresses)
-    return Targets(wrapped_target.target for wrapped_target in wrapped_targets)
+    targets = {wt.target for wt in wrapped_targets}
+    # Expand any aliases.
+    # TODO: Should be recursive.
+    alias_targets_dependencies = await MultiGet(
+        Get(Targets, DependenciesRequest(t.get(Dependencies)))
+        for t in targets
+        if isinstance(t, TargetAlias)
+    )
+    # Zip the dependencies of the alias back to the alias and propagate their origins.
+    targets.update(
+        dep_target for dep_targets in alias_targets_dependencies for dep_target in dep_targets
+    )
+    return Targets(targets)
+
+
+@rule
+async def resolve_unexpanded_targets(addresses: Addresses) -> UnexpandedTargets:
+    wrapped_targets = await MultiGet(Get(WrappedTarget, Address, a) for a in addresses)
+    return UnexpandedTargets(wrapped_target.target for wrapped_target in wrapped_targets)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -179,7 +205,34 @@ async def resolve_targets_with_origins(
         Get(TargetWithOrigin, AddressWithOrigin, address_with_origin)
         for address_with_origin in addresses_with_origins
     )
-    return TargetsWithOrigins(targets_with_origins)
+    # Expand any aliases.
+    # TODO: Should be recursive.
+    alias_targets_with_origins = [
+        to for to in targets_with_origins if isinstance(to.target, TargetAlias)
+    ]
+    alias_targets_dependencies = await MultiGet(
+        Get(Targets, DependenciesRequest(to.target.get(Dependencies)))
+        for to in alias_targets_with_origins
+    )
+    # Zip the dependencies of the alias back to the alias and propagate their origins.
+    expanded_targets_with_origins = set(targets_with_origins)
+    expanded_targets_with_origins.update(
+        TargetWithOrigin(dep_target, ato.origin)
+        for ato, dep_targets in zip(alias_targets_with_origins, alias_targets_dependencies)
+        for dep_target in dep_targets
+    )
+    return TargetsWithOrigins(expanded_targets_with_origins)
+
+
+@rule
+async def resolve_unexpanded_targets_with_origins(
+    addresses_with_origins: AddressesWithOrigins,
+) -> UnexpandedTargetsWithOrigins:
+    targets_with_origins = await MultiGet(
+        Get(TargetWithOrigin, AddressWithOrigin, address_with_origin)
+        for address_with_origin in addresses_with_origins
+    )
+    return UnexpandedTargetsWithOrigins(targets_with_origins)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -417,19 +470,13 @@ async def resolve_addresses_with_origins(specs: Specs) -> AddressesWithOrigins:
     )
     # It's possible to resolve the same address both with filesystem specs and address specs. We
     # dedupe, but must go through some ceremony for the equality check because the OriginSpec will
-    # differ. We must also consider that the filesystem spec may have resulted in a generated
-    # subtarget; if the user explicitly specified the original owning target, we should use the
-    # original target rather than its generated subtarget.
+    # differ.
     address_spec_addresses = FrozenOrderedSet(awo.address for awo in from_address_specs)
     return AddressesWithOrigins(
-        [
+        (
             *from_address_specs,
-            *(
-                awo
-                for awo in from_filesystem_specs
-                if awo.address.maybe_convert_to_base_target() not in address_spec_addresses
-            ),
-        ]
+            *(awo for awo in from_filesystem_specs if awo.address not in address_spec_addresses),
+        )
     )
 
 
@@ -842,7 +889,7 @@ def find_valid_field_sets(
             targets_to_valid_field_sets[tgt_with_origin] = valid_field_sets
     if request.error_if_no_valid_targets and not targets_to_valid_field_sets:
         raise NoValidTargetsException.create_from_field_sets(
-            targets_with_origins,
+            TargetsWithOrigins(targets_with_origins),
             field_set_types=field_set_types,
             goal_description=request.goal_description,
             union_membership=union_membership,

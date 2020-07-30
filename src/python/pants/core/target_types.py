@@ -52,11 +52,11 @@ class Resources(Target):
 # -----------------------------------------------------------------------------------------------
 
 
-class GenericTarget(Target):
+class TargetAlias(Target):
     """A generic target with no specific target type.
 
     This is useful for aggregate targets: https://www.pantsbuild.org/target_aggregate.html.
     """
 
     alias = "target"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, Sources)
+    core_fields = (*COMMON_TARGET_FIELDS, Dependencies)

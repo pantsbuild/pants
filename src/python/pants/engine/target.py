@@ -526,6 +526,14 @@ class Targets(Collection[Target]):
         return self[0]
 
 
+class UnexpandedTargets(Collection[Target]):
+    """Like `Targets`, but will not contain the expansion of `TargetAlias` instances."""
+
+    def expect_single(self) -> Target:
+        assert_single_address([tgt.address for tgt in self])
+        return self[0]
+
+
 class TargetsWithOrigins(Collection[TargetWithOrigin]):
     """A heterogeneous collection of instances of Target subclasses with the original Spec used to
     resolve the target.
@@ -533,6 +541,18 @@ class TargetsWithOrigins(Collection[TargetWithOrigin]):
     See the docstring for `Targets` for an explanation of the `Target`s being heterogeneous and how
     you should filter out the targets you care about.
     """
+
+    def expect_single(self) -> TargetWithOrigin:
+        assert_single_address([tgt_with_origin.target.address for tgt_with_origin in self])
+        return self[0]
+
+    @memoized_property
+    def targets(self) -> Tuple[Target, ...]:
+        return tuple(tgt_with_origin.target for tgt_with_origin in self)
+
+
+class UnexpandedTargetsWithOrigins(Collection[TargetWithOrigin]):
+    """Like `TargetsWithOrigins`, but will not contain the expansion of `TargetAlias` instances."""
 
     def expect_single(self) -> TargetWithOrigin:
         assert_single_address([tgt_with_origin.target.address for tgt_with_origin in self])
