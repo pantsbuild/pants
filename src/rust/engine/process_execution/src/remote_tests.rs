@@ -22,7 +22,7 @@ use tempfile::TempDir;
 use testutil::data::{TestData, TestDirectory};
 use testutil::owned_string_vec;
 use tokio::runtime::Handle;
-use workunit_store::{Level, Workunit, WorkunitMetadata, WorkunitState, WorkunitStore};
+use workunit_store::{Level, SpanId, Workunit, WorkunitMetadata, WorkunitState, WorkunitStore};
 
 use crate::remote::{digest, CommandRunner, ExecutionError, OperationOrStatus};
 use crate::{
@@ -1708,7 +1708,8 @@ async fn remote_workunits_are_stored() {
     .await
     .unwrap();
 
-  let got_workunits = workunits_with_constant_span_id(&mut workunit_store);
+  let span_id = SpanId::new();
+  let got_workunits = workunits_with_constant_span_id(&mut workunit_store, span_id);
 
   use concrete_time::Duration;
   use concrete_time::TimeSpan;
@@ -1722,7 +1723,7 @@ async fn remote_workunits_are_stored() {
           duration: Duration::new(1, 0),
         }
       },
-      span_id: String::from("ignore"),
+      span_id,
       parent_id: None,
       metadata: WorkunitMetadata::with_level(Level::Debug),
     },
@@ -1734,7 +1735,7 @@ async fn remote_workunits_are_stored() {
           duration: Duration::new(1, 0),
         }
       },
-      span_id: String::from("ignore"),
+      span_id,
       parent_id: None,
       metadata: WorkunitMetadata::with_level(Level::Debug),
     },
@@ -1746,7 +1747,7 @@ async fn remote_workunits_are_stored() {
           duration: Duration::new(1, 0),
         }
       },
-      span_id: String::from("ignore"),
+      span_id,
       parent_id: None,
       metadata: WorkunitMetadata::with_level(Level::Debug),
     },
@@ -1758,7 +1759,7 @@ async fn remote_workunits_are_stored() {
           duration: Duration::new(1, 0),
         }
       },
-      span_id: String::from("ignore"),
+      span_id,
       parent_id: None,
       metadata: WorkunitMetadata::with_level(Level::Debug),
     }
@@ -1989,12 +1990,13 @@ async fn extract_output_files_from_response_no_prefix() {
 
 pub(crate) fn workunits_with_constant_span_id(
   workunit_store: &mut WorkunitStore,
+  span_id: SpanId,
 ) -> HashSet<Workunit> {
   workunit_store.with_latest_workunits(log::Level::Trace, |_, completed_workunits| {
     completed_workunits
       .iter()
       .map(|workunit| Workunit {
-        span_id: String::from("ignore"),
+        span_id,
         ..workunit.clone()
       })
       .collect()
