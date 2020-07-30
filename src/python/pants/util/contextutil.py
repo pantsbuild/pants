@@ -9,15 +9,14 @@ import tempfile
 import termios
 import threading
 import zipfile
-from contextlib import closing, contextmanager
+from contextlib import contextmanager
 from queue import Queue
 from socketserver import TCPServer
-from typing import IO, Any, Iterator, Mapping, Optional, Tuple, Type, Union, cast
+from typing import IO, Any, Iterator, Mapping, Optional, Tuple, Type, Union
 
 from colors import green
 
 from pants.util.dirutil import safe_delete
-from pants.util.tarutil import TarFile
 
 
 class InvalidZipPath(ValueError):
@@ -264,22 +263,6 @@ def open_zip(path_or_file: Union[str, Any], *args, **kwargs) -> Iterator[zipfile
         yield zf
     finally:
         zf.close()
-
-
-@contextmanager
-def open_tar(path_or_file: Union[str, Any], *args, **kwargs) -> Iterator[TarFile]:
-    """A with-context for tar files.  Passes through positional and kwargs to tarfile.open.
-
-    If path_or_file is a file, caller must close it separately.
-    """
-    (path, fileobj) = (
-        (path_or_file, None) if isinstance(path_or_file, str) else (None, path_or_file)
-    )
-    kwargs["fileobj"] = fileobj
-    with closing(TarFile.open(path, *args, **kwargs)) as tar:
-        # We must cast the normal tarfile.TarFile to our custom pants.util.tarutil.TarFile.
-        typed_tar = cast(TarFile, tar)
-        yield typed_tar
 
 
 @contextmanager
