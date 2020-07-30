@@ -373,7 +373,7 @@ impl CommandRunner {
           result_cached,
           "remote execution action scheduling",
           time_span,
-          parent_id.clone(),
+          parent_id,
           &workunit_store,
           WorkunitMetadata::with_level(Level::Debug),
         );
@@ -391,7 +391,7 @@ impl CommandRunner {
           result_cached,
           "remote execution worker input fetching",
           time_span,
-          parent_id.clone(),
+          parent_id,
           &workunit_store,
           WorkunitMetadata::with_level(Level::Debug),
         );
@@ -409,7 +409,7 @@ impl CommandRunner {
           result_cached,
           "remote execution worker command executing",
           time_span,
-          parent_id.clone(),
+          parent_id,
           &workunit_store,
           WorkunitMetadata::with_level(Level::Debug),
         );

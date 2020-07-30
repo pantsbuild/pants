@@ -210,8 +210,8 @@ impl StreamingWorkunitData {
       let mut workunit_records = self.workunit_records.lock();
       let mut started_workunits: Vec<Workunit> = vec![];
       for mut started in started_messages.into_iter() {
-        let span_id = started.span_id.clone();
-        workunit_records.insert(span_id.clone(), started.clone());
+        let span_id = started.span_id;
+        workunit_records.insert(span_id, started.clone());
 
         if should_emit(&started) {
           started.parent_id =
@@ -222,7 +222,7 @@ impl StreamingWorkunitData {
 
       let mut completed_workunits: Vec<Workunit> = vec![];
       for (span_id, new_metadata, end_time) in completed_messages.into_iter() {
-        match workunit_records.entry(span_id.clone()) {
+        match workunit_records.entry(span_id) {
           Entry::Vacant(_) => {
             log::warn!("No previously-started workunit found for id: {}", span_id);
             continue;
@@ -243,7 +243,7 @@ impl StreamingWorkunitData {
             if let Some(metadata) = new_metadata {
               workunit.metadata = metadata;
             }
-            workunit_records.insert(span_id.clone(), workunit.clone());
+            workunit_records.insert(span_id, workunit.clone());
 
             if should_emit(&workunit) {
               workunit.parent_id =
@@ -282,14 +282,12 @@ impl HeavyHittersData {
   }
 
   fn add_started_workunit_to_store(started: Workunit, inner_store: &mut HeavyHittersInnerStore) {
-    let span_id = started.span_id.clone();
-    let parent_id = started.parent_id.clone();
+    let span_id = started.span_id;
+    let parent_id = started.parent_id;
 
-    inner_store
-      .workunit_records
-      .insert(span_id.clone(), started);
+    inner_store.workunit_records.insert(span_id, started);
 
-    let child = inner_store.graph.add_node(span_id.clone());
+    let child = inner_store.graph.add_node(span_id);
     inner_store.span_id_to_graph.insert(span_id, child);
     if let Some(parent_id) = parent_id {
       if let Some(parent) = inner_store.span_id_to_graph.get(&parent_id).cloned() {
@@ -306,7 +304,7 @@ impl HeavyHittersData {
   ) {
     use std::collections::hash_map::Entry;
 
-    match inner_store.workunit_records.entry(span_id.clone()) {
+    match inner_store.workunit_records.entry(span_id) {
       Entry::Vacant(_) => {
         log::warn!("No previously-started workunit found for id: {}", span_id);
       }
@@ -365,12 +363,12 @@ impl HeavyHittersData {
     // Initialize the heap with the leaves of the workunit graph.
     let mut queue: BinaryHeap<(Duration, SpanId)> = workunit_graph
       .externals(Direction::Outgoing)
-      .map(|entry| workunit_graph[entry].clone())
+      .map(|entry| workunit_graph[entry])
       .flat_map(|span_id: SpanId| {
         let workunit: Option<&Workunit> = inner.workunit_records.get(&span_id);
         match workunit {
           Some(workunit) if !workunit.metadata.blocked => {
-            duration_for(workunit).map(|d| (d, span_id.clone()))
+            duration_for(workunit).map(|d| (d, span_id))
           }
           _ => None,
         }
@@ -422,7 +420,7 @@ fn first_matched_parent(
     }
 
     // If not, try its parent.
-    span_id = workunit.and_then(|workunit| workunit.parent_id.clone());
+    span_id = workunit.and_then(|workunit| workunit.parent_id);
   }
   None
 }
@@ -484,16 +482,12 @@ impl WorkunitStore {
   }
 
   fn complete_workunit_impl(&self, mut workunit: Workunit, end_time: SystemTime) {
-    let span_id = workunit.span_id.clone();
+    let span_id = workunit.span_id;
     let new_metadata = Some(workunit.metadata.clone());
 
     let tx = self.streaming_workunit_data.msg_tx.lock();
-    tx.send(StoreMsg::Completed(
-      span_id.clone(),
-      new_metadata.clone(),
-      end_time,
-    ))
-    .unwrap();
+    tx.send(StoreMsg::Completed(span_id, new_metadata.clone(), end_time))
+      .unwrap();
 
     if self.rendering_dynamic_ui {
       let tx = self.heavy_hitters_data.msg_tx.lock();
@@ -605,7 +599,7 @@ where
 {
   let mut workunit_state = expect_workunit_state();
   let span_id = SpanId::new();
-  let parent_id = std::mem::replace(&mut workunit_state.parent_id, Some(span_id.clone()));
+  let parent_id = std::mem::replace(&mut workunit_state.parent_id, Some(span_id));
   let mut workunit =
     workunit_store.start_workunit(span_id, name, parent_id, initial_metadata.clone());
   scope_task_workunit_state(Some(workunit_state), async move {
