@@ -10,6 +10,7 @@ from typing import (
     Iterable,
     Iterator,
     List,
+    Mapping,
     NamedTuple,
     Optional,
     Sequence,
@@ -20,12 +21,10 @@ from typing import (
 
 from typing_extensions import Protocol
 
-from pants.backend.python.rules import hermetic_pex
-from pants.backend.python.rules.download_pex_bin import DownloadedPexBin
-from pants.backend.python.rules.hermetic_pex import HermeticPex, PexEnvironment
+from pants.backend.python.rules import pex_cli
+from pants.backend.python.rules.pex_cli import PexCliProcess
+from pants.backend.python.rules.pex_environment import PexEnvironment
 from pants.backend.python.rules.util import parse_interpreter_constraint
-from pants.backend.python.subsystems.python_native_code import PythonNativeCode
-from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
 from pants.backend.python.target_types import PythonInterpreterCompatibility
 from pants.backend.python.target_types import PythonPlatforms as PythonPlatformsField
 from pants.backend.python.target_types import PythonRequirementsField
@@ -41,7 +40,7 @@ from pants.engine.fs import (
     PathGlobs,
 )
 from pants.engine.platform import Platform, PlatformConstraint
-from pants.engine.process import MultiPlatformProcess, ProcessResult
+from pants.engine.process import MultiPlatformProcess, Process, ProcessResult
 from pants.engine.rules import Get, RootRule, collect_rules, rule
 from pants.python.python_repos import PythonRepos
 from pants.python.python_setup import PythonSetup
@@ -210,8 +209,6 @@ class PexRequest:
     additional_inputs: Optional[Digest]
     entry_point: Optional[str]
     additional_args: Tuple[str, ...]
-    # This field doesn't participate in comparison (and therefore hashing), as it doesn't affect
-    # the result.
     description: Optional[str] = dataclasses.field(compare=False)
 
     def __init__(
@@ -278,7 +275,7 @@ class TwoStepPexRequest:
 
 
 @dataclass(frozen=True)
-class Pex(HermeticPex):
+class Pex:
     """Wrapper for a digest containing a pex file created with some filename."""
 
     digest: Digest
@@ -328,12 +325,8 @@ class PexDebug:
 @rule
 async def create_pex(
     request: PexRequest,
-    pex_bin: DownloadedPexBin,
-    pex_environment: PexEnvironment,
     python_setup: PythonSetup,
     python_repos: PythonRepos,
-    subprocess_environment: SubprocessEnvironment,
-    python_native_code: PythonNativeCode,
     platform: Platform,
     log_level: LogLevel,
 ) -> Pex:
@@ -408,25 +401,9 @@ async def create_pex(
 
     merged_digest = await Get(
         Digest,
-        MergeDigests(
-            (
-                pex_bin.digest,
-                sources_digest_as_subdir,
-                additional_inputs_digest,
-                constraint_file_digest,
-            )
-        ),
+        MergeDigests((sources_digest_as_subdir, additional_inputs_digest, constraint_file_digest,)),
     )
 
-    # NB: PEX outputs are platform dependent so in order to get a PEX that we can use locally, without
-    # cross-building, we specify that our PEX command be run on the current local platform. When we
-    # support cross-building through CLI flags we can configure requests that build a PEX for our
-    # local platform that are able to execute on a different platform, but for now in order to
-    # guarantee correct build we need to restrict this command to execute on the same platform type
-    # that the output is intended for. The correct way to interpret the keys
-    # (execution_platform_constraint, target_platform_constraint) of this dictionary is "The output of
-    # this command is intended for `target_platform_constraint` iff it is run on `execution_platform
-    # constraint`".
     description = request.description
     if description is None:
         if request.requirements:
@@ -437,24 +414,26 @@ async def create_pex(
             )
         else:
             description = f"Building {request.output_filename}"
-    process = MultiPlatformProcess(
-        {
-            (
-                PlatformConstraint(platform.value),
-                PlatformConstraint(platform.value),
-            ): pex_bin.create_process(
-                pex_environment=pex_environment,
-                subprocess_environment=subprocess_environment,
-                python_native_code=python_native_code,
-                pex_args=argv,
-                input_digest=merged_digest,
-                description=description,
-                output_files=(request.output_filename,),
-            )
-        }
+
+    process = await Get(
+        Process,
+        PexCliProcess(
+            argv=argv,
+            additional_input_digest=merged_digest,
+            description=description,
+            output_files=[request.output_filename],
+        ),
     )
 
-    result = await Get(ProcessResult, MultiPlatformProcess, process)
+    # NB: Building a Pex is platform dependent, so in order to get a PEX that we can use locally
+    # without cross-building, we specify that our PEX command should be run on the current local
+    # platform.
+    result = await Get(
+        ProcessResult,
+        MultiPlatformProcess(
+            {(PlatformConstraint(platform.value), PlatformConstraint(platform.value)): process}
+        ),
+    )
 
     if pex_debug.might_log:
         lines = result.stderr.decode().splitlines()
@@ -509,10 +488,64 @@ async def two_step_create_pex(two_step_pex_request: TwoStepPexRequest) -> TwoSte
     return TwoStepPex(pex=full_pex)
 
 
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class PexProcess:
+    pex: Pex
+    argv: Tuple[str, ...]
+    description: str = dataclasses.field(compare=False)
+    input_digest: Digest
+    extra_env: Optional[FrozenDict[str, str]]
+    output_files: Optional[Tuple[str, ...]]
+    output_directories: Optional[Tuple[str, ...]]
+    timeout_seconds: Optional[int]
+    execution_slot_variable: Optional[str]
+
+    def __init__(
+        self,
+        pex: Pex,
+        *,
+        argv: Iterable[str],
+        description: str,
+        input_digest: Optional[Digest] = None,
+        extra_env: Optional[Mapping[str, str]] = None,
+        output_files: Optional[Iterable[str]] = None,
+        output_directories: Optional[Iterable[str]] = None,
+        timeout_seconds: Optional[int] = None,
+        execution_slot_variable: Optional[str] = None,
+    ) -> None:
+        self.pex = pex
+        self.argv = tuple(argv)
+        self.description = description
+        self.input_digest = input_digest or pex.digest
+        self.extra_env = FrozenDict(extra_env) if extra_env else None
+        self.output_files = tuple(output_files) if output_files else None
+        self.output_directories = tuple(output_directories) if output_directories else None
+        self.timeout_seconds = timeout_seconds
+        self.execution_slot_variable = execution_slot_variable
+
+
+@rule
+async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment) -> Process:
+    argv = pex_environment.create_argv(f"./{request.pex.output_filename}", *request.argv)
+    env = {**pex_environment.environment_dict, **(request.extra_env or {})}
+    return Process(
+        argv,
+        description=request.description,
+        input_digest=request.input_digest,
+        env=env,
+        output_files=request.output_files,
+        output_directories=request.output_directories,
+        timeout_seconds=request.timeout_seconds,
+        execution_slot_variable=request.execution_slot_variable,
+    )
+
+
 def rules():
     return [
         *collect_rules(),
-        *hermetic_pex.rules(),
+        *pex_cli.rules(),
+        RootRule(PexProcess),
         RootRule(PexRequest),
         RootRule(TwoStepPexRequest),
     ]

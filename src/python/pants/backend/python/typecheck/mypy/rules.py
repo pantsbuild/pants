@@ -4,11 +4,11 @@
 from dataclasses import dataclass
 from typing import Tuple
 
-from pants.backend.python.rules import download_pex_bin, pex, python_sources
-from pants.backend.python.rules.hermetic_pex import PexEnvironment
+from pants.backend.python.rules import pex, python_sources
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
+    PexProcess,
     PexRequest,
     PexRequirements,
 )
@@ -16,8 +16,6 @@ from pants.backend.python.rules.python_sources import (
     UnstrippedPythonSources,
     UnstrippedPythonSourcesRequest,
 )
-from pants.backend.python.subsystems import python_native_code, subprocess_environment
-from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
 from pants.backend.python.target_types import PythonSources
 from pants.backend.python.typecheck.mypy.subsystem import MyPy
 from pants.core.goals.typecheck import TypecheckRequest, TypecheckResult, TypecheckResults
@@ -31,7 +29,7 @@ from pants.engine.fs import (
     MergeDigests,
     PathGlobs,
 )
-from pants.engine.process import FallibleProcessResult, Process
+from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSetWithOrigin, TransitiveTargets
 from pants.engine.unions import UnionRule
@@ -61,12 +59,7 @@ def generate_args(mypy: MyPy, *, file_list_path: str) -> Tuple[str, ...]:
 # TODO(#10131): Improve performance, e.g. by leveraging the MyPy cache.
 # TODO(#10131): Support plugins and type stubs.
 @rule(desc="Lint using MyPy")
-async def mypy_lint(
-    request: MyPyRequest,
-    mypy: MyPy,
-    pex_environment: PexEnvironment,
-    subprocess_environment: SubprocessEnvironment,
-) -> TypecheckResults:
+async def mypy_lint(request: MyPyRequest, mypy: MyPy) -> TypecheckResults:
     if mypy.skip:
         return TypecheckResults()
 
@@ -117,16 +110,16 @@ async def mypy_lint(
         ),
     )
 
-    process = pex.create_process(
-        pex_environment=pex_environment,
-        subprocess_environment=subprocess_environment,
-        pex_path=pex.output_filename,
-        pex_args=generate_args(mypy, file_list_path=file_list_path),
-        input_digest=merged_input_files,
-        env={"PEX_EXTRA_SYS_PATH": ":".join(prepared_sources.source_roots)},
-        description=f"Run MyPy on {pluralize(len(prepared_sources.snapshot.files), 'file')}.",
+    result = await Get(
+        FallibleProcessResult,
+        PexProcess(
+            pex,
+            argv=generate_args(mypy, file_list_path=file_list_path),
+            input_digest=merged_input_files,
+            extra_env={"PEX_EXTRA_SYS_PATH": ":".join(prepared_sources.source_roots)},
+            description=f"Run MyPy on {pluralize(len(prepared_sources.snapshot.files), 'file')}.",
+        ),
     )
-    result = await Get(FallibleProcessResult, Process, process)
     return TypecheckResults(
         [TypecheckResult.from_fallible_process_result(result, typechecker_name="MyPy")]
     )
@@ -136,12 +129,9 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(TypecheckRequest, MyPyRequest),
-        *download_pex_bin.rules(),
         *determine_source_files.rules(),
         *pants_bin.rules(),
         *pex.rules(),
         *python_sources.rules(),
-        *python_native_code.rules(),
         *strip_source_roots.rules(),
-        *subprocess_environment.rules(),
     ]

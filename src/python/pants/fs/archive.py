@@ -3,10 +3,11 @@
 
 import os
 from abc import ABC, abstractmethod
-from collections import OrderedDict
+from contextlib import closing
+from tarfile import TarFile
 from zipfile import ZIP_DEFLATED
 
-from pants.util.contextutil import open_tar, open_zip, temporary_dir
+from pants.util.contextutil import open_zip, temporary_dir
 from pants.util.dirutil import safe_concurrent_rename, safe_walk
 from pants.util.strutil import ensure_text
 
@@ -58,7 +59,7 @@ class TarArchiver(Archiver):
     """
 
     def _extract(self, path_or_file, outdir, **kwargs):
-        with open_tar(path_or_file, errorlevel=1, **kwargs) as tar:
+        with closing(TarFile.open(path_or_file, errorlevel=1, **kwargs)) as tar:
             tar.extractall(outdir)
 
     def __init__(self, mode, extension):
@@ -76,7 +77,9 @@ class TarArchiver(Archiver):
 
         basedir = ensure_text(basedir)
         tarpath = os.path.join(outdir, "{}.{}".format(ensure_text(name), self.extension))
-        with open_tar(tarpath, self.mode, dereference=dereference, errorlevel=1) as tar:
+        with closing(
+            TarFile.open(tarpath, self.mode, dereference=dereference, errorlevel=1)
+        ) as tar:
             tar.add(basedir, arcname=prefix or ".")
         return tarpath
 
@@ -135,13 +138,7 @@ TBZ2 = TarArchiver("w:bz2", "tar.bz2")
 TXZ = TarArchiver("w:xz", "tar.xz")
 ZIP = ZipArchiver(ZIP_DEFLATED, "zip")
 
-_ARCHIVER_BY_TYPE = OrderedDict(tar=TAR, tgz=TGZ, tbz2=TBZ2, txz=TXZ, zip=ZIP)
-
-archive_extensions = {name: archiver.extension for name, archiver in _ARCHIVER_BY_TYPE.items()}
-
-TYPE_NAMES = frozenset(_ARCHIVER_BY_TYPE.keys())
-TYPE_NAMES_NO_PRESERVE_SYMLINKS = frozenset({"zip"})
-TYPE_NAMES_PRESERVE_SYMLINKS = TYPE_NAMES - TYPE_NAMES_NO_PRESERVE_SYMLINKS
+_ARCHIVER_BY_TYPE = dict(tar=TAR, tgz=TGZ, tbz2=TBZ2, txz=TXZ, zip=ZIP)
 
 
 def create_archiver(typename):

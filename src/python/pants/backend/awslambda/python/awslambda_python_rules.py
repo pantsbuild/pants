@@ -12,12 +12,12 @@ from pants.backend.awslambda.python.target_types import (
     PythonAwsLambdaHandler,
     PythonAwsLambdaRuntime,
 )
-from pants.backend.python.rules import download_pex_bin, pex, pex_from_targets, python_sources
-from pants.backend.python.rules.hermetic_pex import PexEnvironment
+from pants.backend.python.rules import pex, pex_from_targets, python_sources
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
     PexPlatforms,
+    PexProcess,
     PexRequest,
     PexRequirements,
     TwoStepPex,
@@ -26,11 +26,9 @@ from pants.backend.python.rules.pex_from_targets import (
     PexFromTargetsRequest,
     TwoStepPexFromTargetsRequest,
 )
-from pants.backend.python.subsystems import python_native_code, subprocess_environment
-from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
 from pants.core.util_rules import strip_source_roots
 from pants.engine.fs import Digest, MergeDigests
-from pants.engine.process import Process, ProcessResult
+from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionRule
 
@@ -50,10 +48,7 @@ class LambdexSetup:
 
 @rule(desc="Create Python AWS Lambda")
 async def create_python_awslambda(
-    field_set: PythonAwsLambdaFieldSet,
-    lambdex_setup: LambdexSetup,
-    pex_environment: PexEnvironment,
-    subprocess_environment: SubprocessEnvironment,
+    field_set: PythonAwsLambdaFieldSet, lambdex_setup: LambdexSetup
 ) -> CreatedAWSLambda:
     # Lambdas typically use the .zip suffix, so we use that instead of .pex.
     pex_filename = f"{field_set.address.target_name}.zip"
@@ -90,17 +85,16 @@ async def create_python_awslambda(
     )
 
     # NB: Lambdex modifies its input pex in-place, so the input file is also the output file.
-    lambdex_args = ("build", "-e", field_set.handler.value, pex_filename)
-    process = lambdex_setup.requirements_pex.create_process(
-        pex_environment=pex_environment,
-        subprocess_environment=subprocess_environment,
-        pex_path="./lambdex.pex",
-        pex_args=lambdex_args,
-        input_digest=input_digest,
-        output_files=(pex_filename,),
-        description=f"Setting up handler in {pex_filename}",
+    result = await Get(
+        ProcessResult,
+        PexProcess(
+            lambdex_setup.requirements_pex,
+            argv=("build", "-e", field_set.handler.value, pex_filename),
+            input_digest=input_digest,
+            output_files=(pex_filename,),
+            description=f"Setting up handler in {pex_filename}",
+        ),
     )
-    result = await Get(ProcessResult, Process, process)
     return CreatedAWSLambda(
         digest=result.output_digest,
         zip_file_relpath=pex_filename,
@@ -130,11 +124,8 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(AWSLambdaFieldSet, PythonAwsLambdaFieldSet),
-        *download_pex_bin.rules(),
         *python_sources.rules(),
         *pex.rules(),
         *pex_from_targets.rules(),
-        *python_native_code.rules(),
         *strip_source_roots.rules(),
-        *subprocess_environment.rules(),
     ]

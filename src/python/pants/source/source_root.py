@@ -19,7 +19,9 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True, order=True)
 class SourceRoot:
-    path: str  # Relative path from the repo root.
+    # Relative path from the buildroot.  Note that a source root at the buildroot
+    # is represented as ".".
+    path: str
 
 
 class SourceRootError(Exception):
