@@ -316,10 +316,10 @@ class BinaryPaths(EngineAware):
         self.binary_name = binary_name
         self.paths = tuple(OrderedSet(paths))
 
-    def level(self) -> Optional[LogLevel]:
-        return LogLevel.DEBUG if self.paths else LogLevel.WARN
+    def level(self) -> LogLevel:
+        return LogLevel.DEBUG
 
-    def message(self) -> Optional[str]:
+    def message(self) -> str:
         if not self.paths:
             return f"failed to find {self.binary_name}"
         found_msg = f"found {self.binary_name} at {self.paths[0]}"

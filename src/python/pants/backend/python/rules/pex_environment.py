@@ -97,14 +97,15 @@ class PexEnvironment(EngineAware):
             **self.subprocess_environment_dict,
         )
 
-    def level(self) -> Optional[LogLevel]:
+    def level(self) -> LogLevel:
         return LogLevel.DEBUG if self.bootstrap_python else LogLevel.WARN
 
-    def message(self) -> Optional[str]:
+    def message(self) -> str:
         if not self.bootstrap_python:
             return (
-                "No bootstrap Python executable could be found. "
-                "Will attempt to run PEXes directly."
+                "No bootstrap Python executable could be found from the option "
+                "`interpreter_search_paths` in the `[python-setup]` scope. Will attempt to run "
+                "PEXes directly."
             )
         return f"Selected {self.bootstrap_python} to bootstrap PEXes with."
 
