@@ -49,7 +49,12 @@ class InjectInitTest(TestBase):
             self.make_snapshot({fp: "" for fp in original_declared_files}),
             sources_stripped=declared_files_stripped,
         )
-        bootstrapper = create_options_bootstrapper(args=[f"--source-root-patterns={source_roots}"])
+        bootstrapper = create_options_bootstrapper(
+            args=[
+                "--backend-packages=pants.backend.python",
+                f"--source-root-patterns={source_roots}",
+            ]
+        )
         result = self.request_single_product(MissingInit, Params(request, bootstrapper)).snapshot
         assert list(result.files) == sorted(expected_discovered)
 

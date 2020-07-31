@@ -3,9 +3,10 @@
 
 from dataclasses import dataclass
 
+from pants.backend.python.dependency_inference.rules import PythonInference
 from pants.backend.python.rules.ancestor_files import AncestorFiles, AncestorFilesRequest
 from pants.engine.fs import Digest, DigestContents, Snapshot
-from pants.engine.rules import Get, rule
+from pants.engine.rules import Get, collect_rules, rule
 
 
 @dataclass(frozen=True)
@@ -26,7 +27,9 @@ class MissingNonEmptyInitFiles(Exception):
 
 
 @rule
-async def find_missing_empty_init_files(request: MissingInitRequest) -> MissingInit:
+async def find_missing_empty_init_files(
+    request: MissingInitRequest, python_inference: PythonInference,
+) -> MissingInit:
     """Find missing empty __init__.py files.
 
     This is a convenience hack, so that repos that aren't using dep inference don't have
@@ -46,10 +49,17 @@ async def find_missing_empty_init_files(request: MissingInitRequest) -> MissingI
     extra_init_files_contents = await Get(DigestContents, Digest, extra_init_files.snapshot.digest)
     non_empty = [fc.path for fc in extra_init_files_contents if fc.content]
     if non_empty:
+        inference_hint = (
+            ""
+            if python_inference.inits
+            else (
+                ", and then add explicit dependencies (or enable `--python-infer-inits` to "
+                "automatically add the dependencies)"
+            )
+        )
         err_msg = (
             f"Missing dependencies on non-empty __init__.py files: {','.join(non_empty)}. "
-            f"To fix, either enable dependency inference or add explicit dependencies on these "
-            f"files."
+            f"To fix: ensure that targets own each of these files{inference_hint}."
         )
         # TODO: Note that in the stripped case these paths will be missing their source roots,
         #  which makes this error message slightly less useful to the end user.
@@ -60,4 +70,4 @@ async def find_missing_empty_init_files(request: MissingInitRequest) -> MissingI
 
 
 def rules():
-    return [find_missing_empty_init_files]
+    return collect_rules()
