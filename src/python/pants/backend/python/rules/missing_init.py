@@ -46,7 +46,11 @@ async def find_missing_empty_init_files(request: MissingInitRequest) -> MissingI
     extra_init_files_contents = await Get(DigestContents, Digest, extra_init_files.snapshot.digest)
     non_empty = [fc.path for fc in extra_init_files_contents if fc.content]
     if non_empty:
-        err_msg = f"Missing dependencies on non-empty __init__.py files: {','.join(non_empty)}"
+        err_msg = (
+            f"Missing dependencies on non-empty __init__.py files: {','.join(non_empty)}. "
+            f"To fix, either enable dependency inference or add explicit dependencies on these "
+            f"files."
+        )
         # TODO: Note that in the stripped case these paths will be missing their source roots,
         #  which makes this error message slightly less useful to the end user.
         #  Once we overhaul the whole stripped vs. non-stripped confusion, this should be remedied.

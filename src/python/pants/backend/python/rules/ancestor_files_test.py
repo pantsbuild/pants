@@ -1,7 +1,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import json
 from typing import List
 
 from pants.backend.python.rules.ancestor_files import (
@@ -44,9 +43,7 @@ class InjectAncestorFilesTest(TestBase):
             self.make_snapshot({fp: "# declared" for fp in original_declared_files}),
             sources_stripped=declared_files_stripped,
         )
-        bootstrapper = create_options_bootstrapper(
-            args=[f"--source-root-patterns={json.dumps(source_roots)}"]
-        )
+        bootstrapper = create_options_bootstrapper(args=[f"--source-root-patterns={source_roots}"])
         result = self.request_single_product(AncestorFiles, Params(request, bootstrapper)).snapshot
         assert list(result.files) == sorted(expected_discovered)
 
