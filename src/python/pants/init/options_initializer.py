@@ -105,17 +105,12 @@ class OptionsInitializer:
 
         add(global_options.pants_workdir)
         add(global_options.pants_distdir)
-        # TODO: We punch a hole in the ignore patterns to allow pantsd to directly watch process
-        # metadata that is written to disk, but we re-ignore the watchman directory (which
-        # contained a named pipe). Over time, as more of the pantsd server components are ported to
-        # rust, we will be able to remove this special case.
-        add(global_options.pants_subprocessdir, include=True)
-        add(os.path.join(global_options.pants_subprocessdir, "watchman"))
+        add(global_options.pants_subprocessdir)
 
         return pants_ignore
 
     @staticmethod
-    def compute_pantsd_invalidation_globs(buildroot, bootstrap_options, absolute_pidfile):
+    def compute_pantsd_invalidation_globs(buildroot, bootstrap_options):
         """Computes the merged value of the `--pantsd-invalidation-globs` option.
 
         Combines --pythonpath and --pants-config-files files that are in {buildroot} dir with those
@@ -126,7 +121,6 @@ class OptionsInitializer:
         # Globs calculated from the sys.path and other file-like configuration need to be sanitized
         # to relative globs (where possible).
         potentially_absolute_globs = (
-            absolute_pidfile,
             *sys.path,
             *bootstrap_options.pythonpath,
             *bootstrap_options.pants_config_files,
