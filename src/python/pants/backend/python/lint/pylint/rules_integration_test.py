@@ -42,7 +42,11 @@ class PylintIntegrationTest(ExternalToolTestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), *pylint_rules(), RootRule(PylintRequest))
+        return (
+            *super().rules(),
+            *pylint_rules(),
+            RootRule(PylintRequest),
+        )
 
     def make_target_with_origin(
         self,

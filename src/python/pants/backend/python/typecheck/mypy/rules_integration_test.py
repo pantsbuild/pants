@@ -6,7 +6,6 @@ from textwrap import dedent
 from typing import List, Optional
 
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
-from pants.backend.python.rules import inject_ancestor_files
 from pants.backend.python.target_types import PythonLibrary
 from pants.backend.python.typecheck.mypy.rules import MyPyFieldSet, MyPyRequest
 from pants.backend.python.typecheck.mypy.rules import rules as mypy_rules
@@ -66,7 +65,6 @@ class MyPyIntegrationTest(ExternalToolTestBase):
             RootRule(MyPyRequest),
             # mypy needs __init__.py files in many cases: we pull in inference to avoid boilerplate.
             *dependency_inference_rules.rules(),
-            *inject_ancestor_files.rules(),
         )
 
     @classmethod

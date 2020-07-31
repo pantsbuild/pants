@@ -3,7 +3,7 @@
 
 from typing import List
 
-from pants.backend.python.rules.inject_ancestor_files import (
+from pants.backend.python.rules.ancestor_files import (
     AncestorFiles,
     AncestorFilesRequest,
     find_missing_ancestor_files,
@@ -30,6 +30,7 @@ class InjectAncestorFilesTest(TestBase):
     def assert_injected(
         self,
         *,
+        source_roots: List[str],
         declared_files_stripped: bool,
         original_declared_files: List[str],
         original_undeclared_files: List[str],
@@ -42,9 +43,7 @@ class InjectAncestorFilesTest(TestBase):
             self.make_snapshot({fp: "# declared" for fp in original_declared_files}),
             sources_stripped=declared_files_stripped,
         )
-        bootstrapper = create_options_bootstrapper(
-            args=["--source-root-patterns=['src/python', 'tests/python']"]
-        )
+        bootstrapper = create_options_bootstrapper(args=[f"--source-root-patterns={source_roots}"])
         result = self.request_single_product(AncestorFiles, Params(request, bootstrapper)).snapshot
         assert list(result.files) == sorted(expected_discovered)
 
@@ -59,6 +58,7 @@ class InjectAncestorFilesTest(TestBase):
 
     def test_unstripped(self) -> None:
         self.assert_injected(
+            source_roots=["src/python", "tests/python"],
             declared_files_stripped=False,
             original_declared_files=[
                 "src/python/project/lib.py",
@@ -75,6 +75,7 @@ class InjectAncestorFilesTest(TestBase):
 
     def test_stripped(self) -> None:
         self.assert_injected(
+            source_roots=["src/python", "tests/python"],
             declared_files_stripped=True,
             original_declared_files=[
                 "project/lib.py",
@@ -88,6 +89,34 @@ class InjectAncestorFilesTest(TestBase):
                 "src/python/project/__init__.py",
                 "tests/python/project/__init__.py",
             ],
+            expected_discovered=["project/__init__.py"],
+        )
+
+    def test_unstripped_source_root_at_buildroot(self) -> None:
+        self.assert_injected(
+            source_roots=["/"],
+            declared_files_stripped=False,
+            original_declared_files=[
+                "project/lib.py",
+                "project/subdir/__init__.py",
+                "project/subdir/lib.py",
+                "no_init/lib.py",
+            ],
+            original_undeclared_files=["project/__init__.py",],
+            expected_discovered=["project/__init__.py"],
+        )
+
+    def test_stripped_source_root_at_buildroot(self) -> None:
+        self.assert_injected(
+            source_roots=["/"],
+            declared_files_stripped=True,
+            original_declared_files=[
+                "project/lib.py",
+                "project/subdir/lib.py",
+                "project/subdir/__init__.py",
+                "project/no_init/lib.py",
+            ],
+            original_undeclared_files=["project/__init__.py",],
             expected_discovered=["project/__init__.py"],
         )
 

@@ -9,8 +9,8 @@ from pants.backend.python.dependency_inference import module_mapper
 from pants.backend.python.dependency_inference.import_parser import find_python_imports
 from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwner
 from pants.backend.python.dependency_inference.python_stdlib.combined import combined_stdlib
-from pants.backend.python.rules import inject_ancestor_files
-from pants.backend.python.rules.inject_ancestor_files import AncestorFiles, AncestorFilesRequest
+from pants.backend.python.rules import ancestor_files
+from pants.backend.python.rules.ancestor_files import AncestorFiles, AncestorFilesRequest
 from pants.backend.python.target_types import PythonSources, PythonTestsSources
 from pants.core.util_rules.strip_source_roots import (
     SourceRootStrippedSources,
@@ -52,7 +52,10 @@ class PythonInference(Subsystem):
             type=bool,
             help=(
                 "Infer a target's dependencies on any __init__.py files existing for the packages "
-                "it is located in (recursively upward in the directory structure)."
+                "it is located in (recursively upward in the directory structure). Note that if "
+                "inference is disabled, empty ancestor __init__.py files will still be included "
+                "even without an explicit dependency, but ones containing any code (even just "
+                "comments) will not, and must be brought in via an explicit dependency."
             ),
         )
         register(
@@ -171,7 +174,7 @@ async def infer_python_conftest_dependencies(
 def rules():
     return [
         *collect_rules(),
-        *inject_ancestor_files.rules(),
+        *ancestor_files.rules(),
         *module_mapper.rules(),
         UnionRule(InferDependenciesRequest, InferPythonDependencies),
         UnionRule(InferDependenciesRequest, InferInitDependencies),
