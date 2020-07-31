@@ -78,6 +78,9 @@ config = [".isort.cfg", "examples/.isort.cfg"]
 
 [mypy]
 config = "build-support/mypy/mypy.ini"
+# TODO(#10131): Figure out how to have Pants automatically set the interpreter constraints in a
+#  robust way. We need this to avoid running MyPy with Python 3.5.
+interpreter_constraints = ["CPython>=3.6"]
 
 [pants-releases]
 branch_notes = """
