@@ -4,6 +4,7 @@
 from dataclasses import dataclass
 from typing import Iterable, List, Tuple, Type
 
+from pants.backend.python.rules import ancestor_files, missing_init
 from pants.backend.python.rules.missing_init import MissingInit, MissingInitRequest
 from pants.backend.python.target_types import PythonSources
 from pants.core.target_types import FilesSources, ResourcesSources
@@ -158,6 +159,8 @@ def rules():
     return [
         *collect_rules(),
         *determine_source_files.rules(),
+        *ancestor_files.rules(),
+        *missing_init.rules(),
         RootRule(StrippedPythonSourcesRequest),
         RootRule(UnstrippedPythonSourcesRequest),
     ]
