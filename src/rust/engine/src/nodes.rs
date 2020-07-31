@@ -1150,8 +1150,11 @@ impl Node for NodeKey {
 
     let user_facing_name = self.user_facing_name();
     let workunit_name = self.workunit_name();
+    let failure_name = user_facing_name
+      .clone()
+      .unwrap_or_else(|| workunit_name.clone());
     let metadata = WorkunitMetadata {
-      desc: user_facing_name.clone(),
+      desc: user_facing_name,
       message: None,
       level: self.workunit_level(),
       blocked: false,
@@ -1220,9 +1223,7 @@ impl Node for NodeKey {
         }
       };
 
-      if let Some(user_facing_name) = user_facing_name {
-        result = result.map_err(|failure| failure.with_pushed_frame(&user_facing_name));
-      }
+      result = result.map_err(|failure| failure.with_pushed_frame(&failure_name));
 
       // If both the Node and the watch failed, prefer the Node's error message.
       match (&result, maybe_watch) {

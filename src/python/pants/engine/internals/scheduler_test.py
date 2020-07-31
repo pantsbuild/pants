@@ -322,6 +322,7 @@ class SchedulerWithNestedRaiseTest(TestBase):
                  1 Exception encountered:
 
                  Engine traceback:
+                   in select
                    in Nested raise
                  Traceback (most recent call last):
                    File LOCATION-INFO, in nested_raise
