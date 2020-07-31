@@ -108,7 +108,8 @@ def main(self):
         _log("Hydrating {} to {}...".format(self, hydrated_pex_dir))
         _hydrate_pex_file(self, hydrated_pex_dir)
 
-    os.execv(sys.executable, [sys.executable, hydrated_pex_dir] + sys.argv[1:])
+    if 'IPEX_SKIP_EXECUTION' not in os.environ:
+        os.execv(sys.executable, [sys.executable, hydrated_pex_dir] + sys.argv[1:])
 
 
 if __name__ == "__main__":
