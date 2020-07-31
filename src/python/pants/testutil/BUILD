@@ -37,12 +37,9 @@ target(
   name = 'int-test',
   dependencies=[
     ':int-test-for-export',
-    # NB: 'pants_run_integration_test.py' runs ./pants in a subprocess, so test results will depend
-    # on the pants binary and all of its transitive dependencies. Adding the dependencies below is
-    # our best proxy for ensuring that any test target depending on this target will be invalidated
-    # on changes to those undeclared dependencies.
+    # NB: 'pants_run_integration_test.py' runs ./pants in a subprocess using the PYTHONPATH
+    # of the testrunner. We include the pants binary itself to fully populate the path.
     'src/python/pants/bin:pants_local_binary',
-    'src/rust/engine',
   ],
 )
 
