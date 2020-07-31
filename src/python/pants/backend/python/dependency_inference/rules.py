@@ -52,7 +52,10 @@ class PythonInference(Subsystem):
             type=bool,
             help=(
                 "Infer a target's dependencies on any __init__.py files existing for the packages "
-                "it is located in (recursively upward in the directory structure)."
+                "it is located in (recursively upward in the directory structure). Note that if "
+                "inference is disabled, empty ancestor __init__.py files will still be included "
+                "even without an explicit dependency, but ones containing any code (even just "
+                "comments) will not, and must be brought in via an explicit dependency."
             ),
         )
         register(
