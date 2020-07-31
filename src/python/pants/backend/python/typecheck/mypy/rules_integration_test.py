@@ -113,7 +113,6 @@ class MyPyIntegrationTest(ExternalToolTestBase):
             "--backend-packages=pants.backend.python",
             "--backend-packages=pants.backend.python.typecheck.mypy",
             "--source-root-patterns=['src/python', 'tests/python']",
-            "--python-infer-imports",
         ]
         if config:
             self.create_file(relpath="mypy.ini", contents=config)

@@ -40,7 +40,7 @@ class PythonInference(Subsystem):
         super().register_options(register)
         register(
             "--imports",
-            default=False,
+            default=True,
             type=bool,
             help=(
                 "Infer a target's imported dependencies by parsing import statements from sources."
