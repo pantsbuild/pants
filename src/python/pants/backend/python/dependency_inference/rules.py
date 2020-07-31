@@ -52,10 +52,10 @@ class PythonInference(Subsystem):
             type=bool,
             help=(
                 "Infer a target's dependencies on any __init__.py files existing for the packages "
-                "it is located in (recursively upward in the directory structure). Note that if "
-                "inference is disabled, empty ancestor __init__.py files will still be included "
-                "even without an explicit dependency, but ones containing any code (even just "
-                "comments) will not, and must be brought in via an explicit dependency."
+                "it is located in (recursively upward in the directory structure). Regardless of "
+                "whether inference is disabled, empty ancestor __init__.py files will still be "
+                "included even without an explicit dependency, but ones containing any code (even "
+                "just comments) will not, and must be brought in via an explicit dependency."
             ),
         )
         register(
@@ -138,9 +138,11 @@ async def infer_python_init_dependencies(
     )
 
     # And add dependencies on their owners.
+    # NB: Because the python_sources rules always locate __init__.py files, and will trigger an
+    # error for files that have content but have not already been included via a dependency, we
+    # don't need to error for unowned files here.
     owners = await MultiGet(
-        Get(Owners, OwnersRequest((f,), OwnersNotFoundBehavior.error))
-        for f in extra_init_files.snapshot.files
+        Get(Owners, OwnersRequest((f,))) for f in extra_init_files.snapshot.files
     )
     return InferredDependencies(itertools.chain.from_iterable(owners))
 
@@ -164,6 +166,7 @@ async def infer_python_conftest_dependencies(
     )
 
     # And add dependencies on their owners.
+    # NB: Because conftest.py files effectively always have content, we require an owning target.
     owners = await MultiGet(
         Get(Owners, OwnersRequest((f,), OwnersNotFoundBehavior.error))
         for f in extra_conftest_files.snapshot.files

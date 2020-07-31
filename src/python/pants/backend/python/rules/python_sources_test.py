@@ -75,6 +75,7 @@ class PythonSourcesTest(ExternalToolTestBase):
                 ),
                 create_options_bootstrapper(
                     args=[
+                        "--backend-packages=pants.backend.python",
                         f"--source-root-patterns={source_roots or ['src/python']}",
                         *(extra_args or []),
                     ]
@@ -99,6 +100,7 @@ class PythonSourcesTest(ExternalToolTestBase):
                 ),
                 create_options_bootstrapper(
                     args=[
+                        "--backend-packages=pants.backend.python",
                         f"--source-root-patterns={source_roots or ['src/python']}",
                         *(extra_args or []),
                     ]
