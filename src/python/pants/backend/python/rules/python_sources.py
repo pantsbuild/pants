@@ -4,8 +4,8 @@
 from dataclasses import dataclass
 from typing import Iterable, List, Tuple, Type
 
-from pants.backend.python.rules import ancestor_files, missing_init
-from pants.backend.python.rules.missing_init import MissingInit, MissingInitRequest
+from pants.backend.python.rules import ancestor_files
+from pants.backend.python.rules.ancestor_files import AncestorFiles, AncestorFilesRequest
 from pants.backend.python.target_types import PythonSources
 from pants.core.target_types import FilesSources, ResourcesSources
 from pants.core.util_rules import determine_source_files
@@ -105,11 +105,14 @@ async def prepare_stripped_python_sources(
         ),
     )
 
-    missing_init = await Get(
-        MissingInit, MissingInitRequest(stripped_sources.snapshot, sources_stripped=True),
+    missing_init_files = await Get(
+        AncestorFiles,
+        AncestorFilesRequest("__init__.py", stripped_sources.snapshot, sources_stripped=True),
     )
+
     init_injected = await Get(
-        Snapshot, MergeDigests((stripped_sources.snapshot.digest, missing_init.snapshot.digest)),
+        Snapshot,
+        MergeDigests((stripped_sources.snapshot.digest, missing_init_files.snapshot.digest)),
     )
 
     return StrippedPythonSources(init_injected)
@@ -129,12 +132,13 @@ async def prepare_unstripped_python_sources(
         ),
     )
 
-    missing_init = await Get(
-        MissingInit, MissingInitRequest(sources.snapshot, sources_stripped=False)
+    missing_init_files = await Get(
+        AncestorFiles,
+        AncestorFilesRequest("__init__.py", sources.snapshot, sources_stripped=False),
     )
 
     init_injected = await Get(
-        Snapshot, MergeDigests((sources.snapshot.digest, missing_init.snapshot.digest)),
+        Snapshot, MergeDigests((sources.snapshot.digest, missing_init_files.snapshot.digest)),
     )
 
     source_root_objs = await MultiGet(
@@ -160,7 +164,6 @@ def rules():
         *collect_rules(),
         *determine_source_files.rules(),
         *ancestor_files.rules(),
-        *missing_init.rules(),
         RootRule(StrippedPythonSourcesRequest),
         RootRule(UnstrippedPythonSourcesRequest),
     ]

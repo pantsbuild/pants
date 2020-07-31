@@ -8,12 +8,7 @@ from typing import Dict, Iterable, List, Set, Tuple, cast
 
 from pkg_resources import Requirement
 
-from pants.backend.python.target_types import PythonSources
-from pants.core.target_types import ResourcesSources
-from pants.core.util_rules.strip_source_roots import SourceRootStrippedSources
 from pants.engine.fs import DigestContents
-from pants.engine.target import Target
-from pants.source.source_root import SourceRootError
 from pants.util.strutil import ensure_text
 
 # Convenient type alias for the pair (package name, data files in the package).
@@ -95,7 +90,8 @@ def distutils_repr(obj):
 
 def find_packages(
     *,
-    tgts_and_stripped_srcs: Iterable[Tuple[Target, SourceRootStrippedSources]],
+    python_files: Set[str],
+    resource_files: Set[str],
     init_py_digest_contents: DigestContents,
     py2: bool,
 ) -> Tuple[Tuple[str, ...], Tuple[str, ...], Tuple[PackageDatum, ...]]:
@@ -107,44 +103,23 @@ def find_packages(
     # Find all packages implied by the sources.
     packages: Set[str] = set()
     package_data: Dict[str, List[str]] = defaultdict(list)
-    for tgt, stripped_srcs in tgts_and_stripped_srcs:
-        if tgt.has_field(PythonSources):
-            for file in stripped_srcs.snapshot.files:
-                # Python 2: An __init__.py file denotes a package.
-                # Python 3: Any directory containing python source files is a package.
-                if not py2 or os.path.basename(file) == "__init__.py":
-                    packages.add(os.path.dirname(file).replace(os.path.sep, "."))
-
-    # Add any packages implied by ancestor __init__.py files.
-    # Note that init_py_contents includes all __init__.py files, not just ancestors, but
-    # that's fine - the others will already have been found in tgts_and_stripped_srcs above.
-    for file_content in init_py_digest_contents:
-        packages.add(os.path.dirname(file_content.path).replace(os.path.sep, "."))
+    for python_file in python_files:
+        # Python 2: An __init__.py file denotes a package.
+        # Python 3: Any directory containing python source files is a package.
+        if not py2 or os.path.basename(python_file) == "__init__.py":
+            packages.add(os.path.dirname(python_file).replace(os.path.sep, "."))
 
     # Now find all package_data.
-    for tgt, stripped_srcs in tgts_and_stripped_srcs:
-        if tgt.has_field(ResourcesSources):
-            source_roots = list(stripped_srcs.root_to_relfiles.keys())
-            if len(source_roots) != 1:
-                # A single target is expected to be under a single source root, so this
-                # should never happen, but we check to be sure.
-                raise SourceRootError(
-                    f"Expected a single source root for target "
-                    f"{tgt.address.spec} but found: {', '.join(source_roots)}. "
-                )
-            source_root = source_roots[0]
-            resource_dir_relpath = os.path.relpath(tgt.address.spec_path, source_root)
-            # Find the closest enclosing package, if any.  Resources will be loaded relative to that.
-            package: str = resource_dir_relpath.replace(os.path.sep, ".")
-            while package and package not in packages:
-                package = package.rpartition(".")[0]
-            # If resource is not in a package, ignore it. There's no principled way to load it anyway.
-            if package:
-                package_dir_relpath = package.replace(".", os.path.sep)
-                package_data[package].extend(
-                    os.path.relpath(file, package_dir_relpath)
-                    for file in stripped_srcs.snapshot.files
-                )
+    for resource_file in resource_files:
+        # Find the closest enclosing package, if any.  Resources will be loaded relative to that.
+        maybe_package: str = os.path.dirname(resource_file).replace(os.path.sep, ".")
+        while maybe_package and maybe_package not in packages:
+            maybe_package = maybe_package.rpartition(".")[0]
+        # If resource is not in a package, ignore it. There's no principled way to load it anyway.
+        if maybe_package:
+            package_data[maybe_package].append(
+                os.path.relpath(resource_file, maybe_package.replace(".", os.path.sep))
+            )
 
     # See which packages are pkg_resources-style namespace packages.
     # Note that implicit PEP 420 namespace packages and pkgutil-style namespace packages
