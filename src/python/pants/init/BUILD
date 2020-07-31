@@ -25,3 +25,10 @@ target(
     'src/python/pants/core',
   ],
 )
+
+python_integration_tests(
+  name="integration",
+  uses_pants_run=True,
+  # TODO(#10504): Lower this to ~120 once fixed.
+  timeout=450,
+)
