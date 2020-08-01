@@ -15,6 +15,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import GeneratedSources, GenerateSourcesRequest, Sources, TransitiveTargets
 from pants.engine.unions import UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
+from pants.util.logging import LogLevel
 
 
 class GeneratePythonFromProtobufRequest(GenerateSourcesRequest):
@@ -37,6 +38,7 @@ async def generate_python_from_protobuf(
         Process(
             ("/bin/mkdir", output_dir),
             description=f"Create the directory {output_dir}",
+            level=LogLevel.DEBUG,
             output_directories=(output_dir,),
         ),
     )
@@ -94,6 +96,7 @@ async def generate_python_from_protobuf(
             ),
             input_digest=input_digest,
             description=f"Generating Python sources from {request.protocol_target.address}.",
+            level=LogLevel.DEBUG,
             output_directories=(output_dir,),
         ),
     )
