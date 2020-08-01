@@ -300,13 +300,12 @@ pub fn val_to_str(val: &Value) -> String {
 }
 
 pub fn val_to_log_level(val: &Value) -> Result<log::Level, String> {
-  let res: Result<PythonLogLevel, String> =
-    project_maybe_u64(&val, "_level").and_then(|n: u64| {
-      n.try_into()
-        .map_err(|e: num_enum::TryFromPrimitiveError<_>| {
-          format!("Could not parse {:?} as a LogLevel: {}", val, e)
-        })
-    });
+  let res: Result<PythonLogLevel, String> = project_maybe_u64(&val, "_level").and_then(|n: u64| {
+    n.try_into()
+      .map_err(|e: num_enum::TryFromPrimitiveError<_>| {
+        format!("Could not parse {:?} as a LogLevel: {}", val, e)
+      })
+  });
   res.map(|py_level| py_level.into())
 }
 
