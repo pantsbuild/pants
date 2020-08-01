@@ -13,6 +13,7 @@ from pants.engine.addresses import (
     Address,
     Addresses,
     AddressesWithOrigins,
+    AddressInput,
     AddressWithOrigin,
     BuildFileAddress,
     BuildFileAddresses,
@@ -21,7 +22,7 @@ from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, S
 from pants.engine.internals.mapper import AddressFamily, AddressMap, AddressMapper
 from pants.engine.internals.parser import BuildFilePreludeSymbols, error_on_imports
 from pants.engine.internals.target_adaptor import TargetAdaptor
-from pants.engine.rules import Get, MultiGet, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import OrderedSet
 
@@ -53,6 +54,33 @@ async def evaluate_preludes(address_mapper: AddressMapper) -> BuildFilePreludeSy
     # TODO: Give a nice error message if a prelude tries to set a expose a non-hashable value.
     values.pop("__builtins__", None)
     return BuildFilePreludeSymbols(FrozenDict(values))
+
+
+@rule
+async def resolve_address(address_input: AddressInput) -> Address:
+    if not address_input.path_component:
+        # Is a target in the root directory.
+        # TODO: More precisely locate the relevant BUILD file here.
+        return Address(
+            spec_path=address_input.path_component, target_name=address_input.target_component
+        )
+
+    # Determine the type of the path_component of the input: if it is a file, directly construct
+    # the Address.
+    snapshot = await Get(Snapshot, PathGlobs(globs=(address_input.path_component,)))
+    if snapshot.files:
+        # TODO: Use new Address internals.
+        raise ResolveError("TODO")
+    elif snapshot.dirs:
+        # TODO: More precisely locate the relevant BUILD file here.
+        return Address(
+            spec_path=address_input.path_component, target_name=address_input.target_component
+        )
+    else:
+        raise ResolveError(
+            f"The file or directory '{address_input.path_component}' does not exist on disk in the "
+            f"workspace: cannot resolve '{address_input.target_component}' relative to it."
+        )
 
 
 @rule
@@ -211,14 +239,5 @@ def create_graph_rules(address_mapper: AddressMapper):
 
     return [
         address_mapper_singleton,
-        # BUILD file parsing.
-        find_target_adaptor,
-        parse_address_family,
-        find_build_file,
-        find_build_files,
-        evaluate_preludes,
-        # AddressSpec handling: locate directories that contain build files, and request
-        # AddressFamilies for each of them.
-        addresses_with_origins_from_address_specs,
-        strip_address_origins,
+        *collect_rules(),
     ]

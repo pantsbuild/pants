@@ -5,7 +5,7 @@ import itertools
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
-from typing import Iterable, List, Sequence, Tuple, Type
+from typing import Iterable, List, Sequence, Tuple, Type, cast
 
 import pytest
 
@@ -17,7 +17,13 @@ from pants.base.specs import (
     FilesystemSpecs,
     SingleAddress,
 )
-from pants.engine.addresses import Address, Addresses, AddressesWithOrigins, AddressWithOrigin
+from pants.engine.addresses import (
+    Address,
+    Addresses,
+    AddressesWithOrigins,
+    AddressInput,
+    AddressWithOrigin,
+)
 from pants.engine.fs import (
     CreateDigest,
     Digest,
@@ -964,11 +970,11 @@ def test_parse_dependencies_field() -> None:
         subproject_roots=[],
     )
     expected_addresses = {
-        Address("demo/subdir", "relative"),
-        Address("", "top_level"),
-        Address("demo", "tgt"),
-        Address("demo", "demo"),
-        Address("demo/no_extension", "no_extension"),
+        AddressInput("demo/subdir", "relative"),
+        AddressInput("", "top_level"),
+        AddressInput("demo", "tgt"),
+        AddressInput("demo", "demo"),
+        AddressInput("demo/no_extension", "no_extension"),
     }
     assert set(result.addresses) == expected_addresses
     assert set(result.ignored_addresses) == expected_addresses
@@ -1091,7 +1097,7 @@ async def infer_smalltalk_dependencies(request: InferSmalltalkDependencies) -> I
                 target_name=gen_name,
                 generated_base_target_name=base_address.target_name,
             )
-        return Address.parse(line)
+        return cast(Address, Address.parse(line))
 
     return InferredDependencies(infer(line) for line in all_lines)
 

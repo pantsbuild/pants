@@ -36,6 +36,7 @@ from pants.engine.addresses import (
     Address,
     Addresses,
     AddressesWithOrigins,
+    AddressInput,
     AddressWithOrigin,
     BuildFileAddress,
 )
@@ -678,9 +679,9 @@ class UnusedDependencyIgnoresException(Exception):
 
 
 class ParsedDependencies(NamedTuple):
-    addresses: List[Address]
+    addresses: List[AddressInput]
     files: List[str]
-    ignored_addresses: List[Address]
+    ignored_addresses: List[AddressInput]
     ignored_files: List[str]
 
 
@@ -688,10 +689,10 @@ def parse_dependencies_field(
     raw_value: Iterable[str], *, spec_path: str, subproject_roots: Sequence[str]
 ) -> ParsedDependencies:
     parse_as_address = functools.partial(
-        Address.parse, relative_to=spec_path, subproject_roots=subproject_roots
+        AddressInput.parse, relative_to=spec_path, subproject_roots=subproject_roots
     )
 
-    def parse(value: str) -> Union[Address, str]:
+    def parse(value: str) -> Union[AddressInput, str]:
         # We allow `//` to specify the value is relative to the build root. This is only actually
         # necessary for top-level addresses, though, like `//:tgt`. Otherwise, we can strip `//`.
         if value.startswith("//") and not value.startswith("//:"):
@@ -704,9 +705,9 @@ def parse_dependencies_field(
             return value
         return parse_as_address(value)
 
-    addresses: List[Address] = []
+    addresses: List[AddressInput] = []
     files: List[str] = []
-    ignored_addresses: List[Address] = []
+    ignored_addresses: List[AddressInput] = []
     ignored_files: List[str] = []
     for v in raw_value:
         is_ignore = v.startswith("!")
@@ -714,9 +715,9 @@ def parse_dependencies_field(
             v = v[1:]
         result = parse(v)
         if is_ignore:
-            collection = ignored_addresses if isinstance(result, Address) else ignored_files
+            collection = ignored_addresses if isinstance(result, AddressInput) else ignored_files
         else:
-            collection = addresses if isinstance(result, Address) else files
+            collection = addresses if isinstance(result, AddressInput) else files
         collection.append(result)  # type: ignore[attr-defined]
     return ParsedDependencies(addresses, files, ignored_addresses, ignored_files)
 
@@ -809,12 +810,17 @@ async def resolve_dependencies(
         itertools.chain.from_iterable(explicit_file_deps_ignore_owners)
     )
 
+    literal_addresses = await MultiGet(Get(Address, AddressInput, ai) for ai in provided.addresses)
+    literal_ignored_addresses = await MultiGet(
+        Get(Address, AddressInput, ai) for ai in provided.ignored_addresses
+    )
+
     original_addresses: Set[Address] = set()
     all_generated_addresses: Set[Address] = set()
     used_ignored_addresses: Set[Address] = set()
     used_ignored_file_deps: Set[Address] = set()
     for addr in (
-        *provided.addresses,
+        *literal_addresses,
         *itertools.chain.from_iterable(explicit_file_deps_owners),
         *itertools.chain.from_iterable(injected),
         *itertools.chain.from_iterable(inferred),
@@ -827,7 +833,7 @@ async def resolve_dependencies(
             )
         else:
             collection = (
-                used_ignored_addresses if addr in provided.ignored_addresses else original_addresses
+                used_ignored_addresses if addr in literal_ignored_addresses else original_addresses
             )
         collection.add(addr)
 
@@ -843,7 +849,7 @@ async def resolve_dependencies(
 
     result = sorted({*original_addresses, *remaining_generated_addresses})
 
-    unused_ignores = {*provided.ignored_addresses, *flattened_ignore_file_deps_owners} - {
+    unused_ignores = {*literal_ignored_addresses, *flattened_ignore_file_deps_owners} - {
         *used_ignored_addresses,
         *used_ignored_file_deps,
     }

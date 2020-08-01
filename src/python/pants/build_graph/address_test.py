@@ -1,148 +1,143 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import unittest
+from pants.build_graph.address import Address, AddressInput, InvalidSpecPath, InvalidTargetName
+from pants.testutil.test_base import TestBase
 
-from pants.build_graph.address import Address, InvalidSpecPath, InvalidTargetName, parse_spec
 
-
-class ParseSpecTest(unittest.TestCase):
+class AddressTest(TestBase):
     def test_parse_spec(self) -> None:
-        spec_path, target_name = parse_spec("a/b/c")
-        self.assertEqual(spec_path, "a/b/c")
-        self.assertEqual(target_name, "c")
+        ai = AddressInput.parse("a/b/c")
+        self.assertEqual(ai.path_component, "a/b/c")
+        self.assertEqual(ai.target_component, "c")
 
-        spec_path, target_name = parse_spec("a/b/c:c")
-        self.assertEqual(spec_path, "a/b/c")
-        self.assertEqual(target_name, "c")
+        ai = AddressInput.parse("a/b/c:c")
+        self.assertEqual(ai.path_component, "a/b/c")
+        self.assertEqual(ai.target_component, "c")
 
-        spec_path, target_name = parse_spec(
-            "a/b/c", relative_to="here"
-        )  # no effect - we have a path
-        self.assertEqual(spec_path, "a/b/c")
-        self.assertEqual(target_name, "c")
+        ai = AddressInput.parse("a/b/c", relative_to="here")  # no effect - we have a path
+        self.assertEqual(ai.path_component, "a/b/c")
+        self.assertEqual(ai.target_component, "c")
 
     def test_parse_local_spec(self) -> None:
-        spec_path, target_name = parse_spec(":c")
-        self.assertEqual(spec_path, "")
-        self.assertEqual(target_name, "c")
+        ai = AddressInput.parse(":c")
+        self.assertEqual(ai.path_component, "")
+        self.assertEqual(ai.target_component, "c")
 
-        spec_path, target_name = parse_spec(":c", relative_to="here")
-        self.assertEqual(spec_path, "here")
-        self.assertEqual(target_name, "c")
+        ai = AddressInput.parse(":c", relative_to="here")
+        self.assertEqual(ai.path_component, "here")
+        self.assertEqual(ai.target_component, "c")
 
     def test_parse_absolute_spec(self) -> None:
-        spec_path, target_name = parse_spec("//a/b/c")
-        self.assertEqual(spec_path, "a/b/c")
-        self.assertEqual(target_name, "c")
+        ai = AddressInput.parse("//a/b/c")
+        self.assertEqual(ai.path_component, "a/b/c")
+        self.assertEqual(ai.target_component, "c")
 
-        spec_path, target_name = parse_spec("//a/b/c:c")
-        self.assertEqual(spec_path, "a/b/c")
-        self.assertEqual(target_name, "c")
+        ai = AddressInput.parse("//a/b/c:c")
+        self.assertEqual(ai.path_component, "a/b/c")
+        self.assertEqual(ai.target_component, "c")
 
-        spec_path, target_name = parse_spec("//:c")
-        self.assertEqual(spec_path, "")
-        self.assertEqual(target_name, "c")
+        ai = AddressInput.parse("//:c")
+        self.assertEqual(ai.path_component, "")
+        self.assertEqual(ai.target_component, "c")
 
     def test_parse_bad_spec_non_normalized(self) -> None:
-        self.do_test_bad_spec_path("..")
-        self.do_test_bad_spec_path(".")
+        self.do_test_bad_path_component("..")
+        self.do_test_bad_path_component(".")
 
-        self.do_test_bad_spec_path("//..")
-        self.do_test_bad_spec_path("//.")
+        self.do_test_bad_path_component("//..")
+        self.do_test_bad_path_component("//.")
 
-        self.do_test_bad_spec_path("a/.")
-        self.do_test_bad_spec_path("a/..")
-        self.do_test_bad_spec_path("../a")
-        self.do_test_bad_spec_path("a/../a")
+        self.do_test_bad_path_component("a/.")
+        self.do_test_bad_path_component("a/..")
+        self.do_test_bad_path_component("../a")
+        self.do_test_bad_path_component("a/../a")
 
-        self.do_test_bad_spec_path("a/")
-        self.do_test_bad_spec_path("a/b/")
+        self.do_test_bad_path_component("a/:a")
+        self.do_test_bad_path_component("a/b/:b")
 
     def test_parse_bad_spec_bad_path(self) -> None:
-        self.do_test_bad_spec_path("/a")
-        self.do_test_bad_spec_path("///a")
+        self.do_test_bad_path_component("/a")
+        self.do_test_bad_path_component("///a")
 
     def test_parse_bad_spec_bad_name(self) -> None:
-        self.do_test_bad_target_name("a:")
-        self.do_test_bad_target_name("a::")
-        self.do_test_bad_target_name("//")
+        self.do_test_bad_target_component("a:")
+        self.do_test_bad_target_component("a::")
+        self.do_test_bad_target_component("//")
 
     def test_parse_bad_spec_build_trailing_path_component(self) -> None:
-        self.do_test_bad_spec_path("BUILD")
-        self.do_test_bad_spec_path("BUILD.suffix")
-        self.do_test_bad_spec_path("//BUILD")
-        self.do_test_bad_spec_path("//BUILD.suffix")
-        self.do_test_bad_spec_path("a/BUILD")
-        self.do_test_bad_spec_path("a/BUILD.suffix")
-        self.do_test_bad_spec_path("//a/BUILD")
-        self.do_test_bad_spec_path("//a/BUILD.suffix")
-        self.do_test_bad_spec_path("a/BUILD:b")
-        self.do_test_bad_spec_path("a/BUILD.suffix:b")
-        self.do_test_bad_spec_path("//a/BUILD:b")
-        self.do_test_bad_spec_path("//a/BUILD.suffix:b")
+        self.do_test_bad_path_component("BUILD")
+        self.do_test_bad_path_component("BUILD.suffix")
+        self.do_test_bad_path_component("//BUILD")
+        self.do_test_bad_path_component("//BUILD.suffix")
+        self.do_test_bad_path_component("a/BUILD")
+        self.do_test_bad_path_component("a/BUILD.suffix")
+        self.do_test_bad_path_component("//a/BUILD")
+        self.do_test_bad_path_component("//a/BUILD.suffix")
+        self.do_test_bad_path_component("a/BUILD:b")
+        self.do_test_bad_path_component("a/BUILD.suffix:b")
+        self.do_test_bad_path_component("//a/BUILD:b")
+        self.do_test_bad_path_component("//a/BUILD.suffix:b")
 
-    def test_banned_chars_in_target_name(self) -> None:
+    def test_banned_chars_in_target_component(self) -> None:
         with self.assertRaises(InvalidTargetName):
-            Address(*parse_spec("a/b:c@d"))
+            AddressInput.parse("a/b:c@d")
 
-    def do_test_bad_spec_path(self, spec: str) -> None:
+    def do_test_bad_path_component(self, spec: str) -> None:
         with self.assertRaises(InvalidSpecPath):
-            Address(*parse_spec(spec))
+            AddressInput.parse(spec)
 
-    def do_test_bad_target_name(self, spec: str) -> None:
+    def do_test_bad_target_component(self, spec: str) -> None:
         with self.assertRaises(InvalidTargetName):
-            Address(*parse_spec(spec))
+            AddressInput.parse(spec)
 
     def test_subproject_spec(self) -> None:
         # Ensure that a spec referring to a subproject gets assigned to that subproject properly.
         def parse(spec, relative_to):
-            return parse_spec(
+            return AddressInput.parse(
                 spec,
                 relative_to=relative_to,
                 subproject_roots=["subprojectA", "path/to/subprojectB"],
             )
 
         # Ensure that a spec in subprojectA is determined correctly.
-        spec_path, target_name = parse("src/python/alib", "subprojectA/src/python")
-        self.assertEqual("subprojectA/src/python/alib", spec_path)
-        self.assertEqual("alib", target_name)
+        ai = parse("src/python/alib", "subprojectA/src/python")
+        self.assertEqual("subprojectA/src/python/alib", ai.path_component)
+        self.assertEqual("alib", ai.target_component)
 
-        spec_path, target_name = parse("src/python/alib:jake", "subprojectA/src/python/alib")
-        self.assertEqual("subprojectA/src/python/alib", spec_path)
-        self.assertEqual("jake", target_name)
+        ai = parse("src/python/alib:jake", "subprojectA/src/python/alib")
+        self.assertEqual("subprojectA/src/python/alib", ai.path_component)
+        self.assertEqual("jake", ai.target_component)
 
-        spec_path, target_name = parse(":rel", "subprojectA/src/python/alib")
-        self.assertEqual("subprojectA/src/python/alib", spec_path)
-        self.assertEqual("rel", target_name)
+        ai = parse(":rel", "subprojectA/src/python/alib")
+        self.assertEqual("subprojectA/src/python/alib", ai.path_component)
+        self.assertEqual("rel", ai.target_component)
 
         # Ensure that a spec in subprojectB, which is more complex, is correct.
-        spec_path, target_name = parse("src/python/blib", "path/to/subprojectB/src/python")
-        self.assertEqual("path/to/subprojectB/src/python/blib", spec_path)
-        self.assertEqual("blib", target_name)
+        ai = parse("src/python/blib", "path/to/subprojectB/src/python")
+        self.assertEqual("path/to/subprojectB/src/python/blib", ai.path_component)
+        self.assertEqual("blib", ai.target_component)
 
-        spec_path, target_name = parse(
-            "src/python/blib:jane", "path/to/subprojectB/src/python/blib"
-        )
-        self.assertEqual("path/to/subprojectB/src/python/blib", spec_path)
-        self.assertEqual("jane", target_name)
+        ai = parse("src/python/blib:jane", "path/to/subprojectB/src/python/blib")
+        self.assertEqual("path/to/subprojectB/src/python/blib", ai.path_component)
+        self.assertEqual("jane", ai.target_component)
 
-        spec_path, target_name = parse(":rel", "path/to/subprojectB/src/python/blib")
-        self.assertEqual("path/to/subprojectB/src/python/blib", spec_path)
-        self.assertEqual("rel", target_name)
+        ai = parse(":rel", "path/to/subprojectB/src/python/blib")
+        self.assertEqual("path/to/subprojectB/src/python/blib", ai.path_component)
+        self.assertEqual("rel", ai.target_component)
 
         # Ensure that a spec in the parent project is not mapped.
-        spec_path, target_name = parse("src/python/parent", "src/python")
-        self.assertEqual("src/python/parent", spec_path)
-        self.assertEqual("parent", target_name)
+        ai = parse("src/python/parent", "src/python")
+        self.assertEqual("src/python/parent", ai.path_component)
+        self.assertEqual("parent", ai.target_component)
 
-        spec_path, target_name = parse("src/python/parent:george", "src/python")
-        self.assertEqual("src/python/parent", spec_path)
-        self.assertEqual("george", target_name)
+        ai = parse("src/python/parent:george", "src/python")
+        self.assertEqual("src/python/parent", ai.path_component)
+        self.assertEqual("george", ai.target_component)
 
-        spec_path, target_name = parse(":rel", "src/python/parent")
-        self.assertEqual("src/python/parent", spec_path)
-        self.assertEqual("rel", target_name)
+        ai = parse(":rel", "src/python/parent")
+        self.assertEqual("src/python/parent", ai.path_component)
+        self.assertEqual("rel", ai.target_component)
 
 
 def test_address_equality() -> None:
