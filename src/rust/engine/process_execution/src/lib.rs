@@ -357,12 +357,22 @@ impl TryFrom<MultiPlatformProcess> for Process {
 pub struct MultiPlatformProcess(pub BTreeMap<(PlatformConstraint, PlatformConstraint), Process>);
 
 impl MultiPlatformProcess {
-  pub fn user_facing_name(&self) -> Option<String> {
+  pub fn user_facing_name(&self) -> String {
     self
       .0
       .iter()
       .next()
-      .map(|(_platforms, epr)| epr.description.clone())
+      .map(|(_platforms, process)| process.description.clone())
+      .unwrap_or_else(|| "<Unnamed process>".to_string())
+  }
+
+  pub fn workunit_level(&self) -> log::Level {
+    self
+      .0
+      .iter()
+      .next()
+      .map(|(_platforms, process)| process.level)
+      .unwrap_or(Level::Info)
   }
 
   pub fn workunit_name(&self) -> String {
@@ -483,7 +493,7 @@ pub fn digest(req: MultiPlatformProcess, metadata: &ProcessMetadata) -> Digest {
   let mut hashes: Vec<String> = req
     .0
     .values()
-    .map(|ref epr| crate::remote::make_execute_request(epr, metadata.clone()).unwrap())
+    .map(|ref process| crate::remote::make_execute_request(process, metadata.clone()).unwrap())
     .map(|(_a, _b, er)| er.get_action_digest().get_hash().to_string())
     .collect();
   hashes.sort();
@@ -526,9 +536,7 @@ impl CommandRunner for BoundedCommandRunner {
     context: Context,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     let name = format!("{}-waiting", req.workunit_name());
-    let desc = req
-      .user_facing_name()
-      .unwrap_or_else(|| "<Unnamed process>".to_string());
+    let desc = req.user_facing_name();
     let mut outer_metadata = WorkunitMetadata::with_level(Level::Debug);
     outer_metadata.desc = Some(desc.clone());
     let bounded_fut = {
@@ -543,7 +551,7 @@ impl CommandRunner for BoundedCommandRunner {
           desc,
           concurrency_id
         );
-        let mut metadata = WorkunitMetadata::with_level(Level::Info);
+        let mut metadata = WorkunitMetadata::with_level(req.workunit_level());
         metadata.desc = Some(desc);
 
         let metadata_updater = |result: &Result<FallibleProcessResultWithPlatform, String>,
