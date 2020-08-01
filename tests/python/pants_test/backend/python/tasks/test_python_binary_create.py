@@ -190,9 +190,9 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
 
     def test_generate_ipex_ansicolors(self):
         self._assert_generate_ipex_ansicolors(
-            blue("i just lazy-loaded the ansicolors dependency!") +
-            "\n")
+            blue("i just lazy-loaded the ansicolors dependency!") + "\n"
+        )
 
     def test_generate_ipex_skip_execution(self):
-        with environment_as(IPEX_SKIP_EXECUTION='true'):
-            self._assert_generate_ipex_ansicolors(expected_output='')
+        with environment_as(PEX_IPEX_SKIP_EXECUTION="true"):
+            self._assert_generate_ipex_ansicolors(expected_output="")

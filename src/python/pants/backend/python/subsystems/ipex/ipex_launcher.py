@@ -18,7 +18,6 @@ from pex.interpreter import PythonInterpreter
 from pex.pex_builder import PEXBuilder
 from pex.pex_info import PexInfo
 
-
 APP_CODE_PREFIX = "user_files/"
 
 
@@ -91,8 +90,7 @@ def _hydrate_pex_file(self, hydrated_pex_dir):
     # modules we just added to the chroot.
     # NB: Bytecode compilation can take an extremely long time for large 3rdparty modules.
     bootstrap_builder.freeze(bytecode_compile=False)
-    os.rename(src=bootstrap_builder.path(),
-              dst=hydrated_pex_dir)
+    os.rename(src=bootstrap_builder.path(), dst=hydrated_pex_dir)
 
 
 def main(self):
@@ -108,7 +106,7 @@ def main(self):
         _log("Hydrating {} to {}...".format(self, hydrated_pex_dir))
         _hydrate_pex_file(self, hydrated_pex_dir)
 
-    if 'IPEX_SKIP_EXECUTION' not in os.environ:
+    if "PEX_IPEX_SKIP_EXECUTION" not in os.environ:
         os.execv(sys.executable, [sys.executable, hydrated_pex_dir] + sys.argv[1:])
 
 
