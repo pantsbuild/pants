@@ -1,6 +1,7 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import dataclasses
 import itertools
 import logging
 from dataclasses import dataclass
@@ -33,7 +34,8 @@ class ProductDescription:
 @dataclass(unsafe_hash=True)
 class Process:
     argv: Tuple[str, ...]
-    description: str
+    description: str = dataclasses.field(compare=False)
+    level: LogLevel = dataclasses.field(compare=False)
     input_digest: Digest
     working_directory: Optional[str]
     env: Tuple[str, ...]
@@ -51,6 +53,7 @@ class Process:
         argv: Iterable[str],
         *,
         description: str,
+        level: LogLevel = LogLevel.INFO,
         input_digest: Digest = EMPTY_DIGEST,
         working_directory: Optional[str] = None,
         env: Optional[Mapping[str, str]] = None,
@@ -88,6 +91,7 @@ class Process:
         """
         self.argv = tuple(argv)
         self.description = description
+        self.level = level
         self.input_digest = input_digest
         self.working_directory = working_directory
         self.env = tuple(itertools.chain.from_iterable((env or {}).items()))
@@ -362,6 +366,7 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
         FallibleProcessResult,
         Process(
             description=f"Searching for `{request.binary_name}` on PATH={search_path}",
+            level=LogLevel.DEBUG,
             input_digest=script_digest,
             argv=["/bin/bash", script_path, request.binary_name],
             env={"PATH": search_path},

@@ -233,6 +233,9 @@ pub struct Process {
   #[derivative(PartialEq = "ignore", Hash = "ignore")]
   pub description: String,
 
+  #[derivative(PartialEq = "ignore", Hash = "ignore")]
+  pub level: log::Level,
+
   ///
   /// Declares that this process uses the given named caches (which might have associated config
   /// in the future) at the associated relative paths within its workspace. Cache names must
@@ -285,6 +288,7 @@ impl Process {
       output_directories: BTreeSet::new(),
       timeout: None,
       description: "".to_string(),
+      level: log::Level::Info,
       append_only_caches: BTreeMap::new(),
       jdk_home: None,
       target_platform: PlatformConstraint::None,

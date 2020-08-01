@@ -21,6 +21,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, collect_rules, goal_rule
+from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
 
@@ -115,6 +116,7 @@ async def run_cloc(
         description=(
             f"Count lines of code for {pluralize(len(sources_snapshot.snapshot.files), 'file')}"
         ),
+        level=LogLevel.DEBUG,
     )
     exec_result = await Get(ProcessResult, Process, req)
 

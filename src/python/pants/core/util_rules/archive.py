@@ -7,6 +7,7 @@ from typing import Optional, Tuple
 from pants.engine.fs import Digest, RemovePrefix, Snapshot
 from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import Get, RootRule, collect_rules, rule
+from pants.util.logging import LogLevel
 
 
 @dataclass(frozen=True)
@@ -51,6 +52,7 @@ async def maybe_extract(extractable: MaybeExtractable) -> ExtractedDigest:
                 argv=("/bin/bash", "-c", f"{extraction_cmd_str}"),
                 input_digest=digest,
                 description=f"Extract {snapshot.files[0]}",
+                level=LogLevel.DEBUG,
                 env={"PATH": "/usr/bin:/bin:/usr/local/bin"},
                 output_directories=(output_dir,),
             )

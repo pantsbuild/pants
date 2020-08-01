@@ -13,7 +13,6 @@ use std::{self, fmt};
 use async_trait::async_trait;
 use futures::future::{self, FutureExt, TryFutureExt};
 use futures::stream::StreamExt;
-use std::convert::TryInto;
 use url::Url;
 
 use crate::context::{Context, Core};
@@ -28,7 +27,6 @@ use fs::{
   self, Dir, DirectoryListing, File, FileContent, GlobExpansionConjunction, GlobMatching, Link,
   PathGlobs, PathStat, PreparedPathGlobs, StrictGlobMatching, VFS,
 };
-use logging::PythonLogLevel;
 use process_execution::{
   self, CacheDest, CacheName, MultiPlatformProcess, PlatformConstraint, Process, RelativePath,
 };
@@ -277,6 +275,7 @@ impl MultiPlatformExecuteProcess {
     };
 
     let description = externs::project_str(&value, "description");
+    let level = externs::val_to_log_level(&externs::project_ignoring_type(&value, "level"))?;
 
     let append_only_caches = externs::project_tuple_encoded_map(&value, "append_only_caches")?
       .into_iter()
@@ -314,6 +313,7 @@ impl MultiPlatformExecuteProcess {
       output_directories,
       timeout,
       description,
+      level,
       append_only_caches,
       jdk_home,
       target_platform,
@@ -839,7 +839,7 @@ impl Task {
     future::try_join_all(get_futures).await
   }
 
-  fn compute_new_artifacts(result_val: &Value) -> Option<Vec<(String, hashing::Digest)>> {
+  fn compute_artifacts(result_val: &Value) -> Option<Vec<(String, hashing::Digest)>> {
     let artifacts_val: Value = externs::call_method(&result_val, "artifacts", &[]).ok()?;
     let artifacts_val: Value = externs::check_for_python_none(artifacts_val)?;
     let gil = Python::acquire_gil();
@@ -878,25 +878,10 @@ impl Task {
     Some(externs::val_to_str(&msg_val))
   }
 
-  fn compute_new_workunit_level(result_val: &Value) -> Option<log::Level> {
-    use num_enum::TryFromPrimitiveError;
-
+  fn compute_workunit_level(result_val: &Value) -> Option<log::Level> {
     let new_level_val: Value = externs::call_method(&result_val, "level", &[]).ok()?;
     let new_level_val = externs::check_for_python_none(new_level_val)?;
-
-    let new_py_level: PythonLogLevel = match externs::project_maybe_u64(&new_level_val, "_level")
-      .and_then(|n: u64| {
-        n.try_into()
-          .map_err(|e: TryFromPrimitiveError<_>| e.to_string())
-      }) {
-      Ok(level) => level,
-      Err(e) => {
-        log::warn!("Couldn't parse {:?} as a LogLevel: {}", new_level_val, e);
-        return None;
-      }
-    };
-
-    Some(new_py_level.into())
+    externs::val_to_log_level(&new_level_val).ok()
   }
 
   ///
@@ -988,9 +973,9 @@ impl WrappedNode for Task {
     if result_type == product {
       let (new_level, message, new_artifacts) = if can_modify_workunit {
         (
-          Self::compute_new_workunit_level(&result_val),
+          Self::compute_workunit_level(&result_val),
           Self::compute_workunit_message(&result_val),
-          Self::compute_new_artifacts(&result_val).unwrap_or_else(Vec::new),
+          Self::compute_artifacts(&result_val).unwrap_or_else(Vec::new),
         )
       } else {
         (None, None, Vec::new())

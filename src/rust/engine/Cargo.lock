@@ -2012,6 +2012,7 @@ dependencies = [
  "env_logger 0.5.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "hashing 0.0.1",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "process_execution 0.0.1",
  "store 0.1.0",
  "task_executor 0.0.1",

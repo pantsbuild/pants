@@ -13,6 +13,7 @@ mod interface;
 mod interface_tests;
 
 use std::collections::BTreeMap;
+use std::convert::TryInto;
 use std::fmt;
 use std::sync::atomic;
 
@@ -26,6 +27,8 @@ use cpython::{
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use parking_lot::RwLock;
+
+use logging::PythonLogLevel;
 
 /// Return the Python value None.
 pub fn none() -> PyObject {
@@ -294,6 +297,17 @@ pub fn val_to_str(val: &Value) -> String {
       .map(|cow| cow.into_owned())
       .unwrap()
   })
+}
+
+pub fn val_to_log_level(val: &Value) -> Result<log::Level, String> {
+  let py_level: Result<PythonLogLevel, String> =
+    project_maybe_u64(&val, "_level").and_then(|n: u64| {
+      n.try_into()
+        .map_err(|e: num_enum::TryFromPrimitiveError<_>| {
+          format!("Could not parse {:?} as a LogLevel: {}", val, e)
+        })
+    });
+  py_level.map(|py_level| py_level.into())
 }
 
 pub fn create_exception(msg: &str) -> Value {
