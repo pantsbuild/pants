@@ -9,14 +9,14 @@ from pants.base.exceptions import DuplicateNameError
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.internals.mapper import AddressFamily, AddressMap, DifferingFamiliesError
-from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, SymbolTable
+from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.util.frozendict import FrozenDict
 
 
 def parse_address_map(build_file: str) -> AddressMap:
     path = "/dev/null"
-    parser = Parser(SymbolTable({"thing": TargetAdaptor}), BuildFileAliases())
+    parser = Parser(target_type_aliases=["thing"], object_aliases=BuildFileAliases())
     address_map = AddressMap.parse(path, build_file, parser, BuildFilePreludeSymbols(FrozenDict()))
     assert path == address_map.path
     return address_map

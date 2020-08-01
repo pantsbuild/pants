@@ -4,13 +4,12 @@
 import pytest
 
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.engine.internals.parser import BuildFilePreludeSymbols, ParseError, Parser, SymbolTable
-from pants.engine.internals.target_adaptor import TargetAdaptor
+from pants.engine.internals.parser import BuildFilePreludeSymbols, ParseError, Parser
 from pants.util.frozendict import FrozenDict
 
 
 def test_imports_banned() -> None:
-    parser = Parser(SymbolTable({}), BuildFileAliases())
+    parser = Parser(target_type_aliases=[], object_aliases=BuildFileAliases())
     with pytest.raises(ParseError) as exc:
         parser.parse(
             "dir/BUILD", "\nx = 'hello'\n\nimport os\n", BuildFilePreludeSymbols(FrozenDict())
@@ -20,8 +19,8 @@ def test_imports_banned() -> None:
 
 def test_unrecognized_symbol() -> None:
     parser = Parser(
-        SymbolTable({"tgt": TargetAdaptor}),
-        BuildFileAliases(
+        target_type_aliases=["tgt"],
+        object_aliases=BuildFileAliases(
             objects={"obj": 0},
             context_aware_object_factories={"caof": lambda parse_context: lambda _: None},
         ),

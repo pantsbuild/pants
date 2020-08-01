@@ -5,20 +5,13 @@ import os.path
 import tokenize
 from dataclasses import dataclass
 from io import StringIO
-from typing import Any, Dict, List, Tuple, Type, cast
+from typing import Any, Dict, Iterable, List, Tuple, cast
 
 from pants.base.exceptions import UnaddressableObjectError
 from pants.base.parse_context import ParseContext
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.util.frozendict import FrozenDict
-
-
-@dataclass(frozen=True)
-class SymbolTable:
-    """A symbol table dict mapping symbol name to implementation class."""
-
-    table: Dict[str, Type]
 
 
 @dataclass(frozen=True)
@@ -31,12 +24,16 @@ class ParseError(Exception):
 
 
 class Parser:
-    def __init__(self, symbol_table: SymbolTable, aliases: BuildFileAliases) -> None:
-        self._symbols, self._parse_context = self._generate_symbols(symbol_table, aliases)
+    def __init__(
+        self, *, target_type_aliases: Iterable[str], object_aliases: BuildFileAliases
+    ) -> None:
+        self._symbols, self._parse_context = self._generate_symbols(
+            target_type_aliases, object_aliases
+        )
 
     @staticmethod
     def _generate_symbols(
-        symbol_table: SymbolTable, aliases: BuildFileAliases,
+        target_type_aliases: Iterable[str], object_aliases: BuildFileAliases,
     ) -> Tuple[Dict[str, Any], ParseContext]:
         symbols: Dict[str, Any] = {}
 
@@ -48,14 +45,11 @@ class Parser:
         parse_context = ParseContext(rel_path=None, type_aliases=symbols)
 
         class Registrar:
-            def __init__(self, parse_context: ParseContext, type_alias: str, object_type):
+            def __init__(self, parse_context: ParseContext, type_alias: str):
                 self._parse_context = parse_context
                 self._type_alias = type_alias
-                self._object_type = object_type
 
             def __call__(self, *args, **kwargs):
-                if not issubclass(self._object_type, TargetAdaptor):
-                    return self._object_type(*args, **kwargs)
                 # Target names default to the name of the directory their BUILD file is in
                 # (as long as it's not the root directory).
                 if "name" not in kwargs:
@@ -66,17 +60,13 @@ class Parser:
                         )
                     kwargs["name"] = dirname
                 kwargs.setdefault("type_alias", self._type_alias)
-                obj = self._object_type(**kwargs)
-                self._parse_context._storage.add(obj)
-                return obj
+                target_adaptor = TargetAdaptor(**kwargs)
+                self._parse_context._storage.add(target_adaptor)
+                return target_adaptor
 
-        for alias, symbol in symbol_table.table.items():
-            registrar = Registrar(parse_context, alias, object_type=symbol)
-            symbols[alias] = registrar
-
-        symbols.update(aliases.objects)
-
-        for alias, object_factory in aliases.context_aware_object_factories.items():
+        symbols.update({alias: Registrar(parse_context, alias) for alias in target_type_aliases})
+        symbols.update(object_aliases.objects)
+        for alias, object_factory in object_aliases.context_aware_object_factories.items():
             symbols[alias] = object_factory(parse_context)
 
         return symbols, parse_context
