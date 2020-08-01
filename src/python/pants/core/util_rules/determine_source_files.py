@@ -82,7 +82,7 @@ def calculate_specified_sources(
 ) -> Union[Snapshot, DigestSubset]:
     # AddressSpecs simply use the entire `sources` field. If it's a generated subtarget, we also
     # know we're as precise as we can get (1 file), so use the whole snapshot.
-    if isinstance(origin, AddressSpec) or address.generated_base_target_name:
+    if isinstance(origin, AddressSpec) or not address.is_base_target:
         return sources_snapshot
     # NB: we ensure that `precise_files_specified` is a subset of the original `sources` field.
     # It's possible when given a glob filesystem spec that the spec will have

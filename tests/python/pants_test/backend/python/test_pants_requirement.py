@@ -36,7 +36,7 @@ class PantsRequirementTest(TestBase):
     ) -> None:
         self.add_to_build_file("3rdparty/python", f"{build_file_entry}\n")
         target = self.request_single_product(
-            WrappedTarget, Address("3rdparty/python", expected_target_name)
+            WrappedTarget, Address("3rdparty/python", target_name=expected_target_name)
         ).target
         assert isinstance(target, PythonRequirementLibrary)
         expected = PythonRequirement(

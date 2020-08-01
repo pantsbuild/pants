@@ -58,24 +58,18 @@ async def evaluate_preludes(address_mapper: AddressMapper) -> BuildFilePreludeSy
 
 @rule
 async def resolve_address(address_input: AddressInput) -> Address:
-    if not address_input.path_component:
+    # Determine the type of the path_component of the input.
+    if address_input.path_component:
+        snapshot = await Get(Snapshot, PathGlobs(globs=(address_input.path_component,)))
+        is_file, is_dir = bool(snapshot.files), bool(snapshot.dirs)
+    else:
         # Is a target in the root directory.
-        # TODO: More precisely locate the relevant BUILD file here.
-        return Address(
-            spec_path=address_input.path_component, target_name=address_input.target_component
-        )
+        is_file, is_dir = False, True
 
-    # Determine the type of the path_component of the input: if it is a file, directly construct
-    # the Address.
-    snapshot = await Get(Snapshot, PathGlobs(globs=(address_input.path_component,)))
-    if snapshot.files:
-        # TODO: Use new Address internals.
-        raise ResolveError("TODO")
-    elif snapshot.dirs:
-        # TODO: More precisely locate the relevant BUILD file here.
-        return Address(
-            spec_path=address_input.path_component, target_name=address_input.target_component
-        )
+    if is_file:
+        return address_input.file_to_address()
+    elif is_dir:
+        return address_input.dir_to_address()
     else:
         raise ResolveError(
             f"The file or directory '{address_input.path_component}' does not exist on disk in the "
@@ -126,6 +120,8 @@ def _raise_did_you_mean(address_family: AddressFamily, name: str, source=None) -
 
 @rule
 async def find_build_file(address: Address) -> BuildFileAddress:
+    # TODO: if the Address is for a base target, can immediately use its `file`, which is already
+    # the BUILD file.
     address_family = await Get(AddressFamily, Dir(address.spec_path))
     owning_address = address.maybe_convert_to_base_target()
     if address_family.addressable_for_address(owning_address) is None:
@@ -136,9 +132,7 @@ async def find_build_file(address: Address) -> BuildFileAddress:
         if build_file_address.address == owning_address
     )
     return (
-        bfa
-        if not address.generated_base_target_name
-        else BuildFileAddress(rel_path=bfa.rel_path, address=address)
+        bfa if address.is_base_target else BuildFileAddress(rel_path=bfa.rel_path, address=address)
     )
 
 

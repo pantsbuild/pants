@@ -158,7 +158,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
             args.append(f"--pytest-execution-slot-var={execution_slot_var}")
 
         options_bootstrapper = create_options_bootstrapper(args=args)
-        address = Address(self.package, "target")
+        address = Address(self.package, target_name="target")
         if origin is None:
             origin = SingleAddress(directory=address.spec_path, name=address.target_name)
         tgt = PythonTests({}, address=address)

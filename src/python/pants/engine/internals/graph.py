@@ -98,12 +98,9 @@ async def resolve_target(
     registered_target_types: RegisteredTargetTypes,
     union_membership: UnionMembership,
 ) -> WrappedTarget:
-    if address.generated_base_target_name:
+    if not address.is_base_target:
         base_target = await Get(WrappedTarget, Address, address.maybe_convert_to_base_target())
-        subtarget = generate_subtarget(
-            base_target.target,
-            full_file_name=PurePath(address.spec_path, address.target_name).as_posix(),
-        )
+        subtarget = generate_subtarget(base_target.target, full_file_name=address.filename)
         return WrappedTarget(subtarget)
 
     target_adaptor = await Get(TargetAdaptor, Address, address)
@@ -165,14 +162,14 @@ def _detect_cycles(
 
     def maybe_report_cycle(address: Address) -> None:
         # NB: File-level dependencies are cycle tolerant.
-        if address.generated_base_target_name or address not in path_stack:
+        if not address.is_base_target or address not in path_stack:
             return
 
         # The path of the cycle is shorter than the entire path to the cycle: if the suffix of
         # the path representing the cycle contains a file dep, it is ignored.
         in_cycle = False
         for path_address in path_stack:
-            if in_cycle and path_address.generated_base_target_name:
+            if in_cycle and not path_address.is_base_target:
                 # There is a file address inside the cycle: do not report it.
                 return
             elif in_cycle:
@@ -743,7 +740,7 @@ def validate_explicit_file_dep(
         )
     # If a file does not exist, but it matches the `sources` glob of a target, then it will
     # have an owning target.
-    file_does_not_exist = len(owners) == 1 and not owners[0].generated_base_target_name
+    file_does_not_exist = len(owners) == 1 and owners[0].is_base_target
     if not owners or file_does_not_exist:
         raise InvalidFileDependencyException(
             f"The target {address} includes {repr(full_file)} in its `dependencies` "
@@ -825,7 +822,7 @@ async def resolve_dependencies(
         *itertools.chain.from_iterable(injected),
         *itertools.chain.from_iterable(inferred),
     ):
-        if addr.generated_base_target_name:
+        if not addr.is_base_target:
             collection = (
                 used_ignored_file_deps
                 if addr in flattened_ignore_file_deps_owners
@@ -857,7 +854,7 @@ async def resolve_dependencies(
     # the user isn't falsely led to believe the ignore is working. We do not do this for generated
     # subtargets because we cannot guarantee that the ignore specified in the original owning
     # target would be used for all generated subtargets.
-    if unused_ignores and not request.field.address.generated_base_target_name:
+    if unused_ignores and request.field.address.is_base_target:
         raise UnusedDependencyIgnoresException(
             request.field.address, unused_ignores=unused_ignores, result=result
         )

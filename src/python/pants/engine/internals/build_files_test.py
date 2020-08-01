@@ -275,7 +275,7 @@ class BuildFileIntegrationTest(TestBase):
 
     def test_build_file_address_generated_subtarget(self) -> None:
         self.create_file("helloworld/BUILD.ext", "mock_tgt(name='original')")
-        addr = Address("helloworld", target_name="generated", generated_base_target_name="original")
+        addr = Address("helloworld", target_name="original", relative_file_path="generated")
         expected_bfa = BuildFileAddress(rel_path="helloworld/BUILD.ext", address=addr)
         bfa = self.request_single_product(BuildFileAddress, addr)
         assert bfa == expected_bfa
