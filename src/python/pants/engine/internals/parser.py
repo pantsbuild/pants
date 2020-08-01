@@ -1,4 +1,4 @@
-# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os.path
@@ -37,8 +37,8 @@ class Parser:
     @staticmethod
     def _generate_symbols(
         symbol_table: SymbolTable, aliases: BuildFileAliases,
-    ) -> Tuple[Dict, ParseContext]:
-        symbols: Dict = {}
+    ) -> Tuple[Dict[str, Any], ParseContext]:
+        symbols: Dict[str, Any] = {}
 
         # Compute "per path" symbols.  For performance, we use the same ParseContext, which we
         # mutate to set the rel_path appropriately before it's actually used. This allows this
@@ -70,17 +70,19 @@ class Parser:
                 self._parse_context._storage.add(obj)
                 return obj
 
-        for alias, symbol in symbol_table.table.items():
-            registrar = Registrar(parse_context, alias, object_type=symbol)
-            symbols[alias] = registrar
-            symbols[symbol] = registrar
-
-        if aliases.objects:
-            symbols.update(aliases.objects)
-
-        for alias, object_factory in aliases.context_aware_object_factories.items():
-            symbols[alias] = object_factory(parse_context)
-
+        symbols.update(
+            {
+                alias: Registrar(parse_context, alias, object_type=symbol)
+                for alias, symbol in symbol_table.table.items()
+            }
+        )
+        symbols.update(aliases.objects)
+        symbols.update(
+            {
+                alias: object_factory(parse_context)
+                for alias, object_factory in aliases.context_aware_object_factories.items()
+            }
+        )
         return symbols, parse_context
 
     def parse(
@@ -102,7 +104,13 @@ class Parser:
                 v.__globals__.update(global_symbols)
             global_symbols[k] = v
 
-        exec(build_file_content, global_symbols)
+        try:
+            exec(build_file_content, global_symbols)
+        except NameError as e:
+            valid_symbols = sorted(s for s in global_symbols.keys() if s != "__builtins__")
+            original = e.args[0].capitalize()
+            raise ParseError(f"{original}.\n\nAll registered symbols: {valid_symbols}")
+
         error_on_imports(build_file_content, filepath)
 
         return cast(List[TargetAdaptor], list(self._parse_context._storage.objects))
@@ -123,6 +131,6 @@ def error_on_imports(build_file_content: str, filepath: str) -> None:
         raise ParseError(
             f"Import used in {filepath} at line {lineno}. Import statements are banned in "
             "BUILD files because they can easily break Pants caching and lead to stale results. "
-            "\n\nInstead, consider writing a macro (https://pants.readme.io/docs/macros) or "
-            "writing a plugin (https://pants.readme.io/docs/plugins-overview)."
+            "\n\nInstead, consider writing a macro (https://www.pantsbuild.org/docs/macros) or "
+            "writing a plugin (https://www.pantsbuild.org/docs/plugins-overview)."
         )

@@ -36,7 +36,7 @@ class AddressMap:
         try:
             target_adaptors = parser.parse(filepath, build_file_content, extra_symbols)
         except Exception as e:
-            raise MappingError(f"Failed to parse {filepath}:\n{e!r}")
+            raise MappingError(f"Failed to parse {filepath}:\n{e}")
         name_to_target_adaptors: Dict[str, TargetAdaptor] = {}
         for target_adaptor in target_adaptors:
             name = target_adaptor.name
