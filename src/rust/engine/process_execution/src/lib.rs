@@ -233,7 +233,6 @@ pub struct Process {
   #[derivative(PartialEq = "ignore", Hash = "ignore")]
   pub description: String,
 
-  #[derivative(PartialEq = "ignore", Hash = "ignore")]
   pub level: log::Level,
 
   ///

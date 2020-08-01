@@ -35,7 +35,7 @@ class ProductDescription:
 class Process:
     argv: Tuple[str, ...]
     description: str = dataclasses.field(compare=False)
-    level: LogLevel = dataclasses.field(compare=False)
+    level: LogLevel
     input_digest: Digest
     working_directory: Optional[str]
     env: Tuple[str, ...]
