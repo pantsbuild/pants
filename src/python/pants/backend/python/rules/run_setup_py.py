@@ -146,13 +146,6 @@ class ExportedTargetRequirements(DeduplicatedCollection[str]):
     sort_input = True
 
 
-# @dataclass(frozen=True)
-# class AncestorInitPyFiles:
-#     """__init__.py files in enclosing packages of the exported code."""
-#
-#     digests: Tuple[Digest, ...]  # The files stripped of their source roots.
-
-
 @dataclass(frozen=True)
 class SetupPySourcesRequest:
     targets: Targets
