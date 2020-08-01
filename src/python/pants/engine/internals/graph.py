@@ -621,7 +621,7 @@ async def hydrate_sources(
             conjunction=conjunction,
             glob_match_error_behavior=glob_match_error_behavior,
             # TODO(#9012): add line number referring to the sources field. When doing this, we'll
-            # likely need to `await Get(BuildFileAddress](Address)`.
+            # likely need to `await Get(BuildFileAddress, Address)`.
             description_of_origin=(
                 f"{sources_field.address}'s `{sources_field.alias}` field"
                 if glob_match_error_behavior != GlobMatchErrorBehavior.ignore

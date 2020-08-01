@@ -31,7 +31,7 @@ class Addresses(Collection[Address]):
 
 @dataclass(frozen=True)
 class AddressWithOrigin:
-    """A BuildFileAddress along with the cmd-line spec it was generated from."""
+    """An Address along with the cmd-line spec it was generated from."""
 
     address: Address
     origin: OriginSpec

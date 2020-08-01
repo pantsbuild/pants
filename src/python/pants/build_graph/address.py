@@ -2,7 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-import re
+from dataclasses import dataclass
 from typing import Optional, Sequence, Tuple
 
 from pants.util.dirutil import fast_relpath, longest_dir_prefix
@@ -279,63 +279,13 @@ class Address:
         )
 
 
-class BuildFileAddress(Address):
+@dataclass(frozen=True)
+class BuildFileAddress:
     """Represents the address of a type materialized from a BUILD file.
 
-    :API: public
+    TODO: This type should likely be removed in favor of storing this information on Target.
     """
 
-    def __init__(
-        self,
-        *,
-        rel_path: str,
-        target_name: Optional[str] = None,
-        generated_base_target_name: Optional[str] = None,
-    ) -> None:
-        """
-        :param rel_path: The BUILD files' path, relative to the root_dir.
-        :param target_name: The name of the target within the BUILD file; defaults to the default
-                            target, aka the name of the BUILD file parent dir.
-        :param generated_base_target_name: If this Address refers to a generated subtarget, this
-                                           stores the target_name of the original base target.
-
-        :API: public
-        """
-        spec_path = os.path.dirname(rel_path)
-        super().__init__(
-            spec_path=spec_path,
-            target_name=target_name or os.path.basename(spec_path),
-            generated_base_target_name=generated_base_target_name,
-        )
-        self.rel_path = rel_path
-
-    def to_address(self) -> Address:
-        """Convert this BuildFileAddress to an Address."""
-        # This is weird, since BuildFileAddress is a subtype of Address, but the engine's exact
-        # type matching requires a new instance.
-        # TODO: Possibly create a new class like `AddressWithBuild` that wraps an `Address`. This
-        #  is weird to subclass `Address` but break Liskov substitution in many places, like the
-        #  constructor. The blocker is that this type is used widely by V1 and it can't be cleanly
-        #  deprecated.
-        return Address(
-            spec_path=self.spec_path,
-            target_name=self.target_name,
-            generated_base_target_name=self.generated_base_target_name,
-        )
-
-    def maybe_convert_to_base_target(self) -> "BuildFileAddress":
-        if not self.generated_base_target_name:
-            return self
-        return self.__class__(rel_path=self.rel_path, target_name=self.generated_base_target_name)
-
-    def __repr__(self) -> str:
-        prefix = f"BuildFileAddress({self.rel_path}, {self.target_name}"
-        return (
-            f"{prefix})"
-            if not self.generated_base_target_name
-            else f"{prefix}, generated_base_target_name={self.generated_base_target_name})"
-        )
-
-
-def _is_build_file_name(name: str) -> bool:
-    return bool(re.match(r"^BUILD(\.[a-zA-Z0-9_-]+)?$", name))
+    address: Address
+    # The relative path of the BUILD file this Address came from.
+    rel_path: str

@@ -3,13 +3,7 @@
 
 import unittest
 
-from pants.build_graph.address import (
-    Address,
-    BuildFileAddress,
-    InvalidSpecPath,
-    InvalidTargetName,
-    parse_spec,
-)
+from pants.build_graph.address import Address, InvalidSpecPath, InvalidTargetName, parse_spec
 
 
 class ParseSpecTest(unittest.TestCase):
@@ -228,21 +222,3 @@ def test_address_parse_method() -> None:
     # Do not attempt to parse generated subtargets, as we would have no way to find the
     # generated_base_target_name.
     assert_parsed("a/b/f.py", "f.py", Address.parse("a/b/f.py"))
-
-
-def test_build_file_address() -> None:
-    bfa = BuildFileAddress(rel_path="dir/BUILD", target_name="example")
-    assert bfa.spec == "dir:example"
-    assert bfa == Address("dir", "example")
-    assert type(bfa.to_address()) is Address
-    assert bfa.to_address() == Address("dir", "example")
-
-    generated_bfa = BuildFileAddress(
-        rel_path="dir/BUILD", target_name="example.txt", generated_base_target_name="original"
-    )
-    assert generated_bfa != BuildFileAddress(rel_path="dir/BUILD", target_name="example.txt")
-    assert generated_bfa == Address("dir", "example.txt", generated_base_target_name="original")
-    assert generated_bfa.spec == "dir/example.txt"
-    assert generated_bfa.maybe_convert_to_base_target() == BuildFileAddress(
-        rel_path="dir/BUILD", target_name="original"
-    )
