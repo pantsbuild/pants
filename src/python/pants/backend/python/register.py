@@ -14,7 +14,6 @@ from pants.backend.python.rules import (
     ancestor_files,
     coverage,
     create_python_binary,
-    missing_init,
     pex,
     pex_cli,
     pex_environment,
@@ -55,7 +54,6 @@ def rules():
     return (
         *coverage.rules(),
         *ancestor_files.rules(),
-        *missing_init.rules(),
         *python_sources.rules(),
         *dependency_inference_rules.rules(),
         *pex.rules(),
