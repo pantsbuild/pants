@@ -4,7 +4,6 @@
 import itertools
 import json
 import logging
-import os
 from dataclasses import dataclass
 from typing import List, Set, Tuple, cast
 
@@ -16,6 +15,11 @@ from pants.backend.python.rules.pex import (
     PexRequest,
     PexRequirements,
 )
+from pants.backend.python.rules.python_sources import (
+    StrippedPythonSources,
+    StrippedPythonSourcesRequest,
+)
+from pants.backend.python.rules.python_sources import rules as python_sources_rules
 from pants.backend.python.rules.setuptools import Setuptools
 from pants.backend.python.rules.util import PackageDatum, distutils_repr, find_packages, is_python2
 from pants.backend.python.target_types import (
@@ -26,13 +30,8 @@ from pants.backend.python.target_types import (
     PythonSources,
 )
 from pants.base.specs import AddressSpecs, AscendantAddresses, SingleAddress
-from pants.core.target_types import ResourcesSources
-from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
+from pants.core.target_types import FilesSources, ResourcesSources
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.strip_source_roots import (
-    SourceRootStrippedSources,
-    StripSourcesFieldRequest,
-)
 from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.console import Console
@@ -63,7 +62,6 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership
 from pants.option.custom_types import shell_str
 from pants.python.python_setup import PythonSetup
-from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -146,13 +144,6 @@ class ExportedTargetRequirements(DeduplicatedCollection[str]):
     """
 
     sort_input = True
-
-
-@dataclass(frozen=True)
-class AncestorInitPyFiles:
-    """__init__.py files in enclosing packages of the exported code."""
-
-    digests: Tuple[Digest, ...]  # The files stripped of their source roots.
 
 
 @dataclass(frozen=True)
@@ -400,7 +391,12 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
     exported_target = request.exported_target
 
     owned_deps = await Get(OwnedDependencies, DependencyOwner(exported_target))
-    targets = Targets(od.target for od in owned_deps)
+    transitive_targets = await Get(TransitiveTargets, Addresses([exported_target.target.address]))
+    # files() targets aren't owned by a single exported target - they aren't code, so
+    # we allow them to be in multiple dists. This is helpful for, e.g., embedding
+    # a standard license file in a dist.
+    files_targets = (tgt for tgt in transitive_targets.closure if tgt.has_field(FilesSources))
+    targets = Targets(itertools.chain((od.target for od in owned_deps), files_targets))
     sources = await Get(SetupPySources, SetupPySourcesRequest(targets, py2=request.py2))
     requirements = await Get(ExportedTargetRequirements, DependencyOwner(exported_target))
 
@@ -464,92 +460,39 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
 
 @rule
 async def get_sources(request: SetupPySourcesRequest) -> SetupPySources:
-    targets = request.targets
-    stripped_srcs_list = await MultiGet(
-        Get(
-            SourceRootStrippedSources,
-            StripSourcesFieldRequest(
-                target.get(Sources),
-                for_sources_types=(PythonSources, ResourcesSources),
-                enable_codegen=True,
-            ),
-        )
-        for target in targets
+    python_sources = await Get(
+        StrippedPythonSources,
+        StrippedPythonSourcesRequest(
+            targets=request.targets, include_resources=False, include_files=False
+        ),
+    )
+    all_sources = await Get(
+        StrippedPythonSources,
+        StrippedPythonSourcesRequest(
+            targets=request.targets, include_resources=True, include_files=True
+        ),
     )
 
-    # Create a chroot with all the sources, and any ancestor __init__.py files that might be needed
-    # for imports to work.  Note that if a repo has multiple exported targets under a single ancestor
-    # package, then that package must be a namespace package, which in Python 3 means it must not
-    # have an __init__.py. We don't validate this here, because it would require inspecting *all*
-    # targets, whether or not they are in the target set for this run - basically the entire repo.
-    # So it's the repo owners' responsibility to ensure __init__.py hygiene.
-    stripped_srcs_digests = [
-        stripped_sources.snapshot.digest for stripped_sources in stripped_srcs_list
-    ]
-    ancestor_init_pys = await Get(AncestorInitPyFiles, Targets, targets)
-    sources_digest = await Get(
-        Digest, MergeDigests((*stripped_srcs_digests, *ancestor_init_pys.digests))
-    )
+    python_files = set(python_sources.snapshot.files)
+    all_files = set(all_sources.snapshot.files)
+    resource_files = all_files - python_files
+
     init_py_digest_contents = await Get(
-        DigestContents, DigestSubset(sources_digest, PathGlobs(["**/__init__.py"]))
+        DigestContents, DigestSubset(python_sources.snapshot.digest, PathGlobs(["**/__init__.py"]))
     )
 
     packages, namespace_packages, package_data = find_packages(
-        tgts_and_stripped_srcs=list(zip(targets, stripped_srcs_list)),
+        python_files=python_files,
+        resource_files=resource_files,
         init_py_digest_contents=init_py_digest_contents,
         py2=request.py2,
     )
     return SetupPySources(
-        digest=sources_digest,
+        digest=all_sources.snapshot.digest,
         packages=packages,
         namespace_packages=namespace_packages,
         package_data=package_data,
     )
-
-
-@rule
-async def get_ancestor_init_py(targets: Targets) -> AncestorInitPyFiles:
-    """Find any ancestor __init__.py files for the given targets.
-
-    Includes sibling __init__.py files. Returns the files stripped of their source roots.
-    """
-    sources = await Get(
-        SourceFiles,
-        AllSourceFilesRequest(
-            (tgt.get(Sources) for tgt in targets),
-            for_sources_types=(PythonSources,),
-            enable_codegen=True,
-        ),
-    )
-    # Find the ancestors of all dirs containing .py files, including those dirs themselves.
-    source_dir_ancestors: Set[Tuple[str, str]] = set()  # Items are (src_root, path incl. src_root).
-    source_roots = await MultiGet(
-        Get(SourceRoot, SourceRootRequest, SourceRootRequest.for_file(path))
-        for path in sources.files
-    )
-    for path, source_root in zip(sources.files, source_roots):
-        source_dir_ancestor = os.path.dirname(path)
-        # Do not allow the repository root to leak (i.e., '.' should not be a package in setup.py).
-        source_root_path = "" if source_root.path == "." else source_root.path
-        while source_dir_ancestor != source_root_path:
-            source_dir_ancestors.add((source_root_path, source_dir_ancestor))
-            source_dir_ancestor = os.path.dirname(source_dir_ancestor)
-
-    source_dir_ancestors_list = list(source_dir_ancestors)  # To force a consistent order.
-
-    # Note that we must MultiGet single globs instead of a a single Get for all the globs, because
-    # we match each result to its originating glob (see use of zip below).
-    ancestor_init_py_digests = await MultiGet(
-        Get(Digest, PathGlobs, PathGlobs([os.path.join(source_dir_ancestor[1], "__init__.py")]))
-        for source_dir_ancestor in source_dir_ancestors_list
-    )
-
-    source_root_stripped_ancestor_init_pys = await MultiGet(
-        Get(Digest, RemovePrefix(digest, source_dir_ancestor[0]))
-        for digest, source_dir_ancestor in zip(ancestor_init_py_digests, source_dir_ancestors_list)
-    )
-
-    return AncestorInitPyFiles(source_root_stripped_ancestor_init_pys)
 
 
 def _is_exported(target: Target) -> bool:
@@ -700,4 +643,7 @@ def is_ownable_target(tgt: Target, union_membership: UnionMembership) -> bool:
 
 
 def rules():
-    return collect_rules()
+    return [
+        *python_sources_rules(),
+        *collect_rules(),
+    ]

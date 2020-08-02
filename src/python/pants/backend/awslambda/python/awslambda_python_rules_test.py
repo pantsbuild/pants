@@ -10,7 +10,6 @@ from pants.backend.awslambda.common.awslambda_common_rules import CreatedAWSLamb
 from pants.backend.awslambda.python.awslambda_python_rules import PythonAwsLambdaFieldSet
 from pants.backend.awslambda.python.awslambda_python_rules import rules as awslambda_python_rules
 from pants.backend.awslambda.python.target_types import PythonAWSLambda
-from pants.backend.python.rules import ancestor_files, missing_init
 from pants.backend.python.target_types import PythonLibrary
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents
@@ -27,8 +26,6 @@ class TestPythonAWSLambdaCreation(ExternalToolTestBase):
         return (
             *super().rules(),
             *awslambda_python_rules(),
-            *ancestor_files.rules(),
-            *missing_init.rules(),
             RootRule(PythonAwsLambdaFieldSet),
         )
 

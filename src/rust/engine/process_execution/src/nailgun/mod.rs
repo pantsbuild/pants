@@ -60,6 +60,7 @@ fn construct_nailgun_server_request(
     output_directories: BTreeSet::new(),
     timeout: Some(Duration::new(1000, 0)),
     description: format!("Start a nailgun server for {}", nailgun_name),
+    level: log::Level::Info,
     append_only_caches: BTreeMap::new(),
     jdk_home: Some(jdk),
     target_platform: platform_constraint,
