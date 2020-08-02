@@ -342,4 +342,5 @@ def rules():
     return [
         *collect_rules(),
         RootRule(SourceRootRequest),
+        RootRule(SourceRootsRequest),
     ]
