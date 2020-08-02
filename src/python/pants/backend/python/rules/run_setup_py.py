@@ -30,7 +30,7 @@ from pants.backend.python.target_types import (
     PythonSources,
 )
 from pants.base.specs import AddressSpecs, AscendantAddresses, SingleAddress
-from pants.core.target_types import ResourcesSources
+from pants.core.target_types import FilesSources, ResourcesSources
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import Collection, DeduplicatedCollection
@@ -391,7 +391,12 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
     exported_target = request.exported_target
 
     owned_deps = await Get(OwnedDependencies, DependencyOwner(exported_target))
-    targets = Targets(od.target for od in owned_deps)
+    transitive_targets = await Get(TransitiveTargets, Addresses([exported_target.target.address]))
+    # files() targets aren't owned by a single exported target - they aren't code, so
+    # we allow them to be in multiple dists. This is helpful for, e.g., embedding
+    # a standard license file in a dist.
+    files_targets = (tgt for tgt in transitive_targets.closure if tgt.has_field(FilesSources))
+    targets = Targets(itertools.chain((od.target for od in owned_deps), files_targets))
     sources = await Get(SetupPySources, SetupPySourcesRequest(targets, py2=request.py2))
     requirements = await Get(ExportedTargetRequirements, DependencyOwner(exported_target))
 

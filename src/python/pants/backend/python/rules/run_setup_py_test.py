@@ -32,7 +32,7 @@ from pants.backend.python.rules.run_setup_py import (
 )
 from pants.backend.python.target_types import PythonBinary, PythonLibrary, PythonRequirementLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.core.target_types import Resources
+from pants.core.target_types import Files, Resources
 from pants.core.util_rules.determine_source_files import rules as determine_source_files_rules
 from pants.core.util_rules.strip_source_roots import rules as strip_source_roots_rules
 from pants.engine.addresses import Address
@@ -58,7 +58,7 @@ class TestSetupPyBase(TestBase):
 
     @classmethod
     def target_types(cls):
-        return [PythonBinary, PythonLibrary, PythonRequirementLibrary, Resources]
+        return [PythonBinary, PythonLibrary, PythonRequirementLibrary, Resources, Files]
 
     def tgt(self, addr: str) -> Target:
         return self.request_single_product(WrappedTarget, Params(Address.parse(addr))).target
@@ -122,6 +122,8 @@ class TestGenerateChroot(TestSetupPyBase):
         self.create_file("src/python/foo/qux/qux.py", "")
         self.create_file("src/python/foo/resources/BUILD", 'resources(sources=["js/code.js"])')
         self.create_file("src/python/foo/resources/js/code.js", "")
+        self.create_file("files/BUILD", 'files(sources=["README.txt"])')
+        self.create_file("files/README.txt", "")
         self.create_file(
             "src/python/foo/BUILD",
             textwrap.dedent(
@@ -131,6 +133,7 @@ class TestGenerateChroot(TestSetupPyBase):
                         'src/python/foo/bar/baz',
                         'src/python/foo/qux',
                         'src/python/foo/resources',
+                        'files',
                     ],
                     provides=setup_py(
                         name='foo', version='1.2.3'
@@ -145,6 +148,7 @@ class TestGenerateChroot(TestSetupPyBase):
         self.create_file("src/python/foo/foo.py", "")
         self.assert_chroot(
             [
+                "src/files/README.txt",
                 "src/foo/qux/__init__.py",
                 "src/foo/qux/qux.py",
                 "src/foo/resources/js/code.js",
