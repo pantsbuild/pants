@@ -7,8 +7,8 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Iterable, Optional, Tuple, Type
 
+from pants.build_graph.address import Address
 from pants.core.target_types import FilesSources
-from pants.engine.addresses import Address
 from pants.engine.fs import (
     EMPTY_SNAPSHOT,
     Digest,
@@ -21,7 +21,7 @@ from pants.engine.fs import (
 from pants.engine.rules import Get, MultiGet, RootRule, collect_rules, rule
 from pants.engine.target import HydratedSources, HydrateSourcesRequest
 from pants.engine.target import Sources as SourcesField
-from pants.source.source_root import SourceRoot, SourceRootRequest
+from pants.source.source_root import SourceRootsRequest, SourceRootsResult
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
 
@@ -56,17 +56,9 @@ class SourceRootStrippedSources:
 
 @dataclass(frozen=True)
 class StripSnapshotRequest:
-    """A request to strip source roots for every file in the snapshot.
-
-    The call site may optionally give the field `representative_path` if it is confident that all
-    the files in the snapshot will only have one source root. Using `representative_path` results in
-    better performance because we only need to find the SourceRoot for a single file rather than
-    every file. The `representative_path` cannot be the source root path itself, it must be some
-    proper subpath of it.
-    """
+    """A request to strip source roots for every file in the snapshot."""
 
     snapshot: Snapshot
-    representative_path: Optional[str] = None
 
 
 @frozen_after_init
@@ -102,28 +94,20 @@ class StripSourcesFieldRequest:
 async def strip_source_roots_from_snapshot(
     request: StripSnapshotRequest,
 ) -> SourceRootStrippedSources:
-    """Removes source roots from a snapshot, e.g. `src/python/pants/util/strutil.py` ->
-    `pants/util/strutil.py`."""
+    """Removes source roots from a snapshot.
+
+    E.g. `src/python/pants/util/strutil.py` -> `pants/util/strutil.py`.
+    """
     if not request.snapshot.files:
         return SourceRootStrippedSources(request.snapshot, FrozenDict())
 
-    if request.representative_path is not None:
-        source_root_obj = await Get(
-            SourceRoot, SourceRootRequest, SourceRootRequest.for_file(request.representative_path)
-        )
-        source_root = source_root_obj.path
-        if source_root == ".":
-            return SourceRootStrippedSources.for_single_source_root(request.snapshot, source_root)
-        resulting_snapshot = await Get(Snapshot, RemovePrefix(request.snapshot.digest, source_root))
-        return SourceRootStrippedSources.for_single_source_root(resulting_snapshot, source_root)
-
-    source_roots = await MultiGet(
-        Get(SourceRoot, SourceRootRequest, SourceRootRequest.for_file(file))
-        for file in request.snapshot.files
+    result = await Get(
+        SourceRootsResult, SourceRootsRequest, SourceRootsRequest.for_files(request.snapshot.files)
     )
-    file_to_source_root = dict(zip(request.snapshot.files, source_roots))
+
+    file_to_source_root = {str(file): root for file, root in result.path_to_root.items()}
     files_grouped_by_source_root = {
-        source_root.path: tuple(files)
+        source_root.path: tuple(str(f) for f in files)
         for source_root, files in itertools.groupby(
             request.snapshot.files, key=file_to_source_root.__getitem__
         )
@@ -160,8 +144,7 @@ async def strip_source_roots_from_snapshot(
 def representative_path_from_address(address: Address) -> str:
     """Generate a representative path for an address.
 
-    A performance hack, so that we don't need to determine the SourceRoot of every single file
-    belonging to a target.
+    Allows us to get a single source root for an entire target.
     """
     return PurePath(address.spec_path, "BUILD").as_posix()
 
@@ -194,13 +177,7 @@ async def strip_source_roots_from_sources_field(
     if isinstance(request.sources_field, FilesSources):
         return SourceRootStrippedSources(sources_snapshot, FrozenDict())
 
-    return await Get(
-        SourceRootStrippedSources,
-        StripSnapshotRequest(
-            sources_snapshot,
-            representative_path=representative_path_from_address(request.sources_field.address),
-        ),
-    )
+    return await Get(SourceRootStrippedSources, StripSnapshotRequest(sources_snapshot))
 
 
 def rules():

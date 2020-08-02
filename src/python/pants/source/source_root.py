@@ -6,12 +6,13 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Iterable, Optional, Set, Tuple, Union
+from typing import Dict, Iterable, Optional, Set, Tuple, Union
 
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.rules import Get, MultiGet, RootRule, collect_rules, rule
 from pants.option.subsystem import Subsystem
+from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_method
 
 logger = logging.getLogger(__name__)
@@ -22,6 +23,11 @@ class SourceRoot:
     # Relative path from the buildroot.  Note that a source root at the buildroot
     # is represented as ".".
     path: str
+
+
+@dataclass(frozen=True)
+class OptionalSourceRoot:
+    source_root: Optional[SourceRoot]
 
 
 class SourceRootError(Exception):
@@ -77,67 +83,6 @@ class SourceRootPatternMatcher:
         return False
 
 
-class SourceRoots:
-    """An interface for querying source roots.
-
-    This is a v1-only class. It exists only because in v1 we need to mutate the source roots (e.g.,
-    when injecting a codegen target). v2 code should use the engine to get a SourceRoot or
-    OptionalSourceRoot product for a SourceRootRequest subject (see rules below).
-    """
-
-    def __init__(self, root_patterns: Iterable[str], fail_if_unmatched: bool = True,) -> None:
-        """Create an object for querying source roots.
-
-        Non-test code should not instantiate directly. See SourceRootConfig.get_source_roots().
-        """
-        self._pattern_matcher = SourceRootPatternMatcher(tuple(root_patterns))
-        self._fail_if_unmatched = fail_if_unmatched
-
-    # We perform pattern matching against absolute paths, where "/" represents the repo root.
-    _repo_root = PurePath(os.path.sep)
-
-    def add_source_root(self, path):
-        """Add the specified fixed source root, which must be relative to the buildroot.
-
-        Useful in a limited set of circumstances, e.g., when unpacking sources from a jar with
-        unknown structure.  Tests should prefer to use dirs that match our source root patterns
-        instead of explicitly setting source roots here.
-        """
-        self._pattern_matcher = SourceRootPatternMatcher(
-            (*self._pattern_matcher.root_patterns, path)
-        )
-
-    def find_by_path(self, path: str) -> Optional[SourceRoot]:
-        """Find the source root for the given path, or None.
-
-        :param path: Find the source root for this path, relative to the buildroot.
-        :return: A SourceRoot instance, or None if the path is not located under a source root
-                 and `unmatched == fail`.
-        """
-        matched_path = self._find_root(PurePath(path))
-        if matched_path:
-            return SourceRoot(path=str(matched_path))
-        if self._fail_if_unmatched:
-            return None
-        # If no source root is found, use the path directly.
-        return SourceRoot(path)
-
-    def _find_root(self, relpath: PurePath) -> Optional[PurePath]:
-        """Return the source root for the given path, relative to the repo root."""
-
-        putative_root = _repo_root / relpath
-        while putative_root != _repo_root:
-            if self._pattern_matcher.matches_root_patterns(putative_root):
-                return putative_root.relative_to(_repo_root)
-            putative_root = putative_root.parent
-        if self._pattern_matcher.matches_root_patterns(putative_root):
-            return putative_root.relative_to(_repo_root)
-        return None
-
-    def get_patterns(self) -> Set[str]:
-        return set(self._pattern_matcher.get_patterns())
-
-
 class SourceRootConfig(Subsystem):
     """Configuration for roots of source trees."""
 
@@ -191,15 +136,34 @@ class SourceRootConfig(Subsystem):
     def get_pattern_matcher(self) -> SourceRootPatternMatcher:
         return SourceRootPatternMatcher(self.options.root_patterns)
 
-    @memoized_method
-    def get_source_roots(self) -> SourceRoots:
-        # Only v1 code should call this method.
-        return SourceRoots(self.options.root_patterns, self.options.unmatched == "fail")
+
+@dataclass(frozen=True)
+class SourceRootsRequest:
+    """Find the source roots for the given files and/or dirs."""
+
+    files: Tuple[PurePath, ...]
+    dirs: Tuple[PurePath, ...]
+
+    def __post_init__(self) -> None:
+        for path in itertools.chain(self.files, self.dirs):
+            if ".." in str(path).split(os.path.sep):
+                raise ValueError(f"SourceRootRequest cannot contain `..` segment: {path}")
+            if path.is_absolute():
+                raise ValueError(f"SourceRootRequest path must be relative: {path}")
+
+    @classmethod
+    def for_files(cls, file_paths: Iterable[str]) -> "SourceRootsRequest":
+        """Create a request for the source root for the given file."""
+        return cls(tuple(sorted({PurePath(file_path) for file_path in file_paths})), ())
 
 
 @dataclass(frozen=True)
 class SourceRootRequest:
-    """Find the source root for the given path."""
+    """Find the source root for the given path.
+
+    If you have multiple paths, particularly if many of them share parent directories, you'll get
+    better performance with a `SourceRootsRequest` (see above) instead.
+    """
 
     path: PurePath
 
@@ -218,12 +182,61 @@ class SourceRootRequest:
 
 
 @dataclass(frozen=True)
-class OptionalSourceRoot:
-    source_root: Optional[SourceRoot]
+class SourceRootsResult:
+    path_to_root: FrozenDict[PurePath, SourceRoot]
+
+
+@dataclass(frozen=True)
+class OptionalSourceRootsResult:
+    path_to_optional_root: FrozenDict[PurePath, OptionalSourceRoot]
 
 
 @rule
-async def get_source_root(
+async def get_optional_source_roots(
+    source_roots_request: SourceRootsRequest,
+) -> OptionalSourceRootsResult:
+    """Rule to request source roots that may not exist."""
+    # A file cannot be a source root, so request for its parent.
+    # In the typical case, where we have multiple files with the same parent, this can
+    # dramatically cut down on the number of engine requests.
+    dirs: Set[PurePath] = set(source_roots_request.dirs)
+    file_to_dir: Dict[PurePath, PurePath] = {
+        file: file.parent for file in source_roots_request.files
+    }
+    dirs.update(file_to_dir.values())
+
+    dir_to_root: Dict[PurePath, OptionalSourceRoot] = {}
+    for d in dirs:
+        root = await Get(OptionalSourceRoot, SourceRootRequest(d))
+        dir_to_root[d] = root
+
+    path_to_optional_root: Dict[PurePath, OptionalSourceRoot] = {}
+    for d in source_roots_request.dirs:
+        path_to_optional_root[d] = dir_to_root[d]
+    for f, d in file_to_dir.items():
+        path_to_optional_root[f] = dir_to_root[d]
+
+    return OptionalSourceRootsResult(path_to_optional_root=FrozenDict(path_to_optional_root))
+
+
+@rule
+async def get_source_roots(source_roots_request: SourceRootsRequest) -> SourceRootsResult:
+    """Convenience rule to allow callers to request SourceRoots that must exist.
+
+    That way callers don't have to unpack OptionalSourceRoots if they know they expect a SourceRoot
+    to exist and are willing to error if it doesn't.
+    """
+    osrr = await Get(OptionalSourceRootsResult, SourceRootsRequest, source_roots_request)
+    path_to_root = {}
+    for path, osr in osrr.path_to_optional_root.items():
+        if osr.source_root is None:
+            raise NoSourceRootError(path)
+        path_to_root[path] = osr.source_root
+    return SourceRootsResult(path_to_root=FrozenDict(path_to_root))
+
+
+@rule
+async def get_optional_source_root(
     source_root_request: SourceRootRequest, source_root_config: SourceRootConfig
 ) -> OptionalSourceRoot:
     """Rule to request a SourceRoot that may not exist."""
@@ -262,7 +275,7 @@ async def get_source_root(
 
 
 @rule
-async def get_source_root_strict(source_root_request: SourceRootRequest) -> SourceRoot:
+async def get_source_root(source_root_request: SourceRootRequest) -> SourceRoot:
     """Convenience rule to allow callers to request a SourceRoot directly.
 
     That way callers don't have to unpack an OptionalSourceRoot if they know they expect a
