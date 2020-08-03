@@ -1,4 +1,4 @@
-# Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os.path
@@ -70,19 +70,15 @@ class Parser:
                 self._parse_context._storage.add(obj)
                 return obj
 
-        symbols.update(
-            {
-                alias: Registrar(parse_context, alias, object_type=symbol)
-                for alias, symbol in symbol_table.table.items()
-            }
-        )
+        for alias, symbol in symbol_table.table.items():
+            registrar = Registrar(parse_context, alias, object_type=symbol)
+            symbols[alias] = registrar
+
         symbols.update(aliases.objects)
-        symbols.update(
-            {
-                alias: object_factory(parse_context)
-                for alias, object_factory in aliases.context_aware_object_factories.items()
-            }
-        )
+
+        for alias, object_factory in aliases.context_aware_object_factories.items():
+            symbols[alias] = object_factory(parse_context)
+
         return symbols, parse_context
 
     def parse(
