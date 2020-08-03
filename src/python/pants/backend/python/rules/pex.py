@@ -44,6 +44,7 @@ from pants.engine.rules import Get, RootRule, collect_rules, rule
 from pants.python.python_repos import PythonRepos
 from pants.python.python_setup import PythonSetup
 from pants.util.frozendict import FrozenDict
+from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.strutil import pluralize
 
@@ -434,6 +435,7 @@ class PexProcess:
     pex: Pex
     argv: Tuple[str, ...]
     description: str = dataclasses.field(compare=False)
+    level: LogLevel
     input_digest: Digest
     extra_env: Optional[FrozenDict[str, str]]
     output_files: Optional[Tuple[str, ...]]
@@ -447,6 +449,7 @@ class PexProcess:
         *,
         argv: Iterable[str],
         description: str,
+        level: LogLevel = LogLevel.INFO,
         input_digest: Optional[Digest] = None,
         extra_env: Optional[Mapping[str, str]] = None,
         output_files: Optional[Iterable[str]] = None,
@@ -457,6 +460,7 @@ class PexProcess:
         self.pex = pex
         self.argv = tuple(argv)
         self.description = description
+        self.level = level
         self.input_digest = input_digest or pex.digest
         self.extra_env = FrozenDict(extra_env) if extra_env else None
         self.output_files = tuple(output_files) if output_files else None
@@ -472,6 +476,7 @@ async def setup_pex_process(request: PexProcess, pex_environment: PexEnvironment
     return Process(
         argv,
         description=request.description,
+        level=request.level,
         input_digest=request.input_digest,
         env=env,
         output_files=request.output_files,

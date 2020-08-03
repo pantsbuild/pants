@@ -3,23 +3,25 @@
 
 import itertools
 import logging
-from collections import defaultdict
 from dataclasses import dataclass
-from typing import Iterable, Optional, cast
+from typing import Iterable, Optional, Tuple, cast
 
 from pants.core.goals.style_request import StyleRequest
 from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSources,
     FieldSetsWithSourcesRequest,
 )
-from pants.engine.collection import Collection
 from pants.engine.console import Console
+from pants.engine.engine_aware import EngineAware
 from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import Targets
 from pants.engine.unions import UnionMembership, union
+from pants.util.logging import LogLevel
+from pants.util.memo import memoized_property
+from pants.util.meta import frozen_after_init
 from pants.util.strutil import strip_v2_chroot_path
 
 logger = logging.Logger(__name__)
@@ -36,18 +38,16 @@ class InvalidLinterReportsError(Exception):
 
 
 @dataclass(frozen=True)
-class LintResult:
+class LintResult(EngineAware):
     exit_code: int
     stdout: str
     stderr: str
-    linter_name: str
     report: Optional[LintReport]
 
     @staticmethod
     def from_fallible_process_result(
         process_result: FallibleProcessResult,
         *,
-        linter_name: str,
         strip_chroot_path: bool = False,
         report: Optional[LintReport] = None,
     ) -> "LintResult":
@@ -58,18 +58,69 @@ class LintResult:
             exit_code=process_result.exit_code,
             stdout=prep_output(process_result.stdout),
             stderr=prep_output(process_result.stderr),
-            linter_name=linter_name,
             report=report,
         )
 
 
-class LintResults(Collection[LintResult]):
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class LintResults(EngineAware):
     """Zero or more LintResult objects for a single linter.
 
     Typically, linters will return one result. If they no-oped, they will return zero results.
     However, some linters may need to partition their input and thus may need to return multiple
     results. For example, many Python linters will need to group by interpreter compatibility.
     """
+
+    results: Tuple[LintResult, ...]
+    linter_name: str
+
+    def __init__(self, results: Iterable[LintResult], *, linter_name: str) -> None:
+        self.results = tuple(results)
+        self.linter_name = linter_name
+
+    @property
+    def skipped(self) -> bool:
+        return bool(self.results) is False
+
+    @memoized_property
+    def exit_code(self) -> int:
+        return next((result.exit_code for result in self.results if result.exit_code != 0), 0)
+
+    @memoized_property
+    def reports(self) -> Tuple[LintReport, ...]:
+        return tuple(result.report for result in self.results if result.report)
+
+    def level(self) -> Optional[LogLevel]:
+        if self.skipped:
+            return LogLevel.DEBUG
+        return LogLevel.WARN if self.exit_code != 0 else LogLevel.INFO
+
+    def message(self) -> Optional[str]:
+        if self.skipped:
+            return "skipped."
+        message = "succeeded." if self.exit_code == 0 else "failed."
+
+        def msg_for_result(result: LintResult) -> str:
+            msg = ""
+            if result.stdout:
+                msg += f"\n{result.stdout}"
+            if result.stderr:
+                msg += f"\n{result.stderr}"
+            if msg:
+                msg = f"{msg.rstrip()}\n\n"
+            return msg
+
+        if len(self.results) == 1:
+            results_msg = msg_for_result(self.results[0])
+        else:
+            results_msg = "\n"
+            results_msg += "".join(
+                f"Partition #{i + 1}:{msg_for_result(result)}"
+                for i, result in enumerate(self.results)
+            )
+        message += results_msg
+        return message
 
 
 @union
@@ -158,28 +209,35 @@ async def lint(
     )
 
     if lint_subsystem.per_target_caching:
-        results = await MultiGet(
+        all_per_target_results = await MultiGet(
             Get(LintResults, LintRequest, request.__class__([field_set]))
             for request in valid_requests
             for field_set in request.field_sets
         )
+        # We consolidate all results for each linter into a single `LintResults`.
+        all_results = tuple(
+            LintResults(
+                itertools.chain.from_iterable(
+                    per_target_results.results for per_target_results in all_linter_results
+                ),
+                linter_name=linter_name,
+            )
+            for linter_name, all_linter_results in itertools.groupby(
+                all_per_target_results, key=lambda results: results.linter_name
+            )
+        )
     else:
-        results = await MultiGet(
+        all_results = await MultiGet(
             Get(LintResults, LintRequest, lint_request) for lint_request in valid_requests
         )
 
-    sorted_results = sorted(itertools.chain.from_iterable(results), key=lambda res: res.linter_name)
-    if not sorted_results:
-        return Lint(exit_code=0)
+    all_results = tuple(sorted(all_results, key=lambda results: results.linter_name))
 
-    linter_to_reports = defaultdict(list)
-    for result in sorted_results:
-        if result.report:
-            linter_to_reports[result.linter_name].append(result.report)
-    if linter_to_reports:
+    reports = list(itertools.chain.from_iterable(results.reports for results in all_results))
+    if reports:
         # TODO(#10532): Tolerate when a linter has multiple reports.
         linters_with_multiple_reports = [
-            linter for linter, reports in linter_to_reports.items() if len(reports) > 1
+            results.linter_name for results in all_results if len(results.reports) > 1
         ]
         if linters_with_multiple_reports:
             if lint_subsystem.per_target_caching:
@@ -195,27 +253,23 @@ async def lint(
                 f"{linters_with_multiple_reports}. The option `--lint-reports-dir` only works if "
                 f"each linter has a single result. {suggestion}"
             )
-        reports = itertools.chain.from_iterable(linter_to_reports.values())
         merged_reports = await Get(Digest, MergeDigests(report.digest for report in reports))
-        workspace.write_digest(merged_reports, path_prefix=lint_subsystem.reports_dir)
+        workspace.write_digest(merged_reports)
         logger.info(f"Wrote lint result files to {lint_subsystem.reports_dir}.")
 
     exit_code = 0
-    for result in sorted_results:
-        if result.exit_code == 0:
+    for results in all_results:
+        if results.skipped:
+            sigil = console.yellow("-")
+            status = "skipped"
+        elif results.exit_code == 0:
             sigil = console.green("✓")
             status = "succeeded"
         else:
             sigil = console.red("𐄂")
             status = "failed"
-            exit_code = result.exit_code
-        console.print_stderr(f"{sigil} {result.linter_name} {status}.")
-        if result.stdout:
-            console.print_stderr(result.stdout)
-        if result.stderr:
-            console.print_stderr(result.stderr)
-        if result != sorted_results[-1]:
-            console.print_stderr("")
+            exit_code = results.exit_code
+        console.print_stderr(f"{sigil} {results.linter_name} {status}.")
 
     return Lint(exit_code)
 

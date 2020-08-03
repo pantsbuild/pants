@@ -49,6 +49,7 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
+from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.strutil import pluralize
 
@@ -233,9 +234,10 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
                 f"Run Pylint on {pluralize(len(partition.field_sets), 'target')}: "
                 f"{address_references}."
             ),
+            level=LogLevel.DEBUG,
         ),
     )
-    return LintResult.from_fallible_process_result(result, linter_name="Pylint")
+    return LintResult.from_fallible_process_result(result)
 
 
 @rule(desc="Lint using Pylint")
@@ -243,7 +245,7 @@ async def pylint_lint(
     request: PylintRequest, pylint: Pylint, python_setup: PythonSetup
 ) -> LintResults:
     if pylint.skip:
-        return LintResults()
+        return LintResults([], linter_name="Pylint")
 
     plugin_targets_request = Get(
         TransitiveTargets,
@@ -296,7 +298,7 @@ async def pylint_lint(
     partitioned_results = await MultiGet(
         Get(LintResult, PylintPartition, partition) for partition in partitions
     )
-    return LintResults(partitioned_results)
+    return LintResults(partitioned_results, linter_name="Pylint")
 
 
 def rules():

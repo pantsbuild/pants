@@ -23,6 +23,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet
 from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
+from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
 
@@ -114,6 +115,7 @@ async def flake8_lint_partition(
                 f"Run Flake8 on {pluralize(len(partition.field_sets), 'target')}: "
                 f"{address_references}"
             ),
+            level=LogLevel.DEBUG,
         ),
     )
 
@@ -132,15 +134,15 @@ async def flake8_lint_partition(
         )
         report = LintReport(report_file_name, report_digest)
 
-    return LintResult.from_fallible_process_result(result, linter_name="Flake8", report=report)
+    return LintResult.from_fallible_process_result(result, report=report)
 
 
-@rule(desc="Lint using Flake8")
+@rule(desc="Lint with Flake8")
 async def flake8_lint(
     request: Flake8Request, flake8: Flake8, python_setup: PythonSetup
 ) -> LintResults:
     if flake8.skip:
-        return LintResults()
+        return LintResults([], linter_name="Flake8")
 
     # NB: Flake8 output depends upon which Python interpreter version it's run with
     # (http://flake8.pycqa.org/en/latest/user/invocation.html). We batch targets by their
@@ -153,7 +155,7 @@ async def flake8_lint(
         Get(LintResult, Flake8Partition(partition_field_sets, partition_compatibility))
         for partition_compatibility, partition_field_sets in constraints_to_field_sets.items()
     )
-    return LintResults(partitioned_results)
+    return LintResults(partitioned_results, linter_name="Flake8")
 
 
 def rules():

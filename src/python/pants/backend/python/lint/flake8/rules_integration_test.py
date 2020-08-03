@@ -1,12 +1,12 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import List, Optional
+from typing import List, Optional, Sequence
 
 from pants.backend.python.lint.flake8.rules import Flake8FieldSet, Flake8Request
 from pants.backend.python.lint.flake8.rules import rules as flake8_rules
 from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonLibrary
-from pants.core.goals.lint import LintResults
+from pants.core.goals.lint import LintResult, LintResults
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, FileContent
 from pants.engine.rules import RootRule
@@ -45,7 +45,7 @@ class Flake8IntegrationTest(ExternalToolTestBase):
         passthrough_args: Optional[str] = None,
         skip: bool = False,
         additional_args: Optional[List[str]] = None,
-    ) -> LintResults:
+    ) -> Sequence[LintResult]:
         args = ["--backend-packages=pants.backend.python.lint.flake8"]
         if config:
             self.create_file(relpath=".flake8", contents=config)
@@ -56,13 +56,14 @@ class Flake8IntegrationTest(ExternalToolTestBase):
             args.append("--flake8-skip")
         if additional_args:
             args.extend(additional_args)
-        return self.request_single_product(
+        results = self.request_single_product(
             LintResults,
             Params(
                 Flake8Request(Flake8FieldSet.create(tgt) for tgt in targets),
                 create_options_bootstrapper(args=args),
             ),
         )
+        return results.results
 
     def test_passing_source(self) -> None:
         target = self.make_target([self.good_source])

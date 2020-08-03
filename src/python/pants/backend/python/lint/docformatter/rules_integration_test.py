@@ -1,13 +1,13 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import List, Optional, Tuple
+from typing import List, Optional, Sequence, Tuple
 
 from pants.backend.python.lint.docformatter.rules import DocformatterFieldSet, DocformatterRequest
 from pants.backend.python.lint.docformatter.rules import rules as docformatter_rules
 from pants.backend.python.target_types import PythonLibrary
 from pants.core.goals.fmt import FmtResult
-from pants.core.goals.lint import LintResults
+from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
@@ -35,7 +35,7 @@ class DocformatterIntegrationTest(ExternalToolTestBase):
 
     def run_docformatter(
         self, targets: List[Target], *, passthrough_args: Optional[str] = None, skip: bool = False,
-    ) -> Tuple[LintResults, FmtResult]:
+    ) -> Tuple[Sequence[LintResult], FmtResult]:
         args = ["--backend-packages=pants.backend.python.lint.docformatter"]
         if passthrough_args:
             args.append(f"--docformatter-args='{passthrough_args}'")
@@ -60,7 +60,7 @@ class DocformatterIntegrationTest(ExternalToolTestBase):
                 options_bootstrapper,
             ),
         )
-        return lint_results, fmt_result
+        return lint_results.results, fmt_result
 
     def get_digest(self, source_files: List[FileContent]) -> Digest:
         return self.request_single_product(Digest, CreateDigest(source_files))
