@@ -66,7 +66,6 @@ fn construct_nailgun_server_request(
     target_platform: platform_constraint,
     is_nailgunnable: true,
     execution_slot_variable: None,
-    cache_failures: false,
   }
 }
 

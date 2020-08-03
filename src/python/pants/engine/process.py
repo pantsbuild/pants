@@ -46,7 +46,6 @@ class Process:
     jdk_home: Optional[str]
     is_nailgunnable: bool
     execution_slot_variable: Optional[str]
-    cache_failures: bool
 
     def __init__(
         self,
@@ -64,7 +63,6 @@ class Process:
         jdk_home: Optional[str] = None,
         is_nailgunnable: bool = False,
         execution_slot_variable: Optional[str] = None,
-        cache_failures: bool = False,
     ) -> None:
         """Request to run a subprocess, similar to subprocess.Popen.
 
@@ -105,7 +103,6 @@ class Process:
         self.jdk_home = jdk_home
         self.is_nailgunnable = is_nailgunnable
         self.execution_slot_variable = execution_slot_variable
-        self.cache_failures = cache_failures
 
 
 @frozen_after_init
