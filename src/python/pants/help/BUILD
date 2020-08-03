@@ -6,6 +6,7 @@ python_library()
 python_tests(
   name='tests',
   sources=['*_test.py', '!*_integration_test.py'],
+  dependencies=["//:build_root"],
 )
 
 python_integration_tests(

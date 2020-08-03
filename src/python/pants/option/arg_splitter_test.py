@@ -1,6 +1,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import os
 import shlex
 import unittest
 from functools import partial
@@ -46,7 +47,7 @@ class ArgSplitterTest(unittest.TestCase):
     ) -> None:
         expected_passthru = expected_passthru or []
         expected_unknown_scopes = expected_unknown_scopes or []
-        splitter = ArgSplitter(ArgSplitterTest._known_scope_infos)
+        splitter = ArgSplitter(ArgSplitterTest._known_scope_infos, buildroot=os.getcwd())
         args = shlex.split(args_str)
         split_args = splitter.split_args(args)
         assert expected_goals == split_args.goals
@@ -62,19 +63,13 @@ class ArgSplitterTest(unittest.TestCase):
 
     @staticmethod
     def assert_unknown_goal(args_str: str, unknown_goals: List[str]) -> None:
-        splitter = ArgSplitter(ArgSplitterTest._known_scope_infos)
+        splitter = ArgSplitter(ArgSplitterTest._known_scope_infos, buildroot=os.getcwd())
         result = splitter.split_args(shlex.split(args_str))
         assert isinstance(splitter.help_request, UnknownGoalHelp)
         assert set(unknown_goals) == set(splitter.help_request.unknown_goals)
         assert result.unknown_scopes == unknown_goals
 
     def test_is_spec(self) -> None:
-        def assert_spec(arg: str) -> None:
-            assert ArgSplitter.likely_a_spec(arg) is True
-
-        def assert_not_spec(arg: str) -> None:
-            assert ArgSplitter.likely_a_spec(arg) is False
-
         unambiguous_specs = [
             "a/b/c",
             "a/b/c/",
@@ -93,21 +88,27 @@ class ArgSplitterTest(unittest.TestCase):
             "!/a/b",
             "!/a/b.txt",
         ]
-        for s in unambiguous_specs:
-            assert_spec(s)
 
         directories_vs_goals = ["foo", "a_b_c"]
         files_vs_subscopes = ["cache.java", "cache.tmp.java"]
         ambiguous_specs = [*directories_vs_goals, *files_vs_subscopes]
+
+        # With no files/directories on disk to tiebreak.
+        splitter = ArgSplitter(ArgSplitterTest._known_scope_infos, buildroot=os.getcwd())
         for spec in ambiguous_specs:
-            assert_not_spec(spec)
-        with temporary_dir() as tmpdir, pushd(tmpdir):
+            assert splitter.likely_a_spec(spec) is False
+        for s in unambiguous_specs:
+            assert splitter.likely_a_spec(s) is True
+
+        # With files/directories on disk to tiebreak.
+        with temporary_dir() as tmpdir:
+            splitter = ArgSplitter(ArgSplitterTest._known_scope_infos, tmpdir)
             for dir in directories_vs_goals:
                 Path(tmpdir, dir).mkdir()
             for f in files_vs_subscopes:
                 Path(tmpdir, f).touch()
             for spec in ambiguous_specs:
-                assert_spec(spec)
+                assert splitter.likely_a_spec(spec) is True
 
     def test_basic_arg_splitting(self) -> None:
         # Various flag combos.
@@ -359,7 +360,7 @@ class ArgSplitterTest(unittest.TestCase):
 
     def test_version_request_detection(self) -> None:
         def assert_version_request(args_str: str) -> None:
-            splitter = ArgSplitter(ArgSplitterTest._known_scope_infos)
+            splitter = ArgSplitter(ArgSplitterTest._known_scope_infos, buildroot=os.getcwd())
             splitter.split_args(shlex.split(args_str))
             self.assertTrue(isinstance(splitter.help_request, VersionHelp))
 
@@ -376,6 +377,6 @@ class ArgSplitterTest(unittest.TestCase):
         self.assert_unknown_goal("./pants foo compile bar baz:qux", ["foo", "bar"])
 
     def test_no_goal_detection(self) -> None:
-        splitter = ArgSplitter(ArgSplitterTest._known_scope_infos)
+        splitter = ArgSplitter(ArgSplitterTest._known_scope_infos, buildroot=os.getcwd())
         splitter.split_args(shlex.split("./pants foo/bar:baz"))
         self.assertTrue(isinstance(splitter.help_request, NoGoalHelp))

@@ -230,14 +230,6 @@ impl<N: Node> Entry<N> {
     &self.node
   }
 
-  pub(crate) fn cacheable_with_output(&self, output: Option<&N::Item>) -> bool {
-    (if let Some(item) = output {
-      self.node.cacheable_item(item)
-    } else {
-      false
-    }) && self.node.cacheable()
-  }
-
   ///
   /// If this Node is currently complete and clean with the given Generation, then waits for it to
   /// be changed in any way. If the node is not clean, or the generation mismatches, returns
@@ -446,7 +438,7 @@ impl<N: Node> Entry<N> {
             entry_id,
             run_token,
             generation,
-            if self.cacheable_with_output(Some(result.as_ref())) {
+            if self.node.cacheable() {
               Some(dep_generations)
             } else {
               None
@@ -518,7 +510,7 @@ impl<N: Node> Entry<N> {
             }
           }
           Some(Ok(result)) => {
-            let next_result: EntryResult<N> = if !self.cacheable_with_output(Some(&result)) {
+            let next_result: EntryResult<N> = if !self.node.cacheable() {
               EntryResult::Uncacheable(result, context.session_id().clone())
             } else if has_weak_deps {
               EntryResult::Dirty(result)

@@ -5,6 +5,7 @@ import copy
 import logging
 from typing import Dict, Iterable, List, Mapping, Optional, Sequence
 
+from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import resolve_conflicting_options, warn_or_error
 from pants.option.arg_splitter import ArgSplitter, HelpRequest
 from pants.option.config import Config
@@ -126,7 +127,7 @@ class Options:
         # We need parsers for all the intermediate scopes, so inherited option values
         # can propagate through them.
         complete_known_scope_infos = cls.complete_scopes(known_scope_infos)
-        splitter = ArgSplitter(complete_known_scope_infos)
+        splitter = ArgSplitter(complete_known_scope_infos, get_buildroot())
         split_args = splitter.split_args(args)
 
         if split_args.passthru and len(split_args.goals) > 1:
