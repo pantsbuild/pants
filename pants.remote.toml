@@ -38,7 +38,7 @@ process_execution_speculation_delay = 15
 executable_search_paths = [
   # These are the interpreter paths we set up on the remote container. We need to specify these
   # because many of our tests for the Python backend need to discover Python interpreters.
-  "/pyenv-docker-build/versions/3.7.3/bin:/pyenv-docker-build/versions/3.6.8/bin:/pyenv-docker-build/versions/2.7.15/bin",
+  "/pyenv-docker-build/versions/3.8.5/bin:/pyenv-docker-build/versions/3.7.8/bin:/pyenv-docker-build/versions/3.6.11/bin:/pyenv-docker-build/versions/2.7.18/bin",
   # The remote container has binaries like `ld` and `gcc` in /usr/bin.
   "/usr/bin",
   # We include the host PATH so that speculation still works.
@@ -50,7 +50,7 @@ executable_search_paths = [
 # platforms. This should be replaced by a proper mechanism to differentiate between the two.
 interpreter_search_paths = [
   # These are the interpreter paths we set up on the remote container.
-  "/pyenv-docker-build/versions/3.7.3/bin:/pyenv-docker-build/versions/3.6.8/bin:/pyenv-docker-build/versions/2.7.15/bin",
+  "/pyenv-docker-build/versions/3.8.5/bin:/pyenv-docker-build/versions/3.7.8/bin:/pyenv-docker-build/versions/3.6.11/bin:/pyenv-docker-build/versions/2.7.18/bin",
   # We include the host PATH and PEXRC values so that speculation still works.
   # NOTE: These come after the remote paths. Putting them before the remote paths means generic
   # bin dirs like /usr/bin will be on the PATH ahead of the pyenv dirs we actually want to use
