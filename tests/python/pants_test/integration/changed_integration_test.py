@@ -165,8 +165,8 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
         # A `python_library` with `sources=['file.name'] .
         "src/python/sources/sources.py": dict(
             none=["src/python/sources/sources.py"],
-            direct=["src/python/sources:sources"],
-            transitive=["src/python/sources:sources"],
+            direct=["src/python/sources"],
+            transitive=["src/python/sources"],
         ),
         # An unclaimed source file.
         "src/python/python_targets/test_unclaimed_src.py": dict(none=[], direct=[], transitive=[]),
@@ -281,7 +281,7 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
             safe_delete(os.path.join(worktree, "src/python/sources/sources.py"))
             pants_run = self.run_pants(["list", "--changed-since=HEAD"])
             self.assert_success(pants_run)
-            self.assertEqual(pants_run.stdout_data.strip(), "src/python/sources:sources")
+            self.assertEqual(pants_run.stdout_data.strip(), "src/python/sources")
 
     def test_changed_with_deleted_resource(self):
         with create_isolated_git_repo() as worktree:
@@ -319,7 +319,7 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
             safe_delete(os.path.join(worktree, deleted_file))
             pants_run = self.run_pants(["--changed-since=HEAD", "list"])
             self.assert_success(pants_run)
-            self.assertEqual(pants_run.stdout_data.strip(), "src/python/sources:sources")
+            self.assertEqual(pants_run.stdout_data.strip(), "src/python/sources")
 
 
 ChangedIntegrationTest.generate_tests()
