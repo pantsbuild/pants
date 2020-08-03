@@ -48,3 +48,7 @@ ENV PATH "${PYENV_ROOT}/versions/${PYTHON_27_VERSION}/bin:${PATH}"
 ENV PATH "${PYENV_ROOT}/versions/${PYTHON_36_VERSION}/bin:${PATH}"
 ENV PATH "${PYENV_ROOT}/versions/${PYTHON_37_VERSION}/bin:${PATH}"
 ENV PATH "${PYENV_ROOT}/versions/${PYTHON_38_VERSION}/bin:${PATH}"
+
+# Ensure UTF-8 locale is configured as required by Pants.
+ENV LC_ALL "en_US.UTF-8"
+ENV LANG "en_US.UTF-8"
