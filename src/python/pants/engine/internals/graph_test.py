@@ -5,7 +5,7 @@ import itertools
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
-from typing import Iterable, List, Sequence, Tuple, Type, cast
+from typing import Iterable, List, Tuple, Type, cast
 
 import pytest
 
@@ -36,13 +36,11 @@ from pants.engine.internals.graph import (
     AmbiguousCodegenImplementationsException,
     AmbiguousImplementationsException,
     CycleException,
-    InvalidFileDependencyException,
     NoValidTargetsException,
     Owners,
     OwnersRequest,
     TooManyTargetsException,
     parse_dependencies_field,
-    validate_explicit_file_dep,
 )
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import Get, RootRule, rule
@@ -947,94 +945,28 @@ class TestCodegen(TestBase):
 
 
 def test_parse_dependencies_field() -> None:
-    given_values = [
-        ":relative",
-        "//:top_level",
-        "demo:tgt",
-        "demo",
-        "./relative.txt",
-        "./child/f.txt",
-        "demo/f.txt",
-        "//top_level.txt",
-        "top_level2.txt",
-        # For files without an extension, you must use `./` There is no way (yet) to reference
-        # a file above you without a file extension.
-        "demo/no_extension",
-        "//demo/no_extension",
-        "./no_extension",
-    ]
+    given_and_expected = {
+        ":relative": AddressInput("demo/subdir", "relative"),
+        "//:top_level": AddressInput("", "top_level"),
+        "demo:tgt": AddressInput("demo", "tgt"),
+        "demo": AddressInput("demo"),
+        "relative.txt": AddressInput("relative.txt"),
+        "child/f.txt": AddressInput("child/f.txt"),
+        "demo/f.txt": AddressInput("demo/f.txt"),
+        "//top_level.txt": AddressInput("top_level.txt"),
+        "top_level2.txt": AddressInput("top_level2.txt"),
+        "demo/no_extension": AddressInput("demo/no_extension"),
+        "//demo/no_extension": AddressInput("demo/no_extension"),
+        "no_extension": AddressInput("no_extension"),
+    }
     result = parse_dependencies_field(
-        [*given_values, *(f"!{v}" for v in given_values)],
+        [*given_and_expected.keys(), *(f"!{v}" for v in given_and_expected.keys())],
         spec_path="demo/subdir",
         subproject_roots=[],
     )
-    expected_addresses = {
-        AddressInput("demo/subdir", "relative"),
-        AddressInput("", "top_level"),
-        AddressInput("demo", "tgt"),
-        AddressInput("demo", "demo"),
-        AddressInput("demo/no_extension", "no_extension"),
-    }
+    expected_addresses = {*given_and_expected.values()}
     assert set(result.addresses) == expected_addresses
     assert set(result.ignored_addresses) == expected_addresses
-    expected_files = {
-        "demo/subdir/relative.txt",
-        "demo/subdir/child/f.txt",
-        "demo/f.txt",
-        "top_level.txt",
-        "top_level2.txt",
-        "demo/subdir/no_extension",
-    }
-    assert set(result.files) == expected_files
-    assert set(result.ignored_files) == expected_files
-
-
-def test_validate_explicit_file_dep() -> None:
-    addr = Address("demo", target_name="tgt")
-
-    def assert_raises(
-        owners: Sequence[Address], *, expected_snippets: Iterable[str], is_an_ignore: bool = False
-    ) -> None:
-        with pytest.raises(InvalidFileDependencyException) as exc:
-            validate_explicit_file_dep(
-                addr, full_file="f.txt", owners=owners, is_an_ignore=is_an_ignore
-            )
-        assert addr.spec in str(exc.value)
-        if is_an_ignore:
-            assert "!f.txt" in str(exc.value)
-        else:
-            assert "f.txt" in str(exc.value)
-        for snippet in expected_snippets:
-            assert snippet in str(exc.value)
-
-    assert_raises(owners=[], expected_snippets=["no owners"])
-    assert_raises(owners=[], is_an_ignore=True, expected_snippets=["no owners"])
-    # Even if there is one owner, if it was not generated, then we fail because we can assume that
-    # the file in question does not actually exist.
-    assert_raises(owners=[Address.parse(":t")], expected_snippets=["no owners"])
-    assert_raises(owners=[Address.parse(":t")], is_an_ignore=True, expected_snippets=["no owners"])
-    assert_raises(
-        owners=[Address.parse(":t1"), Address.parse(":t2")],
-        expected_snippets=["multiple owners", "//:t1", "//:t2"],
-    )
-    assert_raises(
-        owners=[Address.parse(":t1"), Address.parse(":t2")],
-        is_an_ignore=True,
-        expected_snippets=["multiple owners", "!//:t1", "!//:t2"],
-    )
-
-    # Do not raise if there is one single generated owner.
-    validate_explicit_file_dep(
-        addr,
-        full_file="f.txt",
-        owners=[Address("", relative_file_path="f.txt", target_name="demo")],
-    )
-    validate_explicit_file_dep(
-        addr,
-        full_file="f.txt",
-        owners=[Address("", relative_file_path="f.txt", target_name="demo")],
-        is_an_ignore=True,
-    )
 
 
 class SmalltalkDependencies(Dependencies):

@@ -30,7 +30,7 @@ class AddressInput:
     """
 
     path_component: str
-    target_component: Optional[str]
+    target_component: Optional[str] = None
 
     def __post_init__(self):
         if self.target_component is not None or self.path_component == "":
@@ -300,7 +300,7 @@ class Address:
         """
         if self._relative_file_path:
             parent_count = self._relative_file_path.count(os.path.sep)
-            parent_prefix = '@' * parent_count if parent_count else '.'
+            parent_prefix = "@" * parent_count if parent_count else "."
             file_portion = f".{self._relative_file_path.replace(os.sep, '.')}"
         else:
             parent_prefix = "."
