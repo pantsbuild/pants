@@ -14,6 +14,7 @@ from pants.engine.rules import Get, MultiGet, RootRule, collect_rules, rule
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_method
+from pants.util.meta import frozen_after_init
 
 logger = logging.getLogger(__name__)
 
@@ -137,12 +138,18 @@ class SourceRootConfig(Subsystem):
         return SourceRootPatternMatcher(self.options.root_patterns)
 
 
-@dataclass(frozen=True)
+@frozen_after_init
+@dataclass(unsafe_hash=True)
 class SourceRootsRequest:
     """Find the source roots for the given files and/or dirs."""
 
     files: Tuple[PurePath, ...]
     dirs: Tuple[PurePath, ...]
+
+    def __init__(self, files: Iterable[PurePath], dirs: Iterable[PurePath]) -> None:
+        self.files = tuple(sorted(files))
+        self.dirs = tuple(sorted(dirs))
+        self.__post_init__()
 
     def __post_init__(self) -> None:
         for path in itertools.chain(self.files, self.dirs):
@@ -154,7 +161,7 @@ class SourceRootsRequest:
     @classmethod
     def for_files(cls, file_paths: Iterable[str]) -> "SourceRootsRequest":
         """Create a request for the source root for the given file."""
-        return cls(tuple(sorted({PurePath(file_path) for file_path in file_paths})), ())
+        return cls({PurePath(file_path) for file_path in file_paths}, ())
 
 
 @dataclass(frozen=True)
