@@ -28,10 +28,9 @@ async def strip_source_roots(source_files: SourceFiles) -> StrippedSourceFiles:
 
     if source_files.unrooted_files:
         rooted_files = set(source_files.snapshot.files) - set(source_files.unrooted_files)
-        rooted_files_digest = await Get(
-            Digest, DigestSubset(source_files.snapshot.digest, PathGlobs(rooted_files))
+        rooted_files_snapshot = await Get(
+            Snapshot, DigestSubset(source_files.snapshot.digest, PathGlobs(rooted_files))
         )
-        rooted_files_snapshot = await Get(Snapshot, Digest, rooted_files_digest)
     else:
         rooted_files_snapshot = source_files.snapshot
 

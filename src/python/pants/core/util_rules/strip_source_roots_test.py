@@ -6,11 +6,13 @@ from typing import List, Optional
 
 import pytest
 
+from pants.core.util_rules import determine_source_files
 from pants.core.util_rules.determine_source_files import SourceFiles
 from pants.core.util_rules.strip_source_roots import StrippedSourceFiles
 from pants.core.util_rules.strip_source_roots import rules as strip_source_root_rules
 from pants.engine.fs import EMPTY_SNAPSHOT
 from pants.engine.internals.scheduler import ExecutionError
+from pants.engine.rules import RootRule
 from pants.testutil.engine.util import Params
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
@@ -19,7 +21,12 @@ from pants.testutil.test_base import TestBase
 class StripSourceRootsTest(TestBase):
     @classmethod
     def rules(cls):
-        return (*super().rules(), *strip_source_root_rules())
+        return (
+            *super().rules(),
+            *strip_source_root_rules(),
+            *determine_source_files.rules(),
+            RootRule(SourceFiles),
+        )
 
     def get_stripped_files(
         self, request: SourceFiles, *, args: Optional[List[str]] = None,
