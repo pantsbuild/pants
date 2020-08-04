@@ -7,7 +7,7 @@ from typing import List
 from pants.backend.codegen.protobuf.python.rules import GeneratePythonFromProtobufRequest
 from pants.backend.codegen.protobuf.python.rules import rules as protobuf_rules
 from pants.backend.codegen.protobuf.target_types import ProtobufLibrary, ProtobufSources
-from pants.core.util_rules import determine_source_files
+from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.engine.addresses import Address
 from pants.engine.rules import RootRule
 from pants.engine.target import (
@@ -32,6 +32,7 @@ class ProtobufPythonIntegrationTest(ExternalToolTestBase):
             *super().rules(),
             *protobuf_rules(),
             *determine_source_files.rules(),
+            *strip_source_roots.rules(),
             RootRule(GeneratePythonFromProtobufRequest),
         )
 
