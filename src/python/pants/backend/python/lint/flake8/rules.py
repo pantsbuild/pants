@@ -33,14 +33,14 @@ from pants.engine.fs import (
 )
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import FieldSetWithOrigin
+from pants.engine.target import FieldSet
 from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
 from pants.util.strutil import pluralize
 
 
 @dataclass(frozen=True)
-class Flake8FieldSet(FieldSetWithOrigin):
+class Flake8FieldSet(FieldSet):
     required_fields = (PythonSources,)
 
     sources: PythonSources
@@ -96,12 +96,12 @@ async def flake8_lint_partition(
         ),
     )
 
-    all_source_files_request = Get(
+    source_files_request = Get(
         SourceFiles, SourceFilesRequest(field_set.sources for field_set in partition.field_sets)
     )
 
     requirements_pex, config_digest, source_files = await MultiGet(
-        requirements_pex_request, config_digest_request, all_source_files_request
+        requirements_pex_request, config_digest_request, source_files_request
     )
 
     input_digest = await Get(

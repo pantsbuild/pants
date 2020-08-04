@@ -33,14 +33,14 @@ from pants.engine.fs import (
 )
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import FieldSetWithOrigin
+from pants.engine.target import FieldSet
 from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
 from pants.util.strutil import pluralize
 
 
 @dataclass(frozen=True)
-class BanditFieldSet(FieldSetWithOrigin):
+class BanditFieldSet(FieldSet):
     required_fields = (PythonSources,)
 
     sources: PythonSources

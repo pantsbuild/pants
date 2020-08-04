@@ -24,13 +24,13 @@ from pants.core.util_rules.determine_source_files import SourceFiles, SourceFile
 from pants.engine.fs import Digest, GlobMatchErrorBehavior, MergeDigests, PathGlobs
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import FieldSetWithOrigin
+from pants.engine.target import FieldSet
 from pants.engine.unions import UnionRule
 from pants.util.strutil import pluralize
 
 
 @dataclass(frozen=True)
-class BlackFieldSet(FieldSetWithOrigin):
+class BlackFieldSet(FieldSet):
     required_fields = (PythonSources,)
 
     sources: PythonSources

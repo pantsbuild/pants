@@ -42,7 +42,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
-    FieldSetWithOrigin,
+    FieldSet,
     Target,
     Targets,
     TransitiveTargets,
@@ -54,7 +54,7 @@ from pants.util.strutil import pluralize
 
 
 @dataclass(frozen=True)
-class PylintFieldSet(FieldSetWithOrigin):
+class PylintFieldSet(FieldSet):
     required_fields = (PythonSources,)
 
     sources: PythonSources

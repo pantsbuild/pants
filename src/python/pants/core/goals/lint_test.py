@@ -13,13 +13,7 @@ from pants.core.util_rules.filter_empty_sources import (
 )
 from pants.engine.addresses import Address
 from pants.engine.fs import Workspace
-from pants.engine.target import (
-    FieldSetWithOrigin,
-    Sources,
-    Target,
-    TargetsWithOrigins,
-    TargetWithOrigin,
-)
+from pants.engine.target import FieldSet, Sources, Target, Targets
 from pants.engine.unions import UnionMembership
 from pants.testutil.engine.util import MockConsole, MockGet, create_goal_subsystem, run_rule
 from pants.testutil.test_base import TestBase
@@ -30,7 +24,7 @@ class MockTarget(Target):
     core_fields = (Sources,)
 
 
-class MockLinterFieldSet(FieldSetWithOrigin):
+class MockLinterFieldSet(FieldSet):
     required_fields = (Sources,)
 
 
@@ -125,19 +119,14 @@ class InvalidRequest(MockLintRequest):
 
 class LintTest(TestBase):
     @staticmethod
-    def make_target_with_origin(address: Optional[Address] = None) -> TargetWithOrigin:
-        if address is None:
-            address = Address.parse(":tests")
-        return TargetWithOrigin(
-            MockTarget({}, address=address),
-            origin=SingleAddress(directory=address.spec_path, name=address.target_name),
-        )
+    def make_target(address: Optional[Address] = None) -> Target:
+        return MockTarget({}, address=address or Address.parse(":tests"))
 
     def run_lint_rule(
         self,
         *,
         lint_request_types: List[Type[LintRequest]],
-        targets: List[TargetWithOrigin],
+        targets: List[Target],
         per_target_caching: bool,
         include_sources: bool = True,
     ) -> Tuple[int, str]:
@@ -149,7 +138,7 @@ class LintTest(TestBase):
             rule_args=[
                 console,
                 workspace,
-                TargetsWithOrigins(targets),
+                Targets(targets),
                 create_goal_subsystem(LintSubsystem, per_target_caching=per_target_caching),
                 union_membership,
             ],
@@ -176,7 +165,7 @@ class LintTest(TestBase):
         def assert_noops(per_target_caching: bool) -> None:
             exit_code, stderr = self.run_lint_rule(
                 lint_request_types=[FailingRequest],
-                targets=[self.make_target_with_origin()],
+                targets=[self.make_target()],
                 per_target_caching=per_target_caching,
                 include_sources=False,
             )
@@ -190,7 +179,7 @@ class LintTest(TestBase):
         def assert_noops(per_target_caching: bool) -> None:
             exit_code, stderr = self.run_lint_rule(
                 lint_request_types=[InvalidRequest],
-                targets=[self.make_target_with_origin()],
+                targets=[self.make_target()],
                 per_target_caching=per_target_caching,
             )
             assert exit_code == 0
@@ -201,7 +190,7 @@ class LintTest(TestBase):
 
     def test_single_target_with_one_linter(self) -> None:
         address = Address.parse(":tests")
-        target_with_origin = self.make_target_with_origin(address)
+        target_with_origin = self.make_target(address)
 
         def assert_expected(per_target_caching: bool) -> None:
             exit_code, stderr = self.run_lint_rule(
@@ -222,7 +211,7 @@ class LintTest(TestBase):
 
     def test_single_target_with_multiple_linters(self) -> None:
         address = Address.parse(":tests")
-        target_with_origin = self.make_target_with_origin(address)
+        target_with_origin = self.make_target(address)
 
         def assert_expected(per_target_caching: bool) -> None:
             exit_code, stderr = self.run_lint_rule(
@@ -251,10 +240,7 @@ class LintTest(TestBase):
         def get_stderr(*, per_target_caching: bool) -> str:
             exit_code, stderr = self.run_lint_rule(
                 lint_request_types=[ConditionallySucceedsRequest],
-                targets=[
-                    self.make_target_with_origin(good_address),
-                    self.make_target_with_origin(bad_address),
-                ],
+                targets=[self.make_target(good_address), self.make_target(bad_address),],
                 per_target_caching=per_target_caching,
             )
             assert exit_code == ConditionallySucceedsRequest.exit_code([bad_address])
@@ -284,10 +270,7 @@ class LintTest(TestBase):
         def get_stderr(*, per_target_caching: bool) -> str:
             exit_code, stderr = self.run_lint_rule(
                 lint_request_types=[ConditionallySucceedsRequest, SuccessfulRequest],
-                targets=[
-                    self.make_target_with_origin(good_address),
-                    self.make_target_with_origin(bad_address),
-                ],
+                targets=[self.make_target(good_address), self.make_target(bad_address),],
                 per_target_caching=per_target_caching,
             )
             assert exit_code == ConditionallySucceedsRequest.exit_code([bad_address])

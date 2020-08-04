@@ -11,7 +11,7 @@ from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
-from pants.engine.target import Field, Target, TargetsWithOrigins
+from pants.engine.target import Field, Target, Targets, TargetsWithOrigins
 from pants.engine.unions import UnionMembership, union
 from pants.util.strutil import strip_v2_chroot_path
 
@@ -66,7 +66,7 @@ class LanguageFmtTargets:
 
     required_fields: ClassVar[Tuple[Type[Field], ...]]
 
-    targets_with_origins: TargetsWithOrigins
+    targets: Targets
 
     @classmethod
     def belongs_to_language(cls, tgt: Target) -> bool:
@@ -130,7 +130,7 @@ class Fmt(Goal):
 @goal_rule
 async def fmt(
     console: Console,
-    targets_with_origins: TargetsWithOrigins,
+    targets: Targets,
     fmt_subsystem: FmtSubsystem,
     workspace: Workspace,
     union_membership: UnionMembership,
@@ -138,22 +138,16 @@ async def fmt(
     language_target_collection_types = union_membership[LanguageFmtTargets]
     language_target_collections: Iterable[LanguageFmtTargets] = tuple(
         language_target_collection_type(
-            TargetsWithOrigins(
-                target_with_origin
-                for target_with_origin in targets_with_origins
-                if language_target_collection_type.belongs_to_language(target_with_origin.target)
+            Targets(
+                target
+                for target in targets
+                if language_target_collection_type.belongs_to_language(target)
             )
         )
         for language_target_collection_type in language_target_collection_types
     )
     targets_with_sources: Iterable[TargetsWithSources] = await MultiGet(
-        Get(
-            TargetsWithSources,
-            TargetsWithSourcesRequest(
-                target_with_origin.target
-                for target_with_origin in language_target_collection.targets_with_origins
-            ),
-        )
+        Get(TargetsWithSources, TargetsWithSourcesRequest(language_target_collection.targets),)
         for language_target_collection in language_target_collections
     )
     # NB: We must convert back the generic TargetsWithSources objects back into their
@@ -161,10 +155,10 @@ async def fmt(
     # rule to work.
     valid_language_target_collections: Iterable[LanguageFmtTargets] = tuple(
         language_target_collection_cls(
-            TargetsWithOrigins(
-                target_with_origin
-                for target_with_origin in language_target_collection.targets_with_origins
-                if target_with_origin.target in language_targets_with_sources
+            Targets(
+                target
+                for target in language_target_collection.targets
+                if target in language_targets_with_sources
             )
         )
         for language_target_collection_cls, language_target_collection, language_targets_with_sources in zip(
@@ -178,10 +172,10 @@ async def fmt(
             Get(
                 LanguageFmtResults,
                 LanguageFmtTargets,
-                language_target_collection.__class__(TargetsWithOrigins([target_with_origin])),
+                language_target_collection.__class__(Targets([target])),
             )
             for language_target_collection in valid_language_target_collections
-            for target_with_origin in language_target_collection.targets_with_origins
+            for target in language_target_collection.targets
         )
     else:
         per_language_results = await MultiGet(

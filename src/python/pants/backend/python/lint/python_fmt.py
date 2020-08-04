@@ -27,13 +27,9 @@ class PythonFmtRequest(StyleRequest):
 async def format_python_target(
     python_fmt_targets: PythonFmtTargets, union_membership: UnionMembership
 ) -> LanguageFmtResults:
-    targets_with_origins = python_fmt_targets.targets_with_origins
     original_sources = await Get(
         SourceFiles,
-        SourceFilesRequest(
-            target_with_origin.target[PythonSources]
-            for target_with_origin in python_fmt_targets.targets_with_origins
-        ),
+        SourceFilesRequest(target[PythonSources] for target in python_fmt_targets.targets),
     )
     prior_formatter_result = original_sources.snapshot
 
@@ -47,8 +43,8 @@ async def format_python_target(
             PythonFmtRequest,
             fmt_request_type(
                 (
-                    fmt_request_type.field_set_type.create(target_with_origin)
-                    for target_with_origin in targets_with_origins
+                    fmt_request_type.field_set_type.create(target)
+                    for target in python_fmt_targets.targets
                 ),
                 prior_formatter_result=prior_formatter_result,
             ),

@@ -6,14 +6,13 @@ from typing import List, Optional, Tuple
 from pants.backend.python.lint.isort.rules import IsortFieldSet, IsortRequest
 from pants.backend.python.lint.isort.rules import rules as isort_rules
 from pants.backend.python.target_types import PythonLibrary
-from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResults
 from pants.core.util_rules.determine_source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.rules import RootRule
-from pants.engine.target import TargetWithOrigin
+from pants.engine.target import Target
 from pants.testutil.engine.util import Params
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option.util import create_options_bootstrapper
@@ -39,19 +38,14 @@ class IsortIntegrationTest(ExternalToolTestBase):
     def rules(cls):
         return (*super().rules(), *isort_rules(), RootRule(IsortRequest))
 
-    def make_target_with_origin(
-        self, source_files: List[FileContent], *, origin: Optional[OriginSpec] = None,
-    ) -> TargetWithOrigin:
+    def make_target_with_origin(self, source_files: List[FileContent]) -> Target:
         for source_file in source_files:
             self.create_file(f"{source_file.path}", source_file.content.decode())
-        target = PythonLibrary({}, address=Address.parse(":target"))
-        if origin is None:
-            origin = SingleAddress(directory="", name="target")
-        return TargetWithOrigin(target, origin)
+        return PythonLibrary({}, address=Address.parse(":target"))
 
     def run_isort(
         self,
-        targets: List[TargetWithOrigin],
+        targets: List[Target],
         *,
         config: Optional[str] = None,
         passthrough_args: Optional[str] = None,
@@ -136,18 +130,6 @@ class IsortIntegrationTest(ExternalToolTestBase):
         assert "good.py" not in fmt_result.stdout
         assert fmt_result.output == self.get_digest([self.good_source, self.fixed_bad_source])
         assert fmt_result.did_change is True
-
-    def test_precise_file_args(self) -> None:
-        target = self.make_target_with_origin(
-            [self.good_source, self.bad_source], origin=FilesystemLiteralSpec(self.good_source.path)
-        )
-        lint_results, fmt_result = self.run_isort([target])
-        assert len(lint_results) == 1
-        assert lint_results[0].exit_code == 0
-        assert lint_results[0].stdout == ""
-        assert fmt_result.stdout == ""
-        assert fmt_result.output == self.get_digest([self.good_source, self.bad_source])
-        assert fmt_result.did_change is False
 
     def test_respects_config_file(self) -> None:
         target = self.make_target_with_origin([self.needs_config_source])

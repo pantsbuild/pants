@@ -28,13 +28,13 @@ from pants.engine.fs import (
 )
 from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import FieldSetWithOrigin
+from pants.engine.target import FieldSet
 from pants.engine.unions import UnionRule
 from pants.util.strutil import pluralize
 
 
 @dataclass(frozen=True)
-class IsortFieldSet(FieldSetWithOrigin):
+class IsortFieldSet(FieldSet):
     required_fields = (PythonSources,)
 
     sources: PythonSources
