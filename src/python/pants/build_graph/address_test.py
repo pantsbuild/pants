@@ -211,6 +211,9 @@ def test_address_input_from_dir() -> None:
 
 def test_address_normalize_target_name() -> None:
     assert Address("a/b/c", target_name="c") == Address("a/b/c", target_name=None)
+    assert Address("a/b/c", target_name="c", relative_file_path="f.txt") == Address(
+        "a/b/c", target_name=None, relative_file_path="f.txt"
+    )
 
 
 def test_address_equality() -> None:
