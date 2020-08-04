@@ -3,11 +3,25 @@
 
 from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
 from pants.backend.python.target_types import PythonInterpreterCompatibility
+from pants.engine.target import StringField
 
 
 class ProtobufPythonInterpreterCompatibility(PythonInterpreterCompatibility):
     alias = "python_compatibility"
 
 
+class PythonSourceRootField(StringField):
+    """The source root to generate python sources under.
+
+    If unspecified, the source root the protobuf_library is under will be used.
+    """
+
+    alias = "python_source_root"
+    default = None
+
+
 def rules():
-    return [ProtobufLibrary.register_plugin_field(ProtobufPythonInterpreterCompatibility)]
+    return [
+        ProtobufLibrary.register_plugin_field(ProtobufPythonInterpreterCompatibility),
+        ProtobufLibrary.register_plugin_field(PythonSourceRootField),
+    ]
