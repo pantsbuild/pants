@@ -12,7 +12,7 @@ from pants.backend.python.dependency_inference.python_stdlib.combined import com
 from pants.backend.python.rules import ancestor_files
 from pants.backend.python.rules.ancestor_files import AncestorFiles, AncestorFilesRequest
 from pants.backend.python.target_types import PythonSources, PythonTestsSources
-from pants.core.util_rules.determine_source_files import AllSourceFilesRequest
+from pants.core.util_rules.determine_source_files import SourceFilesRequest
 from pants.core.util_rules.strip_source_roots import StrippedSourceFiles
 from pants.engine.fs import Digest, DigestContents
 from pants.engine.internals.graph import Owners, OwnersRequest
@@ -89,9 +89,7 @@ async def infer_python_dependencies(
     if not python_inference.imports:
         return InferredDependencies()
 
-    stripped_sources = await Get(
-        StrippedSourceFiles, AllSourceFilesRequest([request.sources_field])
-    )
+    stripped_sources = await Get(StrippedSourceFiles, SourceFilesRequest([request.sources_field]))
     modules = tuple(
         PythonModule.create_from_stripped_path(PurePath(fp))
         for fp in stripped_sources.snapshot.files

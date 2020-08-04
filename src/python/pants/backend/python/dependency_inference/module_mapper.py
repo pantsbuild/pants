@@ -7,7 +7,7 @@ from typing import Dict, Optional, Set
 
 from pants.backend.python.target_types import PythonRequirementsField, PythonSources
 from pants.base.specs import AddressSpecs, DescendantAddresses
-from pants.core.util_rules.determine_source_files import AllSourceFilesRequest
+from pants.core.util_rules.determine_source_files import SourceFilesRequest
 from pants.core.util_rules.strip_source_roots import StrippedSourceFiles
 from pants.engine.addresses import Address
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -73,7 +73,7 @@ async def map_first_party_modules_to_addresses() -> FirstPartyModuleToAddressMap
         for tgt in candidate_explicit_targets
     )
     stripped_sources_per_explicit_target = await MultiGet(
-        Get(StrippedSourceFiles, AllSourceFilesRequest([tgt[PythonSources]]))
+        Get(StrippedSourceFiles, SourceFilesRequest([tgt[PythonSources]]))
         for tgt in candidate_explicit_targets
     )
 

@@ -7,7 +7,7 @@ from typing import Iterable, List, Type
 from pants.backend.python.target_types import PythonSources
 from pants.core.goals.fmt import FmtResult, LanguageFmtResults, LanguageFmtTargets
 from pants.core.goals.style_request import StyleRequest
-from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
+from pants.core.util_rules.determine_source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, Snapshot
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionMembership, UnionRule, union
@@ -30,7 +30,7 @@ async def format_python_target(
     targets_with_origins = python_fmt_targets.targets_with_origins
     original_sources = await Get(
         SourceFiles,
-        AllSourceFilesRequest(
+        SourceFilesRequest(
             target_with_origin.target[PythonSources]
             for target_with_origin in python_fmt_targets.targets_with_origins
         ),

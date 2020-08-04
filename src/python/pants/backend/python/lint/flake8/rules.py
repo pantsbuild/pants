@@ -22,11 +22,7 @@ from pants.core.goals.lint import (
     LintSubsystem,
 )
 from pants.core.util_rules import determine_source_files, strip_source_roots
-from pants.core.util_rules.determine_source_files import (
-    AllSourceFilesRequest,
-    SourceFiles,
-    SpecifiedSourceFilesRequest,
-)
+from pants.core.util_rules.determine_source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import (
     Digest,
     DigestSubset,
@@ -62,7 +58,7 @@ class Flake8Partition:
 
 
 def generate_args(
-    *, specified_source_files: SourceFiles, flake8: Flake8, output_file: Optional[str]
+    *, source_files: SourceFiles, flake8: Flake8, output_file: Optional[str]
 ) -> Tuple[str, ...]:
     args = []
     if flake8.config:
@@ -70,7 +66,7 @@ def generate_args(
     if output_file:
         args.append(f"--output-file={output_file}")
     args.extend(flake8.args)
-    args.extend(specified_source_files.files)
+    args.extend(source_files.files)
     return tuple(args)
 
 
@@ -101,25 +97,16 @@ async def flake8_lint_partition(
     )
 
     all_source_files_request = Get(
-        SourceFiles, AllSourceFilesRequest(field_set.sources for field_set in partition.field_sets)
-    )
-    specified_source_files_request = Get(
-        SourceFiles,
-        SpecifiedSourceFilesRequest(
-            (field_set.sources, field_set.origin) for field_set in partition.field_sets
-        ),
+        SourceFiles, SourceFilesRequest(field_set.sources for field_set in partition.field_sets)
     )
 
-    requirements_pex, config_digest, all_source_files, specified_source_files = await MultiGet(
-        requirements_pex_request,
-        config_digest_request,
-        all_source_files_request,
-        specified_source_files_request,
+    requirements_pex, config_digest, source_files = await MultiGet(
+        requirements_pex_request, config_digest_request, all_source_files_request
     )
 
     input_digest = await Get(
         Digest,
-        MergeDigests((all_source_files.snapshot.digest, requirements_pex.digest, config_digest)),
+        MergeDigests((source_files.snapshot.digest, requirements_pex.digest, config_digest)),
     )
 
     address_references = ", ".join(
@@ -134,7 +121,7 @@ async def flake8_lint_partition(
         PexProcess(
             requirements_pex,
             argv=generate_args(
-                specified_source_files=specified_source_files,
+                source_files=source_files,
                 flake8=flake8,
                 output_file=report_path.name if report_path else None,
             ),

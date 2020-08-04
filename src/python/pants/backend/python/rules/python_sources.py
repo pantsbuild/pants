@@ -9,7 +9,7 @@ from pants.backend.python.rules.ancestor_files import AncestorFiles, AncestorFil
 from pants.backend.python.target_types import PythonSources
 from pants.core.target_types import FilesSources, ResourcesSources
 from pants.core.util_rules import determine_source_files
-from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
+from pants.core.util_rules.determine_source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.strip_source_roots import StrippedSourceFiles
 from pants.core.util_rules.strip_source_roots import rules as strip_source_roots_rules
 from pants.engine.fs import MergeDigests, Snapshot
@@ -81,7 +81,7 @@ async def prepare_python_sources(
 ) -> PythonSourceFiles:
     sources = await Get(
         SourceFiles,
-        AllSourceFilesRequest(
+        SourceFilesRequest(
             (tgt.get(Sources) for tgt in request.targets),
             for_sources_types=request.valid_sources_types,
             enable_codegen=True,

@@ -27,7 +27,7 @@ from pants.backend.python.target_types import (
 )
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
 from pants.core.util_rules import determine_source_files, strip_source_roots
-from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
+from pants.core.util_rules.determine_source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address, Addresses
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -95,12 +95,12 @@ class PylintRequest(LintRequest):
     field_set_type = PylintFieldSet
 
 
-def generate_args(*, specified_source_files: SourceFiles, pylint: Pylint) -> Tuple[str, ...]:
+def generate_args(*, source_files: SourceFiles, pylint: Pylint) -> Tuple[str, ...]:
     args = []
     if pylint.config is not None:
         args.append(f"--rcfile={pylint.config}")
     args.extend(pylint.args)
-    args.extend(specified_source_files.files)
+    args.extend(source_files.files)
     return tuple(args)
 
 
@@ -164,11 +164,8 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
     prepare_python_sources_request = Get(
         PythonSourceFiles, PythonSourceFilesRequest(partition.targets_with_dependencies),
     )
-    specified_source_files_request = Get(
-        SourceFiles,
-        SpecifiedSourceFilesRequest(
-            (field_set.sources, field_set.origin) for field_set in partition.field_sets
-        ),
+    field_set_sources_request = Get(
+        SourceFiles, SourceFilesRequest(field_set.sources for field_set in partition.field_sets),
     )
 
     (
@@ -178,7 +175,7 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
         config_digest,
         prepared_plugin_sources,
         prepared_python_sources,
-        specified_source_files,
+        field_set_sources,
     ) = await MultiGet(
         pylint_pex_request,
         requirements_pex_request,
@@ -186,7 +183,7 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
         config_digest_request,
         prepare_plugin_sources_request,
         prepare_python_sources_request,
-        specified_source_files_request,
+        field_set_sources_request,
     )
 
     prefixed_plugin_sources = (
@@ -229,7 +226,7 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
         FallibleProcessResult,
         PexProcess(
             pylint_runner_pex,
-            argv=generate_args(specified_source_files=specified_source_files, pylint=pylint),
+            argv=generate_args(source_files=field_set_sources, pylint=pylint),
             input_digest=input_digest,
             extra_env={"PEX_EXTRA_SYS_PATH": ":".join(pythonpath)},
             description=(
