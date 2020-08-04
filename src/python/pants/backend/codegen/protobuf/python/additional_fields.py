@@ -11,13 +11,12 @@ class ProtobufPythonInterpreterCompatibility(PythonInterpreterCompatibility):
 
 
 class PythonSourceRootField(StringField):
-    """The source root to generate python sources under.
+    """The source root to generate Python sources under.
 
     If unspecified, the source root the protobuf_library is under will be used.
     """
 
     alias = "python_source_root"
-    default = None
 
 
 def rules():

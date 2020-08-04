@@ -150,7 +150,7 @@ class ProtobufPythonIntegrationTest(ExternalToolTestBase):
             expected_files=["tests/protobuf/test_protos/f_pb2.py"],
         )
 
-    def test_top_level_source_root(self) -> None:
+    def test_top_level_proto_root(self) -> None:
         self.create_file(
             "protos/f.proto",
             dedent(
@@ -164,6 +164,22 @@ class ProtobufPythonIntegrationTest(ExternalToolTestBase):
         self.add_to_build_file("protos", "protobuf_library()")
         self.assert_files_generated(
             "protos", source_roots=["/"], expected_files=["protos/f_pb2.py"]
+        )
+
+    def test_top_level_python_source_root(self) -> None:
+        self.create_file(
+            "src/proto/protos/f.proto",
+            dedent(
+                """\
+                syntax = "proto2";
+
+                package protos;
+                """
+            ),
+        )
+        self.add_to_build_file("src/proto/protos", "protobuf_library(python_source_root='.')")
+        self.assert_files_generated(
+            "src/proto/protos", source_roots=["/", "src/proto"], expected_files=["protos/f_pb2.py"]
         )
 
     def test_bad_python_source_root(self) -> None:
