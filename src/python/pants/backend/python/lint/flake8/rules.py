@@ -123,7 +123,7 @@ async def flake8_lint_partition(
     )
 
     address_references = ", ".join(
-        sorted(field_set.address.reference() for field_set in partition.field_sets)
+        sorted(field_set.address.spec for field_set in partition.field_sets)
     )
     report_path = (
         lint_subsystem.reports_dir / "flake8_report.txt" if lint_subsystem.reports_dir else None

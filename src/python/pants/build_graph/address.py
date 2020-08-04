@@ -147,7 +147,7 @@ class AddressInput:
         return cls(path_component, target_component)
 
     def file_to_address(self) -> "Address":
-        """Converts to an Address by asserting that the path_component is a file on disk."""
+        """Converts to an Address by assuming that the path_component is a file on disk."""
         if self.target_component is None:
             # Use the default target in the same directory as the file.
             spec_path, relative_file_path = os.path.split(self.path_component)
@@ -196,7 +196,7 @@ class AddressInput:
         return Address(spec_path, relative_file_path=relative_file_path, target_name=target_name)
 
     def dir_to_address(self) -> "Address":
-        """Converts to an Address by asserting that the path_component is a directory on disk."""
+        """Converts to an Address by assuming that the path_component is a directory on disk."""
         return Address(spec_path=self.path_component, target_name=self.target_component)
 
 
@@ -259,6 +259,7 @@ class Address:
         """
         self.spec_path = spec_path
         self._relative_file_path = relative_file_path
+        # If the target_name is the same as the default name would be, we normalize to None.
         self._target_name = (
             target_name if target_name and target_name != os.path.basename(self.spec_path) else None
         )
@@ -325,6 +326,10 @@ class Address:
         target_portion = f"{parent_prefix}{self._target_name}" if self._target_name else ""
         return f"{self.spec_path.replace(os.sep, '.')}{file_portion}{target_portion}"
 
+    @deprecated(
+        removal_version="2.1.0.dev0",
+        hint_message="Use the property .spec, which is the same thing.",
+    )
     def reference(self) -> str:
         """How to reference this address in a BUILD file."""
         return self.spec

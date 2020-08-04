@@ -1,85 +1,72 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from typing import Optional
+
 import pytest
 
 from pants.build_graph.address import Address, AddressInput, InvalidSpecPath, InvalidTargetName
 
 
+def assert_address_input_parsed(
+    spec: str,
+    *,
+    path_component: str,
+    target_component: Optional[str],
+    relative_to: Optional[str] = None
+) -> None:
+    ai = AddressInput.parse(spec, relative_to=relative_to)
+    assert ai.path_component == path_component
+    if target_component is None:
+        assert ai.target_component is None
+    else:
+        assert ai.target_component == target_component
+
+
 def test_address_input_parse_spec() -> None:
-    ai = AddressInput.parse("a/b/c")
-    assert ai.path_component == "a/b/c"
-    assert ai.target_component is None
+    assert_address_input_parsed("a/b/c", path_component="a/b/c", target_component=None)
+    assert_address_input_parsed("a/b/c:c", path_component="a/b/c", target_component="c")
+    # The relative_to has no effect because we have a path.
+    assert_address_input_parsed(
+        "a/b/c", relative_to="here", path_component="a/b/c", target_component=None
+    )
 
-    ai = AddressInput.parse("a/b/c:c")
-    assert ai.path_component == "a/b/c"
-    assert ai.target_component == "c"
+    # Relative address spec
+    assert_address_input_parsed(":c", path_component="", target_component="c")
+    assert_address_input_parsed(
+        ":c", relative_to="here", path_component="here", target_component="c"
+    )
+    assert_address_input_parsed("//:c", relative_to="here", path_component="", target_component="c")
 
-    ai = AddressInput.parse("a/b/c", relative_to="here")  # no effect - we have a path
-    assert ai.path_component == "a/b/c"
-    assert ai.target_component is None
+    # Absolute spec
+    assert_address_input_parsed("//a/b/c", path_component="a/b/c", target_component=None)
+    assert_address_input_parsed("//a/b/c:c", path_component="a/b/c", target_component="c")
+    assert_address_input_parsed("//:c", path_component="", target_component="c")
+    assert_address_input_parsed("//:c", relative_to="here", path_component="", target_component="c")
 
-
-def test_address_input_parse_local_spec() -> None:
-    ai = AddressInput.parse(":c")
-    assert ai.path_component == ""
-    assert ai.target_component == "c"
-
-    ai = AddressInput.parse(":c", relative_to="here")
-    assert ai.path_component == "here"
-    assert ai.target_component == "c"
-
-    ai = AddressInput.parse("//:c", relative_to="here")
-    assert ai.path_component == ""
-    assert ai.target_component == "c"
-
-
-def test_address_input_parse_absolute_spec() -> None:
-    ai = AddressInput.parse("//a/b/c")
-    assert ai.path_component == "a/b/c"
-    assert ai.target_component is None
-
-    ai = AddressInput.parse("//a/b/c:c")
-    assert ai.path_component == "a/b/c"
-    assert ai.target_component == "c"
-
-    ai = AddressInput.parse("//:c")
-    assert ai.path_component == ""
-    assert ai.target_component == "c"
-
-
-def test_address_input_parse_files() -> None:
-    ai = AddressInput.parse("f.txt")
-    assert ai.path_component == "f.txt"
-    assert ai.target_component is None
-
-    ai = AddressInput.parse("//f.txt")
-    assert ai.path_component == "f.txt"
-    assert ai.target_component is None
-
-    ai = AddressInput.parse("a/b/c.txt")
-    assert ai.path_component == "a/b/c.txt"
-    assert ai.target_component is None
-
-    ai = AddressInput.parse("a/b/c.txt:tgt")
-    assert ai.path_component == "a/b/c.txt"
-    assert ai.target_component == "tgt"
-
-    ai = AddressInput.parse("a/b/c.txt:../tgt")
-    assert ai.path_component == "a/b/c.txt"
-    assert ai.target_component == "../tgt"
-
-    ai = AddressInput.parse("//a/b/c.txt:tgt")
-    assert ai.path_component == "a/b/c.txt"
-    assert ai.target_component == "tgt"
-
-    ai = AddressInput.parse("./f.txt", relative_to="base")
-    assert ai.path_component == "base/f.txt"
-    assert ai.target_component is None
-
-    ai = AddressInput.parse("./subdir/f.txt:tgt", relative_to="base")
-    assert ai.path_component == "base/subdir/f.txt"
-    assert ai.target_component == "tgt"
+    # Files
+    assert_address_input_parsed("f.txt", path_component="f.txt", target_component=None)
+    assert_address_input_parsed("//f.txt", path_component="f.txt", target_component=None)
+    assert_address_input_parsed("a/b/c.txt", path_component="a/b/c.txt", target_component=None)
+    assert_address_input_parsed("a/b/c.txt:tgt", path_component="a/b/c.txt", target_component="tgt")
+    assert_address_input_parsed(
+        "a/b/c.txt:../tgt", path_component="a/b/c.txt", target_component="../tgt"
+    )
+    assert_address_input_parsed(
+        "//a/b/c.txt:tgt", path_component="a/b/c.txt", target_component="tgt"
+    )
+    assert_address_input_parsed(
+        "./f.txt", relative_to="here", path_component="here/f.txt", target_component=None
+    )
+    assert_address_input_parsed(
+        "./subdir/f.txt:tgt",
+        relative_to="here",
+        path_component="here/subdir/f.txt",
+        target_component="tgt",
+    )
+    assert_address_input_parsed(
+        "subdir/f.txt", relative_to="here", path_component="subdir/f.txt", target_component=None
+    )
 
 
 def test_address_input_parse_bad_path_component() -> None:

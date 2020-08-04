@@ -293,7 +293,7 @@ async def run_setup_pys(
     if explicit_nonexported_targets:
         raise TargetNotExported(
             "Cannot run setup.py on these targets, because they have no `provides=` clause: "
-            f'{", ".join(so.address.reference() for so in explicit_nonexported_targets)}'
+            f'{", ".join(so.address.spec for so in explicit_nonexported_targets)}'
         )
 
     if setup_py_subsystem.transitive:
@@ -330,13 +330,13 @@ async def run_setup_pys(
         )
 
         for exported_target, setup_py_result in zip(exported_targets, setup_py_results):
-            addr = exported_target.target.address.reference()
+            addr = exported_target.target.address.spec
             console.print_stderr(f"Writing dist for {addr} under {distdir.relpath}/.")
             workspace.write_digest(setup_py_result.output, path_prefix=str(distdir.relpath))
     else:
         # Just dump the chroot.
         for exported_target, chroot in zip(exported_targets, chroots):
-            addr = exported_target.target.address.reference()
+            addr = exported_target.target.address.spec
             provides = exported_target.provides
             setup_py_dir = distdir.relpath / f"{provides.name}-{provides.version}"
             console.print_stderr(f"Writing setup.py chroot for {addr} to {setup_py_dir}")
@@ -379,7 +379,7 @@ async def run_setup_py(
             # setuptools commands that create dists write them to the distdir.
             # TODO: Could there be other useful files to capture?
             output_directories=(dist_dir,),
-            description=f"Run setuptools for {req.exported_target.target.address.reference()}",
+            description=f"Run setuptools for {req.exported_target.target.address}",
         ),
     )
     output_digest = await Get(Digest, RemovePrefix(result.output_digest, dist_dir))
@@ -430,8 +430,7 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
         binary_entry_point = binary.get(PythonEntryPoint).value
         if not binary_entry_point:
             raise InvalidEntryPoint(
-                f"The binary {key} exported by {target.address.reference()} is not a valid entry "
-                f"point."
+                f"The binary {key} exported by {target.address} is not a valid entry point."
             )
         entry_points = setup_kwargs["entry_points"] = setup_kwargs.get("entry_points", {})
         console_scripts = entry_points["console_scripts"] = entry_points.get("console_scripts", [])
@@ -439,8 +438,7 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
 
     # Generate the setup script.
     setup_py_content = SETUP_BOILERPLATE.format(
-        target_address_spec=target.address.reference(),
-        setup_kwargs_str=distutils_repr(setup_kwargs),
+        target_address_spec=target.address.spec, setup_kwargs_str=distutils_repr(setup_kwargs),
     ).encode()
     extra_files_digest = await Get(
         Digest,
@@ -610,13 +608,13 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
                 sibling = next(exported_ancestor_iter, None)
             if sibling_owners:
                 raise AmbiguousOwnerError(
-                    f"Exporting owners for {target.address.reference()} are "
-                    f"ambiguous. Found {exported_ancestor.address.reference()} and "
+                    f"Exporting owners for {target.address} are "
+                    f"ambiguous. Found {exported_ancestor.address} and "
                     f"{len(sibling_owners)} others: "
-                    f'{", ".join(so.address.reference() for so in sibling_owners)}'
+                    f'{", ".join(so.address.spec for so in sibling_owners)}'
                 )
             return ExportedTarget(owner)
-    raise NoOwnerError(f"No exported target owner found for {target.address.reference()}")
+    raise NoOwnerError(f"No exported target owner found for {target.address}")
 
 
 @rule(desc="Set up setuptools")

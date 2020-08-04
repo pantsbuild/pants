@@ -221,7 +221,7 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
     )
 
     address_references = ", ".join(
-        sorted(field_set.address.reference() for field_set in partition.field_sets)
+        sorted(field_set.address.spec for field_set in partition.field_sets)
     )
 
     result = await Get(
