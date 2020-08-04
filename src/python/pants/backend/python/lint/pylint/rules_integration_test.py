@@ -4,7 +4,6 @@
 from pathlib import PurePath
 from textwrap import dedent
 from typing import List, Optional
-from unittest import skip
 
 from pants.backend.python.lint.pylint.plugin_target_type import PylintSourcePlugin
 from pants.backend.python.lint.pylint.rules import PylintFieldSet, PylintRequest
@@ -154,10 +153,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
         assert result[0].exit_code == 0
         assert "Your code has been rated at 10.00/10" in result[0].stdout.strip()
 
-    # @skip_unless_python27_and_python3_present
-    @skip(
-        "flaky test: depends on which Python 3 version is chosen: https://github.com/pantsbuild/pants/issues/10547"
-    )
+    @skip_unless_python27_and_python3_present
     def test_uses_correct_python_version(self) -> None:
         py2_args = [
             "--pylint-version=pylint<2",
@@ -172,7 +168,11 @@ class PylintIntegrationTest(ExternalToolTestBase):
         assert "invalid syntax (<string>, line 2) (syntax-error)" in py2_result[0].stdout
 
         py3_target = self.make_target_with_origin(
-            [self.py3_only_source], name="py3", interpreter_constraints="CPython>=3.6"
+            [self.py3_only_source],
+            name="py3",
+            # NB: Avoid Python 3.8+ for this test due to issues with asteroid/ast.
+            # See https://github.com/pantsbuild/pants/issues/10547.
+            interpreter_constraints="CPython>=3.6,<3.8",
         )
         py3_result = self.run_pylint([py3_target])
         assert len(py3_result) == 1
