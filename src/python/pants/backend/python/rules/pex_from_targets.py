@@ -16,8 +16,8 @@ from pants.backend.python.rules.pex import (
     TwoStepPexRequest,
 )
 from pants.backend.python.rules.python_sources import (
-    StrippedPythonSources,
-    StrippedPythonSourcesRequest,
+    PythonSourceFilesRequest,
+    StrippedPythonSourceFiles,
 )
 from pants.backend.python.target_types import (
     PythonInterpreterCompatibility,
@@ -109,9 +109,9 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         input_digests.append(request.additional_sources)
     if request.include_source_files:
         prepared_sources = await Get(
-            StrippedPythonSources, StrippedPythonSourcesRequest(all_targets)
+            StrippedPythonSourceFiles, PythonSourceFilesRequest(all_targets)
         )
-        input_digests.append(prepared_sources.snapshot.digest)
+        input_digests.append(prepared_sources.stripped_source_files.snapshot.digest)
     merged_input_digest = await Get(Digest, MergeDigests(input_digests))
 
     interpreter_constraints = PexInterpreterConstraints.create_from_compatibility_fields(

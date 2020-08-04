@@ -7,10 +7,8 @@ from typing import Dict, Optional, Set
 
 from pants.backend.python.target_types import PythonRequirementsField, PythonSources
 from pants.base.specs import AddressSpecs, DescendantAddresses
-from pants.core.util_rules.strip_source_roots import (
-    SourceRootStrippedSources,
-    StripSourcesFieldRequest,
-)
+from pants.core.util_rules.determine_source_files import AllSourceFilesRequest
+from pants.core.util_rules.strip_source_roots import StrippedSourceFiles
 from pants.engine.addresses import Address
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -75,9 +73,10 @@ async def map_first_party_modules_to_addresses() -> FirstPartyModuleToAddressMap
         for tgt in candidate_explicit_targets
     )
     stripped_sources_per_explicit_target = await MultiGet(
-        Get(SourceRootStrippedSources, StripSourcesFieldRequest(tgt[PythonSources]))
+        Get(StrippedSourceFiles, AllSourceFilesRequest([tgt[PythonSources]]))
         for tgt in candidate_explicit_targets
     )
+
     modules_to_addresses: Dict[str, Address] = {}
     modules_with_multiple_owners: Set[str] = set()
     for explicit_tgt, unstripped_sources, stripped_sources in zip(

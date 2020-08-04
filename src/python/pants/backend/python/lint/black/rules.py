@@ -111,7 +111,7 @@ async def setup(setup_request: SetupRequest, black: Black) -> Setup:
     all_source_files, requirements_pex, config_digest, specified_source_files = (
         await MultiGet(all_source_files_request, *requests)
         if setup_request.request.prior_formatter_result is None
-        else (SourceFiles(EMPTY_SNAPSHOT), *await MultiGet(*requests))
+        else (SourceFiles(EMPTY_SNAPSHOT, ()), *await MultiGet(*requests))
     )
     all_source_files_snapshot = (
         all_source_files.snapshot

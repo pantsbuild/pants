@@ -21,10 +21,7 @@ from pants.backend.python.rules.pex import (
     PexRequirements,
 )
 from pants.backend.python.rules.pex_from_targets import PexFromTargetsRequest
-from pants.backend.python.rules.python_sources import (
-    UnstrippedPythonSources,
-    UnstrippedPythonSourcesRequest,
-)
+from pants.backend.python.rules.python_sources import PythonSourceFiles, PythonSourceFilesRequest
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.target_types import (
     PythonInterpreterCompatibility,
@@ -150,7 +147,7 @@ async def setup_pytest_for_target(
     )
 
     prepared_sources_request = Get(
-        UnstrippedPythonSources, UnstrippedPythonSourcesRequest(all_targets, include_files=True)
+        PythonSourceFiles, PythonSourceFilesRequest(all_targets, include_files=True)
     )
 
     # Get the file names for the test_target so that we can specify to Pytest precisely which files
@@ -178,7 +175,7 @@ async def setup_pytest_for_target(
         MergeDigests(
             (
                 coverage_config.digest,
-                prepared_sources.snapshot.digest,
+                prepared_sources.source_files.snapshot.digest,
                 requirements_pex.digest,
                 pytest_pex.digest,
                 test_runner_pex.digest,

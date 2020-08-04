@@ -6,12 +6,10 @@ from typing import Iterable, List, Optional, Type
 
 from pants.backend.codegen.protobuf.python.rules import rules as protobuf_rules
 from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
-from pants.backend.python.rules import ancestor_files
 from pants.backend.python.rules.python_sources import (
-    StrippedPythonSources,
-    StrippedPythonSourcesRequest,
-    UnstrippedPythonSources,
-    UnstrippedPythonSourcesRequest,
+    PythonSourceFiles,
+    PythonSourceFilesRequest,
+    StrippedPythonSourceFiles,
 )
 from pants.backend.python.rules.python_sources import rules as python_sources_rules
 from pants.backend.python.target_types import PythonSources
@@ -34,16 +32,14 @@ class NonPythonTarget(Target):
     core_fields = (Sources,)
 
 
-class PythonSourcesTest(ExternalToolTestBase):
+class PythonSourceFilesTest(ExternalToolTestBase):
     @classmethod
     def rules(cls):
         return (
             *super().rules(),
             *python_sources_rules(),
-            *ancestor_files.rules(),
             *protobuf_rules(),
-            RootRule(StrippedPythonSourcesRequest),
-            RootRule(UnstrippedPythonSourcesRequest),
+            RootRule(PythonSourceFilesRequest),
         )
 
     @classmethod
@@ -65,11 +61,11 @@ class PythonSourcesTest(ExternalToolTestBase):
         include_files: bool = False,
         source_roots: Optional[List[str]] = None,
         extra_args: Optional[List[str]] = None,
-    ) -> StrippedPythonSources:
+    ) -> StrippedPythonSourceFiles:
         return self.request_single_product(
-            StrippedPythonSources,
+            StrippedPythonSourceFiles,
             Params(
-                StrippedPythonSourcesRequest(
+                PythonSourceFilesRequest(
                     targets, include_resources=include_resources, include_files=include_files
                 ),
                 create_options_bootstrapper(
@@ -90,11 +86,11 @@ class PythonSourcesTest(ExternalToolTestBase):
         include_files: bool = False,
         source_roots: Optional[List[str]] = None,
         extra_args: Optional[List[str]] = None,
-    ) -> UnstrippedPythonSources:
+    ) -> PythonSourceFiles:
         return self.request_single_product(
-            UnstrippedPythonSources,
+            PythonSourceFiles,
             Params(
-                UnstrippedPythonSourcesRequest(
+                PythonSourceFilesRequest(
                     targets, include_resources=include_resources, include_files=include_files
                 ),
                 create_options_bootstrapper(
@@ -127,7 +123,7 @@ class PythonSourcesTest(ExternalToolTestBase):
             result = self.get_stripped_sources(
                 targets, include_resources=include_resources, include_files=include_files
             )
-            assert result.snapshot.files == tuple(expected)
+            assert result.stripped_source_files.snapshot.files == tuple(expected)
 
         def assert_unstripped(
             *, include_resources: bool, include_files: bool, expected: List[str]
@@ -135,7 +131,7 @@ class PythonSourcesTest(ExternalToolTestBase):
             result = self.get_unstripped_sources(
                 targets, include_resources=include_resources, include_files=include_files
             )
-            assert result.snapshot.files == tuple(expected)
+            assert result.source_files.snapshot.files == tuple(expected)
             assert result.source_roots == ("src/python",)
 
         assert_stripped(
@@ -174,10 +170,10 @@ class PythonSourcesTest(ExternalToolTestBase):
         targets = [self.create_target(parent_directory="", files=["f1.py", "f2.py"])]
 
         stripped_result = self.get_stripped_sources(targets, source_roots=["/"])
-        assert stripped_result.snapshot.files == ("f1.py", "f2.py")
+        assert stripped_result.stripped_source_files.snapshot.files == ("f1.py", "f2.py")
 
         unstripped_result = self.get_unstripped_sources(targets, source_roots=["/"])
-        assert unstripped_result.snapshot.files == ("f1.py", "f2.py")
+        assert unstripped_result.source_files.snapshot.files == ("f1.py", "f2.py")
         assert unstripped_result.source_roots == (".",)
 
     def test_files_not_used_for_source_roots(self) -> None:
@@ -207,10 +203,10 @@ class PythonSourcesTest(ExternalToolTestBase):
         stripped_result = self.get_stripped_sources(
             targets, source_roots=["src/protobuf"], extra_args=backend_args
         )
-        assert stripped_result.snapshot.files == ("dir/f_pb2.py",)
+        assert stripped_result.stripped_source_files.snapshot.files == ("dir/f_pb2.py",)
 
         unstripped_result = self.get_unstripped_sources(
             targets, source_roots=["src/protobuf"], extra_args=backend_args
         )
-        assert unstripped_result.snapshot.files == ("src/protobuf/dir/f_pb2.py",)
+        assert unstripped_result.source_files.snapshot.files == ("src/protobuf/dir/f_pb2.py",)
         assert unstripped_result.source_roots == ("src/protobuf",)
