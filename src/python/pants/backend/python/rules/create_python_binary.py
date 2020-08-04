@@ -22,8 +22,10 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.target_types import PythonPlatforms as PythonPlatformsField
 from pants.core.goals.binary import BinaryFieldSet, CreatedBinary
-from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
+from pants.core.util_rules.determine_source_files import SourceFiles
+from pants.core.util_rules.strip_source_roots import StrippedSourceFiles
 from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.target import HydratedSources, HydrateSourcesRequest
 from pants.engine.unions import UnionRule
 
 
@@ -67,11 +69,15 @@ async def create_python_binary(
 ) -> CreatedBinary:
     entry_point = field_set.entry_point.value
     if entry_point is None:
-        source_files = await Get(
-            SourceFiles, AllSourceFilesRequest([field_set.sources], strip_source_roots=True)
+        # TODO: This is overkill? We don't need to hydrate the sources and strip snapshots,
+        #  we only need the path relative to the source root.
+        binary_sources = await Get(HydratedSources, HydrateSourcesRequest(field_set.sources))
+        stripped_binary_sources = await Get(
+            StrippedSourceFiles, SourceFiles(binary_sources.snapshot, ())
         )
-        entry_point = PythonBinarySources.translate_source_file_to_entry_point(source_files.files)
-
+        entry_point = PythonBinarySources.translate_source_file_to_entry_point(
+            stripped_binary_sources.snapshot.files
+        )
     output_filename = f"{field_set.address.target_name}.pex"
     two_step_pex = await Get(
         TwoStepPex,

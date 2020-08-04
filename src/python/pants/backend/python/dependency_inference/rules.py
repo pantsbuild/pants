@@ -12,10 +12,8 @@ from pants.backend.python.dependency_inference.python_stdlib.combined import com
 from pants.backend.python.rules import ancestor_files
 from pants.backend.python.rules.ancestor_files import AncestorFiles, AncestorFilesRequest
 from pants.backend.python.target_types import PythonSources, PythonTestsSources
-from pants.core.util_rules.strip_source_roots import (
-    SourceRootStrippedSources,
-    StripSourcesFieldRequest,
-)
+from pants.core.util_rules.determine_source_files import AllSourceFilesRequest
+from pants.core.util_rules.strip_source_roots import StrippedSourceFiles
 from pants.engine.fs import Digest, DigestContents
 from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -92,7 +90,7 @@ async def infer_python_dependencies(
         return InferredDependencies()
 
     stripped_sources = await Get(
-        SourceRootStrippedSources, StripSourcesFieldRequest(request.sources_field)
+        StrippedSourceFiles, AllSourceFilesRequest([request.sources_field])
     )
     modules = tuple(
         PythonModule.create_from_stripped_path(PurePath(fp))
@@ -133,8 +131,7 @@ async def infer_python_init_dependencies(
     # Locate __init__.py files not already in the Snapshot.
     hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.sources_field))
     extra_init_files = await Get(
-        AncestorFiles,
-        AncestorFilesRequest("__init__.py", hydrated_sources.snapshot, sources_stripped=False),
+        AncestorFiles, AncestorFilesRequest("__init__.py", hydrated_sources.snapshot),
     )
 
     # And add dependencies on their owners.
@@ -161,8 +158,7 @@ async def infer_python_conftest_dependencies(
     # Locate conftest.py files not already in the Snapshot.
     hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.sources_field))
     extra_conftest_files = await Get(
-        AncestorFiles,
-        AncestorFilesRequest("conftest.py", hydrated_sources.snapshot, sources_stripped=False),
+        AncestorFiles, AncestorFilesRequest("conftest.py", hydrated_sources.snapshot),
     )
 
     # And add dependencies on their owners.

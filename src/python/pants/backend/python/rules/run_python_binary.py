@@ -4,18 +4,21 @@
 from pants.backend.python.rules.create_python_binary import PythonBinaryFieldSet
 from pants.backend.python.rules.pex import Pex, PexPlatforms
 from pants.backend.python.rules.pex_from_targets import PexFromTargetsRequest
-from pants.backend.python.rules.python_sources import (
-    UnstrippedPythonSources,
-    UnstrippedPythonSourcesRequest,
-)
+from pants.backend.python.rules.python_sources import PythonSourceFiles, PythonSourceFilesRequest
 from pants.backend.python.target_types import PythonBinaryDefaults, PythonBinarySources
 from pants.core.goals.binary import BinaryFieldSet
 from pants.core.goals.run import RunRequest
-from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
+from pants.core.util_rules.determine_source_files import SourceFiles
+from pants.core.util_rules.strip_source_roots import StrippedSourceFiles
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import InvalidFieldException, TransitiveTargets
+from pants.engine.target import (
+    HydratedSources,
+    HydrateSourcesRequest,
+    InvalidFieldException,
+    TransitiveTargets,
+)
 from pants.engine.unions import UnionRule
 
 
@@ -25,10 +28,15 @@ async def create_python_binary_run_request(
 ) -> RunRequest:
     entry_point = field_set.entry_point.value
     if entry_point is None:
-        binary_sources = await Get(
-            SourceFiles, AllSourceFilesRequest([field_set.sources], strip_source_roots=True)
+        # TODO: This is overkill? We don't need to hydrate the sources and strip snapshots,
+        #  we only need the path relative to the source root.
+        binary_sources = await Get(HydratedSources, HydrateSourcesRequest(field_set.sources))
+        stripped_binary_sources = await Get(
+            StrippedSourceFiles, SourceFiles(binary_sources.snapshot, ())
         )
-        entry_point = PythonBinarySources.translate_source_file_to_entry_point(binary_sources.files)
+        entry_point = PythonBinarySources.translate_source_file_to_entry_point(
+            stripped_binary_sources.snapshot.files
+        )
     if entry_point is None:
         raise InvalidFieldException(
             "You must either specify `sources` or `entry_point` for the target "
@@ -48,18 +56,19 @@ async def create_python_binary_run_request(
             include_source_files=False,
         ),
     )
-    source_files_request = Get(
-        UnstrippedPythonSources,
-        UnstrippedPythonSourcesRequest(transitive_targets.closure, include_files=True),
+    sources_request = Get(
+        PythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure, include_files=True),
     )
-    pex, source_files = await MultiGet(pex_request, source_files_request)
+    pex, sources = await MultiGet(pex_request, sources_request)
 
-    merged_digest = await Get(Digest, MergeDigests([pex.digest, source_files.snapshot.digest]))
+    merged_digest = await Get(
+        Digest, MergeDigests([pex.digest, sources.source_files.snapshot.digest])
+    )
     return RunRequest(
         digest=merged_digest,
         binary_name=pex.output_filename,
         prefix_args=("-m", entry_point),
-        env={"PEX_EXTRA_SYS_PATH": ":".join(source_files.source_roots)},
+        env={"PEX_EXTRA_SYS_PATH": ":".join(sources.source_roots)},
     )
 
 

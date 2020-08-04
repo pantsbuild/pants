@@ -8,9 +8,11 @@ from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Dict, Iterable, Optional, Set, Tuple, Union
 
+from pants.build_graph.address import Address
 from pants.engine.collection import DeduplicatedCollection
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.rules import Get, MultiGet, RootRule, collect_rules, rule
+from pants.engine.target import Target
 from pants.option.subsystem import Subsystem
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_method
@@ -186,6 +188,15 @@ class SourceRootRequest:
         # The file itself cannot be a source root, so we may as well start the search
         # from its enclosing directory, and save on some superfluous checking.
         return cls(PurePath(file_path).parent)
+
+    @classmethod
+    def for_address(cls, address: Address) -> "SourceRootRequest":
+        # Note that we don't use for_file() here because the spec_path is a directory.
+        return cls(PurePath(address.spec_path))
+
+    @classmethod
+    def for_target(cls, target: Target) -> "SourceRootRequest":
+        return cls.for_address(target.address)
 
 
 @dataclass(frozen=True)

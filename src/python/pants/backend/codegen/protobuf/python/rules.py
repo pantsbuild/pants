@@ -6,7 +6,7 @@ from pants.backend.codegen.protobuf.target_types import ProtobufSources
 from pants.backend.python.target_types import PythonSources
 from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
-from pants.core.util_rules.strip_source_roots import representative_path_from_address
+from pants.core.util_rules.strip_source_roots import StrippedSourceFiles
 from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, Digest, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.platform import Platform
@@ -52,33 +52,36 @@ async def generate_python_from_protobuf(
         AllSourceFilesRequest(
             (tgt.get(Sources) for tgt in transitive_targets.closure),
             for_sources_types=(ProtobufSources,),
-            # NB: By stripping the source roots, we avoid having to set the value `--proto_path`
-            # for Protobuf imports to be discoverable.
-            strip_source_roots=True,
         ),
     )
-    stripped_target_sources_request = Get(
-        SourceFiles,
-        AllSourceFilesRequest([request.protocol_target[ProtobufSources]], strip_source_roots=True),
+    unstripped_target_sources_request = Get(
+        SourceFiles, AllSourceFilesRequest([request.protocol_target[ProtobufSources]]),
     )
 
     (
         downloaded_protoc_binary,
         create_output_dir_result,
-        all_sources,
-        stripped_target_sources,
+        all_sources_unstripped,
+        target_sources_unstripped,
     ) = await MultiGet(
         download_protoc_request,
         create_output_dir_request,
         all_sources_request,
-        stripped_target_sources_request,
+        unstripped_target_sources_request,
+    )
+
+    # NB: By stripping the source roots, we avoid having to set the value `--proto_path`
+    # for Protobuf imports to be discoverable.
+    all_sources_stripped, target_sources_stripped = await MultiGet(
+        Get(StrippedSourceFiles, SourceFiles, all_sources_unstripped),
+        Get(StrippedSourceFiles, SourceFiles, target_sources_unstripped),
     )
 
     input_digest = await Get(
         Digest,
         MergeDigests(
             (
-                all_sources.snapshot.digest,
+                all_sources_stripped.snapshot.digest,
                 downloaded_protoc_binary.digest,
                 create_output_dir_result.output_digest,
             )
@@ -92,7 +95,7 @@ async def generate_python_from_protobuf(
                 downloaded_protoc_binary.exe,
                 "--python_out",
                 output_dir,
-                *stripped_target_sources.snapshot.files,
+                *target_sources_stripped.snapshot.files,
             ),
             input_digest=input_digest,
             description=f"Generating Python sources from {request.protocol_target.address}.",
@@ -105,13 +108,7 @@ async def generate_python_from_protobuf(
     # including adding back the original source root.
     normalized_digest, source_root = await MultiGet(
         Get(Digest, RemovePrefix(result.output_digest, output_dir)),
-        Get(
-            SourceRoot,
-            SourceRootRequest,
-            SourceRootRequest.for_file(
-                representative_path_from_address(request.protocol_target.address)
-            ),
-        ),
+        Get(SourceRoot, SourceRootRequest, SourceRootRequest.for_target(request.protocol_target)),
     )
     source_root_restored = (
         await Get(Snapshot, AddPrefix(normalized_digest, source_root.path))

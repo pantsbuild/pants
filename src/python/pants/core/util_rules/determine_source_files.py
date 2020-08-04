@@ -2,14 +2,10 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from dataclasses import dataclass
-from typing import Iterable, Tuple, Type, Union
+from typing import Iterable, Set, Tuple, Type, Union
 
 from pants.base.specs import AddressSpec, OriginSpec
-from pants.core.util_rules import strip_source_roots
-from pants.core.util_rules.strip_source_roots import (
-    SourceRootStrippedSources,
-    StripSourcesFieldRequest,
-)
+from pants.core.target_types import FilesSources
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestSubset, MergeDigests, PathGlobs, Snapshot
 from pants.engine.rules import Get, MultiGet, RootRule, collect_rules, rule
@@ -28,6 +24,10 @@ class SourceFiles:
 
     snapshot: Snapshot
 
+    # The subset of files in snapshot that are not intended to have an associated source root.
+    # That is, the sources of files() targets.
+    unrooted_files: Tuple[str, ...]
+
     @property
     def files(self) -> Tuple[str, ...]:
         return self.snapshot.files
@@ -39,7 +39,6 @@ class AllSourceFilesRequest:
     sources_fields: Tuple[SourcesField, ...]
     for_sources_types: Tuple[Type[SourcesField], ...]
     enable_codegen: bool
-    strip_source_roots: bool
 
     def __init__(
         self,
@@ -47,12 +46,10 @@ class AllSourceFilesRequest:
         *,
         for_sources_types: Iterable[Type[SourcesField]] = (SourcesField,),
         enable_codegen: bool = False,
-        strip_source_roots: bool = False
     ) -> None:
         self.sources_fields = tuple(sources_fields)
         self.for_sources_types = tuple(for_sources_types)
         self.enable_codegen = enable_codegen
-        self.strip_source_roots = strip_source_roots
 
 
 @frozen_after_init
@@ -61,7 +58,6 @@ class SpecifiedSourceFilesRequest:
     sources_fields_with_origins: Tuple[Tuple[SourcesField, OriginSpec], ...]
     for_sources_types: Tuple[Type[SourcesField], ...]
     enable_codegen: bool
-    strip_source_roots: bool
 
     def __init__(
         self,
@@ -69,12 +65,10 @@ class SpecifiedSourceFilesRequest:
         *,
         for_sources_types: Iterable[Type[SourcesField]] = (SourcesField,),
         enable_codegen: bool = False,
-        strip_source_roots: bool = False
     ) -> None:
         self.sources_fields_with_origins = tuple(sources_fields_with_origins)
         self.for_sources_types = tuple(for_sources_types)
         self.enable_codegen = enable_codegen
-        self.strip_source_roots = strip_source_roots
 
 
 def calculate_specified_sources(
@@ -94,44 +88,37 @@ def calculate_specified_sources(
 @rule
 async def determine_all_source_files(request: AllSourceFilesRequest) -> SourceFiles:
     """Merge all `Sources` fields into one Snapshot."""
-    if request.strip_source_roots:
-        stripped_snapshots = await MultiGet(
-            Get(
-                SourceRootStrippedSources,
-                StripSourcesFieldRequest(
-                    sources_field,
-                    for_sources_types=request.for_sources_types,
-                    enable_codegen=request.enable_codegen,
-                ),
-            )
-            for sources_field in request.sources_fields
+    unrooted_files: Set[str] = set()
+    all_hydrated_sources = await MultiGet(
+        Get(
+            HydratedSources,
+            HydrateSourcesRequest(
+                sources_field,
+                for_sources_types=request.for_sources_types,
+                enable_codegen=request.enable_codegen,
+            ),
         )
-        digests_to_merge = tuple(
-            stripped_snapshot.snapshot.digest for stripped_snapshot in stripped_snapshots
-        )
-    else:
-        all_hydrated_sources = await MultiGet(
-            Get(
-                HydratedSources,
-                HydrateSourcesRequest(
-                    sources_field,
-                    for_sources_types=request.for_sources_types,
-                    enable_codegen=request.enable_codegen,
-                ),
-            )
-            for sources_field in request.sources_fields
-        )
-        digests_to_merge = tuple(
-            hydrated_sources.snapshot.digest for hydrated_sources in all_hydrated_sources
-        )
+        for sources_field in request.sources_fields
+    )
+
+    for hydrated_sources, sources_field in zip(all_hydrated_sources, request.sources_fields):
+        if isinstance(sources_field, FilesSources):
+            unrooted_files.update(hydrated_sources.snapshot.files)
+
+    digests_to_merge = tuple(
+        hydrated_sources.snapshot.digest for hydrated_sources in all_hydrated_sources
+    )
     result = await Get(Snapshot, MergeDigests(digests_to_merge))
-    return SourceFiles(result)
+    return SourceFiles(result, tuple(sorted(unrooted_files)))
 
 
 @rule
 async def determine_specified_source_files(request: SpecifiedSourceFilesRequest) -> SourceFiles:
-    """Determine the specified `sources` for targets, possibly finding a subset of the original
-    `sources` fields if the user supplied file arguments."""
+    """Determine the specified `sources` for targets.
+
+    Possibly finding a subset of the original `sources` fields if the user supplied file arguments.
+    """
+    all_unrooted_files: Set[str] = set()
     all_hydrated_sources = await MultiGet(
         Get(
             HydratedSources,
@@ -150,6 +137,8 @@ async def determine_specified_source_files(request: SpecifiedSourceFilesRequest)
         all_hydrated_sources, request.sources_fields_with_origins
     ):
         sources_field, origin = sources_field_with_origin
+        if isinstance(sources_field, FilesSources):
+            all_unrooted_files.update(hydrated_sources.snapshot.files)
         if not hydrated_sources.snapshot.files:
             continue
         specified_sources = calculate_specified_sources(
@@ -167,23 +156,9 @@ async def determine_specified_source_files(request: SpecifiedSourceFilesRequest)
         )
 
     all_snapshots: Iterable[Snapshot] = (*full_snapshots.values(), *snapshot_subsets)
-    if request.strip_source_roots:
-        all_sources_fields = (*full_snapshots.keys(), *digest_subset_requests.keys())
-        stripped_snapshots = await MultiGet(
-            Get(
-                SourceRootStrippedSources,
-                StripSourcesFieldRequest(
-                    sources_field,
-                    specified_files_snapshot=snapshot,
-                    for_sources_types=request.for_sources_types,
-                    enable_codegen=request.enable_codegen,
-                ),
-            )
-            for sources_field, snapshot in zip(all_sources_fields, all_snapshots)
-        )
-        all_snapshots = (stripped_snapshot.snapshot for stripped_snapshot in stripped_snapshots)
     result = await Get(Snapshot, MergeDigests(snapshot.digest for snapshot in all_snapshots))
-    return SourceFiles(result)
+    unrooted_files = all_unrooted_files.intersection(result.files)
+    return SourceFiles(result, tuple(sorted(unrooted_files)))
 
 
 def rules():
@@ -191,5 +166,4 @@ def rules():
         *collect_rules(),
         RootRule(AllSourceFilesRequest),
         RootRule(SpecifiedSourceFilesRequest),
-        *strip_source_roots.rules(),
     ]
