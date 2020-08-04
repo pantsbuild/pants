@@ -7,7 +7,7 @@ from typing import Optional
 from pants.backend.python.rules import pex_from_targets, python_sources
 from pants.backend.python.rules.pex import PexRequest, PexRequirements
 from pants.backend.python.rules.pex_from_targets import PexFromTargetsRequest
-from pants.backend.python.rules.python_sources import StrippedPythonSourcesRequest
+from pants.backend.python.rules.python_sources import PythonSourceFilesRequest
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
@@ -28,7 +28,7 @@ class PexTest(TestBase):
             *pex_from_targets.rules(),
             *python_sources.rules(),
             RootRule(PexFromTargetsRequest),
-            RootRule(StrippedPythonSourcesRequest),
+            RootRule(PythonSourceFilesRequest),
             SubsystemRule(PythonSetup),
         )
 

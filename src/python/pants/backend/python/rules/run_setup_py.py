@@ -16,8 +16,8 @@ from pants.backend.python.rules.pex import (
     PexRequirements,
 )
 from pants.backend.python.rules.python_sources import (
-    StrippedPythonSources,
-    StrippedPythonSourcesRequest,
+    PythonSourceFilesRequest,
+    StrippedPythonSourceFiles,
 )
 from pants.backend.python.rules.python_sources import rules as python_sources_rules
 from pants.backend.python.rules.setuptools import Setuptools
@@ -461,24 +461,27 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
 @rule
 async def get_sources(request: SetupPySourcesRequest) -> SetupPySources:
     python_sources = await Get(
-        StrippedPythonSources,
-        StrippedPythonSourcesRequest(
+        StrippedPythonSourceFiles,
+        PythonSourceFilesRequest(
             targets=request.targets, include_resources=False, include_files=False
         ),
     )
     all_sources = await Get(
-        StrippedPythonSources,
-        StrippedPythonSourcesRequest(
+        StrippedPythonSourceFiles,
+        PythonSourceFilesRequest(
             targets=request.targets, include_resources=True, include_files=True
         ),
     )
 
-    python_files = set(python_sources.snapshot.files)
-    all_files = set(all_sources.snapshot.files)
+    python_files = set(python_sources.stripped_source_files.snapshot.files)
+    all_files = set(all_sources.stripped_source_files.snapshot.files)
     resource_files = all_files - python_files
 
     init_py_digest_contents = await Get(
-        DigestContents, DigestSubset(python_sources.snapshot.digest, PathGlobs(["**/__init__.py"]))
+        DigestContents,
+        DigestSubset(
+            python_sources.stripped_source_files.snapshot.digest, PathGlobs(["**/__init__.py"])
+        ),
     )
 
     packages, namespace_packages, package_data = find_packages(
@@ -488,7 +491,7 @@ async def get_sources(request: SetupPySourcesRequest) -> SetupPySources:
         py2=request.py2,
     )
     return SetupPySources(
-        digest=all_sources.snapshot.digest,
+        digest=all_sources.stripped_source_files.snapshot.digest,
         packages=packages,
         namespace_packages=namespace_packages,
         package_data=package_data,

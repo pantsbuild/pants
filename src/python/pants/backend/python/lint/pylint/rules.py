@@ -16,10 +16,9 @@ from pants.backend.python.rules.pex import (
     PexRequirements,
 )
 from pants.backend.python.rules.python_sources import (
-    StrippedPythonSources,
-    StrippedPythonSourcesRequest,
-    UnstrippedPythonSources,
-    UnstrippedPythonSourcesRequest,
+    PythonSourceFiles,
+    PythonSourceFilesRequest,
+    StrippedPythonSourceFiles,
 )
 from pants.backend.python.target_types import (
     PythonInterpreterCompatibility,
@@ -160,11 +159,10 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
     )
 
     prepare_plugin_sources_request = Get(
-        StrippedPythonSources, StrippedPythonSourcesRequest(partition.plugin_targets),
+        StrippedPythonSourceFiles, PythonSourceFilesRequest(partition.plugin_targets),
     )
     prepare_python_sources_request = Get(
-        UnstrippedPythonSources,
-        UnstrippedPythonSourcesRequest(partition.targets_with_dependencies),
+        PythonSourceFiles, PythonSourceFilesRequest(partition.targets_with_dependencies),
     )
     specified_source_files_request = Get(
         SourceFiles,
@@ -192,7 +190,10 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
     )
 
     prefixed_plugin_sources = (
-        await Get(Digest, AddPrefix(prepared_plugin_sources.snapshot.digest, "__plugins"))
+        await Get(
+            Digest,
+            AddPrefix(prepared_plugin_sources.stripped_source_files.snapshot.digest, "__plugins"),
+        )
         if pylint.source_plugins
         else EMPTY_DIGEST
     )
@@ -215,7 +216,7 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
                 pylint_runner_pex.digest,
                 config_digest,
                 prefixed_plugin_sources,
-                prepared_python_sources.snapshot.digest,
+                prepared_python_sources.source_files.snapshot.digest,
             )
         ),
     )
@@ -287,7 +288,7 @@ async def pylint_lint(
 
     partitions = (
         PylintPartition(
-            tuple(sorted(target_setups, key=lambda target_setup: target_setup.field_set.address)),
+            tuple(sorted(target_setups, key=lambda tgt_setup: tgt_setup.field_set.address)),
             interpreter_constraints,
             Targets(plugin_targets.closure),
         )
