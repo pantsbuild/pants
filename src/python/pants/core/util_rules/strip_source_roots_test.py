@@ -51,15 +51,10 @@ class StripSourceRootsTest(TestBase):
 
     def test_strip_snapshot(self) -> None:
         def get_stripped_files_for_snapshot(
-            paths: List[str],
-            *,
-            use_representative_path: bool = True,
-            args: Optional[List[str]] = None,
+            paths: List[str], *, args: Optional[List[str]] = None,
         ) -> StrippedResponseData:
             input_snapshot = self.make_snapshot_of_empty_files(paths)
-            request = StripSnapshotRequest(
-                input_snapshot, representative_path=paths[0] if use_representative_path else None
-            )
+            request = StripSnapshotRequest(input_snapshot,)
             return self.get_stripped_files(request, args=args)
 
         # Normal source roots
@@ -67,9 +62,11 @@ class StripSourceRootsTest(TestBase):
             ["project/example.py"],
             {"src/python": ("project/example.py",)},
         )
-        assert get_stripped_files_for_snapshot(
-            ["src/python/project/example.py"], use_representative_path=False
-        ) == (["project/example.py"], {"src/python": ("project/example.py",)})
+        assert get_stripped_files_for_snapshot(["src/python/project/example.py"],) == (
+            ["project/example.py"],
+            {"src/python": ("project/example.py",)},
+        )
+
         assert get_stripped_files_for_snapshot(["src/java/com/project/example.java"]) == (
             ["com/project/example.java"],
             {"src/java": ("com/project/example.java",)},
@@ -83,14 +80,13 @@ class StripSourceRootsTest(TestBase):
         unrecognized_source_root = "no-source-root/example.txt"
         with pytest.raises(ExecutionError) as exc:
             get_stripped_files_for_snapshot([unrecognized_source_root])
-        assert "NoSourceRootError: No source root found for `no-source-root`." in str(exc.value)
+        assert f"NoSourceRootError: No source root found for `{unrecognized_source_root}`." in str(
+            exc.value
+        )
 
         # Support for multiple source roots
         file_names = ["src/python/project/example.py", "src/java/com/project/example.java"]
-        with pytest.raises(ExecutionError) as exc:
-            get_stripped_files_for_snapshot(file_names, use_representative_path=True)
-        assert "Cannot strip prefix src/python" in str(exc.value)
-        assert get_stripped_files_for_snapshot(file_names, use_representative_path=False) == (
+        assert get_stripped_files_for_snapshot(file_names) == (
             ["com/project/example.java", "project/example.py"],
             {"src/python": ("project/example.py",), "src/java": ("com/project/example.java",)},
         )
@@ -98,13 +94,13 @@ class StripSourceRootsTest(TestBase):
         # Test a source root at the repo root. We have performance optimizations for this case
         # because there is nothing to strip.
         source_root_config = [f"--source-root-patterns={json.dumps(['/'])}"]
+
         assert get_stripped_files_for_snapshot(
-            ["project/f1.py", "project/f2.py"],
-            args=source_root_config,
-            use_representative_path=True,
+            ["project/f1.py", "project/f2.py"], args=source_root_config,
         ) == (["project/f1.py", "project/f2.py"], {".": ("project/f1.py", "project/f2.py")})
+
         assert get_stripped_files_for_snapshot(
-            ["dir1/f.py", "dir2/f.py"], args=source_root_config, use_representative_path=False
+            ["dir1/f.py", "dir2/f.py"], args=source_root_config,
         ) == (["dir1/f.py", "dir2/f.py"], {".": ("dir1/f.py", "dir2/f.py")})
 
         # Gracefully handle an empty snapshot

@@ -8,15 +8,21 @@ from typing import Iterable, Optional, cast
 import pytest
 
 from pants.engine.fs import Digest, PathGlobs, Snapshot
+from pants.engine.internals.selectors import Params
+from pants.engine.rules import RootRule
 from pants.source.source_root import (
     OptionalSourceRoot,
     SourceRoot,
     SourceRootConfig,
     SourceRootRequest,
+    SourceRootsRequest,
+    SourceRootsResult,
     all_roots,
-    get_source_root,
+    get_optional_source_root,
 )
+from pants.source.source_root import rules as source_root_rules
 from pants.testutil.engine.util import MockGet, create_subsystem, run_rule
+from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
 
@@ -44,7 +50,7 @@ def _find_root(
         return cast(
             OptionalSourceRoot,
             run_rule(
-                get_source_root,
+                get_optional_source_root,
                 rule_args=[src_root_req, source_root_config],
                 mock_gets=[
                     MockGet(
@@ -174,7 +180,7 @@ def test_marker_file_and_patterns() -> None:
 
 
 class AllRootsTest(TestBase):
-    def test_all_roots(self):
+    def test_all_roots(self) -> None:
 
         dirs = (
             "contrib/go/examples/src/go/src",
@@ -236,7 +242,7 @@ class AllRootsTest(TestBase):
             SourceRoot("fixed/root/jvm"),
         } == set(output)
 
-    def test_all_roots_with_root_at_buildroot(self):
+    def test_all_roots_with_root_at_buildroot(self) -> None:
         source_root_config = create_subsystem(
             SourceRootConfig, root_patterns=["/"], marker_filenames=[],
         )
@@ -259,3 +265,30 @@ class AllRootsTest(TestBase):
             ],
         )
         assert {SourceRoot(".")} == set(output)
+
+
+class SourceRootsRequestTest(TestBase):
+    @classmethod
+    def rules(cls):
+        return [*super().rules(), *source_root_rules(), RootRule(SourceRootsRequest)]
+
+    def test_source_roots_request(self) -> None:
+        req = SourceRootsRequest(
+            files=(PurePath("src/python/foo/bar.py"), PurePath("tests/python/foo/bar_test.py")),
+            dirs=(PurePath("src/python/foo"), PurePath("src/python/baz/qux")),
+        )
+        res = self.request_single_product(
+            SourceRootsResult,
+            Params(
+                req,
+                create_options_bootstrapper(
+                    args=["--source-root-patterns=['src/python','tests/python']"]
+                ),
+            ),
+        )
+        assert {
+            PurePath("src/python/foo/bar.py"): SourceRoot("src/python"),
+            PurePath("tests/python/foo/bar_test.py"): SourceRoot("tests/python"),
+            PurePath("src/python/foo"): SourceRoot("src/python"),
+            PurePath("src/python/baz/qux"): SourceRoot("src/python"),
+        } == dict(res.path_to_root)
