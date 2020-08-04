@@ -170,7 +170,11 @@ class PylintIntegrationTest(ExternalToolTestBase):
         assert "invalid syntax (<string>, line 2) (syntax-error)" in py2_result[0].stdout
 
         py3_target = self.make_target_with_origin(
-            [self.py3_only_source], name="py3", interpreter_constraints="CPython>=3.6"
+            [self.py3_only_source],
+            name="py3",
+            # NB: Avoid Python 3.8+ for this test due to issues with asteroid/ast.
+            # See https://github.com/pantsbuild/pants/issues/10547.
+            interpreter_constraints="CPython>=3.6,<3.8",
         )
         py3_result = self.run_pylint([py3_target])
         assert len(py3_result) == 1
