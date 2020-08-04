@@ -12,7 +12,6 @@ import pytest
 from pants.base.specs import (
     FilesystemGlobSpec,
     FilesystemLiteralSpec,
-    FilesystemResolvedGlobSpec,
     FilesystemSpecs,
     SingleAddress,
 )
@@ -371,24 +370,36 @@ class TestSpecsToAddresses(TestBase):
     def test_filesystem_specs_glob(self) -> None:
         self.create_files("demo", ["f1.txt", "f2.txt"])
         self.add_to_build_file("demo", "target(sources=['*.txt'])")
+        spec = FilesystemGlobSpec("demo/*.txt")
+        result = self.request_single_product(
+            AddressesWithOrigins, Params(FilesystemSpecs([spec]), create_options_bootstrapper()),
+        )
+        assert result == AddressesWithOrigins(
+            [
+                AddressWithOrigin(
+                    Address("demo", relative_file_path="f1.txt", target_name="demo"), origin=spec
+                ),
+                AddressWithOrigin(
+                    Address("demo", relative_file_path="f2.txt", target_name="demo"), origin=spec
+                ),
+            ]
+        )
+
+        # If a glob and a literal spec both resolve to the same file, the literal spec should be
+        # used as it's more precise.
+        literal_spec = FilesystemLiteralSpec("demo/f1.txt")
         result = self.request_single_product(
             AddressesWithOrigins,
-            Params(
-                FilesystemSpecs([FilesystemGlobSpec("demo/*.txt")]), create_options_bootstrapper()
-            ),
-        )
-        expected_origin = FilesystemResolvedGlobSpec(
-            glob="demo/*.txt", files=("demo/f1.txt", "demo/f2.txt")
+            Params(FilesystemSpecs([spec, literal_spec]), create_options_bootstrapper()),
         )
         assert result == AddressesWithOrigins(
             [
                 AddressWithOrigin(
                     Address("demo", relative_file_path="f1.txt", target_name="demo"),
-                    origin=expected_origin,
+                    origin=literal_spec,
                 ),
                 AddressWithOrigin(
-                    Address("demo", relative_file_path="f2.txt", target_name="demo"),
-                    origin=expected_origin,
+                    Address("demo", relative_file_path="f2.txt", target_name="demo"), origin=spec
                 ),
             ]
         )

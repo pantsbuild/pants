@@ -25,7 +25,7 @@ from typing import (
 
 from typing_extensions import final
 
-from pants.base.specs import OriginSpec
+from pants.base.specs import Spec
 from pants.engine.addresses import Address, assert_single_address
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.fs import Snapshot
@@ -494,7 +494,7 @@ class WrappedTarget:
 @dataclass(frozen=True)
 class TargetWithOrigin:
     target: Target
-    origin: OriginSpec
+    origin: Spec
 
 
 class Targets(Collection[Target]):
@@ -733,7 +733,7 @@ class FieldSetWithOrigin(_AbstractFieldSet, metaclass=ABCMeta):
     See FieldSet for documentation on how subclasses should use this base class.
     """
 
-    origin: OriginSpec
+    origin: Spec
 
     @classmethod
     def create(cls: Type[_FSWO], target_with_origin: TargetWithOrigin) -> _FSWO:

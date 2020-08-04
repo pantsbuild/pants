@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Sequence
 
 from pants.base.exceptions import ResolveError
-from pants.base.specs import OriginSpec
+from pants.base.specs import Spec
 from pants.build_graph.address import Address as Address
 from pants.build_graph.address import AddressInput as AddressInput  # noqa: F401: rexporting.
 from pants.build_graph.address import BuildFileAddress as BuildFileAddress
@@ -35,7 +35,7 @@ class AddressWithOrigin:
     """An Address along with the cmd-line spec it was generated from."""
 
     address: Address
-    origin: OriginSpec
+    origin: Spec
 
 
 class AddressesWithOrigins(Collection[AddressWithOrigin]):
