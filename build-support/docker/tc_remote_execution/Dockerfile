@@ -21,12 +21,19 @@ RUN apt-get install -y \
   libssl-dev \
   libsqlite3-dev \
   libffi-dev \
+  locales \
   openjdk-8-jdk-headless \
   openjdk-8-jre-headless \
   python-openssl \
   unzip \
   zip \
   zlib1g-dev
+
+# Configure en_US.UTF-8 locale as Pants requires a UTF-8 locale to operate.
+RUN locale-gen en_US.UTF-8 && update-locale
+ENV LANG "en_US.UTF-8"
+ENV LANGUAGE "en_US.UTF-8"
+ENV LC_ALL "en_US.UTF-8"
 
 # Even though the image already comes installed with Python 2.7, 3.5, and 3.6, we install our own
 # via Pyenv because we need Python 3.7 and want consistency in how we install them.
