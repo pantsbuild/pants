@@ -5,7 +5,6 @@ from abc import ABCMeta, abstractmethod
 from textwrap import dedent
 from typing import ClassVar, Iterable, List, Optional, Tuple, Type
 
-from pants.base.specs import SingleAddress
 from pants.core.goals.lint import Lint, LintRequest, LintResult, LintResults, LintSubsystem, lint
 from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSources,

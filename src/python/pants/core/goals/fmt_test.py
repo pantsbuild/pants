@@ -6,7 +6,6 @@ from pathlib import Path
 from textwrap import dedent
 from typing import ClassVar, Iterable, List, Optional, Type, cast
 
-from pants.base.specs import SingleAddress
 from pants.core.goals.fmt import (
     Fmt,
     FmtResult,
