@@ -28,6 +28,7 @@ class DependeesTest(GoalRuleTestBase):
         return (*super().rules(), *dependee_rules())
 
     def setUp(self) -> None:
+        super().setUp()
         self.add_to_build_file("base", "tgt()")
         self.add_to_build_file("intermediate", "tgt(dependencies=['base'])")
         self.add_to_build_file("leaf", "tgt(dependencies=['intermediate'])")
@@ -57,44 +58,44 @@ class DependeesTest(GoalRuleTestBase):
         self.assert_dependees(targets=[], output_format=OutputFormat.json, expected=["{}"])
 
     def test_normal(self) -> None:
-        self.assert_dependees(targets=["base:base"], expected=["intermediate:intermediate"])
+        self.assert_dependees(targets=["base"], expected=["intermediate"])
         self.assert_dependees(
-            targets=["base:base"],
+            targets=["base"],
             output_format=OutputFormat.json,
             expected=dedent(
                 """\
                 {
-                    "base:base": [
-                        "intermediate:intermediate"
+                    "base": [
+                        "intermediate"
                     ]
                 }"""
             ).splitlines(),
         )
 
     def test_no_dependees(self) -> None:
-        self.assert_dependees(targets=["leaf:leaf"], expected=[])
+        self.assert_dependees(targets=["leaf"], expected=[])
         self.assert_dependees(
-            targets=["leaf:leaf"],
+            targets=["leaf"],
             output_format=OutputFormat.json,
             expected=dedent(
                 """\
                 {
-                    "leaf:leaf": []
+                    "leaf": []
                 }"""
             ).splitlines(),
         )
 
     def test_closed(self) -> None:
-        self.assert_dependees(targets=["leaf:leaf"], closed=True, expected=["leaf:leaf"])
+        self.assert_dependees(targets=["leaf"], closed=True, expected=["leaf"])
         self.assert_dependees(
-            targets=["leaf:leaf"],
+            targets=["leaf"],
             closed=True,
             output_format=OutputFormat.json,
             expected=dedent(
                 """\
                 {
-                    "leaf:leaf": [
-                        "leaf:leaf"
+                    "leaf": [
+                        "leaf"
                     ]
                 }"""
             ).splitlines(),
@@ -102,20 +103,18 @@ class DependeesTest(GoalRuleTestBase):
 
     def test_transitive(self) -> None:
         self.assert_dependees(
-            targets=["base:base"],
-            transitive=True,
-            expected=["intermediate:intermediate", "leaf:leaf"],
+            targets=["base"], transitive=True, expected=["intermediate", "leaf"],
         )
         self.assert_dependees(
-            targets=["base:base"],
+            targets=["base"],
             transitive=True,
             output_format=OutputFormat.json,
             expected=dedent(
                 """\
                 {
-                    "base:base": [
-                        "intermediate:intermediate",
-                        "leaf:leaf"
+                    "base": [
+                        "intermediate",
+                        "leaf"
                     ]
                 }"""
             ).splitlines(),
@@ -125,24 +124,24 @@ class DependeesTest(GoalRuleTestBase):
         # This tests that --output-format=text will deduplicate and that --output-format=json will
         # preserve which dependee belongs to which specified target.
         self.assert_dependees(
-            targets=["base:base", "intermediate:intermediate"],
+            targets=["base", "intermediate"],
             transitive=True,
             # NB: `intermediate` is not included because it's a root and we have `--no-closed`.
-            expected=["leaf:leaf"],
+            expected=["leaf"],
         )
         self.assert_dependees(
-            targets=["base:base", "intermediate:intermediate"],
+            targets=["base", "intermediate"],
             transitive=True,
             output_format=OutputFormat.json,
             expected=dedent(
                 """\
                 {
-                    "base:base": [
-                        "intermediate:intermediate",
-                        "leaf:leaf"
+                    "base": [
+                        "intermediate",
+                        "leaf"
                     ],
-                    "intermediate:intermediate": [
-                        "leaf:leaf"
+                    "intermediate": [
+                        "leaf"
                     ]
                 }"""
             ).splitlines(),

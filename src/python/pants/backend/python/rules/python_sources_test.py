@@ -197,7 +197,7 @@ class PythonSourceFilesTest(ExternalToolTestBase):
             ),
         )
         self.add_to_build_file("src/protobuf/dir", "protobuf_library()")
-        targets = [ProtobufLibrary({}, address=Address("src/protobuf/dir", "dir"))]
+        targets = [ProtobufLibrary({}, address=Address("src/protobuf/dir"))]
         backend_args = ["--backend-packages=pants.backend.codegen.protobuf.python"]
 
         stripped_result = self.get_stripped_sources(

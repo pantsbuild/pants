@@ -250,7 +250,7 @@ async def run_python_test(
             argv=test_setup.args,
             input_digest=test_setup.input_digest,
             output_files=tuple(output_files) if output_files else None,
-            description=f"Run Pytest for {field_set.address.reference()}",
+            description=f"Run Pytest for {field_set.address}",
             timeout_seconds=test_setup.timeout_seconds,
             extra_env=env,
             execution_slot_variable=test_setup.execution_slot_variable,
@@ -284,7 +284,7 @@ async def run_python_test(
         result,
         coverage_data=coverage_data,
         xml_results=xml_results_digest,
-        address_ref=field_set.address.reference(),
+        address_ref=field_set.address.spec,
     )
 
 

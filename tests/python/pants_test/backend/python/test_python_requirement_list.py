@@ -28,7 +28,9 @@ class PythonRequirementListTest(TestBase):
         self, build_file_entry: str, *, target_name: str
     ) -> Tuple[PythonRequirement, ...]:
         self.add_to_build_file("lib", f"{build_file_entry}\n")
-        target = self.request_single_product(WrappedTarget, Address("lib", target_name)).target
+        target = self.request_single_product(
+            WrappedTarget, Address("lib", target_name=target_name)
+        ).target
         assert isinstance(target, PythonRequirementLibrary)
         return target[PythonRequirementsField].value
 

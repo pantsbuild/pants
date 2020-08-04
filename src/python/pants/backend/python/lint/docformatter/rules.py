@@ -104,7 +104,7 @@ async def setup(setup_request: SetupRequest, docformatter: Docformatter) -> Setu
     )
 
     address_references = ", ".join(
-        sorted(field_set.address.reference() for field_set in setup_request.request.field_sets)
+        sorted(field_set.address.spec for field_set in setup_request.request.field_sets)
     )
 
     process = await Get(

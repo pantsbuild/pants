@@ -1,213 +1,284 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import unittest
+from typing import Optional
 
-from pants.build_graph.address import (
-    Address,
-    BuildFileAddress,
-    InvalidSpecPath,
-    InvalidTargetName,
-    parse_spec,
-)
+import pytest
+
+from pants.build_graph.address import Address, AddressInput, InvalidSpecPath, InvalidTargetName
 
 
-class ParseSpecTest(unittest.TestCase):
-    def test_parse_spec(self) -> None:
-        spec_path, target_name = parse_spec("a/b/c")
-        self.assertEqual(spec_path, "a/b/c")
-        self.assertEqual(target_name, "c")
+def assert_address_input_parsed(
+    spec: str,
+    *,
+    path_component: str,
+    target_component: Optional[str],
+    relative_to: Optional[str] = None
+) -> None:
+    ai = AddressInput.parse(spec, relative_to=relative_to)
+    assert ai.path_component == path_component
+    if target_component is None:
+        assert ai.target_component is None
+    else:
+        assert ai.target_component == target_component
 
-        spec_path, target_name = parse_spec("a/b/c:c")
-        self.assertEqual(spec_path, "a/b/c")
-        self.assertEqual(target_name, "c")
 
-        spec_path, target_name = parse_spec(
-            "a/b/c", relative_to="here"
-        )  # no effect - we have a path
-        self.assertEqual(spec_path, "a/b/c")
-        self.assertEqual(target_name, "c")
+def test_address_input_parse_spec() -> None:
+    assert_address_input_parsed("a/b/c", path_component="a/b/c", target_component=None)
+    assert_address_input_parsed("a/b/c:c", path_component="a/b/c", target_component="c")
+    # The relative_to has no effect because we have a path.
+    assert_address_input_parsed(
+        "a/b/c", relative_to="here", path_component="a/b/c", target_component=None
+    )
 
-    def test_parse_local_spec(self) -> None:
-        spec_path, target_name = parse_spec(":c")
-        self.assertEqual(spec_path, "")
-        self.assertEqual(target_name, "c")
+    # Relative address spec
+    assert_address_input_parsed(":c", path_component="", target_component="c")
+    assert_address_input_parsed(
+        ":c", relative_to="here", path_component="here", target_component="c"
+    )
+    assert_address_input_parsed("//:c", relative_to="here", path_component="", target_component="c")
 
-        spec_path, target_name = parse_spec(":c", relative_to="here")
-        self.assertEqual(spec_path, "here")
-        self.assertEqual(target_name, "c")
+    # Absolute spec
+    assert_address_input_parsed("//a/b/c", path_component="a/b/c", target_component=None)
+    assert_address_input_parsed("//a/b/c:c", path_component="a/b/c", target_component="c")
+    assert_address_input_parsed("//:c", path_component="", target_component="c")
+    assert_address_input_parsed("//:c", relative_to="here", path_component="", target_component="c")
 
-    def test_parse_absolute_spec(self) -> None:
-        spec_path, target_name = parse_spec("//a/b/c")
-        self.assertEqual(spec_path, "a/b/c")
-        self.assertEqual(target_name, "c")
+    # Files
+    assert_address_input_parsed("f.txt", path_component="f.txt", target_component=None)
+    assert_address_input_parsed("//f.txt", path_component="f.txt", target_component=None)
+    assert_address_input_parsed("a/b/c.txt", path_component="a/b/c.txt", target_component=None)
+    assert_address_input_parsed("a/b/c.txt:tgt", path_component="a/b/c.txt", target_component="tgt")
+    assert_address_input_parsed(
+        "a/b/c.txt:../tgt", path_component="a/b/c.txt", target_component="../tgt"
+    )
+    assert_address_input_parsed(
+        "//a/b/c.txt:tgt", path_component="a/b/c.txt", target_component="tgt"
+    )
+    assert_address_input_parsed(
+        "./f.txt", relative_to="here", path_component="here/f.txt", target_component=None
+    )
+    assert_address_input_parsed(
+        "./subdir/f.txt:tgt",
+        relative_to="here",
+        path_component="here/subdir/f.txt",
+        target_component="tgt",
+    )
+    assert_address_input_parsed(
+        "subdir/f.txt", relative_to="here", path_component="subdir/f.txt", target_component=None
+    )
 
-        spec_path, target_name = parse_spec("//a/b/c:c")
-        self.assertEqual(spec_path, "a/b/c")
-        self.assertEqual(target_name, "c")
 
-        spec_path, target_name = parse_spec("//:c")
-        self.assertEqual(spec_path, "")
-        self.assertEqual(target_name, "c")
+def test_address_input_parse_bad_path_component() -> None:
+    def assert_bad_path_component(spec: str) -> None:
+        with pytest.raises(InvalidSpecPath):
+            AddressInput.parse(spec)
 
-    def test_parse_bad_spec_non_normalized(self) -> None:
-        self.do_test_bad_spec_path("..")
-        self.do_test_bad_spec_path(".")
+    assert_bad_path_component("..")
+    assert_bad_path_component(".")
 
-        self.do_test_bad_spec_path("//..")
-        self.do_test_bad_spec_path("//.")
+    assert_bad_path_component("//..")
+    assert_bad_path_component("//.")
 
-        self.do_test_bad_spec_path("a/.")
-        self.do_test_bad_spec_path("a/..")
-        self.do_test_bad_spec_path("../a")
-        self.do_test_bad_spec_path("a/../a")
+    assert_bad_path_component("a/.")
+    assert_bad_path_component("a/..")
+    assert_bad_path_component("../a")
+    assert_bad_path_component("a/../a")
 
-        self.do_test_bad_spec_path("a/")
-        self.do_test_bad_spec_path("a/b/")
+    assert_bad_path_component("a/:a")
+    assert_bad_path_component("a/b/:b")
 
-    def test_parse_bad_spec_bad_path(self) -> None:
-        self.do_test_bad_spec_path("/a")
-        self.do_test_bad_spec_path("///a")
+    # Absolute paths are banned.
+    assert_bad_path_component("/a")
+    assert_bad_path_component("///a")
 
-    def test_parse_bad_spec_bad_name(self) -> None:
-        self.do_test_bad_target_name("a:")
-        self.do_test_bad_target_name("a::")
-        self.do_test_bad_target_name("//")
+    # The path_component should not end in BUILD.
+    assert_bad_path_component("BUILD")
+    assert_bad_path_component("BUILD.suffix")
+    assert_bad_path_component("//BUILD")
+    assert_bad_path_component("//BUILD.suffix")
+    assert_bad_path_component("a/BUILD")
+    assert_bad_path_component("a/BUILD.suffix")
+    assert_bad_path_component("//a/BUILD")
+    assert_bad_path_component("//a/BUILD.suffix")
+    assert_bad_path_component("a/BUILD:b")
+    assert_bad_path_component("a/BUILD.suffix:b")
+    assert_bad_path_component("//a/BUILD:b")
+    assert_bad_path_component("//a/BUILD.suffix:b")
 
-    def test_parse_bad_spec_build_trailing_path_component(self) -> None:
-        self.do_test_bad_spec_path("BUILD")
-        self.do_test_bad_spec_path("BUILD.suffix")
-        self.do_test_bad_spec_path("//BUILD")
-        self.do_test_bad_spec_path("//BUILD.suffix")
-        self.do_test_bad_spec_path("a/BUILD")
-        self.do_test_bad_spec_path("a/BUILD.suffix")
-        self.do_test_bad_spec_path("//a/BUILD")
-        self.do_test_bad_spec_path("//a/BUILD.suffix")
-        self.do_test_bad_spec_path("a/BUILD:b")
-        self.do_test_bad_spec_path("a/BUILD.suffix:b")
-        self.do_test_bad_spec_path("//a/BUILD:b")
-        self.do_test_bad_spec_path("//a/BUILD.suffix:b")
 
-    def test_banned_chars_in_target_name(self) -> None:
-        with self.assertRaises(InvalidTargetName):
-            Address(*parse_spec("a/b:c@d"))
+def test_address_input_parse_bad_target_component() -> None:
+    def assert_bad_target_component(spec: str) -> None:
+        with pytest.raises(InvalidTargetName):
+            print(repr(AddressInput.parse(spec)))
 
-    def do_test_bad_spec_path(self, spec: str) -> None:
-        with self.assertRaises(InvalidSpecPath):
-            Address(*parse_spec(spec))
+    # Missing target_component
+    assert_bad_target_component("")
+    assert_bad_target_component("a:")
+    assert_bad_target_component("a::")
+    assert_bad_target_component("//")
+    assert_bad_target_component("//:")
 
-    def do_test_bad_target_name(self, spec: str) -> None:
-        with self.assertRaises(InvalidTargetName):
-            Address(*parse_spec(spec))
+    # Banned chars
+    assert_bad_target_component("//:@t")
+    assert_bad_target_component("//:!t")
+    assert_bad_target_component("//:?t")
+    assert_bad_target_component("//:=t")
 
-    def test_subproject_spec(self) -> None:
-        # Ensure that a spec referring to a subproject gets assigned to that subproject properly.
-        def parse(spec, relative_to):
-            return parse_spec(
-                spec,
-                relative_to=relative_to,
-                subproject_roots=["subprojectA", "path/to/subprojectB"],
-            )
 
-        # Ensure that a spec in subprojectA is determined correctly.
-        spec_path, target_name = parse("src/python/alib", "subprojectA/src/python")
-        self.assertEqual("subprojectA/src/python/alib", spec_path)
-        self.assertEqual("alib", target_name)
-
-        spec_path, target_name = parse("src/python/alib:jake", "subprojectA/src/python/alib")
-        self.assertEqual("subprojectA/src/python/alib", spec_path)
-        self.assertEqual("jake", target_name)
-
-        spec_path, target_name = parse(":rel", "subprojectA/src/python/alib")
-        self.assertEqual("subprojectA/src/python/alib", spec_path)
-        self.assertEqual("rel", target_name)
-
-        # Ensure that a spec in subprojectB, which is more complex, is correct.
-        spec_path, target_name = parse("src/python/blib", "path/to/subprojectB/src/python")
-        self.assertEqual("path/to/subprojectB/src/python/blib", spec_path)
-        self.assertEqual("blib", target_name)
-
-        spec_path, target_name = parse(
-            "src/python/blib:jane", "path/to/subprojectB/src/python/blib"
+def test_subproject_spec() -> None:
+    # Ensure that a spec referring to a subproject gets assigned to that subproject properly.
+    def parse(spec, relative_to):
+        return AddressInput.parse(
+            spec, relative_to=relative_to, subproject_roots=["subprojectA", "path/to/subprojectB"],
         )
-        self.assertEqual("path/to/subprojectB/src/python/blib", spec_path)
-        self.assertEqual("jane", target_name)
 
-        spec_path, target_name = parse(":rel", "path/to/subprojectB/src/python/blib")
-        self.assertEqual("path/to/subprojectB/src/python/blib", spec_path)
-        self.assertEqual("rel", target_name)
+    # Ensure that a spec in subprojectA is determined correctly.
+    ai = parse("src/python/alib", "subprojectA/src/python")
+    assert "subprojectA/src/python/alib" == ai.path_component
+    assert ai.target_component is None
 
-        # Ensure that a spec in the parent project is not mapped.
-        spec_path, target_name = parse("src/python/parent", "src/python")
-        self.assertEqual("src/python/parent", spec_path)
-        self.assertEqual("parent", target_name)
+    ai = parse("src/python/alib:jake", "subprojectA/src/python/alib")
+    assert "subprojectA/src/python/alib" == ai.path_component
+    assert "jake" == ai.target_component
 
-        spec_path, target_name = parse("src/python/parent:george", "src/python")
-        self.assertEqual("src/python/parent", spec_path)
-        self.assertEqual("george", target_name)
+    ai = parse(":rel", "subprojectA/src/python/alib")
+    assert "subprojectA/src/python/alib" == ai.path_component
+    assert "rel" == ai.target_component
 
-        spec_path, target_name = parse(":rel", "src/python/parent")
-        self.assertEqual("src/python/parent", spec_path)
-        self.assertEqual("rel", target_name)
+    # Ensure that a spec in subprojectB, which is more complex, is correct.
+    ai = parse("src/python/blib", "path/to/subprojectB/src/python")
+    assert "path/to/subprojectB/src/python/blib" == ai.path_component
+    assert ai.target_component is None
+
+    ai = parse("src/python/blib:jane", "path/to/subprojectB/src/python/blib")
+    assert "path/to/subprojectB/src/python/blib" == ai.path_component
+    assert "jane" == ai.target_component
+
+    ai = parse(":rel", "path/to/subprojectB/src/python/blib")
+    assert "path/to/subprojectB/src/python/blib" == ai.path_component
+    assert "rel" == ai.target_component
+
+    # Ensure that a spec in the parent project is not mapped.
+    ai = parse("src/python/parent", "src/python")
+    assert "src/python/parent" == ai.path_component
+    assert ai.target_component is None
+
+    ai = parse("src/python/parent:george", "src/python")
+    assert "src/python/parent" == ai.path_component
+    assert "george" == ai.target_component
+
+    ai = parse(":rel", "src/python/parent")
+    assert "src/python/parent" == ai.path_component
+    assert "rel" == ai.target_component
+
+
+def test_address_input_from_file() -> None:
+    assert AddressInput("a/b/c.txt", target_component=None).file_to_address() == Address(
+        "a/b", relative_file_path="c.txt"
+    )
+
+    assert AddressInput("a/b/c.txt", target_component="original").file_to_address() == Address(
+        "a/b", target_name="original", relative_file_path="c.txt"
+    )
+    assert AddressInput("a/b/c.txt", target_component="../original").file_to_address() == Address(
+        "a", target_name="original", relative_file_path="b/c.txt"
+    )
+    assert AddressInput(
+        "a/b/c.txt", target_component="../../original"
+    ).file_to_address() == Address("", target_name="original", relative_file_path="a/b/c.txt")
+
+    # These refer to targets "below" the file, which is illegal.
+    with pytest.raises(InvalidTargetName):
+        AddressInput("f.txt", target_component="subdir/tgt").file_to_address()
+    with pytest.raises(InvalidTargetName):
+        AddressInput("f.txt", target_component="subdir../tgt").file_to_address()
+    with pytest.raises(InvalidTargetName):
+        AddressInput("a/f.txt", target_component="../a/original").file_to_address()
+
+    # Top-level files must include a target_name.
+    with pytest.raises(InvalidTargetName):
+        AddressInput("f.txt").file_to_address()
+    assert AddressInput("f.txt", target_component="tgt").file_to_address() == Address(
+        "", relative_file_path="f.txt", target_name="tgt"
+    )
+
+
+def test_address_input_from_dir() -> None:
+    assert AddressInput("a").dir_to_address() == Address("a")
+    assert AddressInput("a", target_component="b").dir_to_address() == Address("a", target_name="b")
+
+
+def test_address_normalize_target_name() -> None:
+    assert Address("a/b/c", target_name="c") == Address("a/b/c", target_name=None)
+    assert Address("a/b/c", target_name="c", relative_file_path="f.txt") == Address(
+        "a/b/c", target_name=None, relative_file_path="f.txt"
+    )
 
 
 def test_address_equality() -> None:
-    assert "Not really an address" != Address("a/b", "c")
+    assert "Not really an address" != Address("a/b", target_name="c")
 
-    assert Address("a/b", "c") == Address("a/b", "c")
-    assert Address("a/b", "c") == Address.parse("a/b:c")
-    assert Address.parse("a/b:c") == Address.parse("a/b:c")
+    assert Address("a/b", target_name="c") == Address("a/b", target_name="c")
+    assert Address("a/b", target_name="c") != Address("a/b", target_name="d")
+    assert Address("a/b", target_name="c") != Address("a/z", target_name="c")
 
-    assert Address("a/b", "c") != Address("a/b", "c", generated_base_target_name="original")
-    assert Address("a/b", "c", generated_base_target_name="original") == Address(
-        "a/b", "c", generated_base_target_name="original"
+    assert Address("a/b", target_name="c") != Address(
+        "a/b", relative_file_path="c", target_name="original"
+    )
+    assert Address("a/b", relative_file_path="c", target_name="original") == Address(
+        "a/b", relative_file_path="c", target_name="original"
     )
 
 
 def test_address_spec() -> None:
-    normal_addr = Address("a/b", "c")
+    normal_addr = Address("a/b", target_name="c")
     assert normal_addr.spec == "a/b:c" == str(normal_addr) == normal_addr.reference()
-    assert normal_addr.relative_spec == ":c"
     assert normal_addr.path_safe_spec == "a.b.c"
 
-    top_level_addr = Address("", "root")
+    top_level_addr = Address("", target_name="root")
     assert top_level_addr.spec == "//:root" == str(top_level_addr) == top_level_addr.reference()
-    assert top_level_addr.relative_spec == ":root"
     assert top_level_addr.path_safe_spec == ".root"
 
-    generated_addr = Address("a/b", "c.txt", generated_base_target_name="c")
-    assert generated_addr.spec == "a/b/c.txt" == str(generated_addr) == generated_addr.reference()
-    assert generated_addr.relative_spec == "./c.txt"
-    assert generated_addr.path_safe_spec == "a.b.c.txt"
+    generated_addr = Address("a/b", relative_file_path="c.txt", target_name="c")
+    assert generated_addr.spec == "a/b/c.txt:c" == str(generated_addr) == generated_addr.reference()
+    assert generated_addr.path_safe_spec == "a.b.c.txt.c"
 
-    top_level_generated_addr = Address("", "root.txt", generated_base_target_name="root")
+    top_level_generated_addr = Address("", relative_file_path="root.txt", target_name="root")
     assert (
         top_level_generated_addr.spec
-        == "//root.txt"
+        == "//root.txt:root"
         == str(top_level_generated_addr)
         == top_level_generated_addr.reference()
     )
-    assert top_level_generated_addr.relative_spec == "./root.txt"
-    assert top_level_generated_addr.path_safe_spec == ".root.txt"
+    assert top_level_generated_addr.path_safe_spec == ".root.txt.root"
 
     generated_subdirectory_addr = Address(
-        "a/b", "subdir/c.txt", generated_base_target_name="original"
+        "a/b", relative_file_path="subdir/c.txt", target_name="original"
     )
     assert (
         generated_subdirectory_addr.spec
-        == "a/b/subdir/c.txt"
+        == "a/b/subdir/c.txt:../original"
         == str(generated_subdirectory_addr)
         == generated_subdirectory_addr.reference()
     )
-    assert generated_subdirectory_addr.relative_spec == "./subdir/c.txt"
-    assert generated_subdirectory_addr.path_safe_spec == "a.b.subdir.c.txt"
+    assert generated_subdirectory_addr.path_safe_spec == "a.b.subdir.c.txt@original"
+
+    generated_addr_from_default_target = Address("a/b", relative_file_path="c.txt")
+    assert (
+        generated_addr_from_default_target.spec
+        == "a/b/c.txt"
+        == str(generated_addr_from_default_target)
+        == generated_addr_from_default_target.reference()
+    )
+    assert generated_addr_from_default_target.path_safe_spec == "a.b.c.txt"
 
 
 def test_address_maybe_convert_to_base_target() -> None:
-    generated_addr = Address("a/b", "c.txt", generated_base_target_name="c")
-    assert generated_addr.maybe_convert_to_base_target() == Address("a/b", "c")
+    generated_addr = Address("a/b", relative_file_path="c.txt", target_name="c")
+    assert generated_addr.maybe_convert_to_base_target() == Address("a/b", target_name="c")
 
-    normal_addr = Address("a/b", "c")
+    normal_addr = Address("a/b", target_name="c")
     assert normal_addr.maybe_convert_to_base_target() is normal_addr
 
 
@@ -228,21 +299,3 @@ def test_address_parse_method() -> None:
     # Do not attempt to parse generated subtargets, as we would have no way to find the
     # generated_base_target_name.
     assert_parsed("a/b/f.py", "f.py", Address.parse("a/b/f.py"))
-
-
-def test_build_file_address() -> None:
-    bfa = BuildFileAddress(rel_path="dir/BUILD", target_name="example")
-    assert bfa.spec == "dir:example"
-    assert bfa == Address("dir", "example")
-    assert type(bfa.to_address()) is Address
-    assert bfa.to_address() == Address("dir", "example")
-
-    generated_bfa = BuildFileAddress(
-        rel_path="dir/BUILD", target_name="example.txt", generated_base_target_name="original"
-    )
-    assert generated_bfa != BuildFileAddress(rel_path="dir/BUILD", target_name="example.txt")
-    assert generated_bfa == Address("dir", "example.txt", generated_base_target_name="original")
-    assert generated_bfa.spec == "dir/example.txt"
-    assert generated_bfa.maybe_convert_to_base_target() == BuildFileAddress(
-        rel_path="dir/BUILD", target_name="original"
-    )

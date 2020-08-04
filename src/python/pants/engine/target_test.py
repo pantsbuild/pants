@@ -425,7 +425,7 @@ def test_generate_subtarget() -> None:
         address=Address.parse("src/fortran:demo"),
     )
     expected_single_source_address = Address(
-        "src/fortran", target_name="demo.f95", generated_base_target_name="demo"
+        "src/fortran", relative_file_path="demo.f95", target_name="demo"
     )
     assert generate_subtarget(
         single_source_tgt, full_file_name="src/fortran/demo.f95"
@@ -441,7 +441,7 @@ def test_generate_subtarget() -> None:
         {Sources.alias: ["demo.f95", "subdir/demo.f95"]}, address=Address.parse("src/fortran:demo")
     )
     expected_subdir_address = Address(
-        "src/fortran", target_name="subdir/demo.f95", generated_base_target_name="demo"
+        "src/fortran", relative_file_path="subdir/demo.f95", target_name="demo"
     )
     assert generate_subtarget(
         subdir_tgt, full_file_name="src/fortran/subdir/demo.f95"
@@ -457,7 +457,7 @@ def test_generate_subtarget() -> None:
 
     no_sources_tgt = NoSourcesTgt({Tags.alias: ["demo"]}, address=Address.parse("//:no_sources"))
     expected_no_sources_address = Address(
-        "", target_name="fake.txt", generated_base_target_name="no_sources"
+        "", relative_file_path="fake.txt", target_name="no_sources"
     )
     assert generate_subtarget(no_sources_tgt, full_file_name="fake.txt") == NoSourcesTgt(
         {Tags.alias: ["demo"]}, address=expected_no_sources_address

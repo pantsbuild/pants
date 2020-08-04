@@ -134,7 +134,7 @@ class GoalRuleTestBase(TestBase):
         **kwargs: additional kwargs passed to execute_rule.
         """
         result = self.execute_rule(**kwargs)
-        assert list(output) == result.stdout.splitlines()
+        self.assertEqual(list(output), result.stdout.splitlines())
 
     def assert_console_raises(self, exception: Type[Exception], **kwargs) -> None:
         """Verifies the expected exception is raised by the goal rule.

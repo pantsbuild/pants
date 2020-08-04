@@ -76,7 +76,9 @@ class PylintIntegrationTest(ExternalToolTestBase):
                 """
             ),
         )
-        target = self.request_single_product(WrappedTarget, Address(package, name)).target
+        target = self.request_single_product(
+            WrappedTarget, Address(package, target_name=name)
+        ).target
         if origin is None:
             origin = SingleAddress(directory=package, name=name)
         return TargetWithOrigin(target, origin)
@@ -253,7 +255,10 @@ class PylintIntegrationTest(ExternalToolTestBase):
         )
         target = self.make_target_with_origin(
             source_files=[FileContent(f"{self.package}/target.py", source_content.encode())],
-            dependencies=[Address(self.package, "direct_dep"), Address("", "direct_req")],
+            dependencies=[
+                Address(self.package, target_name="direct_dep"),
+                Address("", target_name="direct_req"),
+            ],
         )
 
         result = self.run_pylint([target])

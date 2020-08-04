@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-from pathlib import PurePath
 from typing import Iterable, Optional, cast
 
 from pants.base.build_environment import get_buildroot, get_scm
@@ -120,9 +119,10 @@ class SpecsCalculator:
         address_specs = []
         filesystem_specs = []
         for address in cast(ChangedAddresses, changed_addresses):
-            if address.generated_base_target_name:
-                file_name = PurePath(address.spec_path, address.target_name).as_posix()
-                filesystem_specs.append(FilesystemLiteralSpec(file_name))
+            if not address.is_base_target:
+                # TODO: Should adjust Specs parsing to support parsing the disambiguated file
+                # Address, which would bypass-rediscovering owners.
+                filesystem_specs.append(FilesystemLiteralSpec(address.filename))
             else:
                 address_specs.append(SingleAddress(address.spec_path, address.target_name))
         return Specs(

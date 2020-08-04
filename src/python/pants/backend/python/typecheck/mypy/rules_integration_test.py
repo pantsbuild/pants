@@ -94,7 +94,9 @@ class MyPyIntegrationTest(ExternalToolTestBase):
                 """
             ),
         )
-        target = self.request_single_product(WrappedTarget, Address(package, name)).target
+        target = self.request_single_product(
+            WrappedTarget, Address(package, target_name=name)
+        ).target
         origin = SingleAddress(directory=package, name=name)
         return TargetWithOrigin(target, origin)
 

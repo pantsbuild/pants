@@ -115,19 +115,15 @@ class ModuleMapperTest(TestBase):
         assert result.mapping == FrozenDict(
             {
                 "project.util.dirutil": Address(
-                    "src/python/project/util",
-                    target_name="dirutil.py",
-                    generated_base_target_name="util",
+                    "src/python/project/util", relative_file_path="dirutil.py", target_name="util",
                 ),
                 "project.util.tarutil": Address(
-                    "src/python/project/util",
-                    target_name="tarutil.py",
-                    generated_base_target_name="util",
+                    "src/python/project/util", relative_file_path="tarutil.py", target_name="util",
                 ),
                 "project_test.demo_test": Address(
                     "tests/python/project_test/demo_test",
-                    target_name="__init__.py",
-                    generated_base_target_name="demo_test",
+                    relative_file_path="__init__.py",
+                    target_name="demo_test",
                 ),
             }
         )
@@ -198,16 +194,14 @@ class ModuleMapperTest(TestBase):
         self.create_file("source_root1/project/file2.py")
         self.add_to_build_file("source_root1/project", "python_library()")
         assert get_owner("project.app") == Address(
-            "source_root1/project", target_name="app.py", generated_base_target_name="project"
+            "source_root1/project", relative_file_path="app.py", target_name="project"
         )
 
         # Check a package path
         self.create_file("source_root2/project/subdir/__init__.py")
         self.add_to_build_file("source_root2/project/subdir", "python_library()")
         assert get_owner("project.subdir") == Address(
-            "source_root2/project/subdir",
-            target_name="__init__.py",
-            generated_base_target_name="subdir",
+            "source_root2/project/subdir", relative_file_path="__init__.py", target_name="subdir",
         )
 
         # Test a module with no owner (stdlib). This also sanity checks that we can handle when
@@ -219,5 +213,5 @@ class ModuleMapperTest(TestBase):
         self.create_file("script.py")
         self.add_to_build_file("", "python_library(name='script')")
         assert get_owner("script.Demo") == Address(
-            "", target_name="script.py", generated_base_target_name="script"
+            "", relative_file_path="script.py", target_name="script"
         )

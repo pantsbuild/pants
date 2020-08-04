@@ -13,6 +13,7 @@ from pants.engine.addresses import (
     Address,
     Addresses,
     AddressesWithOrigins,
+    AddressInput,
     AddressWithOrigin,
     BuildFileAddress,
     BuildFileAddresses,
@@ -21,7 +22,7 @@ from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, S
 from pants.engine.internals.mapper import AddressFamily, AddressMap, AddressMapper
 from pants.engine.internals.parser import BuildFilePreludeSymbols, error_on_imports
 from pants.engine.internals.target_adaptor import TargetAdaptor
-from pants.engine.rules import Get, MultiGet, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import OrderedSet
 
@@ -56,6 +57,27 @@ async def evaluate_preludes(address_mapper: AddressMapper) -> BuildFilePreludeSy
 
 
 @rule
+async def resolve_address(address_input: AddressInput) -> Address:
+    # Determine the type of the path_component of the input.
+    if address_input.path_component:
+        snapshot = await Get(Snapshot, PathGlobs(globs=(address_input.path_component,)))
+        is_file, is_dir = bool(snapshot.files), bool(snapshot.dirs)
+    else:
+        # It is an address in the root directory.
+        is_file, is_dir = False, True
+
+    if is_file:
+        return address_input.file_to_address()
+    elif is_dir:
+        return address_input.dir_to_address()
+    else:
+        raise ResolveError(
+            f"The file or directory '{address_input.path_component}' does not exist on disk in the "
+            f"workspace: cannot resolve '{address_input.target_component}' relative to it."
+        )
+
+
+@rule
 async def parse_address_family(
     address_mapper: AddressMapper, prelude_symbols: BuildFilePreludeSymbols, directory: Dir
 ) -> AddressFamily:
@@ -83,7 +105,7 @@ async def parse_address_family(
 
 
 def _raise_did_you_mean(address_family: AddressFamily, name: str, source=None) -> None:
-    names = [a.target_name for a in address_family.addressables]
+    names = [a.address.target_name for a in address_family.addressables]
     possibilities = "\n  ".join(":{}".format(target_name) for target_name in sorted(names))
 
     resolve_error = ResolveError(
@@ -100,21 +122,15 @@ def _raise_did_you_mean(address_family: AddressFamily, name: str, source=None) -
 async def find_build_file(address: Address) -> BuildFileAddress:
     address_family = await Get(AddressFamily, Dir(address.spec_path))
     owning_address = address.maybe_convert_to_base_target()
-    if owning_address not in address_family.addressables:
+    if address_family.addressable_for_address(owning_address) is None:
         _raise_did_you_mean(address_family=address_family, name=owning_address.target_name)
     bfa = next(
         build_file_address
         for build_file_address in address_family.addressables.keys()
-        if build_file_address == owning_address
+        if build_file_address.address == owning_address
     )
     return (
-        bfa
-        if not address.generated_base_target_name
-        else BuildFileAddress(
-            rel_path=bfa.rel_path,
-            target_name=address.target_name,
-            generated_base_target_name=address.generated_base_target_name,
-        )
+        bfa if address.is_base_target else BuildFileAddress(rel_path=bfa.rel_path, address=address)
     )
 
 
@@ -128,7 +144,7 @@ async def find_build_files(addresses: Addresses) -> BuildFileAddresses:
 async def find_target_adaptor(address: Address) -> TargetAdaptor:
     """Hydrate a TargetAdaptor so that it may be converted into the Target API."""
     address_family = await Get(AddressFamily, Dir(address.spec_path))
-    target_adaptor = address_family.addressables_as_address_keyed.get(address)
+    target_adaptor = address_family.addressable_for_address(address)
     if target_adaptor is None:
         _raise_did_you_mean(address_family, address.target_name)
     return cast(TargetAdaptor, target_adaptor)
@@ -181,7 +197,7 @@ async def addresses_with_origins_from_address_specs(
                 addr_families_for_spec
             )
             for bfaddr, _ in all_bfaddr_tgt_pairs:
-                addr = bfaddr.to_address()
+                addr = bfaddr.address
                 # A target might be covered by multiple specs, so we take the most specific one.
                 addr_to_origin[addr] = more_specific(addr_to_origin.get(addr), address_spec)
         except AddressSpec.AddressResolutionError as e:
@@ -190,9 +206,9 @@ async def addresses_with_origins_from_address_specs(
             _raise_did_you_mean(e.single_address_family, e.name, source=e)
 
         matched_addresses.update(
-            bfaddr.to_address()
+            bfaddr.address
             for (bfaddr, tgt) in all_bfaddr_tgt_pairs
-            if address_specs.matcher.matches_target_address_pair(bfaddr, tgt)
+            if address_specs.matcher.matches_target_address_pair(bfaddr.address, tgt)
         )
 
     # NB: This may be empty, as the result of filtering by tag and exclude patterns!
@@ -215,14 +231,5 @@ def create_graph_rules(address_mapper: AddressMapper):
 
     return [
         address_mapper_singleton,
-        # BUILD file parsing.
-        find_target_adaptor,
-        parse_address_family,
-        find_build_file,
-        find_build_files,
-        evaluate_preludes,
-        # AddressSpec handling: locate directories that contain build files, and request
-        # AddressFamilies for each of them.
-        addresses_with_origins_from_address_specs,
-        strip_address_origins,
+        *collect_rules(),
     ]

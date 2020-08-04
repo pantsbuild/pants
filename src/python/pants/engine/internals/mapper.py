@@ -3,7 +3,7 @@
 
 import re
 from dataclasses import dataclass
-from typing import Dict, Iterable, Optional, Tuple, cast
+from typing import Dict, Iterable, Optional, Tuple
 
 from pants.base.exceptions import DuplicateNameError, MappingError
 from pants.build_graph.address import Address, BuildFileAddress
@@ -57,7 +57,7 @@ class DifferingFamiliesError(MappingError):
 
 @dataclass(frozen=True)
 class AddressFamily:
-    """Represents the family of target adaptors in a namespace.
+    """Represents the family of target adaptors collected from the BUILD files in one directory.
 
     To create an AddressFamily, use `create`.
 
@@ -69,6 +69,7 @@ class AddressFamily:
     :param name_to_target_adaptors: A dict mapping from name to the target adaptor.
     """
 
+    # The directory from which the adaptors were parsed.
     namespace: str
     name_to_target_adaptors: Dict[str, Tuple[str, TargetAdaptor]]
 
@@ -108,15 +109,19 @@ class AddressFamily:
     @memoized_property
     def addressables(self) -> Dict[BuildFileAddress, TargetAdaptor]:
         return {
-            BuildFileAddress(rel_path=path, target_name=name): obj
+            BuildFileAddress(
+                rel_path=path, address=Address(spec_path=self.namespace, target_name=name)
+            ): obj
             for name, (path, obj) in self.name_to_target_adaptors.items()
         }
 
-    @property
-    def addressables_as_address_keyed(self) -> Dict[Address, TargetAdaptor]:
-        """Identical to `addresses`, but with a `cast` to allow for type safe lookup of
-        `Address`es."""
-        return cast(Dict[Address, TargetAdaptor], self.addressables)
+    def addressable_for_address(self, address: Address) -> Optional[TargetAdaptor]:
+        assert address.spec_path == self.namespace
+        entry = self.name_to_target_adaptors.get(address.target_name)
+        if entry is None:
+            return None
+        _, target_adaptor = entry
+        return target_adaptor
 
     def __hash__(self):
         return hash(self.namespace)

@@ -125,9 +125,9 @@ class SingleAddress(AddressSpec):
         """
         single_af = assert_single_element(address_families)
         addr_tgt_pairs = [
-            (addr, tgt)
-            for addr, tgt in single_af.addressables.items()
-            if addr.target_name == self.name
+            (bfa, tgt)
+            for bfa, tgt in single_af.addressables.items()
+            if bfa.address.target_name == self.name
         ]
         if len(addr_tgt_pairs) == 0:
             raise self._SingleAddressResolutionError(single_af, self.name)

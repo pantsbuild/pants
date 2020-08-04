@@ -66,7 +66,7 @@ def test_address_family_create_single() -> None:
     assert {
         Address.parse("//:one"): TargetAdaptor(type_alias="thing", name="one", age=42),
         Address.parse("//:two"): TargetAdaptor(type_alias="thing", name="two", age=37),
-    } == address_family.addressables
+    } == {bfa.address: ta for bfa, ta in address_family.addressables.items()}
 
 
 def test_address_family_create_multiple() -> None:
@@ -86,7 +86,7 @@ def test_address_family_create_multiple() -> None:
     assert {
         Address.parse("name/space:one"): TargetAdaptor(type_alias="thing", name="one", age=42),
         Address.parse("name/space:two"): TargetAdaptor(type_alias="thing", name="two", age=37),
-    } == address_family.addressables
+    } == {bfa.address: ta for bfa, ta in address_family.addressables.items()}
 
 
 def test_address_family_create_empty() -> None:
