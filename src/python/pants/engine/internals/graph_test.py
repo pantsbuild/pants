@@ -964,26 +964,14 @@ class TestCodegen(TestBase):
 
 
 def test_parse_dependencies_field() -> None:
-    given_and_expected = {
-        ":relative": AddressInput("demo/subdir", "relative"),
-        "//:top_level": AddressInput("", "top_level"),
-        "demo:tgt": AddressInput("demo", "tgt"),
-        "demo": AddressInput("demo"),
-        "relative.txt": AddressInput("relative.txt"),
-        "child/f.txt": AddressInput("child/f.txt"),
-        "demo/f.txt": AddressInput("demo/f.txt"),
-        "//top_level.txt": AddressInput("top_level.txt"),
-        "top_level2.txt": AddressInput("top_level2.txt"),
-        "demo/no_extension": AddressInput("demo/no_extension"),
-        "//demo/no_extension": AddressInput("demo/no_extension"),
-        "no_extension": AddressInput("no_extension"),
-    }
+    """Ensure that we correctly handle `!` ignores.
+
+    We leave the rest of the parsing to AddressInput and Address.
+    """
     result = parse_dependencies_field(
-        [*given_and_expected.keys(), *(f"!{v}" for v in given_and_expected.keys())],
-        spec_path="demo/subdir",
-        subproject_roots=[],
+        ["a/b/c", "!a/b/c", "f.txt", "!f.txt"], spec_path="demo/subdir", subproject_roots=[],
     )
-    expected_addresses = {*given_and_expected.values()}
+    expected_addresses = {AddressInput("a/b/c"), AddressInput("f.txt")}
     assert set(result.addresses) == expected_addresses
     assert set(result.ignored_addresses) == expected_addresses
 

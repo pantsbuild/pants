@@ -140,13 +140,13 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
     TEST_MAPPING = {
         # A `python_binary` with `sources=['file.name']`.
         "src/python/python_targets/test_binary.py": dict(
-            none=["src/python/python_targets/test_binary.py"],
+            none=["src/python/python_targets/test_binary.py:test"],
             direct=["src/python/python_targets:test"],
             transitive=["src/python/python_targets:test"],
         ),
         # A `python_library` with `sources=['file.name']`.
         "src/python/python_targets/test_library.py": dict(
-            none=["src/python/python_targets/test_library.py"],
+            none=["src/python/python_targets/test_library.py:test_library"],
             direct=[
                 "src/python/python_targets:test",
                 "src/python/python_targets:test_library",

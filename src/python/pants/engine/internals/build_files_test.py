@@ -318,9 +318,12 @@ class ResolveAddressIntegrationTest(TestBase):
             Address("a/b", relative_file_path="c.txt", target_name="c"),
         )
 
-        # Top-level addresses will not have a path_component.
+        # Top-level addresses will not have a path_component, unless they are a file address.
         self.create_file("f.txt")
-        assert_is_expected(AddressInput("f.txt"), Address("", relative_file_path="f.txt"))
+        assert_is_expected(
+            AddressInput("f.txt", target_component="original"),
+            Address("", relative_file_path="f.txt", target_name="original"),
+        )
         assert_is_expected(AddressInput("", target_component="t"), Address("", target_name="t"))
 
         with pytest.raises(ExecutionError) as exc:
