@@ -19,10 +19,9 @@ from pants.engine.internals import graph, options_parsing, uuid
 from pants.engine.internals.build_files import create_graph_rules
 from pants.engine.internals.mapper import AddressMapper
 from pants.engine.internals.native import Native
-from pants.engine.internals.parser import Parser, SymbolTable
+from pants.engine.internals.parser import Parser
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
 from pants.engine.internals.selectors import Params
-from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.platform import create_platform_rules
 from pants.engine.process import InteractiveRunner
 from pants.engine.rules import RootRule, collect_rules, rule
@@ -246,10 +245,9 @@ class EngineInitializer:
         union_membership = UnionMembership.from_rules(build_configuration.union_rules)
 
         registered_target_types = RegisteredTargetTypes.create(build_configuration.target_types)
-        symbol_table_from_registered_targets = SymbolTable(
-            {target_type.alias: TargetAdaptor for target_type in registered_target_types.types}
+        parser = Parser(
+            target_type_aliases=registered_target_types.aliases, object_aliases=build_file_aliases
         )
-        parser = Parser(symbol_table_from_registered_targets, build_file_aliases)
         address_mapper = AddressMapper(
             parser=parser,
             prelude_glob_patterns=build_file_prelude_globs,
@@ -265,10 +263,6 @@ class EngineInitializer:
         @rule
         def build_configuration_singleton() -> BuildConfiguration:
             return build_configuration
-
-        @rule
-        def symbol_table_singleton() -> SymbolTable:
-            return symbol_table_from_registered_targets
 
         @rule
         def registered_target_types_singleton() -> RegisteredTargetTypes:

@@ -30,7 +30,7 @@ from pants.engine.internals.build_files import (
     strip_address_origins,
 )
 from pants.engine.internals.mapper import AddressFamily, AddressMapper
-from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, SymbolTable
+from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import RootRule
@@ -42,7 +42,9 @@ from pants.util.frozendict import FrozenDict
 
 def test_parse_address_family_empty() -> None:
     """Test that parsing an empty BUILD file results in an empty AddressFamily."""
-    address_mapper = AddressMapper(parser=Parser(SymbolTable({}), BuildFileAliases()))
+    address_mapper = AddressMapper(
+        parser=Parser(target_type_aliases=[], object_aliases=BuildFileAliases())
+    )
     af = run_rule(
         parse_address_family,
         rule_args=[address_mapper, BuildFilePreludeSymbols(FrozenDict()), Dir("/dev/null")],
@@ -60,7 +62,9 @@ def test_parse_address_family_empty() -> None:
 def resolve_addresses_with_origins_from_address_specs(
     address_specs: AddressSpecs, address_family: AddressFamily,
 ) -> AddressesWithOrigins:
-    address_mapper = AddressMapper(Parser(SymbolTable({}), BuildFileAliases()))
+    address_mapper = AddressMapper(
+        Parser(target_type_aliases=[], object_aliases=BuildFileAliases())
+    )
     snapshot = Snapshot(Digest("xx", 2), ("root/BUILD",), ())
     addresses_with_origins = run_rule(
         addresses_with_origins_from_address_specs,
