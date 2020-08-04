@@ -279,10 +279,8 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
         )
     )
 
-    file_name_to_generated_address: Dict[str, Address] = {}
-    file_names_with_multiple_owners: OrderedSet[str] = OrderedSet()
     original_addresses_due_to_deleted_files: OrderedSet[Address] = OrderedSet()
-    original_addresses_due_to_multiple_owners: OrderedSet[Address] = OrderedSet()
+    generated_addresses: OrderedSet[Address] = OrderedSet()
     unmatched_sources = set(sources_set)
     for candidate_tgt, candidate_tgt_sources, bfa in zip(
         candidate_targets, candidate_target_sources, build_file_addresses
@@ -297,8 +295,7 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
         if deleted_files_matched:
             original_addresses_due_to_deleted_files.add(candidate_tgt.address)
             continue
-        # Else, we generate subtargets for greater precision. We use those subtargets, unless
-        # there are multiple owners of their file.
+        # Else, we generate subtargets for greater precision.
         generated_subtargets = tuple(
             generate_subtarget(candidate_tgt, full_file_name=f)
             for f in candidate_tgt_sources.snapshot.files
@@ -310,26 +307,11 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
                 generated_subtarget.get(Sources).filespec, paths=sources_set
             ):
                 continue
+            generated_addresses.add(generated_subtarget.address)
 
-            if file_name in file_name_to_generated_address:
-                file_names_with_multiple_owners.add(file_name)
-                original_addresses_due_to_multiple_owners.add(candidate_tgt.address)
-                # We also add the original target of the generated address already stored.
-                already_stored_generated_address = file_name_to_generated_address[file_name]
-                original_addresses_due_to_multiple_owners.add(
-                    already_stored_generated_address.maybe_convert_to_base_target()
-                )
-            else:
-                file_name_to_generated_address[file_name] = generated_subtarget.address
-
-    def already_covered_by_original_addresses(file_name: str, generated_address: Address) -> bool:
-        multiple_generated_subtarget_owners = file_name in file_names_with_multiple_owners
+    def already_covered_by_original_addresses(generated_address: Address) -> bool:
         original_address = generated_address.maybe_convert_to_base_target()
-        return (
-            multiple_generated_subtarget_owners
-            or original_address in original_addresses_due_to_deleted_files
-            or original_address in original_addresses_due_to_multiple_owners
-        )
+        return original_address in original_addresses_due_to_deleted_files
 
     if (
         unmatched_sources
@@ -341,16 +323,10 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
 
     remaining_generated_addresses = FrozenOrderedSet(
         address
-        for file_name, address in file_name_to_generated_address.items()
-        if not already_covered_by_original_addresses(file_name, address)
+        for address in generated_addresses
+        if not already_covered_by_original_addresses(address)
     )
-    return Owners(
-        [
-            *original_addresses_due_to_deleted_files,
-            *original_addresses_due_to_multiple_owners,
-            *remaining_generated_addresses,
-        ]
-    )
+    return Owners([*original_addresses_due_to_deleted_files, *remaining_generated_addresses])
 
 
 # -----------------------------------------------------------------------------------------------

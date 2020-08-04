@@ -12,7 +12,6 @@ import pytest
 from pants.base.specs import (
     FilesystemGlobSpec,
     FilesystemLiteralSpec,
-    FilesystemMergedSpec,
     FilesystemResolvedGlobSpec,
     FilesystemSpecs,
     SingleAddress,
@@ -302,14 +301,7 @@ class TestOwners(TestBase):
         assert result == Owners([Address("demo", target_name="demo")])
 
     def test_owners_multiple_owners(self) -> None:
-        """This tests that we do not use generated subtargets when there are multiple owners.
-
-        There are two edge cases:
-        - There are >1 owners of the file in question.
-        - The file in question only has one owner, but its sibling from the same target does have
-          >1 owner. In this case, we use the original owning target because it would be
-          redundant to include the generated subtarget.
-        """
+        """Even if there are multiple owners of the same file, we still use generated subtargets."""
         self.create_files("demo", ["f1.txt", "f2.txt"])
         self.add_to_build_file(
             "demo",
@@ -328,22 +320,14 @@ class TestOwners(TestBase):
 
         two_owners_result = self.request_single_product(Owners, OwnersRequest(("demo/f2.txt",)))
         assert two_owners_result == Owners(
-            [Address("demo", target_name="f2"), Address("demo", target_name="all")]
-        )
-
-        sibling_has_two_owners_result = self.request_single_product(
-            Owners, OwnersRequest(("demo/f1.txt", "demo/f2.txt"))
-        )
-        assert sibling_has_two_owners_result == Owners(
-            [Address("demo", target_name="f2"), Address("demo", target_name="all")]
+            [
+                Address("demo", relative_file_path="f2.txt", target_name="all"),
+                Address("demo", relative_file_path="f2.txt", target_name="f2"),
+            ]
         )
 
     def test_owners_build_file(self) -> None:
-        """A BUILD file owns every target defined in it.
-
-        This must also respect the general rules for when to use generated subtargets vs. the
-        original owning target. See `test_owners_multiple_owners`.
-        """
+        """A BUILD file owns every target defined in it."""
         self.create_files("demo", ["f1.txt", "f2.txt"])
         self.add_to_build_file(
             "demo",
@@ -358,8 +342,8 @@ class TestOwners(TestBase):
         result = self.request_single_product(Owners, OwnersRequest(("demo/BUILD",)))
         assert set(result) == {
             Address("demo", relative_file_path="f1.txt", target_name="f1"),
-            Address("demo", target_name="f2_first"),
-            Address("demo", target_name="f2_second"),
+            Address("demo", relative_file_path="f2.txt", target_name="f2_first"),
+            Address("demo", relative_file_path="f2.txt", target_name="f2_second"),
         }
 
 
@@ -409,35 +393,6 @@ class TestSpecsToAddresses(TestBase):
             ]
         )
 
-    def test_filesystem_specs_merge_when_same_address(self) -> None:
-        """Test that two filesystem specs resulting in the same address will merge into one result.
-
-        This is a tricky edge case to trigger. First, we must be using the original owning targets,
-        rather than generated subtargets, which means that there must be multiple owning targets.
-        Then, we must have two specs that resulted in the same original address.
-        """
-        self.create_files("demo", ["f1.txt", "f2.txt"])
-        self.add_to_build_file(
-            "demo",
-            dedent(
-                """\
-                target(name='one', sources=['*.txt'])
-                target(name='two', sources=['*.txt'])
-                """
-            ),
-        )
-        specs = [FilesystemLiteralSpec("demo/f1.txt"), FilesystemLiteralSpec("demo/f2.txt")]
-        result = self.request_single_product(
-            AddressesWithOrigins, Params(FilesystemSpecs(specs), create_options_bootstrapper())
-        )
-        expected_origin = FilesystemMergedSpec.create(specs)
-        assert result == AddressesWithOrigins(
-            [
-                AddressWithOrigin(Address("demo", target_name="two"), expected_origin),
-                AddressWithOrigin(Address("demo", target_name="one"), expected_origin),
-            ]
-        )
-
     def test_filesystem_specs_nonexistent_file(self) -> None:
         specs = FilesystemSpecs([FilesystemLiteralSpec("demo/fake.txt")])
         with pytest.raises(ExecutionError) as exc:
@@ -476,36 +431,12 @@ class TestSpecsToAddresses(TestBase):
 
     def test_resolve_addresses(self) -> None:
         """This tests that we correctly merge addresses resolved from address specs with those
-        resolved from filesystem specs.
-
-        Some important edge cases:
-        - If a filesystem spec resulted in a normal target, and that target is already in the
-          address specs, then we should deduplicate to only use the target one time.
-        - If a filesystem spec resulted in a generated subtarget, and that subtarget is generated
-          from an original target that is already in the address specs, then we should not use the
-          generated subtarget.
-        """
+        resolved from filesystem specs."""
         self.create_file("fs_spec/f.txt")
         self.add_to_build_file("fs_spec", "target(sources=['f.txt'])")
         self.create_file("address_spec/f.txt")
         self.add_to_build_file("address_spec", "target(sources=['f.txt'])")
         no_interaction_specs = ["fs_spec/f.txt", "address_spec:address_spec"]
-
-        # Because there are two owners, using a filesystem spec on this should result in both
-        # original targets being used, rather than generated subtargets. If we also use an address
-        # spec on one of those two owners, then we should properly dedupe with the filesystem spec
-        # result.
-        self.create_file("two_owners/f.txt")
-        self.add_to_build_file(
-            "two_owners",
-            dedent(
-                """\
-                target(name='one', sources=['f.txt'])
-                target(name='two', sources=['f.txt'])
-                """
-            ),
-        )
-        two_owners_specs = ["two_owners/f.txt", "two_owners:one"]
 
         # If a generated subtarget's original base target is already included via an address spec,
         # then we should not include the generated subtarget because it would be redundant.
@@ -513,9 +444,7 @@ class TestSpecsToAddresses(TestBase):
         self.add_to_build_file("multiple_files", "target(sources=['*.txt'])")
         multiple_files_specs = ["multiple_files/f2.txt", "multiple_files:multiple_files"]
 
-        specs = SpecsCalculator.parse_specs(
-            [*no_interaction_specs, *two_owners_specs, *multiple_files_specs]
-        )
+        specs = SpecsCalculator.parse_specs([*no_interaction_specs, *multiple_files_specs])
         result = self.request_single_product(
             AddressesWithOrigins, Params(specs, create_options_bootstrapper())
         )
@@ -527,13 +456,6 @@ class TestSpecsToAddresses(TestBase):
             AddressWithOrigin(
                 Address("address_spec", target_name="address_spec"),
                 origin=SingleAddress("address_spec", "address_spec"),
-            ),
-            AddressWithOrigin(
-                Address("two_owners", target_name="one"), origin=SingleAddress("two_owners", "one")
-            ),
-            AddressWithOrigin(
-                Address("two_owners", target_name="two"),
-                origin=FilesystemLiteralSpec("two_owners/f.txt"),
             ),
             AddressWithOrigin(
                 Address("multiple_files", target_name="multiple_files"),
