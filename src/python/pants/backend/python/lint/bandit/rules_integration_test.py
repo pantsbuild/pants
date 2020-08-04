@@ -174,7 +174,10 @@ class BanditIntegrationTest(ExternalToolTestBase):
 
     def test_3rdparty_plugin(self) -> None:
         target = self.make_target_with_origin(
-            [FileContent("bad.py", b"aws_key = 'JalrXUtnFEMI/K7MDENG/bPxRfiCYzEXAMPLEKEY'\n")]
+            [FileContent("bad.py", b"aws_key = 'JalrXUtnFEMI/K7MDENG/bPxRfiCYzEXAMPLEKEY'\n")],
+            # NB: `bandit-aws` does not currently work with Python 3.8. See
+            #  https://github.com/pantsbuild/pants/issues/10545.
+            interpreter_constraints="CPython>=3.6,<3.8",
         )
         result = self.run_bandit(
             [target], additional_args=["--bandit-extra-requirements=bandit-aws"]
