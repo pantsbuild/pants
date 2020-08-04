@@ -718,7 +718,7 @@ async def resolve_dependencies(
     )
 
     inference_request_types = union_membership.get(InferDependenciesRequest)
-    inferred: Tuple[InferredDependencies, ...] = (InferredDependencies(),)
+    inferred: Tuple[InferredDependencies, ...] = ()
     if inference_request_types:
         # Dependency inference is solely determined by the `Sources` field for a Target, so we
         # re-resolve the original target to inspect its `Sources` field, if any.
@@ -743,21 +743,21 @@ async def resolve_dependencies(
         Get(Address, AddressInput, ai) for ai in provided.ignored_addresses
     )
 
-    original_addresses: Set[Address] = set()
-    all_generated_addresses: Set[Address] = set()
-    used_ignored_addresses: Set[Address] = set()
+    base_addresses = set()
+    all_generated_addresses = set()
+    used_ignored_addresses = set()
     for addr in (
         *literal_addresses,
         *itertools.chain.from_iterable(injected),
         *itertools.chain.from_iterable(inferred),
     ):
-        if not addr.is_base_target:
-            collection = all_generated_addresses
+        if addr in literal_ignored_addresses:
+            used_ignored_addresses.add(addr)
         else:
-            collection = (
-                used_ignored_addresses if addr in literal_ignored_addresses else original_addresses
-            )
-        collection.add(addr)
+            if addr.is_base_target:
+                base_addresses.add(addr)
+            else:
+                all_generated_addresses.add(addr)
 
     # We check if a generated subtarget's original base target is already included or if ts base
     # target is the target that we're resolving dependencies for. In either of these cases, it
@@ -765,13 +765,13 @@ async def resolve_dependencies(
     remaining_generated_addresses = set()
     for generated_addr in all_generated_addresses:
         base_addr = generated_addr.maybe_convert_to_base_target()
-        if base_addr in original_addresses or base_addr == request.field.address:
+        if base_addr in base_addresses or base_addr == request.field.address:
             continue
         remaining_generated_addresses.add(generated_addr)
 
-    result = sorted({*original_addresses, *remaining_generated_addresses})
+    result = sorted({*base_addresses, *remaining_generated_addresses})
 
-    unused_ignores = {*literal_ignored_addresses} - {*used_ignored_addresses}
+    unused_ignores = set(literal_ignored_addresses) - set(used_ignored_addresses)
     # If there are unused ignores and this is not a generated subtarget, we eagerly error so that
     # the user isn't falsely led to believe the ignore is working. We do not do this for generated
     # subtargets because we cannot guarantee that the ignore specified in the original owning

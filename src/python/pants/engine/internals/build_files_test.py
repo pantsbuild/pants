@@ -17,6 +17,7 @@ from pants.engine.addresses import (
     Address,
     Addresses,
     AddressesWithOrigins,
+    AddressInput,
     AddressWithOrigin,
     BuildFileAddress,
     BuildFileAddresses,
@@ -85,7 +86,7 @@ def test_address_specs_duplicated() -> None:
     )
     assert len(addresses_with_origins) == 1
     awo = addresses_with_origins[0]
-    assert str(awo.address) == "root:root"
+    assert str(awo.address) == "root"
     assert awo.origin == address_spec
 
 
@@ -263,11 +264,8 @@ class BuildFileIntegrationTest(TestBase):
 
     def test_build_file_address(self) -> None:
         self.create_file("helloworld/BUILD.ext", "mock_tgt()")
-        addr = Address.parse("helloworld")
-        expected_bfa = BuildFileAddress(
-            rel_path="helloworld/BUILD.ext",
-            address=Address(spec_path="helloworld", target_name="helloworld"),
-        )
+        addr = Address("helloworld")
+        expected_bfa = BuildFileAddress(rel_path="helloworld/BUILD.ext", address=addr)
         bfa = self.request_single_product(BuildFileAddress, addr)
         assert bfa == expected_bfa
         bfas = self.request_single_product(BuildFileAddresses, Addresses([addr]))
@@ -284,7 +282,7 @@ class BuildFileIntegrationTest(TestBase):
 
     def test_address_not_found(self) -> None:
         with pytest.raises(ExecutionError) as exc:
-            self.request_single_product(TargetAdaptor, Address.parse("helloworld"))
+            self.request_single_product(TargetAdaptor, Address("helloworld"))
         assert "Directory \\'helloworld\\' does not contain any BUILD files" in str(exc)
 
         self.add_to_build_file("helloworld", "mock_tgt(name='other_tgt')")
@@ -292,4 +290,39 @@ class BuildFileIntegrationTest(TestBase):
             "'helloworld' was not found in namespace 'helloworld'. Did you mean one of:\n  :other_tgt"
         )
         with pytest.raises(ExecutionError, match=expected_rx_str):
-            self.request_single_product(TargetAdaptor, Address.parse("helloworld"))
+            self.request_single_product(TargetAdaptor, Address("helloworld"))
+
+
+class ResolveAddressIntegrationTest(TestBase):
+    @classmethod
+    def rules(cls):
+        return (*super().rules(), RootRule(AddressInput))
+
+    def test_resolve_address(self) -> None:
+        def assert_is_expected(address_input: AddressInput, expected: Address) -> None:
+            assert self.request_single_product(Address, address_input) == expected
+
+        self.create_file("a/b/c.txt")
+        assert_is_expected(
+            AddressInput("a/b/c.txt"), Address("a/b", target_name=None, relative_file_path="c.txt")
+        )
+        assert_is_expected(
+            AddressInput("a/b"), Address("a/b", target_name=None, relative_file_path=None)
+        )
+
+        assert_is_expected(
+            AddressInput("a/b", target_component="c"), Address("a/b", target_name="c")
+        )
+        assert_is_expected(
+            AddressInput("a/b/c.txt", target_component="c"),
+            Address("a/b", relative_file_path="c.txt", target_name="c"),
+        )
+
+        # Top-level addresses will not have a path_component.
+        self.create_file("f.txt")
+        assert_is_expected(AddressInput("f.txt"), Address("", relative_file_path="f.txt"))
+        assert_is_expected(AddressInput("", target_component="t"), Address("", target_name="t"))
+
+        with pytest.raises(ExecutionError) as exc:
+            self.request_single_product(Address, AddressInput("a/b/fake"))
+        assert "'a/b/fake' does not exist on disk" in str(exc.value)

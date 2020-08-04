@@ -63,7 +63,7 @@ async def resolve_address(address_input: AddressInput) -> Address:
         snapshot = await Get(Snapshot, PathGlobs(globs=(address_input.path_component,)))
         is_file, is_dir = bool(snapshot.files), bool(snapshot.dirs)
     else:
-        # Is a target in the root directory.
+        # It is an address in the root directory.
         is_file, is_dir = False, True
 
     if is_file:
@@ -120,8 +120,6 @@ def _raise_did_you_mean(address_family: AddressFamily, name: str, source=None) -
 
 @rule
 async def find_build_file(address: Address) -> BuildFileAddress:
-    # TODO: if the Address is for a base target, can immediately use its `file`, which is already
-    # the BUILD file.
     address_family = await Get(AddressFamily, Dir(address.spec_path))
     owning_address = address.maybe_convert_to_base_target()
     if address_family.addressable_for_address(owning_address) is None:

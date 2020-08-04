@@ -46,7 +46,7 @@ class AddressInput:
                     f"name: {self.target_component}"
                 )
 
-        # A root or relative spec is OK
+        # A root is okay.
         if self.path_component == "":
             return
         components = self.path_component.split(os.sep)
@@ -56,13 +56,13 @@ class AddressInput:
             )
         if components[-1].startswith("BUILD"):
             raise InvalidSpecPath(
-                f"Address spec path {self.path_component} has {components[-1]} as the last path part and BUILD is "
-                "a reserved file."
+                f"Address spec path {self.path_component} has {components[-1]} as the last path "
+                "part and BUILD is a reserved file."
             )
         if os.path.isabs(self.path_component):
             raise InvalidSpecPath(
-                f"Address spec has absolute path {self.path_component}; expected a path relative to the build "
-                "root."
+                f"Address spec has absolute path {self.path_component}; expected a path relative "
+                "to the build root."
             )
 
     @classmethod
@@ -72,7 +72,8 @@ class AddressInput:
         relative_to: Optional[str] = None,
         subproject_roots: Optional[Sequence[str]] = None,
     ) -> "AddressInput":
-        """
+        """Parse a string into an AddressInput.
+
         :param spec: Target address spec.
         :param relative_to: path to use for sibling specs, ie: ':another_in_same_build_family',
           interprets the missing spec_path part as `relative_to`.
@@ -91,9 +92,9 @@ class AddressInput:
         In there is no target name component, it defaults the default target in the resulting
         Address's spec_path.
 
-        Optionally, specs can be prefixed with '//' to denote an absolute spec path.  This is normally
-        not significant except when a spec referring to a root level target is needed from deeper in
-        the tree. For example, in `path/to/buildfile/BUILD`:
+        Optionally, specs can be prefixed with '//' to denote an absolute spec path. This is
+        normally not significant except when a spec referring to a root level target is needed
+        from deeper in the tree. For example, in `path/to/buildfile/BUILD`:
 
             some_target(
                 name='mytarget',
@@ -108,6 +109,11 @@ class AddressInput:
                 name='mytarget',
                 dependencies=['//:targetname'],
             )
+
+        The spec may be a file, such as `a/b/c.txt`. It may include a relative address spec at the
+        end, such as `a/b/c.txt:original` or `a/b/c.txt:../original`, to disambiguate which target
+        the file comes from; otherwise, it will be assumed to come from the default target in the
+        directory, i.e. a target which leaves off `name`.
         """
         subproject = (
             longest_dir_prefix(relative_to, subproject_roots)
@@ -118,37 +124,46 @@ class AddressInput:
         def prefix_subproject(spec_path: str) -> str:
             if not subproject:
                 return spec_path
-            elif spec_path:
+            if spec_path:
                 return os.path.join(subproject, spec_path)
-            else:
-                return os.path.normpath(subproject)
+            return os.path.normpath(subproject)
 
         spec_parts = spec.rsplit(":", 1)
-        if len(spec_parts) == 1:
-            # Is using the default target in the containing directory.
-            path_component = prefix_subproject(strip_prefix(spec_parts[0], "//"))
-            target_component = None
-        else:
-            # Has both a file and target component.
-            path_component, target_component = spec_parts
-            if not path_component and relative_to:
-                path_component = (
-                    fast_relpath(relative_to, subproject) if subproject else relative_to
-                )
-            path_component = prefix_subproject(strip_prefix(path_component, "//"))
+        path_component = spec_parts[0]
+        target_component = None if len(spec_parts) == 1 else spec_parts[1]
+
+        normalized_relative_to = None
+        if relative_to:
+            normalized_relative_to = (
+                fast_relpath(relative_to, subproject) if subproject else relative_to
+            )
+        if path_component.startswith("./") and normalized_relative_to:
+            path_component = os.path.join(normalized_relative_to, path_component[2:])
+        if not path_component and normalized_relative_to:
+            path_component = normalized_relative_to
+
+        path_component = prefix_subproject(strip_prefix(path_component, "//"))
 
         return cls(path_component, target_component)
 
     def file_to_address(self) -> "Address":
         """Converts to an Address by asserting that the path_component is a file on disk."""
         if self.target_component is None:
-            # Using the default target in the same directory as the file.
+            # Use the default target in the same directory as the file.
             spec_path, relative_file_path = os.path.split(self.path_component)
+            # We validate that this is not a top-level file. We couldn't do this earlier in the
+            # AddressSpec constructor because we weren't sure if the path_spec referred to a file
+            # vs. a directory.
+            if not spec_path:
+                raise InvalidTargetName(
+                    "Top-level file specs must include which target they come from, such as "
+                    f"`{self.path_component}:original_target`, but {self.path_component} did not "
+                    f"have an address."
+                )
             return Address(spec_path=spec_path, relative_file_path=relative_file_path)
 
-        # The target component may be "above" (but not below) the file in the filesystem.
-        last_slash_idx = self.target_component.rfind(os.path.sep)
-        if last_slash_idx == -1:
+        parent_count = self.target_component.count(os.path.sep)
+        if parent_count == 0:
             spec_path, relative_file_path = os.path.split(self.path_component)
             return Address(
                 spec_path=spec_path,
@@ -156,16 +171,17 @@ class AddressInput:
                 target_name=self.target_component,
             )
 
-        # Determine how many levels above the file it is, and validate that the path is relative.
-        parent_count = last_slash_idx // 3
-        if self.target_component[:last_slash_idx] != (f"..{os.path.sep}" * parent_count):
+        # The target component may be "above" (but not below) the file in the filesystem.
+        expected_prefix = f"..{os.path.sep}" * parent_count
+        if self.target_component[: self.target_component.rfind(os.path.sep) + 1] != expected_prefix:
             raise InvalidTargetName(
                 "A target may only be defined in a directory containing a file that it owns in "
                 f"the filesystem: `{self.target_component}` is not at-or-above the file "
                 f"`{self.path_component}`."
             )
 
-        # Split the path_component into a spec_path and relative_file_path at the appropriate position.
+        # Split the path_component into a spec_path and relative_file_path at the appropriate
+        # position.
         path_components = self.path_component.split(os.path.sep)
         if len(path_components) <= parent_count:
             raise InvalidTargetName(
@@ -173,8 +189,9 @@ class AddressInput:
                 f"`{self.target_component}` is too far above the file `{self.path_component}` to "
                 "be valid."
             )
-        spec_path = os.path.join(*path_components[:-parent_count])
-        relative_file_path = os.path.join(*path_components[-parent_count:])
+        offset = -1 * (parent_count + 1)
+        spec_path = os.path.join(*path_components[:offset]) if path_components[:offset] else ""
+        relative_file_path = os.path.join(*path_components[offset:])
         target_name = os.path.basename(self.target_component)
         return Address(spec_path, relative_file_path=relative_file_path, target_name=target_name)
 
