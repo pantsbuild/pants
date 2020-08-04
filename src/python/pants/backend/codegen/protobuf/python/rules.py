@@ -4,7 +4,7 @@
 from pants.backend.codegen.protobuf.protoc import Protoc
 from pants.backend.codegen.protobuf.target_types import ProtobufSources
 from pants.backend.python.target_types import PythonSources
-from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
+from pants.core.util_rules.determine_source_files import SourceFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.core.util_rules.strip_source_roots import StrippedSourceFiles
 from pants.engine.addresses import Addresses
@@ -47,34 +47,29 @@ async def generate_python_from_protobuf(
     # actually generate those dependencies; it only needs to look at their .proto files to work
     # with imports.
     transitive_targets = await Get(TransitiveTargets, Addresses([request.protocol_target.address]))
-    all_sources_request = Get(
-        SourceFiles,
-        AllSourceFilesRequest(
+    # NB: By stripping the source roots, we avoid having to set the value `--proto_path`
+    # for Protobuf imports to be discoverable.
+    all_stripped_sources_request = Get(
+        StrippedSourceFiles,
+        SourceFilesRequest(
             (tgt.get(Sources) for tgt in transitive_targets.closure),
             for_sources_types=(ProtobufSources,),
         ),
     )
-    unstripped_target_sources_request = Get(
-        SourceFiles, AllSourceFilesRequest([request.protocol_target[ProtobufSources]]),
+    target_stripped_sources_request = Get(
+        StrippedSourceFiles, SourceFilesRequest([request.protocol_target[ProtobufSources]]),
     )
 
     (
         downloaded_protoc_binary,
         create_output_dir_result,
-        all_sources_unstripped,
-        target_sources_unstripped,
+        all_sources_stripped,
+        target_sources_stripped,
     ) = await MultiGet(
         download_protoc_request,
         create_output_dir_request,
-        all_sources_request,
-        unstripped_target_sources_request,
-    )
-
-    # NB: By stripping the source roots, we avoid having to set the value `--proto_path`
-    # for Protobuf imports to be discoverable.
-    all_sources_stripped, target_sources_stripped = await MultiGet(
-        Get(StrippedSourceFiles, SourceFiles, all_sources_unstripped),
-        Get(StrippedSourceFiles, SourceFiles, target_sources_unstripped),
+        all_stripped_sources_request,
+        target_stripped_sources_request,
     )
 
     input_digest = await Get(

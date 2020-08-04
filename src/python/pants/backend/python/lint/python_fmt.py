@@ -7,7 +7,7 @@ from typing import Iterable, List, Type
 from pants.backend.python.target_types import PythonSources
 from pants.core.goals.fmt import FmtResult, LanguageFmtResults, LanguageFmtTargets
 from pants.core.goals.style_request import StyleRequest
-from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
+from pants.core.util_rules.determine_source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import Digest, Snapshot
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionMembership, UnionRule, union
@@ -27,13 +27,9 @@ class PythonFmtRequest(StyleRequest):
 async def format_python_target(
     python_fmt_targets: PythonFmtTargets, union_membership: UnionMembership
 ) -> LanguageFmtResults:
-    targets_with_origins = python_fmt_targets.targets_with_origins
     original_sources = await Get(
         SourceFiles,
-        AllSourceFilesRequest(
-            target_with_origin.target[PythonSources]
-            for target_with_origin in python_fmt_targets.targets_with_origins
-        ),
+        SourceFilesRequest(target[PythonSources] for target in python_fmt_targets.targets),
     )
     prior_formatter_result = original_sources.snapshot
 
@@ -47,8 +43,8 @@ async def format_python_target(
             PythonFmtRequest,
             fmt_request_type(
                 (
-                    fmt_request_type.field_set_type.create(target_with_origin)
-                    for target_with_origin in targets_with_origins
+                    fmt_request_type.field_set_type.create(target)
+                    for target in python_fmt_targets.targets
                 ),
                 prior_formatter_result=prior_formatter_result,
             ),

@@ -5,30 +5,16 @@ import functools
 import itertools
 import logging
 import os.path
-from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import (
-    DefaultDict,
-    Dict,
-    Iterable,
-    List,
-    NamedTuple,
-    Optional,
-    Sequence,
-    Set,
-    Tuple,
-    Type,
-    Union,
-)
+from typing import Dict, Iterable, List, NamedTuple, Optional, Sequence, Set, Tuple, Type, Union
 
 from pants.base.exceptions import ResolveError
 from pants.base.specs import (
     AddressSpecs,
     AscendantAddresses,
     FilesystemLiteralSpec,
-    FilesystemMergedSpec,
-    FilesystemResolvedGlobSpec,
+    FilesystemSpec,
     FilesystemSpecs,
     Specs,
 )
@@ -366,32 +352,27 @@ async def addresses_with_origins_from_filesystem_specs(
     """Find the owner(s) for each FilesystemSpec while preserving the original FilesystemSpec those
     owners come from.
 
-    When a file has only one owning target, we generate a subtarget from that owner whose source's
-    field only refers to that one file. Otherwise, we use all the original owning targets.
-
-    This will merge FilesystemSpecs that come from the same owning target into a single
-    FilesystemMergedSpec.
+    Every returned address will be a generated subtarget, meaning that each address will have
+    exactly one file in its `sources` field.
     """
-    pathglobs_per_include = (
-        filesystem_specs.path_globs_for_spec(
-            spec, global_options.options.owners_not_found_behavior.to_glob_match_error_behavior(),
+    owners_not_found_behavior = global_options.options.owners_not_found_behavior
+    snapshot_per_include = await MultiGet(
+        Get(
+            Snapshot,
+            PathGlobs,
+            filesystem_specs.path_globs_for_spec(
+                spec, owners_not_found_behavior.to_glob_match_error_behavior()
+            ),
         )
         for spec in filesystem_specs.includes
-    )
-    snapshot_per_include = await MultiGet(
-        Get(Snapshot, PathGlobs, pg) for pg in pathglobs_per_include
     )
     owners_per_include = await MultiGet(
         Get(Owners, OwnersRequest(sources=snapshot.files)) for snapshot in snapshot_per_include
     )
-    addresses_to_specs: DefaultDict[
-        Address, List[Union[FilesystemLiteralSpec, FilesystemResolvedGlobSpec]]
-    ] = defaultdict(list)
-    for spec, snapshot, owners in zip(
-        filesystem_specs.includes, snapshot_per_include, owners_per_include
-    ):
+    addresses_to_specs: Dict[Address, FilesystemSpec] = {}
+    for spec, owners in zip(filesystem_specs.includes, owners_per_include):
         if (
-            global_options.options.owners_not_found_behavior != OwnersNotFoundBehavior.ignore
+            owners_not_found_behavior != OwnersNotFoundBehavior.ignore
             and isinstance(spec, FilesystemLiteralSpec)
             and not owners
         ):
@@ -400,20 +381,17 @@ async def addresses_with_origins_from_filesystem_specs(
                 global_options.options.owners_not_found_behavior,
                 ignore_option="--owners-not-found-behavior=ignore",
             )
-        # We preserve what literal files any globs resolved to. This allows downstream goals to be
-        # more precise in which files they operate on.
-        origin: Union[FilesystemLiteralSpec, FilesystemResolvedGlobSpec] = (
-            spec
-            if isinstance(spec, FilesystemLiteralSpec)
-            else FilesystemResolvedGlobSpec(glob=spec.glob, files=snapshot.files)
-        )
         for address in owners:
-            addresses_to_specs[address].append(origin)
+            # If the address is already covered by a prior spec, and that spec is a literal spec,
+            # then we do not overwrite it. The implication is that if the same address is resolved
+            # both by a glob spec and a literal spec, the literal spec will be used because it's
+            # more precise.
+            if isinstance(addresses_to_specs.get(address), FilesystemLiteralSpec):
+                continue
+            else:
+                addresses_to_specs[address] = spec
     return AddressesWithOrigins(
-        AddressWithOrigin(
-            address, specs[0] if len(specs) == 1 else FilesystemMergedSpec.create(specs)
-        )
-        for address, specs in addresses_to_specs.items()
+        AddressWithOrigin(address, spec) for address, spec in addresses_to_specs.items()
     )
 
 

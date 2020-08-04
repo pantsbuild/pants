@@ -323,22 +323,11 @@ class FilesystemSpec(Spec, metaclass=ABCMeta):
     pass
 
 
-class FilesystemResolvedSpec(FilesystemSpec, metaclass=ABCMeta):
-    @property
-    @abstractmethod
-    def resolved_files(self) -> Tuple[str, ...]:
-        """The literal files this spec refers to after resolving all globs and excludes."""
-
-
 @dataclass(frozen=True)
-class FilesystemLiteralSpec(FilesystemResolvedSpec):
+class FilesystemLiteralSpec(FilesystemSpec):
     """A literal file name, e.g. `foo.py`."""
 
     file: str
-
-    @property
-    def resolved_files(self) -> Tuple[str, ...]:
-        return (self.file,)
 
     def to_spec_string(self) -> str:
         return self.file
@@ -352,46 +341,6 @@ class FilesystemGlobSpec(FilesystemSpec):
 
     def to_spec_string(self) -> str:
         return self.glob
-
-
-@dataclass(frozen=True)
-class FilesystemResolvedGlobSpec(FilesystemGlobSpec, FilesystemResolvedSpec):
-    """A spec with resolved globs.
-
-    For example, `*.py` may resolve to `('f1.py', 'f2.py', '__init__.py')`.
-    """
-
-    files: Tuple[str, ...]
-
-    @property
-    def resolved_files(self) -> Tuple[str, ...]:
-        return self.files
-
-
-@dataclass(frozen=True)
-class FilesystemMergedSpec(FilesystemResolvedSpec):
-    """Represents multiple FilesystemSpecs belonging to the same target."""
-
-    globs: Tuple[str, ...]
-    files: Tuple[str, ...]
-
-    @classmethod
-    def create(
-        cls, original_specs: Iterable[Union[FilesystemLiteralSpec, FilesystemResolvedGlobSpec]]
-    ) -> "FilesystemMergedSpec":
-        globs: List[str] = []
-        files: List[str] = []
-        for spec in original_specs:
-            globs.append(spec.to_spec_string())
-            files.extend(spec.resolved_files)
-        return cls(globs=tuple(sorted(globs)), files=tuple(sorted(files)))
-
-    @property
-    def resolved_files(self) -> Tuple[str, ...]:
-        return self.files
-
-    def to_spec_string(self) -> str:
-        return ", ".join(self.globs)
 
 
 @dataclass(frozen=True)
@@ -449,10 +398,6 @@ class FilesystemSpecs(Collection[FilesystemSpec]):
         return self._generate_path_globs((*self.includes, *self.ignores), glob_match_error_behavior)
 
 
-class AmbiguousSpecs(Exception):
-    pass
-
-
 @dataclass(frozen=True)
 class Specs:
     address_specs: AddressSpecs
@@ -462,6 +407,3 @@ class Specs:
     def provided(self) -> bool:
         """Did the user provide specs?"""
         return bool(self.address_specs) or bool(self.filesystem_specs)
-
-
-OriginSpec = Union[AddressSpec, FilesystemResolvedSpec]

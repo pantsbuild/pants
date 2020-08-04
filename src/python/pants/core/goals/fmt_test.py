@@ -6,7 +6,6 @@ from pathlib import Path
 from textwrap import dedent
 from typing import ClassVar, Iterable, List, Optional, Type, cast
 
-from pants.base.specs import SingleAddress
 from pants.core.goals.fmt import (
     Fmt,
     FmtResult,
@@ -18,7 +17,7 @@ from pants.core.goals.fmt import (
 from pants.core.util_rules.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, Digest, FileContent, MergeDigests, Workspace
-from pants.engine.target import Sources, Target, TargetsWithOrigins, TargetWithOrigin
+from pants.engine.target import Sources, Target, Targets
 from pants.engine.unions import UnionMembership
 from pants.testutil.engine.util import MockConsole, MockGet, create_goal_subsystem, run_rule
 from pants.testutil.test_base import TestBase
@@ -55,9 +54,7 @@ class MockLanguageTargets(LanguageFmtTargets, metaclass=ABCMeta):
         pass
 
     def language_fmt_results(self, result_digest: Digest) -> LanguageFmtResults:
-        addresses = [
-            target_with_origin.target.address for target_with_origin in self.targets_with_origins
-        ]
+        addresses = [target.address for target in self.targets]
         return LanguageFmtResults(
             (
                 FmtResult(
@@ -113,21 +110,16 @@ class FmtTest(TestBase):
         ).digest
 
     @staticmethod
-    def make_target_with_origin(
+    def make_target(
         address: Optional[Address] = None, *, target_cls: Type[Target] = FortranTarget
-    ) -> TargetWithOrigin:
-        if address is None:
-            address = Address.parse(":tests")
-        return TargetWithOrigin(
-            target_cls({}, address=address),
-            origin=SingleAddress(directory=address.spec_path, name=address.target_name),
-        )
+    ) -> Target:
+        return target_cls({}, address=address or Address.parse(":tests"))
 
     def run_fmt_rule(
         self,
         *,
         language_target_collection_types: List[Type[LanguageFmtTargets]],
-        targets: List[TargetWithOrigin],
+        targets: List[Target],
         result_digest: Digest,
         per_target_caching: bool,
         include_sources: bool = True,
@@ -138,7 +130,7 @@ class FmtTest(TestBase):
             fmt,
             rule_args=[
                 console,
-                TargetsWithOrigins(targets),
+                Targets(targets),
                 create_goal_subsystem(FmtSubsystem, per_target_caching=per_target_caching),
                 Workspace(self.scheduler),
                 union_membership,
@@ -182,7 +174,7 @@ class FmtTest(TestBase):
         def assert_noops(*, per_target_caching: bool) -> None:
             stderr = self.run_fmt_rule(
                 language_target_collection_types=[FortranTargets],
-                targets=[self.make_target_with_origin()],
+                targets=[self.make_target()],
                 result_digest=self.fortran_digest,
                 per_target_caching=per_target_caching,
                 include_sources=False,
@@ -197,7 +189,7 @@ class FmtTest(TestBase):
         def assert_noops(*, per_target_caching: bool) -> None:
             stderr = self.run_fmt_rule(
                 language_target_collection_types=[InvalidTargets],
-                targets=[self.make_target_with_origin()],
+                targets=[self.make_target()],
                 result_digest=self.fortran_digest,
                 per_target_caching=per_target_caching,
             )
@@ -209,7 +201,7 @@ class FmtTest(TestBase):
 
     def test_single_language_with_single_target(self) -> None:
         address = Address.parse(":tests")
-        target_with_origin = self.make_target_with_origin(address)
+        target_with_origin = self.make_target(address)
 
         def assert_expected(*, per_target_caching: bool) -> None:
             stderr = self.run_fmt_rule(
@@ -235,7 +227,7 @@ class FmtTest(TestBase):
         def get_stderr(*, per_target_caching: bool) -> str:
             stderr = self.run_fmt_rule(
                 language_target_collection_types=[FortranTargets],
-                targets=[self.make_target_with_origin(addr) for addr in addresses],
+                targets=[self.make_target(addr) for addr in addresses],
                 result_digest=self.fortran_digest,
                 per_target_caching=per_target_caching,
             )
@@ -266,8 +258,8 @@ class FmtTest(TestBase):
             stderr = self.run_fmt_rule(
                 language_target_collection_types=[FortranTargets, SmalltalkTargets],
                 targets=[
-                    self.make_target_with_origin(fortran_address, target_cls=FortranTarget),
-                    self.make_target_with_origin(smalltalk_address, target_cls=SmalltalkTarget),
+                    self.make_target(fortran_address, target_cls=FortranTarget),
+                    self.make_target(smalltalk_address, target_cls=SmalltalkTarget),
                 ],
                 result_digest=self.merged_digest,
                 per_target_caching=per_target_caching,
@@ -291,12 +283,10 @@ class FmtTest(TestBase):
         smalltalk_addresses = [Address.parse(":py1"), Address.parse(":py2")]
 
         fortran_targets = [
-            self.make_target_with_origin(addr, target_cls=FortranTarget)
-            for addr in fortran_addresses
+            self.make_target(addr, target_cls=FortranTarget) for addr in fortran_addresses
         ]
         smalltalk_targets = [
-            self.make_target_with_origin(addr, target_cls=SmalltalkTarget)
-            for addr in smalltalk_addresses
+            self.make_target(addr, target_cls=SmalltalkTarget) for addr in smalltalk_addresses
         ]
 
         def get_stderr(*, per_target_caching: bool) -> str:

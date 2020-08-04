@@ -29,7 +29,7 @@ from pants.backend.python.target_types import (
     PythonTestsTimeout,
 )
 from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
-from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
+from pants.core.util_rules.determine_source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
 from pants.engine.internals.uuid import UUIDRequest
@@ -152,22 +152,20 @@ async def setup_pytest_for_target(
 
     # Get the file names for the test_target so that we can specify to Pytest precisely which files
     # to test, rather than using auto-discovery.
-    specified_source_files_request = Get(
-        SourceFiles, SpecifiedSourceFilesRequest([(field_set.sources, field_set.origin)])
-    )
+    field_set_source_files_request = Get(SourceFiles, SourceFilesRequest([field_set.sources]))
 
     (
         pytest_pex,
         requirements_pex,
         test_runner_pex,
         prepared_sources,
-        specified_source_files,
+        field_set_source_files,
     ) = await MultiGet(
         pytest_pex_request,
         requirements_pex_request,
         test_runner_pex_request,
         prepared_sources_request,
-        specified_source_files_request,
+        field_set_source_files_request,
     )
 
     input_digest = await Get(
@@ -192,7 +190,7 @@ async def setup_pytest_for_target(
         ]
     return TestTargetSetup(
         test_runner_pex=test_runner_pex,
-        args=(*pytest.options.args, *coverage_args, *specified_source_files.files),
+        args=(*pytest.options.args, *coverage_args, *field_set_source_files.files),
         input_digest=input_digest,
         source_roots=prepared_sources.source_roots,
         timeout_seconds=field_set.timeout.calculate_from_global_options(pytest),

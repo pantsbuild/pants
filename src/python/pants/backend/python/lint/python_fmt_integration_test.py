@@ -9,12 +9,11 @@ from pants.backend.python.lint.isort.rules import IsortRequest
 from pants.backend.python.lint.isort.rules import rules as isort_rules
 from pants.backend.python.lint.python_fmt import PythonFmtTargets, format_python_target
 from pants.backend.python.target_types import PythonLibrary
-from pants.base.specs import SingleAddress
 from pants.core.goals.fmt import LanguageFmtResults
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.rules import RootRule
-from pants.engine.target import TargetsWithOrigins, TargetWithOrigin
+from pants.engine.target import Targets
 from pants.testutil.engine.util import Params
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option.util import create_options_bootstrapper
@@ -38,9 +37,9 @@ class PythonFmtIntegrationTest(ExternalToolTestBase):
     ) -> LanguageFmtResults:
         for source_file in source_files:
             self.create_file(source_file.path, source_file.content.decode())
-        target = PythonLibrary({}, address=Address.parse(f"test:{name}"))
-        origin = SingleAddress(directory="test", name=name)
-        targets = PythonFmtTargets(TargetsWithOrigins([TargetWithOrigin(target, origin)]))
+        targets = PythonFmtTargets(
+            Targets([PythonLibrary({}, address=Address.parse(f"test:{name}"))])
+        )
         args = [
             "--backend-packages=['pants.backend.python.lint.black', 'pants.backend.python.lint.isort']",
             *(extra_args or []),

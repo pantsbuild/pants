@@ -17,7 +17,7 @@ from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
-from pants.engine.target import TargetsWithOrigins
+from pants.engine.target import Targets
 from pants.engine.unions import UnionMembership, union
 from pants.util.strutil import strip_v2_chroot_path
 
@@ -132,16 +132,16 @@ class Lint(Goal):
 async def lint(
     console: Console,
     workspace: Workspace,
-    targets_with_origins: TargetsWithOrigins,
+    targets: Targets,
     lint_subsystem: LintSubsystem,
     union_membership: UnionMembership,
 ) -> Lint:
     request_types = union_membership[LintRequest]
     requests: Iterable[StyleRequest] = tuple(
         request_type(
-            request_type.field_set_type.create(target_with_origin)
-            for target_with_origin in targets_with_origins
-            if request_type.field_set_type.is_valid(target_with_origin.target)
+            request_type.field_set_type.create(target)
+            for target in targets
+            if request_type.field_set_type.is_valid(target)
         )
         for request_type in request_types
     )

@@ -6,12 +6,11 @@ from typing import List, Optional
 from pants.backend.python.lint.bandit.rules import BanditFieldSet, BanditRequest
 from pants.backend.python.lint.bandit.rules import rules as bandit_rules
 from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonLibrary
-from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.core.goals.lint import LintResults
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, FileContent
 from pants.engine.rules import RootRule
-from pants.engine.target import TargetWithOrigin
+from pants.engine.target import Target
 from pants.testutil.engine.util import Params
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.interpreter_selection_utils import skip_unless_python27_and_python3_present
@@ -29,26 +28,19 @@ class BanditIntegrationTest(ExternalToolTestBase):
     def rules(cls):
         return (*super().rules(), *bandit_rules(), RootRule(BanditRequest))
 
-    def make_target_with_origin(
-        self,
-        source_files: List[FileContent],
-        *,
-        interpreter_constraints: Optional[str] = None,
-        origin: Optional[OriginSpec] = None,
-    ) -> TargetWithOrigin:
+    def make_target(
+        self, source_files: List[FileContent], *, interpreter_constraints: Optional[str] = None
+    ) -> Target:
         for source_file in source_files:
             self.create_file(source_file.path, source_file.content.decode())
-        target = PythonLibrary(
+        return PythonLibrary(
             {PythonInterpreterCompatibility.alias: interpreter_constraints},
             address=Address.parse(":target"),
         )
-        if origin is None:
-            origin = SingleAddress(directory="", name="target")
-        return TargetWithOrigin(target, origin)
 
     def run_bandit(
         self,
-        targets: List[TargetWithOrigin],
+        targets: List[Target],
         *,
         config: Optional[str] = None,
         passthrough_args: Optional[str] = None,
@@ -74,7 +66,7 @@ class BanditIntegrationTest(ExternalToolTestBase):
         )
 
     def test_passing_source(self) -> None:
-        target = self.make_target_with_origin([self.good_source])
+        target = self.make_target([self.good_source])
         result = self.run_bandit([target])
         assert len(result) == 1
         assert result[0].exit_code == 0
@@ -82,7 +74,7 @@ class BanditIntegrationTest(ExternalToolTestBase):
         assert result[0].results_file is None
 
     def test_failing_source(self) -> None:
-        target = self.make_target_with_origin([self.bad_source])
+        target = self.make_target([self.bad_source])
         result = self.run_bandit([target])
         assert len(result) == 1
         assert result[0].exit_code == 1
@@ -90,7 +82,7 @@ class BanditIntegrationTest(ExternalToolTestBase):
         assert result[0].results_file is None
 
     def test_mixed_sources(self) -> None:
-        target = self.make_target_with_origin([self.good_source, self.bad_source])
+        target = self.make_target([self.good_source, self.bad_source])
         result = self.run_bandit([target])
         assert len(result) == 1
         assert result[0].exit_code == 1
@@ -100,8 +92,8 @@ class BanditIntegrationTest(ExternalToolTestBase):
 
     def test_multiple_targets(self) -> None:
         targets = [
-            self.make_target_with_origin([self.good_source]),
-            self.make_target_with_origin([self.bad_source]),
+            self.make_target([self.good_source]),
+            self.make_target([self.bad_source]),
         ]
         result = self.run_bandit(targets)
         assert len(result) == 1
@@ -110,20 +102,9 @@ class BanditIntegrationTest(ExternalToolTestBase):
         assert "Issue: [B303:blacklist] Use of insecure MD2, MD4, MD5" in result[0].stdout
         assert result[0].results_file is None
 
-    def test_precise_file_args(self) -> None:
-        target = self.make_target_with_origin(
-            [self.good_source, self.bad_source],
-            origin=FilesystemLiteralSpec(self.good_source.path),
-        )
-        result = self.run_bandit([target])
-        assert len(result) == 1
-        assert result[0].exit_code == 0
-        assert "No issues identified." in result[0].stdout
-        assert result[0].results_file is None
-
     @skip_unless_python27_and_python3_present
     def test_uses_correct_python_version(self) -> None:
-        py2_target = self.make_target_with_origin(
+        py2_target = self.make_target(
             [self.py3_only_source], interpreter_constraints="CPython==2.7.*"
         )
         py2_result = self.run_bandit([py2_target])
@@ -131,7 +112,7 @@ class BanditIntegrationTest(ExternalToolTestBase):
         assert py2_result[0].exit_code == 0
         assert "py3.py (syntax error while parsing AST from file)" in py2_result[0].stdout
 
-        py3_target = self.make_target_with_origin(
+        py3_target = self.make_target(
             [self.py3_only_source], interpreter_constraints="CPython>=3.6"
         )
         py3_result = self.run_bandit([py3_target])
@@ -152,7 +133,7 @@ class BanditIntegrationTest(ExternalToolTestBase):
         assert "No issues identified." in batched_py3_result.stdout
 
     def test_respects_config_file(self) -> None:
-        target = self.make_target_with_origin([self.bad_source])
+        target = self.make_target([self.bad_source])
         result = self.run_bandit([target], config="skips: ['B303']\n")
         assert len(result) == 1
         assert result[0].exit_code == 0
@@ -160,7 +141,7 @@ class BanditIntegrationTest(ExternalToolTestBase):
         assert result[0].results_file is None
 
     def test_respects_passthrough_args(self) -> None:
-        target = self.make_target_with_origin([self.bad_source])
+        target = self.make_target([self.bad_source])
         result = self.run_bandit([target], passthrough_args="--skip B303")
         assert len(result) == 1
         assert result[0].exit_code == 0
@@ -168,12 +149,12 @@ class BanditIntegrationTest(ExternalToolTestBase):
         assert result[0].results_file is None
 
     def test_skip(self) -> None:
-        target = self.make_target_with_origin([self.bad_source])
+        target = self.make_target([self.bad_source])
         result = self.run_bandit([target], skip=True)
         assert not result
 
     def test_3rdparty_plugin(self) -> None:
-        target = self.make_target_with_origin(
+        target = self.make_target(
             [FileContent("bad.py", b"aws_key = 'JalrXUtnFEMI/K7MDENG/bPxRfiCYzEXAMPLEKEY'\n")],
             # NB: `bandit-aws` does not currently work with Python 3.8. See
             #  https://github.com/pantsbuild/pants/issues/10545.
@@ -188,7 +169,7 @@ class BanditIntegrationTest(ExternalToolTestBase):
         assert result[0].results_file is None
 
     def test_output_file(self) -> None:
-        target = self.make_target_with_origin([self.bad_source])
+        target = self.make_target([self.bad_source])
         result = self.run_bandit([target], additional_args=["--lint-reports-dir='.'"])
         assert len(result) == 1
         assert result[0].exit_code == 1
