@@ -12,7 +12,6 @@ import pytest
 from pants.base.specs import (
     FilesystemGlobSpec,
     FilesystemLiteralSpec,
-    FilesystemMergedSpec,
     FilesystemResolvedGlobSpec,
     FilesystemSpecs,
     SingleAddress,
