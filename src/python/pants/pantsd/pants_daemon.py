@@ -142,9 +142,7 @@ class PantsDaemon(PantsDaemonProcessManager):
         )
 
         invalidation_globs = OptionsInitializer.compute_pantsd_invalidation_globs(
-            build_root,
-            bootstrap_options,
-            PantsDaemon.metadata_file_path("pantsd", "pid", bootstrap_options.pants_subprocessdir),
+            build_root, bootstrap_options,
         )
 
         scheduler_service = SchedulerService(
@@ -152,7 +150,10 @@ class PantsDaemon(PantsDaemonProcessManager):
             legacy_graph_scheduler=legacy_graph_scheduler,
             build_root=build_root,
             invalidation_globs=invalidation_globs,
-            max_memory_usage_pid=os.getpid(),
+            pidfile=PantsDaemon.metadata_file_path(
+                "pantsd", "pid", bootstrap_options.pants_subprocessdir
+            ),
+            pid=os.getpid(),
             max_memory_usage_in_bytes=bootstrap_options.pantsd_max_memory_usage,
         )
 
@@ -264,22 +265,12 @@ class PantsDaemon(PantsDaemonProcessManager):
         process starting.
         """
 
-        # Write the pidfile.
+        # Write the pidfile. The SchedulerService will monitor it after a grace period.
         pid = os.getpid()
         self.write_pid(pid=pid)
         self.write_metadata_by_name(
             "pantsd", self.FINGERPRINT_KEY, ensure_text(self.options_fingerprint)
         )
-        pidfile_absolute = self._metadata_file_path("pantsd", "pid")
-
-        # Finally, once watched, confirm that we didn't race another process.
-        try:
-            with open(pidfile_absolute, "r") as f:
-                pid_from_file = f.read()
-        except IOError:
-            raise Exception(f"Could not read pants pidfile at {pidfile_absolute}.")
-        if int(pid_from_file) != os.getpid():
-            raise Exception(f"Another instance of pantsd is running at {pid_from_file}")
 
     def run_sync(self):
         """Synchronously run pantsd."""

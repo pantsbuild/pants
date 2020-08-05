@@ -35,7 +35,7 @@ class OptionsInitializerTest(unittest.TestCase):
         suffix = "something-ridiculous"
         ob = OptionsBootstrapper.create(args=[f"--pythonpath=../{suffix}"])
         globs = OptionsInitializer.compute_pantsd_invalidation_globs(
-            get_buildroot(), ob.bootstrap_options.for_global_scope(), "/dev/null/pidfile"
+            get_buildroot(), ob.bootstrap_options.for_global_scope()
         )
         for glob in globs:
             assert suffix not in glob
