@@ -337,12 +337,12 @@ class BinaryPaths(EngineAware):
 @rule(desc="Find binary path")
 async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
     # TODO(John Sirois): Replace this script with a statically linked native binary so we don't
-    #  depend on either /bin/bash being available on the Process host.
-    # TODO(#10507): Running the script directly from a shebang sometimes results in a "Text file
-    #  busy" error.
-    script_path = "./script.sh"
+    #  depend on either `/usr/bin/env` or bash being available on the Process host.
+    script_path = "./find_binary.sh"
     script_content = dedent(
         """
+        #!/usr/bin/env bash
+
         set -euo pipefail
 
         if command -v which > /dev/null; then
@@ -365,7 +365,7 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
             description=f"Searching for `{request.binary_name}` on PATH={search_path}",
             level=LogLevel.DEBUG,
             input_digest=script_digest,
-            argv=["/bin/bash", script_path, request.binary_name],
+            argv=[script_path, request.binary_name],
             env={"PATH": search_path},
         ),
     )

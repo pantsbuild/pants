@@ -893,7 +893,7 @@ impl Store {
           })
           .and_then(|mut f| {
             f.write_all(&bytes)?;
-            if fsync {
+            if fsync || is_executable {
               f.sync_all()
             } else {
               Ok(())
