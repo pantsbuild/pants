@@ -18,7 +18,6 @@ from pants.base.specs import (
     FilesystemSpecs,
     Specs,
 )
-from pants.core.target_types import TargetAlias
 from pants.engine.addresses import (
     Address,
     Addresses,
@@ -69,11 +68,11 @@ from pants.engine.target import (
     WrappedTarget,
     _AbstractFieldSet,
     generate_subtarget,
+    generate_subtarget_address,
 )
 from pants.engine.unions import UnionMembership
 from pants.option.global_options import GlobalOptions, OwnersNotFoundBehavior
 from pants.source.filespec import matches_filespec
-from pants.util.dirutil import fast_relpath
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
 logger = logging.getLogger(__name__)
@@ -84,100 +83,93 @@ logger = logging.getLogger(__name__)
 
 
 @rule
-async def generate_subtargets(
+async def generate_subtargets(address: Address,) -> Subtargets:
+    if not address.is_base_target:
+        raise ValueError(f"Cannot generate file Targets for a file Address: {address}")
+    wrapped_base_target = await Get(WrappedTarget, Address, address)
+    base_target = wrapped_base_target.target
+
+    if not base_target.has_field(Dependencies):
+        # If a target type does not support dependencies, we do not split it, as that would prevent
+        # the base target from depending on its splits.
+        return Subtargets(base_target, ())
+
+    # Create subtargets for the sources matched by each sources field type.
+    sources_field_types = [ft for ft in base_target.field_types if issubclass(ft, Sources)]
+    hydrated_sources_collection = await MultiGet(
+        Get(HydratedSources, HydrateSourcesRequest(base_target.get(sft)))
+        for sft in sources_field_types
+    )
+
+    # For each field type, generate a subtarget per source.
+    subtarget_files = {
+        source
+        for hydrated_sources in hydrated_sources_collection
+        for source in hydrated_sources.snapshot.files
+    }
+    wrapped_subtargets = await MultiGet(
+        Get(
+            WrappedTarget,
+            Address,
+            generate_subtarget_address(address, full_file_name=subtarget_file),
+        )
+        for subtarget_file in sorted(subtarget_files)
+    )
+
+    return Subtargets(base_target, tuple(wt.target for wt in wrapped_subtargets))
+
+
+@rule
+async def resolve_target(
     address: Address,
     registered_target_types: RegisteredTargetTypes,
     union_membership: UnionMembership,
-) -> Subtargets:
+) -> WrappedTarget:
     if not address.is_base_target:
-        raise ValueError(f"Cannot generate file Targets for a file Address: {address}")
+        base_target = await Get(WrappedTarget, Address, address.maybe_convert_to_base_target())
+        subtarget = generate_subtarget(base_target.target, full_file_name=address.filename)
+        return WrappedTarget(subtarget)
+
     target_adaptor = await Get(TargetAdaptor, Address, address)
     target_type = registered_target_types.aliases_to_types.get(target_adaptor.type_alias, None)
     if target_type is None:
         raise UnrecognizedTargetTypeException(
             target_adaptor.type_alias, registered_target_types, address=address
         )
-    # TODO: We could avoid (re)constructing the base target by extracting just the relevant
-    # sources fields for hydration.
-    base_target = target_type(
-        target_adaptor.kwargs, address=address, union_membership=union_membership
-    )
-
-    if not base_target.has_field(Dependencies):
-        # If a target type does not support dependencies, we do not split it, as that would prevent
-        # the base target from depending on its splits.
-        return Subtargets(base_target, {})
-
-    # Create subtargets for the sources matched by each sources field type.
-    sources_field_types = [
-        ft for ft in target_type.class_field_types(union_membership) if issubclass(ft, Sources)
-    ]
-    hydrated_sources_collection = await MultiGet(
-        Get(HydratedSources, HydrateSourcesRequest(base_target.get(sft)))
-        for sft in sources_field_types
-    )
-    subtargets = {}
-    for hydrated_sources in hydrated_sources_collection:
-        # For each field type, generate a subtarget per source.
-        # TODO: Handle overlapping Sources globs.
-        for source in hydrated_sources.snapshot.files:
-            subtarget = generate_subtarget(base_target, full_file_name=source)
-            subtargets[fast_relpath(source, address.spec_path)] = subtarget
-
-    if not subtargets:
-        # If this target supports sources but does not own any, use it verbatim: otherwise we would
-        # have nowhere to propagate its dependencies to.
-        return Subtargets(base_target, {})
-
-    # Finally, re-construct the base target as an alias with dependencies on the subtargets, and
-    # its original explicit dependencies for clarity of introspection.
-    base_dependencies = set(target_adaptor.kwargs.get(Dependencies.alias, ()))
-    base_dependencies.update(st.address.spec for st in subtargets.values())
-    base_target = TargetAlias(
-        {Dependencies.alias: list(base_dependencies)},
-        address=address,
-        union_membership=union_membership,
-    )
-    return Subtargets(base_target, subtargets)
-
-
-@rule
-async def resolve_target(address: Address) -> WrappedTarget:
-    base_address = address.maybe_convert_to_base_target()
-    subtargets = await Get(Subtargets, Address, base_address)
-    if not address.is_base_target:
-        name = fast_relpath(address.filename, base_address.spec_path)
-        subtarget = subtargets.subtargets.get(name)
-        if not subtarget:
-            names = sorted(subtargets.subtargets.keys())
-            raise ResolveError(
-                f"The target at {base_address} did not own `{name}`: instead, it owns {names}."
-            )
-        return WrappedTarget(subtarget)
-    else:
-        return WrappedTarget(subtargets.base)
+    target = target_type(target_adaptor.kwargs, address=address, union_membership=union_membership)
+    return WrappedTarget(target)
 
 
 @rule
 async def resolve_targets(addresses: Addresses) -> Targets:
-    # TODO: This method implements alias expansion independent of `resolve_targets_with_origins`,
-    # because direct expansion of `Addresses` to `Targets` is common in a few places: we can't
-    # always assume that we have `AddressesWithOrigins`. One way to dedupe these two methods would
-    # be to fake some origins, and then strip them afterward.
+    # TODO: This method duplicates `resolve_targets_with_origins`, because direct expansion of
+    # `Addresses` to `Targets` is common in a few places: we can't always assume that we
+    # have `AddressesWithOrigins`. One way to dedupe these two methods would be to fake some
+    # origins, and then strip them afterward.
     wrapped_targets = await MultiGet(Get(WrappedTarget, Address, a) for a in addresses)
     targets = {wt.target for wt in wrapped_targets}
-    # Expand any aliases.
-    # TODO: Should be recursive.
-    alias_targets_dependencies = await MultiGet(
-        Get(Targets, DependenciesRequest(t.get(Dependencies)))
-        for t in targets
-        if isinstance(t, TargetAlias)
+    # Split out and expand any base targets.
+    # TODO: Should recursively expand alias targets here as well.
+    other_targets = []
+    base_targets = []
+    for target in targets:
+        if target.address.is_base_target:
+            base_targets.append(target)
+        else:
+            other_targets.append(target)
+
+    base_targets_subtargets = await MultiGet(
+        Get(Subtargets, Address, bt.address) for bt in base_targets
     )
-    # Zip the dependencies of the alias back to the alias and propagate their origins.
-    targets.update(
-        dep_target for dep_targets in alias_targets_dependencies for dep_target in dep_targets
+    # Zip the subtargets back to the base targets and replace them.
+    # NB: If a target had no subtargets, we use the base.
+    expanded_targets = set(other_targets)
+    expanded_targets.update(
+        target
+        for subtargets in base_targets_subtargets
+        for target in (subtargets.subtargets if subtargets.subtargets else (subtargets.base,))
     )
-    return Targets(targets)
+    return Targets(expanded_targets)
 
 
 @rule
@@ -201,25 +193,31 @@ async def resolve_target_with_origin(address_with_origin: AddressWithOrigin) -> 
 async def resolve_targets_with_origins(
     addresses_with_origins: AddressesWithOrigins,
 ) -> TargetsWithOrigins:
+    # TODO: See `resolve_targets`.
     targets_with_origins = await MultiGet(
         Get(TargetWithOrigin, AddressWithOrigin, address_with_origin)
         for address_with_origin in addresses_with_origins
     )
-    # Expand any aliases.
-    # TODO: Should be recursive.
-    alias_targets_with_origins = [
-        to for to in targets_with_origins if isinstance(to.target, TargetAlias)
-    ]
-    alias_targets_dependencies = await MultiGet(
-        Get(Targets, DependenciesRequest(to.target.get(Dependencies)))
-        for to in alias_targets_with_origins
+    # Split out and expand any base targets.
+    # TODO: Should recursively expand alias targets here as well.
+    other_targets_with_origins = []
+    base_targets_with_origins = []
+    for to in targets_with_origins:
+        if to.target.address.is_base_target:
+            base_targets_with_origins.append(to)
+        else:
+            other_targets_with_origins.append(to)
+
+    base_targets_subtargets = await MultiGet(
+        Get(Subtargets, Address, to.target.address) for to in base_targets_with_origins
     )
-    # Zip the dependencies of the alias back to the alias and propagate their origins.
-    expanded_targets_with_origins = set(targets_with_origins)
+    # Zip the subtargets back to the base targets and replace them while maintaining origins.
+    # NB: If a target had no subtargets, we use the base.
+    expanded_targets_with_origins = set(other_targets_with_origins)
     expanded_targets_with_origins.update(
-        TargetWithOrigin(dep_target, ato.origin)
-        for ato, dep_targets in zip(alias_targets_with_origins, alias_targets_dependencies)
-        for dep_target in dep_targets
+        TargetWithOrigin(target, bto.origin)
+        for bto, subtargets in zip(base_targets_with_origins, base_targets_subtargets)
+        for target in (subtargets.subtargets if subtargets.subtargets else [bto.target])
     )
     return TargetsWithOrigins(expanded_targets_with_origins)
 
@@ -722,6 +720,12 @@ async def resolve_dependencies(
         subproject_roots=global_options.options.subproject_roots,
     )
 
+    # If this is a base target, inject dependencies on its subtargets.
+    subtarget_addresses: Tuple[Address, ...] = ()
+    if request.field.address.is_base_target:
+        subtargets = await Get(Subtargets, Address, request.field.address)
+        subtarget_addresses = tuple(t.address for t in subtargets.subtargets)
+
     # Inject any dependencies. This is determined by the `request.field` class. For example, if
     # there is a rule to inject for FortranDependencies, then FortranDependencies and any subclass
     # of FortranDependencies will use that rule.
@@ -761,6 +765,7 @@ async def resolve_dependencies(
     addresses: Set[Address] = set()
     used_ignored_addresses: Set[Address] = set()
     for addr in [
+        *subtarget_addresses,
         *literal_addresses,
         *itertools.chain.from_iterable(injected),
         *itertools.chain.from_iterable(inferred),

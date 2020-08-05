@@ -30,7 +30,7 @@ from pants.engine.addresses import Address, assert_single_address
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.fs import Snapshot
 from pants.engine.unions import UnionMembership, UnionRule, union
-from pants.source.filespec import Filespec
+from pants.source.filespec import Filespec, matches_filespec
 from pants.util.collections import ensure_list, ensure_str_list
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_classproperty, memoized_property
@@ -482,11 +482,10 @@ class Target(ABC):
 
 @dataclass(frozen=True)
 class Subtargets:
-    # The base target from which the subtargets were extracted. Depends on all of its subtargets.
+    # The base target from which the subtargets were extracted.
     base: Target
-    # The subtargets, one per file that was owned by the base target, with filenames relative to
-    # the spec_path of the base target.
-    subtargets: Dict[str, Target]
+    # The subtargets, one per file that was owned by the base target.
+    subtargets: Tuple[Target, ...]
 
 
 @dataclass(frozen=True)
@@ -641,23 +640,43 @@ def generate_subtarget(base_target: _Tgt, *, full_file_name: str) -> _Tgt:
     are able to deduce specifically which files are being used, we can use only the files we care
     about, rather than the entire `sources` field.
     """
+    if not base_target.has_field(Dependencies):
+        raise ValueError(
+            f"Target {base_target.address.spec} of type {type(base_target).__qualname__} does "
+            f"not support dependencies, and thus cannot depend on {full_file_name}."
+        )
+
     relativized_file_name = (
         PurePath(full_file_name).relative_to(base_target.address.spec_path).as_posix()
     )
 
-    base_target_field_values = {
-        field.alias: (
-            field.value
-            if isinstance(field, PrimitiveField)
-            else field.sanitized_raw_value  # type: ignore[attr-defined]
+    found_source_match = False
+    generated_target_fields = {}
+    for field in base_target.field_values.values():
+        if isinstance(field, Sources) and bool(
+            matches_filespec(field.filespec, paths=(full_file_name,))
+        ):
+            found_source_match = True
+            value = (relativized_file_name,)
+        else:
+            value = (
+                field.value
+                if isinstance(field, PrimitiveField)
+                else field.sanitized_raw_value  # type: ignore[attr-defined]
+            )
+        generated_target_fields[field.alias] = value
+
+    if not found_source_match:
+        # TODO: This should probably be ResolveError, but this function is in the wrong place
+        # for that.
+        sources_fields = [
+            field for field in base_target.field_values.values() if isinstance(field, Sources)
+        ]
+        sources_fields_hint = f" It only matches: {sources_fields}." if sources_fields else ""
+        raise ValueError(
+            f"Target {base_target.address.spec} does not own "
+            f"a file {full_file_name}.{sources_fields_hint}"
         )
-        for field in base_target.field_values.values()
-    }
-    generated_target_fields = (
-        {**base_target_field_values, Sources.alias: (relativized_file_name,)}
-        if base_target.has_field(Sources)
-        else base_target_field_values
-    )
 
     target_cls = type(base_target)
     return target_cls(
