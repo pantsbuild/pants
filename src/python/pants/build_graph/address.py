@@ -323,12 +323,16 @@ class Address:
         if self._relative_file_path:
             parent_count = self._relative_file_path.count(os.path.sep)
             parent_prefix = "@" * parent_count if parent_count else "."
-            file_portion = f".{self._relative_file_path.replace(os.sep, '.')}"
+            file_portion = f".{self._relative_file_path.replace(os.path.sep, '.')}"
         else:
             parent_prefix = "."
             file_portion = ""
-        target_portion = f"{parent_prefix}{self._target_name}" if self._target_name else ""
-        return f"{self.spec_path.replace(os.sep, '.')}{file_portion}{target_portion}"
+        if parent_prefix == ".":
+            target_portion = f"{parent_prefix}{self._target_name}" if self._target_name else ""
+        else:
+            target_name = self._target_name or os.path.basename(self.spec_path)
+            target_portion = f"{parent_prefix}{target_name}"
+        return f"{self.spec_path.replace(os.path.sep, '.')}{file_portion}{target_portion}"
 
     @deprecated(
         removal_version="2.1.0.dev0",

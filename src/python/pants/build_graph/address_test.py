@@ -237,6 +237,7 @@ def test_address_spec() -> None:
         assert address.reference() == expected
         assert address.path_safe_spec == expected_path_spec
 
+    assert_spec(Address("a/b"), expected="a/b", expected_path_spec="a.b")
     assert_spec(Address("a/b", target_name="c"), expected="a/b:c", expected_path_spec="a.b.c")
     assert_spec(Address("", target_name="root"), expected="//:root", expected_path_spec=".root")
     assert_spec(
@@ -262,7 +263,12 @@ def test_address_spec() -> None:
     assert_spec(
         Address("a/b", relative_file_path="subdir/f.txt"),
         expected="a/b/subdir/f.txt:../b",
-        expected_path_spec="a.b.subdir.f.txt",
+        expected_path_spec="a.b.subdir.f.txt@b",
+    )
+    assert_spec(
+        Address("a/b", relative_file_path="subdir/dir2/f.txt"),
+        expected="a/b/subdir/dir2/f.txt:../../b",
+        expected_path_spec="a.b.subdir.dir2.f.txt@@b",
     )
 
 
