@@ -5,6 +5,27 @@ This document describes releases leading up to the ``1.30.x`` ``stable`` series.
 
 See https://pants.readme.io/v1.30/docs/release-notes-1-30 for an overview of the changes in this release.
 
+1.30.1rc0 (8/5/2020)
+--------------------
+
+Bugfixes
+~~~~~~~~
+
+* Remove self-inflicted invalidation caused by exception logging (cherrypick of #10521) (#10553)
+  `PR #10553 <https://github.com/pantsbuild/pants/pull/10553>`_
+
+* Fix bug that caused setup-py to hang if src root==buildroot (cherrypick of #10509) (#10552)
+  `PR #10552 <https://github.com/pantsbuild/pants/pull/10552>`_
+
+* Fix Protobuf when using source roots (cherrypick of #10453) (#10476)
+  `PR #10476 <https://github.com/pantsbuild/pants/pull/10476>`_
+
+* Fix `--print-exception-stacktrace` not invalidating pantsd (cherrypick of #10451) (#10461)
+  `PR #10461 <https://github.com/pantsbuild/pants/pull/10461>`_
+
+* Call instance method on instance rather than class (cherrypick of #10314) (#10426)
+  `PR #10426 <https://github.com/pantsbuild/pants/pull/10426>`_
+
 1.30.0 (7/17/2020)
 ------------------
 
