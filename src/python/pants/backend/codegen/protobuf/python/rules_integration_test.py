@@ -4,11 +4,15 @@
 from textwrap import dedent
 from typing import List
 
+import pytest
+
+from pants.backend.codegen.protobuf.python import additional_fields
 from pants.backend.codegen.protobuf.python.rules import GeneratePythonFromProtobufRequest
 from pants.backend.codegen.protobuf.python.rules import rules as protobuf_rules
 from pants.backend.codegen.protobuf.target_types import ProtobufLibrary, ProtobufSources
 from pants.core.util_rules import determine_source_files, strip_source_roots
 from pants.engine.addresses import Address
+from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import RootRule
 from pants.engine.target import (
     GeneratedSources,
@@ -16,6 +20,7 @@ from pants.engine.target import (
     HydrateSourcesRequest,
     WrappedTarget,
 )
+from pants.source.source_root import NoSourceRootError
 from pants.testutil.engine.util import Params
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option.util import create_options_bootstrapper
@@ -31,6 +36,7 @@ class ProtobufPythonIntegrationTest(ExternalToolTestBase):
         return (
             *super().rules(),
             *protobuf_rules(),
+            *additional_fields.rules(),
             *determine_source_files.rules(),
             *strip_source_roots.rules(),
             RootRule(GeneratePythonFromProtobufRequest),
@@ -106,7 +112,8 @@ class ProtobufPythonIntegrationTest(ExternalToolTestBase):
             ),
         )
         self.add_to_build_file(
-            "src/protobuf/dir2", "protobuf_library(dependencies=['src/protobuf/dir1'])"
+            "src/protobuf/dir2",
+            "protobuf_library(dependencies=['src/protobuf/dir1'], python_source_root='src/python')",
         )
 
         # Test another source root.
@@ -126,7 +133,7 @@ class ProtobufPythonIntegrationTest(ExternalToolTestBase):
             "tests/protobuf/test_protos", "protobuf_library(dependencies=['src/protobuf/dir2'])"
         )
 
-        source_roots = ["/src/protobuf", "/tests/protobuf"]
+        source_roots = ["src/python", "/src/protobuf", "/tests/protobuf"]
         self.assert_files_generated(
             "src/protobuf/dir1",
             source_roots=source_roots,
@@ -135,7 +142,7 @@ class ProtobufPythonIntegrationTest(ExternalToolTestBase):
         self.assert_files_generated(
             "src/protobuf/dir2",
             source_roots=source_roots,
-            expected_files=["src/protobuf/dir2/f_pb2.py"],
+            expected_files=["src/python/dir2/f_pb2.py"],
         )
         self.assert_files_generated(
             "tests/protobuf/test_protos",
@@ -143,7 +150,7 @@ class ProtobufPythonIntegrationTest(ExternalToolTestBase):
             expected_files=["tests/protobuf/test_protos/f_pb2.py"],
         )
 
-    def test_top_level_source_root(self) -> None:
+    def test_top_level_proto_root(self) -> None:
         self.create_file(
             "protos/f.proto",
             dedent(
@@ -158,3 +165,40 @@ class ProtobufPythonIntegrationTest(ExternalToolTestBase):
         self.assert_files_generated(
             "protos", source_roots=["/"], expected_files=["protos/f_pb2.py"]
         )
+
+    def test_top_level_python_source_root(self) -> None:
+        self.create_file(
+            "src/proto/protos/f.proto",
+            dedent(
+                """\
+                syntax = "proto2";
+
+                package protos;
+                """
+            ),
+        )
+        self.add_to_build_file("src/proto/protos", "protobuf_library(python_source_root='.')")
+        self.assert_files_generated(
+            "src/proto/protos", source_roots=["/", "src/proto"], expected_files=["protos/f_pb2.py"]
+        )
+
+    def test_bad_python_source_root(self) -> None:
+        self.create_file(
+            "src/protobuf/dir1/f.proto",
+            dedent(
+                """\
+                syntax = "proto2";
+
+                package dir1;
+                """
+            ),
+        )
+        self.add_to_build_file(
+            "src/protobuf/dir1", "protobuf_library(python_source_root='notasourceroot')"
+        )
+        with pytest.raises(ExecutionError) as exc:
+            self.assert_files_generated(
+                "src/protobuf/dir1", source_roots=["src/protobuf"], expected_files=[]
+            )
+        assert len(exc.value.wrapped_exceptions) == 1
+        assert isinstance(exc.value.wrapped_exceptions[0], NoSourceRootError)

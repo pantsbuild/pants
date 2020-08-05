@@ -1,7 +1,9 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from pathlib import PurePath
 
 from pants.backend.codegen.protobuf.protoc import Protoc
+from pants.backend.codegen.protobuf.python.additional_fields import PythonSourceRootField
 from pants.backend.codegen.protobuf.target_types import ProtobufSources
 from pants.backend.python.target_types import PythonSources
 from pants.core.util_rules.determine_source_files import SourceFilesRequest
@@ -100,11 +102,20 @@ async def generate_python_from_protobuf(
     )
 
     # We must do some path manipulation on the output digest for it to look like normal sources,
-    # including adding back the original source root.
+    # including adding back a source root.
+    py_source_root = request.protocol_target.get(PythonSourceRootField).value
+    if py_source_root:
+        # Verify that the python source root specified by the target is in fact a source root.
+        source_root_request = SourceRootRequest(PurePath(py_source_root))
+    else:
+        # The target didn't specify a python source root, so use the protobuf_library's source root.
+        source_root_request = SourceRootRequest.for_target(request.protocol_target)
+
     normalized_digest, source_root = await MultiGet(
         Get(Digest, RemovePrefix(result.output_digest, output_dir)),
-        Get(SourceRoot, SourceRootRequest, SourceRootRequest.for_target(request.protocol_target)),
+        Get(SourceRoot, SourceRootRequest, source_root_request),
     )
+
     source_root_restored = (
         await Get(Snapshot, AddPrefix(normalized_digest, source_root.path))
         if source_root.path != "."
