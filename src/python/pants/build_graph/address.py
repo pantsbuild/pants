@@ -3,6 +3,7 @@
 
 import os
 from dataclasses import dataclass
+from pathlib import PurePath
 from typing import Optional, Sequence
 
 from pants.base.deprecated import deprecated
@@ -53,11 +54,6 @@ class AddressInput:
         if any(component in (".", "..", "") for component in components):
             raise InvalidSpecPath(
                 f"Address spec has un-normalized path part '{self.path_component}'"
-            )
-        if components[-1].startswith("BUILD"):
-            raise InvalidSpecPath(
-                f"Address spec path {self.path_component} has {components[-1]} as the last path "
-                "part and BUILD is a reserved file."
             )
         if os.path.isabs(self.path_component):
             raise InvalidSpecPath(
@@ -162,6 +158,8 @@ class AddressInput:
                 )
             return Address(spec_path=spec_path, relative_file_path=relative_file_path)
 
+        # The target component may be "above" (but not below) the file in the filesystem.
+        # Determine how many levels above the file it is, and validate that the path is relative.
         parent_count = self.target_component.count(os.path.sep)
         if parent_count == 0:
             spec_path, relative_file_path = os.path.split(self.path_component)
@@ -171,7 +169,6 @@ class AddressInput:
                 target_name=self.target_component,
             )
 
-        # The target component may be "above" (but not below) the file in the filesystem.
         expected_prefix = f"..{os.path.sep}" * parent_count
         if self.target_component[: self.target_component.rfind(os.path.sep) + 1] != expected_prefix:
             raise InvalidTargetName(
@@ -264,6 +261,12 @@ class Address:
             target_name if target_name and target_name != os.path.basename(self.spec_path) else None
         )
         self._hash = hash((self.spec_path, self._relative_file_path, self._target_name))
+        if PurePath(spec_path).name.startswith("BUILD"):
+            raise InvalidSpecPath(
+                f"The address {self.spec} has {PurePath(spec_path).name} as the last part of its "
+                f"path, but BUILD is a reserved name. Please make sure that you did not name any "
+                f"directories BUILD."
+            )
 
     @property
     def is_base_target(self) -> bool:
@@ -302,14 +305,15 @@ class Address:
         file_portion = f"{prefix}{self.spec_path}"
         if self._relative_file_path is not None:
             file_portion = os.path.join(file_portion, self._relative_file_path)
-        if self._target_name is None:
-            return file_portion
 
         # Relativize the target name to the dirname of the file.
         parent_prefix = (
             "../" * self._relative_file_path.count(os.path.sep) if self._relative_file_path else ""
         )
-        return f"{file_portion}:{parent_prefix}{self._target_name}"
+        if self._target_name is None and not parent_prefix:
+            return file_portion
+        target_name = self._target_name or os.path.basename(self.spec_path)
+        return f"{file_portion}:{parent_prefix}{target_name}"
 
     @property
     def path_safe_spec(self) -> str:
@@ -319,12 +323,16 @@ class Address:
         if self._relative_file_path:
             parent_count = self._relative_file_path.count(os.path.sep)
             parent_prefix = "@" * parent_count if parent_count else "."
-            file_portion = f".{self._relative_file_path.replace(os.sep, '.')}"
+            file_portion = f".{self._relative_file_path.replace(os.path.sep, '.')}"
         else:
             parent_prefix = "."
             file_portion = ""
-        target_portion = f"{parent_prefix}{self._target_name}" if self._target_name else ""
-        return f"{self.spec_path.replace(os.sep, '.')}{file_portion}{target_portion}"
+        if parent_prefix == ".":
+            target_portion = f"{parent_prefix}{self._target_name}" if self._target_name else ""
+        else:
+            target_name = self._target_name or os.path.basename(self.spec_path)
+            target_portion = f"{parent_prefix}{target_name}"
+        return f"{self.spec_path.replace(os.path.sep, '.')}{file_portion}{target_portion}"
 
     @deprecated(
         removal_version="2.1.0.dev0",

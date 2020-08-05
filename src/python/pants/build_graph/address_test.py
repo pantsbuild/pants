@@ -92,20 +92,6 @@ def test_address_input_parse_bad_path_component() -> None:
     assert_bad_path_component("/a")
     assert_bad_path_component("///a")
 
-    # The path_component should not end in BUILD.
-    assert_bad_path_component("BUILD")
-    assert_bad_path_component("BUILD.suffix")
-    assert_bad_path_component("//BUILD")
-    assert_bad_path_component("//BUILD.suffix")
-    assert_bad_path_component("a/BUILD")
-    assert_bad_path_component("a/BUILD.suffix")
-    assert_bad_path_component("//a/BUILD")
-    assert_bad_path_component("//a/BUILD.suffix")
-    assert_bad_path_component("a/BUILD:b")
-    assert_bad_path_component("a/BUILD.suffix:b")
-    assert_bad_path_component("//a/BUILD:b")
-    assert_bad_path_component("//a/BUILD.suffix:b")
-
 
 def test_address_input_parse_bad_target_component() -> None:
     def assert_bad_target_component(spec: str) -> None:
@@ -216,6 +202,19 @@ def test_address_normalize_target_name() -> None:
     )
 
 
+def test_address_validate_build_in_spec_path() -> None:
+    with pytest.raises(InvalidSpecPath):
+        Address("a/b/BUILD")
+    with pytest.raises(InvalidSpecPath):
+        Address("a/b/BUILD.ext")
+    with pytest.raises(InvalidSpecPath):
+        Address("a/b/BUILD", target_name="foo")
+
+    # It's fine to use BUILD in the relative_file_path or target_name, though.
+    assert Address("a/b", relative_file_path="BUILD").spec == "a/b/BUILD"
+    assert Address("a/b", target_name="BUILD").spec == "a/b:BUILD"
+
+
 def test_address_equality() -> None:
     assert "Not really an address" != Address("a/b", target_name="c")
 
@@ -232,54 +231,71 @@ def test_address_equality() -> None:
 
 
 def test_address_spec() -> None:
-    normal_addr = Address("a/b", target_name="c")
-    assert normal_addr.spec == "a/b:c" == str(normal_addr) == normal_addr.reference()
-    assert normal_addr.path_safe_spec == "a.b.c"
+    def assert_spec(address: Address, *, expected: str, expected_path_spec: str) -> None:
+        assert address.spec == expected
+        assert str(address) == expected
+        assert address.reference() == expected
+        assert address.path_safe_spec == expected_path_spec
 
-    top_level_addr = Address("", target_name="root")
-    assert top_level_addr.spec == "//:root" == str(top_level_addr) == top_level_addr.reference()
-    assert top_level_addr.path_safe_spec == ".root"
-
-    generated_addr = Address("a/b", relative_file_path="c.txt", target_name="c")
-    assert generated_addr.spec == "a/b/c.txt:c" == str(generated_addr) == generated_addr.reference()
-    assert generated_addr.path_safe_spec == "a.b.c.txt.c"
-
-    top_level_generated_addr = Address("", relative_file_path="root.txt", target_name="root")
-    assert (
-        top_level_generated_addr.spec
-        == "//root.txt:root"
-        == str(top_level_generated_addr)
-        == top_level_generated_addr.reference()
+    assert_spec(Address("a/b"), expected="a/b", expected_path_spec="a.b")
+    assert_spec(Address("a/b", target_name="c"), expected="a/b:c", expected_path_spec="a.b.c")
+    assert_spec(Address("", target_name="root"), expected="//:root", expected_path_spec=".root")
+    assert_spec(
+        Address("a/b", relative_file_path="c.txt", target_name="c"),
+        expected="a/b/c.txt:c",
+        expected_path_spec="a.b.c.txt.c",
     )
-    assert top_level_generated_addr.path_safe_spec == ".root.txt.root"
-
-    generated_subdirectory_addr = Address(
-        "a/b", relative_file_path="subdir/c.txt", target_name="original"
+    assert_spec(
+        Address("", relative_file_path="root.txt", target_name="root"),
+        expected="//root.txt:root",
+        expected_path_spec=".root.txt.root",
     )
-    assert (
-        generated_subdirectory_addr.spec
-        == "a/b/subdir/c.txt:../original"
-        == str(generated_subdirectory_addr)
-        == generated_subdirectory_addr.reference()
+    assert_spec(
+        Address("a/b", relative_file_path="subdir/c.txt", target_name="original"),
+        expected="a/b/subdir/c.txt:../original",
+        expected_path_spec="a.b.subdir.c.txt@original",
     )
-    assert generated_subdirectory_addr.path_safe_spec == "a.b.subdir.c.txt@original"
-
-    generated_addr_from_default_target = Address("a/b", relative_file_path="c.txt")
-    assert (
-        generated_addr_from_default_target.spec
-        == "a/b/c.txt"
-        == str(generated_addr_from_default_target)
-        == generated_addr_from_default_target.reference()
+    assert_spec(
+        Address("a/b", relative_file_path="c.txt"),
+        expected="a/b/c.txt",
+        expected_path_spec="a.b.c.txt",
     )
-    assert generated_addr_from_default_target.path_safe_spec == "a.b.c.txt"
+    assert_spec(
+        Address("a/b", relative_file_path="subdir/f.txt"),
+        expected="a/b/subdir/f.txt:../b",
+        expected_path_spec="a.b.subdir.f.txt@b",
+    )
+    assert_spec(
+        Address("a/b", relative_file_path="subdir/dir2/f.txt"),
+        expected="a/b/subdir/dir2/f.txt:../../b",
+        expected_path_spec="a.b.subdir.dir2.f.txt@@b",
+    )
 
 
 def test_address_maybe_convert_to_base_target() -> None:
-    generated_addr = Address("a/b", relative_file_path="c.txt", target_name="c")
-    assert generated_addr.maybe_convert_to_base_target() == Address("a/b", target_name="c")
+    def assert_converts_to_base_target(generated_addr: Address, *, expected: Address) -> None:
+        assert generated_addr.maybe_convert_to_base_target() == expected
 
-    normal_addr = Address("a/b", target_name="c")
-    assert normal_addr.maybe_convert_to_base_target() is normal_addr
+    assert_converts_to_base_target(
+        Address("a/b", relative_file_path="c.txt", target_name="c"),
+        expected=Address("a/b", target_name="c"),
+    )
+    assert_converts_to_base_target(
+        Address("a/b", relative_file_path="c.txt"), expected=Address("a/b")
+    )
+    assert_converts_to_base_target(
+        Address("a/b", relative_file_path="subdir/f.txt"), expected=Address("a/b")
+    )
+    assert_converts_to_base_target(
+        Address("a/b", relative_file_path="subdir/f.txt", target_name="original"),
+        expected=Address("a/b", target_name="original"),
+    )
+
+    def assert_base_target_noops(addr: Address) -> None:
+        assert addr.maybe_convert_to_base_target() is addr
+
+    assert_base_target_noops(Address("a/b", target_name="c"))
+    assert_base_target_noops(Address("a/b"))
 
 
 def test_address_parse_method() -> None:
