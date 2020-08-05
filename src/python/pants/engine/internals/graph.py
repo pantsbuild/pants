@@ -30,7 +30,6 @@ from pants.engine.collection import Collection
 from pants.engine.fs import (
     EMPTY_SNAPSHOT,
     Digest,
-    GlobExpansionConjunction,
     GlobMatchErrorBehavior,
     MergeDigests,
     PathGlobs,
@@ -83,37 +82,33 @@ logger = logging.getLogger(__name__)
 
 
 @rule
-async def generate_subtargets(address: Address,) -> Subtargets:
+async def generate_subtargets(
+    address: Address, glob_match_error_behavior: GlobMatchErrorBehavior,
+) -> Subtargets:
     if not address.is_base_target:
         raise ValueError(f"Cannot generate file Targets for a file Address: {address}")
     wrapped_base_target = await Get(WrappedTarget, Address, address)
     base_target = wrapped_base_target.target
 
-    if not base_target.has_field(Dependencies):
+    if not base_target.has_field(Dependencies) or not base_target.has_field(Sources):
         # If a target type does not support dependencies, we do not split it, as that would prevent
         # the base target from depending on its splits.
         return Subtargets(base_target, ())
 
-    # Create subtargets for the sources matched by each sources field type.
-    sources_field_types = [ft for ft in base_target.field_types if issubclass(ft, Sources)]
-    hydrated_sources_collection = await MultiGet(
-        Get(HydratedSources, HydrateSourcesRequest(base_target.get(sft)))
-        for sft in sources_field_types
-    )
+    # Create subtargets for matched sources.
+    sources_field_path_globs = base_target[Sources].path_globs(glob_match_error_behavior)
+    if sources_field_path_globs is None:
+        return Subtargets(base_target, ())
 
-    # For each field type, generate a subtarget per source.
-    subtarget_files = {
-        source
-        for hydrated_sources in hydrated_sources_collection
-        for source in hydrated_sources.snapshot.files
-    }
+    # Generate a subtarget per source.
+    snapshot = await Get(Snapshot, PathGlobs, sources_field_path_globs)
     wrapped_subtargets = await MultiGet(
         Get(
             WrappedTarget,
             Address,
             generate_subtarget_address(address, full_file_name=subtarget_file),
         )
-        for subtarget_file in sorted(subtarget_files)
+        for subtarget_file in snapshot.files
     )
 
     return Subtargets(base_target, tuple(wt.target for wt in wrapped_subtargets))
@@ -616,30 +611,10 @@ async def hydrate_sources(
 
     # Now, hydrate the `globs`. Even if we are going to use codegen, we will need the original
     # protocol sources to be hydrated.
-    globs = sources_field.sanitized_raw_value
-    if globs is None:
+    path_globs = sources_field.path_globs(glob_match_error_behavior)
+    if path_globs is None:
         return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec, sources_type=sources_type)
-
-    conjunction = (
-        GlobExpansionConjunction.all_match
-        if not sources_field.default or (set(globs) != set(sources_field.default))
-        else GlobExpansionConjunction.any_match
-    )
-    snapshot = await Get(
-        Snapshot,
-        PathGlobs(
-            (sources_field.prefix_glob_with_address(glob) for glob in globs),
-            conjunction=conjunction,
-            glob_match_error_behavior=glob_match_error_behavior,
-            # TODO(#9012): add line number referring to the sources field. When doing this, we'll
-            # likely need to `await Get(BuildFileAddress, Address)`.
-            description_of_origin=(
-                f"{sources_field.address}'s `{sources_field.alias}` field"
-                if glob_match_error_behavior != GlobMatchErrorBehavior.ignore
-                else None
-            ),
-        ),
-    )
+    snapshot = await Get(Snapshot, PathGlobs, path_globs)
     sources_field.validate_snapshot(snapshot)
 
     # Finally, return if codegen is not in use; otherwise, run the relevant code generator.

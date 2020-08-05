@@ -28,7 +28,7 @@ from typing_extensions import final
 from pants.base.specs import Spec
 from pants.engine.addresses import Address, assert_single_address
 from pants.engine.collection import Collection, DeduplicatedCollection
-from pants.engine.fs import Snapshot
+from pants.engine.fs import GlobExpansionConjunction, GlobMatchErrorBehavior, PathGlobs, Snapshot
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.source.filespec import Filespec, matches_filespec
 from pants.util.collections import ensure_list, ensure_str_list
@@ -1242,10 +1242,34 @@ class Sources(AsyncField):
                 )
 
     @final
-    def prefix_glob_with_address(self, glob: str) -> str:
+    def _prefix_glob_with_address(self, glob: str) -> str:
         if glob.startswith("!"):
             return f"!{PurePath(self.address.spec_path, glob[1:])}"
         return str(PurePath(self.address.spec_path, glob))
+
+    @final
+    def path_globs(self, glob_match_error_behavior: GlobMatchErrorBehavior) -> Optional[PathGlobs]:
+        globs = self.sanitized_raw_value
+        if globs is None:
+            return None
+
+        conjunction = (
+            GlobExpansionConjunction.all_match
+            if not self.default or (set(globs) != set(self.default))
+            else GlobExpansionConjunction.any_match
+        )
+        return PathGlobs(
+            (self._prefix_glob_with_address(glob) for glob in globs),
+            conjunction=conjunction,
+            glob_match_error_behavior=glob_match_error_behavior,
+            # TODO(#9012): add line number referring to the sources field. When doing this, we'll
+            # likely need to `await Get(BuildFileAddress, Address)`.
+            description_of_origin=(
+                f"{self.address}'s `{self.alias}` field"
+                if glob_match_error_behavior != GlobMatchErrorBehavior.ignore
+                else None
+            ),
+        )
 
     @final
     @property
