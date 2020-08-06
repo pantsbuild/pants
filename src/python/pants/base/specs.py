@@ -212,35 +212,22 @@ class AscendantAddresses(AddressSpec):
         )
 
 
-_specificity = {
-    SingleAddress: 0,
-    SiblingAddresses: 1,
-    AscendantAddresses: 2,
-    DescendantAddresses: 3,
-    type(None): 99,
-}
-
-
-def more_specific(
-    address_spec1: Optional[AddressSpec], address_spec2: Optional[AddressSpec]
-) -> AddressSpec:
-    """Returns which of the two specs is more specific.
-
-    This is useful when a target matches multiple specs, and we want to associate it with the "most
-    specific" one, which will make the most intuitive sense to the user.
-    """
-    # Note that if either of spec1 or spec2 is None, the other will be returned.
-    if address_spec1 is None and address_spec2 is None:
-        raise ValueError("internal error: both specs provided to more_specific() were None")
-    return cast(
-        AddressSpec,
-        address_spec1
-        if _specificity[type(address_spec1)] < _specificity[type(address_spec2)]
-        else address_spec2,
-    )
-
-
 class AddressSpecs(Collection[AddressSpec]):
+    @staticmethod
+    def more_specific(spec1: Optional[AddressSpec], spec2: Optional[AddressSpec]) -> AddressSpec:
+        # Note that if either of spec1 or spec2 is None, the other will be returned.
+        if spec1 is None and spec2 is None:
+            raise ValueError("Internal error: both specs provided to more_specific() were None")
+        _specificity = {
+            SingleAddress: 0,
+            SiblingAddresses: 1,
+            AscendantAddresses: 2,
+            DescendantAddresses: 3,
+            type(None): 99,
+        }
+        result = spec1 if _specificity[type(spec1)] < _specificity[type(spec2)] else spec2
+        return cast(AddressSpec, result)
+
     def to_path_globs(
         self, *, build_patterns: Iterable[str], build_ignore_patterns: Iterable[str]
     ) -> PathGlobs:
@@ -290,6 +277,21 @@ class FilesystemIgnoreSpec(FilesystemSpec):
 
 
 class FilesystemSpecs(Collection[FilesystemSpec]):
+    @staticmethod
+    def more_specific(
+        spec1: Optional[FilesystemSpec], spec2: Optional[FilesystemSpec]
+    ) -> FilesystemSpec:
+        # Note that if either of spec1 or spec2 is None, the other will be returned.
+        if spec1 is None and spec2 is None:
+            raise ValueError("Internal error: both specs provided to more_specific() were None")
+        _specificity = {
+            FilesystemLiteralSpec: 0,
+            FilesystemGlobSpec: 1,
+            type(None): 99,
+        }
+        result = spec1 if _specificity[type(spec1)] < _specificity[type(spec2)] else spec2
+        return cast(FilesystemSpec, result)
+
     @memoized_property
     def includes(self) -> Tuple[Union[FilesystemLiteralSpec, FilesystemGlobSpec], ...]:
         return tuple(

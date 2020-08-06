@@ -6,7 +6,7 @@ from typing import Any, Dict, cast
 
 from pants.base.exceptions import ResolveError
 from pants.base.project_tree import Dir
-from pants.base.specs import AddressSpec, AddressSpecs, SingleAddress, more_specific
+from pants.base.specs import AddressSpec, AddressSpecs, SingleAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.engine.addresses import (
     Address,
@@ -200,7 +200,9 @@ async def addresses_with_origins_from_address_specs(
         for bfaddr, _ in all_bfaddr_tgt_pairs:
             addr = bfaddr.address
             # A target might be covered by multiple specs, so we take the most specific one.
-            addr_to_origin[addr] = more_specific(addr_to_origin.get(addr), address_spec)
+            addr_to_origin[addr] = AddressSpecs.more_specific(
+                addr_to_origin.get(addr), address_spec
+            )
 
         matched_addresses.update(
             bfaddr.address
