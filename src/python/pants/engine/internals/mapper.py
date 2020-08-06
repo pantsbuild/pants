@@ -3,7 +3,7 @@
 
 import re
 from dataclasses import dataclass
-from typing import Callable, Dict, Iterable, Optional, Pattern, Tuple
+from typing import Callable, Dict, Iterable, Mapping, Optional, Pattern, Tuple
 
 from pants.base.exceptions import DuplicateNameError, MappingError
 from pants.build_graph.address import Address, BuildFileAddress
@@ -108,15 +108,22 @@ class AddressFamily:
         )
 
     @memoized_property
-    def addressables(self) -> Dict[BuildFileAddress, TargetAdaptor]:
+    def addresses_to_target_adaptors(self) -> Mapping[Address, TargetAdaptor]:
         return {
-            BuildFileAddress(
-                rel_path=path, address=Address(spec_path=self.namespace, target_name=name)
-            ): obj
-            for name, (path, obj) in self.name_to_target_adaptors.items()
+            Address(spec_path=self.namespace, target_name=name): target_adaptor
+            for name, (_, target_adaptor) in self.name_to_target_adaptors.items()
         }
 
-    def addressable_for_address(self, address: Address) -> Optional[TargetAdaptor]:
+    @memoized_property
+    def build_file_addresses(self) -> Tuple[BuildFileAddress, ...]:
+        return tuple(
+            BuildFileAddress(
+                rel_path=path, address=Address(spec_path=self.namespace, target_name=name)
+            )
+            for name, (path, _) in self.name_to_target_adaptors.items()
+        )
+
+    def get_target_adaptor(self, address: Address) -> Optional[TargetAdaptor]:
         assert address.spec_path == self.namespace
         entry = self.name_to_target_adaptors.get(address.target_name)
         if entry is None:
