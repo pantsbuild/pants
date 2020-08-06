@@ -119,9 +119,7 @@ class ThirdPartyModuleToAddressMapping:
 
 @rule
 async def map_third_party_modules_to_addresses() -> ThirdPartyModuleToAddressMapping:
-    all_targets = await Get(
-        Targets, AddressSpecs([DescendantAddresses("")], filter_by_global_options=False)
-    )
+    all_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
     modules_to_addresses: Dict[str, Address] = {}
     modules_with_multiple_owners: Set[str] = set()
     for tgt in all_targets:
