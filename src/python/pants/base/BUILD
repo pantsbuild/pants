@@ -12,14 +12,14 @@ python_tests(
 )
 
 python_tests(
-  name='exception_sink',
+  name='exception_sink_test',
   sources=['exception_sink_test.py'],
   tags=['platform_specific_behavior'],
   timeout=90,
 )
 
 python_integration_tests(
-  name='exception_sink_integration',
+  name='exception_sink_integration_test',
   sources=['exception_sink_integration_test.py'],
   dependencies=[
     'examples/src/python/example:hello_directory',
@@ -34,7 +34,7 @@ python_integration_tests(
 )
 
 python_integration_tests(
-  name='exiter_integration',
+  name='exiter_integration_test',
   sources=['exiter_integration_test.py'],
   dependencies=[
     'testprojects/src/python:unicode_directory',
