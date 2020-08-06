@@ -11,7 +11,7 @@ from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import Dependencies as DependenciesField
-from pants.engine.target import DependenciesRequest, Targets, TransitiveTargets
+from pants.engine.target import DependenciesRequest, Targets, TransitiveTargets, UnexpandedTargets
 
 
 class DependencyType(Enum):
@@ -67,7 +67,7 @@ async def dependencies(
         transitive_targets = await Get(TransitiveTargets, Addresses, addresses)
         targets = Targets(transitive_targets.dependencies)
     else:
-        target_roots = await Get(Targets, Addresses, addresses)
+        target_roots = await Get(UnexpandedTargets, Addresses, addresses)
         dependencies_per_target_root = await MultiGet(
             Get(Targets, DependenciesRequest(tgt.get(DependenciesField))) for tgt in target_roots
         )

@@ -632,7 +632,15 @@ def generate_subtarget_address(base_target_address: Address, *, full_file_name: 
 _Tgt = TypeVar("_Tgt", bound=Target)
 
 
-def generate_subtarget(base_target: _Tgt, *, full_file_name: str) -> _Tgt:
+def generate_subtarget(
+    base_target: _Tgt,
+    *,
+    full_file_name: str,
+    # NB: `union_membership` is only optional to facilitate tests. In production, we should
+    # always provide this parameter. This should be safe to do because production code should
+    # rarely directly instantiate Targets and should instead use the engine to request them.
+    union_membership: Optional[UnionMembership] = None,
+) -> _Tgt:
     """Generate a new target with the exact same metadata as the original, except for the `sources`
     field only referring to the single file `full_file_name` and with a new address.
 
@@ -682,6 +690,7 @@ def generate_subtarget(base_target: _Tgt, *, full_file_name: str) -> _Tgt:
     return target_cls(
         generated_target_fields,
         address=generate_subtarget_address(base_target.address, full_file_name=full_file_name),
+        union_membership=union_membership,
     )
 
 

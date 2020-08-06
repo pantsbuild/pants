@@ -96,12 +96,14 @@ async def generate_subtargets(
         return Subtargets(base_target, ())
 
     # Create subtargets for matched sources.
-    sources_field_path_globs = base_target[Sources].path_globs(glob_match_error_behavior)
+    sources_field = base_target[Sources]
+    sources_field_path_globs = sources_field.path_globs(glob_match_error_behavior)
     if sources_field_path_globs is None:
         return Subtargets(base_target, ())
 
     # Generate a subtarget per source.
     snapshot = await Get(Snapshot, PathGlobs, sources_field_path_globs)
+    sources_field.validate_snapshot(snapshot)
     wrapped_subtargets = await MultiGet(
         Get(
             WrappedTarget,
@@ -122,7 +124,9 @@ async def resolve_target(
 ) -> WrappedTarget:
     if not address.is_base_target:
         base_target = await Get(WrappedTarget, Address, address.maybe_convert_to_base_target())
-        subtarget = generate_subtarget(base_target.target, full_file_name=address.filename)
+        subtarget = generate_subtarget(
+            base_target.target, full_file_name=address.filename, union_membership=union_membership
+        )
         return WrappedTarget(subtarget)
 
     target_adaptor = await Get(TargetAdaptor, Address, address)
@@ -136,13 +140,12 @@ async def resolve_target(
 
 
 @rule
-async def resolve_targets(addresses: Addresses) -> Targets:
+async def resolve_targets(targets: UnexpandedTargets) -> Targets:
     # TODO: This method duplicates `resolve_targets_with_origins`, because direct expansion of
     # `Addresses` to `Targets` is common in a few places: we can't always assume that we
     # have `AddressesWithOrigins`. One way to dedupe these two methods would be to fake some
     # origins, and then strip them afterward.
-    wrapped_targets = await MultiGet(Get(WrappedTarget, Address, a) for a in addresses)
-    targets = {wt.target for wt in wrapped_targets}
+
     # Split out and expand any base targets.
     # TODO: Should recursively expand alias targets here as well.
     other_targets = []
@@ -158,7 +161,7 @@ async def resolve_targets(addresses: Addresses) -> Targets:
     )
     # Zip the subtargets back to the base targets and replace them.
     # NB: If a target had no subtargets, we use the base.
-    expanded_targets = set(other_targets)
+    expanded_targets = OrderedSet(other_targets)
     expanded_targets.update(
         target
         for subtargets in base_targets_subtargets
@@ -354,7 +357,7 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
     live_dirs = FrozenOrderedSet(os.path.dirname(s) for s in live_files)
     deleted_dirs = FrozenOrderedSet(os.path.dirname(s) for s in deleted_files)
 
-    matching_addresses = set()
+    matching_addresses: OrderedSet[Address] = OrderedSet()
     unmatched_sources = set(owners_request.sources)
     for live in (True, False):
         # Walk up the buildroot looking for targets that would conceivably claim changed sources.
