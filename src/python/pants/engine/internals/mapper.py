@@ -123,6 +123,10 @@ class AddressFamily:
             for name, (path, _) in self.name_to_target_adaptors.items()
         )
 
+    @property
+    def target_names(self) -> Tuple[str, ...]:
+        return tuple(addr.target_name for addr in self.addresses_to_target_adaptors)
+
     def get_target_adaptor(self, address: Address) -> Optional[TargetAdaptor]:
         assert address.spec_path == self.namespace
         entry = self.name_to_target_adaptors.get(address.target_name)

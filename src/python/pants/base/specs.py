@@ -44,11 +44,14 @@ def _globs_in_single_dir(dir_path: str, build_patterns: Iterable[str]) -> Tuple[
 
 
 def _address_family_for_dir(
-    dir_path: str, address_families: Mapping[str, "AddressFamily"]
+    address_families: Mapping[str, "AddressFamily"], *, dir_path: str, spec: str
 ) -> "AddressFamily":
     maybe_af = address_families.get(dir_path)
     if maybe_af is None:
-        raise ResolveError(f"Path '{dir_path}' does not contain any BUILD files.")
+        raise ResolveError(
+            f"Path '{dir_path}' does not contain any BUILD files, but '{spec}' expected matching "
+            "targets there."
+        )
     return maybe_af
 
 
@@ -114,7 +117,9 @@ class SingleAddress(AddressSpec):
     def matching_address_families(
         self, address_families_dict: Mapping[str, "AddressFamily"]
     ) -> Tuple["AddressFamily", ...]:
-        return (_address_family_for_dir(self.directory, address_families_dict),)
+        return (
+            _address_family_for_dir(address_families_dict, dir_path=self.directory, spec=str(self)),
+        )
 
     def matching_addresses(
         self, address_families: Sequence["AddressFamily"]
@@ -125,8 +130,14 @@ class SingleAddress(AddressSpec):
             for addr, tgt in single_af.addresses_to_target_adaptors.items()
             if addr.target_name == self.name
         )
+        if not addr_tgt_pairs:
+            raise ResolveError.did_you_mean(
+                bad_name=self.name,
+                known_names=single_af.target_names,
+                namespace=single_af.namespace,
+            )
         # There will be at most one target with a given name in a single AddressFamily.
-        assert len(addr_tgt_pairs) <= 1
+        assert len(addr_tgt_pairs) == 1
         return addr_tgt_pairs
 
 
@@ -145,7 +156,9 @@ class SiblingAddresses(AddressSpec):
     def matching_address_families(
         self, address_families_dict: Mapping[str, "AddressFamily"]
     ) -> Tuple["AddressFamily", ...]:
-        return (_address_family_for_dir(self.directory, address_families_dict),)
+        return (
+            _address_family_for_dir(address_families_dict, dir_path=self.directory, spec=str(self)),
+        )
 
     def matching_addresses(
         self, address_families: Sequence["AddressFamily"]
