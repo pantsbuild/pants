@@ -142,6 +142,10 @@ async def find_build_files(addresses: Addresses) -> BuildFileAddresses:
 @rule
 async def find_target_adaptor(address: Address) -> TargetAdaptor:
     """Hydrate a TargetAdaptor so that it may be converted into the Target API."""
+    if not address.is_base_target:
+        raise ValueError(
+            f"Subtargets are not resident in BUILD files, and so do not have TargetAdaptors: {address}"
+        )
     address_family = await Get(AddressFamily, Dir(address.spec_path))
     target_adaptor = address_family.addressable_for_address(address)
     if target_adaptor is None:

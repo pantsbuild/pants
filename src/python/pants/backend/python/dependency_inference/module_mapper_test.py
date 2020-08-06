@@ -156,7 +156,9 @@ class ModuleMapperTest(TestBase):
                 """
             ),
         )
-        result = self.request_single_product(ThirdPartyModuleToAddressMapping, Params())
+        result = self.request_single_product(
+            ThirdPartyModuleToAddressMapping, Params(create_options_bootstrapper())
+        )
         assert result.mapping == FrozenDict(
             {
                 "colors": Address.parse("3rdparty/python:ansicolors"),

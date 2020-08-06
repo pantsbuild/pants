@@ -149,7 +149,7 @@ class GraphTest(TestBase):
             Params(Addresses([Address("", target_name="t2")]), create_options_bootstrapper()),
         )
         assert len(result.roots) == 1
-        assert result.roots[0].address == Address("", target_name="t2")
+        assert result.roots[0].address == Address("", relative_file_path="t2.txt", target_name="t2")
         assert [tgt.address for tgt in result.dependencies] == [
             Address("", relative_file_path="t1.txt", target_name="t1"),
             Address("", relative_file_path="dep.txt", target_name="dep"),
@@ -292,12 +292,11 @@ class TestOwners(TestBase):
         # For files that do exist, we should still use a generated subtarget, though.
         result = self.request_single_product(Owners, OwnersRequest(("demo/f.txt",)))
         assert result == Owners([Address("demo", relative_file_path="f.txt", target_name="demo")])
-        # However, if a sibling file must use the original target, then we should always use
-        # the original target to avoid redundancy.
+        # However, if a sibling file uses the original target, then both should be used.
         result = self.request_single_product(
             Owners, OwnersRequest(("demo/f.txt", "demo/deleted.txt"))
         )
-        assert result == Owners([Address("demo", target_name="demo")])
+        assert result == Owners([Address("demo", relative_file_path="f.txt"), Address("demo")])
 
     def test_owners_multiple_owners(self) -> None:
         """Even if there are multiple owners of the same file, we still use generated subtargets."""
@@ -441,16 +440,17 @@ class TestSpecsToAddresses(TestBase):
         assert not glob_file_result
 
     def test_resolve_addresses(self) -> None:
-        """This tests that we correctly merge addresses resolved from address specs with those
-        resolved from filesystem specs."""
+        """This tests that we correctly handle resolving from both address and filesystem specs."""
         self.create_file("fs_spec/f.txt")
         self.add_to_build_file("fs_spec", "target(sources=['f.txt'])")
         self.create_file("address_spec/f.txt")
         self.add_to_build_file("address_spec", "target(sources=['f.txt'])")
         no_interaction_specs = ["fs_spec/f.txt", "address_spec:address_spec"]
 
-        # If a generated subtarget's original base target is already included via an address spec,
-        # then we should not include the generated subtarget because it would be redundant.
+        # If a generated subtarget's original base target is included via an address spec,
+        # we will still include the generated subtarget for consistency. When we expand Targets
+        # into their base targets this redundancy is removed, but during Address expansion we
+        # get literal matches.
         self.create_files("multiple_files", ["f1.txt", "f2.txt"])
         self.add_to_build_file("multiple_files", "target(sources=['*.txt'])")
         multiple_files_specs = ["multiple_files/f2.txt", "multiple_files:multiple_files"]
@@ -461,16 +461,18 @@ class TestSpecsToAddresses(TestBase):
         )
         assert set(result) == {
             AddressWithOrigin(
-                Address("fs_spec", relative_file_path="f.txt", target_name="fs_spec"),
+                Address("fs_spec", relative_file_path="f.txt"),
                 origin=FilesystemLiteralSpec("fs_spec/f.txt"),
             ),
             AddressWithOrigin(
-                Address("address_spec", target_name="address_spec"),
-                origin=SingleAddress("address_spec", "address_spec"),
+                Address("address_spec"), origin=SingleAddress("address_spec", "address_spec"),
             ),
             AddressWithOrigin(
-                Address("multiple_files", target_name="multiple_files"),
-                origin=SingleAddress("multiple_files", "multiple_files"),
+                Address("multiple_files"), origin=SingleAddress("multiple_files", "multiple_files"),
+            ),
+            AddressWithOrigin(
+                Address("multiple_files", relative_file_path="f2.txt"),
+                origin=FilesystemLiteralSpec(file="multiple_files/f2.txt"),
             ),
         }
 
@@ -762,6 +764,10 @@ async def generate_smalltalk_from_avro(
 ) -> GeneratedSources:
     protocol_files = request.protocol_sources.files
 
+    # Many codegen implementations will need to look up a protocol target's dependencies in their
+    # rule. We add this here to ensure that this does not result in rule graph issues.
+    _ = await Get(TransitiveTargets, Addresses([request.protocol_target.address]))
+
     def generate_fortran(fp: str) -> FileContent:
         parent = str(PurePath(fp).parent).replace("src/avro", "src/smalltalk")
         file_name = f"{PurePath(fp).stem}.st"
@@ -798,7 +804,8 @@ class TestCodegen(TestBase):
 
         # First, get the original protocol sources.
         hydrated_protocol_sources = self.request_single_product(
-            HydratedSources, HydrateSourcesRequest(protocol_sources)
+            HydratedSources,
+            Params(HydrateSourcesRequest(protocol_sources), create_options_bootstrapper()),
         )
         assert hydrated_protocol_sources.snapshot.files == ("src/avro/f.avro",)
 
@@ -806,8 +813,11 @@ class TestCodegen(TestBase):
         wrapped_tgt = self.request_single_product(WrappedTarget, self.address)
         generated_sources = self.request_single_product(
             GeneratedSources,
-            GenerateSmalltalkFromAvroRequest(
-                hydrated_protocol_sources.snapshot, wrapped_tgt.target
+            Params(
+                GenerateSmalltalkFromAvroRequest(
+                    hydrated_protocol_sources.snapshot, wrapped_tgt.target
+                ),
+                create_options_bootstrapper(),
             ),
         )
         assert generated_sources.snapshot.files == ("src/smalltalk/f.st",)
@@ -815,8 +825,11 @@ class TestCodegen(TestBase):
         # Test that HydrateSourcesRequest can also be used.
         generated_via_hydrate_sources = self.request_single_product(
             HydratedSources,
-            HydrateSourcesRequest(
-                protocol_sources, for_sources_types=[SmalltalkSources], enable_codegen=True
+            Params(
+                HydrateSourcesRequest(
+                    protocol_sources, for_sources_types=[SmalltalkSources], enable_codegen=True
+                ),
+                create_options_bootstrapper(),
             ),
         )
         assert generated_via_hydrate_sources.snapshot.files == ("src/smalltalk/f.st",)
@@ -830,8 +843,11 @@ class TestCodegen(TestBase):
         assert protocol_sources.can_generate(SmalltalkSources, self.union_membership) is True
         generated = self.request_single_product(
             HydratedSources,
-            HydrateSourcesRequest(
-                protocol_sources, for_sources_types=[SmalltalkSources], enable_codegen=True
+            Params(
+                HydrateSourcesRequest(
+                    protocol_sources, for_sources_types=[SmalltalkSources], enable_codegen=True
+                ),
+                create_options_bootstrapper(),
             ),
         )
         assert generated.snapshot.files == ("src/smalltalk/f.st",)
@@ -844,8 +860,11 @@ class TestCodegen(TestBase):
         assert protocol_sources.can_generate(AdaSources, self.union_membership) is False
         generated = self.request_single_product(
             HydratedSources,
-            HydrateSourcesRequest(
-                protocol_sources, for_sources_types=[AdaSources], enable_codegen=True
+            Params(
+                HydrateSourcesRequest(
+                    protocol_sources, for_sources_types=[AdaSources], enable_codegen=True
+                ),
+                create_options_bootstrapper(),
             ),
         )
         assert generated.snapshot.files == ()
@@ -991,7 +1010,7 @@ class TestDependencies(TestBase):
             Addresses,
             Params(DependenciesRequest(target[Dependencies]), create_options_bootstrapper()),
         )
-        assert result == Addresses(sorted(expected))
+        assert sorted(result) == sorted(expected)
 
     def test_normal_resolution(self) -> None:
         self.add_to_build_file(
@@ -1084,8 +1103,9 @@ class TestDependencies(TestBase):
         """We test that dependency inference works generally and that we merge it correctly with
         explicitly provided dependencies.
 
-        If dep inference returns a generated subtarget, but the original owning target was
-        explicitly provided, then we should not use the generated subtarget.
+        For consistency, dep inference does not merge generated subtargets with base targets: if
+        both are inferred, expansion to Targets will remove the redundancy while converting to
+        subtargets.
         """
         self.create_files(
             "",
@@ -1155,6 +1175,13 @@ class TestDependencies(TestBase):
                 Address("", relative_file_path="inferred2.st", target_name="inferred2"),
                 Address("", target_name="inferred_and_provided1"),
                 Address("", target_name="inferred_and_provided2"),
+                Address(
+                    "",
+                    relative_file_path="inferred_and_provided2.st",
+                    target_name="inferred_and_provided2",
+                ),
+                Address("demo", relative_file_path="f1.st"),
+                Address("demo", relative_file_path="f2.st"),
             ],
         )
 
@@ -1173,5 +1200,10 @@ class TestDependencies(TestBase):
             expected=[
                 Address("", target_name="inferred_and_provided1"),
                 Address("", target_name="inferred_and_provided2"),
+                Address(
+                    "",
+                    relative_file_path="inferred_and_provided2.st",
+                    target_name="inferred_and_provided2",
+                ),
             ],
         )

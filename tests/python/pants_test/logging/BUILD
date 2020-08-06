@@ -4,6 +4,7 @@
 python_integration_tests(
   name='tests',
   uses_pants_run=True,
+  timeout=120,
 )
 
 python_library()

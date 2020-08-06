@@ -28,9 +28,9 @@ from typing_extensions import final
 from pants.base.specs import Spec
 from pants.engine.addresses import Address, assert_single_address
 from pants.engine.collection import Collection, DeduplicatedCollection
-from pants.engine.fs import Snapshot
+from pants.engine.fs import GlobExpansionConjunction, GlobMatchErrorBehavior, PathGlobs, Snapshot
 from pants.engine.unions import UnionMembership, UnionRule, union
-from pants.source.filespec import Filespec
+from pants.source.filespec import Filespec, matches_filespec
 from pants.util.collections import ensure_list, ensure_str_list
 from pants.util.frozendict import FrozenDict
 from pants.util.memo import memoized_classproperty, memoized_property
@@ -481,6 +481,14 @@ class Target(ABC):
 
 
 @dataclass(frozen=True)
+class Subtargets:
+    # The base target from which the subtargets were extracted.
+    base: Target
+    # The subtargets, one per file that was owned by the base target.
+    subtargets: Tuple[Target, ...]
+
+
+@dataclass(frozen=True)
 class WrappedTarget:
     """A light wrapper to encapsulate all the distinct `Target` subclasses into a single type.
 
@@ -517,6 +525,14 @@ class Targets(Collection[Target]):
         return self[0]
 
 
+class UnexpandedTargets(Collection[Target]):
+    """Like `Targets`, but will not contain the expansion of `TargetAlias` instances."""
+
+    def expect_single(self) -> Target:
+        assert_single_address([tgt.address for tgt in self])
+        return self[0]
+
+
 class TargetsWithOrigins(Collection[TargetWithOrigin]):
     """A heterogeneous collection of instances of Target subclasses with the original Spec used to
     resolve the target.
@@ -524,6 +540,18 @@ class TargetsWithOrigins(Collection[TargetWithOrigin]):
     See the docstring for `Targets` for an explanation of the `Target`s being heterogeneous and how
     you should filter out the targets you care about.
     """
+
+    def expect_single(self) -> TargetWithOrigin:
+        assert_single_address([tgt_with_origin.target.address for tgt_with_origin in self])
+        return self[0]
+
+    @memoized_property
+    def targets(self) -> Tuple[Target, ...]:
+        return tuple(tgt_with_origin.target for tgt_with_origin in self)
+
+
+class UnexpandedTargetsWithOrigins(Collection[TargetWithOrigin]):
+    """Like `TargetsWithOrigins`, but will not contain the expansion of `TargetAlias` instances."""
 
     def expect_single(self) -> TargetWithOrigin:
         assert_single_address([tgt_with_origin.target.address for tgt_with_origin in self])
@@ -590,6 +618,8 @@ def generate_subtarget_address(base_target_address: Address, *, full_file_name: 
 
     See generate_subtarget().
     """
+    if not base_target_address.is_base_target:
+        raise ValueError(f"Cannot generate file targets for a file Address: {base_target_address}")
     original_spec_path = base_target_address.spec_path
     relative_file_path = PurePath(full_file_name).relative_to(original_spec_path).as_posix()
     return Address(
@@ -602,7 +632,15 @@ def generate_subtarget_address(base_target_address: Address, *, full_file_name: 
 _Tgt = TypeVar("_Tgt", bound=Target)
 
 
-def generate_subtarget(base_target: _Tgt, *, full_file_name: str) -> _Tgt:
+def generate_subtarget(
+    base_target: _Tgt,
+    *,
+    full_file_name: str,
+    # NB: `union_membership` is only optional to facilitate tests. In production, we should
+    # always provide this parameter. This should be safe to do because production code should
+    # rarely directly instantiate Targets and should instead use the engine to request them.
+    union_membership: Optional[UnionMembership] = None,
+) -> _Tgt:
     """Generate a new target with the exact same metadata as the original, except for the `sources`
     field only referring to the single file `full_file_name` and with a new address.
 
@@ -610,28 +648,39 @@ def generate_subtarget(base_target: _Tgt, *, full_file_name: str) -> _Tgt:
     are able to deduce specifically which files are being used, we can use only the files we care
     about, rather than the entire `sources` field.
     """
+    if not base_target.has_field(Dependencies) or not base_target.has_field(Sources):
+        raise ValueError(
+            f"Target {base_target.address.spec} of type {type(base_target).__qualname__} does "
+            "not have both a `dependencies` and `sources` field, and thus cannot generate a "
+            f"subtarget for the file {full_file_name}."
+        )
+
     relativized_file_name = (
         PurePath(full_file_name).relative_to(base_target.address.spec_path).as_posix()
     )
 
-    base_target_field_values = {
-        field.alias: (
-            field.value
-            if isinstance(field, PrimitiveField)
-            else field.sanitized_raw_value  # type: ignore[attr-defined]
-        )
-        for field in base_target.field_values.values()
-    }
-    generated_target_fields = (
-        {**base_target_field_values, Sources.alias: (relativized_file_name,)}
-        if base_target.has_field(Sources)
-        else base_target_field_values
-    )
+    generated_target_fields = {}
+    for field in base_target.field_values.values():
+        if isinstance(field, Sources):
+            if not bool(matches_filespec(field.filespec, paths=[full_file_name])):
+                raise ValueError(
+                    f"Target {base_target.address.spec}'s `sources` field does not match a file "
+                    f"{full_file_name}."
+                )
+            value = (relativized_file_name,)
+        else:
+            value = (
+                field.value
+                if isinstance(field, PrimitiveField)
+                else field.sanitized_raw_value  # type: ignore[attr-defined]
+            )
+        generated_target_fields[field.alias] = value
 
     target_cls = type(base_target)
     return target_cls(
         generated_target_fields,
         address=generate_subtarget_address(base_target.address, full_file_name=full_file_name),
+        union_membership=union_membership,
     )
 
 
@@ -1192,10 +1241,34 @@ class Sources(AsyncField):
                 )
 
     @final
-    def prefix_glob_with_address(self, glob: str) -> str:
+    def _prefix_glob_with_address(self, glob: str) -> str:
         if glob.startswith("!"):
             return f"!{PurePath(self.address.spec_path, glob[1:])}"
         return str(PurePath(self.address.spec_path, glob))
+
+    @final
+    def path_globs(self, glob_match_error_behavior: GlobMatchErrorBehavior) -> Optional[PathGlobs]:
+        globs = self.sanitized_raw_value
+        if globs is None:
+            return None
+
+        conjunction = (
+            GlobExpansionConjunction.all_match
+            if not self.default or (set(globs) != set(self.default))
+            else GlobExpansionConjunction.any_match
+        )
+        return PathGlobs(
+            (self._prefix_glob_with_address(glob) for glob in globs),
+            conjunction=conjunction,
+            glob_match_error_behavior=glob_match_error_behavior,
+            # TODO(#9012): add line number referring to the sources field. When doing this, we'll
+            # likely need to `await Get(BuildFileAddress, Address)`.
+            description_of_origin=(
+                f"{self.address}'s `{self.alias}` field"
+                if glob_match_error_behavior != GlobMatchErrorBehavior.ignore
+                else None
+            ),
+        )
 
     @final
     @property

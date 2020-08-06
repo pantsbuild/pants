@@ -6,6 +6,11 @@ python_library()
 python_tests(
   name="tests",
   sources=['*_test.py', '!*_integration_test.py'],
+  dependencies=[
+    # Used by `options_bootstrapper_test` and `config_test`.
+    '//:build_root',
+    '//:pants_toml',
+  ],
   timeout=300,
 )
 
