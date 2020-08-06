@@ -6,12 +6,14 @@ import subprocess
 from textwrap import dedent
 
 from colors import blue
+from pex.pex_info import PexInfo
 
 from pants.backend.python.tasks.gather_sources import GatherSources
 from pants.backend.python.tasks.python_binary_create import PythonBinaryCreate
 from pants.backend.python.tasks.select_interpreter import SelectInterpreter
 from pants.base.run_info import RunInfo
 from pants.build_graph.register import build_file_aliases as register_core
+from pants.util.contextutil import environment_as
 from pants_test.backend.python.tasks.python_task_test_base import PythonTaskTestBase
 
 
@@ -152,7 +154,7 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
             binary, expected_output="Hello World!\n", expected_shebang=b"#!/usr/bin/env python2\n"
         )
 
-    def test_generate_ipex_ansicolors(self):
+    def _assert_generate_ipex_ansicolors(self, expected_output: str):
         self.create_python_requirement_library(
             "3rdparty/ipex", "ansicolors", requirements=["ansicolors"]
         )
@@ -176,11 +178,21 @@ class PythonBinaryCreateTest(PythonTaskTestBase):
         self.set_options(generate_ipex=True)
         dist_dir = os.path.join(self.build_root, "dist")
 
-        self._assert_pex(
-            binary, expected_output=blue("i just lazy-loaded the ansicolors dependency!") + "\n"
-        )
+        self._assert_pex(binary, expected_output=expected_output)
 
         dehydrated_ipex_file = os.path.join(dist_dir, "bin.ipex")
         assert os.path.isfile(dehydrated_ipex_file)
-        hydrated_pex_output_file = os.path.join(dist_dir, "bin.pex")
-        assert os.path.isfile(hydrated_pex_output_file)
+
+        filename_base, ext = os.path.splitext(dehydrated_ipex_file)
+        code_hash = PexInfo.from_pex(dehydrated_ipex_file).code_hash
+        hydrated_pex_dir = f"{filename_base}-{code_hash}{ext}"
+        assert os.path.isdir(hydrated_pex_dir)
+
+    def test_generate_ipex_ansicolors(self):
+        self._assert_generate_ipex_ansicolors(
+            blue("i just lazy-loaded the ansicolors dependency!") + "\n"
+        )
+
+    def test_generate_ipex_skip_execution(self):
+        with environment_as(PEX_IPEX_SKIP_EXECUTION="true"):
+            self._assert_generate_ipex_ansicolors(expected_output="")

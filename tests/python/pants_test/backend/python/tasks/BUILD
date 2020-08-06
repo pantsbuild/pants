@@ -140,9 +140,11 @@ python_tests(
   name = 'python_binary_create',
   sources = ['test_python_binary_create.py'],
   dependencies = [
+    '3rdparty/python:pex',
     'src/python/pants/backend/python/tasks',
     'src/python/pants/base:run_info',
     'src/python/pants/build_graph',
+    'src/python/pants/util:contextutil',
     ':python_task_test_base',
   ],
   tags = {"partially_type_checked"},

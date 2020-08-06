@@ -41,7 +41,7 @@ def modify_pex_info(pex_info, **kwargs):
     return PexInfo.from_json(json.dumps(new_info))
 
 
-def _hydrate_pex_file(self, hydrated_pex_file):
+def _hydrate_pex_file(self, hydrated_pex_dir):
     # We extract source files into a temporary directory before creating the pex.
     td = tempfile.mkdtemp()
 
@@ -86,24 +86,28 @@ def _hydrate_pex_file(self, hydrated_pex_file):
     for resolved_dist in resolved_distributions:
         bootstrap_builder.add_distribution(resolved_dist.distribution)
 
-    bootstrap_builder.build(hydrated_pex_file, bytecode_compile=False)
+    # We call .freeze() instead of .build() here in order to avoid zipping up all the large 3rdparty
+    # modules we just added to the chroot.
+    # NB: Bytecode compilation can take an extremely long time for large 3rdparty modules.
+    bootstrap_builder.freeze(bytecode_compile=False)
+    os.rename(src=bootstrap_builder.path(), dst=hydrated_pex_dir)
 
 
 def main(self):
     filename_base, ext = os.path.splitext(self)
 
-    # If the ipex (this pex) is already named '.pex', ensure the output filename doesn't collide by
-    # inserting an intermediate '.ipex'!
-    if ext == ".pex":
-        hydrated_pex_file = "{filename_base}.ipex.pex".format(filename_base=filename_base)
-    else:
-        hydrated_pex_file = "{filename_base}.pex".format(filename_base=filename_base)
+    # Incorporate the code hash into the output unpacked pex directory in order to:
+    # (a) avoid execing an out of date hydrated ipex,
+    # (b) avoid collisions with other similarly-named (i)pex files in the same directory!
+    code_hash = PexInfo.from_pex(self).code_hash
+    hydrated_pex_dir = "{}-{}{}".format(filename_base, code_hash, ext)
 
-    if not os.path.exists(hydrated_pex_file):
-        _log("Hydrating {} to {}...".format(self, hydrated_pex_file))
-        _hydrate_pex_file(self, hydrated_pex_file)
+    if not os.path.exists(hydrated_pex_dir):
+        _log("Hydrating {} to {}...".format(self, hydrated_pex_dir))
+        _hydrate_pex_file(self, hydrated_pex_dir)
 
-    os.execv(sys.executable, [sys.executable, hydrated_pex_file] + sys.argv[1:])
+    if "PEX_IPEX_SKIP_EXECUTION" not in os.environ:
+        os.execv(sys.executable, [sys.executable, hydrated_pex_dir] + sys.argv[1:])
 
 
 if __name__ == "__main__":
