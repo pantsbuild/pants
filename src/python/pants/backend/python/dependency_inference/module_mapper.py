@@ -59,8 +59,8 @@ class FirstPartyModuleToAddressMapping:
 
 @rule
 async def map_first_party_modules_to_addresses() -> FirstPartyModuleToAddressMapping:
-    all_explicit_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
-    candidate_targets = tuple(tgt for tgt in all_explicit_targets if tgt.has_field(PythonSources))
+    all_expanded_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
+    candidate_targets = tuple(tgt for tgt in all_expanded_targets if tgt.has_field(PythonSources))
     stripped_sources_per_explicit_target = await MultiGet(
         Get(StrippedSourceFiles, SourceFilesRequest([tgt[PythonSources]]))
         for tgt in candidate_targets
