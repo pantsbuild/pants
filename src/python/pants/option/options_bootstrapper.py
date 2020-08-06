@@ -94,15 +94,16 @@ class OptionsBootstrapper:
 
     @classmethod
     def create(
-        cls, env: Mapping[str, str], args: Sequence[str], *, allow_pantsrc: bool = False
+        cls, env: Mapping[str, str], args: Sequence[str], *, allow_pantsrc: bool
     ) -> "OptionsBootstrapper":
         """Parses the minimum amount of configuration necessary to create an OptionsBootstrapper.
 
         :param env: An environment dictionary, or None to use `os.environ`.
         :param args: An args array, or None to use `sys.argv`.
-        :param allow_pantsrc: True to allow pantsrc files to be used. This defaults to false because
-          of the prevelance of OptionsBootstrapper usage in tests, but should be enabled for
-          production usecases.
+        :param allow_pantsrc: True to allow pantsrc files to be used. Unless tests are expecting to
+          consume pantsrc files, they should pass False in order to avoid reading files from
+          absolute paths. Production usecases should pass True to allow options values to make the
+          decision of whether to respect pantsrc files.
         """
         env = {k: v for k, v in env.items() if k.startswith("PANTS_")}
         args = tuple(args)

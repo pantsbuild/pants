@@ -879,7 +879,9 @@ class OptionsTest(TestBase):
             tmp.flush()
             # Note that we prevent loading a real pants.toml during get_bootstrap_options().
             flags = f'--spec-files={tmp.name} --pants-config-files="[]" compile morx:tgt fleem:tgt'
-            bootstrapper = OptionsBootstrapper.create(env={}, args=shlex.split(f"./pants {flags}"))
+            bootstrapper = OptionsBootstrapper.create(
+                env={}, args=shlex.split(f"./pants {flags}"), allow_pantsrc=False
+            )
             bootstrap_options = bootstrapper.bootstrap_options.for_global_scope()
             options = self._parse(flags=flags, bootstrap_option_values=bootstrap_options)
             sorted_specs = sorted(options.specs)

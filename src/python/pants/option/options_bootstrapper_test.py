@@ -38,7 +38,7 @@ class OptionsBootstrapperTest(unittest.TestCase):
             fp.close()
 
             args = [*self._config_path(fp.name), *(args or [])]
-            bootstrapper = OptionsBootstrapper.create(env=env or {}, args=args)
+            bootstrapper = OptionsBootstrapper.create(env=env or {}, args=args, allow_pantsrc=False)
             vals = bootstrapper.get_bootstrap_options().for_global_scope()
 
         vals_dict = {k: getattr(vals, k) for k in expected_entries}
@@ -135,7 +135,9 @@ class OptionsBootstrapperTest(unittest.TestCase):
             )
             fp.close()
             args = ["--pants-workdir=/qux"] + self._config_path(fp.name)
-            bootstrapper = OptionsBootstrapper.create(env={"PANTS_SUPPORTDIR": "/pear"}, args=args)
+            bootstrapper = OptionsBootstrapper.create(
+                env={"PANTS_SUPPORTDIR": "/pear"}, args=args, allow_pantsrc=False
+            )
             opts = bootstrapper.get_full_options(
                 known_scope_infos=[ScopeInfo(""), ScopeInfo("foo"), ScopeInfo("fruit"),]
             )
@@ -152,7 +154,7 @@ class OptionsBootstrapperTest(unittest.TestCase):
         included = "PANTS_SUPPORTDIR"
         excluded = "NON_PANTS_ENV"
         bootstrapper = OptionsBootstrapper.create(
-            env={excluded: "pear", included: "banana"}, args=[]
+            env={excluded: "pear", included: "banana"}, args=[], allow_pantsrc=False
         )
         self.assertIn(included, bootstrapper.env)
         self.assertNotIn(excluded, bootstrapper.env)
@@ -163,7 +165,9 @@ class OptionsBootstrapperTest(unittest.TestCase):
 
         def create_options_bootstrapper(*config_paths: str) -> OptionsBootstrapper:
             return OptionsBootstrapper.create(
-                env={}, args=[f"--pants-config-files={cp}" for cp in config_paths]
+                env={},
+                args=[f"--pants-config-files={cp}" for cp in config_paths],
+                allow_pantsrc=False,
             )
 
         def assert_config_read_correctly(
@@ -243,7 +247,7 @@ class OptionsBootstrapperTest(unittest.TestCase):
     def test_full_options_caching(self) -> None:
         with temporary_file_path() as config:
             args = self._config_path(config)
-            bootstrapper = OptionsBootstrapper.create(env={}, args=args)
+            bootstrapper = OptionsBootstrapper.create(env={}, args=args, allow_pantsrc=False)
 
             opts1 = bootstrapper.get_full_options(
                 known_scope_infos=[ScopeInfo(""), ScopeInfo("foo"),]
@@ -269,7 +273,7 @@ class OptionsBootstrapperTest(unittest.TestCase):
         def parse_options(*args: str) -> OptionValueContainer:
             full_args = [*args, *self._config_path(None)]
             return (
-                OptionsBootstrapper.create(env={}, args=full_args)
+                OptionsBootstrapper.create(env={}, args=full_args, allow_pantsrc=False)
                 .get_bootstrap_options()
                 .for_global_scope()
             )
@@ -292,7 +296,7 @@ class OptionsBootstrapperTest(unittest.TestCase):
         def parse_options(*args: str) -> OptionValueContainer:
             full_args = [*args, *self._config_path(None)]
             return (
-                OptionsBootstrapper.create(env={}, args=full_args)
+                OptionsBootstrapper.create(env={}, args=full_args, allow_pantsrc=False)
                 .get_bootstrap_options()
                 .for_global_scope()
             )
@@ -381,6 +385,8 @@ class OptionsBootstrapperTest(unittest.TestCase):
             with open(config2, "w") as out2:
                 out2.write("[DEFAULT]\nlogdir = 'logdir2'\n")
 
-            ob = OptionsBootstrapper.create(env={}, args=[f"--pants-config-files=['{config1}']"])
+            ob = OptionsBootstrapper.create(
+                env={}, args=[f"--pants-config-files=['{config1}']"], allow_pantsrc=False
+            )
             logdir = ob.get_bootstrap_options().for_global_scope().logdir
             self.assertEqual("logdir1", logdir)
