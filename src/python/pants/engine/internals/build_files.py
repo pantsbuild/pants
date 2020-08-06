@@ -7,6 +7,7 @@ from typing import Any, Dict
 from pants.base.exceptions import ResolveError
 from pants.base.project_tree import Dir
 from pants.base.specs import AddressSpec, AddressSpecs, SingleAddress
+from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.addresses import (
     Address,
     Addresses,
@@ -18,12 +19,36 @@ from pants.engine.addresses import (
 )
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, Snapshot
 from pants.engine.internals.mapper import AddressFamily, AddressMap, AddressMapper
-from pants.engine.internals.parser import BuildFilePreludeSymbols, error_on_imports
+from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, error_on_imports
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.target import RegisteredTargetTypes
+from pants.option.global_options import GlobalOptions
 from pants.util.collections import assert_single_element
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import OrderedSet
+
+
+@rule
+async def setup_address_mapper(
+    global_options: GlobalOptions,
+    registered_target_types: RegisteredTargetTypes,
+    build_configuration: BuildConfiguration,
+) -> AddressMapper:
+    parser = Parser(
+        target_type_aliases=registered_target_types.aliases,
+        object_aliases=build_configuration.registered_aliases,
+    )
+    opts = global_options.options
+    return AddressMapper(
+        parser,
+        prelude_glob_patterns=opts.build_file_prelude_globs,
+        build_patterns=opts.build_patterns,
+        build_ignore_patterns=opts.build_ignore,
+        tags=opts.tag,
+        exclude_target_regexps=opts.exclude_target_regexp,
+        subproject_roots=opts.subproject_roots,
+    )
 
 
 @rule

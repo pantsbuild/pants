@@ -3,10 +3,12 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Iterable, Optional, Tuple
+from typing import TYPE_CHECKING, Iterable, Optional, Tuple, cast
 
 from pants.engine.collection import Collection
-from pants.engine.rules import RootRule, side_effecting
+from pants.engine.rules import RootRule, collect_rules, rule, side_effecting
+from pants.option.global_options import GlobalOptions
+from pants.option.global_options import GlobMatchErrorBehavior as GlobMatchErrorBehavior
 from pants.util.meta import frozen_after_init
 
 if TYPE_CHECKING:
@@ -65,16 +67,12 @@ class CreateDigest(Collection[FileContent]):
     """
 
 
-class GlobMatchErrorBehavior(Enum):
-    """Describe the action to perform when matching globs in BUILD files to source files.
-
-    NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
-    be aware of any changes to this object's definition.
-    """
-
-    ignore = "ignore"
-    warn = "warn"
-    error = "error"
+@rule
+def glob_match_error_behavior_singleton(global_options: GlobalOptions) -> GlobMatchErrorBehavior:
+    return cast(
+        GlobMatchErrorBehavior,
+        global_options.options.files_not_found_behavior.to_glob_match_error_behavior(),
+    )
 
 
 class GlobExpansionConjunction(Enum):
@@ -266,6 +264,7 @@ class SourcesSnapshot:
 
 def rules():
     return [
+        *collect_rules(),
         RootRule(Workspace),
         RootRule(CreateDigest),
         RootRule(Digest),

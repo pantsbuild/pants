@@ -13,12 +13,10 @@ from pants.base.specs import Specs
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine import fs, process
 from pants.engine.console import Console
-from pants.engine.fs import GlobMatchErrorBehavior, Workspace
+from pants.engine.fs import Workspace
 from pants.engine.goal import Goal
 from pants.engine.internals import build_files, graph, options_parsing, uuid
-from pants.engine.internals.mapper import AddressMapper
 from pants.engine.internals.native import Native
-from pants.engine.internals.parser import Parser
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
 from pants.engine.internals.selectors import Params
 from pants.engine.platform import create_platform_rules
@@ -156,8 +154,6 @@ class EngineInitializer:
         native = Native()
         build_root = get_buildroot()
         bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
-        use_gitignore = bootstrap_options.pants_ignore_use_gitignore
-
         return EngineInitializer.setup_graph_extended(
             options_bootstrapper,
             build_configuration,
@@ -165,21 +161,12 @@ class EngineInitializer:
             pants_ignore_patterns=OptionsInitializer.compute_pants_ignore(
                 build_root, bootstrap_options
             ),
-            use_gitignore=use_gitignore,
+            use_gitignore=bootstrap_options.pants_ignore_use_gitignore,
             local_store_dir=bootstrap_options.local_store_dir,
             local_execution_root_dir=bootstrap_options.local_execution_root_dir,
             named_caches_dir=bootstrap_options.named_caches_dir,
             build_root=build_root,
             native=native,
-            glob_match_error_behavior=(
-                bootstrap_options.files_not_found_behavior.to_glob_match_error_behavior()
-            ),
-            build_file_prelude_globs=bootstrap_options.build_file_prelude_globs,
-            build_patterns=bootstrap_options.build_patterns,
-            build_ignore_patterns=bootstrap_options.build_ignore,
-            tags=bootstrap_options.tag,
-            exclude_target_regexps=bootstrap_options.exclude_target_regexp,
-            subproject_roots=bootstrap_options.subproject_roots,
             include_trace_on_error=bootstrap_options.print_exception_stacktrace,
         )
 
@@ -188,6 +175,7 @@ class EngineInitializer:
         options_bootstrapper: OptionsBootstrapper,
         build_configuration: BuildConfiguration,
         execution_options: ExecutionOptions,
+        native: Native,
         *,
         pants_ignore_patterns: List[str],
         use_gitignore: bool,
@@ -195,49 +183,19 @@ class EngineInitializer:
         local_execution_root_dir: str,
         named_caches_dir: str,
         build_root: Optional[str] = None,
-        native: Optional[Native] = None,
-        glob_match_error_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.warn,
-        build_patterns: Optional[Iterable[str]] = None,
-        build_file_prelude_globs: Optional[Iterable[str]] = None,
-        build_ignore_patterns: Optional[Iterable[str]] = None,
-        tags: Optional[Iterable[str]] = None,
-        exclude_target_regexps: Optional[Iterable[str]] = None,
-        subproject_roots: Optional[Iterable[str]] = None,
         include_trace_on_error: bool = True,
     ) -> GraphScheduler:
         build_root = build_root or get_buildroot()
+
         build_configuration = build_configuration or BuildConfigInitializer.get(
             options_bootstrapper
         )
+        rules = build_configuration.rules
+        union_membership = UnionMembership.from_rules(build_configuration.union_rules)
+        registered_target_types = RegisteredTargetTypes.create(build_configuration.target_types)
 
         bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
         execution_options = execution_options or DEFAULT_EXECUTION_OPTIONS
-
-        rules = build_configuration.rules
-        union_membership = UnionMembership.from_rules(build_configuration.union_rules)
-
-        registered_target_types = RegisteredTargetTypes.create(build_configuration.target_types)
-        parser = Parser(
-            target_type_aliases=registered_target_types.aliases,
-            object_aliases=build_configuration.registered_aliases,
-        )
-        address_mapper = AddressMapper(
-            parser=parser,
-            prelude_glob_patterns=build_file_prelude_globs,
-            build_patterns=build_patterns,
-            build_ignore_patterns=build_ignore_patterns,
-            tags=tags,
-            exclude_target_regexps=exclude_target_regexps,
-            subproject_roots=subproject_roots,
-        )
-
-        @rule
-        def address_mapper_singleton() -> AddressMapper:
-            return address_mapper
-
-        @rule
-        def glob_match_error_behavior_singleton() -> GlobMatchErrorBehavior:
-            return glob_match_error_behavior
 
         @rule
         def build_configuration_singleton() -> BuildConfiguration:

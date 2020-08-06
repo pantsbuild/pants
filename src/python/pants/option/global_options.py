@@ -16,12 +16,23 @@ from pants.base.build_environment import (
     get_pants_configdir,
     pants_version,
 )
-from pants.engine.fs import GlobMatchErrorBehavior
 from pants.option.custom_types import dir_option
 from pants.option.errors import OptionsError
 from pants.option.scope import GLOBAL_SCOPE
 from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
+
+
+class GlobMatchErrorBehavior(Enum):
+    """Describe the action to perform when matching globs in BUILD files to source files.
+
+    NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
+    be aware of any changes to this object's definition.
+    """
+
+    ignore = "ignore"
+    warn = "warn"
+    error = "error"
 
 
 class FileNotFoundBehavior(Enum):
