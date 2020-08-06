@@ -26,11 +26,8 @@ remote_execution_extra_platform_properties = [
 # This should correspond to the number of workers running in Google RBE. See
 # https://console.cloud.google.com/apis/api/remotebuildexecution.googleapis.com/quotas?project=pants-remoting-beta&folder&organizationId&duration=PT6H.
 process_execution_remote_parallelism = 32
-# TODO: Temporarily disabling speculation until we're able to confirm that it never causes a
-# negative performance impact.
-process_execution_speculation_strategy = "none"
-# p95 of RBE appears to be ~ 2 seconds, but we need to factor in local queue time which can be much longer, but no metrics yet.
-process_execution_speculation_delay = 15
+process_execution_speculation_strategy = "local_first"
+process_execution_speculation_delay = 10
 
 [pex]
 # TODO(#7735): This config is not ideal, that we must specify the PATH for both local and remote
