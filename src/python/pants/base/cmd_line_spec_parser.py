@@ -84,8 +84,6 @@ class CmdLineSpecParser:
         spec_path = self._normalize_spec_path(spec)
         if Path(self._root_dir, spec_path).is_file():
             return FilesystemLiteralSpec(spec_path)
-        # Else we apply address shorthand, i.e. `src/python/pants/util` -> `src/python/pants/util:util`
-        # TODO: Figure out what this should look like if (once?) filesystem specs allow directories.
-        # Should this shorthand be removed so that directories may be unambiguously resolved to a
-        # FilesystemSpec? If so, do we still allow the shorthand in BUILD files?
+        # Else we apply address shorthand, i.e. `src/python/pants/util` ->
+        # `src/python/pants/util:util`
         return SingleAddress(directory=spec_path, name=PurePath(spec).name)

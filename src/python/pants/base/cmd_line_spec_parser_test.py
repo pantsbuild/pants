@@ -48,7 +48,7 @@ class CmdLineSpecParserTest(TestBase):
         super().setUp()
         self._spec_parser = CmdLineSpecParser(self.build_root)
 
-    def test_normal_address_specs(self) -> None:
+    def test_single_address_specs(self) -> None:
         self.assert_address_spec_parsed(":root", single("", "root"))
         self.assert_address_spec_parsed("//:root", single("", "root"))
 
@@ -93,6 +93,13 @@ class CmdLineSpecParserTest(TestBase):
     def test_excludes(self) -> None:
         for glob_str in ["!", "!a/b/", "!/a/b/*"]:
             self.assert_filesystem_spec_parsed(glob_str, ignore(glob_str[1:]))
+
+    def test_files_with_original_targets(self) -> None:
+        self.assert_address_spec_parsed("a.txt:tgt", single("a.txt", "tgt"))
+        self.assert_address_spec_parsed("a/b/c.txt:tgt", single("a/b/c.txt", "tgt"))
+        self.assert_address_spec_parsed("./a.txt:tgt", single("a.txt", "tgt"))
+        self.assert_address_spec_parsed("//./a.txt:tgt", single("a.txt", "tgt"))
+        self.assert_address_spec_parsed("a/b/c.txt:../tgt", single("a/b/c.txt", "../tgt"))
 
     def test_ambiguous_files(self) -> None:
         # These could either be files or the shorthand for single addresses. We check if they exist
