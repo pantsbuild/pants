@@ -132,7 +132,9 @@ class DaemonPantsRunner(RawFdRunner):
         # propagated down from the caller.
         #   see https://github.com/pantsbuild/pants/issues/7654
         clean_global_runtime_state(reset_subsystem=True)
-        options_bootstrapper = OptionsBootstrapper.create(env=os.environ, args=sys.argv)
+        options_bootstrapper = OptionsBootstrapper.create(
+            env=os.environ, args=sys.argv, allow_pantsrc=True
+        )
         bootstrap_options = options_bootstrapper.bootstrap_options
         global_bootstrap_options = bootstrap_options.for_global_scope()
 

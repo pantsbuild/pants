@@ -309,7 +309,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
             return
 
         options_bootstrapper = OptionsBootstrapper.create(
-            env={}, args=["--pants-config-files=[]", *self.additional_options]
+            env={}, args=["--pants-config-files=[]", *self.additional_options], allow_pantsrc=False
         )
         global_options = options_bootstrapper.bootstrap_options.for_global_scope()
         local_store_dir = local_store_dir or global_options.local_store_dir
@@ -406,7 +406,9 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         :param cli_options: An iterable of CLI flags to pass as arguments to `OptionsBootstrapper`.
         """
         args = tuple(["--pants-config-files=[]"]) + tuple(cli_options)
-        return OptionsBootstrapper.create(env={}, args=args).bootstrap_options.for_global_scope()
+        return OptionsBootstrapper.create(
+            env={}, args=args, allow_pantsrc=False
+        ).bootstrap_options.for_global_scope()
 
     def make_snapshot(self, files: Dict[str, Union[str, bytes]]) -> Snapshot:
         """Makes a snapshot from a map of file name to file content."""

@@ -81,7 +81,7 @@ def kill_daemon(pid_dir=None):
     if pid_dir:
         args.append(f"--pants-subprocessdir={pid_dir}")
     pantsd_client = PantsDaemonClient(
-        OptionsBootstrapper.create(env=os.environ, args=args).bootstrap_options
+        OptionsBootstrapper.create(env=os.environ, args=args, allow_pantsrc=False).bootstrap_options
     )
     with pantsd_client.lifecycle_lock:
         pantsd_client.terminate()
