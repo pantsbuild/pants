@@ -219,7 +219,7 @@ class OptionsBootstrapperTest(unittest.TestCase):
     def test_options_pantsrc_files(self) -> None:
         def create_options_bootstrapper(*config_paths: str) -> OptionsBootstrapper:
             return OptionsBootstrapper.create(
-                env={}, args=[f"--pantsrc-files={cp}" for cp in config_paths]
+                env={}, args=[f"--pantsrc-files={cp}" for cp in config_paths], allow_pantsrc=True,
             )
 
         with temporary_file(binary_mode=False) as fp:

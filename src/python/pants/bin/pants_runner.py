@@ -65,7 +65,9 @@ class PantsRunner:
     def run(self, start_time: float) -> ExitCode:
         self.scrub_pythonpath()
 
-        options_bootstrapper = OptionsBootstrapper.create(env=self.env, args=self.args)
+        options_bootstrapper = OptionsBootstrapper.create(
+            env=self.env, args=self.args, allow_pantsrc=True
+        )
         bootstrap_options = options_bootstrapper.bootstrap_options
         global_bootstrap_options = bootstrap_options.for_global_scope()
 
