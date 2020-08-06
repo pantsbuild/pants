@@ -389,7 +389,7 @@ class PythonRequirementsFile(Target):
 
 
 class PythonDistribution(Target):
-    """A publishable python distribution."""
+    """A publishable Python distribution."""
 
     alias = "python_distribution"
-    core_fields = (*COMMON_PYTHON_FIELDS, PythonProvidesField)
+    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, PythonProvidesField)

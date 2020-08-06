@@ -637,9 +637,9 @@ async def setup_setuptools(setuptools: Setuptools) -> SetuptoolsSetup:
 
 def is_ownable_target(tgt: Target, union_membership: UnionMembership) -> bool:
     return (
-        # Note that we check for a PythonProvides field so that a python_dependencies
+        # Note that we check for a PythonProvides field so that a python_distribution
         # target can be owned (by itself). This is so that if there are any 3rdparty
-        # requirements directly on the python_dependencies target, we apply them to the dist.
+        # requirements directly on the python_distribution target, we apply them to the dist.
         # This isn't particularly useful (3rdparty requirements should be on the python_library
         # that consumes them)... but users may expect it to work anyway.
         tgt.has_field(PythonProvidesField)
