@@ -412,12 +412,13 @@ class TestGetRequirements(TestSetupPyBase):
                 """
                 python_distribution(
                     name='corge-dist',
-                    dependencies=[':corge'],
+                    # Tests having a 3rdparty requirement directly on a python_distribution.
+                    dependencies=[':corge', '3rdparty:ext3'],
                     provides=setup_py(name='corge', version='2.2.2'),
                 )
 
                 python_library(
-                    dependencies=['3rdparty:ext3', 'src/python/foo/bar'],
+                    dependencies=['src/python/foo/bar'],
                 )
                 """
             ),
@@ -501,12 +502,17 @@ class TestGetOwnedDependencies(TestSetupPyBase):
         )
 
         self.assert_owned(
-            ["src/python/foo/bar:bar1", "src/python/foo/bar/baz:baz1"],
+            [
+                "src/python/foo/bar:bar1",
+                "src/python/foo/bar:bar1-dist",
+                "src/python/foo/bar/baz:baz1",
+            ],
             "src/python/foo/bar:bar1-dist",
         )
         self.assert_owned(
             [
                 "src/python/foo",
+                "src/python/foo:foo-dist",
                 "src/python/foo/bar:bar2",
                 "src/python/foo/bar:bar-resources",
                 "src/python/foo/bar/baz:baz2",

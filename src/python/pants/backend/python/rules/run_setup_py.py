@@ -99,7 +99,7 @@ class ExportedTarget:
     The code provided by this artifact can be from this target or from any targets it owns.
     """
 
-    target: Target
+    target: Target  # In practice, a PythonDistribution.
 
     @property
     def provides(self) -> PythonArtifact:
@@ -112,7 +112,7 @@ class DependencyOwner:
 
     We need this type to prevent rule ambiguities when computing the list of targets owned by an
     ExportedTarget (which involves going from ExportedTarget -> dep -> owner (which is itself an
-    ExportedTarget) and checking if owner is this the original ExportedTarget.
+    ExportedTarget) and checking if owner is the original ExportedTarget.
     """
 
     exported_target: ExportedTarget
@@ -122,10 +122,10 @@ class DependencyOwner:
 class OwnedDependency:
     """A target that is owned by some ExportedTarget.
 
-    Code in this target is published in the owner's artifact.
+    Code in this target is published in the owner's distribution.
 
-    The owner of a target T is T's closest filesystem ancestor among the exported targets
-    that directly or indirectly depend on it (including T itself).
+    The owner of a target T is T's closest filesystem ancestor among the python_distribution
+    targets that directly or indirectly depend on it (including T itself).
     """
 
     target: Target
@@ -637,7 +637,13 @@ async def setup_setuptools(setuptools: Setuptools) -> SetuptoolsSetup:
 
 def is_ownable_target(tgt: Target, union_membership: UnionMembership) -> bool:
     return (
-        tgt.has_field(PythonSources)
+        # Note that we check for a PythonProvides field so that a python_dependencies
+        # target can be owned (by itself). This is so that if there are any 3rdparty
+        # requirements directly on the python_dependencies target, we apply them to the dist.
+        # This isn't particularly useful (3rdparty requirements should be on the python_library
+        # that consumes them)... but users may expect it to work anyway.
+        tgt.has_field(PythonProvidesField)
+        or tgt.has_field(PythonSources)
         or tgt.has_field(ResourcesSources)
         or tgt.get(Sources).can_generate(PythonSources, union_membership)
     )
