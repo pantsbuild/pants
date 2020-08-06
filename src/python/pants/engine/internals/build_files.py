@@ -66,9 +66,12 @@ async def resolve_address(address_input: AddressInput) -> Address:
     elif is_dir:
         return address_input.dir_to_address()
     else:
+        spec = address_input.path_component
+        if address_input.target_component:
+            spec += f":{address_input.target_component}"
         raise ResolveError(
             f"The file or directory '{address_input.path_component}' does not exist on disk in the "
-            f"workspace: cannot resolve '{address_input.target_component}' relative to it."
+            f"workspace, so the address '{spec}' cannot be resolved."
         )
 
 
