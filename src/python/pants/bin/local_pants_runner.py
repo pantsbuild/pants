@@ -19,11 +19,7 @@ from pants.engine.unions import UnionMembership
 from pants.goal.run_tracker import RunTracker
 from pants.help.help_info_extracter import HelpInfoExtracter
 from pants.help.help_printer import HelpPrinter
-from pants.init.engine_initializer import (
-    EngineInitializer,
-    LegacyGraphScheduler,
-    LegacyGraphSession,
-)
+from pants.init.engine_initializer import EngineInitializer, GraphScheduler, GraphSession
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.init.specs_calculator import SpecsCalculator
 from pants.option.options import Options
@@ -53,7 +49,7 @@ class LocalPantsRunner:
     options_bootstrapper: OptionsBootstrapper
     build_config: BuildConfiguration
     specs: Specs
-    graph_session: LegacyGraphSession
+    graph_session: GraphSession
     union_membership: UnionMembership
     profile_path: Optional[str]
     _run_tracker: RunTracker
@@ -71,11 +67,11 @@ class LocalPantsRunner:
         options_bootstrapper: OptionsBootstrapper,
         build_config: BuildConfiguration,
         options: Options,
-        scheduler: Optional[LegacyGraphScheduler] = None,
-    ) -> LegacyGraphSession:
+        scheduler: Optional[GraphScheduler] = None,
+    ) -> GraphSession:
         native = Native()
         native.set_panic_handler()
-        graph_scheduler_helper = scheduler or EngineInitializer.setup_legacy_graph(
+        graph_scheduler_helper = scheduler or EngineInitializer.setup_graph(
             options_bootstrapper, build_config
         )
 
@@ -96,7 +92,7 @@ class LocalPantsRunner:
         cls,
         env: Mapping[str, str],
         options_bootstrapper: OptionsBootstrapper,
-        scheduler: Optional[LegacyGraphScheduler] = None,
+        scheduler: Optional[GraphScheduler] = None,
     ) -> "LocalPantsRunner":
         """Creates a new LocalPantsRunner instance by parsing options.
 

@@ -37,38 +37,27 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class LegacyGraphScheduler:
-    """A thin wrapper around a Scheduler configured with @rules for a symbol table."""
+class GraphScheduler:
+    """A thin wrapper around a Scheduler configured with @rules."""
 
     scheduler: Scheduler
-    build_file_aliases: Any
     goal_map: Any
 
     def new_session(
         self, build_id, dynamic_ui: bool = False, use_colors=True, should_report_workunits=False,
-    ) -> "LegacyGraphSession":
+    ) -> "GraphSession":
         session = self.scheduler.new_session(build_id, dynamic_ui, should_report_workunits)
-        console = Console(use_colors=use_colors, session=session if dynamic_ui else None,)
-        return LegacyGraphSession(session, console, self.build_file_aliases, self.goal_map)
+        console = Console(use_colors=use_colors, session=session if dynamic_ui else None)
+        return GraphSession(session, console, self.goal_map)
 
 
 @dataclass(frozen=True)
-class LegacyGraphSession:
-    """A thin wrapper around a SchedulerSession configured with @rules for a symbol table."""
+class GraphSession:
+    """A thin wrapper around a SchedulerSession configured with @rules."""
 
     scheduler_session: SchedulerSession
     console: Console
-    build_file_aliases: Any
     goal_map: Any
-
-    class InvalidGoals(Exception):
-        """Raised when invalid v2 goals are passed in a v2-only mode."""
-
-        def __init__(self, invalid_goals):
-            super().__init__(
-                f"could not satisfy the following goals with @goal_rules: {', '.join(invalid_goals)}"
-            )
-            self.invalid_goals = invalid_goals
 
     def goal_consumed_subsystem_scopes(self, goal_name: str) -> Tuple[str, ...]:
         """Return the scopes of subsystems that could be consumed while running the given goal."""
@@ -139,7 +128,7 @@ class LegacyGraphSession:
 
 
 class EngineInitializer:
-    """Constructs the components necessary to run the v2 engine with v1 BuildGraph compatibility."""
+    """Constructs the components necessary to run the engine."""
 
     class GoalMappingError(Exception):
         """Raised when a goal cannot be mapped to an @rule."""
@@ -154,22 +143,22 @@ class EngineInitializer:
             goal = r.output_type.name
             if goal in goal_map:
                 raise EngineInitializer.GoalMappingError(
-                    f"could not map goal `{goal}` to rule `{r}`: already claimed by product `{goal_map[goal]}`"
+                    f"could not map goal `{goal}` to rule `{r}`: already claimed by product "
+                    f"`{goal_map[goal]}`"
                 )
             goal_map[goal] = r.output_type
         return goal_map
 
     @staticmethod
-    def setup_legacy_graph(
+    def setup_graph(
         options_bootstrapper: OptionsBootstrapper, build_configuration: BuildConfiguration,
-    ) -> LegacyGraphScheduler:
-        """Construct and return the components necessary for LegacyBuildGraph construction."""
+    ) -> GraphScheduler:
         native = Native()
         build_root = get_buildroot()
         bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
         use_gitignore = bootstrap_options.pants_ignore_use_gitignore
 
-        return EngineInitializer.setup_legacy_graph_extended(
+        return EngineInitializer.setup_graph_extended(
             options_bootstrapper,
             build_configuration,
             ExecutionOptions.from_bootstrap_options(bootstrap_options),
@@ -195,7 +184,7 @@ class EngineInitializer:
         )
 
     @staticmethod
-    def setup_legacy_graph_extended(
+    def setup_graph_extended(
         options_bootstrapper: OptionsBootstrapper,
         build_configuration: BuildConfiguration,
         execution_options: ExecutionOptions,
@@ -215,9 +204,7 @@ class EngineInitializer:
         exclude_target_regexps: Optional[Iterable[str]] = None,
         subproject_roots: Optional[Iterable[str]] = None,
         include_trace_on_error: bool = True,
-    ) -> LegacyGraphScheduler:
-        """Construct and return the components necessary for LegacyBuildGraph construction."""
-
+    ) -> GraphScheduler:
         build_root = build_root or get_buildroot()
         build_configuration = build_configuration or BuildConfigInitializer.get(
             options_bootstrapper
@@ -226,13 +213,13 @@ class EngineInitializer:
         bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
         execution_options = execution_options or DEFAULT_EXECUTION_OPTIONS
 
-        build_file_aliases = build_configuration.registered_aliases
         rules = build_configuration.rules
         union_membership = UnionMembership.from_rules(build_configuration.union_rules)
 
         registered_target_types = RegisteredTargetTypes.create(build_configuration.target_types)
         parser = Parser(
-            target_type_aliases=registered_target_types.aliases, object_aliases=build_file_aliases
+            target_type_aliases=registered_target_types.aliases,
+            object_aliases=build_configuration.registered_aliases,
         )
         address_mapper = AddressMapper(
             parser=parser,
@@ -305,4 +292,4 @@ class EngineInitializer:
             visualize_to_dir=bootstrap_options.native_engine_visualize_to,
         )
 
-        return LegacyGraphScheduler(scheduler, build_file_aliases, goal_map)
+        return GraphScheduler(scheduler, goal_map)

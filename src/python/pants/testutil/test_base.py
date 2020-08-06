@@ -318,7 +318,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
 
         # NB: This uses the long form of initialization because it needs to directly specify
         # `cls.alias_groups` rather than having them be provided by bootstrap options.
-        graph_session = EngineInitializer.setup_legacy_graph_extended(
+        graph_session = EngineInitializer.setup_graph_extended(
             pants_ignore_patterns=[],
             use_gitignore=False,
             local_store_dir=local_store_dir,
