@@ -137,7 +137,9 @@ class PluginResolverTest(TestBase):
                 touch(configpath)
             args = [f"--pants-config-files=['{configpath}']"]
 
-            options_bootstrapper = OptionsBootstrapper.create(env=env, args=args)
+            options_bootstrapper = OptionsBootstrapper.create(
+                env=env, args=args, allow_pantsrc=False
+            )
             plugin_resolver = PluginResolver(options_bootstrapper, interpreter=interpreter)
             cache_dir = plugin_resolver.plugin_cache_dir
 

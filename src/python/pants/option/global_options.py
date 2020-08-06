@@ -359,8 +359,6 @@ class GlobalOptions(Subsystem):
             default=[get_default_pants_config_file()],
             help="Paths to Pants config files.",
         )
-        # TODO: Deprecate the --pantsrc/--pantsrc-files options?  This would require being able
-        # to set extra config file locations in an initial bootstrap config file.
         register(
             "--pantsrc",
             advanced=True,
