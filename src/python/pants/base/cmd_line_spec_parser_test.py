@@ -95,8 +95,8 @@ class CmdLineSpecParserTest(TestBase):
             self.assert_filesystem_spec_parsed(glob_str, ignore(glob_str[1:]))
 
     def test_ambiguous_files(self) -> None:
-        # These could either be files or the shorthand for single addresses. We check if they exist on
-        # the file system to disambiguate.
+        # These could either be files or the shorthand for single addresses. We check if they exist
+        # on the file system to disambiguate.
         for spec in ["a", "b/c"]:
             self.assert_address_spec_parsed(spec, single(spec))
             self.create_file(spec)
