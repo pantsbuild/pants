@@ -419,7 +419,11 @@ class GlobalOptions(Subsystem):
             advanced=True,
             type=list,
             default=["BUILD", "BUILD.*"],
-            help="The naming scheme for BUILD files, i.e. where you define targets.",
+            help=(
+                "The naming scheme for BUILD files, i.e. where you define targets. This only sets "
+                "the naming scheme, not the directory paths to look for. To add ignore"
+                "patterns, use the option `--build-ignore`."
+            ),
         )
         register(
             "--build-ignore",
