@@ -21,7 +21,7 @@ class ListIntegrationTest(PantsRunIntegrationTest):
 
     def test_list_invalid_dir(self):
         pants_run = self.do_command("list", "abcde::", success=False)
-        self.assertIn("AddressLookupError", pants_run.stderr_data)
+        self.assertIn("ResolveError", pants_run.stderr_data)
 
     def test_list_nested_function_scopes(self):
         pants_run = self.do_command(
