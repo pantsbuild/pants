@@ -27,6 +27,7 @@ from pants.backend.python.rules import (
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.target_types import (
     PythonBinary,
+    PythonDistribution,
     PythonLibrary,
     PythonRequirementLibrary,
     PythonRequirementsFile,
@@ -73,6 +74,7 @@ def rules():
 def target_types():
     return [
         PythonBinary,
+        PythonDistribution,
         PythonLibrary,
         PythonRequirementLibrary,
         PythonRequirementsFile,

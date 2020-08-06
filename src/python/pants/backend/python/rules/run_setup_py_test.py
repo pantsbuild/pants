@@ -30,7 +30,12 @@ from pants.backend.python.rules.run_setup_py import (
     get_sources,
     validate_args,
 )
-from pants.backend.python.target_types import PythonBinary, PythonLibrary, PythonRequirementLibrary
+from pants.backend.python.target_types import (
+    PythonBinary,
+    PythonDistribution,
+    PythonLibrary,
+    PythonRequirementLibrary,
+)
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.target_types import Files, Resources
 from pants.core.util_rules.determine_source_files import rules as determine_source_files_rules
@@ -58,7 +63,14 @@ class TestSetupPyBase(TestBase):
 
     @classmethod
     def target_types(cls):
-        return [PythonBinary, PythonLibrary, PythonRequirementLibrary, Resources, Files]
+        return [
+            PythonBinary,
+            PythonDistribution,
+            PythonLibrary,
+            PythonRequirementLibrary,
+            Resources,
+            Files,
+        ]
 
     def tgt(self, addr: str) -> Target:
         return self.request_single_product(WrappedTarget, Params(Address.parse(addr))).target
@@ -106,7 +118,20 @@ class TestGenerateChroot(TestSetupPyBase):
     def test_generate_chroot(self) -> None:
         self.create_file(
             "src/python/foo/bar/baz/BUILD",
-            "python_library(provides=setup_py(name='baz', version='1.1.1'))",
+            textwrap.dedent(
+                """
+            python_distribution(
+                name="baz-dist",
+                dependencies=[':baz'],
+                provides=setup_py(
+                    name='baz',
+                    version='1.1.1'
+                )
+            )
+
+            python_library()
+            """
+            ),
         )
         self.create_file("src/python/foo/bar/baz/baz.py", "")
         self.create_file(
@@ -114,6 +139,7 @@ class TestGenerateChroot(TestSetupPyBase):
             textwrap.dedent(
                 """
                 python_library()
+
                 python_binary(name="bin", entry_point="foo.qux.bin")
                 """
             ),
@@ -128,18 +154,25 @@ class TestGenerateChroot(TestSetupPyBase):
             "src/python/foo/BUILD",
             textwrap.dedent(
                 """
-                python_library(
+                python_distribution(
+                    name='foo-dist',
                     dependencies=[
-                        'src/python/foo/bar/baz',
-                        'src/python/foo/qux',
-                        'src/python/foo/resources',
-                        'files',
+                        ':foo',
                     ],
                     provides=setup_py(
                         name='foo', version='1.2.3'
                     ).with_binaries(
                         foo_main='src/python/foo/qux:bin'
                     )
+                )
+
+                python_library(
+                    dependencies=[
+                        'src/python/foo/bar/baz',
+                        'src/python/foo/qux',
+                        'src/python/foo/resources',
+                        'files',
+                    ]
                 )
                 """
             ),
@@ -167,7 +200,7 @@ class TestGenerateChroot(TestSetupPyBase):
                 "install_requires": ["baz==1.1.1"],
                 "entry_points": {"console_scripts": ["foo_main=foo.qux.bin"]},
             },
-            "src/python/foo",
+            "src/python/foo:foo-dist",
         )
 
     def test_invalid_binary(self) -> None:
@@ -177,16 +210,14 @@ class TestGenerateChroot(TestSetupPyBase):
                 """
                 python_library(name='not_a_binary', sources=[])
                 python_binary(name='no_entrypoint')
-                python_library(
+                python_distribution(
                     name='invalid_bin1',
-                    sources=[],
                     provides=setup_py(
                         name='invalid_bin1', version='1.1.1'
                     ).with_binaries(foo=':not_a_binary')
                 )
-                python_library(
+                python_distribution(
                     name='invalid_bin2',
-                    sources=[],
                     provides=setup_py(
                         name='invalid_bin2', version='1.1.1'
                     ).with_binaries(foo=':no_entrypoint')
@@ -363,10 +394,14 @@ class TestGetRequirements(TestSetupPyBase):
             "src/python/foo/bar/BUILD",
             textwrap.dedent(
                 """
-                python_library(
-                    sources=[],
-                    dependencies=['src/python/foo/bar/baz', 'src/python/foo/bar/qux'],
+                python_distribution(
+                    name='bar-dist',
+                    dependencies=[':bar'],
                     provides=setup_py(name='bar', version='9.8.7'),
+                )
+
+                python_library(
+                    dependencies=['src/python/foo/bar/baz', 'src/python/foo/bar/qux'],
                 )
               """
             ),
@@ -375,17 +410,21 @@ class TestGetRequirements(TestSetupPyBase):
             "src/python/foo/corge/BUILD",
             textwrap.dedent(
                 """
-                python_library(
-                    sources=[],
-                    dependencies=['3rdparty:ext3', 'src/python/foo/bar'],
+                python_distribution(
+                    name='corge-dist',
+                    dependencies=[':corge'],
                     provides=setup_py(name='corge', version='2.2.2'),
+                )
+
+                python_library(
+                    dependencies=['3rdparty:ext3', 'src/python/foo/bar'],
                 )
                 """
             ),
         )
 
-        self.assert_requirements(["ext1==1.22.333", "ext2==4.5.6"], "src/python/foo/bar")
-        self.assert_requirements(["ext3==0.0.1", "bar==9.8.7"], "src/python/foo/corge")
+        self.assert_requirements(["ext1==1.22.333", "ext2==4.5.6"], "src/python/foo/bar:bar-dist")
+        self.assert_requirements(["ext3==0.0.1", "bar==9.8.7"], "src/python/foo/corge:corge-dist")
 
 
 class TestGetOwnedDependencies(TestSetupPyBase):
@@ -423,12 +462,18 @@ class TestGetOwnedDependencies(TestSetupPyBase):
             "src/python/foo/bar/BUILD",
             textwrap.dedent(
                 """
+                python_distribution(
+                    name='bar1-dist',
+                    dependencies=[':bar1'],
+                    provides=setup_py(name='bar1', version='1.1.1'),
+                )
+
                 python_library(
                     name='bar1',
                     sources=[],
                     dependencies=['src/python/foo/bar/baz:baz1'],
-                    provides=setup_py(name='bar1', version='1.1.1'),
                 )
+
                 python_library(
                     name='bar2',
                     sources=[],
@@ -442,18 +487,22 @@ class TestGetOwnedDependencies(TestSetupPyBase):
             "src/python/foo/BUILD",
             textwrap.dedent(
                 """
-                python_library(
-                    name='foo',
-                    sources=[],
-                    dependencies=['src/python/foo/bar:bar1', 'src/python/foo/bar:bar2'],
+                python_distribution(
+                    name='foo-dist',
+                    dependencies=[':foo'],
                     provides=setup_py(name='foo', version='3.4.5'),
+                )
+
+                python_library(
+                    dependencies=['src/python/foo/bar:bar1', 'src/python/foo/bar:bar2'],
                 )
                 """
             ),
         )
 
         self.assert_owned(
-            ["src/python/foo/bar:bar1", "src/python/foo/bar/baz:baz1"], "src/python/foo/bar:bar1"
+            ["src/python/foo/bar:bar1", "src/python/foo/bar/baz:baz1"],
+            "src/python/foo/bar:bar1-dist",
         )
         self.assert_owned(
             [
@@ -462,7 +511,7 @@ class TestGetOwnedDependencies(TestSetupPyBase):
                 "src/python/foo/bar:bar-resources",
                 "src/python/foo/bar/baz:baz2",
             ],
-            "src/python/foo",
+            "src/python/foo:foo-dist",
         )
 
 
@@ -513,9 +562,8 @@ class TestGetExportingOwner(TestSetupPyBase):
             "src/python/foo/bar/BUILD",
             textwrap.dedent(
                 """
-                python_library(
+                python_distribution(
                     name='bar1',
-                    sources=[],
                     dependencies=['src/python/foo/bar/baz:baz1'],
                     provides=setup_py(name='bar1', version='1.1.1'),
                 )
@@ -532,16 +580,14 @@ class TestGetExportingOwner(TestSetupPyBase):
             "src/python/foo/BUILD",
             textwrap.dedent(
                 """
-                python_library(
+                python_distribution(
                     name='foo1',
-                    sources=[],
                     dependencies=['src/python/foo/bar/baz:baz2'],
                     provides=setup_py(name='foo1', version='0.1.2'),
                 )
                 python_library(name='foo2', sources=[])
-                python_library(
+                python_distribution(
                     name='foo3',
-                    sources=[],
                     dependencies=['src/python/foo/bar:bar2'],
                     provides=setup_py(name='foo3', version='3.4.5'),
                 )
@@ -567,9 +613,8 @@ class TestGetExportingOwner(TestSetupPyBase):
             textwrap.dedent(
                 """
                 python_library(name='sibling1', sources=[])
-                python_library(
+                python_distribution(
                     name='sibling2',
-                    sources=[],
                     dependencies=['src/python/siblings:sibling1'],
                     provides=setup_py(name='siblings', version='2.2.2'),
                 )
@@ -593,9 +638,8 @@ class TestGetExportingOwner(TestSetupPyBase):
             "src/python/notanancestor/bbb/BUILD",
             textwrap.dedent(
                 """
-                python_library(
+                python_distribution(
                     name='bbb',
-                    sources=[],
                     dependencies=['src/python/notanancestor/aaa'],
                     provides=setup_py(name='bbb', version='11.22.33'),
                 )
@@ -619,9 +663,8 @@ class TestGetExportingOwner(TestSetupPyBase):
             "src/python/aaa/bbb/BUILD",
             textwrap.dedent(
                 """
-                python_library(
+                python_distribution(
                     name='bbb',
-                    sources=[],
                     dependencies=['src/python/aaa/bbb/ccc'],
                     provides=setup_py(name='bbb', version='1.1.1'),
                 )
@@ -632,9 +675,8 @@ class TestGetExportingOwner(TestSetupPyBase):
             "src/python/aaa/BUILD",
             textwrap.dedent(
                 """
-                python_library(
+                python_distribution(
                     name='aaa',
-                    sources=[],
                     dependencies=['src/python/aaa/bbb/ccc'],
                     provides=setup_py(name='aaa', version='2.2.2'),
                 )
