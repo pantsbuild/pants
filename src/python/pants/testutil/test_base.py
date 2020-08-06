@@ -330,7 +330,6 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
             options_bootstrapper=options_bootstrapper,
             build_root=self.build_root,
             build_configuration=self.build_config(),
-            build_ignore_patterns=None,
             execution_options=ExecutionOptions.from_bootstrap_options(global_options),
         ).new_session(build_id="buildid_for_test", should_report_workunits=True)
         self._scheduler = graph_session.scheduler_session

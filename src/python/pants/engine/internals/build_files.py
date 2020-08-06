@@ -1,13 +1,12 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import itertools
 import os.path
 from typing import Any, Dict, cast
 
 from pants.base.exceptions import ResolveError
 from pants.base.project_tree import Dir
-from pants.base.specs import AddressSpec, AddressSpecs, SingleAddress, more_specific
+from pants.base.specs import AddressSpec, AddressSpecs, SingleAddress
 from pants.build_graph.address_lookup_error import AddressLookupError
 from pants.engine.addresses import (
     Address,
@@ -152,7 +151,7 @@ async def find_target_adaptor(address: Address) -> TargetAdaptor:
 
 @rule
 async def addresses_with_origins_from_address_specs(
-    address_mapper: AddressMapper, address_specs: AddressSpecs,
+    address_mapper: AddressMapper, address_specs: AddressSpecs
 ) -> AddressesWithOrigins:
     """Given an AddressMapper and list of AddressSpecs, return matching AddressesWithOrigins.
 
@@ -162,15 +161,12 @@ async def addresses_with_origins_from_address_specs(
     :raises: :class:`AddressLookupError` if no targets are matched for non-SingleAddress specs.
     """
     # Capture a Snapshot covering all paths for these AddressSpecs, then group by directory.
-    include_patterns = set(
-        itertools.chain.from_iterable(
-            address_spec.make_glob_patterns(address_mapper) for address_spec in address_specs
-        )
-    )
     snapshot = await Get(
         Snapshot,
-        PathGlobs(
-            globs=(*include_patterns, *(f"!{p}" for p in address_mapper.build_ignore_patterns))
+        PathGlobs,
+        address_specs.to_path_globs(
+            build_patterns=address_mapper.build_patterns,
+            build_ignore_patterns=address_mapper.build_ignore_patterns,
         ),
     )
     dirnames = {os.path.dirname(f) for f in snapshot.files}
@@ -196,22 +192,27 @@ async def addresses_with_origins_from_address_specs(
             all_bfaddr_tgt_pairs = address_spec.address_target_pairs_from_address_families(
                 addr_families_for_spec
             )
-            for bfaddr, _ in all_bfaddr_tgt_pairs:
-                addr = bfaddr.address
-                # A target might be covered by multiple specs, so we take the most specific one.
-                addr_to_origin[addr] = more_specific(addr_to_origin.get(addr), address_spec)
         except AddressSpec.AddressResolutionError as e:
             raise AddressLookupError(e) from e
         except SingleAddress._SingleAddressResolutionError as e:
             _raise_did_you_mean(e.single_address_family, e.name, source=e)
 
+        for bfaddr, _ in all_bfaddr_tgt_pairs:
+            addr = bfaddr.address
+            # A target might be covered by multiple specs, so we take the most specific one.
+            addr_to_origin[addr] = AddressSpecs.more_specific(
+                addr_to_origin.get(addr), address_spec
+            )
+
         matched_addresses.update(
             bfaddr.address
             for (bfaddr, tgt) in all_bfaddr_tgt_pairs
-            if address_specs.matcher.matches_target_address_pair(bfaddr.address, tgt)
+            if (
+                address_specs.filter_by_global_options is False
+                or address_mapper.matches_filter_options(bfaddr.address, tgt)
+            )
         )
 
-    # NB: This may be empty, as the result of filtering by tag and exclude patterns!
     return AddressesWithOrigins(
         AddressWithOrigin(address=addr, origin=addr_to_origin[addr]) for addr in matched_addresses
     )
@@ -222,14 +223,5 @@ def strip_address_origins(addresses_with_origins: AddressesWithOrigins) -> Addre
     return Addresses(address_with_origin.address for address_with_origin in addresses_with_origins)
 
 
-def create_graph_rules(address_mapper: AddressMapper):
-    """Creates tasks used to parse targets from BUILD files."""
-
-    @rule
-    def address_mapper_singleton() -> AddressMapper:
-        return address_mapper
-
-    return [
-        address_mapper_singleton,
-        *collect_rules(),
-    ]
+def rules():
+    return collect_rules()

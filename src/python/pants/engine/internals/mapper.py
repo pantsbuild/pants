@@ -3,12 +3,13 @@
 
 import re
 from dataclasses import dataclass
-from typing import Dict, Iterable, Optional, Tuple
+from typing import Callable, Dict, Iterable, Optional, Pattern, Tuple
 
 from pants.base.exceptions import DuplicateNameError, MappingError
 from pants.build_graph.address import Address, BuildFileAddress
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.target_adaptor import TargetAdaptor
+from pants.util.filtering import and_filters, create_filters
 from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
 
@@ -142,29 +143,26 @@ class AddressMapper:
     prelude_glob_patterns: Tuple[str, ...]
     build_patterns: Tuple[str, ...]
     build_ignore_patterns: Tuple[str, ...]
+    tags: Tuple[str, ...]
     exclude_target_regexps: Tuple[str, ...]
     subproject_roots: Tuple[str, ...]
 
     def __init__(
         self,
         parser: Parser,
+        *,
         prelude_glob_patterns: Optional[Iterable[str]] = None,
         build_patterns: Optional[Iterable[str]] = None,
         build_ignore_patterns: Optional[Iterable[str]] = None,
+        tags: Optional[Iterable[str]] = None,
         exclude_target_regexps: Optional[Iterable[str]] = None,
         subproject_roots: Optional[Iterable[str]] = None,
     ) -> None:
-        """Create an AddressMapper.
-
-        :param build_patterns: A tuple of PathGlob-compatible patterns for identifying BUILD files
-                               used to resolve addresses.
-        :param build_ignore_patterns: A list of path ignore patterns used when searching for BUILD files.
-        :param exclude_target_regexps: A list of regular expressions for excluding targets.
-        """
         self.parser = parser
         self.prelude_glob_patterns = tuple(prelude_glob_patterns or [])
         self.build_patterns = tuple(build_patterns or ["BUILD", "BUILD.*"])
         self.build_ignore_patterns = tuple(build_ignore_patterns or [])
+        self.tags = tuple(tags or [])
         self.exclude_target_regexps = tuple(exclude_target_regexps or [])
         self.subproject_roots = tuple(subproject_roots or [])
 
@@ -172,5 +170,26 @@ class AddressMapper:
         return f"AddressMapper(build_patterns={self.build_patterns})"
 
     @memoized_property
-    def exclude_patterns(self):
+    def _exclude_regexps(self) -> Tuple[Pattern, ...]:
         return tuple(re.compile(pattern) for pattern in self.exclude_target_regexps)
+
+    def _is_excluded_by_pattern(self, address: Address) -> bool:
+        return any(p.search(address.spec) is not None for p in self._exclude_regexps)
+
+    @memoized_property
+    def _tag_filter(self):
+        def filter_for_tag(tag: str) -> Callable[[TargetAdaptor], bool]:
+            def filter_target(tgt: TargetAdaptor) -> bool:
+                # `tags` can sometimes be explicitly set to `None`. We convert that to an empty list
+                # with `or`.
+                tags = tgt.kwargs.get("tags", []) or []
+                return tag in [str(t_tag) for t_tag in tags]
+
+            return filter_target
+
+        return and_filters(create_filters(self.tags, filter_for_tag))
+
+    def matches_filter_options(self, address: Address, target: TargetAdaptor) -> bool:
+        """Check that the target matches the provided `--tags` and `--exclude-target-regexp`
+        options."""
+        return self._tag_filter(target) and not self._is_excluded_by_pattern(address)

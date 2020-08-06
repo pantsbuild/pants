@@ -128,14 +128,11 @@ class LocalPantsRunner:
             options_bootstrapper, build_config, options, scheduler
         )
 
-        global_options = options.for_global_scope()
         specs = SpecsCalculator.create(
             options_bootstrapper=options_bootstrapper,
             options=options,
             build_root=build_root,
             session=graph_session.scheduler_session,
-            exclude_patterns=tuple(global_options.exclude_target_regexp),
-            tags=tuple(global_options.tag),
         )
 
         profile_path = env.get("PANTS_PROFILE")
@@ -159,7 +156,7 @@ class LocalPantsRunner:
         self._run_tracker.start(self.options, run_start_time=start_time)
 
         spec_parser = CmdLineSpecParser(get_buildroot())
-        specs = [spec_parser.parse_spec(spec).to_spec_string() for spec in self.options.specs]
+        specs = [str(spec_parser.parse_spec(spec)) for spec in self.options.specs]
         # Note: This will not include values from `--changed-*` flags.
         self._run_tracker.run_info.add_info("specs_from_command_line", specs, stringify=False)
 

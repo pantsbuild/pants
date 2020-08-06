@@ -68,7 +68,7 @@ class GoalRuleTestBase(TestBase):
         console = Console(stdout=stdout, stderr=stderr)
 
         # Run for the specs parsed from the args.
-        specs = SpecsCalculator.parse_specs(full_options.specs, self.build_root)
+        specs = SpecsCalculator.parse_specs(full_options.specs, build_root=self.build_root)
         params = Params(
             specs,
             console,

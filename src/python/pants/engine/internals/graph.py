@@ -377,19 +377,15 @@ async def addresses_with_origins_from_filesystem_specs(
             and not owners
         ):
             _log_or_raise_unmatched_owners(
-                [PurePath(spec.to_spec_string())],
+                [PurePath(str(spec))],
                 global_options.options.owners_not_found_behavior,
                 ignore_option="--owners-not-found-behavior=ignore",
             )
         for address in owners:
-            # If the address is already covered by a prior spec, and that spec is a literal spec,
-            # then we do not overwrite it. The implication is that if the same address is resolved
-            # both by a glob spec and a literal spec, the literal spec will be used because it's
-            # more precise.
-            if isinstance(addresses_to_specs.get(address), FilesystemLiteralSpec):
-                continue
-            else:
-                addresses_to_specs[address] = spec
+            # A target might be covered by multiple specs, so we take the most specific one.
+            addresses_to_specs[address] = FilesystemSpecs.more_specific(
+                addresses_to_specs.get(address), spec
+            )
     return AddressesWithOrigins(
         AddressWithOrigin(address, spec) for address, spec in addresses_to_specs.items()
     )
@@ -754,10 +750,7 @@ class NoValidTargetsException(Exception):
         valid_target_aliases = sorted({target_type.alias for target_type in valid_target_types})
         invalid_target_aliases = sorted({tgt.alias for tgt in targets_with_origins.targets})
         specs = sorted(
-            {
-                target_with_origin.origin.to_spec_string()
-                for target_with_origin in targets_with_origins
-            }
+            {str(target_with_origin.origin) for target_with_origin in targets_with_origins}
         )
         bulleted_list_sep = "\n  * "
         super().__init__(
