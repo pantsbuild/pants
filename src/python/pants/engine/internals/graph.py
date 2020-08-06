@@ -382,10 +382,14 @@ async def addresses_with_origins_from_filesystem_specs(
                 ignore_option="--owners-not-found-behavior=ignore",
             )
         for address in owners:
-            # A target might be covered by multiple specs, so we take the most specific one.
-            addresses_to_specs[address] = FilesystemSpecs.more_specific(
-                addresses_to_specs.get(address), spec
-            )
+            # If the address is already covered by a prior spec, and that spec is a literal spec,
+            # then we do not overwrite it. The implication is that if the same address is resolved
+            # both by a glob spec and a literal spec, the literal spec will be used because it's
+            # more precise.
+            if isinstance(addresses_to_specs.get(address), FilesystemLiteralSpec):
+                continue
+            else:
+                addresses_to_specs[address] = spec
     return AddressesWithOrigins(
         AddressWithOrigin(address, spec) for address, spec in addresses_to_specs.items()
     )

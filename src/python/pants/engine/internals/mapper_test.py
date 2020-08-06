@@ -71,7 +71,7 @@ def test_address_family_create_single() -> None:
     assert {
         Address.parse("//:one"): TargetAdaptor(type_alias="thing", name="one", age=42),
         Address.parse("//:two"): TargetAdaptor(type_alias="thing", name="two", age=37),
-    } == dict(address_family.addresses_to_target_adaptors.items())
+    } == {bfa.address: ta for bfa, ta in address_family.addressables.items()}
 
 
 def test_address_family_create_multiple() -> None:
@@ -91,14 +91,13 @@ def test_address_family_create_multiple() -> None:
     assert {
         Address.parse("name/space:one"): TargetAdaptor(type_alias="thing", name="one", age=42),
         Address.parse("name/space:two"): TargetAdaptor(type_alias="thing", name="two", age=37),
-    } == dict(address_family.addresses_to_target_adaptors.items())
+    } == {bfa.address: ta for bfa, ta in address_family.addressables.items()}
 
 
 def test_address_family_create_empty() -> None:
     # Case where directory exists but is empty.
     address_family = AddressFamily.create("name/space", [])
-    assert {} == address_family.addresses_to_target_adaptors
-    assert () == address_family.build_file_addresses
+    assert {} == address_family.addressables
 
 
 def test_address_family_mismatching_paths() -> None:
