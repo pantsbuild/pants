@@ -217,16 +217,18 @@ class AscendantAddresses(AddressSpec):
 @dataclass(unsafe_hash=True)
 class AddressSpecs:
     specs: Tuple[AddressSpec, ...]
-    apply_target_filters: bool
+    filter_by_global_options: bool
 
-    def __init__(self, specs: Iterable[AddressSpec], *, apply_target_filters: bool) -> None:
+    def __init__(
+        self, specs: Iterable[AddressSpec], *, filter_by_global_options: bool = False
+    ) -> None:
         """Create the specs for what addresses Pants should run on.
 
-        If `apply_target_filters` is set to True, then the resulting Addresses will be filtered by
-        the global options `--tag` and `--exclude-target-regexp`.
+        If `filter_by_global_options` is set to True, then the resulting Addresses will be filtered
+        by the global options `--tag` and `--exclude-target-regexp`.
         """
         self.specs = tuple(specs)
-        self.apply_target_filters = apply_target_filters
+        self.filter_by_global_options = filter_by_global_options
 
     @staticmethod
     def more_specific(spec1: Optional[AddressSpec], spec2: Optional[AddressSpec]) -> AddressSpec:

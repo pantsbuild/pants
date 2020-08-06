@@ -89,7 +89,7 @@ def test_address_specs_duplicated() -> None:
     address_family = AddressFamily(
         "root", {"root": ("root/BUILD", TargetAdaptor(type_alias="", name="root"))}
     )
-    address_specs = AddressSpecs([address_spec, address_spec], apply_target_filters=True)
+    address_specs = AddressSpecs([address_spec, address_spec])
 
     addresses_with_origins = resolve_addresses_with_origins_from_address_specs(
         address_specs, address_family
@@ -102,7 +102,7 @@ def test_address_specs_duplicated() -> None:
 
 def test_address_specs_tag_filter() -> None:
     """Test that targets are filtered based on `tags`."""
-    address_specs = AddressSpecs([SiblingAddresses("root")], apply_target_filters=True)
+    address_specs = AddressSpecs([SiblingAddresses("root")], filter_by_global_options=True)
     address_family = AddressFamily(
         "root",
         {
@@ -126,9 +126,7 @@ def test_address_specs_fail_on_nonexistent() -> None:
     address_family = AddressFamily(
         "root", {"a": ("root/BUILD", TargetAdaptor(type_alias="", name="a"))}
     )
-    address_specs = AddressSpecs(
-        [SingleAddress("root", "b"), SingleAddress("root", "a")], apply_target_filters=True
-    )
+    address_specs = AddressSpecs([SingleAddress("root", "b"), SingleAddress("root", "a")])
 
     expected_rx_str = re.escape("'b' was not found in namespace 'root'. Did you mean one of:\n  :a")
     with pytest.raises(ResolveError, match=expected_rx_str):
@@ -136,16 +134,14 @@ def test_address_specs_fail_on_nonexistent() -> None:
 
     # Ensure that we still catch nonexistent targets later on in the list of command-line
     # address specs.
-    address_specs = AddressSpecs(
-        [SingleAddress("root", "a"), SingleAddress("root", "b")], apply_target_filters=True
-    )
+    address_specs = AddressSpecs([SingleAddress("root", "a"), SingleAddress("root", "b")])
     with pytest.raises(ResolveError, match=expected_rx_str):
         resolve_addresses_with_origins_from_address_specs(address_specs, address_family)
 
 
 def test_address_specs_exclude_pattern() -> None:
     """Test that targets are filtered based on exclude patterns."""
-    address_specs = AddressSpecs([SiblingAddresses("root")], apply_target_filters=True)
+    address_specs = AddressSpecs([SiblingAddresses("root")], filter_by_global_options=True)
     address_family = AddressFamily(
         "root",
         {
@@ -165,7 +161,7 @@ def test_address_specs_exclude_pattern() -> None:
 
 def test_address_specs_exclude_pattern_with_single_address() -> None:
     """Test that single address targets are filtered based on exclude patterns."""
-    address_specs = AddressSpecs([SingleAddress("root", "not_me")], apply_target_filters=True)
+    address_specs = AddressSpecs([SingleAddress("root", "not_me")], filter_by_global_options=True)
     address_family = AddressFamily(
         "root", {"not_me": ("root/BUILD", TargetAdaptor(type_alias="", name="not_me"))}
     )

@@ -208,7 +208,7 @@ async def addresses_with_origins_from_address_specs(
             bfaddr.address
             for (bfaddr, tgt) in all_bfaddr_tgt_pairs
             if (
-                address_specs.apply_target_filters is False
+                address_specs.filter_by_global_options is False
                 or address_mapper.matches_filter_options(bfaddr.address, tgt)
             )
         )
