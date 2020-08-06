@@ -764,6 +764,10 @@ async def generate_smalltalk_from_avro(
 ) -> GeneratedSources:
     protocol_files = request.protocol_sources.files
 
+    # Many codegen implementations will need to look up a protocol target's dependencies in their
+    # rule. We add this here to ensure that this does not result in rule graph issues.
+    _ = await Get(TransitiveTargets, Addresses([request.protocol_target.address]))
+
     def generate_fortran(fp: str) -> FileContent:
         parent = str(PurePath(fp).parent).replace("src/avro", "src/smalltalk")
         file_name = f"{PurePath(fp).stem}.st"
@@ -800,7 +804,8 @@ class TestCodegen(TestBase):
 
         # First, get the original protocol sources.
         hydrated_protocol_sources = self.request_single_product(
-            HydratedSources, HydrateSourcesRequest(protocol_sources)
+            HydratedSources,
+            Params(HydrateSourcesRequest(protocol_sources), create_options_bootstrapper()),
         )
         assert hydrated_protocol_sources.snapshot.files == ("src/avro/f.avro",)
 
@@ -808,8 +813,11 @@ class TestCodegen(TestBase):
         wrapped_tgt = self.request_single_product(WrappedTarget, self.address)
         generated_sources = self.request_single_product(
             GeneratedSources,
-            GenerateSmalltalkFromAvroRequest(
-                hydrated_protocol_sources.snapshot, wrapped_tgt.target
+            Params(
+                GenerateSmalltalkFromAvroRequest(
+                    hydrated_protocol_sources.snapshot, wrapped_tgt.target
+                ),
+                create_options_bootstrapper(),
             ),
         )
         assert generated_sources.snapshot.files == ("src/smalltalk/f.st",)
@@ -817,8 +825,11 @@ class TestCodegen(TestBase):
         # Test that HydrateSourcesRequest can also be used.
         generated_via_hydrate_sources = self.request_single_product(
             HydratedSources,
-            HydrateSourcesRequest(
-                protocol_sources, for_sources_types=[SmalltalkSources], enable_codegen=True
+            Params(
+                HydrateSourcesRequest(
+                    protocol_sources, for_sources_types=[SmalltalkSources], enable_codegen=True
+                ),
+                create_options_bootstrapper(),
             ),
         )
         assert generated_via_hydrate_sources.snapshot.files == ("src/smalltalk/f.st",)
@@ -832,8 +843,11 @@ class TestCodegen(TestBase):
         assert protocol_sources.can_generate(SmalltalkSources, self.union_membership) is True
         generated = self.request_single_product(
             HydratedSources,
-            HydrateSourcesRequest(
-                protocol_sources, for_sources_types=[SmalltalkSources], enable_codegen=True
+            Params(
+                HydrateSourcesRequest(
+                    protocol_sources, for_sources_types=[SmalltalkSources], enable_codegen=True
+                ),
+                create_options_bootstrapper(),
             ),
         )
         assert generated.snapshot.files == ("src/smalltalk/f.st",)
@@ -846,8 +860,11 @@ class TestCodegen(TestBase):
         assert protocol_sources.can_generate(AdaSources, self.union_membership) is False
         generated = self.request_single_product(
             HydratedSources,
-            HydrateSourcesRequest(
-                protocol_sources, for_sources_types=[AdaSources], enable_codegen=True
+            Params(
+                HydrateSourcesRequest(
+                    protocol_sources, for_sources_types=[AdaSources], enable_codegen=True
+                ),
+                create_options_bootstrapper(),
             ),
         )
         assert generated.snapshot.files == ()

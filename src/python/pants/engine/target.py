@@ -648,23 +648,25 @@ def generate_subtarget(
     are able to deduce specifically which files are being used, we can use only the files we care
     about, rather than the entire `sources` field.
     """
-    if not base_target.has_field(Dependencies):
+    if not base_target.has_field(Dependencies) or not base_target.has_field(Sources):
         raise ValueError(
             f"Target {base_target.address.spec} of type {type(base_target).__qualname__} does "
-            f"not support dependencies, and thus cannot depend on {full_file_name}."
+            "not have both a `dependencies` and `sources` field, and thus cannot generate a "
+            f"subtarget for the file {full_file_name}."
         )
 
     relativized_file_name = (
         PurePath(full_file_name).relative_to(base_target.address.spec_path).as_posix()
     )
 
-    found_source_match = False
     generated_target_fields = {}
     for field in base_target.field_values.values():
-        if isinstance(field, Sources) and bool(
-            matches_filespec(field.filespec, paths=(full_file_name,))
-        ):
-            found_source_match = True
+        if isinstance(field, Sources):
+            if not bool(matches_filespec(field.filespec, paths=[full_file_name])):
+                raise ValueError(
+                    f"Target {base_target.address.spec}'s `sources` field does not match a file "
+                    f"{full_file_name}."
+                )
             value = (relativized_file_name,)
         else:
             value = (
@@ -673,18 +675,6 @@ def generate_subtarget(
                 else field.sanitized_raw_value  # type: ignore[attr-defined]
             )
         generated_target_fields[field.alias] = value
-
-    if not found_source_match:
-        # TODO: This should probably be ResolveError, but this function is in the wrong place
-        # for that.
-        sources_fields = [
-            field for field in base_target.field_values.values() if isinstance(field, Sources)
-        ]
-        sources_fields_hint = f" It only matches: {sources_fields}." if sources_fields else ""
-        raise ValueError(
-            f"Target {base_target.address.spec} does not own "
-            f"a file {full_file_name}.{sources_fields_hint}"
-        )
 
     target_cls = type(base_target)
     return target_cls(

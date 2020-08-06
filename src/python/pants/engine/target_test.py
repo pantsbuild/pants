@@ -451,14 +451,21 @@ def test_generate_subtarget() -> None:
         == expected_subdir_address
     )
 
-    class NoSourcesTgt(Target):
-        alias = "no_sources_tgt"
+    # The full_file_name must match the filespec of the base target's Sources field.
+    with pytest.raises(ValueError) as exc:
+        generate_subtarget(single_source_tgt, full_file_name="src/fortran/fake_file.f95")
+    assert "does not match a file src/fortran/fake_file.f95" in str(exc.value)
+
+    class MissingFieldsTarget(Target):
+        alias = "missing_fields_tgt"
         core_fields = (Tags,)
 
-    no_sources_tgt = NoSourcesTgt({Tags.alias: ["demo"]}, address=Address.parse("//:no_sources"))
+    missing_fields_tgt = MissingFieldsTarget(
+        {Tags.alias: ["demo"]}, address=Address("", target_name="missing_fields")
+    )
     with pytest.raises(ValueError) as exc:
-        generate_subtarget(no_sources_tgt, full_file_name="fake.txt")
-    assert "does not support dependencies" in str(exc.value)
+        generate_subtarget(missing_fields_tgt, full_file_name="fake.txt")
+    assert "does not have both a `dependencies` and `sources` field" in str(exc.value)
 
 
 # -----------------------------------------------------------------------------------------------
