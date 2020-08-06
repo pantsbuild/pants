@@ -1,6 +1,7 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import itertools
 import os
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
@@ -79,13 +80,13 @@ class AddressSpec(Spec, metaclass=ABCMeta):
         return addr_tgt_pairs
 
     @abstractmethod
-    def make_glob_patterns(self, address_mapper: Any) -> List[str]:
+    def to_globs(self, address_mapper: Any) -> Tuple[str, ...]:
         """Generate glob patterns matching exactly all the BUILD files this address spec covers."""
 
-    @classmethod
-    def globs_in_single_dir(cls, spec_dir_path: str, address_mapper: Any) -> List[str]:
-        """Implementation of `make_glob_patterns()` which only allows a single base directory."""
-        return [os.path.join(spec_dir_path, pat) for pat in address_mapper.build_patterns]
+    @staticmethod
+    def globs_in_single_dir(spec_dir_path: str, build_patterns: Iterable[str]) -> Tuple[str, ...]:
+        """Implementation of `to_globs()` which only allows a single base directory."""
+        return tuple(os.path.join(spec_dir_path, pat) for pat in build_patterns)
 
 
 @dataclass(frozen=True)
@@ -132,8 +133,8 @@ class SingleAddress(AddressSpec):
         assert len(addr_tgt_pairs) == 1
         return addr_tgt_pairs
 
-    def make_glob_patterns(self, address_mapper: Any) -> List[str]:
-        return self.globs_in_single_dir(self.directory, address_mapper)
+    def to_globs(self, build_patterns: Iterable[str]) -> Tuple[str, ...]:
+        return self.globs_in_single_dir(self.directory, build_patterns)
 
 
 @dataclass(frozen=True)
@@ -151,8 +152,8 @@ class SiblingAddresses(AddressSpec):
     def address_target_pairs_from_address_families(self, address_families: Sequence[Any]):
         return self.all_address_target_pairs(address_families)
 
-    def make_glob_patterns(self, address_mapper: Any) -> List[str]:
-        return self.globs_in_single_dir(self.directory, address_mapper)
+    def to_globs(self, build_patterns: Iterable[str]) -> Tuple[str, ...]:
+        return self.globs_in_single_dir(self.directory, build_patterns)
 
 
 @dataclass(frozen=True)
@@ -180,8 +181,8 @@ class DescendantAddresses(AddressSpec):
             )
         return addr_tgt_pairs
 
-    def make_glob_patterns(self, address_mapper: Any) -> List[str]:
-        return [os.path.join(self.directory, "**", pat) for pat in address_mapper.build_patterns]
+    def to_globs(self, build_patterns: Iterable[str]) -> Tuple[str, ...]:
+        return tuple(os.path.join(self.directory, "**", pat) for pat in build_patterns)
 
 
 @dataclass(frozen=True)
@@ -203,12 +204,12 @@ class AscendantAddresses(AddressSpec):
     def address_target_pairs_from_address_families(self, address_families):
         return self.all_address_target_pairs(address_families)
 
-    def make_glob_patterns(self, address_mapper: Any) -> List[str]:
-        return [
+    def to_globs(self, build_patterns: Iterable[str]) -> Tuple[str, ...]:
+        return tuple(
             os.path.join(f, pattern)
-            for pattern in address_mapper.build_patterns
+            for pattern in build_patterns
             for f in recursive_dirname(self.directory)
-        ]
+        )
 
 
 _specificity = {
@@ -240,7 +241,14 @@ def more_specific(
 
 
 class AddressSpecs(Collection[AddressSpec]):
-    pass
+    def to_path_globs(
+        self, *, build_patterns: Iterable[str], build_ignore_patterns: Iterable[str]
+    ) -> PathGlobs:
+        includes = set(
+            itertools.chain.from_iterable(spec.to_globs(build_patterns) for spec in self)
+        )
+        ignores = (f"!{p}" for p in build_ignore_patterns)
+        return PathGlobs(globs=(*includes, *ignores))
 
 
 class FilesystemSpec(Spec, metaclass=ABCMeta):

@@ -1,7 +1,6 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import itertools
 import os.path
 from typing import Any, Dict, cast
 
@@ -162,15 +161,12 @@ async def addresses_with_origins_from_address_specs(
     :raises: :class:`AddressLookupError` if no targets are matched for non-SingleAddress specs.
     """
     # Capture a Snapshot covering all paths for these AddressSpecs, then group by directory.
-    include_patterns = set(
-        itertools.chain.from_iterable(
-            address_spec.make_glob_patterns(address_mapper) for address_spec in address_specs
-        )
-    )
     snapshot = await Get(
         Snapshot,
-        PathGlobs(
-            globs=(*include_patterns, *(f"!{p}" for p in address_mapper.build_ignore_patterns))
+        PathGlobs,
+        address_specs.to_path_globs(
+            build_patterns=address_mapper.build_patterns,
+            build_ignore_patterns=address_mapper.build_ignore_patterns,
         ),
     )
     dirnames = {os.path.dirname(f) for f in snapshot.files}
