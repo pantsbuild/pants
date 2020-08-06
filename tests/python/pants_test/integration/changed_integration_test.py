@@ -154,6 +154,7 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
             direct=[
                 "src/python/python_targets/test_binary.py:test",
                 "src/python/python_targets/test_library.py:test_library",
+                "src/python/python_targets:test",
                 "src/python/python_targets:test_library",
             ],
             transitive=[
@@ -283,6 +284,7 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
             self.assertEqual(stdout_data.strip(), "")
 
     def test_changed_with_deleted_source(self):
+        # TODO: Update to use multiple sources, with only one deleted.
         with create_isolated_git_repo() as worktree:
             safe_delete(os.path.join(worktree, "src/python/sources/sources.py"))
             pants_run = self.run_pants(["list", "--changed-since=HEAD"])

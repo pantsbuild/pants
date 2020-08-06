@@ -346,27 +346,48 @@ class Owners(Collection[Address]):
 
 @rule
 async def find_owners(owners_request: OwnersRequest) -> Owners:
-    sources_set = FrozenOrderedSet(owners_request.sources)
-    dirs_set = FrozenOrderedSet(os.path.dirname(source) for source in sources_set)
+    # Determine which of the sources are live and which are deleted.
+    sources_set_snapshot = await Get(Snapshot, PathGlobs(owners_request.sources))
 
-    # Walk up the buildroot looking for targets that would conceivably claim changed sources.
-    candidate_specs = tuple(AscendantAddresses(directory=d) for d in dirs_set)
-    candidate_targets = await Get(Targets, AddressSpecs(candidate_specs))
-    build_file_addresses = await MultiGet(
-        Get(BuildFileAddress, Address, tgt.address) for tgt in candidate_targets
-    )
+    live_files = FrozenOrderedSet(sources_set_snapshot.files)
+    deleted_files = FrozenOrderedSet(s for s in owners_request.sources if s not in live_files)
+    live_dirs = FrozenOrderedSet(os.path.dirname(s) for s in live_files)
+    deleted_dirs = FrozenOrderedSet(os.path.dirname(s) for s in deleted_files)
 
     matching_addresses = set()
-    unmatched_sources = set(sources_set)
-    for candidate_tgt, bfa in zip(candidate_targets, build_file_addresses):
-        matching_files = set(
-            matches_filespec(candidate_tgt.get(Sources).filespec, paths=sources_set)
-        )
-        if not matching_files and bfa.rel_path not in sources_set:
-            continue
+    unmatched_sources = set(owners_request.sources)
+    for live in (True, False):
+        # Walk up the buildroot looking for targets that would conceivably claim changed sources.
+        # For live files, we use expanded Targets, which have file level precision but which are
+        # only created for existing files. For deleted files we use UnexpandedTargets, which have
+        # the original declared glob.
+        candidate_targets: Iterable[Target]
+        if live:
+            if not live_dirs:
+                continue
+            sources_set = live_files
+            candidate_specs = tuple(AscendantAddresses(directory=d) for d in live_dirs)
+            candidate_targets = await Get(Targets, AddressSpecs(candidate_specs))
+        else:
+            if not deleted_dirs:
+                continue
+            sources_set = deleted_files
+            candidate_specs = tuple(AscendantAddresses(directory=d) for d in deleted_dirs)
+            candidate_targets = await Get(UnexpandedTargets, AddressSpecs(candidate_specs))
 
-        unmatched_sources -= matching_files
-        matching_addresses.add(candidate_tgt.address)
+        build_file_addresses = await MultiGet(
+            Get(BuildFileAddress, Address, tgt.address) for tgt in candidate_targets
+        )
+
+        for candidate_tgt, bfa in zip(candidate_targets, build_file_addresses):
+            matching_files = set(
+                matches_filespec(candidate_tgt.get(Sources).filespec, paths=sources_set)
+            )
+            if not matching_files and bfa.rel_path not in sources_set:
+                continue
+
+            unmatched_sources -= matching_files
+            matching_addresses.add(candidate_tgt.address)
 
     if (
         unmatched_sources

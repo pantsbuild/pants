@@ -13,7 +13,7 @@ from pants.engine.collection import DeduplicatedCollection
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
-from pants.engine.target import Dependencies, DependenciesRequest, Targets
+from pants.engine.target import Dependencies, DependenciesRequest, Targets, UnexpandedTargets
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
@@ -27,13 +27,17 @@ class AddressToDependees:
 @rule
 async def map_addresses_to_dependees() -> AddressToDependees:
     # Get every target in the project so that we can iterate over them to find their dependencies.
-    all_explicit_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
+    all_expanded_targets, all_explicit_targets = await MultiGet(
+        Get(Targets, AddressSpecs([DescendantAddresses("")])),
+        Get(UnexpandedTargets, AddressSpecs([DescendantAddresses("")])),
+    )
+    all_targets = {*all_expanded_targets, *all_explicit_targets}
     dependencies_per_target = await MultiGet(
-        Get(Addresses, DependenciesRequest(tgt.get(Dependencies))) for tgt in all_explicit_targets
+        Get(Addresses, DependenciesRequest(tgt.get(Dependencies))) for tgt in all_targets
     )
 
     address_to_dependees = defaultdict(set)
-    for tgt, dependencies in zip(all_explicit_targets, dependencies_per_target):
+    for tgt, dependencies in zip(all_targets, dependencies_per_target):
         for dependency in dependencies:
             address_to_dependees[dependency].add(tgt.address)
     return AddressToDependees(

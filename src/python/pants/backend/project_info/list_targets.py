@@ -7,7 +7,7 @@ from pants.engine.addresses import Address, Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import Get, collect_rules, goal_rule
-from pants.engine.target import DescriptionField, ProvidesField, Targets
+from pants.engine.target import DescriptionField, ProvidesField, UnexpandedTargets
 
 
 class ListSubsystem(LineOriented, GoalSubsystem):
@@ -76,7 +76,7 @@ async def list_targets(
         )
 
     if list_subsystem.provides:
-        targets = await Get(Targets, Addresses, addresses)
+        targets = await Get(UnexpandedTargets, Addresses, addresses)
         addresses_with_provide_artifacts = {
             tgt.address: tgt[ProvidesField].value
             for tgt in targets
@@ -88,7 +88,7 @@ async def list_targets(
         return List(exit_code=0)
 
     if list_subsystem.documented:
-        targets = await Get(Targets, Addresses, addresses)
+        targets = await Get(UnexpandedTargets, Addresses, addresses)
         addresses_with_descriptions = cast(
             Dict[Address, str],
             {

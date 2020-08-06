@@ -13,7 +13,7 @@ from pants.engine.target import (
     RegisteredTargetTypes,
     Tags,
     Target,
-    Targets,
+    UnexpandedTargets,
     UnrecognizedTargetTypeException,
 )
 from pants.util.filtering import and_filters, create_filters
@@ -113,7 +113,7 @@ TargetFilter = Callable[[Target], bool]
 
 @goal_rule
 def filter_targets(
-    targets: Targets,
+    targets: UnexpandedTargets,
     filter_subsystem: FilterSubsystem,
     console: Console,
     registered_target_types: RegisteredTargetTypes,
