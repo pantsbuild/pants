@@ -2,26 +2,23 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-import re
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple, Union, cast
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union, cast
 
 from pants.engine.collection import Collection
 from pants.engine.fs import GlobExpansionConjunction, GlobMatchErrorBehavior, PathGlobs
 from pants.util.collections import assert_single_element
 from pants.util.dirutil import fast_relpath_optional, recursive_dirname
-from pants.util.filtering import and_filters, create_filters
 from pants.util.memo import memoized_property
-from pants.util.meta import frozen_after_init
 
 
 class Spec(ABC):
     """A specification for what Pants should operate on."""
 
     @abstractmethod
-    def to_spec_string(self) -> str:
-        """Return the normalized string representation of this spec."""
+    def __str__(self) -> str:
+        """The normalized string representation of this spec."""
 
 
 class AddressSpec(Spec, metaclass=ABCMeta):
@@ -104,8 +101,8 @@ class SingleAddress(AddressSpec):
         if self.name is None:
             raise ValueError(f"A SingleAddress must have a name. Got: {self}")
 
-    def to_spec_string(self) -> str:
-        return "{}:{}".format(self.directory, self.name)
+    def __str__(self) -> str:
+        return f"{self.directory}:{self.name}"
 
     def matching_address_families(self, address_families_dict: Dict[str, Any]) -> List[Any]:
         return self.address_families_for_dir(address_families_dict, self.directory)
@@ -145,7 +142,7 @@ class SiblingAddresses(AddressSpec):
 
     directory: str
 
-    def to_spec_string(self) -> str:
+    def __str__(self) -> str:
         return f"{self.directory}:"
 
     def matching_address_families(self, address_families_dict: Dict[str, Any]) -> List[Any]:
@@ -165,7 +162,7 @@ class DescendantAddresses(AddressSpec):
     directory: str
     error_if_no_matches: bool = True
 
-    def to_spec_string(self) -> str:
+    def __str__(self) -> str:
         return f"{self.directory}::"
 
     def matching_address_families(self, address_families_dict: Dict[str, Any]) -> List[Any]:
@@ -179,7 +176,7 @@ class DescendantAddresses(AddressSpec):
         addr_tgt_pairs = self.all_address_target_pairs(address_families)
         if self.error_if_no_matches and len(addr_tgt_pairs) == 0:
             raise self.AddressResolutionError(
-                f"Address spec {repr(self.to_spec_string())} does not match any targets."
+                f"Address spec '{str(self)}' does not match any targets."
             )
         return addr_tgt_pairs
 
@@ -193,7 +190,7 @@ class AscendantAddresses(AddressSpec):
 
     directory: str
 
-    def to_spec_string(self) -> str:
+    def __str__(self) -> str:
         return f"{self.directory}^"
 
     def matching_address_families(self, address_families_dict: Dict[str, Any]) -> List[Any]:
@@ -242,81 +239,8 @@ def more_specific(
     )
 
 
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class AddressSpecsMatcher:
-    """Contains filters for the output of a AddressSpecs match.
-
-    This class is separated out from `AddressSpecs` to allow for both structural equality of the
-    `tags` and `exclude_patterns`, and for caching of their compiled forms using
-    `@memoized_property` (which uses the hash of the class instance in its key, and results in a
-    very large key when used with `AddressSpecs` directly).
-    """
-
-    tags: Tuple[str, ...]
-    exclude_patterns: Tuple[str, ...]
-
-    def __init__(
-        self,
-        tags: Optional[Iterable[str]] = None,
-        exclude_patterns: Optional[Iterable[str]] = None,
-    ) -> None:
-        self.tags = tuple(tags or [])
-        self.exclude_patterns = tuple(exclude_patterns or [])
-
-    @memoized_property
-    def _exclude_compiled_regexps(self):
-        return [re.compile(pattern) for pattern in set(self.exclude_patterns or [])]
-
-    def _excluded_by_pattern(self, address) -> bool:
-        return any(p.search(address.spec) is not None for p in self._exclude_compiled_regexps)
-
-    @memoized_property
-    def _target_tag_matches(self):
-        def filter_for_tag(tag):
-            def filter_target(tgt):
-                # `tags` can sometimes be explicitly set to `None`. We convert that to an empty list
-                # with `or`.
-                tags = tgt.kwargs.get("tags", []) or []
-                return tag in [str(t_tag) for t_tag in tags]
-
-            return filter_target
-
-        return and_filters(create_filters(self.tags, filter_for_tag))
-
-    def matches_target_address_pair(self, address, target) -> bool:
-        """
-        :param Address address: An Address to match
-        :param TargetAdaptor target: The Target for the address.
-
-        :return: True if the given Address/HydratedTarget are included by this matcher.
-        """
-        return self._target_tag_matches(target) and not self._excluded_by_pattern(address)
-
-
-@frozen_after_init
-@dataclass(unsafe_hash=True)
-class AddressSpecs:
-    """A collection of `AddressSpec`s representing AddressSpec subclasses, and a AddressSpecsMatcher
-    to filter results."""
-
-    dependencies: Tuple[AddressSpec, ...]
-    matcher: AddressSpecsMatcher
-
-    def __init__(
-        self,
-        dependencies: Iterable[AddressSpec],
-        tags: Optional[Iterable[str]] = None,
-        exclude_patterns: Optional[Iterable[str]] = None,
-    ) -> None:
-        self.dependencies = tuple(dependencies)
-        self.matcher = AddressSpecsMatcher(tags=tags, exclude_patterns=exclude_patterns)
-
-    def __iter__(self) -> Iterator[AddressSpec]:
-        return iter(self.dependencies)
-
-    def __bool__(self) -> bool:
-        return bool(self.dependencies)
+class AddressSpecs(Collection[AddressSpec]):
+    pass
 
 
 class FilesystemSpec(Spec, metaclass=ABCMeta):
@@ -329,7 +253,7 @@ class FilesystemLiteralSpec(FilesystemSpec):
 
     file: str
 
-    def to_spec_string(self) -> str:
+    def __str__(self) -> str:
         return self.file
 
 
@@ -339,7 +263,7 @@ class FilesystemGlobSpec(FilesystemSpec):
 
     glob: str
 
-    def to_spec_string(self) -> str:
+    def __str__(self) -> str:
         return self.glob
 
 
@@ -353,7 +277,7 @@ class FilesystemIgnoreSpec(FilesystemSpec):
         if self.glob.startswith("!"):
             raise ValueError(f"The `glob` for {self} should not start with `!`.")
 
-    def to_spec_string(self) -> str:
+    def __str__(self) -> str:
         return f"!{self.glob}"
 
 
@@ -373,7 +297,7 @@ class FilesystemSpecs(Collection[FilesystemSpec]):
         specs: Iterable[FilesystemSpec], glob_match_error_behavior: GlobMatchErrorBehavior
     ) -> PathGlobs:
         return PathGlobs(
-            globs=(s.to_spec_string() for s in specs),
+            globs=(str(s) for s in specs),
             glob_match_error_behavior=glob_match_error_behavior,
             # We validate that _every_ glob is valid.
             conjunction=GlobExpansionConjunction.all_match,

@@ -152,7 +152,7 @@ async def find_target_adaptor(address: Address) -> TargetAdaptor:
 
 @rule
 async def addresses_with_origins_from_address_specs(
-    address_mapper: AddressMapper, address_specs: AddressSpecs,
+    address_mapper: AddressMapper, address_specs: AddressSpecs
 ) -> AddressesWithOrigins:
     """Given an AddressMapper and list of AddressSpecs, return matching AddressesWithOrigins.
 
@@ -196,22 +196,22 @@ async def addresses_with_origins_from_address_specs(
             all_bfaddr_tgt_pairs = address_spec.address_target_pairs_from_address_families(
                 addr_families_for_spec
             )
-            for bfaddr, _ in all_bfaddr_tgt_pairs:
-                addr = bfaddr.address
-                # A target might be covered by multiple specs, so we take the most specific one.
-                addr_to_origin[addr] = more_specific(addr_to_origin.get(addr), address_spec)
         except AddressSpec.AddressResolutionError as e:
             raise AddressLookupError(e) from e
         except SingleAddress._SingleAddressResolutionError as e:
             _raise_did_you_mean(e.single_address_family, e.name, source=e)
 
+        for bfaddr, _ in all_bfaddr_tgt_pairs:
+            addr = bfaddr.address
+            # A target might be covered by multiple specs, so we take the most specific one.
+            addr_to_origin[addr] = more_specific(addr_to_origin.get(addr), address_spec)
+
         matched_addresses.update(
             bfaddr.address
             for (bfaddr, tgt) in all_bfaddr_tgt_pairs
-            if address_specs.matcher.matches_target_address_pair(bfaddr.address, tgt)
+            if address_mapper.matches_filter_options(bfaddr.address, tgt)
         )
 
-    # NB: This may be empty, as the result of filtering by tag and exclude patterns!
     return AddressesWithOrigins(
         AddressWithOrigin(address=addr, origin=addr_to_origin[addr]) for addr in matched_addresses
     )
@@ -222,14 +222,5 @@ def strip_address_origins(addresses_with_origins: AddressesWithOrigins) -> Addre
     return Addresses(address_with_origin.address for address_with_origin in addresses_with_origins)
 
 
-def create_graph_rules(address_mapper: AddressMapper):
-    """Creates tasks used to parse targets from BUILD files."""
-
-    @rule
-    def address_mapper_singleton() -> AddressMapper:
-        return address_mapper
-
-    return [
-        address_mapper_singleton,
-        *collect_rules(),
-    ]
+def rules():
+    return collect_rules()

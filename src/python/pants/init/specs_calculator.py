@@ -33,13 +33,7 @@ class SpecsCalculator:
     """Determines the specs for a given Pants run."""
 
     @classmethod
-    def parse_specs(
-        cls,
-        raw_specs: Iterable[str],
-        build_root: Optional[str] = None,
-        exclude_patterns: Optional[Iterable[str]] = None,
-        tags: Optional[Iterable[str]] = None,
-    ) -> Specs:
+    def parse_specs(cls, raw_specs: Iterable[str], *, build_root: Optional[str] = None) -> Specs:
         """Parse raw string specs into a Specs object."""
         build_root = build_root or get_buildroot()
         spec_parser = CmdLineSpecParser(build_root)
@@ -53,15 +47,7 @@ class SpecsCalculator:
             else:
                 filesystem_specs.add(parsed_spec)
 
-        address_specs_collection = AddressSpecs(
-            dependencies=address_specs,
-            exclude_patterns=exclude_patterns if exclude_patterns else tuple(),
-            tags=tags,
-        )
-        filesystem_specs_collection = FilesystemSpecs(filesystem_specs)
-        return Specs(
-            address_specs=address_specs_collection, filesystem_specs=filesystem_specs_collection,
-        )
+        return Specs(AddressSpecs(address_specs), FilesystemSpecs(filesystem_specs))
 
     @classmethod
     def create(
@@ -70,16 +56,8 @@ class SpecsCalculator:
         options: Options,
         session: SchedulerSession,
         build_root: Optional[str] = None,
-        exclude_patterns: Optional[Iterable[str]] = None,
-        tags: Optional[Iterable[str]] = None,
     ) -> Specs:
-        specs = cls.parse_specs(
-            raw_specs=options.specs,
-            build_root=build_root,
-            exclude_patterns=exclude_patterns,
-            tags=tags,
-        )
-
+        specs = cls.parse_specs(raw_specs=options.specs, build_root=build_root)
         changed_options = ChangedOptions.from_options(options.for_scope("changed"))
 
         logger.debug("specs are: %s", specs)
@@ -125,9 +103,5 @@ class SpecsCalculator:
                 filesystem_specs.append(FilesystemLiteralSpec(address.filename))
             else:
                 address_specs.append(SingleAddress(address.spec_path, address.target_name))
-        return Specs(
-            address_specs=AddressSpecs(
-                address_specs, exclude_patterns=exclude_patterns, tags=tags,
-            ),
-            filesystem_specs=FilesystemSpecs(filesystem_specs),
-        )
+
+        return Specs(AddressSpecs(address_specs), FilesystemSpecs(filesystem_specs))

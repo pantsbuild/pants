@@ -5,7 +5,7 @@ import re
 import unittest
 import unittest.mock
 from textwrap import dedent
-from typing import cast
+from typing import Iterable, Optional, cast
 
 import pytest
 
@@ -60,10 +60,16 @@ def test_parse_address_family_empty() -> None:
 
 
 def resolve_addresses_with_origins_from_address_specs(
-    address_specs: AddressSpecs, address_family: AddressFamily,
+    address_specs: AddressSpecs,
+    address_family: AddressFamily,
+    *,
+    tags: Optional[Iterable[str]] = None,
+    exclude_patterns: Optional[Iterable[str]] = None
 ) -> AddressesWithOrigins:
     address_mapper = AddressMapper(
-        Parser(target_type_aliases=[], object_aliases=BuildFileAliases())
+        Parser(target_type_aliases=[], object_aliases=BuildFileAliases()),
+        tags=tags,
+        exclude_target_regexps=exclude_patterns,
     )
     snapshot = Snapshot(Digest("xx", 2), ("root/BUILD",), ())
     addresses_with_origins = run_rule(
@@ -96,7 +102,7 @@ def test_address_specs_duplicated() -> None:
 
 def test_address_specs_tag_filter() -> None:
     """Test that targets are filtered based on `tags`."""
-    address_specs = AddressSpecs([SiblingAddresses("root")], tags=["+integration"])
+    address_specs = AddressSpecs([SiblingAddresses("root")])
     address_family = AddressFamily(
         "root",
         {
@@ -107,7 +113,7 @@ def test_address_specs_tag_filter() -> None:
     )
 
     addresses_with_origins = resolve_addresses_with_origins_from_address_specs(
-        address_specs, address_family
+        address_specs, address_family, tags=["+integration"]
     )
     assert len(addresses_with_origins) == 1
     awo = addresses_with_origins[0]
@@ -135,7 +141,7 @@ def test_address_specs_fail_on_nonexistent() -> None:
 
 def test_address_specs_exclude_pattern() -> None:
     """Test that targets are filtered based on exclude patterns."""
-    address_specs = AddressSpecs([SiblingAddresses("root")], exclude_patterns=tuple([".exclude*"]))
+    address_specs = AddressSpecs([SiblingAddresses("root")])
     address_family = AddressFamily(
         "root",
         {
@@ -145,7 +151,7 @@ def test_address_specs_exclude_pattern() -> None:
     )
 
     addresses_with_origins = resolve_addresses_with_origins_from_address_specs(
-        address_specs, address_family
+        address_specs, address_family, exclude_patterns=[".exclude*"]
     )
     assert len(addresses_with_origins) == 1
     awo = addresses_with_origins[0]
@@ -155,13 +161,13 @@ def test_address_specs_exclude_pattern() -> None:
 
 def test_address_specs_exclude_pattern_with_single_address() -> None:
     """Test that single address targets are filtered based on exclude patterns."""
-    address_specs = AddressSpecs(
-        [SingleAddress("root", "not_me")], exclude_patterns=tuple(["root.*"])
-    )
+    address_specs = AddressSpecs([SingleAddress("root", "not_me")])
     address_family = AddressFamily(
         "root", {"not_me": ("root/BUILD", TargetAdaptor(type_alias="", name="not_me"))}
     )
-    assert not resolve_addresses_with_origins_from_address_specs(address_specs, address_family)
+    assert not resolve_addresses_with_origins_from_address_specs(
+        address_specs, address_family, exclude_patterns=["root.*"]
+    )
 
 
 def run_prelude_parsing_rule(prelude_content: str) -> BuildFilePreludeSymbols:

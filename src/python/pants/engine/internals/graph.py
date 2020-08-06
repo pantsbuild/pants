@@ -377,7 +377,7 @@ async def addresses_with_origins_from_filesystem_specs(
             and not owners
         ):
             _log_or_raise_unmatched_owners(
-                [PurePath(spec.to_spec_string())],
+                [PurePath(str(spec))],
                 global_options.options.owners_not_found_behavior,
                 ignore_option="--owners-not-found-behavior=ignore",
             )
@@ -754,10 +754,7 @@ class NoValidTargetsException(Exception):
         valid_target_aliases = sorted({target_type.alias for target_type in valid_target_types})
         invalid_target_aliases = sorted({tgt.alias for tgt in targets_with_origins.targets})
         specs = sorted(
-            {
-                target_with_origin.origin.to_spec_string()
-                for target_with_origin in targets_with_origins
-            }
+            {str(target_with_origin.origin) for target_with_origin in targets_with_origins}
         )
         bulleted_list_sep = "\n  * "
         super().__init__(
