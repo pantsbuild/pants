@@ -588,7 +588,7 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
     """
     target = owned_dependency.target
     ancestor_addrs = AscendantAddresses(target.address.spec_path)
-    ancestor_tgts = await Get(Targets, AddressSpecs([ancestor_addrs]))
+    ancestor_tgts = await Get(Targets, AddressSpecs([ancestor_addrs], apply_target_filters=False))
     # Note that addresses sort by (spec_path, target_name), and all these targets are
     # ancestors of the given target, i.e., their spec_paths are all prefixes. So sorting by
     # address will effectively sort by closeness of ancestry to the given target.

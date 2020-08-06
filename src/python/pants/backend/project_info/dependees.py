@@ -27,7 +27,9 @@ class AddressToDependees:
 @rule
 async def map_addresses_to_dependees() -> AddressToDependees:
     # Get every target in the project so that we can iterate over them to find their dependencies.
-    all_explicit_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
+    all_explicit_targets = await Get(
+        Targets, AddressSpecs([DescendantAddresses("")], apply_target_filters=False)
+    )
     dependencies_per_target = await MultiGet(
         Get(Addresses, DependenciesRequest(tgt.get(Dependencies))) for tgt in all_explicit_targets
     )

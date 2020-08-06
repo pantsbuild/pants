@@ -250,7 +250,9 @@ async def find_owners(owners_request: OwnersRequest) -> Owners:
 
     # Walk up the buildroot looking for targets that would conceivably claim changed sources.
     candidate_specs = tuple(AscendantAddresses(directory=d) for d in dirs_set)
-    candidate_targets = await Get(Targets, AddressSpecs(candidate_specs))
+    candidate_targets = await Get(
+        Targets, AddressSpecs(candidate_specs, apply_target_filters=False)
+    )
     candidate_target_sources = await MultiGet(
         Get(HydratedSources, HydrateSourcesRequest(tgt.get(Sources))) for tgt in candidate_targets
     )

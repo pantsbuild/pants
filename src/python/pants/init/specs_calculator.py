@@ -47,7 +47,10 @@ class SpecsCalculator:
             else:
                 filesystem_specs.add(parsed_spec)
 
-        return Specs(AddressSpecs(address_specs), FilesystemSpecs(filesystem_specs))
+        return Specs(
+            AddressSpecs(address_specs, apply_target_filters=True),
+            FilesystemSpecs(filesystem_specs),
+        )
 
     @classmethod
     def create(
@@ -104,4 +107,7 @@ class SpecsCalculator:
             else:
                 address_specs.append(SingleAddress(address.spec_path, address.target_name))
 
-        return Specs(AddressSpecs(address_specs), FilesystemSpecs(filesystem_specs))
+        return Specs(
+            AddressSpecs(address_specs, apply_target_filters=True),
+            FilesystemSpecs(filesystem_specs),
+        )

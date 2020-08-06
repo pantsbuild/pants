@@ -64,7 +64,9 @@ class FirstPartyModuleToAddressMapping:
 
 @rule
 async def map_first_party_modules_to_addresses() -> FirstPartyModuleToAddressMapping:
-    all_explicit_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
+    all_explicit_targets = await Get(
+        Targets, AddressSpecs([DescendantAddresses("")], apply_target_filters=False)
+    )
     candidate_explicit_targets = tuple(
         tgt for tgt in all_explicit_targets if tgt.has_field(PythonSources)
     )
@@ -119,7 +121,9 @@ class ThirdPartyModuleToAddressMapping:
 
 @rule
 async def map_third_party_modules_to_addresses() -> ThirdPartyModuleToAddressMapping:
-    all_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
+    all_targets = await Get(
+        Targets, AddressSpecs([DescendantAddresses("")], apply_target_filters=False)
+    )
     modules_to_addresses: Dict[str, Address] = {}
     modules_with_multiple_owners: Set[str] = set()
     for tgt in all_targets:

@@ -5,13 +5,14 @@ import itertools
 import os
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple, Union, cast
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple, Union, cast
 
 from pants.engine.collection import Collection
 from pants.engine.fs import GlobExpansionConjunction, GlobMatchErrorBehavior, PathGlobs
 from pants.util.collections import assert_single_element
 from pants.util.dirutil import fast_relpath_optional, recursive_dirname
 from pants.util.memo import memoized_property
+from pants.util.meta import frozen_after_init
 
 
 class Spec(ABC):
@@ -212,7 +213,21 @@ class AscendantAddresses(AddressSpec):
         )
 
 
-class AddressSpecs(Collection[AddressSpec]):
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class AddressSpecs:
+    specs: Tuple[AddressSpec, ...]
+    apply_target_filters: bool
+
+    def __init__(self, specs: Iterable[AddressSpec], *, apply_target_filters: bool) -> None:
+        """Create the specs for what addresses Pants should run on.
+
+        If `apply_target_filters` is set to True, then the resulting Addresses will be filtered by
+        the global options `--tag` and `--exclude-target-regexp`.
+        """
+        self.specs = tuple(specs)
+        self.apply_target_filters = apply_target_filters
+
     @staticmethod
     def more_specific(spec1: Optional[AddressSpec], spec2: Optional[AddressSpec]) -> AddressSpec:
         # Note that if either of spec1 or spec2 is None, the other will be returned.
@@ -236,6 +251,12 @@ class AddressSpecs(Collection[AddressSpec]):
         )
         ignores = (f"!{p}" for p in build_ignore_patterns)
         return PathGlobs(globs=(*includes, *ignores))
+
+    def __iter__(self) -> Iterator[AddressSpec]:
+        return iter(self.specs)
+
+    def __bool__(self) -> bool:
+        return bool(self.specs)
 
 
 class FilesystemSpec(Spec, metaclass=ABCMeta):
