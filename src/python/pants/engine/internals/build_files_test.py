@@ -72,7 +72,7 @@ def resolve_addresses_with_origins_from_address_specs(
     snapshot = Snapshot(Digest("xx", 2), ("root/BUILD",), ())
     addresses_with_origins = run_rule(
         addresses_with_origins_from_address_specs,
-        rule_args=[mapper, address_specs, specs_filter],
+        rule_args=[address_specs, mapper, specs_filter],
         mock_gets=[
             MockGet(product_type=Snapshot, subject_type=PathGlobs, mock=lambda _: snapshot),
             MockGet(product_type=AddressFamily, subject_type=Dir, mock=lambda _: address_family,),

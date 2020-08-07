@@ -629,6 +629,9 @@ class TestFindValidFieldSets(TestBase):
 
 
 class TestSources(TestBase):
+    # TODO(#10569): Remove this and simply set the value in the unit test `test_unmatched_globs`.
+    additional_options = ["--files-not-found-behavior=error"]
+
     @classmethod
     def rules(cls):
         return (*super().rules(), RootRule(HydrateSourcesRequest))
