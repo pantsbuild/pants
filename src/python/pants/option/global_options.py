@@ -35,7 +35,7 @@ class GlobMatchErrorBehavior(Enum):
     error = "error"
 
 
-class FileNotFoundBehavior(Enum):
+class FilesNotFoundBehavior(Enum):
     """What to do when globs do not match in BUILD files."""
 
     warn = "warn"
@@ -869,8 +869,8 @@ class GlobalOptions(Subsystem):
         register(
             "--files-not-found-behavior",
             advanced=True,
-            type=FileNotFoundBehavior,
-            default=FileNotFoundBehavior.warn,
+            type=FilesNotFoundBehavior,
+            default=FilesNotFoundBehavior.warn,
             help="What to do when files and globs specified in BUILD files, such as in the "
             "`sources` field, cannot be found. This happens when the files do not exist on "
             "your machine or when they are ignored by the `--pants-ignore` option.",
