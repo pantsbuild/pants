@@ -4,6 +4,7 @@ use fs::{self, GlobExpansionConjunction, GlobMatching, PathGlobs, StrictGlobMatc
 use futures::compat::Future01CompatExt;
 use futures::future::{FutureExt, TryFutureExt};
 use futures::stream::{BoxStream, StreamExt, TryStreamExt};
+use lazy_static::lazy_static;
 use log::{debug, info};
 use nails::execution::{ChildOutput, ExitCode};
 use shell_quote::bash;
@@ -11,7 +12,7 @@ use shell_quote::bash;
 use std::collections::{BTreeSet, HashSet};
 use std::ffi::OsStr;
 use std::fs::create_dir_all;
-use std::io::Write;
+use std::io::{BufRead, BufReader, Write};
 use std::ops::Neg;
 use std::os::unix::{
   fs::{symlink, OpenOptionsExt},
@@ -112,6 +113,83 @@ impl CommandRunner {
     .compat()
     .to_boxed()
   }
+}
+
+lazy_static! {
+  static ref IS_LIKELY_IN_DOCKER: bool = is_likely_in_docker().unwrap_or_else(|e| {
+    log::warn!(
+      "Failed to detect whether we are running in docker: {}\n\n\
+               Please file an issue at https://github.com/pantsbuild/pants/issues/new",
+      e
+    );
+    false
+  });
+}
+
+///
+/// Attempts to detect whether we are running inside a docker container.
+///
+/// NB: Do not call this directly: it is stored in the IS_LIKELY_IN_DOCKER lazy_static.
+///
+fn is_likely_in_docker() -> Result<bool, String> {
+  if cfg!(not(target_os = "linux")) {
+    return Ok(false);
+  }
+
+  // Attempt to detect whether we are in docker. See:
+  //   https://stackoverflow.com/questions/20010199/how-to-determine-if-a-process-runs-inside-lxc-docker
+  let cgroups_matches = {
+    BufReader::new(
+      std::fs::File::open("/proc/1/cgroup")
+        .map_err(|e| format!("Failed to inspect `/proc` to detect docker: {}", e))?,
+    )
+    .lines()
+    .filter_map(|line_result| match line_result {
+      Ok(line) if line.contains("docker") || line.contains("lxc") => Some(line),
+      _ => None,
+    })
+    .collect::<Vec<_>>()
+  };
+
+  if cgroups_matches.is_empty() {
+    Ok(false)
+  } else {
+    log::debug!(
+      "Detected potential docker container based on cgroups ({}): will `sync` \
+      before executing processes.",
+      cgroups_matches.join(", ")
+    );
+    Ok(true)
+  }
+}
+
+///
+/// If we are potentially running inside a docker container (TODO: technically only `aufs` is
+/// relevant), `sync` the filesystem. Noop on other platforms.
+///
+/// See https://github.com/moby/moby/issues/9547.
+///
+async fn sync_if_needed() -> Result<(), String> {
+  if !(*IS_LIKELY_IN_DOCKER) {
+    return Ok(());
+  }
+
+  let output = Command::new("/bin/sync")
+    .stdin(Stdio::null())
+    .output()
+    .await
+    .map_err(|e| format!("Failed to spawn `sync` in likely docker container: {}", e))?;
+
+  if !output.status.success() {
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    return Err(format!(
+      "Failed to run `/bin/sync` in likely docker container ({}): stdout: {}, stderr: {}",
+      output.status, stdout, stderr
+    ));
+  }
+
+  Ok(())
 }
 
 pub struct StreamedHermeticCommand {
@@ -429,6 +507,9 @@ pub trait CapturedWorkdir {
     // down the line for streaming process results to console logs, etc. as tracked by:
     //   https://github.com/pantsbuild/pants/issues/6089
     let child_results_result = {
+      // Now that all inputs are on disk, `sync` if this platform requires it.
+      sync_if_needed().await?;
+
       let child_results_future =
         ChildResults::collect_from(self.run_in_workdir(&workdir_path, req.clone(), context)?);
       if let Some(req_timeout) = req.timeout {
