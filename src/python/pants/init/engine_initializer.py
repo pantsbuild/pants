@@ -15,14 +15,12 @@ from pants.engine import fs, process
 from pants.engine.console import Console
 from pants.engine.fs import GlobMatchErrorBehavior, Workspace
 from pants.engine.goal import Goal
-from pants.engine.internals import graph, options_parsing, uuid
-from pants.engine.internals.build_files import create_graph_rules
+from pants.engine.internals import build_files, graph, options_parsing, uuid
 from pants.engine.internals.mapper import AddressMapper
 from pants.engine.internals.native import Native
-from pants.engine.internals.parser import Parser, SymbolTable
+from pants.engine.internals.parser import Parser
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
 from pants.engine.internals.selectors import Params
-from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.platform import create_platform_rules
 from pants.engine.process import InteractiveRunner
 from pants.engine.rules import RootRule, collect_rules, rule
@@ -172,66 +170,53 @@ class EngineInitializer:
         use_gitignore = bootstrap_options.pants_ignore_use_gitignore
 
         return EngineInitializer.setup_legacy_graph_extended(
-            OptionsInitializer.compute_pants_ignore(build_root, bootstrap_options),
-            use_gitignore,
-            bootstrap_options.local_store_dir,
-            bootstrap_options.local_execution_root_dir,
-            bootstrap_options.named_caches_dir,
-            bootstrap_options.build_file_prelude_globs,
             options_bootstrapper,
             build_configuration,
+            ExecutionOptions.from_bootstrap_options(bootstrap_options),
+            pants_ignore_patterns=OptionsInitializer.compute_pants_ignore(
+                build_root, bootstrap_options
+            ),
+            use_gitignore=use_gitignore,
+            local_store_dir=bootstrap_options.local_store_dir,
+            local_execution_root_dir=bootstrap_options.local_execution_root_dir,
+            named_caches_dir=bootstrap_options.named_caches_dir,
             build_root=build_root,
             native=native,
             glob_match_error_behavior=(
                 bootstrap_options.files_not_found_behavior.to_glob_match_error_behavior()
             ),
+            build_file_prelude_globs=bootstrap_options.build_file_prelude_globs,
+            build_patterns=bootstrap_options.build_patterns,
             build_ignore_patterns=bootstrap_options.build_ignore,
+            tags=bootstrap_options.tag,
             exclude_target_regexps=bootstrap_options.exclude_target_regexp,
             subproject_roots=bootstrap_options.subproject_roots,
             include_trace_on_error=bootstrap_options.print_exception_stacktrace,
-            execution_options=ExecutionOptions.from_bootstrap_options(bootstrap_options),
         )
 
     @staticmethod
     def setup_legacy_graph_extended(
+        options_bootstrapper: OptionsBootstrapper,
+        build_configuration: BuildConfiguration,
+        execution_options: ExecutionOptions,
+        *,
         pants_ignore_patterns: List[str],
         use_gitignore: bool,
         local_store_dir: str,
         local_execution_root_dir: str,
         named_caches_dir: str,
-        build_file_prelude_globs: Tuple[str, ...],
-        options_bootstrapper: OptionsBootstrapper,
-        build_configuration: BuildConfiguration,
-        execution_options: ExecutionOptions,
         build_root: Optional[str] = None,
         native: Optional[Native] = None,
         glob_match_error_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.warn,
-        build_ignore_patterns=None,
-        exclude_target_regexps=None,
-        subproject_roots=None,
+        build_patterns: Optional[Iterable[str]] = None,
+        build_file_prelude_globs: Optional[Iterable[str]] = None,
+        build_ignore_patterns: Optional[Iterable[str]] = None,
+        tags: Optional[Iterable[str]] = None,
+        exclude_target_regexps: Optional[Iterable[str]] = None,
+        subproject_roots: Optional[Iterable[str]] = None,
         include_trace_on_error: bool = True,
     ) -> LegacyGraphScheduler:
-        """Construct and return the components necessary for LegacyBuildGraph construction.
-
-        :param local_store_dir: The directory to use for storing the engine's LMDB store in.
-        :param local_execution_root_dir: The directory to use for local execution sandboxes.
-        :param named_caches_dir: The base directory for named cache storage.
-        :param build_file_prelude_globs: Globs to match files to be prepended to all BUILD files.
-        :param build_root: A path to be used as the build root. If None, then default is used.
-        :param native: An instance of the native-engine subsystem.
-        :param options_bootstrapper: A `OptionsBootstrapper` object containing bootstrap options.
-        :param build_configuration: The `BuildConfiguration` object to get build file aliases from.
-        :param glob_match_error_behavior: How to behave if a glob specified for a target's sources or
-                                          bundles does not expand to anything.
-        :param list build_ignore_patterns: A list of paths ignore patterns used when searching for BUILD
-                                           files, usually taken from the '--build-ignore' global option.
-        :param list exclude_target_regexps: A list of regular expressions for excluding targets.
-        :param list subproject_roots: Paths that correspond with embedded build roots
-                                      under the current build root.
-        :param include_trace_on_error: If True, when an error occurs, the error message will include
-                                       the graph trace.
-        :param execution_options: Option values for (remote) process execution.
-        """
+        """Construct and return the components necessary for LegacyBuildGraph construction."""
 
         build_root = build_root or get_buildroot()
         build_configuration = build_configuration or BuildConfigInitializer.get(
@@ -246,17 +231,22 @@ class EngineInitializer:
         union_membership = UnionMembership.from_rules(build_configuration.union_rules)
 
         registered_target_types = RegisteredTargetTypes.create(build_configuration.target_types)
-        symbol_table_from_registered_targets = SymbolTable(
-            {target_type.alias: TargetAdaptor for target_type in registered_target_types.types}
+        parser = Parser(
+            target_type_aliases=registered_target_types.aliases, object_aliases=build_file_aliases
         )
-        parser = Parser(symbol_table_from_registered_targets, build_file_aliases)
         address_mapper = AddressMapper(
             parser=parser,
             prelude_glob_patterns=build_file_prelude_globs,
+            build_patterns=build_patterns,
             build_ignore_patterns=build_ignore_patterns,
+            tags=tags,
             exclude_target_regexps=exclude_target_regexps,
             subproject_roots=subproject_roots,
         )
+
+        @rule
+        def address_mapper_singleton() -> AddressMapper:
+            return address_mapper
 
         @rule
         def glob_match_error_behavior_singleton() -> GlobMatchErrorBehavior:
@@ -265,10 +255,6 @@ class EngineInitializer:
         @rule
         def build_configuration_singleton() -> BuildConfiguration:
             return build_configuration
-
-        @rule
-        def symbol_table_singleton() -> SymbolTable:
-            return symbol_table_from_registered_targets
 
         @rule
         def registered_target_types_singleton() -> RegisteredTargetTypes:
@@ -287,13 +273,13 @@ class EngineInitializer:
             (
                 *collect_rules(locals()),
                 RootRule(Console),
+                *build_files.rules(),
                 *fs.rules(),
                 *graph.rules(),
                 *uuid.rules(),
                 *options_parsing.rules(),
                 *process.rules(),
                 *create_platform_rules(),
-                *create_graph_rules(address_mapper),
                 *changed_rules(),
                 *rules,
             )

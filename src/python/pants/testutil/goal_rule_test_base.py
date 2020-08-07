@@ -68,7 +68,7 @@ class GoalRuleTestBase(TestBase):
         console = Console(stdout=stdout, stderr=stderr)
 
         # Run for the specs parsed from the args.
-        specs = SpecsCalculator.parse_specs(full_options.specs, self.build_root)
+        specs = SpecsCalculator.parse_specs(full_options.specs, build_root=self.build_root)
         params = Params(
             specs,
             console,
@@ -103,7 +103,7 @@ class GoalRuleTestBase(TestBase):
         # ['1', '2', '3', ''] - always an extra empty string if the separator is properly always
         # a suffix and not applied just between entries.
         result = self.execute_rule(**kwargs)
-        assert sorted([*output, ""]) == sorted(result.stdout.split(sep))
+        self.assertEqual(sorted([*output, ""]), sorted(result.stdout.split(sep)))
 
     def assert_console_output(self, *output, **kwargs) -> None:
         """Verifies the expected output entries are emitted by the goal rule.
@@ -114,7 +114,7 @@ class GoalRuleTestBase(TestBase):
         **kwargs: additional kwargs passed to execute_rule.
         """
         result = self.execute_rule(**kwargs)
-        assert sorted(output) == sorted(result.stdout.splitlines())
+        self.assertEqual(sorted(output), sorted(result.stdout.splitlines()))
 
     def assert_console_output_contains(self, output, **kwargs) -> None:
         """Verifies the expected output string is emitted by the goal rule.
@@ -134,7 +134,7 @@ class GoalRuleTestBase(TestBase):
         **kwargs: additional kwargs passed to execute_rule.
         """
         result = self.execute_rule(**kwargs)
-        assert list(output) == result.stdout.splitlines()
+        self.assertEqual(list(output), result.stdout.splitlines())
 
     def assert_console_raises(self, exception: Type[Exception], **kwargs) -> None:
         """Verifies the expected exception is raised by the goal rule.

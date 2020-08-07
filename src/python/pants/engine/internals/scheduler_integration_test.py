@@ -31,6 +31,6 @@ class SchedulerIntegrationTest(PantsRunIntegrationTest):
         pants_result = self.run_pants(args)
         self.assert_failure(pants_result)
         self.assertEqual(
-            pants_result.stdout_data, "examples/src/python/example/hello/greet:greet\n",
+            pants_result.stdout_data, "examples/src/python/example/hello/greet\n",
         )
         self.assertEqual(pants_result.returncode, 42)

@@ -88,7 +88,8 @@ class ArgSplitter:
         *_HELP_ALL_SCOPES_ARGS,
     )
 
-    def __init__(self, known_scope_infos: Iterable[ScopeInfo]) -> None:
+    def __init__(self, known_scope_infos: Iterable[ScopeInfo], buildroot: str) -> None:
+        self._buildroot = Path(buildroot)
         self._known_scope_infos = known_scope_infos
         # TODO: Get rid of our reliance on known scopes here. We don't really need it now
         # that we heuristically identify target specs based on it containing /, : or being
@@ -219,8 +220,7 @@ class ArgSplitter:
             unknown_scopes=self._unknown_scopes,
         )
 
-    @staticmethod
-    def likely_a_spec(arg: str) -> bool:
+    def likely_a_spec(self, arg: str) -> bool:
         """Return whether `arg` looks like a spec, rather than a goal name.
 
         An arg is a spec if it looks like an AddressSpec or a FilesystemSpec. In the future we can
@@ -229,7 +229,7 @@ class ArgSplitter:
         return (
             any(symbol in arg for symbol in (os.path.sep, ":", "*"))
             or arg.startswith("!")
-            or Path(arg).exists()
+            or (self._buildroot / arg).exists()
         )
 
     def _consume_scope(self) -> Tuple[Optional[str], List[str]]:

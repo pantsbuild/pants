@@ -4,7 +4,6 @@
 import itertools
 import json
 import logging
-import os
 from dataclasses import dataclass
 from typing import List, Set, Tuple, cast
 
@@ -16,6 +15,11 @@ from pants.backend.python.rules.pex import (
     PexRequest,
     PexRequirements,
 )
+from pants.backend.python.rules.python_sources import (
+    PythonSourceFilesRequest,
+    StrippedPythonSourceFiles,
+)
+from pants.backend.python.rules.python_sources import rules as python_sources_rules
 from pants.backend.python.rules.setuptools import Setuptools
 from pants.backend.python.rules.util import PackageDatum, distutils_repr, find_packages, is_python2
 from pants.backend.python.target_types import (
@@ -26,13 +30,8 @@ from pants.backend.python.target_types import (
     PythonSources,
 )
 from pants.base.specs import AddressSpecs, AscendantAddresses, SingleAddress
-from pants.core.target_types import ResourcesSources
-from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
+from pants.core.target_types import FilesSources, ResourcesSources
 from pants.core.util_rules.distdir import DistDir
-from pants.core.util_rules.strip_source_roots import (
-    SourceRootStrippedSources,
-    StripSourcesFieldRequest,
-)
 from pants.engine.addresses import Address, Addresses
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.console import Console
@@ -63,7 +62,6 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership
 from pants.option.custom_types import shell_str
 from pants.python.python_setup import PythonSetup
-from pants.source.source_root import SourceRoot, SourceRootRequest
 from pants.util.logging import LogLevel
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -101,7 +99,7 @@ class ExportedTarget:
     The code provided by this artifact can be from this target or from any targets it owns.
     """
 
-    target: Target
+    target: Target  # In practice, a PythonDistribution.
 
     @property
     def provides(self) -> PythonArtifact:
@@ -114,7 +112,7 @@ class DependencyOwner:
 
     We need this type to prevent rule ambiguities when computing the list of targets owned by an
     ExportedTarget (which involves going from ExportedTarget -> dep -> owner (which is itself an
-    ExportedTarget) and checking if owner is this the original ExportedTarget.
+    ExportedTarget) and checking if owner is the original ExportedTarget.
     """
 
     exported_target: ExportedTarget
@@ -124,10 +122,10 @@ class DependencyOwner:
 class OwnedDependency:
     """A target that is owned by some ExportedTarget.
 
-    Code in this target is published in the owner's artifact.
+    Code in this target is published in the owner's distribution.
 
-    The owner of a target T is T's closest filesystem ancestor among the exported targets
-    that directly or indirectly depend on it (including T itself).
+    The owner of a target T is T's closest filesystem ancestor among the python_distribution
+    targets that directly or indirectly depend on it (including T itself).
     """
 
     target: Target
@@ -146,13 +144,6 @@ class ExportedTargetRequirements(DeduplicatedCollection[str]):
     """
 
     sort_input = True
-
-
-@dataclass(frozen=True)
-class AncestorInitPyFiles:
-    """__init__.py files in enclosing packages of the exported code."""
-
-    digests: Tuple[Digest, ...]  # The files stripped of their source roots.
 
 
 @dataclass(frozen=True)
@@ -302,7 +293,7 @@ async def run_setup_pys(
     if explicit_nonexported_targets:
         raise TargetNotExported(
             "Cannot run setup.py on these targets, because they have no `provides=` clause: "
-            f'{", ".join(so.address.reference() for so in explicit_nonexported_targets)}'
+            f'{", ".join(so.address.spec for so in explicit_nonexported_targets)}'
         )
 
     if setup_py_subsystem.transitive:
@@ -339,13 +330,13 @@ async def run_setup_pys(
         )
 
         for exported_target, setup_py_result in zip(exported_targets, setup_py_results):
-            addr = exported_target.target.address.reference()
+            addr = exported_target.target.address.spec
             console.print_stderr(f"Writing dist for {addr} under {distdir.relpath}/.")
             workspace.write_digest(setup_py_result.output, path_prefix=str(distdir.relpath))
     else:
         # Just dump the chroot.
         for exported_target, chroot in zip(exported_targets, chroots):
-            addr = exported_target.target.address.reference()
+            addr = exported_target.target.address.spec
             provides = exported_target.provides
             setup_py_dir = distdir.relpath / f"{provides.name}-{provides.version}"
             console.print_stderr(f"Writing setup.py chroot for {addr} to {setup_py_dir}")
@@ -388,7 +379,7 @@ async def run_setup_py(
             # setuptools commands that create dists write them to the distdir.
             # TODO: Could there be other useful files to capture?
             output_directories=(dist_dir,),
-            description=f"Run setuptools for {req.exported_target.target.address.reference()}",
+            description=f"Run setuptools for {req.exported_target.target.address}",
         ),
     )
     output_digest = await Get(Digest, RemovePrefix(result.output_digest, dist_dir))
@@ -400,7 +391,12 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
     exported_target = request.exported_target
 
     owned_deps = await Get(OwnedDependencies, DependencyOwner(exported_target))
-    targets = Targets(od.target for od in owned_deps)
+    transitive_targets = await Get(TransitiveTargets, Addresses([exported_target.target.address]))
+    # files() targets aren't owned by a single exported target - they aren't code, so
+    # we allow them to be in multiple dists. This is helpful for, e.g., embedding
+    # a standard license file in a dist.
+    files_targets = (tgt for tgt in transitive_targets.closure if tgt.has_field(FilesSources))
+    targets = Targets(itertools.chain((od.target for od in owned_deps), files_targets))
     sources = await Get(SetupPySources, SetupPySourcesRequest(targets, py2=request.py2))
     requirements = await Get(ExportedTargetRequirements, DependencyOwner(exported_target))
 
@@ -434,8 +430,7 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
         binary_entry_point = binary.get(PythonEntryPoint).value
         if not binary_entry_point:
             raise InvalidEntryPoint(
-                f"The binary {key} exported by {target.address.reference()} is not a valid entry "
-                f"point."
+                f"The binary {key} exported by {target.address} is not a valid entry point."
             )
         entry_points = setup_kwargs["entry_points"] = setup_kwargs.get("entry_points", {})
         console_scripts = entry_points["console_scripts"] = entry_points.get("console_scripts", [])
@@ -443,8 +438,7 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
 
     # Generate the setup script.
     setup_py_content = SETUP_BOILERPLATE.format(
-        target_address_spec=target.address.reference(),
-        setup_kwargs_str=distutils_repr(setup_kwargs),
+        target_address_spec=target.address.spec, setup_kwargs_str=distutils_repr(setup_kwargs),
     ).encode()
     extra_files_digest = await Get(
         Digest,
@@ -464,92 +458,42 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
 
 @rule
 async def get_sources(request: SetupPySourcesRequest) -> SetupPySources:
-    targets = request.targets
-    stripped_srcs_list = await MultiGet(
-        Get(
-            SourceRootStrippedSources,
-            StripSourcesFieldRequest(
-                target.get(Sources),
-                for_sources_types=(PythonSources, ResourcesSources),
-                enable_codegen=True,
-            ),
-        )
-        for target in targets
+    python_sources = await Get(
+        StrippedPythonSourceFiles,
+        PythonSourceFilesRequest(
+            targets=request.targets, include_resources=False, include_files=False
+        ),
+    )
+    all_sources = await Get(
+        StrippedPythonSourceFiles,
+        PythonSourceFilesRequest(
+            targets=request.targets, include_resources=True, include_files=True
+        ),
     )
 
-    # Create a chroot with all the sources, and any ancestor __init__.py files that might be needed
-    # for imports to work.  Note that if a repo has multiple exported targets under a single ancestor
-    # package, then that package must be a namespace package, which in Python 3 means it must not
-    # have an __init__.py. We don't validate this here, because it would require inspecting *all*
-    # targets, whether or not they are in the target set for this run - basically the entire repo.
-    # So it's the repo owners' responsibility to ensure __init__.py hygiene.
-    stripped_srcs_digests = [
-        stripped_sources.snapshot.digest for stripped_sources in stripped_srcs_list
-    ]
-    ancestor_init_pys = await Get(AncestorInitPyFiles, Targets, targets)
-    sources_digest = await Get(
-        Digest, MergeDigests((*stripped_srcs_digests, *ancestor_init_pys.digests))
-    )
+    python_files = set(python_sources.stripped_source_files.snapshot.files)
+    all_files = set(all_sources.stripped_source_files.snapshot.files)
+    resource_files = all_files - python_files
+
     init_py_digest_contents = await Get(
-        DigestContents, DigestSubset(sources_digest, PathGlobs(["**/__init__.py"]))
+        DigestContents,
+        DigestSubset(
+            python_sources.stripped_source_files.snapshot.digest, PathGlobs(["**/__init__.py"])
+        ),
     )
 
     packages, namespace_packages, package_data = find_packages(
-        tgts_and_stripped_srcs=list(zip(targets, stripped_srcs_list)),
+        python_files=python_files,
+        resource_files=resource_files,
         init_py_digest_contents=init_py_digest_contents,
         py2=request.py2,
     )
     return SetupPySources(
-        digest=sources_digest,
+        digest=all_sources.stripped_source_files.snapshot.digest,
         packages=packages,
         namespace_packages=namespace_packages,
         package_data=package_data,
     )
-
-
-@rule
-async def get_ancestor_init_py(targets: Targets) -> AncestorInitPyFiles:
-    """Find any ancestor __init__.py files for the given targets.
-
-    Includes sibling __init__.py files. Returns the files stripped of their source roots.
-    """
-    sources = await Get(
-        SourceFiles,
-        AllSourceFilesRequest(
-            (tgt.get(Sources) for tgt in targets),
-            for_sources_types=(PythonSources,),
-            enable_codegen=True,
-        ),
-    )
-    # Find the ancestors of all dirs containing .py files, including those dirs themselves.
-    source_dir_ancestors: Set[Tuple[str, str]] = set()  # Items are (src_root, path incl. src_root).
-    source_roots = await MultiGet(
-        Get(SourceRoot, SourceRootRequest, SourceRootRequest.for_file(path))
-        for path in sources.files
-    )
-    for path, source_root in zip(sources.files, source_roots):
-        source_dir_ancestor = os.path.dirname(path)
-        # Do not allow the repository root to leak (i.e., '.' should not be a package in setup.py).
-        source_root_path = "" if source_root.path == "." else source_root.path
-        while source_dir_ancestor != source_root_path:
-            source_dir_ancestors.add((source_root_path, source_dir_ancestor))
-            source_dir_ancestor = os.path.dirname(source_dir_ancestor)
-
-    source_dir_ancestors_list = list(source_dir_ancestors)  # To force a consistent order.
-
-    # Note that we must MultiGet single globs instead of a a single Get for all the globs, because
-    # we match each result to its originating glob (see use of zip below).
-    ancestor_init_py_digests = await MultiGet(
-        Get(Digest, PathGlobs, PathGlobs([os.path.join(source_dir_ancestor[1], "__init__.py")]))
-        for source_dir_ancestor in source_dir_ancestors_list
-    )
-
-    source_root_stripped_ancestor_init_pys = await MultiGet(
-        Get(Digest, RemovePrefix(digest, source_dir_ancestor[0]))
-        for digest, source_dir_ancestor in zip(ancestor_init_py_digests, source_dir_ancestors_list)
-    )
-
-    return AncestorInitPyFiles(source_root_stripped_ancestor_init_pys)
 
 
 def _is_exported(target: Target) -> bool:
@@ -644,7 +588,7 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
     """
     target = owned_dependency.target
     ancestor_addrs = AscendantAddresses(target.address.spec_path)
-    ancestor_tgts = await Get(Targets, AddressSpecs((ancestor_addrs,)))
+    ancestor_tgts = await Get(Targets, AddressSpecs([ancestor_addrs]))
     # Note that addresses sort by (spec_path, target_name), and all these targets are
     # ancestors of the given target, i.e., their spec_paths are all prefixes. So sorting by
     # address will effectively sort by closeness of ancestry to the given target.
@@ -667,13 +611,13 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
                 sibling = next(exported_ancestor_iter, None)
             if sibling_owners:
                 raise AmbiguousOwnerError(
-                    f"Exporting owners for {target.address.reference()} are "
-                    f"ambiguous. Found {exported_ancestor.address.reference()} and "
+                    f"Exporting owners for {target.address} are "
+                    f"ambiguous. Found {exported_ancestor.address} and "
                     f"{len(sibling_owners)} others: "
-                    f'{", ".join(so.address.reference() for so in sibling_owners)}'
+                    f'{", ".join(so.address.spec for so in sibling_owners)}'
                 )
             return ExportedTarget(owner)
-    raise NoOwnerError(f"No exported target owner found for {target.address.reference()}")
+    raise NoOwnerError(f"No exported target owner found for {target.address}")
 
 
 @rule(desc="Set up setuptools")
@@ -694,11 +638,20 @@ async def setup_setuptools(setuptools: Setuptools) -> SetuptoolsSetup:
 
 def is_ownable_target(tgt: Target, union_membership: UnionMembership) -> bool:
     return (
-        tgt.has_field(PythonSources)
+        # Note that we check for a PythonProvides field so that a python_distribution
+        # target can be owned (by itself). This is so that if there are any 3rdparty
+        # requirements directly on the python_distribution target, we apply them to the dist.
+        # This isn't particularly useful (3rdparty requirements should be on the python_library
+        # that consumes them)... but users may expect it to work anyway.
+        tgt.has_field(PythonProvidesField)
+        or tgt.has_field(PythonSources)
         or tgt.has_field(ResourcesSources)
         or tgt.get(Sources).can_generate(PythonSources, union_membership)
     )
 
 
 def rules():
-    return collect_rules()
+    return [
+        *python_sources_rules(),
+        *collect_rules(),
+    ]

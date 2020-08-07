@@ -1,6 +1,7 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import dataclasses
 import itertools
 import logging
 from dataclasses import dataclass
@@ -33,7 +34,8 @@ class ProductDescription:
 @dataclass(unsafe_hash=True)
 class Process:
     argv: Tuple[str, ...]
-    description: str
+    description: str = dataclasses.field(compare=False)
+    level: LogLevel
     input_digest: Digest
     working_directory: Optional[str]
     env: Tuple[str, ...]
@@ -44,13 +46,13 @@ class Process:
     jdk_home: Optional[str]
     is_nailgunnable: bool
     execution_slot_variable: Optional[str]
-    cache_failures: bool
 
     def __init__(
         self,
         argv: Iterable[str],
         *,
         description: str,
+        level: LogLevel = LogLevel.INFO,
         input_digest: Digest = EMPTY_DIGEST,
         working_directory: Optional[str] = None,
         env: Optional[Mapping[str, str]] = None,
@@ -61,7 +63,6 @@ class Process:
         jdk_home: Optional[str] = None,
         is_nailgunnable: bool = False,
         execution_slot_variable: Optional[str] = None,
-        cache_failures: bool = False,
     ) -> None:
         """Request to run a subprocess, similar to subprocess.Popen.
 
@@ -88,6 +89,7 @@ class Process:
         """
         self.argv = tuple(argv)
         self.description = description
+        self.level = level
         self.input_digest = input_digest
         self.working_directory = working_directory
         self.env = tuple(itertools.chain.from_iterable((env or {}).items()))
@@ -101,7 +103,6 @@ class Process:
         self.jdk_home = jdk_home
         self.is_nailgunnable = is_nailgunnable
         self.execution_slot_variable = execution_slot_variable
-        self.cache_failures = cache_failures
 
 
 @frozen_after_init
@@ -316,10 +317,10 @@ class BinaryPaths(EngineAware):
         self.binary_name = binary_name
         self.paths = tuple(OrderedSet(paths))
 
-    def level(self) -> Optional[LogLevel]:
-        return LogLevel.DEBUG if self.paths else LogLevel.WARN
+    def level(self) -> LogLevel:
+        return LogLevel.DEBUG
 
-    def message(self) -> Optional[str]:
+    def message(self) -> str:
         if not self.paths:
             return f"failed to find {self.binary_name}"
         found_msg = f"found {self.binary_name} at {self.paths[0]}"
@@ -362,6 +363,7 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
         FallibleProcessResult,
         Process(
             description=f"Searching for `{request.binary_name}` on PATH={search_path}",
+            level=LogLevel.DEBUG,
             input_digest=script_digest,
             argv=["/bin/bash", script_path, request.binary_name],
             env={"PATH": search_path},

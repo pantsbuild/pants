@@ -159,7 +159,7 @@ class TestTest(TestBase):
                 return TargetsToValidFieldSets({})
             return TargetsToValidFieldSets(
                 {
-                    tgt_with_origin: [field_set.create(tgt_with_origin)]
+                    tgt_with_origin: [field_set.create(tgt_with_origin.target)]
                     for tgt_with_origin in targets
                 }
             )

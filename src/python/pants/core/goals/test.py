@@ -23,7 +23,7 @@ from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult, InteractiveProcess, InteractiveRunner
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
-    FieldSetWithOrigin,
+    FieldSet,
     Sources,
     TargetsToValidFieldSets,
     TargetsToValidFieldSetsRequest,
@@ -104,7 +104,7 @@ class TestDebugRequest:
 
 
 @union
-class TestFieldSet(FieldSetWithOrigin, metaclass=ABCMeta):
+class TestFieldSet(FieldSet, metaclass=ABCMeta):
     """The fields necessary to run tests on a target."""
 
     sources: Sources
@@ -356,7 +356,7 @@ async def run_tests(
         format_str = f"{{addr:80}}.....{{result:>{right_align}}}"
         console.print_stderr(
             format_str.format(
-                addr=result.address.reference(), result=color(result.test_result.status.value)
+                addr=result.address.spec, result=color(result.test_result.status.value)
             )
         )
 

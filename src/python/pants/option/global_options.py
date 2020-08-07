@@ -359,8 +359,6 @@ class GlobalOptions(Subsystem):
             default=[get_default_pants_config_file()],
             help="Paths to Pants config files.",
         )
-        # TODO: Deprecate the --pantsrc/--pantsrc-files options?  This would require being able
-        # to set extra config file locations in an initial bootstrap config file.
         register(
             "--pantsrc",
             advanced=True,
@@ -415,13 +413,26 @@ class GlobalOptions(Subsystem):
         )
 
         register(
+            "--build-patterns",
+            advanced=True,
+            type=list,
+            default=["BUILD", "BUILD.*"],
+            help=(
+                "The naming scheme for BUILD files, i.e. where you define targets. This only sets "
+                "the naming scheme, not the directory paths to look for. To add ignore"
+                "patterns, use the option `--build-ignore`."
+            ),
+        )
+        register(
             "--build-ignore",
             advanced=True,
             type=list,
             default=[".*/", "bower_components/", "node_modules/", "*.egg-info/"],
-            help="Paths to ignore when identifying BUILD files. "
-            "This does not affect any other filesystem operations. "
-            "Patterns use the gitignore pattern syntax (https://git-scm.com/docs/gitignore).",
+            help=(
+                "Paths to ignore when identifying BUILD files. This does not affect any other "
+                "filesystem operations; use `--pants-ignore` for that instead. Patterns use the "
+                "gitignore pattern syntax (https://git-scm.com/docs/gitignore)."
+            ),
         )
         register(
             "--pants-ignore",
@@ -463,7 +474,15 @@ class GlobalOptions(Subsystem):
             "your machine or when they are ignored by the `--pants-ignore` option.",
         )
 
-        # TODO(#7203): make a regexp option type!
+        register(
+            "--tag",
+            type=list,
+            metavar="[+-]tag1,tag2,...",
+            help=(
+                "Include only targets with these tags (optional '+' prefix) or without these "
+                "tags ('-' prefix). See https://www.pantsbuild.org/docs/advanced-target-selection."
+            ),
+        )
         register(
             "--exclude-target-regexp",
             advanced=True,
@@ -877,13 +896,6 @@ class GlobalOptions(Subsystem):
         # global-scope options, for convenience.
         cls.register_bootstrap_options(register)
 
-        register(
-            "--tag",
-            type=list,
-            metavar="[+-]tag1,tag2,...",
-            help="Include only targets with these tags (optional '+' prefix) or without these "
-            "tags ('-' prefix). See https://www.pantsbuild.org/docs/advanced-target-selection.",
-        )
         register(
             "--dynamic-ui",
             type=bool,

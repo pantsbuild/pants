@@ -7,18 +7,11 @@ from typing import Dict, Optional, Set
 
 from pants.backend.python.target_types import PythonRequirementsField, PythonSources
 from pants.base.specs import AddressSpecs, DescendantAddresses
-from pants.core.util_rules.strip_source_roots import (
-    SourceRootStrippedSources,
-    StripSourcesFieldRequest,
-)
+from pants.core.util_rules.determine_source_files import SourceFilesRequest
+from pants.core.util_rules.strip_source_roots import StrippedSourceFiles
 from pants.engine.addresses import Address
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import (
-    HydratedSources,
-    HydrateSourcesRequest,
-    Targets,
-    generate_subtarget_address,
-)
+from pants.engine.target import Targets
 from pants.util.frozendict import FrozenDict
 
 
@@ -66,35 +59,22 @@ class FirstPartyModuleToAddressMapping:
 
 @rule
 async def map_first_party_modules_to_addresses() -> FirstPartyModuleToAddressMapping:
-    all_explicit_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
-    candidate_explicit_targets = tuple(
-        tgt for tgt in all_explicit_targets if tgt.has_field(PythonSources)
-    )
-    unstripped_sources_per_explicit_target = await MultiGet(
-        Get(HydratedSources, HydrateSourcesRequest(tgt[PythonSources]))
-        for tgt in candidate_explicit_targets
-    )
+    all_expanded_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
+    candidate_targets = tuple(tgt for tgt in all_expanded_targets if tgt.has_field(PythonSources))
     stripped_sources_per_explicit_target = await MultiGet(
-        Get(SourceRootStrippedSources, StripSourcesFieldRequest(tgt[PythonSources]))
-        for tgt in candidate_explicit_targets
+        Get(StrippedSourceFiles, SourceFilesRequest([tgt[PythonSources]]))
+        for tgt in candidate_targets
     )
+
     modules_to_addresses: Dict[str, Address] = {}
     modules_with_multiple_owners: Set[str] = set()
-    for explicit_tgt, unstripped_sources, stripped_sources in zip(
-        candidate_explicit_targets,
-        unstripped_sources_per_explicit_target,
-        stripped_sources_per_explicit_target,
-    ):
-        for unstripped_f, stripped_f in zip(
-            unstripped_sources.snapshot.files, stripped_sources.snapshot.files
-        ):
+    for tgt, stripped_sources in zip(candidate_targets, stripped_sources_per_explicit_target):
+        for stripped_f in stripped_sources.snapshot.files:
             module = PythonModule.create_from_stripped_path(PurePath(stripped_f)).module
             if module in modules_to_addresses:
                 modules_with_multiple_owners.add(module)
             else:
-                modules_to_addresses[module] = generate_subtarget_address(
-                    explicit_tgt.address, full_file_name=unstripped_f
-                )
+                modules_to_addresses[module] = tgt.address
 
     # Remove modules with ambiguous owners.
     for module in modules_with_multiple_owners:

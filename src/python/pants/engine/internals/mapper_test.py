@@ -8,15 +8,20 @@ import pytest
 from pants.base.exceptions import DuplicateNameError
 from pants.build_graph.address import Address
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.engine.internals.mapper import AddressFamily, AddressMap, DifferingFamiliesError
-from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, SymbolTable
+from pants.engine.internals.mapper import (
+    AddressFamily,
+    AddressMap,
+    AddressMapper,
+    DifferingFamiliesError,
+)
+from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.util.frozendict import FrozenDict
 
 
 def parse_address_map(build_file: str) -> AddressMap:
     path = "/dev/null"
-    parser = Parser(SymbolTable({"thing": TargetAdaptor}), BuildFileAliases())
+    parser = Parser(target_type_aliases=["thing"], object_aliases=BuildFileAliases())
     address_map = AddressMap.parse(path, build_file, parser, BuildFilePreludeSymbols(FrozenDict()))
     assert path == address_map.path
     return address_map
@@ -66,7 +71,7 @@ def test_address_family_create_single() -> None:
     assert {
         Address.parse("//:one"): TargetAdaptor(type_alias="thing", name="one", age=42),
         Address.parse("//:two"): TargetAdaptor(type_alias="thing", name="two", age=37),
-    } == address_family.addressables
+    } == dict(address_family.addresses_to_target_adaptors.items())
 
 
 def test_address_family_create_multiple() -> None:
@@ -86,13 +91,14 @@ def test_address_family_create_multiple() -> None:
     assert {
         Address.parse("name/space:one"): TargetAdaptor(type_alias="thing", name="one", age=42),
         Address.parse("name/space:two"): TargetAdaptor(type_alias="thing", name="two", age=37),
-    } == address_family.addressables
+    } == dict(address_family.addresses_to_target_adaptors.items())
 
 
 def test_address_family_create_empty() -> None:
     # Case where directory exists but is empty.
     address_family = AddressFamily.create("name/space", [])
-    assert {} == address_family.addressables
+    assert {} == address_family.addresses_to_target_adaptors
+    assert () == address_family.build_file_addresses
 
 
 def test_address_family_mismatching_paths() -> None:
@@ -115,3 +121,27 @@ def test_address_family_duplicate_names() -> None:
                 ),
             ],
         )
+
+
+def test_match_filter_options() -> None:
+    def make_target(target_name: str, **kwargs) -> TargetAdaptor:
+        parsed_address = Address("", target_name=target_name)
+        return TargetAdaptor(
+            type_alias="", name=parsed_address.target_name, address=parsed_address, **kwargs
+        )
+
+    untagged_target = make_target(target_name="//:untagged")
+    b_tagged_target = make_target(target_name="//:b-tagged", tags=["b"])
+    a_and_b_tagged_target = make_target(target_name="//:a-and-b-tagged", tags=["a", "b"])
+    none_tagged_target = make_target(target_name="//:none-tagged-target", tags=None)
+
+    parser = Parser(target_type_aliases=[], object_aliases=BuildFileAliases())
+    mapper = AddressMapper(parser, tags=["-a", "+b"])
+
+    def matches(tgt: TargetAdaptor) -> bool:
+        return mapper.matches_filter_options(tgt.kwargs["address"], tgt)
+
+    assert matches(untagged_target) is False
+    assert matches(b_tagged_target) is True
+    assert matches(a_and_b_tagged_target) is False
+    assert matches(none_tagged_target) is False

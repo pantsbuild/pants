@@ -1,7 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.backend.python.rules import pex, pex_from_targets, python_sources
+from pants.backend.python.rules import ancestor_files, pex, pex_from_targets, python_sources
 from pants.backend.python.rules import repl as python_repl
 from pants.backend.python.rules.repl import PythonRepl
 from pants.backend.python.target_types import PythonLibrary
@@ -28,6 +28,7 @@ class ReplTest(GoalRuleTestBase):
             *python_sources.rules(),
             *pex_from_targets.rules(),
             *strip_source_roots.rules(),
+            *ancestor_files.rules(),
             RootRule(PythonRepl),
         )
 

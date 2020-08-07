@@ -4,7 +4,6 @@
 from dataclasses import dataclass
 from typing import Tuple
 
-from pants.backend.python.rules import pex, python_sources
 from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
@@ -12,10 +11,9 @@ from pants.backend.python.rules.pex import (
     PexRequest,
     PexRequirements,
 )
-from pants.backend.python.rules.python_sources import (
-    UnstrippedPythonSources,
-    UnstrippedPythonSourcesRequest,
-)
+from pants.backend.python.rules.pex import rules as pex_rules
+from pants.backend.python.rules.python_sources import PythonSourceFiles, PythonSourceFilesRequest
+from pants.backend.python.rules.python_sources import rules as python_sources_rules
 from pants.backend.python.target_types import PythonSources
 from pants.backend.python.typecheck.mypy.subsystem import MyPy
 from pants.core.goals.typecheck import TypecheckRequest, TypecheckResult, TypecheckResults
@@ -58,8 +56,8 @@ def generate_args(mypy: MyPy, *, file_list_path: str) -> Tuple[str, ...]:
 
 # TODO(#10131): Improve performance, e.g. by leveraging the MyPy cache.
 # TODO(#10131): Support plugins and type stubs.
-@rule(desc="Lint using MyPy")
-async def mypy_lint(request: MyPyRequest, mypy: MyPy) -> TypecheckResults:
+@rule(desc="Typecheck using MyPy")
+async def mypy_typecheck(request: MyPyRequest, mypy: MyPy) -> TypecheckResults:
     if mypy.skip:
         return TypecheckResults()
 
@@ -68,7 +66,7 @@ async def mypy_lint(request: MyPyRequest, mypy: MyPy) -> TypecheckResults:
     )
 
     prepared_sources_request = Get(
-        UnstrippedPythonSources, UnstrippedPythonSourcesRequest(transitive_targets.closure),
+        PythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure),
     )
     pex_request = Get(
         Pex,
@@ -97,17 +95,15 @@ async def mypy_lint(request: MyPyRequest, mypy: MyPy) -> TypecheckResults:
         prepared_sources_request, pex_request, config_digest_request
     )
 
+    srcs_snapshot = prepared_sources.source_files.snapshot
     file_list_path = "__files.txt"
-    python_files = "\n".join(f for f in prepared_sources.snapshot.files if f.endswith(".py"))
+    python_files = "\n".join(f for f in srcs_snapshot.files if f.endswith(".py"))
     file_list_digest = await Get(
         Digest, CreateDigest([FileContent(file_list_path, python_files.encode())]),
     )
 
     merged_input_files = await Get(
-        Digest,
-        MergeDigests(
-            [file_list_digest, prepared_sources.snapshot.digest, pex.digest, config_digest]
-        ),
+        Digest, MergeDigests([file_list_digest, srcs_snapshot.digest, pex.digest, config_digest]),
     )
 
     result = await Get(
@@ -117,7 +113,7 @@ async def mypy_lint(request: MyPyRequest, mypy: MyPy) -> TypecheckResults:
             argv=generate_args(mypy, file_list_path=file_list_path),
             input_digest=merged_input_files,
             extra_env={"PEX_EXTRA_SYS_PATH": ":".join(prepared_sources.source_roots)},
-            description=f"Run MyPy on {pluralize(len(prepared_sources.snapshot.files), 'file')}.",
+            description=f"Run MyPy on {pluralize(len(srcs_snapshot.files), 'file')}.",
         ),
     )
     return TypecheckResults(
@@ -131,7 +127,7 @@ def rules():
         UnionRule(TypecheckRequest, MyPyRequest),
         *determine_source_files.rules(),
         *pants_bin.rules(),
-        *pex.rules(),
-        *python_sources.rules(),
+        *pex_rules(),
+        *python_sources_rules(),
         *strip_source_roots.rules(),
     ]

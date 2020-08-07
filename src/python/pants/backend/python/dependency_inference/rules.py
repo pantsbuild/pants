@@ -9,13 +9,11 @@ from pants.backend.python.dependency_inference import module_mapper
 from pants.backend.python.dependency_inference.import_parser import find_python_imports
 from pants.backend.python.dependency_inference.module_mapper import PythonModule, PythonModuleOwner
 from pants.backend.python.dependency_inference.python_stdlib.combined import combined_stdlib
-from pants.backend.python.rules import inject_ancestor_files
-from pants.backend.python.rules.inject_ancestor_files import AncestorFiles, AncestorFilesRequest
+from pants.backend.python.rules import ancestor_files
+from pants.backend.python.rules.ancestor_files import AncestorFiles, AncestorFilesRequest
 from pants.backend.python.target_types import PythonSources, PythonTestsSources
-from pants.core.util_rules.strip_source_roots import (
-    SourceRootStrippedSources,
-    StripSourcesFieldRequest,
-)
+from pants.core.util_rules.determine_source_files import SourceFilesRequest
+from pants.core.util_rules.strip_source_roots import StrippedSourceFiles
 from pants.engine.fs import Digest, DigestContents
 from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -40,7 +38,7 @@ class PythonInference(Subsystem):
         super().register_options(register)
         register(
             "--imports",
-            default=False,
+            default=True,
             type=bool,
             help=(
                 "Infer a target's imported dependencies by parsing import statements from sources."
@@ -52,7 +50,10 @@ class PythonInference(Subsystem):
             type=bool,
             help=(
                 "Infer a target's dependencies on any __init__.py files existing for the packages "
-                "it is located in (recursively upward in the directory structure)."
+                "it is located in (recursively upward in the directory structure). Regardless of "
+                "whether inference is disabled, empty ancestor __init__.py files will still be "
+                "included even without an explicit dependency, but ones containing any code (even "
+                "just comments) will not, and must be brought in via an explicit dependency."
             ),
         )
         register(
@@ -88,9 +89,7 @@ async def infer_python_dependencies(
     if not python_inference.imports:
         return InferredDependencies()
 
-    stripped_sources = await Get(
-        SourceRootStrippedSources, StripSourcesFieldRequest(request.sources_field)
-    )
+    stripped_sources = await Get(StrippedSourceFiles, SourceFilesRequest([request.sources_field]))
     modules = tuple(
         PythonModule.create_from_stripped_path(PurePath(fp))
         for fp in stripped_sources.snapshot.files
@@ -130,14 +129,15 @@ async def infer_python_init_dependencies(
     # Locate __init__.py files not already in the Snapshot.
     hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.sources_field))
     extra_init_files = await Get(
-        AncestorFiles,
-        AncestorFilesRequest("__init__.py", hydrated_sources.snapshot, sources_stripped=False),
+        AncestorFiles, AncestorFilesRequest("__init__.py", hydrated_sources.snapshot),
     )
 
     # And add dependencies on their owners.
+    # NB: Because the python_sources rules always locate __init__.py files, and will trigger an
+    # error for files that have content but have not already been included via a dependency, we
+    # don't need to error for unowned files here.
     owners = await MultiGet(
-        Get(Owners, OwnersRequest((f,), OwnersNotFoundBehavior.error))
-        for f in extra_init_files.snapshot.files
+        Get(Owners, OwnersRequest((f,))) for f in extra_init_files.snapshot.files
     )
     return InferredDependencies(itertools.chain.from_iterable(owners))
 
@@ -156,11 +156,11 @@ async def infer_python_conftest_dependencies(
     # Locate conftest.py files not already in the Snapshot.
     hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.sources_field))
     extra_conftest_files = await Get(
-        AncestorFiles,
-        AncestorFilesRequest("conftest.py", hydrated_sources.snapshot, sources_stripped=False),
+        AncestorFiles, AncestorFilesRequest("conftest.py", hydrated_sources.snapshot),
     )
 
     # And add dependencies on their owners.
+    # NB: Because conftest.py files effectively always have content, we require an owning target.
     owners = await MultiGet(
         Get(Owners, OwnersRequest((f,), OwnersNotFoundBehavior.error))
         for f in extra_conftest_files.snapshot.files
@@ -171,7 +171,7 @@ async def infer_python_conftest_dependencies(
 def rules():
     return [
         *collect_rules(),
-        *inject_ancestor_files.rules(),
+        *ancestor_files.rules(),
         *module_mapper.rules(),
         UnionRule(InferDependenciesRequest, InferPythonDependencies),
         UnionRule(InferDependenciesRequest, InferInitDependencies),

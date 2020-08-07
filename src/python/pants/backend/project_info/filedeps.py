@@ -17,6 +17,7 @@ from pants.engine.target import (
     Target,
     Targets,
     TransitiveTargets,
+    UnexpandedTargets,
 )
 
 
@@ -84,6 +85,8 @@ async def file_deps(
     if filedeps_subsystem.transitive:
         transitive_targets = await Get(TransitiveTargets, Addresses, addresses)
         targets = transitive_targets.closure
+    elif filedeps_subsystem.globs:
+        targets = await Get(UnexpandedTargets, Addresses, addresses)
     else:
         targets = await Get(Targets, Addresses, addresses)
 

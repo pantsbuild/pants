@@ -14,10 +14,7 @@ from pants.backend.python.rules.pex import (
     PexRequest,
     PexRequirements,
 )
-from pants.backend.python.rules.python_sources import (
-    UnstrippedPythonSources,
-    UnstrippedPythonSourcesRequest,
-)
+from pants.backend.python.rules.python_sources import PythonSourceFiles, PythonSourceFilesRequest
 from pants.backend.python.subsystems.python_tool_base import PythonToolBase
 from pants.core.goals.test import (
     ConsoleCoverageReport,
@@ -247,8 +244,8 @@ async def generate_coverage_reports(
 ) -> CoverageReports:
     """Takes all Python test results and generates a single coverage report."""
     sources = await Get(
-        UnstrippedPythonSources,
-        UnstrippedPythonSourcesRequest(transitive_targets.closure, include_resources=False),
+        PythonSourceFiles,
+        PythonSourceFilesRequest(transitive_targets.closure, include_resources=False),
     )
     input_digest = await Get(
         Digest,
@@ -257,7 +254,7 @@ async def generate_coverage_reports(
                 merged_coverage_data.coverage_data,
                 coverage_config.digest,
                 coverage_setup.pex.digest,
-                sources.snapshot.digest,
+                sources.source_files.snapshot.digest,
             )
         ),
     )

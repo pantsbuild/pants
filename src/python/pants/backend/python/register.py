@@ -11,9 +11,9 @@ from pants.backend.python.pants_requirement import PantsRequirement
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.python_requirements import PythonRequirements
 from pants.backend.python.rules import (
+    ancestor_files,
     coverage,
     create_python_binary,
-    inject_ancestor_files,
     pex,
     pex_cli,
     pex_environment,
@@ -27,6 +27,7 @@ from pants.backend.python.rules import (
 from pants.backend.python.subsystems import python_native_code, subprocess_environment
 from pants.backend.python.target_types import (
     PythonBinary,
+    PythonDistribution,
     PythonLibrary,
     PythonRequirementLibrary,
     PythonRequirementsFile,
@@ -53,7 +54,7 @@ def build_file_aliases():
 def rules():
     return (
         *coverage.rules(),
-        *inject_ancestor_files.rules(),
+        *ancestor_files.rules(),
         *python_sources.rules(),
         *dependency_inference_rules.rules(),
         *pex.rules(),
@@ -73,6 +74,7 @@ def rules():
 def target_types():
     return [
         PythonBinary,
+        PythonDistribution,
         PythonLibrary,
         PythonRequirementLibrary,
         PythonRequirementsFile,

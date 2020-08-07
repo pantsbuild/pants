@@ -9,13 +9,12 @@ from pants.backend.python.lint.pylint.plugin_target_type import PylintSourcePlug
 from pants.backend.python.lint.pylint.rules import PylintFieldSet, PylintRequest
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
-from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.lint import LintResults
 from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
 from pants.engine.rules import RootRule
-from pants.engine.target import TargetWithOrigin, WrappedTarget
+from pants.engine.target import Target, WrappedTarget
 from pants.python.python_requirement import PythonRequirement
 from pants.testutil.engine.util import Params
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
@@ -44,16 +43,15 @@ class PylintIntegrationTest(ExternalToolTestBase):
     def rules(cls):
         return (*super().rules(), *pylint_rules(), RootRule(PylintRequest))
 
-    def make_target_with_origin(
+    def make_target(
         self,
         source_files: List[FileContent],
         *,
         package: Optional[str] = None,
         name: str = "target",
         interpreter_constraints: Optional[str] = None,
-        origin: Optional[OriginSpec] = None,
         dependencies: Optional[List[Address]] = None,
-    ) -> TargetWithOrigin:
+    ) -> Target:
         if not package:
             package = self.package
         for source_file in source_files:
@@ -72,14 +70,11 @@ class PylintIntegrationTest(ExternalToolTestBase):
                 """
             ),
         )
-        target = self.request_single_product(WrappedTarget, Address(package, name)).target
-        if origin is None:
-            origin = SingleAddress(directory=package, name=name)
-        return TargetWithOrigin(target, origin)
+        return self.request_single_product(WrappedTarget, Address(package, target_name=name)).target
 
     def run_pylint(
         self,
-        targets: List[TargetWithOrigin],
+        targets: List[Target],
         *,
         config: Optional[str] = None,
         passthrough_args: Optional[str] = None,
@@ -108,21 +103,21 @@ class PylintIntegrationTest(ExternalToolTestBase):
         )
 
     def test_passing_source(self) -> None:
-        target = self.make_target_with_origin([self.good_source])
+        target = self.make_target([self.good_source])
         result = self.run_pylint([target])
         assert len(result) == 1
         assert result[0].exit_code == 0
         assert "Your code has been rated at 10.00/10" in result[0].stdout.strip()
 
     def test_failing_source(self) -> None:
-        target = self.make_target_with_origin([self.bad_source])
+        target = self.make_target([self.bad_source])
         result = self.run_pylint([target])
         assert len(result) == 1
         assert result[0].exit_code == PYLINT_FAILURE_RETURN_CODE
         assert f"{self.package}/bad.py:2:0: C0103" in result[0].stdout
 
     def test_mixed_sources(self) -> None:
-        target = self.make_target_with_origin([self.good_source, self.bad_source])
+        target = self.make_target([self.good_source, self.bad_source])
         result = self.run_pylint([target])
         assert len(result) == 1
         assert result[0].exit_code == PYLINT_FAILURE_RETURN_CODE
@@ -131,8 +126,8 @@ class PylintIntegrationTest(ExternalToolTestBase):
 
     def test_multiple_targets(self) -> None:
         targets = [
-            self.make_target_with_origin([self.good_source], name="t1"),
-            self.make_target_with_origin([self.bad_source], name="t2"),
+            self.make_target([self.good_source], name="t1"),
+            self.make_target([self.bad_source], name="t2"),
         ]
         result = self.run_pylint(targets)
         assert len(result) == 1
@@ -140,22 +135,13 @@ class PylintIntegrationTest(ExternalToolTestBase):
         assert f"{self.package}/good.py" not in result[0].stdout
         assert f"{self.package}/bad.py:2:0: C0103" in result[0].stdout
 
-    def test_precise_file_args(self) -> None:
-        target = self.make_target_with_origin(
-            [self.good_source, self.bad_source], origin=FilesystemLiteralSpec(self.good_source.path)
-        )
-        result = self.run_pylint([target])
-        assert len(result) == 1
-        assert result[0].exit_code == 0
-        assert "Your code has been rated at 10.00/10" in result[0].stdout.strip()
-
     @skip_unless_python27_and_python3_present
     def test_uses_correct_python_version(self) -> None:
         py2_args = [
             "--pylint-version=pylint<2",
             "--pylint-extra-requirements=['setuptools<45', 'isort>=4.3.21,<4.4']",
         ]
-        py2_target = self.make_target_with_origin(
+        py2_target = self.make_target(
             [self.py3_only_source], name="py2", interpreter_constraints="CPython==2.7.*"
         )
         py2_result = self.run_pylint([py2_target], additional_args=py2_args)
@@ -163,8 +149,12 @@ class PylintIntegrationTest(ExternalToolTestBase):
         assert py2_result[0].exit_code == 2
         assert "invalid syntax (<string>, line 2) (syntax-error)" in py2_result[0].stdout
 
-        py3_target = self.make_target_with_origin(
-            [self.py3_only_source], name="py3", interpreter_constraints="CPython>=3.6"
+        py3_target = self.make_target(
+            [self.py3_only_source],
+            name="py3",
+            # NB: Avoid Python 3.8+ for this test due to issues with asteroid/ast.
+            # See https://github.com/pantsbuild/pants/issues/10547.
+            interpreter_constraints="CPython>=3.6,<3.8",
         )
         py3_result = self.run_pylint([py3_target])
         assert len(py3_result) == 1
@@ -182,14 +172,14 @@ class PylintIntegrationTest(ExternalToolTestBase):
         assert "Your code has been rated at 10.00/10" in batched_py3_result.stdout.strip()
 
     def test_respects_config_file(self) -> None:
-        target = self.make_target_with_origin([self.bad_source])
+        target = self.make_target([self.bad_source])
         result = self.run_pylint([target], config="[pylint]\ndisable = C0103\n")
         assert len(result) == 1
         assert result[0].exit_code == 0
         assert "Your code has been rated at 10.00/10" in result[0].stdout.strip()
 
     def test_respects_passthrough_args(self) -> None:
-        target = self.make_target_with_origin([self.bad_source])
+        target = self.make_target([self.bad_source])
         result = self.run_pylint([target], passthrough_args="--disable=C0103")
         assert len(result) == 1
         assert result[0].exit_code == 0
@@ -247,9 +237,12 @@ class PylintIntegrationTest(ExternalToolTestBase):
             print(green(THIS_VARIABLE_EXISTS))
             """
         )
-        target = self.make_target_with_origin(
+        target = self.make_target(
             source_files=[FileContent(f"{self.package}/target.py", source_content.encode())],
-            dependencies=[Address(self.package, "direct_dep"), Address("", "direct_req")],
+            dependencies=[
+                Address(self.package, target_name="direct_dep"),
+                Address("", target_name="direct_req"),
+            ],
         )
 
         result = self.run_pylint([target])
@@ -258,7 +251,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
         assert "Your code has been rated at 10.00/10" in result[0].stdout.strip()
 
     def test_skip(self) -> None:
-        target = self.make_target_with_origin([self.bad_source])
+        target = self.make_target([self.bad_source])
         result = self.run_pylint([target], skip=True)
         assert not result
 
@@ -276,8 +269,8 @@ class PylintIntegrationTest(ExternalToolTestBase):
             ).encode(),
         )
         targets = [
-            self.make_target_with_origin([self.good_source]),
-            self.make_target_with_origin(
+            self.make_target([self.good_source]),
+            self.make_target(
                 [test_fc],
                 package="tests/python/project",
                 dependencies=[Address.parse(f"{self.package}:target")],
@@ -303,7 +296,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
                     self.assertEqual(True, True)
             """
         )
-        target = self.make_target_with_origin(
+        target = self.make_target(
             [FileContent(f"{self.package}/thirdparty_plugin.py", source_content.encode())]
         )
         result = self.run_pylint(
@@ -392,7 +385,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
             load-plugins=print_plugin
             """
         )
-        target = self.make_target_with_origin(
+        target = self.make_target(
             [FileContent(f"{self.package}/source_plugin.py", b"'''Docstring.'''\nprint()\n")]
         )
         result = self.run_pylint(

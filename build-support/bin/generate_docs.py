@@ -27,7 +27,8 @@ class ReferenceGenerator:
     ./pants \
       --backend-packages="-['internal_backend.rules_for_testing', 'internal_backend.utilities']" \
       --backend-packages="+['pants.backend.python.lint.bandit', \
-        'pants.backend.python.lint.pylint', 'pants.backend.codegen.protobuf.python']" \
+        'pants.backend.python.lint.pylint', 'pants.backend.codegen.protobuf.python', \
+        'pants.backend.awslambda.python']" \
       --no-verify-config help-all > /tmp/help_info
 
     to generate the data, and then:

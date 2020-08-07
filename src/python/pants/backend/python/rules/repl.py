@@ -3,10 +3,7 @@
 
 from pants.backend.python.rules.pex import Pex
 from pants.backend.python.rules.pex_from_targets import PexFromTargetsRequest
-from pants.backend.python.rules.python_sources import (
-    UnstrippedPythonSources,
-    UnstrippedPythonSourcesRequest,
-)
+from pants.backend.python.rules.python_sources import PythonSourceFiles, PythonSourceFilesRequest
 from pants.backend.python.subsystems.ipython import IPython
 from pants.backend.python.target_types import PythonSources
 from pants.core.goals.repl import ReplImplementation, ReplRequest
@@ -31,15 +28,15 @@ async def create_python_repl_request(repl: PythonRepl) -> ReplRequest:
             include_source_files=False,
         ),
     )
-    source_files_request = Get(
-        UnstrippedPythonSources, UnstrippedPythonSourcesRequest(repl.targets)
+    sources_request = Get(PythonSourceFiles, PythonSourceFilesRequest(repl.targets))
+    pex, sources = await MultiGet(pex_request, sources_request)
+    merged_digest = await Get(
+        Digest, MergeDigests((pex.digest, sources.source_files.snapshot.digest))
     )
-    pex, source_files = await MultiGet(pex_request, source_files_request)
-    merged_digest = await Get(Digest, MergeDigests((pex.digest, source_files.snapshot.digest)))
     return ReplRequest(
         digest=merged_digest,
         binary_name=pex.name,
-        env={"PEX_EXTRA_SYS_PATH": ":".join(source_files.source_roots)},
+        env={"PEX_EXTRA_SYS_PATH": ":".join(sources.source_roots)},
     )
 
 
@@ -61,15 +58,15 @@ async def create_ipython_repl_request(repl: IPythonRepl, ipython: IPython) -> Re
             include_source_files=True,
         ),
     )
-    source_files_request = Get(
-        UnstrippedPythonSources, UnstrippedPythonSourcesRequest(repl.targets)
+    sources_request = Get(PythonSourceFiles, PythonSourceFilesRequest(repl.targets))
+    pex, sources = await MultiGet(pex_request, sources_request)
+    merged_digest = await Get(
+        Digest, MergeDigests((pex.digest, sources.source_files.snapshot.digest))
     )
-    pex, source_files = await MultiGet(pex_request, source_files_request)
-    merged_digest = await Get(Digest, MergeDigests((pex.digest, source_files.snapshot.digest)))
     return ReplRequest(
         digest=merged_digest,
         binary_name=pex.name,
-        env={"PEX_EXTRA_SYS_PATH": ":".join(source_files.source_roots)},
+        env={"PEX_EXTRA_SYS_PATH": ":".join(sources.source_roots)},
     )
 
 

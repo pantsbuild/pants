@@ -84,18 +84,13 @@ class DependenciesIntegrationTest(GoalRuleTestBase):
         self.assert_dependencies(
             specs=["some/other/target"],
             dependency_type=DependencyType.SOURCE,
-            expected=["3rdparty/python:req2", "some/target:target"],
+            expected=["3rdparty/python:req2", "some/target"],
         )
         self.assert_dependencies(
             specs=["some/other/target"],
             transitive=True,
             dependency_type=DependencyType.SOURCE,
-            expected=[
-                "3rdparty/python:req2",
-                "some/target:target",
-                "3rdparty/python:req1",
-                "dep/target:target",
-            ],
+            expected=["3rdparty/python:req2", "some/target", "3rdparty/python:req1", "dep/target",],
         )
 
         # `--type=3rdparty`
@@ -116,15 +111,15 @@ class DependenciesIntegrationTest(GoalRuleTestBase):
             specs=["some/other/target"],
             transitive=False,
             dependency_type=DependencyType.SOURCE_AND_THIRD_PARTY,
-            expected=["3rdparty/python:req2", "some/target:target", "req2==1.0.0"],
+            expected=["3rdparty/python:req2", "some/target", "req2==1.0.0"],
         )
         self.assert_dependencies(
             specs=["some/other/target"],
             transitive=True,
             dependency_type=DependencyType.SOURCE_AND_THIRD_PARTY,
             expected=[
-                "some/target:target",
-                "dep/target:target",
+                "some/target",
+                "dep/target",
                 "3rdparty/python:req1",
                 "3rdparty/python:req2",
                 "req1==1.0.0",
@@ -136,20 +131,10 @@ class DependenciesIntegrationTest(GoalRuleTestBase):
         # on it.
         self.assert_dependencies(
             specs=["::"],
-            expected=[
-                "3rdparty/python:req1",
-                "3rdparty/python:req2",
-                "dep/target:target",
-                "some/target:target",
-            ],
+            expected=["3rdparty/python:req1", "3rdparty/python:req2", "dep/target", "some/target",],
         )
         self.assert_dependencies(
             specs=["::"],
             transitive=True,
-            expected=[
-                "3rdparty/python:req1",
-                "3rdparty/python:req2",
-                "dep/target:target",
-                "some/target:target",
-            ],
+            expected=["3rdparty/python:req1", "3rdparty/python:req2", "dep/target", "some/target",],
         )

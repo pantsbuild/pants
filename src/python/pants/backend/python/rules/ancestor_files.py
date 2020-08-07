@@ -1,16 +1,12 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import itertools
 import os
 from dataclasses import dataclass
-from pathlib import PurePath
 from typing import Sequence, Set
 
-from pants.core.util_rules.strip_source_roots import SourceRootStrippedSources, StripSnapshotRequest
 from pants.engine.fs import EMPTY_SNAPSHOT, PathGlobs, Snapshot
 from pants.engine.rules import Get, collect_rules, rule
-from pants.source.source_root import AllSourceRoots
 from pants.util.ordered_set import FrozenOrderedSet
 
 
@@ -31,7 +27,6 @@ class AncestorFilesRequest:
 
     name: str
     snapshot: Snapshot
-    sources_stripped: bool  # True iff snapshot has already had source roots stripped.
 
 
 @dataclass(frozen=True)
@@ -44,11 +39,10 @@ class AncestorFiles:
 def identify_missing_ancestor_files(name: str, sources: Sequence[str]) -> FrozenOrderedSet[str]:
     """Return the paths of potentially missing ancestor files.
 
-    NB: If the sources have not had their source roots (e.g., 'src/python') stripped, this
-    function will consider superfluous files at and above the source roots, (e.g.,
-    src/python/<name>, src/<name>). It is the caller's responsibility to filter these
-    out if necessary. If the sources have had their source roots stripped, then this function
-    will only identify consider files in actual packages.
+    NB: The sources are expected to not have had their source roots stripped.
+    Therefore this function will consider superfluous files at and above the source roots,
+    (e.g., src/python/<name>, src/<name>). It is the caller's responsibility to filter these
+    out if necessary.
     """
     packages: Set[str] = set()
     for source in sources:
@@ -68,32 +62,14 @@ def identify_missing_ancestor_files(name: str, sources: Sequence[str]) -> Frozen
 
 
 @rule
-async def find_missing_ancestor_files(
-    request: AncestorFilesRequest, all_source_roots: AllSourceRoots
-) -> AncestorFiles:
+async def find_missing_ancestor_files(request: AncestorFilesRequest) -> AncestorFiles:
     """Find any named ancestor files that exist on the filesystem but are not in the snapshot."""
     missing_ancestor_files = identify_missing_ancestor_files(request.name, request.snapshot.files)
     if not missing_ancestor_files:
         return AncestorFiles(EMPTY_SNAPSHOT)
 
-    if request.sources_stripped:
-        # If files are stripped, we don't know what source root they might live in, so we look
-        # up every source root.
-        roots = tuple(root.path for root in all_source_roots)
-        missing_ancestor_files = FrozenOrderedSet(
-            PurePath(root, f).as_posix()
-            for root, f in itertools.product(roots, missing_ancestor_files)
-        )
-
     # NB: This will intentionally _not_ error on any unmatched globs.
     discovered_ancestors_snapshot = await Get(Snapshot, PathGlobs(missing_ancestor_files))
-    if request.sources_stripped:
-        # We must now strip all discovered paths.
-        stripped_snapshot = await Get(
-            SourceRootStrippedSources, StripSnapshotRequest(discovered_ancestors_snapshot)
-        )
-        discovered_ancestors_snapshot = stripped_snapshot.snapshot
-
     return AncestorFiles(discovered_ancestors_snapshot)
 
 

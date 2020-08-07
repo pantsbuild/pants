@@ -22,11 +22,7 @@ from pants.core.goals.lint import (
     LintSubsystem,
 )
 from pants.core.util_rules import determine_source_files, strip_source_roots
-from pants.core.util_rules.determine_source_files import (
-    AllSourceFilesRequest,
-    SourceFiles,
-    SpecifiedSourceFilesRequest,
-)
+from pants.core.util_rules.determine_source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import (
     Digest,
     DigestSubset,
@@ -37,14 +33,14 @@ from pants.engine.fs import (
 )
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import FieldSetWithOrigin
+from pants.engine.target import FieldSet
 from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
 from pants.util.strutil import pluralize
 
 
 @dataclass(frozen=True)
-class BanditFieldSet(FieldSetWithOrigin):
+class BanditFieldSet(FieldSet):
     required_fields = (PythonSources,)
 
     sources: PythonSources
@@ -62,7 +58,7 @@ class BanditPartition:
 
 
 def generate_args(
-    *, specified_source_files: SourceFiles, bandit: Bandit, output_file: Optional[str]
+    *, source_files: SourceFiles, bandit: Bandit, output_file: Optional[str]
 ) -> Tuple[str, ...]:
     args = []
     if bandit.config is not None:
@@ -70,7 +66,7 @@ def generate_args(
     if output_file:
         args.append(f"--output={output_file}")
     args.extend(bandit.args)
-    args.extend(specified_source_files.files)
+    args.extend(source_files.files)
     return tuple(args)
 
 
@@ -101,36 +97,26 @@ async def bandit_lint_partition(
         ),
     )
 
-    all_source_files_request = Get(
-        SourceFiles, AllSourceFilesRequest(field_set.sources for field_set in partition.field_sets)
-    )
-    specified_source_files_request = Get(
-        SourceFiles,
-        SpecifiedSourceFilesRequest(
-            (field_set.sources, field_set.origin) for field_set in partition.field_sets
-        ),
+    source_files_request = Get(
+        SourceFiles, SourceFilesRequest(field_set.sources for field_set in partition.field_sets)
     )
 
-    requirements_pex, config_digest, all_source_files, specified_source_files = await MultiGet(
-        requirements_pex_request,
-        config_digest_request,
-        all_source_files_request,
-        specified_source_files_request,
+    requirements_pex, config_digest, source_files = await MultiGet(
+        requirements_pex_request, config_digest_request, source_files_request
     )
 
     input_digest = await Get(
-        Digest,
-        MergeDigests((all_source_files.snapshot.digest, requirements_pex.digest, config_digest)),
+        Digest, MergeDigests((source_files.snapshot.digest, requirements_pex.digest, config_digest))
     )
 
     address_references = ", ".join(
-        sorted(field_set.address.reference() for field_set in partition.field_sets)
+        sorted(field_set.address.spec for field_set in partition.field_sets)
     )
     report_path = (
         lint_subsystem.reports_dir / "bandit_report.txt" if lint_subsystem.reports_dir else None
     )
     args = generate_args(
-        specified_source_files=specified_source_files,
+        source_files=source_files,
         bandit=bandit,
         output_file=report_path.name if report_path else None,
     )

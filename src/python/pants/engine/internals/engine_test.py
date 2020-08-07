@@ -226,6 +226,9 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
                 """
                 1 Exception encountered:
 
+                Engine traceback:
+                  in select
+                  in pants.engine.internals.engine_test.nested_raise
                 Traceback (most recent call last):
                   File LOCATION-INFO, in nested_raise
                     fn_raises(x)

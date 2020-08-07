@@ -2,93 +2,16 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
-import re
-from typing import Optional, Sequence, Tuple
+from dataclasses import dataclass
+from pathlib import PurePath
+from typing import Optional, Sequence
 
+from pants.base.deprecated import deprecated
 from pants.util.dirutil import fast_relpath, longest_dir_prefix
 from pants.util.strutil import strip_prefix
 
-# @ is currently unused, but reserved for possible future needs.
-BANNED_CHARS_IN_TARGET_NAME = frozenset("@")
-
-
-def parse_spec(
-    spec: str, relative_to: Optional[str] = None, subproject_roots: Optional[Sequence[str]] = None,
-) -> Tuple[str, str]:
-    """Parses a target address spec and returns the path from the root of the repo to this target
-    and target name.
-
-    :API: public
-
-    :param spec: Target address spec.
-    :param relative_to: path to use for sibling specs, ie: ':another_in_same_build_family',
-      interprets the missing spec_path part as `relative_to`.
-    :param subproject_roots: Paths that correspond with embedded build roots under
-      the current build root.
-
-    For example:
-
-        some_target(
-            name='mytarget',
-            dependencies=['path/to/buildfile:targetname'],
-        )
-
-    Where `path/to/buildfile:targetname` is the dependent target address spec.
-
-    In case the target name is empty, it returns the last component of the path as target name, ie:
-
-        spec_path, target_name = parse_spec('path/to/buildfile/foo')
-
-    will return spec_path as 'path/to/buildfile/foo' and target_name as 'foo'.
-
-    Optionally, specs can be prefixed with '//' to denote an absolute spec path.  This is normally
-    not significant except when a spec referring to a root level target is needed from deeper in
-    the tree. For example, in `path/to/buildfile/BUILD`:
-
-        some_target(
-            name='mytarget',
-            dependencies=[':targetname'],
-        )
-
-    The `targetname` spec refers to a target defined in `path/to/buildfile/BUILD*`. If instead
-    you want to reference `targetname` in a root level BUILD file, use the absolute form.
-    For example:
-
-        some_target(
-            name='mytarget',
-            dependencies=['//:targetname'],
-        )
-    """
-
-    def normalize_absolute_refs(ref: str) -> str:
-        return strip_prefix(ref, "//")
-
-    subproject = (
-        longest_dir_prefix(relative_to, subproject_roots)
-        if relative_to and subproject_roots
-        else None
-    )
-
-    def prefix_subproject(spec_path: str) -> str:
-        if not subproject:
-            return spec_path
-        elif spec_path:
-            return os.path.join(subproject, spec_path)
-        else:
-            return os.path.normpath(subproject)
-
-    spec_parts = spec.rsplit(":", 1)
-    if len(spec_parts) == 1:
-        default_target_spec = spec_parts[0]
-        spec_path = prefix_subproject(normalize_absolute_refs(default_target_spec))
-        target_name = os.path.basename(spec_path)
-    else:
-        spec_path, target_name = spec_parts
-        if not spec_path and relative_to:
-            spec_path = fast_relpath(relative_to, subproject) if subproject else relative_to
-        spec_path = prefix_subproject(normalize_absolute_refs(spec_path))
-
-    return spec_path, target_name
+# Currently unused, but reserved for possible future needs.
+BANNED_CHARS_IN_TARGET_NAME = frozenset("@!?=")
 
 
 class InvalidSpecPath(ValueError):
@@ -99,12 +22,186 @@ class InvalidTargetName(ValueError):
     """Indicate an invalid target name for `Address`."""
 
 
+@dataclass(frozen=True)
+class AddressInput:
+    """A string that has been parsed and normalized using the Address syntax.
+
+    An AddressInput must be resolved into an Address using the engine (which involves inspecting
+    disk to determine the types of its components).
+    """
+
+    path_component: str
+    target_component: Optional[str] = None
+
+    def __post_init__(self):
+        if self.target_component is not None or self.path_component == "":
+            if not self.target_component:
+                raise InvalidTargetName(
+                    f"Address spec {self.path_component}:{self.target_component} has no name part."
+                )
+
+            banned_chars = BANNED_CHARS_IN_TARGET_NAME & set(self.target_component)
+            if banned_chars:
+                raise InvalidTargetName(
+                    f"Banned chars found in target name. {banned_chars} not allowed in target "
+                    f"name: {self.target_component}"
+                )
+
+        # A root is okay.
+        if self.path_component == "":
+            return
+        components = self.path_component.split(os.sep)
+        if any(component in (".", "..", "") for component in components):
+            raise InvalidSpecPath(
+                f"Address spec has un-normalized path part '{self.path_component}'"
+            )
+        if os.path.isabs(self.path_component):
+            raise InvalidSpecPath(
+                f"Address spec has absolute path {self.path_component}; expected a path relative "
+                "to the build root."
+            )
+
+    @classmethod
+    def parse(
+        cls,
+        spec: str,
+        relative_to: Optional[str] = None,
+        subproject_roots: Optional[Sequence[str]] = None,
+    ) -> "AddressInput":
+        """Parse a string into an AddressInput.
+
+        :param spec: Target address spec.
+        :param relative_to: path to use for sibling specs, ie: ':another_in_same_build_family',
+          interprets the missing spec_path part as `relative_to`.
+        :param subproject_roots: Paths that correspond with embedded build roots under
+          the current build root.
+
+        For example:
+
+            some_target(
+                name='mytarget',
+                dependencies=['path/to/buildfile:targetname'],
+            )
+
+        Where `path/to/buildfile:targetname` is the dependent target address spec.
+
+        In there is no target name component, it defaults the default target in the resulting
+        Address's spec_path.
+
+        Optionally, specs can be prefixed with '//' to denote an absolute spec path. This is
+        normally not significant except when a spec referring to a root level target is needed
+        from deeper in the tree. For example, in `path/to/buildfile/BUILD`:
+
+            some_target(
+                name='mytarget',
+                dependencies=[':targetname'],
+            )
+
+        The `targetname` spec refers to a target defined in `path/to/buildfile/BUILD*`. If instead
+        you want to reference `targetname` in a root level BUILD file, use the absolute form.
+        For example:
+
+            some_target(
+                name='mytarget',
+                dependencies=['//:targetname'],
+            )
+
+        The spec may be a file, such as `a/b/c.txt`. It may include a relative address spec at the
+        end, such as `a/b/c.txt:original` or `a/b/c.txt:../original`, to disambiguate which target
+        the file comes from; otherwise, it will be assumed to come from the default target in the
+        directory, i.e. a target which leaves off `name`.
+        """
+        subproject = (
+            longest_dir_prefix(relative_to, subproject_roots)
+            if relative_to and subproject_roots
+            else None
+        )
+
+        def prefix_subproject(spec_path: str) -> str:
+            if not subproject:
+                return spec_path
+            if spec_path:
+                return os.path.join(subproject, spec_path)
+            return os.path.normpath(subproject)
+
+        spec_parts = spec.rsplit(":", 1)
+        path_component = spec_parts[0]
+        target_component = None if len(spec_parts) == 1 else spec_parts[1]
+
+        normalized_relative_to = None
+        if relative_to:
+            normalized_relative_to = (
+                fast_relpath(relative_to, subproject) if subproject else relative_to
+            )
+        if path_component.startswith("./") and normalized_relative_to:
+            path_component = os.path.join(normalized_relative_to, path_component[2:])
+        if not path_component and normalized_relative_to:
+            path_component = normalized_relative_to
+
+        path_component = prefix_subproject(strip_prefix(path_component, "//"))
+
+        return cls(path_component, target_component)
+
+    def file_to_address(self) -> "Address":
+        """Converts to an Address by assuming that the path_component is a file on disk."""
+        if self.target_component is None:
+            # Use the default target in the same directory as the file.
+            spec_path, relative_file_path = os.path.split(self.path_component)
+            # We validate that this is not a top-level file. We couldn't do this earlier in the
+            # AddressSpec constructor because we weren't sure if the path_spec referred to a file
+            # vs. a directory.
+            if not spec_path:
+                raise InvalidTargetName(
+                    "Top-level file specs must include which target they come from, such as "
+                    f"`{self.path_component}:original_target`, but {self.path_component} did not "
+                    f"have an address."
+                )
+            return Address(spec_path=spec_path, relative_file_path=relative_file_path)
+
+        # The target component may be "above" (but not below) the file in the filesystem.
+        # Determine how many levels above the file it is, and validate that the path is relative.
+        parent_count = self.target_component.count(os.path.sep)
+        if parent_count == 0:
+            spec_path, relative_file_path = os.path.split(self.path_component)
+            return Address(
+                spec_path=spec_path,
+                relative_file_path=relative_file_path,
+                target_name=self.target_component,
+            )
+
+        expected_prefix = f"..{os.path.sep}" * parent_count
+        if self.target_component[: self.target_component.rfind(os.path.sep) + 1] != expected_prefix:
+            raise InvalidTargetName(
+                "A target may only be defined in a directory containing a file that it owns in "
+                f"the filesystem: `{self.target_component}` is not at-or-above the file "
+                f"`{self.path_component}`."
+            )
+
+        # Split the path_component into a spec_path and relative_file_path at the appropriate
+        # position.
+        path_components = self.path_component.split(os.path.sep)
+        if len(path_components) <= parent_count:
+            raise InvalidTargetName(
+                "Targets are addressed relative to the files that they own: "
+                f"`{self.target_component}` is too far above the file `{self.path_component}` to "
+                "be valid."
+            )
+        offset = -1 * (parent_count + 1)
+        spec_path = os.path.join(*path_components[:offset]) if path_components[:offset] else ""
+        relative_file_path = os.path.join(*path_components[offset:])
+        target_name = os.path.basename(self.target_component)
+        return Address(spec_path, relative_file_path=relative_file_path, target_name=target_name)
+
+    def dir_to_address(self) -> "Address":
+        """Converts to an Address by assuming that the path_component is a directory on disk."""
+        return Address(spec_path=self.path_component, target_name=self.target_component)
+
+
 class Address:
     """A target address.
 
-    An address is a unique name representing a
-    `pants.engine.target.Target`. It's composed of the
-    path from the root of the repo to the target plus the target name.
+    An address is a unique name for a `pants.engine.target.Target`, and optionally a particular file
+    that it owns.
 
     While not their only use, a noteworthy use of addresses is specifying
     target dependencies. For example:
@@ -118,12 +215,17 @@ class Address:
     """
 
     @classmethod
+    @deprecated(
+        "2.1.0.dev0",
+        hint_message=(
+            "An Address object should be resolved from an AddressInput using the engine. "
+            "This does not work properly with generated subtargets."
+        ),
+    )
     def parse(cls, spec: str, relative_to: str = "", subproject_roots=None) -> "Address":
         """Parses an address from its serialized form.
 
-        Note that this does not work properly with generated subtargets, e.g. the address
-        `helloworld/app.py`. We would not be able to calculate the `generated_base_target_name`, so
-        we treat this like a normal target address.
+        NB: This method is oblivious to file Addresses.
 
         :param spec: An address in string form <path>:<name>.
         :param relative_to: For sibling specs, ie: ':another_in_same_build_family', interprets
@@ -131,71 +233,63 @@ class Address:
         :param list subproject_roots: Paths that correspond with embedded build roots
                                       under the current build root.
         """
-        spec_path, target_name = parse_spec(
+        return AddressInput.parse(
             spec, relative_to=relative_to, subproject_roots=subproject_roots
-        )
-        return cls(spec_path, target_name)
-
-    @classmethod
-    def validate_path(cls, path: str) -> None:
-        # A root or relative spec is OK
-        if path == "":
-            return
-        components = path.split(os.sep)
-        if any(component in (".", "..", "") for component in components):
-            raise InvalidSpecPath(f"Address spec has un-normalized path part '{path}'")
-        if components[-1].startswith("BUILD"):
-            raise InvalidSpecPath(
-                f"Address spec path {path} has {components[-1]} as the last path part and BUILD is "
-                "a reserved file."
-            )
-        if os.path.isabs(path):
-            raise InvalidSpecPath(
-                f"Address spec has absolute path {path}; expected a path relative to the build "
-                "root."
-            )
-
-    @classmethod
-    def check_target_name(cls, spec_path: str, name: str) -> None:
-        if not name:
-            raise InvalidTargetName(f"Address spec {spec_path}:{name} has no name part")
-
-        banned_chars = BANNED_CHARS_IN_TARGET_NAME & set(name)
-        if banned_chars:
-            raise InvalidTargetName(
-                f"Banned chars found in target name. {banned_chars} not allowed in target "
-                f"name: {name}"
-            )
+        ).dir_to_address()
 
     def __init__(
-        self, spec_path: str, target_name: str, *, generated_base_target_name: Optional[str] = None
+        self,
+        spec_path: str,
+        *,
+        relative_file_path: Optional[str] = None,
+        target_name: Optional[str] = None,
     ) -> None:
         """
-        :param spec_path: The path from the root of the repo to this target.
-        :param target_name: The name of a target this Address refers to.
-        :param generated_base_target_name: If this Address refers to a generated subtarget, this
-                                           stores the target_name of the original base target.
+        :param spec_path: The path from the build root to the directory containing the BUILD file
+          for the target.
+        :param relative_file_path: The relative path from the spec_path to an addressed file,
+          if any. Because files must always be located below targets that apply metadata to
+          them, this will always be relative.
+        :param target_name: The name of the target applying metadata to the file, defined in a
+          BUILD file in the spec_path directory, or None if this path refers to the default
+          target in that directory.
         """
-        self.validate_path(spec_path)
-        self.check_target_name(spec_path, target_name)
-        self._spec_path = spec_path
-        self._target_name = target_name
-        self.generated_base_target_name = generated_base_target_name
-        self._hash = hash((self._spec_path, self._target_name, self.generated_base_target_name))
+        self.spec_path = spec_path
+        self._relative_file_path = relative_file_path
+        # If the target_name is the same as the default name would be, we normalize to None.
+        self._target_name = (
+            target_name if target_name and target_name != os.path.basename(self.spec_path) else None
+        )
+        self._hash = hash((self.spec_path, self._relative_file_path, self._target_name))
+        if PurePath(spec_path).name.startswith("BUILD"):
+            raise InvalidSpecPath(
+                f"The address {self.spec} has {PurePath(spec_path).name} as the last part of its "
+                f"path, but BUILD is a reserved name. Please make sure that you did not name any "
+                f"directories BUILD."
+            )
 
     @property
-    def spec_path(self) -> str:
-        """The path from the build root to this target.
+    def is_base_target(self) -> bool:
+        return self._relative_file_path is None
 
-        :API: public
+    @property
+    def is_default_target(self) -> bool:
+        """True if this is address refers to the "default" target in the spec_path.
+
+        The default target has a target name equal to the directory name.
         """
-        return self._spec_path
+        return self._target_name is None
+
+    @property
+    def filename(self) -> str:
+        if self._relative_file_path is None:
+            raise ValueError("Only a file Address (`not self.is_base_target`) has a filename.")
+        return os.path.join(self.spec_path, self._relative_file_path)
 
     @property
     def target_name(self) -> str:
-        """
-        :API: public
-        """
+        if self._target_name is None:
+            return os.path.basename(self.spec_path)
         return self._target_name
 
     @property
@@ -207,135 +301,92 @@ class Address:
 
         :API: public
         """
-        prefix = "//" if not self._spec_path else ""
-        if self.generated_base_target_name:
-            path = os.path.join(self._spec_path, self._target_name)
-            return f"{prefix}{path}"
-        return f"{prefix}{self._spec_path}:{self._target_name}"
+        prefix = "//" if not self.spec_path else ""
+        file_portion = f"{prefix}{self.spec_path}"
+        if self._relative_file_path is not None:
+            file_portion = os.path.join(file_portion, self._relative_file_path)
+
+        # Relativize the target name to the dirname of the file.
+        parent_prefix = (
+            "../" * self._relative_file_path.count(os.path.sep) if self._relative_file_path else ""
+        )
+        if self._target_name is None and not parent_prefix:
+            return file_portion
+        target_name = self._target_name or os.path.basename(self.spec_path)
+        return f"{file_portion}:{parent_prefix}{target_name}"
 
     @property
     def path_safe_spec(self) -> str:
         """
         :API: public
         """
-        return f"{self._spec_path.replace(os.sep, '.')}.{self._target_name.replace(os.sep, '.')}"
+        if self._relative_file_path:
+            parent_count = self._relative_file_path.count(os.path.sep)
+            parent_prefix = "@" * parent_count if parent_count else "."
+            file_portion = f".{self._relative_file_path.replace(os.path.sep, '.')}"
+        else:
+            parent_prefix = "."
+            file_portion = ""
+        if parent_prefix == ".":
+            target_portion = f"{parent_prefix}{self._target_name}" if self._target_name else ""
+        else:
+            target_name = self._target_name or os.path.basename(self.spec_path)
+            target_portion = f"{parent_prefix}{target_name}"
+        return f"{self.spec_path.replace(os.path.sep, '.')}{file_portion}{target_portion}"
 
-    @property
-    def relative_spec(self) -> str:
-        """
-        :API: public
-        """
-        prefix = ":" if not self.generated_base_target_name else "./"
-        return f"{prefix}{self._target_name}"
-
-    def reference(self, referencing_path: Optional[str] = None) -> str:
-        """How to reference this address in a BUILD file.
-
-        :API: public
-        """
-        if referencing_path and self._spec_path == referencing_path:
-            return self.relative_spec
-        if os.path.basename(self._spec_path) != self._target_name:
-            return self.spec
-        return self._spec_path
+    @deprecated(
+        removal_version="2.1.0.dev0",
+        hint_message="Use the property .spec, which is the same thing.",
+    )
+    def reference(self) -> str:
+        """How to reference this address in a BUILD file."""
+        return self.spec
 
     def maybe_convert_to_base_target(self) -> "Address":
         """If this address is a generated subtarget, convert it back into its original base target.
 
         Otherwise, return itself unmodified.
+
+        TODO: This is not correct: we don't know the owning BUILD file of the base target without
+        resolving. But it's possible that this method can be removed.
         """
-        if not self.generated_base_target_name:
+        if self.is_base_target:
             return self
-        return self.__class__(self._spec_path, target_name=self.generated_base_target_name)
+        return self.__class__(self.spec_path, relative_file_path=None, target_name=self.target_name)
 
     def __eq__(self, other):
         if not isinstance(other, Address):
             return False
         return (
-            self._spec_path == other._spec_path
+            self.spec_path == other.spec_path
+            and self._relative_file_path == other._relative_file_path
             and self._target_name == other._target_name
-            and self.generated_base_target_name == other.generated_base_target_name
         )
 
     def __hash__(self):
         return self._hash
 
     def __repr__(self) -> str:
-        prefix = f"Address({self.spec_path}, {self.target_name}"
-        return (
-            f"{prefix})"
-            if not self.generated_base_target_name
-            else f"{prefix}, generated_base_target_name={self.generated_base_target_name})"
-        )
+        return f"Address({self.spec})"
 
     def __str__(self) -> str:
         return self.spec
 
     def __lt__(self, other):
-        return (self._spec_path, self._target_name, self.generated_base_target_name) < (
-            other._spec_path,
-            other._target_name,
-            other.generated_base_target_name,
+        return (self.spec_path, (self._relative_file_path or ""), (self._target_name or "")) < (
+            other.spec_path,
+            (other._relative_file_path or ""),
+            (other._target_name or ""),
         )
 
 
-class BuildFileAddress(Address):
+@dataclass(frozen=True)
+class BuildFileAddress:
     """Represents the address of a type materialized from a BUILD file.
 
-    :API: public
+    TODO: This type should likely be removed in favor of storing this information on Target.
     """
 
-    def __init__(
-        self,
-        *,
-        rel_path: str,
-        target_name: Optional[str] = None,
-        generated_base_target_name: Optional[str] = None,
-    ) -> None:
-        """
-        :param rel_path: The BUILD files' path, relative to the root_dir.
-        :param target_name: The name of the target within the BUILD file; defaults to the default
-                            target, aka the name of the BUILD file parent dir.
-        :param generated_base_target_name: If this Address refers to a generated subtarget, this
-                                           stores the target_name of the original base target.
-
-        :API: public
-        """
-        spec_path = os.path.dirname(rel_path)
-        super().__init__(
-            spec_path=spec_path,
-            target_name=target_name or os.path.basename(spec_path),
-            generated_base_target_name=generated_base_target_name,
-        )
-        self.rel_path = rel_path
-
-    def to_address(self) -> Address:
-        """Convert this BuildFileAddress to an Address."""
-        # This is weird, since BuildFileAddress is a subtype of Address, but the engine's exact
-        # type matching requires a new instance.
-        # TODO: Possibly create a new class like `AddressWithBuild` that wraps an `Address`. This
-        #  is weird to subclass `Address` but break Liskov substitution in many places, like the
-        #  constructor. The blocker is that this type is used widely by V1 and it can't be cleanly
-        #  deprecated.
-        return Address(
-            spec_path=self.spec_path,
-            target_name=self.target_name,
-            generated_base_target_name=self.generated_base_target_name,
-        )
-
-    def maybe_convert_to_base_target(self) -> "BuildFileAddress":
-        if not self.generated_base_target_name:
-            return self
-        return self.__class__(rel_path=self.rel_path, target_name=self.generated_base_target_name)
-
-    def __repr__(self) -> str:
-        prefix = f"BuildFileAddress({self.rel_path}, {self.target_name}"
-        return (
-            f"{prefix})"
-            if not self.generated_base_target_name
-            else f"{prefix}, generated_base_target_name={self.generated_base_target_name})"
-        )
-
-
-def _is_build_file_name(name: str) -> bool:
-    return bool(re.match(r"^BUILD(\.[a-zA-Z0-9_-]+)?$", name))
+    address: Address
+    # The relative path of the BUILD file this Address came from.
+    rel_path: str

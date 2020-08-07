@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
-from pathlib import PurePath
 from typing import Iterable, Optional, cast
 
 from pants.base.build_environment import get_buildroot, get_scm
@@ -34,13 +33,7 @@ class SpecsCalculator:
     """Determines the specs for a given Pants run."""
 
     @classmethod
-    def parse_specs(
-        cls,
-        raw_specs: Iterable[str],
-        build_root: Optional[str] = None,
-        exclude_patterns: Optional[Iterable[str]] = None,
-        tags: Optional[Iterable[str]] = None,
-    ) -> Specs:
+    def parse_specs(cls, raw_specs: Iterable[str], *, build_root: Optional[str] = None) -> Specs:
         """Parse raw string specs into a Specs object."""
         build_root = build_root or get_buildroot()
         spec_parser = CmdLineSpecParser(build_root)
@@ -54,14 +47,9 @@ class SpecsCalculator:
             else:
                 filesystem_specs.add(parsed_spec)
 
-        address_specs_collection = AddressSpecs(
-            dependencies=address_specs,
-            exclude_patterns=exclude_patterns if exclude_patterns else tuple(),
-            tags=tags,
-        )
-        filesystem_specs_collection = FilesystemSpecs(filesystem_specs)
         return Specs(
-            address_specs=address_specs_collection, filesystem_specs=filesystem_specs_collection,
+            AddressSpecs(address_specs, filter_by_global_options=True),
+            FilesystemSpecs(filesystem_specs),
         )
 
     @classmethod
@@ -71,16 +59,8 @@ class SpecsCalculator:
         options: Options,
         session: SchedulerSession,
         build_root: Optional[str] = None,
-        exclude_patterns: Optional[Iterable[str]] = None,
-        tags: Optional[Iterable[str]] = None,
     ) -> Specs:
-        specs = cls.parse_specs(
-            raw_specs=options.specs,
-            build_root=build_root,
-            exclude_patterns=exclude_patterns,
-            tags=tags,
-        )
-
+        specs = cls.parse_specs(raw_specs=options.specs, build_root=build_root)
         changed_options = ChangedOptions.from_options(options.for_scope("changed"))
 
         logger.debug("specs are: %s", specs)
@@ -120,14 +100,14 @@ class SpecsCalculator:
         address_specs = []
         filesystem_specs = []
         for address in cast(ChangedAddresses, changed_addresses):
-            if address.generated_base_target_name:
-                file_name = PurePath(address.spec_path, address.target_name).as_posix()
-                filesystem_specs.append(FilesystemLiteralSpec(file_name))
+            if not address.is_base_target:
+                # TODO: Should adjust Specs parsing to support parsing the disambiguated file
+                # Address, which would bypass-rediscovering owners.
+                filesystem_specs.append(FilesystemLiteralSpec(address.filename))
             else:
                 address_specs.append(SingleAddress(address.spec_path, address.target_name))
+
         return Specs(
-            address_specs=AddressSpecs(
-                address_specs, exclude_patterns=exclude_patterns, tags=tags,
-            ),
-            filesystem_specs=FilesystemSpecs(filesystem_specs),
+            AddressSpecs(address_specs, filter_by_global_options=True),
+            FilesystemSpecs(filesystem_specs),
         )

@@ -23,7 +23,7 @@ class BuildIgnoreIntegrationTest(PantsRunIntegrationTest):
         self.assert_failure(ignore_result)
         assert f"{tmpdir_relative}/dir" in ignore_result.stderr_data
         self.assert_success(no_ignore_result)
-        assert f"{tmpdir_relative}/dir:dir" in no_ignore_result.stdout_data
+        assert f"{tmpdir_relative}/dir" in no_ignore_result.stdout_data
 
     def test_build_ignore_dependency(self) -> None:
         with temporary_dir(root_dir=get_buildroot()) as tmpdir:

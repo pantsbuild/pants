@@ -7,7 +7,7 @@ from typing import List, Optional, Tuple, cast
 from pants.backend.project_info.list_targets import ListSubsystem, list_targets
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.engine.addresses import Address, Addresses
-from pants.engine.target import DescriptionField, ProvidesField, Target, Targets
+from pants.engine.target import DescriptionField, ProvidesField, Target, UnexpandedTargets
 from pants.testutil.engine.util import MockConsole, MockGet, create_goal_subsystem, run_rule
 
 
@@ -38,7 +38,13 @@ def run_goal(
             ),
             console,
         ],
-        mock_gets=[MockGet(product_type=Targets, subject_type=Addresses, mock=lambda _: targets)],
+        mock_gets=[
+            MockGet(
+                product_type=UnexpandedTargets,
+                subject_type=Addresses,
+                mock=lambda _: UnexpandedTargets(targets),
+            )
+        ],
     )
     return cast(str, console.stdout.getvalue()), cast(str, console.stderr.getvalue())
 

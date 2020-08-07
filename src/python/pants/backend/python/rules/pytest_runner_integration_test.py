@@ -12,7 +12,6 @@ from pants.backend.python.rules import pex, pex_from_targets, pytest_runner, pyt
 from pants.backend.python.rules.coverage import create_coverage_config
 from pants.backend.python.rules.pytest_runner import PythonTestFieldSet
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary, PythonTests
-from pants.base.specs import FilesystemLiteralSpec, OriginSpec, SingleAddress
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.test import Status, TestDebugRequest, TestResult
 from pants.core.util_rules import determine_source_files, strip_source_roots
@@ -20,7 +19,6 @@ from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, FileContent
 from pants.engine.process import InteractiveRunner
 from pants.engine.rules import RootRule
-from pants.engine.target import TargetWithOrigin
 from pants.python.python_requirement import PythonRequirement
 from pants.testutil.engine.util import Params
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
@@ -136,7 +134,6 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         self,
         *,
         passthrough_args: Optional[str] = None,
-        origin: Optional[OriginSpec] = None,
         junit_xml_dir: Optional[str] = None,
         use_coverage: bool = False,
         execution_slot_var: Optional[str] = None,
@@ -157,13 +154,11 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         if execution_slot_var:
             args.append(f"--pytest-execution-slot-var={execution_slot_var}")
 
-        options_bootstrapper = create_options_bootstrapper(args=args)
-        address = Address(self.package, "target")
-        if origin is None:
-            origin = SingleAddress(directory=address.spec_path, name=address.target_name)
-        tgt = PythonTests({}, address=address)
         params = Params(
-            PythonTestFieldSet.create(TargetWithOrigin(tgt, origin)), options_bootstrapper
+            PythonTestFieldSet.create(
+                PythonTests({}, address=Address(self.package, target_name="target"))
+            ),
+            create_options_bootstrapper(args=args),
         )
         test_result = self.request_single_product(TestResult, params)
         debug_request = self.request_single_product(TestDebugRequest, params)
@@ -192,14 +187,6 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         assert result.status == Status.FAILURE
         assert f"{self.package}/test_good.py ." in result.stdout
         assert f"{self.package}/test_bad.py F" in result.stdout
-
-    def test_precise_file_args(self) -> None:
-        self.create_python_test_target([self.good_source, self.bad_source])
-        file_arg = FilesystemLiteralSpec(PurePath(self.package, self.good_source.path).as_posix())
-        result = self.run_pytest(origin=file_arg)
-        assert result.status == Status.SUCCESS
-        assert f"{self.package}/test_good.py ." in result.stdout
-        assert f"{self.package}/test_bad.py F" not in result.stdout
 
     def test_absolute_import(self) -> None:
         self.create_python_library([self.library_source])

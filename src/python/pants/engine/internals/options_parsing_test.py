@@ -12,7 +12,9 @@ from pants.util.logging import LogLevel
 class TestEngineOptionsParsing(TestBase):
     def _ob(self, args=tuple(), env=None):
         self.create_file("pants.toml")
-        options_bootstrap = OptionsBootstrapper.create(args=tuple(args), env=env or {},)
+        options_bootstrap = OptionsBootstrapper.create(
+            args=tuple(args), env=env or {}, allow_pantsrc=False,
+        )
         # NB: BuildConfigInitializer has sideeffects on first-run: in actual usage, these
         # sideeffects will happen during setup. We force them here.
         BuildConfigInitializer.get(options_bootstrap)

@@ -83,12 +83,12 @@ async fn make_execute_request() {
       .collect(),
     timeout: None,
     description: "some description".to_owned(),
+    level: log::Level::Info,
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
     execution_slot_variable: None,
-    cache_failures: false,
   };
 
   let mut want_command = bazel_protos::remote_execution::Command::new();
@@ -168,12 +168,12 @@ async fn make_execute_request_with_instance_name() {
       .collect(),
     timeout: None,
     description: "some description".to_owned(),
+    level: log::Level::Info,
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
     execution_slot_variable: None,
-    cache_failures: false,
   };
 
   let mut want_command = bazel_protos::remote_execution::Command::new();
@@ -261,12 +261,12 @@ async fn make_execute_request_with_cache_key_gen_version() {
       .collect(),
     timeout: None,
     description: "some description".to_owned(),
+    level: log::Level::Info,
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
     execution_slot_variable: None,
-    cache_failures: false,
   };
 
   let mut want_command = bazel_protos::remote_execution::Command::new();
@@ -508,12 +508,12 @@ async fn make_execute_request_with_timeout() {
       .collect(),
     timeout: one_second(),
     description: "some description".to_owned(),
+    level: log::Level::Info,
     append_only_caches: BTreeMap::new(),
     jdk_home: None,
     target_platform: PlatformConstraint::None,
     is_nailgunnable: false,
     execution_slot_variable: None,
-    cache_failures: false,
   };
 
   let mut want_command = bazel_protos::remote_execution::Command::new();

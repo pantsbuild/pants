@@ -3,13 +3,14 @@
 
 from typing import List
 
-from pants.backend.python.rules.inject_ancestor_files import (
+from pants.backend.python.rules.ancestor_files import (
     AncestorFiles,
     AncestorFilesRequest,
     find_missing_ancestor_files,
     identify_missing_ancestor_files,
 )
 from pants.core.util_rules import strip_source_roots
+from pants.core.util_rules.determine_source_files import SourceFiles
 from pants.engine.fs import DigestContents
 from pants.engine.rules import RootRule
 from pants.testutil.engine.util import Params
@@ -25,12 +26,13 @@ class InjectAncestorFilesTest(TestBase):
             find_missing_ancestor_files,
             *strip_source_roots.rules(),
             RootRule(AncestorFilesRequest),
+            RootRule(SourceFiles),
         )
 
     def assert_injected(
         self,
         *,
-        declared_files_stripped: bool,
+        source_roots: List[str],
         original_declared_files: List[str],
         original_undeclared_files: List[str],
         expected_discovered: List[str],
@@ -38,13 +40,9 @@ class InjectAncestorFilesTest(TestBase):
         for f in original_undeclared_files:
             self.create_file(f, "# undeclared")
         request = AncestorFilesRequest(
-            "__init__.py",
-            self.make_snapshot({fp: "# declared" for fp in original_declared_files}),
-            sources_stripped=declared_files_stripped,
+            "__init__.py", self.make_snapshot({fp: "# declared" for fp in original_declared_files}),
         )
-        bootstrapper = create_options_bootstrapper(
-            args=["--source-root-patterns=['src/python', 'tests/python']"]
-        )
+        bootstrapper = create_options_bootstrapper(args=[f"--source-root-patterns={source_roots}"])
         result = self.request_single_product(AncestorFiles, Params(request, bootstrapper)).snapshot
         assert list(result.files) == sorted(expected_discovered)
 
@@ -59,7 +57,7 @@ class InjectAncestorFilesTest(TestBase):
 
     def test_unstripped(self) -> None:
         self.assert_injected(
-            declared_files_stripped=False,
+            source_roots=["src/python", "tests/python"],
             original_declared_files=[
                 "src/python/project/lib.py",
                 "src/python/project/subdir/__init__.py",
@@ -73,21 +71,16 @@ class InjectAncestorFilesTest(TestBase):
             expected_discovered=["src/python/project/__init__.py"],
         )
 
-    def test_stripped(self) -> None:
+    def test_unstripped_source_root_at_buildroot(self) -> None:
         self.assert_injected(
-            declared_files_stripped=True,
+            source_roots=["/"],
             original_declared_files=[
                 "project/lib.py",
-                "project/subdir/lib.py",
                 "project/subdir/__init__.py",
-                "project/no_init/lib.py",
+                "project/subdir/lib.py",
+                "no_init/lib.py",
             ],
-            # NB: These will strip down to end up being the same file. If they had different
-            # contents, Pants would error when trying to merge them.
-            original_undeclared_files=[
-                "src/python/project/__init__.py",
-                "tests/python/project/__init__.py",
-            ],
+            original_undeclared_files=["project/__init__.py",],
             expected_discovered=["project/__init__.py"],
         )
 

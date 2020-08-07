@@ -5,7 +5,7 @@ import re
 import unittest
 import unittest.mock
 from textwrap import dedent
-from typing import cast
+from typing import Iterable, Optional, cast
 
 import pytest
 
@@ -17,6 +17,7 @@ from pants.engine.addresses import (
     Address,
     Addresses,
     AddressesWithOrigins,
+    AddressInput,
     AddressWithOrigin,
     BuildFileAddress,
     BuildFileAddresses,
@@ -29,7 +30,7 @@ from pants.engine.internals.build_files import (
     strip_address_origins,
 )
 from pants.engine.internals.mapper import AddressFamily, AddressMapper
-from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, SymbolTable
+from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import RootRule
@@ -41,7 +42,9 @@ from pants.util.frozendict import FrozenDict
 
 def test_parse_address_family_empty() -> None:
     """Test that parsing an empty BUILD file results in an empty AddressFamily."""
-    address_mapper = AddressMapper(parser=Parser(SymbolTable({}), BuildFileAliases()))
+    address_mapper = AddressMapper(
+        parser=Parser(target_type_aliases=[], object_aliases=BuildFileAliases())
+    )
     af = run_rule(
         parse_address_family,
         rule_args=[address_mapper, BuildFilePreludeSymbols(FrozenDict()), Dir("/dev/null")],
@@ -57,9 +60,17 @@ def test_parse_address_family_empty() -> None:
 
 
 def resolve_addresses_with_origins_from_address_specs(
-    address_specs: AddressSpecs, address_family: AddressFamily,
+    address_specs: AddressSpecs,
+    address_family: AddressFamily,
+    *,
+    tags: Optional[Iterable[str]] = None,
+    exclude_patterns: Optional[Iterable[str]] = None
 ) -> AddressesWithOrigins:
-    address_mapper = AddressMapper(Parser(SymbolTable({}), BuildFileAliases()))
+    address_mapper = AddressMapper(
+        Parser(target_type_aliases=[], object_aliases=BuildFileAliases()),
+        tags=tags,
+        exclude_target_regexps=exclude_patterns,
+    )
     snapshot = Snapshot(Digest("xx", 2), ("root/BUILD",), ())
     addresses_with_origins = run_rule(
         addresses_with_origins_from_address_specs,
@@ -85,13 +96,13 @@ def test_address_specs_duplicated() -> None:
     )
     assert len(addresses_with_origins) == 1
     awo = addresses_with_origins[0]
-    assert str(awo.address) == "root:root"
+    assert str(awo.address) == "root"
     assert awo.origin == address_spec
 
 
 def test_address_specs_tag_filter() -> None:
     """Test that targets are filtered based on `tags`."""
-    address_specs = AddressSpecs([SiblingAddresses("root")], tags=["+integration"])
+    address_specs = AddressSpecs([SiblingAddresses("root")], filter_by_global_options=True)
     address_family = AddressFamily(
         "root",
         {
@@ -102,7 +113,7 @@ def test_address_specs_tag_filter() -> None:
     )
 
     addresses_with_origins = resolve_addresses_with_origins_from_address_specs(
-        address_specs, address_family
+        address_specs, address_family, tags=["+integration"]
     )
     assert len(addresses_with_origins) == 1
     awo = addresses_with_origins[0]
@@ -130,7 +141,7 @@ def test_address_specs_fail_on_nonexistent() -> None:
 
 def test_address_specs_exclude_pattern() -> None:
     """Test that targets are filtered based on exclude patterns."""
-    address_specs = AddressSpecs([SiblingAddresses("root")], exclude_patterns=tuple([".exclude*"]))
+    address_specs = AddressSpecs([SiblingAddresses("root")], filter_by_global_options=True)
     address_family = AddressFamily(
         "root",
         {
@@ -140,7 +151,7 @@ def test_address_specs_exclude_pattern() -> None:
     )
 
     addresses_with_origins = resolve_addresses_with_origins_from_address_specs(
-        address_specs, address_family
+        address_specs, address_family, exclude_patterns=[".exclude*"]
     )
     assert len(addresses_with_origins) == 1
     awo = addresses_with_origins[0]
@@ -150,13 +161,13 @@ def test_address_specs_exclude_pattern() -> None:
 
 def test_address_specs_exclude_pattern_with_single_address() -> None:
     """Test that single address targets are filtered based on exclude patterns."""
-    address_specs = AddressSpecs(
-        [SingleAddress("root", "not_me")], exclude_patterns=tuple(["root.*"])
-    )
+    address_specs = AddressSpecs([SingleAddress("root", "not_me")], filter_by_global_options=True)
     address_family = AddressFamily(
         "root", {"not_me": ("root/BUILD", TargetAdaptor(type_alias="", name="not_me"))}
     )
-    assert not resolve_addresses_with_origins_from_address_specs(address_specs, address_family)
+    assert not resolve_addresses_with_origins_from_address_specs(
+        address_specs, address_family, exclude_patterns=["root.*"]
+    )
 
 
 def run_prelude_parsing_rule(prelude_content: str) -> BuildFilePreludeSymbols:
@@ -263,8 +274,8 @@ class BuildFileIntegrationTest(TestBase):
 
     def test_build_file_address(self) -> None:
         self.create_file("helloworld/BUILD.ext", "mock_tgt()")
-        addr = Address.parse("helloworld")
-        expected_bfa = BuildFileAddress(rel_path="helloworld/BUILD.ext", target_name="helloworld")
+        addr = Address("helloworld")
+        expected_bfa = BuildFileAddress(rel_path="helloworld/BUILD.ext", address=addr)
         bfa = self.request_single_product(BuildFileAddress, addr)
         assert bfa == expected_bfa
         bfas = self.request_single_product(BuildFileAddresses, Addresses([addr]))
@@ -272,12 +283,8 @@ class BuildFileIntegrationTest(TestBase):
 
     def test_build_file_address_generated_subtarget(self) -> None:
         self.create_file("helloworld/BUILD.ext", "mock_tgt(name='original')")
-        addr = Address("helloworld", target_name="generated", generated_base_target_name="original")
-        expected_bfa = BuildFileAddress(
-            rel_path="helloworld/BUILD.ext",
-            target_name="generated",
-            generated_base_target_name="original",
-        )
+        addr = Address("helloworld", target_name="original", relative_file_path="generated")
+        expected_bfa = BuildFileAddress(rel_path="helloworld/BUILD.ext", address=addr)
         bfa = self.request_single_product(BuildFileAddress, addr)
         assert bfa == expected_bfa
         bfas = self.request_single_product(BuildFileAddresses, Addresses([addr]))
@@ -285,7 +292,7 @@ class BuildFileIntegrationTest(TestBase):
 
     def test_address_not_found(self) -> None:
         with pytest.raises(ExecutionError) as exc:
-            self.request_single_product(TargetAdaptor, Address.parse("helloworld"))
+            self.request_single_product(TargetAdaptor, Address("helloworld"))
         assert "Directory \\'helloworld\\' does not contain any BUILD files" in str(exc)
 
         self.add_to_build_file("helloworld", "mock_tgt(name='other_tgt')")
@@ -293,4 +300,42 @@ class BuildFileIntegrationTest(TestBase):
             "'helloworld' was not found in namespace 'helloworld'. Did you mean one of:\n  :other_tgt"
         )
         with pytest.raises(ExecutionError, match=expected_rx_str):
-            self.request_single_product(TargetAdaptor, Address.parse("helloworld"))
+            self.request_single_product(TargetAdaptor, Address("helloworld"))
+
+
+class ResolveAddressIntegrationTest(TestBase):
+    @classmethod
+    def rules(cls):
+        return (*super().rules(), RootRule(AddressInput))
+
+    def test_resolve_address(self) -> None:
+        def assert_is_expected(address_input: AddressInput, expected: Address) -> None:
+            assert self.request_single_product(Address, address_input) == expected
+
+        self.create_file("a/b/c.txt")
+        assert_is_expected(
+            AddressInput("a/b/c.txt"), Address("a/b", target_name=None, relative_file_path="c.txt")
+        )
+        assert_is_expected(
+            AddressInput("a/b"), Address("a/b", target_name=None, relative_file_path=None)
+        )
+
+        assert_is_expected(
+            AddressInput("a/b", target_component="c"), Address("a/b", target_name="c")
+        )
+        assert_is_expected(
+            AddressInput("a/b/c.txt", target_component="c"),
+            Address("a/b", relative_file_path="c.txt", target_name="c"),
+        )
+
+        # Top-level addresses will not have a path_component, unless they are a file address.
+        self.create_file("f.txt")
+        assert_is_expected(
+            AddressInput("f.txt", target_component="original"),
+            Address("", relative_file_path="f.txt", target_name="original"),
+        )
+        assert_is_expected(AddressInput("", target_component="t"), Address("", target_name="t"))
+
+        with pytest.raises(ExecutionError) as exc:
+            self.request_single_product(Address, AddressInput("a/b/fake"))
+        assert "'a/b/fake' does not exist on disk" in str(exc.value)

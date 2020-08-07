@@ -21,10 +21,7 @@ from pants.backend.python.rules.pex import (
     PexRequirements,
 )
 from pants.backend.python.rules.pex_from_targets import PexFromTargetsRequest
-from pants.backend.python.rules.python_sources import (
-    UnstrippedPythonSources,
-    UnstrippedPythonSourcesRequest,
-)
+from pants.backend.python.rules.python_sources import PythonSourceFiles, PythonSourceFilesRequest
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.target_types import (
     PythonInterpreterCompatibility,
@@ -32,7 +29,7 @@ from pants.backend.python.target_types import (
     PythonTestsTimeout,
 )
 from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
-from pants.core.util_rules.determine_source_files import SourceFiles, SpecifiedSourceFilesRequest
+from pants.core.util_rules.determine_source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
 from pants.engine.internals.uuid import UUIDRequest
@@ -153,27 +150,25 @@ async def setup_pytest_for_target(
     )
 
     prepared_sources_request = Get(
-        UnstrippedPythonSources, UnstrippedPythonSourcesRequest(all_targets, include_files=True)
+        PythonSourceFiles, PythonSourceFilesRequest(all_targets, include_files=True)
     )
 
     # Get the file names for the test_target so that we can specify to Pytest precisely which files
     # to test, rather than using auto-discovery.
-    specified_source_files_request = Get(
-        SourceFiles, SpecifiedSourceFilesRequest([(field_set.sources, field_set.origin)])
-    )
+    field_set_source_files_request = Get(SourceFiles, SourceFilesRequest([field_set.sources]))
 
     (
         pytest_pex,
         requirements_pex,
         test_runner_pex,
         prepared_sources,
-        specified_source_files,
+        field_set_source_files,
     ) = await MultiGet(
         pytest_pex_request,
         requirements_pex_request,
         test_runner_pex_request,
         prepared_sources_request,
-        specified_source_files_request,
+        field_set_source_files_request,
     )
 
     input_digest = await Get(
@@ -181,7 +176,7 @@ async def setup_pytest_for_target(
         MergeDigests(
             (
                 coverage_config.digest,
-                prepared_sources.snapshot.digest,
+                prepared_sources.source_files.snapshot.digest,
                 requirements_pex.digest,
                 pytest_pex.digest,
                 test_runner_pex.digest,
@@ -198,7 +193,7 @@ async def setup_pytest_for_target(
         ]
     return TestTargetSetup(
         test_runner_pex=test_runner_pex,
-        args=(*pytest.options.args, *coverage_args, *specified_source_files.files),
+        args=(*pytest.options.args, *coverage_args, *field_set_source_files.files),
         input_digest=input_digest,
         source_roots=prepared_sources.source_roots,
         timeout_seconds=field_set.timeout.calculate_from_global_options(pytest),
@@ -256,7 +251,7 @@ async def run_python_test(
             argv=test_setup.args,
             input_digest=test_setup.input_digest,
             output_files=tuple(output_files) if output_files else None,
-            description=f"Run Pytest for {field_set.address.reference()}",
+            description=f"Run Pytest for {field_set.address}",
             timeout_seconds=test_setup.timeout_seconds,
             extra_env=env,
             execution_slot_variable=test_setup.execution_slot_variable,
@@ -290,7 +285,7 @@ async def run_python_test(
         result,
         coverage_data=coverage_data,
         xml_results=xml_results_digest,
-        address_ref=field_set.address.reference(),
+        address_ref=field_set.address.spec,
     )
 
 

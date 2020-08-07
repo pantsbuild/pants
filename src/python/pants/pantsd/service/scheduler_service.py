@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import logging
+import time
 from typing import List, Optional, Tuple, cast
 
 import psutil
@@ -23,6 +24,8 @@ class SchedulerService(PantsService):
     # will return immediately, so this value primarily affects how frequently the `run` method
     # will check the terminated condition.
     INVALIDATION_POLL_INTERVAL = 0.5
+    # A grace period after startup that we will wait before enforcing our pid.
+    PIDFILE_GRACE_PERIOD = 5
 
     def __init__(
         self,
@@ -30,7 +33,8 @@ class SchedulerService(PantsService):
         legacy_graph_scheduler: LegacyGraphScheduler,
         build_root: str,
         invalidation_globs: List[str],
-        max_memory_usage_pid: int,
+        pidfile: str,
+        pid: int,
         max_memory_usage_in_bytes: int,
     ) -> None:
         """
@@ -38,7 +42,9 @@ class SchedulerService(PantsService):
         :param build_root: The current build root.
         :param invalidation_globs: A list of `globs` that when encountered in filesystem event
                                    subscriptions will tear down the daemon.
-        :param max_memory_usage_pid: A pid to monitor the memory usage of (generally our own!).
+        :param pidfile: A pidfile which should contain this processes' pid in order for the daemon
+                        to remain valid.
+        :param pid: This processes' pid.
         :param max_memory_usage_in_bytes: The maximum memory usage of the process: the service will
                                           shut down if it observes more than this amount in use.
         """
@@ -58,7 +64,8 @@ class SchedulerService(PantsService):
             None,
         )
 
-        self._max_memory_usage_pid = max_memory_usage_pid
+        self._pidfile = pidfile
+        self._pid = pid
         self._max_memory_usage_in_bytes = max_memory_usage_in_bytes
 
     def _get_snapshot(self, globs: Tuple[str, ...], poll: bool) -> Optional[Snapshot]:
@@ -100,27 +107,26 @@ class SchedulerService(PantsService):
         )
         self.terminate()
 
-    def _check_memory_usage(self):
+    def _check_pidfile(self):
         try:
-            memory_usage_in_bytes = psutil.Process(self._max_memory_usage_pid).memory_info()[0]
-            if memory_usage_in_bytes > self._max_memory_usage_in_bytes:
-                raise Exception(
-                    f"pantsd process {self._max_memory_usage_pid} was using "
-                    f"{memory_usage_in_bytes} bytes of memory (above the limit of "
-                    f"{self._max_memory_usage_in_bytes} bytes)."
-                )
-        except Exception as e:
-            # Watcher failed for some reason
-            self._logger.critical(f"The scheduler was invalidated: {e!r}")
-            self.terminate()
+            with open(self._pidfile, "r") as f:
+                pid_from_file = f.read()
+        except IOError:
+            raise Exception(f"Could not read pants pidfile at {self._pidfile}.")
+        if int(pid_from_file) != self._pid:
+            raise Exception(f"Another instance of pantsd is running at {pid_from_file}")
+
+    def _check_memory_usage(self):
+        memory_usage_in_bytes = psutil.Process(self._pid).memory_info()[0]
+        if memory_usage_in_bytes > self._max_memory_usage_in_bytes:
+            raise Exception(
+                f"pantsd process {self._pid} was using "
+                f"{memory_usage_in_bytes} bytes of memory (above the limit of "
+                f"{self._max_memory_usage_in_bytes} bytes)."
+            )
 
     def _check_invalidation_watcher_liveness(self):
-        try:
-            self._scheduler.check_invalidation_watcher_liveness()
-        except Exception as e:
-            # Watcher failed for some reason
-            self._logger.critical(f"The scheduler was invalidated: {e!r}")
-            self.terminate()
+        self._scheduler.check_invalidation_watcher_liveness()
 
     def run(self):
         """Main service entrypoint."""
@@ -129,10 +135,18 @@ class SchedulerService(PantsService):
         globs, _ = self._invalidation_globs_and_snapshot
         self._invalidation_globs_and_snapshot = (globs, self._get_snapshot(globs, poll=False))
         self._logger.debug("watching invalidation patterns: {}".format(globs))
+        pidfile_deadline = time.time() + self.PIDFILE_GRACE_PERIOD
 
         while not self._state.is_terminating:
-            self._state.maybe_pause()
-            self._check_invalidation_watcher_liveness()
-            self._check_memory_usage()
-            # NB: This is a long poll that will keep us from looping too quickly here.
-            self._check_invalidation_globs(poll=True)
+            try:
+                self._state.maybe_pause()
+                self._check_invalidation_watcher_liveness()
+                self._check_memory_usage()
+                if time.time() > pidfile_deadline:
+                    self._check_pidfile()
+                # NB: This is a long poll that will keep us from looping too quickly here.
+                self._check_invalidation_globs(poll=True)
+            except Exception as e:
+                # Watcher failed for some reason
+                self._logger.critical(f"The scheduler was invalidated: {e!r}")
+                self.terminate()

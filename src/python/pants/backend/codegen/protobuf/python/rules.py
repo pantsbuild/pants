@@ -1,12 +1,14 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from pathlib import PurePath
 
 from pants.backend.codegen.protobuf.protoc import Protoc
+from pants.backend.codegen.protobuf.python.additional_fields import PythonSourceRootField
 from pants.backend.codegen.protobuf.target_types import ProtobufSources
 from pants.backend.python.target_types import PythonSources
-from pants.core.util_rules.determine_source_files import AllSourceFilesRequest, SourceFiles
+from pants.core.util_rules.determine_source_files import SourceFilesRequest
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
-from pants.core.util_rules.strip_source_roots import representative_path_from_address
+from pants.core.util_rules.strip_source_roots import StrippedSourceFiles
 from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, Digest, MergeDigests, RemovePrefix, Snapshot
 from pants.engine.platform import Platform
@@ -15,6 +17,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import GeneratedSources, GenerateSourcesRequest, Sources, TransitiveTargets
 from pants.engine.unions import UnionRule
 from pants.source.source_root import SourceRoot, SourceRootRequest
+from pants.util.logging import LogLevel
 
 
 class GeneratePythonFromProtobufRequest(GenerateSourcesRequest):
@@ -37,6 +40,7 @@ async def generate_python_from_protobuf(
         Process(
             ("/bin/mkdir", output_dir),
             description=f"Create the directory {output_dir}",
+            level=LogLevel.DEBUG,
             output_directories=(output_dir,),
         ),
     )
@@ -45,38 +49,36 @@ async def generate_python_from_protobuf(
     # actually generate those dependencies; it only needs to look at their .proto files to work
     # with imports.
     transitive_targets = await Get(TransitiveTargets, Addresses([request.protocol_target.address]))
-    all_sources_request = Get(
-        SourceFiles,
-        AllSourceFilesRequest(
+    # NB: By stripping the source roots, we avoid having to set the value `--proto_path`
+    # for Protobuf imports to be discoverable.
+    all_stripped_sources_request = Get(
+        StrippedSourceFiles,
+        SourceFilesRequest(
             (tgt.get(Sources) for tgt in transitive_targets.closure),
             for_sources_types=(ProtobufSources,),
-            # NB: By stripping the source roots, we avoid having to set the value `--proto_path`
-            # for Protobuf imports to be discoverable.
-            strip_source_roots=True,
         ),
     )
-    stripped_target_sources_request = Get(
-        SourceFiles,
-        AllSourceFilesRequest([request.protocol_target[ProtobufSources]], strip_source_roots=True),
+    target_stripped_sources_request = Get(
+        StrippedSourceFiles, SourceFilesRequest([request.protocol_target[ProtobufSources]]),
     )
 
     (
         downloaded_protoc_binary,
         create_output_dir_result,
-        all_sources,
-        stripped_target_sources,
+        all_sources_stripped,
+        target_sources_stripped,
     ) = await MultiGet(
         download_protoc_request,
         create_output_dir_request,
-        all_sources_request,
-        stripped_target_sources_request,
+        all_stripped_sources_request,
+        target_stripped_sources_request,
     )
 
     input_digest = await Get(
         Digest,
         MergeDigests(
             (
-                all_sources.snapshot.digest,
+                all_sources_stripped.snapshot.digest,
                 downloaded_protoc_binary.digest,
                 create_output_dir_result.output_digest,
             )
@@ -90,26 +92,30 @@ async def generate_python_from_protobuf(
                 downloaded_protoc_binary.exe,
                 "--python_out",
                 output_dir,
-                *stripped_target_sources.snapshot.files,
+                *target_sources_stripped.snapshot.files,
             ),
             input_digest=input_digest,
             description=f"Generating Python sources from {request.protocol_target.address}.",
+            level=LogLevel.DEBUG,
             output_directories=(output_dir,),
         ),
     )
 
     # We must do some path manipulation on the output digest for it to look like normal sources,
-    # including adding back the original source root.
+    # including adding back a source root.
+    py_source_root = request.protocol_target.get(PythonSourceRootField).value
+    if py_source_root:
+        # Verify that the python source root specified by the target is in fact a source root.
+        source_root_request = SourceRootRequest(PurePath(py_source_root))
+    else:
+        # The target didn't specify a python source root, so use the protobuf_library's source root.
+        source_root_request = SourceRootRequest.for_target(request.protocol_target)
+
     normalized_digest, source_root = await MultiGet(
         Get(Digest, RemovePrefix(result.output_digest, output_dir)),
-        Get(
-            SourceRoot,
-            SourceRootRequest,
-            SourceRootRequest.for_file(
-                representative_path_from_address(request.protocol_target.address)
-            ),
-        ),
+        Get(SourceRoot, SourceRootRequest, source_root_request),
     )
+
     source_root_restored = (
         await Get(Snapshot, AddPrefix(normalized_digest, source_root.path))
         if source_root.path != "."

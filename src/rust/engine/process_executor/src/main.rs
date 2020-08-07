@@ -26,7 +26,7 @@
 #![allow(clippy::new_without_default, clippy::new_ret_no_self)]
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
-#![type_length_limit = "1076744"]
+#![type_length_limit = "1076749"]
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryFrom;
@@ -358,6 +358,7 @@ async fn main() {
     output_directories,
     timeout: Some(Duration::new(15 * 60, 0)),
     description: "process_executor".to_string(),
+    level: log::Level::Info,
     append_only_caches: BTreeMap::new(),
     jdk_home: args.value_of("jdk").map(PathBuf::from),
     target_platform: PlatformConstraint::try_from(
@@ -366,7 +367,6 @@ async fn main() {
     .expect("invalid value for `target-platform"),
     is_nailgunnable,
     execution_slot_variable: None,
-    cache_failures: false,
   };
 
   let runner: Box<dyn process_execution::CommandRunner> = match server_arg {

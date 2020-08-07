@@ -13,7 +13,6 @@ use std::{self, fmt};
 use async_trait::async_trait;
 use futures::future::{self, FutureExt, TryFutureExt};
 use futures::stream::StreamExt;
-use std::convert::TryInto;
 use url::Url;
 
 use crate::context::{Context, Core};
@@ -28,7 +27,6 @@ use fs::{
   self, Dir, DirectoryListing, File, FileContent, GlobExpansionConjunction, GlobMatching, Link,
   PathGlobs, PathStat, PreparedPathGlobs, StrictGlobMatching, VFS,
 };
-use logging::PythonLogLevel;
 use process_execution::{
   self, CacheDest, CacheName, MultiPlatformProcess, PlatformConstraint, Process, RelativePath,
 };
@@ -234,10 +232,7 @@ pub fn lift_digest(digest: &Value) -> Result<hashing::Digest, String> {
 /// A Node that represents a set of processes to execute on specific platforms.
 ///
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct MultiPlatformExecuteProcess {
-  cache_failures: bool,
-  process: MultiPlatformProcess,
-}
+pub struct MultiPlatformExecuteProcess(MultiPlatformProcess);
 
 impl MultiPlatformExecuteProcess {
   fn lift_execute_process(
@@ -277,6 +272,7 @@ impl MultiPlatformExecuteProcess {
     };
 
     let description = externs::project_str(&value, "description");
+    let level = externs::val_to_log_level(&externs::project_ignoring_type(&value, "level"))?;
 
     let append_only_caches = externs::project_tuple_encoded_map(&value, "append_only_caches")?
       .into_iter()
@@ -303,8 +299,6 @@ impl MultiPlatformExecuteProcess {
       }
     };
 
-    let cache_failures = externs::project_bool(&value, "cache_failures");
-
     Ok(process_execution::Process {
       argv: externs::project_multi_strs(&value, "argv"),
       env,
@@ -314,12 +308,12 @@ impl MultiPlatformExecuteProcess {
       output_directories,
       timeout,
       description,
+      level,
       append_only_caches,
       jdk_home,
       target_platform,
       is_nailgunnable,
       execution_slot_variable,
-      cache_failures,
     })
   }
 
@@ -346,22 +340,16 @@ impl MultiPlatformExecuteProcess {
       ));
     }
 
-    let mut cache_failures = true;
-
     let mut request_by_constraint: BTreeMap<(PlatformConstraint, PlatformConstraint), Process> =
       BTreeMap::new();
     for (constraint_key, execute_process) in constraint_key_pairs.iter().zip(processes.iter()) {
       let underlying_req =
         MultiPlatformExecuteProcess::lift_execute_process(execute_process, constraint_key.1)?;
-      if !underlying_req.cache_failures {
-        cache_failures = false;
-      }
       request_by_constraint.insert(*constraint_key, underlying_req.clone());
     }
-    Ok(MultiPlatformExecuteProcess {
-      cache_failures,
-      process: MultiPlatformProcess(request_by_constraint),
-    })
+    Ok(MultiPlatformExecuteProcess(MultiPlatformProcess(
+      request_by_constraint,
+    )))
   }
 }
 
@@ -376,7 +364,7 @@ impl WrappedNode for MultiPlatformExecuteProcess {
   type Item = ProcessResult;
 
   async fn run_wrapped_node(self, context: Context) -> NodeResult<ProcessResult> {
-    let request = self.process;
+    let request = self.0;
     let execution_context = process_execution::Context::new(
       context.session.workunit_store(),
       context.session.build_id().to_string(),
@@ -839,7 +827,7 @@ impl Task {
     future::try_join_all(get_futures).await
   }
 
-  fn compute_new_artifacts(result_val: &Value) -> Option<Vec<(String, hashing::Digest)>> {
+  fn compute_artifacts(result_val: &Value) -> Option<Vec<(String, hashing::Digest)>> {
     let artifacts_val: Value = externs::call_method(&result_val, "artifacts", &[]).ok()?;
     let artifacts_val: Value = externs::check_for_python_none(artifacts_val)?;
     let gil = Python::acquire_gil();
@@ -878,25 +866,10 @@ impl Task {
     Some(externs::val_to_str(&msg_val))
   }
 
-  fn compute_new_workunit_level(result_val: &Value) -> Option<log::Level> {
-    use num_enum::TryFromPrimitiveError;
-
+  fn compute_workunit_level(result_val: &Value) -> Option<log::Level> {
     let new_level_val: Value = externs::call_method(&result_val, "level", &[]).ok()?;
     let new_level_val = externs::check_for_python_none(new_level_val)?;
-
-    let new_py_level: PythonLogLevel = match externs::project_maybe_u64(&new_level_val, "_level")
-      .and_then(|n: u64| {
-        n.try_into()
-          .map_err(|e: TryFromPrimitiveError<_>| e.to_string())
-      }) {
-      Ok(level) => level,
-      Err(e) => {
-        log::warn!("Couldn't parse {:?} as a LogLevel: {}", new_level_val, e);
-        return None;
-      }
-    };
-
-    Some(new_py_level.into())
+    externs::val_to_log_level(&new_level_val).ok()
   }
 
   ///
@@ -988,9 +961,9 @@ impl WrappedNode for Task {
     if result_type == product {
       let (new_level, message, new_artifacts) = if can_modify_workunit {
         (
-          Self::compute_new_workunit_level(&result_val),
+          Self::compute_workunit_level(&result_val),
           Self::compute_workunit_message(&result_val),
-          Self::compute_new_artifacts(&result_val).unwrap_or_else(Vec::new),
+          Self::compute_artifacts(&result_val).unwrap_or_else(Vec::new),
         )
       } else {
         (None, None, Vec::new())
@@ -1103,7 +1076,7 @@ impl NodeKey {
   fn workunit_name(&self) -> String {
     match self {
       NodeKey::Task(ref task) => task.task.display_info.name.clone(),
-      NodeKey::MultiPlatformExecuteProcess(mp_epr) => mp_epr.process.workunit_name(),
+      NodeKey::MultiPlatformExecuteProcess(mp_epr) => mp_epr.0.workunit_name(),
       NodeKey::Snapshot(..) => "snapshot".to_string(),
       NodeKey::DigestFile(..) => "digest_file".to_string(),
       NodeKey::DownloadedFile(..) => "downloaded_file".to_string(),
@@ -1124,7 +1097,7 @@ impl NodeKey {
     match self {
       NodeKey::Task(ref task) => task.task.display_info.desc.as_ref().map(|s| s.to_owned()),
       NodeKey::Snapshot(ref s) => Some(format!("Snapshotting: {}", s.0)),
-      NodeKey::MultiPlatformExecuteProcess(mp_epr) => mp_epr.process.user_facing_name(),
+      NodeKey::MultiPlatformExecuteProcess(mp_epr) => Some(mp_epr.0.user_facing_name()),
       NodeKey::DigestFile(DigestFile(File { path, .. })) => {
         Some(format!("Fingerprinting: {}", path.display()))
       }
@@ -1150,8 +1123,11 @@ impl Node for NodeKey {
 
     let user_facing_name = self.user_facing_name();
     let workunit_name = self.workunit_name();
+    let failure_name = user_facing_name
+      .clone()
+      .unwrap_or_else(|| workunit_name.clone());
     let metadata = WorkunitMetadata {
-      desc: user_facing_name.clone(),
+      desc: user_facing_name,
       message: None,
       level: self.workunit_level(),
       blocked: false,
@@ -1220,9 +1196,7 @@ impl Node for NodeKey {
         }
       };
 
-      if let Some(user_facing_name) = user_facing_name {
-        result = result.map_err(|failure| failure.with_pushed_frame(&user_facing_name));
-      }
+      result = result.map_err(|failure| failure.with_pushed_frame(&failure_name));
 
       // If both the Node and the watch failed, prefer the Node's error message.
       match (&result, maybe_watch) {
@@ -1259,23 +1233,6 @@ impl Node for NodeKey {
       _ => true,
     }
   }
-
-  fn cacheable_item(&self, output: &NodeOutput) -> bool {
-    match self {
-      NodeKey::MultiPlatformExecuteProcess(ref mp) => match output {
-        NodeOutput::ProcessResult(ref process_result) => {
-          let process_succeeded = process_result.0.exit_code == 0;
-          if mp.cache_failures {
-            true
-          } else {
-            process_succeeded
-          }
-        }
-        _ => true,
-      },
-      _ => true,
-    }
-  }
 }
 
 impl Display for NodeKey {
@@ -1284,11 +1241,7 @@ impl Display for NodeKey {
       &NodeKey::DigestFile(ref s) => write!(f, "DigestFile({})", s.0.path.display()),
       &NodeKey::DownloadedFile(ref s) => write!(f, "DownloadedFile({})", s.0),
       &NodeKey::MultiPlatformExecuteProcess(ref s) => {
-        if let Some(name) = s.process.user_facing_name() {
-          write!(f, "Process({})", name)
-        } else {
-          write!(f, "Process({:?})", s)
-        }
+        write!(f, "Process({})", s.0.user_facing_name())
       }
       &NodeKey::ReadLink(ref s) => write!(f, "ReadLink({})", (s.0).0.display()),
       &NodeKey::Scandir(ref s) => write!(f, "Scandir({})", (s.0).0.display()),

@@ -5,7 +5,6 @@ print_exception_stacktrace = true
 pythonpath = ["%(buildroot)s/pants-plugins/src/python"]
 
 backend_packages.add = [
-  "pants.backend.awslambda.python",
   "pants.backend.python",
   "pants.backend.python.lint.black",
   "pants.backend.python.lint.docformatter",
@@ -51,9 +50,6 @@ root_patterns = [
   "/build-support/bin",
   "/build-support/migration-support"
 ]
-
-[python-infer]
-imports = true
 
 [python-setup]
 # TODO: Set up an actual lockfile. For now we just "lock" our requirements.txt to itself,

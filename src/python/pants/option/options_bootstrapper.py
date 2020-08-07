@@ -93,11 +93,17 @@ class OptionsBootstrapper:
         return bootstrap_options
 
     @classmethod
-    def create(cls, env: Mapping[str, str], args: Sequence[str]) -> "OptionsBootstrapper":
+    def create(
+        cls, env: Mapping[str, str], args: Sequence[str], *, allow_pantsrc: bool
+    ) -> "OptionsBootstrapper":
         """Parses the minimum amount of configuration necessary to create an OptionsBootstrapper.
 
         :param env: An environment dictionary, or None to use `os.environ`.
         :param args: An args array, or None to use `sys.argv`.
+        :param allow_pantsrc: True to allow pantsrc files to be used. Unless tests are expecting to
+          consume pantsrc files, they should pass False in order to avoid reading files from
+          absolute paths. Production usecases should pass True to allow options values to make the
+          decision of whether to respect pantsrc files.
         """
         env = {k: v for k, v in env.items() if k.startswith("PANTS_")}
         args = tuple(args)
@@ -150,7 +156,7 @@ class OptionsBootstrapper:
         # Now re-read the config, post-bootstrapping. Note the order: First whatever we bootstrapped
         # from (typically pants.toml), then config override, then rcfiles.
         full_config_paths = pre_bootstrap_config.sources()
-        if bootstrap_option_values.pantsrc:
+        if allow_pantsrc and bootstrap_option_values.pantsrc:
             rcfiles = [
                 os.path.expanduser(str(rcfile)) for rcfile in bootstrap_option_values.pantsrc_files
             ]

@@ -11,6 +11,7 @@ dirs = "1"
 env_logger = "0.5.4"
 futures = { version = "0.3", features = ["compat"] }
 hashing = { path = "../hashing" }
+log = "0.4"
 process_execution = { path = "../process_execution" }
 store = { path = "../fs/store" }
 task_executor = { path = "../task_executor" }
