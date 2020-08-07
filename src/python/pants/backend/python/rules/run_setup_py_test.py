@@ -115,7 +115,6 @@ class TestGenerateChroot(TestSetupPyBase):
         assert len(ex.wrapped_exceptions) == 1
         assert type(ex.wrapped_exceptions[0]) == exc_cls
 
-    @pytest.mark.skip("TODO: see https://github.com/pantsbuild/pants/issues/10564")
     def test_generate_chroot(self) -> None:
         self.create_file(
             "src/python/foo/bar/baz/BUILD",
@@ -402,6 +401,7 @@ class TestGetRequirements(TestSetupPyBase):
                 )
 
                 python_library(
+                    sources=[],
                     dependencies=['src/python/foo/bar/baz', 'src/python/foo/bar/qux'],
                 )
               """
@@ -419,6 +419,7 @@ class TestGetRequirements(TestSetupPyBase):
                 )
 
                 python_library(
+                    sources=[],
                     dependencies=['src/python/foo/bar'],
                 )
                 """
@@ -496,6 +497,7 @@ class TestGetOwnedDependencies(TestSetupPyBase):
                 )
 
                 python_library(
+                    sources=[],
                     dependencies=['src/python/foo/bar:bar1', 'src/python/foo/bar:bar2'],
                 )
                 """
