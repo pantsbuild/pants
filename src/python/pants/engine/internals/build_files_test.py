@@ -35,7 +35,8 @@ from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import RootRule
 from pants.engine.target import Target
-from pants.testutil.engine.util import MockGet, run_rule
+from pants.testutil.engine.util import MockGet, Params, run_rule
+from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 from pants.util.frozendict import FrozenDict
 
@@ -237,76 +238,7 @@ class BuildFileIntegrationTest(TestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), RootRule(Addresses))
-
-    def test_target_parsed_correctly(self) -> None:
-        self.add_to_build_file(
-            "helloworld",
-            dedent(
-                """\
-                mock_tgt(
-                    fake_field=42,
-                    dependencies=[
-                        # Because we don't follow dependencies or even parse dependencies, this
-                        # self-cycle should be fine.
-                        "helloworld",
-                        ":sibling",
-                        "helloworld/util",
-                        "helloworld/util:tests",
-                    ],
-                )
-                """
-            ),
-        )
-        addr = Address.parse("helloworld")
-        target_adaptor = self.request_single_product(TargetAdaptor, addr)
-        assert target_adaptor.name == "helloworld"
-        assert target_adaptor.type_alias == "mock_tgt"
-        assert target_adaptor.kwargs["dependencies"] == [
-            "helloworld",
-            ":sibling",
-            "helloworld/util",
-            "helloworld/util:tests",
-        ]
-        # NB: TargetAdaptors do not validate what fields are valid. The Target API should error
-        # when encountering this, but it's fine at this stage.
-        assert target_adaptor.kwargs["fake_field"] == 42
-
-    def test_build_file_address(self) -> None:
-        self.create_file("helloworld/BUILD.ext", "mock_tgt()")
-        addr = Address("helloworld")
-        expected_bfa = BuildFileAddress(rel_path="helloworld/BUILD.ext", address=addr)
-        bfa = self.request_single_product(BuildFileAddress, addr)
-        assert bfa == expected_bfa
-        bfas = self.request_single_product(BuildFileAddresses, Addresses([addr]))
-        assert bfas == BuildFileAddresses([bfa])
-
-    def test_build_file_address_generated_subtarget(self) -> None:
-        self.create_file("helloworld/BUILD.ext", "mock_tgt(name='original')")
-        addr = Address("helloworld", target_name="original", relative_file_path="generated")
-        expected_bfa = BuildFileAddress(rel_path="helloworld/BUILD.ext", address=addr)
-        bfa = self.request_single_product(BuildFileAddress, addr)
-        assert bfa == expected_bfa
-        bfas = self.request_single_product(BuildFileAddresses, Addresses([addr]))
-        assert bfas == BuildFileAddresses([bfa])
-
-    def test_address_not_found(self) -> None:
-        with pytest.raises(ExecutionError) as exc:
-            self.request_single_product(TargetAdaptor, Address("helloworld"))
-        assert "Directory \\'helloworld\\' does not contain any BUILD files" in str(exc)
-
-        self.add_to_build_file("helloworld", "mock_tgt(name='other_tgt')")
-        expected_rx_str = re.escape(
-            "'helloworld' was not found in namespace 'helloworld'. Did you mean one of:\n  :other_tgt"
-        )
-        with pytest.raises(ExecutionError, match=expected_rx_str):
-            self.request_single_product(TargetAdaptor, Address("helloworld"))
-
-
-class ResolveAddressIntegrationTest(TestBase):
-    @classmethod
-    def rules(cls):
-        return (*super().rules(), RootRule(AddressInput))
+        return (*super().rules(), RootRule(Addresses), RootRule(AddressInput))
 
     def test_resolve_address(self) -> None:
         def assert_is_expected(address_input: AddressInput, expected: Address) -> None:
@@ -339,3 +271,68 @@ class ResolveAddressIntegrationTest(TestBase):
         with pytest.raises(ExecutionError) as exc:
             self.request_single_product(Address, AddressInput("a/b/fake"))
         assert "'a/b/fake' does not exist on disk" in str(exc.value)
+
+    def test_target_adaptor_parsed_correctly(self) -> None:
+        self.add_to_build_file(
+            "helloworld",
+            dedent(
+                """\
+                mock_tgt(
+                    fake_field=42,
+                    dependencies=[
+                        # Because we don't follow dependencies or even parse dependencies, this
+                        # self-cycle should be fine.
+                        "helloworld",
+                        ":sibling",
+                        "helloworld/util",
+                        "helloworld/util:tests",
+                    ],
+                )
+                """
+            ),
+        )
+        addr = Address.parse("helloworld")
+        target_adaptor = self.request_single_product(
+            TargetAdaptor, Params(addr, create_options_bootstrapper())
+        )
+        assert target_adaptor.name == "helloworld"
+        assert target_adaptor.type_alias == "mock_tgt"
+        assert target_adaptor.kwargs["dependencies"] == [
+            "helloworld",
+            ":sibling",
+            "helloworld/util",
+            "helloworld/util:tests",
+        ]
+        # NB: TargetAdaptors do not validate what fields are valid. The Target API should error
+        # when encountering this, but it's fine at this stage.
+        assert target_adaptor.kwargs["fake_field"] == 42
+
+    def test_target_adaptor_not_found(self) -> None:
+        bootstrapper = create_options_bootstrapper()
+        with pytest.raises(ExecutionError) as exc:
+            self.request_single_product(TargetAdaptor, Params(Address("helloworld"), bootstrapper))
+        assert "Directory \\'helloworld\\' does not contain any BUILD files" in str(exc)
+
+        self.add_to_build_file("helloworld", "mock_tgt(name='other_tgt')")
+        expected_rx_str = re.escape(
+            "'helloworld' was not found in namespace 'helloworld'. Did you mean one of:\n  :other_tgt"
+        )
+        with pytest.raises(ExecutionError, match=expected_rx_str):
+            self.request_single_product(TargetAdaptor, Params(Address("helloworld"), bootstrapper))
+
+    def test_build_file_address(self) -> None:
+        self.create_file("helloworld/BUILD.ext", "mock_tgt()")
+        bootstrapper = create_options_bootstrapper()
+
+        def assert_bfa_resolved(address: Address) -> None:
+            expected_bfa = BuildFileAddress(rel_path="helloworld/BUILD.ext", address=address)
+            bfa = self.request_single_product(BuildFileAddress, Params(address, bootstrapper))
+            assert bfa == expected_bfa
+            bfas = self.request_single_product(
+                BuildFileAddresses, Params(Addresses([address]), bootstrapper)
+            )
+            assert bfas == BuildFileAddresses([bfa])
+
+        assert_bfa_resolved(Address("helloworld"))
+        # File addresses should use their base target to find the BUILD file.
+        assert_bfa_resolved(Address("helloworld", relative_file_path="f.txt"))

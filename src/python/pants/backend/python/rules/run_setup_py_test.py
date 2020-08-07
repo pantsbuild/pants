@@ -73,7 +73,9 @@ class TestSetupPyBase(TestBase):
         ]
 
     def tgt(self, addr: str) -> Target:
-        return self.request_single_product(WrappedTarget, Params(Address.parse(addr))).target
+        return self.request_single_product(
+            WrappedTarget, Params(Address.parse(addr), create_options_bootstrapper())
+        ).target
 
 
 class TestGenerateChroot(TestSetupPyBase):
@@ -94,7 +96,7 @@ class TestGenerateChroot(TestSetupPyBase):
             SetupPyChroot,
             Params(
                 SetupPyChrootRequest(ExportedTarget(self.tgt(addr)), py2=False),
-                create_options_bootstrapper(args=["--source-root-patterns=src/python"]),
+                create_options_bootstrapper(),
             ),
         )
         snapshot = self.request_single_product(Snapshot, Params(chroot.digest))
@@ -108,7 +110,7 @@ class TestGenerateChroot(TestSetupPyBase):
                 SetupPyChroot,
                 Params(
                     SetupPyChrootRequest(ExportedTarget(self.tgt(addr)), py2=False),
-                    create_options_bootstrapper(args=["--source-root-patterns=src/python"]),
+                    create_options_bootstrapper(),
                 ),
             )
         ex = excinfo.value
@@ -254,7 +256,7 @@ class TestGetSources(TestSetupPyBase):
             SetupPySources,
             Params(
                 SetupPySourcesRequest(Targets([self.tgt(addr) for addr in addrs]), py2=False),
-                create_options_bootstrapper(args=["--source-root-patterns=src/python"]),
+                create_options_bootstrapper(),
             ),
         )
         chroot_snapshot = self.request_single_product(Snapshot, Params(srcs.digest))

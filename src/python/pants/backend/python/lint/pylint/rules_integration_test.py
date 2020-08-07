@@ -27,9 +27,14 @@ PYLINT_FAILURE_RETURN_CODE = 16
 
 class PylintIntegrationTest(ExternalToolTestBase):
     package = "src/python/project"
-    good_source = FileContent(f"{package}/good.py", b"'''docstring'''\nUPPERCASE_CONSTANT = ''\n",)
-    bad_source = FileContent(f"{package}/bad.py", b"'''docstring'''\nlowercase_constant = ''\n",)
-    py3_only_source = FileContent(f"{package}/py3.py", b"'''docstring'''\nCONSTANT: str = ''\n",)
+    good_source = FileContent(f"{package}/good.py", b"'''docstring'''\nUPPERCASE_CONSTANT = ''\n")
+    bad_source = FileContent(f"{package}/bad.py", b"'''docstring'''\nlowercase_constant = ''\n")
+    py3_only_source = FileContent(f"{package}/py3.py", b"'''docstring'''\nCONSTANT: str = ''\n")
+
+    global_args = (
+        "--backend-packages=pants.backend.python.lint.pylint",
+        "--source-root-patterns=['src/python', 'tests/python']",
+    )
 
     @classmethod
     def alias_groups(cls):
@@ -70,7 +75,13 @@ class PylintIntegrationTest(ExternalToolTestBase):
                 """
             ),
         )
-        return self.request_single_product(WrappedTarget, Address(package, target_name=name)).target
+        return self.request_single_product(
+            WrappedTarget,
+            Params(
+                Address(package, target_name=name),
+                create_options_bootstrapper(args=self.global_args),
+            ),
+        ).target
 
     def run_pylint(
         self,
@@ -81,10 +92,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
         skip: bool = False,
         additional_args: Optional[List[str]] = None,
     ) -> LintResults:
-        args = [
-            "--backend-packages=pants.backend.python.lint.pylint",
-            "--source-root-patterns=['src/python', 'tests/python']",
-        ]
+        args = list(self.global_args)
         if config:
             self.create_file(relpath="pylintrc", contents=config)
             args.append("--pylint-config=pylintrc")
