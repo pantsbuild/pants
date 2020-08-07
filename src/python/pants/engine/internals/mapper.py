@@ -154,8 +154,6 @@ class AddressMapper:
     prelude_glob_patterns: Tuple[str, ...]
     build_patterns: Tuple[str, ...]
     build_ignore_patterns: Tuple[str, ...]
-    tags: Tuple[str, ...]
-    exclude_target_regexps: Tuple[str, ...]
     subproject_roots: Tuple[str, ...]
 
     def __init__(
@@ -165,20 +163,35 @@ class AddressMapper:
         prelude_glob_patterns: Optional[Iterable[str]] = None,
         build_patterns: Optional[Iterable[str]] = None,
         build_ignore_patterns: Optional[Iterable[str]] = None,
-        tags: Optional[Iterable[str]] = None,
-        exclude_target_regexps: Optional[Iterable[str]] = None,
         subproject_roots: Optional[Iterable[str]] = None,
     ) -> None:
         self.parser = parser
         self.prelude_glob_patterns = tuple(prelude_glob_patterns or [])
         self.build_patterns = tuple(build_patterns or ["BUILD", "BUILD.*"])
         self.build_ignore_patterns = tuple(build_ignore_patterns or [])
-        self.tags = tuple(tags or [])
-        self.exclude_target_regexps = tuple(exclude_target_regexps or [])
         self.subproject_roots = tuple(subproject_roots or [])
 
     def __repr__(self):
         return f"AddressMapper(build_patterns={self.build_patterns})"
+
+
+# TODO(#10569): merge this with AddressMapper.
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class AddressSpecsFilter:
+    """Filters addresses with the `--tags` and `--exclude-target-regexp` options."""
+
+    tags: Tuple[str, ...]
+    exclude_target_regexps: Tuple[str, ...]
+
+    def __init__(
+        self,
+        *,
+        tags: Optional[Iterable[str]] = None,
+        exclude_target_regexps: Optional[Iterable[str]] = None,
+    ) -> None:
+        self.tags = tuple(tags or [])
+        self.exclude_target_regexps = tuple(exclude_target_regexps or [])
 
     @memoized_property
     def _exclude_regexps(self) -> Tuple[Pattern, ...]:
@@ -200,7 +213,7 @@ class AddressMapper:
 
         return and_filters(create_filters(self.tags, filter_for_tag))
 
-    def matches_filter_options(self, address: Address, target: TargetAdaptor) -> bool:
+    def matches(self, address: Address, target: TargetAdaptor) -> bool:
         """Check that the target matches the provided `--tags` and `--exclude-target-regexp`
         options."""
         return self._tag_filter(target) and not self._is_excluded_by_pattern(address)

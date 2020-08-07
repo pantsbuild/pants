@@ -210,8 +210,6 @@ class EngineInitializer:
             prelude_glob_patterns=bootstrap_options.build_file_prelude_globs,
             build_patterns=bootstrap_options.build_patterns,
             build_ignore_patterns=bootstrap_options.build_ignore,
-            tags=bootstrap_options.tag,
-            exclude_target_regexps=bootstrap_options.exclude_target_regexp,
             subproject_roots=bootstrap_options.subproject_roots,
         )
 
@@ -223,7 +221,10 @@ class EngineInitializer:
         #  GlobMatchErrorBehavior.
         @rule
         def glob_match_error_behavior_singleton() -> GlobMatchErrorBehavior:
-            return bootstrap_options.files_not_found_behavior.to_glob_match_error_behavior()
+            return cast(
+                GlobMatchErrorBehavior,
+                bootstrap_options.files_not_found_behavior.to_glob_match_error_behavior(),
+            )
 
         @rule
         def build_configuration_singleton() -> BuildConfiguration:

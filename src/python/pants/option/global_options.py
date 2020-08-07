@@ -876,24 +876,6 @@ class GlobalOptions(Subsystem):
             "your machine or when they are ignored by the `--pants-ignore` option.",
         )
 
-        # TODO(#10569): move this out of bootstrap options into normal global options.
-        register(
-            "--tag",
-            type=list,
-            metavar="[+-]tag1,tag2,...",
-            help=(
-                "Include only targets with these tags (optional '+' prefix) or without these "
-                "tags ('-' prefix). See https://www.pantsbuild.org/docs/advanced-target-selection."
-            ),
-        )
-        register(
-            "--exclude-target-regexp",
-            type=list,
-            default=[],
-            metavar="<regexp>",
-            help="Exclude target roots that match these regexes.",
-        )
-
     @classmethod
     def register_options(cls, register):
         """Register options not tied to any particular task or subsystem."""
@@ -928,6 +910,23 @@ class GlobalOptions(Subsystem):
                 "inferred by running `./pants dependencies` on your target. You may still need to "
                 "explicitly provide some `dependencies` that cannot be inferred."
             ),
+        )
+
+        register(
+            "--tag",
+            type=list,
+            metavar="[+-]tag1,tag2,...",
+            help=(
+                "Include only targets with these tags (optional '+' prefix) or without these "
+                "tags ('-' prefix). See https://www.pantsbuild.org/docs/advanced-target-selection."
+            ),
+        )
+        register(
+            "--exclude-target-regexp",
+            type=list,
+            default=[],
+            metavar="<regexp>",
+            help="Exclude target roots that match these regexes.",
         )
 
         register(

@@ -17,10 +17,16 @@ from pants.engine.addresses import (
     BuildFileAddresses,
 )
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, Snapshot
-from pants.engine.internals.mapper import AddressFamily, AddressMap, AddressMapper
+from pants.engine.internals.mapper import (
+    AddressFamily,
+    AddressMap,
+    AddressMapper,
+    AddressSpecsFilter,
+)
 from pants.engine.internals.parser import BuildFilePreludeSymbols, error_on_imports
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.option.global_options import GlobalOptions
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import OrderedSet
 
@@ -146,8 +152,14 @@ async def find_target_adaptor(address: Address) -> TargetAdaptor:
 
 
 @rule
+def setup_address_specs_filter(global_options: GlobalOptions) -> AddressSpecsFilter:
+    opts = global_options.options
+    return AddressSpecsFilter(tags=opts.tag, exclude_target_regexps=opts.exclude_target_regexp)
+
+
+@rule
 async def addresses_with_origins_from_address_specs(
-    address_mapper: AddressMapper, address_specs: AddressSpecs
+    address_specs: AddressSpecs, address_mapper: AddressMapper, specs_filter: AddressSpecsFilter
 ) -> AddressesWithOrigins:
     """Given an AddressMapper and list of AddressSpecs, return matching AddressesWithOrigins.
 
@@ -184,10 +196,7 @@ async def addresses_with_origins_from_address_specs(
         matched_addresses.update(
             addr
             for (addr, tgt) in addr_target_pairs_for_spec
-            if (
-                address_specs.filter_by_global_options is False
-                or address_mapper.matches_filter_options(addr, tgt)
-            )
+            if address_specs.filter_by_global_options is False or specs_filter.matches(addr, tgt)
         )
 
     return AddressesWithOrigins(

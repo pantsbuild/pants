@@ -29,7 +29,7 @@ from pants.engine.internals.build_files import (
     parse_address_family,
     strip_address_origins,
 )
-from pants.engine.internals.mapper import AddressFamily, AddressMapper
+from pants.engine.internals.mapper import AddressFamily, AddressMapper, AddressSpecsFilter
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.target_adaptor import TargetAdaptor
@@ -67,15 +67,12 @@ def resolve_addresses_with_origins_from_address_specs(
     tags: Optional[Iterable[str]] = None,
     exclude_patterns: Optional[Iterable[str]] = None
 ) -> AddressesWithOrigins:
-    address_mapper = AddressMapper(
-        Parser(target_type_aliases=[], object_aliases=BuildFileAliases()),
-        tags=tags,
-        exclude_target_regexps=exclude_patterns,
-    )
+    mapper = AddressMapper(Parser(target_type_aliases=[], object_aliases=BuildFileAliases()))
+    specs_filter = AddressSpecsFilter(tags=tags, exclude_target_regexps=exclude_patterns)
     snapshot = Snapshot(Digest("xx", 2), ("root/BUILD",), ())
     addresses_with_origins = run_rule(
         addresses_with_origins_from_address_specs,
-        rule_args=[address_mapper, address_specs],
+        rule_args=[mapper, address_specs, specs_filter],
         mock_gets=[
             MockGet(product_type=Snapshot, subject_type=PathGlobs, mock=lambda _: snapshot),
             MockGet(product_type=AddressFamily, subject_type=Dir, mock=lambda _: address_family,),
