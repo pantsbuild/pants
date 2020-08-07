@@ -97,28 +97,42 @@ pub enum LoadMetadata {
 }
 
 #[derive(Debug, PartialEq, Serialize)]
+pub struct FileMaterializeMetadata {
+  pub loaded_from: LoadMetadata,
+  pub is_executable: bool,
+}
+
+#[derive(Debug, PartialEq, Serialize)]
 pub struct DirectoryMaterializeMetadata {
-  pub metadata: LoadMetadata,
+  pub loaded_from: LoadMetadata,
   pub child_directories: BTreeMap<String, DirectoryMaterializeMetadata>,
-  pub child_files: BTreeMap<String, LoadMetadata>,
+  pub child_files: BTreeMap<String, FileMaterializeMetadata>,
+}
+
+struct FileMetadata {
+  path: String,
+  is_executable: bool,
 }
 
 impl DirectoryMaterializeMetadata {
-  pub fn to_path_list(&self) -> Vec<String> {
+  fn to_file_metadata_list(&self) -> Vec<FileMetadata> {
     fn recurse(
-      outputs: &mut Vec<String>,
+      outputs: &mut Vec<FileMetadata>,
       path_so_far: PathBuf,
       current: &DirectoryMaterializeMetadata,
     ) {
-      for (child, _) in current.child_files.iter() {
-        outputs.push(path_so_far.join(child).to_string_lossy().to_string())
+      for (child, meta) in current.child_files.iter() {
+        outputs.push(FileMetadata {
+          path: path_so_far.join(child).to_string_lossy().to_string(),
+          is_executable: meta.is_executable,
+        })
       }
 
       for (dir, meta) in current.child_directories.iter() {
         recurse(outputs, path_so_far.join(dir), &meta);
       }
     }
-    let mut output_paths: Vec<String> = vec![];
+    let mut output_paths: Vec<FileMetadata> = vec![];
     recurse(&mut output_paths, PathBuf::new(), self);
     output_paths
   }
@@ -126,15 +140,15 @@ impl DirectoryMaterializeMetadata {
 
 #[derive(Debug)]
 struct DirectoryMaterializeMetadataBuilder {
-  pub metadata: LoadMetadata,
+  pub loaded_from: LoadMetadata,
   pub child_directories: Arc<Mutex<BTreeMap<String, DirectoryMaterializeMetadataBuilder>>>,
-  pub child_files: Arc<Mutex<BTreeMap<String, LoadMetadata>>>,
+  pub child_files: Arc<Mutex<BTreeMap<String, FileMaterializeMetadata>>>,
 }
 
 impl DirectoryMaterializeMetadataBuilder {
-  pub fn new(metadata: LoadMetadata) -> Self {
+  pub fn new(loaded_from: LoadMetadata) -> Self {
     DirectoryMaterializeMetadataBuilder {
-      metadata,
+      loaded_from,
       child_directories: Arc::new(Mutex::new(BTreeMap::new())),
       child_files: Arc::new(Mutex::new(BTreeMap::new())),
     }
@@ -148,7 +162,7 @@ impl DirectoryMaterializeMetadataBuilder {
       .into_inner();
     let child_files = Arc::try_unwrap(self.child_files).unwrap().into_inner();
     DirectoryMaterializeMetadata {
-      metadata: self.metadata,
+      loaded_from: self.loaded_from,
       child_directories: child_directories
         .into_iter()
         .map(|(dir, builder)| (dir, builder.build()))
@@ -166,7 +180,7 @@ enum RootOrParentMetadataBuilder {
     (
       String,
       Arc<Mutex<BTreeMap<String, DirectoryMaterializeMetadataBuilder>>>,
-      Arc<Mutex<BTreeMap<String, LoadMetadata>>>,
+      Arc<Mutex<BTreeMap<String, FileMaterializeMetadata>>>,
     ),
   ),
 }
@@ -741,15 +755,17 @@ impl Store {
         // materialize call is significantly faster than doing it as we go.
         future::join_all(
           materialize_metadata
-            .to_path_list()
+            .to_file_metadata_list()
             .into_iter()
-            .map(|path| {
-              let path = destination.join(path);
+            .map(|file_metadata| {
+              let path = destination.join(file_metadata.path);
+              let is_executable = file_metadata.is_executable;
               executor
                 .spawn_blocking(move || {
                   OpenOptions::new()
                     .write(true)
                     .create(false)
+                    .mode(if is_executable { 0o755 } else { 0o644 })
                     .open(path)?
                     .sync_all()
                 })
@@ -795,14 +811,14 @@ impl Store {
         )
       })?;
 
-      let (directory, metadata) = store
+      let (directory, loaded_from) = store
         .load_directory(digest)
         .await?
         .ok_or_else(|| format!("Directory with digest {:?} not found", digest))?;
 
       let (child_directories, child_files) = match root_or_parent_metadata {
         RootOrParentMetadataBuilder::Root(root) => {
-          let builder = DirectoryMaterializeMetadataBuilder::new(metadata);
+          let builder = DirectoryMaterializeMetadataBuilder::new(loaded_from);
           let child_directories = builder.child_directories.clone();
           let child_files = builder.child_files.clone();
           *root.lock() = Some(builder);
@@ -813,7 +829,7 @@ impl Store {
           parent_child_directories,
           _parent_files,
         )) => {
-          let builder = DirectoryMaterializeMetadataBuilder::new(metadata);
+          let builder = DirectoryMaterializeMetadataBuilder::new(loaded_from);
           let child_directories = builder.child_directories.clone();
           let child_files = builder.child_files.clone();
           parent_child_directories.lock().insert(dir_name, builder);
@@ -830,9 +846,18 @@ impl Store {
           let digest = try_future!(file_node.get_digest().try_into());
           let child_files = child_files.clone();
           let name = file_node.get_name().to_owned();
+          let is_executable = file_node.is_executable;
           store
-            .materialize_file(path, digest, file_node.is_executable, false)
-            .map(move |metadata| child_files.lock().insert(name, metadata))
+            .materialize_file(path, digest, is_executable, false)
+            .map(move |loaded_from| {
+              child_files.lock().insert(
+                name,
+                FileMaterializeMetadata {
+                  loaded_from,
+                  is_executable,
+                },
+              )
+            })
             .to_boxed()
         })
         .collect::<Vec<_>>();

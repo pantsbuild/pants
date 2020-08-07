@@ -1,6 +1,6 @@
 use crate::{
-  DirectoryMaterializeMetadata, EntryType, FileContent, LoadMetadata, Store, UploadSummary,
-  MEGABYTES,
+  DirectoryMaterializeMetadata, EntryType, FileContent, FileMaterializeMetadata, LoadMetadata,
+  Store, UploadSummary, MEGABYTES,
 };
 
 use bazel_protos;
@@ -1447,16 +1447,16 @@ async fn materialize_directory_metadata_all_local() {
   let local = LoadMetadata::Local;
 
   let want = DirectoryMaterializeMetadata {
-    metadata: local.clone(),
+    loaded_from: local.clone(),
     child_directories: btreemap! {
       "pets".to_owned() => DirectoryMaterializeMetadata {
-        metadata: local.clone(),
+        loaded_from: local.clone(),
         child_directories: btreemap!{
           "cats".to_owned() => DirectoryMaterializeMetadata {
-            metadata: local.clone(),
+            loaded_from: local.clone(),
             child_directories: btreemap!{},
             child_files: btreemap!{
-              "roland".to_owned() => local.clone(),
+              "roland".to_owned() => FileMaterializeMetadata { loaded_from: local.clone(), is_executable: false },
             },
           }
         },
@@ -1504,10 +1504,13 @@ async fn materialize_directory_metadata_mixed() {
     .child_directories
     .get("pets")
     .unwrap()
-    .metadata
+    .loaded_from
     .is_remote());
   assert_eq!(
-    LoadMetadata::Local,
+    FileMaterializeMetadata {
+      loaded_from: LoadMetadata::Local,
+      is_executable: false
+    },
     *metadata
       .child_directories
       .get("pets")
