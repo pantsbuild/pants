@@ -29,6 +29,7 @@
 #![allow(clippy::mutex_atomic)]
 
 use std::collections::{hash_map, BTreeSet, HashMap, HashSet};
+use std::convert::TryInto;
 
 use crate::rules::{DependencyKey, Rule};
 // TODO: The Builder should likely not be using `params_str`: we should be able to build a graph
@@ -436,8 +437,8 @@ impl<'t, R: Rule> Builder<'t, R> {
     entry: &EntryWithDeps<R>,
     deps: &[(R::DependencyKey, Vec<Entry<R>>)],
   ) -> Result<RuleDependencyEdges<R>, Vec<Diagnostic<R>>> {
-    // Collect the powerset of the union of used parameters, ordered by set size.
-    let params_powerset: Vec<Vec<R::TypeId>> = {
+    // Collect all used parameters.
+    let all_used_params: Vec<R::TypeId> = {
       let mut all_used_params = BTreeSet::new();
       for (key, inputs) in deps {
         let provided_param = key.provided_param();
@@ -450,36 +451,54 @@ impl<'t, R: Rule> Builder<'t, R> {
           );
         }
       }
-      // Compute the powerset ordered by ascending set size.
-      let all_used_params = all_used_params.into_iter().collect::<Vec<_>>();
-      let mut param_sets = Self::powerset(&all_used_params).collect::<Vec<_>>();
-      param_sets.sort_by(|l, r| l.len().cmp(&r.len()));
-      param_sets
+      all_used_params.into_iter().collect::<Vec<_>>()
     };
 
-    // Then, for the powerset of used parameters, determine which dependency combinations are
-    // satisfiable.
-    let mut combinations: HashMap<EntryWithDeps<_>, _> = HashMap::new();
+    // Then, for the powerset of used parameters (in ascending order by set size), determine which
+    // dependency combinations are satisfiable.
+    let used_params_size: u8 = all_used_params.len().try_into().unwrap_or_else(|_| {
+      panic!(
+        "Cannot operate on more than 256 consumed parameters: {}",
+        params_str(&all_used_params.iter().cloned().collect::<ParamTypes<_>>())
+      );
+    });
+    let mut combinations: Vec<(i64, EntryWithDeps<R>, _)> = Vec::new();
     let mut diagnostics = Vec::new();
-    for available_params in params_powerset {
-      let available_params = available_params.into_iter().collect();
+    for available_params_bits in Powerset::new(used_params_size) {
       // If a subset of these parameters is already satisfied, skip. This has the effect of
       // selecting the smallest sets of parameters that will satisfy a rule.
       // NB: This scan over satisfied sets is linear, but should have a small N.
-      if combinations
-        .keys()
-        .any(|satisfied_entry| satisfied_entry.params().is_subset(&available_params))
-      {
+      let already_satisfied = combinations.iter().any(|&(satisfied_params_bits, _, _)| {
+        // Is a subset if "subtracting" the bits of the superset results in the empty set.
+        satisfied_params_bits & !available_params_bits == 0
+      });
+      if already_satisfied {
         continue;
       }
 
+      // We haven't seen this combination before: compute the actual parameter values.
+      let available_params = all_used_params
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, typeid)| {
+          if available_params_bits & (1 << idx) == 0 {
+            None
+          } else {
+            Some(*typeid)
+          }
+        })
+        .collect();
       match Self::choose_dependencies(&available_params, deps) {
         Ok(Some(inputs)) => {
           let mut rule_edges = RuleEdges::default();
           for (key, input) in inputs {
             rule_edges.add_edge(*key, input.clone());
           }
-          combinations.insert(entry.simplified(available_params), rule_edges);
+          combinations.push((
+            available_params_bits,
+            entry.simplified(available_params),
+            rule_edges,
+          ));
         }
         Ok(None) => {}
         Err(diagnostic) => diagnostics.push(diagnostic),
@@ -490,7 +509,7 @@ impl<'t, R: Rule> Builder<'t, R> {
     if combinations.is_empty() {
       Err(diagnostics)
     } else {
-      Ok(combinations)
+      Ok(combinations.into_iter().map(|(_, k, v)| (k, v)).collect())
     }
   }
 
@@ -585,24 +604,6 @@ impl<'t, R: Rule> Builder<'t, R> {
     rules
   }
 
-  fn powerset<'a, T: Clone>(slice: &'a [T]) -> impl Iterator<Item = Vec<T>> + 'a {
-    (0..(1 << slice.len())).map(move |mask| {
-      let mut ss = Vec::new();
-      let mut bitset = mask;
-      while bitset > 0 {
-        // isolate the rightmost bit to select one item
-        let rightmost: u64 = bitset & !(bitset - 1);
-        // turn the isolated bit into an array index
-        let idx = rightmost.trailing_zeros();
-        let item = &slice[idx as usize];
-        ss.push(item.clone());
-        // zero the trailing bit
-        bitset &= bitset - 1;
-      }
-      ss
-    })
-  }
-
   fn gen_root_entries(&self, product_types: &HashSet<R::TypeId>) -> Vec<RootEntry<R>> {
     product_types
       .iter()
@@ -645,5 +646,110 @@ impl<'t, R: Rule> Builder<'t, R> {
       }));
     }
     entries
+  }
+}
+
+///
+/// Iterates over all combinations of the given set size in ascending order.
+///
+pub struct Powerset {
+  pop_count: u8,
+  block_size: u8,
+  permutations_for_pop_count: Permutations,
+}
+
+impl Powerset {
+  pub fn new(block_size: u8) -> Powerset {
+    Powerset {
+      pop_count: 0,
+      block_size,
+      // NB: Initialized for popcount 1, since a popcount of 0 isn't legal, and is handled in
+      // the loop body.
+      permutations_for_pop_count: Permutations::new(1, block_size),
+    }
+  }
+}
+
+impl Iterator for Powerset {
+  type Item = i64;
+
+  fn next(&mut self) -> Option<Self::Item> {
+    if self.pop_count == 0 {
+      self.pop_count += 1;
+      // The empty set.
+      return Some(0);
+    }
+
+    loop {
+      if self.pop_count > self.block_size {
+        return None;
+      }
+
+      let next = self.permutations_for_pop_count.next();
+      if next.is_some() {
+        return next;
+      } else {
+        // Start iterating over the permutations of the next set size.
+        self.pop_count += 1;
+        self.permutations_for_pop_count = Permutations::new(self.pop_count, self.block_size);
+      }
+    }
+  }
+}
+
+///
+/// An iterator that generates all permutations with a particular size as a bitset in an i64.
+///
+/// Based on https://alexbowe.com/popcount-permutations/
+///
+struct Permutations {
+  v: i64,
+  initial: i64,
+  block_mask: i64,
+}
+
+impl Permutations {
+  fn new(pop_count: u8, block_size: u8) -> Permutations {
+    assert!(pop_count > 0);
+    let initial = Self::first_perm(pop_count);
+    let block_mask = Self::first_perm(block_size);
+    Permutations {
+      v: initial,
+      initial,
+      block_mask,
+    }
+  }
+
+  ///
+  /// Generates the first permutation with a given count of set bits, which is used to generate
+  /// the rest.
+  ///
+  fn first_perm(c: u8) -> i64 {
+    (1_i64 << c) - 1_i64
+  }
+
+  ///
+  /// Generate the next permutation with a given amount of set bits,
+  /// given the previous lexicographical value.
+  ///
+  /// Taken from http://graphics.stanford.edu/~seander/bithacks.html
+  ///
+  fn next_perm(v: i64) -> i64 {
+    let t = (v | (v - 1)) + 1;
+    t | ((((t & -t) / (v & -v)) >> 1) - 1)
+  }
+}
+
+impl Iterator for Permutations {
+  type Item = i64;
+
+  fn next(&mut self) -> Option<Self::Item> {
+    if self.v >= self.initial {
+      let result = self.v;
+      self.v = Self::next_perm(self.v) & self.block_mask;
+      Some(result)
+    } else {
+      None
+    }
   }
 }

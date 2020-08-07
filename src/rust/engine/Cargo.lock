@@ -2428,6 +2428,10 @@ dependencies = [
 [[package]]
 name = "rule_graph"
 version = "0.0.1"
+dependencies = [
+ "env_logger 0.5.13 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "rust-argon2"

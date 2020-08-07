@@ -4,3 +4,7 @@ edition = "2018"
 name = "rule_graph"
 authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
+
+[dependencies]
+log = "0.4"
+env_logger = "0.5.4"
