@@ -511,7 +511,7 @@ def lint(python_version: PythonVersion) -> Dict:
             # local execution has finished.
             (
                 "travis-wait-enhanced --timeout 40m --interval 9m -- ./build-support/bin/ci.py "
-                f"--remote-execution-enabled --lint --python-version {python_version.decimal}"
+                f"--lint --python-version {python_version.decimal}"
             ),
         ],
     }
@@ -558,7 +558,7 @@ def python_tests(python_version: PythonVersion) -> Dict:
         "name": f"Python tests (Python {python_version.decimal})",
         "script": [
             "travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py "
-            "--unit-tests --integration-tests --remote-execution-enabled --python-version "
+            "--unit-tests --integration-tests --python-version "
             f"{python_version.decimal}"
         ],
         "after_success": ["./build-support/bin/upload_coverage.sh"],
