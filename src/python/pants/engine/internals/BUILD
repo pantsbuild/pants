@@ -17,7 +17,7 @@ python_integration_tests(
   dependencies=[
     'examples/src/python/example:hello_directory',
   ],
-  timeout=90,
+  timeout=180,
 )
 
 python_library(
