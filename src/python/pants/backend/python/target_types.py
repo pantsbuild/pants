@@ -76,9 +76,6 @@ class PythonProvidesField(ScalarField, ProvidesField):
 COMMON_PYTHON_FIELDS = (
     *COMMON_TARGET_FIELDS,
     Dependencies,
-    # TODO(#9388): Only register the Provides field on PythonBinary and PythonLibrary, not things
-    #  like PythonTests.
-    PythonProvidesField,
     PythonInterpreterCompatibility,
 )
 
@@ -384,3 +381,15 @@ class PythonRequirementsFile(Target):
 
     alias = "_python_requirements_file"
     core_fields = (*COMMON_TARGET_FIELDS, PythonRequirementsFileSources)
+
+
+# -----------------------------------------------------------------------------------------------
+# `python_distribution` target
+# -----------------------------------------------------------------------------------------------
+
+
+class PythonDistribution(Target):
+    """A publishable Python distribution."""
+
+    alias = "python_distribution"
+    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, PythonProvidesField)
