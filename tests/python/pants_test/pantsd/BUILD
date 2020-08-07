@@ -18,5 +18,5 @@ python_integration_tests(
     'testprojects/src/python:print_env_directory',
   ],
   uses_pants_run=True,
-  timeout = 1020
+  timeout = 1800
 )
