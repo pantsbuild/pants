@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.base.specs import (
+    AddressLiteralSpec,
     AddressSpecs,
     AscendantAddresses,
     DescendantAddresses,
@@ -9,24 +10,23 @@ from pants.base.specs import (
     FilesystemLiteralSpec,
     FilesystemSpecs,
     SiblingAddresses,
-    SingleAddress,
 )
 
 
 def test_address_specs_more_specific() -> None:
-    single_address = SingleAddress(directory="foo/bar", name="baz")
+    literal_addr = AddressLiteralSpec(path_component="foo/bar", target_component="baz")
     sibling_addresses = SiblingAddresses(directory="foo/bar")
     ascendant_addresses = AscendantAddresses(directory="foo/bar")
     descendant_addresses = DescendantAddresses(directory="foo/bar")
 
-    assert single_address == AddressSpecs.more_specific(single_address, None)
-    assert single_address == AddressSpecs.more_specific(single_address, sibling_addresses)
-    assert single_address == AddressSpecs.more_specific(single_address, ascendant_addresses)
-    assert single_address == AddressSpecs.more_specific(single_address, descendant_addresses)
-    assert single_address == AddressSpecs.more_specific(None, single_address)
-    assert single_address == AddressSpecs.more_specific(sibling_addresses, single_address)
-    assert single_address == AddressSpecs.more_specific(ascendant_addresses, single_address)
-    assert single_address == AddressSpecs.more_specific(descendant_addresses, single_address)
+    assert literal_addr == AddressSpecs.more_specific(literal_addr, None)
+    assert literal_addr == AddressSpecs.more_specific(literal_addr, sibling_addresses)
+    assert literal_addr == AddressSpecs.more_specific(literal_addr, ascendant_addresses)
+    assert literal_addr == AddressSpecs.more_specific(literal_addr, descendant_addresses)
+    assert literal_addr == AddressSpecs.more_specific(None, literal_addr)
+    assert literal_addr == AddressSpecs.more_specific(sibling_addresses, literal_addr)
+    assert literal_addr == AddressSpecs.more_specific(ascendant_addresses, literal_addr)
+    assert literal_addr == AddressSpecs.more_specific(descendant_addresses, literal_addr)
 
     assert sibling_addresses == AddressSpecs.more_specific(sibling_addresses, None)
     assert sibling_addresses == AddressSpecs.more_specific(sibling_addresses, ascendant_addresses)

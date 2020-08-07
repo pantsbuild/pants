@@ -10,11 +10,12 @@ from typing import Iterable, List, Set, Tuple, Type
 import pytest
 
 from pants.base.specs import (
+    AddressLiteralSpec,
     FilesystemGlobSpec,
     FilesystemLiteralSpec,
     FilesystemSpecs,
-    SingleAddress,
 )
+from pants.base.specs_parser import SpecsParser
 from pants.engine.addresses import (
     Address,
     Addresses,
@@ -67,7 +68,6 @@ from pants.engine.target import (
     WrappedTarget,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
-from pants.init.specs_calculator import SpecsCalculator
 from pants.testutil.engine.util import Params
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
@@ -248,12 +248,12 @@ class GraphTest(TestBase):
 
     def test_resolve_generated_subtarget(self) -> None:
         self.add_to_build_file("demo", "target(sources=['f1.txt', 'f2.txt'])")
-        generated_target_addresss = Address("demo", relative_file_path="f1.txt", target_name="demo")
+        generated_target_address = Address("demo", relative_file_path="f1.txt", target_name="demo")
         generated_target = self.request_single_product(
-            WrappedTarget, Params(generated_target_addresss, create_options_bootstrapper())
+            WrappedTarget, Params(generated_target_address, create_options_bootstrapper())
         ).target
         assert generated_target == MockTarget(
-            {Sources.alias: ["f1.txt"]}, address=generated_target_addresss
+            {Sources.alias: ["f1.txt"]}, address=generated_target_address
         )
 
     def test_resolve_sources_snapshot(self) -> None:
@@ -267,7 +267,7 @@ class GraphTest(TestBase):
         """
         self.create_files("demo", ["f1.txt", "f2.txt"])
         self.add_to_build_file("demo", "target(sources=['*.txt'])")
-        specs = SpecsCalculator.parse_specs(["demo:demo", "demo/f1.txt", "demo/BUILD"])
+        specs = SpecsParser(self.build_root).parse_specs(["demo:demo", "demo/f1.txt", "demo/BUILD"])
         result = self.request_single_product(
             SourcesSnapshot, Params(specs, create_options_bootstrapper())
         )
@@ -469,7 +469,9 @@ class TestSpecsToAddresses(TestBase):
         self.add_to_build_file("multiple_files", "target(sources=['*.txt'])")
         multiple_files_specs = ["multiple_files/f2.txt", "multiple_files:multiple_files"]
 
-        specs = SpecsCalculator.parse_specs([*no_interaction_specs, *multiple_files_specs])
+        specs = SpecsParser(self.build_root).parse_specs(
+            [*no_interaction_specs, *multiple_files_specs]
+        )
         result = self.request_single_product(
             AddressesWithOrigins, Params(specs, create_options_bootstrapper())
         )
@@ -479,10 +481,11 @@ class TestSpecsToAddresses(TestBase):
                 origin=FilesystemLiteralSpec("fs_spec/f.txt"),
             ),
             AddressWithOrigin(
-                Address("address_spec"), origin=SingleAddress("address_spec", "address_spec"),
+                Address("address_spec"), origin=AddressLiteralSpec("address_spec", "address_spec"),
             ),
             AddressWithOrigin(
-                Address("multiple_files"), origin=SingleAddress("multiple_files", "multiple_files"),
+                Address("multiple_files"),
+                origin=AddressLiteralSpec("multiple_files", "multiple_files"),
             ),
             AddressWithOrigin(
                 Address("multiple_files", relative_file_path="f2.txt"),

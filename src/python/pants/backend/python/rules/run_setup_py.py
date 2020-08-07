@@ -29,7 +29,7 @@ from pants.backend.python.target_types import (
     PythonRequirementsField,
     PythonSources,
 )
-from pants.base.specs import AddressSpecs, AscendantAddresses, SingleAddress
+from pants.base.specs import AddressLiteralSpec, AddressSpecs, AscendantAddresses
 from pants.core.target_types import FilesSources, ResourcesSources
 from pants.core.util_rules.distdir import DistDir
 from pants.engine.addresses import Address, Addresses
@@ -288,7 +288,7 @@ async def run_setup_pys(
         tgt = target_with_origin.target
         if _is_exported(tgt):
             exported_targets.append(ExportedTarget(tgt))
-        elif isinstance(target_with_origin.origin, SingleAddress):
+        elif isinstance(target_with_origin.origin, AddressLiteralSpec):
             explicit_nonexported_targets.append(tgt)
     if explicit_nonexported_targets:
         raise TargetNotExported(

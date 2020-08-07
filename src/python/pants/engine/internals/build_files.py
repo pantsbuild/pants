@@ -26,6 +26,7 @@ from pants.engine.internals.mapper import (
 from pants.engine.internals.parser import BuildFilePreludeSymbols, error_on_imports
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.target import UnexpandedTargets
 from pants.option.global_options import GlobalOptions
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import OrderedSet
@@ -166,7 +167,32 @@ async def addresses_with_origins_from_address_specs(
     :raises: :class:`ResolveError` if the provided specs fail to match targets, and those spec
         types expect to have matched something.
     """
-    # Snapshot all BUILD files covered by the AddressSpecs, then group by directory.
+    matched_addresses: OrderedSet[Address] = OrderedSet()
+    addr_to_origin: Dict[Address, AddressSpec] = {}
+    filtering_disabled = address_specs.filter_by_global_options is False
+
+    # First convert all `AddressLiteralSpec`s. Some of the resulting addresses may be file
+    # addresses. This will raise an exception if any of the addresses are not valid.
+    literal_addresses = await MultiGet(
+        Get(Address, AddressInput(spec.path_component, spec.target_component))
+        for spec in address_specs.literals
+    )
+    literal_target_adaptors = await MultiGet(
+        Get(TargetAdaptor, Address, addr.maybe_convert_to_base_target())
+        for addr in literal_addresses
+    )
+    # We convert to targets for the side effect of validating that any file addresses actually
+    # belong to the specified base targets.
+    await Get(UnexpandedTargets, Addresses(literal_addresses))
+    for spec, addr, target_adaptor in zip(
+        address_specs.literals, literal_addresses, literal_target_adaptors
+    ):
+        addr_to_origin[addr] = spec
+        if filtering_disabled or specs_filter.matches(addr, target_adaptor):
+            matched_addresses.add(addr)
+
+    # Then, convert all `AddressGlobSpecs`. Snapshot all BUILD files covered by the specs, then
+    # group by directory.
     snapshot = await Get(
         Snapshot,
         PathGlobs,
@@ -179,24 +205,19 @@ async def addresses_with_origins_from_address_specs(
     address_families = await MultiGet(Get(AddressFamily, Dir(d)) for d in dirnames)
     address_family_by_directory = {af.namespace: af for af in address_families}
 
-    matched_addresses: OrderedSet[Address] = OrderedSet()
-    addr_to_origin: Dict[Address, AddressSpec] = {}
-
-    for address_spec in address_specs:
+    for spec in address_specs.globs:
         # These may raise ResolveError, depending on the type of spec.
-        addr_families_for_spec = address_spec.matching_address_families(address_family_by_directory)
-        addr_target_pairs_for_spec = address_spec.matching_addresses(addr_families_for_spec)
+        addr_families_for_spec = spec.matching_address_families(address_family_by_directory)
+        addr_target_pairs_for_spec = spec.matching_addresses(addr_families_for_spec)
 
         for addr, _ in addr_target_pairs_for_spec:
             # A target might be covered by multiple specs, so we take the most specific one.
-            addr_to_origin[addr] = AddressSpecs.more_specific(
-                addr_to_origin.get(addr), address_spec
-            )
+            addr_to_origin[addr] = AddressSpecs.more_specific(addr_to_origin.get(addr), spec)
 
         matched_addresses.update(
             addr
             for (addr, tgt) in addr_target_pairs_for_spec
-            if address_specs.filter_by_global_options is False or specs_filter.matches(addr, tgt)
+            if filtering_disabled or specs_filter.matches(addr, tgt)
         )
 
     return AddressesWithOrigins(

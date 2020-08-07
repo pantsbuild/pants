@@ -4,7 +4,7 @@
 from typing import cast
 
 from pants.base.build_root import BuildRoot
-from pants.base.specs import SingleAddress
+from pants.base.specs import AddressLiteralSpec
 from pants.core.goals.binary import BinaryFieldSet
 from pants.core.goals.run import Run, RunRequest, RunSubsystem, run
 from pants.engine.addresses import Address
@@ -53,7 +53,7 @@ class RunTest(TestBase):
         address = Address.parse(address_spec)
         target = TestBinaryTarget({}, address=address)
         target_with_origin = TargetWithOrigin(
-            target, SingleAddress(address.spec_path, address.target_name)
+            target, AddressLiteralSpec(address.spec_path, address.target_name)
         )
         field_set = TestBinaryFieldSet.create(target)
 

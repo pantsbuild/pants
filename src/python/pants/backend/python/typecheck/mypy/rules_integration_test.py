@@ -9,7 +9,7 @@ from pants.backend.python.dependency_inference import rules as dependency_infere
 from pants.backend.python.target_types import PythonLibrary
 from pants.backend.python.typecheck.mypy.rules import MyPyFieldSet, MyPyRequest
 from pants.backend.python.typecheck.mypy.rules import rules as mypy_rules
-from pants.base.specs import SingleAddress
+from pants.base.specs import AddressLiteralSpec
 from pants.core.goals.typecheck import TypecheckResults
 from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
@@ -107,7 +107,7 @@ class MyPyIntegrationTest(ExternalToolTestBase):
                 create_options_bootstrapper(args=self.global_args),
             ),
         ).target
-        origin = SingleAddress(directory=package, name=name)
+        origin = AddressLiteralSpec(package, name)
         return TargetWithOrigin(target, origin)
 
     def run_mypy(
