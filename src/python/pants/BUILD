@@ -15,9 +15,8 @@ python_library(
   sources=['__init__.py'],
 )
 
-python_library(
+python_distribution(
   name='pants-packaged',
-  sources=[],
   dependencies=[
     ':dummy_c',
     ':entry_point',

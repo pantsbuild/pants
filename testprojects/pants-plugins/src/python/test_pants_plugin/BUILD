@@ -1,7 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-python_library(
+python_distribution(
   dependencies=[
     # TODO: exclude all inferred Pants dependencies.
     'testprojects/pants-plugins/3rdparty/python/pants',
