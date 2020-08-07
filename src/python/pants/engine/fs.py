@@ -3,11 +3,10 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Iterable, Optional, Tuple, cast
+from typing import TYPE_CHECKING, Iterable, Optional, Tuple
 
 from pants.engine.collection import Collection
-from pants.engine.rules import RootRule, collect_rules, rule, side_effecting
-from pants.option.global_options import GlobalOptions
+from pants.engine.rules import RootRule, collect_rules, side_effecting
 from pants.option.global_options import GlobMatchErrorBehavior as GlobMatchErrorBehavior
 from pants.util.meta import frozen_after_init
 
@@ -65,14 +64,6 @@ class CreateDigest(Collection[FileContent]):
     This does _not_ actually materialize the digest to the build root. You must use
     `engine.fs.Workspace` in a `@goal_rule` to save the resulting digest to disk.
     """
-
-
-@rule
-def glob_match_error_behavior_singleton(global_options: GlobalOptions) -> GlobMatchErrorBehavior:
-    return cast(
-        GlobMatchErrorBehavior,
-        global_options.options.files_not_found_behavior.to_glob_match_error_behavior(),
-    )
 
 
 class GlobExpansionConjunction(Enum):

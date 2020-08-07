@@ -13,10 +13,12 @@ from pants.base.specs import Specs
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine import fs, process
 from pants.engine.console import Console
-from pants.engine.fs import Workspace
+from pants.engine.fs import GlobMatchErrorBehavior, Workspace
 from pants.engine.goal import Goal
 from pants.engine.internals import build_files, graph, options_parsing, uuid
+from pants.engine.internals.mapper import AddressMapper
 from pants.engine.internals.native import Native
+from pants.engine.internals.parser import Parser
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
 from pants.engine.internals.selectors import Params
 from pants.engine.platform import create_platform_rules
@@ -196,6 +198,32 @@ class EngineInitializer:
 
         bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
         execution_options = execution_options or DEFAULT_EXECUTION_OPTIONS
+
+        # TODO(#10569): move this out of engine_initializer.py into a normal rule that sets up
+        #  AddressMapper.
+        parser = Parser(
+            target_type_aliases=registered_target_types.aliases,
+            object_aliases=build_configuration.registered_aliases,
+        )
+        address_mapper = AddressMapper(
+            parser=parser,
+            prelude_glob_patterns=bootstrap_options.build_file_prelude_globs,
+            build_patterns=bootstrap_options.build_patterns,
+            build_ignore_patterns=bootstrap_options.build_ignore,
+            tags=bootstrap_options.tag,
+            exclude_target_regexps=bootstrap_options.exclude_target_regexp,
+            subproject_roots=bootstrap_options.subproject_roots,
+        )
+
+        @rule
+        def address_mapper_singleton() -> AddressMapper:
+            return address_mapper
+
+        # TODO(#10569): move this out of engine_initializer.py into a normal rule that sets up
+        #  GlobMatchErrorBehavior.
+        @rule
+        def glob_match_error_behavior_singleton() -> GlobMatchErrorBehavior:
+            return bootstrap_options.files_not_found_behavior.to_glob_match_error_behavior()
 
         @rule
         def build_configuration_singleton() -> BuildConfiguration:
