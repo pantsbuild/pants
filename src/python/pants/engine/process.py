@@ -343,6 +343,8 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
     script_path = "./script.sh"
     script_content = dedent(
         """
+        #!/usr/bin/env bash
+
         set -euo pipefail
 
         if command -v which > /dev/null; then
@@ -365,7 +367,7 @@ async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
             description=f"Searching for `{request.binary_name}` on PATH={search_path}",
             level=LogLevel.DEBUG,
             input_digest=script_digest,
-            argv=["/bin/bash", script_path, request.binary_name],
+            argv=[script_path, request.binary_name],
             env={"PATH": search_path},
         ),
     )
