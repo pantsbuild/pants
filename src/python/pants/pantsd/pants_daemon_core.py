@@ -7,7 +7,7 @@ from typing import Optional
 
 from typing_extensions import Protocol
 
-from pants.init.engine_initializer import EngineInitializer, LegacyGraphScheduler
+from pants.init.engine_initializer import EngineInitializer, GraphScheduler
 from pants.init.options_initializer import BuildConfigInitializer
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 class PantsServicesConstructor(Protocol):
     def __call__(
-        self, bootstrap_options: OptionValueContainer, legacy_graph_scheduler: LegacyGraphScheduler,
+        self, bootstrap_options: OptionValueContainer, graph_scheduler: GraphScheduler,
     ) -> PantsServices:
         ...
 
@@ -39,7 +39,7 @@ class PantsDaemonCore:
         # N.B. This Event is used as nothing more than an atomic flag - nothing waits on it.
         self._kill_switch = threading.Event()
 
-        self._scheduler: Optional[LegacyGraphScheduler] = None
+        self._scheduler: Optional[GraphScheduler] = None
         self._services: Optional[PantsServices] = None
         self._fingerprint: Optional[str] = None
 
@@ -72,9 +72,7 @@ class PantsDaemonCore:
             if self._services:
                 self._services.shutdown()
             build_config = BuildConfigInitializer.get(options_bootstrapper)
-            self._scheduler = EngineInitializer.setup_legacy_graph(
-                options_bootstrapper, build_config
-            )
+            self._scheduler = EngineInitializer.setup_graph(options_bootstrapper, build_config)
             bootstrap_options_values = options_bootstrapper.bootstrap_options.for_global_scope()
             self._services = self._services_constructor(bootstrap_options_values, self._scheduler)
             self._fingerprint = options_fingerprint
@@ -84,7 +82,7 @@ class PantsDaemonCore:
             self._scheduler = None
             raise e
 
-    def prepare_scheduler(self, options_bootstrapper: OptionsBootstrapper) -> LegacyGraphScheduler:
+    def prepare_scheduler(self, options_bootstrapper: OptionsBootstrapper) -> GraphScheduler:
         """Get a scheduler for the given options_bootstrapper.
 
         Runs in a client context (generally in DaemonPantsRunner) so logging is sent to the client.

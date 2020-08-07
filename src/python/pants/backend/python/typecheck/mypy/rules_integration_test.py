@@ -57,6 +57,12 @@ class MyPyIntegrationTest(ExternalToolTestBase):
         ).encode(),
     )
 
+    global_args = (
+        "--backend-packages=pants.backend.python",
+        "--backend-packages=pants.backend.python.typecheck.mypy",
+        "--source-root-patterns=['src/python', 'tests/python']",
+    )
+
     @classmethod
     def rules(cls):
         return (
@@ -95,7 +101,11 @@ class MyPyIntegrationTest(ExternalToolTestBase):
             ),
         )
         target = self.request_single_product(
-            WrappedTarget, Address(package, target_name=name)
+            WrappedTarget,
+            Params(
+                Address(package, target_name=name),
+                create_options_bootstrapper(args=self.global_args),
+            ),
         ).target
         origin = SingleAddress(directory=package, name=name)
         return TargetWithOrigin(target, origin)
@@ -109,11 +119,7 @@ class MyPyIntegrationTest(ExternalToolTestBase):
         skip: bool = False,
         additional_args: Optional[List[str]] = None,
     ) -> TypecheckResults:
-        args = [
-            "--backend-packages=pants.backend.python",
-            "--backend-packages=pants.backend.python.typecheck.mypy",
-            "--source-root-patterns=['src/python', 'tests/python']",
-        ]
+        args = list(self.global_args)
         if config:
             self.create_file(relpath="mypy.ini", contents=config)
             args.append("--mypy-config=mypy.ini")

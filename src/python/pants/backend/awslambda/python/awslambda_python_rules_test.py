@@ -34,18 +34,17 @@ class TestPythonAWSLambdaCreation(ExternalToolTestBase):
         return [PythonAWSLambda, PythonLibrary]
 
     def create_python_awslambda(self, addr: str) -> Tuple[str, bytes]:
-        target = self.request_single_product(WrappedTarget, Address.parse(addr)).target
+        bootstrapper = create_options_bootstrapper(
+            args=[
+                "--backend-packages=pants.backend.awslambda.python",
+                "--source-root-patterns=src/python",
+            ]
+        )
+        target = self.request_single_product(
+            WrappedTarget, Params(Address.parse(addr), bootstrapper)
+        ).target
         created_awslambda = self.request_single_product(
-            CreatedAWSLambda,
-            Params(
-                PythonAwsLambdaFieldSet.create(target),
-                create_options_bootstrapper(
-                    args=[
-                        "--backend-packages=pants.backend.awslambda.python",
-                        "--source-root-patterns=src/python",
-                    ]
-                ),
-            ),
+            CreatedAWSLambda, Params(PythonAwsLambdaFieldSet.create(target), bootstrapper)
         )
         created_awslambda_digest_contents = self.request_single_product(
             DigestContents, created_awslambda.digest

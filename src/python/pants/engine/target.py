@@ -30,6 +30,7 @@ from pants.engine.addresses import Address, assert_single_address
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.fs import GlobExpansionConjunction, GlobMatchErrorBehavior, PathGlobs, Snapshot
 from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.option.global_options import FilesNotFoundBehavior
 from pants.source.filespec import Filespec, matches_filespec
 from pants.util.collections import ensure_list, ensure_str_list
 from pants.util.frozendict import FrozenDict
@@ -1247,11 +1248,12 @@ class Sources(AsyncField):
         return str(PurePath(self.address.spec_path, glob))
 
     @final
-    def path_globs(self, glob_match_error_behavior: GlobMatchErrorBehavior) -> Optional[PathGlobs]:
+    def path_globs(self, files_not_found_behavior: FilesNotFoundBehavior) -> Optional[PathGlobs]:
         globs = self.sanitized_raw_value
         if globs is None:
             return None
 
+        error_behavior = files_not_found_behavior.to_glob_match_error_behavior()
         conjunction = (
             GlobExpansionConjunction.all_match
             if not self.default or (set(globs) != set(self.default))
@@ -1260,12 +1262,12 @@ class Sources(AsyncField):
         return PathGlobs(
             (self._prefix_glob_with_address(glob) for glob in globs),
             conjunction=conjunction,
-            glob_match_error_behavior=glob_match_error_behavior,
+            glob_match_error_behavior=error_behavior,
             # TODO(#9012): add line number referring to the sources field. When doing this, we'll
             # likely need to `await Get(BuildFileAddress, Address)`.
             description_of_origin=(
                 f"{self.address}'s `{self.alias}` field"
-                if glob_match_error_behavior != GlobMatchErrorBehavior.ignore
+                if error_behavior != GlobMatchErrorBehavior.ignore
                 else None
             ),
         )

@@ -11,7 +11,7 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.internals.mapper import (
     AddressFamily,
     AddressMap,
-    AddressMapper,
+    AddressSpecsFilter,
     DifferingFamiliesError,
 )
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
@@ -123,7 +123,7 @@ def test_address_family_duplicate_names() -> None:
         )
 
 
-def test_match_filter_options() -> None:
+def test_address_specs_filter() -> None:
     def make_target(target_name: str, **kwargs) -> TargetAdaptor:
         parsed_address = Address("", target_name=target_name)
         return TargetAdaptor(
@@ -135,11 +135,10 @@ def test_match_filter_options() -> None:
     a_and_b_tagged_target = make_target(target_name="//:a-and-b-tagged", tags=["a", "b"])
     none_tagged_target = make_target(target_name="//:none-tagged-target", tags=None)
 
-    parser = Parser(target_type_aliases=[], object_aliases=BuildFileAliases())
-    mapper = AddressMapper(parser, tags=["-a", "+b"])
+    specs_filter = AddressSpecsFilter(tags=["-a", "+b"])
 
     def matches(tgt: TargetAdaptor) -> bool:
-        return mapper.matches_filter_options(tgt.kwargs["address"], tgt)
+        return specs_filter.matches(tgt.kwargs["address"], tgt)
 
     assert matches(untagged_target) is False
     assert matches(b_tagged_target) is True

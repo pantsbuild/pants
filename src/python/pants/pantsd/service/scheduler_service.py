@@ -9,7 +9,7 @@ import psutil
 
 from pants.engine.fs import PathGlobs, Snapshot
 from pants.engine.internals.scheduler import ExecutionTimeoutError
-from pants.init.engine_initializer import LegacyGraphScheduler
+from pants.init.engine_initializer import GraphScheduler
 from pants.pantsd.service.pants_service import PantsService
 
 
@@ -30,7 +30,7 @@ class SchedulerService(PantsService):
     def __init__(
         self,
         *,
-        legacy_graph_scheduler: LegacyGraphScheduler,
+        graph_scheduler: GraphScheduler,
         build_root: str,
         invalidation_globs: List[str],
         pidfile: str,
@@ -38,7 +38,7 @@ class SchedulerService(PantsService):
         max_memory_usage_in_bytes: int,
     ) -> None:
         """
-        :param legacy_graph_scheduler: The LegacyGraphScheduler instance for graph construction.
+        :param graph_scheduler: The GraphScheduler instance for graph construction.
         :param build_root: The current build root.
         :param invalidation_globs: A list of `globs` that when encountered in filesystem event
                                    subscriptions will tear down the daemon.
@@ -49,10 +49,10 @@ class SchedulerService(PantsService):
                                           shut down if it observes more than this amount in use.
         """
         super().__init__()
-        self._graph_helper = legacy_graph_scheduler
+        self._graph_helper = graph_scheduler
         self._build_root = build_root
 
-        self._scheduler = legacy_graph_scheduler.scheduler
+        self._scheduler = graph_scheduler.scheduler
         # This session is only used for checking whether any invalidation globs have been invalidated.
         # It is not involved with a build itself; just with deciding when we should restart pantsd.
         self._scheduler_session = self._scheduler.new_session(build_id="scheduler_service_session",)

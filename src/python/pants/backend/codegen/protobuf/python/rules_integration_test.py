@@ -45,22 +45,21 @@ class ProtobufPythonIntegrationTest(ExternalToolTestBase):
     def assert_files_generated(
         self, spec: str, *, expected_files: List[str], source_roots: List[str]
     ) -> None:
-        tgt = self.request_single_product(WrappedTarget, Address.parse(spec)).target
+        bootstrapper = create_options_bootstrapper(
+            args=[
+                "--backend-packages=pants.backend.codegen.protobuf.python",
+                f"--source-root-patterns={repr(source_roots)}",
+            ]
+        )
+        tgt = self.request_single_product(
+            WrappedTarget, Params(Address.parse(spec), bootstrapper)
+        ).target
         protocol_sources = self.request_single_product(
-            HydratedSources,
-            Params(HydrateSourcesRequest(tgt[ProtobufSources]), create_options_bootstrapper()),
+            HydratedSources, Params(HydrateSourcesRequest(tgt[ProtobufSources]), bootstrapper),
         )
         generated_sources = self.request_single_product(
             GeneratedSources,
-            Params(
-                GeneratePythonFromProtobufRequest(protocol_sources.snapshot, tgt),
-                create_options_bootstrapper(
-                    args=[
-                        "--backend-packages=pants.backend.codegen.protobuf.python",
-                        f"--source-root-patterns={repr(source_roots)}",
-                    ]
-                ),
-            ),
+            Params(GeneratePythonFromProtobufRequest(protocol_sources.snapshot, tgt), bootstrapper),
         )
         assert set(generated_sources.snapshot.files) == set(expected_files)
 

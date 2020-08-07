@@ -6,7 +6,7 @@ from typing import Any, Dict
 
 from pants.base.exceptions import ResolveError
 from pants.base.project_tree import Dir
-from pants.base.specs import AddressSpec, AddressSpecs, SingleAddress
+from pants.base.specs import AddressSpec, AddressSpecs
 from pants.engine.addresses import (
     Address,
     Addresses,
@@ -17,11 +17,16 @@ from pants.engine.addresses import (
     BuildFileAddresses,
 )
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, Snapshot
-from pants.engine.internals.mapper import AddressFamily, AddressMap, AddressMapper
+from pants.engine.internals.mapper import (
+    AddressFamily,
+    AddressMap,
+    AddressMapper,
+    AddressSpecsFilter,
+)
 from pants.engine.internals.parser import BuildFilePreludeSymbols, error_on_imports
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.util.collections import assert_single_element
+from pants.option.global_options import GlobalOptions
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import OrderedSet
 
@@ -102,25 +107,15 @@ async def parse_address_family(
     return AddressFamily.create(directory.path, address_maps)
 
 
-def _did_you_mean_exception(address_family: AddressFamily, name: str) -> ResolveError:
-    names = [
-        addr.target_name or os.path.basename(addr.spec_path)
-        for addr in address_family.addresses_to_target_adaptors
-    ]
-    possibilities = "\n  ".join(":{}".format(target_name) for target_name in sorted(names))
-    return ResolveError(
-        f"'{name}' was not found in namespace '{address_family.namespace}'. Did you mean one "
-        f"of:\n  {possibilities}"
-    )
-
-
 @rule
 async def find_build_file(address: Address) -> BuildFileAddress:
     address_family = await Get(AddressFamily, Dir(address.spec_path))
     owning_address = address.maybe_convert_to_base_target()
     if address_family.get_target_adaptor(owning_address) is None:
-        raise _did_you_mean_exception(
-            address_family=address_family, name=owning_address.target_name
+        raise ResolveError.did_you_mean(
+            bad_name=owning_address.target_name,
+            known_names=address_family.target_names,
+            namespace=address_family.namespace,
         )
     bfa = next(
         build_file_address
@@ -148,18 +143,28 @@ async def find_target_adaptor(address: Address) -> TargetAdaptor:
     address_family = await Get(AddressFamily, Dir(address.spec_path))
     target_adaptor = address_family.get_target_adaptor(address)
     if target_adaptor is None:
-        raise _did_you_mean_exception(address_family, address.target_name)
+        raise ResolveError.did_you_mean(
+            bad_name=address.target_name,
+            known_names=address_family.target_names,
+            namespace=address_family.namespace,
+        )
     return target_adaptor
 
 
 @rule
+def setup_address_specs_filter(global_options: GlobalOptions) -> AddressSpecsFilter:
+    opts = global_options.options
+    return AddressSpecsFilter(tags=opts.tag, exclude_target_regexps=opts.exclude_target_regexp)
+
+
+@rule
 async def addresses_with_origins_from_address_specs(
-    address_mapper: AddressMapper, address_specs: AddressSpecs
+    address_specs: AddressSpecs, address_mapper: AddressMapper, specs_filter: AddressSpecsFilter
 ) -> AddressesWithOrigins:
     """Given an AddressMapper and list of AddressSpecs, return matching AddressesWithOrigins.
 
-    :raises: :class:`ResolveError` if there were no matching AddressFamilies or no targets
-        were matched.
+    :raises: :class:`ResolveError` if the provided specs fail to match targets, and those spec
+        types expect to have matched something.
     """
     # Snapshot all BUILD files covered by the AddressSpecs, then group by directory.
     snapshot = await Get(
@@ -182,10 +187,6 @@ async def addresses_with_origins_from_address_specs(
         addr_families_for_spec = address_spec.matching_address_families(address_family_by_directory)
         addr_target_pairs_for_spec = address_spec.matching_addresses(addr_families_for_spec)
 
-        if isinstance(address_spec, SingleAddress) and not addr_target_pairs_for_spec:
-            addr_family = assert_single_element(addr_families_for_spec)
-            raise _did_you_mean_exception(addr_family, address_spec.name)
-
         for addr, _ in addr_target_pairs_for_spec:
             # A target might be covered by multiple specs, so we take the most specific one.
             addr_to_origin[addr] = AddressSpecs.more_specific(
@@ -195,10 +196,7 @@ async def addresses_with_origins_from_address_specs(
         matched_addresses.update(
             addr
             for (addr, tgt) in addr_target_pairs_for_spec
-            if (
-                address_specs.filter_by_global_options is False
-                or address_mapper.matches_filter_options(addr, tgt)
-            )
+            if address_specs.filter_by_global_options is False or specs_filter.matches(addr, tgt)
         )
 
     return AddressesWithOrigins(

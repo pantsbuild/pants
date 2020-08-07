@@ -16,7 +16,6 @@ from pants.base.build_environment import (
     get_pants_configdir,
     pants_version,
 )
-from pants.engine.fs import GlobMatchErrorBehavior
 from pants.option.custom_types import dir_option
 from pants.option.errors import OptionsError
 from pants.option.scope import GLOBAL_SCOPE
@@ -24,7 +23,19 @@ from pants.option.subsystem import Subsystem
 from pants.util.logging import LogLevel
 
 
-class FileNotFoundBehavior(Enum):
+class GlobMatchErrorBehavior(Enum):
+    """Describe the action to perform when matching globs in BUILD files to source files.
+
+    NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
+    be aware of any changes to this object's definition.
+    """
+
+    ignore = "ignore"
+    warn = "warn"
+    error = "error"
+
+
+class FilesNotFoundBehavior(Enum):
     """What to do when globs do not match in BUILD files."""
 
     warn = "warn"
@@ -413,28 +424,6 @@ class GlobalOptions(Subsystem):
         )
 
         register(
-            "--build-patterns",
-            advanced=True,
-            type=list,
-            default=["BUILD", "BUILD.*"],
-            help=(
-                "The naming scheme for BUILD files, i.e. where you define targets. This only sets "
-                "the naming scheme, not the directory paths to look for. To add ignore"
-                "patterns, use the option `--build-ignore`."
-            ),
-        )
-        register(
-            "--build-ignore",
-            advanced=True,
-            type=list,
-            default=[".*/", "bower_components/", "node_modules/", "*.egg-info/"],
-            help=(
-                "Paths to ignore when identifying BUILD files. This does not affect any other "
-                "filesystem operations; use `--pants-ignore` for that instead. Patterns use the "
-                "gitignore pattern syntax (https://git-scm.com/docs/gitignore)."
-            ),
-        )
-        register(
             "--pants-ignore",
             advanced=True,
             type=list,
@@ -455,49 +444,6 @@ class GlobalOptions(Subsystem):
             help="Make use of a root .gitignore file when determining whether to ignore filesystem "
             "operations performed by Pants. If used together with `--pants-ignore`, any exclude/include "
             "patterns specified there apply after .gitignore rules.",
-        )
-        register(
-            "--owners-not-found-behavior",
-            advanced=True,
-            type=OwnersNotFoundBehavior,
-            default=OwnersNotFoundBehavior.error,
-            help="What to do when file arguments do not have any owning target. This happens when there "
-            "are no targets whose `sources` fields include the file argument.",
-        )
-        register(
-            "--files-not-found-behavior",
-            advanced=True,
-            type=FileNotFoundBehavior,
-            default=FileNotFoundBehavior.warn,
-            help="What to do when files and globs specified in BUILD files, such as in the "
-            "`sources` field, cannot be found. This happens when the files do not exist on "
-            "your machine or when they are ignored by the `--pants-ignore` option.",
-        )
-
-        register(
-            "--tag",
-            type=list,
-            metavar="[+-]tag1,tag2,...",
-            help=(
-                "Include only targets with these tags (optional '+' prefix) or without these "
-                "tags ('-' prefix). See https://www.pantsbuild.org/docs/advanced-target-selection."
-            ),
-        )
-        register(
-            "--exclude-target-regexp",
-            advanced=True,
-            type=list,
-            default=[],
-            metavar="<regexp>",
-            help="Exclude target roots that match these regexes.",
-        )
-        register(
-            "--subproject-roots",
-            type=list,
-            advanced=True,
-            default=[],
-            help="Paths that correspond with build roots for any subproject that this "
-            "project depends on.",
         )
 
         # These logging options are registered in the bootstrap phase so that plugins can log during
@@ -669,17 +615,6 @@ class GlobalOptions(Subsystem):
             daemon=True,
             help="Filesystem events matching any of these globs will trigger a daemon restart. "
             "Pants's own code, plugins, and `--pants-config-files` are inherently invalidated.",
-        )
-
-        register(
-            "--build-file-prelude-globs",
-            advanced=True,
-            type=list,
-            default=[],
-            help="Python files to evaluate and whose symbols should be exposed to all BUILD files ."
-            "This allows for writing functions which create multiple rules, or set default "
-            "arguments for rules. The order these files will be evaluated is undefined - they should not rely on each "
-            "other, or override symbols from each other.",
         )
 
         cache_instructions = (
@@ -888,6 +823,59 @@ class GlobalOptions(Subsystem):
             advanced=True,
         )
 
+        # TODO(#10569): move these out of bootstrap options into normal global options.
+        register(
+            "--build-patterns",
+            advanced=True,
+            type=list,
+            default=["BUILD", "BUILD.*"],
+            help=(
+                "The naming scheme for BUILD files, i.e. where you define targets. This only sets "
+                "the naming scheme, not the directory paths to look for. To add ignore"
+                "patterns, use the option `--build-ignore`."
+            ),
+        )
+        register(
+            "--build-ignore",
+            advanced=True,
+            type=list,
+            default=[".*/", "bower_components/", "node_modules/", "*.egg-info/"],
+            help=(
+                "Paths to ignore when identifying BUILD files. This does not affect any other "
+                "filesystem operations; use `--pants-ignore` for that instead. Patterns use the "
+                "gitignore pattern syntax (https://git-scm.com/docs/gitignore)."
+            ),
+        )
+        register(
+            "--build-file-prelude-globs",
+            advanced=True,
+            type=list,
+            default=[],
+            help=(
+                "Python files to evaluate and whose symbols should be exposed to all BUILD files. "
+                "See https://www.pantsbuild.org/docs/macros."
+            ),
+        )
+        register(
+            "--subproject-roots",
+            type=list,
+            advanced=True,
+            default=[],
+            help="Paths that correspond with build roots for any subproject that this "
+            "project depends on.",
+        )
+
+        # TODO(#10569): move this out of bootstrap options into normal global options.
+        register(
+            "--files-not-found-behavior",
+            advanced=True,
+            type=FilesNotFoundBehavior,
+            default=FilesNotFoundBehavior.warn,
+            help="What to do when files and globs specified in BUILD files, such as in the "
+            "`sources` field, cannot be found. This happens when the files do not exist on "
+            "your machine or when they are ignored by the `--pants-ignore` option.",
+        )
+
     @classmethod
     def register_options(cls, register):
         """Register options not tied to any particular task or subsystem."""
@@ -924,6 +912,34 @@ class GlobalOptions(Subsystem):
             ),
         )
 
+        register(
+            "--tag",
+            type=list,
+            metavar="[+-]tag1,tag2,...",
+            help=(
+                "Include only targets with these tags (optional '+' prefix) or without these "
+                "tags ('-' prefix). See https://www.pantsbuild.org/docs/advanced-target-selection."
+            ),
+        )
+        register(
+            "--exclude-target-regexp",
+            type=list,
+            default=[],
+            metavar="<regexp>",
+            help="Exclude target roots that match these regexes.",
+        )
+
+        register(
+            "--owners-not-found-behavior",
+            advanced=True,
+            type=OwnersNotFoundBehavior,
+            default=OwnersNotFoundBehavior.error,
+            help=(
+                "What to do when file arguments do not have any owning target. This happens when "
+                "there are no targets whose `sources` fields include the file argument."
+            ),
+        )
+
         loop_flag = "--loop"
         register(
             loop_flag, type=bool, help="Run goals continuously as file changes are detected.",
@@ -935,6 +951,7 @@ class GlobalOptions(Subsystem):
             advanced=True,
             help=f"The maximum number of times to loop when `{loop_flag}` is specified.",
         )
+
         register(
             "--lock",
             advanced=True,
@@ -943,6 +960,7 @@ class GlobalOptions(Subsystem):
             help="Use a global lock to exclude other versions of Pants from running during "
             "critical operations.",
         )
+
         register(
             "--streaming-workunits-report-interval",
             type=float,

@@ -5,7 +5,7 @@ import itertools
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
-from typing import Iterable, List, Tuple, Type
+from typing import Iterable, List, Set, Tuple, Type
 
 import pytest
 
@@ -102,9 +102,12 @@ class GraphTest(TestBase):
                 """
             ),
         )
+        bootstrapper = create_options_bootstrapper()
 
         def get_target(name: str) -> Target:
-            return self.request_single_product(WrappedTarget, Address("", target_name=name)).target
+            return self.request_single_product(
+                WrappedTarget, Params(Address("", target_name=name), bootstrapper)
+            ).target
 
         t1 = get_target("t1")
         t2 = get_target("t2")
@@ -114,13 +117,12 @@ class GraphTest(TestBase):
         root = get_target("root")
 
         direct_deps = self.request_single_product(
-            Targets, Params(DependenciesRequest(root[Dependencies]), create_options_bootstrapper())
+            Targets, Params(DependenciesRequest(root[Dependencies]), bootstrapper)
         )
         assert direct_deps == Targets([d1, d2, d3])
 
         transitive_targets = self.request_single_product(
-            TransitiveTargets,
-            Params(Addresses([root.address, d2.address]), create_options_bootstrapper()),
+            TransitiveTargets, Params(Addresses([root.address, d2.address]), bootstrapper)
         )
         assert transitive_targets.roots == (root, d2)
         # NB: `//:d2` is both a target root and a dependency of `//:root`.
@@ -248,7 +250,7 @@ class GraphTest(TestBase):
         self.add_to_build_file("demo", "target(sources=['f1.txt', 'f2.txt'])")
         generated_target_addresss = Address("demo", relative_file_path="f1.txt", target_name="demo")
         generated_target = self.request_single_product(
-            WrappedTarget, generated_target_addresss
+            WrappedTarget, Params(generated_target_addresss, create_options_bootstrapper())
         ).target
         assert generated_target == MockTarget(
             {Sources.alias: ["f1.txt"]}, address=generated_target_addresss
@@ -277,6 +279,12 @@ class TestOwners(TestBase):
     def target_types(cls):
         return (MockTarget,)
 
+    def assert_owners(self, requested: Iterable[str], *, expected: Set[Address]) -> None:
+        result = self.request_single_product(
+            Owners, Params(OwnersRequest(tuple(requested)), create_options_bootstrapper())
+        )
+        assert set(result) == expected
+
     def test_owners_source_file_does_not_exist(self) -> None:
         """Test when a source file belongs to a target, even though the file does not actually
         exist.
@@ -287,16 +295,22 @@ class TestOwners(TestBase):
         """
         self.create_file("demo/f.txt")
         self.add_to_build_file("demo", "target(sources=['*.txt'])")
-        result = self.request_single_product(Owners, OwnersRequest(("demo/deleted.txt",)))
-        assert result == Owners([Address("demo", target_name="demo")])
+        self.assert_owners(["demo/deleted.txt"], expected={Address("demo", target_name="demo")})
+
         # For files that do exist, we should still use a generated subtarget, though.
-        result = self.request_single_product(Owners, OwnersRequest(("demo/f.txt",)))
-        assert result == Owners([Address("demo", relative_file_path="f.txt", target_name="demo")])
-        # However, if a sibling file uses the original target, then both should be used.
-        result = self.request_single_product(
-            Owners, OwnersRequest(("demo/f.txt", "demo/deleted.txt"))
+        self.assert_owners(
+            ["demo/f.txt"],
+            expected={Address("demo", relative_file_path="f.txt", target_name="demo")},
         )
-        assert result == Owners([Address("demo", relative_file_path="f.txt"), Address("demo")])
+
+        # If a sibling file uses the original target, then both should be used.
+        self.assert_owners(
+            ["demo/f.txt", "demo/deleted.txt"],
+            expected={
+                Address("demo", relative_file_path="f.txt", target_name="demo"),
+                Address("demo"),
+            },
+        )
 
     def test_owners_multiple_owners(self) -> None:
         """Even if there are multiple owners of the same file, we still use generated subtargets."""
@@ -310,18 +324,16 @@ class TestOwners(TestBase):
                 """
             ),
         )
-
-        one_owner_result = self.request_single_product(Owners, OwnersRequest(("demo/f1.txt",)))
-        assert one_owner_result == Owners(
-            [Address("demo", relative_file_path="f1.txt", target_name="all")]
+        self.assert_owners(
+            ["demo/f1.txt"],
+            expected={Address("demo", relative_file_path="f1.txt", target_name="all")},
         )
-
-        two_owners_result = self.request_single_product(Owners, OwnersRequest(("demo/f2.txt",)))
-        assert two_owners_result == Owners(
-            [
+        self.assert_owners(
+            ["demo/f2.txt"],
+            expected={
                 Address("demo", relative_file_path="f2.txt", target_name="all"),
                 Address("demo", relative_file_path="f2.txt", target_name="f2"),
-            ]
+            },
         )
 
     def test_owners_build_file(self) -> None:
@@ -337,12 +349,14 @@ class TestOwners(TestBase):
                 """
             ),
         )
-        result = self.request_single_product(Owners, OwnersRequest(("demo/BUILD",)))
-        assert set(result) == {
-            Address("demo", relative_file_path="f1.txt", target_name="f1"),
-            Address("demo", relative_file_path="f2.txt", target_name="f2_first"),
-            Address("demo", relative_file_path="f2.txt", target_name="f2_second"),
-        }
+        self.assert_owners(
+            ["demo/BUILD"],
+            expected={
+                Address("demo", relative_file_path="f1.txt", target_name="f1"),
+                Address("demo", relative_file_path="f2.txt", target_name="f2_first"),
+                Address("demo", relative_file_path="f2.txt", target_name="f2_second"),
+            },
+        )
 
 
 class TestSpecsToAddresses(TestBase):
@@ -624,7 +638,7 @@ class TestSources(TestBase):
         self.create_files("src/fortran", files=["f1.f95", "f2.f95", "f1.f03", "ignored.f03"])
         sources = Sources(["f1.f95", "*.f03", "!ignored.f03", "!**/ignore*"], address=addr)
         hydrated_sources = self.request_single_product(
-            HydratedSources, HydrateSourcesRequest(sources)
+            HydratedSources, Params(HydrateSourcesRequest(sources), create_options_bootstrapper())
         )
         assert hydrated_sources.snapshot.files == ("src/fortran/f1.f03", "src/fortran/f1.f95")
 
@@ -644,11 +658,15 @@ class TestSources(TestBase):
 
         addr = Address("", target_name=":lib")
         self.create_files("", files=["f1.f95"])
+        bootstrapper = create_options_bootstrapper()
 
         valid_sources = SourcesSubclass(["*"], address=addr)
         hydrated_valid_sources = self.request_single_product(
             HydratedSources,
-            HydrateSourcesRequest(valid_sources, for_sources_types=[SourcesSubclass]),
+            Params(
+                HydrateSourcesRequest(valid_sources, for_sources_types=[SourcesSubclass]),
+                bootstrapper,
+            ),
         )
         assert hydrated_valid_sources.snapshot.files == ("f1.f95",)
         assert hydrated_valid_sources.sources_type == SourcesSubclass
@@ -656,7 +674,10 @@ class TestSources(TestBase):
         invalid_sources = Sources(["*"], address=addr)
         hydrated_invalid_sources = self.request_single_product(
             HydratedSources,
-            HydrateSourcesRequest(invalid_sources, for_sources_types=[SourcesSubclass]),
+            Params(
+                HydrateSourcesRequest(invalid_sources, for_sources_types=[SourcesSubclass]),
+                bootstrapper,
+            ),
         )
         assert hydrated_invalid_sources.snapshot.files == ()
         assert hydrated_invalid_sources.sources_type is None
@@ -665,7 +686,13 @@ class TestSources(TestBase):
         self.create_files("", files=["f1.f95"])
         sources = Sources(["non_existent.f95"], address=Address("", target_name="lib"))
         with pytest.raises(ExecutionError) as exc:
-            self.request_single_product(HydratedSources, HydrateSourcesRequest(sources))
+            self.request_single_product(
+                HydratedSources,
+                Params(
+                    HydrateSourcesRequest(sources),
+                    create_options_bootstrapper(args=["--files-not-found-behavior=error"]),
+                ),
+            )
         assert "Unmatched glob" in str(exc.value)
         assert "//:lib" in str(exc.value)
         assert "non_existent.f95" in str(exc.value)
@@ -683,7 +710,7 @@ class TestSources(TestBase):
         assert set(sources.sanitized_raw_value or ()) == set(DefaultSources.default)
 
         hydrated_sources = self.request_single_product(
-            HydratedSources, HydrateSourcesRequest(sources)
+            HydratedSources, Params(HydrateSourcesRequest(sources), create_options_bootstrapper())
         )
         assert hydrated_sources.snapshot.files == ("src/fortran/default.f95", "src/fortran/f1.f08")
 
@@ -691,18 +718,21 @@ class TestSources(TestBase):
         class ExpectedExtensionsSources(Sources):
             expected_file_extensions = (".f95", ".f03")
 
+        bootstrapper = create_options_bootstrapper()
         addr = Address("src/fortran", target_name="lib")
         self.create_files("src/fortran", files=["s.f95", "s.f03", "s.f08"])
         sources = ExpectedExtensionsSources(["s.f*"], address=addr)
         with pytest.raises(ExecutionError) as exc:
-            self.request_single_product(HydratedSources, HydrateSourcesRequest(sources))
+            self.request_single_product(
+                HydratedSources, Params(HydrateSourcesRequest(sources), bootstrapper)
+            )
         assert "s.f08" in str(exc.value)
         assert str(addr) in str(exc.value)
 
         # Also check that we support valid sources
         valid_sources = ExpectedExtensionsSources(["s.f95"], address=addr)
         assert self.request_single_product(
-            HydratedSources, HydrateSourcesRequest(valid_sources)
+            HydratedSources, Params(HydrateSourcesRequest(valid_sources), bootstrapper)
         ).snapshot.files == ("src/fortran/s.f95",)
 
     def test_expected_num_files(self) -> None:
@@ -718,8 +748,11 @@ class TestSources(TestBase):
         def hydrate(sources_cls: Type[Sources], sources: Iterable[str]) -> HydratedSources:
             return self.request_single_product(
                 HydratedSources,
-                HydrateSourcesRequest(
-                    sources_cls(sources, address=Address("", target_name=":example"))
+                Params(
+                    HydrateSourcesRequest(
+                        sources_cls(sources, address=Address("", target_name=":example"))
+                    ),
+                    create_options_bootstrapper(),
                 ),
             )
 
@@ -799,25 +832,23 @@ class TestCodegen(TestBase):
         self.union_membership = self.request_single_product(UnionMembership, Params())
 
     def test_generate_sources(self) -> None:
+        bootstrapper = create_options_bootstrapper()
         protocol_sources = AvroSources(["*.avro"], address=self.address)
         assert protocol_sources.can_generate(SmalltalkSources, self.union_membership) is True
 
         # First, get the original protocol sources.
         hydrated_protocol_sources = self.request_single_product(
-            HydratedSources,
-            Params(HydrateSourcesRequest(protocol_sources), create_options_bootstrapper()),
+            HydratedSources, Params(HydrateSourcesRequest(protocol_sources), bootstrapper)
         )
         assert hydrated_protocol_sources.snapshot.files == ("src/avro/f.avro",)
 
         # Test directly feeding the protocol sources into the codegen rule.
-        wrapped_tgt = self.request_single_product(WrappedTarget, self.address)
+        tgt = self.request_single_product(WrappedTarget, Params(self.address, bootstrapper)).target
         generated_sources = self.request_single_product(
             GeneratedSources,
             Params(
-                GenerateSmalltalkFromAvroRequest(
-                    hydrated_protocol_sources.snapshot, wrapped_tgt.target
-                ),
-                create_options_bootstrapper(),
+                GenerateSmalltalkFromAvroRequest(hydrated_protocol_sources.snapshot, tgt),
+                bootstrapper,
             ),
         )
         assert generated_sources.snapshot.files == ("src/smalltalk/f.st",)
@@ -829,7 +860,7 @@ class TestCodegen(TestBase):
                 HydrateSourcesRequest(
                     protocol_sources, for_sources_types=[SmalltalkSources], enable_codegen=True
                 ),
-                create_options_bootstrapper(),
+                bootstrapper,
             ),
         )
         assert generated_via_hydrate_sources.snapshot.files == ("src/smalltalk/f.st",)
@@ -1005,10 +1036,12 @@ class TestDependencies(TestBase):
     def assert_dependencies_resolved(
         self, *, requested_address: Address, expected: Iterable[Address],
     ) -> None:
-        target = self.request_single_product(WrappedTarget, requested_address).target
+        bootstrapper = create_options_bootstrapper()
+        target = self.request_single_product(
+            WrappedTarget, Params(requested_address, bootstrapper)
+        ).target
         result = self.request_single_product(
-            Addresses,
-            Params(DependenciesRequest(target[Dependencies]), create_options_bootstrapper()),
+            Addresses, Params(DependenciesRequest(target[Dependencies]), bootstrapper),
         )
         assert sorted(result) == sorted(expected)
 

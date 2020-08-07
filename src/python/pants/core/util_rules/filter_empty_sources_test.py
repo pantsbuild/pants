@@ -12,6 +12,8 @@ from pants.core.util_rules.filter_empty_sources import (
 from pants.core.util_rules.filter_empty_sources import rules as filter_empty_sources_rules
 from pants.engine.addresses import Address
 from pants.engine.target import FieldSet, Sources, Tags, Target
+from pants.testutil.engine.util import Params
+from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
 
@@ -28,18 +30,22 @@ class FilterEmptySourcesTest(TestBase):
             tags: Tags
 
         self.create_file("f1.txt")
-        valid_addr = Address.parse(":valid")
+        valid_addr = Address("", target_name="valid")
         valid_field_set = MockFieldSet(
             valid_addr, Sources(["f1.txt"], address=valid_addr), Tags(None, address=valid_addr)
         )
 
-        empty_addr = Address.parse(":empty")
+        empty_addr = Address("", target_name="empty")
         empty_field_set = MockFieldSet(
             empty_addr, Sources(None, address=empty_addr), Tags(None, address=empty_addr)
         )
 
         result = self.request_single_product(
-            FieldSetsWithSources, FieldSetsWithSourcesRequest([valid_field_set, empty_field_set]),
+            FieldSetsWithSources,
+            Params(
+                FieldSetsWithSourcesRequest([valid_field_set, empty_field_set]),
+                create_options_bootstrapper(),
+            ),
         )
         assert tuple(result) == (valid_field_set,)
 
@@ -53,11 +59,17 @@ class FilterEmptySourcesTest(TestBase):
             core_fields = ()
 
         self.create_file("f1.txt")
-        valid_tgt = MockTarget({Sources.alias: ["f1.txt"]}, address=Address.parse(":valid"))
-        empty_tgt = MockTarget({}, address=Address.parse(":empty"))
-        invalid_tgt = MockTargetWithNoSourcesField({}, address=Address.parse(":invalid"))
+        valid_tgt = MockTarget(
+            {Sources.alias: ["f1.txt"]}, address=Address("", target_name="valid")
+        )
+        empty_tgt = MockTarget({}, address=Address("", target_name="empty"))
+        invalid_tgt = MockTargetWithNoSourcesField({}, address=Address("", target_name="invalid"))
 
         result = self.request_single_product(
-            TargetsWithSources, TargetsWithSourcesRequest([valid_tgt, empty_tgt, invalid_tgt]),
+            TargetsWithSources,
+            Params(
+                TargetsWithSourcesRequest([valid_tgt, empty_tgt, invalid_tgt]),
+                create_options_bootstrapper(),
+            ),
         )
         assert tuple(result) == (valid_tgt,)

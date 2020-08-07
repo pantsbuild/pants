@@ -13,7 +13,7 @@ from pants.base.specs import Specs
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine import fs, process
 from pants.engine.console import Console
-from pants.engine.fs import GlobMatchErrorBehavior, Workspace
+from pants.engine.fs import Workspace
 from pants.engine.goal import Goal
 from pants.engine.internals import build_files, graph, options_parsing, uuid
 from pants.engine.internals.mapper import AddressMapper
@@ -27,7 +27,11 @@ from pants.engine.rules import RootRule, collect_rules, rule
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
-from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, ExecutionOptions
+from pants.option.global_options import (
+    DEFAULT_EXECUTION_OPTIONS,
+    ExecutionOptions,
+    FilesNotFoundBehavior,
+)
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.subsystem import Subsystem
 from pants.scm.subsystems.changed import rules as changed_rules
@@ -37,38 +41,27 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
-class LegacyGraphScheduler:
-    """A thin wrapper around a Scheduler configured with @rules for a symbol table."""
+class GraphScheduler:
+    """A thin wrapper around a Scheduler configured with @rules."""
 
     scheduler: Scheduler
-    build_file_aliases: Any
     goal_map: Any
 
     def new_session(
         self, build_id, dynamic_ui: bool = False, use_colors=True, should_report_workunits=False,
-    ) -> "LegacyGraphSession":
+    ) -> "GraphSession":
         session = self.scheduler.new_session(build_id, dynamic_ui, should_report_workunits)
-        console = Console(use_colors=use_colors, session=session if dynamic_ui else None,)
-        return LegacyGraphSession(session, console, self.build_file_aliases, self.goal_map)
+        console = Console(use_colors=use_colors, session=session if dynamic_ui else None)
+        return GraphSession(session, console, self.goal_map)
 
 
 @dataclass(frozen=True)
-class LegacyGraphSession:
-    """A thin wrapper around a SchedulerSession configured with @rules for a symbol table."""
+class GraphSession:
+    """A thin wrapper around a SchedulerSession configured with @rules."""
 
     scheduler_session: SchedulerSession
     console: Console
-    build_file_aliases: Any
     goal_map: Any
-
-    class InvalidGoals(Exception):
-        """Raised when invalid v2 goals are passed in a v2-only mode."""
-
-        def __init__(self, invalid_goals):
-            super().__init__(
-                f"could not satisfy the following goals with @goal_rules: {', '.join(invalid_goals)}"
-            )
-            self.invalid_goals = invalid_goals
 
     def goal_consumed_subsystem_scopes(self, goal_name: str) -> Tuple[str, ...]:
         """Return the scopes of subsystems that could be consumed while running the given goal."""
@@ -139,7 +132,7 @@ class LegacyGraphSession:
 
 
 class EngineInitializer:
-    """Constructs the components necessary to run the v2 engine with v1 BuildGraph compatibility."""
+    """Constructs the components necessary to run the engine."""
 
     class GoalMappingError(Exception):
         """Raised when a goal cannot be mapped to an @rule."""
@@ -154,103 +147,86 @@ class EngineInitializer:
             goal = r.output_type.name
             if goal in goal_map:
                 raise EngineInitializer.GoalMappingError(
-                    f"could not map goal `{goal}` to rule `{r}`: already claimed by product `{goal_map[goal]}`"
+                    f"could not map goal `{goal}` to rule `{r}`: already claimed by product "
+                    f"`{goal_map[goal]}`"
                 )
             goal_map[goal] = r.output_type
         return goal_map
 
     @staticmethod
-    def setup_legacy_graph(
+    def setup_graph(
         options_bootstrapper: OptionsBootstrapper, build_configuration: BuildConfiguration,
-    ) -> LegacyGraphScheduler:
-        """Construct and return the components necessary for LegacyBuildGraph construction."""
+    ) -> GraphScheduler:
         native = Native()
         build_root = get_buildroot()
         bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
-        use_gitignore = bootstrap_options.pants_ignore_use_gitignore
-
-        return EngineInitializer.setup_legacy_graph_extended(
+        return EngineInitializer.setup_graph_extended(
             options_bootstrapper,
             build_configuration,
             ExecutionOptions.from_bootstrap_options(bootstrap_options),
+            files_not_found_behavior=bootstrap_options.files_not_found_behavior,
             pants_ignore_patterns=OptionsInitializer.compute_pants_ignore(
                 build_root, bootstrap_options
             ),
-            use_gitignore=use_gitignore,
+            use_gitignore=bootstrap_options.pants_ignore_use_gitignore,
             local_store_dir=bootstrap_options.local_store_dir,
             local_execution_root_dir=bootstrap_options.local_execution_root_dir,
             named_caches_dir=bootstrap_options.named_caches_dir,
             build_root=build_root,
             native=native,
-            glob_match_error_behavior=(
-                bootstrap_options.files_not_found_behavior.to_glob_match_error_behavior()
-            ),
-            build_file_prelude_globs=bootstrap_options.build_file_prelude_globs,
-            build_patterns=bootstrap_options.build_patterns,
-            build_ignore_patterns=bootstrap_options.build_ignore,
-            tags=bootstrap_options.tag,
-            exclude_target_regexps=bootstrap_options.exclude_target_regexp,
-            subproject_roots=bootstrap_options.subproject_roots,
             include_trace_on_error=bootstrap_options.print_exception_stacktrace,
         )
 
     @staticmethod
-    def setup_legacy_graph_extended(
+    def setup_graph_extended(
         options_bootstrapper: OptionsBootstrapper,
         build_configuration: BuildConfiguration,
         execution_options: ExecutionOptions,
+        native: Native,
         *,
+        files_not_found_behavior: FilesNotFoundBehavior,
         pants_ignore_patterns: List[str],
         use_gitignore: bool,
         local_store_dir: str,
         local_execution_root_dir: str,
         named_caches_dir: str,
         build_root: Optional[str] = None,
-        native: Optional[Native] = None,
-        glob_match_error_behavior: GlobMatchErrorBehavior = GlobMatchErrorBehavior.warn,
-        build_patterns: Optional[Iterable[str]] = None,
-        build_file_prelude_globs: Optional[Iterable[str]] = None,
-        build_ignore_patterns: Optional[Iterable[str]] = None,
-        tags: Optional[Iterable[str]] = None,
-        exclude_target_regexps: Optional[Iterable[str]] = None,
-        subproject_roots: Optional[Iterable[str]] = None,
         include_trace_on_error: bool = True,
-    ) -> LegacyGraphScheduler:
-        """Construct and return the components necessary for LegacyBuildGraph construction."""
-
+    ) -> GraphScheduler:
         build_root = build_root or get_buildroot()
+
         build_configuration = build_configuration or BuildConfigInitializer.get(
             options_bootstrapper
         )
+        rules = build_configuration.rules
+        union_membership = UnionMembership.from_rules(build_configuration.union_rules)
+        registered_target_types = RegisteredTargetTypes.create(build_configuration.target_types)
 
         bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
         execution_options = execution_options or DEFAULT_EXECUTION_OPTIONS
 
-        build_file_aliases = build_configuration.registered_aliases
-        rules = build_configuration.rules
-        union_membership = UnionMembership.from_rules(build_configuration.union_rules)
-
-        registered_target_types = RegisteredTargetTypes.create(build_configuration.target_types)
+        # TODO(#10569): move this out of engine_initializer.py into a normal rule that sets up
+        #  AddressMapper.
         parser = Parser(
-            target_type_aliases=registered_target_types.aliases, object_aliases=build_file_aliases
+            target_type_aliases=registered_target_types.aliases,
+            object_aliases=build_configuration.registered_aliases,
         )
         address_mapper = AddressMapper(
             parser=parser,
-            prelude_glob_patterns=build_file_prelude_globs,
-            build_patterns=build_patterns,
-            build_ignore_patterns=build_ignore_patterns,
-            tags=tags,
-            exclude_target_regexps=exclude_target_regexps,
-            subproject_roots=subproject_roots,
+            prelude_glob_patterns=bootstrap_options.build_file_prelude_globs,
+            build_patterns=bootstrap_options.build_patterns,
+            build_ignore_patterns=bootstrap_options.build_ignore,
+            subproject_roots=bootstrap_options.subproject_roots,
         )
 
         @rule
         def address_mapper_singleton() -> AddressMapper:
             return address_mapper
 
+        # TODO(#10569): move this out of engine_initializer.py into a normal rule.
         @rule
-        def glob_match_error_behavior_singleton() -> GlobMatchErrorBehavior:
-            return glob_match_error_behavior
+        def files_not_found_behavior_singleton() -> FilesNotFoundBehavior:
+            return files_not_found_behavior
 
         @rule
         def build_configuration_singleton() -> BuildConfiguration:
@@ -305,4 +281,4 @@ class EngineInitializer:
             visualize_to_dir=bootstrap_options.native_engine_visualize_to,
         )
 
-        return LegacyGraphScheduler(scheduler, build_file_aliases, goal_map)
+        return GraphScheduler(scheduler, goal_map)

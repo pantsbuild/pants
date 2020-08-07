@@ -1,6 +1,8 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from typing import Iterable
+
 
 class TargetDefinitionException(Exception):
     """Indicates an invalid target definition.
@@ -38,3 +40,13 @@ class DuplicateNameError(MappingError):
 
 class ResolveError(MappingError):
     """Indicates an error resolving targets."""
+
+    @classmethod
+    def did_you_mean(
+        cls, *, bad_name: str, known_names: Iterable[str], namespace: str
+    ) -> "ResolveError":
+        possibilities = "\n  ".join(f":{target_name}" for target_name in sorted(known_names))
+        return cls(
+            f"'{bad_name}' was not found in namespace '{namespace}'. Did you mean one "
+            f"of:\n  {possibilities}"
+        )

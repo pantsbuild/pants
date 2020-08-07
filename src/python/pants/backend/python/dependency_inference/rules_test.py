@@ -95,7 +95,9 @@ class PythonDependencyInferenceTest(TestBase):
         self.add_to_build_file("src/python", "python_library()")
 
         def run_dep_inference(address: Address) -> InferredDependencies:
-            target = self.request_single_product(WrappedTarget, address).target
+            target = self.request_single_product(
+                WrappedTarget, Params(address, options_bootstrapper)
+            ).target
             return self.request_single_product(
                 InferredDependencies,
                 Params(InferPythonDependencies(target[PythonSources]), options_bootstrapper),
@@ -133,7 +135,9 @@ class PythonDependencyInferenceTest(TestBase):
         self.add_to_build_file("src/python/root/mid/leaf", "python_library()")
 
         def run_dep_inference(address: Address) -> InferredDependencies:
-            target = self.request_single_product(WrappedTarget, address).target
+            target = self.request_single_product(
+                WrappedTarget, Params(address, options_bootstrapper)
+            ).target
             return self.request_single_product(
                 InferredDependencies,
                 Params(InferInitDependencies(target[PythonSources]), options_bootstrapper),
@@ -162,7 +166,9 @@ class PythonDependencyInferenceTest(TestBase):
         self.add_to_build_file("src/python/root/mid/leaf", "python_tests()")
 
         def run_dep_inference(address: Address) -> InferredDependencies:
-            target = self.request_single_product(WrappedTarget, address).target
+            target = self.request_single_product(
+                WrappedTarget, Params(address, options_bootstrapper)
+            ).target
             return self.request_single_product(
                 InferredDependencies,
                 Params(InferConftestDependencies(target[PythonSources]), options_bootstrapper),

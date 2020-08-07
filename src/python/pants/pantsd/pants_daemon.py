@@ -14,7 +14,7 @@ from pants.base.build_environment import get_buildroot
 from pants.base.exception_sink import ExceptionSink
 from pants.bin.daemon_pants_runner import DaemonPantsRunner
 from pants.engine.internals.native import Native
-from pants.init.engine_initializer import LegacyGraphScheduler
+from pants.init.engine_initializer import GraphScheduler
 from pants.init.logging import clear_logging_handlers, init_rust_logger, setup_logging_to_file
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.option_value_container import OptionValueContainer
@@ -119,7 +119,7 @@ class PantsDaemon(PantsDaemonProcessManager):
 
     @staticmethod
     def _setup_services(
-        bootstrap_options: OptionValueContainer, legacy_graph_scheduler: LegacyGraphScheduler,
+        bootstrap_options: OptionValueContainer, graph_scheduler: GraphScheduler,
     ):
         """Initialize pantsd services.
 
@@ -132,7 +132,7 @@ class PantsDaemon(PantsDaemonProcessManager):
         )
 
         scheduler_service = SchedulerService(
-            legacy_graph_scheduler=legacy_graph_scheduler,
+            graph_scheduler=graph_scheduler,
             build_root=build_root,
             invalidation_globs=invalidation_globs,
             pidfile=PantsDaemon.metadata_file_path(
@@ -142,7 +142,7 @@ class PantsDaemon(PantsDaemonProcessManager):
             max_memory_usage_in_bytes=bootstrap_options.pantsd_max_memory_usage,
         )
 
-        store_gc_service = StoreGCService(legacy_graph_scheduler.scheduler)
+        store_gc_service = StoreGCService(graph_scheduler.scheduler)
         return PantsServices(services=(scheduler_service, store_gc_service))
 
     def __init__(
