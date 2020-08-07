@@ -117,7 +117,11 @@ impl CommandRunner {
 
 lazy_static! {
   static ref IS_LIKELY_IN_DOCKER: bool = is_likely_in_docker().unwrap_or_else(|e| {
-    log::info!("Failed to detect whether we are running in docker: {}", e);
+    log::warn!(
+      "Failed to detect whether we are running in docker: {}\n\n\
+               Please file an issue at https://github.com/pantsbuild/pants/issues/new",
+      e
+    );
     false
   });
 }
@@ -180,7 +184,7 @@ async fn sync_if_needed() -> Result<(), String> {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
     return Err(format!(
-      "Failed to `sync` in likely docker container ({}): stdout: {}, stderr: {}",
+      "Failed to run `/bin/sync` in likely docker container ({}): stdout: {}, stderr: {}",
       output.status, stdout, stderr
     ));
   }
