@@ -7,11 +7,11 @@ from typing import Any, Dict, Iterable, Optional, Type
 
 import pytest
 
+from pants.base.specs_parser import SpecsParser
 from pants.engine.console import Console
 from pants.engine.fs import Workspace
 from pants.engine.goal import Goal
 from pants.init.options_initializer import BuildConfigInitializer
-from pants.init.specs_calculator import SpecsCalculator
 from pants.option.global_options import GlobalOptions
 from pants.testutil.engine.util import Params
 from pants.testutil.option.util import create_options_bootstrapper
@@ -68,7 +68,7 @@ class GoalRuleTestBase(TestBase):
         console = Console(stdout=stdout, stderr=stderr)
 
         # Run for the specs parsed from the args.
-        specs = SpecsCalculator.parse_specs(full_options.specs, build_root=self.build_root)
+        specs = SpecsParser(self.build_root).parse_specs(full_options.specs)
         params = Params(
             specs,
             console,

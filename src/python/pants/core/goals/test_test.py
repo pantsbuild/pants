@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from textwrap import dedent
 from typing import List, Optional, Tuple, Type, cast
 
-from pants.base.specs import SingleAddress
+from pants.base.specs import AddressLiteralSpec
 from pants.core.goals.test import (
     AddressAndTestResult,
     ConsoleCoverageReport,
@@ -128,7 +128,7 @@ class TestTest(TestBase):
             address = Address.parse(":tests")
         return TargetWithOrigin(
             MockTarget({}, address=address),
-            origin=SingleAddress(directory=address.spec_path, name=address.target_name),
+            origin=AddressLiteralSpec(address.spec_path, address.target_name),
         )
 
     def run_test_rule(

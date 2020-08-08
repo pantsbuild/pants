@@ -7,10 +7,10 @@ from dataclasses import dataclass
 from typing import Mapping, Optional, Tuple
 
 from pants.base.build_environment import get_buildroot
-from pants.base.cmd_line_spec_parser import CmdLineSpecParser
 from pants.base.exception_sink import ExceptionSink
 from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE, ExitCode
 from pants.base.specs import Specs
+from pants.base.specs_parser import SpecsParser
 from pants.base.workunit import WorkUnit
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine.internals.native import Native
@@ -21,7 +21,7 @@ from pants.help.help_info_extracter import HelpInfoExtracter
 from pants.help.help_printer import HelpPrinter
 from pants.init.engine_initializer import EngineInitializer, GraphScheduler, GraphSession
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
-from pants.init.specs_calculator import SpecsCalculator
+from pants.init.specs_calculator import calculate_specs
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.subsystem import Subsystem
@@ -124,7 +124,7 @@ class LocalPantsRunner:
             options_bootstrapper, build_config, options, scheduler
         )
 
-        specs = SpecsCalculator.create(
+        specs = calculate_specs(
             options_bootstrapper=options_bootstrapper,
             options=options,
             build_root=build_root,
@@ -151,7 +151,7 @@ class LocalPantsRunner:
 
         self._run_tracker.start(self.options, run_start_time=start_time)
 
-        spec_parser = CmdLineSpecParser(get_buildroot())
+        spec_parser = SpecsParser(get_buildroot())
         specs = [str(spec_parser.parse_spec(spec)) for spec in self.options.specs]
         # Note: This will not include values from `--changed-*` flags.
         self._run_tracker.run_info.add_info("specs_from_command_line", specs, stringify=False)
