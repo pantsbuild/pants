@@ -183,7 +183,9 @@ async def addresses_with_origins_from_address_specs(
     )
     # We convert to targets for the side effect of validating that any file addresses actually
     # belong to the specified base targets.
-    await Get(UnexpandedTargets, Addresses(literal_addresses))
+    await Get(
+        UnexpandedTargets, Addresses(addr for addr in literal_addresses if not addr.is_base_target)
+    )
     for literal_spec, addr, target_adaptor in zip(
         address_specs.literals, literal_addresses, literal_target_adaptors
     ):
