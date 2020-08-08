@@ -31,14 +31,13 @@ from pants.engine.addresses import (
     BuildFileAddress,
     BuildFileAddresses,
 )
-from pants.engine.fs import Digest, DigestContents, FileContent, PathGlobs, Snapshot
+from pants.engine.fs import DigestContents, FileContent, PathGlobs
 from pants.engine.internals.build_files import (
-    addresses_with_origins_from_address_specs,
     evaluate_preludes,
     parse_address_family,
     strip_address_origins,
 )
-from pants.engine.internals.mapper import AddressFamily, AddressMapper, AddressSpecsFilter
+from pants.engine.internals.mapper import AddressMapper
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.target_adaptor import TargetAdaptor
@@ -68,62 +67,6 @@ def test_parse_address_family_empty() -> None:
         ],
     )
     assert len(af.name_to_target_adaptors) == 0
-
-
-def resolve_addresses_with_origins_from_address_specs(
-    address_specs: AddressSpecs,
-    address_family: AddressFamily,
-    *,
-    tags: Optional[Iterable[str]] = None,
-    exclude_patterns: Optional[Iterable[str]] = None
-) -> AddressesWithOrigins:
-    mapper = AddressMapper(Parser(target_type_aliases=[], object_aliases=BuildFileAliases()))
-    specs_filter = AddressSpecsFilter(tags=tags, exclude_target_regexps=exclude_patterns)
-    snapshot = Snapshot(Digest("xx", 2), ("root/BUILD",), ())
-    addresses_with_origins = run_rule(
-        addresses_with_origins_from_address_specs,
-        rule_args=[address_specs, mapper, specs_filter],
-        mock_gets=[
-            MockGet(product_type=Snapshot, subject_type=PathGlobs, mock=lambda _: snapshot),
-            MockGet(product_type=AddressFamily, subject_type=Dir, mock=lambda _: address_family),
-        ],
-    )
-    return cast(AddressesWithOrigins, addresses_with_origins)
-
-
-def test_address_specs_duplicated() -> None:
-    """Test that matching the same AddressSpec twice succeeds."""
-    address_spec = AddressLiteralSpec("root", "root")
-    address_family = AddressFamily(
-        "root", {"root": ("root/BUILD", TargetAdaptor(type_alias="", name="root"))}
-    )
-    address_specs = AddressSpecs([address_spec, address_spec])
-
-    addresses_with_origins = resolve_addresses_with_origins_from_address_specs(
-        address_specs, address_family
-    )
-    assert len(addresses_with_origins) == 1
-    awo = addresses_with_origins[0]
-    assert str(awo.address) == "root"
-    assert awo.origin == address_spec
-
-
-def test_address_specs_fail_on_nonexistent() -> None:
-    """Test that address specs referring to nonexistent targets raise a ResolveError."""
-    address_family = AddressFamily(
-        "root", {"a": ("root/BUILD", TargetAdaptor(type_alias="", name="a"))}
-    )
-    address_specs = AddressSpecs([AddressLiteralSpec("root", "b"), AddressLiteralSpec("root", "a")])
-
-    expected_rx_str = re.escape("'b' was not found in namespace 'root'. Did you mean one of:\n  :a")
-    with pytest.raises(ResolveError, match=expected_rx_str):
-        resolve_addresses_with_origins_from_address_specs(address_specs, address_family)
-
-    # Ensure that we still catch nonexistent targets later on in the list of command-line
-    # address specs.
-    address_specs = AddressSpecs([AddressLiteralSpec("root", "a"), AddressLiteralSpec("root", "b")])
-    with pytest.raises(ResolveError, match=expected_rx_str):
-        resolve_addresses_with_origins_from_address_specs(address_specs, address_family)
 
 
 def run_prelude_parsing_rule(prelude_content: str) -> BuildFilePreludeSymbols:

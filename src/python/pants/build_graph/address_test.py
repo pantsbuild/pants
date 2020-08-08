@@ -299,7 +299,8 @@ def test_address_maybe_convert_to_base_target() -> None:
 
 
 def test_address_spec_to_address_input() -> None:
-    """This smoke tests that Address.spec <-> AddressInput.parse() are idempotent."""
+    """This smoke tests that Address.spec <-> AddressInput.parse() is idempotent."""
+
     def assert_conversion(address: Address, *, expected: AddressInput) -> None:
         assert AddressInput.parse(address.spec) == expected
 

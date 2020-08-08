@@ -184,10 +184,10 @@ async def addresses_with_origins_from_address_specs(
     # We convert to targets for the side effect of validating that any file addresses actually
     # belong to the specified base targets.
     await Get(UnexpandedTargets, Addresses(literal_addresses))
-    for spec, addr, target_adaptor in zip(
+    for literal_spec, addr, target_adaptor in zip(
         address_specs.literals, literal_addresses, literal_target_adaptors
     ):
-        addr_to_origin[addr] = spec
+        addr_to_origin[addr] = literal_spec
         if filtering_disabled or specs_filter.matches(addr, target_adaptor):
             matched_addresses.add(addr)
 
@@ -205,14 +205,14 @@ async def addresses_with_origins_from_address_specs(
     address_families = await MultiGet(Get(AddressFamily, Dir(d)) for d in dirnames)
     address_family_by_directory = {af.namespace: af for af in address_families}
 
-    for spec in address_specs.globs:
+    for glob_spec in address_specs.globs:
         # These may raise ResolveError, depending on the type of spec.
-        addr_families_for_spec = spec.matching_address_families(address_family_by_directory)
-        addr_target_pairs_for_spec = spec.matching_addresses(addr_families_for_spec)
+        addr_families_for_spec = glob_spec.matching_address_families(address_family_by_directory)
+        addr_target_pairs_for_spec = glob_spec.matching_addresses(addr_families_for_spec)
 
         for addr, _ in addr_target_pairs_for_spec:
             # A target might be covered by multiple specs, so we take the most specific one.
-            addr_to_origin[addr] = AddressSpecs.more_specific(addr_to_origin.get(addr), spec)
+            addr_to_origin[addr] = AddressSpecs.more_specific(addr_to_origin.get(addr), glob_spec)
 
         matched_addresses.update(
             addr

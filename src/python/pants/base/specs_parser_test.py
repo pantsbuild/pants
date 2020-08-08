@@ -102,8 +102,8 @@ class SpecsParserTest(TestBase):
         self.assert_address_spec_parsed("a/b/c.txt:../tgt", address_literal("a/b/c.txt", "../tgt"))
 
     def test_ambiguous_files(self) -> None:
-        # These could either be files or the shorthand for address_literal addresses. We check if they exist
-        # on the file system to disambiguate.
+        # These could either be files or the shorthand for address_literal addresses. We check if
+        # they exist on the file system to disambiguate.
         for spec in ["a", "b/c"]:
             self.assert_address_spec_parsed(spec, address_literal(spec))
             self.create_file(spec)

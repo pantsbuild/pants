@@ -5,25 +5,13 @@ import itertools
 import os
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
-from typing import (
-    TYPE_CHECKING,
-    Iterable,
-    Iterator,
-    Mapping,
-    Optional,
-    Sequence,
-    Tuple,
-    Union,
-    cast,
-)
+from typing import TYPE_CHECKING, Iterable, Mapping, Optional, Sequence, Tuple, Union, cast
 
 from pants.base.exceptions import ResolveError
 from pants.build_graph.address import Address
-from pants.engine.collection import Collection
 from pants.engine.fs import GlobExpansionConjunction, GlobMatchErrorBehavior, PathGlobs
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.util.dirutil import fast_relpath_optional, recursive_dirname
-from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
 
 if TYPE_CHECKING:

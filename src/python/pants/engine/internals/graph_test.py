@@ -5,15 +5,18 @@ import itertools
 from dataclasses import dataclass
 from pathlib import PurePath
 from textwrap import dedent
-from typing import Iterable, List, Set, Tuple, Type
+from typing import Iterable, List, Optional, Set, Tuple, Type
 
 import pytest
 
 from pants.base.specs import (
     AddressLiteralSpec,
+    AddressSpecs,
     FilesystemGlobSpec,
     FilesystemLiteralSpec,
+    FilesystemSpec,
     FilesystemSpecs,
+    Specs,
 )
 from pants.base.specs_parser import SpecsParser
 from pants.engine.addresses import (
@@ -68,6 +71,7 @@ from pants.engine.target import (
     WrappedTarget,
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.engine.util import Params
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
@@ -361,97 +365,77 @@ class TestOwners(TestBase):
 
 class TestSpecsToAddresses(TestBase):
     @classmethod
-    def rules(cls):
-        return (*super().rules(), RootRule(Addresses), RootRule(FilesystemSpecs))
-
-    @classmethod
     def target_types(cls):
         return (MockTarget,)
+
+    def resolve_filesystem_specs(
+        self, specs: Iterable[FilesystemSpec], *, bootstrapper: Optional[OptionsBootstrapper] = None
+    ) -> Set[AddressWithOrigin]:
+        result = self.request_single_product(
+            AddressesWithOrigins,
+            Params(
+                Specs(AddressSpecs([]), FilesystemSpecs(specs)),
+                bootstrapper or create_options_bootstrapper(),
+            ),
+        )
+        return set(result)
 
     def test_filesystem_specs_literal_file(self) -> None:
         self.create_files("demo", ["f1.txt", "f2.txt"])
         self.add_to_build_file("demo", "target(sources=['*.txt'])")
         spec = FilesystemLiteralSpec("demo/f1.txt")
-        result = self.request_single_product(
-            AddressesWithOrigins, Params(FilesystemSpecs([spec]), create_options_bootstrapper())
-        )
-        assert len(result) == 1
-        assert result[0] == AddressWithOrigin(
-            Address("demo", relative_file_path="f1.txt", target_name="demo"), origin=spec
-        )
+        assert self.resolve_filesystem_specs([spec]) == {
+            AddressWithOrigin(
+                Address("demo", relative_file_path="f1.txt", target_name="demo"), origin=spec
+            )
+        }
 
     def test_filesystem_specs_glob(self) -> None:
         self.create_files("demo", ["f1.txt", "f2.txt"])
         self.add_to_build_file("demo", "target(sources=['*.txt'])")
         spec = FilesystemGlobSpec("demo/*.txt")
-        result = self.request_single_product(
-            AddressesWithOrigins, Params(FilesystemSpecs([spec]), create_options_bootstrapper()),
-        )
-        assert result == AddressesWithOrigins(
-            [
-                AddressWithOrigin(
-                    Address("demo", relative_file_path="f1.txt", target_name="demo"), origin=spec
-                ),
-                AddressWithOrigin(
-                    Address("demo", relative_file_path="f2.txt", target_name="demo"), origin=spec
-                ),
-            ]
-        )
+        assert self.resolve_filesystem_specs([spec]) == {
+            AddressWithOrigin(
+                Address("demo", relative_file_path="f1.txt", target_name="demo"), origin=spec
+            ),
+            AddressWithOrigin(
+                Address("demo", relative_file_path="f2.txt", target_name="demo"), origin=spec
+            ),
+        }
 
         # If a glob and a literal spec both resolve to the same file, the literal spec should be
         # used as it's more precise.
         literal_spec = FilesystemLiteralSpec("demo/f1.txt")
-        result = self.request_single_product(
-            AddressesWithOrigins,
-            Params(FilesystemSpecs([spec, literal_spec]), create_options_bootstrapper()),
-        )
-        assert result == AddressesWithOrigins(
-            [
-                AddressWithOrigin(
-                    Address("demo", relative_file_path="f1.txt", target_name="demo"),
-                    origin=literal_spec,
-                ),
-                AddressWithOrigin(
-                    Address("demo", relative_file_path="f2.txt", target_name="demo"), origin=spec
-                ),
-            ]
-        )
+        assert self.resolve_filesystem_specs([spec, literal_spec]) == {
+            AddressWithOrigin(
+                Address("demo", relative_file_path="f1.txt", target_name="demo"),
+                origin=literal_spec,
+            ),
+            AddressWithOrigin(
+                Address("demo", relative_file_path="f2.txt", target_name="demo"), origin=spec
+            ),
+        }
 
     def test_filesystem_specs_nonexistent_file(self) -> None:
-        specs = FilesystemSpecs([FilesystemLiteralSpec("demo/fake.txt")])
+        spec = FilesystemLiteralSpec("demo/fake.txt")
         with pytest.raises(ExecutionError) as exc:
-            self.request_single_product(
-                AddressesWithOrigins, Params(specs, create_options_bootstrapper()),
-            )
+            self.resolve_filesystem_specs([spec])
         assert 'Unmatched glob from file arguments: "demo/fake.txt"' in str(exc.value)
-        ignore_errors_result = self.request_single_product(
-            AddressesWithOrigins,
-            Params(specs, create_options_bootstrapper(args=["--owners-not-found-behavior=ignore"])),
+
+        assert not self.resolve_filesystem_specs(
+            [spec],
+            bootstrapper=create_options_bootstrapper(args=["--owners-not-found-behavior=ignore"]),
         )
-        assert not ignore_errors_result
 
     def test_filesystem_specs_no_owner(self) -> None:
         self.create_file("no_owners/f.txt")
         # Error for literal specs.
         with pytest.raises(ExecutionError) as exc:
-            self.request_single_product(
-                AddressesWithOrigins,
-                Params(
-                    FilesystemSpecs([FilesystemLiteralSpec("no_owners/f.txt")]),
-                    create_options_bootstrapper(),
-                ),
-            )
+            self.resolve_filesystem_specs([FilesystemLiteralSpec("no_owners/f.txt")])
         assert "No owning targets could be found for the file `no_owners/f.txt`" in str(exc.value)
 
         # Do not error for glob specs.
-        glob_file_result = self.request_single_product(
-            AddressesWithOrigins,
-            Params(
-                FilesystemSpecs([FilesystemGlobSpec("no_owners/*.txt")]),
-                create_options_bootstrapper(),
-            ),
-        )
-        assert not glob_file_result
+        assert not self.resolve_filesystem_specs([FilesystemGlobSpec("no_owners/*.txt")])
 
     def test_resolve_addresses(self) -> None:
         """This tests that we correctly handle resolving from both address and filesystem specs."""
