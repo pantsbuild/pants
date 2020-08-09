@@ -191,6 +191,7 @@ impl CapturedWorkdir for CommandRunner {
     workdir_path: &'b Path,
     req: Process,
     context: Context,
+    _exclusive_spawn: bool,
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String> {
     // Separate argument lists, to form distinct EPRs for (1) starting the nailgun server and (2) running the client in it.
     let ParsedJVMCommandLines {

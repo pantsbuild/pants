@@ -1007,7 +1007,7 @@ async fn materialize_missing_file() {
   let store_dir = TempDir::new().unwrap();
   let store = new_local_store(store_dir.path());
   store
-    .materialize_file(file.clone(), TestData::roland().digest(), false, true)
+    .materialize_file(file.clone(), TestData::roland().digest(), false)
     .compat()
     .await
     .expect_err("Want unknown digest error");
@@ -1027,7 +1027,7 @@ async fn materialize_file() {
     .await
     .expect("Error saving bytes");
   store
-    .materialize_file(file.clone(), testdata.digest(), false, true)
+    .materialize_file(file.clone(), testdata.digest(), false)
     .compat()
     .await
     .expect("Error materializing file");
@@ -1049,7 +1049,7 @@ async fn materialize_file_executable() {
     .await
     .expect("Error saving bytes");
   store
-    .materialize_file(file.clone(), testdata.digest(), true, true)
+    .materialize_file(file.clone(), testdata.digest(), true)
     .compat()
     .await
     .expect("Error materializing file");

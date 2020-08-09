@@ -182,6 +182,10 @@ impl RelativePath {
   pub fn to_str(&self) -> Option<&str> {
     self.0.to_str()
   }
+
+  pub fn join(&self, other: Self) -> RelativePath {
+    RelativePath(self.0.join(other))
+  }
 }
 
 impl AsRef<Path> for RelativePath {
