@@ -33,7 +33,7 @@ class ProtobufSources(Sources):
 class ProtobufLibrary(Target):
     """Protobuf files used to generate various languages.
 
-    See https://pants.readme.io/docs/protobuf.
+    See https://pantsbuild.org/docs/protobuf.
     """
 
     alias = "protobuf_library"

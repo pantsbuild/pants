@@ -3,7 +3,7 @@
 
 """Python autoformatter for PEP257 docstring conventions.
 
-See https://pants.readme.io/docs/python-linters-and-formatters and
+See https://pantsbuild.org/docs/python-linters-and-formatters and
 https://github.com/myint/docformatter.
 """
 

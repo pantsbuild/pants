@@ -38,7 +38,7 @@ class SourceRootError(Exception):
 
     def __init__(self, msg: str):
         super().__init__(
-            f"{msg}See https://pants.readme.io/docs/source-roots for how to define source roots."
+            f"{msg}See https://pantsbuild.org/docs/source-roots for how to define source roots."
         )
 
 
@@ -119,7 +119,7 @@ class SourceRootConfig(Subsystem):
             "`<buildroot>/project1/src/python`.  A `*` wildcard will match a single path segment, "
             "e.g., `src/*` will match `<buildroot>/src/python` and `<buildroot>/src/rust`. "
             "Use `/` to signify that the buildroot itself is a source root. "
-            "See https://pants.readme.io/docs/source-roots.",
+            "See https://pantsbuild.org/docs/source-roots.",
         )
 
         register(

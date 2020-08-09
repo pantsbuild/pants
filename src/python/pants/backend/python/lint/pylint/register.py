@@ -3,7 +3,7 @@
 
 """Linter for Python.
 
-See https://pants.readme.io/docs/python-linters-and-formatters and https://www.pylint.org.
+See https://pantsbuild.org/docs/python-linters-and-formatters and https://www.pylint.org.
 """
 
 from pants.backend.python.lint.pylint import rules as pylint_rules

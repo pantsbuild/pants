@@ -3,7 +3,7 @@
 
 This document describes releases leading up to the ``1.30.x`` ``stable`` series.
 
-See https://pants.readme.io/v1.30/docs/release-notes-1-30 for an overview of the changes in this release.
+See https://pantsbuild.org/v1.30/docs/release-notes-1-30 for an overview of the changes in this release.
 
 1.30.1rc0 (8/5/2020)
 --------------------

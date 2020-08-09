@@ -101,7 +101,7 @@ class ChangedOptions:
 class Changed(Subsystem):
     """Tell Pants to detect what files and targets have changed from Git.
 
-    See https://pants.readme.io/docs/advanced-target-selection.
+    See https://pantsbuild.org/docs/advanced-target-selection.
     """
 
     options_scope = "changed"

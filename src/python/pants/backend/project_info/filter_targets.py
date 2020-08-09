@@ -20,11 +20,11 @@ from pants.util.filtering import and_filters, create_filters
 
 TARGET_REMOVAL_MSG = (
     "`--filter-target` was removed because it is similar to `--filter-address-regex`. If you still "
-    "need this feature, please message us on Slack (https://pants.readme.io/docs/community)."
+    "need this feature, please message us on Slack (https://pantsbuild.org/docs/community)."
 )
 ANCESTOR_REMOVAL_MSG = (
     "`--filter-ancestor` was removed because it is not trivial to implement. If you still need "
-    "this feature, please message us on Slack (https://pants.readme.io/docs/community)."
+    "this feature, please message us on Slack (https://pantsbuild.org/docs/community)."
 )
 
 

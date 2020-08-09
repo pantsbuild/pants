@@ -3,7 +3,7 @@
 
 """Autoformatter for Python import statements.
 
-See https://pants.readme.io/docs/python-linters-and-formatters and
+See https://pantsbuild.org/docs/python-linters-and-formatters and
 https://timothycrosley.github.io/isort/.
 """
 

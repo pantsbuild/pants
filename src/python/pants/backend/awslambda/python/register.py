@@ -3,7 +3,7 @@
 
 """Create AWS Lambdas from Python code.
 
-See https://pants.readme.io/docs/awslambda-python.
+See https://pantsbuild.org/docs/awslambda-python.
 """
 
 from pants.backend.awslambda.common import awslambda_common_rules
