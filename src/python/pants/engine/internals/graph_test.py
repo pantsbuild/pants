@@ -999,6 +999,8 @@ async def infer_smalltalk_dependencies(request: InferSmalltalkDependencies) -> I
     resolved = await MultiGet(
         Get(Address, AddressInput, AddressInput.parse(line)) for line in all_lines
     )
+    # NB: See `test_depends_on_subtargets` for why we set the field
+    # `sibling_dependencies_inferrable` this way.
     return InferredDependencies(resolved, sibling_dependencies_inferrable=bool(resolved))
 
 
