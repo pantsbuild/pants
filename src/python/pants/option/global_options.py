@@ -923,20 +923,6 @@ class GlobalOptions(Subsystem):
         )
 
         register(
-            "--files-depend-on-target-siblings",
-            type=bool,
-            default=False,
-            advanced=True,
-            help=(
-                "If true, every file in a target will automatically depend on the other files in "
-                "that same target. If false, you will either need to explicitly specify any "
-                "dependencies on sibling files (e.g. `./sibling.txt` in the `dependencies` field), "
-                "or rely on dependency inference to do this. This option results in coarser "
-                "caching, so we only recommend using it if you are not using dependency inference."
-            ),
-        )
-
-        register(
             "--subproject-roots",
             type=list,
             advanced=True,

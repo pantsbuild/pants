@@ -722,20 +722,6 @@ async def resolve_dependencies(
         await MultiGet(Get(Address, AddressInput, ai) for ai in provided.ignored_addresses)
     )
 
-    # If this is a base target, or users have said to always depend on sibling files, inject
-    # dependencies on all the base target's subtargets.
-    subtarget_addresses: Tuple[Address, ...] = ()
-    if (
-        request.field.address.is_base_target
-        or global_options.options.files_depend_on_target_siblings
-    ):
-        subtargets = await Get(
-            Subtargets, Address, request.field.address.maybe_convert_to_base_target()
-        )
-        subtarget_addresses = tuple(
-            t.address for t in subtargets.subtargets if t.address != request.field.address
-        )
-
     # Inject any dependencies. This is determined by the `request.field` class. For example, if
     # there is a rule to inject for FortranDependencies, then FortranDependencies and any subclass
     # of FortranDependencies will use that rule.
@@ -765,6 +751,21 @@ async def resolve_dependencies(
                 inference_request_type(sources_field),
             )
             for inference_request_type in relevant_inference_request_types
+        )
+
+    # If this is a base target, or no dependency inference implementation can infer dependencies on
+    # a file address's sibling files, then we inject dependencies on all the base target's
+    # generated subtargets.
+    subtarget_addresses: Tuple[Address, ...] = ()
+    no_sibling_file_deps_inferrable = not inferred or all(
+        inferred_deps.sibling_dependencies_inferrable is False for inferred_deps in inferred
+    )
+    if request.field.address.is_base_target or no_sibling_file_deps_inferrable:
+        subtargets = await Get(
+            Subtargets, Address, request.field.address.maybe_convert_to_base_target()
+        )
+        subtarget_addresses = tuple(
+            t.address for t in subtargets.subtargets if t.address != request.field.address
         )
 
     addresses: Set[Address] = set()

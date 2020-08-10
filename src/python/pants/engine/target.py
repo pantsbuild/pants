@@ -14,6 +14,7 @@ from typing import (
     Dict,
     Generic,
     Iterable,
+    Iterator,
     Mapping,
     Optional,
     Tuple,
@@ -1542,8 +1543,30 @@ class InferDependenciesRequest:
     infer_from: ClassVar[Type[Sources]]
 
 
-class InferredDependencies(DeduplicatedCollection[Address]):
-    sort_input = True
+@frozen_after_init
+@dataclass(unsafe_hash=True)
+class InferredDependencies:
+    dependencies: FrozenOrderedSet[Address]
+    sibling_dependencies_inferrable: bool
+
+    def __init__(
+        self, dependencies: Iterable[Address], *, sibling_dependencies_inferrable: bool
+    ) -> None:
+        """The result of inferring dependencies.
+
+        If the inference implementation is able to infer file-level dependencies on sibling files
+        belonging to the same target, set sibling_dependencies_inferrable=True. This allows for
+        finer-grained caching because the dependency rule will not automatically add a dependency on
+        all sibling files.
+        """
+        self.dependencies = FrozenOrderedSet(sorted(dependencies))
+        self.sibling_dependencies_inferrable = sibling_dependencies_inferrable
+
+    def __bool__(self) -> bool:
+        return bool(self.dependencies)
+
+    def __iter__(self) -> Iterator[Address]:
+        return iter(self.dependencies)
 
 
 # -----------------------------------------------------------------------------------------------
