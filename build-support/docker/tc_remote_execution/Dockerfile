@@ -62,6 +62,6 @@ RUN adduser \
     --disabled-login \
     --uid 1000 \
     --shell /bin/bash \
-    --gecos 'Pants User' \
-    pants
-USER pants
+    --gecos 'Pants Build User' \
+    pantsbuild
+USER pantsbuild
