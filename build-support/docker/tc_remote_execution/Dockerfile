@@ -55,3 +55,13 @@ ENV PATH "${PYENV_ROOT}/versions/${PYTHON_27_VERSION}/bin:${PATH}"
 ENV PATH "${PYENV_ROOT}/versions/${PYTHON_36_VERSION}/bin:${PATH}"
 ENV PATH "${PYENV_ROOT}/versions/${PYTHON_37_VERSION}/bin:${PATH}"
 ENV PATH "${PYENV_ROOT}/versions/${PYTHON_38_VERSION}/bin:${PATH}"
+
+# Add a non-root user and configure image to use that user for running binaries.
+RUN adduser \
+    --disabled-password \
+    --disabled-login \
+    --uid 1000 \
+    --shell /bin/bash \
+    --gecos 'Pants User' \
+    pants
+USER pants
