@@ -154,7 +154,6 @@ class AddressMapper:
     prelude_glob_patterns: Tuple[str, ...]
     build_patterns: Tuple[str, ...]
     build_ignore_patterns: Tuple[str, ...]
-    subproject_roots: Tuple[str, ...]
 
     def __init__(
         self,
@@ -163,13 +162,11 @@ class AddressMapper:
         prelude_glob_patterns: Optional[Iterable[str]] = None,
         build_patterns: Optional[Iterable[str]] = None,
         build_ignore_patterns: Optional[Iterable[str]] = None,
-        subproject_roots: Optional[Iterable[str]] = None,
     ) -> None:
         self.parser = parser
         self.prelude_glob_patterns = tuple(prelude_glob_patterns or [])
         self.build_patterns = tuple(build_patterns or ["BUILD", "BUILD.*"])
         self.build_ignore_patterns = tuple(build_ignore_patterns or [])
-        self.subproject_roots = tuple(subproject_roots or [])
 
     def __repr__(self):
         return f"AddressMapper(build_patterns={self.build_patterns})"

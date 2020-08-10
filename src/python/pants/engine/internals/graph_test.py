@@ -1021,9 +1021,13 @@ class TestDependencies(TestBase):
         return [SmalltalkLibrary]
 
     def assert_dependencies_resolved(
-        self, *, requested_address: Address, expected: Iterable[Address],
+        self,
+        *,
+        requested_address: Address,
+        expected: Iterable[Address],
+        global_args: Optional[Iterable[str]] = None,
     ) -> None:
-        bootstrapper = create_options_bootstrapper()
+        bootstrapper = create_options_bootstrapper(args=global_args)
         target = self.request_single_product(
             WrappedTarget, Params(requested_address, bootstrapper)
         ).target
@@ -1059,6 +1063,32 @@ class TestDependencies(TestBase):
             self.assert_dependencies_resolved(requested_address=Address("unused"), expected=[])
         assert "'!unused:ignore'" in str(exc.value)
         assert "* unused:sibling" in str(exc.value)
+
+    def test_depends_on_subtargets(self) -> None:
+        """If the address is a base target, or the option `--files-depend-on-target-siblings` is
+        set, then we should depend on all the base target's subtargets."""
+        self.create_file("src/smalltalk/f1.st")
+        self.create_file("src/smalltalk/f2.st")
+        self.add_to_build_file("src/smalltalk", "smalltalk(sources=['*.st'])")
+
+        # Test that a base address depends on its subtargets.
+        self.assert_dependencies_resolved(
+            requested_address=Address("src/smalltalk"),
+            expected=[
+                Address("src/smalltalk", relative_file_path="f1.st"),
+                Address("src/smalltalk", relative_file_path="f2.st"),
+            ],
+        )
+
+        # Test that a file address depends on its siblings, but not itself.
+        self.assert_dependencies_resolved(
+            requested_address=Address("src/smalltalk", relative_file_path="f1.st"),
+            global_args=["--files-depend-on-target-siblings"],
+            expected=[Address("src/smalltalk", relative_file_path="f2.st")],
+        )
+        self.assert_dependencies_resolved(
+            requested_address=Address("src/smalltalk", relative_file_path="f1.st"), expected=[]
+        )
 
     def test_explicit_file_dependencies(self) -> None:
         self.create_files("src/smalltalk/util", ["f1.st", "f2.st", "f3.st"])

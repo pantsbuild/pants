@@ -823,7 +823,8 @@ class GlobalOptions(Subsystem):
             advanced=True,
         )
 
-        # TODO(#10569): move these out of bootstrap options into normal global options.
+        # TODO(#10569): move these out of bootstrap options into normal global options, near the
+        #  --subproject-roots option.
         register(
             "--build-patterns",
             advanced=True,
@@ -855,14 +856,6 @@ class GlobalOptions(Subsystem):
                 "Python files to evaluate and whose symbols should be exposed to all BUILD files. "
                 "See https://www.pantsbuild.org/docs/macros."
             ),
-        )
-        register(
-            "--subproject-roots",
-            type=list,
-            advanced=True,
-            default=[],
-            help="Paths that correspond with build roots for any subproject that this "
-            "project depends on.",
         )
 
         # TODO(#10569): move this out of bootstrap options into normal global options.
@@ -927,6 +920,29 @@ class GlobalOptions(Subsystem):
             default=[],
             metavar="<regexp>",
             help="Exclude target roots that match these regexes.",
+        )
+
+        register(
+            "--files-depend-on-target-siblings",
+            type=bool,
+            default=False,
+            advanced=True,
+            help=(
+                "If true, every file in a target will automatically depend on the other files in "
+                "that same target. If false, you will either need to explicitly specify any "
+                "dependencies on sibling files (e.g. `./sibling.txt` in the `dependencies` field), "
+                "or rely on dependency inference to do this. This option results in coarser "
+                "caching, so we only recommend using it if you are not using dependency inference."
+            ),
+        )
+
+        register(
+            "--subproject-roots",
+            type=list,
+            advanced=True,
+            default=[],
+            help="Paths that correspond with build roots for any subproject that this "
+            "project depends on.",
         )
 
         register(
