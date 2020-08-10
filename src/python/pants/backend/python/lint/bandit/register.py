@@ -3,7 +3,7 @@
 
 """Security linter for Python.
 
-See https://pantsbuild.org/docs/python-linters-and-formatters and
+See https://www.pantsbuild.org/docs/python-linters-and-formatters and
 https://bandit.readthedocs.io/en/latest/.
 """
 

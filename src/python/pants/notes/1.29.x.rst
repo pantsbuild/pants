@@ -3,7 +3,7 @@
 
 This document describes releases leading up to the ``1.29.x`` ``stable`` series.
 
-See https://pantsbuild.org/v1.29/docs/release-notes-1-29 for an overview of the changes in this release.
+See https://www.pantsbuild.org/v1.29/docs/release-notes-1-29 for an overview of the changes in this release.
 
 1.29.0 (6/17/2020)
 ------------------

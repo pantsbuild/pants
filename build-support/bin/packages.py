@@ -251,7 +251,7 @@ def build_pants_wheels() -> None:
 
 
 def build_fs_util() -> None:
-    # See https://pantsbuild.org/docs/contributions-rust for a description of fs_util. We include
+    # See https://www.pantsbuild.org/docs/contributions-rust for a description of fs_util. We include
     # it in our releases because it can be a useful standalone tool.
     with travis_section("fs_util", "Building fs_util"):
         subprocess.run(
@@ -308,14 +308,14 @@ def check_pgp() -> None:
     banner("Checking PGP setup")
     key = get_pgp_key_id()
     if not key:
-        die("You must set up a PGP key. See https://pantsbuild.org/docs/release-process.")
+        die("You must set up a PGP key. See https://www.pantsbuild.org/docs/release-process.")
     print("Found the following key for release signing:\n")
     subprocess.run([get_pgp_program_name(), "-k", key])
     key_confirmation = input("\nIs this the correct key? [Y/n]: ")
     if key_confirmation and key_confirmation.lower() != "y":
         die(
             "Please configure the key you intend to use. See "
-            "https://pantsbuild.org/docs/release-process."
+            "https://www.pantsbuild.org/docs/release-process."
         )
 
 

@@ -16,7 +16,7 @@ class PylintPluginDependencies(Dependencies):
     """Addresses to other targets that this plugin depends on.
 
     Due to restrictions with Pylint plugins, these targets must either be third-party Python
-    dependencies (https://pantsbuild.org/docs/python-third-party-dependencies) or be located
+    dependencies (https://www.pantsbuild.org/docs/python-third-party-dependencies) or be located
     within this target's same directory or a subdirectory.
     """
 
@@ -32,7 +32,7 @@ class PylintSourcePlugin(Target):
         3. Add the parent directory of your target to the `root_patterns` option in the `[source]`
             scope. For example, if your plugin is at `build-support/pylint/custom_plugin.py`, add
             'build-support/pylint'. This is necessary for Pants to know how to tell Pylint to
-            discover your plugin. See https://pantsbuild.org/docs/source-roots.
+            discover your plugin. See https://www.pantsbuild.org/docs/source-roots.
         4. Add `load-plugins=$module_name` to your Pylint config file. For example, if your Python
             file is called `custom_plugin.py`, set `load-plugins=custom_plugin`. Set the `config`
             option in the `[pylint]` scope to point to your Pylint config file.
@@ -40,7 +40,7 @@ class PylintSourcePlugin(Target):
             address, e.g. `source_plugins = ["build-support/pylint:plugin"]`.
 
     To instead load a third-party plugin, set the option `extra_requirements` in the `[pylint]`
-    scope (see https://pantsbuild.org/docs/python-linters-and-formatters). Set `load-plugins` in
+    scope (see https://www.pantsbuild.org/docs/python-linters-and-formatters). Set `load-plugins` in
     your config file, like you'd do with a source plugin.
 
     This target type is treated similarly to a `python_library` target. For example, Python linters
@@ -53,7 +53,7 @@ class PylintSourcePlugin(Target):
     this code.
 
     You can define the `provides` field to release this plugin as a distribution
-    (https://pantsbuild.org/docs/python-setup-py-goal).
+    (https://www.pantsbuild.org/docs/python-setup-py-goal).
     """
 
     alias = "pylint_source_plugin"

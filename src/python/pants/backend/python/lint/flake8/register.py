@@ -3,7 +3,7 @@
 
 """Linter for Python.
 
-See https://pantsbuild.org/docs/python-linters-and-formatters and
+See https://www.pantsbuild.org/docs/python-linters-and-formatters and
 https://flake8.pycqa.org/en/latest/.
 """
 

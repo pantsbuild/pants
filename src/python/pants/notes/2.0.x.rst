@@ -3,7 +3,7 @@
 
 This document describes releases leading up to the ``2.0.x`` ``stable`` series.
 
-See https://pantsbuild.org/v2.0/docs/release-notes-2-0 for an overview of the changes in this release.
+See https://www.pantsbuild.org/v2.0/docs/release-notes-2-0 for an overview of the changes in this release.
 
 2.0.0.dev6 (7/28/2020)
 ----------------------

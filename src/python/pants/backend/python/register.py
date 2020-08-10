@@ -3,7 +3,7 @@
 
 """Support for Python.
 
-See https://pantsbuild.org/docs/python-backend.
+See https://www.pantsbuild.org/docs/python-backend.
 """
 
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
