@@ -1,9 +1,3 @@
-[DEFAULT]
-# If we use typical default process parallelism tied to core count, we see too many cores under
-# travis and either get oomkilled from launching too many processes with too much total memory
-# overhead or else just generally thrash the container and slow things down.
-travis_parallelism = 4
-
 [GLOBAL]
 # Override color support detection - we want colors and Travis supports them.
 colors = true
@@ -13,8 +7,6 @@ dynamic_ui = false
 # TODO: Eventually we would like pantsd enabled in CI as well, but we blanket disable it for
 # now in order to smooth off rough edges locally.
 pantsd = false
-
-process_execution_local_parallelism = "%(travis_parallelism)s"
 
 [test]
 use_coverage = true
