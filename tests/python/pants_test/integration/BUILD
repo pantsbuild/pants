@@ -52,7 +52,7 @@ python_integration_tests(
     'testprojects/tests/python/pants:build_parsing_directory',
   ],
   uses_pants_run=True,
-  timeout = 180,
+  timeout = 240,
 )
 
 python_integration_tests(
