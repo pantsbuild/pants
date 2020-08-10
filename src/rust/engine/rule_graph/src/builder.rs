@@ -30,7 +30,7 @@
 
 use std::collections::{hash_map, BTreeSet, HashMap, HashSet};
 
-use crate::rules::{DependencyKey, Rule};
+use crate::rules::{DependencyKey, Query, Rule};
 // TODO: The Builder should likely not be using `params_str`: we should be able to build a graph
 // without ever rendering a string representation, and deferring that for when/if we have errored.
 use crate::{
@@ -62,27 +62,21 @@ enum ConstructGraphResult<R: Rule> {
 // Given the task index and the root subjects, it produces a rule graph that allows dependency nodes
 // to be found statically rather than dynamically.
 pub struct Builder<'t, R: Rule> {
-  tasks: &'t HashMap<R::TypeId, Vec<R>>,
-  root_param_types: ParamTypes<R::TypeId>,
+  rules: &'t HashMap<R::TypeId, Vec<R>>,
+  queries: Vec<Query<R>>,
 }
 
 impl<'t, R: Rule> Builder<'t, R> {
-  pub fn new(
-    tasks: &'t HashMap<R::TypeId, Vec<R>>,
-    root_param_types: Vec<R::TypeId>,
-  ) -> Builder<'t, R> {
-    let root_param_types = root_param_types.into_iter().collect();
-    Builder {
-      tasks,
-      root_param_types,
-    }
+  pub fn new(rules: &'t HashMap<R::TypeId, Vec<R>>, queries: Vec<Query<R>>) -> Builder<'t, R> {
+    Builder { rules, queries }
   }
 
-  pub fn graph(&self) -> RuleGraph<R> {
-    self.construct_graph(self.gen_root_entries(&self.tasks.keys().cloned().collect()))
-  }
-
-  fn construct_graph(&self, roots: Vec<RootEntry<R>>) -> RuleGraph<R> {
+  pub fn graph(self) -> RuleGraph<R> {
+    let roots = self
+      .queries
+      .iter()
+      .map(|query| RootEntry(query.clone()))
+      .collect::<Vec<_>>();
     let mut dependency_edges: RuleDependencyEdges<_> = HashMap::new();
     let mut simplified_entries = HashMap::new();
     let mut unfulfillable_rules: UnfulfillableRuleMap<_> = HashMap::new();
@@ -99,7 +93,7 @@ impl<'t, R: Rule> Builder<'t, R> {
     let unreachable_rules = self.unreachable_rules(&dependency_edges);
 
     RuleGraph {
-      root_param_types: self.root_param_types.clone(),
+      queries: self.queries,
       rule_dependency_edges: dependency_edges,
       unfulfillable_rules,
       unreachable_rules,
@@ -147,7 +141,7 @@ impl<'t, R: Rule> Builder<'t, R> {
       .collect();
 
     self
-      .tasks
+      .rules
       .values()
       .flat_map(|r| r.iter())
       .filter(|r| r.require_reachable() && !reachable_rules.contains(r))
@@ -603,29 +597,6 @@ impl<'t, R: Rule> Builder<'t, R> {
     })
   }
 
-  fn gen_root_entries(&self, product_types: &HashSet<R::TypeId>) -> Vec<RootEntry<R>> {
-    product_types
-      .iter()
-      .filter_map(|product_type| self.gen_root_entry(&self.root_param_types, *product_type))
-      .collect()
-  }
-
-  fn gen_root_entry(
-    &self,
-    param_types: &ParamTypes<R::TypeId>,
-    product_type: R::TypeId,
-  ) -> Option<RootEntry<R>> {
-    let candidates = self.rhs(param_types, product_type);
-    if candidates.is_empty() {
-      None
-    } else {
-      Some(RootEntry {
-        params: param_types.clone(),
-        dependency_key: R::DependencyKey::new_root(product_type),
-      })
-    }
-  }
-
   ///
   /// Select Entries that can provide the given product type with the given parameters.
   ///
@@ -636,7 +607,7 @@ impl<'t, R: Rule> Builder<'t, R> {
       entries.push(Entry::Param(*type_id));
     }
     // If there are any rules which can produce the desired type, add them.
-    if let Some(matching_rules) = self.tasks.get(&product_type) {
+    if let Some(matching_rules) = self.rules.get(&product_type) {
       entries.extend(matching_rules.iter().map(|rule| {
         Entry::WithDeps(EntryWithDeps::Inner(InnerEntry {
           params: params.clone(),

@@ -321,6 +321,11 @@ py_module_initializer!(native_engine, |py, m| {
     py_fn!(py, tasks_add_select(a: PyTasks, b: PyType)),
   )?;
   m.add(py, "tasks_task_end", py_fn!(py, tasks_task_end(a: PyTasks)))?;
+  m.add(
+    py,
+    "tasks_query_add",
+    py_fn!(py, tasks_query_add(a: PyTasks, b: PyType, c: Vec<PyType>)),
+  )?;
 
   m.add(
     py,
@@ -350,7 +355,6 @@ py_module_initializer!(native_engine, |py, m| {
         named_caches_dir_buf: String,
         ignore_patterns: Vec<String>,
         use_gitignore: bool,
-        root_type_ids: Vec<PyType>,
         remoting_options: PyRemotingOptions,
         exec_strategy_opts: PyExecutionStrategyOptions
       )
@@ -756,7 +760,6 @@ fn scheduler_create(
   named_caches_dir_buf: String,
   ignore_patterns: Vec<String>,
   use_gitignore: bool,
-  root_type_ids: Vec<PyType>,
   remoting_options: PyRemotingOptions,
   exec_strategy_opts: PyExecutionStrategyOptions,
 ) -> CPyResult<PyScheduler> {
@@ -776,7 +779,6 @@ fn scheduler_create(
 
     Core::new(
       executor.clone(),
-      root_type_ids.into_iter().map(externs::type_for).collect(),
       tasks,
       types,
       intrinsics,
@@ -1087,6 +1089,21 @@ fn tasks_add_select(py: Python, tasks_ptr: PyTasks, product: PyType) -> PyUnitRe
 fn tasks_task_end(py: Python, tasks_ptr: PyTasks) -> PyUnitResult {
   with_tasks(py, tasks_ptr, |tasks| {
     tasks.task_end();
+    Ok(None)
+  })
+}
+
+fn tasks_query_add(
+  py: Python,
+  tasks_ptr: PyTasks,
+  output_type: PyType,
+  input_types: Vec<PyType>,
+) -> PyUnitResult {
+  with_tasks(py, tasks_ptr, |tasks| {
+    tasks.query_add(
+      externs::type_for(output_type),
+      input_types.into_iter().map(externs::type_for).collect(),
+    );
     Ok(None)
   })
 }
