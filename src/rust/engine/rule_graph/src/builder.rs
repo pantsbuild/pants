@@ -28,401 +28,821 @@
 // Arc<Mutex> can be more clear than needing to grok Orderings:
 #![allow(clippy::mutex_atomic)]
 
-use std::collections::{hash_map, BTreeSet, HashMap, HashSet};
+use crate::rules::{DependencyKey, ParamTypes, Query, Rule};
+use crate::{Entry, EntryWithDeps, InnerEntry, RootEntry, RuleEdges, RuleGraph};
+
+use std::collections::{hash_map, HashMap, HashSet, VecDeque};
 use std::convert::TryInto;
 
-use crate::rules::{DependencyKey, Rule};
-// TODO: The Builder should likely not be using `params_str`: we should be able to build a graph
-// without ever rendering a string representation, and deferring that for when/if we have errored.
-use crate::{
-  params_str, Diagnostic, Entry, EntryWithDeps, InnerEntry, ParamTypes, RootEntry,
-  RuleDependencyEdges, RuleEdges, RuleGraph, UnfulfillableRuleMap, UnreachableError,
-};
+use indexmap::IndexSet;
+use itertools::Itertools;
+use petgraph::graph::{DiGraph, NodeIndex};
+use petgraph::visit::{Bfs, EdgeRef, IntoNodeReferences, NodeRef, VisitMap, Visitable};
+use petgraph::Direction;
 
-type ChosenDependency<'a, R> = (&'a <R as Rule>::DependencyKey, &'a Entry<R>);
-
-enum ConstructGraphResult<R: Rule> {
-  // The Entry was satisfiable without waiting for any additional nodes to be satisfied. The result
-  // contains copies of the input Entry for each set subset of the parameters that satisfy it.
-  Fulfilled(Vec<EntryWithDeps<R>>),
-  // The Entry was not satisfiable with installed rules.
-  Unfulfillable(EntryWithDeps<R>),
-  // The dependencies of an Entry might be satisfiable, but is currently blocked waiting for the
-  // results of the given entries.
-  //
-  // Holds partially-fulfilled Entries which do not yet contain their full set of used parameters.
-  // These entries are only consumed the case when a caller is the source of a cycle, and in that
-  // case they represent everything except the caller's own parameters (which provides enough
-  // information for the caller to complete).
-  CycledOn {
-    cyclic_deps: HashSet<EntryWithDeps<R>>,
-    partial_simplified_entries: Vec<EntryWithDeps<R>>,
-  },
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
+enum Node<R: Rule> {
+  Query(Query<R>),
+  Rule(R),
+  Param(R::TypeId),
 }
 
-// Given the task index and the root subjects, it produces a rule graph that allows dependency nodes
-// to be found statically rather than dynamically.
+impl<R: Rule> std::fmt::Display for Node<R> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      Node::Query(q) => write!(f, "{}", q),
+      Node::Rule(r) => write!(f, "{}", r),
+      Node::Param(p) => write!(f, "Param({})", p),
+    }
+  }
+}
+
+impl<R: Rule> Node<R> {
+  fn dependency_keys(&self) -> Vec<R::DependencyKey> {
+    match self {
+      Node::Rule(r) => r.dependency_keys(),
+      Node::Query(q) => vec![R::DependencyKey::new_root(q.product)],
+      Node::Param(_) => vec![],
+    }
+  }
+}
+
+enum DependencyNode<R: Rule> {
+  Rule(R),
+  Param(R::TypeId),
+}
+
+type Graph<R> = DiGraph<Node<R>, <R as Rule>::DependencyKey, u32>;
+type ParamsLabeledGraph<R> =
+  DiGraph<(Node<R>, ParamTypes<<R as Rule>::TypeId>), <R as Rule>::DependencyKey, u32>;
+
+///
+/// Given the set of Rules and Queries, produce a RuleGraph that allows dependency nodes
+/// to be found statically.
+///
 pub struct Builder<'t, R: Rule> {
-  tasks: &'t HashMap<R::TypeId, Vec<R>>,
-  root_param_types: ParamTypes<R::TypeId>,
+  rules: &'t HashMap<R::TypeId, Vec<R>>,
+  queries: Vec<Query<R>>,
+  params: ParamTypes<R::TypeId>,
 }
 
 impl<'t, R: Rule> Builder<'t, R> {
-  pub fn new(
-    tasks: &'t HashMap<R::TypeId, Vec<R>>,
-    root_param_types: Vec<R::TypeId>,
-  ) -> Builder<'t, R> {
-    let root_param_types = root_param_types.into_iter().collect();
+  pub fn new(rules: &'t HashMap<R::TypeId, Vec<R>>, queries: Vec<Query<R>>) -> Builder<'t, R> {
+    // The set of all input Params in the graph: ie, those provided either via Queries, or via
+    // a Rule with a DependencyKey that provides a Param.
+    let params = queries
+      .iter()
+      .flat_map(|query| query.params.iter().cloned())
+      .chain(
+        rules
+          .values()
+          .flatten()
+          .flat_map(|rule| rule.dependency_keys())
+          .filter_map(|dk| dk.provided_param()),
+      )
+      .collect::<ParamTypes<_>>();
     Builder {
-      tasks,
-      root_param_types,
+      rules,
+      queries,
+      params,
     }
   }
 
-  pub fn graph(&self) -> RuleGraph<R> {
-    self.construct_graph(self.gen_root_entries(&self.tasks.keys().cloned().collect()))
+  pub fn graph(self) -> Result<RuleGraph<R>, String> {
+    // 1. build a polymorphic graph
+    //    * only consideration: whether something is a valid input Param _anywhere_ in the graph, and
+    //      that we can't satisfy a Get with a Param
+    let initial_polymorphic_graph = self.initial_polymorphic()?;
+    // 2. run live variable analysis on the polymorphic graph to gather a conservative (ie, overly
+    //    large) set of used Params.
+    let polymorphic_live_params_graph = self.live_param_labeled_graph(initial_polymorphic_graph);
+    // 3. monomorphize by copying a node (and its dependees) for each valid combination of its
+    //    dependencies
+    let monomorphic_live_params_graph = Self::monomorphize(polymorphic_live_params_graph);
+    // 4. delete nodes that are illegal based on their final in/out sets.
+    //    * if a DependencyKey does not consume a provided param, the node and all rule
+    //      dependees are deleted
+    let pruned_nodes_graph = self.prune_nodes(monomorphic_live_params_graph);
+    // 5. choose the best dependencies via in/out sets. fail if:
+    //    * invalid required param at a Query
+    //    * take smallest option, fail for equal-sized sets
+    let pruned_edges_graph = self.prune_edges(pruned_nodes_graph)?;
+    // 6. generate the final graph for nodes reachable from queries
+    self.finalize(pruned_edges_graph)
   }
 
-  fn construct_graph(&self, roots: Vec<RootEntry<R>>) -> RuleGraph<R> {
-    let mut dependency_edges: RuleDependencyEdges<_> = HashMap::new();
-    let mut simplified_entries = HashMap::new();
-    let mut unfulfillable_rules: UnfulfillableRuleMap<_> = HashMap::new();
+  fn initial_polymorphic(&self) -> Result<Graph<R>, String> {
+    let mut graph: Graph<R> = DiGraph::new();
 
-    for beginning_root in roots {
-      self.construct_graph_helper(
-        &mut dependency_edges,
-        &mut simplified_entries,
-        &mut unfulfillable_rules,
-        EntryWithDeps::Root(beginning_root),
-      );
-    }
+    // Initialize the graph with nodes for all Queries, Rules, and Params.
+    let queries = self
+      .queries
+      .iter()
+      .map(|query| (query, graph.add_node(Node::Query(query.clone()))))
+      .collect::<HashMap<_, _>>();
+    let rules = self
+      .rules
+      .values()
+      .flatten()
+      .cloned()
+      .map(|rule| (rule.clone(), graph.add_node(Node::Rule(rule))))
+      .collect::<HashMap<_, _>>();
+    let params = self
+      .params
+      .iter()
+      .cloned()
+      .map(|param| (param, graph.add_node(Node::Param(param))))
+      .collect::<HashMap<_, _>>();
 
-    let unreachable_rules = self.unreachable_rules(&dependency_edges);
-
-    RuleGraph {
-      root_param_types: self.root_param_types.clone(),
-      rule_dependency_edges: dependency_edges,
-      unfulfillable_rules,
-      unreachable_rules,
-    }
-  }
-
-  ///
-  /// Compute input TaskRules that are unreachable from root entries.
-  ///
-  fn unreachable_rules(
-    &self,
-    full_dependency_edges: &RuleDependencyEdges<R>,
-  ) -> Vec<UnreachableError<R>> {
-    // Walk the graph, starting from root entries.
-    let mut entry_stack: Vec<_> = full_dependency_edges
-      .keys()
-      .filter(|entry| match entry {
-        EntryWithDeps::Root(_) => true,
-        _ => false,
-      })
-      .collect();
-    let mut visited = HashSet::new();
-    while let Some(entry) = entry_stack.pop() {
-      if visited.contains(&entry) {
+    // Starting from Queries, visit all reachable nodes in the graph.
+    let mut visited = graph.visit_map();
+    let mut to_visit = queries.values().cloned().collect::<Vec<_>>();
+    while let Some(node_id) = to_visit.pop() {
+      if !visited.visit(node_id) {
         continue;
       }
-      visited.insert(entry);
 
-      if let Some(edges) = full_dependency_edges.get(entry) {
-        entry_stack.extend(edges.all_dependencies().filter_map(|e| match e {
-          Entry::WithDeps(ref e) => Some(e),
-          _ => None,
-        }));
+      // Visit the dependency keys of the node (if it has any).
+      for dependency_key in graph[node_id].dependency_keys() {
+        let candidates: Vec<DependencyNode<R>> = self.rhs(dependency_key);
+        if candidates.is_empty() {
+          // "No rules or queries provide type X."
+          return Err("TODO".to_owned());
+        }
+        for candidate in candidates {
+          match candidate {
+            DependencyNode::Rule(r) => {
+              let rule_id = rules.get(&r).unwrap();
+              graph.add_edge(node_id, *rule_id, dependency_key);
+              to_visit.push(*rule_id);
+            }
+            DependencyNode::Param(p) => {
+              graph.add_edge(node_id, *params.get(&p).unwrap(), dependency_key);
+            }
+          }
+        }
       }
     }
 
-    let reachable_rules: HashSet<_> = visited
-      .into_iter()
-      .filter_map(|entry| match entry {
-        EntryWithDeps::Inner(InnerEntry { ref rule, .. }) if rule.require_reachable() => {
-          Some(rule.clone())
-        }
+    Ok(graph)
+  }
+
+  ///
+  /// Splits Rules in the graph that have multiple valid sources of a dependency, and recalculates
+  /// their live variables to attempt to re-join with other copies of the Rule with identical sets.
+  /// Similar to `live_param_labeled_graph`, this is an analysis that propagates "up" the graph
+  /// from dependencies to dependees (and maintains the live param sets initialized by
+  /// `live_param_labeled_graph` while doing so). Visiting a node might cause us to split it and
+  /// re-calculate the live params sets for each split; we then visit the dependees of the split
+  /// nodes to ensure that they are visited as well, and so on.
+  ///
+  /// Any node that has a dependency that does not consume a provided param will be removed (which
+  /// may also cause its dependees to be removed, for the same reason). This is safe to do at any
+  /// time during the monomorphize run, because the liveness sets only shrink over time: if a
+  /// dependency does not consume a provided param with the overapproximated set, it won't with any
+  /// smaller set either.
+  ///
+  /// The exit condition for this phase is that all nodes have their final, accurate param usage sets,
+  /// because all splits that result in smaller param sets for a node will have been executed. BUT,
+  /// it might still be the case that a node has multiple sources of a particular dependency with
+  /// the _same_ param requirements. This represents ambiguity that must be handled (likely by
+  /// erroring) in later phases.
+  ///
+  fn monomorphize(mut graph: ParamsLabeledGraph<R>) -> ParamsLabeledGraph<R> {
+    // We need to visit all nodes in the graph, but because monomorphizing a node enqueues its
+    // dependees we may visit some of them multiple times. We use a set as the to_visit collection
+    // because each visit clears the need to re-visit unless another dependency enqueues it _after_
+    // it has been visited.
+    let mut to_visit = graph
+      .node_references()
+      .map(|node_ref| node_ref.id())
+      .collect::<IndexSet<_>>();
+    // As we go, we record which nodes to delete, but we wait until the end to delete them, as it
+    // will cause NodeIds to shift in the graph (and is only cheap to do in bulk).
+    let mut to_delete = HashSet::new();
+
+    // As we split Rules, we attempt to re-join with existing identical Rule nodes to avoid an
+    // explosion.
+    let mut rules: HashMap<(Node<R>, ParamTypes<_>), _> = graph
+      .node_references()
+      .filter_map(|node_ref| match node_ref.weight().0 {
+        Node::Rule(_) => Some((node_ref.weight().clone(), node_ref.id())),
         _ => None,
       })
       .collect();
 
-    self
-      .tasks
-      .values()
-      .flat_map(|r| r.iter())
-      .filter(|r| r.require_reachable() && !reachable_rules.contains(r))
-      .map(|r| UnreachableError::new(r.clone()))
-      .collect()
-  }
+    println!(
+      "Monomorphizing with: {:?}",
+      petgraph::dot::Dot::with_config(&graph, &[])
+    );
 
-  ///
-  /// Computes whether the given candidate Entry is satisfiable, and if it is, returns a copy
-  /// of the Entry for each set of input parameters that will satisfy it. Once computed, the
-  /// simplified versions are memoized in all_simplified_entries.
-  ///
-  /// When a rule can be fulfilled it will end up stored in both the rule_dependency_edges and
-  /// all_simplified_entries. If it can't be fulfilled, it is added to `unfulfillable_rules`.
-  ///
-  fn construct_graph_helper(
-    &self,
-    rule_dependency_edges: &mut RuleDependencyEdges<R>,
-    all_simplified_entries: &mut HashMap<EntryWithDeps<R>, Vec<EntryWithDeps<R>>>,
-    unfulfillable_rules: &mut UnfulfillableRuleMap<R>,
-    entry: EntryWithDeps<R>,
-  ) -> ConstructGraphResult<R> {
-    if let Some(simplified) = all_simplified_entries.get(&entry) {
-      // A simplified equivalent entry has already been computed, return it.
-      return ConstructGraphResult::Fulfilled(simplified.clone());
-    } else if unfulfillable_rules.get(&entry).is_some() {
-      // The rule is unfulfillable.
-      return ConstructGraphResult::Unfulfillable(entry);
-    }
-
-    // Otherwise, store a placeholder in the rule_dependency_edges map and then visit its
-    // children.
-    //
-    // This prevents infinite recursion by shortcircuiting when an entry recursively depends on
-    // itself. It's totally fine for rules to be recursive: the recursive path just never
-    // contributes to whether the rule is satisfiable.
-    match rule_dependency_edges.entry(entry.clone()) {
-      hash_map::Entry::Vacant(re) => {
-        // When a rule has not been visited before, we start the visit by storing a placeholder in
-        // the rule dependencies map in order to detect rule cycles.
-        re.insert(RuleEdges::default());
+    while let Some(node_id) = to_visit.pop() {
+      if to_delete.contains(&node_id) {
+        continue;
       }
-      hash_map::Entry::Occupied(_) => {
-        // We're currently recursively under this rule, but its simplified equivalence has not yet
-        // been computed (or we would have returned it above). The cyclic parent(s) will complete
-        // before recursing to compute this node again.
-        let mut cyclic_deps = HashSet::new();
-        let simplified = entry.simplified(BTreeSet::new());
-        cyclic_deps.insert(entry);
-        return ConstructGraphResult::CycledOn {
-          cyclic_deps,
-          partial_simplified_entries: vec![simplified],
-        };
-      }
-    };
-
-    // For each dependency of the rule, recurse for each potential match and collect RuleEdges and
-    // used parameters.
-    //
-    // This is a `loop` because if we discover that this entry needs to complete in order to break
-    // a cycle on itself, it will re-compute dependencies after having partially-completed.
-    loop {
-      if let Ok(res) = self.construct_dependencies(
-        rule_dependency_edges,
-        all_simplified_entries,
-        unfulfillable_rules,
-        entry.clone(),
-      ) {
-        break res;
-      }
-    }
-  }
-
-  ///
-  /// For each dependency of the rule, recurse for each potential match and collect RuleEdges and
-  /// used parameters.
-  ///
-  /// This is called in a `loop` until it succeeds, because if we discover that this entry needs
-  /// to complete in order to break a cycle on itself, it will re-compute dependencies after having
-  /// partially-completed.
-  ///
-  fn construct_dependencies(
-    &self,
-    rule_dependency_edges: &mut RuleDependencyEdges<R>,
-    all_simplified_entries: &mut HashMap<EntryWithDeps<R>, Vec<EntryWithDeps<R>>>,
-    unfulfillable_rules: &mut UnfulfillableRuleMap<R>,
-    entry: EntryWithDeps<R>,
-  ) -> Result<ConstructGraphResult<R>, ()> {
-    let mut fulfillable_candidates_by_key = HashMap::new();
-    let mut cycled_on = HashSet::new();
-    let mut unfulfillable_diagnostics = Vec::new();
-
-    let dependency_keys = entry.dependency_keys();
-
-    for dependency_key in dependency_keys {
-      let product = dependency_key.product();
-      let provided_param = dependency_key.provided_param();
-      let params = if let Some(provided_param) = provided_param {
-        // The dependency key provides a parameter: include it in the Params that are already in
-        // the context. A candidate must consume/"use" the provided parameter to be eligible.
-        let mut params = entry.params().clone();
-        params.insert(provided_param);
-        params
-      } else {
-        entry.params().clone()
-      };
-
-      // Collect fulfillable candidates, used parameters, and cyclic deps.
-      let mut cycled = false;
-      let fulfillable_candidates = fulfillable_candidates_by_key
-        .entry(dependency_key)
-        .or_insert_with(Vec::new);
-      let mut unfulfillable_candidates = Vec::new();
-      for candidate in self.rhs(&params, product) {
-        match candidate {
-          Entry::WithDeps(c) => match self.construct_graph_helper(
-            rule_dependency_edges,
-            all_simplified_entries,
-            unfulfillable_rules,
-            c,
-          ) {
-            ConstructGraphResult::Unfulfillable(c) => {
-              unfulfillable_candidates.push((Entry::WithDeps(c), Some("Was unfulfillable.")));
-            }
-            ConstructGraphResult::Fulfilled(simplified_entries) => {
-              fulfillable_candidates.push(
-                simplified_entries
-                  .into_iter()
-                  .filter(|e| {
-                    // Only entries that actually consume a provided (Get) parameter are eligible
-                    // for consideration.
-                    if let Some(pp) = provided_param {
-                      e.params().contains(&pp)
-                    } else {
-                      true
-                    }
-                  })
-                  .map(Entry::WithDeps)
-                  .collect::<Vec<_>>(),
-              );
-            }
-            ConstructGraphResult::CycledOn {
-              cyclic_deps,
-              partial_simplified_entries,
-            } => {
-              cycled = true;
-              cycled_on.extend(cyclic_deps);
-              fulfillable_candidates.push(
-                partial_simplified_entries
-                  .into_iter()
-                  .map(Entry::WithDeps)
-                  .collect::<Vec<_>>(),
-              );
-            }
-          },
-          Entry::Param(param) => {
-            // We cannot consume a Param to fulfill a dependency when there is a provided Param.
-            // Even if the Param was already in scope, this dependency provides a new value for
-            // the Param which would shadow any existing value in this subgraph, and which must
-            // be consumed.
-            if provided_param.is_none() {
-              fulfillable_candidates.push(vec![Entry::Param(param)]);
-            } else {
-              unfulfillable_candidates.push((
-                Entry::Param(param),
-                Some("Cannot consume a Param to fulfill a Get."),
-              ));
-            }
-          }
-        };
-      }
-
-      if cycled {
-        // If any candidate triggered a cycle on a rule that has not yet completed, then we are not
-        // yet fulfillable, and should finish gathering any other cyclic rule dependencies.
+      if !matches!(&graph[node_id].0, Node::Rule(_)) {
         continue;
       }
 
-      if fulfillable_candidates.is_empty() {
-        // If no candidates were fulfillable, this rule is not fulfillable.
-        unfulfillable_diagnostics.push(Diagnostic {
-          params: params.clone(),
-          reason: {
-            let hint = if unfulfillable_candidates.is_empty() {
-              let root_hint = if provided_param.is_none() {
-                format!(
-                    " If that type should be provided from outside the rule graph, consider declaring RootRule({}).",
-                    product
-                )
-              } else {
-                "".to_string()
-              };
-              format!(
-                  " No installed rules return the type {}: Is the rule that you're expecting to run registered?{}",
-                  product,
-                  root_hint
-              )
-            } else {
-              "".to_string()
-            };
-            format!("No rule was able to compute {}.{}", dependency_key, hint)
-          },
-          details: unfulfillable_candidates,
-        });
+      // If any DependencyKey has multiple (live/not-deleted) sources, the Rule needs to be
+      // monomorphized/duplicated.
+      let edges_by_dependency_key: Vec<Vec<(R::DependencyKey, _)>> = {
+        let mut sorted_edges = graph
+          .edges_directed(node_id, Direction::Outgoing)
+          .collect::<Vec<_>>();
+        sorted_edges.sort_by_key(|edge_ref| edge_ref.weight());
+        sorted_edges
+          .into_iter()
+          .group_by(|edge_ref| edge_ref.weight())
+          .into_iter()
+          .map(|(dependency_key, edge_refs)| {
+            edge_refs
+              .filter(|edge_ref| {
+                // Filter out the dependency if the in_set of the dependency node does not consume a
+                // provided param. Since the "used parameter" sets of nodes only shrink as
+                // monomorphize runs, it's always safe to eliminate a potential dependency this way.
+                let consumes_provided =
+                  if let Some(provided_param) = dependency_key.provided_param() {
+                    graph[edge_ref.target()].1.contains(&provided_param)
+                  } else {
+                    true
+                  };
+                consumes_provided && !to_delete.contains(&edge_ref.target())
+              })
+              .map(|edge_ref| (*edge_ref.weight(), edge_ref.target()))
+              .collect()
+          })
+          .collect()
+      };
+
+      if edges_by_dependency_key.iter().all(|edges| edges.len() == 1) {
+        // This node is already monomorphic: dependencies may have changed though, so confirm
+        // that its liveness set is up to date. If it isn't, we'll fall through to monomorphize it,
+        // which will handle the update and potential merge with an existing node.
+        let new_in_set = Self::live_params(
+          &graph,
+          node_id,
+          graph
+            .edges_directed(node_id, Direction::Outgoing)
+            .map(|edge_ref| (*edge_ref.weight(), edge_ref.target())),
+        );
+        if graph[node_id].1 == new_in_set {
+          /*
+          println!(
+            ">>> already monomorphic {:?} with accurate liveness.",
+            graph[node_id]
+          );
+          */
+          continue;
+        } else {
+          /*
+          println!(
+            ">>> already monomorphic {:?}, but needs liveness updates.",
+            graph[node_id]
+          );
+          */
+        }
       }
+
+      /*
+      println!(
+        ">>> visiting {:?} for {:?}",
+        edges_by_dependency_key
+          .iter()
+          .map(|edges| edges.len())
+          .collect::<Vec<_>>(),
+        graph[node_id]
+      );
+      */
+
+      // Needs changes. Add dependees to the list of nodes to visit, and this node to the
+      // list of nodes to be deleted.
+      let dependee_edges = graph
+        .edges_directed(node_id, Direction::Incoming)
+        .map(|edge_ref| (edge_ref.source(), *edge_ref.weight()))
+        .collect::<Vec<_>>();
+      to_visit.extend(dependee_edges.iter().map(|(dependee_id, _)| dependee_id));
+      to_delete.insert(node_id);
+      rules.remove(&graph[node_id]);
+
+      // For each combination of dependencies, produce or find a replacement node.
+      let mut modified_existing_nodes = HashSet::new();
+      for combination in combinations_of_one(&edges_by_dependency_key) {
+        // Compute a live variable set for this combination of deps, and see whether there is
+        // an existing copy of this Rule with those live_params.
+        let live_params = Self::live_params(
+          &graph,
+          node_id,
+          combination.iter().map(|(dk, di)| (dk.clone(), di.clone())),
+        );
+        /*
+        println!(
+          ">>>   {} generating permutation for {} that consumes: {:#?}",
+          graph[node_id].0,
+          crate::params_str(&live_params),
+          combination
+            .iter()
+            .map(|(dk, di)| format!(
+              "{} from ({} with {})",
+              dk,
+              graph[*di].0,
+              crate::params_str(&graph[*di].1)
+            ))
+            .collect::<Vec<_>>()
+        );
+        */
+        let (replacement_id, is_new_node) =
+          match rules.entry((graph[node_id].0.clone(), live_params.clone())) {
+            hash_map::Entry::Occupied(oe) => (*oe.get(), false),
+            hash_map::Entry::Vacant(ve) => (
+              *ve.insert(graph.add_node((graph[node_id].0.clone(), live_params.clone()))),
+              true,
+            ),
+          };
+
+        // Give all dependees edges to the chosen node for this combo.
+        for (dependee_id, dependency_key) in &dependee_edges {
+          // NB: For existing nodes, confirm that we are not creating a duplicate edge.
+          if is_new_node
+            || graph
+              .edges_directed(*dependee_id, Direction::Outgoing)
+              .all(|edge_ref| {
+                edge_ref.target() != replacement_id || edge_ref.weight() != dependency_key
+              })
+          {
+            graph.add_edge(*dependee_id, replacement_id, *dependency_key);
+          }
+        }
+
+        // And give it edges to this combination of dependencies (while confirming that we don't
+        // create dupes).
+        let existing_edges = graph
+          .edges_directed(replacement_id, Direction::Outgoing)
+          .map(|edge_ref| (*edge_ref.weight(), edge_ref.target()))
+          .collect::<HashSet<_>>();
+        for (dependency_key, dependency_id) in combination {
+          // NB: When a node depends on itself, we adjust the destination of that self-edge to point to
+          // the new node.
+          let dependency_id = if *dependency_id == node_id {
+            replacement_id
+          } else {
+            *dependency_id
+          };
+          if !existing_edges.contains(&(*dependency_key, dependency_id)) {
+            if !is_new_node {
+              modified_existing_nodes.insert(replacement_id);
+            }
+            graph.add_edge(replacement_id, dependency_id, *dependency_key);
+          }
+        }
+      }
+
+      // If we modified any existing nodes, we revisit them unless they had the same live params
+      // set as our input. Because we "deleted" our input node before running, any combinations that
+      // resulted in collisions back to that same set represent ambiguities, either:
+      //   1. temporarily, because some of our dependencies did not have their final liveness sets
+      //      because they had not been visited yet. they are guaranteed to be visited eventually
+      //      though, and our replacement node will be too because it depends on them
+      //   2. permanently, because there is ambiguity that cannot be resolved by this phase, in
+      //      which case we leave it the graph to be resolved by the pruning phases
+      // In either case, it is fruitless to revisit those nodes, so we ignore them here. See the
+      // method docstring.
+      to_visit.extend(
+        modified_existing_nodes
+          .into_iter()
+          .filter(|existing_node_id| {
+            let visit = graph[*existing_node_id].1 != graph[node_id].1;
+            if visit {
+              println!(
+                ">>> enqueueing existing node to be visited {:?}",
+                existing_node_id
+              );
+            }
+            visit
+          }),
+      );
     }
 
-    // If any dependencies were completely unfulfillable, then whether or not there were cyclic
-    // dependencies isn't relevant.
-    if !unfulfillable_diagnostics.is_empty() {
-      // Was not fulfillable. Remove the placeholder: the unfulfillable entries we stored will
-      // prevent us from attempting to expand this node again.
-      unfulfillable_rules
-        .entry(entry.clone())
-        .or_insert_with(Vec::new)
-        .extend(unfulfillable_diagnostics);
-      rule_dependency_edges.remove(&entry);
-      return Ok(ConstructGraphResult::Unfulfillable(entry));
-    }
+    // Finally, delete all nodes that were replaced (which will also delete their edges).
+    graph.filter_map(
+      |node_id, node| {
+        if to_delete.is_visited(&node_id) {
+          None
+        } else {
+          Some(node.clone())
+        }
+      },
+      |_, edge_weight| Some(*edge_weight),
+    )
+  }
 
-    // No dependencies were completely unfulfillable (although some may have been cyclic).
-    let flattened_fulfillable_candidates_by_key = fulfillable_candidates_by_key
-      .into_iter()
-      .map(|(k, candidate_group)| (k, candidate_group.into_iter().flatten().collect()))
-      .collect::<Vec<_>>();
+  ///
+  /// Execute live variable analysis to determine which Params are used by which nodes.
+  ///
+  /// See https://en.wikipedia.org/wiki/Live_variable_analysis
+  ///
+  fn live_param_labeled_graph(&self, graph: Graph<R>) -> ParamsLabeledGraph<R> {
+    // Add in and out sets for each node, with the only non-empty sets initially being the in-set
+    // for Params which represent the "usage" of a Param, and the params provided by a Query as its
+    // in-set.
+    let mut graph: ParamsLabeledGraph<R> = graph.map(
+      |_node_id, node| match node {
+        Node::Rule(r) => (Node::Rule(r.clone()), ParamTypes::new()),
+        Node::Query(q) => (Node::Query(q.clone()), q.params.clone()),
+        Node::Param(p) => {
+          let mut in_set = ParamTypes::new();
+          in_set.insert(*p);
+          (Node::Param(*p), in_set)
+        }
+      },
+      |_edge_id, edge_weight| *edge_weight,
+    );
 
-    // Generate one Entry per legal combination of parameters.
-    let simplified_entries =
-      match Self::monomorphize(&entry, &flattened_fulfillable_candidates_by_key) {
-        Ok(se) => se,
-        Err(ambiguous_diagnostics) => {
-          // At least one combination of the dependencies was ambiguous.
-          unfulfillable_rules
-            .entry(entry.clone())
-            .or_insert_with(Vec::new)
-            .extend(ambiguous_diagnostics);
-          rule_dependency_edges.remove(&entry);
-          return Ok(ConstructGraphResult::Unfulfillable(entry));
+    // Starting from leaves of the graph, propagate used Params through nodes. To minimize
+    // the total number of visits, we walk breadth first with a queue.
+    let mut to_visit = graph
+      .externals(Direction::Outgoing)
+      .collect::<VecDeque<_>>();
+    while let Some(node_id) = to_visit.pop_front() {
+      let new_in_set = match &graph[node_id] {
+        (Node::Rule(_), in_set) => {
+          // If our new in_set is different from our old in_set, update it and schedule our
+          // dependees.
+          let new_in_set = Self::live_params(
+            &graph,
+            node_id,
+            graph
+              .edges_directed(node_id, Direction::Outgoing)
+              .map(|edge_ref| (*edge_ref.weight(), edge_ref.target())),
+          );
+          if in_set != &new_in_set {
+            to_visit.extend(graph.neighbors_directed(node_id, Direction::Incoming));
+            Some(new_in_set)
+          } else {
+            None
+          }
+        }
+        (Node::Param(_), _) => {
+          // Params are always leaves with an in-set of their own value, and no out-set. Visiting a
+          // Param means just kicking off visits to all of its predecessors.
+          to_visit.extend(graph.neighbors_directed(node_id, Direction::Incoming));
+          continue;
+        }
+        (Node::Query(_), _) => {
+          // Queries are always roots with an out-set of the Params that can be computed based on
+          // the Rule(s) that they depend on. We do not validate Queries during this phase of graph
+          // construction: potential ambiguity is resolved later during pruning.
+          continue;
         }
       };
-    let simplified_entries_only: Vec<_> = simplified_entries.keys().cloned().collect();
 
-    if cycled_on.is_empty() {
-      // All dependencies were fulfillable and none were blocked on cycles. Remove the
-      // placeholder and store the simplified entries.
-      rule_dependency_edges.remove(&entry);
-      rule_dependency_edges.extend(simplified_entries);
-
-      all_simplified_entries.insert(entry, simplified_entries_only.clone());
-      Ok(ConstructGraphResult::Fulfilled(simplified_entries_only))
-    } else {
-      // The set of cycled dependencies can only contain call stack "parents" of the dependency: we
-      // remove this entry from the set (if we're in it), until the top-most cyclic parent
-      // (represented by an empty set) is the one that re-starts recursion.
-      cycled_on.remove(&entry);
-      if cycled_on.is_empty() {
-        // If we were the only member of the set of cyclic dependencies, then we are the top-most
-        // cyclic parent in the call stack, and we should complete. This represents the case where
-        // a rule recursively depends on itself, and thus "cannot complete without completing".
-        //
-        // Store our simplified equivalence and then re-execute our dependency discovery. In this
-        // second attempt our cyclic dependencies will use the simplified representation(s) to succeed.
-        all_simplified_entries.insert(entry, simplified_entries_only);
-        Err(())
-      } else {
-        // This rule may be fulfillable, but we can't compute its complete set of dependencies until
-        // parent rule entries complete. Remove our placeholder edges before returning.
-        rule_dependency_edges.remove(&entry);
-        Ok(ConstructGraphResult::CycledOn {
-          cyclic_deps: cycled_on,
-          partial_simplified_entries: simplified_entries_only,
-        })
+      if let Some(in_set) = new_in_set {
+        graph[node_id].1 = in_set;
       }
     }
+
+    graph
+  }
+
+  ///
+  /// After nodes are all labeled with their in/out Param sets, we eliminate any monomorphized
+  /// Rules that did not satisfy the requirement that the provided param of a DependencyKey needs
+  /// to be used.
+  ///
+  fn prune_nodes(&self, graph: ParamsLabeledGraph<R>) -> ParamsLabeledGraph<R> {
+    let mut to_visit = graph
+      .node_references()
+      .map(|node_ref| node_ref.id())
+      .collect::<Vec<_>>();
+    // We keep a reversed copy of the graph to use for deleting dependees transitively.
+    let reversed_graph = {
+      let mut rg = graph.clone();
+      rg.reverse();
+      rg
+    };
+
+    // Uses the same lazy deletion strategy as monomorphize.
+    let mut to_delete = graph.visit_map();
+
+    println!(
+      "Pruning nodes with: {:?}",
+      petgraph::dot::Dot::with_config(&graph, &[])
+    );
+
+    while let Some(node_id) = to_visit.pop() {
+      if to_delete.is_visited(&node_id) {
+        continue;
+      }
+
+      // Validate that for each dependency, the in_set of the dependency node consumes the provided
+      // param.
+      let valid_dependencies = graph
+        .edges_directed(node_id, Direction::Outgoing)
+        .all(|edge_ref| {
+          if let Some(provided_param) = edge_ref.weight().provided_param() {
+            graph[edge_ref.target()].1.contains(&provided_param)
+          } else {
+            true
+          }
+        });
+      if valid_dependencies {
+        continue;
+      }
+
+      // Otherwise, this node (and all rules that depend on it) should be deleted.
+      let mut dependees = Bfs::new(&reversed_graph, node_id);
+      while let Some(dependee_id) = dependees.next(&graph) {
+        if !to_delete.is_visited(&dependee_id) && matches!(&graph[dependee_id].0, Node::Rule(_)) {
+          to_delete.visit(dependee_id);
+        }
+      }
+    }
+
+    // Finally, delete all nodes that were invalidated.
+    graph.filter_map(
+      |node_id, node| {
+        if to_delete.is_visited(&node_id) {
+          None
+        } else {
+          Some(node.clone())
+        }
+      },
+      |_, edge_weight| Some(*edge_weight),
+    )
+  }
+
+  ///
+  /// After nodes have been pruned, all remaining nodes are valid, and we can statically decide
+  /// which source of each DependencyKey a Node should use, and prune edges to the rest.
+  ///
+  fn prune_edges(&self, graph: ParamsLabeledGraph<R>) -> Result<ParamsLabeledGraph<R>, String> {
+    // Edge removal is expensive, so we wait until the end of iteration to do it, and filter
+    // dead edges while running.
+    let mut edges_to_delete = HashSet::new();
+
+    println!(
+      "Pruning edges with: {:?}",
+      petgraph::dot::Dot::with_config(&graph, &[])
+    );
+
+    // Walk from roots, choosing one source for each DependencyKey of each node.
+    let mut visited = graph.visit_map();
+    let mut to_visit = graph.externals(Direction::Incoming).collect::<Vec<_>>();
+    while let Some(node_id) = to_visit.pop() {
+      if !visited.visit(node_id) {
+        continue;
+      }
+      let node = &graph[node_id].0;
+
+      // * "no choice of rule that consumes param X" here (ie it's both GEN'd and KILL'd within the node)
+      // * invalid required param at a Query
+      // * take smallest option, fail for equal-sized sets
+
+      let edges_by_dependency_key = {
+        let mut sorted_edges = graph
+          .edges_directed(node_id, Direction::Outgoing)
+          .collect::<Vec<_>>();
+        sorted_edges.sort_by_key(|edge_ref| edge_ref.weight());
+        sorted_edges
+          .into_iter()
+          .group_by(|edge_ref| edge_ref.weight())
+      };
+      for (dependency_key, edge_refs) in &edges_by_dependency_key {
+        // Collect live edges.
+        let live_edge_refs = edge_refs
+          .filter(|edge_ref| !edges_to_delete.contains(&edge_ref.id()))
+          .collect::<Vec<_>>();
+
+        // Filter out any that are not satisfiable for this node based on its type and in/out sets.
+        let relevant_edge_refs: Vec<_> = match node {
+          Node::Query(q) => {
+            // Only dependencies with in_sets that are a subset of our params can be used.
+            live_edge_refs
+              .iter()
+              .filter(|edge_ref| {
+                let dependency_in_set = &graph[edge_ref.target()].1;
+                dependency_in_set.is_subset(&q.params)
+              })
+              .collect()
+          }
+          Node::Rule(_) => {
+            // If there is a provided param, only dependencies that consume it can be used.
+            live_edge_refs
+              .iter()
+              .filter(|edge_ref| {
+                if let Some(provided_param) = dependency_key.provided_param() {
+                  graph[edge_ref.target()].1.contains(&provided_param)
+                } else {
+                  true
+                }
+              })
+              .collect()
+          }
+          Node::Param(p) => {
+            panic!(
+              "A Param node should not have dependencies: {} had {:#?}",
+              p,
+              live_edge_refs
+                .iter()
+                .map(|edge_ref| format!("{}", graph[edge_ref.target()].0))
+                .collect::<Vec<_>>()
+            );
+          }
+        };
+
+        // We prefer the dependency with the smallest set of input Params, as that minimizes Rule
+        // identities in the graph and biases toward receiving values from dependencies (which do not
+        // affect our identity) rather than dependents.
+        /*
+        println!(
+          ">>> for {} at {}, choosing from {:#?}",
+          node,
+          dependency_key,
+          relevant_edge_refs
+            .iter()
+            .map(|edge_ref| format!("{}", graph[edge_ref.target()].0))
+            .collect::<Vec<_>>()
+        );
+        */
+        let chosen_edges = {
+          let mut minimum_param_set_size = ::std::usize::MAX;
+          let mut chosen_edges = Vec::new();
+          for edge_ref in relevant_edge_refs {
+            let param_set_size = graph[edge_ref.target()].1.len();
+            if param_set_size < minimum_param_set_size {
+              chosen_edges.clear();
+              chosen_edges.push(edge_ref);
+              minimum_param_set_size = param_set_size;
+            } else if param_set_size == minimum_param_set_size {
+              chosen_edges.push(edge_ref);
+            }
+          }
+          chosen_edges
+        };
+        match chosen_edges.len() {
+          1 => {
+            // Schedule this dependency to be visited, and Mark all other choices deleted.
+            let chosen_edge = chosen_edges[0];
+            to_visit.push(chosen_edge.target());
+            edges_to_delete.extend(
+              live_edge_refs
+                .iter()
+                .map(|edge_ref| edge_ref.id())
+                .filter(|edge_ref_id| *edge_ref_id != chosen_edge.id()),
+            );
+          }
+          0 => {
+            return Err(format!(
+              "TODO: No source of dependency {} for {}. All potential sources were \
+                    eliminated: {:#?}",
+              dependency_key,
+              node,
+              live_edge_refs
+                .iter()
+                .map(|edge_ref| {
+                  format!(
+                    "{} (needed {})",
+                    graph[edge_ref.target()].0,
+                    crate::params_str(&graph[edge_ref.target()].1)
+                  )
+                })
+                .collect::<Vec<_>>()
+            ));
+          }
+          _ => {
+            return Err(format!(
+              "TODO: Too many sources of dependency {} for {}: {:#?}",
+              dependency_key,
+              node,
+              chosen_edges
+                .iter()
+                .map(|edge_ref| format!("{}", graph[edge_ref.target()].0))
+                .collect::<Vec<_>>()
+            ));
+          }
+        }
+      }
+    }
+
+    // Finally, return a new graph with pruned edges.
+    Ok(graph.filter_map(
+      |_node_id, node| Some(node.clone()),
+      |edge_id, edge_weight| {
+        if edges_to_delete.contains(&edge_id) {
+          None
+        } else {
+          Some(*edge_weight)
+        }
+      },
+    ))
+  }
+
+  ///
+  /// Takes a Graph that has been pruned to eliminate unambiguous choices: any duplicate edges at
+  /// this point are errors.
+  ///
+  fn finalize(self, pruned_graph: ParamsLabeledGraph<R>) -> Result<RuleGraph<R>, String> {
+    let graph = pruned_graph;
+
+    let entry_for = |node_id| -> Entry<R> {
+      let (node, in_set): &(Node<R>, ParamTypes<R::TypeId>) = &graph[node_id];
+      match node {
+        Node::Rule(rule) => Entry::WithDeps(EntryWithDeps::Inner(InnerEntry {
+          params: in_set.clone(),
+          rule: rule.clone(),
+        })),
+        Node::Query(q) => Entry::WithDeps(EntryWithDeps::Root(RootEntry(q.clone()))),
+        Node::Param(p) => Entry::Param(*p),
+      }
+    };
+
+    println!(
+      "Finalizing with: {:?}",
+      petgraph::dot::Dot::with_config(&graph, &[])
+    );
+
+    // Visit the reachable portion of the graph to create Edges, starting from roots.
+    let mut rule_dependency_edges = HashMap::new();
+    let mut visited = graph.visit_map();
+    let mut to_visit = graph.externals(Direction::Incoming).collect::<Vec<_>>();
+    while let Some(node_id) = to_visit.pop() {
+      if !visited.visit(node_id) {
+        continue;
+      }
+
+      // Create an entry for the node, and schedule its dependencies to be visited.
+      let entry = entry_for(node_id);
+      to_visit.extend(graph.neighbors_directed(node_id, Direction::Outgoing));
+
+      // Convert the graph edges into RuleEdges: graph pruning should already have confirmed that
+      // there was one dependency per DependencyKey.
+      let dependencies = graph
+        .edges_directed(node_id, Direction::Outgoing)
+        .map(|edge_ref| (*edge_ref.weight(), vec![entry_for(edge_ref.target())]))
+        .collect::<HashMap<_, _>>();
+
+      match entry {
+        Entry::WithDeps(wd) => {
+          rule_dependency_edges.insert(wd, RuleEdges { dependencies });
+        }
+        Entry::Param(p) => {
+          if !dependencies.is_empty() {
+            return Err(format!(
+              "Param entry for {} should not have had dependencies, but had: {:#?}",
+              p, dependencies
+            ));
+          }
+        }
+      }
+    }
+
+    Ok(RuleGraph {
+      queries: self.queries,
+      rule_dependency_edges,
+      // TODO
+      unfulfillable_rules: HashMap::default(),
+      // TODO
+      unreachable_rules: Vec::default(),
+    })
+  }
+
+  ///
+  /// Calculates the "live params" (live variables) that are required to satisfy the given set of
+  /// dependency edges.
+  ///
+  fn live_params(
+    graph: &ParamsLabeledGraph<R>,
+    node_id: NodeIndex<u32>,
+    dependency_edges: impl Iterator<Item = (R::DependencyKey, NodeIndex<u32>)>,
+  ) -> ParamTypes<R::TypeId> {
+    // Union the live sets of our dependencies, less any Params "provided" (ie "declared variables"
+    // in the context of live variable analysis) by the relevant DependencyKeys.
+    dependency_edges
+      .flat_map(|(dependency_key, dependency_id)| {
+        if dependency_id == node_id {
+          // A self-edge to this node does not contribute Params to its own liveness set, for two
+          // reasons:
+          //   1. it should always be a noop.
+          //   2. any time it is _not_ a noop, it is probably because we're busying updating the
+          //      liveness set, and the node contributing to its own set ends up using a stale
+          //      result.
+          Box::new(std::iter::empty())
+        } else if let Some(provided_param) = dependency_key.provided_param() {
+          // If the DependencyKey "provides" the Param, it does not count toward our in-set.
+          Box::new(
+            graph[dependency_id]
+              .1
+              .iter()
+              .filter(move |p| *p != &provided_param)
+              .cloned(),
+          )
+        } else {
+          let iter: Box<dyn Iterator<Item = R::TypeId>> =
+            Box::new(graph[dependency_id].1.iter().cloned());
+          iter
+        }
+      })
+      .collect()
   }
 
   ///
@@ -433,7 +853,7 @@ impl<'t, R: Rule> Builder<'t, R> {
   /// used parameters to filter the possible combinations of dependencies. If multiple choices of
   /// dependencies are possible for any set of parameters, then the graph is ambiguous.
   ///
-  fn monomorphize(
+  fn monomorphize_rule(
     entry: &EntryWithDeps<R>,
     deps: &[(R::DependencyKey, Vec<Entry<R>>)],
   ) -> Result<RuleDependencyEdges<R>, Vec<Diagnostic<R>>> {
@@ -604,46 +1024,23 @@ impl<'t, R: Rule> Builder<'t, R> {
     rules
   }
 
-  fn gen_root_entries(&self, product_types: &HashSet<R::TypeId>) -> Vec<RootEntry<R>> {
-    product_types
-      .iter()
-      .filter_map(|product_type| self.gen_root_entry(&self.root_param_types, *product_type))
-      .collect()
-  }
-
-  fn gen_root_entry(
-    &self,
-    param_types: &ParamTypes<R::TypeId>,
-    product_type: R::TypeId,
-  ) -> Option<RootEntry<R>> {
-    let candidates = self.rhs(param_types, product_type);
-    if candidates.is_empty() {
-      None
-    } else {
-      Some(RootEntry {
-        params: param_types.clone(),
-        dependency_key: R::DependencyKey::new_root(product_type),
-      })
-    }
-  }
-
   ///
-  /// Select Entries that can provide the given product type with the given parameters.
+  /// Create Nodes that might be able to provide the given product type.
   ///
-  fn rhs(&self, params: &ParamTypes<R::TypeId>, product_type: R::TypeId) -> Vec<Entry<R>> {
+  fn rhs(&self, dependency_key: R::DependencyKey) -> Vec<DependencyNode<R>> {
     let mut entries = Vec::new();
     // If the params can provide the type directly, add that.
-    if let Some(type_id) = params.get(&product_type) {
-      entries.push(Entry::Param(*type_id));
+    if dependency_key.provided_param().is_none() && self.params.contains(&dependency_key.product())
+    {
+      entries.push(DependencyNode::Param(dependency_key.product()));
     }
     // If there are any rules which can produce the desired type, add them.
-    if let Some(matching_rules) = self.tasks.get(&product_type) {
-      entries.extend(matching_rules.iter().map(|rule| {
-        Entry::WithDeps(EntryWithDeps::Inner(InnerEntry {
-          params: params.clone(),
-          rule: rule.clone(),
-        }))
-      }));
+    if let Some(matching_rules) = self.rules.get(&dependency_key.product()) {
+      entries.extend(
+        matching_rules
+          .iter()
+          .map(|rule| DependencyNode::Rule(rule.clone())),
+      );
     }
     entries
   }

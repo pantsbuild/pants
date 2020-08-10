@@ -18,7 +18,9 @@ pub trait TypeId: Clone + Copy + Debug + Display + Hash + Eq + Ord + Sized + 'st
     I: Iterator<Item = Self>;
 }
 
-pub trait DependencyKey: Clone + Copy + Debug + Display + Hash + Eq + Sized + 'static {
+pub trait DependencyKey:
+  Clone + Copy + Debug + Display + Hash + Ord + Eq + Sized + 'static
+{
   type TypeId: TypeId;
 
   ///

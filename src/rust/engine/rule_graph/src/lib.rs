@@ -45,6 +45,7 @@ struct UnreachableError<R: Rule> {
 }
 
 impl<R: Rule> UnreachableError<R> {
+  #[allow(dead_code)]
   fn new(rule: R) -> UnreachableError<R> {
     UnreachableError {
       rule,
@@ -77,59 +78,12 @@ impl<R: Rule> EntryWithDeps<R> {
       EntryWithDeps::Root(ref re) => &re.0.params,
     }
   }
-
-  ///
-  /// Returns the set of DependencyKeys representing the dependencies of this EntryWithDeps.
-  ///
-  fn dependency_keys(&self) -> Vec<R::DependencyKey> {
-    match self {
-      EntryWithDeps::Inner(InnerEntry { ref rule, .. }) => rule.dependency_keys(),
-      EntryWithDeps::Root(RootEntry {
-        ref dependency_key, ..
-      }) => vec![*dependency_key],
-    }
-  }
-
-  ///
-  /// Given a set of used parameters (which must be a subset of the parameters available here),
-  /// return a clone of this entry with its parameter set reduced to the used parameters.
-  ///
-  fn simplified(&self, used_params: ParamTypes<R::TypeId>) -> EntryWithDeps<R> {
-    let mut simplified = self.clone();
-    {
-      let simplified_params = match &mut simplified {
-        EntryWithDeps::Inner(ref mut ie) => &mut ie.params,
-        EntryWithDeps::Root(ref mut re) => &mut re.params,
-      };
-
-      let unavailable_params: ParamTypes<_> =
-        used_params.difference(simplified_params).cloned().collect();
-      assert!(
-        unavailable_params.is_empty(),
-        "Entry {} used parameters that were not available: {}",
-        entry_with_deps_str(self),
-        params_str(&unavailable_params),
-      );
-
-      *simplified_params = used_params;
-    }
-    simplified
-  }
 }
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub enum Entry<R: Rule> {
   Param(R::TypeId),
   WithDeps(EntryWithDeps<R>),
-}
-
-impl<R: Rule> Entry<R> {
-  fn params(&self) -> Vec<R::TypeId> {
-    match self {
-      Entry::WithDeps(ref e) => e.params().iter().cloned().collect(),
-      Entry::Param(ref type_id) => vec![*type_id],
-    }
-  }
 }
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
@@ -713,6 +667,8 @@ impl<R: Rule> RuleGraph<R> {
 ///
 /// Records the dependency rules for a rule.
 ///
+/// TODO: No longer needs a Vec<Entry>.
+///
 #[derive(Eq, PartialEq, Clone, Debug)]
 pub struct RuleEdges<R: Rule> {
   dependencies: HashMap<R::DependencyKey, Vec<Entry<R>>>,
@@ -728,14 +684,6 @@ impl<R: Rule> RuleEdges<R> {
 
   pub fn all_dependencies(&self) -> impl Iterator<Item = &Entry<R>> {
     self.dependencies.values().flatten()
-  }
-
-  fn add_edge(&mut self, dependency_key: R::DependencyKey, new_dependency: Entry<R>) {
-    self
-      .dependencies
-      .entry(dependency_key)
-      .or_insert_with(Vec::new)
-      .push(new_dependency);
   }
 }
 
