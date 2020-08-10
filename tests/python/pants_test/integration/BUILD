@@ -59,6 +59,7 @@ python_integration_tests(
   name = 'prelude_integration',
   sources = ['test_prelude_integration.py'],
   uses_pants_run=True,
+  timeout = 180,
 )
 
 python_integration_tests(
