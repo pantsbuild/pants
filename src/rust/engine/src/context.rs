@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
-use crate::core::{Failure, TypeId};
+use crate::core::Failure;
 use crate::intrinsics::Intrinsics;
 use crate::nodes::{NodeKey, WrappedNode};
 use crate::scheduler::Session;
@@ -86,7 +86,6 @@ pub struct ExecutionStrategyOptions {
 impl Core {
   pub fn new(
     executor: Executor,
-    root_subject_types: Vec<TypeId>,
     tasks: Tasks,
     types: Types,
     intrinsics: Intrinsics,
@@ -251,7 +250,7 @@ impl Core {
     let graph = Arc::new(InvalidatableGraph(Graph::new()));
 
     let http_client = reqwest::Client::new();
-    let rule_graph = RuleGraph::new(tasks.as_map(), root_subject_types);
+    let rule_graph = RuleGraph::new(tasks.as_map(), tasks.queries().clone());
 
     let gitignore_file = if use_gitignore {
       let gitignore_path = build_root.join(".gitignore");

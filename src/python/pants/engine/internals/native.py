@@ -197,7 +197,6 @@ class Native(metaclass=SingletonMetaclass):
     def new_scheduler(
         self,
         tasks,
-        root_subject_types,
         build_root: str,
         local_store_dir: str,
         local_execution_root_dir: str,
@@ -253,7 +252,6 @@ class Native(metaclass=SingletonMetaclass):
             named_caches_dir,
             ignore_patterns,
             use_gitignore,
-            root_subject_types,
             remoting_options,
             exec_stategy_opts,
         )
