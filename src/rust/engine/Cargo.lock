@@ -2732,7 +2732,7 @@ dependencies = [
  "grpcio 0.5.1 (git+https://github.com/pantsbuild/grpc-rs.git?rev=ed3afa3c24ddf1fdd86826e836f57c00757dfc00)",
  "hashing 0.0.1",
  "indexmap 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "itertools 0.7.11 (registry+https://github.com/rust-lang/crates.io-index)",
+ "itertools 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "lmdb 0.8.0 (git+https://github.com/pantsbuild/lmdb-rs.git?rev=06bdfbfc6348f6804127176e561843f214fc17f8)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "maplit 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",

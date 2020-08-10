@@ -109,7 +109,7 @@ futures = { version = "0.3", features = ["compat"] }
 graph = { path = "graph" }
 hashing = { path = "hashing" }
 indexmap = "1.4"
-itertools = "0.8.2"
+itertools = "0.8"
 lazy_static = "1"
 log = "0.4"
 logging = { path = "logging" }
