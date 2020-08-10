@@ -122,7 +122,6 @@ class Scheduler:
         self._visualize_to_dir = visualize_to_dir
         # Validate and register all provided and intrinsic tasks.
         rule_index = RuleIndex.create(rules)
-        self._root_subject_types = [r.output_type for r in rule_index.roots]
 
         # Create the native Scheduler and Session.
         tasks = self._register_rules(rule_index, union_membership)
@@ -155,7 +154,6 @@ class Scheduler:
 
         self._scheduler = native.new_scheduler(
             tasks=tasks,
-            root_subject_types=self._root_subject_types,
             build_root=build_root,
             local_store_dir=local_store_dir,
             local_execution_root_dir=local_execution_root_dir,
@@ -200,6 +198,12 @@ class Scheduler:
                     self._register_task(tasks, output_type, rule, union_membership)
                 else:
                     raise ValueError(f"Unexpected Rule type: {rule}")
+        for query in rule_index.queries:
+            self._native.lib.tasks_query_add(
+                tasks,
+                query.output_type,
+                query.input_types,
+            )
         return tasks
 
     def _register_task(

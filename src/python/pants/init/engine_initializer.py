@@ -4,7 +4,7 @@
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, List, Optional, Set, Tuple, Type, cast
+from typing import Any, Iterable, List, Optional, Set, Tuple, Type, cast, ClassVar
 
 from pants.base.build_environment import get_buildroot
 from pants.base.build_root import BuildRoot
@@ -23,7 +23,7 @@ from pants.engine.internals.scheduler import Scheduler, SchedulerSession
 from pants.engine.internals.selectors import Params
 from pants.engine.platform import create_platform_rules
 from pants.engine.process import InteractiveRunner
-from pants.engine.rules import RootRule, collect_rules, rule
+from pants.engine.rules import RootRule, collect_rules, rule, QueryRule
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
@@ -63,6 +63,9 @@ class GraphSession:
     console: Console
     goal_map: Any
 
+    # NB: Keep this in sync with the method `run_goal_rules`.
+    goal_param_types: ClassVar[Tuple[Type, ...]] = (Specs, Console, InteractiveRunner, OptionsBootstrapper, Workspace)
+
     def goal_consumed_subsystem_scopes(self, goal_name: str) -> Tuple[str, ...]:
         """Return the scopes of subsystems that could be consumed while running the given goal."""
         goal_product = self.goal_map.get(goal_name)
@@ -75,11 +78,8 @@ class GraphSession:
 
     def goal_consumed_types(self, goal_product: Type) -> Set[Type]:
         """Return the set of types that could possibly be consumed while running the given goal."""
-        # NB: Keep this in sync with the method `run_goal_rules`.
         return set(
-            self.scheduler_session.scheduler.rule_graph_consumed_types(
-                [Specs, Console, InteractiveRunner, OptionsBootstrapper, Workspace], goal_product
-            )
+            self.scheduler_session.scheduler.rule_graph_consumed_types(self.goal_param_types, goal_product)
         )
 
     def run_goal_rules(
@@ -113,7 +113,7 @@ class GraphSession:
             )
             if not is_implemented:
                 continue
-            # NB: Keep this in sync with the method `goal_consumed_types`.
+            # NB: Keep this in sync with the property `goal_param_types`.
             params = Params(
                 specs, options_bootstrapper, self.console, workspace, interactive_runner
             )
@@ -260,8 +260,13 @@ class EngineInitializer:
                 *rules,
             )
         )
-
         goal_map = EngineInitializer._make_goal_map_from_rules(rules)
+        rules = FrozenOrderedSet(
+            (
+                *rules,
+                *[QueryRule(goal_type, GraphSession.goal_param_types) for goal_type in goal_map.values()]
+            )
+        )
 
         def ensure_absolute_path(v: str) -> str:
             return Path(v).resolve().as_posix()

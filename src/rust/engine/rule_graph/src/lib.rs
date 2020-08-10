@@ -30,14 +30,13 @@
 mod builder;
 mod rules;
 
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::io;
 
 pub use crate::builder::Builder;
-pub use crate::rules::{DependencyKey, DisplayForGraph, DisplayForGraphArgs, Rule, TypeId};
-
-// TODO: Consider switching to HashSet and dropping the Ord bound from TypeId.
-type ParamTypes<T> = BTreeSet<T>;
+pub use crate::rules::{
+  DependencyKey, DisplayForGraph, DisplayForGraphArgs, ParamTypes, Query, Rule, TypeId,
+};
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 struct UnreachableError<R: Rule> {
@@ -75,7 +74,7 @@ impl<R: Rule> EntryWithDeps<R> {
   pub fn params(&self) -> &ParamTypes<R::TypeId> {
     match self {
       EntryWithDeps::Inner(ref ie) => &ie.params,
-      EntryWithDeps::Root(ref re) => &re.params,
+      EntryWithDeps::Root(ref re) => &re.0.params,
     }
   }
 
@@ -134,10 +133,7 @@ impl<R: Rule> Entry<R> {
 }
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
-pub struct RootEntry<R: Rule> {
-  params: ParamTypes<R::TypeId>,
-  dependency_key: R::DependencyKey,
-}
+pub struct RootEntry<R: Rule>(Query<R>);
 
 #[derive(Eq, Hash, PartialEq, Clone, Debug)]
 pub struct InnerEntry<R: Rule> {
@@ -178,7 +174,7 @@ struct Diagnostic<R: Rule> {
 ///   containing the reasons why they were eliminated from the graph.
 #[derive(Debug)]
 pub struct RuleGraph<R: Rule> {
-  root_param_types: ParamTypes<R::TypeId>,
+  queries: Vec<Query<R>>,
   rule_dependency_edges: RuleDependencyEdges<R>,
   unfulfillable_rules: UnfulfillableRuleMap<R>,
   unreachable_rules: Vec<UnreachableError<R>>,
@@ -189,7 +185,7 @@ pub struct RuleGraph<R: Rule> {
 impl<R: Rule> Default for RuleGraph<R> {
   fn default() -> Self {
     RuleGraph {
-      root_param_types: ParamTypes::default(),
+      queries: Vec::default(),
       rule_dependency_edges: RuleDependencyEdges::default(),
       unfulfillable_rules: UnfulfillableRuleMap::default(),
       unreachable_rules: Vec::default(),
@@ -263,12 +259,10 @@ impl<R: Rule> DisplayForGraph for EntryWithDeps<R> {
         params_str(params)
       ),
       &EntryWithDeps::Root(ref root) => format!(
-        // TODO: Consider dropping this (final) public use of the keyword "Select", while ensuring
-        // that error messages remain sufficiently grokkable.
-        "Select({}){}for {}",
-        root.dependency_key,
+        "Query({}){}for {}",
+        root.0.product,
         display_args.line_separator(),
-        params_str(&root.params)
+        params_str(&root.0.params)
       ),
     }
   }
@@ -310,8 +304,8 @@ fn entry_with_deps_str<R: Rule>(entry: &EntryWithDeps<R>) -> String {
 }
 
 impl<R: Rule> RuleGraph<R> {
-  pub fn new(tasks: &HashMap<R::TypeId, Vec<R>>, root_param_types: Vec<R::TypeId>) -> RuleGraph<R> {
-    Builder::new(tasks, root_param_types).graph()
+  pub fn new(rules: &HashMap<R::TypeId, Vec<R>>, queries: Vec<Query<R>>) -> RuleGraph<R> {
+    Builder::new(rules, queries).graph().unwrap()
   }
 
   pub fn find_root_edges<I: IntoIterator<Item = R::TypeId>>(
@@ -355,7 +349,7 @@ impl<R: Rule> RuleGraph<R> {
     }
 
     Ok(RuleGraph {
-      root_param_types: self.root_param_types.clone(),
+      queries: self.queries.clone(),
       rule_dependency_edges: reachable,
       unfulfillable_rules: UnfulfillableRuleMap::default(),
       unreachable_rules: Vec::default(),
@@ -388,13 +382,12 @@ impl<R: Rule> RuleGraph<R> {
     product: R::TypeId,
   ) -> Result<(EntryWithDeps<R>, RuleEdges<R>), String> {
     let params: ParamTypes<_> = param_inputs.into_iter().collect();
-    let dependency_key = R::DependencyKey::new_root(product);
 
     // Attempt to find an exact match.
-    let maybe_root = EntryWithDeps::Root(RootEntry {
+    let maybe_root = EntryWithDeps::Root(RootEntry(Query {
+      product,
       params: params.clone(),
-      dependency_key,
-    });
+    }));
     if let Some(edges) = self.rule_dependency_edges.get(&maybe_root) {
       return Ok((maybe_root, edges.clone()));
     }
@@ -406,8 +399,7 @@ impl<R: Rule> RuleGraph<R> {
       .iter()
       .filter_map(|(entry, edges)| match entry {
         EntryWithDeps::Root(ref root_entry)
-          if root_entry.dependency_key == dependency_key
-            && root_entry.params.is_subset(&params) =>
+          if root_entry.0.product == product && root_entry.0.params.is_subset(&params) =>
         {
           Some((entry, edges))
         }
@@ -420,45 +412,35 @@ impl<R: Rule> RuleGraph<R> {
         let (root_entry, edges) = subset_matches[0];
         Ok((root_entry.clone(), edges.clone()))
       }
-      0 if params.is_subset(&self.root_param_types) => {
+      0 => {
         // The Params were all registered as RootRules, but the combination wasn't legal.
         let mut suggestions: Vec<_> = self
           .rule_dependency_edges
           .keys()
           .filter_map(|entry| match entry {
-            EntryWithDeps::Root(ref root_entry) if root_entry.dependency_key == dependency_key => {
-              Some(format!("Params({})", params_str(&root_entry.params)))
+            EntryWithDeps::Root(ref root_entry) if root_entry.0.product == product => {
+              Some(format!("Params({})", params_str(&root_entry.0.params)))
             }
             _ => None,
           })
           .collect();
         let suggestions_str = if suggestions.is_empty() {
           format!(
-            "return the type {}. Is the @rule that you're expecting to run registered?",
+            "return the type {}. Try registering QueryRule({} for {}).",
             product,
+            product,
+            params_str(&params),
           )
         } else {
           suggestions.sort();
           format!(
-            "can compute {} given input Params({}), but there were @rules that could compute it using:\n  {}",
+            "can compute {} given input Params({}), but it can be produced using:\n  {}",
             product,
             params_str(&params),
             suggestions.join("\n  ")
           )
         };
-        Err(format!("No installed @rules {}", suggestions_str,))
-      }
-      0 => {
-        // Some Param(s) were not registered.
-        let mut unregistered_params: Vec<_> = params
-          .difference(&self.root_param_types)
-          .map(|p| p.to_string())
-          .collect();
-        unregistered_params.sort();
-        Err(format!(
-          "Types that will be passed as Params at the root of a graph need to be registered via RootRule:\n  {}",
-          unregistered_params.join("\n  "),
-        ))
+        Err(format!("No installed QueryRules {}", suggestions_str,))
       }
       _ => {
         let match_strs = subset_matches
@@ -642,18 +624,14 @@ impl<R: Rule> RuleGraph<R> {
 
   pub fn visualize(&self, f: &mut dyn io::Write) -> io::Result<()> {
     let display_args = DisplayForGraphArgs { multiline: true };
-    let mut root_subject_type_strs = self
-      .root_param_types
+    let mut queries_strs = self
+      .queries
       .iter()
-      .map(|&t| format!("{}", t))
+      .map(|q| q.to_string())
       .collect::<Vec<String>>();
-    root_subject_type_strs.sort();
+    queries_strs.sort();
     writeln!(f, "digraph {{")?;
-    writeln!(
-      f,
-      "  // root subject types: {}",
-      root_subject_type_strs.join(", ")
-    )?;
+    writeln!(f, "  // queries: {}", queries_strs.join(", "))?;
     writeln!(f, "  // root entries")?;
     let mut root_rule_strs = self
       .rule_dependency_edges

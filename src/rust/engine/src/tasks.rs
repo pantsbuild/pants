@@ -8,7 +8,7 @@ use crate::core::{Function, TypeId};
 use crate::intrinsics::Intrinsics;
 use crate::selectors::{DependencyKey, Get, Select};
 
-use rule_graph::{DisplayForGraph, DisplayForGraphArgs};
+use rule_graph::{DisplayForGraph, DisplayForGraphArgs, Query};
 
 use log::Level;
 
@@ -169,6 +169,8 @@ pub struct Tasks {
   rules: HashMap<TypeId, Vec<Rule>>,
   // Used during the construction of the tasks map.
   preparing: Option<Task>,
+  // queries
+  queries: Vec<Query<Rule>>,
 }
 
 ///
@@ -186,11 +188,16 @@ impl Tasks {
     Tasks {
       rules: HashMap::default(),
       preparing: None,
+      queries: Vec::default(),
     }
   }
 
   pub fn as_map(&self) -> &HashMap<TypeId, Vec<Rule>> {
     &self.rules
+  }
+
+  pub fn queries(&self) -> &Vec<Query<Rule>> {
+    &self.queries
   }
 
   pub fn intrinsics_set(&mut self, intrinsics: &Intrinsics) {
@@ -265,5 +272,9 @@ impl Tasks {
       rules,
     );
     rules.push(rule);
+  }
+
+  pub fn query_add(&mut self, product: TypeId, params: Vec<TypeId>) {
+    self.queries.push(Query::new(product, params));
   }
 }
