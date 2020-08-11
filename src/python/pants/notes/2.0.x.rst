@@ -5,6 +5,231 @@ This document describes releases leading up to the ``2.0.x`` ``stable`` series.
 
 See https://www.pantsbuild.org/v2.0/docs/release-notes-2-0 for an overview of the changes in this release.
 
+2.0.0.dev7 (8/10/2020)
+----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* A python_distribution target. (#10565)
+  `PR #10565 <https://github.com/pantsbuild/pants/pull/10565>`_
+
+* Enable Python dependency inference by default (#10520)
+  `PR #10520 <https://github.com/pantsbuild/pants/pull/10520>`_
+
+* Targets act as aliases for their files (#10511)
+  `PR #10511 <https://github.com/pantsbuild/pants/pull/10511>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Allow using file addresses on the command line (#10573)
+  `PR #10573 <https://github.com/pantsbuild/pants/pull/10573>`_
+
+* Add `--build-patterns` option (#10559)
+  `PR #10559 <https://github.com/pantsbuild/pants/pull/10559>`_
+
+* Allow protobuf_library targets to specify a python source root. (#10549)
+  `PR #10549 <https://github.com/pantsbuild/pants/pull/10549>`_
+
+* Restore the missing init injection logic. (#10517)
+  `PR #10517 <https://github.com/pantsbuild/pants/pull/10517>`_
+
+* Add `--pex-executable-search-path` (#10489)
+  `PR #10489 <https://github.com/pantsbuild/pants/pull/10489>`_
+
+* Add support for bandit output file. (#10412)
+  `PR #10412 <https://github.com/pantsbuild/pants/pull/10412>`_
+
+Bugfixes
+~~~~~~~~
+
+* Sync before executing a process if running in Docker (#10568)
+  `PR #10568 <https://github.com/pantsbuild/pants/pull/10568>`_
+
+* Fix some issues from #10535 Address changes (#10555)
+  `PR #10555 <https://github.com/pantsbuild/pants/pull/10555>`_
+
+* Remove self-inflicted invalidation caused by exception logging. (#10521)
+  `PR #10521 <https://github.com/pantsbuild/pants/pull/10521>`_
+
+* Fix bug that caused setup-py to hang if src root==buildroot. (#10509)
+  `PR #10509 <https://github.com/pantsbuild/pants/pull/10509>`_
+
+* Fix ExternalTool to use relative paths (#10503)
+  `PR #10503 <https://github.com/pantsbuild/pants/pull/10503>`_
+
+* Fix `./pants binary` not outputting the full output path (#10506)
+  `PR #10506 <https://github.com/pantsbuild/pants/pull/10506>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Stop validating that `!` dependency ignores are used (#10585)
+  `PR #10585 <https://github.com/pantsbuild/pants/pull/10585>`_
+
+* Lower the default for `--python-setup-resolver-jobs` (#10584)
+  `PR #10584 <https://github.com/pantsbuild/pants/pull/10584>`_
+
+* Automatically inject dependencies on sibling files when dependency inference is unused (#10582)
+  `PR #10582 <https://github.com/pantsbuild/pants/pull/10582>`_
+
+* Use a constraints file in this repo. (#10579)
+  `PR #10579 <https://github.com/pantsbuild/pants/pull/10579>`_
+
+* Disable speculation by default (#10581)
+  `PR #10581 <https://github.com/pantsbuild/pants/pull/10581>`_
+
+* upgrade to Rust v1.45.2 (#10556)
+  `PR #10556 <https://github.com/pantsbuild/pants/pull/10556>`_
+
+* Move `--tag` and `--exclude-target-regexp` out of bootstrap options (#10569)
+  `PR #10569 <https://github.com/pantsbuild/pants/pull/10569>`_
+
+* Allow for disabling pantsrc in OptionsBootstrapper independently of options values (#10562)
+  `PR #10562 <https://github.com/pantsbuild/pants/pull/10562>`_
+
+* Refactor rule to resolve address specs (#10563)
+  `PR #10563 <https://github.com/pantsbuild/pants/pull/10563>`_
+
+* Stop using `AddressWithOrigin` for precise file arguments (#10551)
+  `PR #10551 <https://github.com/pantsbuild/pants/pull/10551>`_
+
+* Always use generated subtargets with file arguments (#10550)
+  `PR #10550 <https://github.com/pantsbuild/pants/pull/10550>`_
+
+* Remove unused `SymbolTable` (#10544)
+  `PR #10544 <https://github.com/pantsbuild/pants/pull/10544>`_
+
+* Support and require disambiguated file addresses (#10535)
+  `PR #10535 <https://github.com/pantsbuild/pants/pull/10535>`_
+
+* Revert "Add cache_failures option to Process type (#10433)" (#10534)
+  `PR #10534 <https://github.com/pantsbuild/pants/pull/10534>`_
+
+* Simplify source root stripping. (#10543)
+  `PR #10543 <https://github.com/pantsbuild/pants/pull/10543>`_
+
+* Improve source root stripping performance. (#10533)
+  `PR #10533 <https://github.com/pantsbuild/pants/pull/10533>`_
+
+* ArgSplitter operates relative to the buildroot. (#10540)
+  `PR #10540 <https://github.com/pantsbuild/pants/pull/10540>`_
+
+* Simplify the setup-py rules. (#10529)
+  `PR #10529 <https://github.com/pantsbuild/pants/pull/10529>`_
+
+* Allow `Process` to set its workunit level (#10528)
+  `PR #10528 <https://github.com/pantsbuild/pants/pull/10528>`_
+
+* Rely on the init-injection rules to trigger errors for un-depended-on-and-relevant __init__.py files. (#10524)
+  `PR #10524 <https://github.com/pantsbuild/pants/pull/10524>`_
+
+* Remove rust source include from integration tests. (#10522)
+  `PR #10522 <https://github.com/pantsbuild/pants/pull/10522>`_
+
+* upgrade to rust v1.45.1 (#10523)
+  `PR #10523 <https://github.com/pantsbuild/pants/pull/10523>`_
+
+* Store SpanIds as integers (#10512)
+  `PR #10512 <https://github.com/pantsbuild/pants/pull/10512>`_
+
+* Remove `tarutil.py` (#10516)
+  `PR #10516 <https://github.com/pantsbuild/pants/pull/10516>`_
+
+* Refactor Pex usage through new helper rules (#10514)
+  `PR #10514 <https://github.com/pantsbuild/pants/pull/10514>`_
+
+* Get rid of the remote backend subsystems. (#10502)
+  `PR #10502 <https://github.com/pantsbuild/pants/pull/10502>`_
+
+* Move subsystem.py and its test into pants.option. (#10500)
+  `PR #10500 <https://github.com/pantsbuild/pants/pull/10500>`_
+
+* Lower the default local parallelism, and align the number of swimlanes to it. (#10499)
+  `PR #10499 <https://github.com/pantsbuild/pants/pull/10499>`_
+
+* Rotate travis aws creds. (#10496)
+  `PR #10496 <https://github.com/pantsbuild/pants/pull/10496>`_
+
+* Add cache_failures option to Process type (#10433)
+  `PR #10433 <https://github.com/pantsbuild/pants/pull/10433>`_
+
+* Deprecate `Subsystem.get_options()` in favor of `Subsystem.options` (#10493)
+  `PR #10493 <https://github.com/pantsbuild/pants/pull/10493>`_
+
+* Simplify script to check `__init__.py` files (#10488)
+  `PR #10488 <https://github.com/pantsbuild/pants/pull/10488>`_
+
+* Merge interactive_process.py into process.py (#10495)
+  `PR #10495 <https://github.com/pantsbuild/pants/pull/10495>`_
+
+* Export `Get` and `MultiGet` from `rules.py` (#10485)
+  `PR #10485 <https://github.com/pantsbuild/pants/pull/10485>`_
+
+* Simplify `engine/internals/nodes.py` (#10487)
+  `PR #10487 <https://github.com/pantsbuild/pants/pull/10487>`_
+
+* Add cache_failures option to Process type (#10433)
+  `PR #10433 <https://github.com/pantsbuild/pants/pull/10433>`_
+
+Testing
+~~~~~~~
+
+* Disable remote execution due to RBE shutdown. (#10566)
+  `PR #10566 <https://github.com/pantsbuild/pants/pull/10566>`_
+
+* remoting: use non-RBE pants remote execution image (#10539)
+  `PR #10539 <https://github.com/pantsbuild/pants/pull/10539>`_
+
+* Avoid Python 3.8+ for Pylint test (#10548)
+  `PR #10548 <https://github.com/pantsbuild/pants/pull/10548>`_
+
+* avoid Py 3.8 for BanditIntegrationTest.test_3rdparty_plugin (#10546)
+  `PR #10546 <https://github.com/pantsbuild/pants/pull/10546>`_
+
+* set locale vars for remoting image (#10541)
+  `PR #10541 <https://github.com/pantsbuild/pants/pull/10541>`_
+
+* Test for rule graph issues with each distinct backend (#10519)
+  `PR #10519 <https://github.com/pantsbuild/pants/pull/10519>`_
+
+* docker image for remote execution without GCP/RBE (#10515)
+  `PR #10515 <https://github.com/pantsbuild/pants/pull/10515>`_
+
+Documentation/Logging
+~~~~~~~~~~~~~~~~~~~~~
+
+* Update docs urls to pantsbuild.org. (#10580)
+  `PR #10580 <https://github.com/pantsbuild/pants/pull/10580>`_
+
+* Improve log message when resolving entire lockfile. (#10578)
+  `PR #10578 <https://github.com/pantsbuild/pants/pull/10578>`_
+
+* Improve error message when the path component does not exist (#10570)
+  `PR #10570 <https://github.com/pantsbuild/pants/pull/10570>`_
+
+* Prepare 1.30.1rc0 (#10554)
+  `PR #10554 <https://github.com/pantsbuild/pants/pull/10554>`_
+
+* Improve error message for unrecognized BUILD file symbols (#10531)
+  `PR #10531 <https://github.com/pantsbuild/pants/pull/10531>`_
+
+* Reduce verbosity of finding binaries (#10525)
+  `PR #10525 <https://github.com/pantsbuild/pants/pull/10525>`_
+
+* Render all frames of a failure in Engine tracebacks (#10510)
+  `PR #10510 <https://github.com/pantsbuild/pants/pull/10510>`_
+
+* Fix bad indent of default in option help. (#10501)
+  `PR #10501 <https://github.com/pantsbuild/pants/pull/10501>`_
+
+* Fix display of default/current values in help. (#10490)
+  `PR #10490 <https://github.com/pantsbuild/pants/pull/10490>`_
+
+* Stop warning when return code != 0 or 1 (#10486)
+  `PR #10486 <https://github.com/pantsbuild/pants/pull/10486>`_
+
 2.0.0.dev6 (7/28/2020)
 ----------------------
 
