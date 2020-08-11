@@ -8,10 +8,9 @@ from pants.backend.python.rules import ancestor_files
 from pants.backend.python.rules.ancestor_files import AncestorFiles, AncestorFilesRequest
 from pants.backend.python.target_types import PythonSources
 from pants.core.target_types import FilesSources, ResourcesSources
-from pants.core.util_rules import determine_source_files
-from pants.core.util_rules.determine_source_files import SourceFiles, SourceFilesRequest
-from pants.core.util_rules.strip_source_roots import StrippedSourceFiles
-from pants.core.util_rules.strip_source_roots import rules as strip_source_roots_rules
+from pants.core.util_rules import source_files, stripped_source_files
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.fs import MergeDigests, Snapshot
 from pants.engine.rules import Get, MultiGet, RootRule, collect_rules, rule
 from pants.engine.target import Sources, Target
@@ -121,8 +120,8 @@ async def strip_python_sources(python_sources: PythonSourceFiles) -> StrippedPyt
 def rules():
     return [
         *collect_rules(),
-        *determine_source_files.rules(),
         *ancestor_files.rules(),
-        *strip_source_roots_rules(),
+        *source_files.rules(),
+        *stripped_source_files.rules(),
         RootRule(PythonSourceFilesRequest),
     ]

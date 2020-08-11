@@ -29,7 +29,7 @@ from pants.backend.python.target_types import (
     PythonTestsTimeout,
 )
 from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
-from pants.core.util_rules.determine_source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
 from pants.engine.internals.uuid import UUIDRequest

@@ -8,7 +8,7 @@ from pants.backend.python.lint.black.rules import rules as black_rules
 from pants.backend.python.target_types import PythonLibrary
 from pants.core.goals.fmt import FmtResult
 from pants.core.goals.lint import LintResults
-from pants.core.util_rules.determine_source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.rules import RootRule

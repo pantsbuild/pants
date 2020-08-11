@@ -16,7 +16,7 @@ from pants.backend.python.target_types import (
     PythonTests,
 )
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.core.util_rules import determine_source_files, strip_source_roots
+from pants.core.util_rules import source_files, stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.rules import RootRule
 from pants.engine.target import InferredDependencies, WrappedTarget
@@ -36,8 +36,8 @@ class PythonDependencyInferenceTest(TestBase):
     def rules(cls):
         return (
             *super().rules(),
-            *strip_source_roots.rules(),
-            *determine_source_files.rules(),
+            *stripped_source_files.rules(),
+            *source_files.rules(),
             *dependency_inference_rules(),
             all_roots,
             RootRule(InferPythonDependencies),
