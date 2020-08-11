@@ -133,6 +133,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
     )
 
     requirements = exact_reqs
+    description = request.description
 
     if python_setup.requirement_constraints:
         exact_req_projects = {Requirement.parse(req).project_name for req in exact_reqs}
@@ -159,11 +160,12 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         if python_setup.resolve_all_constraints:
             if unconstrained_projects:
                 logger.warning(
-                    "Ignoring resolve_all_constraints setting in [python_setup] scope"
-                    "Because constraints file does not cover all requirements."
+                    "Ignoring resolve_all_constraints setting in [python_setup] scope "
+                    "because constraints file does not cover all requirements."
                 )
             else:
                 requirements = PexRequirements(str(req) for req in constraints_file_reqs)
+                description = description or f"Resolving {python_setup.requirement_constraints}"
     elif python_setup.resolve_all_constraints:
         raise ValueError(
             "resolve_all_constraints in the [python-setup] scope is set, so "
@@ -179,7 +181,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         sources=merged_input_digest,
         additional_inputs=request.additional_inputs,
         additional_args=request.additional_args,
-        description=request.description,
+        description=description,
     )
 
 
