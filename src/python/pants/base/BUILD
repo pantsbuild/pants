@@ -40,5 +40,5 @@ python_integration_tests(
     'testprojects/src/python:unicode_directory',
   ],
   uses_pants_run=True,
-  timeout=120,
+  timeout=180,
 )
