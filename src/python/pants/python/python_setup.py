@@ -134,11 +134,11 @@ class PythonSetup(Subsystem):
             default=2,
             advanced=True,
             help=(
-                 "The maximum number of concurrent jobs to build wheels with. Because Pants "
-                 "can run multiple subprocesses in parallel, the total parallelism will be "
-                 "`--process-execution-{local,remote}-parallelism x --python-setup-resolver-jobs`. "
-                 "Setting this option higher may result in better parallelism, but, if set too "
-                 "high, may result in starvation and Out of Memory errors."
+                "The maximum number of concurrent jobs to build wheels with. Because Pants "
+                "can run multiple subprocesses in parallel, the total parallelism will be "
+                "`--process-execution-{local,remote}-parallelism x --python-setup-resolver-jobs`. "
+                "Setting this option higher may result in better parallelism, but, if set too "
+                "high, may result in starvation and Out of Memory errors."
             ),
         )
 
