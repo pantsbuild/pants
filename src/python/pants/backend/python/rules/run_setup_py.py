@@ -286,7 +286,7 @@ async def run_setup_pys(
 
     for target_with_origin in targets_with_origins:
         tgt = target_with_origin.target
-        if _is_exported(tgt):
+        if tgt.has_field(PythonProvidesField):
             exported_targets.append(ExportedTarget(tgt))
         elif isinstance(target_with_origin.origin, AddressLiteralSpec):
             explicit_nonexported_targets.append(tgt)
@@ -498,10 +498,6 @@ async def get_sources(request: SetupPySourcesRequest) -> SetupPySources:
     )
 
 
-def _is_exported(target: Target) -> bool:
-    return target.has_field(PythonProvidesField) and target[PythonProvidesField].value is not None
-
-
 @rule(desc="Compute distribution's 3rd party requirements")
 async def get_requirements(
     dep_owner: DependencyOwner, union_membership: UnionMembership
@@ -595,7 +591,9 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
     # ancestors of the given target, i.e., their spec_paths are all prefixes. So sorting by
     # address will effectively sort by closeness of ancestry to the given target.
     exported_ancestor_tgts = sorted(
-        [t for t in ancestor_tgts if _is_exported(t)], key=lambda t: t.address, reverse=True,
+        [t for t in ancestor_tgts if t.has_field(PythonProvidesField)],
+        key=lambda t: t.address,
+        reverse=True,
     )
     exported_ancestor_iter = iter(exported_ancestor_tgts)
     for exported_ancestor in exported_ancestor_iter:
