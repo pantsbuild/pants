@@ -110,14 +110,16 @@ class PythonDependencyInferenceTest(TestBase):
             [
                 Address("3rdparty/python", target_name="Django"),
                 Address("src/python/util", relative_file_path="dep.py", target_name="util"),
-            ]
+            ],
+            sibling_dependencies_inferrable=True,
         )
 
         generated_subtarget_address = Address(
             "src/python", relative_file_path="f2.py", target_name="python"
         )
         assert run_dep_inference(generated_subtarget_address) == InferredDependencies(
-            [Address("src/python", relative_file_path="app.py", target_name="python")]
+            [Address("src/python", relative_file_path="app.py", target_name="python")],
+            sibling_dependencies_inferrable=True,
         )
 
     def test_infer_python_inits(self) -> None:
@@ -147,7 +149,8 @@ class PythonDependencyInferenceTest(TestBase):
             [
                 Address("src/python/root", relative_file_path="__init__.py", target_name="root"),
                 Address("src/python/root/mid", relative_file_path="__init__.py", target_name="mid"),
-            ]
+            ],
+            sibling_dependencies_inferrable=False,
         )
 
     def test_infer_python_conftests(self) -> None:
@@ -178,5 +181,6 @@ class PythonDependencyInferenceTest(TestBase):
             [
                 Address("src/python/root", relative_file_path="conftest.py", target_name="root"),
                 Address("src/python/root/mid", relative_file_path="conftest.py", target_name="mid"),
-            ]
+            ],
+            sibling_dependencies_inferrable=False,
         )

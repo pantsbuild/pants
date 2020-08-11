@@ -999,7 +999,9 @@ async def infer_smalltalk_dependencies(request: InferSmalltalkDependencies) -> I
     resolved = await MultiGet(
         Get(Address, AddressInput, AddressInput.parse(line)) for line in all_lines
     )
-    return InferredDependencies(resolved)
+    # NB: See `test_depends_on_subtargets` for why we set the field
+    # `sibling_dependencies_inferrable` this way.
+    return InferredDependencies(resolved, sibling_dependencies_inferrable=bool(resolved))
 
 
 class TestDependencies(TestBase):
@@ -1226,4 +1228,37 @@ class TestDependencies(TestBase):
                     target_name="inferred_and_provided2",
                 ),
             ],
+        )
+
+    def test_depends_on_subtargets(self) -> None:
+        """If the address is a base target, or none of the dependency inference rules can infer
+        dependencies on sibling files, then we should depend on all the base target's subtargets."""
+        self.create_file("src/smalltalk/f1.st")
+        self.create_file("src/smalltalk/f2.st")
+        self.add_to_build_file("src/smalltalk", "smalltalk(sources=['*.st'])")
+
+        # Test that a base address depends on its subtargets.
+        self.assert_dependencies_resolved(
+            requested_address=Address("src/smalltalk"),
+            expected=[
+                Address("src/smalltalk", relative_file_path="f1.st"),
+                Address("src/smalltalk", relative_file_path="f2.st"),
+            ],
+        )
+
+        # Test that a file address depends on its siblings if it has no dependency inference rule,
+        # or those inference rules do not claim to infer dependencies on siblings.
+        self.assert_dependencies_resolved(
+            requested_address=Address("src/smalltalk", relative_file_path="f1.st"),
+            expected=[Address("src/smalltalk", relative_file_path="f2.st")],
+        )
+
+        # Now we recreate the files so that the mock dependency inference will have results, which
+        # will cause it to claim to be able to infer dependencies on sibling files.
+        self.add_to_build_file("src/smalltalk/util", "smalltalk()")
+        self.create_file("src/smalltalk/f1.st", "src/smalltalk/util")
+        self.assert_dependencies_resolved(
+            requested_address=Address("src/smalltalk", relative_file_path="f1.st"),
+            # We only expect the inferred address, not any dependencies on sibling files.
+            expected=[Address("src/smalltalk/util")],
         )

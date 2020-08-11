@@ -216,7 +216,6 @@ class EngineInitializer:
             prelude_glob_patterns=bootstrap_options.build_file_prelude_globs,
             build_patterns=bootstrap_options.build_patterns,
             build_ignore_patterns=bootstrap_options.build_ignore,
-            subproject_roots=bootstrap_options.subproject_roots,
         )
 
         @rule
