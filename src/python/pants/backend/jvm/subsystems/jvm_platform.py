@@ -293,22 +293,29 @@ class JvmPlatform(Subsystem):
 
         Handles java version-isms, converting things like '7' -> '1.7' appropriately.
 
-        Truncates input versions down to just the major and minor numbers (eg, 1.6), ignoring extra
-        versioning information after the second number.
+        Truncates input versions down to just the information needed to identify the release. For
+        versions Java 8 and below, just the major and minor numbers (eg, 1.6), ignoring extra
+        versioning information after the second number. For Java 9 and above truncates to just the
+        major version.
 
         :param version: the input version, given as a string or Revision object.
         :return: the parsed and cleaned version, suitable as a javac -source or -target argument.
         :rtype: Revision
         """
-        conversion = {str(i): f"1.{i}" for i in cls.SUPPORTED_CONVERSION_VERSIONS}
-        if str(version) in conversion:
-            return Revision.lenient(conversion[str(version)])
-
         if not hasattr(version, "components"):
-            version = Revision.lenient(version)
-        if len(version.components) <= 2:
-            return version
-        return Revision(*version.components[:2])
+            version = Revision.lenient(str(version))
+
+        if version.components[0] == 1:
+            if version.components[1] > 8:
+                return Revision(version.components[1])
+            else:
+                return Revision(*version.components[:2])
+        elif version.components[0] in cls.SUPPORTED_CONVERSION_VERSIONS:
+            return Revision(1, version.components[0])
+        elif version.components[0] > 8:
+            return Revision(*version.components)
+        else:
+            raise ValueError(f"Unsupported Java version {version}")
 
 
 @total_ordering

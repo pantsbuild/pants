@@ -19,6 +19,27 @@ class HasRuntimePlatform(RuntimePlatformMixin, JvmTarget):
 
 
 class JvmPlatformTest(TestBase):
+    def test_parse_java_version(self):
+        def parse(v):
+            return JvmPlatform.parse_java_version(v)
+
+        def rev(v):
+            return Revision.lenient(v)
+
+        assert parse("1.8") == rev("1.8")
+        assert parse("1.8.2") == rev("1.8")
+        assert parse("1.9") == rev("9")
+        assert parse("6") == rev("1.6")
+        assert parse("7") == rev("1.7")
+        assert parse("8") == rev("1.8")
+        assert parse("8.0") == rev("1.8")
+        assert parse("9") == rev("9")
+        assert parse("10") == rev("10")
+        assert parse("11") == rev("11")
+        assert parse("11.0") == rev("11")
+        with self.assertRaisesWithMessage(ValueError, "Unsupported Java version 5"):
+            parse("5")
+
     def test_runtime_lookup_both_defaults(self):
         init_subsystem(
             JvmPlatform,
