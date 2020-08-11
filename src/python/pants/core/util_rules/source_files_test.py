@@ -6,8 +6,8 @@ from pathlib import PurePath
 from typing import Iterable, List, NamedTuple, Type
 
 from pants.core.target_types import FilesSources
-from pants.core.util_rules.determine_source_files import SourceFiles, SourceFilesRequest
-from pants.core.util_rules.determine_source_files import rules as determine_source_files_rules
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.source_files import rules as source_files_rules
 from pants.engine.addresses import Address
 from pants.engine.target import Sources as SourcesField
 from pants.testutil.engine.util import Params
@@ -29,10 +29,10 @@ SOURCES2 = TargetSources("tests/python", ["t1.py", "t2.java"])
 SOURCES3 = TargetSources("src/java", ["j1.java", "j2.java"])
 
 
-class DetermineSourceFilesTest(TestBase):
+class SourceFilesTest(TestBase):
     @classmethod
     def rules(cls):
-        return (*super().rules(), *determine_source_files_rules())
+        return (*super().rules(), *source_files_rules())
 
     def mock_sources_field(
         self,

@@ -7,8 +7,8 @@ from typing import Dict, Optional, Set
 
 from pants.backend.python.target_types import PythonRequirementsField, PythonSources
 from pants.base.specs import AddressSpecs, DescendantAddresses
-from pants.core.util_rules.determine_source_files import SourceFilesRequest
-from pants.core.util_rules.strip_source_roots import StrippedSourceFiles
+from pants.core.util_rules.source_files import SourceFilesRequest
+from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.addresses import Address
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Targets

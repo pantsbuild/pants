@@ -14,7 +14,7 @@ from pants.backend.python.rules.pytest_runner import PythonTestFieldSet
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary, PythonTests
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.test import Status, TestDebugRequest, TestResult
-from pants.core.util_rules import determine_source_files, strip_source_roots
+from pants.core.util_rules import source_files, stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, FileContent
 from pants.engine.process import InteractiveRunner
@@ -120,11 +120,11 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
             *super().rules(),
             create_coverage_config,
             *pytest_runner.rules(),
-            *determine_source_files.rules(),
             *python_sources.rules(),
             *pex.rules(),
             *pex_from_targets.rules(),
-            *strip_source_roots.rules(),
+            *source_files.rules(),
+            *stripped_source_files.rules(),
             RootRule(PythonTestFieldSet),
             # For conftest detection.
             *dependency_inference_rules.rules(),

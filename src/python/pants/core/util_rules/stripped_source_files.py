@@ -4,7 +4,7 @@
 import itertools
 from dataclasses import dataclass
 
-from pants.core.util_rules.determine_source_files import SourceFiles
+from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, RemovePrefix, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult

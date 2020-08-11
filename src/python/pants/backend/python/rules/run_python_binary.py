@@ -8,8 +8,8 @@ from pants.backend.python.rules.python_sources import PythonSourceFiles, PythonS
 from pants.backend.python.target_types import PythonBinaryDefaults, PythonBinarySources
 from pants.core.goals.binary import BinaryFieldSet
 from pants.core.goals.run import RunRequest
-from pants.core.util_rules.determine_source_files import SourceFiles
-from pants.core.util_rules.strip_source_roots import StrippedSourceFiles
+from pants.core.util_rules.source_files import SourceFiles
+from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
