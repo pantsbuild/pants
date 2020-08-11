@@ -823,52 +823,6 @@ class GlobalOptions(Subsystem):
             advanced=True,
         )
 
-        # TODO(#10569): move these out of bootstrap options into normal global options, near the
-        #  --subproject-roots option.
-        register(
-            "--build-patterns",
-            advanced=True,
-            type=list,
-            default=["BUILD", "BUILD.*"],
-            help=(
-                "The naming scheme for BUILD files, i.e. where you define targets. This only sets "
-                "the naming scheme, not the directory paths to look for. To add ignore"
-                "patterns, use the option `--build-ignore`."
-            ),
-        )
-        register(
-            "--build-ignore",
-            advanced=True,
-            type=list,
-            default=[".*/", "bower_components/", "node_modules/", "*.egg-info/"],
-            help=(
-                "Paths to ignore when identifying BUILD files. This does not affect any other "
-                "filesystem operations; use `--pants-ignore` for that instead. Patterns use the "
-                "gitignore pattern syntax (https://git-scm.com/docs/gitignore)."
-            ),
-        )
-        register(
-            "--build-file-prelude-globs",
-            advanced=True,
-            type=list,
-            default=[],
-            help=(
-                "Python files to evaluate and whose symbols should be exposed to all BUILD files. "
-                "See https://www.pantsbuild.org/docs/macros."
-            ),
-        )
-
-        # TODO(#10569): move this out of bootstrap options into normal global options.
-        register(
-            "--files-not-found-behavior",
-            advanced=True,
-            type=FilesNotFoundBehavior,
-            default=FilesNotFoundBehavior.warn,
-            help="What to do when files and globs specified in BUILD files, such as in the "
-            "`sources` field, cannot be found. This happens when the files do not exist on "
-            "your machine or when they are ignored by the `--pants-ignore` option.",
-        )
-
     @classmethod
     def register_options(cls, register):
         """Register options not tied to any particular task or subsystem."""
@@ -923,6 +877,38 @@ class GlobalOptions(Subsystem):
         )
 
         register(
+            "--build-patterns",
+            advanced=True,
+            type=list,
+            default=["BUILD", "BUILD.*"],
+            help=(
+                "The naming scheme for BUILD files, i.e. where you define targets. This only sets "
+                "the naming scheme, not the directory paths to look for. To add ignore"
+                "patterns, use the option `--build-ignore`."
+            ),
+        )
+        register(
+            "--build-ignore",
+            advanced=True,
+            type=list,
+            default=[".*/", "bower_components/", "node_modules/", "*.egg-info/"],
+            help=(
+                "Paths to ignore when identifying BUILD files. This does not affect any other "
+                "filesystem operations; use `--pants-ignore` for that instead. Patterns use the "
+                "gitignore pattern syntax (https://git-scm.com/docs/gitignore)."
+            ),
+        )
+        register(
+            "--build-file-prelude-globs",
+            advanced=True,
+            type=list,
+            default=[],
+            help=(
+                "Python files to evaluate and whose symbols should be exposed to all BUILD files. "
+                "See https://www.pantsbuild.org/docs/macros."
+            ),
+        )
+        register(
             "--subproject-roots",
             type=list,
             advanced=True,
@@ -931,6 +917,15 @@ class GlobalOptions(Subsystem):
             "project depends on.",
         )
 
+        register(
+            "--files-not-found-behavior",
+            advanced=True,
+            type=FilesNotFoundBehavior,
+            default=FilesNotFoundBehavior.warn,
+            help="What to do when files and globs specified in BUILD files, such as in the "
+            "`sources` field, cannot be found. This happens when the files do not exist on "
+            "your machine or when they are ignored by the `--pants-ignore` option.",
+        )
         register(
             "--owners-not-found-behavior",
             advanced=True,

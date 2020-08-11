@@ -16,7 +16,6 @@ from pants.engine.console import Console
 from pants.engine.fs import Workspace
 from pants.engine.goal import Goal
 from pants.engine.internals import build_files, graph, options_parsing, uuid
-from pants.engine.internals.mapper import AddressMapper
 from pants.engine.internals.native import Native
 from pants.engine.internals.parser import Parser
 from pants.engine.internals.scheduler import Scheduler, SchedulerSession
@@ -27,11 +26,7 @@ from pants.engine.rules import RootRule, collect_rules, rule
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
-from pants.option.global_options import (
-    DEFAULT_EXECUTION_OPTIONS,
-    ExecutionOptions,
-    FilesNotFoundBehavior,
-)
+from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, ExecutionOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.subsystem import Subsystem
 from pants.scm.subsystems.changed import rules as changed_rules
@@ -164,7 +159,6 @@ class EngineInitializer:
             options_bootstrapper,
             build_configuration,
             ExecutionOptions.from_bootstrap_options(bootstrap_options),
-            files_not_found_behavior=bootstrap_options.files_not_found_behavior,
             pants_ignore_patterns=OptionsInitializer.compute_pants_ignore(
                 build_root, bootstrap_options
             ),
@@ -184,7 +178,6 @@ class EngineInitializer:
         execution_options: ExecutionOptions,
         native: Native,
         *,
-        files_not_found_behavior: FilesNotFoundBehavior,
         pants_ignore_patterns: List[str],
         use_gitignore: bool,
         local_store_dir: str,
@@ -205,27 +198,12 @@ class EngineInitializer:
         bootstrap_options = options_bootstrapper.bootstrap_options.for_global_scope()
         execution_options = execution_options or DEFAULT_EXECUTION_OPTIONS
 
-        # TODO(#10569): move this out of engine_initializer.py into a normal rule that sets up
-        #  AddressMapper.
-        parser = Parser(
-            target_type_aliases=registered_target_types.aliases,
-            object_aliases=build_configuration.registered_aliases,
-        )
-        address_mapper = AddressMapper(
-            parser=parser,
-            prelude_glob_patterns=bootstrap_options.build_file_prelude_globs,
-            build_patterns=bootstrap_options.build_patterns,
-            build_ignore_patterns=bootstrap_options.build_ignore,
-        )
-
         @rule
-        def address_mapper_singleton() -> AddressMapper:
-            return address_mapper
-
-        # TODO(#10569): move this out of engine_initializer.py into a normal rule.
-        @rule
-        def files_not_found_behavior_singleton() -> FilesNotFoundBehavior:
-            return files_not_found_behavior
+        def parser_singleton() -> Parser:
+            return Parser(
+                target_type_aliases=registered_target_types.aliases,
+                object_aliases=build_configuration.registered_aliases,
+            )
 
         @rule
         def build_configuration_singleton() -> BuildConfiguration:
