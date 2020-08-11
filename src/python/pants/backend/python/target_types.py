@@ -56,23 +56,6 @@ class PythonInterpreterCompatibility(StringOrStringSequenceField):
         return python_setup.compatibility_or_constraints(self.value)
 
 
-class PythonProvidesField(ScalarField, ProvidesField):
-    """The`setup.py` kwargs for the external artifact built from this target.
-
-    See https://www.pantsbuild.org/docs/python-setup-py-goal.
-    """
-
-    expected_type = PythonArtifact
-    expected_type_description = "setup_py(**kwargs)"
-    value: Optional[PythonArtifact]
-
-    @classmethod
-    def compute_value(
-        cls, raw_value: Optional[PythonArtifact], *, address: Address
-    ) -> Optional[PythonArtifact]:
-        return super().compute_value(raw_value, address=address)
-
-
 COMMON_PYTHON_FIELDS = (
     *COMMON_TARGET_FIELDS,
     Dependencies,
@@ -388,8 +371,30 @@ class PythonRequirementsFile(Target):
 # -----------------------------------------------------------------------------------------------
 
 
+class PythonProvidesField(ScalarField, ProvidesField):
+    """The`setup.py` kwargs for the external artifact built from this target.
+
+    See https://www.pantsbuild.org/docs/python-setup-py-goal.
+    """
+
+    expected_type = PythonArtifact
+    expected_type_description = "setup_py(**kwargs)"
+    value: PythonArtifact
+    required = True
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[PythonArtifact], *, address: Address
+    ) -> PythonArtifact:
+        return cast(PythonArtifact, super().compute_value(raw_value, address=address))
+
+
+class PythonDistributionDependencies(Dependencies):
+    required = True
+
+
 class PythonDistribution(Target):
     """A publishable Python distribution."""
 
     alias = "python_distribution"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, PythonProvidesField)
+    core_fields = (*COMMON_TARGET_FIELDS, PythonDistributionDependencies, PythonProvidesField)

@@ -32,7 +32,7 @@ from pants.backend.python.target_types import (
 from pants.base.specs import AddressLiteralSpec, AddressSpecs, AscendantAddresses
 from pants.core.target_types import FilesSources, ResourcesSources
 from pants.core.util_rules.distdir import DistDir
-from pants.engine.addresses import Address, Addresses
+from pants.engine.addresses import Address, Addresses, AddressInput
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.console import Console
 from pants.engine.fs import (
@@ -103,7 +103,7 @@ class ExportedTarget:
 
     @property
     def provides(self) -> PythonArtifact:
-        return cast(PythonArtifact, self.target[PythonProvidesField].value)
+        return self.target[PythonProvidesField].value
 
 
 @dataclass(frozen=True)
@@ -419,13 +419,15 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
     )
     key_to_binary_spec = provides.binaries
     keys = list(key_to_binary_spec.keys())
-    binaries = await Get(
-        Targets,
-        Addresses(
-            Address.parse(key_to_binary_spec[key], relative_to=target.address.spec_path)
-            for key in keys
-        ),
+    addresses = await MultiGet(
+        Get(
+            Address,
+            AddressInput,
+            AddressInput.parse(key_to_binary_spec[key], relative_to=target.address.spec_path),
+        )
+        for key in keys
     )
+    binaries = await Get(Targets, Addresses(addresses))
     for key, binary in zip(keys, binaries):
         binary_entry_point = binary.get(PythonEntryPoint).value
         if not binary_entry_point:
