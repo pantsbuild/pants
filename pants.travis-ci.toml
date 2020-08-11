@@ -8,10 +8,6 @@ dynamic_ui = false
 # now in order to smooth off rough edges locally.
 pantsd = false
 
-[python-setup]
-# TODO: See https://github.com/pantsbuild/pants/issues/9964
-resolver_jobs = 2
-
 [test]
 use_coverage = true
 
