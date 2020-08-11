@@ -3,7 +3,7 @@
 
 """Type checker for Python.
 
-See https://pants.readme.io/docs/python-linters-and-formatters and
+See https://www.pantsbuild.org/docs/python-linters-and-formatters and
 https://mypy.readthedocs.io/en/stable/.
 """
 

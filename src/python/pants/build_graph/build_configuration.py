@@ -40,7 +40,7 @@ class BuildConfiguration:
             """Return the registered aliases exposed in BUILD files.
 
             These returned aliases aren't so useful for actually parsing BUILD files.
-            They are useful for generating things like http://pantsbuild.github.io/build_dictionary.html.
+            They are useful for generating online documentation.
 
             :returns: A new BuildFileAliases instance containing this BuildConfiguration's registered alias
                       mappings.

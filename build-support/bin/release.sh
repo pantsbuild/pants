@@ -415,7 +415,7 @@ _OPTS="dhnftlowepq"
 function usage() {
   echo "With no options all packages are built, smoke tested and published to"
   echo "PyPI.  Credentials are needed for this as described in the"
-  echo "release docs: http://pantsbuild.org/release.html"
+  echo "release docs: https://www.pantsbuild.org/docs/releases"
   echo
   echo "Usage: $0 [-d] (-h|-n|-f|-t|-l|-o|-w|-e|-p|-q)"
   echo " -d  Enables debug mode (verbose output, script pauses after venv creation)"

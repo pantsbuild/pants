@@ -3,7 +3,7 @@
 
 """Autoformatter for Python.
 
-See https://pants.readme.io/docs/python-linters-and-formatters and
+See https://www.pantsbuild.org/docs/python-linters-and-formatters and
 https://black.readthedocs.io/en/stable/.
 """
 

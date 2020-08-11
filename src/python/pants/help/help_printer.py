@@ -155,7 +155,7 @@ class HelpPrinter:
         print("  [target] accepts two special forms:")
         print("    dir:  to include all targets in the specified directory.")
         print("    dir:: to include all targets found recursively under the directory.\n")
-        print("More documentation is available at https://pantsbuild.org")
+        print("More documentation is available at https://www.pantsbuild.org")
 
         print(self._format_help(GLOBAL_SCOPE, advanced))
 

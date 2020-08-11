@@ -1309,7 +1309,7 @@ Refactoring, Improvements, and Tooling
 * Spelling mistake in first_tutorial (#4045)
   `PR #4045 <https://github.com/pantsbuild/pants/pull/4045>`_
 
-* Replace instances of pantsbuild.github.io in the docs with pantsbuild.org.
+* Replace instances of pantsbuild.github.io in the docs with www.pantsbuild.org.
   `PR #4074 <https://github.com/pantsbuild/pants/pull/4074>`_
 
 * A task to resolve python requirements.
