@@ -17,23 +17,20 @@ API Changes
 * Enable Python dependency inference by default (#10520)
   `PR #10520 <https://github.com/pantsbuild/pants/pull/10520>`_
 
+* Targets act as aliases for their files (#10511)
+  `PR #10511 <https://github.com/pantsbuild/pants/pull/10511>`_
+
 New Features
 ~~~~~~~~~~~~
 
 * Allow using file addresses on the command line (#10573)
   `PR #10573 <https://github.com/pantsbuild/pants/pull/10573>`_
 
-* Targets act as aliases for their files (#10511)
-  `PR #10511 <https://github.com/pantsbuild/pants/pull/10511>`_
-
 * Add `--build-patterns` option (#10559)
   `PR #10559 <https://github.com/pantsbuild/pants/pull/10559>`_
 
 * Allow protobuf_library targets to specify a python source root. (#10549)
   `PR #10549 <https://github.com/pantsbuild/pants/pull/10549>`_
-
-* Revert "Add cache_failures option to Process type (#10433)" (#10534)
-  `PR #10534 <https://github.com/pantsbuild/pants/pull/10534>`_
 
 * Restore the missing init injection logic. (#10517)
   `PR #10517 <https://github.com/pantsbuild/pants/pull/10517>`_
@@ -43,9 +40,6 @@ New Features
 
 * Add support for bandit output file. (#10412)
   `PR #10412 <https://github.com/pantsbuild/pants/pull/10412>`_
-
-* Add cache_failures option to Process type (#10433)
-  `PR #10433 <https://github.com/pantsbuild/pants/pull/10433>`_
 
 Bugfixes
 ~~~~~~~~
@@ -98,9 +92,6 @@ Refactoring, Improvements, and Tooling
 * Refactor rule to resolve address specs (#10563)
   `PR #10563 <https://github.com/pantsbuild/pants/pull/10563>`_
 
-* Prepare 1.30.1rc0 (#10554)
-  `PR #10554 <https://github.com/pantsbuild/pants/pull/10554>`_
-
 * Stop using `AddressWithOrigin` for precise file arguments (#10551)
   `PR #10551 <https://github.com/pantsbuild/pants/pull/10551>`_
 
@@ -112,6 +103,9 @@ Refactoring, Improvements, and Tooling
 
 * Support and require disambiguated file addresses (#10535)
   `PR #10535 <https://github.com/pantsbuild/pants/pull/10535>`_
+
+* Revert "Add cache_failures option to Process type (#10433)" (#10534)
+  `PR #10534 <https://github.com/pantsbuild/pants/pull/10534>`_
 
 * Simplify source root stripping. (#10543)
   `PR #10543 <https://github.com/pantsbuild/pants/pull/10543>`_
@@ -176,6 +170,9 @@ Refactoring, Improvements, and Tooling
 * Simplify `engine/internals/nodes.py` (#10487)
   `PR #10487 <https://github.com/pantsbuild/pants/pull/10487>`_
 
+* Add cache_failures option to Process type (#10433)
+  `PR #10433 <https://github.com/pantsbuild/pants/pull/10433>`_
+
 Testing
 ~~~~~~~
 
@@ -211,6 +208,9 @@ Documentation/Logging
 
 * Improve error message when the path component does not exist (#10570)
   `PR #10570 <https://github.com/pantsbuild/pants/pull/10570>`_
+
+* Prepare 1.30.1rc0 (#10554)
+  `PR #10554 <https://github.com/pantsbuild/pants/pull/10554>`_
 
 * Improve error message for unrecognized BUILD file symbols (#10531)
   `PR #10531 <https://github.com/pantsbuild/pants/pull/10531>`_
