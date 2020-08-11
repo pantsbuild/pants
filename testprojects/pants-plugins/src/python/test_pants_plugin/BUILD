@@ -13,5 +13,6 @@ python_distribution(
     namespace_packages=[
       'test_pants_plugin',
     ],
-  )
+  ),
+  tags=['lockfile_ignore'],
 )
