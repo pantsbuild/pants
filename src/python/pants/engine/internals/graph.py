@@ -659,29 +659,6 @@ async def hydrate_sources(
 # -----------------------------------------------------------------------------------------------
 
 
-class UnusedDependencyIgnoresException(Exception):
-    def __init__(
-        self, address: Address, *, unused_ignores: Iterable[Address], result: Iterable[Address]
-    ) -> None:
-        # If the address was generated, we convert back to the original base target to correspond to
-        # what users actually put in BUILD files.
-        address = address.maybe_convert_to_base_target()
-        sorted_unused_ignores = sorted([f"!{addr}" for addr in unused_ignores])
-        formatted_unused_ignores = (
-            repr(sorted_unused_ignores[0])
-            if len(sorted_unused_ignores) == 1
-            else str(sorted_unused_ignores)
-        )
-        bulleted_list_sep = "\n  * "
-        possible_deps = sorted(addr.spec for addr in result)
-        super().__init__(
-            f"The target {address} includes {formatted_unused_ignores} in its `dependencies` field, "
-            f"but {'it does' if len(sorted_unused_ignores) == 1 else 'they do'} not match any of "
-            f"the resolved dependencies. Instead, please choose from the dependencies that are "
-            f"being used:\n\n{bulleted_list_sep}{bulleted_list_sep.join(possible_deps)}"
-        )
-
-
 class ParsedDependencies(NamedTuple):
     addresses: List[AddressInput]
     ignored_addresses: List[AddressInput]
@@ -718,7 +695,7 @@ async def resolve_dependencies(
         subproject_roots=global_options.options.subproject_roots,
     )
     literal_addresses = await MultiGet(Get(Address, AddressInput, ai) for ai in provided.addresses)
-    literal_ignored_addresses = set(
+    ignored_addresses = set(
         await MultiGet(Get(Address, AddressInput, ai) for ai in provided.ignored_addresses)
     )
 
@@ -768,31 +745,17 @@ async def resolve_dependencies(
             t.address for t in subtargets.subtargets if t.address != request.field.address
         )
 
-    addresses: Set[Address] = set()
-    used_ignored_addresses: Set[Address] = set()
-    for addr in [
-        *subtarget_addresses,
-        *literal_addresses,
-        *itertools.chain.from_iterable(injected),
-        *itertools.chain.from_iterable(inferred),
-    ]:
-        if addr in literal_ignored_addresses:
-            used_ignored_addresses.add(addr)
-        else:
-            addresses.add(addr)
-    result = sorted(addresses)
-
-    unused_ignores = literal_ignored_addresses - used_ignored_addresses
-    # If there are unused ignores and this is not a generated subtarget, we eagerly error so that
-    # the user isn't falsely led to believe the ignore is working. We do not do this for generated
-    # subtargets because we cannot guarantee that the ignore specified in the original owning
-    # target would be used for all generated subtargets.
-    if unused_ignores and request.field.address.is_base_target:
-        raise UnusedDependencyIgnoresException(
-            request.field.address, unused_ignores=unused_ignores, result=result
+    result = {
+        addr
+        for addr in (
+            *subtarget_addresses,
+            *literal_addresses,
+            *itertools.chain.from_iterable(injected),
+            *itertools.chain.from_iterable(inferred),
         )
-
-    return Addresses(result)
+        if addr not in ignored_addresses
+    }
+    return Addresses(sorted(result))
 
 
 # -----------------------------------------------------------------------------------------------
