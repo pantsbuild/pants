@@ -370,7 +370,11 @@ class Address:
         return f"Address({self.spec})"
 
     def __str__(self) -> str:
-        return self.spec
+        """A useful human-readable representation.
+
+        If this is a base address, it's full spec, if it's a file subtarget, the path to that file.
+        """
+        return self.spec if self.is_base_target else self.filename
 
     def __lt__(self, other):
         return (self.spec_path, (self._relative_file_path or ""), (self._target_name or "")) < (

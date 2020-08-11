@@ -356,7 +356,7 @@ async def run_tests(
         format_str = f"{{addr:80}}.....{{result:>{right_align}}}"
         console.print_stderr(
             format_str.format(
-                addr=result.address.spec, result=color(result.test_result.status.value)
+                addr=str(result.address), result=color(result.test_result.status.value)
             )
         )
 
