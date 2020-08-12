@@ -21,7 +21,7 @@ from pants.engine.rules import RootRule
 from pants.engine.target import Target
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.util import clean_global_runtime_state
-from pants.option.global_options import ExecutionOptions, FilesNotFoundBehavior
+from pants.option.global_options import ExecutionOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.subsystem import Subsystem
 from pants.source import source_root
@@ -319,7 +319,6 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         graph_session = EngineInitializer.setup_graph_extended(
             pants_ignore_patterns=[],
             use_gitignore=False,
-            files_not_found_behavior=FilesNotFoundBehavior.error,
             local_store_dir=local_store_dir,
             local_execution_root_dir=local_execution_root_dir,
             named_caches_dir=named_caches_dir,

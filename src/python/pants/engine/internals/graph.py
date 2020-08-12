@@ -69,7 +69,7 @@ from pants.engine.target import (
     generate_subtarget_address,
 )
 from pants.engine.unions import UnionMembership
-from pants.option.global_options import FilesNotFoundBehavior, GlobalOptions, OwnersNotFoundBehavior
+from pants.option.global_options import GlobalOptions, OwnersNotFoundBehavior
 from pants.source.filespec import matches_filespec
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
@@ -81,9 +81,7 @@ logger = logging.getLogger(__name__)
 
 
 @rule
-async def generate_subtargets(
-    address: Address, files_not_found_behavior: FilesNotFoundBehavior
-) -> Subtargets:
+async def generate_subtargets(address: Address, global_options: GlobalOptions) -> Subtargets:
     if not address.is_base_target:
         raise ValueError(f"Cannot generate file Targets for a file Address: {address}")
     wrapped_base_target = await Get(WrappedTarget, Address, address)
@@ -96,7 +94,9 @@ async def generate_subtargets(
 
     # Create subtargets for matched sources.
     sources_field = base_target[Sources]
-    sources_field_path_globs = sources_field.path_globs(files_not_found_behavior)
+    sources_field_path_globs = sources_field.path_globs(
+        global_options.options.files_not_found_behavior
+    )
     if sources_field_path_globs is None:
         return Subtargets(base_target, ())
 
@@ -588,7 +588,7 @@ class AmbiguousCodegenImplementationsException(Exception):
 @rule
 async def hydrate_sources(
     request: HydrateSourcesRequest,
-    files_not_found_behavior: FilesNotFoundBehavior,
+    global_options: GlobalOptions,
     union_membership: UnionMembership,
 ) -> HydratedSources:
     sources_field = request.field
@@ -634,7 +634,7 @@ async def hydrate_sources(
 
     # Now, hydrate the `globs`. Even if we are going to use codegen, we will need the original
     # protocol sources to be hydrated.
-    path_globs = sources_field.path_globs(files_not_found_behavior)
+    path_globs = sources_field.path_globs(global_options.options.files_not_found_behavior)
     if path_globs is None:
         return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec, sources_type=sources_type)
     snapshot = await Get(Snapshot, PathGlobs, path_globs)
