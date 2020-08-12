@@ -504,14 +504,14 @@ def lint(python_version: PythonVersion) -> Dict:
         "script": [
             (
                 "travis-wait-enhanced --timeout 50m --interval 9m -- ./build-support/bin/ci.py "
-                f"--githooks --sanity-checks --doc-gen --python-version {python_version.decimal}"
+                f"--githooks --smoke-tests --doc-gen --python-version {python_version.decimal}"
             ),
             # NB: We split up `--lint` into its own shard because it uses remote execution. The
             # RBE token expires after 60 minutes, so we don't want to generate the token until all
             # local execution has finished.
             (
                 "travis-wait-enhanced --timeout 40m --interval 9m -- ./build-support/bin/ci.py "
-                f"--remote-execution-enabled --lint --python-version {python_version.decimal}"
+                f"--lint --python-version {python_version.decimal}"
             ),
         ],
     }
@@ -557,8 +557,8 @@ def unit_tests(python_version: PythonVersion) -> Dict:
         **linux_shard(python_version=python_version, install_travis_wait=True),
         "name": f"Unit tests (Python {python_version.decimal})",
         "script": [
-            "travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py --unit-tests --plugin-tests "
-            f"--remote-execution-enabled --python-version {python_version.decimal}"
+            "travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py "
+            f"--unit-tests --plugin-tests --python-version {python_version.decimal}"
         ],
     }
     safe_append(shard, "env", f"CACHE_NAME=unit_tests.py{python_version.number}")
@@ -616,41 +616,26 @@ def build_wheels_osx() -> Dict:
 # -------------------------------------------------------------------------
 
 
-def integration_tests_v1(python_version: PythonVersion) -> List[Dict]:
-    num_integration_shards = 6
+def integration_tests(python_version: PythonVersion) -> List[Dict]:
+    num_integration_shards = 15
 
     def make_shard(*, shard_num: int) -> Dict:
         shard = {
             **linux_shard(python_version=python_version),
-            "name": f"Integration tests - V1 - shard {shard_num} (Python {python_version.decimal})",
+            "name": f"Integration tests shard {shard_num} (Python {python_version.decimal})",
             "script": [
                 (
-                    "./build-support/bin/ci.py --integration-tests-v1 --integration-shard "
+                    "./build-support/bin/ci.py --integration-tests --integration-shard "
                     f"{shard_num}/{num_integration_shards} --python-version {python_version.decimal}"
                 ),
             ],
         }
         safe_append(
-            shard, "env", f"CACHE_NAME=integration.v1.shard_{shard_num}.py{python_version.number}",
+            shard, "env", f"CACHE_NAME=integration.shard_{shard_num}.py{python_version.number}",
         )
         return shard
 
     return [make_shard(shard_num=i) for i in range(num_integration_shards)]
-
-
-def integration_tests_v2(python_version: PythonVersion) -> Dict:
-    shard = {
-        **linux_shard(python_version=python_version, install_travis_wait=True),
-        "name": f"Integration tests - V2 (Python {python_version.decimal})",
-        "script": [
-            (
-                "travis-wait-enhanced --timeout 65m --interval 9m -- ./build-support/bin/ci.py --integration-tests-v2 "
-                f"--remote-execution-enabled --python-version {python_version.decimal}"
-            ),
-        ],
-    }
-    safe_append(shard, "env", f"CACHE_NAME=integration.v2.py{python_version.number}")
-    return shard
 
 
 # -------------------------------------------------------------------------
@@ -728,32 +713,32 @@ def osx_platform_tests(python_version: PythonVersion) -> Dict:
 
 
 # -------------------------------------------------------------------------
-# OSX sanity checks
+# OSX smoke tests
 # -------------------------------------------------------------------------
 
 
-def _osx_sanity_check(
+def _osx_smoke_test(
     python_version: PythonVersion, *, os_version_number: int, osx_image: str
 ) -> Dict:
     shard = {
         **osx_shard(python_version=python_version, osx_image=osx_image),
-        "name": f"OSX 10.{os_version_number} sanity check (Python {python_version.decimal})",
+        "name": f"OSX 10.{os_version_number} smoke test (Python {python_version.decimal})",
         "script": [
-            f"MODE=debug ./build-support/bin/ci.py --sanity-checks --python-version {python_version.decimal}"
+            f"MODE=debug ./build-support/bin/ci.py --smoke-tests --python-version {python_version.decimal}"
         ],
     }
     safe_append(
-        shard, "env", f"CACHE_NAME=osx_sanity.10_{os_version_number}.py{python_version.number}"
+        shard, "env", f"CACHE_NAME=osx_smoke_test.10_{os_version_number}.py{python_version.number}"
     )
     return shard
 
 
-def osx_10_12_sanity_check(python_version: PythonVersion) -> Dict:
-    return _osx_sanity_check(python_version, os_version_number=12, osx_image="xcode9.2")
+def osx_10_12_smoke_test(python_version: PythonVersion) -> Dict:
+    return _osx_smoke_test(python_version, os_version_number=12, osx_image="xcode9.2")
 
 
-def osx_10_13_sanity_check(python_version: PythonVersion) -> Dict:
-    return _osx_sanity_check(python_version, os_version_number=13, osx_image="xcode10.1")
+def osx_10_13_smoke_test(python_version: PythonVersion) -> Dict:
+    return _osx_smoke_test(python_version, os_version_number=13, osx_image="xcode10.1")
 
 
 # -------------------------------------------------------------------------
@@ -876,16 +861,15 @@ def main() -> None:
                     # TODO: fix Cargo audit. Run `build-support/bin/ci.py --cargo-audit` locally.
                     # cargo_audit(),
                     *[unit_tests(v) for v in supported_python_versions],
-                    *[integration_tests_v2(v) for v in supported_python_versions],
-                    *integration_tests_v1(PythonVersion.py36),
-                    *integration_tests_v1(PythonVersion.py37),
+                    *integration_tests(PythonVersion.py36),
+                    *integration_tests(PythonVersion.py37),
                     rust_tests_linux(),
                     rust_tests_osx(),
                     build_wheels_linux(),
                     build_wheels_osx(),
                     *[osx_platform_tests(v) for v in supported_python_versions],
-                    *[osx_10_12_sanity_check(v) for v in supported_python_versions],
-                    *[osx_10_13_sanity_check(v) for v in supported_python_versions],
+                    *[osx_10_12_smoke_test(v) for v in supported_python_versions],
+                    *[osx_10_13_smoke_test(v) for v in supported_python_versions],
                     *[jvm_tests(v) for v in supported_python_versions],
                     deploy_stable(),
                     deploy_unstable(),

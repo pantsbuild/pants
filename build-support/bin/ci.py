@@ -6,11 +6,9 @@ import argparse
 import os
 import platform
 import subprocess
-import tempfile
-from contextlib import contextmanager
 from enum import Enum, auto
 from pathlib import Path
-from typing import Iterable, Iterator, List, NamedTuple, Optional, Set, Union
+from typing import Iterable, List, NamedTuple, Optional, Set, Union
 
 from common import banner, die, green, travis_section
 
@@ -21,44 +19,38 @@ def main() -> None:
     args = create_parser().parse_args()
     setup_environment(python_version=args.python_version)
 
-    with maybe_get_remote_execution_oauth_token_path(
-        remote_execution_enabled=args.remote_execution_enabled
-    ) as remote_execution_oauth_token_path:
+    if args.bootstrap:
+        bootstrap(
+            clean=args.bootstrap_clean,
+            try_to_skip_rust_compilation=args.bootstrap_try_to_skip_rust_compilation,
+            python_version=args.python_version,
+        )
+    set_run_from_pex()
 
-        if args.bootstrap:
-            bootstrap(
-                clean=args.bootstrap_clean,
-                try_to_skip_rust_compilation=args.bootstrap_try_to_skip_rust_compilation,
-                python_version=args.python_version,
-            )
-        set_run_from_pex()
-
-        if args.githooks:
-            run_githooks()
-        if args.sanity_checks:
-            run_sanity_checks()
-        if args.lint:
-            run_lint(oauth_token_path=remote_execution_oauth_token_path)
-        if args.doc_gen:
-            run_doc_gen_tests()
-        if args.clippy:
-            run_clippy()
-        if args.cargo_audit:
-            run_cargo_audit()
-        if args.unit_tests:
-            run_unit_tests(oauth_token_path=remote_execution_oauth_token_path)
-        if args.rust_tests:
-            run_rust_tests()
-        if args.jvm_tests:
-            run_jvm_tests()
-        if args.integration_tests_v1:
-            run_integration_tests_v1(shard=args.integration_shard)
-        if args.integration_tests_v2:
-            run_integration_tests_v2(oauth_token_path=remote_execution_oauth_token_path)
-        if args.plugin_tests:
-            run_plugin_tests(oauth_token_path=remote_execution_oauth_token_path)
-        if args.platform_specific_tests:
-            run_platform_specific_tests()
+    if args.githooks:
+        run_githooks()
+    if args.sanity_checks:
+        run_smoke_tests()
+    if args.lint:
+        run_lint()
+    if args.doc_gen:
+        run_doc_gen_tests()
+    if args.clippy:
+        run_clippy()
+    if args.cargo_audit:
+        run_cargo_audit()
+    if args.unit_tests:
+        run_unit_tests()
+    if args.rust_tests:
+        run_rust_tests()
+    if args.jvm_tests:
+        run_jvm_tests()
+    if args.integration_tests:
+        run_integration_tests(shard=args.integration_shard)
+    if args.plugin_tests:
+        run_plugin_tests()
+    if args.platform_specific_tests:
+        run_platform_specific_tests()
 
     banner("CI ENDS")
     print()
@@ -88,14 +80,6 @@ def create_parser() -> argparse.ArgumentParser:
         help="Run Pants with this version (defaults to 3.6).",
     )
     parser.add_argument(
-        "--remote-execution-enabled",
-        action="store_true",
-        help="Pants will use remote build execution remote where possible (for now, the V2 unit tests). "
-        "If running locally, you must be logged in via the `gcloud` CLI to an account with remote "
-        "build execution permissions. If running in CI, the script will ping the secure token "
-        "generator at https://github.com/pantsbuild/rbe-token-server.",
-    )
-    parser.add_argument(
         "--bootstrap", action="store_true", help="Bootstrap a pants.pex from local sources."
     )
     parser.add_argument(
@@ -114,9 +98,9 @@ def create_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--githooks", action="store_true", help="Run pre-commit githook.")
     parser.add_argument(
-        "--sanity-checks",
+        "--smoke-tests",
         action="store_true",
-        help="Run sanity checks of bootstrapped Pants and repo BUILD files.",
+        help="Run smoke tests of bootstrapped Pants and repo BUILD files.",
     )
     parser.add_argument("--lint", action="store_true", help="Run lint over whole codebase.")
     parser.add_argument("--doc-gen", action="store_true", help="Run doc generation tests.")
@@ -128,14 +112,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument("--rust-tests", action="store_true", help="Run Rust tests.")
     parser.add_argument("--jvm-tests", action="store_true", help="Run JVM tests.")
     parser.add_argument(
-        "--integration-tests-v1",
-        action="store_true",
-        help="Run Python integration tests w/ V1 runner.",
-    )
-    parser.add_argument(
-        "--integration-tests-v2",
-        action="store_true",
-        help="Run Python integration tests w/ V2 runner.",
+        "--integration-tests", action="store_true", help="Run Python integration tests",
     )
     parser.add_argument(
         "--integration-shard",
@@ -189,29 +166,6 @@ def set_run_from_pex() -> None:
     os.environ["RUN_PANTS_FROM_PEX"] = "1"
 
 
-@contextmanager
-def maybe_get_remote_execution_oauth_token_path(
-    *, remote_execution_enabled: bool
-) -> Iterator[Optional[str]]:
-    if not remote_execution_enabled:
-        yield None
-        return
-    command = (
-        ["./pants.pex", "--quiet", "run", "build-support/bin:get_rbe_token"]
-        if os.getenv("CI")
-        else ["gcloud", "auth", "application-default", "print-access-token"]
-    )
-    token: str = subprocess.run(
-        command, encoding="utf-8", stdout=subprocess.PIPE, check=True
-    ).stdout
-    if not os.getenv("CI"):
-        token = token.splitlines()[0]
-    with tempfile.NamedTemporaryFile(mode="w+") as tf:
-        tf.write(token)
-        tf.seek(0)
-        yield tf.name
-
-
 # -------------------------------------------------------------------------
 # Block lists
 # -------------------------------------------------------------------------
@@ -225,17 +179,10 @@ class TestStrategy(Enum):
     v1_no_chroot = auto()
     v1_chroot = auto()
     v2_local = auto()
-    v2_remote = auto()
 
     def pants_command(
-        self,
-        *,
-        targets: Iterable[Union[Target, Glob]],
-        shard: Optional[str] = None,
-        oauth_token_path: Optional[str] = None,
+        self, *, targets: Iterable[Union[Target, Glob]], shard: Optional[str] = None,
     ) -> List[str]:
-        if self == self.v2_remote and oauth_token_path is None:  # type: ignore[comparison-overlap]  # issues with understanding `self`
-            raise ValueError("Must specify oauth_token_path.")
         result = {
             self.v1_no_chroot: [
                 "./pants.pex",
@@ -246,12 +193,6 @@ class TestStrategy(Enum):
             ],
             self.v1_chroot: ["./pants.pex", "test.pytest", *sorted(targets), *PYTEST_PASSTHRU_ARGS],
             self.v2_local: ["./pants.pex", "--no-v1", "--v2", "test", *sorted(targets)],
-            self.v2_remote: [
-                "./pants.pex",
-                *_use_remote_execution(oauth_token_path or ""),
-                "test",
-                *sorted(targets),
-            ],
         }[
             self  # type: ignore[index]  # issues with understanding `self`
         ]
@@ -272,12 +213,9 @@ class TestTargetSets(NamedTuple):
     v1_no_chroot: TargetSet
     v1_chroot: TargetSet
     v2_local: TargetSet
-    v2_remote: TargetSet
 
     @staticmethod
-    def calculate(
-        *, test_type: TestType, remote_execution_enabled: bool = False
-    ) -> "TestTargetSets":
+    def calculate(*, test_type: TestType) -> "TestTargetSets":
         def get_listed_targets(filename: str) -> TargetSet:
             list_path = Path(f"build-support/ci_lists/{filename}")
             if not list_path.exists():
@@ -306,20 +244,12 @@ class TestTargetSets(NamedTuple):
 
         v1_no_chroot_targets = get_listed_targets(f"{test_type}_chroot_block_list.txt")
         v1_chroot_targets = get_listed_targets(f"{test_type}_v2_block_list.txt")
-        v2_local_targets = get_listed_targets(f"{test_type}_remote_block_list.txt")
-        v2_remote_targets = (
-            all_targets - v2_local_targets - v1_chroot_targets - v1_no_chroot_targets
-        )
-
-        if not remote_execution_enabled:
-            v2_local_targets |= v2_remote_targets
-            v2_remote_targets = set()
+        v2_local_targets = all_targets - v1_chroot_targets - v1_no_chroot_targets
 
         return TestTargetSets(
             v1_no_chroot=v1_no_chroot_targets,
             v1_chroot=v1_chroot_targets,
             v2_local=v2_local_targets,
-            v2_remote=v2_remote_targets,
         )
 
 
@@ -374,15 +304,6 @@ def check_pants_pex_exists() -> None:
 PYTEST_PASSTHRU_ARGS = ["--", "-q", "-rfa"]
 
 
-def _use_remote_execution(oauth_token_path: str) -> List[str]:
-    return [
-        "--no-v1",
-        "--v2",
-        "--pants-config-files=pants.remote.toml",
-        f"--remote-oauth-bearer-token-path={oauth_token_path}",
-    ]
-
-
 def _run_command(
     command: List[str],
     *,
@@ -409,9 +330,9 @@ def run_githooks() -> None:
     )
 
 
-def run_sanity_checks() -> None:
+def run_smoke_tests() -> None:
     def run_check(command: List[str]) -> None:
-        print(f"* Executing `./pants.pex {' '.join(command)}` as a sanity check")
+        print(f"* Executing `./pants.pex {' '.join(command)}` as a smoke test")
         try:
             subprocess.run(
                 ["./pants.pex", *command],
@@ -431,23 +352,17 @@ def run_sanity_checks() -> None:
         ["roots"],
         ["targets"],
     ]
-    with travis_section("SanityCheck", "Sanity checking bootstrapped Pants and repo BUILD files"):
+    with travis_section("SmokeTest", "Smoke testing Pants and repo BUILD files"):
         check_pants_pex_exists()
         for check in checks:
             run_check(check)
 
 
-def run_lint(*, oauth_token_path: Optional[str] = None) -> None:
+def run_lint() -> None:
     targets = ["contrib::", "examples::", "src::", "tests::", "zinc::"]
     command_prefix = ["./pants.pex", "--tag=-nolint"]
-
-    v2_command = (
-        [*command_prefix, "--no-v1", "--v2", "lint", *targets]
-        if oauth_token_path is None
-        else [*command_prefix, *_use_remote_execution(oauth_token_path), "lint", *targets]
-    )
     _run_command(
-        v2_command,
+        [*command_prefix, "--no-v1", "--v2", "lint", *targets],
         slug="Lint (V2)",
         start_message="Running V2 lint checks",
         die_message="Lint check failure.",
@@ -509,19 +424,8 @@ def run_cargo_audit() -> None:
             die("Cargo audit failure")
 
 
-def run_unit_tests(*, oauth_token_path: Optional[str] = None) -> None:
-    target_sets = TestTargetSets.calculate(
-        test_type=TestType.unit, remote_execution_enabled=oauth_token_path is not None
-    )
-    if target_sets.v2_remote:
-        _run_command(
-            command=TestStrategy.v2_remote.pants_command(
-                targets=target_sets.v2_remote, oauth_token_path=oauth_token_path
-            ),
-            slug="UnitTestsV2Remote",
-            start_message="Running unit tests via remote V2 strategy",
-            die_message="Unit test failure (remote V2 strategy)",
-        )
+def run_unit_tests() -> None:
+    target_sets = TestTargetSets.calculate(test_type=TestType.unit)
     if target_sets.v2_local:
         _run_command(
             command=TestStrategy.v2_local.pants_command(targets=target_sets.v2_local),
@@ -581,10 +485,8 @@ def run_jvm_tests() -> None:
     )
 
 
-def run_integration_tests_v1(*, shard: Optional[str]) -> None:
-    target_sets = TestTargetSets.calculate(
-        test_type=TestType.integration, remote_execution_enabled=False
-    )
+def run_integration_tests(*, shard: Optional[str]) -> None:
+    target_sets = TestTargetSets.calculate(test_type=TestType.integration)
     if target_sets.v1_no_chroot:
         _run_command(
             command=TestStrategy.v1_no_chroot.pants_command(
@@ -597,7 +499,7 @@ def run_integration_tests_v1(*, shard: Optional[str]) -> None:
     if target_sets.v1_chroot:
         _run_command(
             command=TestStrategy.v1_chroot.pants_command(
-                targets=target_sets.v1_chroot, shard=shard
+                targets=target_sets.v1_chroot.union(target_sets.v2_local), shard=shard
             ),
             slug="IntegrationTestsV1Chroot",
             start_message="Running integration tests via V1 chroot strategy.",
@@ -605,33 +507,9 @@ def run_integration_tests_v1(*, shard: Optional[str]) -> None:
         )
 
 
-def run_integration_tests_v2(*, oauth_token_path: Optional[str] = None) -> None:
-    target_sets = TestTargetSets.calculate(
-        test_type=TestType.integration, remote_execution_enabled=oauth_token_path is not None
-    )
-    if target_sets.v2_remote:
-        _run_command(
-            command=TestStrategy.v2_remote.pants_command(
-                targets=target_sets.v2_remote, oauth_token_path=oauth_token_path
-            ),
-            slug="IntegrationTestsV2Remote",
-            start_message="Running integration tests via V2 remote strategy.",
-            die_message="Integration test failure (V2 remote)",
-        )
-    if target_sets.v2_local:
-        _run_command(
-            command=TestStrategy.v2_local.pants_command(targets=target_sets.v2_local),
-            slug="IntegrationTestsV2Local",
-            start_message="Running integration tests via V2 local strategy.",
-            die_message="Integration test failure (V2 local)",
-        )
-
-
-def run_plugin_tests(*, oauth_token_path: Optional[str] = None) -> None:
+def run_plugin_tests() -> None:
     _run_command(
-        TestStrategy.v2_remote.pants_command(
-            targets={"pants-plugins/src/python::"}, oauth_token_path=oauth_token_path
-        ),
+        TestStrategy.v2_remote.pants_command(targets={"pants-plugins/src/python::"}),
         slug="BackendTests",
         start_message="Running internal backend Python tests",
         die_message="Internal backend Python test failure.",
