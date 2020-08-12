@@ -622,6 +622,10 @@ impl CommandRunner {
         let multiplier = thread_rng().gen_range(0, 2u32.pow(num_retries_since_last_success) + 1);
         let sleep_time = slot_time * multiplier;
         trace!("retry sleep: {:?}", sleep_time);
+        trace!(
+          "num_retries_since_last_success: {:?}",
+          num_retries_since_last_success
+        );
         tokio::time::delay_for(sleep_time).await;
       }
 
@@ -682,7 +686,7 @@ impl CommandRunner {
               // Check if the number of request attempts sent thus far have exceeded the number
               // of retries allowed since the last successful connection. (There is no point in
               // continually submitting a request if ultimately futile.)
-              if num_retries_since_last_success > MAX_RETRIES {
+              if num_retries_since_last_success >= MAX_RETRIES {
                 return Err(format!(
                   "Too many failures from server, last error was stream close"
                 ));
@@ -718,9 +722,12 @@ impl CommandRunner {
             // of retries allowed since the last successful connection. (There is no point in
             // continually submitting a request if ultimately futile.)
             trace!("retryable error: {}", e);
-            if num_retries_since_last_success > MAX_RETRIES {
+            trace!("{} > {}", num_retries_since_last_success, MAX_RETRIES);
+            if num_retries_since_last_success >= MAX_RETRIES {
+              trace!("too many retries");
               return Err(format!("Too many failures from server, last error: {}", e));
             } else {
+              trace!("keep on trying");
               // Increment the retry counter and allow loop to retry.
               num_retries_since_last_success += 1;
             }

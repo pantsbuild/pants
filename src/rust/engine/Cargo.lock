@@ -1972,6 +1972,7 @@ dependencies = [
  "concrete_time 0.0.1",
  "derivative 2.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "double-checked-cell-async 2.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "env_logger 0.5.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "fs 0.0.1",
  "futures 0.1.29 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
