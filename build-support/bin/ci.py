@@ -29,7 +29,7 @@ def main() -> None:
 
     if args.githooks:
         run_githooks()
-    if args.sanity_checks:
+    if args.smoke_tests:
         run_smoke_tests()
     if args.lint:
         run_lint()
