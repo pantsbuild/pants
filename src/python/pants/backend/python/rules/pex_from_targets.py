@@ -83,6 +83,29 @@ class PexFromTargetsRequest:
         self.additional_inputs = additional_inputs
         self.description = description
 
+    @classmethod
+    def for_requirements(
+        cls, addresses: Addresses, *, zip_safe: bool = False
+    ) -> "PexFromTargetsRequest":
+        """Create an instance that can be used to get a requirements pex.
+
+        Useful to ensure that these requests are uniform (e.g., the using the same output filename),
+        so that the underlying pexes are more likely to be reused instead of re-resolved.
+
+        We default to zip_safe=False because there are various issues with running zipped pexes
+        directly, and it's best to only use those if you're sure it's the right thing to do.
+        Also, pytest must use zip_safe=False for performance reasons (see comment in
+        pytest_runner.py) and we get more re-use of pexes if other uses follow suit.
+        This default is a helpful nudge in that direction.
+        """
+        zip_safe_args = () if zip_safe else ("--not-zip-safe",)
+        return PexFromTargetsRequest(
+            addresses=sorted(addresses),
+            output_filename="requirements.pex",
+            include_source_files=False,
+            additional_args=zip_safe_args,
+        )
+
 
 @dataclass(frozen=True)
 class TwoStepPexFromTargetsRequest:
@@ -97,29 +120,6 @@ class TwoStepPexFromTargetsRequest:
     """
 
     pex_from_targets_request: PexFromTargetsRequest
-
-
-def requirements_pex_from_targets_request(
-    addresses: Addresses, zip_safe: bool = False
-) -> PexFromTargetsRequest:
-    """Helper function to create the PexFromTargetsRequest for getting a requirements pex.
-
-    Useful to ensure that these requests are uniform (e.g., the using the same output filename),
-    so that the underlying pexes are more likely to be reused instead of re-resolved.
-
-    We default to zip_safe=False because there are various issues with running zipped pexes
-    # directly, and it's best to only use those if you're sure it's the right thing to do.
-    # Also, pytest must use zip_safe=False for performance reasons (see comment in pytest_runner.py)
-    # and we get more re-use of pexes if other uses follow suit. This default is a helpful nudge
-    # in that direction.
-    """
-    zip_safe_args = () if zip_safe else ("--not-zip-safe",)
-    return PexFromTargetsRequest(
-        addresses=sorted(addresses),
-        output_filename="requirements.pex",
-        include_source_files=False,
-        additional_args=zip_safe_args,
-    )
 
 
 @rule

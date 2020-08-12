@@ -2,10 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.python.rules.pex import Pex, PexRequest, PexRequirements
-from pants.backend.python.rules.pex_from_targets import (
-    PexFromTargetsRequest,
-    requirements_pex_from_targets_request,
-)
+from pants.backend.python.rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.rules.python_sources import PythonSourceFiles, PythonSourceFilesRequest
 from pants.backend.python.subsystems.ipython import IPython
 from pants.core.goals.repl import ReplImplementation, ReplRequest
@@ -24,7 +21,7 @@ async def create_python_repl_request(repl: PythonRepl) -> ReplRequest:
     requirements_request = Get(
         Pex,
         PexFromTargetsRequest,
-        requirements_pex_from_targets_request(Addresses(tgt.address for tgt in repl.targets)),
+        PexFromTargetsRequest.for_requirements(Addresses(tgt.address for tgt in repl.targets)),
     )
     sources_request = Get(
         PythonSourceFiles, PythonSourceFilesRequest(repl.targets, include_files=True)
@@ -46,12 +43,12 @@ class IPythonRepl(ReplImplementation):
 
 @rule
 async def create_ipython_repl_request(repl: IPythonRepl, ipython: IPython) -> ReplRequest:
-    # Note that unlike above, we get an intermediate PexRequest here (instead of going straight
-    # to a Pex) so that we can capture the interpreter constraints.
+    # Note that we get an intermediate PexRequest here (instead of going straight to a Pex)
+    # so that we can get the interpreter constraints for use in ipython_request.
     requirements_pex_request = await Get(
         PexRequest,
         PexFromTargetsRequest,
-        requirements_pex_from_targets_request(Addresses(tgt.address for tgt in repl.targets)),
+        PexFromTargetsRequest.for_requirements(Addresses(tgt.address for tgt in repl.targets)),
     )
 
     sources_request = Get(
