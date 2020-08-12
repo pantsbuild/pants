@@ -25,6 +25,7 @@ use futures01::Future as Future01;
 use hashing::{Digest, Fingerprint};
 use log::{debug, trace, warn, Level};
 use protobuf::{self, Message, ProtobufEnum};
+use rand::{thread_rng, Rng};
 use store::{Snapshot, SnapshotOps, Store, StoreFileByDigest};
 use workunit_store::{with_workunit, SpanId, WorkunitMetadata, WorkunitStore};
 
@@ -83,6 +84,7 @@ pub struct CommandRunner {
   execution_client: Arc<bazel_protos::remote_execution_grpc::ExecutionClient>,
   action_cache_client: Arc<bazel_protos::remote_execution_grpc::ActionCacheClient>,
   overall_deadline: Duration,
+  retry_interval_duration: Duration,
   capabilities_cell: Arc<DoubleCheckedCell<bazel_protos::remote_execution::ServerCapabilities>>,
   capabilities_client: Arc<bazel_protos::remote_execution_grpc::CapabilitiesClient>,
 }
@@ -104,6 +106,7 @@ impl CommandRunner {
     store: Store,
     platform: Platform,
     overall_deadline: Duration,
+    retry_interval_duration: Duration,
   ) -> Result<Self, String> {
     let env = Arc::new(grpcio::EnvBuilder::new().build());
     let channel = {
@@ -163,6 +166,7 @@ impl CommandRunner {
       store,
       platform,
       overall_deadline,
+      retry_interval_duration,
       capabilities_cell: Arc::new(DoubleCheckedCell::new()),
       capabilities_client,
     };
@@ -606,10 +610,21 @@ impl CommandRunner {
     process: Process,
     context: &Context,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
+    const MAX_RETRIES: u32 = 5;
     let start_time = Instant::now();
     let mut current_operation_name: Option<String> = None;
+    let mut num_retries_since_last_success = 0;
 
     loop {
+      // If we are currently retrying a request, then add an exponential backoff.
+      if num_retries_since_last_success > 0 {
+        let slot_time = Duration::from_millis(100);
+        let multiplier = thread_rng().gen_range(0, 2u32.pow(num_retries_since_last_success) + 1);
+        let sleep_time = slot_time * multiplier;
+        trace!("retry sleep: {:?}", sleep_time);
+        tokio::time::delay_for(sleep_time).await;
+      }
+
       let call_opt = call_option(&self.headers, Some(context.build_id.clone()))?;
       let rpc_result = match current_operation_name {
         None => {
@@ -663,6 +678,20 @@ impl CommandRunner {
             }
             StreamOutcome::StreamClosed(operation_name_opt) => {
               trace!("wait_on_operation_stream (build_id={}) returned stream close, will retry operation_name={:?}", context.build_id, operation_name_opt);
+
+              // Check if the number of request attempts sent thus far have exceeded the number
+              // of retries allowed since the last successful connection. (There is no point in
+              // continually submitting a request if ultimately futile.)
+              if num_retries_since_last_success > MAX_RETRIES {
+                return Err(format!(
+                  "Too many failures from server, last error was stream close"
+                ));
+              } else {
+                // Increment the retry counter and allow loop to retry.
+                num_retries_since_last_success += 1;
+              }
+
+              // Iterate the loop to reconnect to the operation.
               current_operation_name = operation_name_opt;
               continue;
             }
@@ -685,8 +714,16 @@ impl CommandRunner {
         Err(err) => match err {
           ExecutionError::Fatal(e) => return Err(e),
           ExecutionError::Retryable(e) => {
-            // do nothing, will retry
+            // Check if the number of request attempts sent thus far have exceeded the number
+            // of retries allowed since the last successful connection. (There is no point in
+            // continually submitting a request if ultimately futile.)
             trace!("retryable error: {}", e);
+            if num_retries_since_last_success > MAX_RETRIES {
+              return Err(format!("Too many failures from server, last error: {}", e));
+            } else {
+              // Increment the retry counter and allow loop to retry.
+              num_retries_since_last_success += 1;
+            }
           }
           ExecutionError::MissingDigests(missing_digests) => {
             trace!(

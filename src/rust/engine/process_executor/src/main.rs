@@ -400,6 +400,7 @@ async fn main() {
             store.clone(),
             Platform::Linux,
             Duration::from_secs(overall_deadline_secs),
+            Duration::from_millis(100),
           )
           .expect("Failed to make command runner"),
         )

@@ -31,6 +31,7 @@ use crate::{
 };
 
 const OVERALL_DEADLINE_SECS: Duration = Duration::from_secs(10 * 60);
+const RETRY_INTERVAL: Duration = Duration::from_micros(100);
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct RemoteTestResult {
@@ -947,6 +948,7 @@ async fn sends_headers() {
     store,
     Platform::Linux,
     OVERALL_DEADLINE_SECS,
+    RETRY_INTERVAL,
   )
   .unwrap();
   let context = Context {
@@ -1152,6 +1154,7 @@ async fn ensure_inline_stdio_is_stored() {
     store.clone(),
     Platform::Linux,
     OVERALL_DEADLINE_SECS,
+    RETRY_INTERVAL,
   )
   .unwrap();
 
@@ -1435,6 +1438,7 @@ async fn execute_missing_file_uploads_if_known() {
     store.clone(),
     Platform::Linux,
     OVERALL_DEADLINE_SECS,
+    RETRY_INTERVAL,
   )
   .unwrap();
 
@@ -1511,6 +1515,7 @@ async fn execute_missing_file_errors_if_unknown() {
     store,
     Platform::Linux,
     OVERALL_DEADLINE_SECS,
+    RETRY_INTERVAL,
   )
   .unwrap();
 
@@ -2205,6 +2210,7 @@ fn create_command_runner(
     store.clone(),
     platform,
     OVERALL_DEADLINE_SECS,
+    RETRY_INTERVAL,
   )
   .expect("Failed to make command runner");
   (command_runner, store)
