@@ -619,7 +619,7 @@ impl CommandRunner {
       // If we are currently retrying a request, then add an exponential backoff.
       if num_retries_since_last_success > 0 {
         let slot_time = Duration::from_millis(100);
-        let multiplier = thread_rng().gen_range(0, 2u32.pow(num_retries_since_last_success) + 1);
+        let multiplier = thread_rng().gen_range(0, 2_u32.pow(num_retries_since_last_success) + 1);
         let sleep_time = slot_time * multiplier;
         trace!("retry sleep: {:?}", sleep_time);
         trace!(
@@ -687,9 +687,9 @@ impl CommandRunner {
               // of retries allowed since the last successful connection. (There is no point in
               // continually submitting a request if ultimately futile.)
               if num_retries_since_last_success >= MAX_RETRIES {
-                return Err(format!(
-                  "Too many failures from server, last error was stream close"
-                ));
+                return Err(
+                  "Too many failures from server, last error was stream close".to_owned(),
+                );
               } else {
                 // Increment the retry counter and allow loop to retry.
                 num_retries_since_last_success += 1;
