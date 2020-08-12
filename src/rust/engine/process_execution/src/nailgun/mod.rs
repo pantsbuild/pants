@@ -181,12 +181,13 @@ impl super::CommandRunner for CommandRunner {
   }
 }
 
+#[async_trait]
 impl CapturedWorkdir for CommandRunner {
   fn named_caches(&self) -> &NamedCaches {
     self.inner.named_caches()
   }
 
-  fn run_in_workdir<'a, 'b, 'c>(
+  async fn run_in_workdir<'a, 'b, 'c>(
     &'a self,
     workdir_path: &'b Path,
     req: Process,

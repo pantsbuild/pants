@@ -23,8 +23,8 @@ use std::str;
 use std::sync::Arc;
 use store::{OneOffStoreFileByDigest, Snapshot, Store};
 
-use parking_lot::RwLock;
 use tokio::process::Command;
+use tokio::sync::RwLock;
 use tokio::time::timeout;
 use tokio_util::codec::{BytesCodec, FramedRead};
 
@@ -45,7 +45,7 @@ pub struct CommandRunner {
   named_caches: NamedCaches,
   cleanup_local_dirs: bool,
   platform: Platform,
-  spawn_lock: Arc<RwLock<bool>>,
+  spawn_lock: Arc<RwLock<()>>,
 }
 
 impl CommandRunner {
@@ -63,7 +63,7 @@ impl CommandRunner {
       named_caches,
       cleanup_local_dirs,
       platform: Platform::current().unwrap(),
-      spawn_lock: Arc::new(RwLock::new(true)),
+      spawn_lock: Arc::new(RwLock::new(())),
     }
   }
 
@@ -295,12 +295,13 @@ impl super::CommandRunner for CommandRunner {
   }
 }
 
+#[async_trait]
 impl CapturedWorkdir for CommandRunner {
   fn named_caches(&self) -> &NamedCaches {
     &self.named_caches
   }
 
-  fn run_in_workdir<'a, 'b, 'c>(
+  async fn run_in_workdir<'a, 'b, 'c>(
     &'a self,
     workdir_path: &'b Path,
     req: Process,
@@ -316,10 +317,28 @@ impl CapturedWorkdir for CommandRunner {
         workdir_path.to_owned()
       })
       .envs(&req.env);
+
+    // See the documentation of the `CapturedWorkdir::run_in_workdir` method, but `exclusive_spawn`
+    // indicates the binary we're spawning was written out by the current thread, and, as such,
+    // there may be open file handles against it. This will occur whenever a concurrent call of this
+    // method proceeds through its fork point
+    // (https://pubs.opengroup.org/onlinepubs/009695399/functions/fork.html) while the current
+    // thread is in the middle of writing the binary and thus captures a clone of the open file
+    // handle, but that concurrent call has not yet gotten to its exec point
+    // (https://pubs.opengroup.org/onlinepubs/009695399/functions/exec.html) where the operating
+    // system will close the cloned file handle (via O_CLOEXEC being set on all files opened by
+    // Rust). To prevent a race like this holding this thread's binary open leading to an ETXTBSY
+    // (https://pubs.opengroup.org/onlinepubs/9699919799/functions/V2_chap02.html) error, we
+    // maintain RwLock that allows non-`exclusive_spawn` binaries to spawn concurrently but ensures
+    // all such concurrent spawns have completed (and thus closed any cloned file handles) before
+    // proceeding to spawn the `exclusive_spawn` binary this thread has written.
+    //
+    // See: https://github.com/golang/go/issues/22315 for an excellent description of this generic
+    // unix problem.
     let _locked = if exclusive_spawn {
-      *self.spawn_lock.write()
+      *self.spawn_lock.write().await
     } else {
-      *self.spawn_lock.read()
+      *self.spawn_lock.read().await
     };
     command.stream(&req)
   }
@@ -454,12 +473,11 @@ pub trait CapturedWorkdir {
     // down the line for streaming process results to console logs, etc. as tracked by:
     //   https://github.com/pantsbuild/pants/issues/6089
     let child_results_result = {
-      let child_results_future = ChildResults::collect_from(self.run_in_workdir(
-        &workdir_path,
-        req.clone(),
-        context,
-        exclusive_spawn,
-      )?);
+      let child_results_future = ChildResults::collect_from(
+        self
+          .run_in_workdir(&workdir_path, req.clone(), context, exclusive_spawn)
+          .await?,
+      );
       if let Some(req_timeout) = req.timeout {
         timeout(req_timeout, child_results_future)
           .await
@@ -592,9 +610,24 @@ export {}
   fn named_caches(&self) -> &NamedCaches;
 
   ///
-  /// TODO: See the note on references in ASYNC.md.
+  /// Spawn the given process in a working directory prepared with its expected input digest.
   ///
-  fn run_in_workdir<'a, 'b, 'c>(
+  /// If the process to be executed has an `argv[0]` that points into its input digest then
+  /// `exclusive_spawn` will be `true` and the spawn implementation should account for the
+  /// possibility of concurrent fork+exec holding open the cloned `argv[0]` file descriptor, which,
+  /// if unhandled, will result in ETXTBSY errors spawning the process.
+  ///
+  /// See the documentation note in `CommandRunner` in this file for more details.
+  ///
+  /// TODO(John Sirois): https://github.com/pantsbuild/pants/issues/10601
+  ///  Centralize local spawning to one object - we currently spawn here (in
+  ///  process_execution::local::CommandRunner) to launch user `Process`es and in
+  ///  process_execution::nailgun::CommandRunner when a jvm nailgun server needs to be started. The
+  ///  proper handling of `exclusive_spawn` really requires a single point of control for all
+  ///  fork+execs in the scheduler. For now we rely on the fact that the process_execution::nailgun
+  ///  module is dead code in practice.
+  ///
+  async fn run_in_workdir<'a, 'b, 'c>(
     &'a self,
     workdir_path: &'b Path,
     req: Process,
