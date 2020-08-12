@@ -1,17 +1,21 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
+import os
 from abc import ABC
 from dataclasses import dataclass
-from typing import ClassVar, Dict, Mapping, Optional, Type, cast
+from pathlib import PurePath
+from typing import ClassVar, Dict, Mapping, Optional, Tuple, Type, cast
 
+from pants.base.build_root import BuildRoot
 from pants.engine.console import Console
-from pants.engine.fs import Digest
+from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import InteractiveProcess, InteractiveRunner
 from pants.engine.rules import Get, collect_rules, goal_rule
 from pants.engine.target import Targets, TransitiveTargets
 from pants.engine.unions import UnionMembership, union
+from pants.option.global_options import GlobalOptions
+from pants.util.contextutil import temporary_dir
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
 
@@ -26,6 +30,11 @@ class ReplImplementation(ABC):
 
     name: ClassVar[str]
     targets: Targets
+    # Path (relative to the buildroot) of the chroot the sources will be materialized to.
+    chroot_relpath: str
+
+    def in_chroot(self, relpath: str) -> str:
+        return os.path.join(self.chroot_relpath, relpath)
 
 
 class ReplSubsystem(GoalSubsystem):
@@ -57,24 +66,27 @@ class Repl(Goal):
 @dataclass(unsafe_hash=True)
 class ReplRequest:
     digest: Digest
-    binary_name: str
+    args: Tuple[str, ...]
     env: FrozenDict[str, str]
 
     def __init__(
-        self, *, digest: Digest, binary_name: str, env: Optional[Mapping[str, str]] = None,
+        self, *, digest: Digest, args: Tuple[str, ...], env: Optional[Mapping[str, str]] = None,
     ) -> None:
         self.digest = digest
-        self.binary_name = binary_name
+        self.args = args
         self.env = FrozenDict(env or {})
 
 
 @goal_rule
 async def run_repl(
     console: Console,
+    workspace: Workspace,
     interactive_runner: InteractiveRunner,
     repl_subsystem: ReplSubsystem,
     transitive_targets: TransitiveTargets,
+    build_root: BuildRoot,
     union_membership: UnionMembership,
+    global_options: GlobalOptions,
 ) -> Repl:
     # TODO: When we support multiple languages, detect the default repl to use based
     #  on the targets.  For now we default to the python repl.
@@ -92,14 +104,17 @@ async def run_repl(
         )
         return Repl(-1)
 
-    repl_impl = repl_implementation_cls(targets=Targets(transitive_targets.closure))
-    request = await Get(ReplRequest, ReplImplementation, repl_impl)
-
-    result = interactive_runner.run(
-        InteractiveProcess(
-            argv=(request.binary_name,), env=request.env, input_digest=request.digest
+    with temporary_dir(root_dir=global_options.options.pants_workdir, cleanup=False) as tmpdir:
+        tmpdir_relative_path = PurePath(tmpdir).relative_to(build_root.path).as_posix()
+        repl_impl = repl_implementation_cls(
+            targets=Targets(transitive_targets.closure), chroot_relpath=tmpdir_relative_path
         )
-    )
+        request = await Get(ReplRequest, ReplImplementation, repl_impl)
+
+        workspace.write_digest(request.digest, path_prefix=tmpdir_relative_path)
+        result = interactive_runner.run(
+            InteractiveProcess(argv=request.args, env=request.env, run_in_workspace=True)
+        )
     return Repl(result.exit_code)
 
 

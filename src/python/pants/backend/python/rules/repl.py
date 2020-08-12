@@ -1,5 +1,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
+from typing import Tuple
 
 from pants.backend.python.rules.pex import Pex, PexRequest, PexRequirements
 from pants.backend.python.rules.pex_from_targets import PexFromTargetsRequest
@@ -30,10 +31,11 @@ async def create_python_repl_request(repl: PythonRepl) -> ReplRequest:
     merged_digest = await Get(
         Digest, MergeDigests((requirements_pex.digest, sources.source_files.snapshot.digest))
     )
+    chrooted_source_roots = [repl.in_chroot(sr) for sr in sources.source_roots]
     return ReplRequest(
         digest=merged_digest,
-        binary_name=requirements_pex.output_filename,
-        env={"PEX_EXTRA_SYS_PATH": ":".join(sources.source_roots)},
+        args=(repl.in_chroot(requirements_pex.output_filename),),
+        env={"PEX_EXTRA_SYS_PATH": ":".join(chrooted_source_roots)},
     )
 
 
@@ -51,10 +53,13 @@ async def create_ipython_repl_request(repl: IPythonRepl, ipython: IPython) -> Re
         PexFromTargetsRequest.for_requirements(Addresses(tgt.address for tgt in repl.targets)),
     )
 
+    requirements_request = Get(Pex, PexRequest, requirements_pex_request)
+
     sources_request = Get(
         PythonSourceFiles, PythonSourceFilesRequest(repl.targets, include_files=True)
     )
 
+    req_pex_path = repl.in_chroot(requirements_pex_request.output_filename)
     ipython_request = Get(
         Pex,
         PexRequest(
@@ -62,12 +67,12 @@ async def create_ipython_repl_request(repl: IPythonRepl, ipython: IPython) -> Re
             entry_point=ipython.entry_point,
             requirements=PexRequirements(ipython.all_requirements),
             interpreter_constraints=requirements_pex_request.interpreter_constraints,
-            additional_args=("--pex-path", requirements_pex_request.output_filename,),
+            additional_args=("--pex-path", req_pex_path),
         ),
     )
 
     requirements_pex, sources, ipython_pex = await MultiGet(
-        Get(Pex, PexRequest, requirements_pex_request), sources_request, ipython_request
+        requirements_request, sources_request, ipython_request
     )
     merged_digest = await Get(
         Digest,
@@ -75,10 +80,14 @@ async def create_ipython_repl_request(repl: IPythonRepl, ipython: IPython) -> Re
             (requirements_pex.digest, sources.source_files.snapshot.digest, ipython_pex.digest)
         ),
     )
+    chrooted_source_roots = [repl.in_chroot(sr) for sr in sources.source_roots]
+    args: Tuple[str, ...] = (repl.in_chroot(ipython_pex.output_filename),)
+    if ipython.options.ignore_cwd:
+        args = args + ("--ignore-cwd",)
     return ReplRequest(
         digest=merged_digest,
-        binary_name=ipython_pex.output_filename,
-        env={"PEX_EXTRA_SYS_PATH": ":".join(sources.source_roots)},
+        args=args,
+        env={"PEX_EXTRA_SYS_PATH": ":".join(chrooted_source_roots)},
     )
 
 

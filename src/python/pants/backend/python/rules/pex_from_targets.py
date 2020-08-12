@@ -98,12 +98,11 @@ class PexFromTargetsRequest:
         pytest_runner.py) and we get more re-use of pexes if other uses follow suit.
         This default is a helpful nudge in that direction.
         """
-        zip_safe_args = () if zip_safe else ("--not-zip-safe",)
         return PexFromTargetsRequest(
             addresses=sorted(addresses),
             output_filename="requirements.pex",
             include_source_files=False,
-            additional_args=zip_safe_args,
+            additional_args=() if zip_safe else ("--not-zip-safe",),
         )
 
 
