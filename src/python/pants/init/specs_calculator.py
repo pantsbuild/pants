@@ -7,7 +7,7 @@ from typing import Optional, cast
 from pants.base.build_environment import get_buildroot, get_scm
 from pants.base.specs import AddressLiteralSpec, AddressSpecs, FilesystemSpecs, Specs
 from pants.base.specs_parser import SpecsParser
-from pants.build_graph.address import AddressInput
+from pants.engine.addresses import AddressInput
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Params
 from pants.option.options import Options

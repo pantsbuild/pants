@@ -1489,12 +1489,15 @@ class InjectDependenciesRequest(ABC):
             inject_for = FortranDependencies
 
         @rule
-        def inject_fortran_dependencies(request: InjectFortranDependencies) -> InjectedDependencies:
-            return InjectedDependencies([Address.parse("//:injected")]
+        async def inject_fortran_dependencies(
+            request: InjectFortranDependencies
+        ) -> InjectedDependencies:
+            address = await Get(Address, AddressInput, AddressInput.parse("//:injected"))
+            return InjectedDependencies([address]]
 
         def rules():
             return [
-                inject_fortran_dependencies,
+                *collect_rules(),
                 UnionRule(InjectDependenciesRequest, InjectFortranDependencies),
             ]
     """
