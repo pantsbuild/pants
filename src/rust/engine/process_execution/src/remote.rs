@@ -613,12 +613,12 @@ impl CommandRunner {
     const MAX_RETRIES: u32 = 5;
     let start_time = Instant::now();
     let mut current_operation_name: Option<String> = None;
-    let mut num_retries_since_last_success = 0;
+    let mut num_retries = 0;
 
     loop {
       // If we are currently retrying a request, then add an exponential backoff.
-      if num_retries_since_last_success > 0 {
-        let multiplier = thread_rng().gen_range(0, 2_u32.pow(num_retries_since_last_success) + 1);
+      if num_retries > 0 {
+        let multiplier = thread_rng().gen_range(0, 2_u32.pow(num_retries) + 1);
         let sleep_time = self.retry_interval_duration * multiplier;
         trace!("retry sleep: {:?}", sleep_time);
         tokio::time::delay_for(sleep_time).await;
@@ -681,13 +681,13 @@ impl CommandRunner {
               // Check if the number of request attempts sent thus far have exceeded the number
               // of retries allowed since the last successful connection. (There is no point in
               // continually submitting a request if ultimately futile.)
-              if num_retries_since_last_success >= MAX_RETRIES {
+              if num_retries >= MAX_RETRIES {
                 return Err(
                   "Too many failures from server, last error was stream close".to_owned(),
                 );
               } else {
                 // Increment the retry counter and allow loop to retry.
-                num_retries_since_last_success += 1;
+                num_retries += 1;
               }
 
               // Iterate the loop to reconnect to the operation.
@@ -717,11 +717,11 @@ impl CommandRunner {
             // of retries allowed since the last successful connection. (There is no point in
             // continually submitting a request if ultimately futile.)
             trace!("retryable error: {}", e);
-            if num_retries_since_last_success >= MAX_RETRIES {
+            if num_retries >= MAX_RETRIES {
               return Err(format!("Too many failures from server, last error: {}", e));
             } else {
               // Increment the retry counter and allow loop to retry.
-              num_retries_since_last_success += 1;
+              num_retries += 1;
             }
           }
           ExecutionError::MissingDigests(missing_digests) => {
