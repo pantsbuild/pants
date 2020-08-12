@@ -6,7 +6,8 @@ from enum import Enum
 from typing import TYPE_CHECKING, Iterable, Optional, Tuple
 
 from pants.engine.collection import Collection
-from pants.engine.rules import RootRule, side_effecting
+from pants.engine.rules import RootRule, collect_rules, side_effecting
+from pants.option.global_options import GlobMatchErrorBehavior as GlobMatchErrorBehavior
 from pants.util.meta import frozen_after_init
 
 if TYPE_CHECKING:
@@ -63,18 +64,6 @@ class CreateDigest(Collection[FileContent]):
     This does _not_ actually materialize the digest to the build root. You must use
     `engine.fs.Workspace` in a `@goal_rule` to save the resulting digest to disk.
     """
-
-
-class GlobMatchErrorBehavior(Enum):
-    """Describe the action to perform when matching globs in BUILD files to source files.
-
-    NB: this object is interpreted from within Snapshot::lift_path_globs() -- that method will need to
-    be aware of any changes to this object's definition.
-    """
-
-    ignore = "ignore"
-    warn = "warn"
-    error = "error"
 
 
 class GlobExpansionConjunction(Enum):
@@ -266,6 +255,7 @@ class SourcesSnapshot:
 
 def rules():
     return [
+        *collect_rules(),
         RootRule(Workspace),
         RootRule(CreateDigest),
         RootRule(Digest),

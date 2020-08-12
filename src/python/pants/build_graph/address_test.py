@@ -298,6 +298,39 @@ def test_address_maybe_convert_to_base_target() -> None:
     assert_base_target_noops(Address("a/b"))
 
 
+def test_address_spec_to_address_input() -> None:
+    """This smoke tests that Address.spec <-> AddressInput.parse() is idempotent."""
+
+    def assert_conversion(address: Address, *, expected: AddressInput) -> None:
+        assert AddressInput.parse(address.spec) == expected
+
+    assert_conversion(Address("a/b/c"), expected=AddressInput("a/b/c"))
+    assert_conversion(Address("a/b/c", target_name="tgt"), expected=AddressInput("a/b/c", "tgt"))
+
+    assert_conversion(
+        Address("a/b/c", relative_file_path="f.txt"), expected=AddressInput("a/b/c/f.txt")
+    )
+    assert_conversion(
+        Address("a/b/c", relative_file_path="f.txt", target_name="tgt"),
+        expected=AddressInput("a/b/c/f.txt", "tgt"),
+    )
+
+    assert_conversion(Address("", target_name="tgt"), expected=AddressInput("", "tgt"))
+    assert_conversion(
+        Address("", relative_file_path="f.txt", target_name="tgt"),
+        expected=AddressInput("f.txt", "tgt"),
+    )
+
+    assert_conversion(
+        Address("a/b/c", relative_file_path="subdir/f.txt"),
+        expected=AddressInput("a/b/c/subdir/f.txt", "../c"),
+    )
+    assert_conversion(
+        Address("a/b/c", relative_file_path="subdir/f.txt", target_name="tgt"),
+        expected=AddressInput("a/b/c/subdir/f.txt", "../tgt"),
+    )
+
+
 def test_address_parse_method() -> None:
     def assert_parsed(spec_path: str, target_name: str, address: Address) -> None:
         assert spec_path == address.spec_path

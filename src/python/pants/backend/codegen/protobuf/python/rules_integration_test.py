@@ -10,7 +10,7 @@ from pants.backend.codegen.protobuf.python import additional_fields
 from pants.backend.codegen.protobuf.python.rules import GeneratePythonFromProtobufRequest
 from pants.backend.codegen.protobuf.python.rules import rules as protobuf_rules
 from pants.backend.codegen.protobuf.target_types import ProtobufLibrary, ProtobufSources
-from pants.core.util_rules import determine_source_files, strip_source_roots
+from pants.core.util_rules import source_files, stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import RootRule
@@ -37,30 +37,29 @@ class ProtobufPythonIntegrationTest(ExternalToolTestBase):
             *super().rules(),
             *protobuf_rules(),
             *additional_fields.rules(),
-            *determine_source_files.rules(),
-            *strip_source_roots.rules(),
+            *source_files.rules(),
+            *stripped_source_files.rules(),
             RootRule(GeneratePythonFromProtobufRequest),
         )
 
     def assert_files_generated(
         self, spec: str, *, expected_files: List[str], source_roots: List[str]
     ) -> None:
-        tgt = self.request_single_product(WrappedTarget, Address.parse(spec)).target
+        bootstrapper = create_options_bootstrapper(
+            args=[
+                "--backend-packages=pants.backend.codegen.protobuf.python",
+                f"--source-root-patterns={repr(source_roots)}",
+            ]
+        )
+        tgt = self.request_single_product(
+            WrappedTarget, Params(Address.parse(spec), bootstrapper)
+        ).target
         protocol_sources = self.request_single_product(
-            HydratedSources,
-            Params(HydrateSourcesRequest(tgt[ProtobufSources]), create_options_bootstrapper()),
+            HydratedSources, Params(HydrateSourcesRequest(tgt[ProtobufSources]), bootstrapper),
         )
         generated_sources = self.request_single_product(
             GeneratedSources,
-            Params(
-                GeneratePythonFromProtobufRequest(protocol_sources.snapshot, tgt),
-                create_options_bootstrapper(
-                    args=[
-                        "--backend-packages=pants.backend.codegen.protobuf.python",
-                        f"--source-root-patterns={repr(source_roots)}",
-                    ]
-                ),
-            ),
+            Params(GeneratePythonFromProtobufRequest(protocol_sources.snapshot, tgt), bootstrapper),
         )
         assert set(generated_sources.snapshot.files) == set(expected_files)
 

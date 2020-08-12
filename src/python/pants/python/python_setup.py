@@ -131,9 +131,15 @@ class PythonSetup(Subsystem):
         register(
             "--resolver-jobs",
             type=int,
-            default=None,
+            default=2,
             advanced=True,
-            help="The maximum number of concurrent jobs to resolve wheels with.",
+            help=(
+                "The maximum number of concurrent jobs to build wheels with. Because Pants "
+                "can run multiple subprocesses in parallel, the total parallelism will be "
+                "`--process-execution-{local,remote}-parallelism x --python-setup-resolver-jobs`. "
+                "Setting this option higher may result in better parallelism, but, if set too "
+                "high, may result in starvation and Out of Memory errors."
+            ),
         )
 
     @property
@@ -179,8 +185,8 @@ class PythonSetup(Subsystem):
         return manylinux
 
     @property
-    def resolver_jobs(self):
-        return self.options.resolver_jobs
+    def resolver_jobs(self) -> int:
+        return cast(int, self.options.resolver_jobs)
 
     @property
     def scratch_dir(self):

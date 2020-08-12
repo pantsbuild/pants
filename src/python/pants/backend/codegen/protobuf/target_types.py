@@ -2,8 +2,8 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from pants.backend.codegen.protobuf.protoc import Protoc
-from pants.engine.addresses import Address
-from pants.engine.rules import collect_rules, rule
+from pants.engine.addresses import Address, AddressInput
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     Dependencies,
@@ -33,7 +33,7 @@ class ProtobufSources(Sources):
 class ProtobufLibrary(Target):
     """Protobuf files used to generate various languages.
 
-    See https://pants.readme.io/docs/protobuf.
+    See https://www.pantsbuild.org/docs/protobuf.
     """
 
     alias = "protobuf_library"
@@ -45,8 +45,13 @@ class InjectProtobufDependencies(InjectDependenciesRequest):
 
 
 @rule
-def inject_dependencies(_: InjectProtobufDependencies, protoc: Protoc) -> InjectedDependencies:
-    return InjectedDependencies(Address.parse(addr) for addr in protoc.runtime_targets)
+async def inject_dependencies(
+    _: InjectProtobufDependencies, protoc: Protoc
+) -> InjectedDependencies:
+    addresses = await MultiGet(
+        Get(Address, AddressInput, AddressInput.parse(addr)) for addr in protoc.runtime_targets
+    )
+    return InjectedDependencies(addresses)
 
 
 def rules():

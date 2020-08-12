@@ -128,12 +128,11 @@ class PexInterpreterConstraints(DeduplicatedCollection[str]):
             for parsed_constraint in parsed_constraints:
                 if parsed_constraint.interpreter != expected_interpreter:
                     attempted_interpreters = {
-                        interpreter: sorted(
+                        interp: sorted(
                             str(parsed_constraint) for parsed_constraint in parsed_constraints
                         )
-                        for interpreter, parsed_constraints in itertools.groupby(
-                            parsed_constraints,
-                            key=lambda parsed_constraint: parsed_constraint.interpreter,
+                        for interp, parsed_constraints in itertools.groupby(
+                            parsed_constraints, key=lambda pc: pc.interpreter,
                         )
                     }
                     raise ValueError(

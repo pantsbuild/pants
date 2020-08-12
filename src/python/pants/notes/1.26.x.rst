@@ -485,7 +485,7 @@ Testing
 Documentation
 ~~~~~~~~~~~~~
 
-* Fix options reference page on pantsbuild.org. (#9138)
+* Fix options reference page on www.pantsbuild.org. (#9138)
   `PR #9138 <https://github.com/pantsbuild/pants/pull/9138>`_
 
 1.26.0.dev0 (02/11/2020)

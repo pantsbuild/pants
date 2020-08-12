@@ -6,7 +6,11 @@ files(
   sources = ['*.sh'],
 )
 
-python_tests(name="tests")
+python_tests(
+  name="tests",
+  # reversion_test.py times out occasionally.
+  timeout=90,
+)
 
 python_binary(
    name = 'bootstrap_and_deploy_ci_pants_pex',

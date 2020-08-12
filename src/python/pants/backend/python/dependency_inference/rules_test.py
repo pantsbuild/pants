@@ -16,7 +16,7 @@ from pants.backend.python.target_types import (
     PythonTests,
 )
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.core.util_rules import determine_source_files, strip_source_roots
+from pants.core.util_rules import source_files, stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.rules import RootRule
 from pants.engine.target import InferredDependencies, WrappedTarget
@@ -36,8 +36,8 @@ class PythonDependencyInferenceTest(TestBase):
     def rules(cls):
         return (
             *super().rules(),
-            *strip_source_roots.rules(),
-            *determine_source_files.rules(),
+            *stripped_source_files.rules(),
+            *source_files.rules(),
             *dependency_inference_rules(),
             all_roots,
             RootRule(InferPythonDependencies),
@@ -95,7 +95,9 @@ class PythonDependencyInferenceTest(TestBase):
         self.add_to_build_file("src/python", "python_library()")
 
         def run_dep_inference(address: Address) -> InferredDependencies:
-            target = self.request_single_product(WrappedTarget, address).target
+            target = self.request_single_product(
+                WrappedTarget, Params(address, options_bootstrapper)
+            ).target
             return self.request_single_product(
                 InferredDependencies,
                 Params(InferPythonDependencies(target[PythonSources]), options_bootstrapper),
@@ -108,14 +110,16 @@ class PythonDependencyInferenceTest(TestBase):
             [
                 Address("3rdparty/python", target_name="Django"),
                 Address("src/python/util", relative_file_path="dep.py", target_name="util"),
-            ]
+            ],
+            sibling_dependencies_inferrable=True,
         )
 
         generated_subtarget_address = Address(
             "src/python", relative_file_path="f2.py", target_name="python"
         )
         assert run_dep_inference(generated_subtarget_address) == InferredDependencies(
-            [Address("src/python", relative_file_path="app.py", target_name="python")]
+            [Address("src/python", relative_file_path="app.py", target_name="python")],
+            sibling_dependencies_inferrable=True,
         )
 
     def test_infer_python_inits(self) -> None:
@@ -133,7 +137,9 @@ class PythonDependencyInferenceTest(TestBase):
         self.add_to_build_file("src/python/root/mid/leaf", "python_library()")
 
         def run_dep_inference(address: Address) -> InferredDependencies:
-            target = self.request_single_product(WrappedTarget, address).target
+            target = self.request_single_product(
+                WrappedTarget, Params(address, options_bootstrapper)
+            ).target
             return self.request_single_product(
                 InferredDependencies,
                 Params(InferInitDependencies(target[PythonSources]), options_bootstrapper),
@@ -143,7 +149,8 @@ class PythonDependencyInferenceTest(TestBase):
             [
                 Address("src/python/root", relative_file_path="__init__.py", target_name="root"),
                 Address("src/python/root/mid", relative_file_path="__init__.py", target_name="mid"),
-            ]
+            ],
+            sibling_dependencies_inferrable=False,
         )
 
     def test_infer_python_conftests(self) -> None:
@@ -162,7 +169,9 @@ class PythonDependencyInferenceTest(TestBase):
         self.add_to_build_file("src/python/root/mid/leaf", "python_tests()")
 
         def run_dep_inference(address: Address) -> InferredDependencies:
-            target = self.request_single_product(WrappedTarget, address).target
+            target = self.request_single_product(
+                WrappedTarget, Params(address, options_bootstrapper)
+            ).target
             return self.request_single_product(
                 InferredDependencies,
                 Params(InferConftestDependencies(target[PythonSources]), options_bootstrapper),
@@ -172,5 +181,6 @@ class PythonDependencyInferenceTest(TestBase):
             [
                 Address("src/python/root", relative_file_path="conftest.py", target_name="root"),
                 Address("src/python/root/mid", relative_file_path="conftest.py", target_name="mid"),
-            ]
+            ],
+            sibling_dependencies_inferrable=False,
         )

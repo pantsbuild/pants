@@ -26,7 +26,7 @@ from pants.backend.python.rules.pex_from_targets import (
     PexFromTargetsRequest,
     TwoStepPexFromTargetsRequest,
 )
-from pants.core.util_rules import strip_source_roots
+from pants.core.util_rules import stripped_source_files
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
@@ -127,5 +127,5 @@ def rules():
         *python_sources.rules(),
         *pex.rules(),
         *pex_from_targets.rules(),
-        *strip_source_roots.rules(),
+        *stripped_source_files.rules(),
     ]

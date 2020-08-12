@@ -14,7 +14,7 @@ Some noteworthy features include:
 * Unified interface for multiple tools and languages.
 * Extensibility and customizability via a plugin API.
 
-Documentation: [pantsbuild.org](http://www.pantsbuild.org/).
+Documentation: [www.pantsbuild.org](https://www.pantsbuild.org/).
 
 We release to [PyPI](https://pypi.org/pypi)
 [![version](https://img.shields.io/pypi/v/pantsbuild.pants.svg)](https://pypi.org/pypi/pantsbuild.pants)

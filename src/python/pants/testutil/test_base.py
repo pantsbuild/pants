@@ -15,13 +15,13 @@ from pants.base.build_root import BuildRoot
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.addresses import Address
-from pants.engine.fs import GlobMatchErrorBehavior, PathGlobs, PathGlobsAndRoot, Snapshot
+from pants.engine.fs import PathGlobs, PathGlobsAndRoot, Snapshot
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.rules import RootRule
 from pants.engine.target import Target
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.util import clean_global_runtime_state
-from pants.option.global_options import ExecutionOptions
+from pants.option.global_options import ExecutionOptions, FilesNotFoundBehavior
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.subsystem import Subsystem
 from pants.source import source_root
@@ -316,16 +316,13 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         local_execution_root_dir = global_options.local_execution_root_dir
         named_caches_dir = global_options.named_caches_dir
 
-        # NB: This uses the long form of initialization because it needs to directly specify
-        # `cls.alias_groups` rather than having them be provided by bootstrap options.
-        graph_session = EngineInitializer.setup_legacy_graph_extended(
+        graph_session = EngineInitializer.setup_graph_extended(
             pants_ignore_patterns=[],
             use_gitignore=False,
+            files_not_found_behavior=FilesNotFoundBehavior.error,
             local_store_dir=local_store_dir,
             local_execution_root_dir=local_execution_root_dir,
             named_caches_dir=named_caches_dir,
-            build_file_prelude_globs=(),
-            glob_match_error_behavior=GlobMatchErrorBehavior.error,
             native=init_native(),
             options_bootstrapper=options_bootstrapper,
             build_root=self.build_root,

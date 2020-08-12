@@ -46,104 +46,29 @@ def side_effecting(cls):
 class _RuleVisitor(ast.NodeVisitor):
     """Pull `Get` calls out of an @rule body."""
 
-    def __init__(
-        self, *, resolve_type: Callable[[str], Type[Any]], source_file: Optional[str] = None
-    ) -> None:
+    def __init__(self, *, resolve_type: Callable[[str], Type[Any]], source_file_name: str) -> None:
         super().__init__()
-        self._source_file = source_file or "<string>"
-        self._resolve_type = resolve_type
-        self._gets: List[GetConstraints] = []
+        self.source_file_name = source_file_name
+        self.resolve_type = resolve_type
+        self.gets: List[GetConstraints] = []
 
-    @property
-    def gets(self) -> List[GetConstraints]:
-        return self._gets
-
-    @frozen_after_init
-    @dataclass(unsafe_hash=True)
-    class _GetDescriptor:
-        product_type_name: str
-        subject_arg_exprs: Tuple[ast.expr, ...]
-
-        def __init__(
-            self, product_type_expr: ast.expr, subject_arg_exprs: Iterable[ast.expr]
-        ) -> None:
-            if not isinstance(product_type_expr, ast.Name):
-                raise ValueError(
-                    f"Unrecognized type argument T for Get[T]: " f"{ast.dump(product_type_expr)}"
-                )
-            self.product_type_name = product_type_expr.id
-            self.subject_arg_exprs = tuple(subject_arg_exprs)
-
-    def _identify_source(self, node: Union[ast.expr, ast.stmt]) -> str:
-        start_pos = f"{node.lineno}:{node.col_offset}"
-
-        end_lineno, end_col_offset = [
-            getattr(node, attr, None) for attr in ("end_lineno", "end_col_offset")
-        ]
-        end_pos = f"-{end_lineno}:{end_col_offset}" if end_lineno and end_col_offset else ""
-
-        return f"{self._source_file} at {start_pos}{end_pos}"
-
-    def _extract_get_descriptor(self, call_node: ast.Call) -> Optional[_GetDescriptor]:
+    @staticmethod
+    def maybe_extract_get_args(call_node: ast.Call) -> Optional[List[ast.expr]]:
         """Check if the node looks like a Get(T, ...) call."""
         if not isinstance(call_node.func, ast.Name):
             return None
         if call_node.func.id != "Get":
             return None
-        return self._GetDescriptor(
-            product_type_expr=call_node.args[0], subject_arg_exprs=call_node.args[1:]
-        )
-
-    def _extract_constraints(self, get_descriptor: _GetDescriptor) -> GetConstraints[Any, Any]:
-        """Parses a `Get(T, ...)` call in one of its two legal forms to return its type constraints.
-
-        :param get_descriptor: An `ast.Call` node representing a call to `Get(T, ...)`.
-        :return: A tuple of product type id and subject type id.
-        """
-
-        def render_args():
-            rendered_args = ", ".join(
-                # Dump the Name's id to simplify output when available, falling back to the name of
-                # the node's class.
-                getattr(subject_arg, "id", type(subject_arg).__name__)
-                for subject_arg in get_descriptor.subject_arg_exprs
-            )
-            return f"Get({get_descriptor.product_type_name}, {rendered_args})"
-
-        if not 1 <= len(get_descriptor.subject_arg_exprs) <= 2:
-            raise ValueError(
-                f"Invalid Get. Expected either one or two args, but got: {render_args()}"
-            )
-
-        product_type = self._resolve_type(get_descriptor.product_type_name)
-
-        if len(get_descriptor.subject_arg_exprs) == 1:
-            subject_constructor = get_descriptor.subject_arg_exprs[0]
-            if not isinstance(subject_constructor, ast.Call):
-                raise ValueError(
-                    f"Expected Get(product_type, subject_type(subject)), but got: {render_args()}"
-                )
-            constructor_type_id = subject_constructor.func.id  # type: ignore[attr-defined]
-            return GetConstraints[Any, Any](
-                product_type=product_type,
-                subject_declared_type=self._resolve_type(constructor_type_id),
-            )
-
-        subject_declared_type, _ = get_descriptor.subject_arg_exprs
-        if not isinstance(subject_declared_type, ast.Name):
-            raise ValueError(
-                f"Expected Get(product_type, subject_declared_type, subject), but got: "
-                f"{render_args()}"
-            )
-        return GetConstraints[Any, Any](
-            product_type=product_type,
-            subject_declared_type=self._resolve_type(subject_declared_type.id),
-        )
+        return call_node.args
 
     def visit_Call(self, call_node: ast.Call) -> None:
-        get_descriptor = self._extract_get_descriptor(call_node)
-        if get_descriptor:
-            self._gets.append(self._extract_constraints(get_descriptor))
+        get_args = self.maybe_extract_get_args(call_node)
+        if get_args is not None:
+            product_str, subject_str = GetConstraints.parse_product_and_subject_types(
+                get_args, source_file_name=self.source_file_name
+            )
+            get = GetConstraints(self.resolve_type(product_str), self.resolve_type(subject_str))
+            self.gets.append(get)
         # Ensure we descend into e.g. MultiGet(Get(...)...) calls.
         self.generic_visit(call_node)
 
@@ -210,7 +135,7 @@ def _make_rule(
             raise ValueError("The @rule decorator must be applied innermost of all decorators.")
 
         owning_module = sys.modules[func.__module__]
-        source = inspect.getsource(func)
+        source = inspect.getsource(func) or "<string>"
         source_file = inspect.getsourcefile(func)
         beginning_indent = _get_starting_indent(source)
         if beginning_indent:
@@ -245,7 +170,7 @@ def _make_rule(
             for child in ast.iter_child_nodes(parent):
                 parents_table[child] = parent
 
-        rule_visitor = _RuleVisitor(source_file=source_file, resolve_type=resolve_type)
+        rule_visitor = _RuleVisitor(source_file_name=source_file, resolve_type=resolve_type)
         rule_visitor.visit(rule_func_node)
 
         gets = FrozenOrderedSet(rule_visitor.gets)

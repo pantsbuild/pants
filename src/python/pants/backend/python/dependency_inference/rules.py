@@ -12,8 +12,8 @@ from pants.backend.python.dependency_inference.python_stdlib.combined import com
 from pants.backend.python.rules import ancestor_files
 from pants.backend.python.rules.ancestor_files import AncestorFiles, AncestorFilesRequest
 from pants.backend.python.target_types import PythonSources, PythonTestsSources
-from pants.core.util_rules.determine_source_files import SourceFilesRequest
-from pants.core.util_rules.strip_source_roots import StrippedSourceFiles
+from pants.core.util_rules.source_files import SourceFilesRequest
+from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.fs import Digest, DigestContents
 from pants.engine.internals.graph import Owners, OwnersRequest
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
@@ -87,7 +87,7 @@ async def infer_python_dependencies(
     request: InferPythonDependencies, python_inference: PythonInference
 ) -> InferredDependencies:
     if not python_inference.imports:
-        return InferredDependencies()
+        return InferredDependencies([], sibling_dependencies_inferrable=False)
 
     stripped_sources = await Get(StrippedSourceFiles, SourceFilesRequest([request.sources_field]))
     modules = tuple(
@@ -105,7 +105,7 @@ async def infer_python_dependencies(
         for imported_module in file_imports.explicit_imports
         if imported_module not in combined_stdlib
     )
-    return InferredDependencies(
+    result = (
         owner.address
         for owner in owner_per_import
         if (
@@ -113,6 +113,7 @@ async def infer_python_dependencies(
             and owner.address.maybe_convert_to_base_target() != request.sources_field.address
         )
     )
+    return InferredDependencies(result, sibling_dependencies_inferrable=True)
 
 
 class InferInitDependencies(InferDependenciesRequest):
@@ -124,7 +125,7 @@ async def infer_python_init_dependencies(
     request: InferInitDependencies, python_inference: PythonInference
 ) -> InferredDependencies:
     if not python_inference.inits:
-        return InferredDependencies()
+        return InferredDependencies([], sibling_dependencies_inferrable=False)
 
     # Locate __init__.py files not already in the Snapshot.
     hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.sources_field))
@@ -139,7 +140,9 @@ async def infer_python_init_dependencies(
     owners = await MultiGet(
         Get(Owners, OwnersRequest((f,))) for f in extra_init_files.snapshot.files
     )
-    return InferredDependencies(itertools.chain.from_iterable(owners))
+    return InferredDependencies(
+        itertools.chain.from_iterable(owners), sibling_dependencies_inferrable=False
+    )
 
 
 class InferConftestDependencies(InferDependenciesRequest):
@@ -151,7 +154,7 @@ async def infer_python_conftest_dependencies(
     request: InferConftestDependencies, python_inference: PythonInference,
 ) -> InferredDependencies:
     if not python_inference.conftests:
-        return InferredDependencies()
+        return InferredDependencies([], sibling_dependencies_inferrable=False)
 
     # Locate conftest.py files not already in the Snapshot.
     hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.sources_field))
@@ -165,7 +168,9 @@ async def infer_python_conftest_dependencies(
         Get(Owners, OwnersRequest((f,), OwnersNotFoundBehavior.error))
         for f in extra_conftest_files.snapshot.files
     )
-    return InferredDependencies(itertools.chain.from_iterable(owners))
+    return InferredDependencies(
+        itertools.chain.from_iterable(owners), sibling_dependencies_inferrable=False
+    )
 
 
 def rules():

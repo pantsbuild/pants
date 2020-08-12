@@ -12,6 +12,8 @@ from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import WrappedTarget
 from pants.python.python_requirement import PythonRequirement
+from pants.testutil.engine.util import Params
+from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
 
@@ -29,7 +31,8 @@ class PythonRequirementListTest(TestBase):
     ) -> Tuple[PythonRequirement, ...]:
         self.add_to_build_file("lib", f"{build_file_entry}\n")
         target = self.request_single_product(
-            WrappedTarget, Address("lib", target_name=target_name)
+            WrappedTarget,
+            Params(Address("lib", target_name=target_name), create_options_bootstrapper()),
         ).target
         assert isinstance(target, PythonRequirementLibrary)
         return target[PythonRequirementsField].value

@@ -29,10 +29,10 @@ from pants.backend.python.target_types import (
     PythonRequirementsField,
     PythonSources,
 )
-from pants.base.specs import AddressSpecs, AscendantAddresses, SingleAddress
+from pants.base.specs import AddressLiteralSpec, AddressSpecs, AscendantAddresses
 from pants.core.target_types import FilesSources, ResourcesSources
 from pants.core.util_rules.distdir import DistDir
-from pants.engine.addresses import Address, Addresses
+from pants.engine.addresses import Address, Addresses, AddressInput
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.console import Console
 from pants.engine.fs import (
@@ -103,7 +103,7 @@ class ExportedTarget:
 
     @property
     def provides(self) -> PythonArtifact:
-        return cast(PythonArtifact, self.target[PythonProvidesField].value)
+        return self.target[PythonProvidesField].value
 
 
 @dataclass(frozen=True)
@@ -286,9 +286,9 @@ async def run_setup_pys(
 
     for target_with_origin in targets_with_origins:
         tgt = target_with_origin.target
-        if _is_exported(tgt):
+        if tgt.has_field(PythonProvidesField):
             exported_targets.append(ExportedTarget(tgt))
-        elif isinstance(target_with_origin.origin, SingleAddress):
+        elif isinstance(target_with_origin.origin, AddressLiteralSpec):
             explicit_nonexported_targets.append(tgt)
     if explicit_nonexported_targets:
         raise TargetNotExported(
@@ -419,13 +419,15 @@ async def generate_chroot(request: SetupPyChrootRequest) -> SetupPyChroot:
     )
     key_to_binary_spec = provides.binaries
     keys = list(key_to_binary_spec.keys())
-    binaries = await Get(
-        Targets,
-        Addresses(
-            Address.parse(key_to_binary_spec[key], relative_to=target.address.spec_path)
-            for key in keys
-        ),
+    addresses = await MultiGet(
+        Get(
+            Address,
+            AddressInput,
+            AddressInput.parse(key_to_binary_spec[key], relative_to=target.address.spec_path),
+        )
+        for key in keys
     )
+    binaries = await Get(Targets, Addresses(addresses))
     for key, binary in zip(keys, binaries):
         binary_entry_point = binary.get(PythonEntryPoint).value
         if not binary_entry_point:
@@ -494,10 +496,6 @@ async def get_sources(request: SetupPySourcesRequest) -> SetupPySources:
         namespace_packages=namespace_packages,
         package_data=package_data,
     )
-
-
-def _is_exported(target: Target) -> bool:
-    return target.has_field(PythonProvidesField) and target[PythonProvidesField].value is not None
 
 
 @rule(desc="Compute distribution's 3rd party requirements")
@@ -593,7 +591,9 @@ async def get_exporting_owner(owned_dependency: OwnedDependency) -> ExportedTarg
     # ancestors of the given target, i.e., their spec_paths are all prefixes. So sorting by
     # address will effectively sort by closeness of ancestry to the given target.
     exported_ancestor_tgts = sorted(
-        [t for t in ancestor_tgts if _is_exported(t)], key=lambda t: t.address, reverse=True,
+        [t for t in ancestor_tgts if t.has_field(PythonProvidesField)],
+        key=lambda t: t.address,
+        reverse=True,
     )
     exported_ancestor_iter = iter(exported_ancestor_tgts)
     for exported_ancestor in exported_ancestor_iter:

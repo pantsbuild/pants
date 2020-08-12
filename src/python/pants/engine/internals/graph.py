@@ -30,7 +30,6 @@ from pants.engine.collection import Collection
 from pants.engine.fs import (
     EMPTY_SNAPSHOT,
     Digest,
-    GlobMatchErrorBehavior,
     MergeDigests,
     PathGlobs,
     Snapshot,
@@ -70,7 +69,7 @@ from pants.engine.target import (
     generate_subtarget_address,
 )
 from pants.engine.unions import UnionMembership
-from pants.option.global_options import GlobalOptions, OwnersNotFoundBehavior
+from pants.option.global_options import FilesNotFoundBehavior, GlobalOptions, OwnersNotFoundBehavior
 from pants.source.filespec import matches_filespec
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
 
@@ -83,7 +82,7 @@ logger = logging.getLogger(__name__)
 
 @rule
 async def generate_subtargets(
-    address: Address, glob_match_error_behavior: GlobMatchErrorBehavior,
+    address: Address, files_not_found_behavior: FilesNotFoundBehavior
 ) -> Subtargets:
     if not address.is_base_target:
         raise ValueError(f"Cannot generate file Targets for a file Address: {address}")
@@ -97,7 +96,7 @@ async def generate_subtargets(
 
     # Create subtargets for matched sources.
     sources_field = base_target[Sources]
-    sources_field_path_globs = sources_field.path_globs(glob_match_error_behavior)
+    sources_field_path_globs = sources_field.path_globs(files_not_found_behavior)
     if sources_field_path_globs is None:
         return Subtargets(base_target, ())
 
@@ -589,7 +588,7 @@ class AmbiguousCodegenImplementationsException(Exception):
 @rule
 async def hydrate_sources(
     request: HydrateSourcesRequest,
-    glob_match_error_behavior: GlobMatchErrorBehavior,
+    files_not_found_behavior: FilesNotFoundBehavior,
     union_membership: UnionMembership,
 ) -> HydratedSources:
     sources_field = request.field
@@ -635,7 +634,7 @@ async def hydrate_sources(
 
     # Now, hydrate the `globs`. Even if we are going to use codegen, we will need the original
     # protocol sources to be hydrated.
-    path_globs = sources_field.path_globs(glob_match_error_behavior)
+    path_globs = sources_field.path_globs(files_not_found_behavior)
     if path_globs is None:
         return HydratedSources(EMPTY_SNAPSHOT, sources_field.filespec, sources_type=sources_type)
     snapshot = await Get(Snapshot, PathGlobs, path_globs)
@@ -658,29 +657,6 @@ async def hydrate_sources(
 # -----------------------------------------------------------------------------------------------
 # Resolve the Dependencies field
 # -----------------------------------------------------------------------------------------------
-
-
-class UnusedDependencyIgnoresException(Exception):
-    def __init__(
-        self, address: Address, *, unused_ignores: Iterable[Address], result: Iterable[Address]
-    ) -> None:
-        # If the address was generated, we convert back to the original base target to correspond to
-        # what users actually put in BUILD files.
-        address = address.maybe_convert_to_base_target()
-        sorted_unused_ignores = sorted([f"!{addr}" for addr in unused_ignores])
-        formatted_unused_ignores = (
-            repr(sorted_unused_ignores[0])
-            if len(sorted_unused_ignores) == 1
-            else str(sorted_unused_ignores)
-        )
-        bulleted_list_sep = "\n  * "
-        possible_deps = sorted(addr.spec for addr in result)
-        super().__init__(
-            f"The target {address} includes {formatted_unused_ignores} in its `dependencies` field, "
-            f"but {'it does' if len(sorted_unused_ignores) == 1 else 'they do'} not match any of "
-            f"the resolved dependencies. Instead, please choose from the dependencies that are "
-            f"being used:\n\n{bulleted_list_sep}{bulleted_list_sep.join(possible_deps)}"
-        )
 
 
 class ParsedDependencies(NamedTuple):
@@ -718,12 +694,10 @@ async def resolve_dependencies(
         spec_path=request.field.address.spec_path,
         subproject_roots=global_options.options.subproject_roots,
     )
-
-    # If this is a base target, inject dependencies on its subtargets.
-    subtarget_addresses: Tuple[Address, ...] = ()
-    if request.field.address.is_base_target:
-        subtargets = await Get(Subtargets, Address, request.field.address)
-        subtarget_addresses = tuple(t.address for t in subtargets.subtargets)
+    literal_addresses = await MultiGet(Get(Address, AddressInput, ai) for ai in provided.addresses)
+    ignored_addresses = set(
+        await MultiGet(Get(Address, AddressInput, ai) for ai in provided.ignored_addresses)
+    )
 
     # Inject any dependencies. This is determined by the `request.field` class. For example, if
     # there is a rule to inject for FortranDependencies, then FortranDependencies and any subclass
@@ -756,36 +730,32 @@ async def resolve_dependencies(
             for inference_request_type in relevant_inference_request_types
         )
 
-    literal_addresses = await MultiGet(Get(Address, AddressInput, ai) for ai in provided.addresses)
-    literal_ignored_addresses = set(
-        await MultiGet(Get(Address, AddressInput, ai) for ai in provided.ignored_addresses)
+    # If this is a base target, or no dependency inference implementation can infer dependencies on
+    # a file address's sibling files, then we inject dependencies on all the base target's
+    # generated subtargets.
+    subtarget_addresses: Tuple[Address, ...] = ()
+    no_sibling_file_deps_inferrable = not inferred or all(
+        inferred_deps.sibling_dependencies_inferrable is False for inferred_deps in inferred
     )
-
-    addresses: Set[Address] = set()
-    used_ignored_addresses: Set[Address] = set()
-    for addr in [
-        *subtarget_addresses,
-        *literal_addresses,
-        *itertools.chain.from_iterable(injected),
-        *itertools.chain.from_iterable(inferred),
-    ]:
-        if addr in literal_ignored_addresses:
-            used_ignored_addresses.add(addr)
-        else:
-            addresses.add(addr)
-    result = sorted(addresses)
-
-    unused_ignores = literal_ignored_addresses - used_ignored_addresses
-    # If there are unused ignores and this is not a generated subtarget, we eagerly error so that
-    # the user isn't falsely led to believe the ignore is working. We do not do this for generated
-    # subtargets because we cannot guarantee that the ignore specified in the original owning
-    # target would be used for all generated subtargets.
-    if unused_ignores and request.field.address.is_base_target:
-        raise UnusedDependencyIgnoresException(
-            request.field.address, unused_ignores=unused_ignores, result=result
+    if request.field.address.is_base_target or no_sibling_file_deps_inferrable:
+        subtargets = await Get(
+            Subtargets, Address, request.field.address.maybe_convert_to_base_target()
+        )
+        subtarget_addresses = tuple(
+            t.address for t in subtargets.subtargets if t.address != request.field.address
         )
 
-    return Addresses(result)
+    result = {
+        addr
+        for addr in (
+            *subtarget_addresses,
+            *literal_addresses,
+            *itertools.chain.from_iterable(injected),
+            *itertools.chain.from_iterable(inferred),
+        )
+        if addr not in ignored_addresses
+    }
+    return Addresses(sorted(result))
 
 
 # -----------------------------------------------------------------------------------------------

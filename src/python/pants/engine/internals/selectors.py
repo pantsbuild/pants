@@ -1,8 +1,10 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import ast
 import itertools
 from dataclasses import dataclass
+from functools import partial
 from textwrap import dedent
 from typing import (
     Any,
@@ -10,6 +12,7 @@ from typing import (
     Generic,
     Iterable,
     Optional,
+    Sequence,
     Tuple,
     Type,
     TypeVar,
@@ -26,11 +29,83 @@ _ProductType = TypeVar("_ProductType")
 _SubjectType = TypeVar("_SubjectType")
 
 
+class GetParseError(ValueError):
+    def __init__(
+        self, explanation: str, *, get_args: Sequence[ast.expr], source_file_name: str
+    ) -> None:
+        def render_arg(expr: ast.expr) -> str:
+            if isinstance(expr, ast.Name):
+                return expr.id
+            if isinstance(expr, ast.Call):
+                # Check if it's a top-level function call.
+                if hasattr(expr.func, "id"):
+                    return f"{expr.func.id}()"  # type: ignore[attr-defined]
+                # Check if it's a method call.
+                if hasattr(expr.func, "attr") and hasattr(expr.func, "value"):
+                    return f"{expr.func.value.id}.{expr.func.attr}()"  # type: ignore[attr-defined]
+
+            # Fall back to the name of the ast node's class.
+            return str(type(expr))
+
+        rendered_args = ", ".join(render_arg(arg) for arg in get_args)
+        # TODO: Add the line numbers for the `Get`. The number for `get_args[0].lineno` are
+        #  off because they're relative to the wrapping rule.
+        super().__init__(
+            f"Invalid Get. {explanation} Failed for Get({rendered_args}) in {source_file_name}."
+        )
+
+
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class GetConstraints(Generic[_ProductType, _SubjectType]):
-    product_type: Type[_ProductType]
-    subject_declared_type: Type[_SubjectType]
+class GetConstraints:
+    product_type: Type
+    subject_declared_type: Type
+
+    @classmethod
+    def parse_product_and_subject_types(
+        cls, get_args: Sequence[ast.expr], *, source_file_name: str
+    ) -> Tuple[str, str]:
+        parse_error = partial(GetParseError, get_args=get_args, source_file_name=source_file_name)
+
+        if len(get_args) not in (2, 3):
+            raise parse_error(
+                f"Expected either two or three arguments, but got {len(get_args)} arguments."
+            )
+
+        product_expr = get_args[0]
+        if not isinstance(product_expr, ast.Name):
+            raise parse_error(
+                "The first argument should be the type of the product, like `Digest` or "
+                "`ProcessResult`."
+            )
+        product_type = product_expr.id
+
+        subject_args = get_args[1:]
+        if len(subject_args) == 1:
+            subject_constructor = subject_args[0]
+            if not isinstance(subject_constructor, ast.Call):
+                raise parse_error(
+                    "Because you are using the shorthand form Get(ProductType, "
+                    "SubjectType(constructor args), the second argument should be a constructor "
+                    "call, like `MergeDigest(...)` or `Process(...)`."
+                )
+            if not hasattr(subject_constructor.func, "id"):
+                raise parse_error(
+                    "Because you are using the shorthand form Get(ProductType, "
+                    "SubjectType(constructor args), the second argument should be a top-level "
+                    "constructor function call, like `MergeDigest(...)` or `Process(...)`, rather "
+                    "than a method call."
+                )
+            return product_type, subject_constructor.func.id  # type: ignore[attr-defined]
+
+        subject_type, _ = subject_args
+        if not isinstance(subject_type, ast.Name):
+            raise parse_error(
+                "Because you are using the longhand form Get(ProductType, SubjectType, "
+                "subject_instance), the second argument should be a type, like `MergeDigests` or "
+                "`Process`."
+            )
+        return product_type, subject_type.id
 
 
 @frozen_after_init

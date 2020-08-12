@@ -16,7 +16,7 @@ from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.internals.native import Native
 from pants.engine.internals.scheduler import Scheduler
-from pants.engine.internals.selectors import GetConstraints
+from pants.engine.internals.selectors import GetConstraints, GetParseError
 from pants.engine.rules import (
     Get,
     MissingParameterTypeAnnotation,
@@ -57,7 +57,9 @@ def create_scheduler(rules, validate=True, native=None):
 class RuleVisitorTest(unittest.TestCase):
     @staticmethod
     def _parse_rule_gets(rule_text: str, **types: Type) -> List[GetConstraints]:
-        rule_visitor = _RuleVisitor(resolve_type=lambda name: types[name])
+        rule_visitor = _RuleVisitor(
+            resolve_type=lambda name: types[name], source_file_name="parse_rules.py"
+        )
         rule_visitor.visit(ast.parse(rule_text))
         return rule_visitor.gets
 
@@ -153,19 +155,19 @@ class RuleVisitorTest(unittest.TestCase):
             self._parse_rule_gets("Get(int, DNE, 'bob')")
 
     def test_invalid_get_no_subject_args(self) -> None:
-        with pytest.raises(ValueError):
+        with pytest.raises(GetParseError):
             self._parse_rule_gets("Get(A, )", A=int)
 
     def test_invalid_get_too_many_subject_args(self) -> None:
-        with pytest.raises(ValueError):
+        with pytest.raises(GetParseError):
             self._parse_rule_gets("Get(A, B, 'bob', 3)", A=int, B=str)
 
     def test_invalid_get_invalid_subject_arg_no_constructor_call(self) -> None:
-        with pytest.raises(ValueError):
+        with pytest.raises(GetParseError):
             self._parse_rule_gets("Get(A, 'bob')", A=int)
 
     def test_invalid_get_invalid_product_type_not_a_type_name(self) -> None:
-        with pytest.raises(ValueError):
+        with pytest.raises(GetParseError):
             self._parse_rule_gets("Get(call(), A('bob'))", A=str)
 
 

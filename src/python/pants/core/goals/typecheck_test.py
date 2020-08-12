@@ -5,7 +5,7 @@ from abc import ABCMeta, abstractmethod
 from textwrap import dedent
 from typing import ClassVar, Iterable, List, Optional, Tuple, Type
 
-from pants.base.specs import SingleAddress
+from pants.base.specs import AddressLiteralSpec
 from pants.core.goals.typecheck import (
     Typecheck,
     TypecheckRequest,
@@ -134,7 +134,7 @@ class TypecheckTest(TestBase):
             address = Address.parse(":tests")
         return TargetWithOrigin(
             MockTarget({}, address=address),
-            origin=SingleAddress(directory=address.spec_path, name=address.target_name),
+            origin=AddressLiteralSpec(address.spec_path, address.target_name),
         )
 
     @staticmethod

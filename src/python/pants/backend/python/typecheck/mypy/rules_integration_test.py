@@ -9,7 +9,7 @@ from pants.backend.python.dependency_inference import rules as dependency_infere
 from pants.backend.python.target_types import PythonLibrary
 from pants.backend.python.typecheck.mypy.rules import MyPyFieldSet, MyPyRequest
 from pants.backend.python.typecheck.mypy.rules import rules as mypy_rules
-from pants.base.specs import SingleAddress
+from pants.base.specs import AddressLiteralSpec
 from pants.core.goals.typecheck import TypecheckResults
 from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
@@ -57,6 +57,12 @@ class MyPyIntegrationTest(ExternalToolTestBase):
         ).encode(),
     )
 
+    global_args = (
+        "--backend-packages=pants.backend.python",
+        "--backend-packages=pants.backend.python.typecheck.mypy",
+        "--source-root-patterns=['src/python', 'tests/python']",
+    )
+
     @classmethod
     def rules(cls):
         return (
@@ -95,9 +101,13 @@ class MyPyIntegrationTest(ExternalToolTestBase):
             ),
         )
         target = self.request_single_product(
-            WrappedTarget, Address(package, target_name=name)
+            WrappedTarget,
+            Params(
+                Address(package, target_name=name),
+                create_options_bootstrapper(args=self.global_args),
+            ),
         ).target
-        origin = SingleAddress(directory=package, name=name)
+        origin = AddressLiteralSpec(package, name)
         return TargetWithOrigin(target, origin)
 
     def run_mypy(
@@ -109,11 +119,7 @@ class MyPyIntegrationTest(ExternalToolTestBase):
         skip: bool = False,
         additional_args: Optional[List[str]] = None,
     ) -> TypecheckResults:
-        args = [
-            "--backend-packages=pants.backend.python",
-            "--backend-packages=pants.backend.python.typecheck.mypy",
-            "--source-root-patterns=['src/python', 'tests/python']",
-        ]
+        args = list(self.global_args)
         if config:
             self.create_file(relpath="mypy.ini", contents=config)
             args.append("--mypy-config=mypy.ini")

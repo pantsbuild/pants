@@ -85,8 +85,11 @@ class ArgSplitterTest(unittest.TestCase):
             "a/b/test*",
             "a/**/*",
             "!",
-            "!/a/b",
-            "!/a/b.txt",
+            "!a/b",
+            "!a/b.txt",
+            "a/b.txt:tgt",
+            "a/b.txt:../tgt",
+            "!a/b.txt:tgt",
         ]
 
         directories_vs_goals = ["foo", "a_b_c"]

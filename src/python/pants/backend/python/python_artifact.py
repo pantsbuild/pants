@@ -24,15 +24,13 @@ class PythonArtifact:
         def has(name):
             value = self._kw.get(name)
             if value is None:
-                raise self.MissingArgument(
-                    "PythonArtifact requires {} to be specified!".format(name)
-                )
+                raise self.MissingArgument(f"PythonArtifact requires {name} to be specified!")
             return value
 
         def misses(name):
             if name in self._kw:
                 raise self.UnsupportedArgument(
-                    "PythonArtifact prohibits {} from being specified".format(name)
+                    f"PythonArtifact prohibits {name} from being specified"
                 )
 
         self._version = has("version")
@@ -50,7 +48,7 @@ class PythonArtifact:
 
     @property
     def requirement(self):
-        return "{}=={}".format(self._name, self._version)
+        return f"{self._name}=={self._version}"
 
     @property
     def setup_py_keywords(self):

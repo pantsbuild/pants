@@ -5,13 +5,22 @@ import re
 import unittest
 import unittest.mock
 from textwrap import dedent
-from typing import Iterable, Optional, cast
+from typing import Iterable, Optional, Set, cast
 
 import pytest
 
 from pants.base.exceptions import ResolveError
 from pants.base.project_tree import Dir
-from pants.base.specs import AddressSpecs, SiblingAddresses, SingleAddress
+from pants.base.specs import (
+    AddressLiteralSpec,
+    AddressSpec,
+    AddressSpecs,
+    AscendantAddresses,
+    DescendantAddresses,
+    FilesystemSpecs,
+    SiblingAddresses,
+    Specs,
+)
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.addresses import (
     Address,
@@ -22,20 +31,21 @@ from pants.engine.addresses import (
     BuildFileAddress,
     BuildFileAddresses,
 )
-from pants.engine.fs import Digest, DigestContents, FileContent, PathGlobs, Snapshot
+from pants.engine.fs import DigestContents, FileContent, PathGlobs
 from pants.engine.internals.build_files import (
-    addresses_with_origins_from_address_specs,
     evaluate_preludes,
     parse_address_family,
     strip_address_origins,
 )
-from pants.engine.internals.mapper import AddressFamily, AddressMapper
+from pants.engine.internals.mapper import AddressMapper
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import RootRule
-from pants.engine.target import Target
-from pants.testutil.engine.util import MockGet, run_rule
+from pants.engine.target import Dependencies, Sources, Tags, Target
+from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.testutil.engine.util import MockGet, Params, run_rule
+from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 from pants.util.frozendict import FrozenDict
 
@@ -57,117 +67,6 @@ def test_parse_address_family_empty() -> None:
         ],
     )
     assert len(af.name_to_target_adaptors) == 0
-
-
-def resolve_addresses_with_origins_from_address_specs(
-    address_specs: AddressSpecs,
-    address_family: AddressFamily,
-    *,
-    tags: Optional[Iterable[str]] = None,
-    exclude_patterns: Optional[Iterable[str]] = None
-) -> AddressesWithOrigins:
-    address_mapper = AddressMapper(
-        Parser(target_type_aliases=[], object_aliases=BuildFileAliases()),
-        tags=tags,
-        exclude_target_regexps=exclude_patterns,
-    )
-    snapshot = Snapshot(Digest("xx", 2), ("root/BUILD",), ())
-    addresses_with_origins = run_rule(
-        addresses_with_origins_from_address_specs,
-        rule_args=[address_mapper, address_specs],
-        mock_gets=[
-            MockGet(product_type=Snapshot, subject_type=PathGlobs, mock=lambda _: snapshot),
-            MockGet(product_type=AddressFamily, subject_type=Dir, mock=lambda _: address_family,),
-        ],
-    )
-    return cast(AddressesWithOrigins, addresses_with_origins)
-
-
-def test_address_specs_duplicated() -> None:
-    """Test that matching the same AddressSpec twice succeeds."""
-    address_spec = SingleAddress("root", "root")
-    address_family = AddressFamily(
-        "root", {"root": ("root/BUILD", TargetAdaptor(type_alias="", name="root"))}
-    )
-    address_specs = AddressSpecs([address_spec, address_spec])
-
-    addresses_with_origins = resolve_addresses_with_origins_from_address_specs(
-        address_specs, address_family
-    )
-    assert len(addresses_with_origins) == 1
-    awo = addresses_with_origins[0]
-    assert str(awo.address) == "root"
-    assert awo.origin == address_spec
-
-
-def test_address_specs_tag_filter() -> None:
-    """Test that targets are filtered based on `tags`."""
-    address_specs = AddressSpecs([SiblingAddresses("root")], filter_by_global_options=True)
-    address_family = AddressFamily(
-        "root",
-        {
-            "a": ("root/BUILD", TargetAdaptor(type_alias="", name="a")),
-            "b": ("root/BUILD", TargetAdaptor(type_alias="", name="b", tags={"integration"})),
-            "c": ("root/BUILD", TargetAdaptor(type_alias="", name="c", tags={"not_integration"})),
-        },
-    )
-
-    addresses_with_origins = resolve_addresses_with_origins_from_address_specs(
-        address_specs, address_family, tags=["+integration"]
-    )
-    assert len(addresses_with_origins) == 1
-    awo = addresses_with_origins[0]
-    assert str(awo.address) == "root:b"
-    assert awo.origin == SiblingAddresses("root")
-
-
-def test_address_specs_fail_on_nonexistent() -> None:
-    """Test that address specs referring to nonexistent targets raise a ResolveError."""
-    address_family = AddressFamily(
-        "root", {"a": ("root/BUILD", TargetAdaptor(type_alias="", name="a"))}
-    )
-    address_specs = AddressSpecs([SingleAddress("root", "b"), SingleAddress("root", "a")])
-
-    expected_rx_str = re.escape("'b' was not found in namespace 'root'. Did you mean one of:\n  :a")
-    with pytest.raises(ResolveError, match=expected_rx_str):
-        resolve_addresses_with_origins_from_address_specs(address_specs, address_family)
-
-    # Ensure that we still catch nonexistent targets later on in the list of command-line
-    # address specs.
-    address_specs = AddressSpecs([SingleAddress("root", "a"), SingleAddress("root", "b")])
-    with pytest.raises(ResolveError, match=expected_rx_str):
-        resolve_addresses_with_origins_from_address_specs(address_specs, address_family)
-
-
-def test_address_specs_exclude_pattern() -> None:
-    """Test that targets are filtered based on exclude patterns."""
-    address_specs = AddressSpecs([SiblingAddresses("root")], filter_by_global_options=True)
-    address_family = AddressFamily(
-        "root",
-        {
-            "exclude_me": ("root/BUILD", TargetAdaptor(type_alias="", name="exclude_me")),
-            "not_me": ("root/BUILD", TargetAdaptor(type_alias="", name="not_me")),
-        },
-    )
-
-    addresses_with_origins = resolve_addresses_with_origins_from_address_specs(
-        address_specs, address_family, exclude_patterns=[".exclude*"]
-    )
-    assert len(addresses_with_origins) == 1
-    awo = addresses_with_origins[0]
-    assert str(awo.address) == "root:not_me"
-    assert awo.origin == SiblingAddresses("root")
-
-
-def test_address_specs_exclude_pattern_with_single_address() -> None:
-    """Test that single address targets are filtered based on exclude patterns."""
-    address_specs = AddressSpecs([SingleAddress("root", "not_me")], filter_by_global_options=True)
-    address_family = AddressFamily(
-        "root", {"not_me": ("root/BUILD", TargetAdaptor(type_alias="", name="not_me"))}
-    )
-    assert not resolve_addresses_with_origins_from_address_specs(
-        address_specs, address_family, exclude_patterns=["root.*"]
-    )
 
 
 def run_prelude_parsing_rule(prelude_content: str) -> BuildFilePreludeSymbols:
@@ -220,14 +119,14 @@ def test_strip_address_origin() -> None:
     addr = Address.parse("//:demo")
     result = run_rule(
         strip_address_origins,
-        rule_args=[AddressesWithOrigins([AddressWithOrigin(addr, SingleAddress("", "demo"))])],
+        rule_args=[AddressesWithOrigins([AddressWithOrigin(addr, AddressLiteralSpec("", "demo"))])],
     )
     assert list(result) == [addr]
 
 
 class MockTgt(Target):
     alias = "mock_tgt"
-    core_fields = ()
+    core_fields = (Dependencies, Sources, Tags)
 
 
 class BuildFileIntegrationTest(TestBase):
@@ -237,76 +136,7 @@ class BuildFileIntegrationTest(TestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), RootRule(Addresses))
-
-    def test_target_parsed_correctly(self) -> None:
-        self.add_to_build_file(
-            "helloworld",
-            dedent(
-                """\
-                mock_tgt(
-                    fake_field=42,
-                    dependencies=[
-                        # Because we don't follow dependencies or even parse dependencies, this
-                        # self-cycle should be fine.
-                        "helloworld",
-                        ":sibling",
-                        "helloworld/util",
-                        "helloworld/util:tests",
-                    ],
-                )
-                """
-            ),
-        )
-        addr = Address.parse("helloworld")
-        target_adaptor = self.request_single_product(TargetAdaptor, addr)
-        assert target_adaptor.name == "helloworld"
-        assert target_adaptor.type_alias == "mock_tgt"
-        assert target_adaptor.kwargs["dependencies"] == [
-            "helloworld",
-            ":sibling",
-            "helloworld/util",
-            "helloworld/util:tests",
-        ]
-        # NB: TargetAdaptors do not validate what fields are valid. The Target API should error
-        # when encountering this, but it's fine at this stage.
-        assert target_adaptor.kwargs["fake_field"] == 42
-
-    def test_build_file_address(self) -> None:
-        self.create_file("helloworld/BUILD.ext", "mock_tgt()")
-        addr = Address("helloworld")
-        expected_bfa = BuildFileAddress(rel_path="helloworld/BUILD.ext", address=addr)
-        bfa = self.request_single_product(BuildFileAddress, addr)
-        assert bfa == expected_bfa
-        bfas = self.request_single_product(BuildFileAddresses, Addresses([addr]))
-        assert bfas == BuildFileAddresses([bfa])
-
-    def test_build_file_address_generated_subtarget(self) -> None:
-        self.create_file("helloworld/BUILD.ext", "mock_tgt(name='original')")
-        addr = Address("helloworld", target_name="original", relative_file_path="generated")
-        expected_bfa = BuildFileAddress(rel_path="helloworld/BUILD.ext", address=addr)
-        bfa = self.request_single_product(BuildFileAddress, addr)
-        assert bfa == expected_bfa
-        bfas = self.request_single_product(BuildFileAddresses, Addresses([addr]))
-        assert bfas == BuildFileAddresses([bfa])
-
-    def test_address_not_found(self) -> None:
-        with pytest.raises(ExecutionError) as exc:
-            self.request_single_product(TargetAdaptor, Address("helloworld"))
-        assert "Directory \\'helloworld\\' does not contain any BUILD files" in str(exc)
-
-        self.add_to_build_file("helloworld", "mock_tgt(name='other_tgt')")
-        expected_rx_str = re.escape(
-            "'helloworld' was not found in namespace 'helloworld'. Did you mean one of:\n  :other_tgt"
-        )
-        with pytest.raises(ExecutionError, match=expected_rx_str):
-            self.request_single_product(TargetAdaptor, Address("helloworld"))
-
-
-class ResolveAddressIntegrationTest(TestBase):
-    @classmethod
-    def rules(cls):
-        return (*super().rules(), RootRule(AddressInput))
+        return (*super().rules(), RootRule(Addresses), RootRule(AddressInput))
 
     def test_resolve_address(self) -> None:
         def assert_is_expected(address_input: AddressInput, expected: Address) -> None:
@@ -339,3 +169,248 @@ class ResolveAddressIntegrationTest(TestBase):
         with pytest.raises(ExecutionError) as exc:
             self.request_single_product(Address, AddressInput("a/b/fake"))
         assert "'a/b/fake' does not exist on disk" in str(exc.value)
+
+    def test_target_adaptor_parsed_correctly(self) -> None:
+        self.add_to_build_file(
+            "helloworld",
+            dedent(
+                """\
+                mock_tgt(
+                    fake_field=42,
+                    dependencies=[
+                        # Because we don't follow dependencies or even parse dependencies, this
+                        # self-cycle should be fine.
+                        "helloworld",
+                        ":sibling",
+                        "helloworld/util",
+                        "helloworld/util:tests",
+                    ],
+                )
+                """
+            ),
+        )
+        addr = Address("helloworld")
+        target_adaptor = self.request_single_product(
+            TargetAdaptor, Params(addr, create_options_bootstrapper())
+        )
+        assert target_adaptor.name == "helloworld"
+        assert target_adaptor.type_alias == "mock_tgt"
+        assert target_adaptor.kwargs["dependencies"] == [
+            "helloworld",
+            ":sibling",
+            "helloworld/util",
+            "helloworld/util:tests",
+        ]
+        # NB: TargetAdaptors do not validate what fields are valid. The Target API should error
+        # when encountering this, but it's fine at this stage.
+        assert target_adaptor.kwargs["fake_field"] == 42
+
+    def test_target_adaptor_not_found(self) -> None:
+        bootstrapper = create_options_bootstrapper()
+        with pytest.raises(ExecutionError) as exc:
+            self.request_single_product(TargetAdaptor, Params(Address("helloworld"), bootstrapper))
+        assert "Directory \\'helloworld\\' does not contain any BUILD files" in str(exc)
+
+        self.add_to_build_file("helloworld", "mock_tgt(name='other_tgt')")
+        expected_rx_str = re.escape(
+            "'helloworld' was not found in namespace 'helloworld'. Did you mean one of:\n  :other_tgt"
+        )
+        with pytest.raises(ExecutionError, match=expected_rx_str):
+            self.request_single_product(TargetAdaptor, Params(Address("helloworld"), bootstrapper))
+
+    def test_build_file_address(self) -> None:
+        self.create_file("helloworld/BUILD.ext", "mock_tgt()")
+        bootstrapper = create_options_bootstrapper()
+
+        def assert_bfa_resolved(address: Address) -> None:
+            expected_bfa = BuildFileAddress(rel_path="helloworld/BUILD.ext", address=address)
+            bfa = self.request_single_product(BuildFileAddress, Params(address, bootstrapper))
+            assert bfa == expected_bfa
+            bfas = self.request_single_product(
+                BuildFileAddresses, Params(Addresses([address]), bootstrapper)
+            )
+            assert bfas == BuildFileAddresses([bfa])
+
+        assert_bfa_resolved(Address("helloworld"))
+        # File addresses should use their base target to find the BUILD file.
+        assert_bfa_resolved(Address("helloworld", relative_file_path="f.txt"))
+
+    def resolve_address_specs(
+        self, specs: Iterable[AddressSpec], bootstrapper: Optional[OptionsBootstrapper] = None
+    ) -> Set[AddressWithOrigin]:
+        result = self.request_single_product(
+            AddressesWithOrigins,
+            Params(
+                Specs(AddressSpecs(specs, filter_by_global_options=True), FilesystemSpecs([])),
+                bootstrapper or create_options_bootstrapper(),
+            ),
+        )
+        return set(result)
+
+    def test_address_specs_deduplication(self) -> None:
+        """When multiple specs cover the same address, we should deduplicate to one single
+        AddressWithOrigin.
+
+        We should use the most specific origin spec possible, such as AddressLiteralSpec >
+        SiblingAddresses.
+        """
+        self.create_file("demo/f.txt")
+        self.add_to_build_file("demo", "mock_tgt(sources=['f.txt'])")
+        # We also include a file address to ensure that that is included in the result.
+        specs = [
+            AddressLiteralSpec("demo", "demo"),
+            AddressLiteralSpec("demo/f.txt", "demo"),
+            SiblingAddresses("demo"),
+            DescendantAddresses("demo"),
+            AscendantAddresses("demo"),
+        ]
+        assert self.resolve_address_specs(specs) == {
+            AddressWithOrigin(Address("demo"), AddressLiteralSpec("demo", "demo")),
+            AddressWithOrigin(
+                Address("demo", relative_file_path="f.txt"),
+                AddressLiteralSpec("demo/f.txt", "demo"),
+            ),
+        }
+
+    def test_address_specs_filter_by_tag(self) -> None:
+        self.create_file("demo/f.txt")
+        self.add_to_build_file(
+            "demo",
+            dedent(
+                """\
+                mock_tgt(name="a", sources=["f.txt"])
+                mock_tgt(name="b", sources=["f.txt"], tags=["integration"])
+                mock_tgt(name="c", sources=["f.txt"], tags=["ignore"])
+                """
+            ),
+        )
+        bootstrapper = create_options_bootstrapper(args=["--tag=+integration"])
+
+        assert self.resolve_address_specs(
+            [SiblingAddresses("demo")], bootstrapper=bootstrapper
+        ) == {AddressWithOrigin(Address("demo", target_name="b"), SiblingAddresses("demo"))}
+
+        # The same filtering should work when given literal addresses, including file addresses.
+        # For file addresses, we look up the `tags` field of the original base target.
+        literals_result = self.resolve_address_specs(
+            [
+                AddressLiteralSpec("demo", "a"),
+                AddressLiteralSpec("demo", "b"),
+                AddressLiteralSpec("demo", "c"),
+                AddressLiteralSpec("demo/f.txt", "a"),
+                AddressLiteralSpec("demo/f.txt", "b"),
+                AddressLiteralSpec("demo/f.txt", "c"),
+            ],
+            bootstrapper=bootstrapper,
+        )
+        assert literals_result == {
+            AddressWithOrigin(
+                Address("demo", relative_file_path="f.txt", target_name="b"),
+                AddressLiteralSpec("demo/f.txt", "b"),
+            ),
+            AddressWithOrigin(Address("demo", target_name="b"), AddressLiteralSpec("demo", "b")),
+        }
+
+    def test_address_specs_filter_by_exclude_pattern(self) -> None:
+        self.create_file("demo/f.txt")
+        self.add_to_build_file(
+            "demo",
+            dedent(
+                """\
+                mock_tgt(name="exclude_me", sources=["f.txt"])
+                mock_tgt(name="not_me", sources=["f.txt"])
+                """
+            ),
+        )
+        bootstrapper = create_options_bootstrapper(args=["--exclude-target-regexp=exclude_me.*"])
+
+        assert self.resolve_address_specs(
+            [SiblingAddresses("demo")], bootstrapper=bootstrapper
+        ) == {AddressWithOrigin(Address("demo", target_name="not_me"), SiblingAddresses("demo"))}
+
+        # The same filtering should work when given literal addresses, including file addresses.
+        # The filtering will operate against the normalized Address.spec.
+        literals_result = self.resolve_address_specs(
+            [
+                AddressLiteralSpec("demo", "exclude_me"),
+                AddressLiteralSpec("demo", "not_me"),
+                AddressLiteralSpec("demo/f.txt", "exclude_me"),
+                AddressLiteralSpec("demo/f.txt", "not_me"),
+            ],
+            bootstrapper=bootstrapper,
+        )
+
+        assert literals_result == {
+            AddressWithOrigin(
+                Address("demo", relative_file_path="f.txt", target_name="not_me"),
+                AddressLiteralSpec("demo/f.txt", "not_me"),
+            ),
+            AddressWithOrigin(
+                Address("demo", target_name="not_me"), AddressLiteralSpec("demo", "not_me")
+            ),
+        }
+
+    def test_address_specs_do_not_exist(self) -> None:
+        self.create_file("real/f.txt")
+        self.add_to_build_file("real", "mock_tgt(sources=['f.txt'])")
+        self.add_to_build_file("empty", "# empty")
+
+        def assert_resolve_error(specs: Iterable[AddressSpec], *, expected: str) -> None:
+            with pytest.raises(ExecutionError) as exc:
+                self.resolve_address_specs(specs)
+            assert expected in str(exc.value)
+
+        # Literal addresses require both a BUILD file to exist and for a target to be resolved.
+        assert_resolve_error(
+            [AddressLiteralSpec("fake", "tgt")], expected="'fake' does not exist on disk"
+        )
+        assert_resolve_error(
+            [AddressLiteralSpec("fake/f.txt", "tgt")],
+            expected="'fake/f.txt' does not exist on disk",
+        )
+        did_you_mean = ResolveError.did_you_mean(
+            bad_name="fake_tgt", known_names=["real"], namespace="real"
+        )
+        assert_resolve_error([AddressLiteralSpec("real", "fake_tgt")], expected=str(did_you_mean))
+        assert_resolve_error(
+            [AddressLiteralSpec("real/f.txt", "fake_tgt")], expected=str(did_you_mean)
+        )
+
+        # SiblingAddresses require the BUILD file to exist, but are okay if no targets are resolved.
+        assert_resolve_error(
+            [SiblingAddresses("fake")],
+            expected=(
+                "'fake' does not contain any BUILD files, but 'fake:' expected matching targets "
+                "there."
+            ),
+        )
+        assert not self.resolve_address_specs([SiblingAddresses("empty")])
+
+        # DescendantAddresses requires at least one match, even if BUILD files exist.
+        assert_resolve_error(
+            [DescendantAddresses("fake"), DescendantAddresses("empty")],
+            expected="Address spec 'fake::' does not match any targets",
+        )
+
+        # AscendantAddresses does not require any matches or BUILD files.
+        assert not self.resolve_address_specs(
+            [AscendantAddresses("fake"), AscendantAddresses("empty")]
+        )
+
+    def test_address_specs_file_does_not_belong_to_target(self) -> None:
+        """Even if a file's address file exists and target exist, we should validate that the file
+        actually belongs to that target."""
+        self.create_file("demo/f.txt")
+        self.add_to_build_file(
+            "demo",
+            dedent(
+                """\
+                mock_tgt(name='owner', sources=['f.txt'])
+                mock_tgt(name='not_owner')
+                """
+            ),
+        )
+
+        with pytest.raises(ExecutionError) as exc:
+            self.resolve_address_specs([AddressLiteralSpec("demo/f.txt", "not_owner")])
+        assert "does not match a file demo/f.txt" in str(exc.value)

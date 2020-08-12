@@ -38,8 +38,7 @@ from pants.backend.python.target_types import (
 )
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.target_types import Files, Resources
-from pants.core.util_rules.determine_source_files import rules as determine_source_files_rules
-from pants.core.util_rules.strip_source_roots import rules as strip_source_roots_rules
+from pants.core.util_rules import source_files, stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.fs import Snapshot
 from pants.engine.internals.scheduler import ExecutionError
@@ -73,7 +72,9 @@ class TestSetupPyBase(TestBase):
         ]
 
     def tgt(self, addr: str) -> Target:
-        return self.request_single_product(WrappedTarget, Params(Address.parse(addr))).target
+        return self.request_single_product(
+            WrappedTarget, Params(Address.parse(addr), create_options_bootstrapper())
+        ).target
 
 
 class TestGenerateChroot(TestSetupPyBase):
@@ -94,7 +95,7 @@ class TestGenerateChroot(TestSetupPyBase):
             SetupPyChroot,
             Params(
                 SetupPyChrootRequest(ExportedTarget(self.tgt(addr)), py2=False),
-                create_options_bootstrapper(args=["--source-root-patterns=src/python"]),
+                create_options_bootstrapper(),
             ),
         )
         snapshot = self.request_single_product(Snapshot, Params(chroot.digest))
@@ -108,7 +109,7 @@ class TestGenerateChroot(TestSetupPyBase):
                 SetupPyChroot,
                 Params(
                     SetupPyChrootRequest(ExportedTarget(self.tgt(addr)), py2=False),
-                    create_options_bootstrapper(args=["--source-root-patterns=src/python"]),
+                    create_options_bootstrapper(),
                 ),
             )
         ex = excinfo.value
@@ -237,8 +238,8 @@ class TestGetSources(TestSetupPyBase):
             get_sources,
             RootRule(SetupPySourcesRequest),
             RootRule(SourceRootConfig),
-            *determine_source_files_rules(),
-            *strip_source_roots_rules(),
+            *source_files.rules(),
+            *stripped_source_files.rules(),
             *python_sources.rules(),
         ]
 
@@ -254,7 +255,7 @@ class TestGetSources(TestSetupPyBase):
             SetupPySources,
             Params(
                 SetupPySourcesRequest(Targets([self.tgt(addr) for addr in addrs]), py2=False),
-                create_options_bootstrapper(args=["--source-root-patterns=src/python"]),
+                create_options_bootstrapper(),
             ),
         )
         chroot_snapshot = self.request_single_product(Snapshot, Params(srcs.digest))

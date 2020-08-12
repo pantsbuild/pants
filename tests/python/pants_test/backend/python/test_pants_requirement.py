@@ -11,6 +11,8 @@ from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import WrappedTarget
 from pants.python.python_requirement import PythonRequirement
+from pants.testutil.engine.util import Params
+from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
 
@@ -36,7 +38,11 @@ class PantsRequirementTest(TestBase):
     ) -> None:
         self.add_to_build_file("3rdparty/python", f"{build_file_entry}\n")
         target = self.request_single_product(
-            WrappedTarget, Address("3rdparty/python", target_name=expected_target_name)
+            WrappedTarget,
+            Params(
+                Address("3rdparty/python", target_name=expected_target_name),
+                create_options_bootstrapper(),
+            ),
         ).target
         assert isinstance(target, PythonRequirementLibrary)
         expected = PythonRequirement(

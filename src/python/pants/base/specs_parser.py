@@ -3,24 +3,28 @@
 
 import os
 from pathlib import Path, PurePath
-from typing import Union
+from typing import Iterable, Union
 
 from pants.base.specs import (
+    AddressLiteralSpec,
     AddressSpec,
+    AddressSpecs,
     DescendantAddresses,
     FilesystemGlobSpec,
     FilesystemIgnoreSpec,
     FilesystemLiteralSpec,
     FilesystemSpec,
+    FilesystemSpecs,
     SiblingAddresses,
-    SingleAddress,
+    Specs,
 )
+from pants.util.ordered_set import OrderedSet
 
 
-class CmdLineSpecParser:
+class SpecsParser:
     """Parses address selectors and filesystem specs as passed from the command line.
 
-    See the `specs` package for more information on the types of objects returned.
+    See the `specs` module for more information on the types of objects returned.
     This class supports some flexibility in the path portion of the spec to allow for more natural
     command line use cases like tab completion leaving a trailing / for directories and relative
     paths, ie both of these::
@@ -74,7 +78,7 @@ class CmdLineSpecParser:
         if ":" in spec:
             spec_parts = spec.rsplit(":", 1)
             spec_path = self._normalize_spec_path(spec_parts[0])
-            return SingleAddress(directory=spec_path, name=spec_parts[1])
+            return AddressLiteralSpec(path_component=spec_path, target_component=spec_parts[1])
         if spec.startswith("!"):
             return FilesystemIgnoreSpec(spec[1:])
         if "*" in spec:
@@ -84,8 +88,21 @@ class CmdLineSpecParser:
         spec_path = self._normalize_spec_path(spec)
         if Path(self._root_dir, spec_path).is_file():
             return FilesystemLiteralSpec(spec_path)
-        # Else we apply address shorthand, i.e. `src/python/pants/util` -> `src/python/pants/util:util`
-        # TODO: Figure out what this should look like if (once?) filesystem specs allow directories.
-        # Should this shorthand be removed so that directories may be unambiguously resolved to a
-        # FilesystemSpec? If so, do we still allow the shorthand in BUILD files?
-        return SingleAddress(directory=spec_path, name=PurePath(spec).name)
+        # Else we apply address shorthand, i.e. `src/python/pants/util` ->
+        # `src/python/pants/util:util`
+        return AddressLiteralSpec(path_component=spec_path, target_component=PurePath(spec).name)
+
+    def parse_specs(self, specs: Iterable[str]) -> Specs:
+        address_specs: OrderedSet[AddressSpec] = OrderedSet()
+        filesystem_specs: OrderedSet[FilesystemSpec] = OrderedSet()
+        for spec_str in specs:
+            parsed_spec = self.parse_spec(spec_str)
+            if isinstance(parsed_spec, AddressSpec):
+                address_specs.add(parsed_spec)
+            else:
+                filesystem_specs.add(parsed_spec)
+
+        return Specs(
+            AddressSpecs(address_specs, filter_by_global_options=True),
+            FilesystemSpecs(filesystem_specs),
+        )

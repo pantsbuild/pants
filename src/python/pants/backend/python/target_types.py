@@ -43,7 +43,7 @@ class PythonInterpreterCompatibility(StringOrStringSequenceField):
     If this is left off, this will default to the option `interpreter_constraints` in the
     [python-setup] scope.
 
-    See https://pants.readme.io/docs/python-interpreter-compatibility.
+    See https://www.pantsbuild.org/docs/python-interpreter-compatibility.
     """
 
     alias = "compatibility"
@@ -54,23 +54,6 @@ class PythonInterpreterCompatibility(StringOrStringSequenceField):
         If interpreter constraints are supplied by the CLI flag, return those only.
         """
         return python_setup.compatibility_or_constraints(self.value)
-
-
-class PythonProvidesField(ScalarField, ProvidesField):
-    """The`setup.py` kwargs for the external artifact built from this target.
-
-    See https://pants.readme.io/docs/python-setup-py-goal.
-    """
-
-    expected_type = PythonArtifact
-    expected_type_description = "setup_py(**kwargs)"
-    value: Optional[PythonArtifact]
-
-    @classmethod
-    def compute_value(
-        cls, raw_value: Optional[PythonArtifact], *, address: Address
-    ) -> Optional[PythonArtifact]:
-        return super().compute_value(raw_value, address=address)
 
 
 COMMON_PYTHON_FIELDS = (
@@ -233,7 +216,7 @@ class PythonBinary(Target):
 
     PEX files are self-contained executable files that contain a complete Python environment capable
     of running the target. For more information about PEX files, see
-    https://pants.readme.io/docs/pex-files.
+    https://www.pantsbuild.org/docs/pex-files.
     """
 
     alias = "python_binary"
@@ -298,7 +281,7 @@ class PythonTests(Target):
 
     These may be written in either Pytest-style or unittest style.
 
-    See https://pants.readme.io/docs/python-test-goal.
+    See https://www.pantsbuild.org/docs/python-test-goal.
     """
 
     alias = "python_tests"
@@ -360,7 +343,7 @@ class PythonRequirementLibrary(Target):
     `python_requirements()` to convert each requirement into a `python_requirement_library()` target
     automatically.
 
-    See https://pants.readme.io/docs/python-third-party-dependencies.
+    See https://www.pantsbuild.org/docs/python-third-party-dependencies.
     """
 
     alias = "python_requirement_library"
@@ -386,6 +369,24 @@ class PythonRequirementsFile(Target):
 # -----------------------------------------------------------------------------------------------
 # `python_distribution` target
 # -----------------------------------------------------------------------------------------------
+
+
+class PythonProvidesField(ScalarField, ProvidesField):
+    """The`setup.py` kwargs for the external artifact built from this target.
+
+    See https://www.pantsbuild.org/docs/python-setup-py-goal.
+    """
+
+    expected_type = PythonArtifact
+    expected_type_description = "setup_py(**kwargs)"
+    value: PythonArtifact
+    required = True
+
+    @classmethod
+    def compute_value(
+        cls, raw_value: Optional[PythonArtifact], *, address: Address
+    ) -> PythonArtifact:
+        return cast(PythonArtifact, super().compute_value(raw_value, address=address))
 
 
 class PythonDistribution(Target):

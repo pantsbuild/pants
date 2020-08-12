@@ -26,8 +26,8 @@ from pants.backend.python.target_types import (
     PythonSources,
 )
 from pants.core.goals.lint import LintRequest, LintResult, LintResults
-from pants.core.util_rules import determine_source_files, strip_source_roots
-from pants.core.util_rules.determine_source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules import source_files, stripped_source_files
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address, Addresses
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -306,8 +306,8 @@ def rules():
     return [
         *collect_rules(),
         UnionRule(LintRequest, PylintRequest),
-        *determine_source_files.rules(),
+        *source_files.rules(),
         *pex.rules(),
         *python_sources.rules(),
-        *strip_source_roots.rules(),
+        *stripped_source_files.rules(),
     ]

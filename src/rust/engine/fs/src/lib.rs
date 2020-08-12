@@ -697,7 +697,7 @@ pub fn increase_limits() -> Result<String, String> {
     if cur < TARGET_NOFILE_LIMIT {
       let err_suffix = format!(
         "To avoid 'too many open file handle' errors, we recommend a limit of at least {}: \
-        please see https://pants.readme.io/docs/troubleshooting#too-many-open-files-error \
+        please see https://www.pantsbuild.org/docs/troubleshooting#too-many-open-files-error \
         for more information.",
         TARGET_NOFILE_LIMIT
       );
