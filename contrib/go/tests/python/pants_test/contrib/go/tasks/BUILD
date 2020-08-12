@@ -16,7 +16,7 @@ python_tests(
     'src/python/pants/testutil:task_test_base',
   ],
   tags = {'partially_type_checked'},
-  timeout=120,
+  timeout=240,
 )
 
 

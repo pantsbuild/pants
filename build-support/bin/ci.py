@@ -509,7 +509,7 @@ def run_integration_tests(*, shard: Optional[str]) -> None:
 
 def run_plugin_tests() -> None:
     _run_command(
-        TestStrategy.v2_remote.pants_command(targets={"pants-plugins/src/python::"}),
+        TestStrategy.v2_local.pants_command(targets={"pants-plugins/src/python::"}),
         slug="BackendTests",
         start_message="Running internal backend Python tests",
         die_message="Internal backend Python test failure.",
