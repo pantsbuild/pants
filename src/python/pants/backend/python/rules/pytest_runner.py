@@ -20,7 +20,10 @@ from pants.backend.python.rules.pex import (
     PexRequest,
     PexRequirements,
 )
-from pants.backend.python.rules.pex_from_targets import PexFromTargetsRequest
+from pants.backend.python.rules.pex_from_targets import (
+    PexFromTargetsRequest,
+    requirements_pex_from_targets_request,
+)
 from pants.backend.python.rules.python_sources import PythonSourceFiles, PythonSourceFilesRequest
 from pants.backend.python.subsystems.pytest import PyTest
 from pants.backend.python.target_types import (
@@ -89,9 +92,9 @@ async def setup_pytest_for_target(
         python_setup,
     )
 
-    # Ensure all pexes we merge via PEX_PATH to form the test runner use the interpreter constraints
-    # of the tests. This is handled by CreatePexFromTargetClosure, but we must pass this through for
-    # CreatePex requests.
+    # Ensure all pexes we merge via --pex-path to form the test runner use the interpreter
+    # constraints of the tests. This is handled by PexFromTargetsRequest, but we must pass
+    # this through for PexRequest.
     pex_request = functools.partial(PexRequest, interpreter_constraints=interpreter_constraints)
 
     # NB: We set `--not-zip-safe` because Pytest plugin discovery, which uses
@@ -112,14 +115,9 @@ async def setup_pytest_for_target(
         ),
     )
 
+    # Defaults to zip_safe=False.
     requirements_pex_request = Get(
-        Pex,
-        PexFromTargetsRequest(
-            addresses=test_addresses,
-            output_filename="requirements.pex",
-            include_source_files=False,
-            additional_args=additional_args_for_pytest,
-        ),
+        Pex, PexFromTargetsRequest, requirements_pex_from_targets_request(test_addresses)
     )
 
     test_runner_pex_request = Get(
@@ -128,7 +126,6 @@ async def setup_pytest_for_target(
         pex_request(
             output_filename="test_runner.pex",
             entry_point="pytest:main",
-            interpreter_constraints=interpreter_constraints,
             additional_args=(
                 "--pex-path",
                 # TODO(John Sirois): Support shading python binaries:
