@@ -147,34 +147,6 @@ class AddressFamily:
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class AddressMapper:
-    """Configuration to parse BUILD files matching a filename pattern."""
-
-    parser: Parser
-    prelude_glob_patterns: Tuple[str, ...]
-    build_patterns: Tuple[str, ...]
-    build_ignore_patterns: Tuple[str, ...]
-
-    def __init__(
-        self,
-        parser: Parser,
-        *,
-        prelude_glob_patterns: Optional[Iterable[str]] = None,
-        build_patterns: Optional[Iterable[str]] = None,
-        build_ignore_patterns: Optional[Iterable[str]] = None,
-    ) -> None:
-        self.parser = parser
-        self.prelude_glob_patterns = tuple(prelude_glob_patterns or [])
-        self.build_patterns = tuple(build_patterns or ["BUILD", "BUILD.*"])
-        self.build_ignore_patterns = tuple(build_ignore_patterns or [])
-
-    def __repr__(self):
-        return f"AddressMapper(build_patterns={self.build_patterns})"
-
-
-# TODO(#10569): merge this with AddressMapper.
-@frozen_after_init
-@dataclass(unsafe_hash=True)
 class AddressSpecsFilter:
     """Filters addresses with the `--tags` and `--exclude-target-regexp` options."""
 

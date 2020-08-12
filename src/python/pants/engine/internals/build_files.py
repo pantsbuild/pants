@@ -17,13 +17,8 @@ from pants.engine.addresses import (
     BuildFileAddresses,
 )
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, Snapshot
-from pants.engine.internals.mapper import (
-    AddressFamily,
-    AddressMap,
-    AddressMapper,
-    AddressSpecsFilter,
-)
-from pants.engine.internals.parser import BuildFilePreludeSymbols, error_on_imports
+from pants.engine.internals.mapper import AddressFamily, AddressMap, AddressSpecsFilter
+from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser, error_on_imports
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import UnexpandedTargets
@@ -33,11 +28,11 @@ from pants.util.ordered_set import OrderedSet
 
 
 @rule
-async def evaluate_preludes(address_mapper: AddressMapper) -> BuildFilePreludeSymbols:
+async def evaluate_preludes(global_options: GlobalOptions) -> BuildFilePreludeSymbols:
     prelude_digest_contents = await Get(
         DigestContents,
         PathGlobs(
-            address_mapper.prelude_glob_patterns,
+            global_options.options.build_file_prelude_globs,
             glob_match_error_behavior=GlobMatchErrorBehavior.ignore,
         ),
     )
@@ -83,7 +78,10 @@ async def resolve_address(address_input: AddressInput) -> Address:
 
 @rule
 async def parse_address_family(
-    address_mapper: AddressMapper, prelude_symbols: BuildFilePreludeSymbols, directory: Dir
+    parser: Parser,
+    global_options: GlobalOptions,
+    prelude_symbols: BuildFilePreludeSymbols,
+    directory: Dir,
 ) -> AddressFamily:
     """Given an AddressMapper and a directory, return an AddressFamily.
 
@@ -93,8 +91,8 @@ async def parse_address_family(
         DigestContents,
         PathGlobs(
             globs=(
-                *(os.path.join(directory.path, p) for p in address_mapper.build_patterns),
-                *(f"!{p}" for p in address_mapper.build_ignore_patterns),
+                *(os.path.join(directory.path, p) for p in global_options.options.build_patterns),
+                *(f"!{p}" for p in global_options.options.build_ignore),
             )
         ),
     )
@@ -102,7 +100,7 @@ async def parse_address_family(
         raise ResolveError(f"Directory '{directory.path}' does not contain any BUILD files.")
 
     address_maps = [
-        AddressMap.parse(fc.path, fc.content.decode(), address_mapper.parser, prelude_symbols)
+        AddressMap.parse(fc.path, fc.content.decode(), parser, prelude_symbols)
         for fc in digest_contents
     ]
     return AddressFamily.create(directory.path, address_maps)
@@ -160,7 +158,7 @@ def setup_address_specs_filter(global_options: GlobalOptions) -> AddressSpecsFil
 
 @rule
 async def addresses_with_origins_from_address_specs(
-    address_specs: AddressSpecs, address_mapper: AddressMapper, specs_filter: AddressSpecsFilter
+    address_specs: AddressSpecs, global_options: GlobalOptions, specs_filter: AddressSpecsFilter
 ) -> AddressesWithOrigins:
     """Given an AddressMapper and list of AddressSpecs, return matching AddressesWithOrigins.
 
@@ -199,8 +197,8 @@ async def addresses_with_origins_from_address_specs(
         Snapshot,
         PathGlobs,
         address_specs.to_path_globs(
-            build_patterns=address_mapper.build_patterns,
-            build_ignore_patterns=address_mapper.build_ignore_patterns,
+            build_patterns=global_options.options.build_patterns,
+            build_ignore_patterns=global_options.options.build_ignore,
         ),
     )
     dirnames = {os.path.dirname(f) for f in snapshot.files}
