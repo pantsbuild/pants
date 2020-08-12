@@ -74,6 +74,11 @@ class PythonSetup(Subsystem):
             default=["current"],
             help="A list of platforms to be supported by this Python environment. Each platform"
             "is a string, as returned by pkg_resources.get_supported_platform().",
+            removal_version="2.1.0.dev0",
+            removal_hint=(
+                "The option `--python-setup-platforms` does not do anything anymore. Instead, "
+                "explicitly set the `platforms` field on each `python_binary`."
+            ),
         )
         register(
             "--interpreter-cache-dir",
@@ -85,6 +90,7 @@ class PythonSetup(Subsystem):
             removal_version="2.1.0.dev0",
             removal_hint=(
                 "The option `--python-setup-interpreter-cache-dir` does not do anything anymore."
+                "Instead, use the global option `--named-caches-dir`."
             ),
         )
         register(
@@ -96,7 +102,8 @@ class PythonSetup(Subsystem):
             "If unspecified, a standard path under the workdir is used.",
             removal_version="2.1.0.dev0",
             removal_hint=(
-                "The option `--python-setup-resolver-cache-dir` does not do anything anymore."
+                "The option `--python-setup-resolver-cache-dir` does not do anything anymore. "
+                "Instead, use the global option `--named-caches-dir`."
             ),
         )
         register(
@@ -105,6 +112,12 @@ class PythonSetup(Subsystem):
             type=bool,
             default=UnsetBool,
             help="Whether to include pre-releases when resolving requirements.",
+            removal_version="2.1.0.dev0",
+            removal_hint=(
+                "The option `--python-setup-resolver-allow-prereleases` does not no anything. To "
+                "use a pre-release, explicitly use that pre-release version in your requirement "
+                "string, e.g. `my_dist==99.0.dev0`."
+            ),
         )
         register(
             "--interpreter-search-paths",
@@ -160,26 +173,8 @@ class PythonSetup(Subsystem):
         return self.expand_interpreter_search_paths(self.options.interpreter_search_paths)
 
     @property
-    def platforms(self):
-        return self.options.platforms
-
-    @property
-    def interpreter_cache_dir(self):
-        return self.options.interpreter_cache_dir or os.path.join(self.scratch_dir, "interpreters")
-
-    @property
-    def resolver_cache_dir(self):
-        return self.options.resolver_cache_dir or os.path.join(
-            self.scratch_dir, "resolved_requirements"
-        )
-
-    @property
-    def resolver_allow_prereleases(self):
-        return self.options.resolver_allow_prereleases
-
-    @property
-    def manylinux(self):
-        manylinux = self.options.resolver_manylinux
+    def manylinux(self) -> Optional[str]:
+        manylinux = cast(Optional[str], self.options.resolver_manylinux)
         if manylinux is None or manylinux.lower() in ("false", "no", "none"):
             return None
         return manylinux
