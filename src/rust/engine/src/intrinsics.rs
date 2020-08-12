@@ -213,16 +213,15 @@ fn remove_prefix_request_to_digest(
   let store = core.store();
 
   async move {
-    let input_digest = lift_digest(&externs::project_ignoring_type(&args[0], "digest"))?;
+    let input_digest =
+      lift_digest(&externs::project_ignoring_type(&args[0], "digest")).map_err(|e| throw(&e))?;
     let prefix = externs::project_str(&args[0], "prefix");
     let digest = store
       .strip_prefix(input_digest, PathBuf::from(prefix))
       .await
-      .map_err(|e| format!("{:?}", e))?;
-    let res: Result<_, String> = Ok(Snapshot::store_directory(&core, &digest));
-    res
+      .map_err(|e| throw(&format!("{:?}", e)))?;
+    Ok(Snapshot::store_directory(&core, &digest))
   }
-  .map_err(|e: String| throw(&e))
   .boxed()
 }
 
@@ -233,16 +232,15 @@ fn add_prefix_request_to_digest(
   let core = context.core;
   let store = core.store();
   async move {
-    let input_digest = lift_digest(&externs::project_ignoring_type(&args[0], "digest"))?;
+    let input_digest =
+      lift_digest(&externs::project_ignoring_type(&args[0], "digest")).map_err(|e| throw(&e))?;
     let prefix = externs::project_str(&args[0], "prefix");
     let digest = store
       .add_prefix(input_digest, PathBuf::from(prefix))
       .await
-      .map_err(|e| format!("{:?}", e))?;
-    let res: Result<_, String> = Ok(Snapshot::store_directory(&core, &digest));
-    res
+      .map_err(|e| throw(&format!("{:?}", e)))?;
+    Ok(Snapshot::store_directory(&core, &digest))
   }
-  .map_err(|e: String| throw(&e))
   .boxed()
 }
 
@@ -270,13 +268,11 @@ fn merge_digests_request_to_digest(
     .collect();
   async move {
     let digest = store
-      .merge(digests?)
+      .merge(digests.map_err(|e| throw(&e))?)
       .await
-      .map_err(|e| format!("{:?}", e))?;
-    let res: Result<_, String> = Ok(Snapshot::store_directory(&core, &digest));
-    res
+      .map_err(|e| throw(&format!("{:?}", e)))?;
+    Ok(Snapshot::store_directory(&core, &digest))
   }
-  .map_err(|err: String| throw(&err))
   .boxed()
 }
 
@@ -286,15 +282,10 @@ fn download_file_to_digest(
 ) -> BoxFuture<'static, NodeResult<Value>> {
   let core = context.core.clone();
   async move {
-    let key = externs::acquire_key_for(args.pop().unwrap()).map_err(|e| format!("{:?}", e))?;
-    let snapshot = context
-      .get(DownloadedFile(key))
-      .await
-      .map_err(|e| format!("{:?}", e))?;
-    let res: Result<_, String> = Ok(Snapshot::store_directory(&core, &snapshot.digest));
-    res
+    let key = externs::acquire_key_for(args.pop().unwrap())?;
+    let snapshot = context.get(DownloadedFile(key)).await?;
+    Ok(Snapshot::store_directory(&core, &snapshot.digest))
   }
-  .map_err(|err: String| throw(&err))
   .boxed()
 }
 
@@ -304,15 +295,10 @@ fn path_globs_to_digest(
 ) -> BoxFuture<'static, NodeResult<Value>> {
   let core = context.core.clone();
   async move {
-    let key = externs::acquire_key_for(args.pop().unwrap()).map_err(|e| format!("{:?}", e))?;
-    let digest = context
-      .get(Snapshot(key))
-      .await
-      .map_err(|e| format!("{:?}", e))?;
-    let res: Result<_, String> = Ok(Snapshot::store_directory(&core, &digest));
-    res
+    let key = externs::acquire_key_for(args.pop().unwrap())?;
+    let digest = context.get(Snapshot(key)).await?;
+    Ok(Snapshot::store_directory(&core, &digest))
   }
-  .map_err(|err: String| throw(&err))
   .boxed()
 }
 
@@ -343,12 +329,13 @@ fn create_digest_to_digest(
   let store = context.core.store();
 
   async move {
-    let digests = future::try_join_all(digests).await?;
-    let digest = store.merge(digests).await.map_err(|e| format!("{:?}", e))?;
-    let res: Result<_, String> = Ok(Snapshot::store_directory(&context.core, &digest));
-    res
+    let digests = future::try_join_all(digests).await.map_err(|e| throw(&e))?;
+    let digest = store
+      .merge(digests)
+      .await
+      .map_err(|e| throw(&format!("{:?}", e)))?;
+    Ok(Snapshot::store_directory(&context.core, &digest))
   }
-  .map_err(|err: String| throw(&err))
   .boxed()
 }
 
@@ -360,18 +347,15 @@ fn digest_subset_to_digest(
   let store = context.core.store();
 
   async move {
-    let path_globs = Snapshot::lift_path_globs(&globs)?;
-    let original_digest = lift_digest(&externs::project_ignoring_type(&args[0], "digest"))?;
+    let path_globs = Snapshot::lift_path_globs(&globs).map_err(|e| throw(&e))?;
+    let original_digest =
+      lift_digest(&externs::project_ignoring_type(&args[0], "digest")).map_err(|e| throw(&e))?;
     let subset_params = SubsetParams { globs: path_globs };
-
     let digest = store
       .subset(original_digest, subset_params)
       .await
-      .map_err(|e| format!("{:?}", e))?;
-
-    let res: Result<_, String> = Ok(Snapshot::store_directory(&context.core, &digest));
-    res
+      .map_err(|e| throw(&format!("{:?}", e)))?;
+    Ok(Snapshot::store_directory(&context.core, &digest))
   }
-  .map_err(|err: String| throw(&err))
   .boxed()
 }
