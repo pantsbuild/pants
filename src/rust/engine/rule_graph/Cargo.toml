@@ -6,7 +6,6 @@ authors = [ "Pants Build <pantsbuild@gmail.com>" ]
 publish = false
 
 [dependencies]
-indexmap = "1.4"
 itertools = "0.8"
 log = "0.4"
 petgraph = "0.4.5"

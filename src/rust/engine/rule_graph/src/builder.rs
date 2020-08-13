@@ -34,10 +34,11 @@ use crate::{params_str, Entry, EntryWithDeps, InnerEntry, RootEntry, RuleEdges, 
 use std::collections::{hash_map, HashMap, HashSet, VecDeque};
 use std::convert::TryInto;
 
-use indexmap::IndexSet;
 use itertools::Itertools;
 use petgraph::graph::{DiGraph, NodeIndex};
-use petgraph::visit::{Bfs, EdgeRef, IntoNodeReferences, NodeRef, VisitMap, Visitable};
+use petgraph::visit::{
+  Bfs, DfsPostOrder, EdgeRef, IntoNodeReferences, NodeRef, VisitMap, Visitable,
+};
 use petgraph::Direction;
 
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
@@ -209,14 +210,26 @@ impl<'t, R: Rule> Builder<'t, R> {
   /// erroring) in later phases.
   ///
   fn monomorphize(mut graph: ParamsLabeledGraph<R>) -> ParamsLabeledGraph<R> {
-    // We need to visit all nodes in the graph, but because monomorphizing a node enqueues its
-    // dependees we may visit some of them multiple times. We use a set as the to_visit collection
-    // because each visit clears the need to re-visit unless another dependency enqueues it _after_
-    // it has been visited.
-    let mut to_visit = graph
-      .node_references()
-      .map(|node_ref| node_ref.id())
-      .collect::<IndexSet<_>>();
+    // In order to reduce the number of permutations rapidly, we make a best effort attempt to
+    // visit a node before any of its dependencies using DFS-post-order. We need to visit all
+    // nodes in the graph, but because monomorphizing a node enqueues its dependees we may
+    // visit some of them multiple times.
+    //
+    // TODO: Incorporate a set with the to_visit collection to avoid needing to re-visit unless
+    // another dependency enqueues it _after_ it has been visited.
+    let mut to_visit = {
+      let mut dfs = DfsPostOrder {
+        stack: graph.externals(Direction::Incoming).collect(),
+        discovered: graph.visit_map(),
+        finished: graph.visit_map(),
+      };
+      let mut to_visit = VecDeque::new();
+      while let Some(node_id) = dfs.next(&graph) {
+        to_visit.push_back(node_id);
+      }
+      to_visit
+    };
+
     // As we go, we record which nodes to delete, but we wait until the end to delete them, as it
     // will cause NodeIds to shift in the graph (and is only cheap to do in bulk).
     let mut to_delete = HashSet::new();
@@ -231,12 +244,41 @@ impl<'t, R: Rule> Builder<'t, R> {
       })
       .collect();
 
-    println!(
-      "Monomorphizing with: {:?}",
-      petgraph::dot::Dot::with_config(&graph, &[])
-    );
+    if let Some(subgraph_node_ref) = graph
+      .node_references()
+      .find(|node_ref| node_ref.weight().0.to_string().contains("resolve_address("))
+    {
+      let subgraph_id = subgraph_node_ref.id();
+      let mut bfs = Bfs::new(&graph, subgraph_id);
+      let mut visited = graph.visit_map();
+      while let Some(node_id) = bfs.next(&graph) {
+        visited.visit(node_id);
+      }
 
-    while let Some(node_id) = to_visit.pop() {
+      let subgraph = graph.filter_map(
+        |node_id, node| {
+          if visited.is_visited(&node_id) {
+            Some(node.clone())
+          } else {
+            None
+          }
+        },
+        |_, edge_weight| Some(*edge_weight),
+      );
+
+      println!(
+        "Subgraph below {}: {:?}",
+        graph[subgraph_id].0,
+        petgraph::dot::Dot::with_config(&subgraph, &[])
+      );
+    }
+
+    println!(">>> initial visit order:");
+    for node_id in &to_visit {
+      println!(">>>   {}\t{}", graph[*node_id].1.len(), graph[*node_id].0);
+    }
+
+    while let Some(node_id) = to_visit.pop_front() {
       if to_delete.contains(&node_id) {
         continue;
       }
@@ -257,18 +299,7 @@ impl<'t, R: Rule> Builder<'t, R> {
           .into_iter()
           .map(|(dependency_key, edge_refs)| {
             let dependency_ids = edge_refs
-              .filter(|edge_ref| {
-                // Filter out the dependency if the in_set of the dependency node does not consume a
-                // provided param. Since the "used parameter" sets of nodes only shrink as
-                // monomorphize runs, it's always safe to eliminate a potential dependency this way.
-                let consumes_provided =
-                  if let Some(provided_param) = dependency_key.provided_param() {
-                    graph[edge_ref.target()].1.contains(&provided_param)
-                  } else {
-                    true
-                  };
-                consumes_provided && !to_delete.contains(&edge_ref.target())
-              })
+              .filter(|edge_ref| !to_delete.contains(&edge_ref.target()))
               .map(|edge_ref| edge_ref.target())
               .collect();
             (*dependency_key, dependency_ids)
@@ -276,48 +307,52 @@ impl<'t, R: Rule> Builder<'t, R> {
           .collect()
       };
 
+      // Confirm that its liveness set is up to date. If it isn't, we'll fall through to
+      // monomorphize it, which will handle the update and potential merge with an existing node.
+      let new_in_set = Self::live_params(
+        &graph,
+        node_id,
+        edges_by_dependency_key
+          .iter()
+          .flat_map(|(dependency_key, edges)| {
+            edges
+              .iter()
+              .map(move |dependency_id| (*dependency_key, *dependency_id))
+          }),
+      );
+
       if edges_by_dependency_key
         .iter()
         .all(|(_, dependency_ids)| dependency_ids.len() == 1)
+        && new_in_set == graph[node_id].1
       {
-        // This node is already monomorphic: dependencies may have changed though, so confirm
-        // that its liveness set is up to date. If it isn't, we'll fall through to monomorphize it,
-        // which will handle the update and potential merge with an existing node.
-        let new_in_set = Self::live_params(
-          &graph,
-          node_id,
-          graph
-            .edges_directed(node_id, Direction::Outgoing)
-            .map(|edge_ref| (*edge_ref.weight(), edge_ref.target())),
+        println!(
+          ">>> already monomorphic {} with accurate liveness: {}",
+          graph[node_id].0,
+          params_str(&graph[node_id].1)
         );
-        if graph[node_id].1 == new_in_set {
-          /*
-          println!(
-            ">>> already monomorphic {:?} with accurate liveness.",
-            graph[node_id]
-          );
-          */
-          continue;
-        } else {
-          /*
-          println!(
-            ">>> already monomorphic {:?}, but needs liveness updates.",
-            graph[node_id]
-          );
-          */
+        /*
+        if graph[node_id].0.to_string().contains("resolve_address(") {
+          panic!("See above.");
         }
+        */
+        continue;
       }
 
-      /*
       println!(
-        ">>> visiting {:?} for {:?}",
-        edges_by_dependency_key
-          .iter()
-          .map(|edges| edges.len())
-          .collect::<Vec<_>>(),
-        graph[node_id]
+        ">>> creating monomorphizations of {} with {} (reduced to {} from {})",
+        graph[node_id].0,
+        params_str(&new_in_set),
+        new_in_set.len(),
+        graph[node_id].1.len(),
       );
-      */
+      let monomorphizations =
+        Self::monomorphizations(&graph, node_id, &new_in_set, &edges_by_dependency_key);
+      println!(
+        ">>> created {} monomorphizations with lengths for {}",
+        monomorphizations.len(),
+        graph[node_id].0,
+      );
 
       // Needs changes. Add dependees to the list of nodes to visit, and this node to the
       // list of nodes to be deleted.
@@ -331,9 +366,7 @@ impl<'t, R: Rule> Builder<'t, R> {
 
       // Generate a replacement node per valid monomorphization of this rule.
       let mut modified_existing_nodes = HashSet::new();
-      for combination in
-        Self::monomorphizations(&graph, &graph[node_id].1, &edges_by_dependency_key)
-      {
+      for combination in monomorphizations {
         // Compute a live variable set for this combination of deps, and see whether there is
         // an existing copy of this Rule with those live_params.
         let live_params = Self::live_params(
@@ -343,16 +376,17 @@ impl<'t, R: Rule> Builder<'t, R> {
         );
         /*
         println!(
-          ">>>   {} generating permutation for {} that consumes: {:#?}",
+          ">>>   {} generating permutation (reduced to {} from {}) that consumes: {:#?}",
           graph[node_id].0,
-          crate::params_str(&live_params),
+          live_params.len(),
+          new_in_set.len(),
           combination
             .iter()
             .map(|(dk, di)| format!(
               "{} from ({} with {})",
               dk,
               graph[*di].0,
-              crate::params_str(&graph[*di].1)
+              params_str(&graph[*di].1)
             ))
             .collect::<Vec<_>>()
         );
@@ -366,8 +400,23 @@ impl<'t, R: Rule> Builder<'t, R> {
             ),
           };
 
-        // Give all dependees edges to the chosen node for this combo.
+        // Give all dependees for whom this combination is still valid edges to the new node.
         for (dependee_id, dependency_key) in &dependee_edges {
+          if dependency_key
+            .provided_param()
+            .map(|p| !live_params.contains(&p))
+            .unwrap_or(false)
+          {
+            // This combination did not consume the required param.
+            println!(
+              ">>> skipping edge from {} to {} because {} was not consumed by this combo (only {})",
+              graph[*dependee_id].0,
+              graph[replacement_id].0,
+              dependency_key,
+              params_str(&live_params)
+            );
+            continue;
+          }
           // NB: For existing nodes, confirm that we are not creating a duplicate edge.
           if is_new_node
             || graph
@@ -413,20 +462,21 @@ impl<'t, R: Rule> Builder<'t, R> {
       //      which case we leave it the graph to be resolved by the pruning phases
       // In either case, it is fruitless to revisit those nodes, so we ignore them here. See the
       // method docstring.
-      to_visit.extend(
-        modified_existing_nodes
-          .into_iter()
-          .filter(|existing_node_id| {
-            let visit = graph[*existing_node_id].1 != graph[node_id].1;
-            if visit {
-              println!(
-                ">>> enqueueing existing node to be visited {:?}",
-                existing_node_id
-              );
-            }
-            visit
-          }),
-      );
+      for existing_node_id in modified_existing_nodes {
+        if graph[existing_node_id].1 != graph[node_id].1 {
+          println!(
+            ">>> enqueueing existing node to be visited {:?}",
+            existing_node_id
+          );
+          to_visit.push_back(existing_node_id);
+        }
+      }
+
+      /*
+      if graph[node_id].0.to_string().contains("resolve_address(") {
+        panic!("See above.");
+      }
+      */
     }
 
     // Finally, delete all nodes that were replaced (which will also delete their edges).
@@ -860,6 +910,7 @@ impl<'t, R: Rule> Builder<'t, R> {
   ///
   fn monomorphizations(
     graph: &ParamsLabeledGraph<R>,
+    node_id: NodeIndex<u32>,
     all_available_params: &ParamTypes<R::TypeId>,
     deps: &[(R::DependencyKey, Vec<NodeIndex<u32>>)],
   ) -> Vec<Vec<(R::DependencyKey, NodeIndex<u32>)>> {
@@ -905,7 +956,7 @@ impl<'t, R: Rule> Builder<'t, R> {
       // TODO: We don't currently allow for ambiguity here (ambiguous entries are logged and
       // dropped), but we should (using the `combinations_of_one` code), and generate the
       // node for later inspection.
-      let chosen_dependencies = Self::choose_dependencies(graph, &available_params, deps);
+      let chosen_dependencies = Self::choose_dependencies(graph, node_id, &available_params, deps);
       if !chosen_dependencies.is_empty() {
         combinations.push((available_params_bits, chosen_dependencies));
       }
@@ -922,19 +973,33 @@ impl<'t, R: Rule> Builder<'t, R> {
   /// exists (it may not, because we're searching for sets of legal parameters in the powerset
   /// of all used params).
   ///
-  /// NB: There is no need to confirm that a provided param is consumed, because all dependencies
-  /// have already been filtered for that case.
-  ///
   fn choose_dependencies<'a>(
     graph: &ParamsLabeledGraph<R>,
+    node_id: NodeIndex<u32>,
     available_params: &ParamTypes<R::TypeId>,
     deps: &[(R::DependencyKey, Vec<NodeIndex<u32>>)],
   ) -> Vec<Vec<(R::DependencyKey, NodeIndex<u32>)>> {
     let mut combination = Vec::new();
     for (key, dependency_ids) in deps {
+      let provided_param = key.provided_param();
       let satisfiable_dependency_ids = dependency_ids
         .iter()
-        .filter(|&dependency_id| graph[*dependency_id].1.is_subset(available_params))
+        .filter(|&dependency_id| {
+          let dep_set = if *dependency_id == node_id {
+            available_params
+          } else {
+            &graph[*dependency_id].1
+          };
+          let consumes_provided = if let Some(ref p) = provided_param {
+            dep_set.contains(p)
+          } else {
+            true
+          };
+          consumes_provided
+            && dep_set
+              .iter()
+              .all(|p| available_params.contains(p) || Some(*p) == provided_param)
+        })
         .collect::<Vec<_>>();
 
       if satisfiable_dependency_ids.is_empty() {
@@ -951,7 +1016,11 @@ impl<'t, R: Rule> Builder<'t, R> {
       let mut minimum_param_set_size = ::std::usize::MAX;
       let mut smallest_satisfiable_ids = Vec::new();
       for satisfiable_id in satisfiable_dependency_ids {
-        let param_set_size = graph[*satisfiable_id].1.len();
+        let param_set_size = if *satisfiable_id == node_id {
+          available_params.len()
+        } else {
+          graph[*satisfiable_id].1.len()
+        };
         if param_set_size < minimum_param_set_size {
           smallest_satisfiable_ids.clear();
           smallest_satisfiable_ids.push(satisfiable_id);
@@ -969,7 +1038,15 @@ impl<'t, R: Rule> Builder<'t, R> {
           return vec![];
         }
         _ => {
-          println!(">>> TODO: ambiguity.");
+          println!(
+            ">>> TODO: ambiguity for {} with {}: {:?}",
+            key,
+            params_str(&available_params),
+            smallest_satisfiable_ids
+              .iter()
+              .map(|&id| format!("{}", graph[*id].0))
+              .collect::<Vec<_>>()
+          );
           return vec![];
         }
       }
