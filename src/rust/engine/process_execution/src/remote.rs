@@ -721,7 +721,7 @@ impl CommandRunner {
             // continually submitting a request if ultimately futile.)
             trace!("retryable error: {}", e);
             if num_retries >= MAX_RETRIES {
-              return Err(format!("Too many failures from server, last error: {}", e));
+              return Err(format!("Too many failures from server. The last error was: {}", e));
             } else {
               // Increment the retry counter and allow loop to retry.
               num_retries += 1;
