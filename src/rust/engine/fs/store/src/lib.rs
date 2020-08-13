@@ -42,7 +42,7 @@ use bazel_protos::remote_execution as remexec;
 use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
 use concrete_time::TimeSpan;
-use fs::{default_cache_path, FileContent};
+use fs::{default_cache_path, FileContent, RelativePath};
 use futures::compat::Future01CompatExt;
 use futures::future::{self as future03, Either, FutureExt, TryFutureExt};
 use futures01::{future, Future};
@@ -51,7 +51,7 @@ use protobuf::Message;
 use serde_derive::Serialize;
 pub use serverset::BackoffConfig;
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::convert::TryInto;
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -104,27 +104,30 @@ pub struct DirectoryMaterializeMetadata {
 }
 
 impl DirectoryMaterializeMetadata {
-  fn to_path_list(&self) -> Vec<String> {
+  fn to_relative_paths(&self) -> Result<HashSet<RelativePath>, String> {
     fn recurse(
-      outputs: &mut Vec<String>,
-      path_so_far: PathBuf,
+      outputs: &mut HashSet<RelativePath>,
+      path_so_far: RelativePath,
       current: &DirectoryMaterializeMetadata,
-    ) {
+    ) -> Result<(), String> {
       for (child, _) in current.child_files.iter() {
-        outputs.push(path_so_far.join(child).to_string_lossy().to_string())
+        outputs.insert(path_so_far.join(RelativePath::new(child)?));
       }
 
       for (dir, meta) in current.child_directories.iter() {
-        recurse(outputs, path_so_far.join(dir), &meta);
+        recurse(outputs, path_so_far.join(RelativePath::new(dir)?), &meta)?
       }
+      Ok(())
     }
-    let mut output_paths: Vec<String> = vec![];
-    recurse(&mut output_paths, PathBuf::new(), self);
-    output_paths
+    let mut output_paths: HashSet<RelativePath> = HashSet::new();
+    recurse(&mut output_paths, RelativePath::empty(), self)?;
+    Ok(output_paths)
   }
 
-  pub fn contains(&self, path: &str) -> bool {
-    self.to_path_list().contains(&path.to_string())
+  pub fn contains_file(&self, path: &RelativePath) -> bool {
+    self
+      .to_relative_paths()
+      .map_or(false, |paths| paths.contains(path))
   }
 }
 

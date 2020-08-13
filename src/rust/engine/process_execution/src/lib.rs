@@ -36,7 +36,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryFrom;
 use std::ops::AddAssign;
-use std::path::{Component, Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use store::UploadSummary;
@@ -68,6 +68,7 @@ pub mod named_caches;
 extern crate uname;
 
 pub use crate::named_caches::{CacheDest, CacheName, NamedCaches};
+use fs::RelativePath;
 
 #[derive(PartialOrd, Ord, Clone, Copy, Debug, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum Platform {
@@ -145,52 +146,6 @@ impl From<PlatformConstraint> for String {
       PlatformConstraint::Darwin => "darwin".to_string(),
       PlatformConstraint::None => "none".to_string(),
     }
-  }
-}
-
-#[derive(Derivative, Clone, Debug, Eq)]
-#[derivative(PartialEq, Hash)]
-pub struct RelativePath(PathBuf);
-
-impl RelativePath {
-  pub fn new<P: AsRef<Path>>(path: P) -> Result<RelativePath, String> {
-    let mut relative_path = PathBuf::new();
-    let candidate = path.as_ref();
-    for component in candidate.components() {
-      match component {
-        Component::Prefix(_) => {
-          return Err(format!("Windows paths are not allowed: {:?}", candidate))
-        }
-        Component::RootDir => {
-          return Err(format!("Absolute paths are not allowed: {:?}", candidate))
-        }
-        Component::CurDir => continue,
-        Component::ParentDir => {
-          if !relative_path.pop() {
-            return Err(format!(
-              "Relative paths that escape the root are not allowed: {:?}",
-              candidate
-            ));
-          }
-        }
-        Component::Normal(path) => relative_path.push(path),
-      }
-    }
-    Ok(RelativePath(relative_path))
-  }
-
-  pub fn to_str(&self) -> Option<&str> {
-    self.0.to_str()
-  }
-
-  pub fn join(&self, other: Self) -> RelativePath {
-    RelativePath(self.0.join(other))
-  }
-}
-
-impl AsRef<Path> for RelativePath {
-  fn as_ref(&self) -> &Path {
-    self.0.as_path()
   }
 }
 

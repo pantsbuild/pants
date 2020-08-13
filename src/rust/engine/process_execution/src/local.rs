@@ -1,6 +1,8 @@
 use async_trait::async_trait;
 use boxfuture::{try_future, BoxFuture, Boxable};
-use fs::{self, GlobExpansionConjunction, GlobMatching, PathGlobs, StrictGlobMatching};
+use fs::{
+  self, GlobExpansionConjunction, GlobMatching, PathGlobs, RelativePath, StrictGlobMatching,
+};
 use futures::compat::Future01CompatExt;
 use futures::future::{FutureExt, TryFutureExt};
 use futures::stream::{BoxStream, StreamExt, TryStreamExt};
@@ -30,7 +32,7 @@ use tokio_util::codec::{BytesCodec, FramedRead};
 
 use crate::{
   Context, FallibleProcessResultWithPlatform, MultiPlatformProcess, NamedCaches, Platform,
-  PlatformConstraint, Process, RelativePath,
+  PlatformConstraint, Process,
 };
 
 use bytes::{Bytes, BytesMut};
@@ -453,20 +455,16 @@ pub trait CapturedWorkdir {
       .await?;
 
     let exclusive_spawn = RelativePath::new(&req.argv[0]).map_or(false, |relative_path| {
-      let executable_path = if let Some(working_drectory) = &req.working_directory {
-        working_drectory.join(relative_path)
+      let executable = if let Some(working_directory) = &req.working_directory {
+        working_directory.join(relative_path)
       } else {
         relative_path
       };
-      if let Some(exe) = executable_path.to_str() {
-        let exe_was_materialized = sandbox.contains(exe);
-        if exe_was_materialized {
-          debug!("Obtaining exclusive spawn lock for process with argv {:?} since we materialized its binary {}.", &req.argv, exe);
-        }
-        exe_was_materialized
-      } else {
-        false
+      let exe_was_materialized = sandbox.contains_file(&executable);
+      if exe_was_materialized {
+        debug!("Obtaining exclusive spawn lock for process with argv {:?} since we materialized its executable {:?}.", &req.argv, executable);
       }
+      exe_was_materialized
     });
 
     // Spawn the process.
