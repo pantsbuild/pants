@@ -1,7 +1,31 @@
+use crate::builder::combinations_of_one;
 use crate::{Palette, Query, RuleGraph};
 use std::fmt;
 
-use crate::builder::Powerset;
+#[test]
+fn combinations_of_one_test() {
+  let combo = |input: Vec<Vec<usize>>| -> Vec<Vec<usize>> {
+    combinations_of_one(&input)
+      .map(|output| output.into_iter().cloned().collect())
+      .collect()
+  };
+  let empty: Vec<Vec<usize>> = vec![];
+
+  // Any empty set means the whole result is empty.
+  assert_eq!(empty, combo(vec![]));
+  assert_eq!(empty, combo(vec![vec![1, 2], vec![]]));
+  assert_eq!(empty, combo(vec![vec![], vec![1, 2]]));
+
+  assert_eq!(vec![vec![1]], combo(vec![vec![1]]));
+  assert_eq!(
+    vec![vec![1, 3], vec![2, 3]],
+    combo(vec![vec![1, 2], vec![3]])
+  );
+  assert_eq!(
+    vec![vec![1, 2, 4], vec![1, 3, 4]],
+    combo(vec![vec![1], vec![2, 3], vec![4]])
+  );
+}
 
 #[test]
 fn basic() {
@@ -211,31 +235,6 @@ fn wide() {
 
   graph.validate().unwrap();
   graph.find_root_edges(vec!["D"], "Output").unwrap();
-}
-
-#[test]
-fn powerset_by_size() {
-  assert_eq!(vec![0], Powerset::new(0).collect::<Vec<_>>());
-  assert_eq!(vec![0, 1], Powerset::new(1).collect::<Vec<_>>());
-
-  // And that they are in ascending order by size (ie popcount).
-  let set_size = 8;
-  let powerset_size = 2_i64.pow(set_size as u32);
-  let mut powerset = Powerset::new(set_size).collect::<Vec<_>>();
-  assert_eq!(powerset_size, powerset.len() as i64);
-  let mut prev_popcount = 0;
-  for x in &powerset {
-    assert!(prev_popcount <= x.count_ones());
-    prev_popcount = x.count_ones();
-  }
-  // And that all of the integers are present exactly once.
-  powerset.sort();
-  assert_eq!(
-    (0i64..(powerset_size as i64))
-      .into_iter()
-      .collect::<Vec<_>>(),
-    powerset
-  );
 }
 
 impl super::TypeId for &'static str {

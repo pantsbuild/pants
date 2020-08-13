@@ -32,7 +32,6 @@ use crate::rules::{DependencyKey, ParamTypes, Query, Rule};
 use crate::{params_str, Entry, EntryWithDeps, InnerEntry, RootEntry, RuleEdges, RuleGraph};
 
 use std::collections::{hash_map, HashMap, HashSet, VecDeque};
-use std::convert::TryInto;
 
 use itertools::Itertools;
 use petgraph::graph::{DiGraph, NodeIndex};
@@ -288,7 +287,7 @@ impl<'t, R: Rule> Builder<'t, R> {
 
       // If any DependencyKey has multiple (live/not-deleted) sources, the Rule needs to be
       // monomorphized/duplicated.
-      let edges_by_dependency_key: Vec<(R::DependencyKey, Vec<_>)> = {
+      let edges_by_dependency_key: Vec<Vec<(R::DependencyKey, _)>> = {
         let mut sorted_edges = graph
           .edges_directed(node_id, Direction::Outgoing)
           .collect::<Vec<_>>();
@@ -298,58 +297,38 @@ impl<'t, R: Rule> Builder<'t, R> {
           .group_by(|edge_ref| edge_ref.weight())
           .into_iter()
           .map(|(dependency_key, edge_refs)| {
-            let dependency_ids = edge_refs
+            edge_refs
               .filter(|edge_ref| !to_delete.contains(&edge_ref.target()))
-              .map(|edge_ref| edge_ref.target())
-              .collect();
-            (*dependency_key, dependency_ids)
+              .map(|edge_ref| (*dependency_key, edge_ref.target()))
+              .collect()
           })
           .collect()
       };
 
-      // Confirm that its liveness set is up to date. If it isn't, we'll fall through to
-      // monomorphize it, which will handle the update and potential merge with an existing node.
-      let new_in_set = Self::live_params(
-        &graph,
-        node_id,
-        edges_by_dependency_key
-          .iter()
-          .flat_map(|(dependency_key, edges)| {
-            edges
-              .iter()
-              .map(move |dependency_id| (*dependency_key, *dependency_id))
-          }),
-      );
-
-      if edges_by_dependency_key
-        .iter()
-        .all(|(_, dependency_ids)| dependency_ids.len() == 1)
-        && new_in_set == graph[node_id].1
-      {
-        println!(
-          ">>> already monomorphic {} with accurate liveness: {}",
-          graph[node_id].0,
-          params_str(&graph[node_id].1)
+      if edges_by_dependency_key.iter().all(|edges| edges.len() == 1) {
+        // Confirm that its liveness set is up to date. If it isn't, we'll fall through to
+        // monomorphize it, which will handle the update and potential merge with an existing node.
+        let new_in_set = Self::live_params(
+          &graph,
+          node_id,
+          edges_by_dependency_key
+            .iter()
+            .flat_map(|edges| edges.iter().cloned()),
         );
-        /*
-        if graph[node_id].0.to_string().contains("resolve_address(") {
-          panic!("See above.");
+
+        if new_in_set == graph[node_id].1 {
+          println!(
+            ">>> already monomorphic {} with accurate liveness: {}",
+            graph[node_id].0,
+            params_str(&graph[node_id].1)
+          );
+          continue;
         }
-        */
-        continue;
       }
 
+      let monomorphizations = Self::monomorphizations(&graph, node_id, &edges_by_dependency_key);
       println!(
-        ">>> creating monomorphizations of {} with {} (reduced to {} from {})",
-        graph[node_id].0,
-        params_str(&new_in_set),
-        new_in_set.len(),
-        graph[node_id].1.len(),
-      );
-      let monomorphizations =
-        Self::monomorphizations(&graph, node_id, &new_in_set, &edges_by_dependency_key);
-      println!(
-        ">>> created {} monomorphizations with lengths for {}",
+        ">>> created {} monomorphizations for {}",
         monomorphizations.len(),
         graph[node_id].0,
       );
@@ -364,16 +343,9 @@ impl<'t, R: Rule> Builder<'t, R> {
       to_delete.insert(node_id);
       rules.remove(&graph[node_id]);
 
-      // Generate a replacement node per valid monomorphization of this rule.
+      // Generate replacement nodes for the valid monomorphizations of this rule.
       let mut modified_existing_nodes = HashSet::new();
-      for combination in monomorphizations {
-        // Compute a live variable set for this combination of deps, and see whether there is
-        // an existing copy of this Rule with those live_params.
-        let live_params = Self::live_params(
-          &graph,
-          node_id,
-          combination.iter().map(|(dk, di)| (dk.clone(), di.clone())),
-        );
+      for (live_params, combinations) in monomorphizations {
         /*
         println!(
           ">>>   {} generating permutation (reduced to {} from {}) that consumes: {:#?}",
@@ -400,54 +372,55 @@ impl<'t, R: Rule> Builder<'t, R> {
             ),
           };
 
-        // Give all dependees for whom this combination is still valid edges to the new node.
-        for (dependee_id, dependency_key) in &dependee_edges {
-          if dependency_key
-            .provided_param()
-            .map(|p| !live_params.contains(&p))
-            .unwrap_or(false)
-          {
-            // This combination did not consume the required param.
-            println!(
-              ">>> skipping edge from {} to {} because {} was not consumed by this combo (only {})",
-              graph[*dependee_id].0,
-              graph[replacement_id].0,
-              dependency_key,
-              params_str(&live_params)
-            );
-            continue;
-          }
-          // NB: For existing nodes, confirm that we are not creating a duplicate edge.
-          if is_new_node
-            || graph
+        for combination in combinations {
+          // Give all dependees for whom this combination is still valid edges to the new node.
+          for (dependee_id, dependency_key) in &dependee_edges {
+            if dependency_key
+              .provided_param()
+              .map(|p| !live_params.contains(&p))
+              .unwrap_or(false)
+            {
+              // This combination did not consume the required param.
+              println!(
+                ">>> skipping edge from {} to {} because {} was not consumed by this combo (only {})",
+                graph[*dependee_id].0,
+                graph[replacement_id].0,
+                dependency_key,
+                params_str(&live_params)
+              );
+              continue;
+            }
+            // NB: Confirm that we are not creating a duplicate edge.
+            if graph
               .edges_directed(*dependee_id, Direction::Outgoing)
               .all(|edge_ref| {
                 edge_ref.target() != replacement_id || edge_ref.weight() != dependency_key
               })
-          {
-            graph.add_edge(*dependee_id, replacement_id, *dependency_key);
-          }
-        }
-
-        // And give it edges to this combination of dependencies (while confirming that we don't
-        // create dupes).
-        let existing_edges = graph
-          .edges_directed(replacement_id, Direction::Outgoing)
-          .map(|edge_ref| (*edge_ref.weight(), edge_ref.target()))
-          .collect::<HashSet<_>>();
-        for (dependency_key, dependency_id) in combination {
-          // NB: When a node depends on itself, we adjust the destination of that self-edge to point to
-          // the new node.
-          let dependency_id = if dependency_id == node_id {
-            replacement_id
-          } else {
-            dependency_id
-          };
-          if !existing_edges.contains(&(dependency_key, dependency_id)) {
-            if !is_new_node {
-              modified_existing_nodes.insert(replacement_id);
+            {
+              graph.add_edge(*dependee_id, replacement_id, *dependency_key);
             }
-            graph.add_edge(replacement_id, dependency_id, dependency_key);
+          }
+
+          // And give it edges to this combination of dependencies (while confirming that we don't
+          // create dupes).
+          let existing_edges = graph
+            .edges_directed(replacement_id, Direction::Outgoing)
+            .map(|edge_ref| (*edge_ref.weight(), edge_ref.target()))
+            .collect::<HashSet<_>>();
+          for (dependency_key, dependency_id) in combination {
+            // NB: When a node depends on itself, we adjust the destination of that self-edge to point to
+            // the new node.
+            let dependency_id = if dependency_id == node_id {
+              replacement_id
+            } else {
+              dependency_id
+            };
+            if !existing_edges.contains(&(dependency_key, dependency_id)) {
+              if !is_new_node {
+                modified_existing_nodes.insert(replacement_id);
+              }
+              graph.add_edge(replacement_id, dependency_id, dependency_key);
+            }
           }
         }
       }
@@ -911,148 +884,64 @@ impl<'t, R: Rule> Builder<'t, R> {
   fn monomorphizations(
     graph: &ParamsLabeledGraph<R>,
     node_id: NodeIndex<u32>,
-    all_available_params: &ParamTypes<R::TypeId>,
-    deps: &[(R::DependencyKey, Vec<NodeIndex<u32>>)],
-  ) -> Vec<Vec<(R::DependencyKey, NodeIndex<u32>)>> {
-    // For the powerset of used parameters (in ascending order by set size), determine which
-    // dependency combinations are satisfiable.
-    let used_params_size: u8 = all_available_params.len().try_into().unwrap_or_else(|_| {
-      panic!(
-        "Cannot operate on more than 256 consumed parameters: {}",
-        params_str(
-          &all_available_params
-            .iter()
-            .cloned()
-            .collect::<ParamTypes<_>>()
-        )
-      );
-    });
-    let mut combinations: Vec<(i64, Vec<Vec<(R::DependencyKey, NodeIndex<u32>)>>)> = Vec::new();
-    for available_params_bits in Powerset::new(used_params_size) {
-      // If a subset of these parameters is already satisfied, skip. This has the effect of
-      // selecting the smallest sets of parameters that will satisfy a rule.
-      // NB: This scan over satisfied sets is linear, but should have a small N.
-      let already_satisfied = combinations.iter().any(|&(satisfied_params_bits, _)| {
-        // Is a subset if "subtracting" the bits of the superset results in the empty set.
-        satisfied_params_bits & !available_params_bits == 0
-      });
-      if already_satisfied {
-        continue;
-      }
+    deps: &[Vec<(R::DependencyKey, NodeIndex<u32>)>],
+  ) -> HashMap<ParamTypes<R::TypeId>, Vec<Vec<(R::DependencyKey, NodeIndex<u32>)>>> {
+    let mut combinations: HashMap<
+      ParamTypes<R::TypeId>,
+      Vec<Vec<(R::DependencyKey, NodeIndex<u32>)>>,
+    > = HashMap::new();
+    for combination in combinations_of_one(deps) {
+      let combination = combination.into_iter().cloned().collect::<Vec<_>>();
+      let live_params = Self::live_params(graph, node_id, combination.iter().cloned());
 
-      // We haven't seen this combination before: compute the actual parameter values, and then
-      // choose valid combinations of dependencies.
-      let available_params = all_available_params
-        .iter()
-        .enumerate()
-        .filter_map(|(idx, typeid)| {
-          if available_params_bits & (1 << idx) == 0 {
-            None
+      // If this exact param set has already been satisfied, we still recompute the possible
+      // combination of deps in case it represents ambiguity. Otherwise, if this set is a superset
+      // of any already-satisfied set, skip it. Finally, if it is a subset of any already satisfied
+      // sets, delete them.
+      // NB: This scan over satisfied sets is linear, but should have a small N because of how it
+      // is filtered.
+      let is_new_set = if combinations.contains_key(&live_params) {
+        false
+      } else if combinations
+        .keys()
+        .any(|already_satisfied| already_satisfied.is_subset(&live_params))
+      {
+        // If any subsets are already satisfied, skip this combination.
+        continue;
+      } else {
+        true
+      };
+
+      // Confirm that this combination of deps is satisfiable: if so, add to the set for this param
+      // count, and if it is a new set, delete any larger sets.
+      let satisfiable = combination.iter().all(|(dependency_key, dependency_id)| {
+        if let Some(provided_param) = dependency_key.provided_param() {
+          let used_set = if *dependency_id == node_id {
+            &live_params
           } else {
-            Some(*typeid)
-          }
-        })
-        .collect();
-      // TODO: We don't currently allow for ambiguity here (ambiguous entries are logged and
-      // dropped), but we should (using the `combinations_of_one` code), and generate the
-      // node for later inspection.
-      let chosen_dependencies = Self::choose_dependencies(graph, node_id, &available_params, deps);
-      if !chosen_dependencies.is_empty() {
-        combinations.push((available_params_bits, chosen_dependencies));
+            &graph[*dependency_id].1
+          };
+          used_set.contains(&provided_param)
+        } else {
+          true
+        }
+      });
+      if satisfiable {
+        if is_new_set {
+          // Remove any supersets of this set, and then add it.
+          combinations.retain(|already_satisfied, _| !already_satisfied.is_superset(&live_params));
+          combinations.insert(live_params, vec![combination]);
+        } else {
+          // Add this combination to the existing set.
+          combinations
+            .get_mut(&live_params)
+            .unwrap()
+            .push(combination);
+        }
       }
     }
 
     combinations
-      .into_iter()
-      .flat_map(|(_, combinations)| combinations)
-      .collect()
-  }
-
-  ///
-  /// Given a set of available Params, choose one combination of satisfiable dependencies if it
-  /// exists (it may not, because we're searching for sets of legal parameters in the powerset
-  /// of all used params).
-  ///
-  fn choose_dependencies<'a>(
-    graph: &ParamsLabeledGraph<R>,
-    node_id: NodeIndex<u32>,
-    available_params: &ParamTypes<R::TypeId>,
-    deps: &[(R::DependencyKey, Vec<NodeIndex<u32>>)],
-  ) -> Vec<Vec<(R::DependencyKey, NodeIndex<u32>)>> {
-    let mut combination = Vec::new();
-    for (key, dependency_ids) in deps {
-      let provided_param = key.provided_param();
-      let satisfiable_dependency_ids = dependency_ids
-        .iter()
-        .filter(|&dependency_id| {
-          let dep_set = if *dependency_id == node_id {
-            available_params
-          } else {
-            &graph[*dependency_id].1
-          };
-          let consumes_provided = if let Some(ref p) = provided_param {
-            dep_set.contains(p)
-          } else {
-            true
-          };
-          consumes_provided
-            && dep_set
-              .iter()
-              .all(|p| available_params.contains(p) || Some(*p) == provided_param)
-        })
-        .collect::<Vec<_>>();
-
-      if satisfiable_dependency_ids.is_empty() {
-        // No source of a dependency was satisfiable with these Params.
-        return vec![];
-      } else if satisfiable_dependency_ids.len() == 1 {
-        combination.push((*key, *satisfiable_dependency_ids[0]));
-        continue;
-      }
-
-      // Choose the non-ambiguous entry with the smallest set of Params, as that minimizes Node
-      // identities in the graph and biases toward receiving values from dependencies (which do not
-      // affect our identity) rather than dependents.
-      let mut minimum_param_set_size = ::std::usize::MAX;
-      let mut smallest_satisfiable_ids = Vec::new();
-      for satisfiable_id in satisfiable_dependency_ids {
-        let param_set_size = if *satisfiable_id == node_id {
-          available_params.len()
-        } else {
-          graph[*satisfiable_id].1.len()
-        };
-        if param_set_size < minimum_param_set_size {
-          smallest_satisfiable_ids.clear();
-          smallest_satisfiable_ids.push(satisfiable_id);
-          minimum_param_set_size = param_set_size;
-        } else if param_set_size == minimum_param_set_size {
-          smallest_satisfiable_ids.push(satisfiable_id);
-        }
-      }
-
-      match smallest_satisfiable_ids.len() {
-        1 => {
-          combination.push((*key, *smallest_satisfiable_ids[0]));
-        }
-        0 => {
-          return vec![];
-        }
-        _ => {
-          println!(
-            ">>> TODO: ambiguity for {} with {}: {:?}",
-            key,
-            params_str(&available_params),
-            smallest_satisfiable_ids
-              .iter()
-              .map(|&id| format!("{}", graph[*id].0))
-              .collect::<Vec<_>>()
-          );
-          return vec![];
-        }
-      }
-    }
-
-    vec![combination]
   }
 
   ///
@@ -1078,106 +967,22 @@ impl<'t, R: Rule> Builder<'t, R> {
 }
 
 ///
-/// Iterates over all combinations of the given set size in ascending order.
+/// Generate all combinations of one element from each input vector.
 ///
-pub struct Powerset {
-  pop_count: u8,
-  block_size: u8,
-  permutations_for_pop_count: Permutations,
-}
-
-impl Powerset {
-  pub fn new(block_size: u8) -> Powerset {
-    Powerset {
-      pop_count: 0,
-      block_size,
-      // NB: Initialized for popcount 1, since a popcount of 0 isn't legal, and is handled in
-      // the loop body.
-      permutations_for_pop_count: Permutations::new(1, block_size),
-    }
-  }
-}
-
-impl Iterator for Powerset {
-  type Item = i64;
-
-  fn next(&mut self) -> Option<Self::Item> {
-    if self.pop_count == 0 {
-      self.pop_count += 1;
-      // The empty set.
-      return Some(0);
-    }
-
-    loop {
-      if self.pop_count > self.block_size {
-        return None;
-      }
-
-      let next = self.permutations_for_pop_count.next();
-      if next.is_some() {
-        return next;
-      } else {
-        // Start iterating over the permutations of the next set size.
-        self.pop_count += 1;
-        self.permutations_for_pop_count = Permutations::new(self.pop_count, self.block_size);
-      }
-    }
-  }
-}
-
-///
-/// An iterator that generates all permutations with a particular size as a bitset in an i64.
-///
-/// Based on https://alexbowe.com/popcount-permutations/
-///
-struct Permutations {
-  v: i64,
-  initial: i64,
-  block_mask: i64,
-}
-
-impl Permutations {
-  fn new(pop_count: u8, block_size: u8) -> Permutations {
-    assert!(pop_count > 0);
-    let initial = Self::first_perm(pop_count);
-    let block_mask = Self::first_perm(block_size);
-    Permutations {
-      v: initial,
-      initial,
-      block_mask,
-    }
-  }
-
-  ///
-  /// Generates the first permutation with a given count of set bits, which is used to generate
-  /// the rest.
-  ///
-  fn first_perm(c: u8) -> i64 {
-    (1_i64 << c) - 1_i64
-  }
-
-  ///
-  /// Generate the next permutation with a given amount of set bits,
-  /// given the previous lexicographical value.
-  ///
-  /// Taken from http://graphics.stanford.edu/~seander/bithacks.html
-  ///
-  fn next_perm(v: i64) -> i64 {
-    let t = (v | (v - 1)) + 1;
-    t | ((((t & -t) / (v & -v)) >> 1) - 1)
-  }
-}
-
-impl Iterator for Permutations {
-  type Item = i64;
-
-  fn next(&mut self) -> Option<Self::Item> {
-    if self.v >= self.initial {
-      let result = self.v;
-      self.v = Self::next_perm(self.v) & self.block_mask;
-      Some(result)
-    } else {
-      None
+pub(crate) fn combinations_of_one<T: std::fmt::Debug>(
+  input: &[Vec<T>],
+) -> Box<dyn Iterator<Item = Vec<&T>> + '_> {
+  match input.len() {
+    0 => Box::new(std::iter::empty()),
+    1 => Box::new(input[0].iter().map(|item| vec![item])),
+    len => {
+      let last_idx = len - 1;
+      Box::new(input[last_idx].iter().flat_map(move |item| {
+        combinations_of_one(&input[..last_idx]).map(move |mut prefix| {
+          prefix.push(item);
+          prefix
+        })
+      }))
     }
   }
 }
