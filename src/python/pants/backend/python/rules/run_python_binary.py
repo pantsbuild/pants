@@ -66,7 +66,7 @@ async def create_python_binary_run_request(
         Pex,
         PexRequest(
             output_filename=output_filename,
-            additional_args=(*field_set.generate_additional_args(python_binary_defaults),),
+            additional_args=field_set.generate_additional_args(python_binary_defaults),
         ),
     )
 
