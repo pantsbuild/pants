@@ -1,6 +1,8 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import os
+
 from pants.backend.python.rules.create_python_binary import PythonBinaryFieldSet
 from pants.backend.python.rules.pex import Pex, PexPlatforms
 from pants.backend.python.rules.pex_from_targets import PexFromTargetsRequest
@@ -64,11 +66,11 @@ async def create_python_binary_run_request(
     merged_digest = await Get(
         Digest, MergeDigests([pex.digest, sources.source_files.snapshot.digest])
     )
+    chrooted_source_roots = [os.path.join("{chroot}", sr) for sr in sources.source_roots]
     return RunRequest(
         digest=merged_digest,
-        binary_name=pex.output_filename,
-        prefix_args=("-m", entry_point),
-        env={"PEX_EXTRA_SYS_PATH": ":".join(sources.source_roots)},
+        args=(os.path.join("{chroot}", pex.output_filename), "-m", entry_point),
+        env={"PEX_EXTRA_SYS_PATH": ":".join(chrooted_source_roots)},
     )
 
 

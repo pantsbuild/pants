@@ -306,8 +306,7 @@ async def create_pex(
     platform: Platform,
     log_level: LogLevel,
 ) -> Pex:
-    """Returns a PEX with the given requirements, optional entry point, optional interpreter
-    constraints, and optional requirement constraints."""
+    """Returns a PEX with the given settings."""
 
     argv = [
         "--output-file",
