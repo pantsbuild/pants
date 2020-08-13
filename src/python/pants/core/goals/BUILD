@@ -15,6 +15,12 @@ python_integration_tests(
     'examples/src/python/example:hello_directory',
     '//:isort_cfg',
     'examples:isort_cfg',
+    ':pydevd'
   ],
   timeout=240,
+)
+
+python_requirement_library(
+  name='pydevd',
+  requirements=[python_requirement('pydevd-pycharm')]
 )

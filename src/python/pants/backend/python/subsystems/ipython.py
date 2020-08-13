@@ -10,7 +10,23 @@ class IPython(PythonToolBase):
     """The IPython enhanced REPL (https://ipython.org/)."""
 
     options_scope = "ipython"
-    default_version = "ipython==5.8.0"
+    default_version = "ipython==7.16.1"  # The last version to support Python 3.6.
     default_extra_requirements: List[str] = []
     default_entry_point = "IPython:start_ipython"
-    default_interpreter_constraints = ["CPython>=2.7,<3", "CPython>=3.4"]
+    default_interpreter_constraints = ["CPython>=3.6"]
+
+    @classmethod
+    def register_options(cls, register):
+        super().register_options(register)
+        register(
+            "--ignore-cwd",
+            type=str,
+            advanced=True,
+            default=True,
+            help="Whether to tell IPython not to put the CWD on the import path. "
+            "Normally you want this to be True, so that imports come from the hermetic "
+            "environment Pants creates.  However IPython<7.13.0 doesn't support this option, "
+            "so if you're using an earlier version (e.g., because you have Python 2.7 code) "
+            "then you will need to set this to False, and you may have issues with imports "
+            "from your CWD shading the hermetic environment.",
+        )
