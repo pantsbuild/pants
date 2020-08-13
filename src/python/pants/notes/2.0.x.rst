@@ -5,6 +5,72 @@ This document describes releases leading up to the ``2.0.x`` ``stable`` series.
 
 See https://www.pantsbuild.org/v2.0/docs/release-notes-2-0 for an overview of the changes in this release.
 
+2.0.0.dev8 (8/13/2020)
+----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Change `conftest.py` to default to `python_library` rather than `python_tests` (#10603)
+  `PR #10603 <https://github.com/pantsbuild/pants/pull/10603>`_
+
+* Deprecate `--python-setup-platforms` (#10596)
+  `PR #10596 <https://github.com/pantsbuild/pants/pull/10596>`_
+
+* Make `zip_safe` default to False for `python_binary` targets. (#10608)
+  `PR #10608 <https://github.com/pantsbuild/pants/pull/10608>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Add `--python-infer-string-imports` (#10609)
+  `PR #10609 <https://github.com/pantsbuild/pants/pull/10609>`_
+
+* Add `--pex-verbosity` option to facilitate debugging (#10604)
+  `PR #10604 <https://github.com/pantsbuild/pants/pull/10604>`_
+
+Bugfixes
+~~~~~~~~
+
+* Fix binary running to correctly work with source roots. (#10607)
+  `PR #10607 <https://github.com/pantsbuild/pants/pull/10607>`_
+
+* Fix issues with REPL implementation (#10597)
+  `PR #10597 <https://github.com/pantsbuild/pants/pull/10597>`_
+
+* Fix regression in unmatched globs error message (#10595)
+  `PR #10595 <https://github.com/pantsbuild/pants/pull/10595>`_
+
+* Require `provides` field for a `python_distribution` target (#10591)
+  `PR #10591 <https://github.com/pantsbuild/pants/pull/10591>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Rename `determine_source_files.py` and `strip_source_roots.py` (#10588)
+  `PR #10588 <https://github.com/pantsbuild/pants/pull/10588>`_
+
+* Add XML test results as artifacts on the test goal workunit (#10606)
+  `PR #10606 <https://github.com/pantsbuild/pants/pull/10606>`_
+
+* Add non-root pantsbuild user to remote execution image (#10583)
+  `PR #10583 <https://github.com/pantsbuild/pants/pull/10583>`_
+
+* Move `--files-not-found-behavior` and BUILD file options out of bootstrap options (#10586)
+  `PR #10586 <https://github.com/pantsbuild/pants/pull/10586>`_
+
+* Remoting: limit retries for execution requests. (#10600)
+  `PR #10600 <https://github.com/pantsbuild/pants/pull/10600>`_
+
+* Ensure MyPy always runs with at least Python 3.6 internally. (#10602)
+  `PR #10602 <https://github.com/pantsbuild/pants/pull/10602>`_
+
+Documentation
+~~~~~~~~~~~~~
+
+* Improve errors for invalid `Get` objects (#10593)
+  `PR #10593 <https://github.com/pantsbuild/pants/pull/10593>`_
+
 2.0.0.dev7 (8/10/2020)
 ----------------------
 
