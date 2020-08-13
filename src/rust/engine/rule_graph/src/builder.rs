@@ -29,7 +29,7 @@
 #![allow(clippy::mutex_atomic)]
 
 use crate::rules::{DependencyKey, ParamTypes, Query, Rule};
-use crate::{Entry, EntryWithDeps, InnerEntry, RootEntry, RuleEdges, RuleGraph};
+use crate::{params_str, Entry, EntryWithDeps, InnerEntry, RootEntry, RuleEdges, RuleGraph};
 
 use std::collections::{hash_map, HashMap, HashSet, VecDeque};
 use std::convert::TryInto;
@@ -246,7 +246,7 @@ impl<'t, R: Rule> Builder<'t, R> {
 
       // If any DependencyKey has multiple (live/not-deleted) sources, the Rule needs to be
       // monomorphized/duplicated.
-      let edges_by_dependency_key: Vec<Vec<(R::DependencyKey, _)>> = {
+      let edges_by_dependency_key: Vec<(R::DependencyKey, Vec<_>)> = {
         let mut sorted_edges = graph
           .edges_directed(node_id, Direction::Outgoing)
           .collect::<Vec<_>>();
@@ -256,7 +256,7 @@ impl<'t, R: Rule> Builder<'t, R> {
           .group_by(|edge_ref| edge_ref.weight())
           .into_iter()
           .map(|(dependency_key, edge_refs)| {
-            edge_refs
+            let dependency_ids = edge_refs
               .filter(|edge_ref| {
                 // Filter out the dependency if the in_set of the dependency node does not consume a
                 // provided param. Since the "used parameter" sets of nodes only shrink as
@@ -269,13 +269,17 @@ impl<'t, R: Rule> Builder<'t, R> {
                   };
                 consumes_provided && !to_delete.contains(&edge_ref.target())
               })
-              .map(|edge_ref| (*edge_ref.weight(), edge_ref.target()))
-              .collect()
+              .map(|edge_ref| edge_ref.target())
+              .collect();
+            (*dependency_key, dependency_ids)
           })
           .collect()
       };
 
-      if edges_by_dependency_key.iter().all(|edges| edges.len() == 1) {
+      if edges_by_dependency_key
+        .iter()
+        .all(|(_, dependency_ids)| dependency_ids.len() == 1)
+      {
         // This node is already monomorphic: dependencies may have changed though, so confirm
         // that its liveness set is up to date. If it isn't, we'll fall through to monomorphize it,
         // which will handle the update and potential merge with an existing node.
@@ -325,9 +329,11 @@ impl<'t, R: Rule> Builder<'t, R> {
       to_delete.insert(node_id);
       rules.remove(&graph[node_id]);
 
-      // For each combination of dependencies, produce or find a replacement node.
+      // Generate a replacement node per valid monomorphization of this rule.
       let mut modified_existing_nodes = HashSet::new();
-      for combination in combinations_of_one(&edges_by_dependency_key) {
+      for combination in
+        Self::monomorphizations(&graph, &graph[node_id].1, &edges_by_dependency_key)
+      {
         // Compute a live variable set for this combination of deps, and see whether there is
         // an existing copy of this Rule with those live_params.
         let live_params = Self::live_params(
@@ -383,16 +389,16 @@ impl<'t, R: Rule> Builder<'t, R> {
         for (dependency_key, dependency_id) in combination {
           // NB: When a node depends on itself, we adjust the destination of that self-edge to point to
           // the new node.
-          let dependency_id = if *dependency_id == node_id {
+          let dependency_id = if dependency_id == node_id {
             replacement_id
           } else {
-            *dependency_id
+            dependency_id
           };
-          if !existing_edges.contains(&(*dependency_key, dependency_id)) {
+          if !existing_edges.contains(&(dependency_key, dependency_id)) {
             if !is_new_node {
               modified_existing_nodes.insert(replacement_id);
             }
-            graph.add_edge(replacement_id, dependency_id, *dependency_key);
+            graph.add_edge(replacement_id, dependency_id, dependency_key);
           }
         }
       }
@@ -850,45 +856,32 @@ impl<'t, R: Rule> Builder<'t, R> {
   /// simplified Entry for each legal combination of parameters.
   ///
   /// Computes the union of all parameters used by the dependencies, and then uses the powerset of
-  /// used parameters to filter the possible combinations of dependencies. If multiple choices of
-  /// dependencies are possible for any set of parameters, then the graph is ambiguous.
+  /// used parameters to filter the possible combinations of dependencies.
   ///
-  fn monomorphize_rule(
-    entry: &EntryWithDeps<R>,
-    deps: &[(R::DependencyKey, Vec<Entry<R>>)],
-  ) -> Result<RuleDependencyEdges<R>, Vec<Diagnostic<R>>> {
-    // Collect all used parameters.
-    let all_used_params: Vec<R::TypeId> = {
-      let mut all_used_params = BTreeSet::new();
-      for (key, inputs) in deps {
-        let provided_param = key.provided_param();
-        for input in inputs {
-          all_used_params.extend(
-            input
-              .params()
-              .into_iter()
-              .filter(|p| Some(*p) != provided_param),
-          );
-        }
-      }
-      all_used_params.into_iter().collect::<Vec<_>>()
-    };
-
-    // Then, for the powerset of used parameters (in ascending order by set size), determine which
+  fn monomorphizations(
+    graph: &ParamsLabeledGraph<R>,
+    all_available_params: &ParamTypes<R::TypeId>,
+    deps: &[(R::DependencyKey, Vec<NodeIndex<u32>>)],
+  ) -> Vec<Vec<(R::DependencyKey, NodeIndex<u32>)>> {
+    // For the powerset of used parameters (in ascending order by set size), determine which
     // dependency combinations are satisfiable.
-    let used_params_size: u8 = all_used_params.len().try_into().unwrap_or_else(|_| {
+    let used_params_size: u8 = all_available_params.len().try_into().unwrap_or_else(|_| {
       panic!(
         "Cannot operate on more than 256 consumed parameters: {}",
-        params_str(&all_used_params.iter().cloned().collect::<ParamTypes<_>>())
+        params_str(
+          &all_available_params
+            .iter()
+            .cloned()
+            .collect::<ParamTypes<_>>()
+        )
       );
     });
-    let mut combinations: Vec<(i64, EntryWithDeps<R>, _)> = Vec::new();
-    let mut diagnostics = Vec::new();
+    let mut combinations: Vec<(i64, Vec<Vec<(R::DependencyKey, NodeIndex<u32>)>>)> = Vec::new();
     for available_params_bits in Powerset::new(used_params_size) {
       // If a subset of these parameters is already satisfied, skip. This has the effect of
       // selecting the smallest sets of parameters that will satisfy a rule.
       // NB: This scan over satisfied sets is linear, but should have a small N.
-      let already_satisfied = combinations.iter().any(|&(satisfied_params_bits, _, _)| {
+      let already_satisfied = combinations.iter().any(|&(satisfied_params_bits, _)| {
         // Is a subset if "subtracting" the bits of the superset results in the empty set.
         satisfied_params_bits & !available_params_bits == 0
       });
@@ -896,8 +889,9 @@ impl<'t, R: Rule> Builder<'t, R> {
         continue;
       }
 
-      // We haven't seen this combination before: compute the actual parameter values.
-      let available_params = all_used_params
+      // We haven't seen this combination before: compute the actual parameter values, and then
+      // choose valid combinations of dependencies.
+      let available_params = all_available_params
         .iter()
         .enumerate()
         .filter_map(|(idx, typeid)| {
@@ -908,120 +902,80 @@ impl<'t, R: Rule> Builder<'t, R> {
           }
         })
         .collect();
-      match Self::choose_dependencies(&available_params, deps) {
-        Ok(Some(inputs)) => {
-          let mut rule_edges = RuleEdges::default();
-          for (key, input) in inputs {
-            rule_edges.add_edge(*key, input.clone());
-          }
-          combinations.push((
-            available_params_bits,
-            entry.simplified(available_params),
-            rule_edges,
-          ));
-        }
-        Ok(None) => {}
-        Err(diagnostic) => diagnostics.push(diagnostic),
+      // TODO: We don't currently allow for ambiguity here (ambiguous entries are logged and
+      // dropped), but we should (using the `combinations_of_one` code), and generate the
+      // node for later inspection.
+      let chosen_dependencies = Self::choose_dependencies(graph, &available_params, deps);
+      if !chosen_dependencies.is_empty() {
+        combinations.push((available_params_bits, chosen_dependencies));
       }
     }
 
-    // If none of the combinations was satisfiable, return the generated diagnostics.
-    if combinations.is_empty() {
-      Err(diagnostics)
-    } else {
-      Ok(combinations.into_iter().map(|(_, k, v)| (k, v)).collect())
-    }
+    combinations
+      .into_iter()
+      .flat_map(|(_, combinations)| combinations)
+      .collect()
   }
 
   ///
-  /// Given a set of available Params, choose one combination of satisfiable Entry dependencies if
-  /// it exists (it may not, because we're searching for sets of legal parameters in the powerset
+  /// Given a set of available Params, choose one combination of satisfiable dependencies if it
+  /// exists (it may not, because we're searching for sets of legal parameters in the powerset
   /// of all used params).
   ///
-  /// If an ambiguity is detected in rule dependencies (ie, if multiple rules are satisfiable for
-  /// a single dependency key), fail with a Diagnostic.
+  /// NB: There is no need to confirm that a provided param is consumed, because all dependencies
+  /// have already been filtered for that case.
   ///
   fn choose_dependencies<'a>(
+    graph: &ParamsLabeledGraph<R>,
     available_params: &ParamTypes<R::TypeId>,
-    deps: &'a [(R::DependencyKey, Vec<Entry<R>>)],
-  ) -> Result<Option<Vec<ChosenDependency<'a, R>>>, Diagnostic<R>> {
+    deps: &[(R::DependencyKey, Vec<NodeIndex<u32>>)],
+  ) -> Vec<Vec<(R::DependencyKey, NodeIndex<u32>)>> {
     let mut combination = Vec::new();
-    for (key, input_entries) in deps {
-      let provided_param = key.provided_param();
-      let satisfiable_entries = input_entries
+    for (key, dependency_ids) in deps {
+      let satisfiable_dependency_ids = dependency_ids
         .iter()
-        .filter(|input_entry| {
-          input_entry
-            .params()
-            .iter()
-            .all(|p| available_params.contains(p) || Some(*p) == provided_param)
-        })
+        .filter(|&dependency_id| graph[*dependency_id].1.is_subset(available_params))
         .collect::<Vec<_>>();
 
-      let chosen_entries = Self::choose_dependency(satisfiable_entries);
-      match chosen_entries.len() {
-        0 => {
-          return Ok(None);
+      if satisfiable_dependency_ids.is_empty() {
+        // No source of a dependency was satisfiable with these Params.
+        return vec![];
+      } else if satisfiable_dependency_ids.len() == 1 {
+        combination.push((*key, *satisfiable_dependency_ids[0]));
+        continue;
+      }
+
+      // Choose the non-ambiguous entry with the smallest set of Params, as that minimizes Node
+      // identities in the graph and biases toward receiving values from dependencies (which do not
+      // affect our identity) rather than dependents.
+      let mut minimum_param_set_size = ::std::usize::MAX;
+      let mut smallest_satisfiable_ids = Vec::new();
+      for satisfiable_id in satisfiable_dependency_ids {
+        let param_set_size = graph[*satisfiable_id].1.len();
+        if param_set_size < minimum_param_set_size {
+          smallest_satisfiable_ids.clear();
+          smallest_satisfiable_ids.push(satisfiable_id);
+          minimum_param_set_size = param_set_size;
+        } else if param_set_size == minimum_param_set_size {
+          smallest_satisfiable_ids.push(satisfiable_id);
         }
+      }
+
+      match smallest_satisfiable_ids.len() {
         1 => {
-          combination.push((key, chosen_entries[0]));
+          combination.push((*key, *smallest_satisfiable_ids[0]));
+        }
+        0 => {
+          return vec![];
         }
         _ => {
-          let params_clause = match available_params.len() {
-            0 => "",
-            1 => " with parameter type ",
-            _ => " with parameter types ",
-          };
-
-          return Err(Diagnostic {
-            params: available_params.clone(),
-            reason: format!(
-              "Ambiguous rules to compute {}{}{}",
-              key,
-              params_clause,
-              params_str(&available_params),
-            ),
-            details: chosen_entries
-              .into_iter()
-              .map(|e| (e.clone(), None))
-              .collect(),
-          });
+          println!(">>> TODO: ambiguity.");
+          return vec![];
         }
       }
     }
 
-    Ok(Some(combination))
-  }
-
-  #[allow(clippy::comparison_chain)] // Not actually clearer here.
-  fn choose_dependency<'a>(satisfiable_entries: Vec<&'a Entry<R>>) -> Vec<&'a Entry<R>> {
-    if satisfiable_entries.is_empty() {
-      // No source of this dependency was satisfiable with these Params.
-      return vec![];
-    } else if satisfiable_entries.len() == 1 {
-      return satisfiable_entries;
-    }
-
-    // We prefer the non-ambiguous entry with the smallest set of Params, as that minimizes Node
-    // identities in the graph and biases toward receiving values from dependencies (which do not
-    // affect our identity) rather than dependents.
-    let mut minimum_param_set_size = ::std::usize::MAX;
-    let mut rules = Vec::new();
-    for satisfiable_entry in satisfiable_entries {
-      let param_set_size = match satisfiable_entry {
-        Entry::WithDeps(ref wd) => wd.params().len(),
-        Entry::Param(_) => 1,
-      };
-      if param_set_size < minimum_param_set_size {
-        rules.clear();
-        rules.push(satisfiable_entry);
-        minimum_param_set_size = param_set_size;
-      } else if param_set_size == minimum_param_set_size {
-        rules.push(satisfiable_entry);
-      }
-    }
-
-    rules
+    vec![combination]
   }
 
   ///
