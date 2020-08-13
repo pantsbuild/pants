@@ -165,10 +165,13 @@ class PexZipSafe(BoolField):
     """Whether or not this binary is safe to run in compacted (zip-file) form.
 
     If they are not zip safe, they will be written to disk prior to execution.
+
+    We default to False, because there are various gotchas with zipped pexes. Notably,
+    PEP420 implicit namespace packages don't appear to work in that environment.
     """
 
     alias = "zip_safe"
-    default = True
+    default = False
     value: bool
 
 
