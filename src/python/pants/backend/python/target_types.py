@@ -240,7 +240,7 @@ class PythonBinary(Target):
 
 
 class PythonTestsSources(PythonSources):
-    default = ("test_*.py", "*_test.py", "tests.py", "conftest.py")
+    default = ("test_*.py", "*_test.py", "tests.py")
 
 
 class PythonTestsTimeout(IntField):
