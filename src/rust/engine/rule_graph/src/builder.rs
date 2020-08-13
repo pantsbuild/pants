@@ -117,17 +117,13 @@ impl<'t, R: Rule> Builder<'t, R> {
     //    large) set of used Params.
     let polymorphic_live_params_graph = self.live_param_labeled_graph(initial_polymorphic_graph);
     // 3. monomorphize by copying a node (and its dependees) for each valid combination of its
-    //    dependencies
+    //    dependencies while mantaining liveness sets.
     let monomorphic_live_params_graph = Self::monomorphize(polymorphic_live_params_graph);
-    // 4. delete nodes that are illegal based on their final in/out sets.
-    //    * if a DependencyKey does not consume a provided param, the node and all rule
-    //      dependees are deleted
-    let pruned_nodes_graph = self.prune_nodes(monomorphic_live_params_graph);
-    // 5. choose the best dependencies via in/out sets. fail if:
+    // 4. choose the best dependencies via in/out sets. fail if:
     //    * invalid required param at a Query
     //    * take smallest option, fail for equal-sized sets
-    let pruned_edges_graph = self.prune_edges(pruned_nodes_graph)?;
-    // 6. generate the final graph for nodes reachable from queries
+    let pruned_edges_graph = self.prune_edges(monomorphic_live_params_graph)?;
+    // 5. generate the final graph for nodes reachable from queries
     self.finalize(pruned_edges_graph)
   }
 
@@ -531,73 +527,6 @@ impl<'t, R: Rule> Builder<'t, R> {
     }
 
     graph
-  }
-
-  ///
-  /// After nodes are all labeled with their in/out Param sets, we eliminate any monomorphized
-  /// Rules that did not satisfy the requirement that the provided param of a DependencyKey needs
-  /// to be used.
-  ///
-  fn prune_nodes(&self, graph: ParamsLabeledGraph<R>) -> ParamsLabeledGraph<R> {
-    let mut to_visit = graph
-      .node_references()
-      .map(|node_ref| node_ref.id())
-      .collect::<Vec<_>>();
-    // We keep a reversed copy of the graph to use for deleting dependees transitively.
-    let reversed_graph = {
-      let mut rg = graph.clone();
-      rg.reverse();
-      rg
-    };
-
-    // Uses the same lazy deletion strategy as monomorphize.
-    let mut to_delete = graph.visit_map();
-
-    println!(
-      "Pruning nodes with: {:?}",
-      petgraph::dot::Dot::with_config(&graph, &[])
-    );
-
-    while let Some(node_id) = to_visit.pop() {
-      if to_delete.is_visited(&node_id) {
-        continue;
-      }
-
-      // Validate that for each dependency, the in_set of the dependency node consumes the provided
-      // param.
-      let valid_dependencies = graph
-        .edges_directed(node_id, Direction::Outgoing)
-        .all(|edge_ref| {
-          if let Some(provided_param) = edge_ref.weight().provided_param() {
-            graph[edge_ref.target()].1.contains(&provided_param)
-          } else {
-            true
-          }
-        });
-      if valid_dependencies {
-        continue;
-      }
-
-      // Otherwise, this node (and all rules that depend on it) should be deleted.
-      let mut dependees = Bfs::new(&reversed_graph, node_id);
-      while let Some(dependee_id) = dependees.next(&graph) {
-        if !to_delete.is_visited(&dependee_id) && matches!(&graph[dependee_id].0, Node::Rule(_)) {
-          to_delete.visit(dependee_id);
-        }
-      }
-    }
-
-    // Finally, delete all nodes that were invalidated.
-    graph.filter_map(
-      |node_id, node| {
-        if to_delete.is_visited(&node_id) {
-          None
-        } else {
-          Some(node.clone())
-        }
-      },
-      |_, edge_weight| Some(*edge_weight),
-    )
   }
 
   ///
