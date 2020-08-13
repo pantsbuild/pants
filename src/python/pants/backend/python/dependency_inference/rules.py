@@ -49,10 +49,10 @@ class PythonInference(Subsystem):
             default=False,
             type=bool,
             help=(
-                "Infer a target's dependencies based on strings that look like dynamic imports, "
-                "such as `importlib.import_module('example.subdir.Foo')`. This can be useful if "
-                "you use lots of dynamic imports, such as with Django apps. To ignore any false "
-                "positives, put `!{bad_address}` in the `dependencies` field of your target."
+                "Infer a target's dependencies based on strings that look like dynamic "
+                "dependencies, such as Django settings files expressing dependencies as strings. "
+                "To ignore any false positives, put `!{bad_address}` in the `dependencies` field "
+                "of your target."
             ),
         )
         register(
