@@ -30,8 +30,7 @@ class ReplImplementation(ABC):
 
     name: ClassVar[str]
     targets: Targets
-    # Absolute path of the chroot the sources will be materialized to.
-    chroot: str
+    chroot: str  # Absolute path of the chroot the sources will be materialized to.
 
     def in_chroot(self, relpath: str) -> str:
         return os.path.join(self.chroot, relpath)
@@ -105,13 +104,14 @@ async def run_repl(
         return Repl(-1)
 
     with temporary_dir(root_dir=global_options.options.pants_workdir, cleanup=False) as tmpdir:
-        tmpdir_relative_path = PurePath(tmpdir).relative_to(build_root.path).as_posix()
         repl_impl = repl_implementation_cls(
             targets=Targets(transitive_targets.closure), chroot=tmpdir
         )
         request = await Get(ReplRequest, ReplImplementation, repl_impl)
 
-        workspace.write_digest(request.digest, path_prefix=tmpdir_relative_path)
+        workspace.write_digest(
+            request.digest, path_prefix=PurePath(tmpdir).relative_to(build_root.path).as_posix()
+        )
         result = interactive_runner.run(
             InteractiveProcess(argv=request.args, env=request.env, run_in_workspace=True)
         )

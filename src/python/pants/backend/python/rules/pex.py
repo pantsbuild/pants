@@ -183,7 +183,6 @@ class PexPlatforms(DeduplicatedCollection[str]):
 
     @classmethod
     def create_from_platforms_field(cls, field: PythonPlatformsField) -> "PexPlatforms":
-        # TODO(#9562): wire to `--python-setup-platforms` once we know when/where it should be used.
         return cls(field.value or ())
 
     def generate_pex_arg_list(self) -> List[str]:
@@ -277,8 +276,7 @@ async def create_pex(
     platform: Platform,
     pex_runtime_environment: PexRuntimeEnvironment,
 ) -> Pex:
-    """Returns a PEX with the given requirements, optional entry point, optional interpreter
-    constraints, and optional requirement constraints."""
+    """Returns a PEX with the given settings."""
 
     argv = [
         "--output-file",
