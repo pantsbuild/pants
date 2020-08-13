@@ -459,7 +459,9 @@ pub trait CapturedWorkdir {
       };
       if let Some(exe) = executable_path.to_str() {
         let exe_was_materialized = sandbox.contains(exe);
-        debug!("Obtaining exclusive spawn lock for process with argv {:?} since we materialized its binary {}.", &req.argv, exe);
+        if exe_was_materialized {
+          debug!("Obtaining exclusive spawn lock for process with argv {:?} since we materialized its binary {}.", &req.argv, exe);
+        }
         exe_was_materialized
       } else {
         false
