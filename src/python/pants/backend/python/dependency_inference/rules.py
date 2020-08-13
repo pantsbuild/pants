@@ -3,7 +3,7 @@
 
 import itertools
 from pathlib import PurePath
-from typing import cast
+from typing import List, cast
 
 from pants.backend.python.dependency_inference import module_mapper
 from pants.backend.python.dependency_inference.import_parser import find_python_imports
@@ -45,6 +45,17 @@ class PythonInference(Subsystem):
             ),
         )
         register(
+            "--string-imports",
+            default=False,
+            type=bool,
+            help=(
+                "Infer a target's dependencies based on strings that look like dynamic imports, "
+                "such as `importlib.import_module('example.subdir.Foo')`. This can be useful if "
+                "you use lots of dynamic imports, such as with Django apps. To ignore any false "
+                "positives, put `!{bad_address}` in the `dependencies` field of your target."
+            ),
+        )
+        register(
             "--inits",
             default=True,
             type=bool,
@@ -68,6 +79,10 @@ class PythonInference(Subsystem):
     @property
     def imports(self) -> bool:
         return cast(bool, self.options.imports)
+
+    @property
+    def string_imports(self) -> bool:
+        return cast(bool, self.options.string_imports)
 
     @property
     def inits(self) -> bool:
@@ -95,23 +110,28 @@ async def infer_python_dependencies(
         for fp in stripped_sources.snapshot.files
     )
     digest_contents = await Get(DigestContents, Digest, stripped_sources.snapshot.digest)
-    imports_per_file = tuple(
-        find_python_imports(file_content.content.decode(), module_name=module.module)
-        for file_content, module in zip(digest_contents, modules)
-    )
-    owner_per_import = await MultiGet(
-        Get(PythonModuleOwner, PythonModule(imported_module))
-        for file_imports in imports_per_file
-        for imported_module in file_imports.explicit_imports
-        if imported_module not in combined_stdlib
-    )
+
+    owner_requests: List[Get[PythonModuleOwner, PythonModule]] = []
+    for file_content, module in zip(digest_contents, modules):
+        file_imports_obj = find_python_imports(
+            file_content.content.decode(), module_name=module.module
+        )
+        detected_imports = (
+            file_imports_obj.all_imports
+            if python_inference.string_imports
+            else file_imports_obj.explicit_imports
+        )
+        owner_requests.extend(
+            Get(PythonModuleOwner, PythonModule(imported_module))
+            for imported_module in detected_imports
+            if imported_module not in combined_stdlib
+        )
+
+    owner_per_import = await MultiGet(owner_requests)
     result = (
         owner.address
         for owner in owner_per_import
-        if (
-            owner.address
-            and owner.address.maybe_convert_to_base_target() != request.sources_field.address
-        )
+        if owner.address and owner.address != request.sources_field.address
     )
     return InferredDependencies(result, sibling_dependencies_inferrable=True)
 
