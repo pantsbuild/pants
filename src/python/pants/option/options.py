@@ -415,17 +415,10 @@ class Options:
         namespace: OptionValueContainer,
         include_passive_options: bool = False,
     ) -> Parser.ParseArgsRequest:
-        levenshtein_max_distance = (
-            self._bootstrap_option_values.option_name_check_distance
-            if self._bootstrap_option_values
-            else 0
-        )
-
         return Parser.ParseArgsRequest(
             flags_in_scope=flags_in_scope,
             namespace=namespace,
             get_all_scoped_flag_names=lambda: self._all_scoped_flag_names_for_fuzzy_matching,
-            levenshtein_max_distance=levenshtein_max_distance,
             passthrough_args=self._passthru,
             include_passive_options=include_passive_options,
         )

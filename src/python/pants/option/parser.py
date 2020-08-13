@@ -225,7 +225,6 @@ class Parser:
         flag_value_map: Dict[str, List[Any]]
         namespace: OptionValueContainer
         get_all_scoped_flag_names: FlagNameProvider
-        levenshtein_max_distance: int
         passthrough_args: List[str]
         # A passive option is one that doesn't affect functionality, or appear in help messages, but
         # can be provided without failing validation. This allows us to conditionally register options
@@ -239,7 +238,6 @@ class Parser:
             flags_in_scope: Iterable[str],
             namespace: OptionValueContainer,
             get_all_scoped_flag_names: FlagNameProvider,
-            levenshtein_max_distance: int,
             passthrough_args: List[str],
             include_passive_options: bool = False,
         ) -> None:
@@ -250,14 +248,10 @@ class Parser:
                                               all registered option names in all their scopes. This
                                               is used to create an error message with suggestions
                                               when raising a `ParseError`.
-            :param levenshtein_max_distance: The maximum Levenshtein edit distance between option names
-                                             to determine similarly named options when an option name
-                                             hasn't been registered.
             """
             self.flag_value_map = self._create_flag_value_map(flags_in_scope)
             self.namespace = namespace
             self.get_all_scoped_flag_names = get_all_scoped_flag_names
-            self.levenshtein_max_distance = levenshtein_max_distance
             self.passthrough_args = passthrough_args
             self.include_passive_options = include_passive_options
 
@@ -294,7 +288,6 @@ class Parser:
         flag_value_map = parse_args_request.flag_value_map
         namespace = parse_args_request.namespace
         get_all_scoped_flag_names = parse_args_request.get_all_scoped_flag_names
-        levenshtein_max_distance = parse_args_request.levenshtein_max_distance
 
         mutex_map: DefaultDict[str, List[str]] = defaultdict(list)
         for args, kwargs in self._unnormalized_option_registrations_iter():
@@ -383,7 +376,7 @@ class Parser:
             self._raise_error_for_invalid_flag_names(
                 tuple(flag_value_map.keys()),
                 all_scoped_flag_names=get_all_scoped_flag_names(),
-                max_edit_distance=levenshtein_max_distance,
+                max_edit_distance=2,
             )
 
         return namespace

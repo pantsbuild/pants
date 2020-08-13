@@ -218,14 +218,6 @@ class GlobalOptions(Subsystem):
             "from the start of the warning string, and will always be case-insensitive. "
             "See the `warnings` module documentation for more background on these are used.",
         )
-        register(
-            "--option-name-check-distance",
-            advanced=True,
-            type=int,
-            default=2,
-            help="The maximum Levenshtein distance to use when offering suggestions for invalid "
-            "option names.",
-        )
 
         register(
             "--pants-version",
