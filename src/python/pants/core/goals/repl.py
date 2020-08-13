@@ -30,11 +30,11 @@ class ReplImplementation(ABC):
 
     name: ClassVar[str]
     targets: Targets
-    # Path (relative to the buildroot) of the chroot the sources will be materialized to.
-    chroot_relpath: str
+    # Absolute path of the chroot the sources will be materialized to.
+    chroot: str
 
     def in_chroot(self, relpath: str) -> str:
-        return os.path.join(self.chroot_relpath, relpath)
+        return os.path.join(self.chroot, relpath)
 
 
 class ReplSubsystem(GoalSubsystem):
@@ -107,7 +107,7 @@ async def run_repl(
     with temporary_dir(root_dir=global_options.options.pants_workdir, cleanup=False) as tmpdir:
         tmpdir_relative_path = PurePath(tmpdir).relative_to(build_root.path).as_posix()
         repl_impl = repl_implementation_cls(
-            targets=Targets(transitive_targets.closure), chroot_relpath=tmpdir_relative_path
+            targets=Targets(transitive_targets.closure), chroot=tmpdir
         )
         request = await Get(ReplRequest, ReplImplementation, repl_impl)
 
