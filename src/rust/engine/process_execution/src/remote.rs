@@ -611,16 +611,19 @@ impl CommandRunner {
     context: &Context,
   ) -> Result<FallibleProcessResultWithPlatform, String> {
     const MAX_RETRIES: u32 = 5;
+    const MAX_BACKOFF_DURATION: Duration = Duration::from_secs(10);
+
     let start_time = Instant::now();
     let mut current_operation_name: Option<String> = None;
     let mut num_retries = 0;
 
     loop {
-      // If we are currently retrying a request, then add an exponential backoff.
+      // If we are currently retrying a request, then delay using an exponential backoff.
       if num_retries > 0 {
         let multiplier = thread_rng().gen_range(0, 2_u32.pow(num_retries) + 1);
         let sleep_time = self.retry_interval_duration * multiplier;
-        trace!("retry sleep: {:?}", sleep_time);
+        let sleep_time = sleep_time.min(MAX_BACKOFF_DURATION);
+        debug!("delaying {:?} before retry", sleep_time);
         tokio::time::delay_for(sleep_time).await;
       }
 
