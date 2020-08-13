@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from typing import (
     FrozenSet,
     Iterable,
-    Iterator,
     List,
     Mapping,
     NamedTuple,
@@ -23,7 +22,7 @@ from typing_extensions import Protocol
 
 from pants.backend.python.rules import pex_cli
 from pants.backend.python.rules.pex_cli import PexCliProcess
-from pants.backend.python.rules.pex_environment import PexEnvironment
+from pants.backend.python.rules.pex_environment import PexEnvironment, PexRuntimeEnvironment
 from pants.backend.python.rules.util import parse_interpreter_constraint
 from pants.backend.python.target_types import PythonInterpreterCompatibility
 from pants.backend.python.target_types import PythonPlatforms as PythonPlatformsField
@@ -46,7 +45,6 @@ from pants.python.python_repos import PythonRepos
 from pants.python.python_setup import PythonSetup
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants.util.memo import memoized_property
 from pants.util.meta import frozen_after_init
 from pants.util.strutil import pluralize
 
@@ -272,39 +270,13 @@ class TwoStepPex:
 logger = logging.getLogger(__name__)
 
 
-@dataclass(frozen=True)
-class PexDebug:
-    log_level: LogLevel
-
-    _PEX_LEVEL_BY_PANTS_LEVEL = {
-        LogLevel.TRACE: 9,
-        LogLevel.DEBUG: 3,
-    }
-
-    @memoized_property
-    def level(self) -> int:
-        return self._PEX_LEVEL_BY_PANTS_LEVEL.get(self.log_level, 0)
-
-    def iter_pex_args(self) -> Iterator[str]:
-        yield "--no-emit-warnings"
-        if self.level > 0:
-            yield f"-{'v' * self.level}"
-
-    @property
-    def might_log(self):
-        return self.level > 0
-
-    def log(self, *args, **kwargs) -> None:
-        self.log_level.log(logger, *args, **kwargs)
-
-
 @rule
 async def create_pex(
     request: PexRequest,
     python_setup: PythonSetup,
     python_repos: PythonRepos,
     platform: Platform,
-    log_level: LogLevel,
+    pex_runtime_environment: PexRuntimeEnvironment,
 ) -> Pex:
     """Returns a PEX with the given requirements, optional entry point, optional interpreter
     constraints, and optional requirement constraints."""
@@ -332,8 +304,10 @@ async def create_pex(
     else:
         argv.extend(request.interpreter_constraints.generate_pex_arg_list())
 
-    pex_debug = PexDebug(log_level)
-    argv.extend(pex_debug.iter_pex_args())
+    argv.append("--no-emit-warnings")
+    verbosity = pex_runtime_environment.verbosity
+    if verbosity > 0:
+        argv.append(f"-{'v' * verbosity}")
 
     if python_setup.resolver_jobs:
         argv.extend(["--jobs", str(python_setup.resolver_jobs)])
@@ -407,12 +381,14 @@ async def create_pex(
         ),
     )
 
-    if pex_debug.might_log:
+    if verbosity > 0:
         lines = result.stderr.decode().splitlines()
+
         if lines:
-            pex_debug.log(f"Debug output from Pex for: {process}")
+            log_level = LogLevel.DEBUG if verbosity <= 3 else LogLevel.TRACE
+            log_level.log(logger, f"Verbose output from Pex for: {process}")
             for line in lines:
-                pex_debug.log(line)
+                log_level.log(logger, line)
 
     return Pex(digest=result.output_digest, output_filename=request.output_filename)
 

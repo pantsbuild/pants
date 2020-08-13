@@ -3,7 +3,7 @@
 
 import os
 from dataclasses import dataclass
-from typing import Iterable, Mapping, Optional, Tuple
+from typing import Iterable, Mapping, Optional, Tuple, cast
 
 from pants.backend.python.subsystems import subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
@@ -55,6 +55,18 @@ class PexRuntimeEnvironment(Subsystem):
                 "`[python-setup]` to influence where interpreters are searched for."
             ),
         )
+        register(
+            "--verbosity",
+            advanced=True,
+            type=int,
+            default=0,
+            help=(
+                "Set the verbosity level of PEX debug logging. "
+                "The higher the number, the more logging, with 0 being disabled, 3 being "
+                "equivalent to debug-devel logging, and 9 being equivalent to "
+                "trace-level logging."
+            ),
+        )
 
     @memoized_property
     def path(self) -> Tuple[str, ...]:
@@ -73,6 +85,13 @@ class PexRuntimeEnvironment(Subsystem):
     @property
     def bootstrap_interpreter_names(self) -> Tuple[str, ...]:
         return tuple(self.options.bootstrap_interpreter_names)
+
+    @property
+    def verbosity(self) -> int:
+        level = cast(int, self.options.verbosity)
+        if level < 0 or level > 9:
+            raise ValueError("verbosity level must be between 0 and 9")
+        return level
 
 
 @dataclass(frozen=True)
