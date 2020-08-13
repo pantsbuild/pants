@@ -74,6 +74,10 @@ config = [".isort.cfg", "examples/.isort.cfg"]
 [mypy]
 config = "build-support/mypy/mypy.ini"
 
+# TODO(John Sirois): Remove once proper interpreter selection is performed automatically as part of
+#  https://github.com/pantsbuild/pants/issues/10131
+interpreter_constraints=["CPython>=3.6"]
+
 [pants-releases]
 branch_notes = """
 {
