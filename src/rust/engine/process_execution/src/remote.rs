@@ -686,7 +686,7 @@ impl CommandRunner {
               // continually submitting a request if ultimately futile.)
               if num_retries >= MAX_RETRIES {
                 return Err(
-                  "Too many failures from server, last error was stream close".to_owned(),
+                  "Too many failures from server. The last event was the server disconnecting with no error given.".to_owned(),
                 );
               } else {
                 // Increment the retry counter and allow loop to retry.
