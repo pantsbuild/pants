@@ -23,7 +23,7 @@ use std::str;
 use std::sync::Arc;
 use store::{OneOffStoreFileByDigest, Snapshot, Store};
 
-use tokio::process::Command;
+use tokio::process::{Child, Command};
 use tokio::sync::RwLock;
 use tokio::time::timeout;
 use tokio_util::codec::{BytesCodec, FramedRead};
@@ -117,15 +117,15 @@ impl CommandRunner {
   }
 }
 
-pub struct StreamedHermeticCommand {
+pub struct HermeticCommand {
   inner: Command,
 }
 
 ///
-/// A streaming command that accepts no input stream and does not consult the `PATH`.
+/// A command that accepts no input stream and does not consult the `PATH`.
 ///
-impl StreamedHermeticCommand {
-  fn new<S: AsRef<OsStr>>(program: S) -> StreamedHermeticCommand {
+impl HermeticCommand {
+  fn new<S: AsRef<OsStr>>(program: S) -> HermeticCommand {
     let mut inner = Command::new(program);
     inner
       // TODO: This will not universally prevent child processes continuing to run in the
@@ -136,10 +136,10 @@ impl StreamedHermeticCommand {
       // It would be really nice not to have to manually set PATH but this is sadly the only way
       // to stop automatic PATH searching.
       .env("PATH", "");
-    StreamedHermeticCommand { inner }
+    HermeticCommand { inner }
   }
 
-  fn args<I, S>(&mut self, args: I) -> &mut StreamedHermeticCommand
+  fn args<I, S>(&mut self, args: I) -> &mut HermeticCommand
   where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
@@ -148,7 +148,7 @@ impl StreamedHermeticCommand {
     self
   }
 
-  fn envs<I, K, V>(&mut self, vars: I) -> &mut StreamedHermeticCommand
+  fn envs<I, K, V>(&mut self, vars: I) -> &mut HermeticCommand
   where
     I: IntoIterator<Item = (K, V)>,
     K: AsRef<OsStr>,
@@ -158,49 +158,23 @@ impl StreamedHermeticCommand {
     self
   }
 
-  fn current_dir<P: AsRef<Path>>(&mut self, dir: P) -> &mut StreamedHermeticCommand {
+  fn current_dir<P: AsRef<Path>>(&mut self, dir: P) -> &mut HermeticCommand {
     self.inner.current_dir(dir);
     self
   }
 
-  ///
-  /// TODO: See the note on references in ASYNC.md.
-  ///
-  fn stream<'a, 'b>(
-    &'a mut self,
-    req: &Process,
-  ) -> Result<BoxStream<'b, Result<ChildOutput, String>>, String> {
+  fn spawn<O: Into<Stdio>, E: Into<Stdio>>(
+    &mut self,
+    stdout: O,
+    stderr: E,
+  ) -> Result<Child, String> {
     self
       .inner
       .stdin(Stdio::null())
-      .stdout(Stdio::piped())
-      .stderr(Stdio::piped())
+      .stdout(stdout)
+      .stderr(stderr)
       .spawn()
       .map_err(|e| format!("Error launching process: {:?}", e))
-      .map(|mut child| {
-        debug!("spawned local process as {} for {:?}", child.id(), req);
-        let stdout_stream = FramedRead::new(child.stdout.take().unwrap(), BytesCodec::new())
-          .map_ok(|bytes| ChildOutput::Stdout(bytes.into()))
-          .boxed();
-        let stderr_stream = FramedRead::new(child.stderr.take().unwrap(), BytesCodec::new())
-          .map_ok(|bytes| ChildOutput::Stderr(bytes.into()))
-          .boxed();
-        let exit_stream = child
-          .into_stream()
-          .map_ok(|exit_status| {
-            ChildOutput::Exit(ExitCode(
-              exit_status
-                .code()
-                .or_else(|| exit_status.signal().map(Neg::neg))
-                .expect("Child process should exit via returned code or signal."),
-            ))
-          })
-          .boxed();
-
-        futures::stream::select_all(vec![stdout_stream, stderr_stream, exit_stream])
-          .map_err(|e| format!("Failed to consume process outputs: {:?}", e))
-          .boxed()
-      })
   }
 }
 
@@ -308,7 +282,7 @@ impl CapturedWorkdir for CommandRunner {
     _context: Context,
     exclusive_spawn: bool,
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String> {
-    let mut command = StreamedHermeticCommand::new(&req.argv[0]);
+    let mut command = HermeticCommand::new(&req.argv[0]);
     command
       .args(&req.argv[1..])
       .current_dir(if let Some(ref working_directory) = req.working_directory {
@@ -335,12 +309,39 @@ impl CapturedWorkdir for CommandRunner {
     //
     // See: https://github.com/golang/go/issues/22315 for an excellent description of this generic
     // unix problem.
-    let _locked = if exclusive_spawn {
-      *self.spawn_lock.write().await
-    } else {
-      *self.spawn_lock.read().await
+    let mut child = {
+      let _locked = if exclusive_spawn {
+        *self.spawn_lock.write().await
+      } else {
+        *self.spawn_lock.read().await
+      };
+      command.spawn(Stdio::piped(), Stdio::piped())?
     };
-    command.stream(&req)
+
+    debug!("spawned local process as {} for {:?}", child.id(), req);
+    let stdout_stream = FramedRead::new(child.stdout.take().unwrap(), BytesCodec::new())
+      .map_ok(|bytes| ChildOutput::Stdout(bytes.into()))
+      .boxed();
+    let stderr_stream = FramedRead::new(child.stderr.take().unwrap(), BytesCodec::new())
+      .map_ok(|bytes| ChildOutput::Stderr(bytes.into()))
+      .boxed();
+    let exit_stream = child
+      .into_stream()
+      .map_ok(|exit_status| {
+        ChildOutput::Exit(ExitCode(
+          exit_status
+            .code()
+            .or_else(|| exit_status.signal().map(Neg::neg))
+            .expect("Child process should exit via returned code or signal."),
+        ))
+      })
+      .boxed();
+
+    Ok(
+      futures::stream::select_all(vec![stdout_stream, stderr_stream, exit_stream])
+        .map_err(|e| format!("Failed to consume process outputs: {:?}", e))
+        .boxed(),
+    )
   }
 }
 
