@@ -31,6 +31,7 @@ use crate::{
 };
 
 const OVERALL_DEADLINE_SECS: Duration = Duration::from_secs(10 * 60);
+const RETRY_INTERVAL: Duration = Duration::from_micros(0);
 
 #[derive(Debug, PartialEq)]
 pub(crate) struct RemoteTestResult {
@@ -947,6 +948,7 @@ async fn sends_headers() {
     store,
     Platform::Linux,
     OVERALL_DEADLINE_SECS,
+    RETRY_INTERVAL,
   )
   .unwrap();
   let context = Context {
@@ -1152,6 +1154,7 @@ async fn ensure_inline_stdio_is_stored() {
     store.clone(),
     Platform::Linux,
     OVERALL_DEADLINE_SECS,
+    RETRY_INTERVAL,
   )
   .unwrap();
 
@@ -1339,6 +1342,135 @@ async fn initial_response_missing_response_and_error() {
 }
 
 #[tokio::test]
+async fn fails_after_retry_limit_exceeded() {
+  let workunit_store = WorkunitStore::new(false);
+  workunit_store.init_thread_state(None);
+
+  let execute_request = echo_foo_request();
+
+  let mock_server = {
+    let (action, _, execute_request) = crate::remote::make_execute_request(
+      &execute_request.clone().try_into().unwrap(),
+      empty_request_metadata(),
+    )
+    .unwrap();
+
+    let action_digest = digest(&action).unwrap();
+
+    mock::execution_server::TestServer::new(
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::GetActionResult {
+          action_digest,
+          response: Err(grpcio::RpcStatus::new(
+            grpcio::RpcStatusCode::NOT_FOUND,
+            None,
+          )),
+        },
+        ExpectedAPICall::Execute {
+          execute_request: execute_request.clone(),
+          stream_responses: Ok(vec![make_retryable_operation_failure()]),
+        },
+        ExpectedAPICall::Execute {
+          execute_request: execute_request.clone(),
+          stream_responses: Ok(vec![make_retryable_operation_failure()]),
+        },
+        ExpectedAPICall::Execute {
+          execute_request: execute_request.clone(),
+          stream_responses: Ok(vec![make_retryable_operation_failure()]),
+        },
+        ExpectedAPICall::Execute {
+          execute_request: execute_request.clone(),
+          stream_responses: Ok(vec![make_retryable_operation_failure()]),
+        },
+        ExpectedAPICall::Execute {
+          execute_request: execute_request.clone(),
+          stream_responses: Ok(vec![make_retryable_operation_failure()]),
+        },
+        ExpectedAPICall::Execute {
+          execute_request: execute_request.clone(),
+          stream_responses: Ok(vec![make_retryable_operation_failure()]),
+        },
+      ]),
+      None,
+    )
+  };
+
+  let result = run_command_remote(mock_server.address(), execute_request)
+    .await
+    .expect_err("Expected error");
+
+  assert_eq!(
+    result,
+    "Too many failures from server. The last error was: the bot running the task appears to be lost"
+  );
+}
+
+#[tokio::test]
+async fn fails_after_retry_limit_exceeded_with_stream_close() {
+  let workunit_store = WorkunitStore::new(false);
+  workunit_store.init_thread_state(None);
+
+  let execute_request = echo_foo_request();
+
+  let mock_server = {
+    let op_name = "foo-bar".to_owned();
+    let (action, _, execute_request) = crate::remote::make_execute_request(
+      &execute_request.clone().try_into().unwrap(),
+      empty_request_metadata(),
+    )
+    .unwrap();
+
+    let action_digest = digest(&action).unwrap();
+
+    mock::execution_server::TestServer::new(
+      mock::execution_server::MockExecution::new(vec![
+        ExpectedAPICall::GetActionResult {
+          action_digest,
+          response: Err(grpcio::RpcStatus::new(
+            grpcio::RpcStatusCode::NOT_FOUND,
+            None,
+          )),
+        },
+        ExpectedAPICall::Execute {
+          execute_request: execute_request.clone(),
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::WaitExecution {
+          operation_name: op_name.clone(),
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::WaitExecution {
+          operation_name: op_name.clone(),
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::WaitExecution {
+          operation_name: op_name.clone(),
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::WaitExecution {
+          operation_name: op_name.clone(),
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+        ExpectedAPICall::WaitExecution {
+          operation_name: op_name.clone(),
+          stream_responses: Ok(vec![make_incomplete_operation(&op_name)]),
+        },
+      ]),
+      None,
+    )
+  };
+
+  let result = run_command_remote(mock_server.address(), execute_request)
+    .await
+    .expect_err("Expected error");
+
+  assert_eq!(
+    result,
+    "Too many failures from server. The last event was the server disconnecting with no error given."
+  );
+}
+
+#[tokio::test]
 async fn execute_missing_file_uploads_if_known() {
   let workunit_store = WorkunitStore::new(false);
   workunit_store.init_thread_state(None);
@@ -1435,6 +1567,7 @@ async fn execute_missing_file_uploads_if_known() {
     store.clone(),
     Platform::Linux,
     OVERALL_DEADLINE_SECS,
+    RETRY_INTERVAL,
   )
   .unwrap();
 
@@ -1511,6 +1644,7 @@ async fn execute_missing_file_errors_if_unknown() {
     store,
     Platform::Linux,
     OVERALL_DEADLINE_SECS,
+    RETRY_INTERVAL,
   )
   .unwrap();
 
@@ -2205,6 +2339,7 @@ fn create_command_runner(
     store.clone(),
     platform,
     OVERALL_DEADLINE_SECS,
+    RETRY_INTERVAL,
   )
   .expect("Failed to make command runner");
   (command_runner, store)
