@@ -60,7 +60,6 @@ async def create_ipython_repl_request(repl: IPythonRepl, ipython: IPython) -> Re
         PythonSourceFiles, PythonSourceFilesRequest(repl.targets, include_files=True)
     )
 
-    req_pex_path = repl.in_chroot(requirements_pex_request.output_filename)
     ipython_request = Get(
         Pex,
         PexRequest(
@@ -68,7 +67,6 @@ async def create_ipython_repl_request(repl: IPythonRepl, ipython: IPython) -> Re
             entry_point=ipython.entry_point,
             requirements=PexRequirements(ipython.all_requirements),
             interpreter_constraints=requirements_pex_request.interpreter_constraints,
-            additional_args=("--pex-path", req_pex_path),
         ),
     )
 
@@ -88,7 +86,10 @@ async def create_ipython_repl_request(repl: IPythonRepl, ipython: IPython) -> Re
     return ReplRequest(
         digest=merged_digest,
         args=args,
-        env={"PEX_EXTRA_SYS_PATH": ":".join(chrooted_source_roots)},
+        env={
+            "PEX_PATH": repl.in_chroot(requirements_pex_request.output_filename),
+            "PEX_EXTRA_SYS_PATH": ":".join(chrooted_source_roots),
+        },
     )
 
 
