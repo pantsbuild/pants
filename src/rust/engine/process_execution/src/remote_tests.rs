@@ -1401,7 +1401,7 @@ async fn fails_after_retry_limit_exceeded() {
 
   assert_eq!(
     result,
-    "Too many failures from server, last error: the bot running the task appears to be lost"
+    "Too many failures from server. The last error was: the bot running the task appears to be lost"
   );
 }
 
@@ -1466,7 +1466,7 @@ async fn fails_after_retry_limit_exceeded_with_stream_close() {
 
   assert_eq!(
     result,
-    "Too many failures from server, last error was stream close"
+    "Too many failures from server. The last event was the server disconnecting with no error given."
   );
 }
 
