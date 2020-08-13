@@ -44,7 +44,6 @@ from pants.engine.rules import Get, RootRule, collect_rules, rule
 from pants.python.python_repos import PythonRepos
 from pants.python.python_setup import PythonSetup
 from pants.util.frozendict import FrozenDict
-from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.strutil import pluralize
 
@@ -382,13 +381,9 @@ async def create_pex(
     )
 
     if verbosity > 0:
-        lines = result.stderr.decode().splitlines()
-
-        if lines:
-            log_level = LogLevel.DEBUG if verbosity <= 3 else LogLevel.TRACE
-            log_level.log(logger, f"Verbose output from Pex for: {process}")
-            for line in lines:
-                log_level.log(logger, line)
+        log_output = result.stderr.decode()
+        if log_output:
+            logger.info("%s", log_output)
 
     return Pex(digest=result.output_digest, output_filename=request.output_filename)
 

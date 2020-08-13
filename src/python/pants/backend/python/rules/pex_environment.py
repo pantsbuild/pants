@@ -60,12 +60,7 @@ class PexRuntimeEnvironment(Subsystem):
             advanced=True,
             type=int,
             default=0,
-            help=(
-                "Set the verbosity level of PEX debug logging. "
-                "The higher the number, the more logging, with 0 being disabled, 3 being "
-                "equivalent to debug-devel logging, and 9 being equivalent to "
-                "trace-level logging."
-            ),
+            help="Set the verbosity level of PEX logging, from 0 (no logging) up to 9 (max logging).",
         )
 
     @memoized_property
