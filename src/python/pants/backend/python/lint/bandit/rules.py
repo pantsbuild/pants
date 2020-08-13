@@ -14,13 +14,7 @@ from pants.backend.python.rules.pex import (
     PexRequirements,
 )
 from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonSources
-from pants.core.goals.lint import (
-    LintRequest,
-    LintResult,
-    LintResultFile,
-    LintResults,
-    LintSubsystem,
-)
+from pants.core.goals.lint import LintReport, LintRequest, LintResult, LintResults, LintSubsystem
 from pants.core.util_rules import source_files, stripped_source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import (
@@ -58,13 +52,13 @@ class BanditPartition:
 
 
 def generate_args(
-    *, source_files: SourceFiles, bandit: Bandit, output_file: Optional[str]
+    *, source_files: SourceFiles, bandit: Bandit, report_file_name: Optional[str]
 ) -> Tuple[str, ...]:
     args = []
     if bandit.config is not None:
         args.append(f"--config={bandit.config}")
-    if output_file:
-        args.append(f"--output={output_file}")
+    if report_file_name:
+        args.append(f"--output={report_file_name}")
     args.extend(bandit.args)
     args.extend(source_files.files)
     return tuple(args)
@@ -111,13 +105,9 @@ async def bandit_lint_partition(
     address_references = ", ".join(
         sorted(field_set.address.spec for field_set in partition.field_sets)
     )
-    report_path = (
-        lint_subsystem.reports_dir / "bandit_report.txt" if lint_subsystem.reports_dir else None
-    )
+    report_file_name = "bandit_report.txt" if lint_subsystem.reports_dir else None
     args = generate_args(
-        source_files=source_files,
-        bandit=bandit,
-        output_file=report_path.name if report_path else None,
+        source_files=source_files, bandit=bandit, report_file_name=report_file_name
     )
 
     result = await Get(
@@ -130,22 +120,26 @@ async def bandit_lint_partition(
                 f"Run Bandit on {pluralize(len(partition.field_sets), 'target')}: "
                 f"{address_references}."
             ),
-            output_files=(report_path.name,) if report_path else None,
+            output_files=(report_file_name,) if report_file_name else None,
         ),
     )
 
-    results_file = None
-    if report_path:
-        report_file_snapshot = await Get(
-            Snapshot, DigestSubset(result.output_digest, PathGlobs([report_path.name]))
+    report = None
+    if report_file_name:
+        report_digest = await Get(
+            Digest,
+            DigestSubset(
+                result.output_digest,
+                PathGlobs(
+                    [report_file_name],
+                    glob_match_error_behavior=GlobMatchErrorBehavior.warn,
+                    description_of_origin="Bandit report file",
+                ),
+            ),
         )
-        if len(report_file_snapshot.files) != 1:
-            raise Exception(f"Unexpected report file snapshot: {report_file_snapshot.files}")
-        results_file = LintResultFile(output_path=report_path, digest=report_file_snapshot.digest)
+        report = LintReport(report_file_name, report_digest)
 
-    return LintResult.from_fallible_process_result(
-        result, linter_name="Bandit", results_file=results_file
-    )
+    return LintResult.from_fallible_process_result(result, linter_name="Bandit", report=report)
 
 
 @rule(desc="Lint using Bandit")

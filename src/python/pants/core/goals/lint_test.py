@@ -11,7 +11,7 @@ from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSourcesRequest,
 )
 from pants.engine.addresses import Address
-from pants.engine.fs import Workspace
+from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests, Workspace
 from pants.engine.target import FieldSet, Sources, Target, Targets
 from pants.engine.unions import UnionMembership
 from pants.testutil.engine.util import MockConsole, MockGet, create_goal_subsystem, run_rule
@@ -51,7 +51,7 @@ class MockLintRequest(LintRequest, metaclass=ABCMeta):
                     self.stdout(addresses),
                     "",
                     linter_name=self.linter_name,
-                    results_file=None,
+                    report=None,
                 )
             ]
         )
@@ -153,6 +153,9 @@ class LintTest(TestBase):
                     mock=lambda field_sets: FieldSetsWithSources(
                         field_sets if include_sources else ()
                     ),
+                ),
+                MockGet(
+                    product_type=Digest, subject_type=MergeDigests, mock=lambda _: EMPTY_DIGEST
                 ),
             ],
             union_membership=union_membership,
