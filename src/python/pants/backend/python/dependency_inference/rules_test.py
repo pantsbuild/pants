@@ -159,14 +159,16 @@ class PythonDependencyInferenceTest(TestBase):
         )
 
         self.create_file("src/python/root/conftest.py")
-        self.add_to_build_file("src/python/root", "python_library(sources=['conftest.py'])")
+        self.add_to_build_file("src/python/root", "python_library()")
 
         self.create_file("src/python/root/mid/conftest.py")
-        self.add_to_build_file("src/python/root/mid", "python_library(sources=['conftest.py'])")
+        self.add_to_build_file("src/python/root/mid", "python_library()")
 
         self.create_file("src/python/root/mid/leaf/conftest.py")
         self.create_file("src/python/root/mid/leaf/this_is_a_test.py")
-        self.add_to_build_file("src/python/root/mid/leaf", "python_tests()")
+        self.add_to_build_file(
+            "src/python/root/mid/leaf", "python_tests()\npython_library(name='conftest')"
+        )
 
         def run_dep_inference(address: Address) -> InferredDependencies:
             target = self.request_single_product(
@@ -181,6 +183,11 @@ class PythonDependencyInferenceTest(TestBase):
             [
                 Address("src/python/root", relative_file_path="conftest.py", target_name="root"),
                 Address("src/python/root/mid", relative_file_path="conftest.py", target_name="mid"),
+                Address(
+                    "src/python/root/mid/leaf",
+                    relative_file_path="conftest.py",
+                    target_name="conftest",
+                ),
             ],
             sibling_dependencies_inferrable=False,
         )
