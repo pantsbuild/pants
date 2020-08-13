@@ -48,7 +48,7 @@ async def create_python_binary_run_request(
     transitive_targets = await Get(TransitiveTargets, Addresses([field_set.address]))
 
     # Note that we get an intermediate PexRequest here (instead of going straight to a Pex)
-    # so that we can get the interpreter constraints for use in ipython_request.
+    # so that we can get the interpreter constraints for use in runner_pex_request.
     requirements_pex_request = await Get(
         PexRequest,
         PexFromTargetsRequest,
@@ -66,6 +66,7 @@ async def create_python_binary_run_request(
         Pex,
         PexRequest(
             output_filename=output_filename,
+            interpreter_constraints=requirements_pex_request.interpreter_constraints,
             additional_args=field_set.generate_additional_args(python_binary_defaults),
         ),
     )

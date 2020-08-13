@@ -186,7 +186,6 @@ class PexPlatforms(DeduplicatedCollection[str]):
 
     @classmethod
     def create_from_platforms_field(cls, field: PythonPlatformsField) -> "PexPlatforms":
-        # TODO(#9562): wire to `--python-setup-platforms` once we know when/where it should be used.
         return cls(field.value or ())
 
     def generate_pex_arg_list(self) -> List[str]:
