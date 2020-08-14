@@ -551,18 +551,6 @@ class TargetsWithOrigins(Collection[TargetWithOrigin]):
         return tuple(tgt_with_origin.target for tgt_with_origin in self)
 
 
-class UnexpandedTargetsWithOrigins(Collection[TargetWithOrigin]):
-    """Like `TargetsWithOrigins`, but will not contain the expansion of `TargetAlias` instances."""
-
-    def expect_single(self) -> TargetWithOrigin:
-        assert_single_address([tgt_with_origin.target.address for tgt_with_origin in self])
-        return self[0]
-
-    @memoized_property
-    def targets(self) -> Tuple[Target, ...]:
-        return tuple(tgt_with_origin.target for tgt_with_origin in self)
-
-
 @dataclass(frozen=True)
 class TransitiveTargets:
     """A set of Target roots, and their transitive, flattened, de-duped dependencies.

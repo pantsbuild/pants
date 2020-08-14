@@ -61,7 +61,6 @@ from pants.engine.target import (
     TargetWithOrigin,
     TransitiveTargets,
     UnexpandedTargets,
-    UnexpandedTargetsWithOrigins,
     UnrecognizedTargetTypeException,
     WrappedTarget,
     _AbstractFieldSet,
@@ -217,17 +216,6 @@ async def resolve_targets_with_origins(
         for target in (subtargets.subtargets if subtargets.subtargets else [bto.target])
     )
     return TargetsWithOrigins(expanded_targets_with_origins)
-
-
-@rule
-async def resolve_unexpanded_targets_with_origins(
-    addresses_with_origins: AddressesWithOrigins,
-) -> UnexpandedTargetsWithOrigins:
-    targets_with_origins = await MultiGet(
-        Get(TargetWithOrigin, AddressWithOrigin, address_with_origin)
-        for address_with_origin in addresses_with_origins
-    )
-    return UnexpandedTargetsWithOrigins(targets_with_origins)
 
 
 # -----------------------------------------------------------------------------------------------
