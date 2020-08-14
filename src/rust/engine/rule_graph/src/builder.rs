@@ -229,6 +229,8 @@ impl<'t, R: Rule> Builder<'t, R> {
     // will cause NodeIds to shift in the graph (and is only cheap to do in bulk).
     let mut to_delete = HashSet::new();
 
+    let debug_str = "resolve_unexpanded_targets(";
+
     // As we split Rules, we attempt to re-join with existing identical Rule nodes to avoid an
     // explosion.
     let mut rules: HashMap<(Node<R>, ParamTypes<_>), _> = graph
@@ -241,7 +243,7 @@ impl<'t, R: Rule> Builder<'t, R> {
 
     if let Some(subgraph_node_ref) = graph
       .node_references()
-      .find(|node_ref| node_ref.weight().0.to_string().contains("resolve_address("))
+      .find(|node_ref| node_ref.weight().0.to_string().contains(debug_str))
     {
       let subgraph_id = subgraph_node_ref.id();
       let mut bfs = Bfs::new(&graph, subgraph_id);
@@ -322,6 +324,20 @@ impl<'t, R: Rule> Builder<'t, R> {
         }
       }
 
+      if graph[node_id].0.to_string().contains(debug_str) {
+        println!(
+          ">>> monomorphizing {} with: {:#?}",
+          graph[node_id].0,
+          edges_by_dependency_key
+            .iter()
+            .flat_map(|edges| edges.iter().map(|(dk, di)| (
+              dk.to_string(),
+              graph[*di].0.to_string(),
+              params_str(&graph[*di].1)
+            )))
+            .collect::<Vec<_>>(),
+        );
+      }
       let monomorphizations = Self::monomorphizations(&graph, node_id, &edges_by_dependency_key);
       println!(
         ">>> created {} monomorphizations for {}",
@@ -342,23 +358,6 @@ impl<'t, R: Rule> Builder<'t, R> {
       // Generate replacement nodes for the valid monomorphizations of this rule.
       let mut modified_existing_nodes = HashSet::new();
       for (live_params, combinations) in monomorphizations {
-        /*
-        println!(
-          ">>>   {} generating permutation (reduced to {} from {}) that consumes: {:#?}",
-          graph[node_id].0,
-          live_params.len(),
-          new_in_set.len(),
-          combination
-            .iter()
-            .map(|(dk, di)| format!(
-              "{} from ({} with {})",
-              dk,
-              graph[*di].0,
-              params_str(&graph[*di].1)
-            ))
-            .collect::<Vec<_>>()
-        );
-        */
         let (replacement_id, is_new_node) =
           match rules.entry((graph[node_id].0.clone(), live_params.clone())) {
             hash_map::Entry::Occupied(oe) => (*oe.get(), false),
@@ -369,6 +368,20 @@ impl<'t, R: Rule> Builder<'t, R> {
           };
 
         for combination in combinations {
+          println!(
+            ">>>   {} generating permutation for {} that consumes: {:#?}",
+            graph[node_id].0,
+            params_str(&live_params),
+            combination
+              .iter()
+              .map(|(dk, di)| format!(
+                "{} from ({} with {})",
+                dk,
+                graph[*di].0,
+                params_str(&graph[*di].1)
+              ))
+              .collect::<Vec<_>>()
+          );
           // Give all dependees for whom this combination is still valid edges to the new node.
           for (dependee_id, dependency_key) in &dependee_edges {
             if dependency_key
@@ -377,13 +390,15 @@ impl<'t, R: Rule> Builder<'t, R> {
               .unwrap_or(false)
             {
               // This combination did not consume the required param.
-              println!(
-                ">>> skipping edge from {} to {} because {} was not consumed by this combo (only {})",
-                graph[*dependee_id].0,
-                graph[replacement_id].0,
-                dependency_key,
-                params_str(&live_params)
-              );
+              if graph[*dependee_id].0.to_string().contains(debug_str) {
+                println!(
+                    ">>> skipping edge from {} to {} because {} was not consumed by this combo (only {})",
+                    graph[*dependee_id].0,
+                    graph[replacement_id].0,
+                    dependency_key,
+                    params_str(&live_params)
+                );
+              }
               continue;
             }
             // NB: Confirm that we are not creating a duplicate edge.
@@ -441,11 +456,31 @@ impl<'t, R: Rule> Builder<'t, R> {
         }
       }
 
-      /*
-      if graph[node_id].0.to_string().contains("resolve_address(") {
-        panic!("See above.");
+      if graph[node_id].0.to_string().contains(debug_str) {
+        let subgraph_id = node_id;
+        let mut bfs = Bfs::new(&graph, subgraph_id);
+        let mut visited = graph.visit_map();
+        while let Some(node_id) = bfs.next(&graph) {
+          visited.visit(node_id);
+        }
+
+        let subgraph = graph.filter_map(
+          |node_id, node| {
+            if visited.is_visited(&node_id) && to_delete.is_visited(&node_id) {
+              Some(format!("{} for {}", node.0, params_str(&node.1)))
+            } else {
+              None
+            }
+          },
+          |_, edge_weight| Some(*edge_weight),
+        );
+
+        panic!(
+          "Subgraph below {}: {}",
+          graph[subgraph_id].0,
+          petgraph::dot::Dot::with_config(&subgraph, &[])
+        );
       }
-      */
     }
 
     // Finally, delete all nodes that were replaced (which will also delete their edges).
@@ -806,9 +841,6 @@ impl<'t, R: Rule> Builder<'t, R> {
   ///
   /// Given an Entry and a mapping of all legal sources of each of its dependencies, generates a
   /// simplified Entry for each legal combination of parameters.
-  ///
-  /// Computes the union of all parameters used by the dependencies, and then uses the powerset of
-  /// used parameters to filter the possible combinations of dependencies.
   ///
   fn monomorphizations(
     graph: &ParamsLabeledGraph<R>,
