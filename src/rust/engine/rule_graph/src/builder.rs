@@ -67,14 +67,48 @@ impl<R: Rule> Node<R> {
   }
 }
 
+///
+/// A Node labeled with Param types that it is required (by its transitive dependees) to consume,
+/// and Param types that are actually (by its transitive dependencies) consumed.
+///
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
+struct ParamsLabeled<R: Rule> {
+  node: Node<R>,
+  // Params that are actually consumed by transitive dependencies.
+  in_set: ParamTypes<R::TypeId>,
+  // Params that the Node's transitive dependees require to be consumed.
+  out_set: ParamTypes<R::TypeId>,
+}
+
+impl<R: Rule> ParamsLabeled<R> {
+  fn new(node: Node<R>) -> ParamsLabeled<R> {
+    ParamsLabeled {
+      node,
+      in_set: ParamTypes::new(),
+      out_set: ParamTypes::new(),
+    }
+  }
+}
+
+impl<R: Rule> std::fmt::Display for ParamsLabeled<R> {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(
+      f,
+      "ParamsLabeled(node: {}, in: ({}), out: ({}))",
+      self.node,
+      params_str(&self.in_set),
+      params_str(&self.out_set)
+    )
+  }
+}
+
 enum DependencyNode<R: Rule> {
   Rule(R),
   Param(R::TypeId),
 }
 
 type Graph<R> = DiGraph<Node<R>, <R as Rule>::DependencyKey, u32>;
-type ParamsLabeledGraph<R> =
-  DiGraph<(Node<R>, ParamTypes<<R as Rule>::TypeId>), <R as Rule>::DependencyKey, u32>;
+type ParamsLabeledGraph<R> = DiGraph<ParamsLabeled<R>, <R as Rule>::DependencyKey, u32>;
 
 ///
 /// Given the set of Rules and Queries, produce a RuleGraph that allows dependency nodes
@@ -229,13 +263,18 @@ impl<'t, R: Rule> Builder<'t, R> {
     // will cause NodeIds to shift in the graph (and is only cheap to do in bulk).
     let mut to_delete = HashSet::new();
 
+    println!(
+      "Monomorphizing with: {}",
+      petgraph::dot::Dot::with_config(&graph, &[])
+    );
+
     let debug_str = "resolve_unexpanded_targets(";
 
     // As we split Rules, we attempt to re-join with existing identical Rule nodes to avoid an
     // explosion.
-    let mut rules: HashMap<(Node<R>, ParamTypes<_>), _> = graph
+    let mut rules: HashMap<ParamsLabeled<R>, _> = graph
       .node_references()
-      .filter_map(|node_ref| match node_ref.weight().0 {
+      .filter_map(|node_ref| match node_ref.weight().node {
         Node::Rule(_) => Some((node_ref.weight().clone(), node_ref.id())),
         _ => None,
       })
@@ -243,7 +282,7 @@ impl<'t, R: Rule> Builder<'t, R> {
 
     if let Some(subgraph_node_ref) = graph
       .node_references()
-      .find(|node_ref| node_ref.weight().0.to_string().contains(debug_str))
+      .find(|node_ref| node_ref.weight().node.to_string().contains(debug_str))
     {
       let subgraph_id = subgraph_node_ref.id();
       let mut bfs = Bfs::new(&graph, subgraph_id);
@@ -264,22 +303,26 @@ impl<'t, R: Rule> Builder<'t, R> {
       );
 
       println!(
-        "Subgraph below {}: {:?}",
-        graph[subgraph_id].0,
+        "Subgraph below {}: {}",
+        graph[subgraph_id].node,
         petgraph::dot::Dot::with_config(&subgraph, &[])
       );
     }
 
     println!(">>> initial visit order:");
     for node_id in &to_visit {
-      println!(">>>   {}\t{}", graph[*node_id].1.len(), graph[*node_id].0);
+      println!(
+        ">>>   {}\t{}",
+        graph[*node_id].in_set.len(),
+        graph[*node_id].node
+      );
     }
 
     while let Some(node_id) = to_visit.pop_front() {
       if to_delete.contains(&node_id) {
         continue;
       }
-      if !matches!(&graph[node_id].0, Node::Rule(_)) {
+      if !matches!(&graph[node_id].node, Node::Rule(_)) {
         continue;
       }
 
@@ -306,7 +349,7 @@ impl<'t, R: Rule> Builder<'t, R> {
       if edges_by_dependency_key.iter().all(|edges| edges.len() == 1) {
         // Confirm that its liveness set is up to date. If it isn't, we'll fall through to
         // monomorphize it, which will handle the update and potential merge with an existing node.
-        let new_in_set = Self::live_params(
+        let new_in_set = Self::params_in_set(
           &graph,
           node_id,
           edges_by_dependency_key
@@ -314,35 +357,37 @@ impl<'t, R: Rule> Builder<'t, R> {
             .flat_map(|edges| edges.iter().cloned()),
         );
 
-        if new_in_set == graph[node_id].1 {
+        if new_in_set == graph[node_id].in_set {
           println!(
             ">>> already monomorphic {} with accurate liveness: {}",
-            graph[node_id].0,
-            params_str(&graph[node_id].1)
+            graph[node_id].node,
+            params_str(&graph[node_id].in_set)
           );
           continue;
         }
       }
 
-      if graph[node_id].0.to_string().contains(debug_str) {
+      /*
+      if graph[node_id].node.to_string().contains(debug_str) {
         println!(
           ">>> monomorphizing {} with: {:#?}",
-          graph[node_id].0,
+          graph[node_id].node,
           edges_by_dependency_key
             .iter()
             .flat_map(|edges| edges.iter().map(|(dk, di)| (
               dk.to_string(),
-              graph[*di].0.to_string(),
-              params_str(&graph[*di].1)
+              graph[*di].node.to_string(),
+              params_str(&graph[*di].in_set)
             )))
             .collect::<Vec<_>>(),
         );
       }
+      */
       let monomorphizations = Self::monomorphizations(&graph, node_id, &edges_by_dependency_key);
       println!(
         ">>> created {} monomorphizations for {}",
         monomorphizations.len(),
-        graph[node_id].0,
+        graph[node_id].node,
       );
 
       // Needs changes. Add dependees to the list of nodes to visit, and this node to the
@@ -358,30 +403,33 @@ impl<'t, R: Rule> Builder<'t, R> {
       // Generate replacement nodes for the valid monomorphizations of this rule.
       let mut modified_existing_nodes = HashSet::new();
       for (live_params, combinations) in monomorphizations {
-        let (replacement_id, is_new_node) =
-          match rules.entry((graph[node_id].0.clone(), live_params.clone())) {
-            hash_map::Entry::Occupied(oe) => (*oe.get(), false),
-            hash_map::Entry::Vacant(ve) => (
-              *ve.insert(graph.add_node((graph[node_id].0.clone(), live_params.clone()))),
-              true,
-            ),
-          };
+        let pl = ParamsLabeled {
+          node: graph[node_id].node.clone(),
+          in_set: live_params.clone(),
+          out_set: ParamTypes::new(),
+        };
+        let (replacement_id, is_new_node) = match rules.entry(pl.clone()) {
+          hash_map::Entry::Occupied(oe) => (*oe.get(), false),
+          hash_map::Entry::Vacant(ve) => (*ve.insert(graph.add_node(pl)), true),
+        };
 
         for combination in combinations {
+          /*
           println!(
             ">>>   {} generating permutation for {} that consumes: {:#?}",
-            graph[node_id].0,
+            graph[node_id].node,
             params_str(&live_params),
             combination
               .iter()
               .map(|(dk, di)| format!(
                 "{} from ({} with {})",
                 dk,
-                graph[*di].0,
-                params_str(&graph[*di].1)
+                graph[*di].node,
+                params_str(&graph[*di].in_set)
               ))
               .collect::<Vec<_>>()
           );
+          */
           // Give all dependees for whom this combination is still valid edges to the new node.
           for (dependee_id, dependency_key) in &dependee_edges {
             if dependency_key
@@ -390,15 +438,17 @@ impl<'t, R: Rule> Builder<'t, R> {
               .unwrap_or(false)
             {
               // This combination did not consume the required param.
-              if graph[*dependee_id].0.to_string().contains(debug_str) {
+              /*
+              if graph[*dependee_id].node.to_string().contains(debug_str) {
                 println!(
                     ">>> skipping edge from {} to {} because {} was not consumed by this combo (only {})",
-                    graph[*dependee_id].0,
-                    graph[replacement_id].0,
+                    graph[*dependee_id].node,
+                    graph[replacement_id].node,
                     dependency_key,
                     params_str(&live_params)
                 );
               }
+              */
               continue;
             }
             // NB: Confirm that we are not creating a duplicate edge.
@@ -447,7 +497,7 @@ impl<'t, R: Rule> Builder<'t, R> {
       // In either case, it is fruitless to revisit those nodes, so we ignore them here. See the
       // method docstring.
       for existing_node_id in modified_existing_nodes {
-        if graph[existing_node_id].1 != graph[node_id].1 {
+        if graph[existing_node_id].in_set != graph[node_id].in_set {
           println!(
             ">>> enqueueing existing node to be visited {:?}",
             existing_node_id
@@ -456,7 +506,7 @@ impl<'t, R: Rule> Builder<'t, R> {
         }
       }
 
-      if graph[node_id].0.to_string().contains(debug_str) {
+      if graph[node_id].node.to_string().contains(debug_str) {
         let subgraph_id = node_id;
         let mut bfs = Bfs::new(&graph, subgraph_id);
         let mut visited = graph.visit_map();
@@ -467,7 +517,7 @@ impl<'t, R: Rule> Builder<'t, R> {
         let subgraph = graph.filter_map(
           |node_id, node| {
             if visited.is_visited(&node_id) && to_delete.is_visited(&node_id) {
-              Some(format!("{} for {}", node.0, params_str(&node.1)))
+              Some(format!("{} for {}", node.node, params_str(&node.in_set)))
             } else {
               None
             }
@@ -477,7 +527,7 @@ impl<'t, R: Rule> Builder<'t, R> {
 
         println!(
           "Subgraph below {}: {}",
-          graph[subgraph_id].0,
+          graph[subgraph_id].node,
           petgraph::dot::Dot::with_config(&subgraph, &[])
         );
       }
@@ -497,67 +547,78 @@ impl<'t, R: Rule> Builder<'t, R> {
   }
 
   ///
-  /// Execute live variable analysis to determine which Params are used by which nodes.
+  /// Execute live variable analysis to determine which Params are used and provided by each node.
   ///
   /// See https://en.wikipedia.org/wiki/Live_variable_analysis
   ///
   fn live_param_labeled_graph(&self, graph: Graph<R>) -> ParamsLabeledGraph<R> {
-    // Add in and out sets for each node, with the only non-empty sets initially being the in-set
-    // for Params which represent the "usage" of a Param, and the params provided by a Query as its
-    // in-set.
+    // Add in and out sets for each node, with all sets empty initially.
     let mut graph: ParamsLabeledGraph<R> = graph.map(
-      |_node_id, node| match node {
-        Node::Rule(r) => (Node::Rule(r.clone()), ParamTypes::new()),
-        Node::Query(q) => (Node::Query(q.clone()), q.params.clone()),
-        Node::Param(p) => {
-          let mut in_set = ParamTypes::new();
-          in_set.insert(*p);
-          (Node::Param(*p), in_set)
-        }
-      },
+      |_node_id, node| ParamsLabeled::new(node.clone()),
       |_edge_id, edge_weight| *edge_weight,
     );
 
-    // Starting from leaves of the graph, propagate used Params through nodes. To minimize
-    // the total number of visits, we walk breadth first with a queue.
+    // Because the leaves of the graph (generally Param nodes) are the most significant source of
+    // information, we start there. But we will eventually visit all reachable nodes, possibly
+    // multiple times. Informations flows both up (the in_sets) and down (the out_sets) this
+    // graph.
     let mut to_visit = graph
       .externals(Direction::Outgoing)
       .collect::<VecDeque<_>>();
     while let Some(node_id) = to_visit.pop_front() {
-      let new_in_set = match &graph[node_id] {
-        (Node::Rule(_), in_set) => {
-          // If our new in_set is different from our old in_set, update it and schedule our
-          // dependees.
-          let new_in_set = Self::live_params(
+      let (new_in_set, new_out_set) = match &graph[node_id].node {
+        Node::Rule(_) => {
+          // Rules have in_sets computed from their dependencies, and out_sets computed from their
+          // dependees and any provided params.
+          let in_set = Self::params_in_set(
             &graph,
             node_id,
             graph
               .edges_directed(node_id, Direction::Outgoing)
               .map(|edge_ref| (*edge_ref.weight(), edge_ref.target())),
           );
-          if in_set != &new_in_set {
-            to_visit.extend(graph.neighbors_directed(node_id, Direction::Incoming));
-            Some(new_in_set)
-          } else {
-            None
-          }
+          let out_set = Self::params_out_set(
+            &graph,
+            node_id,
+            graph
+              .edges_directed(node_id, Direction::Incoming)
+              .map(|edge_ref| (*edge_ref.weight(), edge_ref.source())),
+          );
+          (Some(in_set), Some(out_set))
         }
-        (Node::Param(_), _) => {
-          // Params are always leaves with an in-set of their own value, and no out-set. Visiting a
-          // Param means just kicking off visits to all of its predecessors.
-          to_visit.extend(graph.neighbors_directed(node_id, Direction::Incoming));
-          continue;
+        Node::Param(p) => {
+          // Params are always leaves with an in-set of their own value, and no out-set.
+          let mut in_set = ParamTypes::new();
+          in_set.insert(*p);
+          (Some(in_set), None)
         }
-        (Node::Query(_), _) => {
-          // Queries are always roots with an out-set of the Params that can be computed based on
-          // the Rule(s) that they depend on. We do not validate Queries during this phase of graph
-          // construction: potential ambiguity is resolved later during pruning.
-          continue;
+        Node::Query(_) => {
+          // Queries are always roots. Although they "provide" Params to the graph, none of a
+          // Query's params are "required" to be consumed (in the `DependencyKey.provided_param()`
+          // sense), and so their out sets are always empty.
+          let in_set = Self::params_in_set(
+            &graph,
+            node_id,
+            graph
+              .edges_directed(node_id, Direction::Outgoing)
+              .map(|edge_ref| (*edge_ref.weight(), edge_ref.target())),
+          );
+          (Some(in_set), None)
         }
       };
 
       if let Some(in_set) = new_in_set {
-        graph[node_id].1 = in_set;
+        if in_set != graph[node_id].in_set {
+          to_visit.extend(graph.neighbors_directed(node_id, Direction::Incoming));
+          graph[node_id].in_set = in_set;
+        }
+      }
+
+      if let Some(out_set) = new_out_set {
+        if out_set != graph[node_id].out_set {
+          to_visit.extend(graph.neighbors_directed(node_id, Direction::Outgoing));
+          graph[node_id].out_set = out_set;
+        }
       }
     }
 
@@ -574,7 +635,7 @@ impl<'t, R: Rule> Builder<'t, R> {
     let mut edges_to_delete = HashSet::new();
 
     println!(
-      "Pruning edges with: {:?}",
+      "Pruning edges with: {}",
       petgraph::dot::Dot::with_config(&graph, &[])
     );
 
@@ -585,7 +646,7 @@ impl<'t, R: Rule> Builder<'t, R> {
       if !visited.visit(node_id) {
         continue;
       }
-      let node = &graph[node_id].0;
+      let node = &graph[node_id].node;
 
       // * "no choice of rule that consumes param X" here (ie it's both GEN'd and KILL'd within the node)
       // * invalid required param at a Query
@@ -613,7 +674,7 @@ impl<'t, R: Rule> Builder<'t, R> {
             live_edge_refs
               .iter()
               .filter(|edge_ref| {
-                let dependency_in_set = &graph[edge_ref.target()].1;
+                let dependency_in_set = &graph[edge_ref.target()].in_set;
                 dependency_in_set.is_subset(&q.params)
               })
               .collect()
@@ -624,7 +685,7 @@ impl<'t, R: Rule> Builder<'t, R> {
               .iter()
               .filter(|edge_ref| {
                 if let Some(provided_param) = dependency_key.provided_param() {
-                  graph[edge_ref.target()].1.contains(&provided_param)
+                  graph[edge_ref.target()].in_set.contains(&provided_param)
                 } else {
                   true
                 }
@@ -637,7 +698,7 @@ impl<'t, R: Rule> Builder<'t, R> {
               p,
               live_edge_refs
                 .iter()
-                .map(|edge_ref| format!("{}", graph[edge_ref.target()].0))
+                .map(|edge_ref| format!("{}", graph[edge_ref.target()].node))
                 .collect::<Vec<_>>()
             );
           }
@@ -653,7 +714,7 @@ impl<'t, R: Rule> Builder<'t, R> {
           dependency_key,
           relevant_edge_refs
             .iter()
-            .map(|edge_ref| format!("{}", graph[edge_ref.target()].0))
+            .map(|edge_ref| format!("{}", graph[edge_ref.target()].node))
             .collect::<Vec<_>>()
         );
         */
@@ -661,7 +722,7 @@ impl<'t, R: Rule> Builder<'t, R> {
           let mut minimum_param_set_size = ::std::usize::MAX;
           let mut chosen_edges = Vec::new();
           for edge_ref in relevant_edge_refs {
-            let param_set_size = graph[edge_ref.target()].1.len();
+            let param_set_size = graph[edge_ref.target()].in_set.len();
             if param_set_size < minimum_param_set_size {
               chosen_edges.clear();
               chosen_edges.push(edge_ref);
@@ -695,8 +756,8 @@ impl<'t, R: Rule> Builder<'t, R> {
                 .map(|edge_ref| {
                   format!(
                     "{} (needed {})",
-                    graph[edge_ref.target()].0,
-                    crate::params_str(&graph[edge_ref.target()].1)
+                    graph[edge_ref.target()].node,
+                    crate::params_str(&graph[edge_ref.target()].in_set)
                   )
                 })
                 .collect::<Vec<_>>()
@@ -709,7 +770,7 @@ impl<'t, R: Rule> Builder<'t, R> {
               node,
               chosen_edges
                 .iter()
-                .map(|edge_ref| format!("{}", graph[edge_ref.target()].0))
+                .map(|edge_ref| format!("{}", graph[edge_ref.target()].node))
                 .collect::<Vec<_>>()
             ));
           }
@@ -738,7 +799,7 @@ impl<'t, R: Rule> Builder<'t, R> {
     let graph = pruned_graph;
 
     let entry_for = |node_id| -> Entry<R> {
-      let (node, in_set): &(Node<R>, ParamTypes<R::TypeId>) = &graph[node_id];
+      let ParamsLabeled { node, in_set, .. }: &ParamsLabeled<R> = &graph[node_id];
       match node {
         Node::Rule(rule) => Entry::WithDeps(EntryWithDeps::Inner(InnerEntry {
           params: in_set.clone(),
@@ -750,7 +811,7 @@ impl<'t, R: Rule> Builder<'t, R> {
     };
 
     println!(
-      "Finalizing with: {:?}",
+      "Finalizing with: {}",
       petgraph::dot::Dot::with_config(&graph, &[])
     );
 
@@ -800,42 +861,68 @@ impl<'t, R: Rule> Builder<'t, R> {
   }
 
   ///
-  /// Calculates the "live params" (live variables) that are required to satisfy the given set of
-  /// dependency edges.
+  /// Calculates the in_set required to satisfy the given set of dependency edges.
   ///
-  fn live_params(
+  fn params_in_set(
     graph: &ParamsLabeledGraph<R>,
     node_id: NodeIndex<u32>,
     dependency_edges: impl Iterator<Item = (R::DependencyKey, NodeIndex<u32>)>,
   ) -> ParamTypes<R::TypeId> {
-    // Union the live sets of our dependencies, less any Params "provided" (ie "declared variables"
+    // Union the in_sets of our dependencies, less any Params "provided" (ie "declared variables"
     // in the context of live variable analysis) by the relevant DependencyKeys.
-    dependency_edges
-      .flat_map(|(dependency_key, dependency_id)| {
-        if dependency_id == node_id {
-          // A self-edge to this node does not contribute Params to its own liveness set, for two
-          // reasons:
-          //   1. it should always be a noop.
-          //   2. any time it is _not_ a noop, it is probably because we're busying updating the
-          //      liveness set, and the node contributing to its own set ends up using a stale
-          //      result.
-          Box::new(std::iter::empty())
-        } else if let Some(provided_param) = dependency_key.provided_param() {
-          // If the DependencyKey "provides" the Param, it does not count toward our in-set.
-          Box::new(
-            graph[dependency_id]
-              .1
-              .iter()
-              .filter(move |p| *p != &provided_param)
-              .cloned(),
-          )
-        } else {
-          let iter: Box<dyn Iterator<Item = R::TypeId>> =
-            Box::new(graph[dependency_id].1.iter().cloned());
-          iter
-        }
-      })
-      .collect()
+    let mut in_set = ParamTypes::new();
+    for (dependency_key, dependency_id) in dependency_edges {
+      if dependency_id == node_id {
+        // A self-edge to this node does not contribute Params to its own liveness set, for two
+        // reasons:
+        //   1. it should always be a noop.
+        //   2. any time it is _not_ a noop, it is probably because we're busying updating the
+        //      liveness set, and the node contributing to its own set ends up using a stale
+        //      result.
+        continue;
+      }
+
+      if let Some(provided_param) = dependency_key.provided_param() {
+        // If the DependencyKey "provides" the Param, it does not count toward our in-set.
+        in_set.extend(
+          graph[dependency_id]
+            .in_set
+            .iter()
+            .filter(move |p| *p != &provided_param)
+            .cloned(),
+        );
+      } else {
+        in_set.extend(graph[dependency_id].in_set.iter().cloned());
+      }
+    }
+    in_set
+  }
+
+  ///
+  /// Calculates the out_set required to satisfy the given set of dependee edges.
+  ///
+  fn params_out_set(
+    graph: &ParamsLabeledGraph<R>,
+    node_id: NodeIndex<u32>,
+    dependee_edges: impl Iterator<Item = (R::DependencyKey, NodeIndex<u32>)>,
+  ) -> ParamTypes<R::TypeId> {
+    // Union the out_sets of our dependees, plus any Params "provided" (ie "declared variables"
+    // in the context of live variable analysis) by the relevant DependencyKeys.
+    let mut out_set = ParamTypes::new();
+    for (dependency_key, dependee_id) in dependee_edges {
+      if dependee_id == node_id {
+        // A self-edge to this node does not contribute Params to its out_set: see the reasoning
+        // in `Self::params_in_set`.
+        continue;
+      }
+
+      out_set.extend(graph[dependee_id].out_set.iter().cloned());
+      if let Some(p) = dependency_key.provided_param() {
+        // If the DependencyKey "provides" the Param, it is added to our out_set as well.
+        out_set.insert(p);
+      }
+    }
+    out_set
   }
 
   ///
@@ -858,7 +945,7 @@ impl<'t, R: Rule> Builder<'t, R> {
     > = HashMap::new();
     for combination in combinations_of_one(deps) {
       let combination = combination.into_iter().cloned().collect::<Vec<_>>();
-      let live_params = Self::live_params(graph, node_id, combination.iter().cloned());
+      let live_params = Self::params_in_set(graph, node_id, combination.iter().cloned());
 
       // Confirm that this combination of deps is satisfiable: if so, add to the set for this param
       // count, and if it is a new set, delete any larger sets.
@@ -867,7 +954,7 @@ impl<'t, R: Rule> Builder<'t, R> {
           let used_set = if *dependency_id == node_id {
             &live_params
           } else {
-            &graph[*dependency_id].1
+            &graph[*dependency_id].in_set
           };
           used_set.contains(&provided_param)
         } else {
@@ -877,7 +964,10 @@ impl<'t, R: Rule> Builder<'t, R> {
 
       if satisfiable {
         // Add this combination to the existing set.
-        combinations.entry(live_params).or_insert_with(|| vec![]).push(combination);
+        combinations
+          .entry(live_params)
+          .or_insert_with(|| vec![])
+          .push(combination);
       }
     }
 
