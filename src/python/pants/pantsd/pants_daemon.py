@@ -15,7 +15,12 @@ from pants.base.exception_sink import ExceptionSink
 from pants.bin.daemon_pants_runner import DaemonPantsRunner
 from pants.engine.internals.native import Native
 from pants.init.engine_initializer import GraphScheduler
-from pants.init.logging import clear_logging_handlers, init_rust_logger, setup_logging_to_file
+from pants.init.logging import (
+    clear_logging_handlers,
+    get_log_domain_levels,
+    init_rust_logger,
+    setup_logging_to_file,
+)
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.options import Options
@@ -211,8 +216,15 @@ class PantsDaemon(PantsDaemonProcessManager):
         # for further forks.
         with stdio_as(stdin_fd=-1, stdout_fd=-1, stderr_fd=-1):
             # Reinitialize logging for the daemon context.
-            use_color = self._bootstrap_options.for_global_scope().colors
-            init_rust_logger(self._log_level, self._log_show_rust_3rdparty, use_color=use_color)
+            bootstrap_options = self._bootstrap_options.for_global_scope()
+            use_color = bootstrap_options.colors
+            log_domain_levels = get_log_domain_levels(bootstrap_options)
+            init_rust_logger(
+                self._log_level,
+                self._log_show_rust_3rdparty,
+                use_color=use_color,
+                log_domain_levels=log_domain_levels,
+            )
 
             level = self._log_level
             ignores = self._bootstrap_options.for_global_scope().ignore_pants_warnings

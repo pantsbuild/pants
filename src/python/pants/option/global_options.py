@@ -182,9 +182,13 @@ class GlobalOptions(Subsystem):
         register(
             "--log-domain-levels",
             type=dict,
+            default={},
             advanced=True,
-            help="Set a more specific logging level for one or more logging domains. A logging domain is "
-            "a particular subsection of Pants functionality.",
+            help=(
+                "Set a more specific logging level for one or more logging domains. A logging domain is "
+                "a particular subsection of Pants functionality. The logging level is one of "
+                "`warn`, `error`, `info`, `debug`, or `trace`."
+            ),
         )
 
         register(

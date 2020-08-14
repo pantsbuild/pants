@@ -7,7 +7,7 @@ import os
 import sys
 import warnings
 from logging import Formatter, Handler, LogRecord, StreamHandler
-from typing import List, Optional, TextIO, Tuple
+from typing import Dict, List, Optional, TextIO, Tuple
 
 import pants.util.logging as pants_logging
 from pants.base.exception_sink import ExceptionSink
@@ -27,8 +27,11 @@ def init_rust_logger(
     log_show_rust_3rdparty: bool,
     use_color: bool,
     show_log_domain: bool = False,
+    log_domain_levels: Dict[str, LogLevel] = {},
 ) -> None:
-    Native().init_rust_logging(log_level.level, log_show_rust_3rdparty, use_color, show_log_domain)
+    Native().init_rust_logging(
+        log_level.level, log_show_rust_3rdparty, use_color, show_log_domain, log_domain_levels
+    )
 
 
 class NativeHandler(StreamHandler):
@@ -120,6 +123,19 @@ def _common_logging_setup(level: LogLevel, warnings_filter_regexes: Optional[Lis
         requests_logger.propagate = True
 
 
+def get_log_domain_levels(global_bootstrap_options) -> Dict[str, LogLevel]:
+    raw_log_domain_levels = global_bootstrap_options.log_domain_levels
+    log_domain_levels: Dict[str, LogLevel] = {}
+    for key, value in raw_log_domain_levels.items():
+        if not isinstance(key, str):
+            raise ValueError("keys for log_domain_levels must be strings")
+        if not isinstance(value, str):
+            raise ValueError("values for log_domain_levels must be strings")
+        log_level = LogLevel[value.upper()]
+        log_domain_levels[key] = log_level
+    return log_domain_levels
+
+
 def setup_logging(global_bootstrap_options):
     """Sets up logging for a pants run.
 
@@ -137,8 +153,11 @@ def setup_logging(global_bootstrap_options):
     log_show_rust_3rdparty = global_bootstrap_options.log_show_rust_3rdparty
     use_color = global_bootstrap_options.colors
     show_log_domain = global_bootstrap_options.show_log_domain
+    log_domain_levels = get_log_domain_levels(global_bootstrap_options)
 
-    init_rust_logger(global_level, log_show_rust_3rdparty, use_color, show_log_domain)
+    init_rust_logger(
+        global_level, log_show_rust_3rdparty, use_color, show_log_domain, log_domain_levels
+    )
     setup_logging_to_stderr(global_level, warnings_filter_regexes=ignores)
     if log_dir:
         setup_logging_to_file(global_level, log_dir=log_dir, warnings_filter_regexes=ignores)

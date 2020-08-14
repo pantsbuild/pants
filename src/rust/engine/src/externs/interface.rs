@@ -42,6 +42,7 @@
 /// how we expose ourselves back to Python.
 use std::any::Any;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::convert::TryInto;
 use std::fs::File;
 use std::io;
@@ -52,8 +53,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use cpython::{
-  exc, py_class, py_exception, py_fn, py_module_initializer, NoArgs, PyClone, PyErr, PyList,
-  PyObject, PyResult as CPyResult, PyString, PyTuple, PyType, Python, PythonObject, ToPyObject,
+  exc, py_class, py_exception, py_fn, py_module_initializer, NoArgs, PyClone, PyDict, PyErr,
+  PyList, PyObject, PyResult as CPyResult, PyString, PyTuple, PyType, Python, PythonObject,
+  ToPyObject,
 };
 use futures::compat::Future01CompatExt;
 use futures::future::FutureExt;
@@ -87,7 +89,10 @@ py_module_initializer!(native_engine, |py, m| {
   m.add(
     py,
     "init_logging",
-    py_fn!(py, init_logging(a: u64, b: bool, c: bool, d: bool)),
+    py_fn!(
+      py,
+      init_logging(a: u64, b: bool, c: bool, d: bool, e: PyDict)
+    ),
   )?;
   m.add(
     py,
@@ -1645,13 +1650,30 @@ fn default_config_path(py: Python) -> CPyResult<String> {
 }
 
 fn init_logging(
-  _: Python,
+  py: Python,
   level: u64,
   show_rust_3rdparty_logs: bool,
   use_color: bool,
   show_log_domain: bool,
+  log_domain_levels: PyDict,
 ) -> PyUnitResult {
-  Logger::init(level, show_rust_3rdparty_logs, use_color, show_log_domain);
+  let log_domain_levels = log_domain_levels
+    .items(py)
+    .iter()
+    .map(|(k, v)| {
+      let k = k.extract::<String>(py).unwrap();
+      let v = v.extract::<u64>(py).unwrap();
+      (k, v)
+    })
+    .collect::<HashMap<_, _>>();
+
+  Logger::init(
+    level,
+    show_rust_3rdparty_logs,
+    use_color,
+    show_log_domain,
+    log_domain_levels,
+  );
   Ok(None)
 }
 

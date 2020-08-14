@@ -1,9 +1,6 @@
 // Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-use crate::PythonLogLevel;
-
-use colored::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
@@ -14,12 +11,15 @@ use std::io::{stderr, Stderr, Write};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use colored::*;
 use lazy_static::lazy_static;
 use log::{debug, log, set_logger, set_max_level, LevelFilter, Log, Metadata, Record};
 use parking_lot::Mutex;
 use simplelog::{ConfigBuilder, LevelPadding, WriteLogger};
 use tokio::task_local;
 use uuid::Uuid;
+
+use crate::PythonLogLevel;
 
 const TIME_FORMAT_STR: &str = "%H:%M:%S";
 
@@ -36,6 +36,7 @@ pub struct PantsLogger {
   show_rust_3rdparty_logs: AtomicBool,
   show_log_domain: AtomicBool,
   stderr_handlers: Mutex<HashMap<Uuid, StdioHandler>>,
+  log_level_filters: Mutex<RefCell<HashMap<String, log::LevelFilter>>>,
 }
 
 impl PantsLogger {
@@ -47,6 +48,7 @@ impl PantsLogger {
       use_color: AtomicBool::new(true),
       show_log_domain: AtomicBool::new(false),
       stderr_handlers: Mutex::new(HashMap::new()),
+      log_level_filters: Mutex::new(RefCell::new(HashMap::new())),
     }
   }
 
@@ -55,7 +57,19 @@ impl PantsLogger {
     show_rust_3rdparty_logs: bool,
     use_color: bool,
     show_log_domain: bool,
+    log_domain_levels: HashMap<String, u64>,
   ) {
+    let log_domain_levels = log_domain_levels
+      .iter()
+      .map(|(k, v)| {
+        let python_level: PythonLogLevel = (*v).try_into().unwrap_or_else(|e| {
+          panic!("Unrecognized log level from python: {}: {}", v, e);
+        });
+        let level: log::LevelFilter = python_level.into();
+        (k.clone(), level)
+      })
+      .collect::<HashMap<_, _>>();
+
     let max_python_level: Result<PythonLogLevel, _> = max_level.try_into();
     match max_python_level {
       Ok(python_level) => {
@@ -68,6 +82,7 @@ impl PantsLogger {
         PANTS_LOGGER
           .show_rust_3rdparty_logs
           .store(show_rust_3rdparty_logs, Ordering::SeqCst);
+        PANTS_LOGGER.log_level_filters.lock().replace(log_domain_levels);
         if set_logger(&*PANTS_LOGGER).is_err() {
           debug!("Logging already initialized.");
         }
@@ -93,6 +108,7 @@ impl PantsLogger {
           level.into(),
           self.show_rust_3rdparty_logs.load(Ordering::SeqCst),
           self.show_log_domain.load(Ordering::SeqCst),
+          self.log_level_filters.lock().borrow().clone(),
         )
       })
   }
@@ -128,6 +144,7 @@ impl PantsLogger {
               level.into(),
               self.show_rust_3rdparty_logs.load(Ordering::SeqCst),
               self.show_log_domain.load(Ordering::SeqCst),
+              self.log_level_filters.lock().borrow().clone(),
             );
             fd
           })
@@ -253,6 +270,8 @@ impl Log for PantsLogger {
 
 struct MaybeWriteLogger<W: Write + Send + 'static> {
   level: LevelFilter,
+  show_rust_3rdparty_logs: bool,
+  log_domain_filters: HashMap<String, LevelFilter>,
   inner: Option<Box<WriteLogger<W>>>,
 }
 
@@ -260,6 +279,8 @@ impl<W: Write + Send + 'static> MaybeWriteLogger<W> {
   pub fn empty() -> MaybeWriteLogger<W> {
     MaybeWriteLogger {
       level: LevelFilter::Off,
+      show_rust_3rdparty_logs: true,
+      log_domain_filters: HashMap::new(),
       inner: None,
     }
   }
@@ -269,6 +290,7 @@ impl<W: Write + Send + 'static> MaybeWriteLogger<W> {
     level: LevelFilter,
     show_rust_3rdparty_logs: bool,
     show_log_domain: bool,
+    log_domain_filters: HashMap<String, LevelFilter>,
   ) -> MaybeWriteLogger<W> {
     // We initialize the inner WriteLogger with no filters so that we don't
     // have to create a new one every time we change the level of the outer
@@ -288,6 +310,8 @@ impl<W: Write + Send + 'static> MaybeWriteLogger<W> {
 
     MaybeWriteLogger {
       level,
+      log_domain_filters,
+      show_rust_3rdparty_logs,
       inner: Some(WriteLogger::new(LevelFilter::max(), config, writable)),
     }
   }
@@ -295,7 +319,13 @@ impl<W: Write + Send + 'static> MaybeWriteLogger<W> {
 
 impl<W: Write + Send + 'static> Log for MaybeWriteLogger<W> {
   fn enabled(&self, metadata: &Metadata) -> bool {
-    metadata.level() <= self.level
+    let enabled_globally = metadata.level() <= self.level;
+    let enabled_for_log_domain = self
+      .log_domain_filters
+      .get(metadata.target())
+      .map(|lf| metadata.level() <= *lf)
+      .unwrap_or(false);
+    enabled_globally || enabled_for_log_domain
   }
 
   fn log(&self, record: &Record) {

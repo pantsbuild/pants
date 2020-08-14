@@ -26,6 +26,7 @@ from pants.engine.internals.native_engine import (
 )
 from pants.engine.rules import Get
 from pants.engine.unions import union
+from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
 from pants.util.meta import SingletonMetaclass
 
@@ -125,9 +126,17 @@ class Native(metaclass=SingletonMetaclass):
         return self.lib.decompress_tarball(tarfile_path, dest_dir)
 
     def init_rust_logging(
-        self, level, log_show_rust_3rdparty: bool, use_color: bool, show_log_domain: bool
+        self,
+        level,
+        log_show_rust_3rdparty: bool,
+        use_color: bool,
+        show_log_domain: bool,
+        log_domain_levels: Dict[str, LogLevel],
     ):
-        return self.lib.init_logging(level, log_show_rust_3rdparty, use_color, show_log_domain)
+        log_domain_levels_as_ints = {k: v.level for k, v in log_domain_levels.items()}
+        return self.lib.init_logging(
+            level, log_show_rust_3rdparty, use_color, show_log_domain, log_domain_levels_as_ints
+        )
 
     def default_cache_path(self) -> str:
         return cast(str, self.lib.default_cache_path())
