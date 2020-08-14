@@ -4,6 +4,7 @@
 import logging
 import os
 import subprocess
+from enum import Enum
 from pathlib import Path
 from typing import Callable, Iterable, List, Optional, Tuple, cast
 
@@ -15,6 +16,24 @@ from pants.option.subsystem import Subsystem
 from pants.util.memo import memoized_property
 
 logger = logging.getLogger(__name__)
+
+
+class ResolveAllConstraintsOption(Enum):
+    """When to allow re-using a resolve of an entire constraints file.
+
+    This helps avoid many repeated resolves of overlapping requirement subsets,
+    at the expense of using a larger requirement set that may be strictly necessary.
+
+    Note that use of any value other than NEVER requires --requirement-constraints to be set.
+    """
+
+    # Use the strict requirement subset always.
+    NEVER = "never"
+    # Use the strict requirement subset when building deployable binaries, but use
+    # the entire constraints file otherwise (e.g., when running tests).
+    NONDEPLOYABLES = "nondeployables"
+    # Always use the entire constraints file.
+    ALWAYS = "always"
 
 
 class PythonSetup(Subsystem):
@@ -43,7 +62,7 @@ class PythonSetup(Subsystem):
             type=file_option,
             help=(
                 "When resolving third-party requirements, use this "
-                "constraint file to determine which versions to use. See "
+                "constraints file to determine which versions to use. See "
                 "https://pip.pypa.io/en/stable/user_guide/#constraints-files for more information "
                 "on the format of constraint files and how constraints are applied in Pex and Pip."
             ),
@@ -51,8 +70,8 @@ class PythonSetup(Subsystem):
         register(
             "--resolve-all-constraints",
             advanced=True,
-            default=False,
-            type=bool,
+            default=ResolveAllConstraintsOption.NEVER,
+            type=ResolveAllConstraintsOption,
             help=(
                 "If set, and the requirements of the code being operated on are a subset of the "
                 "constraints file, then the entire constraints file will be used instead of the "
@@ -63,7 +82,7 @@ class PythonSetup(Subsystem):
                 "You may wish to leave this option set for normal work, such as running tests, "
                 "but selectively turn it off via command-line-flag when building deployable "
                 "binaries, so that you only deploy the requirements you actually need for a "
-                "given binary."
+                "given binary. Requires [python-setup].requirement_constraints to be set."
             ),
         )
         register(
@@ -165,8 +184,8 @@ class PythonSetup(Subsystem):
         return cast(Optional[str], self.options.requirement_constraints)
 
     @property
-    def resolve_all_constraints(self) -> bool:
-        return cast(bool, self.options.resolve_all_constraints)
+    def resolve_all_constraints(self) -> ResolveAllConstraintsOption:
+        return cast(ResolveAllConstraintsOption, self.options.resolve_all_constraints)
 
     @memoized_property
     def interpreter_search_paths(self):

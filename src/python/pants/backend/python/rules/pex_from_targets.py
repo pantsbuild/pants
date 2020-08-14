@@ -34,7 +34,7 @@ from pants.engine.fs import (
 )
 from pants.engine.rules import Get, RootRule, collect_rules, rule
 from pants.engine.target import TransitiveTargets
-from pants.python.python_setup import PythonSetup
+from pants.python.python_setup import PythonSetup, ResolveAllConstraintsOption
 from pants.util.meta import frozen_after_init
 
 logger = logging.getLogger(__name__)
@@ -57,6 +57,8 @@ class PexFromTargetsRequest:
     # A human-readable description to use in the UI.  This field doesn't participate
     # in comparison (and therefore hashing), as it doesn't affect the result.
     description: Optional[str] = dataclasses.field(compare=False)
+    # Is this request for building a deployable binary?
+    for_deployable_binary: bool
 
     def __init__(
         self,
@@ -71,6 +73,7 @@ class PexFromTargetsRequest:
         additional_sources: Optional[Digest] = None,
         additional_inputs: Optional[Digest] = None,
         description: Optional[str] = None,
+        for_deployable_binary: bool = False,
     ) -> None:
         self.addresses = Addresses(addresses)
         self.output_filename = output_filename
@@ -82,6 +85,7 @@ class PexFromTargetsRequest:
         self.additional_sources = additional_sources
         self.additional_inputs = additional_inputs
         self.description = description
+        self.for_deployable_binary = for_deployable_binary
 
     @classmethod
     def for_requirements(
@@ -158,7 +162,11 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
     description = request.description
 
     if python_setup.requirement_constraints:
-        exact_req_projects = {Requirement.parse(req).project_name for req in exact_reqs}
+        # In requirement strings Foo_Bar and foo-bar refer to the same project.
+        def canonical(name: str) -> str:
+            return name.lower().replace("_", "-")
+
+        exact_req_projects = {canonical(Requirement.parse(req).project_name) for req in exact_reqs}
         constraints_file_contents = await Get(
             DigestContents,
             PathGlobs(
@@ -171,7 +179,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         constraints_file_reqs = set(
             parse_requirements(next(iter(constraints_file_contents)).content.decode())
         )
-        constraint_file_projects = {req.project_name for req in constraints_file_reqs}
+        constraint_file_projects = {canonical(req.project_name) for req in constraints_file_reqs}
         unconstrained_projects = exact_req_projects - constraint_file_projects
         if unconstrained_projects:
             logger.warning(
@@ -179,7 +187,10 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
                 f"entries for the following requirements: {', '.join(unconstrained_projects)}"
             )
 
-        if python_setup.resolve_all_constraints:
+        if python_setup.resolve_all_constraints == ResolveAllConstraintsOption.ALWAYS or (
+            python_setup.resolve_all_constraints == ResolveAllConstraintsOption.NONDEPLOYABLES
+            and not request.for_deployable_binary
+        ):
             if unconstrained_projects:
                 logger.warning(
                     "Ignoring resolve_all_constraints setting in [python_setup] scope "
@@ -188,10 +199,11 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
             else:
                 requirements = PexRequirements(str(req) for req in constraints_file_reqs)
                 description = description or f"Resolving {python_setup.requirement_constraints}"
-    elif python_setup.resolve_all_constraints:
+    elif python_setup.resolve_all_constraints != ResolveAllConstraintsOption.NEVER:
         raise ValueError(
-            "resolve_all_constraints in the [python-setup] scope is set, so "
-            "requirement_constraints in [python-setup] must also be provided."
+            f"[python-setup].resolve_all_constraints is set to "
+            f"{python_setup.resolve_all_constraints.value}, so "
+            f"[python-setup].requirement_constraints must also be provided."
         )
 
     return PexRequest(

@@ -88,6 +88,7 @@ async def create_python_binary(
                 platforms=PexPlatforms.create_from_platforms_field(field_set.platforms),
                 output_filename=output_filename,
                 additional_args=field_set.generate_additional_args(python_binary_defaults),
+                for_deployable_binary=True,
             )
         ),
     )
