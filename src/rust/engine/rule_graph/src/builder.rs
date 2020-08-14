@@ -68,7 +68,7 @@ impl<R: Rule> Node<R> {
 }
 
 ///
-/// A Node labeled with Param types that it is required (by its transitive dependees) to consume,
+/// A Node labeled with Param types that are declared (by its transitive dependees) for consumption,
 /// and Param types that are actually (by its transitive dependencies) consumed.
 ///
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
@@ -76,7 +76,7 @@ struct ParamsLabeled<R: Rule> {
   node: Node<R>,
   // Params that are actually consumed by transitive dependencies.
   in_set: ParamTypes<R::TypeId>,
-  // Params that the Node's transitive dependees require to be consumed.
+  // Params that the Node's transitive dependees have available for consumption.
   out_set: ParamTypes<R::TypeId>,
 }
 
@@ -358,6 +358,13 @@ impl<'t, R: Rule> Builder<'t, R> {
         dbos
       };
 
+      let dependees_by_out_set_len = dependees_by_out_set.len();
+      let dependencies_by_key_lens = dependencies_by_key
+        .iter()
+        .map(|edges| edges.len())
+        .collect::<Vec<_>>();
+      //println!(">>> dependees of {} by out set: {:#?}", graph[node_id], dependees_by_out_set);
+
       /*
       if graph[node_id].node.to_string().contains(debug_str) {
         println!(
@@ -375,47 +382,45 @@ impl<'t, R: Rule> Builder<'t, R> {
       }
       */
 
-      // Generate the monomorphizations of this Node, where each item is a potential node to
+      // Generate the monomorphizations of this Node, where each key is a potential node to
       // create, and the dependees and dependencies to give it (respectively).
-      let monomorphizations: Vec<(
+      let mut monomorphizations: HashMap<
         ParamsLabeled<R>,
-        Vec<(R::DependencyKey, _)>,
-        Vec<(R::DependencyKey, _)>,
-      )> = dependees_by_out_set
-        .into_iter()
-        .flat_map(|(out_set, dependees)| {
-          let node = graph[node_id].node.clone();
+        (
+          HashSet<(R::DependencyKey, _)>,
+          HashSet<(R::DependencyKey, _)>,
+        ),
+      > = HashMap::new();
+      for (out_set, dependees) in dependees_by_out_set {
+        let node = graph[node_id].node.clone();
+        for (in_set, dependencies) in
           Self::monomorphizations(&graph, node_id, out_set.clone(), &dependencies_by_key)
-            .into_iter()
-            .flat_map(move |(in_set, dependencies_sets)| {
-              let node = node.clone();
-              let out_set = out_set.clone();
-              let dependees = dependees.clone();
-              dependencies_sets.into_iter().map(move |dependencies| {
-                (
-                  ParamsLabeled {
-                    node: node.clone(),
-                    in_set: in_set.clone(),
-                    out_set: out_set.clone(),
-                  },
-                  dependees.clone(),
-                  dependencies.clone(),
-                )
-              })
+        {
+          // Add this set of dependees and dependencies to the relevant output node.
+          let entry = monomorphizations
+            .entry(ParamsLabeled {
+              node: node.clone(),
+              in_set: in_set.clone(),
+              out_set: out_set.clone(),
             })
-        })
-        .collect();
+            .or_insert_with(|| (HashSet::new(), HashSet::new()));
+          entry.0.extend(dependees.iter().cloned());
+          entry.1.extend(dependencies);
+        }
+      }
 
       // If the result of monomorphization was identical to the input, then nothing needs to
       // change: this node is valid (for now!).
-      if monomorphizations.len() == 1 && monomorphizations[0].0 == graph[node_id] {
+      if monomorphizations.len() == 1 && monomorphizations.contains_key(&graph[node_id]) {
         println!(">>> no changes for {}", graph[node_id].node);
         continue;
       }
 
       println!(
-        ">>> created {} monomorphizations for {}",
+        ">>> created {} monomorphizations (from {} dependee sets and {:?} dependencies) for {}",
         monomorphizations.len(),
+        dependees_by_out_set_len,
+        dependencies_by_key_lens,
         graph[node_id].node,
       );
 
@@ -428,7 +433,8 @@ impl<'t, R: Rule> Builder<'t, R> {
       to_visit.extend(graph.neighbors_undirected(node_id));
 
       // Generate a replacement node for each monomorphization of this rule.
-      for (new_node, dependees, dependencies) in monomorphizations {
+      for (new_node, (dependees, dependencies)) in monomorphizations {
+        /*
         println!(
           ">>>   generating {}, which consumes: {:#?}",
           new_node,
@@ -441,6 +447,7 @@ impl<'t, R: Rule> Builder<'t, R> {
             ))
             .collect::<Vec<_>>()
         );
+        */
 
         let (replacement_id, is_new_node) = match rules.entry(new_node.clone()) {
           hash_map::Entry::Occupied(oe) => {
@@ -455,6 +462,14 @@ impl<'t, R: Rule> Builder<'t, R> {
 
         // Give all dependees edges to the new node.
         for (dependency_key, dependee_id) in &dependees {
+          // Only combinations that consume the required param are valid.
+          // TODO: Could include this filtering in monomorphization to eliminate some more sets
+          // there?
+          if let Some(p) = dependency_key.provided_param() {
+            if !graph[replacement_id].in_set.contains(&p) {
+              continue;
+            }
+          }
           // Add a new edge (and confirm that we're not creating a duplicate if this is not a new
           // node).
           if is_new_node
@@ -574,10 +589,8 @@ impl<'t, R: Rule> Builder<'t, R> {
           in_set.insert(*p);
           (Some(in_set), None)
         }
-        Node::Query(_) => {
-          // Queries are always roots. Although they "provide" Params to the graph, none of a
-          // Query's params are "required" to be consumed (in the `DependencyKey.provided_param()`
-          // sense), and so their out sets are always empty.
+        Node::Query(q) => {
+          // Queries are always roots which declare some parameters.
           let in_set = Self::params_in_set(
             &graph,
             node_id,
@@ -585,7 +598,7 @@ impl<'t, R: Rule> Builder<'t, R> {
               .edges_directed(node_id, Direction::Outgoing)
               .map(|edge_ref| (*edge_ref.weight(), edge_ref.target())),
           );
-          (Some(in_set), None)
+          (Some(in_set), Some(q.params.clone()))
         }
       };
 
@@ -909,24 +922,26 @@ impl<'t, R: Rule> Builder<'t, R> {
 
   ///
   /// Given a node and a mapping of all legal sources of each of its dependencies, generates a
-  /// simplified node for each legal combination of parameters.
+  /// simplified node for each legal set with potentially useful in_sets.
+  ///
+  /// Note that because ambiguities are preserved (to allow for useful errors
+  /// post-monomorphization), the output is a set of a dependencies which might contain multiple
+  /// entries per DependencyKey.
   ///
   fn monomorphizations(
     graph: &ParamsLabeledGraph<R>,
     node_id: NodeIndex<u32>,
     out_set: ParamTypes<R::TypeId>,
     deps: &[Vec<(R::DependencyKey, NodeIndex<u32>)>],
-  ) -> HashMap<ParamTypes<R::TypeId>, Vec<Vec<(R::DependencyKey, NodeIndex<u32>)>>> {
-    let mut combinations: HashMap<
-      ParamTypes<R::TypeId>,
-      Vec<Vec<(R::DependencyKey, NodeIndex<u32>)>>,
-    > = HashMap::new();
+  ) -> HashMap<ParamTypes<R::TypeId>, HashSet<(R::DependencyKey, NodeIndex<u32>)>> {
+    let mut combinations = HashMap::new();
+
     for combination in combinations_of_one(deps) {
       let combination = combination.into_iter().cloned().collect::<Vec<_>>();
       let in_set = Self::params_in_set(graph, node_id, combination.iter().cloned());
 
       // Confirm that this combination of deps is satisfiable: ie, that each dependency consumes
-      // the out_set along with any provided param.
+      // any provided param(s).
       let satisfiable = combination.iter().all(|(dependency_key, dependency_id)| {
         let dependency_in_set = if *dependency_id == node_id {
           // Is a self edge: use the in_set that we're considering creating.
@@ -935,20 +950,67 @@ impl<'t, R: Rule> Builder<'t, R> {
           &graph[*dependency_id].in_set
         };
 
-        dependency_in_set.is_superset(&out_set)
-          && dependency_key
-            .provided_param()
-            .map(|p| dependency_in_set.contains(&p))
-            .unwrap_or(true)
+        dependency_key
+          .provided_param()
+          .map(|p| dependency_in_set.contains(&p))
+          .unwrap_or(true)
       });
-
-      if satisfiable {
-        // Add this combination to the existing set.
-        combinations
-          .entry(in_set)
-          .or_insert_with(|| vec![])
-          .push(combination);
+      if !satisfiable {
+        continue;
       }
+
+      // And that it is useful. The out_set shrinks as monomorphization runs and nodes are split,
+      // and so we can't require that all of the params are consumed (because that might prevent a
+      // dependee whose out_set might later shrink from consuming a node). Likewise, we can't
+      // just generate the smallest possible in_sets without regard for the out_set, because some
+      // of the members of the out_set will end up being required for consumption.
+      //
+      // So: we generate all sets where the in_set (is empty or) intersects with the out_set. But
+      // in cases where the in_set is a superset of the out_set, we only keep the smallest
+      // candidate in_sets.
+      if in_set.is_disjoint(&out_set) && !in_set.is_empty() {
+        // None of the out_set parameters are present in this set, so it is cannot be useful.
+        continue;
+      }
+
+      // If this set contains the entire out_set, and there are any subsets of this set already
+      // satisfied, skip it.
+      let is_sufficient_set = in_set.is_superset(&out_set);
+      let mut is_superset_of_sufficient_set = false;
+      let mut is_sufficient_subset_of = Vec::new();
+      for already_satisfied in combinations.keys() {
+        let is_superset = in_set.is_superset(already_satisfied);
+        if is_superset && &in_set == already_satisfied {
+          // This set is identical to an existing set: store it.
+          break;
+        }
+
+        // Supersets of already sufficient sets are discarded.
+        if is_superset && already_satisfied.is_superset(&out_set) {
+          is_superset_of_sufficient_set = true;
+          break;
+        }
+
+        // Otherwise, if we are sufficient and _also_ a subset of this existing sufficient set,
+        // then we "win" and that other set should be removed.
+        if is_sufficient_set && in_set.is_subset(already_satisfied) {
+          is_sufficient_subset_of.push(already_satisfied.clone());
+        }
+      }
+      if is_superset_of_sufficient_set {
+        // An existing set was a better choice than this one.
+        continue;
+      }
+      for to_eliminate in is_sufficient_subset_of {
+        // The new set is better than an old set: eliminate the old set.
+        combinations.remove(&to_eliminate);
+      }
+
+      // If we've made it this far, we're worth recording. Huzzah!
+      combinations
+        .entry(in_set)
+        .or_insert_with(|| HashSet::new())
+        .extend(combination);
     }
 
     combinations
