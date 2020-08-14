@@ -369,7 +369,10 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
             relpath=PurePath(self.source_root, self.conftest_source.path).as_posix(),
             contents=self.conftest_source.content.decode(),
         )
-        self.add_to_build_file(self.source_root, "python_library()")
+
+        self.create_file(
+            relpath=PurePath(self.source_root, "BUILD").as_posix(), contents="python_tests()",
+        )
 
         result = self.run_pytest(passthrough_args="-s")
         assert result.status == Status.SUCCESS
