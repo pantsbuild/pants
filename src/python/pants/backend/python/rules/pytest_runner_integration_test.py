@@ -11,7 +11,12 @@ from pants.backend.python.dependency_inference import rules as dependency_infere
 from pants.backend.python.rules import pex, pex_from_targets, pytest_runner, python_sources
 from pants.backend.python.rules.coverage import create_coverage_config
 from pants.backend.python.rules.pytest_runner import PythonTestFieldSet
-from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary, PythonTests
+from pants.backend.python.target_types import (
+    ConftestTarget,
+    PythonLibrary,
+    PythonRequirementLibrary,
+    PythonTests,
+)
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.test import Status, TestDebugRequest, TestResult
 from pants.core.util_rules import source_files, stripped_source_files
@@ -112,7 +117,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
 
     @classmethod
     def target_types(cls):
-        return [PythonLibrary, PythonTests, PythonRequirementLibrary]
+        return [ConftestTarget, PythonLibrary, PythonTests, PythonRequirementLibrary]
 
     @classmethod
     def rules(cls):
@@ -369,7 +374,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
             relpath=PurePath(self.source_root, self.conftest_source.path).as_posix(),
             contents=self.conftest_source.content.decode(),
         )
-        self.add_to_build_file(self.source_root, "python_library()")
+        self.add_to_build_file(self.source_root, "conftest()")
 
         result = self.run_pytest(passthrough_args="-s")
         assert result.status == Status.SUCCESS

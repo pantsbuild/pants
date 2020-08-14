@@ -10,6 +10,7 @@ from pants.backend.python.dependency_inference.rules import (
 )
 from pants.backend.python.dependency_inference.rules import rules as dependency_inference_rules
 from pants.backend.python.target_types import (
+    ConftestTarget,
     PythonLibrary,
     PythonRequirementLibrary,
     PythonSources,
@@ -47,7 +48,7 @@ class PythonDependencyInferenceTest(TestBase):
 
     @classmethod
     def target_types(cls):
-        return [PythonLibrary, PythonRequirementLibrary, PythonTests]
+        return [ConftestTarget, PythonLibrary, PythonRequirementLibrary, PythonTests]
 
     def test_infer_python_imports(self) -> None:
         self.add_to_build_file(
@@ -173,15 +174,15 @@ class PythonDependencyInferenceTest(TestBase):
         )
 
         self.create_file("src/python/root/conftest.py")
-        self.add_to_build_file("src/python/root", "python_library()")
+        self.add_to_build_file("src/python/root", "conftest()")
 
         self.create_file("src/python/root/mid/conftest.py")
-        self.add_to_build_file("src/python/root/mid", "python_library()")
+        self.add_to_build_file("src/python/root/mid", "conftest()")
 
         self.create_file("src/python/root/mid/leaf/conftest.py")
         self.create_file("src/python/root/mid/leaf/this_is_a_test.py")
         self.add_to_build_file(
-            "src/python/root/mid/leaf", "python_tests()\npython_library(name='conftest')"
+            "src/python/root/mid/leaf", "python_tests()\nconftest(name='conftest')"
         )
 
         def run_dep_inference(address: Address) -> InferredDependencies:

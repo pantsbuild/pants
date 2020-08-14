@@ -300,7 +300,7 @@ class PythonTests(Target):
 
 
 class PythonLibrarySources(PythonSources):
-    default = ("*.py",) + tuple(f"!{pat}" for pat in PythonTestsSources.default)
+    default = ("*.py", "!conftest.py") + tuple(f"!{pat}" for pat in PythonTestsSources.default)
 
 
 class PythonLibrary(Target):
@@ -308,6 +308,26 @@ class PythonLibrary(Target):
 
     alias = "python_library"
     core_fields = (*COMMON_PYTHON_FIELDS, PythonLibrarySources)
+
+
+# -----------------------------------------------------------------------------------------------
+# `conftest` target
+# -----------------------------------------------------------------------------------------------
+
+
+class ConftestSources(PythonLibrarySources):
+    default = ("conftest.py",)
+
+
+class ConftestTarget(Target):
+    """A `conftest.py` file used by Pytest-style tests.
+
+    A `conftest` target behaves the same as a `python_library` target, and is sugar for
+    `python_library(sources=['conftest.py']`.
+    """
+
+    alias = "conftest"
+    core_fields = (*COMMON_PYTHON_FIELDS, ConftestSources)
 
 
 # -----------------------------------------------------------------------------------------------
