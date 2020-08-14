@@ -70,7 +70,7 @@ class PythonSetup(Subsystem):
         register(
             "--resolve-all-constraints",
             advanced=True,
-            default=ResolveAllConstraintsOption.NEVER,
+            default=ResolveAllConstraintsOption.NONDEPLOYABLES,
             type=ResolveAllConstraintsOption,
             help=(
                 "If set, and the requirements of the code being operated on are a subset of the "
@@ -186,6 +186,9 @@ class PythonSetup(Subsystem):
     @property
     def resolve_all_constraints(self) -> ResolveAllConstraintsOption:
         return cast(ResolveAllConstraintsOption, self.options.resolve_all_constraints)
+
+    def resolve_all_constraints_was_set_explicitly(self) -> bool:
+        return not self.options.is_default("resolve_all_constraints")
 
     @memoized_property
     def interpreter_search_paths(self):

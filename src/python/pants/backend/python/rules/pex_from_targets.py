@@ -199,7 +199,10 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
             else:
                 requirements = PexRequirements(str(req) for req in constraints_file_reqs)
                 description = description or f"Resolving {python_setup.requirement_constraints}"
-    elif python_setup.resolve_all_constraints != ResolveAllConstraintsOption.NEVER:
+    elif (
+        python_setup.resolve_all_constraints != ResolveAllConstraintsOption.NEVER
+        and python_setup.resolve_all_constraints_was_set_explicitly()
+    ):
         raise ValueError(
             f"[python-setup].resolve_all_constraints is set to "
             f"{python_setup.resolve_all_constraints.value}, so "

@@ -81,12 +81,13 @@ class PexTest(TestBase):
         request = PexFromTargetsRequest([Address.parse("//:tgt")], output_filename="dummy.pex")
 
         def get_pex_request(
-            constraints_file: Optional[str], resolve_all: ResolveAllConstraintsOption
+            constraints_file: Optional[str], resolve_all: Optional[ResolveAllConstraintsOption]
         ) -> PexRequest:
             args = [
                 "--backend-packages=pants.backend.python",
-                f"--python-setup-resolve-all-constraints={resolve_all.value}",
             ]
+            if resolve_all:
+                args.append(f"--python-setup-resolve-all-constraints={resolve_all.value}")
             if constraints_file:
                 args.append(f"--python-setup-requirement-constraints={constraints_file}")
             return self.request_single_product(
@@ -109,3 +110,6 @@ class PexTest(TestBase):
             "[python-setup].resolve_all_constraints is set to always, so "
             "[python-setup].requirement_constraints must also be provided."
         ) in str(err.exception)
+
+        # Shouldn't error, as we don't explicitly set --resolve-all-constraints.
+        get_pex_request(None, None)
