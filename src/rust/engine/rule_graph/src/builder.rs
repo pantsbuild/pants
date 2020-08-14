@@ -475,7 +475,7 @@ impl<'t, R: Rule> Builder<'t, R> {
           |_, edge_weight| Some(*edge_weight),
         );
 
-        panic!(
+        println!(
           "Subgraph below {}: {}",
           graph[subgraph_id].0,
           petgraph::dot::Dot::with_config(&subgraph, &[])
@@ -842,6 +842,11 @@ impl<'t, R: Rule> Builder<'t, R> {
   /// Given an Entry and a mapping of all legal sources of each of its dependencies, generates a
   /// simplified Entry for each legal combination of parameters.
   ///
+  /// TODO: We currently generate a significant over-approximation of what might be necessary,
+  /// because we are not tracking which subgraphs have transitive "provided param" requirements.
+  /// If we did, we could avoid generating monomorphizations that were not necessary to satisfy
+  /// those requirements.
+  ///
   fn monomorphizations(
     graph: &ParamsLabeledGraph<R>,
     node_id: NodeIndex<u32>,
@@ -854,24 +859,6 @@ impl<'t, R: Rule> Builder<'t, R> {
     for combination in combinations_of_one(deps) {
       let combination = combination.into_iter().cloned().collect::<Vec<_>>();
       let live_params = Self::live_params(graph, node_id, combination.iter().cloned());
-
-      // If this exact param set has already been satisfied, we still recompute the possible
-      // combination of deps in case it represents ambiguity. Otherwise, if this set is a superset
-      // of any already-satisfied set, skip it. Finally, if it is a subset of any already satisfied
-      // sets, delete them.
-      // NB: This scan over satisfied sets is linear, but should have a small N because of how it
-      // is filtered.
-      let is_new_set = if combinations.contains_key(&live_params) {
-        false
-      } else if combinations
-        .keys()
-        .any(|already_satisfied| already_satisfied.is_subset(&live_params))
-      {
-        // If any subsets are already satisfied, skip this combination.
-        continue;
-      } else {
-        true
-      };
 
       // Confirm that this combination of deps is satisfiable: if so, add to the set for this param
       // count, and if it is a new set, delete any larger sets.
@@ -887,18 +874,10 @@ impl<'t, R: Rule> Builder<'t, R> {
           true
         }
       });
+
       if satisfiable {
-        if is_new_set {
-          // Remove any supersets of this set, and then add it.
-          combinations.retain(|already_satisfied, _| !already_satisfied.is_superset(&live_params));
-          combinations.insert(live_params, vec![combination]);
-        } else {
-          // Add this combination to the existing set.
-          combinations
-            .get_mut(&live_params)
-            .unwrap()
-            .push(combination);
-        }
+        // Add this combination to the existing set.
+        combinations.entry(live_params).or_insert_with(|| vec![]).push(combination);
       }
     }
 
