@@ -219,24 +219,24 @@ impl<'t, R: Rule> Builder<'t, R> {
 
   ///
   /// Splits Rules in the graph that have multiple valid sources of a dependency, and recalculates
-  /// their live variables to attempt to re-join with other copies of the Rule with identical sets.
-  /// Similar to `live_param_labeled_graph`, this is an analysis that propagates "up" the graph
-  /// from dependencies to dependees (and maintains the live param sets initialized by
-  /// `live_param_labeled_graph` while doing so). Visiting a node might cause us to split it and
-  /// re-calculate the live params sets for each split; we then visit the dependees of the split
-  /// nodes to ensure that they are visited as well, and so on.
+  /// their in/out sets to attempt to re-join with other copies of the Rule with identical sets.
+  /// Similar to `live_param_labeled_graph`, this is an analysis that propagates both up and down
+  /// the graph (and maintains the in/out sets initialized by `live_param_labeled_graph` while doing
+  /// so). Visiting a node might cause us to split it and re-calculate the in/out sets for each
+  /// split; we then visit the nodes affected by the split to ensure that they are updated as well,
+  /// and so on.
   ///
   /// Any node that has a dependency that does not consume a provided param will be removed (which
   /// may also cause its dependees to be removed, for the same reason). This is safe to do at any
-  /// time during the monomorphize run, because the liveness sets only shrink over time: if a
-  /// dependency does not consume a provided param with the overapproximated set, it won't with any
-  /// smaller set either.
+  /// time during the monomorphize run, because the in/out sets are adjusted in tandem based on the
+  /// current dependencies/dependees.
   ///
-  /// The exit condition for this phase is that all nodes have their final, accurate param usage sets,
-  /// because all splits that result in smaller param sets for a node will have been executed. BUT,
-  /// it might still be the case that a node has multiple sources of a particular dependency with
-  /// the _same_ param requirements. This represents ambiguity that must be handled (likely by
-  /// erroring) in later phases.
+  /// The exit condition for this phase is that all dependees of a node have the same minimal
+  /// out_set, and all valid combinations of dependencies have the same minimal in_set. This occurs
+  /// when all splits that would result in smaller param sets for a node have been executed. Note
+  /// though that it might still be the case that a node has multiple sources of a particular
+  /// dependency with the _same_ param requirements. This represents ambiguity that must be handled
+  /// (likely by erroring) in later phases.
   ///
   fn monomorphize(mut graph: ParamsLabeledGraph<R>) -> ParamsLabeledGraph<R> {
     // In order to reduce the number of permutations rapidly, we make a best effort attempt to
@@ -309,15 +309,6 @@ impl<'t, R: Rule> Builder<'t, R> {
       );
     }
 
-    println!(">>> initial visit order:");
-    for node_id in &to_visit {
-      println!(
-        ">>>   {}\t{}",
-        graph[*node_id].in_set.len(),
-        graph[*node_id].node
-      );
-    }
-
     while let Some(node_id) = to_visit.pop_front() {
       if to_delete.contains(&node_id) {
         continue;
@@ -326,11 +317,11 @@ impl<'t, R: Rule> Builder<'t, R> {
         continue;
       }
 
-      // If any DependencyKey has multiple (live/not-deleted) sources, the Rule needs to be
-      // monomorphized/duplicated.
-      let edges_by_dependency_key: Vec<Vec<(R::DependencyKey, _)>> = {
+      // Group dependencies by DependencyKey.
+      let dependencies_by_key: Vec<Vec<(R::DependencyKey, _)>> = {
         let mut sorted_edges = graph
           .edges_directed(node_id, Direction::Outgoing)
+          .filter(|edge_ref| !to_delete.contains(&edge_ref.target()))
           .collect::<Vec<_>>();
         sorted_edges.sort_by_key(|edge_ref| edge_ref.weight());
         sorted_edges
@@ -339,40 +330,40 @@ impl<'t, R: Rule> Builder<'t, R> {
           .into_iter()
           .map(|(dependency_key, edge_refs)| {
             edge_refs
-              .filter(|edge_ref| !to_delete.contains(&edge_ref.target()))
               .map(|edge_ref| (*dependency_key, edge_ref.target()))
               .collect()
           })
           .collect()
       };
 
-      if edges_by_dependency_key.iter().all(|edges| edges.len() == 1) {
-        // Confirm that its liveness set is up to date. If it isn't, we'll fall through to
-        // monomorphize it, which will handle the update and potential merge with an existing node.
-        let new_in_set = Self::params_in_set(
-          &graph,
-          node_id,
-          edges_by_dependency_key
-            .iter()
-            .flat_map(|edges| edges.iter().cloned()),
-        );
+      // Group dependees by out_set.
+      let dependees_by_out_set: HashMap<ParamTypes<R::TypeId>, Vec<(R::DependencyKey, _)>> = {
+        let mut dbos = HashMap::new();
+        for edge_ref in graph.edges_directed(node_id, Direction::Incoming) {
+          if to_delete.contains(&edge_ref.source()) {
+            continue;
+          }
 
-        if new_in_set == graph[node_id].in_set {
-          println!(
-            ">>> already monomorphic {} with accurate liveness: {}",
-            graph[node_id].node,
-            params_str(&graph[node_id].in_set)
-          );
-          continue;
+          // Compute the out_set of this dependee, plus the provided param, if any.
+          let mut out_set = graph[edge_ref.source()].out_set.clone();
+          if let Some(p) = edge_ref.weight().provided_param() {
+            out_set.insert(p);
+          }
+
+          dbos
+            .entry(out_set)
+            .or_insert_with(|| vec![])
+            .push((*edge_ref.weight(), edge_ref.source()));
         }
-      }
+        dbos
+      };
 
       /*
       if graph[node_id].node.to_string().contains(debug_str) {
         println!(
           ">>> monomorphizing {} with: {:#?}",
           graph[node_id].node,
-          edges_by_dependency_key
+          dependencies_by_key
             .iter()
             .flat_map(|edges| edges.iter().map(|(dk, di)| (
               dk.to_string(),
@@ -383,126 +374,117 @@ impl<'t, R: Rule> Builder<'t, R> {
         );
       }
       */
-      let monomorphizations = Self::monomorphizations(&graph, node_id, &edges_by_dependency_key);
+
+      // Generate the monomorphizations of this Node, where each item is a potential node to
+      // create, and the dependees and dependencies to give it (respectively).
+      let monomorphizations: Vec<(
+        ParamsLabeled<R>,
+        Vec<(R::DependencyKey, _)>,
+        Vec<(R::DependencyKey, _)>,
+      )> = dependees_by_out_set
+        .into_iter()
+        .flat_map(|(out_set, dependees)| {
+          let node = graph[node_id].node.clone();
+          Self::monomorphizations(&graph, node_id, out_set.clone(), &dependencies_by_key)
+            .into_iter()
+            .flat_map(move |(in_set, dependencies_sets)| {
+              let node = node.clone();
+              let out_set = out_set.clone();
+              let dependees = dependees.clone();
+              dependencies_sets.into_iter().map(move |dependencies| {
+                (
+                  ParamsLabeled {
+                    node: node.clone(),
+                    in_set: in_set.clone(),
+                    out_set: out_set.clone(),
+                  },
+                  dependees.clone(),
+                  dependencies.clone(),
+                )
+              })
+            })
+        })
+        .collect();
+
+      // If the result of monomorphization was identical to the input, then nothing needs to
+      // change: this node is valid (for now!).
+      if monomorphizations.len() == 1 && monomorphizations[0].0 == graph[node_id] {
+        println!(">>> no changes for {}", graph[node_id].node);
+        continue;
+      }
+
       println!(
         ">>> created {} monomorphizations for {}",
         monomorphizations.len(),
         graph[node_id].node,
       );
 
-      // Needs changes. Add dependees to the list of nodes to visit, and this node to the
-      // list of nodes to be deleted.
-      let dependee_edges = graph
-        .edges_directed(node_id, Direction::Incoming)
-        .map(|edge_ref| (edge_ref.source(), *edge_ref.weight()))
-        .collect::<Vec<_>>();
-      to_visit.extend(dependee_edges.iter().map(|(dependee_id, _)| dependee_id));
+      // Needs changes. Add this node to the list of nodes to be deleted.
       to_delete.insert(node_id);
       rules.remove(&graph[node_id]);
+      // And schedule visits for all dependees and dependencies.
+      // TODO: It's possible that we could avoid notifying neighbors in some cases based on their
+      // observed in/out sets not having changed... but this is easier to implement.
+      to_visit.extend(graph.neighbors_undirected(node_id));
 
-      // Generate replacement nodes for the valid monomorphizations of this rule.
-      let mut modified_existing_nodes = HashSet::new();
-      for (live_params, combinations) in monomorphizations {
-        let pl = ParamsLabeled {
-          node: graph[node_id].node.clone(),
-          in_set: live_params.clone(),
-          out_set: ParamTypes::new(),
-        };
-        let (replacement_id, is_new_node) = match rules.entry(pl.clone()) {
-          hash_map::Entry::Occupied(oe) => (*oe.get(), false),
-          hash_map::Entry::Vacant(ve) => (*ve.insert(graph.add_node(pl)), true),
+      // Generate a replacement node for each monomorphization of this rule.
+      for (new_node, dependees, dependencies) in monomorphizations {
+        println!(
+          ">>>   generating {}, which consumes: {:#?}",
+          new_node,
+          dependencies
+            .iter()
+            .map(|(dk, di)| (
+              dk.to_string(),
+              graph[*di].node.to_string(),
+              params_str(&graph[*di].in_set)
+            ))
+            .collect::<Vec<_>>()
+        );
+
+        let (replacement_id, is_new_node) = match rules.entry(new_node.clone()) {
+          hash_map::Entry::Occupied(oe) => {
+            // We're adding edges to an existing node. Ensure that we visit it later to square
+            // that.
+            let existing_id = *oe.get();
+            to_visit.push_back(existing_id);
+            (existing_id, false)
+          }
+          hash_map::Entry::Vacant(ve) => (*ve.insert(graph.add_node(new_node)), true),
         };
 
-        for combination in combinations {
-          /*
-          println!(
-            ">>>   {} generating permutation for {} that consumes: {:#?}",
-            graph[node_id].node,
-            params_str(&live_params),
-            combination
-              .iter()
-              .map(|(dk, di)| format!(
-                "{} from ({} with {})",
-                dk,
-                graph[*di].node,
-                params_str(&graph[*di].in_set)
-              ))
-              .collect::<Vec<_>>()
-          );
-          */
-          // Give all dependees for whom this combination is still valid edges to the new node.
-          for (dependee_id, dependency_key) in &dependee_edges {
-            if dependency_key
-              .provided_param()
-              .map(|p| !live_params.contains(&p))
-              .unwrap_or(false)
-            {
-              // This combination did not consume the required param.
-              /*
-              if graph[*dependee_id].node.to_string().contains(debug_str) {
-                println!(
-                    ">>> skipping edge from {} to {} because {} was not consumed by this combo (only {})",
-                    graph[*dependee_id].node,
-                    graph[replacement_id].node,
-                    dependency_key,
-                    params_str(&live_params)
-                );
-              }
-              */
-              continue;
-            }
-            // NB: Confirm that we are not creating a duplicate edge.
-            if graph
+        // Give all dependees edges to the new node.
+        for (dependency_key, dependee_id) in &dependees {
+          // Add a new edge (and confirm that we're not creating a duplicate if this is not a new
+          // node).
+          if is_new_node
+            || graph
               .edges_directed(*dependee_id, Direction::Outgoing)
               .all(|edge_ref| {
                 edge_ref.target() != replacement_id || edge_ref.weight() != dependency_key
               })
-            {
-              graph.add_edge(*dependee_id, replacement_id, *dependency_key);
-            }
-          }
-
-          // And give it edges to this combination of dependencies (while confirming that we don't
-          // create dupes).
-          let existing_edges = graph
-            .edges_directed(replacement_id, Direction::Outgoing)
-            .map(|edge_ref| (*edge_ref.weight(), edge_ref.target()))
-            .collect::<HashSet<_>>();
-          for (dependency_key, dependency_id) in combination {
-            // NB: When a node depends on itself, we adjust the destination of that self-edge to point to
-            // the new node.
-            let dependency_id = if dependency_id == node_id {
-              replacement_id
-            } else {
-              dependency_id
-            };
-            if !existing_edges.contains(&(dependency_key, dependency_id)) {
-              if !is_new_node {
-                modified_existing_nodes.insert(replacement_id);
-              }
-              graph.add_edge(replacement_id, dependency_id, dependency_key);
-            }
+          {
+            graph.add_edge(*dependee_id, replacement_id, *dependency_key);
           }
         }
-      }
 
-      // If we modified any existing nodes, we revisit them unless they had the same live params
-      // set as our input. Because we "deleted" our input node before running, any combinations that
-      // resulted in collisions back to that same set represent ambiguities, either:
-      //   1. temporarily, because some of our dependencies did not have their final liveness sets
-      //      because they had not been visited yet. they are guaranteed to be visited eventually
-      //      though, and our replacement node will be too because it depends on them
-      //   2. permanently, because there is ambiguity that cannot be resolved by this phase, in
-      //      which case we leave it the graph to be resolved by the pruning phases
-      // In either case, it is fruitless to revisit those nodes, so we ignore them here. See the
-      // method docstring.
-      for existing_node_id in modified_existing_nodes {
-        if graph[existing_node_id].in_set != graph[node_id].in_set {
-          println!(
-            ">>> enqueueing existing node to be visited {:?}",
-            existing_node_id
-          );
-          to_visit.push_back(existing_node_id);
+        // And give the new node edges to this combination of dependencies (while confirming that we
+        // don't create dupes).
+        let existing_edges = graph
+          .edges_directed(replacement_id, Direction::Outgoing)
+          .map(|edge_ref| (*edge_ref.weight(), edge_ref.target()))
+          .collect::<HashSet<_>>();
+        for (dependency_key, dependency_id) in dependencies {
+          // NB: When a node depends on itself, we adjust the destination of that self-edge to point to
+          // the new node.
+          let dependency_id = if dependency_id == node_id {
+            replacement_id
+          } else {
+            dependency_id
+          };
+          if !existing_edges.contains(&(dependency_key, dependency_id)) {
+            graph.add_edge(replacement_id, dependency_id, dependency_key);
+          }
         }
       }
 
@@ -926,17 +908,13 @@ impl<'t, R: Rule> Builder<'t, R> {
   }
 
   ///
-  /// Given an Entry and a mapping of all legal sources of each of its dependencies, generates a
-  /// simplified Entry for each legal combination of parameters.
-  ///
-  /// TODO: We currently generate a significant over-approximation of what might be necessary,
-  /// because we are not tracking which subgraphs have transitive "provided param" requirements.
-  /// If we did, we could avoid generating monomorphizations that were not necessary to satisfy
-  /// those requirements.
+  /// Given a node and a mapping of all legal sources of each of its dependencies, generates a
+  /// simplified node for each legal combination of parameters.
   ///
   fn monomorphizations(
     graph: &ParamsLabeledGraph<R>,
     node_id: NodeIndex<u32>,
+    out_set: ParamTypes<R::TypeId>,
     deps: &[Vec<(R::DependencyKey, NodeIndex<u32>)>],
   ) -> HashMap<ParamTypes<R::TypeId>, Vec<Vec<(R::DependencyKey, NodeIndex<u32>)>>> {
     let mut combinations: HashMap<
@@ -945,27 +923,29 @@ impl<'t, R: Rule> Builder<'t, R> {
     > = HashMap::new();
     for combination in combinations_of_one(deps) {
       let combination = combination.into_iter().cloned().collect::<Vec<_>>();
-      let live_params = Self::params_in_set(graph, node_id, combination.iter().cloned());
+      let in_set = Self::params_in_set(graph, node_id, combination.iter().cloned());
 
-      // Confirm that this combination of deps is satisfiable: if so, add to the set for this param
-      // count, and if it is a new set, delete any larger sets.
+      // Confirm that this combination of deps is satisfiable: ie, that each dependency consumes
+      // the out_set along with any provided param.
       let satisfiable = combination.iter().all(|(dependency_key, dependency_id)| {
-        if let Some(provided_param) = dependency_key.provided_param() {
-          let used_set = if *dependency_id == node_id {
-            &live_params
-          } else {
-            &graph[*dependency_id].in_set
-          };
-          used_set.contains(&provided_param)
+        let dependency_in_set = if *dependency_id == node_id {
+          // Is a self edge: use the in_set that we're considering creating.
+          &in_set
         } else {
-          true
-        }
+          &graph[*dependency_id].in_set
+        };
+
+        dependency_in_set.is_superset(&out_set)
+          && dependency_key
+            .provided_param()
+            .map(|p| dependency_in_set.contains(&p))
+            .unwrap_or(true)
       });
 
       if satisfiable {
         // Add this combination to the existing set.
         combinations
-          .entry(live_params)
+          .entry(in_set)
           .or_insert_with(|| vec![])
           .push(combination);
       }
