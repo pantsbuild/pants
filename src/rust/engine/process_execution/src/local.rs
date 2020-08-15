@@ -27,7 +27,7 @@ use store::{OneOffStoreFileByDigest, Snapshot, Store};
 
 use tokio::process::{Child, Command};
 use tokio::sync::RwLock;
-use tokio::time::timeout;
+use tokio::time::{timeout, Duration};
 use tokio_util::codec::{BytesCodec, FramedRead};
 
 use crate::{
@@ -39,7 +39,6 @@ use bytes::{Bytes, BytesMut};
 
 pub const USER_EXECUTABLE_MODE: u32 = 0o100755;
 
-#[derive(Clone)]
 pub struct CommandRunner {
   pub store: Store,
   executor: task_executor::Executor,
@@ -47,7 +46,7 @@ pub struct CommandRunner {
   named_caches: NamedCaches,
   cleanup_local_dirs: bool,
   platform: Platform,
-  spawn_lock: Arc<RwLock<()>>,
+  spawn_lock: RwLock<()>,
 }
 
 impl CommandRunner {
@@ -65,7 +64,7 @@ impl CommandRunner {
       named_caches,
       cleanup_local_dirs,
       platform: Platform::current().unwrap(),
-      spawn_lock: Arc::new(RwLock::new(())),
+      spawn_lock: RwLock::new(()),
     }
   }
 
@@ -169,14 +168,13 @@ impl HermeticCommand {
     &mut self,
     stdout: O,
     stderr: E,
-  ) -> Result<Child, String> {
+  ) -> std::io::Result<Child> {
     self
       .inner
       .stdin(Stdio::null())
       .stdout(stdout)
       .stderr(stderr)
       .spawn()
-      .map_err(|e| format!("Error launching process: {:?}", e))
   }
 }
 
@@ -311,14 +309,45 @@ impl CapturedWorkdir for CommandRunner {
     //
     // See: https://github.com/golang/go/issues/22315 for an excellent description of this generic
     // unix problem.
-    let mut fork_exec = || command.spawn(Stdio::piped(), Stdio::piped());
+    let mut fork_exec = move || command.spawn(Stdio::piped(), Stdio::piped());
     let mut child = {
       if exclusive_spawn {
         let _write_locked = self.spawn_lock.write().await;
-        fork_exec()
+
+        // Despite the mitigations taken against racing our own forks, forks can happen in our
+        // process but outside of our control (in libraries). As such, we back-stop by sleeping and
+        // trying again for a while if we do hit one of these fork races we do not control.
+        const MAX_ETXTBSY_WAIT: Duration = Duration::from_millis(100);
+        let mut retries = 0;
+        let mut sleep_millis = 1;
+
+        let start_time = std::time::Instant::now();
+        loop {
+          match fork_exec() {
+            Err(e) => {
+              if e.raw_os_error() == Some(libc::ETXTBSY) && start_time.elapsed() < MAX_ETXTBSY_WAIT
+              {
+                tokio::time::delay_for(std::time::Duration::from_millis(sleep_millis)).await;
+                retries += 1;
+                sleep_millis *= 2;
+                continue;
+              } else if retries > 0 {
+                break Err(format!(
+                  "Error launching process after {} {} for ETXTBSY. Final error was: {:?}",
+                  retries,
+                  if retries == 1 { "retry" } else { "retries" },
+                  e
+                ));
+              } else {
+                break Err(format!("Error launching process: {:?}", e));
+              }
+            }
+            Ok(child) => break Ok(child),
+          }
+        }
       } else {
         let _read_locked = self.spawn_lock.read().await;
-        fork_exec()
+        fork_exec().map_err(|e| format!("Error launching process: {:?}", e))
       }
     }?;
 
@@ -360,10 +389,7 @@ pub trait CapturedWorkdir {
     cleanup_local_dirs: bool,
     workdir_base: &Path,
     platform: Platform,
-  ) -> Result<FallibleProcessResultWithPlatform, String>
-  where
-    Self: Send + Sync + Clone + 'static,
-  {
+  ) -> Result<FallibleProcessResultWithPlatform, String> {
     // Set up a temporary workdir, which will optionally be preserved.
     let (workdir_path, maybe_workdir) = {
       let workdir = tempfile::Builder::new()
