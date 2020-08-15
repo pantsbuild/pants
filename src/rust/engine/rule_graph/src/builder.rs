@@ -323,7 +323,7 @@ impl<'t, R: Rule> Builder<'t, R> {
       }
 
       iteration += 1;
-      let looping = graph.node_count() - to_delete.len() > 3500;
+      let looping = graph.node_count() - to_delete.len() > 10000;
       if iteration % 100 == 0 {
         println!(
           ">>> iteration {}: live_node_count: {}, to_visit: {} (, node_count: {}, to_delete: {})",
@@ -485,7 +485,7 @@ impl<'t, R: Rule> Builder<'t, R> {
         // Give all dependees edges to the new node.
         for (dependency_key, dependee_id) in &dependees {
           // Only combinations that consume the required param are valid.
-          // TODO: Could include this filtering in monomorphization to eliminate some more sets
+          // TODO: Could include this filtering in monomorphization to avoid creating some sets
           // there?
           if let Some(p) = dependency_key.provided_param() {
             if !graph[replacement_id].in_set.contains(&p) {
@@ -656,10 +656,12 @@ impl<'t, R: Rule> Builder<'t, R> {
     // dead edges while running.
     let mut edges_to_delete = HashSet::new();
 
+    /*
     println!(
       "Pruning edges with: {}",
       petgraph::dot::Dot::with_config(&graph, &[])
     );
+    */
 
     // Walk from roots, choosing one source for each DependencyKey of each node.
     let mut visited = graph.visit_map();
@@ -832,10 +834,12 @@ impl<'t, R: Rule> Builder<'t, R> {
       }
     };
 
+    /*
     println!(
       "Finalizing with: {}",
       petgraph::dot::Dot::with_config(&graph, &[])
     );
+    */
 
     // Visit the reachable portion of the graph to create Edges, starting from roots.
     let mut rule_dependency_edges = HashMap::new();
@@ -991,45 +995,52 @@ impl<'t, R: Rule> Builder<'t, R> {
       // dependee whose out_set might later shrink from consuming a node). Likewise, we can't
       // just generate the smallest possible in_sets without regard for the out_set, because some
       // of the members of the out_set will end up being required for consumption.
-      //
-      // So: we generate all sets where the in_set (is empty or) intersects with the out_set. But
-      // in cases where the in_set is a superset of the out_set, we only keep the smallest
-      // candidate in_sets.
-      if in_set.is_disjoint(&out_set) && !in_set.is_empty() {
-        // None of the out_set parameters are present in this set, so it is cannot be useful.
-        continue;
-      }
-
-      // If this set contains the entire out_set, and there are any subsets of this set already
-      // satisfied, skip it.
-      let is_sufficient_set = in_set.is_superset(&out_set);
-      let mut is_superset_of_sufficient_set = false;
-      let mut is_sufficient_subset_of = Vec::new();
+      let candidate_consumes = out_set.intersection(&in_set).collect::<ParamTypes<_>>();
+      let mut was_eliminated = false;
+      let mut eliminated = Vec::new();
       for already_satisfied in combinations.keys() {
-        let is_superset = in_set.is_superset(already_satisfied);
-        if is_superset && &in_set == already_satisfied {
-          // This set is identical to an existing set: store it.
+        if &in_set == already_satisfied {
+          // This set is identical to an existing set: we must store it.
           break;
         }
 
-        // Supersets of already sufficient sets are discarded.
-        if is_superset && already_satisfied.is_superset(&out_set) {
-          is_superset_of_sufficient_set = true;
+        // If both candidates consume the same portion of the out_set, take the smaller one over
+        // all.
+        let already_satisfied_consumes = out_set
+          .intersection(&already_satisfied)
+          .collect::<ParamTypes<_>>();
+        if candidate_consumes == already_satisfied_consumes {
+          if in_set.len() < already_satisfied.len() {
+            eliminated.push(already_satisfied.clone());
+            continue;
+          } else if in_set.len() > already_satisfied.len() {
+            was_eliminated = true;
+            break;
+          } else {
+            // Keep both, unfortunately.
+            break;
+          }
+        }
+
+        // If the candidate consumes a subset of the out_set relative to the already satisfied node,
+        // it is eliminated.
+        if candidate_consumes.is_subset(&already_satisfied_consumes) {
+          was_eliminated = true;
           break;
         }
 
-        // Otherwise, if we are sufficient and _also_ a subset of this existing sufficient set,
-        // then we "win" and that other set should be removed.
-        if is_sufficient_set && in_set.is_subset(already_satisfied) {
-          is_sufficient_subset_of.push(already_satisfied.clone());
+        // Otherwise, if the candidate consume a superset of the out_set relative to the already satisfied
+        // node, then the already satisfied node is eliminated.
+        if candidate_consumes.is_superset(&already_satisfied_consumes) {
+          eliminated.push(already_satisfied.clone());
         }
       }
-      if is_superset_of_sufficient_set {
+      if was_eliminated {
         // An existing set was a better choice than this one.
         continue;
       }
-      for to_eliminate in is_sufficient_subset_of {
-        // The new set is better than an old set: eliminate the old set.
+      for to_eliminate in eliminated {
+        // The new set is better than some old set(s): remove them.
         combinations.remove(&to_eliminate);
       }
 
