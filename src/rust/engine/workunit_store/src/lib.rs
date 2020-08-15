@@ -324,7 +324,6 @@ impl HeavyHittersData {
         if let Some(metadata) = new_metadata {
           workunit.metadata = metadata;
         }
-        workunit.log_workunit_state();
         inner_store.workunit_records.insert(span_id, workunit);
       }
     }
@@ -493,16 +492,18 @@ impl WorkunitStore {
       let tx = self.heavy_hitters_data.msg_tx.lock();
       tx.send(StoreMsg::Completed(span_id, new_metadata, end_time))
         .unwrap();
-    } else {
-      let start_time = match workunit.state {
-        WorkunitState::Started { start_time } => start_time,
-        _ => panic!(),
-      };
-      let time_span = TimeSpan::from_start_and_end_systemtime(&start_time, &end_time);
-      let new_state = WorkunitState::Completed { time_span };
-      workunit.state = new_state;
-      workunit.log_workunit_state();
     }
+    let start_time = match workunit.state {
+      WorkunitState::Started { start_time } => start_time,
+      _ => {
+        log::warn!("Workunit {} was already completed", span_id);
+        return;
+      }
+    };
+    let time_span = TimeSpan::from_start_and_end_systemtime(&start_time, &end_time);
+    let new_state = WorkunitState::Completed { time_span };
+    workunit.state = new_state;
+    workunit.log_workunit_state();
   }
 
   pub fn add_completed_workunit(
