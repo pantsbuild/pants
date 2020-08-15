@@ -223,8 +223,15 @@ class GlobalOptions(Subsystem):
             advanced=True,
             type=int,
             default=2,
-            help="The maximum Levenshtein distance to use when offering suggestions for invalid "
-            "option names.",
+            help=(
+                "The maximum Levenshtein distance to use when offering suggestions for invalid "
+                "option names."
+            ),
+            removal_version="2.1.0.dev0",
+            removal_hint=(
+                "The option `--option-name-check-distance` no longer does anything, as Pants now "
+                "always uses the default of 2."
+            ),
         )
 
         register(
