@@ -663,7 +663,7 @@ impl<N: Node> Graph<N> {
       // Retry the dst a number of times to handle Node invalidation.
       let context = context.clone();
       loop {
-        match entry.get(&context, entry_id).await {
+        match entry.get_node_result(&context, entry_id).await {
           Ok(r) => break Ok(Some(r)),
           Err(err) if err == N::Error::invalidated() => {
             let node = {
@@ -682,7 +682,7 @@ impl<N: Node> Graph<N> {
       }
     } else {
       // Not retriable.
-      Ok(Some(entry.get(context, entry_id).await?))
+      Ok(Some(entry.get_node_result(context, entry_id).await?))
     }
   }
 
