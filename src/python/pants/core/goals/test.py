@@ -162,6 +162,9 @@ class CoverageReport(ABC):
         """
         ...
 
+    def get_artifact(self) -> Optional[Tuple[str, Digest]]:
+        return None
+
 
 @dataclass(frozen=True)
 class ConsoleCoverageReport(CoverageReport):
@@ -192,9 +195,12 @@ class FilesystemCoverageReport(CoverageReport):
         )
         return self.report_file
 
+    def get_artifact(self) -> Optional[Tuple[str, Digest]]:
+        return self.report_type.value, self.result_digest
+
 
 @dataclass(frozen=True)
-class CoverageReports:
+class CoverageReports(EngineAware):
     reports: Tuple[CoverageReport, ...]
 
     def materialize(self, console: Console, workspace: Workspace) -> Tuple[PurePath, ...]:
@@ -204,6 +210,15 @@ class CoverageReports:
             if report_path:
                 report_paths.append(report_path)
         return tuple(report_paths)
+
+    def artifacts(self) -> Optional[Dict[str, Digest]]:
+        artifacts = {}
+        for report in self.reports:
+            artifact = report.get_artifact()
+            if not artifact:
+                continue
+            artifacts[artifact[0]] = artifact[1]
+        return artifacts or None
 
 
 class ShowOutput(Enum):
