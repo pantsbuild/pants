@@ -43,10 +43,9 @@ logger = logging.getLogger(__name__)
 @frozen_after_init
 @dataclass(unsafe_hash=True)
 class PexFromTargetsRequest:
-    """Request to create a PEX from the closure of a set of targets."""
-
     addresses: Addresses
     output_filename: str
+    internal_only: bool
     entry_point: Optional[str]
     platforms: PexPlatforms
     additional_args: Tuple[str, ...]
@@ -54,17 +53,16 @@ class PexFromTargetsRequest:
     include_source_files: bool
     additional_sources: Optional[Digest]
     additional_inputs: Optional[Digest]
-    # A human-readable description to use in the UI.  This field doesn't participate
-    # in comparison (and therefore hashing), as it doesn't affect the result.
+    # This field doesn't participate in comparison (and therefore hashing), as it doesn't affect
+    # the result.
     description: Optional[str] = dataclasses.field(compare=False)
-    # Is this request for building a deployable binary?
-    for_deployable_binary: bool
 
     def __init__(
         self,
         addresses: Iterable[Address],
         *,
         output_filename: str,
+        internal_only: bool,
         entry_point: Optional[str] = None,
         platforms: PexPlatforms = PexPlatforms(),
         additional_args: Iterable[str] = (),
@@ -73,10 +71,38 @@ class PexFromTargetsRequest:
         additional_sources: Optional[Digest] = None,
         additional_inputs: Optional[Digest] = None,
         description: Optional[str] = None,
-        for_deployable_binary: bool = False,
     ) -> None:
+        """Request to create a Pex from the transitive closure of the given addresses.
+
+        :param addresses: The addresses to use for determining what is included in the Pex. The
+            transitive closure of these addresses will be used; you only need to specify the roots.
+        :param output_filename: The name of the built Pex file, which typically should end in
+            `.pex`.
+        :param internal_only: Whether we ever materialize the Pex and distribute it directly
+            to end users, such as with the `binary` goal. Typically, instead, the user never
+            directly uses the Pex, e.g. with `lint` and `test`. If True, we will use a Pex setting
+            that results in faster build time but compatibility with fewer interpreters at runtime.
+        :param entry_point: The entry-point for the built Pex, equivalent to Pex's `-m` flag. If
+            left off, the Pex will open up as a REPL.
+        :param platforms: Which platforms should be supported. Setting this value will cause
+            interpreter constraints to not be used because platforms already constrain the valid
+            Python versions, e.g. by including `cp36m` in the platform string.
+        :param additional_args: Any additional Pex flags.
+        :param additional_requirements: Additional requirements to install, in addition to any
+            requirements used by the transitive closure of the given addresses.
+        :param include_source_files: Whether to include source files in the built Pex or not.
+            Setting this to `False` and loading the source files by instead populating the chroot
+            and setting the environment variable `PEX_EXTRA_SYS_PATH` will result in substantially
+            fewer rebuilds of the Pex.
+        :param additional_sources: Any additional source files to include in the built Pex.
+        :param additional_inputs: Any inputs that are not source files and should not be included
+            directly in the Pex, but should be present in the environment when building the Pex.
+        :param description: A human-readable description to render in the dynamic UI when building
+            the Pex.
+        """
         self.addresses = Addresses(addresses)
         self.output_filename = output_filename
+        self.internal_only = internal_only
         self.entry_point = entry_point
         self.platforms = platforms
         self.additional_args = tuple(additional_args)
@@ -85,11 +111,10 @@ class PexFromTargetsRequest:
         self.additional_sources = additional_sources
         self.additional_inputs = additional_inputs
         self.description = description
-        self.for_deployable_binary = for_deployable_binary
 
     @classmethod
     def for_requirements(
-        cls, addresses: Addresses, *, zip_safe: bool = False
+        cls, addresses: Addresses, *, internal_only: bool, zip_safe: bool = False
     ) -> "PexFromTargetsRequest":
         """Create an instance that can be used to get a requirements pex.
 
@@ -107,6 +132,7 @@ class PexFromTargetsRequest:
             output_filename="requirements.pex",
             include_source_files=False,
             additional_args=() if zip_safe else ("--not-zip-safe",),
+            internal_only=internal_only,
         )
 
 
@@ -189,7 +215,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
 
         if python_setup.resolve_all_constraints == ResolveAllConstraintsOption.ALWAYS or (
             python_setup.resolve_all_constraints == ResolveAllConstraintsOption.NONDEPLOYABLES
-            and not request.for_deployable_binary
+            and request.internal_only
         ):
             if unconstrained_projects:
                 logger.warning(
@@ -211,6 +237,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
 
     return PexRequest(
         output_filename=request.output_filename,
+        internal_only=request.internal_only,
         requirements=requirements,
         interpreter_constraints=interpreter_constraints,
         platforms=request.platforms,

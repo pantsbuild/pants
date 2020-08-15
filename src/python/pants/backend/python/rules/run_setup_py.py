@@ -628,6 +628,7 @@ async def setup_setuptools(setuptools: Setuptools) -> SetuptoolsSetup:
         Pex,
         PexRequest(
             output_filename="setuptools.pex",
+            internal_only=True,
             requirements=PexRequirements(setuptools.all_requirements),
             interpreter_constraints=PexInterpreterConstraints(setuptools.interpreter_constraints),
         ),

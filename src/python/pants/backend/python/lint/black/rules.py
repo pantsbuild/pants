@@ -75,6 +75,7 @@ async def setup(setup_request: SetupRequest, black: Black) -> Setup:
         Pex,
         PexRequest(
             output_filename="black.pex",
+            internal_only=True,
             requirements=PexRequirements(black.all_requirements),
             interpreter_constraints=PexInterpreterConstraints(black.interpreter_constraints),
             entry_point=black.entry_point,

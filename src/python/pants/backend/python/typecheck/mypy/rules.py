@@ -72,6 +72,7 @@ async def mypy_typecheck(request: MyPyRequest, mypy: MyPy) -> TypecheckResults:
         Pex,
         PexRequest(
             output_filename="mypy.pex",
+            internal_only=True,
             requirements=PexRequirements(mypy.all_requirements),
             # NB: This only determines what MyPy is run with. The user can specify what version
             # their code is with `--python-version`. See

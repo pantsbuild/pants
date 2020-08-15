@@ -23,7 +23,9 @@ async def create_python_repl_request(repl: PythonRepl) -> ReplRequest:
     requirements_request = Get(
         Pex,
         PexFromTargetsRequest,
-        PexFromTargetsRequest.for_requirements(Addresses(tgt.address for tgt in repl.targets)),
+        PexFromTargetsRequest.for_requirements(
+            Addresses(tgt.address for tgt in repl.targets), internal_only=True
+        ),
     )
     sources_request = Get(
         PythonSourceFiles, PythonSourceFilesRequest(repl.targets, include_files=True)
@@ -35,7 +37,7 @@ async def create_python_repl_request(repl: PythonRepl) -> ReplRequest:
     chrooted_source_roots = [repl.in_chroot(sr) for sr in sources.source_roots]
     return ReplRequest(
         digest=merged_digest,
-        args=(repl.in_chroot(requirements_pex.output_filename),),
+        args=(repl.in_chroot(requirements_pex.name),),
         env={"PEX_EXTRA_SYS_PATH": ":".join(chrooted_source_roots)},
     )
 
@@ -51,7 +53,9 @@ async def create_ipython_repl_request(repl: IPythonRepl, ipython: IPython) -> Re
     requirements_pex_request = await Get(
         PexRequest,
         PexFromTargetsRequest,
-        PexFromTargetsRequest.for_requirements(Addresses(tgt.address for tgt in repl.targets)),
+        PexFromTargetsRequest.for_requirements(
+            Addresses(tgt.address for tgt in repl.targets), internal_only=True
+        ),
     )
 
     requirements_request = Get(Pex, PexRequest, requirements_pex_request)
@@ -67,6 +71,7 @@ async def create_ipython_repl_request(repl: IPythonRepl, ipython: IPython) -> Re
             entry_point=ipython.entry_point,
             requirements=PexRequirements(ipython.all_requirements),
             interpreter_constraints=requirements_pex_request.interpreter_constraints,
+            internal_only=True,
         ),
     )
 
@@ -80,7 +85,7 @@ async def create_ipython_repl_request(repl: IPythonRepl, ipython: IPython) -> Re
         ),
     )
     chrooted_source_roots = [repl.in_chroot(sr) for sr in sources.source_roots]
-    args: Tuple[str, ...] = (repl.in_chroot(ipython_pex.output_filename),)
+    args: Tuple[str, ...] = (repl.in_chroot(ipython_pex.name),)
     if ipython.options.ignore_cwd:
         args = args + ("--ignore-cwd",)
     return ReplRequest(

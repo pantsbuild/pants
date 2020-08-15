@@ -65,6 +65,7 @@ async def create_python_awslambda(
     pex_request = TwoStepPexFromTargetsRequest(
         PexFromTargetsRequest(
             addresses=[field_set.address],
+            internal_only=False,
             entry_point=None,
             output_filename=pex_filename,
             platforms=PexPlatforms([platform]),
@@ -75,7 +76,6 @@ async def create_python_awslambda(
                 # available and matching the AMI platform.
                 "--resolve-local-platforms",
             ],
-            for_deployable_binary=True,
         )
     )
 
@@ -111,6 +111,7 @@ async def setup_lambdex(lambdex: Lambdex) -> LambdexSetup:
         Pex,
         PexRequest(
             output_filename="lambdex.pex",
+            internal_only=True,
             requirements=PexRequirements(lambdex.all_requirements),
             interpreter_constraints=PexInterpreterConstraints(lambdex.interpreter_constraints),
             entry_point=lambdex.entry_point,

@@ -84,16 +84,16 @@ async def create_python_binary(
         TwoStepPexFromTargetsRequest(
             PexFromTargetsRequest(
                 addresses=[field_set.address],
+                internal_only=False,
                 entry_point=entry_point,
                 platforms=PexPlatforms.create_from_platforms_field(field_set.platforms),
                 output_filename=output_filename,
                 additional_args=field_set.generate_additional_args(python_binary_defaults),
-                for_deployable_binary=True,
             )
         ),
     )
     pex = two_step_pex.pex
-    return CreatedBinary(digest=pex.digest, binary_name=pex.output_filename)
+    return CreatedBinary(digest=pex.digest, binary_name=pex.name)
 
 
 def rules():

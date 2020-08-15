@@ -53,6 +53,7 @@ class PluginResolverTest(TestBase):
             Params(
                 PexRequest(
                     output_filename="setup-py-runner.pex",
+                    internal_only=True,
                     requirements=PexRequirements(["setuptools==44.0.0", "wheel==0.34.2"]),
                 ),
                 create_options_bootstrapper(args=["--backend-packages=pants.backend.python"]),

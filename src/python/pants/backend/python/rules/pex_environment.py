@@ -96,8 +96,10 @@ class PexEnvironment(EngineAware):
     subprocess_environment_dict: FrozenDict[str, str]
     bootstrap_python: Optional[str] = None
 
-    def create_argv(self, pex_path: str, *args: str) -> Iterable[str]:
-        argv = [self.bootstrap_python] if self.bootstrap_python else []
+    def create_argv(
+        self, pex_path: str, *args: str, always_use_shebang: bool = False
+    ) -> Iterable[str]:
+        argv = [self.bootstrap_python] if self.bootstrap_python and not always_use_shebang else []
         argv.extend((pex_path, *args))
         return argv
 

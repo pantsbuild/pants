@@ -52,7 +52,7 @@ async def create_python_binary_run_request(
     requirements_pex_request = await Get(
         PexRequest,
         PexFromTargetsRequest,
-        PexFromTargetsRequest.for_requirements(Addresses([field_set.address])),
+        PexFromTargetsRequest.for_requirements(Addresses([field_set.address]), internal_only=True),
     )
 
     requirements_request = Get(Pex, PexRequest, requirements_pex_request)
@@ -68,6 +68,7 @@ async def create_python_binary_run_request(
             output_filename=output_filename,
             interpreter_constraints=requirements_pex_request.interpreter_constraints,
             additional_args=field_set.generate_additional_args(python_binary_defaults),
+            internal_only=True,
         ),
     )
 
@@ -89,7 +90,7 @@ async def create_python_binary_run_request(
     pex_path = in_chroot(requirements_pex_request.output_filename)
     return RunRequest(
         digest=merged_digest,
-        args=(in_chroot(runner_pex.output_filename), "-m", entry_point),
+        args=(in_chroot(runner_pex.name), "-m", entry_point),
         env={"PEX_PATH": pex_path, "PEX_EXTRA_SYS_PATH": ":".join(chrooted_source_roots)},
     )
 

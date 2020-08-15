@@ -62,6 +62,7 @@ async def setup(setup_request: SetupRequest, docformatter: Docformatter) -> Setu
         Pex,
         PexRequest(
             output_filename="docformatter.pex",
+            internal_only=True,
             requirements=PexRequirements(docformatter.all_requirements),
             interpreter_constraints=PexInterpreterConstraints(docformatter.interpreter_constraints),
             entry_point=docformatter.entry_point,

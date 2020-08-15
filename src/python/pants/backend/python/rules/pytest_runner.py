@@ -112,12 +112,15 @@ async def setup_pytest_for_target(
             requirements=PexRequirements(pytest.get_requirement_strings()),
             interpreter_constraints=interpreter_constraints,
             additional_args=additional_args_for_pytest,
+            internal_only=True,
         ),
     )
 
     # Defaults to zip_safe=False.
     requirements_pex_request = Get(
-        Pex, PexFromTargetsRequest, PexFromTargetsRequest.for_requirements(test_addresses)
+        Pex,
+        PexFromTargetsRequest,
+        PexFromTargetsRequest.for_requirements(test_addresses, internal_only=True),
     )
 
     test_runner_pex_request = Get(
@@ -140,6 +143,7 @@ async def setup_pytest_for_target(
                     )
                 ),
             ),
+            internal_only=True,
         ),
     )
 
@@ -286,7 +290,7 @@ async def run_python_test(
 @rule(desc="Run Pytest in an interactive process")
 def debug_python_test(setup: TestTargetSetup) -> TestDebugRequest:
     process = InteractiveProcess(
-        argv=(setup.test_runner_pex.output_filename, *setup.args), input_digest=setup.input_digest,
+        argv=(setup.test_runner_pex.name, *setup.args), input_digest=setup.input_digest,
     )
     return TestDebugRequest(process)
 
