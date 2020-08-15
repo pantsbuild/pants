@@ -4,11 +4,10 @@
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import List, Optional, Tuple, Type, cast
+from typing import List, Optional, Tuple, Type
 
 from pants.base.specs import AddressLiteralSpec
 from pants.core.goals.test import (
-    AddressAndTestResult,
     ConsoleCoverageReport,
     CoverageData,
     CoverageDataCollection,
@@ -20,7 +19,6 @@ from pants.core.goals.test import (
     TestFieldSet,
     TestResult,
     TestSubsystem,
-    WrappedTestFieldSet,
     run_tests,
 )
 from pants.core.util_rules.filter_empty_sources import (
@@ -165,14 +163,6 @@ class TestTest(TestBase):
                 }
             )
 
-        def mock_coordinator_of_tests(
-            wrapped_field_set: WrappedTestFieldSet,
-        ) -> AddressAndTestResult:
-            field_set = cast(MockTestFieldSet, wrapped_field_set.field_set)
-            return AddressAndTestResult(
-                address=field_set.address, test_result=field_set.test_result
-            )
-
         def mock_coverage_report_generation(
             coverage_data_collection: MockCoverageDataCollection,
         ) -> CoverageReports:
@@ -192,9 +182,9 @@ class TestTest(TestBase):
                     mock=mock_find_valid_field_sets,
                 ),
                 MockGet(
-                    product_type=AddressAndTestResult,
-                    subject_type=WrappedTestFieldSet,
-                    mock=lambda wrapped_config: mock_coordinator_of_tests(wrapped_config),
+                    product_type=TestResult,
+                    subject_type=TestFieldSet,
+                    mock=lambda fs: fs.test_result,
                 ),
                 MockGet(
                     product_type=TestDebugRequest,

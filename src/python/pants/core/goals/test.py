@@ -22,7 +22,7 @@ from pants.engine.engine_aware import EngineAware
 from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult, InteractiveProcess, InteractiveRunner
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import (
     FieldSet,
     Sources,
@@ -131,19 +131,6 @@ class TestFieldSet(FieldSet, metaclass=ABCMeta):
     sources: Sources
 
     __test__ = False
-
-
-# NB: This is only used for the sake of coordinator_of_tests. Consider inlining that rule so that
-# we can remove this wrapper type.
-@dataclass(frozen=True)
-class WrappedTestFieldSet:
-    field_set: TestFieldSet
-
-
-@dataclass(frozen=True)
-class AddressAndTestResult:
-    address: Address
-    test_result: TestResult
 
 
 class CoverageData(ABC):
@@ -340,64 +327,51 @@ async def run_tests(
     )
 
     results = await MultiGet(
-        Get(AddressAndTestResult, WrappedTestFieldSet(field_set))
-        for field_set in field_sets_with_sources
+        Get(TestResult, TestFieldSet, field_set) for field_set in field_sets_with_sources
     )
 
     # Print details.
     for result in results:
-        if result.test_result.status == Status.SKIPPED:
+        if result.status == Status.SKIPPED:
             continue
         if test_subsystem.options.output == ShowOutput.NONE or (
-            test_subsystem.options.output == ShowOutput.FAILED
-            and result.test_result.status == Status.SUCCESS
+            test_subsystem.options.output == ShowOutput.FAILED and result.status == Status.SUCCESS
         ):
             continue
-        has_output = result.test_result.stdout or result.test_result.stderr
+        has_output = result.stdout or result.stderr
         if has_output:
-            status = (
-                console.green("✓")
-                if result.test_result.status == Status.SUCCESS
-                else console.red("𐄂")
-            )
+            status = console.green("✓") if result.status == Status.SUCCESS else console.red("𐄂")
             console.print_stderr(f"{status} {result.address}")
-        if result.test_result.stdout:
-            console.print_stderr(result.test_result.stdout)
-        if result.test_result.stderr:
-            console.print_stderr(result.test_result.stderr)
+        if result.stdout:
+            console.print_stderr(result.stdout)
+        if result.stderr:
+            console.print_stderr(result.stderr)
         if has_output and result != results[-1]:
             console.print_stderr("")
 
     # Print summary
     console.print_stderr("")
     for result in results:
-        if result.test_result.status == Status.SKIPPED:
+        if result.status == Status.SKIPPED:
             continue
-        color = console.green if result.test_result.status == Status.SUCCESS else console.red
+        color = console.green if result.status == Status.SUCCESS else console.red
         # The right-align logic sees the color control codes as characters, so we have
         # to account for that. In f-strings the alignment field widths must be literals,
         # so we have to indirect via a call to .format().
         right_align = 19 if console.use_colors else 10
         format_str = f"{{addr:80}}.....{{result:>{right_align}}}"
         console.print_stderr(
-            format_str.format(
-                addr=result.address.spec, result=color(result.test_result.status.value)
-            )
+            format_str.format(addr=result.address.spec, result=color(result.status.value))
         )
 
     merged_xml_results = await Get(
-        Digest,
-        MergeDigests(
-            result.test_result.xml_results for result in results if result.test_result.xml_results
-        ),
+        Digest, MergeDigests(result.xml_results for result in results if result.xml_results),
     )
     workspace.write_digest(merged_xml_results)
 
     if test_subsystem.use_coverage:
         all_coverage_data: Iterable[CoverageData] = [
-            result.test_result.coverage_data
-            for result in results
-            if result.test_result.coverage_data is not None
+            result.coverage_data for result in results if result.coverage_data is not None
         ]
 
         coverage_types_to_collection_types: Dict[
@@ -426,18 +400,11 @@ async def run_tests(
 
     exit_code = (
         PANTS_FAILED_EXIT_CODE
-        if any(res.test_result.status == Status.FAILURE for res in results)
+        if any(res.status == Status.FAILURE for res in results)
         else PANTS_SUCCEEDED_EXIT_CODE
     )
 
     return Test(exit_code)
-
-
-@rule(desc="Run test target")
-async def coordinator_of_tests(wrapped_field_set: WrappedTestFieldSet) -> AddressAndTestResult:
-    field_set = wrapped_field_set.field_set
-    result = await Get(TestResult, TestFieldSet, field_set)
-    return AddressAndTestResult(field_set.address, result)
 
 
 def rules():
