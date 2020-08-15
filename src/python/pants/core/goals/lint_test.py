@@ -236,7 +236,7 @@ def test_streaming_output_skip() -> None:
 
 
 def test_streaming_output_success() -> None:
-    results = LintResults([LintResult(0, "stdout", "stderr", report=None)], linter_name="linter")
+    results = LintResults([LintResult(0, "stdout", "stderr")], linter_name="linter")
     assert results.level() == LogLevel.INFO
     assert results.message() == dedent(
         """\
@@ -249,11 +249,11 @@ def test_streaming_output_success() -> None:
 
 
 def test_streaming_output_failure() -> None:
-    results = LintResults([LintResult(1, "stdout", "stderr", report=None)], linter_name="linter")
+    results = LintResults([LintResult(18, "stdout", "stderr")], linter_name="linter")
     assert results.level() == LogLevel.WARN
     assert results.message() == dedent(
         """\
-        failed.
+        failed (exit code 18).
         stdout
         stderr
 
@@ -263,15 +263,19 @@ def test_streaming_output_failure() -> None:
 
 def test_streaming_output_partitions() -> None:
     results = LintResults(
-        [LintResult(1, "", "", report=None), LintResult(0, "stdout", "stderr", report=None)],
+        [
+            LintResult(21, "", "", partition_description="ghc8.1"),
+            LintResult(0, "stdout", "stderr", partition_description="ghc9.2"),
+        ],
         linter_name="linter",
     )
     assert results.level() == LogLevel.WARN
     assert results.message() == dedent(
         """\
-        failed.
-        Partition #1:
-        Partition #2:
+        failed (exit code 21).
+        Partition #1 - ghc8.1:
+
+        Partition #2 - ghc9.2:
         stdout
         stderr
 

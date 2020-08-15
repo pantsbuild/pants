@@ -125,12 +125,16 @@ class BanditIntegrationTest(ExternalToolTestBase):
         # to still fail, but Py3 should pass.
         combined_result = self.run_bandit([py2_target, py3_target])
         assert len(combined_result) == 2
+
         batched_py2_result, batched_py3_result = sorted(
             combined_result, key=lambda result: result.stderr
         )
         assert batched_py2_result.exit_code == 0
+        assert batched_py2_result.partition_description == "['CPython==2.7.*']"
         assert "py3.py (syntax error while parsing AST from file)" in batched_py2_result.stdout
+
         assert batched_py3_result.exit_code == 0
+        assert batched_py3_result.partition_description == "['CPython>=3.6']"
         assert "No issues identified." in batched_py3_result.stdout
 
     def test_respects_config_file(self) -> None:

@@ -230,7 +230,9 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
             level=LogLevel.DEBUG,
         ),
     )
-    return LintResult.from_fallible_process_result(result)
+    return LintResult.from_fallible_process_result(
+        result, partition_description=str(sorted(partition.interpreter_constraints))
+    )
 
 
 @rule(desc="Lint using Pylint")

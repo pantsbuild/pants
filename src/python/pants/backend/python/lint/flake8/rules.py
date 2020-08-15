@@ -128,7 +128,9 @@ async def flake8_lint_partition(
         )
         report = LintReport(report_file_name, report_digest)
 
-    return LintResult.from_fallible_process_result(result, report=report)
+    return LintResult.from_fallible_process_result(
+        result, partition_description=str(sorted(partition.interpreter_constraints)), report=report
+    )
 
 
 @rule(desc="Lint with Flake8")

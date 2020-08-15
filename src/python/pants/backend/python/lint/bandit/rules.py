@@ -127,7 +127,9 @@ async def bandit_lint_partition(
         )
         report = LintReport(report_file_name, report_digest)
 
-    return LintResult.from_fallible_process_result(result, report=report)
+    return LintResult.from_fallible_process_result(
+        result, partition_description=str(sorted(partition.interpreter_constraints)), report=report
+    )
 
 
 @rule(desc="Lint with Bandit")
@@ -148,7 +150,7 @@ async def bandit_lint(
         Get(LintResult, BanditPartition(partition_field_sets, partition_compatibility))
         for partition_compatibility, partition_field_sets in constraints_to_field_sets.items()
     )
-    return LintResults(partitioned_results, linter_name="bandit")
+    return LintResults(partitioned_results, linter_name="Bandit")
 
 
 def rules():

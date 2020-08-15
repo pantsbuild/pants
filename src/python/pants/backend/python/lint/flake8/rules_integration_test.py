@@ -126,8 +126,11 @@ class Flake8IntegrationTest(ExternalToolTestBase):
             combined_result, key=lambda result: result.exit_code
         )
         assert batched_py2_result.exit_code == 1
+        assert batched_py2_result.partition_description == "['CPython==2.7.*']"
         assert "py3.py:1:8: E999 SyntaxError" in batched_py2_result.stdout
+
         assert batched_py3_result.exit_code == 0
+        assert batched_py3_result.partition_description == "['CPython>=3.6']"
         assert batched_py3_result.stdout.strip() == ""
 
     def test_respects_config_file(self) -> None:

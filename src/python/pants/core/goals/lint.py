@@ -42,13 +42,15 @@ class LintResult(EngineAware):
     exit_code: int
     stdout: str
     stderr: str
-    report: Optional[LintReport]
+    partition_description: Optional[str] = None
+    report: Optional[LintReport] = None
 
     @classmethod
     def from_fallible_process_result(
         cls,
         process_result: FallibleProcessResult,
         *,
+        partition_description: Optional[str] = None,
         strip_chroot_path: bool = False,
         report: Optional[LintReport] = None,
     ) -> "LintResult":
@@ -59,6 +61,7 @@ class LintResult(EngineAware):
             exit_code=process_result.exit_code,
             stdout=prep_output(process_result.stdout),
             stderr=prep_output(process_result.stderr),
+            partition_description=partition_description,
             report=report,
         )
 
@@ -100,7 +103,7 @@ class LintResults(EngineAware):
     def message(self) -> Optional[str]:
         if self.skipped:
             return "skipped."
-        message = "succeeded." if self.exit_code == 0 else "failed."
+        message = "succeeded." if self.exit_code == 0 else f"failed (exit code {self.exit_code})."
 
         def msg_for_result(result: LintResult) -> str:
             msg = ""
@@ -117,8 +120,12 @@ class LintResults(EngineAware):
         else:
             results_msg = "\n"
             for i, result in enumerate(self.results):
-                msg = msg_for_result(result) or "\n"
-                results_msg += f"Partition #{i + 1}:{msg}"
+                msg = f"Partition #{i + 1}"
+                msg += (
+                    f" - {result.partition_description}:" if result.partition_description else ":"
+                )
+                msg += msg_for_result(result) or "\n\n"
+                results_msg += msg
         message += results_msg
         return message
 
