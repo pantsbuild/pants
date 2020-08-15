@@ -1,8 +1,10 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import os
+
 from pants.backend.python.rules.create_python_binary import PythonBinaryFieldSet
-from pants.backend.python.rules.pex import Pex, PexPlatforms
+from pants.backend.python.rules.pex import Pex, PexRequest
 from pants.backend.python.rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.rules.python_sources import PythonSourceFiles, PythonSourceFilesRequest
 from pants.backend.python.target_types import PythonBinaryDefaults, PythonBinarySources
@@ -45,31 +47,51 @@ async def create_python_binary_run_request(
 
     transitive_targets = await Get(TransitiveTargets, Addresses([field_set.address]))
 
+    # Note that we get an intermediate PexRequest here (instead of going straight to a Pex)
+    # so that we can get the interpreter constraints for use in runner_pex_request.
+    requirements_pex_request = await Get(
+        PexRequest,
+        PexFromTargetsRequest,
+        PexFromTargetsRequest.for_requirements(Addresses([field_set.address]), internal_only=True),
+    )
+
+    requirements_request = Get(Pex, PexRequest, requirements_pex_request)
+
+    sources_request = Get(
+        PythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure, include_files=True)
+    )
+
     output_filename = f"{field_set.address.target_name}.pex"
-    pex_request = Get(
+    runner_pex_request = Get(
         Pex,
-        PexFromTargetsRequest(
-            addresses=Addresses([field_set.address]),
-            internal_only=True,
-            platforms=PexPlatforms.create_from_platforms_field(field_set.platforms),
+        PexRequest(
             output_filename=output_filename,
+            interpreter_constraints=requirements_pex_request.interpreter_constraints,
             additional_args=field_set.generate_additional_args(python_binary_defaults),
-            include_source_files=False,
+            internal_only=True,
         ),
     )
-    sources_request = Get(
-        PythonSourceFiles, PythonSourceFilesRequest(transitive_targets.closure, include_files=True),
+
+    requirements, sources, runner_pex = await MultiGet(
+        requirements_request, sources_request, runner_pex_request
     )
-    pex, sources = await MultiGet(pex_request, sources_request)
 
     merged_digest = await Get(
-        Digest, MergeDigests([pex.digest, sources.source_files.snapshot.digest])
+        Digest,
+        MergeDigests(
+            [requirements.digest, sources.source_files.snapshot.digest, runner_pex.digest]
+        ),
     )
+
+    def in_chroot(relpath: str) -> str:
+        return os.path.join("{chroot}", relpath)
+
+    chrooted_source_roots = [in_chroot(sr) for sr in sources.source_roots]
+    pex_path = in_chroot(requirements_pex_request.output_filename)
     return RunRequest(
         digest=merged_digest,
-        binary_name=pex.name,
-        prefix_args=("-m", entry_point),
-        env={"PEX_EXTRA_SYS_PATH": ":".join(sources.source_roots)},
+        args=(in_chroot(runner_pex.name), "-m", entry_point),
+        env={"PEX_PATH": pex_path, "PEX_EXTRA_SYS_PATH": ":".join(chrooted_source_roots)},
     )
 
 

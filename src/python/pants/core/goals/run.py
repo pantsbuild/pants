@@ -24,21 +24,16 @@ from pants.util.meta import frozen_after_init
 @dataclass(unsafe_hash=True)
 class RunRequest:
     digest: Digest
-    binary_name: str
-    prefix_args: Tuple[str, ...]
+    # Values in args and in env can contain the format specifier "{chroot}", which will
+    # be substituted with the (absolute) chroot path.
+    args: Tuple[str, ...]
     env: FrozenDict[str, str]
 
     def __init__(
-        self,
-        *,
-        digest: Digest,
-        binary_name: str,
-        prefix_args: Optional[Iterable[str]] = None,
-        env: Optional[Mapping[str, str]] = None,
+        self, *, digest: Digest, args: Iterable[str], env: Optional[Mapping[str, str]] = None,
     ) -> None:
         self.digest = digest
-        self.binary_name = binary_name
-        self.prefix_args = tuple(prefix_args or ())
+        self.args = tuple(args)
         self.env = FrozenDict(env or {})
 
 
@@ -97,14 +92,15 @@ async def run(
     request = await Get(RunRequest, BinaryFieldSet, field_set)
 
     with temporary_dir(root_dir=global_options.options.pants_workdir, cleanup=True) as tmpdir:
-        tmpdir_relative_path = PurePath(tmpdir).relative_to(build_root.path).as_posix()
-        workspace.write_digest(request.digest, path_prefix=tmpdir_relative_path)
+        workspace.write_digest(
+            request.digest, path_prefix=PurePath(tmpdir).relative_to(build_root.path).as_posix()
+        )
 
-        exe_path = PurePath(tmpdir, request.binary_name).as_posix()
+        args = (arg.format(chroot=tmpdir) for arg in request.args)
+        env = {k: v.format(chroot=tmpdir) for k, v in request.env.items()}
+
         process = InteractiveProcess(
-            argv=(exe_path, *request.prefix_args, *run_subsystem.args),
-            env=request.env,
-            run_in_workspace=True,
+            argv=(*args, *run_subsystem.args), env=env, run_in_workspace=True,
         )
         try:
             result = interactive_runner.run(process)

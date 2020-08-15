@@ -33,6 +33,9 @@ mod glob_matching_tests;
 #[cfg(test)]
 mod posixfs_tests;
 
+#[macro_use]
+extern crate derivative;
+
 pub use crate::glob_matching::{
   ExpandablePathGlobs, GlobMatching, PathGlob, PreparedPathGlobs, DOUBLE_STAR_GLOB,
   SINGLE_STAR_GLOB,
@@ -41,7 +44,7 @@ pub use crate::glob_matching::{
 use std::cmp::min;
 use std::io::{self, Read};
 use std::os::unix::fs::PermissionsExt;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 use std::{fmt, fs};
 
@@ -84,6 +87,56 @@ pub fn default_config_path() -> PathBuf {
     .or_else(|| dirs::home_dir().map(|home| home.join(".config")))
     .unwrap_or_else(|| panic!("Could not find home dir or {}.", XDG_CONFIG_HOME));
   config_path.join("pants")
+}
+
+#[derive(Derivative, Clone, Debug, Eq)]
+#[derivative(PartialEq, Hash)]
+pub struct RelativePath(PathBuf);
+
+impl RelativePath {
+  pub fn empty() -> RelativePath {
+    RelativePath(PathBuf::new())
+  }
+
+  pub fn new<P: AsRef<Path>>(path: P) -> Result<RelativePath, String> {
+    let mut relative_path = PathBuf::new();
+    let candidate = path.as_ref();
+    for component in candidate.components() {
+      match component {
+        Component::Prefix(_) => {
+          return Err(format!("Windows paths are not allowed: {:?}", candidate))
+        }
+        Component::RootDir => {
+          return Err(format!("Absolute paths are not allowed: {:?}", candidate))
+        }
+        Component::CurDir => continue,
+        Component::ParentDir => {
+          if !relative_path.pop() {
+            return Err(format!(
+              "Relative paths that escape the root are not allowed: {:?}",
+              candidate
+            ));
+          }
+        }
+        Component::Normal(path) => relative_path.push(path),
+      }
+    }
+    Ok(RelativePath(relative_path))
+  }
+
+  pub fn to_str(&self) -> Option<&str> {
+    self.0.to_str()
+  }
+
+  pub fn join(&self, other: Self) -> RelativePath {
+    RelativePath(self.0.join(other))
+  }
+}
+
+impl AsRef<Path> for RelativePath {
+  fn as_ref(&self) -> &Path {
+    self.0.as_path()
+  }
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -755,3 +808,6 @@ pub fn safe_create_dir(path: &Path) -> Result<(), String> {
     Err(err) => Err(format!("{}", err)),
   }
 }
+
+#[cfg(test)]
+mod tests;

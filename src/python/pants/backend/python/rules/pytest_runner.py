@@ -1,7 +1,6 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import functools
 import itertools
 import logging
 from dataclasses import dataclass
@@ -89,13 +88,6 @@ async def setup_pytest_for_target(
         python_setup,
     )
 
-    # Ensure all pexes we merge via PEX_PATH to form the test runner use the interpreter constraints
-    # of the tests. This is handled by CreatePexFromTargetClosure, but we must pass this through for
-    # CreatePex requests.
-    pex_request = functools.partial(
-        PexRequest, interpreter_constraints=interpreter_constraints, internal_only=True
-    )
-
     # NB: We set `--not-zip-safe` because Pytest plugin discovery, which uses
     # `importlib_metadata` and thus `zipp`, does not play nicely when doing import magic directly
     # from zip files. `zipp` has pathologically bad behavior with large zipfiles.
@@ -106,32 +98,28 @@ async def setup_pytest_for_target(
 
     pytest_pex_request = Get(
         Pex,
-        PexRequest,
-        pex_request(
+        PexRequest(
             output_filename="pytest.pex",
             requirements=PexRequirements(pytest.get_requirement_strings()),
+            interpreter_constraints=interpreter_constraints,
             additional_args=additional_args_for_pytest,
+            internal_only=True,
         ),
     )
 
+    # Defaults to zip_safe=False.
     requirements_pex_request = Get(
         Pex,
-        PexFromTargetsRequest(
-            addresses=test_addresses,
-            output_filename="requirements.pex",
-            internal_only=True,
-            include_source_files=False,
-            additional_args=additional_args_for_pytest,
-        ),
+        PexFromTargetsRequest,
+        PexFromTargetsRequest.for_requirements(test_addresses, internal_only=True),
     )
 
     test_runner_pex_request = Get(
         Pex,
-        PexRequest,
-        pex_request(
+        PexRequest(
+            interpreter_constraints=interpreter_constraints,
             output_filename="test_runner.pex",
             entry_point="pytest:main",
-            interpreter_constraints=interpreter_constraints,
             additional_args=(
                 "--pex-path",
                 # TODO(John Sirois): Support shading python binaries:
@@ -146,6 +134,7 @@ async def setup_pytest_for_target(
                     )
                 ),
             ),
+            internal_only=True,
         ),
     )
 

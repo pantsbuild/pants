@@ -2,8 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import re
-import unittest
-import unittest.mock
 from textwrap import dedent
 from typing import Iterable, Optional, Set, cast
 
@@ -37,14 +35,14 @@ from pants.engine.internals.build_files import (
     parse_address_family,
     strip_address_origins,
 )
-from pants.engine.internals.mapper import AddressMapper
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.target_adaptor import TargetAdaptor
 from pants.engine.rules import RootRule
 from pants.engine.target import Dependencies, Sources, Tags, Target
+from pants.option.global_options import GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.testutil.engine.util import MockGet, Params, run_rule
+from pants.testutil.engine.util import MockGet, Params, create_subsystem, run_rule
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 from pants.util.frozendict import FrozenDict
@@ -52,12 +50,14 @@ from pants.util.frozendict import FrozenDict
 
 def test_parse_address_family_empty() -> None:
     """Test that parsing an empty BUILD file results in an empty AddressFamily."""
-    address_mapper = AddressMapper(
-        parser=Parser(target_type_aliases=[], object_aliases=BuildFileAliases())
-    )
     af = run_rule(
         parse_address_family,
-        rule_args=[address_mapper, BuildFilePreludeSymbols(FrozenDict()), Dir("/dev/null")],
+        rule_args=[
+            Parser(target_type_aliases=[], object_aliases=BuildFileAliases()),
+            create_subsystem(GlobalOptions, build_patterns=["BUILD"], build_ignore=[]),
+            BuildFilePreludeSymbols(FrozenDict()),
+            Dir("/dev/null"),
+        ],
         mock_gets=[
             MockGet(
                 product_type=DigestContents,
@@ -70,11 +70,9 @@ def test_parse_address_family_empty() -> None:
 
 
 def run_prelude_parsing_rule(prelude_content: str) -> BuildFilePreludeSymbols:
-    address_mapper = unittest.mock.Mock()
-    address_mapper.prelude_glob_patterns = ("prelude",)
     symbols = run_rule(
         evaluate_preludes,
-        rule_args=[address_mapper],
+        rule_args=[create_subsystem(GlobalOptions, build_file_prelude_globs=["prelude"])],
         mock_gets=[
             MockGet(
                 product_type=DigestContents,

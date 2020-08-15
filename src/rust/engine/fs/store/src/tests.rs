@@ -5,6 +5,7 @@ use crate::{
 
 use bazel_protos;
 use bytes::Bytes;
+use fs::RelativePath;
 use futures::compat::Future01CompatExt;
 use hashing::{Digest, Fingerprint};
 use maplit::btreemap;
@@ -1007,7 +1008,7 @@ async fn materialize_missing_file() {
   let store_dir = TempDir::new().unwrap();
   let store = new_local_store(store_dir.path());
   store
-    .materialize_file(file.clone(), TestData::roland().digest(), false, true)
+    .materialize_file(file.clone(), TestData::roland().digest(), false)
     .compat()
     .await
     .expect_err("Want unknown digest error");
@@ -1027,7 +1028,7 @@ async fn materialize_file() {
     .await
     .expect("Error saving bytes");
   store
-    .materialize_file(file.clone(), testdata.digest(), false, true)
+    .materialize_file(file.clone(), testdata.digest(), false)
     .compat()
     .await
     .expect("Error materializing file");
@@ -1049,7 +1050,7 @@ async fn materialize_file_executable() {
     .await
     .expect("Error saving bytes");
   store
-    .materialize_file(file.clone(), testdata.digest(), true, true)
+    .materialize_file(file.clone(), testdata.digest(), true)
     .compat()
     .await
     .expect("Error materializing file");
@@ -1563,4 +1564,90 @@ async fn explicitly_overwrites_already_existing_file() {
 
   let file_contents = std::fs::read(&file_path).unwrap();
   assert_eq!(file_contents, b"abc123".to_vec());
+}
+
+fn create_empty_directory_materialize_metadata() -> DirectoryMaterializeMetadata {
+  crate::DirectoryMaterializeMetadata {
+    metadata: LoadMetadata::Local,
+    child_directories: Default::default(),
+    child_files: Default::default(),
+  }
+}
+
+fn create_files_directory_materialize_metadata<S: AsRef<str>, F: IntoIterator<Item = S>>(
+  child_files: F,
+) -> DirectoryMaterializeMetadata {
+  crate::DirectoryMaterializeMetadata {
+    child_files: child_files
+      .into_iter()
+      .map(|c| (c.as_ref().to_string(), LoadMetadata::Local))
+      .collect(),
+    ..create_empty_directory_materialize_metadata()
+  }
+}
+
+fn create_directories_directory_materialize_metadata<
+  S: AsRef<str>,
+  F: IntoIterator<Item = (S, DirectoryMaterializeMetadata)>,
+>(
+  child_dirs: F,
+) -> DirectoryMaterializeMetadata {
+  crate::DirectoryMaterializeMetadata {
+    child_directories: child_dirs
+      .into_iter()
+      .map(|(c, d)| (c.as_ref().to_string(), d))
+      .collect(),
+    ..create_empty_directory_materialize_metadata()
+  }
+}
+
+#[test]
+fn directory_materialize_metadata_empty_contains_file_empty() {
+  let md = create_empty_directory_materialize_metadata();
+  assert!(!md.contains_file(&RelativePath::new("").unwrap()));
+}
+
+#[test]
+fn directory_materialize_metadata_empty_contains_file() {
+  let md = create_empty_directory_materialize_metadata();
+  assert!(!md.contains_file(&RelativePath::new("./script.sh").unwrap()));
+}
+
+#[test]
+fn directory_materialize_metadata_contains_file() {
+  let md = create_files_directory_materialize_metadata(vec!["script.sh"]);
+  assert!(md.contains_file(&RelativePath::new("./script.sh").unwrap()));
+  assert!(md.contains_file(&RelativePath::new("script.sh").unwrap()));
+}
+
+#[test]
+fn directory_materialize_metadata_un_normalized_contains_file() {
+  let md = create_files_directory_materialize_metadata(vec!["./script.sh"]);
+  assert!(md.contains_file(&RelativePath::new("./script.sh").unwrap()));
+  assert!(md.contains_file(&RelativePath::new("script.sh").unwrap()));
+}
+
+#[test]
+fn directory_materialize_metadata_contains_subdir_file() {
+  let subdir_md = create_files_directory_materialize_metadata(vec!["script.sh"]);
+  let md = create_directories_directory_materialize_metadata(vec![
+    ("subdir", subdir_md),
+    ("script", create_empty_directory_materialize_metadata()),
+  ]);
+
+  assert!(!md.contains_file(&RelativePath::new("./script.sh").unwrap()));
+  assert!(!md.contains_file(&RelativePath::new("script.sh").unwrap()));
+  assert!(md.contains_file(&RelativePath::new("./subdir/script.sh").unwrap()));
+  assert!(md.contains_file(&RelativePath::new("subdir/script.sh").unwrap()));
+}
+
+#[test]
+fn directory_materialize_metadata_empty_dir() {
+  let md = create_directories_directory_materialize_metadata(vec![(
+    "script",
+    create_empty_directory_materialize_metadata(),
+  )]);
+
+  assert!(!md.contains_file(&RelativePath::new("./script").unwrap()));
+  assert!(!md.contains_file(&RelativePath::new("script").unwrap()));
 }

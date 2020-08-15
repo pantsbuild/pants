@@ -12,7 +12,6 @@ from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import FieldSet, TargetsToValidFieldSets, TargetsToValidFieldSetsRequest
 from pants.engine.unions import union
 
-# TODO(#6004): use proper Logging singleton, rather than static logger.
 logger = logging.getLogger(__name__)
 
 

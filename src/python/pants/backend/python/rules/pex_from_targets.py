@@ -34,7 +34,7 @@ from pants.engine.fs import (
 )
 from pants.engine.rules import Get, RootRule, collect_rules, rule
 from pants.engine.target import TransitiveTargets
-from pants.python.python_setup import PythonSetup
+from pants.python.python_setup import PythonSetup, ResolveAllConstraintsOption
 from pants.util.meta import frozen_after_init
 
 logger = logging.getLogger(__name__)
@@ -112,6 +112,29 @@ class PexFromTargetsRequest:
         self.additional_inputs = additional_inputs
         self.description = description
 
+    @classmethod
+    def for_requirements(
+        cls, addresses: Addresses, *, internal_only: bool, zip_safe: bool = False
+    ) -> "PexFromTargetsRequest":
+        """Create an instance that can be used to get a requirements pex.
+
+        Useful to ensure that these requests are uniform (e.g., the using the same output filename),
+        so that the underlying pexes are more likely to be reused instead of re-resolved.
+
+        We default to zip_safe=False because there are various issues with running zipped pexes
+        directly, and it's best to only use those if you're sure it's the right thing to do.
+        Also, pytest must use zip_safe=False for performance reasons (see comment in
+        pytest_runner.py) and we get more re-use of pexes if other uses follow suit.
+        This default is a helpful nudge in that direction.
+        """
+        return PexFromTargetsRequest(
+            addresses=sorted(addresses),
+            output_filename="requirements.pex",
+            include_source_files=False,
+            additional_args=() if zip_safe else ("--not-zip-safe",),
+            internal_only=internal_only,
+        )
+
 
 @dataclass(frozen=True)
 class TwoStepPexFromTargetsRequest:
@@ -165,7 +188,11 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
     description = request.description
 
     if python_setup.requirement_constraints:
-        exact_req_projects = {Requirement.parse(req).project_name for req in exact_reqs}
+        # In requirement strings Foo_Bar and foo-bar refer to the same project.
+        def canonical(name: str) -> str:
+            return name.lower().replace("_", "-")
+
+        exact_req_projects = {canonical(Requirement.parse(req).project_name) for req in exact_reqs}
         constraints_file_contents = await Get(
             DigestContents,
             PathGlobs(
@@ -178,7 +205,7 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         constraints_file_reqs = set(
             parse_requirements(next(iter(constraints_file_contents)).content.decode())
         )
-        constraint_file_projects = {req.project_name for req in constraints_file_reqs}
+        constraint_file_projects = {canonical(req.project_name) for req in constraints_file_reqs}
         unconstrained_projects = exact_req_projects - constraint_file_projects
         if unconstrained_projects:
             logger.warning(
@@ -186,7 +213,10 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
                 f"entries for the following requirements: {', '.join(unconstrained_projects)}"
             )
 
-        if python_setup.resolve_all_constraints:
+        if python_setup.resolve_all_constraints == ResolveAllConstraintsOption.ALWAYS or (
+            python_setup.resolve_all_constraints == ResolveAllConstraintsOption.NONDEPLOYABLES
+            and request.internal_only
+        ):
             if unconstrained_projects:
                 logger.warning(
                     "Ignoring resolve_all_constraints setting in [python_setup] scope "
@@ -195,10 +225,14 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
             else:
                 requirements = PexRequirements(str(req) for req in constraints_file_reqs)
                 description = description or f"Resolving {python_setup.requirement_constraints}"
-    elif python_setup.resolve_all_constraints:
+    elif (
+        python_setup.resolve_all_constraints != ResolveAllConstraintsOption.NEVER
+        and python_setup.resolve_all_constraints_was_set_explicitly()
+    ):
         raise ValueError(
-            "resolve_all_constraints in the [python-setup] scope is set, so "
-            "requirement_constraints in [python-setup] must also be provided."
+            f"[python-setup].resolve_all_constraints is set to "
+            f"{python_setup.resolve_all_constraints.value}, so "
+            f"[python-setup].requirement_constraints must also be provided."
         )
 
     return PexRequest(

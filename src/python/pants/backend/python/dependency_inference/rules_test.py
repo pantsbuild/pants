@@ -50,9 +50,6 @@ class PythonDependencyInferenceTest(TestBase):
         return [PythonLibrary, PythonRequirementLibrary, PythonTests]
 
     def test_infer_python_imports(self) -> None:
-        options_bootstrapper = create_options_bootstrapper(
-            args=["--backend-packages=pants.backend.python", "--source-root-patterns=src/python"]
-        )
         self.add_to_build_file(
             "3rdparty/python",
             dedent(
@@ -65,8 +62,8 @@ class PythonDependencyInferenceTest(TestBase):
             ),
         )
 
-        self.create_file("src/python/no_owner/f.py")
-        self.add_to_build_file("src/python/no_owner", "python_library()")
+        self.create_file("src/python/str_import/subdir/f.py")
+        self.add_to_build_file("src/python/str_import/subdir", "python_library()")
 
         self.create_file("src/python/util/dep.py")
         self.add_to_build_file("src/python/util", "python_library()")
@@ -89,12 +86,21 @@ class PythonDependencyInferenceTest(TestBase):
                 import typing
                 # Import from another file in the same target.
                 from app import main
+
+                # Dynamic string import.
+                importlib.import_module('str_import.subdir.f')
                 """
             ),
         )
         self.add_to_build_file("src/python", "python_library()")
 
-        def run_dep_inference(address: Address) -> InferredDependencies:
+        def run_dep_inference(
+            address: Address, *, enable_string_imports: bool = False
+        ) -> InferredDependencies:
+            args = ["--backend-packages=pants.backend.python", "--source-root-patterns=src/python"]
+            if enable_string_imports:
+                args.append("--python-infer-string-imports")
+            options_bootstrapper = create_options_bootstrapper(args=args)
             target = self.request_single_product(
                 WrappedTarget, Params(address, options_bootstrapper)
             ).target
@@ -103,12 +109,11 @@ class PythonDependencyInferenceTest(TestBase):
                 Params(InferPythonDependencies(target[PythonSources]), options_bootstrapper),
             )
 
-        # NB: We do not infer `src/python/app.py`, even though it's used by `src/python/f2.py`,
-        # because it is part of the requested address.
         normal_address = Address("src/python")
         assert run_dep_inference(normal_address) == InferredDependencies(
             [
                 Address("3rdparty/python", target_name="Django"),
+                Address("src/python", relative_file_path="app.py"),
                 Address("src/python/util", relative_file_path="dep.py", target_name="util"),
             ],
             sibling_dependencies_inferrable=True,
@@ -119,6 +124,15 @@ class PythonDependencyInferenceTest(TestBase):
         )
         assert run_dep_inference(generated_subtarget_address) == InferredDependencies(
             [Address("src/python", relative_file_path="app.py", target_name="python")],
+            sibling_dependencies_inferrable=True,
+        )
+        assert run_dep_inference(
+            generated_subtarget_address, enable_string_imports=True
+        ) == InferredDependencies(
+            [
+                Address("src/python", relative_file_path="app.py", target_name="python"),
+                Address("src/python/str_import/subdir", relative_file_path="f.py"),
+            ],
             sibling_dependencies_inferrable=True,
         )
 
@@ -159,14 +173,16 @@ class PythonDependencyInferenceTest(TestBase):
         )
 
         self.create_file("src/python/root/conftest.py")
-        self.add_to_build_file("src/python/root", "python_library(sources=['conftest.py'])")
+        self.add_to_build_file("src/python/root", "python_library()")
 
         self.create_file("src/python/root/mid/conftest.py")
-        self.add_to_build_file("src/python/root/mid", "python_library(sources=['conftest.py'])")
+        self.add_to_build_file("src/python/root/mid", "python_library()")
 
         self.create_file("src/python/root/mid/leaf/conftest.py")
         self.create_file("src/python/root/mid/leaf/this_is_a_test.py")
-        self.add_to_build_file("src/python/root/mid/leaf", "python_tests()")
+        self.add_to_build_file(
+            "src/python/root/mid/leaf", "python_tests()\npython_library(name='conftest')"
+        )
 
         def run_dep_inference(address: Address) -> InferredDependencies:
             target = self.request_single_product(
@@ -181,6 +197,11 @@ class PythonDependencyInferenceTest(TestBase):
             [
                 Address("src/python/root", relative_file_path="conftest.py", target_name="root"),
                 Address("src/python/root/mid", relative_file_path="conftest.py", target_name="mid"),
+                Address(
+                    "src/python/root/mid/leaf",
+                    relative_file_path="conftest.py",
+                    target_name="conftest",
+                ),
             ],
             sibling_dependencies_inferrable=False,
         )

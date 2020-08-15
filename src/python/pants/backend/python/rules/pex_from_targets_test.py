@@ -14,7 +14,7 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import RootRule, SubsystemRule
 from pants.python.python_requirement import PythonRequirement
-from pants.python.python_setup import PythonSetup
+from pants.python.python_setup import PythonSetup, ResolveAllConstraintsOption
 from pants.testutil.engine.util import Params
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
@@ -82,30 +82,36 @@ class PexTest(TestBase):
             [Address.parse("//:tgt")], output_filename="demo.pex", internal_only=True
         )
 
-        def get_pex_request(constraints_file: Optional[str], resolve_all: bool) -> PexRequest:
+        def get_pex_request(
+            constraints_file: Optional[str], resolve_all: Optional[ResolveAllConstraintsOption]
+        ) -> PexRequest:
             args = [
                 "--backend-packages=pants.backend.python",
-                f"--python-setup-resolve-all-constraints={resolve_all}",
             ]
+            if resolve_all:
+                args.append(f"--python-setup-resolve-all-constraints={resolve_all.value}")
             if constraints_file:
                 args.append(f"--python-setup-requirement-constraints={constraints_file}")
             return self.request_single_product(
                 PexRequest, Params(request, create_options_bootstrapper(args=args))
             )
 
-        pex_req1 = get_pex_request("constraints1.txt", False)
+        pex_req1 = get_pex_request("constraints1.txt", ResolveAllConstraintsOption.NEVER)
         assert pex_req1.requirements == PexRequirements(["foo>=0.1.2", "bar==5.5.5", "baz"])
 
-        pex_req2 = get_pex_request("constraints1.txt", True)
+        pex_req2 = get_pex_request("constraints1.txt", ResolveAllConstraintsOption.ALWAYS)
         assert pex_req2.requirements == PexRequirements(
             ["foo==1.0.0", "bar==5.5.5", "baz==2.2.2", "qux==3.4.5"]
         )
 
         with self.assertRaises(ExecutionError) as err:
-            get_pex_request(None, True)
+            get_pex_request(None, ResolveAllConstraintsOption.ALWAYS)
         assert len(err.exception.wrapped_exceptions) == 1
         assert isinstance(err.exception.wrapped_exceptions[0], ValueError)
         assert (
-            "resolve_all_constraints in the [python-setup] scope is set, so "
-            "requirement_constraints in [python-setup] must also be provided."
+            "[python-setup].resolve_all_constraints is set to always, so "
+            "[python-setup].requirement_constraints must also be provided."
         ) in str(err.exception)
+
+        # Shouldn't error, as we don't explicitly set --resolve-all-constraints.
+        get_pex_request(None, None)

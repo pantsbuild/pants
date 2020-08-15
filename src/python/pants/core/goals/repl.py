@@ -1,6 +1,6 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
-
+import os
 from abc import ABC
 from dataclasses import dataclass
 from pathlib import PurePath
@@ -12,7 +12,7 @@ from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import InteractiveProcess, InteractiveRunner
 from pants.engine.rules import Get, collect_rules, goal_rule
-from pants.engine.target import Field, Target, Targets, TransitiveTargets
+from pants.engine.target import Targets, TransitiveTargets
 from pants.engine.unions import UnionMembership, union
 from pants.option.global_options import GlobalOptions
 from pants.util.contextutil import temporary_dir
@@ -23,17 +23,17 @@ from pants.util.meta import frozen_after_init
 @union
 @dataclass(frozen=True)
 class ReplImplementation(ABC):
-    """This type proxies from the top-level `repl` goal to a specific REPL implementation for a
-    specific language or languages."""
+    """A REPL implementation for a specific language or runtime.
+
+    Proxies from the top-level `repl` goal to an actual implementation.
+    """
 
     name: ClassVar[str]
-    required_fields: ClassVar[Tuple[Type[Field], ...]]
-
     targets: Targets
+    chroot: str  # Absolute path of the chroot the sources will be materialized to.
 
-    @classmethod
-    def is_valid(cls, tgt: Target) -> bool:
-        return tgt.has_fields(cls.required_fields)
+    def in_chroot(self, relpath: str) -> str:
+        return os.path.join(self.chroot, relpath)
 
 
 class ReplSubsystem(GoalSubsystem):
@@ -65,14 +65,14 @@ class Repl(Goal):
 @dataclass(unsafe_hash=True)
 class ReplRequest:
     digest: Digest
-    binary_name: str
+    args: Tuple[str, ...]
     env: FrozenDict[str, str]
 
     def __init__(
-        self, *, digest: Digest, binary_name: str, env: Optional[Mapping[str, str]] = None,
+        self, *, digest: Digest, args: Tuple[str, ...], env: Optional[Mapping[str, str]] = None,
     ) -> None:
         self.digest = digest
-        self.binary_name = binary_name
+        self.args = args
         self.env = FrozenDict(env or {})
 
 
@@ -87,6 +87,8 @@ async def run_repl(
     union_membership: UnionMembership,
     global_options: GlobalOptions,
 ) -> Repl:
+    # TODO: When we support multiple languages, detect the default repl to use based
+    #  on the targets.  For now we default to the python repl.
     repl_shell_name = repl_subsystem.shell or "python"
 
     implementations: Dict[str, Type[ReplImplementation]] = {
@@ -101,21 +103,18 @@ async def run_repl(
         )
         return Repl(-1)
 
-    repl_impl = repl_implementation_cls(
-        targets=Targets(
-            tgt for tgt in transitive_targets.closure if repl_implementation_cls.is_valid(tgt)
-        )
-    )
-    request = await Get(ReplRequest, ReplImplementation, repl_impl)
-
     with temporary_dir(root_dir=global_options.options.pants_workdir, cleanup=False) as tmpdir:
-        tmpdir_relative_path = PurePath(tmpdir).relative_to(build_root.path).as_posix()
-        exe_path = PurePath(tmpdir, request.binary_name).as_posix()
-        workspace.write_digest(request.digest, path_prefix=tmpdir_relative_path)
-        result = interactive_runner.run(
-            InteractiveProcess(argv=(exe_path,), env=request.env, run_in_workspace=True)
+        repl_impl = repl_implementation_cls(
+            targets=Targets(transitive_targets.closure), chroot=tmpdir
         )
+        request = await Get(ReplRequest, ReplImplementation, repl_impl)
 
+        workspace.write_digest(
+            request.digest, path_prefix=PurePath(tmpdir).relative_to(build_root.path).as_posix()
+        )
+        result = interactive_runner.run(
+            InteractiveProcess(argv=request.args, env=request.env, run_in_workspace=True)
+        )
     return Repl(result.exit_code)
 
 

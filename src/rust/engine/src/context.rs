@@ -208,6 +208,7 @@ impl Core {
             // need to take an option all the way down here and into the remote::CommandRunner struct.
             Platform::Linux,
             remoting_opts.execution_overall_deadline,
+            Duration::from_millis(100),
           )?)
         };
 

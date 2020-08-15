@@ -85,6 +85,11 @@ class TestResult(EngineAware):
             address_ref=address_ref,
         )
 
+    def artifacts(self) -> Optional[Dict[str, Digest]]:
+        if not self.xml_results:
+            return None
+        return {"xml_results_digest": self.xml_results}
+
     def level(self):
         if self.status == Status.FAILURE:
             return LogLevel.ERROR

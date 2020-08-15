@@ -1,6 +1,7 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import os
 from typing import cast
 
 from pants.base.build_root import BuildRoot
@@ -35,7 +36,7 @@ class RunTest(TestBase):
                 [FileContent(path="program.py", content=program_text, is_executable=True)]
             ),
         )
-        return RunRequest(digest=digest, binary_name="program.py")
+        return RunRequest(digest=digest, args=(os.path.join("{chroot}", "program.py"),))
 
     def single_target_run(
         self, *, console: MockConsole, program_text: bytes, address_spec: str,
