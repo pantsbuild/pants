@@ -227,10 +227,18 @@ impl<'t, R: Rule> Builder<'t, R> {
   /// split; we then visit the nodes affected by the split to ensure that they are updated as well,
   /// and so on.
   ///
-  /// Any node that has a dependency that does not consume a provided param will be removed (which
-  /// may also cause its dependees to be removed, for the same reason). This is safe to do at any
-  /// time during the monomorphize run, because the in/out sets are adjusted in tandem based on the
-  /// current dependencies/dependees.
+  /// During this phase, the out_set of a node is used to determine which Params are legal to
+  /// consume in each subgraph: as this information propagates down the graph, Param dependencies
+  /// might be eliminated, which results in corresponding changes to the in_set which flow back
+  /// up the graph. As the in_sets shrink, we shrink the out_sets as well to avoid creating
+  /// redundant nodes: although the params are still technically declared by the dependees, we can
+  /// be sure that any not contained in the in_set are not used.
+  ///
+  /// Any node that has only invalid sources of a dependency (such as those that do not consume a
+  /// provided param, or those that consume a Param that is not present in their scope) will be
+  /// removed (which may also cause its dependees to be removed, for the same reason). This is safe
+  /// to do at any time during the monomorphize run, because the in/out sets are adjusted in tandem
+  /// based on the current dependencies/dependees.
   ///
   /// The exit condition for this phase is that all dependees of a node have the same minimal
   /// out_set, and all valid combinations of dependencies have the same minimal in_set. This occurs
@@ -323,8 +331,8 @@ impl<'t, R: Rule> Builder<'t, R> {
       }
 
       iteration += 1;
-      let looping = graph.node_count() - to_delete.len() > 1000000;
-      if iteration % 100 == 0 {
+      let looping = graph.node_count() - to_delete.len() > 100000;
+      if iteration % 1 == 0 {
         println!(
           ">>> iteration {}: live_node_count: {}, to_visit: {} (, node_count: {}, to_delete: {})",
           iteration,
@@ -419,7 +427,10 @@ impl<'t, R: Rule> Builder<'t, R> {
             .entry(ParamsLabeled {
               node: node.clone(),
               in_set: in_set.clone(),
-              out_set: out_set.clone(),
+              // NB: See the method doc. Although our dependees could technically still provide a
+              // larger set of params, anything not in the in_set is not consumed in this subgraph,
+              // and the out_set shrinks correspondingly to avoid creating redundant nodes.
+              out_set: out_set.intersection(&in_set).cloned().collect(),
             })
             .or_insert_with(|| (HashSet::new(), HashSet::new()));
           entry.0.extend(dependees.iter().cloned());
@@ -677,12 +688,10 @@ impl<'t, R: Rule> Builder<'t, R> {
     // dead edges while running.
     let mut edges_to_delete = HashSet::new();
 
-    /*
     println!(
       "Pruning edges with: {}",
       petgraph::dot::Dot::with_config(&graph, &[])
     );
-    */
 
     // Walk from roots, choosing one source for each DependencyKey of each node.
     let mut visited = graph.visit_map();
@@ -855,10 +864,12 @@ impl<'t, R: Rule> Builder<'t, R> {
       }
     };
 
+    /*
     println!(
       "Finalizing with: {}",
       petgraph::dot::Dot::with_config(&graph, &[])
     );
+    */
 
     // Visit the reachable portion of the graph to create Edges, starting from roots.
     let mut rule_dependency_edges = HashMap::new();
@@ -978,6 +989,11 @@ impl<'t, R: Rule> Builder<'t, R> {
   /// post-monomorphization), the output is a set of dependencies which might contain multiple
   /// entries per DependencyKey.
   ///
+  /// Unfortunately, we cannot eliminate dependencies based on their in_sets not being a subset of
+  /// the out_set, because it's possible that they have not converged (transitively) to their true
+  /// requirements yet. We _are_ able to reject dependencies that directly depend on something that
+  /// is not present though: and as this happens lower in the graph, the in_sets will shrink.
+  ///
   fn monomorphizations(
     graph: &ParamsLabeledGraph<R>,
     node_id: NodeIndex<u32>,
@@ -1045,19 +1061,6 @@ impl<'t, R: Rule> Builder<'t, R> {
             // Keep both, unfortunately.
             break;
           }
-        }
-
-        // If the candidate consumes a subset of the out_set relative to the already satisfied node,
-        // it is eliminated.
-        if candidate_consumes.is_subset(&already_satisfied_consumes) {
-          was_eliminated = true;
-          break;
-        }
-
-        // Otherwise, if the candidate consume a superset of the out_set relative to the already satisfied
-        // node, then the already satisfied node is eliminated.
-        if candidate_consumes.is_superset(&already_satisfied_consumes) {
-          eliminated.push(already_satisfied.clone());
         }
       }
       if was_eliminated {
