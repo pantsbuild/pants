@@ -1,4 +1,4 @@
-use crate::{Process, RelativePath};
+use crate::Process;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::time::Duration;
@@ -36,21 +36,4 @@ fn process_equality() {
   // Absence of timeout is included in hash.
   assert!(a != d);
   assert!(hash(&a) != hash(&d));
-}
-
-#[test]
-fn relative_path_ok() {
-  assert_eq!(Some("a"), RelativePath::new("a").unwrap().to_str());
-  assert_eq!(Some("a"), RelativePath::new("./a").unwrap().to_str());
-  assert_eq!(Some("a"), RelativePath::new("b/../a").unwrap().to_str());
-  assert_eq!(
-    Some("a/c"),
-    RelativePath::new("b/../a/././c").unwrap().to_str()
-  );
-}
-
-#[test]
-fn relative_path_err() {
-  assert!(RelativePath::new("../a").is_err());
-  assert!(RelativePath::new("/a").is_err());
 }

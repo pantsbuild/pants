@@ -25,10 +25,10 @@ use bytes::{self, BufMut};
 use cpython::{PyDict, PyString, Python, PythonObject};
 use fs::{
   self, Dir, DirectoryListing, File, FileContent, GlobExpansionConjunction, GlobMatching, Link,
-  PathGlobs, PathStat, PreparedPathGlobs, StrictGlobMatching, VFS,
+  PathGlobs, PathStat, PreparedPathGlobs, RelativePath, StrictGlobMatching, VFS,
 };
 use process_execution::{
-  self, CacheDest, CacheName, MultiPlatformProcess, PlatformConstraint, Process, RelativePath,
+  self, CacheDest, CacheName, MultiPlatformProcess, PlatformConstraint, Process,
 };
 
 use graph::{Entry, Node, NodeError, NodeVisualizer};

@@ -36,11 +36,10 @@ use std::process::exit;
 use std::time::Duration;
 
 use clap::{value_t, App, AppSettings, Arg};
+use fs::RelativePath;
 use futures::compat::Future01CompatExt;
 use hashing::{Digest, Fingerprint};
-use process_execution::{
-  Context, NamedCaches, Platform, PlatformConstraint, ProcessMetadata, RelativePath,
-};
+use process_execution::{Context, NamedCaches, Platform, PlatformConstraint, ProcessMetadata};
 use store::{BackoffConfig, Store};
 use tokio::runtime::Handle;
 use workunit_store::WorkunitStore;
