@@ -263,10 +263,7 @@ def test_streaming_output_failure() -> None:
 
 def test_streaming_output_partitions() -> None:
     results = LintResults(
-        [
-            LintResult(1, "", "", report=None),
-            LintResult(0, "stdout", "stderr", report=None),
-        ],
+        [LintResult(1, "", "", report=None), LintResult(0, "stdout", "stderr", report=None)],
         linter_name="linter",
     )
     assert results.level() == LogLevel.WARN

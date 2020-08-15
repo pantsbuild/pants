@@ -44,8 +44,9 @@ class LintResult(EngineAware):
     stderr: str
     report: Optional[LintReport]
 
-    @staticmethod
+    @classmethod
     def from_fallible_process_result(
+        cls,
         process_result: FallibleProcessResult,
         *,
         strip_chroot_path: bool = False,
@@ -54,7 +55,7 @@ class LintResult(EngineAware):
         def prep_output(s: bytes) -> str:
             return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
 
-        return LintResult(
+        return cls(
             exit_code=process_result.exit_code,
             stdout=prep_output(process_result.stdout),
             stderr=prep_output(process_result.stderr),
