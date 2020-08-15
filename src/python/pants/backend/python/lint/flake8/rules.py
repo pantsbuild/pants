@@ -14,23 +14,10 @@ from pants.backend.python.rules.pex import (
     PexRequirements,
 )
 from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonSources
-from pants.core.goals.lint import (
-    LintRequest,
-    LintResult,
-    LintResultFile,
-    LintResults,
-    LintSubsystem,
-)
+from pants.core.goals.lint import LintReport, LintRequest, LintResult, LintResults, LintSubsystem
 from pants.core.util_rules import source_files, stripped_source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import (
-    Digest,
-    DigestSubset,
-    GlobMatchErrorBehavior,
-    MergeDigests,
-    PathGlobs,
-    Snapshot,
-)
+from pants.engine.fs import Digest, DigestSubset, GlobMatchErrorBehavior, MergeDigests, PathGlobs
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet
@@ -58,13 +45,13 @@ class Flake8Partition:
 
 
 def generate_args(
-    *, source_files: SourceFiles, flake8: Flake8, output_file: Optional[str]
+    *, source_files: SourceFiles, flake8: Flake8, report_file_name: Optional[str]
 ) -> Tuple[str, ...]:
     args = []
     if flake8.config:
         args.append(f"--config={flake8.config}")
-    if output_file:
-        args.append(f"--output-file={output_file}")
+    if report_file_name:
+        args.append(f"--output-file={report_file_name}")
     args.extend(flake8.args)
     args.extend(source_files.files)
     return tuple(args)
@@ -112,40 +99,40 @@ async def flake8_lint_partition(
     address_references = ", ".join(
         sorted(field_set.address.spec for field_set in partition.field_sets)
     )
-    report_path = (
-        lint_subsystem.reports_dir / "flake8_report.txt" if lint_subsystem.reports_dir else None
-    )
+    report_file_name = "flake8_report.txt" if lint_subsystem.reports_dir else None
 
     result = await Get(
         FallibleProcessResult,
         PexProcess(
             requirements_pex,
             argv=generate_args(
-                source_files=source_files,
-                flake8=flake8,
-                output_file=report_path.name if report_path else None,
+                source_files=source_files, flake8=flake8, report_file_name=report_file_name,
             ),
             input_digest=input_digest,
-            output_files=(report_path.name,) if report_path else None,
+            output_files=(report_file_name,) if report_file_name else None,
             description=(
                 f"Run Flake8 on {pluralize(len(partition.field_sets), 'target')}: "
-                f"{address_references}."
+                f"{address_references}"
             ),
         ),
     )
 
-    results_file = None
-    if report_path:
-        report_file_snapshot = await Get(
-            Snapshot, DigestSubset(result.output_digest, PathGlobs([report_path.name]))
+    report = None
+    if report_file_name:
+        report_digest = await Get(
+            Digest,
+            DigestSubset(
+                result.output_digest,
+                PathGlobs(
+                    [report_file_name],
+                    glob_match_error_behavior=GlobMatchErrorBehavior.warn,
+                    description_of_origin="Flake8 report file",
+                ),
+            ),
         )
-        if len(report_file_snapshot.files) != 1:
-            raise Exception(f"Unexpected report file snapshot: {report_file_snapshot.files}")
-        results_file = LintResultFile(output_path=report_path, digest=report_file_snapshot.digest)
+        report = LintReport(report_file_name, report_digest)
 
-    return LintResult.from_fallible_process_result(
-        result, linter_name="Flake8", results_file=results_file
-    )
+    return LintResult.from_fallible_process_result(result, linter_name="Flake8", report=report)
 
 
 @rule(desc="Lint using Flake8")
