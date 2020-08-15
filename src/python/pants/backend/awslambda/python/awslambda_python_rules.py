@@ -75,6 +75,7 @@ async def create_python_awslambda(
                 # available and matching the AMI platform.
                 "--resolve-local-platforms",
             ],
+            for_deployable_binary=True,
         )
     )
 

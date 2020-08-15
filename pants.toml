@@ -53,7 +53,7 @@ root_patterns = [
 
 [python-setup]
 requirement_constraints = "3rdparty/python/constraints.txt"
-resolve_all_constraints = true
+resolve_all_constraints = "nondeployables"
 
 [black]
 config = "pyproject.toml"
