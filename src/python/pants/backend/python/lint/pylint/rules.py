@@ -219,10 +219,6 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
         ),
     )
 
-    address_references = ", ".join(
-        sorted(field_set.address.spec for field_set in partition.field_sets)
-    )
-
     result = await Get(
         FallibleProcessResult,
         PexProcess(
@@ -230,10 +226,7 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
             argv=generate_args(source_files=field_set_sources, pylint=pylint),
             input_digest=input_digest,
             extra_env={"PEX_EXTRA_SYS_PATH": ":".join(pythonpath)},
-            description=(
-                f"Run Pylint on {pluralize(len(partition.field_sets), 'target')}: "
-                f"{address_references}."
-            ),
+            description=f"Run Pylint on {pluralize(len(partition.field_sets), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )

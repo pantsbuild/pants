@@ -97,9 +97,6 @@ async def flake8_lint_partition(
         MergeDigests((source_files.snapshot.digest, requirements_pex.digest, config_digest)),
     )
 
-    address_references = ", ".join(
-        sorted(field_set.address.spec for field_set in partition.field_sets)
-    )
     report_file_name = "flake8_report.txt" if lint_subsystem.reports_dir else None
 
     result = await Get(
@@ -111,10 +108,7 @@ async def flake8_lint_partition(
             ),
             input_digest=input_digest,
             output_files=(report_file_name,) if report_file_name else None,
-            description=(
-                f"Run Flake8 on {pluralize(len(partition.field_sets), 'target')}: "
-                f"{address_references}"
-            ),
+            description=f"Run Flake8 on {pluralize(len(partition.field_sets), 'file')}.",
             level=LogLevel.DEBUG,
         ),
     )

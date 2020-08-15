@@ -109,10 +109,6 @@ async def setup(setup_request: SetupRequest, isort: Isort) -> Setup:
         MergeDigests((source_files_snapshot.digest, requirements_pex.digest, config_digest)),
     )
 
-    address_references = ", ".join(
-        sorted(field_set.address.spec for field_set in setup_request.request.field_sets)
-    )
-
     process = await Get(
         Process,
         PexProcess(
@@ -122,10 +118,7 @@ async def setup(setup_request: SetupRequest, isort: Isort) -> Setup:
             ),
             input_digest=input_digest,
             output_files=source_files_snapshot.files,
-            description=(
-                f"Run isort on {pluralize(len(setup_request.request.field_sets), 'target')}: "
-                f"{address_references}"
-            ),
+            description=f"Run isort on {pluralize(len(setup_request.request.field_sets), 'file')}.",
             level=LogLevel.DEBUG if setup_request.check_only else LogLevel.INFO,
         ),
     )

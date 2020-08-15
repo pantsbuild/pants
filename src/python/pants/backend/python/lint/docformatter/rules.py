@@ -102,8 +102,7 @@ async def setup(setup_request: SetupRequest, docformatter: Docformatter) -> Setu
             input_digest=input_digest,
             output_files=source_files_snapshot.files,
             description=(
-                f"Run Docformatter on {pluralize(len(setup_request.request.field_sets), 'target')}: "
-                f"{address_references}"
+                f"Run Docformatter on {pluralize(len(setup_request.request.field_sets), 'file')}."
             ),
             level=LogLevel.DEBUG if setup_request.check_only else LogLevel.INFO,
         ),
