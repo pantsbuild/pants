@@ -311,14 +311,16 @@ impl CapturedWorkdir for CommandRunner {
     //
     // See: https://github.com/golang/go/issues/22315 for an excellent description of this generic
     // unix problem.
+    let mut fork_exec = || command.spawn(Stdio::piped(), Stdio::piped());
     let mut child = {
-      let _locked = if exclusive_spawn {
-        *self.spawn_lock.write().await
+      if exclusive_spawn {
+        let _write_locked = self.spawn_lock.write().await;
+        fork_exec()
       } else {
-        *self.spawn_lock.read().await
-      };
-      command.spawn(Stdio::piped(), Stdio::piped())?
-    };
+        let _read_locked = self.spawn_lock.read().await;
+        fork_exec()
+      }
+    }?;
 
     debug!("spawned local process as {} for {:?}", child.id(), req);
     let stdout_stream = FramedRead::new(child.stdout.take().unwrap(), BytesCodec::new())
@@ -455,14 +457,14 @@ pub trait CapturedWorkdir {
       .await?;
 
     let exclusive_spawn = RelativePath::new(&req.argv[0]).map_or(false, |relative_path| {
-      let executable = if let Some(working_directory) = &req.working_directory {
+      let executable_path = if let Some(working_directory) = &req.working_directory {
         working_directory.join(relative_path)
       } else {
         relative_path
       };
-      let exe_was_materialized = sandbox.contains_file(&executable);
+      let exe_was_materialized = sandbox.contains_file(&executable_path);
       if exe_was_materialized {
-        debug!("Obtaining exclusive spawn lock for process with argv {:?} since we materialized its executable {:?}.", &req.argv, executable);
+        debug!("Obtaining exclusive spawn lock for process with argv {:?} since we materialized its executable {:?}.", &req.argv, executable_path);
       }
       exe_was_materialized
     });
