@@ -323,7 +323,7 @@ impl<'t, R: Rule> Builder<'t, R> {
       }
 
       iteration += 1;
-      let looping = graph.node_count() - to_delete.len() > 10000;
+      let looping = graph.node_count() - to_delete.len() > 1500;
       if iteration % 100 == 0 {
         println!(
           ">>> iteration {}: live_node_count: {}, to_visit: {} (, node_count: {}, to_delete: {})",
@@ -505,11 +505,15 @@ impl<'t, R: Rule> Builder<'t, R> {
           }
         }
 
-        // And give the new node edges to this combination of dependencies (while confirming that we
+        // And give the replacement node edges to this combination of dependencies (while confirming that we
         // don't create dupes).
         let existing_edges = graph
           .edges_directed(replacement_id, Direction::Outgoing)
-          .map(|edge_ref| (*edge_ref.weight(), edge_ref.target()))
+          .map(|edge_ref| {
+            if !to_delete.contains(&edge_ref.target()) {
+              (*edge_ref.weight(), edge_ref.target())
+            }
+          })
           .collect::<HashSet<_>>();
         if looping {
           println!(">>> had existing edges: {:?}", existing_edges);
@@ -834,12 +838,10 @@ impl<'t, R: Rule> Builder<'t, R> {
       }
     };
 
-    /*
     println!(
       "Finalizing with: {}",
       petgraph::dot::Dot::with_config(&graph, &[])
     );
-    */
 
     // Visit the reachable portion of the graph to create Edges, starting from roots.
     let mut rule_dependency_edges = HashMap::new();
@@ -971,8 +973,7 @@ impl<'t, R: Rule> Builder<'t, R> {
       let combination = combination.into_iter().cloned().collect::<Vec<_>>();
       let in_set = Self::params_in_set(graph, node_id, combination.iter().cloned());
 
-      // Confirm that this combination of deps is satisfiable: ie, that each dependency consumes
-      // any provided param(s).
+      // Confirm that this combination of deps is satisfiable.
       let satisfiable = combination.iter().all(|(dependency_key, dependency_id)| {
         let dependency_in_set = if *dependency_id == node_id {
           // Is a self edge: use the in_set that we're considering creating.
@@ -981,10 +982,17 @@ impl<'t, R: Rule> Builder<'t, R> {
           &graph[*dependency_id].in_set
         };
 
-        dependency_key
+        // Any param provided by this key must be consumed.
+        let consumes_provided_param = dependency_key
           .provided_param()
           .map(|p| dependency_in_set.contains(&p))
-          .unwrap_or(true)
+          .unwrap_or(true);
+        // And if the dependency is a Param, that Param must be present in the out_set.
+        let uses_only_present_param = match &graph[*dependency_id].node {
+          Node::Param(p) => out_set.contains(&p),
+          _ => true,
+        };
+        consumes_provided_param && uses_only_present_param
       });
       if !satisfiable {
         continue;
