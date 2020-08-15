@@ -5,6 +5,48 @@ This document describes releases leading up to the ``2.0.x`` ``stable`` series.
 
 See https://www.pantsbuild.org/v2.0/docs/release-notes-2-0 for an overview of the changes in this release.
 
+2.0.0.dev9 (8/15/2020)
+----------------------
+
+API Changes
+~~~~~~~~~~~
+
+* Deprecate `--option-name-check-distance` (#10611)
+  `PR #10611 <https://github.com/pantsbuild/pants/pull/10611>`_
+
+New Features
+~~~~~~~~~~~~
+
+* Allow restricting use of resolve_all_constraints. (#10614)
+  `PR #10614 <https://github.com/pantsbuild/pants/pull/10614>`_
+
+Bugfixes
+~~~~~~~~
+
+* Revert #10603 so that `conftest.py` belongs to `python_tests` again (#10619)
+  `PR #10619 <https://github.com/pantsbuild/pants/pull/10619>`_
+
+* Spawning against materialized binaries works. (#10577)
+  `PR #10577 <https://github.com/pantsbuild/pants/pull/10577>`_
+
+* Fix linter reports when there are multiple generated (#10612)
+  `PR #10612 <https://github.com/pantsbuild/pants/pull/10612>`_
+
+* Fix log not always showing up when `--dynamic-ui` is set (#10616)
+  `PR #10616 <https://github.com/pantsbuild/pants/pull/10616>`_
+
+Refactoring, Improvements, and Tooling
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+* Simplify `core/goals/test.py` (#10622)
+  `PR #10622 <https://github.com/pantsbuild/pants/pull/10622>`_
+
+* Remove passive options mechanism (#10621)
+  `PR #10621 <https://github.com/pantsbuild/pants/pull/10621>`_
+
+* Speed up resolving requirements through `--use-first-matching-interpreter` Pex flag (#10442)
+  `PR #10442 <https://github.com/pantsbuild/pants/pull/10442>`_
+
 2.0.0.dev8 (8/13/2020)
 ----------------------
 
