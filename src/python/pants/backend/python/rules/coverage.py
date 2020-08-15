@@ -312,6 +312,8 @@ def _get_coverage_reports(
             report_file = output_dir / "htmlcov" / "index.html"
         elif report_type == CoverageReportType.XML:
             report_file = output_dir / "coverage.xml"
+        elif report_type == CoverageReportType.JSON:
+            report_file = output_dir / "coverage.json"
         else:
             raise ValueError(f"Invalid coverage report type: {report_type}")
         coverage_reports.append(
