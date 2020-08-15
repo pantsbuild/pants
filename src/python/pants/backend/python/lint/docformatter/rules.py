@@ -86,10 +86,6 @@ async def setup(setup_request: SetupRequest, docformatter: Docformatter) -> Setu
         Digest, MergeDigests((source_files_snapshot.digest, requirements_pex.digest))
     )
 
-    address_references = ", ".join(
-        sorted(field_set.address.spec for field_set in setup_request.request.field_sets)
-    )
-
     process = await Get(
         Process,
         PexProcess(
