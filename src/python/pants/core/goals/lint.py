@@ -117,7 +117,7 @@ class LintResults(EngineAware):
             results_msg = "\n"
             for i, result in enumerate(self.results):
                 msg = msg_for_result(result) or "\n"
-                results_msg += f"Partition #{i + 1}{msg}"
+                results_msg += f"Partition #{i + 1}:{msg}"
         message += results_msg
         return message
 

@@ -174,7 +174,7 @@ class LintTest(TestBase):
                 per_target_caching=per_target_caching,
             )
             assert exit_code == FailingRequest.exit_code([address])
-            assert stderr == "𐄂 FailingLinter failed.\n"
+            assert stderr == "\n𐄂 FailingLinter failed.\n"
 
         assert_expected(per_target_caching=False)
         assert_expected(per_target_caching=True)
@@ -192,6 +192,7 @@ class LintTest(TestBase):
             assert exit_code == FailingRequest.exit_code([address])
             assert stderr == dedent(
                 """\
+
                 𐄂 FailingLinter failed.
                 ✓ SuccessfulLinter succeeded.
                 """
@@ -218,6 +219,7 @@ class LintTest(TestBase):
             assert exit_code == ConditionallySucceedsRequest.exit_code([bad_address])
             assert stderr == dedent(
                 """\
+
                 𐄂 ConditionallySucceedsLinter failed.
                 ✓ SuccessfulLinter succeeded.
                 """
@@ -262,7 +264,7 @@ def test_streaming_output_failure() -> None:
 def test_streaming_output_partitions() -> None:
     results = LintResults(
         [
-            LintResult(1, "stdout", "stderr", report=None),
+            LintResult(1, "", "", report=None),
             LintResult(0, "stdout", "stderr", report=None),
         ],
         linter_name="linter",
@@ -272,9 +274,6 @@ def test_streaming_output_partitions() -> None:
         """\
         failed.
         Partition #1:
-        stdout
-        stderr
-
         Partition #2:
         stdout
         stderr
