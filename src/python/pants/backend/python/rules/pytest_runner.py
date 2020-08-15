@@ -4,6 +4,7 @@
 import itertools
 import logging
 from dataclasses import dataclass
+from pathlib import PurePath
 from typing import Optional, Tuple
 from uuid import UUID
 
@@ -27,7 +28,7 @@ from pants.backend.python.target_types import (
     PythonTestsSources,
     PythonTestsTimeout,
 )
-from pants.core.goals.test import Status, TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
+from pants.core.goals.test import TestDebugRequest, TestFieldSet, TestResult, TestSubsystem
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Addresses
 from pants.engine.fs import AddPrefix, Digest, DigestSubset, MergeDigests, PathGlobs, Snapshot
@@ -50,7 +51,12 @@ class PythonTestFieldSet(TestFieldSet):
     timeout: PythonTestsTimeout
 
     def is_conftest(self) -> bool:
-        return not self.address.is_base_target and self.address.filename.endswith("conftest.py")
+        """We skip `conftest.py`, even though it belongs to a `python_tests` target, because it does
+        not have any tests to run on."""
+        return (
+            not self.address.is_base_target
+            and PurePath(self.address.filename).name == "conftest.py"
+        )
 
 
 @dataclass(frozen=True)
@@ -201,7 +207,7 @@ async def run_python_test(
     test_subsystem: TestSubsystem,
 ) -> TestResult:
     if field_set.is_conftest():
-        return TestResult(Status.SKIPPED, "", "", None, None, field_set.address.spec)
+        return TestResult.skipped(field_set.address)
 
     add_opts = [f"--color={'yes' if global_options.options.colors else 'no'}"]
 
@@ -273,7 +279,7 @@ async def run_python_test(
         result,
         coverage_data=coverage_data,
         xml_results=xml_results_digest,
-        address_ref=field_set.address.spec,
+        address=field_set.address,
     )
 
 

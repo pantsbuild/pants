@@ -65,28 +65,40 @@ class TestResult(EngineAware):
     status: Status
     stdout: str
     stderr: str
+    address: Address
     coverage_data: Optional["CoverageData"]
     xml_results: Optional[Digest]
-    address_ref: str = ""
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
 
-    @staticmethod
+    @classmethod
+    def skipped(cls, address: Address) -> "TestResult":
+        return cls(
+            status=Status.SKIPPED,
+            stdout="",
+            stderr="",
+            address=address,
+            coverage_data=None,
+            xml_results=None,
+        )
+
+    @classmethod
     def from_fallible_process_result(
+        cls,
         process_result: FallibleProcessResult,
+        address: Address,
         *,
         coverage_data: Optional["CoverageData"] = None,
         xml_results: Optional[Digest] = None,
-        address_ref: str = "",
     ) -> "TestResult":
-        return TestResult(
+        return cls(
             status=Status.SUCCESS if process_result.exit_code == 0 else Status.FAILURE,
             stdout=process_result.stdout.decode(),
             stderr=process_result.stderr.decode(),
+            address=address,
             coverage_data=coverage_data,
             xml_results=xml_results,
-            address_ref=address_ref,
         )
 
     def artifacts(self) -> Optional[Dict[str, Digest]]:
@@ -101,7 +113,7 @@ class TestResult(EngineAware):
 
     def message(self):
         result = "succeeded" if self.status == Status.SUCCESS else "failed"
-        return f"tests {result}: {self.address_ref}"
+        return f"tests {result}: {self.address}"
 
 
 @dataclass(frozen=True)
