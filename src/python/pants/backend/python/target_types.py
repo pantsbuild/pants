@@ -243,7 +243,7 @@ class PythonBinary(Target):
 
 
 class PythonTestsSources(PythonSources):
-    default = ("test_*.py", "*_test.py", "tests.py")
+    default = ("test_*.py", "*_test.py", "tests.py", "conftest.py")
 
 
 class PythonTestsTimeout(IntField):
@@ -284,7 +284,7 @@ class PythonTests(Target):
 
     These may be written in either Pytest-style or unittest style.
 
-    All test util code, including `conftest.py`, should go into a dedicated `python_library()`
+    All test util code, other than `conftest.py`, should go into a dedicated `python_library()`
     target and then be included in the `dependencies` field.
 
     See https://www.pantsbuild.org/docs/python-test-goal.
