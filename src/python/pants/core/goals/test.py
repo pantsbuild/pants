@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
+import logging
 from abc import ABC, ABCMeta
 from dataclasses import dataclass
 from enum import Enum
@@ -31,10 +32,13 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, union
 from pants.util.logging import LogLevel
 
+logger = logging.getLogger(__name__)
+
 
 class Status(Enum):
     SUCCESS = "SUCCESS"
     FAILURE = "FAILURE"
+    SKIPPED = "SKIP"
 
 
 class CoverageReportType(Enum):
@@ -330,6 +334,8 @@ async def run_tests(
 
     # Print details.
     for result in results:
+        if result.test_result.status == Status.SKIPPED:
+            continue
         if test_subsystem.options.output == ShowOutput.NONE or (
             test_subsystem.options.output == ShowOutput.FAILED
             and result.test_result.status == Status.SUCCESS
@@ -353,6 +359,8 @@ async def run_tests(
     # Print summary
     console.print_stderr("")
     for result in results:
+        if result.test_result.status == Status.SKIPPED:
+            continue
         color = console.green if result.test_result.status == Status.SUCCESS else console.red
         # The right-align logic sees the color control codes as characters, so we have
         # to account for that. In f-strings the alignment field widths must be literals,

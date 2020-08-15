@@ -133,6 +133,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
     def run_pytest(
         self,
         *,
+        address: Optional[Address] = None,
         passthrough_args: Optional[str] = None,
         junit_xml_dir: Optional[str] = None,
         use_coverage: bool = False,
@@ -153,11 +154,10 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
             args.append("--test-use-coverage")
         if execution_slot_var:
             args.append(f"--pytest-execution-slot-var={execution_slot_var}")
-
+        if not address:
+            address = Address(self.package, target_name="target")
         params = Params(
-            PythonTestFieldSet.create(
-                PythonTests({}, address=Address(self.package, target_name="target"))
-            ),
+            PythonTestFieldSet.create(PythonTests({}, address=address)),
             create_options_bootstrapper(args=args),
         )
         test_result = self.request_single_product(TestResult, params)
@@ -362,21 +362,24 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         assert f"{self.package}/test_good.py ." in result.stdout
         assert result.coverage_data is not None
 
-    def test_conftest_injection(self) -> None:
+    def test_conftest_handling(self) -> None:
+        """Tests that we a) inject a dependency on conftest.py and b) skip running directly on
+        conftest.py."""
         self.create_python_test_target([self.good_source])
-
         self.create_file(
-            relpath=PurePath(self.source_root, self.conftest_source.path).as_posix(),
-            contents=self.conftest_source.content.decode(),
+            PurePath(self.source_root, self.conftest_source.path).as_posix(),
+            self.conftest_source.content.decode(),
         )
-
-        self.create_file(
-            relpath=PurePath(self.source_root, "BUILD").as_posix(), contents="python_tests()",
-        )
+        self.add_to_build_file(self.source_root, "python_tests()")
 
         result = self.run_pytest(passthrough_args="-s")
         assert result.status == Status.SUCCESS
         assert f"{self.package}/test_good.py In conftest!\n." in result.stdout
+
+        result = self.run_pytest(
+            address=Address(self.source_root, relative_file_path="conftest.py")
+        )
+        assert result.status == Status.SKIPPED
 
     def test_execution_slot_variable(self) -> None:
         source = FileContent(

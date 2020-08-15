@@ -284,6 +284,9 @@ class PythonTests(Target):
 
     These may be written in either Pytest-style or unittest style.
 
+    All test util code, other than `conftest.py`, should go into a dedicated `python_library()`
+    target and then be included in the `dependencies` field.
+
     See https://www.pantsbuild.org/docs/python-test-goal.
     """
 
