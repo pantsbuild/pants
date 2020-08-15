@@ -323,7 +323,7 @@ impl<'t, R: Rule> Builder<'t, R> {
       }
 
       iteration += 1;
-      let looping = graph.node_count() - to_delete.len() > 1500;
+      let looping = graph.node_count() - to_delete.len() > 1000000;
       if iteration % 100 == 0 {
         println!(
           ">>> iteration {}: live_node_count: {}, to_visit: {} (, node_count: {}, to_delete: {})",
@@ -431,19 +431,57 @@ impl<'t, R: Rule> Builder<'t, R> {
       // change: this node is valid (for now!).
       if monomorphizations.len() == 1 && monomorphizations.contains_key(&graph[node_id]) {
         if looping {
-          println!(">>> no changes for {}", graph[node_id]);
+          println!(">>> no changes for {:?}: {}", node_id, graph[node_id]);
         }
         continue;
       }
 
       if looping {
         println!(
-            ">>> created {} monomorphizations (from {} dependee sets and {:?} dependencies) for {:#?}",
+            ">>> created {} monomorphizations (from {} dependee sets and {:?} dependencies) for {:?}: {:#?}",
             monomorphizations.len(),
             dependees_by_out_set_len,
             dependencies_by_key_lens,
+            node_id,
             graph[node_id],
         );
+
+        if graph[node_id].node.to_string().contains(debug_str) {
+          let subgraph_id = node_id;
+          let mut bfs = Bfs::new(&graph, subgraph_id);
+          let mut visited = graph.visit_map();
+          while let Some(node_id) = bfs.next(&graph) {
+            visited.visit(node_id);
+          }
+          // Include the direct deps of any visited node.
+          let collected = graph
+            .node_references()
+            .filter(|node_ref| visited.is_visited(&node_ref.id()))
+            .map(|node_ref| node_ref.id())
+            .collect::<Vec<_>>();
+          for node_id in collected {
+            for dependee_id in graph.neighbors_directed(node_id, Direction::Incoming) {
+              visited.visit(dependee_id);
+            }
+          }
+
+          let subgraph = graph.filter_map(
+            |node_id, node| {
+              if visited.is_visited(&node_id) && !to_delete.is_visited(&node_id) {
+                Some(node)
+              } else {
+                None
+              }
+            },
+            |_, edge_weight| Some(*edge_weight),
+          );
+
+          println!(
+            "Subgraph below {}: {}",
+            graph[subgraph_id].node,
+            petgraph::dot::Dot::with_config(&subgraph, &[])
+          );
+        }
       }
 
       // Needs changes. Add this node to the list of nodes to be deleted.
@@ -476,6 +514,9 @@ impl<'t, R: Rule> Builder<'t, R> {
             // We're adding edges to an existing node. Ensure that we visit it later to square
             // that.
             let existing_id = *oe.get();
+            if looping {
+              println!(">>> using existing node: {:?}", existing_id);
+            }
             to_visit.insert(existing_id);
             (existing_id, false)
           }
@@ -509,15 +550,9 @@ impl<'t, R: Rule> Builder<'t, R> {
         // don't create dupes).
         let existing_edges = graph
           .edges_directed(replacement_id, Direction::Outgoing)
-          .map(|edge_ref| {
-            if !to_delete.contains(&edge_ref.target()) {
-              (*edge_ref.weight(), edge_ref.target())
-            }
-          })
+          .filter(|edge_ref| !to_delete.contains(&edge_ref.target()))
+          .map(|edge_ref| (*edge_ref.weight(), edge_ref.target()))
           .collect::<HashSet<_>>();
-        if looping {
-          println!(">>> had existing edges: {:?}", existing_edges);
-        }
         for (dependency_key, dependency_id) in dependencies {
           // NB: When a node depends on itself, we adjust the destination of that self-edge to point to
           // the new node.
@@ -527,38 +562,20 @@ impl<'t, R: Rule> Builder<'t, R> {
             dependency_id
           };
           if !existing_edges.contains(&(dependency_key, dependency_id)) {
+            if looping {
+              println!(">>> adding edge: {:?}", (dependency_key, dependency_id));
+            }
             graph.add_edge(replacement_id, dependency_id, dependency_key);
+          } else {
+            if looping {
+              println!(
+                ">>> skipping existing edge: {:?}",
+                (dependency_key, dependency_id)
+              );
+            }
           }
         }
       }
-
-      /*
-      if graph[node_id].node.to_string().contains(debug_str) {
-        let subgraph_id = node_id;
-        let mut bfs = Bfs::new(&graph, subgraph_id);
-        let mut visited = graph.visit_map();
-        while let Some(node_id) = bfs.next(&graph) {
-          visited.visit(node_id);
-        }
-
-        let subgraph = graph.filter_map(
-          |node_id, node| {
-            if visited.is_visited(&node_id) && to_delete.is_visited(&node_id) {
-              Some(format!("{} for {}", node.node, params_str(&node.in_set)))
-            } else {
-              None
-            }
-          },
-          |_, edge_weight| Some(*edge_weight),
-        );
-
-        println!(
-          "Subgraph below {}: {}",
-          graph[subgraph_id].node,
-          petgraph::dot::Dot::with_config(&subgraph, &[])
-        );
-      }
-      */
     }
 
     // Finally, delete all nodes that were replaced (which will also delete their edges).
