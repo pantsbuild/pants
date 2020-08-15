@@ -33,6 +33,7 @@ use crate::{params_str, Entry, EntryWithDeps, InnerEntry, RootEntry, RuleEdges, 
 
 use std::collections::{hash_map, HashMap, HashSet, VecDeque};
 
+use indexmap::IndexSet;
 use itertools::Itertools;
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::visit::{
@@ -244,19 +245,22 @@ impl<'t, R: Rule> Builder<'t, R> {
     // nodes in the graph, but because monomorphizing a node enqueues its dependees we may
     // visit some of them multiple times.
     //
-    // TODO: Incorporate a set with the to_visit collection to avoid needing to re-visit unless
-    // another dependency enqueues it _after_ it has been visited.
+    // We use an IndexSet to preserve the initial DFS order while still removing duplicates. The
+    // nodes that should be visited last will be at the bottom of the set, and will stay there
+    // until things above them have been removed.
     let mut to_visit = {
       let mut dfs = DfsPostOrder {
         stack: graph.externals(Direction::Incoming).collect(),
         discovered: graph.visit_map(),
         finished: graph.visit_map(),
       };
-      let mut to_visit = VecDeque::new();
+      let mut to_visit = Vec::new();
       while let Some(node_id) = dfs.next(&graph) {
-        to_visit.push_back(node_id);
+        to_visit.push(node_id);
       }
-      to_visit
+      // The IndexSet acts like a stack (ie, we can only remove from the end) so we reverse the DFS
+      // order to ensure that the last nodes in the DFS end up at the bottom of the stack.
+      to_visit.into_iter().rev().collect::<IndexSet<_>>()
     };
 
     // As we go, we record which nodes to delete, but we wait until the end to delete them, as it
@@ -268,7 +272,7 @@ impl<'t, R: Rule> Builder<'t, R> {
       petgraph::dot::Dot::with_config(&graph, &[])
     );
 
-    let debug_str = "resolve_unexpanded_targets(";
+    let debug_str = "this_is_not_a_real_rule(";
 
     // As we split Rules, we attempt to re-join with existing identical Rule nodes to avoid an
     // explosion.
@@ -309,12 +313,26 @@ impl<'t, R: Rule> Builder<'t, R> {
       );
     }
 
-    while let Some(node_id) = to_visit.pop_front() {
+    let mut iteration = 0;
+    while let Some(node_id) = to_visit.pop() {
       if to_delete.contains(&node_id) {
         continue;
       }
       if !matches!(&graph[node_id].node, Node::Rule(_)) {
         continue;
+      }
+
+      iteration += 1;
+      let looping = graph.node_count() - to_delete.len() > 3500;
+      if iteration % 100 == 0 {
+        println!(
+          ">>> iteration {}: live_node_count: {}, to_visit: {} (, node_count: {}, to_delete: {})",
+          iteration,
+          graph.node_count() - to_delete.len(),
+          to_visit.len(),
+          graph.node_count(),
+          to_delete.len()
+        );
       }
 
       // Group dependencies by DependencyKey.
@@ -363,9 +381,9 @@ impl<'t, R: Rule> Builder<'t, R> {
         .iter()
         .map(|edges| edges.len())
         .collect::<Vec<_>>();
-      //println!(">>> dependees of {} by out set: {:#?}", graph[node_id], dependees_by_out_set);
-
       /*
+      println!(">>> dependees of {} by out set: {:#?}", graph[node_id], dependees_by_out_set);
+
       if graph[node_id].node.to_string().contains(debug_str) {
         println!(
           ">>> monomorphizing {} with: {:#?}",
@@ -412,17 +430,21 @@ impl<'t, R: Rule> Builder<'t, R> {
       // If the result of monomorphization was identical to the input, then nothing needs to
       // change: this node is valid (for now!).
       if monomorphizations.len() == 1 && monomorphizations.contains_key(&graph[node_id]) {
-        println!(">>> no changes for {}", graph[node_id].node);
+        if looping {
+          println!(">>> no changes for {}", graph[node_id]);
+        }
         continue;
       }
 
-      println!(
-        ">>> created {} monomorphizations (from {} dependee sets and {:?} dependencies) for {}",
-        monomorphizations.len(),
-        dependees_by_out_set_len,
-        dependencies_by_key_lens,
-        graph[node_id].node,
-      );
+      if looping {
+        println!(
+            ">>> created {} monomorphizations (from {} dependee sets and {:?} dependencies) for {:#?}",
+            monomorphizations.len(),
+            dependees_by_out_set_len,
+            dependencies_by_key_lens,
+            graph[node_id],
+        );
+      }
 
       // Needs changes. Add this node to the list of nodes to be deleted.
       to_delete.insert(node_id);
@@ -434,27 +456,27 @@ impl<'t, R: Rule> Builder<'t, R> {
 
       // Generate a replacement node for each monomorphization of this rule.
       for (new_node, (dependees, dependencies)) in monomorphizations {
-        /*
-        println!(
-          ">>>   generating {}, which consumes: {:#?}",
-          new_node,
-          dependencies
-            .iter()
-            .map(|(dk, di)| (
-              dk.to_string(),
-              graph[*di].node.to_string(),
-              params_str(&graph[*di].in_set)
-            ))
-            .collect::<Vec<_>>()
-        );
-        */
+        if looping {
+          println!(
+            ">>>   generating {:#?}, which consumes: {:#?}",
+            new_node,
+            dependencies
+              .iter()
+              .map(|(dk, di)| (
+                dk.to_string(),
+                graph[*di].node.to_string(),
+                params_str(&graph[*di].in_set)
+              ))
+              .collect::<Vec<_>>()
+          );
+        }
 
         let (replacement_id, is_new_node) = match rules.entry(new_node.clone()) {
           hash_map::Entry::Occupied(oe) => {
             // We're adding edges to an existing node. Ensure that we visit it later to square
             // that.
             let existing_id = *oe.get();
-            to_visit.push_back(existing_id);
+            to_visit.insert(existing_id);
             (existing_id, false)
           }
           hash_map::Entry::Vacant(ve) => (*ve.insert(graph.add_node(new_node)), true),
@@ -489,6 +511,9 @@ impl<'t, R: Rule> Builder<'t, R> {
           .edges_directed(replacement_id, Direction::Outgoing)
           .map(|edge_ref| (*edge_ref.weight(), edge_ref.target()))
           .collect::<HashSet<_>>();
+        if looping {
+          println!(">>> had existing edges: {:?}", existing_edges);
+        }
         for (dependency_key, dependency_id) in dependencies {
           // NB: When a node depends on itself, we adjust the destination of that self-edge to point to
           // the new node.
@@ -503,6 +528,7 @@ impl<'t, R: Rule> Builder<'t, R> {
         }
       }
 
+      /*
       if graph[node_id].node.to_string().contains(debug_str) {
         let subgraph_id = node_id;
         let mut bfs = Bfs::new(&graph, subgraph_id);
@@ -528,6 +554,7 @@ impl<'t, R: Rule> Builder<'t, R> {
           petgraph::dot::Dot::with_config(&subgraph, &[])
         );
       }
+      */
     }
 
     // Finally, delete all nodes that were replaced (which will also delete their edges).
@@ -925,7 +952,7 @@ impl<'t, R: Rule> Builder<'t, R> {
   /// simplified node for each legal set with potentially useful in_sets.
   ///
   /// Note that because ambiguities are preserved (to allow for useful errors
-  /// post-monomorphization), the output is a set of a dependencies which might contain multiple
+  /// post-monomorphization), the output is a set of dependencies which might contain multiple
   /// entries per DependencyKey.
   ///
   fn monomorphizations(
