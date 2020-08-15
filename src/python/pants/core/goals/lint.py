@@ -115,10 +115,9 @@ class LintResults(EngineAware):
             results_msg = msg_for_result(self.results[0])
         else:
             results_msg = "\n"
-            results_msg += "".join(
-                f"Partition #{i + 1}:{msg_for_result(result)}"
-                for i, result in enumerate(self.results)
-            )
+            for i, result in enumerate(self.results):
+                msg = msg_for_result(result) or "\n"
+                results_msg += f"Partition #{i + 1}{msg}"
         message += results_msg
         return message
 
@@ -258,6 +257,8 @@ async def lint(
         logger.info(f"Wrote lint result files to {lint_subsystem.reports_dir}.")
 
     exit_code = 0
+    if all_results:
+        console.print_stderr("")
     for results in all_results:
         if results.skipped:
             sigil = console.yellow("-")
