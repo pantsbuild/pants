@@ -1,6 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -90,9 +89,8 @@ fn construct_nailgun_client_request(
 /// If that flag is set, it will connect to a running nailgun server and run the command there.
 /// Otherwise, it will just delegate to the regular local runner.
 ///
-#[derive(Clone)]
 pub struct CommandRunner {
-  inner: Arc<super::local::CommandRunner>,
+  inner: super::local::CommandRunner,
   nailgun_pool: NailgunPool,
   async_semaphore: async_semaphore::AsyncSemaphore,
   metadata: ProcessMetadata,
@@ -108,7 +106,7 @@ impl CommandRunner {
     executor: task_executor::Executor,
   ) -> Self {
     CommandRunner {
-      inner: Arc::new(runner),
+      inner: runner,
       nailgun_pool: NailgunPool::new(),
       async_semaphore: AsyncSemaphore::new(1),
       metadata,
@@ -181,16 +179,18 @@ impl super::CommandRunner for CommandRunner {
   }
 }
 
+#[async_trait]
 impl CapturedWorkdir for CommandRunner {
   fn named_caches(&self) -> &NamedCaches {
     self.inner.named_caches()
   }
 
-  fn run_in_workdir<'a, 'b, 'c>(
+  async fn run_in_workdir<'a, 'b, 'c>(
     &'a self,
     workdir_path: &'b Path,
     req: Process,
     context: Context,
+    _exclusive_spawn: bool,
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String> {
     // Separate argument lists, to form distinct EPRs for (1) starting the nailgun server and (2) running the client in it.
     let ParsedJVMCommandLines {

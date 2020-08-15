@@ -4,6 +4,7 @@
 import itertools
 import logging
 from dataclasses import dataclass
+from pathlib import PurePath
 from typing import Optional, Tuple
 from uuid import UUID
 
@@ -48,6 +49,14 @@ class PythonTestFieldSet(TestFieldSet):
 
     sources: PythonTestsSources
     timeout: PythonTestsTimeout
+
+    def is_conftest(self) -> bool:
+        """We skip `conftest.py`, even though it belongs to a `python_tests` target, because it does
+        not have any tests to run on."""
+        return (
+            not self.address.is_base_target
+            and PurePath(self.address.filename).name == "conftest.py"
+        )
 
 
 @dataclass(frozen=True)
@@ -188,24 +197,27 @@ async def setup_pytest_for_target(
     )
 
 
+# TODO(#10618): Once this is fixed, move `TestTargetSetup` into an `await Get` so that we only set
+#  up the test if it isn't skipped.
 @rule(desc="Run Pytest")
 async def run_python_test(
     field_set: PythonTestFieldSet,
-    test_setup: TestTargetSetup,
+    setup: TestTargetSetup,
     global_options: GlobalOptions,
     test_subsystem: TestSubsystem,
 ) -> TestResult:
-    """Runs pytest for one target."""
-    output_files = []
+    if field_set.is_conftest():
+        return TestResult.skipped(field_set.address)
 
     add_opts = [f"--color={'yes' if global_options.options.colors else 'no'}"]
 
+    output_files = []
     # Configure generation of JUnit-compatible test report.
     test_results_file = None
-    if test_setup.xml_dir:
+    if setup.xml_dir:
         test_results_file = f"{field_set.address.path_safe_spec}.xml"
         add_opts.extend(
-            (f"--junitxml={test_results_file}", "-o", f"junit_family={test_setup.junit_family}")
+            (f"--junitxml={test_results_file}", "-o", f"junit_family={setup.junit_family}")
         )
         output_files.append(test_results_file)
 
@@ -213,10 +225,7 @@ async def run_python_test(
     if test_subsystem.use_coverage:
         output_files.append(".coverage")
 
-    env = {
-        "PYTEST_ADDOPTS": " ".join(add_opts),
-        "PEX_EXTRA_SYS_PATH": ":".join(test_setup.source_roots),
-    }
+    env = {"PYTEST_ADDOPTS": " ".join(add_opts), "PEX_EXTRA_SYS_PATH": ":".join(setup.source_roots)}
 
     if test_subsystem.force:
         # This is a slightly hacky way to force the process to run: since the env var
@@ -232,14 +241,14 @@ async def run_python_test(
     result = await Get(
         FallibleProcessResult,
         PexProcess(
-            test_setup.test_runner_pex,
-            argv=test_setup.args,
-            input_digest=test_setup.input_digest,
+            setup.test_runner_pex,
+            argv=setup.args,
+            input_digest=setup.input_digest,
             output_files=tuple(output_files) if output_files else None,
             description=f"Run Pytest for {field_set.address}",
-            timeout_seconds=test_setup.timeout_seconds,
+            timeout_seconds=setup.timeout_seconds,
             extra_env=env,
-            execution_slot_variable=test_setup.execution_slot_variable,
+            execution_slot_variable=setup.execution_slot_variable,
         ),
     )
 
@@ -261,7 +270,7 @@ async def run_python_test(
         if xml_results_snapshot.files == (test_results_file,):
             xml_results_digest = await Get(
                 Digest,
-                AddPrefix(xml_results_snapshot.digest, test_setup.xml_dir),  # type: ignore[arg-type]
+                AddPrefix(xml_results_snapshot.digest, setup.xml_dir),  # type: ignore[arg-type]
             )
         else:
             logger.warning(f"Failed to generate JUnit XML data for {field_set.address}.")
@@ -270,21 +279,17 @@ async def run_python_test(
         result,
         coverage_data=coverage_data,
         xml_results=xml_results_digest,
-        address_ref=field_set.address.spec,
+        address=field_set.address,
     )
 
 
 @rule(desc="Run Pytest in an interactive process")
-async def debug_python_test(test_setup: TestTargetSetup) -> TestDebugRequest:
+def debug_python_test(setup: TestTargetSetup) -> TestDebugRequest:
     process = InteractiveProcess(
-        argv=(test_setup.test_runner_pex.output_filename, *test_setup.args),
-        input_digest=test_setup.input_digest,
+        argv=(setup.test_runner_pex.output_filename, *setup.args), input_digest=setup.input_digest,
     )
     return TestDebugRequest(process)
 
 
 def rules():
-    return [
-        *collect_rules(),
-        UnionRule(TestFieldSet, PythonTestFieldSet),
-    ]
+    return [*collect_rules(), UnionRule(TestFieldSet, PythonTestFieldSet)]

@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
+import logging
 from abc import ABC, ABCMeta
 from dataclasses import dataclass
 from enum import Enum
@@ -31,10 +32,13 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership, union
 from pants.util.logging import LogLevel
 
+logger = logging.getLogger(__name__)
+
 
 class Status(Enum):
     SUCCESS = "SUCCESS"
     FAILURE = "FAILURE"
+    SKIPPED = "SKIP"
 
 
 class CoverageReportType(Enum):
@@ -61,28 +65,40 @@ class TestResult(EngineAware):
     status: Status
     stdout: str
     stderr: str
+    address: Address
     coverage_data: Optional["CoverageData"]
     xml_results: Optional[Digest]
-    address_ref: str = ""
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
 
-    @staticmethod
+    @classmethod
+    def skipped(cls, address: Address) -> "TestResult":
+        return cls(
+            status=Status.SKIPPED,
+            stdout="",
+            stderr="",
+            address=address,
+            coverage_data=None,
+            xml_results=None,
+        )
+
+    @classmethod
     def from_fallible_process_result(
+        cls,
         process_result: FallibleProcessResult,
+        address: Address,
         *,
         coverage_data: Optional["CoverageData"] = None,
         xml_results: Optional[Digest] = None,
-        address_ref: str = "",
     ) -> "TestResult":
-        return TestResult(
+        return cls(
             status=Status.SUCCESS if process_result.exit_code == 0 else Status.FAILURE,
             stdout=process_result.stdout.decode(),
             stderr=process_result.stderr.decode(),
+            address=address,
             coverage_data=coverage_data,
             xml_results=xml_results,
-            address_ref=address_ref,
         )
 
     def artifacts(self) -> Optional[Dict[str, Digest]]:
@@ -97,7 +113,7 @@ class TestResult(EngineAware):
 
     def message(self):
         result = "succeeded" if self.status == Status.SUCCESS else "failed"
-        return f"tests {result}: {self.address_ref}"
+        return f"tests {result}: {self.address}"
 
 
 @dataclass(frozen=True)
@@ -330,6 +346,8 @@ async def run_tests(
 
     # Print details.
     for result in results:
+        if result.test_result.status == Status.SKIPPED:
+            continue
         if test_subsystem.options.output == ShowOutput.NONE or (
             test_subsystem.options.output == ShowOutput.FAILED
             and result.test_result.status == Status.SUCCESS
@@ -353,6 +371,8 @@ async def run_tests(
     # Print summary
     console.print_stderr("")
     for result in results:
+        if result.test_result.status == Status.SKIPPED:
+            continue
         color = console.green if result.test_result.status == Status.SUCCESS else console.red
         # The right-align logic sees the color control codes as characters, so we have
         # to account for that. In f-strings the alignment field widths must be literals,

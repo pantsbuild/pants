@@ -2,8 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
+import logging
+from collections import defaultdict
 from dataclasses import dataclass
-from pathlib import PurePath
 from typing import Iterable, Optional, cast
 
 from pants.core.goals.style_request import StyleRequest
@@ -13,7 +14,7 @@ from pants.core.util_rules.filter_empty_sources import (
 )
 from pants.engine.collection import Collection
 from pants.engine.console import Console
-from pants.engine.fs import Digest, Workspace
+from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
@@ -21,11 +22,17 @@ from pants.engine.target import Targets
 from pants.engine.unions import UnionMembership, union
 from pants.util.strutil import strip_v2_chroot_path
 
+logger = logging.Logger(__name__)
+
 
 @dataclass(frozen=True)
-class LintResultFile:
-    output_path: PurePath
+class LintReport:
+    file_name: str
     digest: Digest
+
+
+class InvalidLinterReportsError(Exception):
+    pass
 
 
 @dataclass(frozen=True)
@@ -34,7 +41,7 @@ class LintResult:
     stdout: str
     stderr: str
     linter_name: str
-    results_file: Optional[LintResultFile]
+    report: Optional[LintReport]
 
     @staticmethod
     def from_fallible_process_result(
@@ -42,7 +49,7 @@ class LintResult:
         *,
         linter_name: str,
         strip_chroot_path: bool = False,
-        results_file: Optional[LintResultFile] = None,
+        report: Optional[LintReport] = None,
     ) -> "LintResult":
         def prep_output(s: bytes) -> str:
             return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
@@ -52,15 +59,8 @@ class LintResult:
             stdout=prep_output(process_result.stdout),
             stderr=prep_output(process_result.stderr),
             linter_name=linter_name,
-            results_file=results_file,
+            report=report,
         )
-
-    def materialize(self, console: Console, workspace: Workspace) -> None:
-        if not self.results_file:
-            return
-        output_path = self.results_file.output_path
-        workspace.write_digest(self.results_file.digest, path_prefix=output_path.parent.as_posix())
-        console.print_stdout(f"Wrote {self.linter_name} report to: {output_path.as_posix()}")
 
 
 class LintResults(Collection[LintResult]):
@@ -111,7 +111,10 @@ class LintSubsystem(GoalSubsystem):
             metavar="<DIR>",
             default=None,
             advanced=True,
-            help="Specifying a directory causes linter that support it to write report files into this directory",
+            help=(
+                "Specifying a directory causes linters that support writing report files to write "
+                "into this directory.",
+            ),
         )
 
     @property
@@ -119,9 +122,8 @@ class LintSubsystem(GoalSubsystem):
         return cast(bool, self.options.per_target_caching)
 
     @property
-    def reports_dir(self) -> Optional[PurePath]:
-        v = self.options.reports_dir
-        return PurePath(v) if v else None
+    def reports_dir(self) -> Optional[str]:
+        return cast(Optional[str], self.options.reports_dir)
 
 
 class Lint(Goal):
@@ -170,22 +172,50 @@ async def lint(
     if not sorted_results:
         return Lint(exit_code=0)
 
+    linter_to_reports = defaultdict(list)
+    for result in sorted_results:
+        if result.report:
+            linter_to_reports[result.linter_name].append(result.report)
+    if linter_to_reports:
+        # TODO(#10532): Tolerate when a linter has multiple reports.
+        linters_with_multiple_reports = [
+            linter for linter, reports in linter_to_reports.items() if len(reports) > 1
+        ]
+        if linters_with_multiple_reports:
+            if lint_subsystem.per_target_caching:
+                suggestion = "Try running without `--lint-per-target-caching` set."
+            else:
+                suggestion = (
+                    "The linters likely partitioned the input targets, such as grouping by Python "
+                    "interpreter compatibility. Try running on fewer targets or unset "
+                    "`--lint-reports-dir`."
+                )
+            raise InvalidLinterReportsError(
+                "Multiple reports would have been written for these linters: "
+                f"{linters_with_multiple_reports}. The option `--lint-reports-dir` only works if "
+                f"each linter has a single result. {suggestion}"
+            )
+        reports = itertools.chain.from_iterable(linter_to_reports.values())
+        merged_reports = await Get(Digest, MergeDigests(report.digest for report in reports))
+        workspace.write_digest(merged_reports, path_prefix=lint_subsystem.reports_dir)
+        logger.info(f"Wrote lint result files to {lint_subsystem.reports_dir}.")
+
     exit_code = 0
     for result in sorted_results:
-        console.print_stderr(
-            f"{console.green('✓')} {result.linter_name} succeeded."
-            if result.exit_code == 0
-            else f"{console.red('𐄂')} {result.linter_name} failed."
-        )
+        if result.exit_code == 0:
+            sigil = console.green("✓")
+            status = "succeeded"
+        else:
+            sigil = console.red("𐄂")
+            status = "failed"
+            exit_code = result.exit_code
+        console.print_stderr(f"{sigil} {result.linter_name} {status}.")
         if result.stdout:
             console.print_stderr(result.stdout)
         if result.stderr:
             console.print_stderr(result.stderr)
         if result != sorted_results[-1]:
             console.print_stderr("")
-        result.materialize(console, workspace)
-        if result.exit_code != 0:
-            exit_code = result.exit_code
 
     return Lint(exit_code)
 

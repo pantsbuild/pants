@@ -42,7 +42,7 @@ use bazel_protos::remote_execution as remexec;
 use boxfuture::{try_future, BoxFuture, Boxable};
 use bytes::Bytes;
 use concrete_time::TimeSpan;
-use fs::{default_cache_path, FileContent};
+use fs::{default_cache_path, FileContent, RelativePath};
 use futures::compat::Future01CompatExt;
 use futures::future::{self as future03, Either, FutureExt, TryFutureExt};
 use futures01::{future, Future};
@@ -51,7 +51,7 @@ use protobuf::Message;
 use serde_derive::Serialize;
 pub use serverset::BackoffConfig;
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::convert::TryInto;
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -104,23 +104,30 @@ pub struct DirectoryMaterializeMetadata {
 }
 
 impl DirectoryMaterializeMetadata {
-  pub fn to_path_list(&self) -> Vec<String> {
+  fn to_relative_paths(&self) -> Result<HashSet<RelativePath>, String> {
     fn recurse(
-      outputs: &mut Vec<String>,
-      path_so_far: PathBuf,
+      outputs: &mut HashSet<RelativePath>,
+      path_so_far: RelativePath,
       current: &DirectoryMaterializeMetadata,
-    ) {
+    ) -> Result<(), String> {
       for (child, _) in current.child_files.iter() {
-        outputs.push(path_so_far.join(child).to_string_lossy().to_string())
+        outputs.insert(path_so_far.join(RelativePath::new(child)?));
       }
 
       for (dir, meta) in current.child_directories.iter() {
-        recurse(outputs, path_so_far.join(dir), &meta);
+        recurse(outputs, path_so_far.join(RelativePath::new(dir)?), &meta)?
       }
+      Ok(())
     }
-    let mut output_paths: Vec<String> = vec![];
-    recurse(&mut output_paths, PathBuf::new(), self);
-    output_paths
+    let mut output_paths: HashSet<RelativePath> = HashSet::new();
+    recurse(&mut output_paths, RelativePath::empty(), self)?;
+    Ok(output_paths)
+  }
+
+  pub fn contains_file(&self, path: &RelativePath) -> bool {
+    self
+      .to_relative_paths()
+      .map_or(false, |paths| paths.contains(path))
   }
 }
 
@@ -726,40 +733,13 @@ impl Store {
     digest: Digest,
   ) -> BoxFuture<DirectoryMaterializeMetadata, String> {
     let root = Arc::new(Mutex::new(None));
-    let executor = self.local.executor().clone();
     self
       .materialize_directory_helper(
-        destination.clone(),
+        destination,
         RootOrParentMetadataBuilder::Root(root.clone()),
         digest,
       )
-      .and_then(move |()| {
-        let materialize_metadata = Arc::try_unwrap(root).unwrap().into_inner().unwrap().build();
-        // We fundamentally materialize files for other processes to read; as such, we must ensure
-        // data is flushed to disk and visible to them as opposed to just our process. Even though
-        // we need to re-open all written files, executing all fsyncs at the end of the
-        // materialize call is significantly faster than doing it as we go.
-        future::join_all(
-          materialize_metadata
-            .to_path_list()
-            .into_iter()
-            .map(|path| {
-              let path = destination.join(path);
-              executor
-                .spawn_blocking(move || {
-                  OpenOptions::new()
-                    .write(true)
-                    .create(false)
-                    .open(path)?
-                    .sync_all()
-                })
-                .compat()
-            })
-            .collect::<Vec<_>>(),
-        )
-        .map_err(|e| format!("Failed to fsync directory contents: {}", e))
-        .map(move |_| materialize_metadata)
-      })
+      .and_then(move |()| Ok(Arc::try_unwrap(root).unwrap().into_inner().unwrap().build()))
       .to_boxed()
   }
 
@@ -831,7 +811,7 @@ impl Store {
           let child_files = child_files.clone();
           let name = file_node.get_name().to_owned();
           store
-            .materialize_file(path, digest, file_node.is_executable, false)
+            .materialize_file(path, digest, file_node.is_executable)
             .map(move |metadata| child_files.lock().insert(name, metadata))
             .to_boxed()
         })
@@ -864,16 +844,11 @@ impl Store {
     .to_boxed()
   }
 
-  ///
-  /// Materializes a single file. This method is private because generally files should be
-  /// materialized together via `materialize_directory`, which handles batch fsync'ing.
-  ///
   fn materialize_file(
     &self,
     destination: PathBuf,
     digest: Digest,
     is_executable: bool,
-    fsync: bool,
   ) -> BoxFuture<LoadMetadata, String> {
     let store = self.clone();
     let res = async move {
@@ -881,28 +856,25 @@ impl Store {
         .load_file_bytes_with(digest, move |bytes| {
           if destination.exists() {
             std::fs::remove_file(&destination)
-          } else {
-            Ok(())
+              .map_err(|e| format!("Failed to overwrite {}: {:?}", destination.display(), e))?;
           }
-          .and_then(|_| {
-            OpenOptions::new()
-              .create(true)
-              .write(true)
-              .mode(if is_executable { 0o755 } else { 0o644 })
-              .open(&destination)
-          })
-          .and_then(|mut f| {
-            f.write_all(&bytes)?;
-            if fsync {
-              f.sync_all()
-            } else {
-              Ok(())
-            }
-          })
-          .map_err(|e| format!("Error writing file {:?}: {:?}", destination, e))
+          let mut f = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .mode(if is_executable { 0o755 } else { 0o644 })
+            .open(&destination)
+            .map_err(|e| {
+              format!(
+                "Error opening file {} for writing: {:?}",
+                destination.display(),
+                e
+              )
+            })?;
+          f.write_all(&bytes)
+            .map_err(|e| format!("Error writing file {}: {:?}", destination.display(), e))?;
+          Ok(())
         })
         .await?;
-
       match write_result {
         Some((Ok(()), metadata)) => Ok(metadata),
         Some((Err(e), _metadata)) => Err(e),

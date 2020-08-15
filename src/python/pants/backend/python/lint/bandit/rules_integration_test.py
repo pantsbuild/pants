@@ -71,7 +71,7 @@ class BanditIntegrationTest(ExternalToolTestBase):
         assert len(result) == 1
         assert result[0].exit_code == 0
         assert "No issues identified." in result[0].stdout.strip()
-        assert result[0].results_file is None
+        assert result[0].report is None
 
     def test_failing_source(self) -> None:
         target = self.make_target([self.bad_source])
@@ -79,7 +79,7 @@ class BanditIntegrationTest(ExternalToolTestBase):
         assert len(result) == 1
         assert result[0].exit_code == 1
         assert "Issue: [B303:blacklist] Use of insecure MD2, MD4, MD5" in result[0].stdout
-        assert result[0].results_file is None
+        assert result[0].report is None
 
     def test_mixed_sources(self) -> None:
         target = self.make_target([self.good_source, self.bad_source])
@@ -88,7 +88,7 @@ class BanditIntegrationTest(ExternalToolTestBase):
         assert result[0].exit_code == 1
         assert "good.py" not in result[0].stdout
         assert "Issue: [B303:blacklist] Use of insecure MD2, MD4, MD5" in result[0].stdout
-        assert result[0].results_file is None
+        assert result[0].report is None
 
     def test_multiple_targets(self) -> None:
         targets = [
@@ -100,7 +100,7 @@ class BanditIntegrationTest(ExternalToolTestBase):
         assert result[0].exit_code == 1
         assert "good.py" not in result[0].stdout
         assert "Issue: [B303:blacklist] Use of insecure MD2, MD4, MD5" in result[0].stdout
-        assert result[0].results_file is None
+        assert result[0].report is None
 
     @skip_unless_python27_and_python3_present
     def test_uses_correct_python_version(self) -> None:
@@ -138,7 +138,7 @@ class BanditIntegrationTest(ExternalToolTestBase):
         assert len(result) == 1
         assert result[0].exit_code == 0
         assert "No issues identified." in result[0].stdout.strip()
-        assert result[0].results_file is None
+        assert result[0].report is None
 
     def test_respects_passthrough_args(self) -> None:
         target = self.make_target([self.bad_source])
@@ -146,7 +146,7 @@ class BanditIntegrationTest(ExternalToolTestBase):
         assert len(result) == 1
         assert result[0].exit_code == 0
         assert "No issues identified." in result[0].stdout.strip()
-        assert result[0].results_file is None
+        assert result[0].report is None
 
     def test_skip(self) -> None:
         target = self.make_target([self.bad_source])
@@ -166,18 +166,18 @@ class BanditIntegrationTest(ExternalToolTestBase):
         assert len(result) == 1
         assert result[0].exit_code == 1
         assert "Issue: [C100:hardcoded_aws_key]" in result[0].stdout
-        assert result[0].results_file is None
+        assert result[0].report is None
 
-    def test_output_file(self) -> None:
+    def test_report_file(self) -> None:
         target = self.make_target([self.bad_source])
         result = self.run_bandit([target], additional_args=["--lint-reports-dir='.'"])
         assert len(result) == 1
         assert result[0].exit_code == 1
         assert result[0].stdout.strip() == ""
-        assert result[0].results_file is not None
-        output_files = self.request_single_product(DigestContents, result[0].results_file.digest)
-        assert len(output_files) == 1
+        assert result[0].report is not None
+        report_files = self.request_single_product(DigestContents, result[0].report.digest)
+        assert len(report_files) == 1
         assert (
             "Issue: [B303:blacklist] Use of insecure MD2, MD4, MD5"
-            in output_files[0].content.decode()
+            in report_files[0].content.decode()
         )

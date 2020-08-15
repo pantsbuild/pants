@@ -78,6 +78,7 @@ class MockTestFieldSet(TestFieldSet, metaclass=ABCMeta):
             status=self.status(self.address),
             stdout=self.stdout(self.address),
             stderr=self.stderr(self.address),
+            address=self.address,
             coverage_data=MockCoverageData(self.address),
             xml_results=None,
         )

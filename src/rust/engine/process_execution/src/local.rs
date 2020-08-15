@@ -1,10 +1,11 @@
 use async_trait::async_trait;
 use boxfuture::{try_future, BoxFuture, Boxable};
-use fs::{self, GlobExpansionConjunction, GlobMatching, PathGlobs, StrictGlobMatching};
+use fs::{
+  self, GlobExpansionConjunction, GlobMatching, PathGlobs, RelativePath, StrictGlobMatching,
+};
 use futures::compat::Future01CompatExt;
 use futures::future::{FutureExt, TryFutureExt};
 use futures::stream::{BoxStream, StreamExt, TryStreamExt};
-use lazy_static::lazy_static;
 use log::{debug, info};
 use nails::execution::{ChildOutput, ExitCode};
 use shell_quote::bash;
@@ -12,7 +13,7 @@ use shell_quote::bash;
 use std::collections::{BTreeSet, HashSet};
 use std::ffi::OsStr;
 use std::fs::create_dir_all;
-use std::io::{BufRead, BufReader, Write};
+use std::io::Write;
 use std::ops::Neg;
 use std::os::unix::{
   fs::{symlink, OpenOptionsExt},
@@ -24,8 +25,9 @@ use std::str;
 use std::sync::Arc;
 use store::{OneOffStoreFileByDigest, Snapshot, Store};
 
-use tokio::process::Command;
-use tokio::time::timeout;
+use tokio::process::{Child, Command};
+use tokio::sync::RwLock;
+use tokio::time::{timeout, Duration};
 use tokio_util::codec::{BytesCodec, FramedRead};
 
 use crate::{
@@ -37,7 +39,6 @@ use bytes::{Bytes, BytesMut};
 
 pub const USER_EXECUTABLE_MODE: u32 = 0o100755;
 
-#[derive(Clone)]
 pub struct CommandRunner {
   pub store: Store,
   executor: task_executor::Executor,
@@ -45,6 +46,7 @@ pub struct CommandRunner {
   named_caches: NamedCaches,
   cleanup_local_dirs: bool,
   platform: Platform,
+  spawn_lock: RwLock<()>,
 }
 
 impl CommandRunner {
@@ -62,6 +64,7 @@ impl CommandRunner {
       named_caches,
       cleanup_local_dirs,
       platform: Platform::current().unwrap(),
+      spawn_lock: RwLock::new(()),
     }
   }
 
@@ -115,92 +118,15 @@ impl CommandRunner {
   }
 }
 
-lazy_static! {
-  static ref IS_LIKELY_IN_DOCKER: bool = is_likely_in_docker().unwrap_or_else(|e| {
-    log::warn!(
-      "Failed to detect whether we are running in docker: {}\n\n\
-               Please file an issue at https://github.com/pantsbuild/pants/issues/new",
-      e
-    );
-    false
-  });
-}
-
-///
-/// Attempts to detect whether we are running inside a docker container.
-///
-/// NB: Do not call this directly: it is stored in the IS_LIKELY_IN_DOCKER lazy_static.
-///
-fn is_likely_in_docker() -> Result<bool, String> {
-  if cfg!(not(target_os = "linux")) {
-    return Ok(false);
-  }
-
-  // Attempt to detect whether we are in docker. See:
-  //   https://stackoverflow.com/questions/20010199/how-to-determine-if-a-process-runs-inside-lxc-docker
-  let cgroups_matches = {
-    BufReader::new(
-      std::fs::File::open("/proc/1/cgroup")
-        .map_err(|e| format!("Failed to inspect `/proc` to detect docker: {}", e))?,
-    )
-    .lines()
-    .filter_map(|line_result| match line_result {
-      Ok(line) if line.contains("docker") || line.contains("lxc") => Some(line),
-      _ => None,
-    })
-    .collect::<Vec<_>>()
-  };
-
-  if cgroups_matches.is_empty() {
-    Ok(false)
-  } else {
-    log::debug!(
-      "Detected potential docker container based on cgroups ({}): will `sync` \
-      before executing processes.",
-      cgroups_matches.join(", ")
-    );
-    Ok(true)
-  }
-}
-
-///
-/// If we are potentially running inside a docker container (TODO: technically only `aufs` is
-/// relevant), `sync` the filesystem. Noop on other platforms.
-///
-/// See https://github.com/moby/moby/issues/9547.
-///
-async fn sync_if_needed() -> Result<(), String> {
-  if !(*IS_LIKELY_IN_DOCKER) {
-    return Ok(());
-  }
-
-  let output = Command::new("/bin/sync")
-    .stdin(Stdio::null())
-    .output()
-    .await
-    .map_err(|e| format!("Failed to spawn `sync` in likely docker container: {}", e))?;
-
-  if !output.status.success() {
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    return Err(format!(
-      "Failed to run `/bin/sync` in likely docker container ({}): stdout: {}, stderr: {}",
-      output.status, stdout, stderr
-    ));
-  }
-
-  Ok(())
-}
-
-pub struct StreamedHermeticCommand {
+pub struct HermeticCommand {
   inner: Command,
 }
 
 ///
-/// A streaming command that accepts no input stream and does not consult the `PATH`.
+/// A command that accepts no input stream and does not consult the `PATH`.
 ///
-impl StreamedHermeticCommand {
-  fn new<S: AsRef<OsStr>>(program: S) -> StreamedHermeticCommand {
+impl HermeticCommand {
+  fn new<S: AsRef<OsStr>>(program: S) -> HermeticCommand {
     let mut inner = Command::new(program);
     inner
       // TODO: This will not universally prevent child processes continuing to run in the
@@ -211,10 +137,10 @@ impl StreamedHermeticCommand {
       // It would be really nice not to have to manually set PATH but this is sadly the only way
       // to stop automatic PATH searching.
       .env("PATH", "");
-    StreamedHermeticCommand { inner }
+    HermeticCommand { inner }
   }
 
-  fn args<I, S>(&mut self, args: I) -> &mut StreamedHermeticCommand
+  fn args<I, S>(&mut self, args: I) -> &mut HermeticCommand
   where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
@@ -223,7 +149,7 @@ impl StreamedHermeticCommand {
     self
   }
 
-  fn envs<I, K, V>(&mut self, vars: I) -> &mut StreamedHermeticCommand
+  fn envs<I, K, V>(&mut self, vars: I) -> &mut HermeticCommand
   where
     I: IntoIterator<Item = (K, V)>,
     K: AsRef<OsStr>,
@@ -233,49 +159,22 @@ impl StreamedHermeticCommand {
     self
   }
 
-  fn current_dir<P: AsRef<Path>>(&mut self, dir: P) -> &mut StreamedHermeticCommand {
+  fn current_dir<P: AsRef<Path>>(&mut self, dir: P) -> &mut HermeticCommand {
     self.inner.current_dir(dir);
     self
   }
 
-  ///
-  /// TODO: See the note on references in ASYNC.md.
-  ///
-  fn stream<'a, 'b>(
-    &'a mut self,
-    req: &Process,
-  ) -> Result<BoxStream<'b, Result<ChildOutput, String>>, String> {
+  fn spawn<O: Into<Stdio>, E: Into<Stdio>>(
+    &mut self,
+    stdout: O,
+    stderr: E,
+  ) -> std::io::Result<Child> {
     self
       .inner
       .stdin(Stdio::null())
-      .stdout(Stdio::piped())
-      .stderr(Stdio::piped())
+      .stdout(stdout)
+      .stderr(stderr)
       .spawn()
-      .map_err(|e| format!("Error launching process: {:?}", e))
-      .map(|mut child| {
-        debug!("spawned local process as {} for {:?}", child.id(), req);
-        let stdout_stream = FramedRead::new(child.stdout.take().unwrap(), BytesCodec::new())
-          .map_ok(|bytes| ChildOutput::Stdout(bytes.into()))
-          .boxed();
-        let stderr_stream = FramedRead::new(child.stderr.take().unwrap(), BytesCodec::new())
-          .map_ok(|bytes| ChildOutput::Stderr(bytes.into()))
-          .boxed();
-        let exit_stream = child
-          .into_stream()
-          .map_ok(|exit_status| {
-            ChildOutput::Exit(ExitCode(
-              exit_status
-                .code()
-                .or_else(|| exit_status.signal().map(Neg::neg))
-                .expect("Child process should exit via returned code or signal."),
-            ))
-          })
-          .boxed();
-
-        futures::stream::select_all(vec![stdout_stream, stderr_stream, exit_stream])
-          .map_err(|e| format!("Failed to consume process outputs: {:?}", e))
-          .boxed()
-      })
   }
 }
 
@@ -370,26 +269,112 @@ impl super::CommandRunner for CommandRunner {
   }
 }
 
+#[async_trait]
 impl CapturedWorkdir for CommandRunner {
   fn named_caches(&self) -> &NamedCaches {
     &self.named_caches
   }
 
-  fn run_in_workdir<'a, 'b, 'c>(
+  async fn run_in_workdir<'a, 'b, 'c>(
     &'a self,
     workdir_path: &'b Path,
     req: Process,
     _context: Context,
+    exclusive_spawn: bool,
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String> {
-    StreamedHermeticCommand::new(&req.argv[0])
+    let mut command = HermeticCommand::new(&req.argv[0]);
+    command
       .args(&req.argv[1..])
       .current_dir(if let Some(ref working_directory) = req.working_directory {
         workdir_path.join(working_directory)
       } else {
         workdir_path.to_owned()
       })
-      .envs(&req.env)
-      .stream(&req)
+      .envs(&req.env);
+
+    // See the documentation of the `CapturedWorkdir::run_in_workdir` method, but `exclusive_spawn`
+    // indicates the binary we're spawning was written out by the current thread, and, as such,
+    // there may be open file handles against it. This will occur whenever a concurrent call of this
+    // method proceeds through its fork point
+    // (https://pubs.opengroup.org/onlinepubs/009695399/functions/fork.html) while the current
+    // thread is in the middle of writing the binary and thus captures a clone of the open file
+    // handle, but that concurrent call has not yet gotten to its exec point
+    // (https://pubs.opengroup.org/onlinepubs/009695399/functions/exec.html) where the operating
+    // system will close the cloned file handle (via O_CLOEXEC being set on all files opened by
+    // Rust). To prevent a race like this holding this thread's binary open leading to an ETXTBSY
+    // (https://pubs.opengroup.org/onlinepubs/9699919799/functions/V2_chap02.html) error, we
+    // maintain RwLock that allows non-`exclusive_spawn` binaries to spawn concurrently but ensures
+    // all such concurrent spawns have completed (and thus closed any cloned file handles) before
+    // proceeding to spawn the `exclusive_spawn` binary this thread has written.
+    //
+    // See: https://github.com/golang/go/issues/22315 for an excellent description of this generic
+    // unix problem.
+    let mut fork_exec = move || command.spawn(Stdio::piped(), Stdio::piped());
+    let mut child = {
+      if exclusive_spawn {
+        let _write_locked = self.spawn_lock.write().await;
+
+        // Despite the mitigations taken against racing our own forks, forks can happen in our
+        // process but outside of our control (in libraries). As such, we back-stop by sleeping and
+        // trying again for a while if we do hit one of these fork races we do not control.
+        const MAX_ETXTBSY_WAIT: Duration = Duration::from_millis(100);
+        let mut retries = 0;
+        let mut sleep_millis = 1;
+
+        let start_time = std::time::Instant::now();
+        loop {
+          match fork_exec() {
+            Err(e) => {
+              if e.raw_os_error() == Some(libc::ETXTBSY) && start_time.elapsed() < MAX_ETXTBSY_WAIT
+              {
+                tokio::time::delay_for(std::time::Duration::from_millis(sleep_millis)).await;
+                retries += 1;
+                sleep_millis *= 2;
+                continue;
+              } else if retries > 0 {
+                break Err(format!(
+                  "Error launching process after {} {} for ETXTBSY. Final error was: {:?}",
+                  retries,
+                  if retries == 1 { "retry" } else { "retries" },
+                  e
+                ));
+              } else {
+                break Err(format!("Error launching process: {:?}", e));
+              }
+            }
+            Ok(child) => break Ok(child),
+          }
+        }
+      } else {
+        let _read_locked = self.spawn_lock.read().await;
+        fork_exec().map_err(|e| format!("Error launching process: {:?}", e))
+      }
+    }?;
+
+    debug!("spawned local process as {} for {:?}", child.id(), req);
+    let stdout_stream = FramedRead::new(child.stdout.take().unwrap(), BytesCodec::new())
+      .map_ok(|bytes| ChildOutput::Stdout(bytes.into()))
+      .boxed();
+    let stderr_stream = FramedRead::new(child.stderr.take().unwrap(), BytesCodec::new())
+      .map_ok(|bytes| ChildOutput::Stderr(bytes.into()))
+      .boxed();
+    let exit_stream = child
+      .into_stream()
+      .map_ok(|exit_status| {
+        ChildOutput::Exit(ExitCode(
+          exit_status
+            .code()
+            .or_else(|| exit_status.signal().map(Neg::neg))
+            .expect("Child process should exit via returned code or signal."),
+        ))
+      })
+      .boxed();
+
+    Ok(
+      futures::stream::select_all(vec![stdout_stream, stderr_stream, exit_stream])
+        .map_err(|e| format!("Failed to consume process outputs: {:?}", e))
+        .boxed(),
+    )
   }
 }
 
@@ -404,10 +389,7 @@ pub trait CapturedWorkdir {
     cleanup_local_dirs: bool,
     workdir_base: &Path,
     platform: Platform,
-  ) -> Result<FallibleProcessResultWithPlatform, String>
-  where
-    Self: Send + Sync + Clone + 'static,
-  {
+  ) -> Result<FallibleProcessResultWithPlatform, String> {
     // Set up a temporary workdir, which will optionally be preserved.
     let (workdir_path, maybe_workdir) = {
       let workdir = tempfile::Builder::new()
@@ -443,7 +425,7 @@ pub trait CapturedWorkdir {
     // Start with async materialization of input snapshots, followed by synchronous materialization
     // of other configured inputs. Note that we don't do this in parallel, as that might cause
     // non-determinism when paths overlap.
-    let _metadata = store
+    let sandbox = store
       .materialize_directory(workdir_path.clone(), req.input_files)
       .compat()
       .await?;
@@ -500,6 +482,19 @@ pub trait CapturedWorkdir {
       })
       .await?;
 
+    let exclusive_spawn = RelativePath::new(&req.argv[0]).map_or(false, |relative_path| {
+      let executable_path = if let Some(working_directory) = &req.working_directory {
+        working_directory.join(relative_path)
+      } else {
+        relative_path
+      };
+      let exe_was_materialized = sandbox.contains_file(&executable_path);
+      if exe_was_materialized {
+        debug!("Obtaining exclusive spawn lock for process with argv {:?} since we materialized its executable {:?}.", &req.argv, executable_path);
+      }
+      exe_was_materialized
+    });
+
     // Spawn the process.
     // NB: We fully buffer up the `Stream` above into final `ChildResults` below and so could
     // instead be using `CommandExt::output_async` above to avoid the `ChildResults::collect_from`
@@ -507,11 +502,11 @@ pub trait CapturedWorkdir {
     // down the line for streaming process results to console logs, etc. as tracked by:
     //   https://github.com/pantsbuild/pants/issues/6089
     let child_results_result = {
-      // Now that all inputs are on disk, `sync` if this platform requires it.
-      sync_if_needed().await?;
-
-      let child_results_future =
-        ChildResults::collect_from(self.run_in_workdir(&workdir_path, req.clone(), context)?);
+      let child_results_future = ChildResults::collect_from(
+        self
+          .run_in_workdir(&workdir_path, req.clone(), context, exclusive_spawn)
+          .await?,
+      );
       if let Some(req_timeout) = req.timeout {
         timeout(req_timeout, child_results_future)
           .await
@@ -644,12 +639,28 @@ export {}
   fn named_caches(&self) -> &NamedCaches;
 
   ///
-  /// TODO: See the note on references in ASYNC.md.
+  /// Spawn the given process in a working directory prepared with its expected input digest.
   ///
-  fn run_in_workdir<'a, 'b, 'c>(
+  /// If the process to be executed has an `argv[0]` that points into its input digest then
+  /// `exclusive_spawn` will be `true` and the spawn implementation should account for the
+  /// possibility of concurrent fork+exec holding open the cloned `argv[0]` file descriptor, which,
+  /// if unhandled, will result in ETXTBSY errors spawning the process.
+  ///
+  /// See the documentation note in `CommandRunner` in this file for more details.
+  ///
+  /// TODO(John Sirois): https://github.com/pantsbuild/pants/issues/10601
+  ///  Centralize local spawning to one object - we currently spawn here (in
+  ///  process_execution::local::CommandRunner) to launch user `Process`es and in
+  ///  process_execution::nailgun::CommandRunner when a jvm nailgun server needs to be started. The
+  ///  proper handling of `exclusive_spawn` really requires a single point of control for all
+  ///  fork+execs in the scheduler. For now we rely on the fact that the process_execution::nailgun
+  ///  module is dead code in practice.
+  ///
+  async fn run_in_workdir<'a, 'b, 'c>(
     &'a self,
     workdir_path: &'b Path,
     req: Process,
     context: Context,
+    exclusive_spawn: bool,
   ) -> Result<BoxStream<'c, Result<ChildOutput, String>>, String>;
 }
