@@ -226,12 +226,6 @@ class Parser:
         namespace: OptionValueContainer
         get_all_scoped_flag_names: FlagNameProvider
         passthrough_args: List[str]
-        # A passive option is one that doesn't affect functionality, or appear in help messages, but
-        # can be provided without failing validation. This allows us to conditionally register options
-        # (e.g., v1 only or v2 only) without having to remove usages when the condition changes.
-        # TODO: This is currently only used for the v1/v2 switch. When everything is v2 we'll probably
-        #  want to get rid of this concept.
-        include_passive_options: bool
 
         def __init__(
             self,
@@ -239,7 +233,6 @@ class Parser:
             namespace: OptionValueContainer,
             get_all_scoped_flag_names: FlagNameProvider,
             passthrough_args: List[str],
-            include_passive_options: bool = False,
         ) -> None:
             """
             :param flags_in_scope: Iterable of arg strings to parse into flag values.
@@ -253,7 +246,6 @@ class Parser:
             self.namespace = namespace
             self.get_all_scoped_flag_names = get_all_scoped_flag_names
             self.passthrough_args = passthrough_args
-            self.include_passive_options = include_passive_options
 
         @staticmethod
         def _create_flag_value_map(flags: Iterable[str]) -> DefaultDict[str, List[Optional[str]]]:
@@ -291,9 +283,6 @@ class Parser:
 
         mutex_map: DefaultDict[str, List[str]] = defaultdict(list)
         for args, kwargs in self._unnormalized_option_registrations_iter():
-            if kwargs.get("passive") and not parse_args_request.include_passive_options:
-                continue
-
             self._validate(args, kwargs)
             dest = self.parse_dest(*args, **kwargs)
 
@@ -619,7 +608,6 @@ class Parser:
         "fromfile",
         "mutually_exclusive_group",
         "daemon",
-        "passive",
         "passthrough",
     }
 

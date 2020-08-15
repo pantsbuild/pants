@@ -244,8 +244,6 @@ class HelpInfoExtracter:
         advanced_options = []
         deprecated_options = []
         for args, kwargs in parser.option_registrations_iter():
-            if kwargs.get("passive"):
-                continue
             history = parser.history(kwargs["dest"])
             ohi = self.get_option_help_info(args, kwargs)
             ohi = dataclasses.replace(ohi, value_history=history)
