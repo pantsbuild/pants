@@ -280,7 +280,7 @@ impl<'t, R: Rule> Builder<'t, R> {
       petgraph::dot::Dot::with_config(&graph, &[])
     );
 
-    let debug_str = "this_is_not_a_real_rule(";
+    let debug_str = "upcast_process(";
 
     // As we split Rules, we attempt to re-join with existing identical Rule nodes to avoid an
     // explosion.
@@ -331,7 +331,7 @@ impl<'t, R: Rule> Builder<'t, R> {
       }
 
       iteration += 1;
-      let looping = graph.node_count() - to_delete.len() > 100000;
+      let looping = graph.node_count() - to_delete.len() > 290;
       if iteration % 1 == 0 {
         println!(
           ">>> iteration {}: live_node_count: {}, to_visit: {} (, node_count: {}, to_delete: {})",
@@ -464,22 +464,15 @@ impl<'t, R: Rule> Builder<'t, R> {
           while let Some(node_id) = bfs.next(&graph) {
             visited.visit(node_id);
           }
-          // Include the direct deps of any visited node.
-          let collected = graph
-            .node_references()
-            .filter(|node_ref| visited.is_visited(&node_ref.id()))
-            .map(|node_ref| node_ref.id())
-            .collect::<Vec<_>>();
-          for node_id in collected {
-            for dependee_id in graph.neighbors_directed(node_id, Direction::Incoming) {
-              visited.visit(dependee_id);
-            }
+          // Include the direct deps of this node.
+          for dependee_id in graph.neighbors_directed(node_id, Direction::Incoming) {
+            visited.visit(dependee_id);
           }
 
           let subgraph = graph.filter_map(
             |node_id, node| {
               if visited.is_visited(&node_id) && !to_delete.is_visited(&node_id) {
-                Some(node)
+                Some(format!("{:?}: {}", node_id, node))
               } else {
                 None
               }
@@ -525,14 +518,18 @@ impl<'t, R: Rule> Builder<'t, R> {
             // We're adding edges to an existing node. Ensure that we visit it later to square
             // that.
             let existing_id = *oe.get();
-            if looping {
-              println!(">>> using existing node: {:?}", existing_id);
-            }
             to_visit.insert(existing_id);
             (existing_id, false)
           }
           hash_map::Entry::Vacant(ve) => (*ve.insert(graph.add_node(new_node)), true),
         };
+        if looping {
+          if is_new_node {
+            println!(">>> node: creating new: {:?}", replacement_id);
+          } else {
+            println!(">>> node: using existing: {:?}", replacement_id);
+          }
+        }
 
         // Give all dependees edges to the new node.
         for (dependency_key, dependee_id) in &dependees {
@@ -553,7 +550,20 @@ impl<'t, R: Rule> Builder<'t, R> {
                 edge_ref.target() != replacement_id || edge_ref.weight() != dependency_key
               })
           {
+            if looping {
+              println!(
+                ">>> dependee edge: adding: {:?}",
+                (dependee_id, dependency_key)
+              );
+            }
             graph.add_edge(*dependee_id, replacement_id, *dependency_key);
+          } else {
+            if looping {
+              println!(
+                ">>> dependee edge: skipping existing: {:?}",
+                (dependee_id, dependency_key)
+              );
+            }
           }
         }
 
@@ -574,13 +584,16 @@ impl<'t, R: Rule> Builder<'t, R> {
           };
           if !existing_edges.contains(&(dependency_key, dependency_id)) {
             if looping {
-              println!(">>> adding edge: {:?}", (dependency_key, dependency_id));
+              println!(
+                ">>> dependency edge: adding: {:?}",
+                (dependency_key, dependency_id)
+              );
             }
             graph.add_edge(replacement_id, dependency_id, dependency_key);
           } else {
             if looping {
               println!(
-                ">>> skipping existing edge: {:?}",
+                ">>> dependency edge: skipping existing: {:?}",
                 (dependency_key, dependency_id)
               );
             }
