@@ -318,16 +318,19 @@ async def run_tests(
         targets_to_valid_field_sets = await Get(
             TargetsToValidFieldSets,
             TargetsToValidFieldSetsRequest(
-                TestFieldSet,
-                goal_description="`test --debug`",
-                error_if_no_valid_targets=True,
-                expect_single_field_set=True,
+                TestFieldSet, goal_description="`test --debug`", error_if_no_valid_targets=True
             ),
         )
-        field_set = targets_to_valid_field_sets.field_sets[0]
-        request = await Get(TestDebugRequest, TestFieldSet, field_set)
-        debug_result = interactive_runner.run(request.process)
-        return Test(debug_result.exit_code)
+        debug_requests = await MultiGet(
+            Get(TestDebugRequest, TestFieldSet, field_set)
+            for field_set in targets_to_valid_field_sets.field_sets
+        )
+        exit_code = 0
+        for debug_request in debug_requests:
+            debug_result = interactive_runner.run(debug_request.process)
+            if debug_result.exit_code != 0:
+                exit_code = debug_result.exit_code
+        return Test(exit_code)
 
     targets_to_valid_field_sets = await Get(
         TargetsToValidFieldSets,
