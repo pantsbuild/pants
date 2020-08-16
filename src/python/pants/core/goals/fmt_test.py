@@ -143,7 +143,7 @@ class FmtTest(TestBase):
         language_target_collection_types: List[Type[LanguageFmtTargets]],
         targets: List[Target],
         result_digest: Digest,
-        per_target_caching: bool,
+        per_file_caching: bool,
         include_sources: bool = True,
     ) -> str:
         console = MockConsole(use_colors=False)
@@ -153,7 +153,9 @@ class FmtTest(TestBase):
             rule_args=[
                 console,
                 Targets(targets),
-                create_goal_subsystem(FmtSubsystem, per_target_caching=per_target_caching),
+                create_goal_subsystem(
+                    FmtSubsystem, per_file_caching=per_file_caching, per_target_caching=False
+                ),
                 Workspace(self.scheduler),
                 union_membership,
             ],
@@ -193,40 +195,40 @@ class FmtTest(TestBase):
             assert smalltalk_file.read_text() == self.smalltalk_file.content.decode()
 
     def test_empty_target_noops(self) -> None:
-        def assert_noops(*, per_target_caching: bool) -> None:
+        def assert_noops(*, per_file_caching: bool) -> None:
             stderr = self.run_fmt_rule(
                 language_target_collection_types=[FortranTargets],
                 targets=[self.make_target()],
                 result_digest=self.fortran_digest,
-                per_target_caching=per_target_caching,
+                per_file_caching=per_file_caching,
                 include_sources=False,
             )
             assert stderr.strip() == ""
             self.assert_workspace_modified(fortran_formatted=False, smalltalk_formatted=False)
 
-        assert_noops(per_target_caching=False)
-        assert_noops(per_target_caching=True)
+        assert_noops(per_file_caching=False)
+        assert_noops(per_file_caching=True)
 
     def test_invalid_target_noops(self) -> None:
-        def assert_noops(*, per_target_caching: bool) -> None:
+        def assert_noops(*, per_file_caching: bool) -> None:
             stderr = self.run_fmt_rule(
                 language_target_collection_types=[InvalidTargets],
                 targets=[self.make_target()],
                 result_digest=self.fortran_digest,
-                per_target_caching=per_target_caching,
+                per_file_caching=per_file_caching,
             )
             assert stderr.strip() == ""
             self.assert_workspace_modified(fortran_formatted=False, smalltalk_formatted=False)
 
-        assert_noops(per_target_caching=False)
-        assert_noops(per_target_caching=True)
+        assert_noops(per_file_caching=False)
+        assert_noops(per_file_caching=True)
 
     def test_summary(self) -> None:
         """Tests that the final summary is correct.
 
         This checks that we:
         * Merge multiple results for the same formatter together (when you use
-            `--per-target-caching`).
+            `--per-file-caching`).
         * Correctly distinguish between skipped, changed, and did not change.
         """
         fortran_addresses = [Address.parse(":f1"), Address.parse(":needs_formatting")]
@@ -239,12 +241,12 @@ class FmtTest(TestBase):
             self.make_target(addr, target_cls=SmalltalkTarget) for addr in smalltalk_addresses
         ]
 
-        def assert_expected(*, per_target_caching: bool) -> None:
+        def assert_expected(*, per_file_caching: bool) -> None:
             stderr = self.run_fmt_rule(
                 language_target_collection_types=[FortranTargets, SmalltalkTargets],
                 targets=[*fortran_targets, *smalltalk_targets],
                 result_digest=self.merged_digest,
-                per_target_caching=per_target_caching,
+                per_file_caching=per_file_caching,
             )
             self.assert_workspace_modified(fortran_formatted=True, smalltalk_formatted=True)
             assert stderr == dedent(
@@ -256,8 +258,8 @@ class FmtTest(TestBase):
                 """
             )
 
-        assert_expected(per_target_caching=False)
-        assert_expected(per_target_caching=True)
+        assert_expected(per_file_caching=False)
+        assert_expected(per_file_caching=True)
 
 
 def test_streaming_output_skip() -> None:
