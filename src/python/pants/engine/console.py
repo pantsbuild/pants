@@ -5,7 +5,7 @@ import sys
 from dataclasses import dataclass
 from typing import Callable, Optional, cast
 
-from colors import blue, cyan, green, magenta, red
+from colors import blue, cyan, green, magenta, red, yellow
 
 from pants.engine.internals.native import Native
 from pants.engine.internals.scheduler import SchedulerSession
@@ -117,3 +117,6 @@ class Console:
 
     def red(self, text: str) -> str:
         return self._safe_color(text, red)
+
+    def yellow(self, text: str) -> str:
+        return self._safe_color(text, yellow)

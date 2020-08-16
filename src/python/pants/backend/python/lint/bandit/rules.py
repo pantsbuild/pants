@@ -23,6 +23,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet
 from pants.engine.unions import UnionRule
 from pants.python.python_setup import PythonSetup
+from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
 
@@ -96,25 +97,19 @@ async def bandit_lint_partition(
         Digest, MergeDigests((source_files.snapshot.digest, requirements_pex.digest, config_digest))
     )
 
-    address_references = ", ".join(
-        sorted(field_set.address.spec for field_set in partition.field_sets)
-    )
     report_file_name = "bandit_report.txt" if lint_subsystem.reports_dir else None
-    args = generate_args(
-        source_files=source_files, bandit=bandit, report_file_name=report_file_name
-    )
 
     result = await Get(
         FallibleProcessResult,
         PexProcess(
             requirements_pex,
-            argv=args,
-            input_digest=input_digest,
-            description=(
-                f"Run Bandit on {pluralize(len(partition.field_sets), 'target')}: "
-                f"{address_references}."
+            argv=generate_args(
+                source_files=source_files, bandit=bandit, report_file_name=report_file_name
             ),
+            input_digest=input_digest,
+            description=f"Run Bandit on {pluralize(len(partition.field_sets), 'file')}.",
             output_files=(report_file_name,) if report_file_name else None,
+            level=LogLevel.DEBUG,
         ),
     )
 
@@ -133,15 +128,17 @@ async def bandit_lint_partition(
         )
         report = LintReport(report_file_name, report_digest)
 
-    return LintResult.from_fallible_process_result(result, linter_name="Bandit", report=report)
+    return LintResult.from_fallible_process_result(
+        result, partition_description=str(sorted(partition.interpreter_constraints)), report=report
+    )
 
 
-@rule(desc="Lint using Bandit")
+@rule(desc="Lint with Bandit")
 async def bandit_lint(
     request: BanditRequest, bandit: Bandit, python_setup: PythonSetup
 ) -> LintResults:
     if bandit.skip:
-        return LintResults()
+        return LintResults([], linter_name="Bandit")
 
     # NB: Bandit output depends upon which Python interpreter version it's run with
     # ( https://github.com/PyCQA/bandit#under-which-version-of-python-should-i-install-bandit). We
@@ -154,7 +151,7 @@ async def bandit_lint(
         Get(LintResult, BanditPartition(partition_field_sets, partition_compatibility))
         for partition_compatibility, partition_field_sets in constraints_to_field_sets.items()
     )
-    return LintResults(partitioned_results)
+    return LintResults(partitioned_results, linter_name="Bandit")
 
 
 def rules():

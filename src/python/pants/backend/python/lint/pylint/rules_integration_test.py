@@ -3,14 +3,14 @@
 
 from pathlib import PurePath
 from textwrap import dedent
-from typing import List, Optional
+from typing import List, Optional, Sequence
 
 from pants.backend.python.lint.pylint.plugin_target_type import PylintSourcePlugin
 from pants.backend.python.lint.pylint.rules import PylintFieldSet, PylintRequest
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.core.goals.lint import LintResults
+from pants.core.goals.lint import LintResult, LintResults
 from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
 from pants.engine.rules import RootRule
@@ -91,7 +91,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
         passthrough_args: Optional[str] = None,
         skip: bool = False,
         additional_args: Optional[List[str]] = None,
-    ) -> LintResults:
+    ) -> Sequence[LintResult]:
         args = list(self.global_args)
         if config:
             self.create_file(relpath="pylintrc", contents=config)
@@ -102,13 +102,14 @@ class PylintIntegrationTest(ExternalToolTestBase):
             args.append("--pylint-skip")
         if additional_args:
             args.extend(additional_args)
-        return self.request_single_product(
+        results = self.request_single_product(
             LintResults,
             Params(
                 PylintRequest(PylintFieldSet.create(tgt) for tgt in targets),
                 create_options_bootstrapper(args=args),
             ),
         )
+        return results.results
 
     def test_passing_source(self) -> None:
         target = self.make_target([self.good_source])
@@ -174,9 +175,13 @@ class PylintIntegrationTest(ExternalToolTestBase):
         batched_py3_result, batched_py2_result = sorted(
             combined_result, key=lambda result: result.exit_code
         )
+
         assert batched_py2_result.exit_code == 2
+        assert batched_py2_result.partition_description == "['CPython==2.7.*']"
         assert "invalid syntax (<string>, line 2) (syntax-error)" in batched_py2_result.stdout
+
         assert batched_py3_result.exit_code == 0
+        assert batched_py3_result.partition_description == "['CPython>=3.6,<3.8']"
         assert "Your code has been rated at 10.00/10" in batched_py3_result.stdout.strip()
 
     def test_respects_config_file(self) -> None:

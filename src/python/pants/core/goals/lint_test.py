@@ -16,6 +16,7 @@ from pants.engine.target import FieldSet, Sources, Target, Targets
 from pants.engine.unions import UnionMembership
 from pants.testutil.engine.util import MockConsole, MockGet, create_goal_subsystem, run_rule
 from pants.testutil.test_base import TestBase
+from pants.util.logging import LogLevel
 
 
 class MockTarget(Target):
@@ -36,24 +37,12 @@ class MockLintRequest(LintRequest, metaclass=ABCMeta):
     def exit_code(_: Iterable[Address]) -> int:
         pass
 
-    @staticmethod
-    @abstractmethod
-    def stdout(_: Iterable[Address]) -> str:
-        pass
-
     @property
     def lint_results(self) -> LintResults:
         addresses = [config.address for config in self.field_sets]
         return LintResults(
-            [
-                LintResult(
-                    self.exit_code(addresses),
-                    self.stdout(addresses),
-                    "",
-                    linter_name=self.linter_name,
-                    report=None,
-                )
-            ]
+            [LintResult(self.exit_code(addresses), "", "", report=None)],
+            linter_name=self.linter_name,
         )
 
 
@@ -64,10 +53,6 @@ class SuccessfulRequest(MockLintRequest):
     def exit_code(_: Iterable[Address]) -> int:
         return 0
 
-    @staticmethod
-    def stdout(addresses: Iterable[Address]) -> str:
-        return ", ".join(str(address) for address in addresses)
-
 
 class FailingRequest(MockLintRequest):
     linter_name = "FailingLinter"
@@ -75,10 +60,6 @@ class FailingRequest(MockLintRequest):
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
         return 1
-
-    @staticmethod
-    def stdout(addresses: Iterable[Address]) -> str:
-        return ", ".join(str(address) for address in addresses)
 
 
 class ConditionallySucceedsRequest(MockLintRequest):
@@ -90,9 +71,15 @@ class ConditionallySucceedsRequest(MockLintRequest):
             return 127
         return 0
 
+
+class SkippedRequest(MockLintRequest):
     @staticmethod
-    def stdout(addresses: Iterable[Address]) -> str:
-        return ", ".join(str(address) for address in addresses)
+    def exit_code(_) -> int:
+        return 0
+
+    @property
+    def lint_results(self) -> LintResults:
+        return LintResults([], linter_name="SkippedLinter")
 
 
 class InvalidField(Sources):
@@ -110,10 +97,6 @@ class InvalidRequest(MockLintRequest):
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
         return -1
-
-    @staticmethod
-    def stdout(addresses: Iterable[Address]) -> str:
-        return ", ".join(str(address) for address in addresses)
 
 
 class LintTest(TestBase):
@@ -190,116 +173,91 @@ class LintTest(TestBase):
         assert_noops(per_target_caching=False)
         assert_noops(per_target_caching=True)
 
-    def test_single_target_with_one_linter(self) -> None:
-        address = Address.parse(":tests")
-        target_with_origin = self.make_target(address)
+    def test_summary(self) -> None:
+        """Test that we render the summary correctly.
 
-        def assert_expected(per_target_caching: bool) -> None:
+        This tests that we:
+        * Merge multiple results belonging to the same linter (`--per-target-caching`).
+        * Decide correctly between skipped, failed, and succeeded.
+        """
+        good_address = Address.parse(":good")
+        bad_address = Address.parse(":bad")
+
+        def assert_expected(*, per_target_caching: bool) -> None:
             exit_code, stderr = self.run_lint_rule(
-                lint_request_types=[FailingRequest],
-                targets=[target_with_origin],
+                lint_request_types=[
+                    ConditionallySucceedsRequest,
+                    FailingRequest,
+                    SkippedRequest,
+                    SuccessfulRequest,
+                ],
+                targets=[self.make_target(good_address), self.make_target(bad_address)],
                 per_target_caching=per_target_caching,
             )
-            assert exit_code == FailingRequest.exit_code([address])
+            assert exit_code == FailingRequest.exit_code([bad_address])
             assert stderr == dedent(
-                f"""\
+                """\
+
+                𐄂 ConditionallySucceedsLinter failed.
                 𐄂 FailingLinter failed.
-                {FailingRequest.stdout([address])}
-                """
-            )
-
-        assert_expected(per_target_caching=False)
-        assert_expected(per_target_caching=True)
-
-    def test_single_target_with_multiple_linters(self) -> None:
-        address = Address.parse(":tests")
-        target_with_origin = self.make_target(address)
-
-        def assert_expected(per_target_caching: bool) -> None:
-            exit_code, stderr = self.run_lint_rule(
-                lint_request_types=[SuccessfulRequest, FailingRequest],
-                targets=[target_with_origin],
-                per_target_caching=per_target_caching,
-            )
-            assert exit_code == FailingRequest.exit_code([address])
-            assert stderr == dedent(
-                f"""\
-                𐄂 FailingLinter failed.
-                {FailingRequest.stdout([address])}
-
+                - SkippedLinter skipped.
                 ✓ SuccessfulLinter succeeded.
-                {SuccessfulRequest.stdout([address])}
                 """
             )
 
         assert_expected(per_target_caching=False)
         assert_expected(per_target_caching=True)
 
-    def test_multiple_targets_with_one_linter(self) -> None:
-        good_address = Address.parse(":good")
-        bad_address = Address.parse(":bad")
 
-        def get_stderr(*, per_target_caching: bool) -> str:
-            exit_code, stderr = self.run_lint_rule(
-                lint_request_types=[ConditionallySucceedsRequest],
-                targets=[self.make_target(good_address), self.make_target(bad_address),],
-                per_target_caching=per_target_caching,
-            )
-            assert exit_code == ConditionallySucceedsRequest.exit_code([bad_address])
-            return stderr
+def test_streaming_output_skip() -> None:
+    results = LintResults([], linter_name="linter")
+    assert results.level() == LogLevel.DEBUG
+    assert results.message() == "skipped."
 
-        assert get_stderr(per_target_caching=False) == dedent(
-            f"""\
-            𐄂 ConditionallySucceedsLinter failed.
-            {ConditionallySucceedsRequest.stdout([good_address, bad_address])}
-            """
-        )
 
-        assert get_stderr(per_target_caching=True) == dedent(
-            f"""\
-            ✓ ConditionallySucceedsLinter succeeded.
-            {ConditionallySucceedsRequest.stdout([good_address])}
+def test_streaming_output_success() -> None:
+    results = LintResults([LintResult(0, "stdout", "stderr")], linter_name="linter")
+    assert results.level() == LogLevel.INFO
+    assert results.message() == dedent(
+        """\
+        succeeded.
+        stdout
+        stderr
 
-            𐄂 ConditionallySucceedsLinter failed.
-            {ConditionallySucceedsRequest.stdout([bad_address])}
-            """
-        )
+        """
+    )
 
-    def test_multiple_targets_with_multiple_linters(self) -> None:
-        good_address = Address.parse(":good")
-        bad_address = Address.parse(":bad")
 
-        def get_stderr(*, per_target_caching: bool) -> str:
-            exit_code, stderr = self.run_lint_rule(
-                lint_request_types=[ConditionallySucceedsRequest, SuccessfulRequest],
-                targets=[self.make_target(good_address), self.make_target(bad_address),],
-                per_target_caching=per_target_caching,
-            )
-            assert exit_code == ConditionallySucceedsRequest.exit_code([bad_address])
-            return stderr
+def test_streaming_output_failure() -> None:
+    results = LintResults([LintResult(18, "stdout", "stderr")], linter_name="linter")
+    assert results.level() == LogLevel.WARN
+    assert results.message() == dedent(
+        """\
+        failed (exit code 18).
+        stdout
+        stderr
 
-        assert get_stderr(per_target_caching=False) == dedent(
-            f"""\
-            𐄂 ConditionallySucceedsLinter failed.
-            {ConditionallySucceedsRequest.stdout([good_address, bad_address])}
+        """
+    )
 
-            ✓ SuccessfulLinter succeeded.
-            {SuccessfulRequest.stdout([good_address, bad_address])}
-            """
-        )
 
-        assert get_stderr(per_target_caching=True) == dedent(
-            f"""\
-            ✓ ConditionallySucceedsLinter succeeded.
-            {ConditionallySucceedsRequest.stdout([good_address])}
+def test_streaming_output_partitions() -> None:
+    results = LintResults(
+        [
+            LintResult(21, "", "", partition_description="ghc8.1"),
+            LintResult(0, "stdout", "stderr", partition_description="ghc9.2"),
+        ],
+        linter_name="linter",
+    )
+    assert results.level() == LogLevel.WARN
+    assert results.message() == dedent(
+        """\
+        failed (exit code 21).
+        Partition #1 - ghc8.1:
 
-            𐄂 ConditionallySucceedsLinter failed.
-            {ConditionallySucceedsRequest.stdout([bad_address])}
+        Partition #2 - ghc9.2:
+        stdout
+        stderr
 
-            ✓ SuccessfulLinter succeeded.
-            {SuccessfulRequest.stdout([good_address])}
-
-            ✓ SuccessfulLinter succeeded.
-            {SuccessfulRequest.stdout([bad_address])}
-            """
-        )
+        """
+    )

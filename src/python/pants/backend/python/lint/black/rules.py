@@ -26,6 +26,7 @@ from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet
 from pants.engine.unions import UnionRule
+from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
 
@@ -110,10 +111,6 @@ async def setup(setup_request: SetupRequest, black: Black) -> Setup:
         MergeDigests((source_files_snapshot.digest, requirements_pex.digest, config_digest)),
     )
 
-    address_references = ", ".join(
-        sorted(field_set.address.spec for field_set in setup_request.request.field_sets)
-    )
-
     process = await Get(
         Process,
         PexProcess(
@@ -123,16 +120,14 @@ async def setup(setup_request: SetupRequest, black: Black) -> Setup:
             ),
             input_digest=input_digest,
             output_files=source_files_snapshot.files,
-            description=(
-                f"Run Black on {pluralize(len(setup_request.request.field_sets), 'target')}: "
-                f"{address_references}."
-            ),
+            description=f"Run Black on {pluralize(len(setup_request.request.field_sets), 'file')}.",
+            level=LogLevel.DEBUG if setup_request.check_only else LogLevel.INFO,
         ),
     )
     return Setup(process, original_digest=source_files_snapshot.digest)
 
 
-@rule(desc="Format using Black")
+@rule(desc="Format with Black")
 async def black_fmt(field_sets: BlackRequest, black: Black) -> FmtResult:
     if black.skip:
         return FmtResult.noop()
@@ -146,18 +141,15 @@ async def black_fmt(field_sets: BlackRequest, black: Black) -> FmtResult:
     )
 
 
-@rule(desc="Lint using Black")
+@rule(desc="Lint with Black")
 async def black_lint(field_sets: BlackRequest, black: Black) -> LintResults:
     if black.skip:
-        return LintResults()
+        return LintResults([], linter_name="Black")
     setup = await Get(Setup, SetupRequest(field_sets, check_only=True))
     result = await Get(FallibleProcessResult, Process, setup.process)
     return LintResults(
-        [
-            LintResult.from_fallible_process_result(
-                result, linter_name="Black", strip_chroot_path=True
-            )
-        ]
+        [LintResult.from_fallible_process_result(result, strip_chroot_path=True)],
+        linter_name="Black",
     )
 
 

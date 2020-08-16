@@ -30,6 +30,7 @@ from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet
 from pants.engine.unions import UnionRule
+from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
 
@@ -109,10 +110,6 @@ async def setup(setup_request: SetupRequest, isort: Isort) -> Setup:
         MergeDigests((source_files_snapshot.digest, requirements_pex.digest, config_digest)),
     )
 
-    address_references = ", ".join(
-        sorted(field_set.address.spec for field_set in setup_request.request.field_sets)
-    )
-
     process = await Get(
         Process,
         PexProcess(
@@ -122,16 +119,14 @@ async def setup(setup_request: SetupRequest, isort: Isort) -> Setup:
             ),
             input_digest=input_digest,
             output_files=source_files_snapshot.files,
-            description=(
-                f"Run isort on {pluralize(len(setup_request.request.field_sets), 'target')}: "
-                f"{address_references}."
-            ),
+            description=f"Run isort on {pluralize(len(setup_request.request.field_sets), 'file')}.",
+            level=LogLevel.DEBUG if setup_request.check_only else LogLevel.INFO,
         ),
     )
     return Setup(process, original_digest=source_files_snapshot.digest)
 
 
-@rule(desc="Format using isort")
+@rule(desc="Format with isort")
 async def isort_fmt(request: IsortRequest, isort: Isort) -> FmtResult:
     if isort.skip:
         return FmtResult.noop()
@@ -145,18 +140,15 @@ async def isort_fmt(request: IsortRequest, isort: Isort) -> FmtResult:
     )
 
 
-@rule(desc="Lint using isort")
+@rule(desc="Lint with isort")
 async def isort_lint(request: IsortRequest, isort: Isort) -> LintResults:
     if isort.skip:
-        return LintResults()
+        return LintResults([], linter_name="isort")
     setup = await Get(Setup, SetupRequest(request, check_only=True))
     result = await Get(FallibleProcessResult, Process, setup.process)
     return LintResults(
-        [
-            LintResult.from_fallible_process_result(
-                result, linter_name="isort", strip_chroot_path=True
-            )
-        ]
+        [LintResult.from_fallible_process_result(result, strip_chroot_path=True)],
+        linter_name="isort",
     )
 
 

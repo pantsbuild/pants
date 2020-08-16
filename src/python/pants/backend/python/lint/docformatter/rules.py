@@ -24,6 +24,7 @@ from pants.engine.process import FallibleProcessResult, Process, ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet
 from pants.engine.unions import UnionRule
+from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
 
@@ -86,10 +87,6 @@ async def setup(setup_request: SetupRequest, docformatter: Docformatter) -> Setu
         Digest, MergeDigests((source_files_snapshot.digest, requirements_pex.digest))
     )
 
-    address_references = ", ".join(
-        sorted(field_set.address.spec for field_set in setup_request.request.field_sets)
-    )
-
     process = await Get(
         Process,
         PexProcess(
@@ -102,15 +99,15 @@ async def setup(setup_request: SetupRequest, docformatter: Docformatter) -> Setu
             input_digest=input_digest,
             output_files=source_files_snapshot.files,
             description=(
-                f"Run Docformatter on {pluralize(len(setup_request.request.field_sets), 'target')}: "
-                f"{address_references}."
+                f"Run Docformatter on {pluralize(len(setup_request.request.field_sets), 'file')}."
             ),
+            level=LogLevel.DEBUG if setup_request.check_only else LogLevel.INFO,
         ),
     )
     return Setup(process, original_digest=source_files_snapshot.digest)
 
 
-@rule(desc="Format Python docstrings with docformatter")
+@rule(desc="Format with docformatter")
 async def docformatter_fmt(request: DocformatterRequest, docformatter: Docformatter) -> FmtResult:
     if docformatter.skip:
         return FmtResult.noop()
@@ -121,16 +118,16 @@ async def docformatter_fmt(request: DocformatterRequest, docformatter: Docformat
     )
 
 
-@rule(desc="Lint Python docstrings with docformatter")
+@rule(desc="Lint with docformatter")
 async def docformatter_lint(
     request: DocformatterRequest, docformatter: Docformatter
 ) -> LintResults:
     if docformatter.skip:
-        return LintResults()
+        return LintResults([], linter_name="Docformatter")
     setup = await Get(Setup, SetupRequest(request, check_only=True))
     result = await Get(FallibleProcessResult, Process, setup.process)
     return LintResults(
-        [LintResult.from_fallible_process_result(result, linter_name="Docformatter")]
+        [LintResult.from_fallible_process_result(result)], linter_name="Docformatter"
     )
 
 

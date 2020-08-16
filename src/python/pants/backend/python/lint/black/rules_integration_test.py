@@ -1,13 +1,13 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import List, Optional, Tuple
+from typing import List, Optional, Sequence, Tuple
 
 from pants.backend.python.lint.black.rules import BlackFieldSet, BlackRequest
 from pants.backend.python.lint.black.rules import rules as black_rules
 from pants.backend.python.target_types import PythonLibrary
 from pants.core.goals.fmt import FmtResult
-from pants.core.goals.lint import LintResults
+from pants.core.goals.lint import LintResult, LintResults
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
@@ -43,7 +43,7 @@ class BlackIntegrationTest(ExternalToolTestBase):
         config: Optional[str] = None,
         passthrough_args: Optional[str] = None,
         skip: bool = False,
-    ) -> Tuple[LintResults, FmtResult]:
+    ) -> Tuple[Sequence[LintResult], FmtResult]:
         args = ["--backend-packages=pants.backend.python.lint.black"]
         if config is not None:
             self.create_file(relpath="pyproject.toml", contents=config)
@@ -71,7 +71,7 @@ class BlackIntegrationTest(ExternalToolTestBase):
                 options_bootstrapper,
             ),
         )
-        return lint_results, fmt_result
+        return lint_results.results, fmt_result
 
     def get_digest(self, source_files: List[FileContent]) -> Digest:
         return self.request_single_product(Digest, CreateDigest(source_files))
