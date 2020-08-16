@@ -321,6 +321,8 @@ impl<'t, R: Rule> Builder<'t, R> {
     }
 
     let mut iteration = 0;
+    let mut maybe_in_loop = HashSet::new();
+    let mut looping = false;
     while let Some(node_id) = to_visit.pop() {
       if to_delete.contains(&node_id) {
         continue;
@@ -330,7 +332,9 @@ impl<'t, R: Rule> Builder<'t, R> {
       }
 
       iteration += 1;
-      let looping = graph.node_count() - to_delete.len() > 310;
+      if graph.node_count() - to_delete.len() > 310 {
+        looping = true;
+      }
       if iteration % 1 == 0 {
         println!(
           ">>> iteration {}: live_node_count: {}, to_visit: {} (, node_count: {}, to_delete: {})",
@@ -479,6 +483,25 @@ impl<'t, R: Rule> Builder<'t, R> {
             node_id,
             graph[node_id],
         );
+
+        maybe_in_loop.insert(node_id);
+        if maybe_in_loop.len() > 40 {
+          let subgraph = graph.filter_map(
+            |node_id, node| {
+              if maybe_in_loop.contains(&node_id) {
+                Some(format!("{:?}: {}", node_id, node))
+              } else {
+                None
+              }
+            },
+            |_, edge_weight| Some(*edge_weight),
+          );
+
+          panic!(
+            "Loop subgraph: {}",
+            petgraph::dot::Dot::with_config(&subgraph, &[])
+          );
+        }
 
         if graph[node_id].node.to_string().contains(debug_str) {
           let subgraph_id = node_id;
