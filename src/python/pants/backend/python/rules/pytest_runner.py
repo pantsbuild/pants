@@ -211,7 +211,7 @@ async def run_python_test(
     test_subsystem: TestSubsystem,
 ) -> TestResult:
     if field_set.is_conftest():
-        return TestResult.skipped(field_set.address)
+        return TestResult.skip(field_set.address)
 
     add_opts = [f"--color={'yes' if global_options.options.colors else 'no'}"]
 
@@ -288,7 +288,9 @@ async def run_python_test(
 
 
 @rule(desc="Setup Pytest to run interactively")
-def debug_python_test(setup: TestTargetSetup) -> TestDebugRequest:
+def debug_python_test(field_set: PythonTestFieldSet, setup: TestTargetSetup) -> TestDebugRequest:
+    if field_set.is_conftest():
+        return TestDebugRequest(None)
     process = InteractiveProcess(
         argv=(setup.test_runner_pex.name, *setup.args), input_digest=setup.input_digest,
     )
