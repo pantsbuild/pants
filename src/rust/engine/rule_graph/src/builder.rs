@@ -151,7 +151,7 @@ impl<'t, R: Rule> Builder<'t, R> {
     // 2. run live variable analysis on the polymorphic graph to gather a conservative (ie, overly
     //    large) set of used Params.
     let polymorphic_live_params_graph = self.live_param_labeled_graph(initial_polymorphic_graph);
-    // 3. monomorphize by copying a node (and its dependees) for each valid combination of its
+    // 3. monomorphize by partitioning a node (and its dependees) for each valid combination of its
     //    dependencies while mantaining liveness sets.
     let monomorphic_live_params_graph = Self::monomorphize(polymorphic_live_params_graph);
     // 4. choose the best dependencies via in/out sets. fail if:
@@ -231,8 +231,8 @@ impl<'t, R: Rule> Builder<'t, R> {
   /// consume in each subgraph: as this information propagates down the graph, Param dependencies
   /// might be eliminated, which results in corresponding changes to the in_set which flow back
   /// up the graph. As the in_sets shrink, we shrink the out_sets as well to avoid creating
-  /// redundant nodes: although the params are still technically declared by the dependees, we can
-  /// be sure that any not contained in the in_set are not used.
+  /// redundant nodes: although the params might still technically be declared by the dependees, we
+  /// can be sure that any not contained in the in_set are not used.
   ///
   /// Any node that has only invalid sources of a dependency (such as those that do not consume a
   /// provided param, or those that consume a Param that is not present in their scope) will be
@@ -240,12 +240,11 @@ impl<'t, R: Rule> Builder<'t, R> {
   /// to do at any time during the monomorphize run, because the in/out sets are adjusted in tandem
   /// based on the current dependencies/dependees.
   ///
-  /// The exit condition for this phase is that all dependees of a node have the same minimal
-  /// out_set, and all valid combinations of dependencies have the same minimal in_set. This occurs
-  /// when all splits that would result in smaller param sets for a node have been executed. Note
-  /// though that it might still be the case that a node has multiple sources of a particular
-  /// dependency with the _same_ param requirements. This represents ambiguity that must be handled
-  /// (likely by erroring) in later phases.
+  /// The exit condition for this phase is that all valid combinations of dependencies have the
+  /// same minimal in_set. This occurs when all splits that would result in smaller sets of
+  /// dependencies for a node have been executed. Note though that it might still be the case that
+  /// a node has multiple sources of a particular dependency with the _same_ param requirements.
+  /// This represents ambiguity that must be handled (likely by erroring) in later phases.
   ///
   fn monomorphize(mut graph: ParamsLabeledGraph<R>) -> ParamsLabeledGraph<R> {
     // In order to reduce the number of permutations rapidly, we make a best effort attempt to
@@ -280,7 +279,7 @@ impl<'t, R: Rule> Builder<'t, R> {
       petgraph::dot::Dot::with_config(&graph, &[])
     );
 
-    let debug_str = "upcast_process(";
+    let debug_str = "this_is_not_a_real_rule(";
 
     // As we split Rules, we attempt to re-join with existing identical Rule nodes to avoid an
     // explosion.
@@ -331,7 +330,7 @@ impl<'t, R: Rule> Builder<'t, R> {
       }
 
       iteration += 1;
-      let looping = graph.node_count() - to_delete.len() > 290;
+      let looping = graph.node_count() - to_delete.len() > 310;
       if iteration % 1 == 0 {
         println!(
           ">>> iteration {}: live_node_count: {}, to_visit: {} (, node_count: {}, to_delete: {})",
@@ -438,13 +437,37 @@ impl<'t, R: Rule> Builder<'t, R> {
         }
       }
 
-      // If the result of monomorphization was identical to the input, then nothing needs to
-      // change: this node is valid (for now!).
-      if monomorphizations.len() == 1 && monomorphizations.contains_key(&graph[node_id]) {
-        if looping {
-          println!(">>> no changes for {:?}: {}", node_id, graph[node_id]);
+      // The goal of this phase is to shrink the in_sets as much as possible via dependency changes.
+      //
+      // The base case for a node then is that its dependencies cannot be partitioned to produce a
+      // smaller in_set, and that the in/out sets are accurate based on any transitive changes
+      // above or below this node. If both of these conditions are satisified, the node is valid.
+      //
+      // Note though that we do _not_ split a node based purely on the out_sets of dependees: we
+      // only split if it would result in different dependencies or in_sets.
+      if !monomorphizations.is_empty()
+        && monomorphizations
+          .keys()
+          .all(|r| r.in_set == graph[node_id].in_set)
+      {
+        // There was at least one output monomorphization (if there were zero, we'd want to fall
+        // through to delete the node), and all of the monomorphizations had the initial in_set.
+        // If all of the monomorphizations also used all of the same dependencies as we started
+        // with, then we've noop'ed.
+        let initial_dependencies = graph
+          .edges_directed(node_id, Direction::Outgoing)
+          .filter(|edge_ref| !to_delete.contains(&edge_ref.target()))
+          .map(|edge_ref| (*edge_ref.weight(), edge_ref.target()))
+          .collect::<HashSet<_>>();
+        if monomorphizations
+          .values()
+          .all(|(_, dependencies)| dependencies == &initial_dependencies)
+        {
+          if looping {
+            println!(">>> no changes for {:?}: {}", node_id, graph[node_id]);
+          }
+          continue;
         }
-        continue;
       }
 
       if looping {
@@ -1044,11 +1067,15 @@ impl<'t, R: Rule> Builder<'t, R> {
         continue;
       }
 
-      // And that it is useful. The out_set shrinks as monomorphization runs and nodes are split,
-      // and so we can't require that all of the params are consumed (because that might prevent a
-      // dependee whose out_set might later shrink from consuming a node). Likewise, we can't
-      // just generate the smallest possible in_sets without regard for the out_set, because some
-      // of the members of the out_set will end up being required for consumption.
+      // And that it is useful.
+      //
+      // The out_set shrinks as monomorphization runs and nodes are split,
+      // and so we can't require that all of the params are consumed (both because not all out_sets
+      // are required for consumption, and also because that might prevent a dependee whose out_set
+      // might later shrink from consuming a node).
+      //
+      // Likewise, we can't just generate the smallest possible in_sets without regard for the
+      // out_set, because some of the members of the out_set will end up being required for consumption.
       let candidate_consumes = out_set.intersection(&in_set).collect::<ParamTypes<_>>();
       let mut was_eliminated = false;
       let mut eliminated = Vec::new();
