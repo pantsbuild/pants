@@ -6,6 +6,7 @@ import logging
 from dataclasses import dataclass
 from typing import Iterable, Optional, Tuple
 
+from packaging.utils import canonicalize_name as canonicalize_project_name
 from pkg_resources import Requirement, parse_requirements
 
 from pants.backend.python.rules.pex import (
@@ -188,11 +189,13 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
     description = request.description
 
     if python_setup.requirement_constraints:
-        # In requirement strings Foo_Bar and foo-bar refer to the same project.
-        def canonical(name: str) -> str:
-            return name.lower().replace("_", "-")
+        # In requirement strings Foo_-Bar.BAZ and foo-bar-baz refer to the same project. We let
+        # packaging canonicalize for us.
+        # See: https://www.python.org/dev/peps/pep-0503/#normalized-names
 
-        exact_req_projects = {canonical(Requirement.parse(req).project_name) for req in exact_reqs}
+        exact_req_projects = {
+            canonicalize_project_name(Requirement.parse(req).project_name) for req in exact_reqs
+        }
         constraints_file_contents = await Get(
             DigestContents,
             PathGlobs(
@@ -205,7 +208,9 @@ async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonS
         constraints_file_reqs = set(
             parse_requirements(next(iter(constraints_file_contents)).content.decode())
         )
-        constraint_file_projects = {canonical(req.project_name) for req in constraints_file_reqs}
+        constraint_file_projects = {
+            canonicalize_project_name(req.project_name) for req in constraints_file_reqs
+        }
         unconstrained_projects = exact_req_projects - constraint_file_projects
         if unconstrained_projects:
             logger.warning(
