@@ -120,7 +120,7 @@ async def setup(setup_request: SetupRequest, isort: Isort) -> Setup:
             input_digest=input_digest,
             output_files=source_files_snapshot.files,
             description=f"Run isort on {pluralize(len(setup_request.request.field_sets), 'file')}.",
-            level=LogLevel.DEBUG if setup_request.check_only else LogLevel.INFO,
+            level=LogLevel.DEBUG,
         ),
     )
     return Setup(process, original_digest=source_files_snapshot.digest)
@@ -129,7 +129,7 @@ async def setup(setup_request: SetupRequest, isort: Isort) -> Setup:
 @rule(desc="Format with isort")
 async def isort_fmt(request: IsortRequest, isort: Isort) -> FmtResult:
     if isort.skip:
-        return FmtResult.noop()
+        return FmtResult.skip(formatter_name="isort")
     setup = await Get(Setup, SetupRequest(request, check_only=False))
     result = await Get(ProcessResult, Process, setup.process)
     return FmtResult.from_process_result(

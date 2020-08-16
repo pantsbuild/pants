@@ -4,7 +4,7 @@
 from abc import ABCMeta, abstractmethod
 from pathlib import Path
 from textwrap import dedent
-from typing import ClassVar, Iterable, List, Optional, Type, cast
+from typing import ClassVar, List, Optional, Type, cast
 
 from pants.core.goals.fmt import (
     Fmt,
@@ -21,6 +21,7 @@ from pants.engine.target import Sources, Target, Targets
 from pants.engine.unions import UnionMembership
 from pants.testutil.engine.util import MockConsole, MockGet, create_goal_subsystem, run_rule
 from pants.testutil.test_base import TestBase
+from pants.util.logging import LogLevel
 
 
 class FortranSources(Sources):
@@ -48,21 +49,28 @@ class InvalidSources(Sources):
 class MockLanguageTargets(LanguageFmtTargets, metaclass=ABCMeta):
     formatter_name: ClassVar[str]
 
-    @staticmethod
     @abstractmethod
-    def stdout(_: Iterable[Address]) -> str:
+    def language_fmt_results(self, result_digest: Digest) -> LanguageFmtResults:
         pass
 
+
+class FortranTargets(MockLanguageTargets):
+    required_fields = (FortranSources,)
+
     def language_fmt_results(self, result_digest: Digest) -> LanguageFmtResults:
-        addresses = [target.address for target in self.targets]
+        output = (
+            result_digest
+            if any(tgt.address.target_name == "needs_formatting" for tgt in self.targets)
+            else EMPTY_DIGEST
+        )
         return LanguageFmtResults(
             (
                 FmtResult(
                     input=EMPTY_DIGEST,
-                    output=result_digest,
-                    stdout=self.stdout(addresses),
+                    output=output,
+                    stdout="",
                     stderr="",
-                    formatter_name=self.formatter_name,
+                    formatter_name="FortranConditionallyDidChange",
                 ),
             ),
             input=EMPTY_DIGEST,
@@ -70,31 +78,45 @@ class MockLanguageTargets(LanguageFmtTargets, metaclass=ABCMeta):
         )
 
 
-class FortranTargets(MockLanguageTargets):
-    required_fields = (FortranSources,)
-    formatter_name = "FortranFormatter"
-
-    @staticmethod
-    def stdout(addresses: Iterable[Address]) -> str:
-        return ", ".join(str(address) for address in addresses)
-
-
 class SmalltalkTargets(MockLanguageTargets):
     required_fields = (SmalltalkSources,)
-    formatter_name = "SmalltalkFormatter"
 
-    @staticmethod
-    def stdout(addresses: Iterable[Address]) -> str:
-        return ", ".join(str(address) for address in addresses)
+    def language_fmt_results(self, result_digest: Digest) -> LanguageFmtResults:
+        return LanguageFmtResults(
+            (
+                FmtResult(
+                    input=result_digest,
+                    output=result_digest,
+                    stdout="",
+                    stderr="",
+                    formatter_name="SmalltalkDidNotChange",
+                ),
+                FmtResult.skip(formatter_name="SmalltalkSkipped"),
+            ),
+            input=EMPTY_DIGEST,
+            output=result_digest,
+        )
 
 
 class InvalidTargets(MockLanguageTargets):
     required_fields = (InvalidSources,)
-    formatter_name = "InvalidFormatter"
 
-    @staticmethod
-    def stdout(addresses: Iterable[Address]) -> str:
-        return ", ".join(str(address) for address in addresses)
+    def language_fmt_results(self, result_digest: Digest) -> LanguageFmtResults:
+        # Note: we return a result that would result in a change so that we can validate that this
+        # result is not actually returned.
+        return LanguageFmtResults(
+            (
+                FmtResult(
+                    input=EMPTY_DIGEST,
+                    output=result_digest,
+                    stdout="",
+                    stderr="",
+                    formatter_name="InvalidFormatter",
+                ),
+            ),
+            input=EMPTY_DIGEST,
+            output=result_digest,
+        )
 
 
 class FmtTest(TestBase):
@@ -199,88 +221,16 @@ class FmtTest(TestBase):
         assert_noops(per_target_caching=False)
         assert_noops(per_target_caching=True)
 
-    def test_single_language_with_single_target(self) -> None:
-        address = Address.parse(":tests")
-        target_with_origin = self.make_target(address)
+    def test_summary(self) -> None:
+        """Tests that the final summary is correct.
 
-        def assert_expected(*, per_target_caching: bool) -> None:
-            stderr = self.run_fmt_rule(
-                language_target_collection_types=[FortranTargets],
-                targets=[target_with_origin],
-                result_digest=self.fortran_digest,
-                per_target_caching=per_target_caching,
-            )
-            assert stderr == dedent(
-                f"""\
-                𐄂 FortranFormatter made changes.
-                {FortranTargets.stdout([address])}
-                """
-            )
-            self.assert_workspace_modified(fortran_formatted=True, smalltalk_formatted=False)
-
-        assert_expected(per_target_caching=False)
-        assert_expected(per_target_caching=True)
-
-    def test_single_language_with_multiple_targets(self) -> None:
-        addresses = [Address.parse(":t1"), Address.parse(":t2")]
-
-        def get_stderr(*, per_target_caching: bool) -> str:
-            stderr = self.run_fmt_rule(
-                language_target_collection_types=[FortranTargets],
-                targets=[self.make_target(addr) for addr in addresses],
-                result_digest=self.fortran_digest,
-                per_target_caching=per_target_caching,
-            )
-            self.assert_workspace_modified(fortran_formatted=True, smalltalk_formatted=False)
-            return stderr
-
-        assert get_stderr(per_target_caching=False) == dedent(
-            f"""\
-            𐄂 FortranFormatter made changes.
-            {FortranTargets.stdout(addresses)}
-            """
-        )
-        assert get_stderr(per_target_caching=True) == dedent(
-            f"""\
-            𐄂 FortranFormatter made changes.
-            {FortranTargets.stdout([addresses[0]])}
-
-            𐄂 FortranFormatter made changes.
-            {FortranTargets.stdout([addresses[1]])}
-            """
-        )
-
-    def test_multiple_languages_with_single_targets(self) -> None:
-        fortran_address = Address.parse(":fortran")
-        smalltalk_address = Address.parse(":smalltalk")
-
-        def assert_expected(*, per_target_caching: bool) -> None:
-            stderr = self.run_fmt_rule(
-                language_target_collection_types=[FortranTargets, SmalltalkTargets],
-                targets=[
-                    self.make_target(fortran_address, target_cls=FortranTarget),
-                    self.make_target(smalltalk_address, target_cls=SmalltalkTarget),
-                ],
-                result_digest=self.merged_digest,
-                per_target_caching=per_target_caching,
-            )
-            assert stderr == dedent(
-                f"""\
-                𐄂 FortranFormatter made changes.
-                {FortranTargets.stdout([fortran_address])}
-
-                𐄂 SmalltalkFormatter made changes.
-                {SmalltalkTargets.stdout([smalltalk_address])}
-                """
-            )
-            self.assert_workspace_modified(fortran_formatted=True, smalltalk_formatted=True)
-
-        assert_expected(per_target_caching=False)
-        assert_expected(per_target_caching=True)
-
-    def test_multiple_languages_with_multiple_targets(self) -> None:
-        fortran_addresses = [Address.parse(":py1"), Address.parse(":py2")]
-        smalltalk_addresses = [Address.parse(":py1"), Address.parse(":py2")]
+        This checks that we:
+        * Merge multiple results for the same formatter together (when you use
+            `--per-target-caching`).
+        * Correctly distinguish between skipped, changed, and did not change.
+        """
+        fortran_addresses = [Address.parse(":f1"), Address.parse(":needs_formatting")]
+        smalltalk_addresses = [Address.parse(":s1"), Address.parse(":s2")]
 
         fortran_targets = [
             self.make_target(addr, target_cls=FortranTarget) for addr in fortran_addresses
@@ -289,7 +239,7 @@ class FmtTest(TestBase):
             self.make_target(addr, target_cls=SmalltalkTarget) for addr in smalltalk_addresses
         ]
 
-        def get_stderr(*, per_target_caching: bool) -> str:
+        def assert_expected(*, per_target_caching: bool) -> None:
             stderr = self.run_fmt_rule(
                 language_target_collection_types=[FortranTargets, SmalltalkTargets],
                 targets=[*fortran_targets, *smalltalk_targets],
@@ -297,29 +247,58 @@ class FmtTest(TestBase):
                 per_target_caching=per_target_caching,
             )
             self.assert_workspace_modified(fortran_formatted=True, smalltalk_formatted=True)
-            return stderr
+            assert stderr == dedent(
+                """\
 
-        assert get_stderr(per_target_caching=False) == dedent(
-            f"""\
-            𐄂 FortranFormatter made changes.
-            {FortranTargets.stdout(fortran_addresses)}
+                𐄂 FortranConditionallyDidChange made changes.
+                ✓ SmalltalkDidNotChange made no changes.
+                - SmalltalkSkipped skipped.
+                """
+            )
 
-            𐄂 SmalltalkFormatter made changes.
-            {SmalltalkTargets.stdout(smalltalk_addresses)}
-            """
-        )
-        assert get_stderr(per_target_caching=True) == dedent(
-            f"""\
-            𐄂 FortranFormatter made changes.
-            {FortranTargets.stdout([fortran_addresses[0]])}
+        assert_expected(per_target_caching=False)
+        assert_expected(per_target_caching=True)
 
-            𐄂 FortranFormatter made changes.
-            {FortranTargets.stdout([fortran_addresses[1]])}
 
-            𐄂 SmalltalkFormatter made changes.
-            {SmalltalkTargets.stdout([smalltalk_addresses[0]])}
+def test_streaming_output_skip() -> None:
+    result = FmtResult.skip(formatter_name="formatter")
+    assert result.level() == LogLevel.DEBUG
+    assert result.message() == "skipped."
 
-            𐄂 SmalltalkFormatter made changes.
-            {SmalltalkTargets.stdout([smalltalk_addresses[1]])}
-            """
-        )
+
+def test_streaming_output_changed() -> None:
+    result = FmtResult(
+        input=EMPTY_DIGEST,
+        output=Digest("abc", 10),
+        stdout="stdout",
+        stderr="stderr",
+        formatter_name="formatter",
+    )
+    assert result.level() == LogLevel.WARN
+    assert result.message() == dedent(
+        """\
+        made changes.
+        stdout
+        stderr
+
+        """
+    )
+
+
+def test_streaming_output_not_changed() -> None:
+    result = FmtResult(
+        input=EMPTY_DIGEST,
+        output=EMPTY_DIGEST,
+        stdout="stdout",
+        stderr="stderr",
+        formatter_name="formatter",
+    )
+    assert result.level() == LogLevel.INFO
+    assert result.message() == dedent(
+        """\
+        made no changes.
+        stdout
+        stderr
+
+        """
+    )

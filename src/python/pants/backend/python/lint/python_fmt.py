@@ -49,8 +49,7 @@ async def format_python_target(
                 prior_formatter_result=prior_formatter_result,
             ),
         )
-        if result != FmtResult.noop():
-            results.append(result)
+        results.append(result)
         if result.did_change:
             prior_formatter_result = await Get(Snapshot, Digest, result.output)
     return LanguageFmtResults(
