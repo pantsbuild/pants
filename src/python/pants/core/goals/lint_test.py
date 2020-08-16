@@ -72,6 +72,16 @@ class ConditionallySucceedsRequest(MockLintRequest):
         return 0
 
 
+class SkippedRequest(MockLintRequest):
+    @staticmethod
+    def exit_code(_) -> int:
+        return 0
+
+    @property
+    def lint_results(self) -> LintResults:
+        return LintResults([], linter_name="SkippedLinter")
+
+
 class InvalidField(Sources):
     pass
 
@@ -163,64 +173,34 @@ class LintTest(TestBase):
         assert_noops(per_target_caching=False)
         assert_noops(per_target_caching=True)
 
-    def test_single_target_with_one_linter(self) -> None:
-        address = Address.parse(":tests")
-        target = self.make_target(address)
+    def test_summary(self) -> None:
+        """Test that we render the summary correctly.
 
-        def assert_expected(per_target_caching: bool) -> None:
-            exit_code, stderr = self.run_lint_rule(
-                lint_request_types=[FailingRequest],
-                targets=[target],
-                per_target_caching=per_target_caching,
-            )
-            assert exit_code == FailingRequest.exit_code([address])
-            assert stderr == "\n𐄂 FailingLinter failed.\n"
-
-        assert_expected(per_target_caching=False)
-        assert_expected(per_target_caching=True)
-
-    def test_single_target_with_multiple_linters(self) -> None:
-        address = Address.parse(":tests")
-        target = self.make_target(address)
-
-        def assert_expected(per_target_caching: bool) -> None:
-            exit_code, stderr = self.run_lint_rule(
-                lint_request_types=[SuccessfulRequest, FailingRequest],
-                targets=[target],
-                per_target_caching=per_target_caching,
-            )
-            assert exit_code == FailingRequest.exit_code([address])
-            assert stderr == dedent(
-                """\
-
-                𐄂 FailingLinter failed.
-                ✓ SuccessfulLinter succeeded.
-                """
-            )
-
-        assert_expected(per_target_caching=False)
-        assert_expected(per_target_caching=True)
-
-    def test_merge_per_target_caching(self) -> None:
-        """Even if the user used `--per-target-caching`, the final summary should only show one
-        result for each linter.
-
-        The linter should report any failing error code, even if some of its results succeeded.
+        This tests that we:
+        * Merge multiple results belonging to the same linter (`--per-target-caching`).
+        * Decide correctly between skipped, failed, and succeeded.
         """
         good_address = Address.parse(":good")
         bad_address = Address.parse(":bad")
 
         def assert_expected(*, per_target_caching: bool) -> None:
             exit_code, stderr = self.run_lint_rule(
-                lint_request_types=[ConditionallySucceedsRequest, SuccessfulRequest],
-                targets=[self.make_target(good_address), self.make_target(bad_address),],
+                lint_request_types=[
+                    ConditionallySucceedsRequest,
+                    FailingRequest,
+                    SkippedRequest,
+                    SuccessfulRequest,
+                ],
+                targets=[self.make_target(good_address), self.make_target(bad_address)],
                 per_target_caching=per_target_caching,
             )
-            assert exit_code == ConditionallySucceedsRequest.exit_code([bad_address])
+            assert exit_code == FailingRequest.exit_code([bad_address])
             assert stderr == dedent(
                 """\
 
                 𐄂 ConditionallySucceedsLinter failed.
+                𐄂 FailingLinter failed.
+                - SkippedLinter skipped.
                 ✓ SuccessfulLinter succeeded.
                 """
             )

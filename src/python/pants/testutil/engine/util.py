@@ -19,7 +19,7 @@ from typing import (
     get_type_hints,
 )
 
-from colors import blue, cyan, green, magenta, red
+from colors import blue, cyan, green, magenta, red, yellow
 
 from pants.engine.goal import GoalSubsystem
 from pants.engine.internals.native import Native
@@ -267,6 +267,9 @@ class MockConsole:
 
     def red(self, text: str) -> str:
         return self._safe_color(text, red)
+
+    def yellow(self, text: str) -> str:
+        return self._safe_color(text, yellow)
 
 
 def fmt_rust_function(func: Callable) -> str:
