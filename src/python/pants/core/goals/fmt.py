@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import ClassVar, Iterable, List, Optional, Tuple, Type, cast
 
@@ -244,12 +245,10 @@ async def fmt(
     # We group all results for the same formatter so that we can give one final status in the
     # summary. This is only relevant if there were multiple results because of
     # `--per-target-caching`.
-    formatter_to_results = {
-        formatter_name: tuple(results)
-        for formatter_name, results in itertools.groupby(
-            individual_results, key=lambda result: result.formatter_name
-        )
-    }
+    formatter_to_results = defaultdict(set)
+    for result in individual_results:
+        formatter_to_results[result.formatter_name].add(result)
+
     for formatter, results in sorted(formatter_to_results.items()):
         if any(result.did_change for result in results):
             sigil = console.red("𐄂")
