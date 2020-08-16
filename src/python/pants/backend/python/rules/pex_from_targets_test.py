@@ -47,7 +47,7 @@ class PexTest(TestBase):
             dedent(
                 """
                 python_requirement_library(name="foo",
-                    requirements=[python_requirement("foo>=0.1.2")])
+                    requirements=[python_requirement("foo-bar>=0.1.2")])
                 python_requirement_library(name="bar",
                     requirements=[ python_requirement("bar==5.5.5")])
                 python_requirement_library(name="baz",
@@ -60,7 +60,7 @@ class PexTest(TestBase):
             "constraints1.txt",
             dedent(
                 """
-                foo==1.0.0
+                Foo._-BAR==1.0.0
                 bar==5.5.5
                 baz==2.2.2
                 qux==3.4.5
@@ -97,11 +97,11 @@ class PexTest(TestBase):
             )
 
         pex_req1 = get_pex_request("constraints1.txt", ResolveAllConstraintsOption.NEVER)
-        assert pex_req1.requirements == PexRequirements(["foo>=0.1.2", "bar==5.5.5", "baz"])
+        assert pex_req1.requirements == PexRequirements(["foo-bar>=0.1.2", "bar==5.5.5", "baz"])
 
         pex_req2 = get_pex_request("constraints1.txt", ResolveAllConstraintsOption.ALWAYS)
         assert pex_req2.requirements == PexRequirements(
-            ["foo==1.0.0", "bar==5.5.5", "baz==2.2.2", "qux==3.4.5"]
+            ["Foo._-BAR==1.0.0", "bar==5.5.5", "baz==2.2.2", "qux==3.4.5"]
         )
 
         with self.assertRaises(ExecutionError) as err:
