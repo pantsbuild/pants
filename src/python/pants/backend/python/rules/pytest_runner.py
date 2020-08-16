@@ -287,7 +287,7 @@ async def run_python_test(
     )
 
 
-@rule(desc="Run Pytest in an interactive process")
+@rule(desc="Setup Pytest to run interactively")
 def debug_python_test(setup: TestTargetSetup) -> TestDebugRequest:
     process = InteractiveProcess(
         argv=(setup.test_runner_pex.name, *setup.args), input_digest=setup.input_digest,
