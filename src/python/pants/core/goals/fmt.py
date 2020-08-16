@@ -2,36 +2,44 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import itertools
+from collections import defaultdict
 from dataclasses import dataclass
-from typing import ClassVar, Iterable, List, Tuple, Type, cast
+from typing import ClassVar, Iterable, List, Optional, Tuple, Type, cast
 
 from pants.core.util_rules.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
 from pants.engine.console import Console
+from pants.engine.engine_aware import EngineAware
 from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
 from pants.engine.target import Field, Target, Targets
 from pants.engine.unions import UnionMembership, union
+from pants.util.logging import LogLevel
 from pants.util.strutil import strip_v2_chroot_path
 
 
 @dataclass(frozen=True)
-class FmtResult:
+class FmtResult(EngineAware):
     input: Digest
     output: Digest
     stdout: str
     stderr: str
     formatter_name: str
 
-    @staticmethod
-    def noop() -> "FmtResult":
-        return FmtResult(
-            input=EMPTY_DIGEST, output=EMPTY_DIGEST, stdout="", stderr="", formatter_name=""
+    @classmethod
+    def skip(cls, *, formatter_name: str) -> "FmtResult":
+        return cls(
+            input=EMPTY_DIGEST,
+            output=EMPTY_DIGEST,
+            stdout="",
+            stderr="",
+            formatter_name=formatter_name,
         )
 
-    @staticmethod
+    @classmethod
     def from_process_result(
+        cls,
         process_result: ProcessResult,
         *,
         original_digest: Digest,
@@ -41,7 +49,7 @@ class FmtResult:
         def prep_output(s: bytes) -> str:
             return strip_v2_chroot_path(s) if strip_chroot_path else s.decode()
 
-        return FmtResult(
+        return cls(
             input=original_digest,
             output=process_result.output_digest,
             stdout=prep_output(process_result.stdout),
@@ -50,8 +58,35 @@ class FmtResult:
         )
 
     @property
+    def skipped(self) -> bool:
+        return (
+            self.input == EMPTY_DIGEST
+            and self.output == EMPTY_DIGEST
+            and not self.stdout
+            and not self.stderr
+        )
+
+    @property
     def did_change(self) -> bool:
         return self.output != self.input
+
+    def level(self) -> Optional[LogLevel]:
+        if self.skipped:
+            return LogLevel.DEBUG
+        return LogLevel.WARN if self.did_change else LogLevel.INFO
+
+    def message(self) -> Optional[str]:
+        if self.skipped:
+            return "skipped."
+        message = "made changes." if self.did_change else "made no changes."
+        output = ""
+        if self.stdout:
+            output += f"\n{self.stdout}"
+        if self.stderr:
+            output += f"\n{self.stderr}"
+        if output:
+            output = f"{output.rstrip()}\n\n"
+        return f"{message}{output}"
 
 
 @union
@@ -204,19 +239,27 @@ async def fmt(
         merged_formatted_digest = await Get(Digest, MergeDigests(changed_digests))
         workspace.write_digest(merged_formatted_digest)
 
-    sorted_results = sorted(individual_results, key=lambda res: res.formatter_name)
-    for result in sorted_results:
-        console.print_stderr(
-            f"{console.green('✓')} {result.formatter_name} made no changes."
-            if not result.did_change
-            else f"{console.red('𐄂')} {result.formatter_name} made changes."
-        )
-        if result.stdout:
-            console.print_stderr(result.stdout)
-        if result.stderr:
-            console.print_stderr(result.stderr)
-        if result != sorted_results[-1]:
-            console.print_stderr("")
+    if individual_results:
+        console.print_stderr("")
+
+    # We group all results for the same formatter so that we can give one final status in the
+    # summary. This is only relevant if there were multiple results because of
+    # `--per-target-caching`.
+    formatter_to_results = defaultdict(set)
+    for result in individual_results:
+        formatter_to_results[result.formatter_name].add(result)
+
+    for formatter, results in sorted(formatter_to_results.items()):
+        if any(result.did_change for result in results):
+            sigil = console.red("𐄂")
+            status = "made changes"
+        elif all(result.skipped for result in results):
+            sigil = console.yellow("-")
+            status = "skipped"
+        else:
+            sigil = console.green("✓")
+            status = "made no changes"
+        console.print_stderr(f"{sigil} {formatter} {status}.")
 
     # Since the rules to produce FmtResult should use ExecuteRequest, rather than
     # FallibleProcess, we assume that there were no failures.

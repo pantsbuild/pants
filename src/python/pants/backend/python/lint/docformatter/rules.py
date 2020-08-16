@@ -101,7 +101,7 @@ async def setup(setup_request: SetupRequest, docformatter: Docformatter) -> Setu
             description=(
                 f"Run Docformatter on {pluralize(len(setup_request.request.field_sets), 'file')}."
             ),
-            level=LogLevel.DEBUG if setup_request.check_only else LogLevel.INFO,
+            level=LogLevel.DEBUG,
         ),
     )
     return Setup(process, original_digest=source_files_snapshot.digest)
@@ -110,7 +110,7 @@ async def setup(setup_request: SetupRequest, docformatter: Docformatter) -> Setu
 @rule(desc="Format with docformatter")
 async def docformatter_fmt(request: DocformatterRequest, docformatter: Docformatter) -> FmtResult:
     if docformatter.skip:
-        return FmtResult.noop()
+        return FmtResult.skip(formatter_name="Docformatter")
     setup = await Get(Setup, SetupRequest(request, check_only=False))
     result = await Get(ProcessResult, Process, setup.process)
     return FmtResult.from_process_result(

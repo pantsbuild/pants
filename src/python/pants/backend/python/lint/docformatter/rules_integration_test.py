@@ -123,5 +123,5 @@ class DocformatterIntegrationTest(ExternalToolTestBase):
         target = self.make_target([self.bad_source])
         lint_results, fmt_result = self.run_docformatter([target], skip=True)
         assert not lint_results
-        assert fmt_result == FmtResult.noop()
+        assert fmt_result.skipped is True
         assert fmt_result.did_change is False

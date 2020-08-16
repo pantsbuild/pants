@@ -159,5 +159,5 @@ class IsortIntegrationTest(ExternalToolTestBase):
         target = self.make_target_with_origin([self.bad_source])
         lint_results, fmt_result = self.run_isort([target], skip=True)
         assert not lint_results
-        assert fmt_result == FmtResult.noop()
+        assert fmt_result.skipped is True
         assert fmt_result.did_change is False

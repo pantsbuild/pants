@@ -121,7 +121,7 @@ async def setup(setup_request: SetupRequest, black: Black) -> Setup:
             input_digest=input_digest,
             output_files=source_files_snapshot.files,
             description=f"Run Black on {pluralize(len(setup_request.request.field_sets), 'file')}.",
-            level=LogLevel.DEBUG if setup_request.check_only else LogLevel.INFO,
+            level=LogLevel.DEBUG,
         ),
     )
     return Setup(process, original_digest=source_files_snapshot.digest)
@@ -130,7 +130,7 @@ async def setup(setup_request: SetupRequest, black: Black) -> Setup:
 @rule(desc="Format with Black")
 async def black_fmt(field_sets: BlackRequest, black: Black) -> FmtResult:
     if black.skip:
-        return FmtResult.noop()
+        return FmtResult.skip(formatter_name="Black")
     setup = await Get(Setup, SetupRequest(field_sets, check_only=False))
     result = await Get(ProcessResult, Process, setup.process)
     return FmtResult.from_process_result(
