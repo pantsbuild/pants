@@ -1073,6 +1073,12 @@ impl<'t, R: Rule> Builder<'t, R> {
   /// post-monomorphization), the output is a set of dependencies which might contain multiple
   /// entries per DependencyKey.
   ///
+  /// Unfortunately, we cannot eliminate dependencies based on their in_sets not being a subset of
+  /// the out_set, because it's possible that they have not converged (transitively) to their true
+  /// requirements yet. See the doc string of `monomorphize`. We _are_ able to reject dependencies
+  /// that directly depend on something that is not present though: and as this happens lower in
+  /// the graph, the in_sets will shrink.
+  ///
   fn monomorphizations(
     graph: &ParamsLabeledGraph<R>,
     node_id: NodeIndex<u32>,
@@ -1086,21 +1092,26 @@ impl<'t, R: Rule> Builder<'t, R> {
       let in_set = Self::params_in_set(graph, node_id, combination.iter().cloned());
 
       // Confirm that this combination of deps is satisfiable.
-      let satisfiable = in_set.is_subset(&out_set)
-        && combination.iter().all(|(dependency_key, dependency_id)| {
-          let dependency_in_set = if *dependency_id == node_id {
-            // Is a self edge: use the in_set that we're considering creating.
-            &in_set
-          } else {
-            &graph[*dependency_id].in_set
-          };
+      let satisfiable = combination.iter().all(|(dependency_key, dependency_id)| {
+        let dependency_in_set = if *dependency_id == node_id {
+          // Is a self edge: use the in_set that we're considering creating.
+          &in_set
+        } else {
+          &graph[*dependency_id].in_set
+        };
 
-          // Any param provided by this key must be consumed.
-          dependency_key
-            .provided_param()
-            .map(|p| dependency_in_set.contains(&p))
-            .unwrap_or(true)
-        });
+        // Any param provided by this key must be consumed.
+        let consumes_provided_param = dependency_key
+          .provided_param()
+          .map(|p| dependency_in_set.contains(&p))
+          .unwrap_or(true);
+        // And if the dependency is a Param, that Param must be present in the out_set.
+        let uses_only_present_param = match &graph[*dependency_id].node {
+          Node::Param(p) => out_set.contains(&p),
+          _ => true,
+        };
+        consumes_provided_param && uses_only_present_param
+      });
       if !satisfiable {
         continue;
       }
