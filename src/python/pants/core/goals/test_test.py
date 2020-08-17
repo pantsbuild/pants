@@ -256,7 +256,7 @@ class TestTest(TestBase):
                 self.make_target_with_origin(bad_address),
             ],
         )
-        assert exit_code == 1
+        assert exit_code == ConditionallySucceedsFieldSet.exit_code(bad_address)
         assert stderr == dedent(
             f"""\
             ✓ {good_address}

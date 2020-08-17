@@ -347,7 +347,6 @@ async def run_tests(
     )
 
     # Print details.
-    exit_code = 0
     for result in results:
         if result.skipped:
             continue
@@ -365,10 +364,9 @@ async def run_tests(
             console.print_stderr(result.stderr)
         if has_output and result != results[-1]:
             console.print_stderr("")
-        if result.exit_code is not None and result.exit_code != 0:
-            exit_code = result.exit_code
 
     # Print summary
+    exit_code = 0
     console.print_stderr("")
     for result in results:
         if result.skipped:
@@ -380,6 +378,8 @@ async def run_tests(
         right_align = 19 if console.use_colors else 10
         format_str = f"{{addr:80}}.....{{result:>{right_align}}}"
         console.print_stderr(format_str.format(addr=result.address.spec, result=result_desc))
+        if result.exit_code is not None and result.exit_code != 0:
+            exit_code = result.exit_code
 
     merged_xml_results = await Get(
         Digest, MergeDigests(result.xml_results for result in results if result.xml_results),
