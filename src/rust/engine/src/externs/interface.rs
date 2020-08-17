@@ -1314,15 +1314,20 @@ fn match_path_globs(
   path_globs: PyObject,
   paths: Vec<String>,
 ) -> CPyResult<Vec<String>> {
-  let path_globs = nodes::Snapshot::lift_path_globs(&path_globs.into())
-    .map_err(|e| PyErr::new::<exc::ValueError, _>(py, (e,)))?;
-  let matches = py.allow_threads(|| {
-    paths
-      .into_iter()
-      .map(PathBuf::from)
-      .filter(|pb| path_globs.matches(pb.as_ref()))
-      .collect::<Vec<_>>()
-  });
+  let matches = py
+    .allow_threads(|| {
+      let path_globs = nodes::Snapshot::lift_path_globs(&path_globs.into())?;
+
+      Ok(
+        paths
+          .into_iter()
+          .map(PathBuf::from)
+          .filter(|pb| path_globs.matches(pb.as_ref()))
+          .collect::<Vec<_>>(),
+      )
+    })
+    .map_err(|e: String| PyErr::new::<exc::ValueError, _>(py, (e,)))?;
+
   matches
     .into_iter()
     .map(|pb| {
