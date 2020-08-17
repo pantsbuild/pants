@@ -278,7 +278,7 @@ impl<'t, R: Rule> Builder<'t, R> {
       petgraph::dot::Dot::with_config(&graph, &[])
     );
 
-    let debug_str = "this_is_not_a_real_rule(";
+    let debug_str = "resolve_unexpanded_targets(";
 
     // As we split Rules, we attempt to re-join with existing identical Rule nodes to avoid an
     // explosion.
@@ -331,11 +331,11 @@ impl<'t, R: Rule> Builder<'t, R> {
       }
 
       iteration += 1;
-      if graph.node_count() - to_delete.len() > 100000 {
+      if iteration > 10000 {
         looping = true;
       }
       let debug = looping || graph[node_id].node.to_string().contains(debug_str);
-      if debug {
+      if debug || iteration % 100 == 0 {
         println!(
           ">>> iteration {}: live_node_count: {}, to_visit: {} (, node_count: {}, to_delete: {})",
           iteration,
@@ -414,19 +414,21 @@ impl<'t, R: Rule> Builder<'t, R> {
       for (out_set, dependees) in dependees_by_out_set {
         let node = graph[node_id].node.clone();
         for (in_set, dependencies) in
-          Self::monomorphizations(&graph, node_id, out_set.clone(), &dependencies_by_key, false)
+          Self::monomorphizations(&graph, node_id, out_set.clone(), &dependencies_by_key, debug)
         {
           // Add this set of dependees and dependencies to the relevant output node.
-          let entry = monomorphizations
-            .entry(ParamsLabeled {
+          let key = ParamsLabeled {
               node: node.clone(),
               in_set: in_set.clone(),
               // NB: See the method doc. Although our dependees could technically still provide a
               // larger set of params, anything not in the in_set is not consumed in this subgraph,
               // and the out_set shrinks correspondingly to avoid creating redundant nodes.
               out_set: out_set.intersection(&in_set).cloned().collect(),
-            })
-            .or_insert_with(|| (HashSet::new(), HashSet::new()));
+            };
+          let entry = monomorphizations.entry(key.clone()).or_insert_with(|| (HashSet::new(), HashSet::new()));
+          if debug {
+            println!(">>> giving combination {}:\n  {} dependees and\n  {} dependencies", key, dependees.len(), dependencies.len());
+          }
           entry.0.extend(dependees.iter().cloned());
           entry.1.extend(dependencies);
         }
@@ -437,7 +439,7 @@ impl<'t, R: Rule> Builder<'t, R> {
       // The base case for a node then is that its dependencies cannot be partitioned to produce
       // disjoint in_sets, and that the in/out sets are accurate based on any transitive changes
       // above or below this node. If both of these conditions are satisified, the node is valid.
-      if let Some((dependees, dependencies)) = monomorphizations.get(&graph[node_id]) {
+      if let Some((_, dependencies)) = monomorphizations.get(&graph[node_id]) {
         // If any of the output nodes is identical to the input node, we may not be able to reduce
         // this node further (right now). It's very important that splitting a node never results
         // in a completely identical (including its dependencies) node, regardless of whether it
@@ -463,15 +465,6 @@ impl<'t, R: Rule> Builder<'t, R> {
                   in_set_union.union(&node.in_set).cloned().collect()
                 })
           {
-            println!(
-              ">>> had dependees: {:#?}",
-              dependees
-                .iter()
-                .map(|(dk, di)| {
-                  (dk.to_string(), graph[*di].to_string())
-                })
-                .collect::<Vec<_>>()
-            );
             // The other monomorphizations completely consume the in_set: we can eliminate the
             // original node, and only generate the remaining nodes.
             monomorphizations.remove(&graph[node_id]);
