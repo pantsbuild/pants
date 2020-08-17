@@ -1065,7 +1065,8 @@ impl NodeKey {
   fn workunit_level(&self) -> Level {
     match self {
       NodeKey::Task(ref task) => task.task.display_info.level,
-      _ => Level::Debug,
+      NodeKey::DownloadedFile(..) => Level::Debug,
+      _ => Level::Trace,
     }
   }
 
