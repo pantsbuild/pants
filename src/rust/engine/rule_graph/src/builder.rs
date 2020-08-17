@@ -279,7 +279,7 @@ impl<'t, R: Rule> Builder<'t, R> {
       petgraph::dot::Dot::with_config(&graph, &[])
     );
 
-    let debug_str = "this_is_not_a_real_rule(";
+    let debug_str = "Query(SetupPy for";
 
     // As we split Rules, we attempt to re-join with existing identical Rule nodes to avoid an
     // explosion.
@@ -332,7 +332,7 @@ impl<'t, R: Rule> Builder<'t, R> {
       }
 
       iteration += 1;
-      if graph.node_count() - to_delete.len() > 310 {
+      if graph.node_count() - to_delete.len() > 100000 {
         looping = true;
       }
       if iteration % 1 == 0 {
@@ -443,34 +443,56 @@ impl<'t, R: Rule> Builder<'t, R> {
 
       // The goal of this phase is to shrink the in_sets as much as possible via dependency changes.
       //
-      // The base case for a node then is that its dependencies cannot be partitioned to produce a
-      // smaller in_set, and that the in/out sets are accurate based on any transitive changes
+      // The base case for a node then is that its dependencies cannot be partitioned to produce
+      // disjoint in_sets, and that the in/out sets are accurate based on any transitive changes
       // above or below this node. If both of these conditions are satisified, the node is valid.
-      //
-      // Note though that we do _not_ split a node based purely on the out_sets of dependees: we
-      // only split if it would result in different dependencies or in_sets.
-      if !monomorphizations.is_empty()
-        && monomorphizations
-          .keys()
-          .all(|r| r.in_set == graph[node_id].in_set)
-      {
-        // There was at least one output monomorphization (if there were zero, we'd want to fall
-        // through to delete the node), and all of the monomorphizations had the initial in_set.
-        // If all of the monomorphizations also used all of the same dependencies as we started
-        // with, then we've noop'ed.
+      if let Some((_, dependencies)) = monomorphizations.get(&graph[node_id]) {
+        // If any of the output nodes is identical to the input node, we may not be able to reduce
+        // this node further (right now). It's very important that splitting a node never results
+        // in a completely identical (including its dependencies) node, regardless of whether it
+        // also produces other valid combinations: that would result in an infinite loop, where
+        // every time we visited the node, it would be split in the same way.
         let initial_dependencies = graph
           .edges_directed(node_id, Direction::Outgoing)
           .filter(|edge_ref| !to_delete.contains(&edge_ref.target()))
           .map(|edge_ref| (*edge_ref.weight(), edge_ref.target()))
           .collect::<HashSet<_>>();
-        if monomorphizations
-          .values()
-          .all(|(_, dependencies)| dependencies == &initial_dependencies)
-        {
-          if looping {
-            println!(">>> no changes for {:?}: {}", node_id, graph[node_id]);
+        if dependencies == &initial_dependencies {
+          // Is an identical node. If there are other monomorphizations and they _collectively_
+          // consume the entire in_set (ie, by unioning to at the original in_set), then we
+          // assume that we can safely (?) eliminate the original node, in favor of those choices.
+          // Otherwise, we must treat this node as ambiguous, and noop until something changes
+          // above or below us.
+          if monomorphizations.len() > 1
+            && graph[node_id].in_set
+              == monomorphizations
+                .keys()
+                .filter(|node| *node != &graph[node_id])
+                .fold(ParamTypes::new(), |in_set_union, node| {
+                  in_set_union.union(&node.in_set).cloned().collect()
+                })
+          {
+            // The other monomorphizations completely consume the in_set: we can eliminate the
+            // original node, and only generate the remaining nodes.
+            monomorphizations.remove(&graph[node_id]);
+            println!(
+              ">>> attempting to prevent infinite loop by eliminating {:?}: {}\nand only producing: {:#?}",
+              node_id,
+              graph[node_id],
+              monomorphizations.keys().map(|n| format!("{}", n)).collect::<Vec<_>>(),
+            );
+          } else {
+            // Otherwise, this node can not be reduced (at this time at least).
+            //if looping {
+            println!(
+              ">>> not able to reduce {:?}: {} (had {} monomorphizations)",
+              node_id,
+              graph[node_id],
+              monomorphizations.len()
+            );
+            //}
+            continue;
           }
-          continue;
         }
       }
 
@@ -646,6 +668,42 @@ impl<'t, R: Rule> Builder<'t, R> {
           }
         }
       }
+    }
+
+    if let Some(subgraph_node_ref) = graph
+      .node_references()
+      .find(|node_ref| node_ref.weight().node.to_string().contains(debug_str))
+    {
+      let subgraph_id = subgraph_node_ref.id();
+      let mut bfs = Bfs::new(&graph, subgraph_id);
+      let mut visited = graph.visit_map();
+      while let Some(node_id) = bfs.next(&graph) {
+        if graph[node_id]
+          .in_set
+          .iter()
+          .find(|p| &p.to_string() == "MultiPlatformProcess" || &p.to_string() == "PexProcess")
+          .is_some()
+        {
+          visited.visit(node_id);
+        }
+      }
+
+      let subgraph = graph.filter_map(
+        |node_id, node| {
+          if visited.is_visited(&node_id) && !to_delete.is_visited(&node_id) {
+            Some(node.clone())
+          } else {
+            None
+          }
+        },
+        |_, edge_weight| Some(*edge_weight),
+      );
+
+      println!(
+        "Subgraph below {}: {}",
+        graph[subgraph_id].node,
+        petgraph::dot::Dot::with_config(&subgraph, &[])
+      );
     }
 
     // Finally, delete all nodes that were replaced (which will also delete their edges).
