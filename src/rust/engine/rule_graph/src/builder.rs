@@ -278,7 +278,7 @@ impl<'t, R: Rule> Builder<'t, R> {
       petgraph::dot::Dot::with_config(&graph, &[])
     );
 
-    let debug_str = "a_singleton";
+    let debug_str = "this_is_not_a_real_rule(";
 
     // As we split Rules, we attempt to re-join with existing identical Rule nodes to avoid an
     // explosion.
@@ -356,12 +356,7 @@ impl<'t, R: Rule> Builder<'t, R> {
             .map(|edge_ref| (*edge_ref.weight(), edge_ref.target())),
         )
         .into_iter()
-        .map(|(dependency_key, edges)| {
-            if edges.is_empty() {
-              println!("Uh oh: no edges for {} for {}", dependency_key, graph[node_id]);
-            }
-            edges
-        })
+        .map(|(_, edges)| edges)
         .collect();
 
       // A node with no declared dependencies is always already minimal.
@@ -391,25 +386,21 @@ impl<'t, R: Rule> Builder<'t, R> {
         dbos
       };
 
-      let dependees_by_out_set_len = dependees_by_out_set.len();
-      /*
-      println!(">>> dependees of {} by out set: {:#?}", graph[node_id], dependees_by_out_set);
-
-      if graph[node_id].node.to_string().contains(debug_str) {
-        println!(
-          ">>> monomorphizing {} with: {:#?}",
-          graph[node_id].node,
-          dependencies_by_key
-            .iter()
-            .flat_map(|edges| edges.iter().map(|(dk, di)| (
-              dk.to_string(),
-              graph[*di].node.to_string(),
-              params_str(&graph[*di].in_set)
-            )))
-            .collect::<Vec<_>>(),
-        );
+      // A node with no declared dependencies is always already minimal.
+      if dependencies_by_key.is_empty() {
+        continue;
       }
-      */
+
+      let dependees_by_out_set_len = dependees_by_out_set.len();
+      let dependencies_by_key_lens = dependencies_by_key
+        .iter()
+        .map(|edges| edges.len())
+        .collect::<Vec<_>>();
+      let dependees_by_out_set_strs =
+          dependees_by_out_set
+            .keys()
+            .map(|out_set| params_str(&out_set))
+            .collect::<Vec<_>>();
 
       // Generate the monomorphizations of this Node, where each key is a potential node to
       // create, and the dependees and dependencies to give it (respectively).
@@ -423,7 +414,7 @@ impl<'t, R: Rule> Builder<'t, R> {
       for (out_set, dependees) in dependees_by_out_set {
         let node = graph[node_id].node.clone();
         for (in_set, dependencies) in
-          Self::monomorphizations(&graph, node_id, out_set.clone(), &dependencies_by_key)
+          Self::monomorphizations(&graph, node_id, out_set.clone(), &dependencies_by_key, false)
         {
           // Add this set of dependees and dependencies to the relevant output node.
           let entry = monomorphizations
@@ -446,7 +437,7 @@ impl<'t, R: Rule> Builder<'t, R> {
       // The base case for a node then is that its dependencies cannot be partitioned to produce
       // disjoint in_sets, and that the in/out sets are accurate based on any transitive changes
       // above or below this node. If both of these conditions are satisified, the node is valid.
-      if let Some((_, dependencies)) = monomorphizations.get(&graph[node_id]) {
+      if let Some((dependees, dependencies)) = monomorphizations.get(&graph[node_id]) {
         // If any of the output nodes is identical to the input node, we may not be able to reduce
         // this node further (right now). It's very important that splitting a node never results
         // in a completely identical (including its dependencies) node, regardless of whether it
@@ -472,6 +463,15 @@ impl<'t, R: Rule> Builder<'t, R> {
                   in_set_union.union(&node.in_set).cloned().collect()
                 })
           {
+            println!(
+              ">>> had dependees: {:#?}",
+              dependees
+                .iter()
+                .map(|(dk, di)| {
+                  (dk.to_string(), graph[*di].to_string())
+                })
+                .collect::<Vec<_>>()
+            );
             // The other monomorphizations completely consume the in_set: we can eliminate the
             // original node, and only generate the remaining nodes.
             monomorphizations.remove(&graph[node_id]);
@@ -498,9 +498,10 @@ impl<'t, R: Rule> Builder<'t, R> {
 
       if debug {
         println!(
-          ">>> created {} monomorphizations (from {} dependee sets) for {:?}: {:#?} with {:#?}",
+          ">>> created {} monomorphizations (from {} dependee sets and {:?} dependencies) for {:?}: {:#?} with {:#?} and {:#?}",
           monomorphizations.len(),
           dependees_by_out_set_len,
+          dependencies_by_key_lens,
           node_id,
           graph[node_id],
           dependencies_by_key
@@ -510,7 +511,8 @@ impl<'t, R: Rule> Builder<'t, R> {
                 .iter()
                 .map(|(dk, di)| (dk.to_string(), graph[*di].to_string()))
             })
-            .collect::<Vec<_>>()
+            .collect::<Vec<_>>(),
+          dependees_by_out_set_strs,
         );
 
         if looping {
@@ -647,6 +649,42 @@ impl<'t, R: Rule> Builder<'t, R> {
           }
         }
       }
+    }
+
+    if let Some(subgraph_node_ref) = graph
+      .node_references()
+      .find(|node_ref| node_ref.weight().node.to_string().contains(debug_str))
+    {
+      let subgraph_id = subgraph_node_ref.id();
+      let mut bfs = Bfs::new(&graph, subgraph_id);
+      let mut visited = graph.visit_map();
+      while let Some(node_id) = bfs.next(&graph) {
+        if graph[node_id]
+          .in_set
+          .iter()
+          .find(|p| &p.to_string() == "AddressSpecs" || &p.to_string() == "Addresses" || &p.to_string() == "Specs")
+          .is_some()
+        {
+          visited.visit(node_id);
+        }
+      }
+
+      let subgraph = graph.filter_map(
+        |node_id, node| {
+          if visited.is_visited(&node_id) && !to_delete.is_visited(&node_id) {
+            Some(node.clone())
+          } else {
+            None
+          }
+        },
+        |_, edge_weight| Some(*edge_weight),
+      );
+
+      println!(
+        "Subgraph below {}: {}",
+        graph[subgraph_id].node,
+        petgraph::dot::Dot::with_config(&subgraph, &[])
+      );
     }
 
     // Finally, delete all nodes that were replaced (which will also delete their edges).
@@ -1084,6 +1122,7 @@ impl<'t, R: Rule> Builder<'t, R> {
     node_id: NodeIndex<u32>,
     out_set: ParamTypes<R::TypeId>,
     deps: &[Vec<(R::DependencyKey, NodeIndex<u32>)>],
+    debug: bool,
   ) -> HashMap<ParamTypes<R::TypeId>, HashSet<(R::DependencyKey, NodeIndex<u32>)>> {
     let mut combinations = HashMap::new();
 
@@ -1113,6 +1152,16 @@ impl<'t, R: Rule> Builder<'t, R> {
         consumes_provided_param && uses_only_present_param
       });
       if !satisfiable {
+        if debug {
+          println!(">>> combination not satisfiable: {}: {:#?}", params_str(&in_set),
+            combination
+              .iter()
+              .map(|(dk, di)| {
+                 (dk.to_string(), graph[*di].to_string())
+              })
+              .collect::<Vec<_>>(),
+          );
+        }
         continue;
       }
 
@@ -1154,11 +1203,18 @@ impl<'t, R: Rule> Builder<'t, R> {
       }
       if was_eliminated {
         // An existing set was a better choice than this one.
+        if debug {
+          println!(">>> combination was eliminated: {}", params_str(&in_set));
+        }
         continue;
       }
       for to_eliminate in eliminated {
         // The new set is better than some old set(s): remove them.
         combinations.remove(&to_eliminate);
+      }
+
+      if debug {
+        println!(">>> combination was valid!: {}", params_str(&in_set));
       }
 
       // If we've made it this far, we're worth recording. Huzzah!
