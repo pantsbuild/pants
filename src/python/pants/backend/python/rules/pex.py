@@ -293,7 +293,7 @@ class TwoStepPex:
 logger = logging.getLogger(__name__)
 
 
-@rule
+@rule(level=LogLevel.DEBUG)
 async def create_pex(
     request: PexRequest,
     python_setup: PythonSetup,
@@ -419,7 +419,7 @@ async def create_pex(
     )
 
 
-@rule
+@rule(level=LogLevel.DEBUG)
 async def two_step_create_pex(two_step_pex_request: TwoStepPexRequest) -> TwoStepPex:
     """Create a PEX in two steps: a requirements-only PEX and then a full PEX from it."""
     request = two_step_pex_request.pex_request

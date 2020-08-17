@@ -39,6 +39,7 @@ from pants.engine.target import TransitiveTargets
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
 from pants.python.python_setup import PythonSetup
+from pants.util.logging import LogLevel
 
 logger = logging.getLogger()
 
@@ -74,7 +75,7 @@ class TestTargetSetup:
     __test__ = False
 
 
-@rule
+@rule(level=LogLevel.DEBUG)
 async def setup_pytest_for_target(
     field_set: PythonTestFieldSet,
     pytest: PyTest,
@@ -203,7 +204,7 @@ async def setup_pytest_for_target(
 
 # TODO(#10618): Once this is fixed, move `TestTargetSetup` into an `await Get` so that we only set
 #  up the test if it isn't skipped.
-@rule(desc="Run Pytest")
+@rule(desc="Run Pytest", level=LogLevel.DEBUG)
 async def run_python_test(
     field_set: PythonTestFieldSet,
     setup: TestTargetSetup,
@@ -287,7 +288,7 @@ async def run_python_test(
     )
 
 
-@rule(desc="Setup Pytest to run interactively")
+@rule(desc="Setup Pytest to run interactively", level=LogLevel.DEBUG)
 def debug_python_test(field_set: PythonTestFieldSet, setup: TestTargetSetup) -> TestDebugRequest:
     if field_set.is_conftest():
         return TestDebugRequest(None)

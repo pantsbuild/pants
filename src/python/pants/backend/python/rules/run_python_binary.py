@@ -22,9 +22,10 @@ from pants.engine.target import (
     TransitiveTargets,
 )
 from pants.engine.unions import UnionRule
+from pants.util.logging import LogLevel
 
 
-@rule
+@rule(level=LogLevel.DEBUG)
 async def create_python_binary_run_request(
     field_set: PythonBinaryFieldSet, python_binary_defaults: PythonBinaryDefaults
 ) -> RunRequest:

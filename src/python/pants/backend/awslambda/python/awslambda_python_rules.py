@@ -31,6 +31,7 @@ from pants.engine.fs import Digest, MergeDigests
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.unions import UnionRule
+from pants.util.logging import LogLevel
 
 
 @dataclass(frozen=True)
@@ -46,7 +47,7 @@ class LambdexSetup:
     requirements_pex: Pex
 
 
-@rule(desc="Create Python AWS Lambda")
+@rule(desc="Create Python AWS Lambda", level=LogLevel.DEBUG)
 async def create_python_awslambda(
     field_set: PythonAwsLambdaFieldSet, lambdex_setup: LambdexSetup
 ) -> CreatedAWSLambda:

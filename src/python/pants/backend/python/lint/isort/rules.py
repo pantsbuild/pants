@@ -68,8 +68,8 @@ def generate_args(*, source_files: SourceFiles, isort: Isort, check_only: bool) 
     return tuple(args)
 
 
-@rule
-async def setup(setup_request: SetupRequest, isort: Isort) -> Setup:
+@rule(level=LogLevel.DEBUG)
+async def setup_isort(setup_request: SetupRequest, isort: Isort) -> Setup:
     requirements_pex_request = Get(
         Pex,
         PexRequest(
@@ -126,7 +126,7 @@ async def setup(setup_request: SetupRequest, isort: Isort) -> Setup:
     return Setup(process, original_digest=source_files_snapshot.digest)
 
 
-@rule(desc="Format with isort")
+@rule(desc="Format with isort", level=LogLevel.DEBUG)
 async def isort_fmt(request: IsortRequest, isort: Isort) -> FmtResult:
     if isort.skip:
         return FmtResult.skip(formatter_name="isort")
@@ -140,7 +140,7 @@ async def isort_fmt(request: IsortRequest, isort: Isort) -> FmtResult:
     )
 
 
-@rule(desc="Lint with isort")
+@rule(desc="Lint with isort", level=LogLevel.DEBUG)
 async def isort_lint(request: IsortRequest, isort: Isort) -> LintResults:
     if isort.skip:
         return LintResults([], linter_name="isort")

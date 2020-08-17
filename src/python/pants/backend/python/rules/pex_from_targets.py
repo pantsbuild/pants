@@ -36,6 +36,7 @@ from pants.engine.fs import (
 from pants.engine.rules import Get, RootRule, collect_rules, rule
 from pants.engine.target import TransitiveTargets
 from pants.python.python_setup import PythonSetup, ResolveAllConstraintsOption
+from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 
 logger = logging.getLogger(__name__)
@@ -152,7 +153,7 @@ class TwoStepPexFromTargetsRequest:
     pex_from_targets_request: PexFromTargetsRequest
 
 
-@rule
+@rule(level=LogLevel.DEBUG)
 async def pex_from_targets(request: PexFromTargetsRequest, python_setup: PythonSetup) -> PexRequest:
     transitive_targets = await Get(TransitiveTargets, Addresses, request.addresses)
     all_targets = transitive_targets.closure

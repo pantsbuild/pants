@@ -58,7 +58,7 @@ def generate_args(
     return tuple(args)
 
 
-@rule
+@rule(level=LogLevel.DEBUG)
 async def bandit_lint_partition(
     partition: BanditPartition, bandit: Bandit, lint_subsystem: LintSubsystem
 ) -> LintResult:
@@ -133,7 +133,7 @@ async def bandit_lint_partition(
     )
 
 
-@rule(desc="Lint with Bandit")
+@rule(desc="Lint with Bandit", level=LogLevel.DEBUG)
 async def bandit_lint(
     request: BanditRequest, bandit: Bandit, python_setup: PythonSetup
 ) -> LintResults:

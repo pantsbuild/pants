@@ -8,6 +8,7 @@ from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.fs import Digest, DigestSubset, MergeDigests, PathGlobs, RemovePrefix, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.source.source_root import SourceRootsRequest, SourceRootsResult
+from pants.util.logging import LogLevel
 
 
 @dataclass(frozen=True)
@@ -17,7 +18,7 @@ class StrippedSourceFiles:
     snapshot: Snapshot
 
 
-@rule
+@rule(level=LogLevel.DEBUG)
 async def strip_source_roots(source_files: SourceFiles) -> StrippedSourceFiles:
     """Removes source roots from a snapshot.
 

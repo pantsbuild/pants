@@ -58,7 +58,7 @@ def generate_args(
     return tuple(args)
 
 
-@rule
+@rule(level=LogLevel.DEBUG)
 async def flake8_lint_partition(
     partition: Flake8Partition, flake8: Flake8, lint_subsystem: LintSubsystem
 ) -> LintResult:
@@ -134,7 +134,7 @@ async def flake8_lint_partition(
     )
 
 
-@rule(desc="Lint with Flake8")
+@rule(desc="Lint with Flake8", level=LogLevel.DEBUG)
 async def flake8_lint(
     request: Flake8Request, flake8: Flake8, python_setup: PythonSetup
 ) -> LintResults:

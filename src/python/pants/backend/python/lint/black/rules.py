@@ -70,8 +70,8 @@ def generate_args(*, source_files: SourceFiles, black: Black, check_only: bool,)
     return tuple(args)
 
 
-@rule
-async def setup(setup_request: SetupRequest, black: Black) -> Setup:
+@rule(level=LogLevel.DEBUG)
+async def setup_black(setup_request: SetupRequest, black: Black) -> Setup:
     requirements_pex_request = Get(
         Pex,
         PexRequest(
@@ -127,7 +127,7 @@ async def setup(setup_request: SetupRequest, black: Black) -> Setup:
     return Setup(process, original_digest=source_files_snapshot.digest)
 
 
-@rule(desc="Format with Black")
+@rule(desc="Format with Black", level=LogLevel.DEBUG)
 async def black_fmt(field_sets: BlackRequest, black: Black) -> FmtResult:
     if black.skip:
         return FmtResult.skip(formatter_name="Black")
@@ -141,7 +141,7 @@ async def black_fmt(field_sets: BlackRequest, black: Black) -> FmtResult:
     )
 
 
-@rule(desc="Lint with Black")
+@rule(desc="Lint with Black", level=LogLevel.DEBUG)
 async def black_lint(field_sets: BlackRequest, black: Black) -> LintResults:
     if black.skip:
         return LintResults([], linter_name="Black")

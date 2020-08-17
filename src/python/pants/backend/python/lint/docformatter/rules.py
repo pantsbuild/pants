@@ -57,8 +57,8 @@ def generate_args(
     return ("--check" if check_only else "--in-place", *docformatter.args, *source_files.files)
 
 
-@rule
-async def setup(setup_request: SetupRequest, docformatter: Docformatter) -> Setup:
+@rule(level=LogLevel.DEBUG)
+async def setup_docformatter(setup_request: SetupRequest, docformatter: Docformatter) -> Setup:
     requirements_pex_request = Get(
         Pex,
         PexRequest(
@@ -107,7 +107,7 @@ async def setup(setup_request: SetupRequest, docformatter: Docformatter) -> Setu
     return Setup(process, original_digest=source_files_snapshot.digest)
 
 
-@rule(desc="Format with docformatter")
+@rule(desc="Format with docformatter", level=LogLevel.DEBUG)
 async def docformatter_fmt(request: DocformatterRequest, docformatter: Docformatter) -> FmtResult:
     if docformatter.skip:
         return FmtResult.skip(formatter_name="Docformatter")
@@ -118,7 +118,7 @@ async def docformatter_fmt(request: DocformatterRequest, docformatter: Docformat
     )
 
 
-@rule(desc="Lint with docformatter")
+@rule(desc="Lint with docformatter", level=LogLevel.DEBUG)
 async def docformatter_lint(
     request: DocformatterRequest, docformatter: Docformatter
 ) -> LintResults:

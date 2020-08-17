@@ -328,6 +328,8 @@ def rule(*args, **kwargs) -> Callable:
 
 
 def goal_rule(*args, **kwargs) -> Callable:
+    if "level" not in kwargs:
+        kwargs["level"] = LogLevel.DEBUG
     return inner_rule(*args, **kwargs, rule_type=RuleType.goal_rule, cacheable=False)
 
 
