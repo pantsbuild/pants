@@ -279,7 +279,7 @@ impl<'t, R: Rule> Builder<'t, R> {
       petgraph::dot::Dot::with_config(&graph, &[])
     );
 
-    let debug_str = "Query(SetupPy for";
+    let debug_str = "a_singleton";
 
     // As we split Rules, we attempt to re-join with existing identical Rule nodes to avoid an
     // explosion.
@@ -335,7 +335,8 @@ impl<'t, R: Rule> Builder<'t, R> {
       if graph.node_count() - to_delete.len() > 100000 {
         looping = true;
       }
-      if iteration % 1 == 0 {
+      let debug = looping || graph[node_id].node.to_string().contains(debug_str);
+      if debug {
         println!(
           ">>> iteration {}: live_node_count: {}, to_visit: {} (, node_count: {}, to_delete: {})",
           iteration,
@@ -388,10 +389,6 @@ impl<'t, R: Rule> Builder<'t, R> {
       };
 
       let dependees_by_out_set_len = dependees_by_out_set.len();
-      let dependencies_by_key_lens = dependencies_by_key
-        .iter()
-        .map(|edges| edges.len())
-        .collect::<Vec<_>>();
       /*
       println!(">>> dependees of {} by out set: {:#?}", graph[node_id], dependees_by_out_set);
 
@@ -483,76 +480,55 @@ impl<'t, R: Rule> Builder<'t, R> {
             );
           } else {
             // Otherwise, this node can not be reduced (at this time at least).
-            //if looping {
-            println!(
-              ">>> not able to reduce {:?}: {} (had {} monomorphizations)",
-              node_id,
-              graph[node_id],
-              monomorphizations.len()
-            );
-            //}
+            if debug {
+              println!(
+                ">>> not able to reduce {:?}: {} (had {} monomorphizations)",
+                node_id,
+                graph[node_id],
+                monomorphizations.len()
+              );
+            }
             continue;
           }
         }
       }
 
-      if looping {
+      if debug {
         println!(
-            ">>> created {} monomorphizations (from {} dependee sets and {:?} dependencies) for {:?}: {:#?}",
-            monomorphizations.len(),
-            dependees_by_out_set_len,
-            dependencies_by_key_lens,
-            node_id,
-            graph[node_id],
+          ">>> created {} monomorphizations (from {} dependee sets) for {:?}: {:#?} with {:#?}",
+          monomorphizations.len(),
+          dependees_by_out_set_len,
+          node_id,
+          graph[node_id],
+          dependencies_by_key
+            .iter()
+            .flat_map(|choices| {
+              choices
+                .iter()
+                .map(|(dk, di)| (dk.to_string(), graph[*di].to_string()))
+            })
+            .collect::<Vec<_>>()
         );
 
-        maybe_in_loop.insert(node_id);
-        if maybe_in_loop.len() > 40 {
-          let subgraph = graph.filter_map(
-            |node_id, node| {
-              if maybe_in_loop.contains(&node_id) {
-                Some(format!("{:?}: {}", node_id, node))
-              } else {
-                None
-              }
-            },
-            |_, edge_weight| Some(*edge_weight),
-          );
+        if looping {
+          maybe_in_loop.insert(node_id);
+          if maybe_in_loop.len() > 40 {
+            let subgraph = graph.filter_map(
+              |node_id, node| {
+                if maybe_in_loop.contains(&node_id) {
+                  Some(format!("{:?}: {}", node_id, node))
+                } else {
+                  None
+                }
+              },
+              |_, edge_weight| Some(*edge_weight),
+            );
 
-          panic!(
-            "Loop subgraph: {}",
-            petgraph::dot::Dot::with_config(&subgraph, &[])
-          );
-        }
-
-        if graph[node_id].node.to_string().contains(debug_str) {
-          let subgraph_id = node_id;
-          let mut bfs = Bfs::new(&graph, subgraph_id);
-          let mut visited = graph.visit_map();
-          while let Some(node_id) = bfs.next(&graph) {
-            visited.visit(node_id);
+            panic!(
+              "Loop subgraph: {}",
+              petgraph::dot::Dot::with_config(&subgraph, &[])
+            );
           }
-          // Include the direct deps of this node.
-          for dependee_id in graph.neighbors_directed(node_id, Direction::Incoming) {
-            visited.visit(dependee_id);
-          }
-
-          let subgraph = graph.filter_map(
-            |node_id, node| {
-              if visited.is_visited(&node_id) && !to_delete.is_visited(&node_id) {
-                Some(format!("{:?}: {}", node_id, node))
-              } else {
-                None
-              }
-            },
-            |_, edge_weight| Some(*edge_weight),
-          );
-
-          println!(
-            "Subgraph below {}: {}",
-            graph[subgraph_id].node,
-            petgraph::dot::Dot::with_config(&subgraph, &[])
-          );
         }
       }
 
@@ -566,7 +542,7 @@ impl<'t, R: Rule> Builder<'t, R> {
 
       // Generate a replacement node for each monomorphization of this rule.
       for (new_node, (dependees, dependencies)) in monomorphizations {
-        if looping {
+        if debug {
           println!(
             ">>>   generating {:#?}, which consumes: {:#?}",
             new_node,
@@ -591,7 +567,7 @@ impl<'t, R: Rule> Builder<'t, R> {
           }
           hash_map::Entry::Vacant(ve) => (*ve.insert(graph.add_node(new_node)), true),
         };
-        if looping {
+        if debug {
           if is_new_node {
             println!(">>> node: creating new: {:?}", replacement_id);
           } else {
@@ -618,7 +594,7 @@ impl<'t, R: Rule> Builder<'t, R> {
                 edge_ref.target() != replacement_id || edge_ref.weight() != dependency_key
               })
           {
-            if looping {
+            if debug {
               println!(
                 ">>> dependee edge: adding: {:?}",
                 (dependee_id, dependency_key)
@@ -626,7 +602,7 @@ impl<'t, R: Rule> Builder<'t, R> {
             }
             graph.add_edge(*dependee_id, replacement_id, *dependency_key);
           } else {
-            if looping {
+            if debug {
               println!(
                 ">>> dependee edge: skipping existing: {:?}",
                 (dependee_id, dependency_key)
@@ -651,7 +627,7 @@ impl<'t, R: Rule> Builder<'t, R> {
             dependency_id
           };
           if !existing_edges.contains(&(dependency_key, dependency_id)) {
-            if looping {
+            if debug {
               println!(
                 ">>> dependency edge: adding: {:?}",
                 (dependency_key, dependency_id)
@@ -659,7 +635,7 @@ impl<'t, R: Rule> Builder<'t, R> {
             }
             graph.add_edge(replacement_id, dependency_id, dependency_key);
           } else {
-            if looping {
+            if debug {
               println!(
                 ">>> dependency edge: skipping existing: {:?}",
                 (dependency_key, dependency_id)
@@ -668,42 +644,6 @@ impl<'t, R: Rule> Builder<'t, R> {
           }
         }
       }
-    }
-
-    if let Some(subgraph_node_ref) = graph
-      .node_references()
-      .find(|node_ref| node_ref.weight().node.to_string().contains(debug_str))
-    {
-      let subgraph_id = subgraph_node_ref.id();
-      let mut bfs = Bfs::new(&graph, subgraph_id);
-      let mut visited = graph.visit_map();
-      while let Some(node_id) = bfs.next(&graph) {
-        if graph[node_id]
-          .in_set
-          .iter()
-          .find(|p| &p.to_string() == "MultiPlatformProcess" || &p.to_string() == "PexProcess")
-          .is_some()
-        {
-          visited.visit(node_id);
-        }
-      }
-
-      let subgraph = graph.filter_map(
-        |node_id, node| {
-          if visited.is_visited(&node_id) && !to_delete.is_visited(&node_id) {
-            Some(node.clone())
-          } else {
-            None
-          }
-        },
-        |_, edge_weight| Some(*edge_weight),
-      );
-
-      println!(
-        "Subgraph below {}: {}",
-        graph[subgraph_id].node,
-        petgraph::dot::Dot::with_config(&subgraph, &[])
-      );
     }
 
     // Finally, delete all nodes that were replaced (which will also delete their edges).
@@ -1106,11 +1046,6 @@ impl<'t, R: Rule> Builder<'t, R> {
   /// post-monomorphization), the output is a set of dependencies which might contain multiple
   /// entries per DependencyKey.
   ///
-  /// Unfortunately, we cannot eliminate dependencies based on their in_sets not being a subset of
-  /// the out_set, because it's possible that they have not converged (transitively) to their true
-  /// requirements yet. We _are_ able to reject dependencies that directly depend on something that
-  /// is not present though: and as this happens lower in the graph, the in_sets will shrink.
-  ///
   fn monomorphizations(
     graph: &ParamsLabeledGraph<R>,
     node_id: NodeIndex<u32>,
@@ -1124,26 +1059,21 @@ impl<'t, R: Rule> Builder<'t, R> {
       let in_set = Self::params_in_set(graph, node_id, combination.iter().cloned());
 
       // Confirm that this combination of deps is satisfiable.
-      let satisfiable = combination.iter().all(|(dependency_key, dependency_id)| {
-        let dependency_in_set = if *dependency_id == node_id {
-          // Is a self edge: use the in_set that we're considering creating.
-          &in_set
-        } else {
-          &graph[*dependency_id].in_set
-        };
+      let satisfiable = in_set.is_subset(&out_set)
+        && combination.iter().all(|(dependency_key, dependency_id)| {
+          let dependency_in_set = if *dependency_id == node_id {
+            // Is a self edge: use the in_set that we're considering creating.
+            &in_set
+          } else {
+            &graph[*dependency_id].in_set
+          };
 
-        // Any param provided by this key must be consumed.
-        let consumes_provided_param = dependency_key
-          .provided_param()
-          .map(|p| dependency_in_set.contains(&p))
-          .unwrap_or(true);
-        // And if the dependency is a Param, that Param must be present in the out_set.
-        let uses_only_present_param = match &graph[*dependency_id].node {
-          Node::Param(p) => out_set.contains(&p),
-          _ => true,
-        };
-        consumes_provided_param && uses_only_present_param
-      });
+          // Any param provided by this key must be consumed.
+          dependency_key
+            .provided_param()
+            .map(|p| dependency_in_set.contains(&p))
+            .unwrap_or(true)
+        });
       if !satisfiable {
         continue;
       }
