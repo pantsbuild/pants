@@ -39,6 +39,7 @@ from pants.engine.target import TransitiveTargets
 from pants.engine.unions import UnionRule
 from pants.option.global_options import GlobalOptions
 from pants.python.python_setup import PythonSetup
+from pants.util.logging import LogLevel
 
 logger = logging.getLogger()
 
@@ -253,6 +254,7 @@ async def run_python_test(
             timeout_seconds=setup.timeout_seconds,
             extra_env=env,
             execution_slot_variable=setup.execution_slot_variable,
+            level=LogLevel.DEBUG,
         ),
     )
 
@@ -287,7 +289,7 @@ async def run_python_test(
     )
 
 
-@rule(desc="Setup Pytest to run interactively")
+@rule(desc="Set up Pytest to run interactively")
 def debug_python_test(field_set: PythonTestFieldSet, setup: TestTargetSetup) -> TestDebugRequest:
     if field_set.is_conftest():
         return TestDebugRequest(None)

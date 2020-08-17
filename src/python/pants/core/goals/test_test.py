@@ -3,6 +3,7 @@
 
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
+from functools import partial
 from textwrap import dedent
 from typing import List, Optional, Tuple, Type
 
@@ -12,11 +13,11 @@ from pants.core.goals.test import (
     CoverageData,
     CoverageDataCollection,
     CoverageReports,
+    EnrichedTestResult,
     ShowOutput,
     Test,
     TestDebugRequest,
     TestFieldSet,
-    TestResult,
     TestSubsystem,
     run_tests,
 )
@@ -37,6 +38,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership
 from pants.testutil.engine.util import MockConsole, MockGet, create_goal_subsystem, run_rule
 from pants.testutil.test_base import TestBase
+from pants.util.logging import LogLevel
 
 
 class MockTarget(Target):
@@ -61,23 +63,15 @@ class MockTestFieldSet(TestFieldSet, metaclass=ABCMeta):
     def exit_code(_: Address) -> int:
         pass
 
-    @staticmethod
-    def stdout(_: Address) -> str:
-        return ""
-
-    @staticmethod
-    def stderr(_: Address) -> str:
-        return ""
-
     @property
-    def test_result(self) -> TestResult:
-        return TestResult(
+    def test_result(self) -> EnrichedTestResult:
+        return EnrichedTestResult(
             exit_code=self.exit_code(self.address),
-            stdout=self.stdout(self.address),
-            stderr=self.stderr(self.address),
+            stdout="",
+            stderr="",
             address=self.address,
             coverage_data=MockCoverageData(self.address),
-            xml_results=None,
+            output_setting=ShowOutput.ALL,
         )
 
 
@@ -86,31 +80,11 @@ class SuccessfulFieldSet(MockTestFieldSet):
     def exit_code(_: Address) -> int:
         return 0
 
-    @staticmethod
-    def stdout(address: Address) -> str:
-        return f"Successful test target: Passed for {address}!"
-
 
 class ConditionallySucceedsFieldSet(MockTestFieldSet):
     @staticmethod
     def exit_code(address: Address) -> int:
         return 27 if address.target_name == "bad" else 0
-
-    @staticmethod
-    def stdout(address: Address) -> str:
-        return (
-            f"Conditionally succeeds test target: Passed for {address}!"
-            if address.target_name != "bad"
-            else ""
-        )
-
-    @staticmethod
-    def stderr(address: Address) -> str:
-        return (
-            f"Conditionally succeeds test target: Had an issue for {address}! Oh no!"
-            if address.target_name == "bad"
-            else ""
-        )
 
 
 class TestTest(TestBase):
@@ -181,7 +155,7 @@ class TestTest(TestBase):
                     mock=mock_find_valid_field_sets,
                 ),
                 MockGet(
-                    product_type=TestResult,
+                    product_type=EnrichedTestResult,
                     subject_type=TestFieldSet,
                     mock=lambda fs: fs.test_result,
                 ),
@@ -230,22 +204,7 @@ class TestTest(TestBase):
         assert exit_code == 0
         assert stderr.strip() == ""
 
-    def test_single_target(self) -> None:
-        address = Address.parse(":tests")
-        exit_code, stderr = self.run_test_rule(
-            field_set=SuccessfulFieldSet, targets=[self.make_target_with_origin(address)]
-        )
-        assert exit_code == 0
-        assert stderr == dedent(
-            f"""\
-            ✓ {address}
-            {SuccessfulFieldSet.stdout(address)}
-
-            {address}                                                                        .....   SUCCESS
-            """
-        )
-
-    def test_multiple_targets(self) -> None:
+    def test_summary(self) -> None:
         good_address = Address.parse(":good")
         bad_address = Address.parse(":bad")
 
@@ -255,55 +214,6 @@ class TestTest(TestBase):
                 self.make_target_with_origin(good_address),
                 self.make_target_with_origin(bad_address),
             ],
-        )
-        assert exit_code == ConditionallySucceedsFieldSet.exit_code(bad_address)
-        assert stderr == dedent(
-            f"""\
-            ✓ {good_address}
-            {ConditionallySucceedsFieldSet.stdout(good_address)}
-
-            𐄂 {bad_address}
-            {ConditionallySucceedsFieldSet.stderr(bad_address)}
-
-            {good_address}                                                                         .....   SUCCESS
-            {bad_address}                                                                          .....   FAILURE
-            """
-        )
-
-    def test_output_failed(self) -> None:
-        good_address = Address.parse(":good")
-        bad_address = Address.parse(":bad")
-
-        exit_code, stderr = self.run_test_rule(
-            field_set=ConditionallySucceedsFieldSet,
-            targets=[
-                self.make_target_with_origin(good_address),
-                self.make_target_with_origin(bad_address),
-            ],
-            output=ShowOutput.FAILED,
-        )
-        assert exit_code == ConditionallySucceedsFieldSet.exit_code(bad_address)
-        assert stderr == dedent(
-            f"""\
-            𐄂 {bad_address}
-            {ConditionallySucceedsFieldSet.stderr(bad_address)}
-
-            {good_address}                                                                         .....   SUCCESS
-            {bad_address}                                                                          .....   FAILURE
-            """
-        )
-
-    def test_output_none(self) -> None:
-        good_address = Address.parse(":good")
-        bad_address = Address.parse(":bad")
-
-        exit_code, stderr = self.run_test_rule(
-            field_set=ConditionallySucceedsFieldSet,
-            targets=[
-                self.make_target_with_origin(good_address),
-                self.make_target_with_origin(bad_address),
-            ],
-            output=ShowOutput.NONE,
         )
         assert exit_code == ConditionallySucceedsFieldSet.exit_code(bad_address)
         assert stderr == dedent(
@@ -330,3 +240,72 @@ class TestTest(TestBase):
         )
         assert exit_code == 0
         assert stderr.strip().endswith(f"Ran coverage on {addr1.spec}, {addr2.spec}")
+
+
+def assert_streaming_output(
+    *,
+    exit_code: Optional[int],
+    stdout: str = "stdout",
+    stderr: str = "stderr",
+    output_setting: ShowOutput = ShowOutput.ALL,
+    expected_level: LogLevel,
+    expected_message: str,
+) -> None:
+    result = EnrichedTestResult(
+        exit_code=exit_code,
+        stdout=stdout,
+        stderr=stderr,
+        output_setting=output_setting,
+        address=Address("demo_test"),
+    )
+    assert result.level() == expected_level
+    assert result.message() == expected_message
+
+
+def test_streaming_output_skip() -> None:
+    assert_streaming_output(
+        exit_code=None,
+        stdout="",
+        stderr="",
+        expected_level=LogLevel.DEBUG,
+        expected_message="demo_test skipped.",
+    )
+
+
+def test_streaming_output_success() -> None:
+    assert_success_streamed = partial(
+        assert_streaming_output, exit_code=0, expected_level=LogLevel.INFO
+    )
+    assert_success_streamed(
+        expected_message=dedent(
+            """\
+            demo_test succeeded.
+            stdout
+            stderr
+
+            """
+        ),
+    )
+    assert_success_streamed(
+        output_setting=ShowOutput.FAILED, expected_message="demo_test succeeded."
+    )
+    assert_success_streamed(output_setting=ShowOutput.NONE, expected_message="demo_test succeeded.")
+
+
+def test_streaming_output_failure() -> None:
+    assert_failure_streamed = partial(
+        assert_streaming_output, exit_code=1, expected_level=LogLevel.WARN
+    )
+    message = dedent(
+        """\
+        demo_test failed (exit code 1).
+        stdout
+        stderr
+
+        """
+    )
+    assert_failure_streamed(expected_message=message)
+    assert_failure_streamed(output_setting=ShowOutput.FAILED, expected_message=message)
+    assert_failure_streamed(
+        output_setting=ShowOutput.NONE, expected_message="demo_test failed (exit code 1)."
+    )

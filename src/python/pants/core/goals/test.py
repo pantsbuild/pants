@@ -21,7 +21,7 @@ from pants.engine.engine_aware import EngineAware
 from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult, InteractiveProcess, InteractiveRunner
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
+from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSet,
     Sources,
@@ -54,7 +54,7 @@ class CoverageReportType(Enum):
 
 
 @dataclass(frozen=True)
-class TestResult(EngineAware):
+class TestResult:
     exit_code: Optional[int]
     stdout: str
     stderr: str
@@ -87,6 +87,17 @@ class TestResult(EngineAware):
             xml_results=xml_results,
         )
 
+
+@dataclass(frozen=True)
+class EnrichedTestResult(EngineAware):
+    exit_code: Optional[int]
+    stdout: str
+    stderr: str
+    address: Address
+    output_setting: "ShowOutput"
+    coverage_data: Optional["CoverageData"] = None
+    xml_results: Optional[Digest] = None
+
     @property
     def skipped(self) -> bool:
         return (
@@ -102,14 +113,28 @@ class TestResult(EngineAware):
             return None
         return {"xml_results_digest": self.xml_results}
 
-    def level(self):
-        if self.exit_code != 0:
-            return LogLevel.ERROR
-        return None
+    def level(self) -> LogLevel:
+        if self.skipped:
+            return LogLevel.DEBUG
+        return LogLevel.INFO if self.exit_code == 0 else LogLevel.WARN
 
-    def message(self):
-        result = "succeeded" if self.exit_code == 0 else f"failed (exit code {self.exit_code})"
-        return f"tests {result}: {self.address}"
+    def message(self) -> str:
+        if self.skipped:
+            return f"{self.address} skipped."
+        status = "succeeded" if self.exit_code == 0 else f"failed (exit code {self.exit_code})"
+        message = f"{self.address} {status}."
+        if self.output_setting == ShowOutput.NONE or (
+            self.output_setting == ShowOutput.FAILED and self.exit_code == 0
+        ):
+            return message
+        output = ""
+        if self.stdout:
+            output += f"\n{self.stdout}"
+        if self.stderr:
+            output += f"\n{self.stderr}"
+        if output:
+            output = f"{output.rstrip()}\n\n"
+        return f"{message}{output}"
 
 
 @dataclass(frozen=True)
@@ -343,31 +368,13 @@ async def run_tests(
     )
 
     results = await MultiGet(
-        Get(TestResult, TestFieldSet, field_set) for field_set in field_sets_with_sources
+        Get(EnrichedTestResult, TestFieldSet, field_set) for field_set in field_sets_with_sources
     )
-
-    # Print details.
-    for result in results:
-        if result.skipped:
-            continue
-        if test_subsystem.options.output == ShowOutput.NONE or (
-            test_subsystem.options.output == ShowOutput.FAILED and result.exit_code == 0
-        ):
-            continue
-        has_output = result.stdout or result.stderr
-        if has_output:
-            status = console.green("✓") if result.exit_code == 0 else console.red("𐄂")
-            console.print_stderr(f"{status} {result.address}")
-        if result.stdout:
-            console.print_stderr(result.stdout)
-        if result.stderr:
-            console.print_stderr(result.stderr)
-        if has_output and result != results[-1]:
-            console.print_stderr("")
 
     # Print summary
     exit_code = 0
-    console.print_stderr("")
+    if results:
+        console.print_stderr("")
     for result in results:
         if result.skipped:
             continue
@@ -416,6 +423,21 @@ async def run_tests(
             desktop.ui_open(console, interactive_runner, coverage_report_files)
 
     return Test(exit_code)
+
+
+@rule(desc="Run tests")
+def enrich_test_result(
+    test_result: TestResult, test_subsystem: TestSubsystem
+) -> EnrichedTestResult:
+    return EnrichedTestResult(
+        exit_code=test_result.exit_code,
+        stdout=test_result.stdout,
+        stderr=test_result.stderr,
+        address=test_result.address,
+        coverage_data=test_result.coverage_data,
+        xml_results=test_result.xml_results,
+        output_setting=test_subsystem.output,
+    )
 
 
 def rules():
