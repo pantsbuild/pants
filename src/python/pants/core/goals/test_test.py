@@ -217,10 +217,10 @@ class TestTest(TestBase):
         )
         assert exit_code == ConditionallySucceedsFieldSet.exit_code(bad_address)
         assert stderr == dedent(
-            f"""\
+            """\
 
-            {good_address}                                                                         .....   SUCCESS
-            {bad_address}                                                                          .....   FAILURE
+            ✓ //:good succeeded.
+            𐄂 //:bad failed.
             """
         )
 
@@ -240,6 +240,26 @@ class TestTest(TestBase):
         )
         assert exit_code == 0
         assert stderr.strip().endswith(f"Ran coverage on {addr1.spec}, {addr2.spec}")
+
+
+def sort_results() -> None:
+    create_test_result = partial(
+        EnrichedTestResult, stdout="", stderr="", output_setting=ShowOutput.ALL
+    )
+    skip1 = create_test_result(exit_code=None, address=Address("t1"))
+    skip2 = create_test_result(exit_code=None, address=Address("t2"))
+    success1 = create_test_result(exit_code=0, address=Address("t1"))
+    success2 = create_test_result(exit_code=0, address=Address("t2"))
+    fail1 = create_test_result(exit_code=1, address=Address("t1"))
+    fail2 = create_test_result(exit_code=1, address=Address("t2"))
+    assert sorted([fail2, success2, skip2, fail1, success1, skip1]) == [
+        skip1,
+        skip2,
+        success1,
+        success2,
+        fail1,
+        fail2,
+    ]
 
 
 def assert_streaming_output(

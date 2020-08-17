@@ -7,7 +7,7 @@ from abc import ABC, ABCMeta
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import PurePath
-from typing import Dict, Iterable, List, Optional, Tuple, Type, TypeVar, cast
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Type, TypeVar, Union, cast
 
 from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSources,
@@ -135,6 +135,19 @@ class EnrichedTestResult(EngineAware):
         if output:
             output = f"{output.rstrip()}\n\n"
         return f"{message}{output}"
+
+    def __lt__(self, other: Union[Any, "EnrichedTestResult"]) -> bool:
+        """We sort first by status (skipped vs failed vs succeeded), then alphanumerically within
+        each group."""
+        if not isinstance(other, EnrichedTestResult):
+            return NotImplemented
+        if self.exit_code == other.exit_code:
+            return self.address.spec < other.address.spec
+        if self.exit_code is None:
+            return True
+        if other.exit_code is None:
+            return False
+        return self.exit_code < other.exit_code
 
 
 @dataclass(frozen=True)
@@ -371,22 +384,21 @@ async def run_tests(
         Get(EnrichedTestResult, TestFieldSet, field_set) for field_set in field_sets_with_sources
     )
 
-    # Print summary
+    # Print summary.
     exit_code = 0
     if results:
         console.print_stderr("")
-    for result in results:
+    for result in sorted(results):
         if result.skipped:
             continue
-        result_desc = console.green("SUCCESS") if result.exit_code == 0 else console.red("FAILURE")
-        # The right-align logic sees the color control codes as characters, so we have
-        # to account for that. In f-strings the alignment field widths must be literals,
-        # so we have to indirect via a call to .format().
-        right_align = 19 if console.use_colors else 10
-        format_str = f"{{addr:80}}.....{{result:>{right_align}}}"
-        console.print_stderr(format_str.format(addr=result.address.spec, result=result_desc))
-        if result.exit_code is not None and result.exit_code != 0:
-            exit_code = result.exit_code
+        if result.exit_code == 0:
+            sigil = console.green("✓")
+            status = "succeeded"
+        else:
+            sigil = console.red("𐄂")
+            status = "failed"
+            exit_code = cast(int, result.exit_code)
+        console.print_stderr(f"{sigil} {result.address} {status}.")
 
     merged_xml_results = await Get(
         Digest, MergeDigests(result.xml_results for result in results if result.xml_results),
