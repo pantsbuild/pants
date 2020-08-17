@@ -31,10 +31,9 @@
 use crate::rules::{DependencyKey, ParamTypes, Query, Rule};
 use crate::{params_str, Entry, EntryWithDeps, InnerEntry, RootEntry, RuleEdges, RuleGraph};
 
-use std::collections::{hash_map, HashMap, HashSet, VecDeque};
+use std::collections::{hash_map, BTreeMap, HashMap, HashSet, VecDeque};
 
 use indexmap::IndexSet;
-use itertools::Itertools;
 use petgraph::graph::{DiGraph, NodeIndex};
 use petgraph::visit::{
   Bfs, DfsPostOrder, EdgeRef, IntoNodeReferences, NodeRef, VisitMap, Visitable,
@@ -348,23 +347,27 @@ impl<'t, R: Rule> Builder<'t, R> {
       }
 
       // Group dependencies by DependencyKey.
-      let dependencies_by_key: Vec<Vec<(R::DependencyKey, _)>> = {
-        let mut sorted_edges = graph
-          .edges_directed(node_id, Direction::Outgoing)
-          .filter(|edge_ref| !to_delete.contains(&edge_ref.target()))
-          .collect::<Vec<_>>();
-        sorted_edges.sort_by_key(|edge_ref| edge_ref.weight());
-        sorted_edges
-          .into_iter()
-          .group_by(|edge_ref| edge_ref.weight())
-          .into_iter()
-          .map(|(dependency_key, edge_refs)| {
-            edge_refs
-              .map(|edge_ref| (*dependency_key, edge_ref.target()))
-              .collect()
-          })
-          .collect()
-      };
+      let dependencies_by_key: Vec<Vec<(R::DependencyKey, NodeIndex<u32>)>> =
+        Self::edges_by_dependency_key(
+          &graph[node_id].node,
+          graph
+            .edges_directed(node_id, Direction::Outgoing)
+            .filter(|edge_ref| !to_delete.contains(&edge_ref.target()))
+            .map(|edge_ref| (*edge_ref.weight(), edge_ref.target())),
+        )
+        .into_iter()
+        .map(|(dependency_key, edges)| {
+            if edges.is_empty() {
+              println!("Uh oh: no edges for {} for {}", dependency_key, graph[node_id]);
+            }
+            edges
+        })
+        .collect();
+
+      // A node with no declared dependencies is always already minimal.
+      if dependencies_by_key.is_empty() {
+        continue;
+      }
 
       // Group dependees by out_set.
       let dependees_by_out_set: HashMap<ParamTypes<R::TypeId>, Vec<(R::DependencyKey, _)>> = {
@@ -763,26 +766,24 @@ impl<'t, R: Rule> Builder<'t, R> {
       // * invalid required param at a Query
       // * take smallest option, fail for equal-sized sets
 
-      let edges_by_dependency_key = {
-        let mut sorted_edges = graph
+      let edges_by_dependency_key = Self::edges_by_dependency_key(
+        node,
+        graph
           .edges_directed(node_id, Direction::Outgoing)
-          .collect::<Vec<_>>();
-        sorted_edges.sort_by_key(|edge_ref| edge_ref.weight());
-        sorted_edges
-          .into_iter()
-          .group_by(|edge_ref| edge_ref.weight())
-      };
-      for (dependency_key, edge_refs) in &edges_by_dependency_key {
-        // Collect live edges.
-        let live_edge_refs = edge_refs
           .filter(|edge_ref| !edges_to_delete.contains(&edge_ref.id()))
+          .map(|edge_ref| (*edge_ref.weight(), edge_ref)),
+      );
+      for (dependency_key, edge_refs) in edges_by_dependency_key {
+        let edge_refs = edge_refs
+          .into_iter()
+          .map(|(_, edge_ref)| edge_ref)
           .collect::<Vec<_>>();
 
         // Filter out any that are not satisfiable for this node based on its type and in/out sets.
         let relevant_edge_refs: Vec<_> = match node {
           Node::Query(q) => {
             // Only dependencies with in_sets that are a subset of our params can be used.
-            live_edge_refs
+            edge_refs
               .iter()
               .filter(|edge_ref| {
                 let dependency_in_set = &graph[edge_ref.target()].in_set;
@@ -792,7 +793,7 @@ impl<'t, R: Rule> Builder<'t, R> {
           }
           Node::Rule(_) => {
             // If there is a provided param, only dependencies that consume it can be used.
-            live_edge_refs
+            edge_refs
               .iter()
               .filter(|edge_ref| {
                 if let Some(provided_param) = dependency_key.provided_param() {
@@ -807,7 +808,7 @@ impl<'t, R: Rule> Builder<'t, R> {
             panic!(
               "A Param node should not have dependencies: {} had {:#?}",
               p,
-              live_edge_refs
+              edge_refs
                 .iter()
                 .map(|edge_ref| format!("{}", graph[edge_ref.target()].node))
                 .collect::<Vec<_>>()
@@ -850,7 +851,7 @@ impl<'t, R: Rule> Builder<'t, R> {
             let chosen_edge = chosen_edges[0];
             to_visit.push(chosen_edge.target());
             edges_to_delete.extend(
-              live_edge_refs
+              edge_refs
                 .iter()
                 .map(|edge_ref| edge_ref.id())
                 .filter(|edge_ref_id| *edge_ref_id != chosen_edge.id()),
@@ -862,7 +863,7 @@ impl<'t, R: Rule> Builder<'t, R> {
                     eliminated: {:#?}",
               dependency_key,
               node,
-              live_edge_refs
+              edge_refs
                 .iter()
                 .map(|edge_ref| {
                   format!(
@@ -971,6 +972,32 @@ impl<'t, R: Rule> Builder<'t, R> {
       // TODO
       unreachable_rules: Vec::default(),
     })
+  }
+
+  ///
+  /// Groups the given edges by the DependencyKeys of the given node.
+  ///
+  fn edges_by_dependency_key<T>(
+    node: &Node<R>,
+    dependency_edges: impl Iterator<Item = (R::DependencyKey, T)>,
+  ) -> BTreeMap<R::DependencyKey, Vec<(R::DependencyKey, T)>> {
+    let mut edges_by_dependency_key = node
+      .dependency_keys()
+      .into_iter()
+      .map(|dk| (dk, vec![]))
+      .collect::<BTreeMap<_, _>>();
+    for (dependency_key, value) in dependency_edges {
+      edges_by_dependency_key
+        .get_mut(&dependency_key)
+        .unwrap_or_else(|| {
+          panic!(
+            "{} did not declare a dependency {}, but had an edge for it.",
+            node, dependency_key
+          );
+        })
+        .push((dependency_key, value));
+    }
+    edges_by_dependency_key
   }
 
   ///
