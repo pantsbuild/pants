@@ -109,7 +109,7 @@ class LintTest(TestBase):
         *,
         lint_request_types: List[Type[LintRequest]],
         targets: List[Target],
-        per_target_caching: bool,
+        per_file_caching: bool,
         include_sources: bool = True,
     ) -> Tuple[int, str]:
         console = MockConsole(use_colors=False)
@@ -121,7 +121,9 @@ class LintTest(TestBase):
                 console,
                 workspace,
                 Targets(targets),
-                create_goal_subsystem(LintSubsystem, per_target_caching=per_target_caching),
+                create_goal_subsystem(
+                    LintSubsystem, per_file_caching=per_file_caching, per_target_caching=False
+                ),
                 union_membership,
             ],
             mock_gets=[
@@ -147,43 +149,43 @@ class LintTest(TestBase):
         return result.exit_code, console.stderr.getvalue()
 
     def test_empty_target_noops(self) -> None:
-        def assert_noops(per_target_caching: bool) -> None:
+        def assert_noops(per_file_caching: bool) -> None:
             exit_code, stderr = self.run_lint_rule(
                 lint_request_types=[FailingRequest],
                 targets=[self.make_target()],
-                per_target_caching=per_target_caching,
+                per_file_caching=per_file_caching,
                 include_sources=False,
             )
             assert exit_code == 0
             assert stderr == ""
 
-        assert_noops(per_target_caching=False)
-        assert_noops(per_target_caching=True)
+        assert_noops(per_file_caching=False)
+        assert_noops(per_file_caching=True)
 
     def test_invalid_target_noops(self) -> None:
-        def assert_noops(per_target_caching: bool) -> None:
+        def assert_noops(per_file_caching: bool) -> None:
             exit_code, stderr = self.run_lint_rule(
                 lint_request_types=[InvalidRequest],
                 targets=[self.make_target()],
-                per_target_caching=per_target_caching,
+                per_file_caching=per_file_caching,
             )
             assert exit_code == 0
             assert stderr == ""
 
-        assert_noops(per_target_caching=False)
-        assert_noops(per_target_caching=True)
+        assert_noops(per_file_caching=False)
+        assert_noops(per_file_caching=True)
 
     def test_summary(self) -> None:
         """Test that we render the summary correctly.
 
         This tests that we:
-        * Merge multiple results belonging to the same linter (`--per-target-caching`).
+        * Merge multiple results belonging to the same linter (`--per-file-caching`).
         * Decide correctly between skipped, failed, and succeeded.
         """
         good_address = Address.parse(":good")
         bad_address = Address.parse(":bad")
 
-        def assert_expected(*, per_target_caching: bool) -> None:
+        def assert_expected(*, per_file_caching: bool) -> None:
             exit_code, stderr = self.run_lint_rule(
                 lint_request_types=[
                     ConditionallySucceedsRequest,
@@ -192,7 +194,7 @@ class LintTest(TestBase):
                     SuccessfulRequest,
                 ],
                 targets=[self.make_target(good_address), self.make_target(bad_address)],
-                per_target_caching=per_target_caching,
+                per_file_caching=per_file_caching,
             )
             assert exit_code == FailingRequest.exit_code([bad_address])
             assert stderr == dedent(
@@ -205,8 +207,8 @@ class LintTest(TestBase):
                 """
             )
 
-        assert_expected(per_target_caching=False)
-        assert_expected(per_target_caching=True)
+        assert_expected(per_file_caching=False)
+        assert_expected(per_file_caching=True)
 
 
 def test_streaming_output_skip() -> None:

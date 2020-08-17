@@ -6,6 +6,7 @@ import logging
 from dataclasses import dataclass
 from typing import Iterable, Optional, Tuple, cast
 
+from pants.base.deprecated import resolve_conflicting_options
 from pants.core.goals.style_request import StyleRequest
 from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSources,
@@ -149,18 +150,30 @@ class LintSubsystem(GoalSubsystem):
     def register_options(cls, register) -> None:
         super().register_options(register)
         register(
-            "--per-target-caching",
+            "--per-file-caching",
             advanced=True,
             type=bool,
             default=False,
             help=(
-                "Rather than running all targets in a single batch, run each target as a "
+                "Rather than linting all files in a single batch, lint each file as a "
                 "separate process. Why do this? You'll get many more cache hits. Why not do this? "
                 "Linters both have substantial startup overhead and are cheap to add one "
                 "additional file to the run. On a cold cache, it is much faster to use "
-                "`--no-per-target-caching`. We only recommend using `--per-target-caching` if you "
+                "`--no-per-file-caching`. We only recommend using `--per-file-caching` if you "
                 "are using a remote cache or if you have benchmarked that this option will be "
-                "faster than `--no-per-target-caching` for your use case."
+                "faster than `--no-per-file-caching` for your use case."
+            ),
+        )
+        register(
+            "--per-target-caching",
+            advanced=True,
+            type=bool,
+            default=False,
+            help="See `--per-file-caching`.",
+            removal_version="2.1.0.dev0",
+            removal_hint=(
+                "Use the renamed `--per-file-caching` option instead. If this option is set, Pants "
+                "will now run per every file, rather than per target."
             ),
         )
         register(
@@ -171,13 +184,21 @@ class LintSubsystem(GoalSubsystem):
             advanced=True,
             help=(
                 "Specifying a directory causes linters that support writing report files to write "
-                "into this directory.",
+                "into this directory."
             ),
         )
 
     @property
-    def per_target_caching(self) -> bool:
-        return cast(bool, self.options.per_target_caching)
+    def per_file_caching(self) -> bool:
+        val = resolve_conflicting_options(
+            old_option="per_target_caching",
+            new_option="per_file_caching",
+            old_container=self.options,
+            new_container=self.options,
+            old_scope=self.name,
+            new_scope=self.name,
+        )
+        return cast(bool, val)
 
     @property
     def reports_dir(self) -> Optional[str]:
@@ -215,8 +236,8 @@ async def lint(
         if request
     )
 
-    if lint_subsystem.per_target_caching:
-        all_per_target_results = await MultiGet(
+    if lint_subsystem.per_file_caching:
+        all_per_file_results = await MultiGet(
             Get(LintResults, LintRequest, request.__class__([field_set]))
             for request in valid_requests
             for field_set in request.field_sets
@@ -225,12 +246,12 @@ async def lint(
         all_results = tuple(
             LintResults(
                 itertools.chain.from_iterable(
-                    per_target_results.results for per_target_results in all_linter_results
+                    per_file_results.results for per_file_results in all_linter_results
                 ),
                 linter_name=linter_name,
             )
             for linter_name, all_linter_results in itertools.groupby(
-                all_per_target_results, key=lambda results: results.linter_name
+                all_per_file_results, key=lambda results: results.linter_name
             )
         )
     else:
@@ -247,8 +268,8 @@ async def lint(
             results.linter_name for results in all_results if len(results.reports) > 1
         ]
         if linters_with_multiple_reports:
-            if lint_subsystem.per_target_caching:
-                suggestion = "Try running without `--lint-per-target-caching` set."
+            if lint_subsystem.per_file_caching:
+                suggestion = "Try running without `--lint-per-file-caching` set."
             else:
                 suggestion = (
                     "The linters likely partitioned the input targets, such as grouping by Python "
