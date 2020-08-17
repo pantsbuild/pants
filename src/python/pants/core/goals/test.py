@@ -9,7 +9,6 @@ from enum import Enum
 from pathlib import PurePath
 from typing import Dict, Iterable, List, Optional, Tuple, Type, TypeVar, cast
 
-from pants.base.exiter import PANTS_FAILED_EXIT_CODE, PANTS_SUCCEEDED_EXIT_CODE
 from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSources,
     FieldSetsWithSourcesRequest,
@@ -35,12 +34,6 @@ from pants.util.logging import LogLevel
 logger = logging.getLogger(__name__)
 
 
-class Status(Enum):
-    SUCCESS = "SUCCESS"
-    FAILURE = "FAILURE"
-    SKIPPED = "SKIP"
-
-
 class CoverageReportType(Enum):
     CONSOLE = ("console", "report")
     XML = ("xml", None)
@@ -62,26 +55,19 @@ class CoverageReportType(Enum):
 
 @dataclass(frozen=True)
 class TestResult(EngineAware):
-    status: Status
+    exit_code: Optional[int]
     stdout: str
     stderr: str
     address: Address
-    coverage_data: Optional["CoverageData"]
-    xml_results: Optional[Digest]
+    coverage_data: Optional["CoverageData"] = None
+    xml_results: Optional[Digest] = None
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
 
     @classmethod
-    def skipped(cls, address: Address) -> "TestResult":
-        return cls(
-            status=Status.SKIPPED,
-            stdout="",
-            stderr="",
-            address=address,
-            coverage_data=None,
-            xml_results=None,
-        )
+    def skip(cls, address: Address) -> "TestResult":
+        return cls(exit_code=None, stdout="", stderr="", address=address)
 
     @classmethod
     def from_fallible_process_result(
@@ -93,12 +79,22 @@ class TestResult(EngineAware):
         xml_results: Optional[Digest] = None,
     ) -> "TestResult":
         return cls(
-            status=Status.SUCCESS if process_result.exit_code == 0 else Status.FAILURE,
+            exit_code=process_result.exit_code,
             stdout=process_result.stdout.decode(),
             stderr=process_result.stderr.decode(),
             address=address,
             coverage_data=coverage_data,
             xml_results=xml_results,
+        )
+
+    @property
+    def skipped(self) -> bool:
+        return (
+            self.exit_code is None
+            and not self.stdout
+            and not self.stderr
+            and not self.coverage_data
+            and not self.xml_results
         )
 
     def artifacts(self) -> Optional[Dict[str, Digest]]:
@@ -107,18 +103,18 @@ class TestResult(EngineAware):
         return {"xml_results_digest": self.xml_results}
 
     def level(self):
-        if self.status == Status.FAILURE:
+        if self.exit_code != 0:
             return LogLevel.ERROR
         return None
 
     def message(self):
-        result = "succeeded" if self.status == Status.SUCCESS else "failed"
+        result = "succeeded" if self.exit_code == 0 else f"failed (exit code {self.exit_code})"
         return f"tests {result}: {self.address}"
 
 
 @dataclass(frozen=True)
 class TestDebugRequest:
-    process: InteractiveProcess
+    process: Optional[InteractiveProcess]
 
     # Prevent this class from being detected by pytest as a test class.
     __test__ = False
@@ -327,6 +323,8 @@ async def run_tests(
         )
         exit_code = 0
         for debug_request in debug_requests:
+            if debug_request.process is None:
+                continue
             debug_result = interactive_runner.run(debug_request.process)
             if debug_result.exit_code != 0:
                 exit_code = debug_result.exit_code
@@ -350,15 +348,15 @@ async def run_tests(
 
     # Print details.
     for result in results:
-        if result.status == Status.SKIPPED:
+        if result.skipped:
             continue
         if test_subsystem.options.output == ShowOutput.NONE or (
-            test_subsystem.options.output == ShowOutput.FAILED and result.status == Status.SUCCESS
+            test_subsystem.options.output == ShowOutput.FAILED and result.exit_code == 0
         ):
             continue
         has_output = result.stdout or result.stderr
         if has_output:
-            status = console.green("✓") if result.status == Status.SUCCESS else console.red("𐄂")
+            status = console.green("✓") if result.exit_code == 0 else console.red("𐄂")
             console.print_stderr(f"{status} {result.address}")
         if result.stdout:
             console.print_stderr(result.stdout)
@@ -368,19 +366,20 @@ async def run_tests(
             console.print_stderr("")
 
     # Print summary
+    exit_code = 0
     console.print_stderr("")
     for result in results:
-        if result.status == Status.SKIPPED:
+        if result.skipped:
             continue
-        color = console.green if result.status == Status.SUCCESS else console.red
+        result_desc = console.green("SUCCESS") if result.exit_code == 0 else console.red("FAILURE")
         # The right-align logic sees the color control codes as characters, so we have
         # to account for that. In f-strings the alignment field widths must be literals,
         # so we have to indirect via a call to .format().
         right_align = 19 if console.use_colors else 10
         format_str = f"{{addr:80}}.....{{result:>{right_align}}}"
-        console.print_stderr(
-            format_str.format(addr=result.address.spec, result=color(result.status.value))
-        )
+        console.print_stderr(format_str.format(addr=result.address.spec, result=result_desc))
+        if result.exit_code is not None and result.exit_code != 0:
+            exit_code = result.exit_code
 
     merged_xml_results = await Get(
         Digest, MergeDigests(result.xml_results for result in results if result.xml_results),
@@ -415,12 +414,6 @@ async def run_tests(
 
         if coverage_report_files and test_subsystem.open_coverage:
             desktop.ui_open(console, interactive_runner, coverage_report_files)
-
-    exit_code = (
-        PANTS_FAILED_EXIT_CODE
-        if any(res.status == Status.FAILURE for res in results)
-        else PANTS_SUCCEEDED_EXIT_CODE
-    )
 
     return Test(exit_code)
 

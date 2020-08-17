@@ -13,7 +13,6 @@ from pants.core.goals.test import (
     CoverageDataCollection,
     CoverageReports,
     ShowOutput,
-    Status,
     Test,
     TestDebugRequest,
     TestFieldSet,
@@ -59,7 +58,7 @@ class MockTestFieldSet(TestFieldSet, metaclass=ABCMeta):
 
     @staticmethod
     @abstractmethod
-    def status(_: Address) -> Status:
+    def exit_code(_: Address) -> int:
         pass
 
     @staticmethod
@@ -73,7 +72,7 @@ class MockTestFieldSet(TestFieldSet, metaclass=ABCMeta):
     @property
     def test_result(self) -> TestResult:
         return TestResult(
-            status=self.status(self.address),
+            exit_code=self.exit_code(self.address),
             stdout=self.stdout(self.address),
             stderr=self.stderr(self.address),
             address=self.address,
@@ -84,8 +83,8 @@ class MockTestFieldSet(TestFieldSet, metaclass=ABCMeta):
 
 class SuccessfulFieldSet(MockTestFieldSet):
     @staticmethod
-    def status(_: Address) -> Status:
-        return Status.SUCCESS
+    def exit_code(_: Address) -> int:
+        return 0
 
     @staticmethod
     def stdout(address: Address) -> str:
@@ -94,8 +93,8 @@ class SuccessfulFieldSet(MockTestFieldSet):
 
 class ConditionallySucceedsFieldSet(MockTestFieldSet):
     @staticmethod
-    def status(address: Address) -> Status:
-        return Status.FAILURE if address.target_name == "bad" else Status.SUCCESS
+    def exit_code(address: Address) -> int:
+        return 27 if address.target_name == "bad" else 0
 
     @staticmethod
     def stdout(address: Address) -> str:
@@ -257,7 +256,7 @@ class TestTest(TestBase):
                 self.make_target_with_origin(bad_address),
             ],
         )
-        assert exit_code == 1
+        assert exit_code == ConditionallySucceedsFieldSet.exit_code(bad_address)
         assert stderr == dedent(
             f"""\
             ✓ {good_address}
@@ -283,15 +282,15 @@ class TestTest(TestBase):
             ],
             output=ShowOutput.FAILED,
         )
-        assert exit_code == 1
+        assert exit_code == ConditionallySucceedsFieldSet.exit_code(bad_address)
         assert stderr == dedent(
             f"""\
-                𐄂 {bad_address}
-                {ConditionallySucceedsFieldSet.stderr(bad_address)}
+            𐄂 {bad_address}
+            {ConditionallySucceedsFieldSet.stderr(bad_address)}
 
-                {good_address}                                                                         .....   SUCCESS
-                {bad_address}                                                                          .....   FAILURE
-                """
+            {good_address}                                                                         .....   SUCCESS
+            {bad_address}                                                                          .....   FAILURE
+            """
         )
 
     def test_output_none(self) -> None:
@@ -306,13 +305,13 @@ class TestTest(TestBase):
             ],
             output=ShowOutput.NONE,
         )
-        assert exit_code == 1
+        assert exit_code == ConditionallySucceedsFieldSet.exit_code(bad_address)
         assert stderr == dedent(
             f"""\
 
-                    {good_address}                                                                         .....   SUCCESS
-                    {bad_address}                                                                          .....   FAILURE
-                    """
+            {good_address}                                                                         .....   SUCCESS
+            {bad_address}                                                                          .....   FAILURE
+            """
         )
 
     def test_debug_target(self) -> None:
