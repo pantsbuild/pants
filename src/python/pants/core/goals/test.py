@@ -21,7 +21,7 @@ from pants.engine.engine_aware import EngineAware
 from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult, InteractiveProcess, InteractiveRunner
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
+from pants.engine.rules import Get, MultiGet, RootRule, collect_rules, goal_rule, rule
 from pants.engine.target import (
     FieldSet,
     Sources,
@@ -453,4 +453,4 @@ def enrich_test_result(
 
 
 def rules():
-    return collect_rules()
+    return (*collect_rules(), RootRule(TestResult))
