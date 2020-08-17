@@ -13,6 +13,7 @@ from pants.engine.addresses import Address
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import Targets
 from pants.util.frozendict import FrozenDict
+from pants.util.logging import LogLevel
 
 
 @dataclass(frozen=True)
@@ -57,7 +58,7 @@ class FirstPartyModuleToAddressMapping:
         return self.mapping.get(parent_module)
 
 
-@rule
+@rule(desc="Creating map of first party targets to Python modules", level=LogLevel.DEBUG)
 async def map_first_party_modules_to_addresses() -> FirstPartyModuleToAddressMapping:
     all_expanded_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
     candidate_targets = tuple(tgt for tgt in all_expanded_targets if tgt.has_field(PythonSources))
@@ -98,7 +99,7 @@ class ThirdPartyModuleToAddressMapping:
         return self.address_for_module(parent_module)
 
 
-@rule
+@rule(desc="Creating map of third party targets to Python modules", level=LogLevel.DEBUG)
 async def map_third_party_modules_to_addresses() -> ThirdPartyModuleToAddressMapping:
     all_targets = await Get(Targets, AddressSpecs([DescendantAddresses("")]))
     modules_to_addresses: Dict[str, Address] = {}

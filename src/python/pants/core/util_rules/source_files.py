@@ -9,7 +9,6 @@ from pants.engine.fs import MergeDigests, Snapshot
 from pants.engine.rules import Get, MultiGet, RootRule, collect_rules, rule
 from pants.engine.target import HydratedSources, HydrateSourcesRequest
 from pants.engine.target import Sources as SourcesField
-from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 
 
@@ -51,7 +50,7 @@ class SourceFilesRequest:
         self.enable_codegen = enable_codegen
 
 
-@rule(level=LogLevel.DEBUG)
+@rule
 async def determine_source_files(request: SourceFilesRequest) -> SourceFiles:
     """Merge all `Sources` fields into one Snapshot."""
     unrooted_files: Set[str] = set()

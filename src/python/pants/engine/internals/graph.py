@@ -72,6 +72,8 @@ from pants.engine.unions import UnionMembership
 from pants.option.global_options import GlobalOptions, OwnersNotFoundBehavior
 from pants.source.filespec import matches_filespec
 from pants.util.ordered_set import FrozenOrderedSet, OrderedSet
+from pants.util.logging import LogLevel
+
 
 logger = logging.getLogger(__name__)
 
@@ -478,7 +480,7 @@ async def addresses_with_origins_from_filesystem_specs(
     )
 
 
-@rule
+@rule(desc="Find targets from input specs", level=LogLevel.DEBUG)
 async def resolve_addresses_with_origins(specs: Specs) -> AddressesWithOrigins:
     from_address_specs, from_filesystem_specs = await MultiGet(
         Get(AddressesWithOrigins, AddressSpecs, specs.address_specs),
@@ -501,7 +503,7 @@ async def resolve_addresses_with_origins(specs: Specs) -> AddressesWithOrigins:
 # -----------------------------------------------------------------------------------------------
 
 
-@rule
+@rule(desc="Find all sources from input specs", level=LogLevel.DEBUG)
 async def resolve_sources_snapshot(specs: Specs, global_options: GlobalOptions) -> SourcesSnapshot:
     """Request a snapshot for the given specs.
 
