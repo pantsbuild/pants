@@ -14,9 +14,10 @@ from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
+from pants.engine.rules import Get, MultiGet, QueryRule, collect_rules, goal_rule
 from pants.engine.target import TargetsWithOrigins
 from pants.engine.unions import UnionMembership, union
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.util.strutil import strip_v2_chroot_path
 
 
@@ -126,4 +127,8 @@ async def typecheck(
 
 
 def rules():
-    return collect_rules()
+    return [
+        *collect_rules(),
+        # NB: Would be unused otherwise.
+        QueryRule(TypecheckSubsystem, [OptionsBootstrapper]),
+    ]

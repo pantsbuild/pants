@@ -90,19 +90,23 @@ impl<'t, R: Rule> Builder<'t, R> {
       );
     }
 
-    let unreachable_rules = self.unreachable_rules(&dependency_edges);
+    // TODO: See https://github.com/pantsbuild/pants/issues/10649.
+    // let unreachable_rules = self.unreachable_rules(&dependency_edges);
 
     RuleGraph {
       queries: self.queries,
       rule_dependency_edges: dependency_edges,
       unfulfillable_rules,
-      unreachable_rules,
+      unreachable_rules: vec![],
     }
   }
 
   ///
   /// Compute input TaskRules that are unreachable from root entries.
   ///
+  /// TODO: See https://github.com/pantsbuild/pants/issues/10649
+  ///
+  #[allow(dead_code)]
   fn unreachable_rules(
     &self,
     full_dependency_edges: &RuleDependencyEdges<R>,

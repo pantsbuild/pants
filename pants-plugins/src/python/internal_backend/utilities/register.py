@@ -8,7 +8,8 @@ from packaging.version import Version
 
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.engine.rules import SubsystemRule
+from pants.engine.rules import QueryRule, SubsystemRule
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.subsystem import Subsystem
 from pants.util.ordered_set import FrozenOrderedSet
 from pants.version import PANTS_SEMVER, VERSION
@@ -113,4 +114,10 @@ def build_file_aliases():
 
 
 def rules():
-    return [SubsystemRule(PantsReleases)]
+    return [
+        # NB: This subsystem must be declared in order for pants.toml to be parsed in this repo,
+        # but it is not consumed by any @rules. To prevent it from being considered to be
+        # unreachable, we add an (otherwise unused) query to return it.
+        SubsystemRule(PantsReleases),
+        QueryRule(PantsReleases, [OptionsBootstrapper]),
+    ]

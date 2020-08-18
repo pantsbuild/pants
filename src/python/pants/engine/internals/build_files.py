@@ -14,7 +14,6 @@ from pants.engine.addresses import (
     AddressInput,
     AddressWithOrigin,
     BuildFileAddress,
-    BuildFileAddresses,
 )
 from pants.engine.fs import DigestContents, GlobMatchErrorBehavior, PathGlobs, Snapshot
 from pants.engine.internals.mapper import AddressFamily, AddressMap, AddressSpecsFilter
@@ -124,12 +123,6 @@ async def find_build_file(address: Address) -> BuildFileAddress:
     return (
         bfa if address.is_base_target else BuildFileAddress(rel_path=bfa.rel_path, address=address)
     )
-
-
-@rule
-async def find_build_files(addresses: Addresses) -> BuildFileAddresses:
-    bfas = await MultiGet(Get(BuildFileAddress, Address, address) for address in addresses)
-    return BuildFileAddresses(bfas)
 
 
 @rule

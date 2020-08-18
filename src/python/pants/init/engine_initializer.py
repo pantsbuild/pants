@@ -13,7 +13,7 @@ from pants.base.specs import Specs
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.engine import fs, process
 from pants.engine.console import Console
-from pants.engine.fs import Workspace
+from pants.engine.fs import PathGlobs, Snapshot, Workspace
 from pants.engine.goal import Goal
 from pants.engine.internals import build_files, graph, options_parsing, uuid
 from pants.engine.internals.native import Native
@@ -22,9 +22,10 @@ from pants.engine.internals.scheduler import Scheduler, SchedulerSession
 from pants.engine.internals.selectors import Params
 from pants.engine.platform import create_platform_rules
 from pants.engine.process import InteractiveRunner
-from pants.engine.rules import RootRule, collect_rules, rule, QueryRule
+from pants.engine.rules import QueryRule, RootRule, collect_rules, rule
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
+from pants.init import specs_calculator
 from pants.init.options_initializer import BuildConfigInitializer, OptionsInitializer
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS, ExecutionOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -242,6 +243,7 @@ class EngineInitializer:
                 *process.rules(),
                 *create_platform_rules(),
                 *changed_rules(),
+                *specs_calculator.rules(),
                 *rules,
             )
         )
@@ -254,6 +256,8 @@ class EngineInitializer:
                     QueryRule(goal_type, GraphSession.goal_param_types)
                     for goal_type in goal_map.values()
                 ],
+                # Used by the SchedulerService.
+                QueryRule(Snapshot, [PathGlobs]),
             )
         )
 

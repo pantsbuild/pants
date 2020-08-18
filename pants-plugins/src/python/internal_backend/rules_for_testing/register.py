@@ -4,7 +4,8 @@
 from pants.engine.addresses import Addresses
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.rules import collect_rules, goal_rule
+from pants.engine.rules import QueryRule, collect_rules, goal_rule
+from pants.option.options_bootstrapper import OptionsBootstrapper
 
 
 class ListAndDieForTestingSubsystem(GoalSubsystem):
@@ -25,4 +26,8 @@ def fast_list_and_die_for_testing(console: Console, addresses: Addresses) -> Lis
 
 
 def rules():
-    return collect_rules()
+    return [
+        *collect_rules(),
+        # NB: Would be unused otherwise.
+        QueryRule(ListAndDieForTestingSubsystem, [OptionsBootstrapper]),
+    ]
