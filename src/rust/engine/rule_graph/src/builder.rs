@@ -251,9 +251,9 @@ impl<'t, R: Rule> Builder<'t, R> {
     // nodes in the graph, but because monomorphizing a node enqueues its dependees we may
     // visit some of them multiple times.
     //
-    // We use an IndexSet to preserve the initial DFS order while still removing duplicates. The
-    // nodes that should be visited last will be at the bottom of the set, and will stay there
-    // until things above them have been removed.
+    // DFS converges much more quickly than BFS. We use an IndexSet to preserve the initial walk
+    // order while still removing duplicates. The nodes that should be visited last will remain at
+    // the bottom of the set/stack, and will stay there until things above them have been removed.
     let mut to_visit = {
       let mut dfs = DfsPostOrder {
         stack: graph.externals(Direction::Incoming).collect(),
@@ -740,7 +740,7 @@ impl<'t, R: Rule> Builder<'t, R> {
 
     // Because the leaves of the graph (generally Param nodes) are the most significant source of
     // information, we start there. But we will eventually visit all reachable nodes, possibly
-    // multiple times. Informations flows both up (the in_sets) and down (the out_sets) this
+    // multiple times. Information flows both up (the in_sets) and down (the out_sets) this
     // graph.
     let mut to_visit = graph
       .externals(Direction::Outgoing)
