@@ -279,7 +279,7 @@ impl<N: Node> Entry<N> {
   /// Spawn the execution of the node on an Executor, which will cause it to execute outside of
   /// the Graph lock and call back into the graph lock to set the final value.
   ///
-  pub(crate) fn run(
+  pub(crate) fn spawn_node_execution(
     context_factory: &N::Context,
     node: &N,
     entry_id: EntryId,
@@ -367,7 +367,7 @@ impl<N: Node> Entry<N> {
   /// by value.
   ///
   #[allow(clippy::type_complexity)] // This return type is not particularly complex.
-  pub(crate) fn get(
+  pub(crate) fn get_node_result(
     &mut self,
     context: &N::Context,
     entry_id: EntryId,
@@ -376,25 +376,23 @@ impl<N: Node> Entry<N> {
       let mut state = self.state.lock();
 
       // First check whether the Node is already complete, or is currently running: in both of these
-      // cases we don't swap the state of the Node.
-      match &mut *state {
-        &mut EntryState::Running {
+      // cases we return early without swapping the state of the Node.
+      match *state {
+        EntryState::Running {
           ref mut waiters, ..
         } => {
           let (send, recv) = oneshot::channel();
           waiters.push(send);
           return async move { recv.await.map_err(|_| N::Error::invalidated())? }.boxed();
         }
-        &mut EntryState::Completed {
+        EntryState::Completed {
           ref result,
           generation,
           ..
         } if result.is_clean(context) => {
           return future::ready(Ok((result.as_ref().clone(), generation))).boxed();
         }
-        _ => {
-          // Fall through to the second match.
-        }
+        _ => (),
       };
 
       // Otherwise, we'll need to swap the state of the Node, so take it by value.
@@ -403,7 +401,7 @@ impl<N: Node> Entry<N> {
           run_token,
           generation,
           previous_result,
-        } => Self::run(
+        } => Self::spawn_node_execution(
           context,
           &self.node,
           entry_id,
@@ -415,24 +413,22 @@ impl<N: Node> Entry<N> {
         EntryState::Completed {
           run_token,
           generation,
-          pollers,
           result,
           dep_generations,
+          ..
         } => {
           assert!(
             !result.is_clean(context),
             "A clean Node should not reach this point: {:?}",
             result
           );
-          // NB: Explicitly drop the pollers: would happen anyway, but avoids an unused variable.
-          mem::drop(pollers);
           // The Node has already completed but needs to re-run. If the Node is dirty, we are the
           // first caller to request it since it was marked dirty. We attempt to clean it (which
           // will cause it to re-run if the dep_generations mismatch).
           //
           // On the other hand, if the Node is uncacheable, we store the previous result as
           // Uncacheable, which allows its value to be used only within the current Run.
-          Self::run(
+          Self::spawn_node_execution(
             context,
             &self.node,
             entry_id,
@@ -454,7 +450,7 @@ impl<N: Node> Entry<N> {
       // Swap in the new state and then recurse.
       *state = next_state;
     }
-    self.get(context, entry_id)
+    self.get_node_result(context, entry_id)
   }
 
   ///
@@ -745,7 +741,7 @@ impl<N: Node> Entry<N> {
     }
   }
 
-  pub fn has_uncacheable_deps(&self) -> bool {
+  pub(crate) fn has_uncacheable_deps(&self) -> bool {
     match *self.state.lock() {
       EntryState::Completed { ref result, .. } => result.has_uncacheable_deps(),
       EntryState::NotStarted { .. } | EntryState::Running { .. } => false,
