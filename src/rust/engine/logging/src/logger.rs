@@ -45,7 +45,7 @@ impl PantsLogger {
       pantsd_log: Mutex::new(MaybeWriteLogger::empty()),
       stderr_log: Mutex::new(MaybeWriteLogger::empty()),
       show_rust_3rdparty_logs: AtomicBool::new(true),
-      use_color: AtomicBool::new(true),
+      use_color: AtomicBool::new(false),
       show_log_domain: AtomicBool::new(false),
       stderr_handlers: Mutex::new(HashMap::new()),
       log_level_filters: Mutex::new(RefCell::new(HashMap::new())),
@@ -82,7 +82,10 @@ impl PantsLogger {
         PANTS_LOGGER
           .show_rust_3rdparty_logs
           .store(show_rust_3rdparty_logs, Ordering::SeqCst);
-        PANTS_LOGGER.log_level_filters.lock().replace(log_domain_levels);
+        PANTS_LOGGER
+          .log_level_filters
+          .lock()
+          .replace(log_domain_levels);
         if set_logger(&*PANTS_LOGGER).is_err() {
           debug!("Logging already initialized.");
         }
@@ -106,7 +109,6 @@ impl PantsLogger {
         *self.stderr_log.lock() = MaybeWriteLogger::new(
           stderr(),
           level.into(),
-          self.show_rust_3rdparty_logs.load(Ordering::SeqCst),
           self.show_log_domain.load(Ordering::SeqCst),
           self.log_level_filters.lock().borrow().clone(),
         )
@@ -142,7 +144,6 @@ impl PantsLogger {
             *self.pantsd_log.lock() = MaybeWriteLogger::new(
               file,
               level.into(),
-              self.show_rust_3rdparty_logs.load(Ordering::SeqCst),
               self.show_log_domain.load(Ordering::SeqCst),
               self.log_level_filters.lock().borrow().clone(),
             );
@@ -270,7 +271,6 @@ impl Log for PantsLogger {
 
 struct MaybeWriteLogger<W: Write + Send + 'static> {
   level: LevelFilter,
-  show_rust_3rdparty_logs: bool,
   log_domain_filters: HashMap<String, LevelFilter>,
   inner: Option<Box<WriteLogger<W>>>,
 }
@@ -279,7 +279,6 @@ impl<W: Write + Send + 'static> MaybeWriteLogger<W> {
   pub fn empty() -> MaybeWriteLogger<W> {
     MaybeWriteLogger {
       level: LevelFilter::Off,
-      show_rust_3rdparty_logs: true,
       log_domain_filters: HashMap::new(),
       inner: None,
     }
@@ -288,7 +287,6 @@ impl<W: Write + Send + 'static> MaybeWriteLogger<W> {
   pub fn new(
     writable: W,
     level: LevelFilter,
-    show_rust_3rdparty_logs: bool,
     show_log_domain: bool,
     log_domain_filters: HashMap<String, LevelFilter>,
   ) -> MaybeWriteLogger<W> {
@@ -311,7 +309,6 @@ impl<W: Write + Send + 'static> MaybeWriteLogger<W> {
     MaybeWriteLogger {
       level,
       log_domain_filters,
-      show_rust_3rdparty_logs,
       inner: Some(WriteLogger::new(LevelFilter::max(), config, writable)),
     }
   }

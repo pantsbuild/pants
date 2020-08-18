@@ -52,6 +52,7 @@ class NativeHandler(StreamHandler):
         self.native = Native()
         self.native_filename = native_filename
         # Set to most granular level - rust logging code will take care of the filtering
+        # TODO: This should ask Rust for the minimum level to use since TRACE level generates too many logs.
         self.setLevel(pants_logging.TRACE)
 
         if stream:

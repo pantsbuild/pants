@@ -258,7 +258,6 @@ class PantsDaemon(PantsDaemonProcessManager):
 
         # Write the pidfile. The SchedulerService will monitor it after a grace period.
         pid = os.getpid()
-        self._logger.debug(f"pantsd running with PID: {pid}")
         self.write_pid(pid=pid)
         self.write_metadata_by_name(
             "pantsd", self.FINGERPRINT_KEY, ensure_text(self.options_fingerprint)
