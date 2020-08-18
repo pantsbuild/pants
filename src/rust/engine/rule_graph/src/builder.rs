@@ -376,6 +376,12 @@ impl<'t, R: Rule> Builder<'t, R> {
 
       // A node with no declared dependencies is always already minimal.
       if dependencies_by_key.is_empty() {
+        // But we ensure that its out_set is accurate before continuing.
+        if graph[node_id].out_set != graph[node_id].in_set {
+          rules.remove(&graph[node_id]);
+          graph.node_weight_mut(node_id).unwrap().out_set = graph[node_id].in_set.clone();
+          rules.insert(graph[node_id].clone(), node_id);
+        }
         continue;
       }
 
@@ -400,11 +406,6 @@ impl<'t, R: Rule> Builder<'t, R> {
         }
         dbos
       };
-
-      // A node with no declared dependencies is always already minimal.
-      if dependencies_by_key.is_empty() {
-        continue;
-      }
 
       let dependees_by_out_set_len = dependees_by_out_set.len();
       let dependencies_by_key_lens = dependencies_by_key
