@@ -297,7 +297,7 @@ impl<'t, R: Rule> Builder<'t, R> {
     );
     */
 
-    let debug_str = "run_setup_py(";
+    let debug_str = "this_is_not_a_real_rule(";
 
     // As we split Rules, we attempt to re-join with existing identical Rule nodes to avoid an
     // explosion.
@@ -1188,17 +1188,18 @@ impl<'t, R: Rule> Builder<'t, R> {
 
   ///
   /// Given a node and a mapping of all legal sources of each of its dependencies, generates a
-  /// simplified node for each legal set with potentially useful in_sets.
+  /// simplified node for each legal set.
   ///
   /// Note that because ambiguities are preserved (to allow for useful errors
   /// post-monomorphization), the output is a set of dependencies which might contain multiple
   /// entries per DependencyKey.
   ///
   /// Unfortunately, we cannot eliminate dependencies based on their in_sets not being a subset of
-  /// the out_set, because it's possible that they have not converged (transitively) to their true
-  /// requirements yet. See the doc string of `monomorphize`. We _are_ able to reject dependencies
-  /// that directly depend on something that is not present though: and as this happens lower in
-  /// the graph, the in_sets will shrink.
+  /// the out_set, because it's possible that the in_sets have not shrunk (transitively) to their
+  /// true requirements yet. See the doc string of `monomorphize`. We _are_ able to reject
+  /// dependencies that _directly_ depend on something that is not present though: either via a
+  /// direct dependency on a Param node that is not present in the out_set, or a DependencyKey's
+  /// provided_param that is not in the in_set of a combination.
   ///
   fn monomorphizations(
     graph: &ParamsLabeledGraph<R>,
@@ -1246,54 +1247,6 @@ impl<'t, R: Rule> Builder<'t, R> {
           );
         }
         continue;
-      }
-
-      // And that it is useful.
-      //
-      // The out_set shrinks as monomorphization runs and nodes are split,
-      // and so we can't require that all of the params are consumed (both because not all out_sets
-      // are required for consumption, and also because that might prevent a dependee whose out_set
-      // might later shrink from consuming a node).
-      //
-      // Likewise, we can't just generate the smallest possible in_sets without regard for the
-      // out_set, because some of the members of the out_set will end up being required for consumption.
-      let candidate_consumes = out_set.intersection(&in_set).collect::<ParamTypes<_>>();
-      let mut was_eliminated = false;
-      let mut eliminated = Vec::new();
-      for already_satisfied in combinations.keys() {
-        if &in_set == already_satisfied {
-          // This set is identical to an existing set: we must store it.
-          break;
-        }
-
-        // If both candidates consume the same portion of the out_set, take the smaller one over
-        // all.
-        let already_satisfied_consumes = out_set
-          .intersection(&already_satisfied)
-          .collect::<ParamTypes<_>>();
-        if candidate_consumes == already_satisfied_consumes {
-          if in_set.len() < already_satisfied.len() {
-            eliminated.push(already_satisfied.clone());
-            continue;
-          } else if in_set.len() > already_satisfied.len() {
-            was_eliminated = true;
-            break;
-          } else {
-            // Keep both, unfortunately.
-            break;
-          }
-        }
-      }
-      if was_eliminated {
-        // An existing set was a better choice than this one.
-        if debug {
-          println!(">>> combination was eliminated: {}", params_str(&in_set));
-        }
-        continue;
-      }
-      for to_eliminate in eliminated {
-        // The new set is better than some old set(s): remove them.
-        combinations.remove(&to_eliminate);
       }
 
       if debug {
