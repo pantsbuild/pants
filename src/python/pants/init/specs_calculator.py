@@ -10,6 +10,7 @@ from pants.base.specs_parser import SpecsParser
 from pants.engine.addresses import AddressInput
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.internals.selectors import Params
+from pants.engine.rules import QueryRule
 from pants.option.options import Options
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.scm.subsystems.changed import ChangedAddresses, ChangedOptions, ChangedRequest
@@ -77,3 +78,9 @@ def calculate_specs(
             )
         )
     return Specs(AddressSpecs(address_specs, filter_by_global_options=True), FilesystemSpecs([]))
+
+
+def rules():
+    return [
+        QueryRule(ChangedAddresses, [ChangedRequest, OptionsBootstrapper]),
+    ]

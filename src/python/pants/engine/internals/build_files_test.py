@@ -27,7 +27,6 @@ from pants.engine.addresses import (
     AddressInput,
     AddressWithOrigin,
     BuildFileAddress,
-    BuildFileAddresses,
 )
 from pants.engine.fs import DigestContents, FileContent, PathGlobs
 from pants.engine.internals.build_files import (
@@ -224,10 +223,6 @@ class BuildFileIntegrationTest(TestBase):
             expected_bfa = BuildFileAddress(rel_path="helloworld/BUILD.ext", address=address)
             bfa = self.request_product(BuildFileAddress, Params(address, bootstrapper))
             assert bfa == expected_bfa
-            bfas = self.request_product(
-                BuildFileAddresses, Params(Addresses([address]), bootstrapper)
-            )
-            assert bfas == BuildFileAddresses([bfa])
 
         assert_bfa_resolved(Address("helloworld"))
         # File addresses should use their base target to find the BUILD file.
