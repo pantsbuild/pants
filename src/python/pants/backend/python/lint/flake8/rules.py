@@ -14,10 +14,16 @@ from pants.backend.python.rules.pex import (
     PexRequirements,
 )
 from pants.backend.python.target_types import PythonInterpreterCompatibility, PythonSources
-from pants.core.goals.lint import LintReport, LintRequest, LintResult, LintResults, LintSubsystem
+from pants.core.goals.lint import (
+    LintRequest,
+    LintResult,
+    LintResults,
+    LintSubsystem,
+    extract_lint_report,
+)
 from pants.core.util_rules import source_files, stripped_source_files
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import Digest, DigestSubset, GlobMatchErrorBehavior, MergeDigests, PathGlobs
+from pants.engine.fs import Digest, GlobMatchErrorBehavior, MergeDigests, PathGlobs
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet
@@ -114,21 +120,7 @@ async def flake8_lint_partition(
         ),
     )
 
-    report = None
-    if report_file_name:
-        report_digest = await Get(
-            Digest,
-            DigestSubset(
-                result.output_digest,
-                PathGlobs(
-                    [report_file_name],
-                    glob_match_error_behavior=GlobMatchErrorBehavior.warn,
-                    description_of_origin="Flake8 report file",
-                ),
-            ),
-        )
-        report = LintReport(report_file_name, report_digest)
-
+    report = await extract_lint_report("Flake8", result, report_file_name)
     return LintResult.from_fallible_process_result(
         result, partition_description=str(sorted(partition.interpreter_constraints)), report=report
     )

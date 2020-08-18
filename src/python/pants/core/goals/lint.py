@@ -14,7 +14,14 @@ from pants.core.util_rules.filter_empty_sources import (
 )
 from pants.engine.console import Console
 from pants.engine.engine_aware import EngineAware
-from pants.engine.fs import Digest, MergeDigests, Workspace
+from pants.engine.fs import (
+    Digest,
+    DigestSubset,
+    GlobMatchErrorBehavior,
+    MergeDigests,
+    PathGlobs,
+    Workspace,
+)
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
@@ -36,6 +43,25 @@ class LintReport:
 
 class InvalidLinterReportsError(Exception):
     pass
+
+
+async def extract_lint_report(
+    origin: str, result: FallibleProcessResult, report_file_name: Optional[str]
+) -> Optional[LintReport]:
+    if not report_file_name:
+        return None
+    report_digest = await Get(
+        Digest,
+        DigestSubset(
+            result.output_digest,
+            PathGlobs(
+                [report_file_name],
+                glob_match_error_behavior=GlobMatchErrorBehavior.warn,
+                description_of_origin=f"{origin} report file",
+            ),
+        ),
+    )
+    return LintReport(report_file_name, report_digest)
 
 
 @dataclass(frozen=True)
