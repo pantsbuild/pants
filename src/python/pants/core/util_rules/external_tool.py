@@ -11,6 +11,7 @@ from pants.engine.fs import Digest, DownloadFile
 from pants.engine.platform import Platform
 from pants.engine.rules import Get, RootRule, collect_rules, rule
 from pants.option.subsystem import Subsystem
+from pants.util.logging import LogLevel
 from pants.util.meta import classproperty
 
 
@@ -167,7 +168,7 @@ class ExternalTool(Subsystem):
         )
 
 
-@rule
+@rule(level=LogLevel.DEBUG)
 async def download_external_tool(request: ExternalToolRequest) -> DownloadedExternalTool:
     digest = await Get(Digest, DownloadFile, request.download_file_request)
     extracted_digest = await Get(ExtractedDigest, MaybeExtractable(digest))

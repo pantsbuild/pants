@@ -15,6 +15,7 @@ from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule, rule
 from pants.engine.target import Dependencies, DependenciesRequest, Targets, UnexpandedTargets
 from pants.util.frozendict import FrozenDict
+from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import FrozenOrderedSet
 
@@ -24,7 +25,7 @@ class AddressToDependees:
     mapping: FrozenDict[Address, FrozenOrderedSet[Address]]
 
 
-@rule
+@rule(level=LogLevel.DEBUG)
 async def map_addresses_to_dependees() -> AddressToDependees:
     # Get every target in the project so that we can iterate over them to find their dependencies.
     all_expanded_targets, all_explicit_targets = await MultiGet(
@@ -66,7 +67,7 @@ class Dependees(DeduplicatedCollection[Address]):
     sort_input = True
 
 
-@rule
+@rule(level=LogLevel.DEBUG)
 def find_dependees(
     request: DependeesRequest, address_to_dependees: AddressToDependees
 ) -> Dependees:

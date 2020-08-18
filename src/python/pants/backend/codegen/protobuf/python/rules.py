@@ -25,7 +25,7 @@ class GeneratePythonFromProtobufRequest(GenerateSourcesRequest):
     output = PythonSources
 
 
-@rule(desc="Generate Python from Protobuf")
+@rule(desc="Generate Python from Protobuf", level=LogLevel.DEBUG)
 async def generate_python_from_protobuf(
     request: GeneratePythonFromProtobufRequest, protoc: Protoc
 ) -> GeneratedSources:
@@ -40,7 +40,7 @@ async def generate_python_from_protobuf(
         Process(
             ("/bin/mkdir", output_dir),
             description=f"Create the directory {output_dir}",
-            level=LogLevel.DEBUG,
+            level=LogLevel.TRACE,
             output_directories=(output_dir,),
         ),
     )

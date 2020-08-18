@@ -419,7 +419,7 @@ class RuleArgumentAnnotationTest(unittest.TestCase):
         self.assertIsNotNone(a_named_rule.rule)
         self.assertEqual(another_named_rule.rule.canonical_name, "something_different")
         self.assertEqual(another_named_rule.rule.desc, "Human readable desc")
-        self.assertEqual(another_named_rule.rule.level, LogLevel.DEBUG)
+        self.assertEqual(another_named_rule.rule.level, LogLevel.TRACE)
 
     def test_bogus_rules(self):
         with self.assertRaises(UnrecognizedRuleArgument):

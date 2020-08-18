@@ -16,6 +16,7 @@ from pants.engine.rules import Get, MultiGet, RootRule, collect_rules, rule
 from pants.engine.target import Sources, Target
 from pants.engine.unions import UnionMembership
 from pants.source.source_root import SourceRoot, SourceRootRequest
+from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 
 
@@ -74,7 +75,7 @@ class PythonSourceFilesRequest:
         return tuple(types)
 
 
-@rule
+@rule(level=LogLevel.DEBUG)
 async def prepare_python_sources(
     request: PythonSourceFilesRequest, union_membership: UnionMembership
 ) -> PythonSourceFiles:
@@ -111,7 +112,7 @@ async def prepare_python_sources(
     )
 
 
-@rule
+@rule(level=LogLevel.DEBUG)
 async def strip_python_sources(python_sources: PythonSourceFiles) -> StrippedPythonSourceFiles:
     stripped = await Get(StrippedSourceFiles, SourceFiles, python_sources.source_files)
     return StrippedPythonSourceFiles(stripped)

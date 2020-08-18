@@ -12,13 +12,14 @@ from pants.engine.addresses import Addresses
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.unions import UnionRule
+from pants.util.logging import LogLevel
 
 
 class PythonRepl(ReplImplementation):
     name = "python"
 
 
-@rule
+@rule(level=LogLevel.DEBUG)
 async def create_python_repl_request(repl: PythonRepl) -> ReplRequest:
     requirements_request = Get(
         Pex,
@@ -46,7 +47,7 @@ class IPythonRepl(ReplImplementation):
     name = "ipython"
 
 
-@rule
+@rule(level=LogLevel.DEBUG)
 async def create_ipython_repl_request(repl: IPythonRepl, ipython: IPython) -> ReplRequest:
     # Note that we get an intermediate PexRequest here (instead of going straight to a Pex)
     # so that we can get the interpreter constraints for use in ipython_request.

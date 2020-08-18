@@ -31,6 +31,7 @@ from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSetWithOrigin, TransitiveTargets
 from pants.engine.unions import UnionRule
+from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
 
@@ -56,7 +57,7 @@ def generate_args(mypy: MyPy, *, file_list_path: str) -> Tuple[str, ...]:
 
 # TODO(#10131): Improve performance, e.g. by leveraging the MyPy cache.
 # TODO(#10131): Support plugins and type stubs.
-@rule(desc="Typecheck using MyPy")
+@rule(desc="Typecheck using MyPy", level=LogLevel.DEBUG)
 async def mypy_typecheck(request: MyPyRequest, mypy: MyPy) -> TypecheckResults:
     if mypy.skip:
         return TypecheckResults()

@@ -281,7 +281,7 @@ def rule_decorator(func, **kwargs) -> Callable:
     if effective_desc is None and is_goal_cls:
         effective_desc = f"`{effective_name}` goal"
 
-    effective_level = kwargs.get("level", LogLevel.DEBUG)
+    effective_level = kwargs.get("level", LogLevel.TRACE)
     if not isinstance(effective_level, LogLevel):
         raise ValueError(
             "Expected to receive a value of type LogLevel for the level "
@@ -328,6 +328,8 @@ def rule(*args, **kwargs) -> Callable:
 
 
 def goal_rule(*args, **kwargs) -> Callable:
+    if "level" not in kwargs:
+        kwargs["level"] = LogLevel.DEBUG
     return inner_rule(*args, **kwargs, rule_type=RuleType.goal_rule, cacheable=False)
 
 
@@ -407,9 +409,9 @@ class TaskRule(Rule):
         input_gets: Iterable[GetConstraints],
         canonical_name: str,
         desc: Optional[str] = None,
-        level: LogLevel = LogLevel.DEBUG,
+        level: LogLevel = LogLevel.TRACE,
         cacheable: bool = True,
-    ):
+    ) -> None:
         self._output_type = output_type
         self.input_selectors = tuple(input_selectors)
         self.input_gets = tuple(input_gets)

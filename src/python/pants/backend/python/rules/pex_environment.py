@@ -126,7 +126,7 @@ class PexEnvironment(EngineAware):
         return f"Selected {self.bootstrap_python} to bootstrap PEXes with."
 
 
-@rule(desc="Find PEX Python")
+@rule(desc="Find PEX Python", level=LogLevel.DEBUG)
 async def find_pex_python(
     python_setup: PythonSetup,
     pex_runtime_environment: PexRuntimeEnvironment,

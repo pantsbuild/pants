@@ -38,7 +38,7 @@ def get_extraction_cmd(archive_path: str, output_dir: str) -> Optional[Tuple[str
     return None
 
 
-@rule
+@rule(level=LogLevel.DEBUG)
 async def maybe_extract(extractable: MaybeExtractable) -> ExtractedDigest:
     """If digest contains a single archive file, extract it, otherwise return the input digest."""
     digest = extractable.digest

@@ -477,7 +477,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
             }
         )
         assert select["name"] == "select"
-        assert select["level"] == "DEBUG"
+        assert select["level"] == "TRACE"
 
         r1 = next(item for item in finished if item["name"] == "canonical_rule_one")
         assert r1["parent_id"] == select["span_id"]
@@ -520,7 +520,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
             scheduler,
             callbacks=[tracker.add],
             report_interval_seconds=0.01,
-            max_workunit_verbosity=LogLevel.DEBUG,
+            max_workunit_verbosity=LogLevel.TRACE,
         )
 
         with debug_level_handler.session():
@@ -565,7 +565,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
             scheduler,
             callbacks=[tracker.add],
             report_interval_seconds=0.01,
-            max_workunit_verbosity=LogLevel.DEBUG,
+            max_workunit_verbosity=LogLevel.TRACE,
         )
         with handler.session():
             scheduler.product_request(ModifiedOutput, subjects=[0])
@@ -601,7 +601,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
             scheduler,
             callbacks=[tracker.add],
             report_interval_seconds=0.01,
-            max_workunit_verbosity=LogLevel.DEBUG,
+            max_workunit_verbosity=LogLevel.TRACE,
         )
         with handler.session():
             scheduler.product_request(ModifiedOutput, subjects=[0])
@@ -610,7 +610,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         workunit = next(
             item for item in finished if item["name"] == "pants.engine.internals.engine_test.a_rule"
         )
-        assert workunit["level"] == "DEBUG"
+        assert workunit["level"] == "TRACE"
 
     def test_artifacts_on_engine_aware_type(self) -> None:
         @dataclass(frozen=True)
@@ -634,7 +634,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
             scheduler,
             callbacks=[tracker.add],
             report_interval_seconds=0.01,
-            max_workunit_verbosity=LogLevel.DEBUG,
+            max_workunit_verbosity=LogLevel.TRACE,
         )
         with handler.session():
             scheduler.product_request(Output, subjects=[0])

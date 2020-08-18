@@ -27,6 +27,7 @@ from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import HydratedSources, HydrateSourcesRequest
 from pants.engine.unions import UnionRule
+from pants.util.logging import LogLevel
 
 
 @dataclass(frozen=True)
@@ -63,7 +64,7 @@ class PythonBinaryFieldSet(BinaryFieldSet):
         return tuple(args)
 
 
-@rule
+@rule(level=LogLevel.DEBUG)
 async def create_python_binary(
     field_set: PythonBinaryFieldSet, python_binary_defaults: PythonBinaryDefaults
 ) -> CreatedBinary:

@@ -105,7 +105,7 @@ def generate_args(*, source_files: SourceFiles, pylint: Pylint) -> Tuple[str, ..
     return tuple(args)
 
 
-@rule
+@rule(level=LogLevel.DEBUG)
 async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> LintResult:
     # We build one PEX with Pylint requirements and another with all direct 3rd-party dependencies.
     # Splitting this into two PEXes gives us finer-grained caching. We then merge via `--pex-path`.
@@ -238,7 +238,7 @@ async def pylint_lint_partition(partition: PylintPartition, pylint: Pylint) -> L
     )
 
 
-@rule(desc="Lint using Pylint")
+@rule(desc="Lint using Pylint", level=LogLevel.DEBUG)
 async def pylint_lint(
     request: PylintRequest, pylint: Pylint, python_setup: PythonSetup
 ) -> LintResults:

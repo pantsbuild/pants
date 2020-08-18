@@ -41,6 +41,7 @@ from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import TransitiveTargets
 from pants.engine.unions import UnionRule
 from pants.option.custom_types import file_option
+from pants.util.logging import LogLevel
 
 
 """
@@ -208,7 +209,7 @@ class MergedCoverageData:
     coverage_data: Digest
 
 
-@rule(desc="Merge Pytest coverage data")
+@rule(desc="Merge Pytest coverage data", level=LogLevel.DEBUG)
 async def merge_coverage_data(
     data_collection: PytestCoverageDataCollection, coverage_setup: CoverageSetup
 ) -> MergedCoverageData:
@@ -229,12 +230,13 @@ async def merge_coverage_data(
             input_digest=input_digest,
             output_files=(".coverage",),
             description=f"Merge {len(prefixes)} Pytest coverage reports.",
+            level=LogLevel.DEBUG,
         ),
     )
     return MergedCoverageData(result.output_digest)
 
 
-@rule(desc="Generate Pytest coverage reports")
+@rule(desc="Generate Pytest coverage reports", level=LogLevel.DEBUG)
 async def generate_coverage_reports(
     merged_coverage_data: MergedCoverageData,
     coverage_setup: CoverageSetup,
@@ -284,6 +286,7 @@ async def generate_coverage_reports(
                 output_directories=("htmlcov",) if report_type == CoverageReportType.HTML else None,
                 output_files=("coverage.xml",) if report_type == CoverageReportType.XML else None,
                 description=f"Generate Pytest {report_type.report_name} coverage report.",
+                level=LogLevel.DEBUG,
             )
         )
     results = await MultiGet(Get(ProcessResult, PexProcess, process) for process in pex_processes)
