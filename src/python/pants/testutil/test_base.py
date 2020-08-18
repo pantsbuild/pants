@@ -9,8 +9,7 @@ from abc import ABC, ABCMeta, abstractmethod
 from collections import defaultdict
 from contextlib import contextmanager
 from tempfile import mkdtemp
-from textwrap import dedent
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Type, TypeVar, Union, cast, Set
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Type, TypeVar, Union, cast
 
 from pants.base.build_root import BuildRoot
 from pants.build_graph.build_configuration import BuildConfiguration
@@ -190,7 +189,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         relpath: The relative path to the BUILD file from the build root.
         target:  A string containing the target definition as it would appear in a BUILD file.
         """
-        self.create_file(self.build_path(relpath), target, mode="a")
+        return self.create_file(self.build_path(relpath), target, mode="a")
 
     @classmethod
     def alias_groups(cls):
