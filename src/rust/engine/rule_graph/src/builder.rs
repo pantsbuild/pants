@@ -122,6 +122,10 @@ pub struct Builder<'t, R: Rule> {
 
 impl<'t, R: Rule> Builder<'t, R> {
   pub fn new(rules: &'t HashMap<R::TypeId, Vec<R>>, queries: Vec<Query<R>>) -> Builder<'t, R> {
+    let queries = queries
+      .into_iter()
+      .filter(|q| &q.product.to_string() == "SetupPy")
+      .collect::<Vec<_>>();
     // The set of all input Params in the graph: ie, those provided either via Queries, or via
     // a Rule with a DependencyKey that provides a Param.
     let params = queries
@@ -293,7 +297,7 @@ impl<'t, R: Rule> Builder<'t, R> {
     );
     */
 
-    let debug_str = "this_is_not_a_real_rule(";
+    let debug_str = "run_setup_py(";
 
     // As we split Rules, we attempt to re-join with existing identical Rule nodes to avoid an
     // explosion.
@@ -349,7 +353,15 @@ impl<'t, R: Rule> Builder<'t, R> {
       if iteration > 10000 {
         looping = true;
       }
-      let debug = looping || graph[node_id].node.to_string().contains(debug_str);
+      let debug = looping
+        || graph[node_id].node.to_string().contains(debug_str)
+        || graph
+          .neighbors_directed(node_id, Direction::Incoming)
+          .find(|dependee_id| {
+            !to_delete.contains(dependee_id)
+              && graph[*dependee_id].node.to_string().contains(debug_str)
+          })
+          .is_some();
       if debug || iteration % 100 == 0 {
         println!(
           ">>> iteration {}: live_node_count: {}, to_visit: {} (, node_count: {}, to_delete: {})",
@@ -845,6 +857,29 @@ impl<'t, R: Rule> Builder<'t, R> {
           .map(|(_, edge_ref)| edge_ref)
           .collect::<Vec<_>>();
 
+        /*
+        for dependency_ref in &edge_refs {
+          let mut difference = graph[dependency_ref.target()]
+            .out_set
+            .difference(&graph[node_id].out_set);
+          if let Some(missing_param) = difference.next() {
+            if let Some(provided_param) = dependency_ref.weight().provided_param() {
+              if *missing_param == provided_param && difference.next().is_none() {
+                continue;
+              }
+            }
+
+            println!(
+              ">>> node {:?} does not have an out_set that is a superset of its dependency {:?}:\n  {}\n  {}",
+              node_id,
+              dependency_ref.target(),
+              graph[node_id],
+              graph[dependency_ref.target()],
+            );
+          }
+        }
+        */
+
         // Filter out any that are not satisfiable for this node based on its type and in/out sets.
         let relevant_edge_refs: Vec<_> = match node {
           Node::Query(q) => {
@@ -924,7 +959,7 @@ impl<'t, R: Rule> Builder<'t, R> {
             );
           }
           0 => {
-            return Err(format!(
+            println!(
               "TODO: No source of dependency {} for {}. All potential sources were \
                     eliminated: {:#?}",
               dependency_key,
@@ -939,7 +974,10 @@ impl<'t, R: Rule> Builder<'t, R> {
                   )
                 })
                 .collect::<Vec<_>>()
-            ));
+            );
+            // TODO: Not sustainable obviously. Need to figure out why these happen. But first
+            // let's see all of them.
+            break;
           }
           _ => {
             let mut bfs = Bfs::new(&graph, node_id);
@@ -965,15 +1003,9 @@ impl<'t, R: Rule> Builder<'t, R> {
               node,
               petgraph::dot::Dot::with_config(&subgraph, &[])
             );
-            return Err(format!(
-              "TODO: Too many sources of dependency {} for {}: {:#?}",
-              dependency_key,
-              node,
-              chosen_edges
-                .iter()
-                .map(|edge_ref| format!("{}", graph[edge_ref.target()].node))
-                .collect::<Vec<_>>()
-            ));
+            // TODO: Not sustainable obviously. Need to figure out why these happen. But first
+            // let's see all of them.
+            break;
           }
         }
       }
