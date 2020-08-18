@@ -15,8 +15,8 @@ class NativeEngineLoggingTest(PantsRunIntegrationTest):
         """
         return False
 
-    def test_native_logging(self):
-        expected_msg = r"\[DEBUG\] engine::scheduler: Launching \d+ root"
+    def test_native_logging(self) -> None:
+        expected_msg = r"\[DEBUG\] Launching \d+ root"
         pants_run = self.run_pants(["-linfo", "list", "3rdparty::"])
         self.assertNotRegex(pants_run.stderr_data, expected_msg)
 
@@ -25,19 +25,11 @@ class NativeEngineLoggingTest(PantsRunIntegrationTest):
 
 
 class PantsdNativeLoggingTest(PantsDaemonIntegrationTestBase):
-    def test_pantsd_file_logging(self):
+    def test_pantsd_file_logging(self) -> None:
         with self.pantsd_successful_run_context("debug") as ctx:
             daemon_run = ctx.runner(["list", "3rdparty::"])
             ctx.checker.assert_started()
-
-            self.assert_run_contains_log(
-                "connecting to pantsd on port",
-                "DEBUG",
-                "pants.bin.remote_pants_runner",
-                daemon_run,
-            )
+            assert "[DEBUG] connecting to pantsd on port" in daemon_run.stderr_data
 
             pantsd_log = "\n".join(read_pantsd_log(ctx.workdir))
-            self.assert_contains_log(
-                "logging initialized", "DEBUG", "pants.pantsd.pants_daemon", pantsd_log,
-            )
+            assert "[DEBUG] logging initialized" in pantsd_log

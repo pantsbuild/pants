@@ -243,6 +243,7 @@ impl<W: Write + Send + 'static> MaybeWriteLogger<W> {
       .set_time_to_local(true)
       .set_thread_level(LevelFilter::Off)
       .set_level_padding(LevelPadding::Off)
+      .set_target_level(LevelFilter::Off)
       .build();
 
     MaybeWriteLogger {

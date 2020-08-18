@@ -3,7 +3,6 @@
 
 import glob
 import os
-import re
 import subprocess
 import sys
 import unittest
@@ -358,23 +357,6 @@ class PantsRunIntegrationTest(unittest.TestCase):
         error_msg = "\n".join(details)
 
         assertion(value, pants_run.returncode, error_msg)
-
-    def assert_run_contains_log(self, msg, level, module, pants_run: PantsResult):
-        """Asserts that the passed run's stderr contained the log message."""
-        self.assert_contains_log(msg, level, module, pants_run.stderr_data, pants_run.pid)
-
-    def assert_contains_log(self, msg, level, module, log, pid=None):
-        """Asserts that the passed log contains the message logged by the module at the level.
-
-        If pid is specified, performs an exact match including the pid of the pants process.
-        Otherwise performs a regex match asserting that some pid is present.
-        """
-        prefix = f"[{level}] {module}:pid="
-        suffix = f": {msg}"
-        if pid is None:
-            self.assertRegex(log, re.escape(prefix) + r"\d+" + re.escape(suffix))
-        else:
-            self.assertIn(f"{prefix}{pid}{suffix}", log)
 
     @contextmanager
     def file_renamed(self, prefix, test_name, real_name):
