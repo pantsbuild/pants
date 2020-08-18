@@ -273,12 +273,27 @@ impl<'t, R: Rule> Builder<'t, R> {
     // will cause NodeIds to shift in the graph (and is only cheap to do in bulk).
     let mut to_delete = HashSet::new();
 
+    // TODO: Unfortunately, monomorphize is not completely monotonic (for reasons I can't nail
+    // down), and so it is possible for nodes to split fruitlessly in loops, where each iteration
+    // of the loop results in identical splits of each intermediate node. We could hypothetically
+    // break these loops by shrinking the in_set/out_sets synthetically (ie: removing Params until
+    // the loop converged), but it's likely that that would result in strange error cases.
+    //
+    // Instead, we force the phase to be monotonic by recording splits that we have executed, and
+    // considering the re-execution of the same split to be a noop. If this results in a loop of
+    // nodes that cannot be further reduced, it's likely that that loop will not be the only way to
+    // satisfy a dependency: if it is, then at least we have preserved the loop for error
+    // reporting.
+    let mut splits: HashMap<ParamsLabeled<R>, Vec<HashSet<ParamsLabeled<R>>>> = HashMap::new();
+
+    /*
     println!(
       "Monomorphizing with: {}",
       petgraph::dot::Dot::with_config(&graph, &[])
     );
+    */
 
-    let debug_str = "resolve_unexpanded_targets(";
+    let debug_str = "this_is_not_a_real_rule(";
 
     // As we split Rules, we attempt to re-join with existing identical Rule nodes to avoid an
     // explosion.
@@ -396,11 +411,10 @@ impl<'t, R: Rule> Builder<'t, R> {
         .iter()
         .map(|edges| edges.len())
         .collect::<Vec<_>>();
-      let dependees_by_out_set_strs =
-          dependees_by_out_set
-            .keys()
-            .map(|out_set| params_str(&out_set))
-            .collect::<Vec<_>>();
+      let dependees_by_out_set_strs = dependees_by_out_set
+        .keys()
+        .map(|out_set| params_str(&out_set))
+        .collect::<Vec<_>>();
 
       // Generate the monomorphizations of this Node, where each key is a potential node to
       // create, and the dependees and dependencies to give it (respectively).
@@ -413,21 +427,32 @@ impl<'t, R: Rule> Builder<'t, R> {
       > = HashMap::new();
       for (out_set, dependees) in dependees_by_out_set {
         let node = graph[node_id].node.clone();
-        for (in_set, dependencies) in
-          Self::monomorphizations(&graph, node_id, out_set.clone(), &dependencies_by_key, debug)
-        {
+        for (in_set, dependencies) in Self::monomorphizations(
+          &graph,
+          node_id,
+          out_set.clone(),
+          &dependencies_by_key,
+          debug,
+        ) {
           // Add this set of dependees and dependencies to the relevant output node.
           let key = ParamsLabeled {
-              node: node.clone(),
-              in_set: in_set.clone(),
-              // NB: See the method doc. Although our dependees could technically still provide a
-              // larger set of params, anything not in the in_set is not consumed in this subgraph,
-              // and the out_set shrinks correspondingly to avoid creating redundant nodes.
-              out_set: out_set.intersection(&in_set).cloned().collect(),
-            };
-          let entry = monomorphizations.entry(key.clone()).or_insert_with(|| (HashSet::new(), HashSet::new()));
+            node: node.clone(),
+            in_set: in_set.clone(),
+            // NB: See the method doc. Although our dependees could technically still provide a
+            // larger set of params, anything not in the in_set is not consumed in this subgraph,
+            // and the out_set shrinks correspondingly to avoid creating redundant nodes.
+            out_set: out_set.intersection(&in_set).cloned().collect(),
+          };
+          let entry = monomorphizations
+            .entry(key.clone())
+            .or_insert_with(|| (HashSet::new(), HashSet::new()));
           if debug {
-            println!(">>> giving combination {}:\n  {} dependees and\n  {} dependencies", key, dependees.len(), dependencies.len());
+            println!(
+              ">>> giving combination {}:\n  {} dependees and\n  {} dependencies",
+              key,
+              dependees.len(),
+              dependencies.len()
+            );
           }
           entry.0.extend(dependees.iter().cloned());
           entry.1.extend(dependencies);
@@ -439,54 +464,57 @@ impl<'t, R: Rule> Builder<'t, R> {
       // The base case for a node then is that its dependencies cannot be partitioned to produce
       // disjoint in_sets, and that the in/out sets are accurate based on any transitive changes
       // above or below this node. If both of these conditions are satisified, the node is valid.
+      //
+      // See the TODO on `splits`.
       if let Some((_, dependencies)) = monomorphizations.get(&graph[node_id]) {
-        // If any of the output nodes is identical to the input node, we may not be able to reduce
-        // this node further (right now). It's very important that splitting a node never results
-        // in a completely identical (including its dependencies) node, regardless of whether it
-        // also produces other valid combinations: that would result in an infinite loop, where
-        // every time we visited the node, it would be split in the same way.
-        let initial_dependencies = graph
-          .edges_directed(node_id, Direction::Outgoing)
-          .filter(|edge_ref| !to_delete.contains(&edge_ref.target()))
-          .map(|edge_ref| (*edge_ref.weight(), edge_ref.target()))
-          .collect::<HashSet<_>>();
-        if dependencies == &initial_dependencies {
-          // Is an identical node. If there are other monomorphizations and they _collectively_
-          // consume the entire in_set (ie, by unioning to at the original in_set), then we
-          // assume that we can safely (?) eliminate the original node, in favor of those choices.
-          // Otherwise, we must treat this node as ambiguous, and noop until something changes
-          // above or below us.
-          if monomorphizations.len() > 1
-            && graph[node_id].in_set
-              == monomorphizations
-                .keys()
-                .filter(|node| *node != &graph[node_id])
-                .fold(ParamTypes::new(), |in_set_union, node| {
-                  in_set_union.union(&node.in_set).cloned().collect()
-                })
-          {
-            // The other monomorphizations completely consume the in_set: we can eliminate the
-            // original node, and only generate the remaining nodes.
-            monomorphizations.remove(&graph[node_id]);
+        // We generated an identical node: if there was only one output node and its dependencies were
+        // also identical, then we have nooped.
+        if monomorphizations.len() == 1
+          && dependencies
+            == &graph
+              .edges_directed(node_id, Direction::Outgoing)
+              .filter(|edge_ref| !to_delete.contains(&edge_ref.target()))
+              .map(|edge_ref| (*edge_ref.weight(), edge_ref.target()))
+              .collect::<HashSet<_>>()
+        {
+          // This node can not be reduced (at this time at least).
+          if debug {
             println!(
-              ">>> attempting to prevent infinite loop by eliminating {:?}: {}\nand only producing: {:#?}",
+              ">>> not able to reduce {:?}: {} (had {} monomorphizations)",
               node_id,
               graph[node_id],
-              monomorphizations.keys().map(|n| format!("{}", n)).collect::<Vec<_>>(),
+              monomorphizations.len()
             );
-          } else {
-            // Otherwise, this node can not be reduced (at this time at least).
-            if debug {
-              println!(
-                ">>> not able to reduce {:?}: {} (had {} monomorphizations)",
-                node_id,
-                graph[node_id],
-                monomorphizations.len()
-              );
-            }
-            continue;
           }
+          continue;
         }
+
+        // Otherwise, see if this exact split has occurred before: if so, noop.
+        let split_output = monomorphizations.keys().cloned().collect::<HashSet<_>>();
+        if splits
+          .get(&graph[node_id])
+          .map(|split_outputs| split_outputs.contains(&split_output))
+          .unwrap_or(false)
+        {
+          // This exact split has been executed before: noop. See the TODO on `splits`.
+          if debug {
+            println!(
+              ">>> re-observed split:\n  {}\n  to\n  {}",
+              graph[node_id],
+              split_output
+                .iter()
+                .map(|n| n.to_string())
+                .collect::<Vec<_>>()
+                .join("\n  ")
+            );
+          }
+          continue;
+        }
+        // Else, record it for later.
+        splits
+          .entry(graph[node_id].clone())
+          .or_insert_with(|| vec![])
+          .push(split_output);
       }
 
       if debug {
@@ -655,7 +683,11 @@ impl<'t, R: Rule> Builder<'t, R> {
         if graph[node_id]
           .in_set
           .iter()
-          .find(|p| &p.to_string() == "AddressSpecs" || &p.to_string() == "Addresses" || &p.to_string() == "Specs")
+          .find(|p| {
+            &p.to_string() == "AddressSpecs"
+              || &p.to_string() == "Addresses"
+              || &p.to_string() == "Specs"
+          })
           .is_some()
         {
           visited.visit(node_id);
@@ -779,10 +811,12 @@ impl<'t, R: Rule> Builder<'t, R> {
     // dead edges while running.
     let mut edges_to_delete = HashSet::new();
 
+    /*
     println!(
       "Pruning edges with: {}",
       petgraph::dot::Dot::with_config(&graph, &[])
     );
+    */
 
     // Walk from roots, choosing one source for each DependencyKey of each node.
     let mut visited = graph.visit_map();
@@ -907,6 +941,29 @@ impl<'t, R: Rule> Builder<'t, R> {
             ));
           }
           _ => {
+            let mut bfs = Bfs::new(&graph, node_id);
+            let mut visited = graph.visit_map();
+            while let Some(node_id) = bfs.next(&graph) {
+              visited.visit(node_id);
+            }
+
+            let subgraph = graph.filter_map(
+              |node_id, node| {
+                if visited.is_visited(&node_id) {
+                  Some(node.clone())
+                } else {
+                  None
+                }
+              },
+              |_, edge_weight| Some(*edge_weight),
+            );
+
+            println!(
+              "TODO: Too many sources of dependency {} for {}: {}",
+              dependency_key,
+              node,
+              petgraph::dot::Dot::with_config(&subgraph, &[])
+            );
             return Err(format!(
               "TODO: Too many sources of dependency {} for {}: {:#?}",
               dependency_key,
@@ -1146,12 +1203,12 @@ impl<'t, R: Rule> Builder<'t, R> {
       });
       if !satisfiable {
         if debug {
-          println!(">>> combination not satisfiable: {}: {:#?}", params_str(&in_set),
+          println!(
+            ">>> combination not satisfiable: {}: {:#?}",
+            params_str(&in_set),
             combination
               .iter()
-              .map(|(dk, di)| {
-                 (dk.to_string(), graph[*di].to_string())
-              })
+              .map(|(dk, di)| { (dk.to_string(), graph[*di].to_string()) })
               .collect::<Vec<_>>(),
           );
         }
