@@ -286,15 +286,6 @@ impl<'t, R: Rule> Builder<'t, R> {
     // reporting.
     let mut splits: HashMap<ParamsLabeled<R>, Vec<HashSet<ParamsLabeled<R>>>> = HashMap::new();
 
-    /*
-    println!(
-      "Monomorphizing with: {}",
-      petgraph::dot::Dot::with_config(&graph, &[])
-    );
-    */
-
-    let debug_str = "this_is_not_a_real_rule(";
-
     // As we split Rules, we attempt to re-join with existing identical Rule nodes to avoid an
     // explosion.
     let mut rules: HashMap<ParamsLabeled<R>, _> = graph
@@ -304,35 +295,6 @@ impl<'t, R: Rule> Builder<'t, R> {
         _ => None,
       })
       .collect();
-
-    if let Some(subgraph_node_ref) = graph
-      .node_references()
-      .find(|node_ref| node_ref.weight().node.to_string().contains(debug_str))
-    {
-      let subgraph_id = subgraph_node_ref.id();
-      let mut bfs = Bfs::new(&graph, subgraph_id);
-      let mut visited = graph.visit_map();
-      while let Some(node_id) = bfs.next(&graph) {
-        visited.visit(node_id);
-      }
-
-      let subgraph = graph.filter_map(
-        |node_id, node| {
-          if visited.is_visited(&node_id) {
-            Some(node.clone())
-          } else {
-            None
-          }
-        },
-        |_, edge_weight| Some(*edge_weight),
-      );
-
-      println!(
-        "Subgraph below {}: {}",
-        graph[subgraph_id].node,
-        petgraph::dot::Dot::with_config(&subgraph, &[])
-      );
-    }
 
     let mut iteration = 0;
     let mut maybe_in_loop = HashSet::new();
@@ -349,10 +311,9 @@ impl<'t, R: Rule> Builder<'t, R> {
       if iteration > 10000 {
         looping = true;
       }
-      let debug = looping || graph[node_id].node.to_string().contains(debug_str);
-      if debug || iteration % 100 == 0 {
-        println!(
-          ">>> iteration {}: live_node_count: {}, to_visit: {} (, node_count: {}, to_delete: {})",
+      if iteration % 100 == 0 {
+        log::debug!(
+          "rule_graph monomorphize: iteration {}: live_node_count: {}, to_visit: {} (node_count: {}, to_delete: {})",
           iteration,
           graph.node_count() - to_delete.len(),
           to_visit.len(),
@@ -407,15 +368,51 @@ impl<'t, R: Rule> Builder<'t, R> {
         dbos
       };
 
-      let dependees_by_out_set_len = dependees_by_out_set.len();
-      let dependencies_by_key_lens = dependencies_by_key
+      if looping {
+        log::debug!(
+          "creating monomorphizations (from {} dependee sets and {:?} dependencies) for {:?}: {:#?} with {:#?} and {:#?}",
+          dependees_by_out_set.len(),
+          dependencies_by_key
         .iter()
         .map(|edges| edges.len())
-        .collect::<Vec<_>>();
-      let dependees_by_out_set_strs = dependees_by_out_set
+        .collect::<Vec<_>>(),
+          node_id,
+          graph[node_id],
+          dependencies_by_key
+            .iter()
+            .flat_map(|choices| {
+              choices
+                .iter()
+                .map(|(dk, di)| (dk.to_string(), graph[*di].to_string()))
+            })
+            .collect::<Vec<_>>(),
+          dependees_by_out_set
         .keys()
         .map(|out_set| params_str(&out_set))
-        .collect::<Vec<_>>();
+        .collect::<Vec<_>>(),
+        );
+
+        if looping {
+          maybe_in_loop.insert(node_id);
+          if maybe_in_loop.len() > 40 {
+            let subgraph = graph.filter_map(
+              |node_id, node| {
+                if maybe_in_loop.contains(&node_id) {
+                  Some(format!("{:?}: {}", node_id, node))
+                } else {
+                  None
+                }
+              },
+              |_, edge_weight| Some(*edge_weight),
+            );
+
+            panic!(
+              "Loop subgraph: {}",
+              petgraph::dot::Dot::with_config(&subgraph, &[])
+            );
+          }
+        }
+      }
 
       // Generate the monomorphizations of this Node, where each key is a potential node to
       // create, and the dependees and dependencies to give it (respectively).
@@ -428,13 +425,9 @@ impl<'t, R: Rule> Builder<'t, R> {
       > = HashMap::new();
       for (out_set, dependees) in dependees_by_out_set {
         let node = graph[node_id].node.clone();
-        for (in_set, dependencies) in Self::monomorphizations(
-          &graph,
-          node_id,
-          out_set.clone(),
-          &dependencies_by_key,
-          debug,
-        ) {
+        for (in_set, dependencies) in
+          Self::monomorphizations(&graph, node_id, out_set.clone(), &dependencies_by_key)
+        {
           // Add this set of dependees and dependencies to the relevant output node.
           let key = ParamsLabeled {
             node: node.clone(),
@@ -447,9 +440,9 @@ impl<'t, R: Rule> Builder<'t, R> {
           let entry = monomorphizations
             .entry(key.clone())
             .or_insert_with(|| (HashSet::new(), HashSet::new()));
-          if debug {
-            println!(
-              ">>> giving combination {}:\n  {} dependees and\n  {} dependencies",
+          if looping {
+            log::debug!(
+              "giving combination {}:\n  {} dependees and\n  {} dependencies",
               key,
               dependees.len(),
               dependencies.len()
@@ -479,9 +472,9 @@ impl<'t, R: Rule> Builder<'t, R> {
               .collect::<HashSet<_>>()
         {
           // This node can not be reduced (at this time at least).
-          if debug {
-            println!(
-              ">>> not able to reduce {:?}: {} (had {} monomorphizations)",
+          if looping {
+            log::debug!(
+              "not able to reduce {:?}: {} (had {} monomorphizations)",
               node_id,
               graph[node_id],
               monomorphizations.len()
@@ -498,9 +491,9 @@ impl<'t, R: Rule> Builder<'t, R> {
           .unwrap_or(false)
         {
           // This exact split has been executed before: noop. See the TODO on `splits`.
-          if debug {
-            println!(
-              ">>> re-observed split:\n  {}\n  to\n  {}",
+          if looping {
+            log::debug!(
+              "re-observed split:\n  {}\n  to\n  {}",
               graph[node_id],
               split_output
                 .iter()
@@ -514,48 +507,28 @@ impl<'t, R: Rule> Builder<'t, R> {
         // Else, record it for later.
         splits
           .entry(graph[node_id].clone())
-          .or_insert_with(|| vec![])
+          .or_insert_with(Vec::new)
           .push(split_output);
       }
 
-      if debug {
-        println!(
-          ">>> created {} monomorphizations (from {} dependee sets and {:?} dependencies) for {:?}: {:#?} with {:#?} and {:#?}",
-          monomorphizations.len(),
-          dependees_by_out_set_len,
-          dependencies_by_key_lens,
-          node_id,
-          graph[node_id],
-          dependencies_by_key
-            .iter()
-            .flat_map(|choices| {
-              choices
-                .iter()
-                .map(|(dk, di)| (dk.to_string(), graph[*di].to_string()))
-            })
-            .collect::<Vec<_>>(),
-          dependees_by_out_set_strs,
-        );
+      if looping {
+        maybe_in_loop.insert(node_id);
+        if maybe_in_loop.len() > 40 {
+          let subgraph = graph.filter_map(
+            |node_id, node| {
+              if maybe_in_loop.contains(&node_id) {
+                Some(format!("{:?}: {}", node_id, node))
+              } else {
+                None
+              }
+            },
+            |_, edge_weight| Some(*edge_weight),
+          );
 
-        if looping {
-          maybe_in_loop.insert(node_id);
-          if maybe_in_loop.len() > 40 {
-            let subgraph = graph.filter_map(
-              |node_id, node| {
-                if maybe_in_loop.contains(&node_id) {
-                  Some(format!("{:?}: {}", node_id, node))
-                } else {
-                  None
-                }
-              },
-              |_, edge_weight| Some(*edge_weight),
-            );
-
-            panic!(
-              "Loop subgraph: {}",
-              petgraph::dot::Dot::with_config(&subgraph, &[])
-            );
-          }
+          panic!(
+            "Loop subgraph: {}",
+            petgraph::dot::Dot::with_config(&subgraph, &[])
+          );
         }
       }
 
@@ -563,15 +536,13 @@ impl<'t, R: Rule> Builder<'t, R> {
       to_delete.insert(node_id);
       rules.remove(&graph[node_id]);
       // And schedule visits for all dependees and dependencies.
-      // TODO: It's possible that we could avoid notifying neighbors in some cases based on their
-      // observed in/out sets not having changed... but this is easier to implement.
       to_visit.extend(graph.neighbors_undirected(node_id));
 
       // Generate a replacement node for each monomorphization of this rule.
       for (new_node, (dependees, dependencies)) in monomorphizations {
-        if debug {
-          println!(
-            ">>>   generating {:#?}, which consumes: {:#?}",
+        if looping {
+          log::debug!(
+            "   generating {:#?}, which consumes: {:#?}",
             new_node,
             dependencies
               .iter()
@@ -594,12 +565,9 @@ impl<'t, R: Rule> Builder<'t, R> {
           }
           hash_map::Entry::Vacant(ve) => (*ve.insert(graph.add_node(new_node)), true),
         };
-        if debug {
-          if is_new_node {
-            println!(">>> node: creating new: {:?}", replacement_id);
-          } else {
-            println!(">>> node: using existing: {:?}", replacement_id);
-          }
+        if looping {
+          let keyword = if is_new_node { "creating" } else { "using" };
+          log::debug!("node: {}: {:?}", keyword, replacement_id);
         }
 
         // Give all dependees edges to the new node.
@@ -621,20 +589,15 @@ impl<'t, R: Rule> Builder<'t, R> {
                 edge_ref.target() != replacement_id || edge_ref.weight() != dependency_key
               })
           {
-            if debug {
-              println!(
-                ">>> dependee edge: adding: {:?}",
-                (dependee_id, dependency_key)
-              );
+            if looping {
+              log::debug!("dependee edge: adding: {:?}", (dependee_id, dependency_key));
             }
             graph.add_edge(*dependee_id, replacement_id, *dependency_key);
-          } else {
-            if debug {
-              println!(
-                ">>> dependee edge: skipping existing: {:?}",
-                (dependee_id, dependency_key)
-              );
-            }
+          } else if looping {
+            log::debug!(
+              "dependee edge: skipping existing: {:?}",
+              (dependee_id, dependency_key)
+            );
           }
         }
 
@@ -653,64 +616,24 @@ impl<'t, R: Rule> Builder<'t, R> {
           } else {
             dependency_id
           };
-          if !existing_edges.contains(&(dependency_key, dependency_id)) {
-            if debug {
-              println!(
-                ">>> dependency edge: adding: {:?}",
+          if existing_edges.contains(&(dependency_key, dependency_id)) {
+            if looping {
+              log::debug!(
+                "dependency edge: skipping existing: {:?}",
+                (dependency_key, dependency_id)
+              );
+            }
+          } else {
+            if looping {
+              log::debug!(
+                "dependency edge: adding: {:?}",
                 (dependency_key, dependency_id)
               );
             }
             graph.add_edge(replacement_id, dependency_id, dependency_key);
-          } else {
-            if debug {
-              println!(
-                ">>> dependency edge: skipping existing: {:?}",
-                (dependency_key, dependency_id)
-              );
-            }
           }
         }
       }
-    }
-
-    if let Some(subgraph_node_ref) = graph
-      .node_references()
-      .find(|node_ref| node_ref.weight().node.to_string().contains(debug_str))
-    {
-      let subgraph_id = subgraph_node_ref.id();
-      let mut bfs = Bfs::new(&graph, subgraph_id);
-      let mut visited = graph.visit_map();
-      while let Some(node_id) = bfs.next(&graph) {
-        if graph[node_id]
-          .in_set
-          .iter()
-          .find(|p| {
-            &p.to_string() == "AddressSpecs"
-              || &p.to_string() == "Addresses"
-              || &p.to_string() == "Specs"
-          })
-          .is_some()
-        {
-          visited.visit(node_id);
-        }
-      }
-
-      let subgraph = graph.filter_map(
-        |node_id, node| {
-          if visited.is_visited(&node_id) && !to_delete.is_visited(&node_id) {
-            Some(node.clone())
-          } else {
-            None
-          }
-        },
-        |_, edge_weight| Some(*edge_weight),
-      );
-
-      println!(
-        "Subgraph below {}: {}",
-        graph[subgraph_id].node,
-        petgraph::dot::Dot::with_config(&subgraph, &[])
-      );
     }
 
     // Finally, delete all nodes that were replaced (which will also delete their edges).
@@ -812,13 +735,6 @@ impl<'t, R: Rule> Builder<'t, R> {
     // dead edges while running.
     let mut edges_to_delete = HashSet::new();
 
-    /*
-    println!(
-      "Pruning edges with: {}",
-      petgraph::dot::Dot::with_config(&graph, &[])
-    );
-    */
-
     // Walk from roots, choosing one source for each DependencyKey of each node.
     let mut visited = graph.visit_map();
     let mut to_visit = graph.externals(Direction::Incoming).collect::<Vec<_>>();
@@ -827,10 +743,6 @@ impl<'t, R: Rule> Builder<'t, R> {
         continue;
       }
       let node = &graph[node_id].node;
-
-      // * "no choice of rule that consumes param X" here (ie it's both GEN'd and KILL'd within the node)
-      // * invalid required param at a Query
-      // * take smallest option, fail for equal-sized sets
 
       let edges_by_dependency_key = Self::edges_by_dependency_key(
         node,
@@ -885,17 +797,6 @@ impl<'t, R: Rule> Builder<'t, R> {
         // We prefer the dependency with the smallest set of input Params, as that minimizes Rule
         // identities in the graph and biases toward receiving values from dependencies (which do not
         // affect our identity) rather than dependents.
-        /*
-        println!(
-          ">>> for {} at {}, choosing from {:#?}",
-          node,
-          dependency_key,
-          relevant_edge_refs
-            .iter()
-            .map(|edge_ref| format!("{}", graph[edge_ref.target()].node))
-            .collect::<Vec<_>>()
-        );
-        */
         let chosen_edges = {
           let mut minimum_param_set_size = ::std::usize::MAX;
           let mut chosen_edges = Vec::new();
@@ -925,8 +826,7 @@ impl<'t, R: Rule> Builder<'t, R> {
           }
           0 => {
             return Err(format!(
-              "TODO: No source of dependency {} for {}. All potential sources were \
-                    eliminated: {:#?}",
+              "No source of dependency {} for {}. All potential sources were eliminated: {:#?}",
               dependency_key,
               node,
               edge_refs
@@ -942,31 +842,34 @@ impl<'t, R: Rule> Builder<'t, R> {
             ));
           }
           _ => {
-            let mut bfs = Bfs::new(&graph, node_id);
-            let mut visited = graph.visit_map();
-            while let Some(node_id) = bfs.next(&graph) {
-              visited.visit(node_id);
+            if log::log_enabled!(log::Level::Debug) {
+              let mut bfs = Bfs::new(&graph, node_id);
+              let mut visited = graph.visit_map();
+              while let Some(node_id) = bfs.next(&graph) {
+                visited.visit(node_id);
+              }
+
+              let subgraph = graph.filter_map(
+                |node_id, node| {
+                  if visited.is_visited(&node_id) {
+                    Some(node.clone())
+                  } else {
+                    None
+                  }
+                },
+                |_, edge_weight| Some(*edge_weight),
+              );
+
+              log::debug!(
+                "Too many sources of dependency {} for {}: {}",
+                dependency_key,
+                node,
+                petgraph::dot::Dot::with_config(&subgraph, &[])
+              );
             }
 
-            let subgraph = graph.filter_map(
-              |node_id, node| {
-                if visited.is_visited(&node_id) {
-                  Some(node.clone())
-                } else {
-                  None
-                }
-              },
-              |_, edge_weight| Some(*edge_weight),
-            );
-
-            println!(
-              "TODO: Too many sources of dependency {} for {}: {}",
-              dependency_key,
-              node,
-              petgraph::dot::Dot::with_config(&subgraph, &[])
-            );
             return Err(format!(
-              "TODO: Too many sources of dependency {} for {}: {:#?}",
+              "Too many sources of dependency {} for {}: {:#?}",
               dependency_key,
               node,
               chosen_edges
@@ -1010,13 +913,6 @@ impl<'t, R: Rule> Builder<'t, R> {
         Node::Param(p) => Entry::Param(*p),
       }
     };
-
-    /*
-    println!(
-      "Finalizing with: {}",
-      petgraph::dot::Dot::with_config(&graph, &[])
-    );
-    */
 
     // Visit the reachable portion of the graph to create Edges, starting from roots.
     let mut rule_dependency_edges = HashMap::new();
@@ -1174,7 +1070,6 @@ impl<'t, R: Rule> Builder<'t, R> {
     node_id: NodeIndex<u32>,
     out_set: ParamTypes<R::TypeId>,
     deps: &[Vec<(R::DependencyKey, NodeIndex<u32>)>],
-    debug: bool,
   ) -> HashMap<ParamTypes<R::TypeId>, HashSet<(R::DependencyKey, NodeIndex<u32>)>> {
     let mut combinations = HashMap::new();
 
@@ -1204,27 +1099,13 @@ impl<'t, R: Rule> Builder<'t, R> {
         consumes_provided_param && uses_only_present_param
       });
       if !satisfiable {
-        if debug {
-          println!(
-            ">>> combination not satisfiable: {}: {:#?}",
-            params_str(&in_set),
-            combination
-              .iter()
-              .map(|(dk, di)| { (dk.to_string(), graph[*di].to_string()) })
-              .collect::<Vec<_>>(),
-          );
-        }
         continue;
-      }
-
-      if debug {
-        println!(">>> combination was valid!: {}", params_str(&in_set));
       }
 
       // If we've made it this far, we're worth recording. Huzzah!
       combinations
         .entry(in_set)
-        .or_insert_with(|| HashSet::new())
+        .or_insert_with(HashSet::new)
         .extend(combination);
     }
 
