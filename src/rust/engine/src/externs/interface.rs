@@ -61,7 +61,7 @@ use futures::future::{self as future03, TryFutureExt};
 use futures01::Future;
 use hashing::{Digest, EMPTY_DIGEST};
 use log::{self, debug, error, warn, Log};
-use logging::logger::LOGGER;
+use logging::logger::PANTS_LOGGER;
 use logging::{Destination, Logger, PythonLogLevel};
 use rule_graph::{self, RuleGraph};
 use store::SnapshotOps;
@@ -1658,7 +1658,7 @@ fn setup_pantsd_logger(py: Python, log_file: String, level: u64) -> CPyResult<i6
   logging::set_thread_destination(Destination::Pantsd);
 
   let path = PathBuf::from(log_file);
-  LOGGER
+  PANTS_LOGGER
     .set_pantsd_logger(path, level)
     .map(i64::from)
     .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))
@@ -1666,7 +1666,7 @@ fn setup_pantsd_logger(py: Python, log_file: String, level: u64) -> CPyResult<i6
 
 fn setup_stderr_logger(_: Python, level: u64) -> PyUnitResult {
   logging::set_thread_destination(Destination::Stderr);
-  LOGGER
+  PANTS_LOGGER
     .set_stderr_logger(level)
     .expect("Error setting up STDERR logger");
   Ok(None)
@@ -1717,7 +1717,7 @@ fn teardown_dynamic_ui(
 
 fn flush_log(py: Python) -> PyUnitResult {
   py.allow_threads(|| {
-    LOGGER.flush();
+    PANTS_LOGGER.flush();
     Ok(None)
   })
 }

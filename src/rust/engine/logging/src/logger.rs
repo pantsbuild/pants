@@ -26,10 +26,10 @@ const TIME_FORMAT_STR: &str = "%H:%M:%S";
 pub type StdioHandler = Box<dyn Fn(&str) -> Result<(), ()> + Send>;
 
 lazy_static! {
-  pub static ref LOGGER: Logger = Logger::new();
+  pub static ref PANTS_LOGGER: PantsLogger = PantsLogger::new();
 }
 
-pub struct Logger {
+pub struct PantsLogger {
   pantsd_log: Mutex<MaybeWriteLogger<File>>,
   stderr_log: Mutex<MaybeWriteLogger<Stderr>>,
   use_color: AtomicBool,
@@ -37,13 +37,13 @@ pub struct Logger {
   stderr_handlers: Mutex<HashMap<Uuid, StdioHandler>>,
 }
 
-impl Logger {
-  pub fn new() -> Logger {
-    Logger {
+impl PantsLogger {
+  pub fn new() -> PantsLogger {
+    PantsLogger {
       pantsd_log: Mutex::new(MaybeWriteLogger::empty()),
       stderr_log: Mutex::new(MaybeWriteLogger::empty()),
       show_rust_3rdparty_logs: AtomicBool::new(true),
-      use_color: AtomicBool::new(true),
+      use_color: AtomicBool::new(false),
       stderr_handlers: Mutex::new(HashMap::new()),
     }
   }
@@ -54,15 +54,15 @@ impl Logger {
       Ok(python_level) => {
         let level: log::LevelFilter = python_level.into();
         set_max_level(level);
-        LOGGER.use_color.store(use_color, Ordering::SeqCst);
-        LOGGER
+        PANTS_LOGGER.use_color.store(use_color, Ordering::SeqCst);
+        PANTS_LOGGER
           .show_rust_3rdparty_logs
           .store(show_rust_3rdparty_logs, Ordering::SeqCst);
-        if set_logger(&*LOGGER).is_err() {
+        if set_logger(&*PANTS_LOGGER).is_err() {
           debug!("Logging already initialized.");
         }
       }
-      Err(err) => panic!("Unrecognised log level from python: {}: {}", max_level, err),
+      Err(err) => panic!("Unrecognised log level from Python: {}: {}", max_level, err),
     };
   }
 
@@ -78,11 +78,7 @@ impl Logger {
       .map_err(|err| format!("{}", err))
       .map(|level: PythonLogLevel| {
         self.maybe_increase_global_verbosity(level.into());
-        *self.stderr_log.lock() = MaybeWriteLogger::new(
-          stderr(),
-          level.into(),
-          self.show_rust_3rdparty_logs.load(Ordering::SeqCst),
-        )
+        *self.stderr_log.lock() = MaybeWriteLogger::new(stderr(), level.into())
       })
   }
 
@@ -112,11 +108,7 @@ impl Logger {
           .map(|file| {
             let fd = file.as_raw_fd();
             self.maybe_increase_global_verbosity(level.into());
-            *self.pantsd_log.lock() = MaybeWriteLogger::new(
-              file,
-              level.into(),
-              self.show_rust_3rdparty_logs.load(Ordering::SeqCst),
-            );
+            *self.pantsd_log.lock() = MaybeWriteLogger::new(file, level.into());
             fd
           })
           .map_err(|err| format!("Error opening pantsd logfile: {}", err))
@@ -149,7 +141,7 @@ impl Logger {
   }
 }
 
-impl Log for Logger {
+impl Log for PantsLogger {
   fn enabled(&self, _metadata: &Metadata) -> bool {
     // Individual log levels are handled by each sub-logger,
     // And a global filter is applied to set_max_level.
@@ -160,6 +152,24 @@ impl Log for Logger {
   fn log(&self, record: &Record) {
     use chrono::Timelike;
     use log::Level;
+
+    let mut should_log = self.show_rust_3rdparty_logs.load(Ordering::SeqCst);
+    if !should_log {
+      if let Some(ref module_path) = record.module_path() {
+        for pants_package in super::pants_packages::PANTS_PACKAGE_NAMES {
+          if &module_path.split("::").next().unwrap() == pants_package {
+            should_log = true;
+            break;
+          }
+        }
+      } else {
+        should_log = true;
+      }
+    }
+    if !should_log {
+      return;
+    }
+
     let destination = get_destination();
     match destination {
       Destination::Stderr => {
@@ -185,12 +195,13 @@ impl Log for Logger {
         let log_string = format!("{} {} {}", time_str, level_marker, record.args());
 
         {
-          // If there are no handlers, or sending to any of the handlers failed, send to stderr
-          // directly.
+          // We first try to output to all registered handlers. If there are none, or any of them
+          // fail, then we fallback to sending directly to stderr.
           let handlers_map = self.stderr_handlers.lock();
           let mut any_handler_failed = false;
           for callback in handlers_map.values() {
-            if callback(&log_string).is_err() {
+            let handler_res = callback(&log_string);
+            if handler_res.is_err() {
               any_handler_failed = true;
             }
           }
@@ -211,7 +222,6 @@ impl Log for Logger {
 
 struct MaybeWriteLogger<W: Write + Send + 'static> {
   level: LevelFilter,
-  show_rust_3rdparty_logs: bool,
   inner: Option<Box<WriteLogger<W>>>,
 }
 
@@ -219,16 +229,11 @@ impl<W: Write + Send + 'static> MaybeWriteLogger<W> {
   pub fn empty() -> MaybeWriteLogger<W> {
     MaybeWriteLogger {
       level: LevelFilter::Off,
-      show_rust_3rdparty_logs: true,
       inner: None,
     }
   }
 
-  pub fn new(
-    writable: W,
-    level: LevelFilter,
-    show_rust_3rdparty_logs: bool,
-  ) -> MaybeWriteLogger<W> {
+  pub fn new(writable: W, level: LevelFilter) -> MaybeWriteLogger<W> {
     // We initialize the inner WriteLogger with no filters so that we don't
     // have to create a new one every time we change the level of the outer
     // MaybeWriteLogger.
@@ -242,7 +247,6 @@ impl<W: Write + Send + 'static> MaybeWriteLogger<W> {
 
     MaybeWriteLogger {
       level,
-      show_rust_3rdparty_logs,
       inner: Some(WriteLogger::new(LevelFilter::max(), config, writable)),
     }
   }
@@ -255,22 +259,6 @@ impl<W: Write + Send + 'static> Log for MaybeWriteLogger<W> {
 
   fn log(&self, record: &Record) {
     if !self.enabled(record.metadata()) {
-      return;
-    }
-    let mut should_log = self.show_rust_3rdparty_logs;
-    if !self.show_rust_3rdparty_logs {
-      if let Some(ref module_path) = record.module_path() {
-        for pants_package in super::pants_packages::PANTS_PACKAGE_NAMES {
-          if &module_path.split("::").next().unwrap() == pants_package {
-            should_log = true;
-            break;
-          }
-        }
-      } else {
-        should_log = true;
-      }
-    }
-    if !should_log {
       return;
     }
     if let Some(ref logger) = self.inner {
