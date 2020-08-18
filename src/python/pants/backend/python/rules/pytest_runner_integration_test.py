@@ -377,7 +377,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         result = self.run_pytest(
             address=Address(self.source_root, relative_file_path="conftest.py")
         )
-        assert result.skipped is True
+        assert result.exit_code is None
 
     def test_execution_slot_variable(self) -> None:
         source = FileContent(

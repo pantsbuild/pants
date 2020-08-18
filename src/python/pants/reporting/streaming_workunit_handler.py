@@ -39,7 +39,7 @@ class StreamingWorkunitHandler:
         scheduler: Any,
         callbacks: Iterable[Callable],
         report_interval_seconds: float,
-        max_workunit_verbosity: LogLevel = LogLevel.DEBUG,
+        max_workunit_verbosity: LogLevel = LogLevel.TRACE,
     ):
         self.scheduler = scheduler
         self.report_interval = report_interval_seconds

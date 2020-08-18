@@ -15,29 +15,15 @@ class LogOutputIntegrationTest(PantsRunIntegrationTest):
         src_root = Path(tmpdir, "src", "python", "project")
         src_root.mkdir(parents=True)
         (src_root / "__init__.py").touch()
-
-        (src_root / "fake_test.py").write_text(
+        (src_root / "lib.py").write_text(
             dedent(
                 """\
-
-                def fake_test():
-                    assert 1 == 2
+                def add(x: int, y: int) -> int:
+                    return x + y
                 """
             )
         )
-
-        (src_root / "BUILD").write_text(
-            dedent(
-                """\
-                python_tests(
-                    name="fake",
-                )
-
-                python_library()
-                """
-            )
-        )
-
+        (src_root / "BUILD").write_text("python_library()")
         return tmpdir_relative
 
     def test_completed_log_output(self) -> None:
@@ -46,8 +32,8 @@ class LogOutputIntegrationTest(PantsRunIntegrationTest):
             tmpdir_relative = self._prepare_sources(tmpdir, build_root)
 
             test_run_result = self.run_pants(
-                ["--no-dynamic-ui", "test", f"{tmpdir_relative}/src/python/project:fake"]
+                ["--no-dynamic-ui", "typecheck", f"{tmpdir_relative}/src/python/project"]
             )
 
-            assert "[INFO] Starting: Run Pytest for" in test_run_result.stderr_data
-            assert "[INFO] Completed: Run Pytest for" in test_run_result.stderr_data
+            assert "[INFO] Starting: Run MyPy on" in test_run_result.stderr_data
+            assert "[INFO] Completed: Run MyPy on" in test_run_result.stderr_data

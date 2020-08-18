@@ -254,6 +254,7 @@ async def run_python_test(
             timeout_seconds=setup.timeout_seconds,
             extra_env=env,
             execution_slot_variable=setup.execution_slot_variable,
+            level=LogLevel.DEBUG,
         ),
     )
 
@@ -288,7 +289,7 @@ async def run_python_test(
     )
 
 
-@rule(desc="Setup Pytest to run interactively", level=LogLevel.DEBUG)
+@rule(desc="Set up Pytest to run interactively", level=LogLevel.DEBUG)
 def debug_python_test(field_set: PythonTestFieldSet, setup: TestTargetSetup) -> TestDebugRequest:
     if field_set.is_conftest():
         return TestDebugRequest(None)
