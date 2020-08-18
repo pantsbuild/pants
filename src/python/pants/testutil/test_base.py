@@ -129,7 +129,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         files = {f for relpath in relpaths for f in recursive_dirname(relpath)}
         return self._scheduler.invalidate_files(files)
 
-    def create_link(self, relsrc: str, reldst: str):
+    def create_link(self, relsrc: str, reldst: str) -> None:
         """Creates a symlink within the buildroot.
 
         :API: public
