@@ -51,7 +51,7 @@ pub mod logger;
 
 pub use logger::{get_destination, scope_task_destination, set_thread_destination, Destination};
 
-pub type Logger = logger::Logger;
+pub type Logger = logger::PantsLogger;
 
 use num_enum::TryFromPrimitive;
 

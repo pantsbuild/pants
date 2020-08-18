@@ -36,7 +36,7 @@ use indexmap::IndexMap;
 use indicatif::{MultiProgress, ProgressBar, ProgressDrawTarget, ProgressStyle};
 use uuid::Uuid;
 
-use logging::logger::{StdioHandler, LOGGER};
+use logging::logger::{StdioHandler, PANTS_LOGGER};
 use task_executor::Executor;
 use workunit_store::WorkunitStore;
 
@@ -192,7 +192,7 @@ impl ConsoleUI {
     self.instance = Some(Instance {
       tasks_to_display: IndexMap::new(),
       multi_progress_task,
-      logger_handle: LOGGER.register_stderr_handler(stderr_handler),
+      logger_handle: PANTS_LOGGER.register_stderr_handler(stderr_handler),
       bars,
     });
     Ok(())
@@ -203,7 +203,7 @@ impl ConsoleUI {
   ///
   pub fn teardown(&mut self) -> impl Future<Output = Result<(), String>> {
     if let Some(instance) = self.instance.take() {
-      LOGGER.deregister_stderr_handler(instance.logger_handle);
+      PANTS_LOGGER.deregister_stderr_handler(instance.logger_handle);
       instance
         .multi_progress_task
         .map_err(|e| format!("Failed to render UI: {}", e))
