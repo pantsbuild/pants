@@ -632,10 +632,9 @@ impl CommandRunner {
         None => {
           // The request has not been submitted yet. Submit the request using the REv2
           // Execute method.
-          trace!(
+          debug!(
             "no current operation: submitting execute request: build_id={}; execute_request={:?}",
-            context.build_id,
-            execute_request
+            context.build_id, execute_request
           );
           self
             .execution_client
@@ -645,10 +644,9 @@ impl CommandRunner {
         Some(ref operation_name) => {
           // The request has been submitted already. Reconnect to the status stream
           // using the REv2 WaitExecution method.
-          trace!(
+          debug!(
             "existing operation: reconnecting to operation stream: build_id={}; operation_name={}",
-            context.build_id,
-            operation_name
+            context.build_id, operation_name
           );
           let mut wait_execution_request = WaitExecutionRequest::new();
           wait_execution_request.set_name(operation_name.to_owned());
@@ -778,12 +776,9 @@ impl crate::CommandRunner for CommandRunner {
     let build_id = context.build_id.clone();
 
     debug!("Remote execution: {}", request.description);
-    trace!(
+    debug!(
       "built REv2 request (build_id={}): action={:?}; command={:?}; execute_request={:?}",
-      &build_id,
-      action,
-      command,
-      execute_request
+      &build_id, action, command, execute_request
     );
 
     // Record the time that we started to process this request, then compute the ultimate
@@ -810,6 +805,10 @@ impl crate::CommandRunner for CommandRunner {
       |_, md| md,
     )
     .await?;
+    debug!(
+      "action cache response: build_id={}; digest={:?}: {:?}",
+      &build_id, action_digest, cached_response_opt
+    );
     if let Some(cached_response) = cached_response_opt {
       return Ok(cached_response);
     }
