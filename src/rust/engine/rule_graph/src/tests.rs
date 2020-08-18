@@ -36,6 +36,7 @@ fn basic() {
   let graph = RuleGraph::new(&rules, queries);
 
   graph.validate().unwrap();
+  graph.find_root_edges(vec!["b"], "a").unwrap();
 }
 
 #[test]
@@ -47,6 +48,7 @@ fn singleton() {
   let graph = RuleGraph::new(&rules, queries);
 
   graph.validate().unwrap();
+  graph.find_root_edges(vec![""], "a").unwrap();
 }
 
 #[test]
@@ -85,6 +87,7 @@ fn nested_basic() {
   let graph = RuleGraph::new(&rules, queries);
 
   graph.validate().unwrap();
+  graph.find_root_edges(vec!["d"], "a").unwrap();
 }
 
 #[test]
@@ -111,6 +114,7 @@ fn nested_multiple() {
   let graph = RuleGraph::new(&rules, queries);
 
   graph.validate().unwrap();
+  graph.find_root_edges(vec!["d"], "a").unwrap();
 }
 
 #[test]
