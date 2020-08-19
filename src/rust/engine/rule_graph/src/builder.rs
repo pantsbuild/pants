@@ -941,8 +941,6 @@ impl<'t, R: Rule> Builder<'t, R> {
       queries: self.queries,
       rule_dependency_edges,
       // TODO
-      unfulfillable_rules: HashMap::default(),
-      // TODO
       unreachable_rules: Vec::default(),
     })
   }

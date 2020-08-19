@@ -13,7 +13,7 @@ from pants.engine.fs import EMPTY_DIGEST
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.scheduler_test_base import SchedulerTestBase
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, MultiGet, QueryRule, RootRule, rule
+from pants.engine.rules import Get, MultiGet, QueryRule, rule
 from pants.reporting.streaming_workunit_handler import (
     StreamingWorkunitContext,
     StreamingWorkunitHandler,
@@ -219,7 +219,7 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
         )
 
     def test_illegal_root_selection(self):
-        rules = [RootRule(B)]
+        rules = [QueryRule(A, [B])]
         scheduler = self.scheduler(rules, include_trace_on_error=False)
 
         # No rules are available to compute A.
@@ -562,6 +562,10 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
 class StreamingWorkunitProcessTests(TestBase):
 
     additional_options = ["--no-process-execution-use-local-cache"]
+
+    @classmethod
+    def rules(cls):
+        return [*super().rules(), QueryRule(ProcessResult, (Process,))]
 
     def test_process_digests_on_workunits(self):
         scheduler = self.scheduler

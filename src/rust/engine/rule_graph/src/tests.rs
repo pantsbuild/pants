@@ -33,9 +33,9 @@ fn basic() {
     .into_iter()
     .collect();
   let queries = vec![Query::new("a", vec!["b"])];
-  let graph = RuleGraph::new(&rules, queries);
+  let graph = RuleGraph::new(&rules, queries).unwrap();
 
-  graph.validate().unwrap();
+  graph.validate_reachability().unwrap();
   graph.find_root_edges(vec!["b"], "a").unwrap();
 }
 
@@ -45,9 +45,9 @@ fn singleton() {
     .into_iter()
     .collect();
   let queries = vec![Query::new("a", vec![])];
-  let graph = RuleGraph::new(&rules, queries);
+  let graph = RuleGraph::new(&rules, queries).unwrap();
 
-  graph.validate().unwrap();
+  graph.validate_reachability().unwrap();
   graph.find_root_edges(vec![""], "a").unwrap();
 }
 
@@ -57,13 +57,11 @@ fn insufficient_query() {
     .into_iter()
     .collect();
   let queries = vec![Query::new("a", vec![])];
-  let graph = RuleGraph::new(&rules, queries);
 
-  assert!(graph
-    .validate()
+  assert!(RuleGraph::new(&rules, queries)
     .err()
     .unwrap()
-    .contains("No rule was able to compute DependencyKey(\"b\", None)."));
+    .contains("No installed rules return the type b"));
 }
 
 #[test]
@@ -84,9 +82,9 @@ fn nested_basic() {
   .into_iter()
   .collect();
   let queries = vec![Query::new("a", vec!["d"])];
-  let graph = RuleGraph::new(&rules, queries);
+  let graph = RuleGraph::new(&rules, queries).unwrap();
 
-  graph.validate().unwrap();
+  graph.validate_reachability().unwrap();
   graph.find_root_edges(vec!["d"], "a").unwrap();
 }
 
@@ -111,9 +109,9 @@ fn nested_multiple() {
   .into_iter()
   .collect();
   let queries = vec![Query::new("a", vec!["d"])];
-  let graph = RuleGraph::new(&rules, queries);
+  let graph = RuleGraph::new(&rules, queries).unwrap();
 
-  graph.validate().unwrap();
+  graph.validate_reachability().unwrap();
   graph.find_root_edges(vec!["d"], "a").unwrap();
 }
 
@@ -135,9 +133,9 @@ fn self_cycle_simple() {
     Query::new("Fib", vec!["int"]),
     Query::new("Fib", vec!["Fib"]),
   ];
-  let graph = RuleGraph::new(&rules, queries);
+  let graph = RuleGraph::new(&rules, queries).unwrap();
 
-  graph.validate().unwrap();
+  graph.validate_reachability().unwrap();
   graph.find_root_edges(vec!["int"], "Fib").unwrap();
   graph.find_root_edges(vec!["Fib"], "Fib").unwrap();
 }
@@ -169,9 +167,9 @@ fn self_cycle_with_external_dep() {
   .into_iter()
   .collect();
   let queries = vec![Query::new("Thing", vec!["int"])];
-  let graph = RuleGraph::new(&rules, queries);
+  let graph = RuleGraph::new(&rules, queries).unwrap();
 
-  graph.validate().unwrap();
+  graph.validate_reachability().unwrap();
   graph.find_root_edges(vec!["int"], "Thing").unwrap();
 }
 
@@ -205,9 +203,9 @@ fn mutual_recursion() {
     Query::new("IsEven", vec!["int"]),
     Query::new("IsOdd", vec!["int"]),
   ];
-  let graph = RuleGraph::new(&rules, queries);
+  let graph = RuleGraph::new(&rules, queries).unwrap();
 
-  graph.validate().unwrap();
+  graph.validate_reachability().unwrap();
   graph.find_root_edges(vec!["int"], "IsEven").unwrap();
   graph.find_root_edges(vec!["int"], "IsOdd").unwrap();
 }
@@ -235,9 +233,9 @@ fn wide() {
   .into_iter()
   .collect();
   let queries = vec![Query::new("Output", vec!["D"])];
-  let graph = RuleGraph::new(&rules, queries);
+  let graph = RuleGraph::new(&rules, queries).unwrap();
 
-  graph.validate().unwrap();
+  graph.validate_reachability().unwrap();
   graph.find_root_edges(vec!["D"], "Output").unwrap();
 }
 

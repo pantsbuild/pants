@@ -225,8 +225,8 @@ py_module_initializer!(native_engine, |py, m| {
 
   m.add(
     py,
-    "validator_run",
-    py_fn!(py, validator_run(a: PyScheduler)),
+    "validate_reachability",
+    py_fn!(py, validate_reachability(a: PyScheduler)),
   )?;
   m.add(
     py,
@@ -1182,12 +1182,12 @@ fn session_new_run_id(py: Python, session_ptr: PySession) -> PyUnitResult {
   })
 }
 
-fn validator_run(py: Python, scheduler_ptr: PyScheduler) -> PyUnitResult {
+fn validate_reachability(py: Python, scheduler_ptr: PyScheduler) -> PyUnitResult {
   with_scheduler(py, scheduler_ptr, |scheduler| {
     scheduler
       .core
       .rule_graph
-      .validate()
+      .validate_reachability()
       .map_err(|e| PyErr::new::<exc::Exception, _>(py, (e,)))
       .map(|()| None)
   })
