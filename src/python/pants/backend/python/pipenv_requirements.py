@@ -34,7 +34,7 @@ class PipenvRequirements:
         self,
         requirements_relpath: str = "Pipfile.lock",
         module_mapping: Optional[Mapping[str, Iterable[str]]] = None,
-        pipfile_target: str = None,
+        pipfile_target: Optional[str] = None,
     ) -> None:
         """
         :param requirements_relpath: The relpath from this BUILD file to the requirements file.
