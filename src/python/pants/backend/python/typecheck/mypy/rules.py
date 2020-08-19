@@ -29,14 +29,14 @@ from pants.engine.fs import (
 )
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import FieldSetWithOrigin, TransitiveTargets
+from pants.engine.target import FieldSet, TransitiveTargets
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 from pants.util.strutil import pluralize
 
 
 @dataclass(frozen=True)
-class MyPyFieldSet(FieldSetWithOrigin):
+class MyPyFieldSet(FieldSet):
     required_fields = (PythonSources,)
 
     sources: PythonSources

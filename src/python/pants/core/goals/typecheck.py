@@ -14,7 +14,7 @@ from pants.engine.engine_aware import EngineAware
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
-from pants.engine.target import TargetsWithOrigins
+from pants.engine.target import Targets
 from pants.engine.unions import UnionMembership, union
 from pants.util.logging import LogLevel
 from pants.util.memo import memoized_property
@@ -129,14 +129,14 @@ class Typecheck(Goal):
 
 @goal_rule
 async def typecheck(
-    console: Console, targets_with_origins: TargetsWithOrigins, union_membership: UnionMembership
+    console: Console, targets: Targets, union_membership: UnionMembership
 ) -> Typecheck:
     typecheck_request_types = union_membership[TypecheckRequest]
     requests: Iterable[StyleRequest] = tuple(
         lint_request_type(
-            lint_request_type.field_set_type.create(target_with_origin)
-            for target_with_origin in targets_with_origins
-            if lint_request_type.field_set_type.is_valid(target_with_origin.target)
+            lint_request_type.field_set_type.create(target)
+            for target in targets
+            if lint_request_type.field_set_type.is_valid(target)
         )
         for lint_request_type in typecheck_request_types
     )

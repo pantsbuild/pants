@@ -5,7 +5,6 @@ from abc import ABCMeta, abstractmethod
 from textwrap import dedent
 from typing import ClassVar, Iterable, List, Optional, Tuple, Type
 
-from pants.base.specs import AddressLiteralSpec
 from pants.core.goals.typecheck import (
     Typecheck,
     TypecheckRequest,
@@ -18,13 +17,7 @@ from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSourcesRequest,
 )
 from pants.engine.addresses import Address
-from pants.engine.target import (
-    FieldSetWithOrigin,
-    Sources,
-    Target,
-    TargetsWithOrigins,
-    TargetWithOrigin,
-)
+from pants.engine.target import FieldSet, Sources, Target, Targets
 from pants.engine.unions import UnionMembership
 from pants.testutil.engine.util import MockConsole, MockGet, run_rule
 from pants.testutil.test_base import TestBase
@@ -36,7 +29,7 @@ class MockTarget(Target):
     core_fields = (Sources,)
 
 
-class MockTypecheckFieldSet(FieldSetWithOrigin):
+class MockTypecheckFieldSet(FieldSet):
     required_fields = (Sources,)
 
 
@@ -113,26 +106,23 @@ class InvalidRequest(MockTypecheckRequest):
 
 class TypecheckTest(TestBase):
     @staticmethod
-    def make_target_with_origin(address: Optional[Address] = None) -> TargetWithOrigin:
+    def make_target(address: Optional[Address] = None) -> Target:
         if address is None:
             address = Address.parse(":tests")
-        return TargetWithOrigin(
-            MockTarget({}, address=address),
-            origin=AddressLiteralSpec(address.spec_path, address.target_name),
-        )
+        return MockTarget({}, address=address)
 
     @staticmethod
     def run_typecheck_rule(
         *,
         request_types: List[Type[TypecheckRequest]],
-        targets: List[TargetWithOrigin],
+        targets: List[Target],
         include_sources: bool = True,
     ) -> Tuple[int, str]:
         console = MockConsole(use_colors=False)
         union_membership = UnionMembership({TypecheckRequest: request_types})
         result: Typecheck = run_rule(
             typecheck,
-            rule_args=[console, TargetsWithOrigins(targets), union_membership],
+            rule_args=[console, Targets(targets), union_membership],
             mock_gets=[
                 MockGet(
                     product_type=TypecheckResults,
@@ -154,16 +144,14 @@ class TypecheckTest(TestBase):
 
     def test_empty_target_noops(self) -> None:
         exit_code, stderr = self.run_typecheck_rule(
-            request_types=[FailingRequest],
-            targets=[self.make_target_with_origin()],
-            include_sources=False,
+            request_types=[FailingRequest], targets=[self.make_target()], include_sources=False,
         )
         assert exit_code == 0
         assert stderr == ""
 
     def test_invalid_target_noops(self) -> None:
         exit_code, stderr = self.run_typecheck_rule(
-            request_types=[InvalidRequest], targets=[self.make_target_with_origin()]
+            request_types=[InvalidRequest], targets=[self.make_target()]
         )
         assert exit_code == 0
         assert stderr == ""
@@ -178,10 +166,7 @@ class TypecheckTest(TestBase):
                 SkippedRequest,
                 SuccessfulRequest,
             ],
-            targets=[
-                self.make_target_with_origin(good_address),
-                self.make_target_with_origin(bad_address),
-            ],
+            targets=[self.make_target(good_address), self.make_target(bad_address),],
         )
         assert exit_code == FailingRequest.exit_code([bad_address])
         assert stderr == dedent(
