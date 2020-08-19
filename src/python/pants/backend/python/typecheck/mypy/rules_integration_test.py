@@ -3,14 +3,14 @@
 
 from pathlib import PurePath
 from textwrap import dedent
-from typing import List, Optional
+from typing import List, Optional, Sequence
 
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
 from pants.backend.python.target_types import PythonLibrary
 from pants.backend.python.typecheck.mypy.rules import MyPyFieldSet, MyPyRequest
 from pants.backend.python.typecheck.mypy.rules import rules as mypy_rules
 from pants.base.specs import AddressLiteralSpec
-from pants.core.goals.typecheck import TypecheckResults
+from pants.core.goals.typecheck import TypecheckResult, TypecheckResults
 from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
 from pants.engine.rules import RootRule
@@ -118,7 +118,7 @@ class MyPyIntegrationTest(ExternalToolTestBase):
         passthrough_args: Optional[str] = None,
         skip: bool = False,
         additional_args: Optional[List[str]] = None,
-    ) -> TypecheckResults:
+    ) -> Sequence[TypecheckResult]:
         args = list(self.global_args)
         if config:
             self.create_file(relpath="mypy.ini", contents=config)
@@ -129,13 +129,14 @@ class MyPyIntegrationTest(ExternalToolTestBase):
             args.append("--mypy-skip")
         if additional_args:
             args.extend(additional_args)
-        return self.request_single_product(
+        result = self.request_single_product(
             TypecheckResults,
             Params(
                 MyPyRequest(MyPyFieldSet.create(tgt) for tgt in targets),
                 create_options_bootstrapper(args=args),
             ),
         )
+        return result.results
 
     def test_passing_source(self) -> None:
         target = self.make_target_with_origin([self.good_source])

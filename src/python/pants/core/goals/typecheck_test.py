@@ -28,6 +28,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionMembership
 from pants.testutil.engine.util import MockConsole, MockGet, run_rule
 from pants.testutil.test_base import TestBase
+from pants.util.logging import LogLevel
 
 
 class MockTarget(Target):
@@ -48,23 +49,12 @@ class MockTypecheckRequest(TypecheckRequest, metaclass=ABCMeta):
     def exit_code(_: Iterable[Address]) -> int:
         pass
 
-    @staticmethod
-    @abstractmethod
-    def stdout(_: Iterable[Address]) -> str:
-        pass
-
     @property
     def typecheck_results(self) -> TypecheckResults:
         addresses = [config.address for config in self.field_sets]
         return TypecheckResults(
-            [
-                TypecheckResult(
-                    self.exit_code(addresses),
-                    self.stdout(addresses),
-                    "",
-                    typechecker_name=self.typechecker_name,
-                )
-            ]
+            [TypecheckResult(self.exit_code(addresses), "", "",)],
+            typechecker_name=self.typechecker_name,
         )
 
 
@@ -75,10 +65,6 @@ class SuccessfulRequest(MockTypecheckRequest):
     def exit_code(_: Iterable[Address]) -> int:
         return 0
 
-    @staticmethod
-    def stdout(addresses: Iterable[Address]) -> str:
-        return ", ".join(str(address) for address in addresses)
-
 
 class FailingRequest(MockTypecheckRequest):
     typechecker_name = "FailingTypechecker"
@@ -86,10 +72,6 @@ class FailingRequest(MockTypecheckRequest):
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
         return 1
-
-    @staticmethod
-    def stdout(addresses: Iterable[Address]) -> str:
-        return ", ".join(str(address) for address in addresses)
 
 
 class ConditionallySucceedsRequest(MockTypecheckRequest):
@@ -101,9 +83,15 @@ class ConditionallySucceedsRequest(MockTypecheckRequest):
             return 127
         return 0
 
+
+class SkippedRequest(MockTypecheckRequest):
     @staticmethod
-    def stdout(addresses: Iterable[Address]) -> str:
-        return ", ".join(str(address) for address in addresses)
+    def exit_code(_) -> int:
+        return 0
+
+    @property
+    def typecheck_results(self) -> TypecheckResults:
+        return TypecheckResults([], typechecker_name="SkippedTypechecker")
 
 
 class InvalidField(Sources):
@@ -121,10 +109,6 @@ class InvalidRequest(MockTypecheckRequest):
     @staticmethod
     def exit_code(_: Iterable[Address]) -> int:
         return -1
-
-    @staticmethod
-    def stdout(addresses: Iterable[Address]) -> str:
-        return ", ".join(str(address) for address in addresses)
 
 
 class TypecheckTest(TestBase):
@@ -184,72 +168,86 @@ class TypecheckTest(TestBase):
         assert exit_code == 0
         assert stderr == ""
 
-    def test_single_target_with_one_typechecker(self) -> None:
-        address = Address.parse(":tests")
-        target_with_origin = self.make_target_with_origin(address)
-        exit_code, stderr = self.run_typecheck_rule(
-            request_types=[FailingRequest], targets=[target_with_origin]
-        )
-        assert exit_code == FailingRequest.exit_code([address])
-        assert stderr == dedent(
-            f"""\
-            𐄂 FailingTypechecker failed.
-            {FailingRequest.stdout([address])}
-            """
-        )
-
-    def test_single_target_with_multiple_typecheckers(self) -> None:
-        address = Address.parse(":tests")
-        target_with_origin = self.make_target_with_origin(address)
-        exit_code, stderr = self.run_typecheck_rule(
-            request_types=[SuccessfulRequest, FailingRequest], targets=[target_with_origin]
-        )
-        assert exit_code == FailingRequest.exit_code([address])
-        assert stderr == dedent(
-            f"""\
-            𐄂 FailingTypechecker failed.
-            {FailingRequest.stdout([address])}
-
-            ✓ SuccessfulTypechecker succeeded.
-            {SuccessfulRequest.stdout([address])}
-            """
-        )
-
-    def test_multiple_targets_with_one_typechecker(self) -> None:
+    def test_summary(self) -> None:
         good_address = Address.parse(":good")
         bad_address = Address.parse(":bad")
         exit_code, stderr = self.run_typecheck_rule(
-            request_types=[ConditionallySucceedsRequest],
+            request_types=[
+                ConditionallySucceedsRequest,
+                FailingRequest,
+                SkippedRequest,
+                SuccessfulRequest,
+            ],
             targets=[
                 self.make_target_with_origin(good_address),
                 self.make_target_with_origin(bad_address),
             ],
         )
-        assert exit_code == ConditionallySucceedsRequest.exit_code([bad_address])
+        assert exit_code == FailingRequest.exit_code([bad_address])
         assert stderr == dedent(
-            f"""\
-            𐄂 ConditionallySucceedsTypechecker failed.
-            {ConditionallySucceedsRequest.stdout([good_address, bad_address])}
-            """
-        )
+            """\
 
-    def test_multiple_targets_with_multiple_typecheckers(self) -> None:
-        good_address = Address.parse(":good")
-        bad_address = Address.parse(":bad")
-        exit_code, stderr = self.run_typecheck_rule(
-            request_types=[ConditionallySucceedsRequest, SuccessfulRequest],
-            targets=[
-                self.make_target_with_origin(good_address),
-                self.make_target_with_origin(bad_address),
-            ],
-        )
-        assert exit_code == ConditionallySucceedsRequest.exit_code([bad_address])
-        assert stderr == dedent(
-            f"""\
             𐄂 ConditionallySucceedsTypechecker failed.
-            {ConditionallySucceedsRequest.stdout([good_address, bad_address])}
-
+            𐄂 FailingTypechecker failed.
+            - SkippedTypechecker skipped.
             ✓ SuccessfulTypechecker succeeded.
-            {SuccessfulRequest.stdout([good_address, bad_address])}
             """
         )
+
+
+def test_streaming_output_skip() -> None:
+    results = TypecheckResults([], typechecker_name="typchecker")
+    assert results.level() == LogLevel.DEBUG
+    assert results.message() == "skipped."
+
+
+def test_streaming_output_success() -> None:
+    results = TypecheckResults(
+        [TypecheckResult(0, "stdout", "stderr")], typechecker_name="typchecker"
+    )
+    assert results.level() == LogLevel.INFO
+    assert results.message() == dedent(
+        """\
+        succeeded.
+        stdout
+        stderr
+
+        """
+    )
+
+
+def test_streaming_output_failure() -> None:
+    results = TypecheckResults(
+        [TypecheckResult(18, "stdout", "stderr")], typechecker_name="typchecker"
+    )
+    assert results.level() == LogLevel.WARN
+    assert results.message() == dedent(
+        """\
+        failed (exit code 18).
+        stdout
+        stderr
+
+        """
+    )
+
+
+def test_streaming_output_partitions() -> None:
+    results = TypecheckResults(
+        [
+            TypecheckResult(21, "", "", partition_description="ghc8.1"),
+            TypecheckResult(0, "stdout", "stderr", partition_description="ghc9.2"),
+        ],
+        typechecker_name="typchecker",
+    )
+    assert results.level() == LogLevel.WARN
+    assert results.message() == dedent(
+        """\
+        failed (exit code 21).
+        Partition #1 - ghc8.1:
+
+        Partition #2 - ghc9.2:
+        stdout
+        stderr
+
+        """
+    )

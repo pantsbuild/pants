@@ -60,7 +60,7 @@ def generate_args(mypy: MyPy, *, file_list_path: str) -> Tuple[str, ...]:
 @rule(desc="Typecheck using MyPy", level=LogLevel.DEBUG)
 async def mypy_typecheck(request: MyPyRequest, mypy: MyPy) -> TypecheckResults:
     if mypy.skip:
-        return TypecheckResults()
+        return TypecheckResults([], typechecker_name="MyPy")
 
     transitive_targets = await Get(
         TransitiveTargets, Addresses(fs.address for fs in request.field_sets)
@@ -115,10 +115,11 @@ async def mypy_typecheck(request: MyPyRequest, mypy: MyPy) -> TypecheckResults:
             input_digest=merged_input_files,
             extra_env={"PEX_EXTRA_SYS_PATH": ":".join(prepared_sources.source_roots)},
             description=f"Run MyPy on {pluralize(len(srcs_snapshot.files), 'file')}.",
+            level=LogLevel.DEBUG,
         ),
     )
     return TypecheckResults(
-        [TypecheckResult.from_fallible_process_result(result, typechecker_name="MyPy")]
+        [TypecheckResult.from_fallible_process_result(result)], typechecker_name="MyPy"
     )
 
 
