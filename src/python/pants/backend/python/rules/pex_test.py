@@ -14,6 +14,7 @@ from pants.backend.python.rules.pex import (
     Pex,
     PexInterpreterConstraints,
     PexPlatforms,
+    PexProcess,
     PexRequest,
     PexRequirements,
 )
@@ -183,7 +184,12 @@ def parse_requirements(requirements: Iterable[str]) -> Iterator[ExactRequirement
 class PexTest(ExternalToolTestBase):
     @classmethod
     def rules(cls):
-        return (*super().rules(), *pex_rules(), QueryRule(Pex, (PexRequest, OptionsBootstrapper)))
+        return (
+            *super().rules(),
+            *pex_rules(),
+            QueryRule(Pex, (PexRequest, OptionsBootstrapper)),
+            QueryRule(Process, (PexProcess, OptionsBootstrapper)),
+        )
 
     def create_pex_and_get_all_data(
         self,
