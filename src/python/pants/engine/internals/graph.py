@@ -36,7 +36,7 @@ from pants.engine.fs import (
     SourcesSnapshot,
 )
 from pants.engine.internals.target_adaptor import TargetAdaptor
-from pants.engine.rules import Get, MultiGet, RootRule, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
@@ -928,13 +928,4 @@ def find_valid_field_sets(
 
 
 def rules():
-    return [
-        *collect_rules(),
-        RootRule(DependenciesRequest),
-        RootRule(HydrateSourcesRequest),
-        RootRule(InferDependenciesRequest),
-        RootRule(InjectDependenciesRequest),
-        RootRule(OwnersRequest),
-        RootRule(Specs),
-        RootRule(TargetsToValidFieldSetsRequest),
-    ]
+    return collect_rules()

@@ -22,7 +22,7 @@ from pants.engine.internals.scheduler import Scheduler, SchedulerSession
 from pants.engine.internals.selectors import Params
 from pants.engine.platform import create_platform_rules
 from pants.engine.process import InteractiveRunner
-from pants.engine.rules import QueryRule, RootRule, collect_rules, rule
+from pants.engine.rules import QueryRule, collect_rules, rule
 from pants.engine.target import RegisteredTargetTypes
 from pants.engine.unions import UnionMembership
 from pants.init import specs_calculator
@@ -234,7 +234,6 @@ class EngineInitializer:
         rules = FrozenOrderedSet(
             (
                 *collect_rules(locals()),
-                RootRule(Console),
                 *build_files.rules(),
                 *desktop.rules(),
                 *fs.rules(),

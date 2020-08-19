@@ -492,10 +492,7 @@ class RuleIndex:
         union_rules: OrderedSet[UnionRule] = OrderedSet()
 
         def add_rule(rule: Rule) -> None:
-            if isinstance(rule, RootRule):
-                # TODO
-                pass
-            elif isinstance(rule, QueryRule):
+            if isinstance(rule, QueryRule):
                 queries.add(rule)
             else:
                 output_type = rule.output_type

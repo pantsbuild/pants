@@ -17,8 +17,9 @@ from pants.backend.python.target_types import (
 )
 from pants.core.util_rules import source_files, stripped_source_files
 from pants.engine.addresses import Address
-from pants.engine.rules import RootRule
+from pants.engine.rules import QueryRule
 from pants.engine.target import InferredDependencies, WrappedTarget
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.source.source_root import all_roots
 from pants.testutil.engine_util import Params
 from pants.testutil.option_util import create_options_bootstrapper
@@ -34,9 +35,9 @@ class PythonDependencyInferenceTest(TestBase):
             *source_files.rules(),
             *dependency_inference_rules(),
             all_roots,
-            RootRule(InferPythonDependencies),
-            RootRule(InferInitDependencies),
-            RootRule(InferConftestDependencies),
+            QueryRule(InferredDependencies, (InferPythonDependencies, OptionsBootstrapper)),
+            QueryRule(InferredDependencies, (InferInitDependencies, OptionsBootstrapper)),
+            QueryRule(InferredDependencies, (InferConftestDependencies, OptionsBootstrapper)),
         )
 
     @classmethod

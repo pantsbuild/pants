@@ -22,8 +22,9 @@ from pants.backend.python.target_types import PythonInterpreterCompatibility
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import RootRule
+from pants.engine.rules import QueryRule
 from pants.engine.target import FieldSet
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.python.python_setup import PythonSetup
 from pants.testutil.engine_util import Params
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
@@ -182,11 +183,7 @@ def parse_requirements(requirements: Iterable[str]) -> Iterator[ExactRequirement
 class PexTest(ExternalToolTestBase):
     @classmethod
     def rules(cls):
-        return (
-            *super().rules(),
-            *pex_rules(),
-            RootRule(PexRequest),
-        )
+        return (*super().rules(), *pex_rules(), QueryRule(Pex, (PexRequest, OptionsBootstrapper)))
 
     def create_pex_and_get_all_data(
         self,

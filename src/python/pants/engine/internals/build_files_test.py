@@ -15,14 +15,11 @@ from pants.base.specs import (
     AddressSpecs,
     AscendantAddresses,
     DescendantAddresses,
-    FilesystemSpecs,
     SiblingAddresses,
-    Specs,
 )
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.addresses import (
     Address,
-    Addresses,
     AddressesWithOrigins,
     AddressInput,
     AddressWithOrigin,
@@ -37,7 +34,7 @@ from pants.engine.internals.build_files import (
 from pants.engine.internals.parser import BuildFilePreludeSymbols, Parser
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.target_adaptor import TargetAdaptor
-from pants.engine.rules import RootRule
+from pants.engine.rules import QueryRule
 from pants.engine.target import Dependencies, Sources, Tags, Target
 from pants.option.global_options import GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -133,7 +130,13 @@ class BuildFileIntegrationTest(TestBase):
 
     @classmethod
     def rules(cls):
-        return (*super().rules(), RootRule(Addresses), RootRule(AddressInput))
+        return (
+            *super().rules(),
+            QueryRule(Address, (AddressInput,)),
+            QueryRule(TargetAdaptor, (Address, OptionsBootstrapper)),
+            QueryRule(BuildFileAddress, (Address, OptionsBootstrapper)),
+            QueryRule(AddressesWithOrigins, (AddressSpecs, OptionsBootstrapper)),
+        )
 
     def test_resolve_address(self) -> None:
         def assert_is_expected(address_input: AddressInput, expected: Address) -> None:
@@ -234,7 +237,7 @@ class BuildFileIntegrationTest(TestBase):
         result = self.request_product(
             AddressesWithOrigins,
             Params(
-                Specs(AddressSpecs(specs, filter_by_global_options=True), FilesystemSpecs([])),
+                AddressSpecs(specs, filter_by_global_options=True),
                 bootstrapper or create_options_bootstrapper(),
             ),
         )

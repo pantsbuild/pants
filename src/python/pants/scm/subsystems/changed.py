@@ -12,7 +12,7 @@ from pants.base.deprecated import resolve_conflicting_options
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
 from pants.engine.internals.graph import Owners, OwnersRequest
-from pants.engine.rules import Get, RootRule, collect_rules, rule
+from pants.engine.rules import Get, collect_rules, rule
 from pants.option.option_value_container import OptionValueContainer
 from pants.option.subsystem import Subsystem
 from pants.scm.scm import Scm
@@ -156,8 +156,4 @@ class Changed(Subsystem):
 
 
 def rules():
-    return [
-        *collect_rules(),
-        RootRule(ChangedRequest),
-        *dependees.rules(),
-    ]
+    return [*collect_rules(), *dependees.rules()]

@@ -12,9 +12,10 @@ from pants.backend.awslambda.python.awslambda_python_rules import rules as awsla
 from pants.backend.awslambda.python.target_types import PythonAWSLambda
 from pants.backend.python.target_types import PythonLibrary
 from pants.engine.addresses import Address
-from pants.engine.fs import DigestContents
-from pants.engine.rules import RootRule
+from pants.engine.fs import Digest, DigestContents
+from pants.engine.rules import QueryRule
 from pants.engine.target import WrappedTarget
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.engine_util import Params
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option_util import create_options_bootstrapper
@@ -26,7 +27,8 @@ class TestPythonAWSLambdaCreation(ExternalToolTestBase):
         return (
             *super().rules(),
             *awslambda_python_rules(),
-            RootRule(PythonAwsLambdaFieldSet),
+            QueryRule(CreatedAWSLambda, (PythonAwsLambdaFieldSet, OptionsBootstrapper)),
+            QueryRule(DigestContents, (Digest,)),
         )
 
     @classmethod

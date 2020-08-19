@@ -4,7 +4,7 @@
 from dataclasses import dataclass
 
 from pants.build_graph.build_configuration import BuildConfiguration
-from pants.engine.rules import RootRule, collect_rules, rule
+from pants.engine.rules import collect_rules, rule
 from pants.init.options_initializer import OptionsInitializer
 from pants.option.global_options import GlobalOptions
 from pants.option.options import Options
@@ -44,8 +44,4 @@ def log_level(global_options: GlobalOptions) -> LogLevel:
 
 
 def rules():
-    return [
-        *collect_rules(),
-        RootRule(Scope),
-        RootRule(OptionsBootstrapper),
-    ]
+    return collect_rules()

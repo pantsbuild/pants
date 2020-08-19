@@ -13,7 +13,7 @@ from pants.engine.fs import EMPTY_DIGEST
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.scheduler_test_base import SchedulerTestBase
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, MultiGet, RootRule, rule
+from pants.engine.rules import Get, MultiGet, QueryRule, RootRule, rule
 from pants.reporting.streaming_workunit_handler import (
     StreamingWorkunitContext,
     StreamingWorkunitHandler,
@@ -164,41 +164,24 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
 
     def test_recursive_multi_get(self):
         # Tests that a rule that "uses itself" multiple times per invoke works.
-        rules = [
-            fib,
-            RootRule(int),
-        ]
-
+        rules = [fib, QueryRule(Fib, (int,))]
         (fib_10,) = self.mk_scheduler(rules=rules).product_request(Fib, subjects=[10])
-
         self.assertEqual(55, fib_10.val)
 
     def test_no_include_trace_error_raises_boring_error(self):
-        rules = [
-            RootRule(B),
-            nested_raise,
-        ]
-
+        rules = [nested_raise, QueryRule(A, (B,))]
         scheduler = self.scheduler(rules, include_trace_on_error=False)
-
         with self.assertRaises(ExecutionError) as cm:
             list(scheduler.product_request(A, subjects=[(B())]))
-
         self.assert_equal_with_printing(
             "1 Exception encountered:\n\n  Exception: An exception for B\n", str(cm.exception)
         )
 
     def test_no_include_trace_error_multiple_paths_raises_executionerror(self):
-        rules = [
-            RootRule(B),
-            nested_raise,
-        ]
-
+        rules = [nested_raise, QueryRule(A, (B,))]
         scheduler = self.scheduler(rules, include_trace_on_error=False)
-
         with self.assertRaises(ExecutionError) as cm:
             list(scheduler.product_request(A, subjects=[B(), B()]))
-
         self.assert_equal_with_printing(
             dedent(
                 """
@@ -212,15 +195,10 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
         )
 
     def test_include_trace_error_raises_error_with_trace(self):
-        rules = [
-            RootRule(B),
-            nested_raise,
-        ]
-
+        rules = [nested_raise, QueryRule(A, (B,))]
         scheduler = self.scheduler(rules, include_trace_on_error=True)
         with self.assertRaises(ExecutionError) as cm:
             list(scheduler.product_request(A, subjects=[(B())]))
-
         self.assert_equal_with_printing(
             dedent(
                 """
@@ -350,7 +328,7 @@ class WorkunitTracker:
 
 class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
     def test_streaming_workunits_reporting(self):
-        rules = [fib, RootRule(int)]
+        rules = [fib, QueryRule(Fib, (int,))]
         scheduler = self.mk_scheduler(
             rules, include_trace_on_error=False, should_report_workunits=True
         )
@@ -380,7 +358,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         assert tracker.finished
 
     def test_streaming_workunits_parent_id_and_rule_metadata(self):
-        rules = [RootRule(Input), rule_one_function, rule_two, rule_three, rule_four]
+        rules = [rule_one_function, rule_two, rule_three, rule_four, QueryRule(Beta, (Input,))]
         scheduler = self.mk_scheduler(
             rules, include_trace_on_error=False, should_report_workunits=True
         )
@@ -445,7 +423,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         assert r4["level"] == "INFO"
 
     def test_streaming_workunit_log_levels(self) -> None:
-        rules = [RootRule(Input), rule_one_function, rule_two, rule_three, rule_four]
+        rules = [rule_one_function, rule_two, rule_three, rule_four, QueryRule(Beta, (Input,))]
         scheduler = self.mk_scheduler(
             rules, include_trace_on_error=False, should_report_workunits=True
         )
@@ -483,7 +461,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         assert r1["parent_id"] == select["span_id"]
 
     def test_streaming_workunit_log_level_parent_rewrite(self) -> None:
-        rules = [RootRule(Input), rule_A, rule_B, rule_C]
+        rules = [rule_A, rule_B, rule_C, QueryRule(Alpha, (Input,))]
         scheduler = self.mk_scheduler(
             rules, include_trace_on_error=False, should_report_workunits=True
         )
@@ -555,7 +533,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         def a_rule(n: int) -> ModifiedOutput:
             return ModifiedOutput(val=n, _level=LogLevel.ERROR)
 
-        rules = [a_rule, RootRule(int)]
+        rules = [a_rule, QueryRule(ModifiedOutput, (int,))]
         scheduler = self.mk_scheduler(
             rules, include_trace_on_error=False, should_report_workunits=True
         )
@@ -591,7 +569,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         def a_rule(n: int) -> ModifiedOutput:
             return ModifiedOutput(val=n, _level=None)
 
-        rules = [a_rule, RootRule(int)]
+        rules = [a_rule, QueryRule(ModifiedOutput, (int,))]
         scheduler = self.mk_scheduler(
             rules, include_trace_on_error=False, should_report_workunits=True
         )
@@ -624,7 +602,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         def a_rule(n: int) -> Output:
             return Output(val=n)
 
-        rules = [a_rule, RootRule(int)]
+        rules = [a_rule, QueryRule(Output, (int,))]
         scheduler = self.mk_scheduler(
             rules, include_trace_on_error=False, should_report_workunits=True
         )

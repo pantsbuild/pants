@@ -7,11 +7,11 @@ from typing import Optional
 from pants.backend.python.rules import pex_from_targets, python_sources
 from pants.backend.python.rules.pex import PexRequest, PexRequirements
 from pants.backend.python.rules.pex_from_targets import PexFromTargetsRequest
-from pants.backend.python.rules.python_sources import PythonSourceFilesRequest
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.build_graph.address import Address
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.rules import RootRule, SubsystemRule
+from pants.engine.rules import QueryRule, SubsystemRule
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.python.python_setup import PythonSetup, ResolveAllConstraintsOption
 from pants.testutil.engine_util import Params
 from pants.testutil.option_util import create_options_bootstrapper
@@ -25,8 +25,7 @@ class PexTest(TestBase):
             *super().rules(),
             *pex_from_targets.rules(),
             *python_sources.rules(),
-            RootRule(PexFromTargetsRequest),
-            RootRule(PythonSourceFilesRequest),
+            QueryRule(PexRequest, (PexFromTargetsRequest, OptionsBootstrapper)),
             SubsystemRule(PythonSetup),
         )
 

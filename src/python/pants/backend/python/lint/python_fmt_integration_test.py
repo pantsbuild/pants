@@ -3,18 +3,17 @@
 
 from typing import List, Optional
 
-from pants.backend.python.lint.black.rules import BlackRequest
 from pants.backend.python.lint.black.rules import rules as black_rules
-from pants.backend.python.lint.isort.rules import IsortRequest
 from pants.backend.python.lint.isort.rules import rules as isort_rules
 from pants.backend.python.lint.python_fmt import PythonFmtTargets, format_python_target
 from pants.backend.python.target_types import PythonLibrary
 from pants.core.goals.fmt import LanguageFmtResults
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
-from pants.engine.rules import RootRule
+from pants.engine.rules import QueryRule
 from pants.engine.target import Targets
 from pants.testutil.engine_util import Params
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option_util import create_options_bootstrapper
 
@@ -27,9 +26,7 @@ class PythonFmtIntegrationTest(ExternalToolTestBase):
             format_python_target,
             *black_rules(),
             *isort_rules(),
-            RootRule(PythonFmtTargets),
-            RootRule(BlackRequest),
-            RootRule(IsortRequest),
+            QueryRule(LanguageFmtResults, (PythonFmtTargets, OptionsBootstrapper)),
         )
 
     def run_black_and_isort(

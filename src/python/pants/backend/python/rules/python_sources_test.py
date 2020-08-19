@@ -15,9 +15,10 @@ from pants.backend.python.rules.python_sources import rules as python_sources_ru
 from pants.backend.python.target_types import PythonSources
 from pants.core.target_types import Files, Resources
 from pants.engine.addresses import Address
-from pants.engine.rules import RootRule
+from pants.engine.rules import QueryRule
 from pants.engine.target import Sources, Target
 from pants.testutil.engine_util import Params
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option_util import create_options_bootstrapper
 
@@ -39,7 +40,8 @@ class PythonSourceFilesTest(ExternalToolTestBase):
             *super().rules(),
             *python_sources_rules(),
             *protobuf_rules(),
-            RootRule(PythonSourceFilesRequest),
+            QueryRule(PythonSourceFiles, (PythonSourceFilesRequest, OptionsBootstrapper)),
+            QueryRule(StrippedPythonSourceFiles, (PythonSourceFilesRequest, OptionsBootstrapper)),
         )
 
     @classmethod

@@ -19,7 +19,8 @@ from pants.backend.python.dependency_inference.module_mapper import (
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.core.util_rules import source_files, stripped_source_files
 from pants.engine.addresses import Address
-from pants.engine.rules import RootRule
+from pants.engine.rules import QueryRule
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.engine_util import Params
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
@@ -82,7 +83,9 @@ class ModuleMapperTest(TestBase):
             map_first_party_modules_to_addresses,
             map_module_to_address,
             map_third_party_modules_to_addresses,
-            RootRule(PythonModule),
+            QueryRule(FirstPartyModuleToAddressMapping, (OptionsBootstrapper,)),
+            QueryRule(ThirdPartyModuleToAddressMapping, (OptionsBootstrapper,)),
+            QueryRule(PythonModuleOwner, (PythonModule, OptionsBootstrapper)),
         )
 
     @classmethod

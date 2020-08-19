@@ -6,7 +6,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, Iterable, Optional, Tuple
 
 from pants.engine.collection import Collection
-from pants.engine.rules import RootRule, collect_rules, side_effecting
+from pants.engine.rules import QueryRule, side_effecting
 from pants.option.global_options import GlobMatchErrorBehavior as GlobMatchErrorBehavior
 from pants.util.meta import frozen_after_init
 
@@ -254,15 +254,14 @@ class SourcesSnapshot:
 
 
 def rules():
-    return [
-        *collect_rules(),
-        RootRule(Workspace),
-        RootRule(CreateDigest),
-        RootRule(Digest),
-        RootRule(MergeDigests),
-        RootRule(PathGlobs),
-        RootRule(RemovePrefix),
-        RootRule(AddPrefix),
-        RootRule(DownloadFile),
-        RootRule(DigestSubset),
-    ]
+    return (
+        QueryRule(Digest, (CreateDigest,)),
+        QueryRule(Digest, (PathGlobs,)),
+        QueryRule(Digest, (AddPrefix,)),
+        QueryRule(Digest, (RemovePrefix,)),
+        QueryRule(Digest, (DownloadFile,)),
+        QueryRule(Digest, (MergeDigests,)),
+        QueryRule(Digest, (DigestSubset,)),
+        QueryRule(DigestContents, (Digest,)),
+        QueryRule(Snapshot, (Digest,)),
+    )
