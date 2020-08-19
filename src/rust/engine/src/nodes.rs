@@ -1248,7 +1248,11 @@ impl Display for NodeKey {
       &NodeKey::Scandir(ref s) => write!(f, "Scandir({})", (s.0).0.display()),
       &NodeKey::Select(ref s) => write!(f, "{}", s.product),
       &NodeKey::Task(ref task) => {
-        write!(f, "@rule {}({})", task.task.display_info.name, task.params)
+        // TODO(#7907) we probably want to include some kind of representation of
+        // the Params of an @rule when we stringify the @rule. But we need to make
+        // sure we don't naively dump the string representation of a Key, which
+        // could get gigantic.
+        write!(f, "@rule {}", task.task.display_info.name)
       }
       &NodeKey::Snapshot(ref s) => write!(f, "Snapshot({})", s.0),
     }
