@@ -1252,7 +1252,7 @@ impl Display for NodeKey {
         // the Params of an @rule when we stringify the @rule. But we need to make
         // sure we don't naively dump the string representation of a Key, which
         // could get gigantic.
-        write!(f, "@rule {}", task.task.display_info.name)
+        write!(f, "@rule({})", task.task.display_info.name)
       }
       &NodeKey::Snapshot(ref s) => write!(f, "Snapshot({})", s.0),
     }
