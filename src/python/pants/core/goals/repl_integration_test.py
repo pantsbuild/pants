@@ -4,11 +4,15 @@
 from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
 from pants.backend.python.rules import ancestor_files, pex, pex_from_targets, python_sources
 from pants.backend.python.rules import repl as python_repl
+from pants.backend.python.rules.pex import PexProcess
 from pants.backend.python.target_types import PythonLibrary
 from pants.core.goals.repl import Repl
 from pants.core.goals.repl import rules as repl_rules
 from pants.core.util_rules import archive, external_tool, stripped_source_files
 from pants.testutil.test_base import TestBase
+from pants.engine.process import Process
+from pants.engine.rules import QueryRule
+from pants.option.options_bootstrapper import OptionsBootstrapper
 
 
 class ReplTest(TestBase):
@@ -25,6 +29,7 @@ class ReplTest(TestBase):
             *pex_from_targets.rules(),
             *stripped_source_files.rules(),
             *ancestor_files.rules(),
+            QueryRule(Process, (PexProcess, OptionsBootstrapper)),
         )
 
     @classmethod

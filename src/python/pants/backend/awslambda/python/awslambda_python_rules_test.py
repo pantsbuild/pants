@@ -28,7 +28,6 @@ class TestPythonAWSLambdaCreation(ExternalToolTestBase):
             *super().rules(),
             *awslambda_python_rules(),
             QueryRule(CreatedAWSLambda, (PythonAwsLambdaFieldSet, OptionsBootstrapper)),
-            QueryRule(DigestContents, (Digest,)),
         )
 
     @classmethod

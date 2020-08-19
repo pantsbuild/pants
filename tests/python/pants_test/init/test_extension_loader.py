@@ -21,7 +21,7 @@ from pkg_resources import (
 from pants.base.exceptions import BuildConfigurationError
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.engine.rules import RootRule, rule
+from pants.engine.rules import rule
 from pants.engine.target import COMMON_TARGET_FIELDS, Target
 from pants.init.extension_loader import (
     PluginLoadOrderError,
@@ -290,13 +290,12 @@ class LoaderTest(unittest.TestCase):
 
     def test_rules(self):
         def backend_rules():
-            return [example_rule, RootRule(RootType)]
+            return [example_rule]
 
         with self.create_register(rules=backend_rules) as backend_package:
             load_backend(self.bc_builder, backend_package)
             self.assertEqual(
-                self.bc_builder.create().rules,
-                FrozenOrderedSet([example_rule.rule, RootRule(RootType)]),
+                self.bc_builder.create().rules, FrozenOrderedSet([example_rule.rule]),
             )
 
         def plugin_rules():
@@ -306,7 +305,7 @@ class LoaderTest(unittest.TestCase):
         self.load_plugins(["this-plugin-rules"])
         self.assertEqual(
             self.bc_builder.create().rules,
-            FrozenOrderedSet([example_rule.rule, RootRule(RootType), example_plugin_rule.rule]),
+            FrozenOrderedSet([example_rule.rule, example_plugin_rule.rule]),
         )
 
     def test_target_types(self):

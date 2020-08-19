@@ -3,14 +3,17 @@
 
 from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResultWithPlatform, Process
+from pants.engine.rules import QueryRule
 from pants.testutil.test_base import TestBase
 
 
 class PlatformTest(TestBase):
+    @classmethod
+    def rules(cls):
+        return (*super().rules(), QueryRule(FallibleProcessResultWithPlatform, (Process,)))
+
     def test_platform_on_local_epr_result(self) -> None:
-
         this_platform = Platform.current
-
         process = Process(
             argv=("/bin/echo", "test"), description="Run some program that will exit cleanly."
         )

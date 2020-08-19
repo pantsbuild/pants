@@ -6,7 +6,7 @@ from typing import List, Optional
 
 import pytest
 
-from pants.core.util_rules import source_files, stripped_source_files
+from pants.core.util_rules import stripped_source_files
 from pants.core.util_rules.source_files import SourceFiles
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.fs import EMPTY_SNAPSHOT
@@ -23,7 +23,6 @@ class StrippedSourceFilesTest(TestBase):
     def rules(cls):
         return (
             *super().rules(),
-            *source_files.rules(),
             *stripped_source_files.rules(),
             QueryRule(StrippedSourceFiles, (SourceFiles, OptionsBootstrapper)),
         )

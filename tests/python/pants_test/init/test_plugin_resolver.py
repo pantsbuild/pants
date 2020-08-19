@@ -14,11 +14,11 @@ from pex.resolver import Unsatisfiable
 from pkg_resources import Requirement, WorkingSet
 
 from pants.backend.python.rules import pex
-from pants.backend.python.rules.pex import Pex, PexRequest, PexRequirements
+from pants.backend.python.rules.pex import Pex, PexProcess, PexRequest, PexRequirements
 from pants.core.util_rules import archive, external_tool
 from pants.engine.fs import CreateDigest, Digest, FileContent, MergeDigests, Snapshot
 from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import RootRule
+from pants.engine.rules import QueryRule
 from pants.init.plugin_resolver import PluginResolver
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.engine_util import Params
@@ -44,7 +44,9 @@ class PluginResolverTest(TestBase):
             *pex.rules(),
             *external_tool.rules(),
             *archive.rules(),
-            RootRule(PexRequest),
+            QueryRule(Pex, (PexRequest, OptionsBootstrapper)),
+            QueryRule(Process, (PexProcess, OptionsBootstrapper)),
+            QueryRule(ProcessResult, (Process,)),
         )
 
     def _create_pex(self) -> Pex:

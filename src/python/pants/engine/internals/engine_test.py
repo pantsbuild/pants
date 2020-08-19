@@ -218,77 +218,13 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
             remove_locations_from_traceback(str(cm.exception)),
         )
 
-    @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/6829")
-    def test_trace_multi(self):
-        # Tests that when multiple distinct failures occur, they are each rendered.
-
-        @rule
-        def d_from_b_nested_raise(b: B) -> D:  # type: ignore[return]
-            fn_raises(b)
-
-        @rule
-        def c_from_b_nested_raise(b: B) -> C:  # type: ignore[return]
-            fn_raises(b)
-
-        @rule
-        def a_from_c_and_d(c: C, d: D) -> A:
-            return A()
-
-        rules = [
-            RootRule(B),
-            d_from_b_nested_raise,
-            c_from_b_nested_raise,
-            a_from_c_and_d,
-        ]
-
-        scheduler = self.scheduler(rules, include_trace_on_error=True)
-        with self.assertRaises(ExecutionError) as cm:
-            list(scheduler.product_request(A, subjects=[(B())]))
-
-        self.assert_equal_with_printing(
-            dedent(
-                f"""
-                1 Exception encountered:
-                Computing Select(<{__name__}..B object at 0xEEEEEEEEE>, A)
-                  Computing Task(a_from_c_and_d(), <{__name__}..B object at 0xEEEEEEEEE>, A, true)
-                    Computing Task(d_from_b_nested_raise(), <{__name__}..B object at 0xEEEEEEEEE>, =D, true)
-                      Throw(An exception for B)
-                        Traceback (most recent call last):
-                          File LOCATION-INFO, in call
-                            val = func(*args)
-                          File LOCATION-INFO, in d_from_b_nested_raise
-                            fn_raises(b)
-                          File LOCATION-INFO, in fn_raises
-                            raise Exception('An exception for {{}}'.format(type(x).__name__))
-                        Exception: An exception for B
-
-
-                Computing Select(<{__name__}..B object at 0xEEEEEEEEE>, A)
-                  Computing Task(a_from_c_and_d(), <{__name__}..B object at 0xEEEEEEEEE>, A, true)
-                    Computing Task(c_from_b_nested_raise(), <{__name__}..B object at 0xEEEEEEEEE>, =C, true)
-                      Throw(An exception for B)
-                        Traceback (most recent call last):
-                          File LOCATION-INFO, in call
-                            val = func(*args)
-                          File LOCATION-INFO, in c_from_b_nested_raise
-                            fn_raises(b)
-                          File LOCATION-INFO, in fn_raises
-                            raise Exception('An exception for {{}}'.format(type(x).__name__))
-                        Exception: An exception for B
-                """
-            ).lstrip()
-            + "\n",
-            remove_locations_from_traceback(str(cm.exception)),
-        )
-
     def test_illegal_root_selection(self):
         rules = [RootRule(B)]
-
         scheduler = self.scheduler(rules, include_trace_on_error=False)
 
         # No rules are available to compute A.
         with self.assertRaises(Exception) as cm:
-            list(scheduler.product_request(A, subjects=[(B())]))
+            scheduler.product_request(A, subjects=[(B())])
 
         self.assert_equal_with_printing(
             "No installed @rules return the type A. Is the @rule that you're expecting to run registered?",
@@ -297,10 +233,8 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
 
     def test_nonexistent_root_fails_differently(self):
         rules = [upcast]
-
         with self.assertRaises(Exception) as cm:
-            list(self.mk_scheduler(rules=rules, include_trace_on_error=False))
-
+            self.mk_scheduler(rules=rules, include_trace_on_error=False)
         assert "consider declaring RootRule(MyInt)" in str(cm.exception)
 
 
