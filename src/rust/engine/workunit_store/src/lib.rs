@@ -71,10 +71,11 @@ pub struct Workunit {
 }
 
 impl Workunit {
-  fn log_workunit_state(&self) {
-    let state = match self.state {
-      WorkunitState::Started { .. } => "Starting:",
-      WorkunitState::Completed { .. } => "Completed:",
+  fn log_workunit_state(&self, canceled: bool) {
+    let state = match (&self.state, canceled) {
+      (_, true) => "Canceled:",
+      (WorkunitState::Started { .. }, _) => "Starting:",
+      (WorkunitState::Completed { .. }, _) => "Completed:",
     };
 
     let level = self.metadata.level;
@@ -158,13 +159,13 @@ impl Default for WorkunitMetadata {
 enum StoreMsg {
   Started(Workunit),
   Completed(SpanId, Option<WorkunitMetadata>, SystemTime),
+  Canceled(SpanId),
 }
 
 #[derive(Clone)]
 pub struct WorkunitStore {
-  rendering_dynamic_ui: bool,
   streaming_workunit_data: StreamingWorkunitData,
-  heavy_hitters_data: HeavyHittersData,
+  heavy_hitters_data: Option<HeavyHittersData>,
 }
 
 #[derive(Clone)]
@@ -203,6 +204,7 @@ impl StreamingWorkunitData {
             StoreMsg::Completed(span, metadata, time) => {
               completed_messages.push((span, metadata, time))
             }
+            StoreMsg::Canceled(..) => (),
           }
         }
       }
@@ -342,6 +344,10 @@ impl HeavyHittersData {
           StoreMsg::Completed(span_id, new_metadata, time) => {
             Self::add_completed_workunit_to_store(span_id, new_metadata, time, &mut inner)
           }
+          StoreMsg::Canceled(span_id) => {
+            inner.workunit_records.remove(&span_id);
+            inner.span_id_to_graph.remove(&span_id);
+          }
         }
       }
     }
@@ -428,8 +434,11 @@ impl WorkunitStore {
   pub fn new(rendering_dynamic_ui: bool) -> WorkunitStore {
     WorkunitStore {
       streaming_workunit_data: StreamingWorkunitData::new(),
-      heavy_hitters_data: HeavyHittersData::new(),
-      rendering_dynamic_ui,
+      heavy_hitters_data: if rendering_dynamic_ui {
+        Some(HeavyHittersData::new())
+      } else {
+        None
+      },
     }
   }
 
@@ -444,7 +453,10 @@ impl WorkunitStore {
   /// Find the longest running leaf workunits, and render their first visible parents.
   ///
   pub fn heavy_hitters(&self, k: usize) -> HashMap<String, Option<Duration>> {
-    self.heavy_hitters_data.heavy_hitters(k)
+    match self.heavy_hitters_data {
+      Some(ref heavy_hitters_data) => heavy_hitters_data.heavy_hitters(k),
+      None => HashMap::new(),
+    }
   }
 
   fn start_workunit(
@@ -463,11 +475,11 @@ impl WorkunitStore {
       },
       metadata,
     };
-    if self.rendering_dynamic_ui {
-      let sender = self.heavy_hitters_data.msg_tx.lock();
+    if let Some(ref heavy_hitters_data) = self.heavy_hitters_data {
+      let sender = heavy_hitters_data.msg_tx.lock();
       sender.send(StoreMsg::Started(started.clone())).unwrap();
     } else {
-      started.log_workunit_state()
+      started.log_workunit_state(false)
     }
 
     let sender = self.streaming_workunit_data.msg_tx.lock();
@@ -480,6 +492,14 @@ impl WorkunitStore {
     self.complete_workunit_impl(workunit, time)
   }
 
+  fn cancel_workunit(&self, workunit: &Workunit) {
+    workunit.log_workunit_state(true);
+    if let Some(ref heavy_hitters_data) = self.heavy_hitters_data {
+      let tx = heavy_hitters_data.msg_tx.lock();
+      tx.send(StoreMsg::Canceled(workunit.span_id)).unwrap();
+    }
+  }
+
   fn complete_workunit_impl(&self, mut workunit: Workunit, end_time: SystemTime) {
     let span_id = workunit.span_id;
     let new_metadata = Some(workunit.metadata.clone());
@@ -488,8 +508,8 @@ impl WorkunitStore {
     tx.send(StoreMsg::Completed(span_id, new_metadata.clone(), end_time))
       .unwrap();
 
-    if self.rendering_dynamic_ui {
-      let tx = self.heavy_hitters_data.msg_tx.lock();
+    if let Some(ref heavy_hitters_data) = self.heavy_hitters_data {
+      let tx = heavy_hitters_data.msg_tx.lock();
       tx.send(StoreMsg::Completed(span_id, new_metadata, end_time))
         .unwrap();
     }
@@ -503,7 +523,7 @@ impl WorkunitStore {
     let time_span = TimeSpan::from_start_and_end_systemtime(&start_time, &end_time);
     let new_state = WorkunitState::Completed { time_span };
     workunit.state = new_state;
-    workunit.log_workunit_state();
+    workunit.log_workunit_state(false);
   }
 
   pub fn add_completed_workunit(
@@ -524,8 +544,8 @@ impl WorkunitStore {
       metadata,
     };
 
-    if self.rendering_dynamic_ui {
-      let sender = self.heavy_hitters_data.msg_tx.lock();
+    if let Some(ref heavy_hitters_data) = self.heavy_hitters_data {
+      let sender = heavy_hitters_data.msg_tx.lock();
       sender.send(StoreMsg::Started(workunit.clone())).unwrap();
     }
     {
@@ -603,14 +623,42 @@ where
   let parent_id = std::mem::replace(&mut workunit_state.parent_id, Some(span_id));
   let mut workunit =
     workunit_store.start_workunit(span_id, name, parent_id, initial_metadata.clone());
+  let mut guard = CanceledWorkunitGuard::new(&workunit_store, workunit.clone());
   scope_task_workunit_state(Some(workunit_state), async move {
     let result = f.await;
     let final_metadata = final_metadata_fn(&result, initial_metadata);
     workunit.metadata = final_metadata;
     workunit_store.complete_workunit(workunit);
+    guard.not_canceled();
     result
   })
   .await
+}
+
+struct CanceledWorkunitGuard {
+  store: WorkunitStore,
+  workunit: Option<Workunit>,
+}
+
+impl CanceledWorkunitGuard {
+  fn new(store: &WorkunitStore, workunit: Workunit) -> CanceledWorkunitGuard {
+    CanceledWorkunitGuard {
+      store: store.clone(),
+      workunit: Some(workunit),
+    }
+  }
+
+  fn not_canceled(&mut self) {
+    self.workunit = None;
+  }
+}
+
+impl Drop for CanceledWorkunitGuard {
+  fn drop(&mut self) {
+    if let Some(workunit) = &self.workunit {
+      self.store.cancel_workunit(workunit);
+    }
+  }
 }
 
 ///
