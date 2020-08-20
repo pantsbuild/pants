@@ -65,6 +65,25 @@ fn insufficient_query() {
 }
 
 #[test]
+fn ambiguity() {
+  let rules = vec![(
+    "a",
+    vec![
+      Rule("a_from_b", vec![DependencyKey("b", None)]),
+      Rule("a_from_c", vec![DependencyKey("c", None)]),
+    ],
+  )]
+  .into_iter()
+  .collect();
+  let queries = vec![Query::new("a", vec!["b", "c"])];
+
+  assert!(RuleGraph::new(&rules, queries)
+    .err()
+    .unwrap()
+    .contains("Encountered 1 rule graph error:\n  Too many"));
+}
+
+#[test]
 fn nested_basic() {
   let rules = vec![
     (

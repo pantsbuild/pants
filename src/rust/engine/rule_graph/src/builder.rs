@@ -35,9 +35,7 @@ use std::collections::{hash_map, BTreeMap, HashMap, HashSet, VecDeque};
 
 use indexmap::IndexSet;
 use petgraph::graph::{DiGraph, EdgeReference, NodeIndex};
-use petgraph::visit::{
-  Bfs, DfsPostOrder, EdgeRef, IntoNodeReferences, NodeRef, VisitMap, Visitable,
-};
+use petgraph::visit::{DfsPostOrder, EdgeRef, IntoNodeReferences, NodeRef, VisitMap, Visitable};
 use petgraph::Direction;
 
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
@@ -154,6 +152,7 @@ enum NodePrunedReason {
 #[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
 enum EdgePrunedReason {
   DoesNotConsumeProvidedParam,
+  SmallerParamSetAvailable,
 }
 
 type Graph<R> = DiGraph<Node<R>, <R as Rule>::DependencyKey, u32>;
@@ -392,7 +391,7 @@ impl<'t, R: Rule> Builder<'t, R> {
       }
 
       iteration += 1;
-      if iteration > 15000 {
+      if iteration > 100000 {
         looping = true;
       }
       if iteration % 1000 == 0 {
@@ -815,44 +814,57 @@ impl<'t, R: Rule> Builder<'t, R> {
   }
 
   ///
-  /// After nodes have been monomorphized, nodes have the smallest dependency sets possible.
+  /// After nodes have been monomorphizedthey have the smallest dependency sets possible.
   /// In cases where a node still has more than one source of a dependency, this phase statically
   /// decides which source of each DependencyKey to use, and prunes edges to the rest.
   ///
-  /// If a node has too many (in an ambiguous way) or too few, renders errors using the deletion
-  /// information from monomomorphize.
+  /// If a node has too many dependencies (in an ambiguous way) or too few, this phase will fail
+  /// slowly to collect all errored nodes (including those that have been deleted), and render the
+  /// most specific error possible.
   ///
-  fn prune_edges(&self, graph: MonomorphizedGraph<R>) -> Result<ParamsLabeledGraph<R>, String> {
-    // Edge removal is expensive, so we wait until the end of iteration to do it, and filter
-    // dead edges while running.
-    let mut edges_to_delete = HashSet::new();
-
+  fn prune_edges(&self, mut graph: MonomorphizedGraph<R>) -> Result<ParamsLabeledGraph<R>, String> {
     // Walk from roots, choosing one source for each DependencyKey of each node.
     let mut visited = graph.visit_map();
-    let mut to_visit = graph.externals(Direction::Incoming).collect::<Vec<_>>();
+    let mut errored = HashMap::new();
+    // NB: We visit any node that is enqueued, even if it is deleted. But because we filter to
+    // Queries at the root (which are never deleted by monomorphize), a deleted node will only be
+    // enqueued in where we have already encountered an error and are continuing on to find a
+    // root cause.
+    let mut to_visit = graph
+      .node_references()
+      .filter_map(|node_ref| match node_ref.weight().inner() {
+        Some(ParamsLabeled {
+          node: Node::Query(_),
+          ..
+        }) => Some(node_ref.id()),
+        _ => None,
+      })
+      .collect::<Vec<_>>();
+
     while let Some(node_id) = to_visit.pop() {
       if !visited.visit(node_id) {
         continue;
       }
-      // Only include non-deleted nodes.
-      let node = if let Some(params_labeled) = graph[node_id].inner() {
-        &params_labeled.node
-      } else {
-        continue;
-      };
+      // See the note above about deleted nodes.
+      let node = &graph[node_id].0.node;
 
-      // TODO: Include deleted edges, and use them in error messages below.
-      let edges_by_dependency_key = Self::edges_by_dependency_key(&graph, node_id, false);
+      let edges_by_dependency_key = Self::edges_by_dependency_key(&graph, node_id, true);
+      let mut edges_to_delete = Vec::new();
       for (dependency_key, edge_refs) in edges_by_dependency_key {
-        // Filter out any that are not satisfiable for this node based on its type and in/out sets.
+        // Filter out any that are not satisfiable for this node based on its type and in/out sets,
+        // and any that were deleted/invalid.
         let relevant_edge_refs: Vec<_> = match node {
           Node::Query(q) => {
             // Only dependencies with in_sets that are a subset of our params can be used.
             edge_refs
               .iter()
               .filter(|edge_ref| {
-                let dependency_in_set = &graph[edge_ref.target()].0.in_set;
-                dependency_in_set.is_subset(&q.params)
+                if edge_ref.weight().is_deleted() || graph[edge_ref.target()].is_deleted() {
+                  false
+                } else {
+                  let dependency_in_set = &graph[edge_ref.target()].0.in_set;
+                  dependency_in_set.is_subset(&q.params)
+                }
               })
               .collect()
           }
@@ -861,7 +873,9 @@ impl<'t, R: Rule> Builder<'t, R> {
             edge_refs
               .iter()
               .filter(|edge_ref| {
-                if let Some(provided_param) = dependency_key.provided_param() {
+                if edge_ref.weight().is_deleted() || graph[edge_ref.target()].is_deleted() {
+                  false
+                } else if let Some(provided_param) = dependency_key.provided_param() {
                   graph[edge_ref.target()].0.in_set.contains(&provided_param)
                 } else {
                   true
@@ -901,7 +915,7 @@ impl<'t, R: Rule> Builder<'t, R> {
         };
         match chosen_edges.len() {
           1 => {
-            // Schedule this dependency to be visited, and Mark all other choices deleted.
+            // Schedule this dependency to be visited, and mark all other choices deleted.
             let chosen_edge = chosen_edges[0];
             to_visit.push(chosen_edge.target());
             edges_to_delete.extend(
@@ -912,80 +926,105 @@ impl<'t, R: Rule> Builder<'t, R> {
             );
           }
           0 => {
-            return Err(format!(
-              "No source of dependency {} for {}. All potential sources were eliminated: {:#?}",
-              dependency_key,
-              node,
-              edge_refs
-                .iter()
-                .map(|edge_ref| {
-                  format!(
-                    "{} (needed {})",
-                    graph[edge_ref.target()].0.node,
-                    crate::params_str(&graph[edge_ref.target()].0.in_set)
-                  )
-                })
-                .collect::<Vec<_>>()
-            ));
-          }
-          _ => {
-            if log::log_enabled!(log::Level::Debug) {
-              let mut bfs = Bfs::new(&graph, node_id);
-              let mut visited = graph.visit_map();
-              while let Some(node_id) = bfs.next(&graph) {
-                visited.visit(node_id);
-              }
-
-              let subgraph = graph.filter_map(
-                |node_id, node| {
-                  if visited.is_visited(&node_id) {
-                    Some(node.clone())
-                  } else {
-                    None
-                  }
-                },
-                |_, edge_weight| Some(edge_weight.clone()),
-              );
-
-              log::debug!(
-                "Too many sources of dependency {} for {}: {}",
+            // Render and visit all candidates, including those that were deleted.
+            to_visit.extend(edge_refs.iter().map(|edge_ref| edge_ref.target()));
+            errored.insert(
+              node_id,
+              format!(
+                "No source of dependency {} for {}. All potential sources were eliminated: {:#?}",
                 dependency_key,
                 node,
-                petgraph::dot::Dot::with_config(&subgraph, &[])
-              );
-            }
-
-            return Err(format!(
-              "Too many sources of dependency {} for {}: {:#?}",
-              dependency_key,
-              node,
-              chosen_edges
-                .iter()
-                .map(|edge_ref| format!("{}", graph[edge_ref.target()].0.node))
-                .collect::<Vec<_>>()
-            ));
+                edge_refs
+                  .iter()
+                  .map(|edge_ref| {
+                    // TODO: Include edge/node deletion reasons.
+                    format!(
+                      "{} (for {})",
+                      graph[edge_ref.target()].0.node,
+                      params_str(&graph[edge_ref.target()].0.in_set)
+                    )
+                  })
+                  .collect::<Vec<_>>()
+              ),
+            );
+          }
+          _ => {
+            // Render and visit only the chosen candidates to see why they were ambiguous.
+            to_visit.extend(chosen_edges.iter().map(|edge_ref| edge_ref.target()));
+            errored.insert(
+              node_id,
+              format!(
+                "Too many sources of dependency {} for {}: {:#?}",
+                dependency_key,
+                node,
+                chosen_edges
+                  .iter()
+                  .map(|edge_ref| {
+                    // TODO: Include edge/node deletion reasons.
+                    format!(
+                      "{} (for {})",
+                      graph[edge_ref.target()].0.node,
+                      params_str(&graph[edge_ref.target()].0.in_set)
+                    )
+                  })
+                  .collect::<Vec<_>>()
+              ),
+            );
           }
         }
       }
+      for edge_to_delete in edges_to_delete {
+        graph[edge_to_delete].mark_deleted(EdgePrunedReason::SmallerParamSetAvailable);
+      }
     }
 
-    // Finally, return a new graph with all deleted data discarded.
-    Ok(graph.filter_map(
-      |_node_id, node| {
-        if let Some(node) = node.inner() {
-          Some(node.clone())
-        } else {
-          None
-        }
-      },
-      |_edge_id, edge| {
-        if let Some(edge) = edge.inner() {
-          Some(*edge)
-        } else {
-          None
-        }
-      },
-    ))
+    if errored.is_empty() {
+      // Finally, return a new graph with all deleted data discarded.
+      Ok(graph.filter_map(
+        |_node_id, node| {
+          if let Some(node) = node.inner() {
+            Some(node.clone())
+          } else {
+            None
+          }
+        },
+        |_edge_id, edge| {
+          if let Some(edge) = edge.inner() {
+            Some(*edge)
+          } else {
+            None
+          }
+        },
+      ))
+    } else {
+      // Render the most specific errors.
+      Err(Self::render_errored(&graph, errored))
+    }
+  }
+
+  fn render_errored(
+    graph: &MonomorphizedGraph<R>,
+    errored: HashMap<NodeIndex<u32>, String>,
+  ) -> String {
+    // Leaf errors have no dependencies in the errored map.
+    let mut leaf_errors = errored
+      .iter()
+      .filter(|(node_id, _)| {
+        !graph
+          .neighbors_directed(**node_id, Direction::Outgoing)
+          .any(|dependency_id| errored.contains_key(&dependency_id))
+      })
+      .map(|(_, error)| error.replace("\n", "\n    "))
+      .collect::<Vec<_>>();
+
+    leaf_errors.sort();
+
+    format!(
+      "Encountered {} rule graph error{}:\n  {}",
+      leaf_errors.len(),
+      if leaf_errors.len() == 1 { "" } else { "s" },
+      leaf_errors.join("\n  "),
+    )
   }
 
   ///
