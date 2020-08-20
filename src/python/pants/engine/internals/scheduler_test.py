@@ -8,7 +8,7 @@ from textwrap import dedent
 from typing import Any, FrozenSet
 
 from pants.engine.internals.scheduler import ExecutionError
-from pants.engine.rules import Get, RootRule, rule
+from pants.engine.rules import Get, QueryRule, rule
 from pants.engine.unions import UnionRule, union
 from pants.testutil.engine_util import (
     Params,
@@ -33,8 +33,9 @@ def fn_raises(x):
 
 
 @rule(desc="Nested raise")
-def nested_raise(x: B) -> A:  # type: ignore[return]
-    fn_raises(x)
+def nested_raise(b: B) -> A:
+    fn_raises(b)
+    return A()
 
 
 @rule
@@ -81,26 +82,28 @@ class UnionWrapper:
 
 
 class UnionA:
-    def a(self):
+    @staticmethod
+    def a() -> A:
         return A()
 
 
 @rule
 def select_union_a(union_a: UnionA) -> A:
-    return union_a.a()  # type: ignore[no-any-return]
+    return union_a.a()
 
 
 class UnionB:
-    def a(self):
+    @staticmethod
+    def a() -> A:
         return A()
 
 
 @rule
 def select_union_b(union_b: UnionB) -> A:
-    return union_b.a()  # type: ignore[no-any-return]
+    return union_b.a()
 
 
-# TODO: add GetMulti testing for unions!
+# TODO: add MultiGet testing for unions!
 @rule
 async def a_union_test(union_wrapper: UnionWrapper) -> A:
     union_a = await Get(A, UnionBase, union_wrapper.inner)
@@ -179,30 +182,28 @@ def assert_execution_error(test_case, expected_msg):
 class SchedulerTest(TestBase):
     @classmethod
     def rules(cls):
-        return super().rules() + [
-            RootRule(A),
-            # B is both a RootRule and an intermediate product here.
-            RootRule(B),
-            RootRule(C),
-            RootRule(UnionX),
-            error_msg_test_rule,
+        return (
+            *super().rules(),
             consumes_a_and_b,
+            QueryRule(str, (A, B)),
             transitive_b_c,
+            QueryRule(str, (A, C)),
             transitive_coroutine_rule,
-            RootRule(UnionWrapper),
+            QueryRule(D, (C,)),
             UnionRule(UnionBase, UnionA),
             UnionRule(UnionWithNonMemberErrorMsg, UnionWrapper),
-            RootRule(UnionA),
             select_union_a,
             UnionRule(union_base=UnionBase, union_member=UnionB),
-            RootRule(UnionB),
             select_union_b,
             a_union_test,
+            QueryRule(A, (UnionWrapper,)),
+            error_msg_test_rule,
+            QueryRule(UnionX, (UnionWrapper,)),
             boolean_cycle,
+            QueryRule(BooleanDeps, (bool,)),
             boolean_and_int,
-            RootRule(int),
-            RootRule(bool),
-        ]
+            QueryRule(A, (int, bool)),
+        )
 
     def test_use_params(self):
         # Confirm that we can pass in Params in order to provide multiple inputs to an execution.
@@ -215,9 +216,7 @@ class SchedulerTest(TestBase):
         self.assertEqual(result_str, consumes_a_and_b(a, b))
 
         # But not a subset.
-        expected_msg = "No installed @rules can compute {} given input Params(A), but".format(
-            str.__name__
-        )
+        expected_msg = "No installed QueryRules can compute str given input Params(A), but"
         with self.assertRaisesRegex(Exception, re.escape(expected_msg)):
             self.request_product(str, Params(a))
 
@@ -271,14 +270,15 @@ class SchedulerTest(TestBase):
 class SchedulerWithNestedRaiseTest(TestBase):
     @classmethod
     def rules(cls):
-        return super().rules() + [
-            RootRule(B),
-            RootRule(TypeCheckFailWrapper),
-            RootRule(CollectionType),
+        return (
+            *super().rules(),
             a_typecheck_fail_test,
             c_unhashable,
             nested_raise,
-        ]
+            QueryRule(A, (TypeCheckFailWrapper,)),
+            QueryRule(A, (B,)),
+            QueryRule(C, (CollectionType,)),
+        )
 
     def test_get_type_match_failure(self):
         """Test that Get(...)s are now type-checked during rule execution, to allow for union
@@ -323,7 +323,7 @@ class SchedulerWithNestedRaiseTest(TestBase):
                    in Nested raise
                  Traceback (most recent call last):
                    File LOCATION-INFO, in nested_raise
-                     fn_raises(x)
+                     fn_raises(b)
                    File LOCATION-INFO, in fn_raises
                      raise Exception(f"An exception for {type(x).__name__}")
                  Exception: An exception for B

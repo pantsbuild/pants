@@ -252,12 +252,11 @@ class EngineInitializer:
             (
                 *rules,
                 # Install queries for each Goal.
-                *[
+                *(
                     QueryRule(goal_type, GraphSession.goal_param_types)
                     for goal_type in goal_map.values()
-                ],
-                # Used by the SchedulerService.
-                QueryRule(Snapshot, [PathGlobs]),
+                ),
+                QueryRule(Snapshot, [PathGlobs]),  # Used by the SchedulerService.
             )
         )
 

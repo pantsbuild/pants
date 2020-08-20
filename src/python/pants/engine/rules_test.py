@@ -50,7 +50,7 @@ def create_scheduler(rules, validate=True, native=None):
         rules=rules,
         union_membership=UnionMembership({}),
         execution_options=DEFAULT_EXECUTION_OPTIONS,
-        validate=validate,
+        validate_reachability=validate,
     )
 
 
