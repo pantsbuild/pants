@@ -9,21 +9,43 @@ from pants.util.logging import LogLevel
 
 
 class EngineAware(ABC):
-    """This is a marker class used to indicate that the output of an `@rule` can send metadata about
-    the rule's output to the engine.
+    """`EngineAware` is a marker class used to send metadata about
+    types serving as the input parameters or return type of an `@rule`
+    to the engine.
 
-    EngineAware defines abstract methods on the class, all of which return an Optional[T], and which
-    are expected to be overridden by concrete types implementing EngineAware.
+    Every method defined on `EngineAware` has a return type `Optional[T]` and
+    a default implementation that returns None. When pants executes a goal,
+    the engine will call these methods on rule inputs and outputs that subclass
+    EngineAware. If the method call returns `None`, the engine will do nothing,
+    but will change its behavior in some way if the method returns a non-`None` value.
+
+    `EngineAware` subclasses may implement whichever subset of these methods
+    they need, leaving the others alone. Subclassing `EngineAware` and
+    implementing none of these methods is equivalent to not subclassing
+    `EngineAware` at all.
     """
 
     def level(self) -> Optional[LogLevel]:
-        """Overrides the level of the workunit associated with this type."""
+        """If implemented for a type returned by an `@rule`, this method will override
+        the level of the workunit associated with that `@rule`.
+        """
         return None
 
     def message(self) -> Optional[str]:
-        """Sets an optional result message on the workunit."""
+        """If implemented for a type returned by an `@rule`, sets an optional result
+        message on the workunit for that `@rule`.
+        """
         return None
 
     def artifacts(self) -> Optional[Dict[str, Digest]]:
-        """Sets a map of names to `Digest`s to appear as artifacts on the workunit."""
+        """If implemented on a type returned by an `@rule`, sets the `artifacts` entry
+        of that `@rule`'s workunit. `artifacts` is a mapping of arbitrary string
+        keys to `Digest`s.
+        """
+        return None
+
+    def parameter_debug(self) -> Optional[str]:
+        """If implemented on an input parameter to an `@rule`, this string
+        will be shown in certain `@rule` debug contexts in the engine.
+        """
         return None

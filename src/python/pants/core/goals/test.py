@@ -159,12 +159,15 @@ class TestDebugRequest:
 
 
 @union
-class TestFieldSet(FieldSet, metaclass=ABCMeta):
+class TestFieldSet(FieldSet, EngineAware, metaclass=ABCMeta):
     """The fields necessary to run tests on a target."""
 
     sources: Sources
 
     __test__ = False
+
+    def parameter_debug(self):
+        return f'{self.address}'
 
 
 class CoverageData(ABC):

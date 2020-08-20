@@ -16,7 +16,7 @@ use futures::stream::StreamExt;
 use url::Url;
 
 use crate::context::{Context, Core};
-use crate::core::{throw, Failure, Key, Params, TypeId, Value};
+use crate::core::{display_sorted_in_parens, throw, Failure, Key, Params, TypeId, Value};
 use crate::externs;
 use crate::selectors;
 use crate::tasks::{self, Rule};
@@ -908,7 +908,7 @@ impl fmt::Debug for Task {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(
       f,
-      "Task({}, {}, {}, {})",
+      "Task {{ func: {}, params: {}, product: {}, cacheable: {} }}",
       self.task.func, self.params, self.product, self.task.cacheable,
     )
   }
@@ -1124,9 +1124,37 @@ impl Node for NodeKey {
 
     let user_facing_name = self.user_facing_name();
     let workunit_name = self.workunit_name();
-    let failure_name = user_facing_name
-      .clone()
-      .unwrap_or_else(|| workunit_name.clone());
+    let failure_name = match &self {
+      NodeKey::Task(ref task) => {
+        let name = user_facing_name
+          .clone()
+          .unwrap_or_else(|| workunit_name.clone());
+        let displayable_param_names: Vec<_> = task
+          .params
+          .keys()
+          .filter_map(|key| {
+            let value = externs::val_for(key);
+            externs::call_method(&value, "parameter_debug", &[])
+              .ok()
+              .and_then(|val| externs::check_for_python_none(val))
+              .map(|val| externs::val_to_str(&val))
+          })
+          .collect();
+        if displayable_param_names.len() == 0 {
+          name
+        } else {
+          format!(
+            "{} {}",
+            name,
+            display_sorted_in_parens(displayable_param_names.iter())
+          )
+        }
+      }
+      _ => user_facing_name
+        .clone()
+        .unwrap_or_else(|| workunit_name.clone()),
+    };
+
     let metadata = WorkunitMetadata {
       desc: user_facing_name,
       message: None,
