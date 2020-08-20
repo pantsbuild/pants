@@ -4,6 +4,7 @@
 use std::collections::{BTreeMap, HashSet};
 use std::convert::{Into, TryInto};
 use std::future::Future;
+use std::io::Read;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -24,6 +25,7 @@ use process_execution::{
   Platform, ProcessMetadata,
 };
 use rand::seq::SliceRandom;
+use regex::Regex;
 use rule_graph::RuleGraph;
 use sharded_lmdb::{ShardedLmdb, DEFAULT_LEASE_TIME};
 use store::Store;
@@ -32,6 +34,18 @@ use uuid::Uuid;
 use watch::{Invalidatable, InvalidationWatcher};
 
 const GIGABYTES: usize = 1024 * 1024 * 1024;
+
+// The reqwest crate has no support for ingesting multiple certificates in a single file,
+// and requires single PEM blocks. There is a pem crate that can decode multiple certificates
+// from a single buffer, but it is not suitable for our use because we don't want to decode
+// the certificates, but rather pass them as source to reqwest. The pem also inappropriately
+// squelches errors.
+//
+// Instead we make our own use of a copy of the regex used by the pem crate.  Note:
+//   - The leading (?s) which sets the flag to allow . to match \n.
+//   - The use of ungreedy repetition via .*?, so we get shortest instead of longest matches.
+const PEM_RE_STR: &str =
+  r"(?s)-----BEGIN (?P<begin>.*?)-----\s*(?P<data>.*?)-----END (?P<end>.*?)-----\s*";
 
 ///
 /// The core context shared (via Arc) between the Scheduler and the Context objects of
@@ -95,6 +109,7 @@ impl Core {
     local_store_dir: PathBuf,
     local_execution_root_dir: PathBuf,
     named_caches_dir: PathBuf,
+    ca_certs_path: Option<PathBuf>,
     remoting_opts: RemotingOptions,
     exec_strategy_opts: ExecutionStrategyOptions,
   ) -> Result<Core, String> {
@@ -249,7 +264,38 @@ impl Core {
     }
     let graph = Arc::new(InvalidatableGraph(Graph::new()));
 
-    let http_client = reqwest::Client::new();
+    // These certs are for downloads, not to be confused with the ones used for remoting.
+    let ca_certs = if let Some(ref path) = ca_certs_path {
+      let mut buf = Vec::new();
+      std::fs::File::open(path)
+        .and_then(|mut f| f.read_to_end(&mut buf))
+        .map_err(|err| format!("Error reading root CA certs file {:?}: {}", path, err))?;
+      let content = std::str::from_utf8(&buf)
+        .map_err(|err| format!("Error decoding root CA certs file {:?}: {}", path, err))?;
+
+      let pem_re = Regex::new(PEM_RE_STR).unwrap();
+      let certs_res: Result<Vec<reqwest::Certificate>, _> = pem_re
+        .find_iter(content)
+        .map(|mat| reqwest::Certificate::from_pem(mat.as_str().as_bytes()))
+        .collect();
+      certs_res.map_err(|err| {
+        format!(
+          "Error parsing PEM from root CA certs file {:?}: {}",
+          path, err
+        )
+      })?
+    } else {
+      Vec::new()
+    };
+
+    let http_client_builder = ca_certs
+      .iter()
+      .fold(reqwest::Client::builder(), |builder, cert| {
+        builder.add_root_certificate(cert.clone())
+      });
+    let http_client = http_client_builder
+      .build()
+      .map_err(|err| format!("Error building HTTP client: {}", err))?;
     let rule_graph = RuleGraph::new(tasks.rules().clone(), tasks.queries().clone())?;
 
     let gitignore_file = if use_gitignore {
