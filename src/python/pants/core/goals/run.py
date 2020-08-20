@@ -1,23 +1,29 @@
 # Copyright 2019 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+from abc import ABCMeta
 from dataclasses import dataclass
 from pathlib import PurePath
 from typing import Iterable, Mapping, Optional, Tuple
 
 from pants.base.build_root import BuildRoot
-from pants.core.goals.binary import BinaryFieldSet
 from pants.engine.console import Console
 from pants.engine.fs import Digest, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import InteractiveProcess, InteractiveRunner
 from pants.engine.rules import Get, collect_rules, goal_rule
-from pants.engine.target import TargetsToValidFieldSets, TargetsToValidFieldSetsRequest
+from pants.engine.target import FieldSet, TargetsToValidFieldSets, TargetsToValidFieldSetsRequest
+from pants.engine.unions import union
 from pants.option.custom_types import shell_str
 from pants.option.global_options import GlobalOptions
 from pants.util.contextutil import temporary_dir
 from pants.util.frozendict import FrozenDict
 from pants.util.meta import frozen_after_init
+
+
+@union
+class RunFieldSet(FieldSet, metaclass=ABCMeta):
+    """The fields necessary from a target to run a program/script."""
 
 
 @frozen_after_init
@@ -46,8 +52,7 @@ class RunSubsystem(GoalSubsystem):
 
     name = "run"
 
-    # NB: To be runnable, there must be a BinaryFieldSet that works with the target.
-    required_union_implementations = (BinaryFieldSet,)
+    required_union_implementations = (RunFieldSet,)
 
     @classmethod
     def register_options(cls, register) -> None:
@@ -82,14 +87,14 @@ async def run(
     targets_to_valid_field_sets = await Get(
         TargetsToValidFieldSets,
         TargetsToValidFieldSetsRequest(
-            BinaryFieldSet,
+            RunFieldSet,
             goal_description="the `run` goal",
             error_if_no_valid_targets=True,
             expect_single_field_set=True,
         ),
     )
     field_set = targets_to_valid_field_sets.field_sets[0]
-    request = await Get(RunRequest, BinaryFieldSet, field_set)
+    request = await Get(RunRequest, RunFieldSet, field_set)
 
     with temporary_dir(root_dir=global_options.options.pants_workdir, cleanup=True) as tmpdir:
         workspace.write_digest(

@@ -22,6 +22,7 @@ from pants.backend.python.target_types import (
 )
 from pants.backend.python.target_types import PythonPlatforms as PythonPlatformsField
 from pants.core.goals.binary import BinaryFieldSet, CreatedBinary
+from pants.core.goals.run import RunFieldSet
 from pants.core.util_rules.source_files import SourceFiles
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
 from pants.engine.rules import Get, collect_rules, rule
@@ -31,7 +32,7 @@ from pants.util.logging import LogLevel
 
 
 @dataclass(frozen=True)
-class PythonBinaryFieldSet(BinaryFieldSet):
+class PythonBinaryFieldSet(BinaryFieldSet, RunFieldSet):
     required_fields = (PythonEntryPoint, PythonBinarySources)
 
     sources: PythonBinarySources

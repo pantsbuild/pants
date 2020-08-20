@@ -6,8 +6,7 @@ from typing import cast
 
 from pants.base.build_root import BuildRoot
 from pants.base.specs import AddressLiteralSpec
-from pants.core.goals.binary import BinaryFieldSet
-from pants.core.goals.run import Run, RunRequest, RunSubsystem, run
+from pants.core.goals.run import Run, RunFieldSet, RunRequest, RunSubsystem, run
 from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent, Workspace
 from pants.engine.process import InteractiveProcess, InteractiveRunner
@@ -44,7 +43,7 @@ class RunTest(TestBase):
         workspace = Workspace(self.scheduler)
         interactive_runner = InteractiveRunner(self.scheduler)
 
-        class TestBinaryFieldSet(BinaryFieldSet):
+        class TestRunFieldSet(RunFieldSet):
             required_fields = ()
 
         class TestBinaryTarget(Target):
@@ -56,7 +55,7 @@ class RunTest(TestBase):
         target_with_origin = TargetWithOrigin(
             target, AddressLiteralSpec(address.spec_path, address.target_name)
         )
-        field_set = TestBinaryFieldSet.create(target)
+        field_set = TestRunFieldSet.create(target)
 
         res = run_rule(
             run,
@@ -76,7 +75,7 @@ class RunTest(TestBase):
                 ),
                 MockGet(
                     product_type=RunRequest,
-                    subject_type=TestBinaryFieldSet,
+                    subject_type=TestRunFieldSet,
                     mock=lambda _: self.create_mock_run_request(program_text),
                 ),
             ],
