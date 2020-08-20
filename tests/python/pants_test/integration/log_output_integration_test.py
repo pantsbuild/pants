@@ -32,8 +32,8 @@ class LogOutputIntegrationTest(PantsRunIntegrationTest):
             tmpdir_relative = self._prepare_sources(tmpdir, build_root)
 
             test_run_result = self.run_pants(
-                ["--no-dynamic-ui", "typecheck", f"{tmpdir_relative}/src/python/project"]
+                ["--no-dynamic-ui", "-ldebug", "typecheck", f"{tmpdir_relative}/src/python/project"]
             )
 
-            assert "[INFO] Starting: Run MyPy on" in test_run_result.stderr_data
-            assert "[INFO] Completed: Run MyPy on" in test_run_result.stderr_data
+            assert "[DEBUG] Starting: Run MyPy on" in test_run_result.stderr_data
+            assert "[DEBUG] Completed: Run MyPy on" in test_run_result.stderr_data
