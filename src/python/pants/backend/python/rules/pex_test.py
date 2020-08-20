@@ -189,6 +189,7 @@ class PexTest(ExternalToolTestBase):
             *pex_rules(),
             QueryRule(Pex, (PexRequest, OptionsBootstrapper)),
             QueryRule(Process, (PexProcess, OptionsBootstrapper)),
+            QueryRule(ProcessResult, (Process,)),
         )
 
     def create_pex_and_get_all_data(
