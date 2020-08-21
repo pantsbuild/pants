@@ -175,6 +175,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
             join()
 
+    @pytest.mark.xfail(reason="TODO(#10644): re-enable once we can set arbitrary env vars.")
     def test_pantsd_client_env_var_is_inherited_by_pantsd_runner_children(self):
         EXPECTED_KEY = "TEST_ENV_VAR_FOR_PANTSD_INTEGRATION_TEST"
         EXPECTED_VALUE = "333"
