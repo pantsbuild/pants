@@ -8,6 +8,7 @@
   clippy::zero_ptr
 )]
 
+pub mod engine_aware;
 mod interface;
 #[cfg(test)]
 mod interface_tests;

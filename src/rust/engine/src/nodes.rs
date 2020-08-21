@@ -18,11 +18,12 @@ use url::Url;
 use crate::context::{Context, Core};
 use crate::core::{display_sorted_in_parens, throw, Failure, Key, Params, TypeId, Value};
 use crate::externs;
+use crate::externs::engine_aware::{self, EngineAwareInformation};
 use crate::selectors;
 use crate::tasks::{self, Rule};
 use boxfuture::{BoxFuture, Boxable};
 use bytes::{self, BufMut};
-use cpython::{PyDict, PyString, Python, PythonObject};
+use cpython::PythonObject;
 use fs::{
   self, Dir, DirectoryListing, File, FileContent, GlobExpansionConjunction, GlobMatching, Link,
   PathGlobs, PathStat, PreparedPathGlobs, RelativePath, StrictGlobMatching, VFS,
@@ -827,51 +828,6 @@ impl Task {
     future::try_join_all(get_futures).await
   }
 
-  fn compute_artifacts(result_val: &Value) -> Option<Vec<(String, hashing::Digest)>> {
-    let artifacts_val: Value = externs::call_method(&result_val, "artifacts", &[]).ok()?;
-    let artifacts_val: Value = externs::check_for_python_none(artifacts_val)?;
-    let gil = Python::acquire_gil();
-    let py = gil.python();
-    let artifacts_dict: &PyDict = &*artifacts_val.cast_as::<PyDict>(py).ok()?;
-    let mut output = Vec::new();
-
-    for (key, value) in artifacts_dict.items(py).into_iter() {
-      let key_name: String = match key.cast_as::<PyString>(py) {
-        Ok(s) => s.to_string_lossy(py).into(),
-        Err(e) => {
-          log::warn!(
-            "Error in EngineAware.artifacts() implementation - non-string key: {:?}",
-            e
-          );
-          return None;
-        }
-      };
-      let digest = match lift_digest(&Value::new(value)) {
-        Ok(digest) => digest,
-        Err(e) => {
-          log::warn!("Error in EngineAware.artifacts() implementation: {}", e);
-          return None;
-        }
-      };
-
-      output.push((key_name, digest));
-    }
-
-    Some(output)
-  }
-
-  fn compute_workunit_message(result_val: &Value) -> Option<String> {
-    let msg_val: Value = externs::call_method(&result_val, "message", &[]).ok()?;
-    let msg_val = externs::check_for_python_none(msg_val)?;
-    Some(externs::val_to_str(&msg_val))
-  }
-
-  fn compute_workunit_level(result_val: &Value) -> Option<log::Level> {
-    let new_level_val: Value = externs::call_method(&result_val, "level", &[]).ok()?;
-    let new_level_val = externs::check_for_python_none(new_level_val)?;
-    externs::val_to_log_level(&new_level_val).ok()
-  }
-
   ///
   /// Given a python generator Value, loop to request the generator's dependencies until
   /// it completes with a result Value.
@@ -961,9 +917,9 @@ impl WrappedNode for Task {
     if result_type == product {
       let (new_level, message, new_artifacts) = if can_modify_workunit {
         (
-          Self::compute_workunit_level(&result_val),
-          Self::compute_workunit_message(&result_val),
-          Self::compute_artifacts(&result_val).unwrap_or_else(Vec::new),
+          engine_aware::EngineAwareLevel::retrieve(&result_val),
+          engine_aware::Message::retrieve(&result_val),
+          engine_aware::Artifacts::retrieve(&result_val).unwrap_or_else(Vec::new)
         )
       } else {
         (None, None, Vec::new())
@@ -1134,10 +1090,7 @@ impl Node for NodeKey {
           .keys()
           .filter_map(|key| {
             let value = externs::val_for(key);
-            externs::call_method(&value, "parameter_debug", &[])
-              .ok()
-              .and_then(|val| externs::check_for_python_none(val))
-              .map(|val| externs::val_to_str(&val))
+            engine_aware::ParameterDebug::retrieve(&value)
           })
           .collect();
         if displayable_param_names.len() == 0 {
