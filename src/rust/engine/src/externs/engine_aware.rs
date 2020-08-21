@@ -8,8 +8,8 @@ use cpython::{PyDict, PyString, Python};
 use hashing::Digest;
 use workunit_store::Level;
 
-//TODO all `retrieve` impelemntations should add a check that the `Value` actually subclasses
-//`EngineAware`
+// TODO all `retrieve` implementations should add a check that the `Value` actually subclasses
+// `EngineAware`
 
 pub trait EngineAwareInformation {
   type MaybeOutput;
@@ -53,14 +53,14 @@ impl EngineAwareInformation for Artifacts {
     let artifacts_val: Value = externs::check_for_python_none(artifacts_val)?;
     let gil = Python::acquire_gil();
     let py = gil.python();
-    let artifacts_dict: &PyDict = &*artifacts_val.cast_as::<PyDict>(py).ok()?;
+    let artifacts_dict: &PyDict = artifacts_val.cast_as::<PyDict>(py).ok()?;
     let mut output = Vec::new();
 
     for (key, value) in artifacts_dict.items(py).into_iter() {
       let key_name: String = match key.cast_as::<PyString>(py) {
         Ok(s) => s.to_string_lossy(py).into(),
         Err(e) => {
-          log::warn!(
+          log::error!(
             "Error in EngineAware.artifacts() implementation - non-string key: {:?}",
             e
           );
@@ -70,7 +70,7 @@ impl EngineAwareInformation for Artifacts {
       let digest = match lift_digest(&Value::new(value)) {
         Ok(digest) => digest,
         Err(e) => {
-          log::warn!("Error in EngineAware.artifacts() implementation: {}", e);
+          log::error!("Error in EngineAware.artifacts() implementation: {}", e);
           return None;
         }
       };

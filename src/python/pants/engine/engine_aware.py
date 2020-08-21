@@ -13,7 +13,7 @@ class EngineAware(ABC):
     parameters or return type of an `@rule` to the engine.
 
     Every method defined on `EngineAware` has a return type `Optional[T]` and
-    a default implementation that returns None. When pants executes a goal,
+    a default implementation that returns None. When Pants executes a goal,
     the engine will call these methods on rule inputs and outputs that subclass
     EngineAware. If the method call returns `None`, the engine will do nothing,
     but will change its behavior in some way if the method returns a non-`None` value.
@@ -25,8 +25,12 @@ class EngineAware(ABC):
     """
 
     def level(self) -> Optional[LogLevel]:
-        """If implemented for a type returned by an `@rule`, this method will override the level of
-        the workunit associated with that `@rule`."""
+        """If implemented for a type returned by an `@rule`, this method will modify the level of
+        the workunit associated with that `@rule`.
+
+        For instance, this can be used to change a workunit that would normally be at `Debug` level
+        to `Warn` if an anomalous condition occurs within the `@rule`, leaving it alone otherwise.
+        """
         return None
 
     def message(self) -> Optional[str]:
