@@ -3,11 +3,11 @@
 
 from pathlib import Path
 
-from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
+from pants.testutil.pants_integration_test import PantsIntegrationTest, ensure_daemon
 from pants.util.contextutil import temporary_dir
 
 
-class SchedulerIntegrationTest(PantsRunIntegrationTest):
+class SchedulerIntegrationTest(PantsIntegrationTest):
     def test_visualize_to(self):
         # Tests usage of the `--native-engine-visualize-to=` option, which triggers background
         # visualization of the graph. There are unit tests confirming the content of the rendered
@@ -30,7 +30,5 @@ class SchedulerIntegrationTest(PantsRunIntegrationTest):
         ]
         pants_result = self.run_pants(args)
         self.assert_failure(pants_result)
-        self.assertEqual(
-            pants_result.stdout_data, "examples/src/python/example/hello/greet\n",
-        )
-        self.assertEqual(pants_result.returncode, 42)
+        self.assertEqual(pants_result.stdout, "examples/src/python/example/hello/greet\n")
+        self.assertEqual(pants_result.exit_code, 42)

@@ -4,11 +4,11 @@
 from pathlib import Path
 
 from pants.base.build_environment import get_buildroot
-from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
+from pants.testutil.pants_integration_test import PantsIntegrationTest
 from pants.util.contextutil import temporary_dir
 
 
-class BuildIgnoreIntegrationTest(PantsRunIntegrationTest):
+class BuildIgnoreIntegrationTest(PantsIntegrationTest):
     """Tests the functionality of the `build_ignore_patterns` option."""
 
     def test_build_ignore_list(self):
@@ -21,9 +21,9 @@ class BuildIgnoreIntegrationTest(PantsRunIntegrationTest):
             )
             no_ignore_result = self.run_pants(["list", f"{tmpdir_relative}/dir"])
         self.assert_failure(ignore_result)
-        assert f"{tmpdir_relative}/dir" in ignore_result.stderr_data
+        assert f"{tmpdir_relative}/dir" in ignore_result.stderr
         self.assert_success(no_ignore_result)
-        assert f"{tmpdir_relative}/dir" in no_ignore_result.stdout_data
+        assert f"{tmpdir_relative}/dir" in no_ignore_result.stdout
 
     def test_build_ignore_dependency(self) -> None:
         with temporary_dir(root_dir=get_buildroot()) as tmpdir:
@@ -43,6 +43,6 @@ class BuildIgnoreIntegrationTest(PantsRunIntegrationTest):
             )
             no_ignore_result = self.run_pants(["dependencies", f"{tmpdir_relative}/dir2"])
         self.assert_failure(ignore_result)
-        assert f"{tmpdir_relative}/dir1" in ignore_result.stderr_data
+        assert f"{tmpdir_relative}/dir1" in ignore_result.stderr
         self.assert_success(no_ignore_result)
-        assert f"{tmpdir_relative}/dir1" in no_ignore_result.stdout_data
+        assert f"{tmpdir_relative}/dir1" in no_ignore_result.stdout

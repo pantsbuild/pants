@@ -3,10 +3,10 @@
 
 from textwrap import dedent
 
-from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
+from pants.testutil.pants_integration_test import PantsIntegrationTest
 
 
-class PreludeIntegrationTest(PantsRunIntegrationTest):
+class PreludeIntegrationTest(PantsIntegrationTest):
     """Tests the functionality build file preludes."""
 
     def test_build_file_prelude(self):
@@ -31,4 +31,4 @@ class PreludeIntegrationTest(PantsRunIntegrationTest):
                 ]
             )
             self.assert_success(run)
-            assert "Unique output here!!" in run.stdout_data
+            assert "Unique output here!!" in run.stdout

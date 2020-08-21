@@ -5,10 +5,10 @@ from pathlib import Path
 
 from pants.base.build_environment import get_buildroot
 from pants.option.scope import GLOBAL_SCOPE_CONFIG_SECTION
-from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
+from pants.testutil.pants_integration_test import PantsIntegrationTest
 
 
-class RunnerIntegrationTest(PantsRunIntegrationTest):
+class RunnerIntegrationTest(PantsIntegrationTest):
     """Test logic performed in PantsRunner."""
 
     def test_warning_filter(self):
@@ -24,7 +24,7 @@ class RunnerIntegrationTest(PantsRunIntegrationTest):
         warning_run = self.run_pants(cmdline)
         self.assert_success(warning_run)
         self.assertRegex(
-            warning_run.stderr_data,
+            warning_run.stderr,
             "\\[WARN\\].*DeprecationWarning: DEPRECATED: This is a test warning!",
         )
 
@@ -40,4 +40,4 @@ class RunnerIntegrationTest(PantsRunIntegrationTest):
             },
         )
         self.assert_success(non_warning_run)
-        self.assertNotIn("test warning", non_warning_run.stderr_data)
+        self.assertNotIn("test warning", non_warning_run.stderr)

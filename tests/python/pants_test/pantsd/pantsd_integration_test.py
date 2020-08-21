@@ -12,7 +12,7 @@ from textwrap import dedent
 
 import pytest
 
-from pants.testutil.pants_run_integration_test import read_pantsd_log
+from pants.testutil.pants_integration_test import read_pantsd_log
 from pants.util.contextutil import environment_as, temporary_dir, temporary_file
 from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, safe_open, touch
 from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
@@ -53,7 +53,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     def test_pantsd_broken_pipe(self):
         with self.pantsd_test_context() as (workdir, pantsd_config, checker):
             run = self.run_pants_with_workdir("help | head -1", workdir, pantsd_config, shell=True)
-            self.assertNotIn("broken pipe", run.stderr_data.lower())
+            self.assertNotIn("broken pipe", run.stderr.lower())
             checker.assert_started()
 
     def test_pantsd_pantsd_runner_doesnt_die_after_failed_run(self):
@@ -151,7 +151,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             self.assertNotEqual(run.stdout_data, "", f"Empty stdout for {cmd}")
 
         for run_pair in zip(non_daemon_runs, daemon_runs):
-            non_daemon_stdout = run_pair[0].stdout_data
+            non_daemon_stdout = run_pair[0].stdout
             daemon_stdout = run_pair[1].stdout_data
 
             for line_pair in zip(non_daemon_stdout.splitlines(), daemon_stdout.splitlines()):
@@ -468,7 +468,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             self.assert_failure(waiter_run)
 
             for regexp in regexps:
-                self.assertRegex(waiter_run.stderr_data, regexp)
+                self.assertRegex(waiter_run.stderr, regexp)
 
             time.sleep(5)
             checker.assert_stopped()

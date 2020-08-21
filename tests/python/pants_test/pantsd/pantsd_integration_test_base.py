@@ -12,11 +12,7 @@ import psutil
 from colors import bold, cyan, magenta
 
 from pants.pantsd.process_manager import ProcessManager
-from pants.testutil.pants_run_integration_test import (
-    PantsRunIntegrationTest,
-    kill_daemon,
-    read_pantsd_log,
-)
+from pants.testutil.pants_integration_test import PantsIntegrationTest, kill_daemon, read_pantsd_log
 from pants.testutil.retry import attempts
 from pants.util.collections import recursively_update
 from pants.util.contextutil import temporary_dir
@@ -98,7 +94,7 @@ class PantsdRunContext:
     pantsd_config: Dict[str, Any]
 
 
-class PantsDaemonIntegrationTestBase(PantsRunIntegrationTest):
+class PantsDaemonIntegrationTestBase(PantsIntegrationTest):
     @classmethod
     def use_pantsd_env_var(cls):
         """We set our own ad-hoc pantsd configuration in most of these tests."""
