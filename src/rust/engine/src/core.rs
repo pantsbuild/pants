@@ -95,6 +95,7 @@ where
   let mut items: Vec<_> = items.map(|p| format!("{}", p)).collect();
   match items.len() {
     0 => "()".to_string(),
+    1 => items.pop().unwrap(),
     _ => {
       items.sort();
       format!("({})", items.join(", "))

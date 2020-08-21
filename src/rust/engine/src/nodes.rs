@@ -1095,6 +1095,12 @@ impl Node for NodeKey {
           .collect();
         if displayable_param_names.is_empty() {
           name
+        } else if displayable_param_names.len() == 1 {
+          format!(
+            "{} ({})",
+            name,
+            display_sorted_in_parens(displayable_param_names.iter())
+          )
         } else {
           format!(
             "{} {}",
