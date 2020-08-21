@@ -13,10 +13,10 @@ from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSources,
     FieldSetsWithSourcesRequest,
 )
-from pants.engine import desktop
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
 from pants.engine.console import Console
+from pants.engine.desktop import OpenFiles, OpenFilesRequest
 from pants.engine.engine_aware import EngineAware
 from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
@@ -432,7 +432,11 @@ async def run_tests(
             coverage_report_files.extend(report_files)
 
         if coverage_report_files and test_subsystem.open_coverage:
-            desktop.ui_open(console, interactive_runner, coverage_report_files)
+            open_files = await Get(
+                OpenFiles, OpenFilesRequest(coverage_report_files, error_if_open_not_found=False)
+            )
+            for process in open_files.processes:
+                interactive_runner.run(process)
 
     return Test(exit_code)
 

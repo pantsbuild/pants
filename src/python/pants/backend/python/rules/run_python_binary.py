@@ -89,11 +89,10 @@ async def create_python_binary_run_request(
     def in_chroot(relpath: str) -> str:
         return os.path.join("{chroot}", relpath)
 
-    pex_path = in_chroot(requirements_pex_request.output_filename)
     chrooted_source_roots = [in_chroot(sr) for sr in sources.source_roots]
     env = {
         **pex_env.environment_dict,
-        "PEX_PATH": pex_path,
+        "PEX_PATH": in_chroot(requirements_pex_request.output_filename),
         "PEX_EXTRA_SYS_PATH": ":".join(chrooted_source_roots),
     }
 
