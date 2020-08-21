@@ -44,5 +44,5 @@ target(
 
 python_tests(
   name='tests',
-  sources=['*_test.py', '!pants_run_integration_test.py']
+  sources=['*_test.py', '!pants_integration_test.py', '!pants_run_integration_test.py']
 )
