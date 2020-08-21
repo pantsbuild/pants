@@ -20,12 +20,12 @@ python_distribution(
 )
 
 python_library(
-  sources=['*.py', '!pants_run_integration_test.py', '!_test.py'],
+  sources=['*.py', '!pants_integration_test.py', '!pants_run_integration_test.py', '!_test.py'],
 )
 
 python_library(
   name = 'int-test-for-export',
-  sources = ['pants_run_integration_test.py'],
+  sources = ['pants_integration_test.py', 'pants_run_integration_test.py'],
   dependencies = [
     '//:build_root',
     'src/python/pants:entry_point'

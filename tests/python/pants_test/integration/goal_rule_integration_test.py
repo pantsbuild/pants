@@ -7,7 +7,7 @@ import time
 import pytest
 
 from pants.base.build_environment import get_buildroot
-from pants.testutil.pants_run_integration_test import ensure_daemon
+from pants.testutil.pants_integration_test import ensure_daemon
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import fast_relpath, safe_file_dump
 from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
@@ -21,7 +21,7 @@ class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
     @ensure_daemon
     def test_list(self):
         result = self.do_command("list", self.target, success=True)
-        output_lines = result.stdout_data.splitlines()
+        output_lines = result.stdout.splitlines()
         self.assertEqual(len(output_lines), 4)
         self.assertIn("examples/src/python/example/hello/main", output_lines)
 
@@ -41,7 +41,7 @@ class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
     def test_goal_validation(self):
         result = self.do_command("blah", "::", success=False)
 
-        self.assertIn("Unknown goals: blah", result.stdout_data)
+        self.assertIn("Unknown goals: blah", result.stdout)
 
     def test_list_loop(self):
         # Create a BUILD file in a nested temporary directory, and add additional targets to it.
@@ -77,7 +77,7 @@ class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
             self.assert_success(pants_result)
             assert [
                 f"{rel_tmpdir}:{name}" for name in ("one", "two", "three")
-            ] == pants_result.stdout_data.splitlines()
+            ] == pants_result.stdout.splitlines()
 
     def test_unimplemented_goals_noop(self) -> None:
         # If the goal is actually run, it should fail because `run` expects a single target

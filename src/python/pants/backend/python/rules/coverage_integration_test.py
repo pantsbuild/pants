@@ -6,11 +6,11 @@ from pathlib import Path
 from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
-from pants.testutil.pants_run_integration_test import PantsResult, PantsRunIntegrationTest
+from pants.testutil.pants_integration_test import PantsIntegrationTest, PantsResult
 from pants.util.contextutil import temporary_dir
 
 
-class CoverageIntegrationTest(PantsRunIntegrationTest):
+class CoverageIntegrationTest(PantsIntegrationTest):
     def _prepare_sources(self, tmpdir: str, build_root: str) -> Path:
         tmpdir_relative = Path(tmpdir).relative_to(build_root)
         src_root = Path(tmpdir, "src", "python", "project")
@@ -144,7 +144,7 @@ class CoverageIntegrationTest(PantsRunIntegrationTest):
         # Regression test: make sure that individual tests do not complain about failing to
         # generate reports. This was showing up at test-time, even though the final merged
         # report would work properly.
-        assert "Failed to generate report" not in result.stderr_data
+        assert "Failed to generate report" not in result.stderr
         return result
 
     def test_coverage(self) -> None:
@@ -169,7 +169,7 @@ class CoverageIntegrationTest(PantsRunIntegrationTest):
                 TOTAL                                                            17      0   100%
                 """
             )
-            in result.stderr_data
+            in result.stderr
         )
 
     def test_coverage_with_filter(self) -> None:
@@ -191,11 +191,11 @@ class CoverageIntegrationTest(PantsRunIntegrationTest):
                 TOTAL                                                             8      0   100%
                 """
             )
-            in result.stderr_data
+            in result.stderr
         )
 
     def _assert_raw_coverage(self, result: PantsResult, build_root: str) -> None:
-        assert "Wrote raw coverage report to `dist/coverage/python`" in result.stderr_data
+        assert "Wrote raw coverage report to `dist/coverage/python`" in result.stderr
         coverage_data = Path(build_root, "dist", "coverage", "python", ".coverage")
         assert coverage_data.exists() is True
         conn = sqlite3.connect(coverage_data.as_posix())
@@ -226,11 +226,11 @@ class CoverageIntegrationTest(PantsRunIntegrationTest):
             coverage_path = Path(build_root, "dist", "coverage", "python")
             assert coverage_path.exists() is True
 
-            assert "Wrote xml coverage report to `dist/coverage/python`" in result.stderr_data
+            assert "Wrote xml coverage report to `dist/coverage/python`" in result.stderr
             xml_coverage = coverage_path / "coverage.xml"
             assert xml_coverage.exists() is True
 
-            assert "Wrote html coverage report to `dist/coverage/python`" in result.stderr_data
+            assert "Wrote html coverage report to `dist/coverage/python`" in result.stderr
             html_cov_dir = coverage_path / "htmlcov"
             assert html_cov_dir.exists() is True
             assert (html_cov_dir / "index.html").exists() is True

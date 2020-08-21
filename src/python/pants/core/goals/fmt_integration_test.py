@@ -3,11 +3,11 @@
 
 import re
 
-from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
+from pants.testutil.pants_integration_test import PantsIntegrationTest, ensure_daemon
 from pants.util.dirutil import read_file
 
 
-class FmtIntegrationTest(PantsRunIntegrationTest):
+class FmtIntegrationTest(PantsIntegrationTest):
     @ensure_daemon
     def test_fmt_then_edit(self):
         f = "examples/src/python/example/hello/greet/greet.py"
