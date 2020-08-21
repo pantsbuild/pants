@@ -34,6 +34,7 @@ class FrozenDict(Mapping[K, V]):
                 f"FrozenDict was called with {len(item)} positional arguments but it expects one."
             )
 
+        # NB: Keep the variable name `_data` in sync with `externs/mod.rs`.
         self._data = dict(item[0]) if item else dict()
         self._data.update(**kwargs)
 

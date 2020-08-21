@@ -2,7 +2,6 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import dataclasses
-import itertools
 import logging
 from dataclasses import dataclass
 from textwrap import dedent
@@ -13,6 +12,7 @@ from pants.engine.engine_aware import EngineAware
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent
 from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.rules import Get, RootRule, collect_rules, rule, side_effecting
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 from pants.util.meta import frozen_after_init
 from pants.util.ordered_set import OrderedSet
@@ -38,8 +38,8 @@ class Process:
     level: LogLevel
     input_digest: Digest
     working_directory: Optional[str]
-    env: Tuple[str, ...]
-    append_only_caches: Tuple[str, ...]
+    env: FrozenDict[str, str]
+    append_only_caches: FrozenDict[str, str]
     output_files: Tuple[str, ...]
     output_directories: Tuple[str, ...]
     timeout_seconds: Union[int, float]
@@ -92,10 +92,8 @@ class Process:
         self.level = level
         self.input_digest = input_digest
         self.working_directory = working_directory
-        self.env = tuple(itertools.chain.from_iterable((env or {}).items()))
-        self.append_only_caches = tuple(
-            itertools.chain.from_iterable((append_only_caches or {}).items())
-        )
+        self.env = FrozenDict(env or {})
+        self.append_only_caches = FrozenDict(append_only_caches or {})
         self.output_files = tuple(output_files or ())
         self.output_directories = tuple(output_directories or ())
         # NB: A negative or None time value is normalized to -1 to ease the transfer to Rust.
@@ -253,7 +251,7 @@ class InteractiveProcessResult:
 @dataclass(unsafe_hash=True)
 class InteractiveProcess:
     argv: Tuple[str, ...]
-    env: Tuple[str, ...]
+    env: FrozenDict[str, str]
     input_digest: Digest
     run_in_workspace: bool
 
@@ -269,11 +267,11 @@ class InteractiveProcess:
 
         Unlike `Process`, the result will not be cached.
 
-        To run the process, request an `InteractiveRunner` in a `@goal_rule`, then run
-        `interactive_runner.run_process()`.
+        To run the process, request `InteractiveRunner` in a `@goal_rule`, then use
+        `interactive_runner.run()`.
         """
         self.argv = tuple(argv)
-        self.env = tuple(itertools.chain.from_iterable((env or {}).items()))
+        self.env = FrozenDict(env or {})
         self.input_digest = input_digest
         self.run_in_workspace = run_in_workspace
         self.__post_init__()
