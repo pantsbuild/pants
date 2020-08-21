@@ -123,6 +123,10 @@ impl<T, Reason> MaybeDeleted<T, Reason> {
     }
   }
 
+  fn deleted_reason(&self) -> Option<&Reason> {
+    self.1.as_ref()
+  }
+
   fn is_deleted(&self) -> bool {
     self.1.is_some()
   }
@@ -168,13 +172,13 @@ type MonomorphizedGraph<R> = DiGraph<
 /// to be found statically.
 ///
 pub struct Builder<'t, R: Rule> {
-  rules: &'t HashMap<R::TypeId, Vec<R>>,
+  rules: &'t BTreeMap<R::TypeId, Vec<R>>,
   queries: Vec<Query<R>>,
   params: ParamTypes<R::TypeId>,
 }
 
 impl<'t, R: Rule> Builder<'t, R> {
-  pub fn new(rules: &'t HashMap<R::TypeId, Vec<R>>, queries: Vec<Query<R>>) -> Builder<'t, R> {
+  pub fn new(rules: &'t BTreeMap<R::TypeId, Vec<R>>, queries: Vec<Query<R>>) -> Builder<'t, R> {
     // The set of all input Params in the graph: ie, those provided either via Queries, or via
     // a Rule with a DependencyKey that provides a Param.
     let params = queries
@@ -286,6 +290,32 @@ impl<'t, R: Rule> Builder<'t, R> {
               root_hint,
           ));
         }
+      }
+    }
+
+    if log::log_enabled!(log::Level::Debug) {
+      for scc in petgraph::algo::kosaraju_scc(&graph) {
+        // Each strongly connected component containing more than one node represents a loop.
+        if scc.len() < 2 {
+          continue;
+        }
+
+        let loop_members = scc.into_iter().collect::<HashSet<_>>();
+        let sccgraph = graph.filter_map(
+          |node_id, node| {
+            if loop_members.contains(&node_id) {
+              Some(node.clone())
+            } else {
+              None
+            }
+          },
+          |_, edge_weight| Some(edge_weight.clone()),
+        );
+
+        log::debug!(
+          "// strongly connected component:\n{}",
+          petgraph::dot::Dot::with_config(&sccgraph, &[])
+        );
       }
     }
 
@@ -926,8 +956,16 @@ impl<'t, R: Rule> Builder<'t, R> {
             );
           }
           0 => {
-            // Render and visit all candidates, including those that were deleted.
-            to_visit.extend(edge_refs.iter().map(|edge_ref| edge_ref.target()));
+            // Render all candidates, and traverse any edges that were deleted for interesting reasons.
+            to_visit.extend(
+              edge_refs
+                .iter()
+                .filter(|edge_ref| match graph[edge_ref.target()].deleted_reason() {
+                  None | Some(NodePrunedReason::NoValidCombinationsOfDependencies) => true,
+                  _ => false,
+                })
+                .map(|edge_ref| edge_ref.target()),
+            );
             errored.insert(
               node_id,
               format!(
@@ -936,14 +974,7 @@ impl<'t, R: Rule> Builder<'t, R> {
                 node,
                 edge_refs
                   .iter()
-                  .map(|edge_ref| {
-                    // TODO: Include edge/node deletion reasons.
-                    format!(
-                      "{} (for {})",
-                      graph[edge_ref.target()].0.node,
-                      params_str(&graph[edge_ref.target()].0.in_set)
-                    )
-                  })
+                  .map(|edge_ref| graph[edge_ref.target()].to_string())
                   .collect::<Vec<_>>()
               ),
             );
@@ -959,14 +990,7 @@ impl<'t, R: Rule> Builder<'t, R> {
                 node,
                 chosen_edges
                   .iter()
-                  .map(|edge_ref| {
-                    // TODO: Include edge/node deletion reasons.
-                    format!(
-                      "{} (for {})",
-                      graph[edge_ref.target()].0.node,
-                      params_str(&graph[edge_ref.target()].0.in_set)
-                    )
-                  })
+                  .map(|edge_ref| graph[edge_ref.target()].to_string())
                   .collect::<Vec<_>>()
               ),
             );
@@ -1009,10 +1033,10 @@ impl<'t, R: Rule> Builder<'t, R> {
     // Leaf errors have no dependencies in the errored map.
     let mut leaf_errors = errored
       .iter()
-      .filter(|(node_id, _)| {
+      .filter(|(&node_id, _)| {
         !graph
-          .neighbors_directed(**node_id, Direction::Outgoing)
-          .any(|dependency_id| errored.contains_key(&dependency_id))
+          .neighbors_directed(node_id, Direction::Outgoing)
+          .any(|dependency_id| errored.contains_key(&dependency_id) && node_id != dependency_id)
       })
       .map(|(_, error)| error.replace("\n", "\n    "))
       .collect::<Vec<_>>();
