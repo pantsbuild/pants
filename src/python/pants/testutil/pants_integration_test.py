@@ -14,7 +14,7 @@ from threading import Lock
 from typing import Callable, Iterator, List, Optional, Union
 
 from pants.base.build_environment import get_buildroot
-from pants.base.deprecated import deprecated
+from pants.base.deprecated import warn_or_error
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.option.config import TomlSerializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
@@ -40,18 +40,30 @@ class PantsResult:
     pid: Pid
 
     @property
-    @deprecated(removal_version="2.1.0.dev0", hint_message="Use `PantsResult.exit_code` instead.")
     def returncode(self) -> int:
+        warn_or_error(
+            removal_version="2.1.0.dev0",
+            deprecated_entity_description="the property PantsResult.returncode",
+            hint="Use `PantsResult.exit_code` instead.",
+        )
         return self.exit_code
 
     @property
-    @deprecated(removal_version="2.1.0.dev0", hint_message="Use `PantsResult.stdout` instead.")
     def stdout_data(self) -> str:
+        warn_or_error(
+            removal_version="2.1.0.dev0",
+            deprecated_entity_description="the property PantsResult.stdout_data",
+            hint="Use `PantsResult.stdout` instead.",
+        )
         return self.stdout
 
     @property
-    @deprecated(removal_version="2.1.0.dev0", hint_message="Use `PantsResult.stderr` instead.")
     def stderr_data(self) -> str:
+        warn_or_error(
+            removal_version="2.1.0.dev0",
+            deprecated_entity_description="the property PantsResult.stderr_data",
+            hint="Use `PantsResult.stderr` instead.",
+        )
         return self.stderr
 
 
