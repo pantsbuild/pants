@@ -919,7 +919,7 @@ impl WrappedNode for Task {
         (
           engine_aware::EngineAwareLevel::retrieve(&result_val),
           engine_aware::Message::retrieve(&result_val),
-          engine_aware::Artifacts::retrieve(&result_val).unwrap_or_else(Vec::new)
+          engine_aware::Artifacts::retrieve(&result_val).unwrap_or_else(Vec::new),
         )
       } else {
         (None, None, Vec::new())
@@ -1093,7 +1093,7 @@ impl Node for NodeKey {
             engine_aware::ParameterDebug::retrieve(&value)
           })
           .collect();
-        if displayable_param_names.len() == 0 {
+        if displayable_param_names.is_empty() {
           name
         } else {
           format!(

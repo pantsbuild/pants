@@ -2,22 +2,22 @@
 // Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 use crate::core::Value;
-use crate::nodes::lift_digest;
-use hashing::Digest;
 use crate::externs;
-use workunit_store::Level;
+use crate::nodes::lift_digest;
 use cpython::{PyDict, PyString, Python};
+use hashing::Digest;
+use workunit_store::Level;
 
 //TODO all `retrieve` impelemntations should add a check that the `Value` actually subclasses
 //`EngineAware`
 
 pub trait EngineAwareInformation {
-  type MaybeOutput; 
+  type MaybeOutput;
   fn retrieve(value: &Value) -> Option<Self::MaybeOutput>;
 }
 
 #[derive(Clone, Debug)]
-pub struct EngineAwareLevel { }
+pub struct EngineAwareLevel {}
 
 impl EngineAwareInformation for EngineAwareLevel {
   type MaybeOutput = Level;
@@ -30,7 +30,7 @@ impl EngineAwareInformation for EngineAwareLevel {
 }
 
 #[derive(Clone, Debug)]
-pub struct Message { }
+pub struct Message {}
 
 impl EngineAwareInformation for Message {
   type MaybeOutput = String;
@@ -43,7 +43,7 @@ impl EngineAwareInformation for Message {
 }
 
 #[derive(Clone, Debug)]
-pub struct Artifacts { }
+pub struct Artifacts {}
 
 impl EngineAwareInformation for Artifacts {
   type MaybeOutput = Vec<(String, Digest)>;
@@ -81,9 +81,8 @@ impl EngineAwareInformation for Artifacts {
   }
 }
 
-
 #[derive(Clone, Debug)]
-pub struct ParameterDebug { }
+pub struct ParameterDebug {}
 
 impl EngineAwareInformation for ParameterDebug {
   type MaybeOutput = String;
@@ -91,7 +90,7 @@ impl EngineAwareInformation for ParameterDebug {
   fn retrieve(value: &Value) -> Option<String> {
     externs::call_method(&value, "parameter_debug", &[])
       .ok()
-      .and_then(|val| externs::check_for_python_none(val))
+      .and_then(externs::check_for_python_none)
       .map(|val| externs::val_to_str(&val))
   }
 }

@@ -167,7 +167,7 @@ class TestFieldSet(FieldSet, EngineAware, metaclass=ABCMeta):
     __test__ = False
 
     def parameter_debug(self):
-        return f'{self.address}'
+        return f"{self.address}"
 
 
 class CoverageData(ABC):

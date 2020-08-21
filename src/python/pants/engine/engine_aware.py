@@ -9,9 +9,8 @@ from pants.util.logging import LogLevel
 
 
 class EngineAware(ABC):
-    """`EngineAware` is a marker class used to send metadata about
-    types serving as the input parameters or return type of an `@rule`
-    to the engine.
+    """`EngineAware` is a marker class used to send metadata about types serving as the input
+    parameters or return type of an `@rule` to the engine.
 
     Every method defined on `EngineAware` has a return type `Optional[T]` and
     a default implementation that returns None. When pants executes a goal,
@@ -26,26 +25,24 @@ class EngineAware(ABC):
     """
 
     def level(self) -> Optional[LogLevel]:
-        """If implemented for a type returned by an `@rule`, this method will override
-        the level of the workunit associated with that `@rule`.
-        """
+        """If implemented for a type returned by an `@rule`, this method will override the level of
+        the workunit associated with that `@rule`."""
         return None
 
     def message(self) -> Optional[str]:
-        """If implemented for a type returned by an `@rule`, sets an optional result
-        message on the workunit for that `@rule`.
-        """
+        """If implemented for a type returned by an `@rule`, sets an optional result message on the
+        workunit for that `@rule`."""
         return None
 
     def artifacts(self) -> Optional[Dict[str, Digest]]:
-        """If implemented on a type returned by an `@rule`, sets the `artifacts` entry
-        of that `@rule`'s workunit. `artifacts` is a mapping of arbitrary string
-        keys to `Digest`s.
+        """If implemented on a type returned by an `@rule`, sets the `artifacts` entry of that
+        `@rule`'s workunit.
+
+        `artifacts` is a mapping of arbitrary string keys to `Digest`s.
         """
         return None
 
     def parameter_debug(self) -> Optional[str]:
-        """If implemented on an input parameter to an `@rule`, this string
-        will be shown in certain `@rule` debug contexts in the engine.
-        """
+        """If implemented on an input parameter to an `@rule`, this string will be shown in certain
+        `@rule` debug contexts in the engine."""
         return None
