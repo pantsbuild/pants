@@ -287,9 +287,9 @@ class ProcessTest(TestBase):
             + create_javac_compile_rules()
         )
 
-    def test_create_from_snapshot_with_env(self):
-        req = Process(argv=("foo",), description="Some process", env={"VAR": "VAL"},)
-        self.assertEqual(req.env, ("VAR", "VAL"))
+    def test_env(self):
+        req = Process(argv=("foo",), description="Some process", env={"VAR": "VAL"})
+        assert dict(req.env) == {"VAR": "VAL"}
 
     def test_integration_concat_with_snapshots_stdout(self):
 

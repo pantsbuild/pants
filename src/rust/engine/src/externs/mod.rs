@@ -24,7 +24,6 @@ use cpython::{
   py_class, CompareOp, FromPyObject, ObjectProtocol, PyBool, PyBytes, PyClone, PyDict, PyErr,
   PyObject, PyResult as CPyResult, PyString, PyTuple, PyType, Python, PythonObject, ToPyObject,
 };
-use itertools::Itertools;
 use lazy_static::lazy_static;
 use parking_lot::RwLock;
 
@@ -238,18 +237,16 @@ pub fn project_multi_strs(value: &Value, field: &str) -> Vec<String> {
   getattr(value, field).unwrap()
 }
 
-// This is intended for projecting environment variable maps - i.e. Python Dict[str, str] that are
-// encoded as a Tuple of an (even) number of str's. It could be made more general if we need
-// similar functionality for something else.
-pub fn project_tuple_encoded_map(
-  value: &Value,
-  field: &str,
-) -> Result<BTreeMap<String, String>, String> {
-  let parts = project_multi_strs(&value, field);
-  if parts.len() % 2 != 0 {
-    return Err("Error parsing env: odd number of parts".to_owned());
-  }
-  Ok(parts.into_iter().tuples::<(_, _)>().collect())
+pub fn project_frozendict(value: &Value, field: &str) -> BTreeMap<String, String> {
+  let frozendict = Value::new(getattr(value, field).unwrap());
+  let pydict: PyDict = getattr(&frozendict, "_data").unwrap();
+  let gil = Python::acquire_gil();
+  let py = gil.python();
+  pydict
+    .items(py)
+    .into_iter()
+    .map(|(k, v)| (val_to_str(&Value::new(k)), val_to_str(&Value::new(v))))
+    .collect()
 }
 
 pub fn project_str(value: &Value, field: &str) -> String {
