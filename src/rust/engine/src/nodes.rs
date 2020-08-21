@@ -1090,7 +1090,7 @@ impl Node for NodeKey {
           .keys()
           .filter_map(|key| {
             let value = externs::val_for(key);
-            engine_aware::ParameterDebug::retrieve(&value)
+            engine_aware::DebugHint::retrieve(&value)
           })
           .collect();
         if displayable_param_names.is_empty() {

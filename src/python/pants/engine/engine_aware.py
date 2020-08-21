@@ -46,7 +46,7 @@ class EngineAware(ABC):
         """
         return None
 
-    def parameter_debug(self) -> Optional[str]:
+    def debug_hint(self) -> Optional[str]:
         """If implemented on an input parameter to an `@rule`, this string will be shown in certain
         `@rule` debug contexts in the engine."""
         return None

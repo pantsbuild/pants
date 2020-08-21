@@ -82,13 +82,13 @@ impl EngineAwareInformation for Artifacts {
 }
 
 #[derive(Clone, Debug)]
-pub struct ParameterDebug {}
+pub struct DebugHint {}
 
-impl EngineAwareInformation for ParameterDebug {
+impl EngineAwareInformation for DebugHint {
   type MaybeOutput = String;
 
   fn retrieve(value: &Value) -> Option<String> {
-    externs::call_method(&value, "parameter_debug", &[])
+    externs::call_method(&value, "debug_hint", &[])
       .ok()
       .and_then(externs::check_for_python_none)
       .map(|val| externs::val_to_str(&val))
