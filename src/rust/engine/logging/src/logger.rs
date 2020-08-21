@@ -15,7 +15,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use lazy_static::lazy_static;
-use log::{debug, log, set_logger, set_max_level, LevelFilter, Log, Metadata, Record};
+use log::{debug, log, max_level, set_logger, set_max_level, LevelFilter, Log, Metadata, Record};
 use parking_lot::Mutex;
 use simplelog::{ConfigBuilder, LevelPadding, WriteLogger};
 use tokio::task_local;
@@ -66,53 +66,34 @@ impl PantsLogger {
     };
   }
 
-  fn maybe_increase_global_verbosity(&self, new_level: log::LevelFilter) {
-    if log::max_level() < new_level {
-      set_max_level(new_level);
-    }
-  }
-
-  pub fn set_stderr_logger(&self, python_level: u64) -> Result<(), String> {
-    python_level
-      .try_into()
-      .map_err(|err| format!("{}", err))
-      .map(|level: PythonLogLevel| {
-        self.maybe_increase_global_verbosity(level.into());
-        *self.stderr_log.lock() = MaybeWriteLogger::new(stderr(), level.into())
-      })
+  pub fn set_stderr_logger(&self) {
+    *self.stderr_log.lock() = MaybeWriteLogger::new(stderr())
   }
 
   ///
-  /// Set up a file logger which logs at python_level to log_file_path.
+  /// Set up a file logger to log_file_path.
   /// Returns the file descriptor of the log file.
   ///
   #[cfg(unix)]
   pub fn set_pantsd_logger(
     &self,
     log_file_path: PathBuf,
-    python_level: u64,
   ) -> Result<std::os::unix::io::RawFd, String> {
     use std::os::unix::io::AsRawFd;
-    python_level
-      .try_into()
-      .map_err(|err| format!("{}", err))
-      .and_then(|level: PythonLogLevel| {
-        {
-          // Maybe close open file by dropping the existing logger
-          *self.pantsd_log.lock() = MaybeWriteLogger::empty();
-        }
-        OpenOptions::new()
-          .create(true)
-          .append(true)
-          .open(log_file_path)
-          .map(|file| {
-            let fd = file.as_raw_fd();
-            self.maybe_increase_global_verbosity(level.into());
-            *self.pantsd_log.lock() = MaybeWriteLogger::new(file, level.into());
-            fd
-          })
-          .map_err(|err| format!("Error opening pantsd logfile: {}", err))
+    {
+      // Maybe close open file by dropping the existing logger
+      *self.pantsd_log.lock() = MaybeWriteLogger::empty();
+    }
+    OpenOptions::new()
+      .create(true)
+      .append(true)
+      .open(log_file_path)
+      .map(|file| {
+        let fd = file.as_raw_fd();
+        *self.pantsd_log.lock() = MaybeWriteLogger::new(file);
+        fd
       })
+      .map_err(|err| format!("Error opening pantsd logfile: {}", err))
   }
 
   /// log_from_python is only used in the Python FFI, which in turn is only called within the
@@ -120,12 +101,8 @@ impl PantsLogger {
   /// function, which translates the log message into the Rust log paradigm provided by
   /// the `log` crate.
   pub fn log_from_python(message: &str, python_level: u64, target: &str) -> Result<(), String> {
-    python_level
-      .try_into()
-      .map_err(|err| format!("{}", err))
-      .map(|level: PythonLogLevel| {
-        log!(target: target, level.into(), "{}", message);
-      })
+    let level: PythonLogLevel = python_level.try_into().map_err(|err| format!("{}", err))?;
+    Ok(log!(target: target, level.into(), "{}", message))
   }
 
   pub fn register_stderr_handler(&self, callback: StdioHandler) -> Uuid {
@@ -142,14 +119,15 @@ impl PantsLogger {
 }
 
 impl Log for PantsLogger {
-  fn enabled(&self, _metadata: &Metadata) -> bool {
-    // Individual log levels are handled by each sub-logger,
-    // And a global filter is applied to set_max_level.
-    // No need to filter here.
-    true
+  fn enabled(&self, metadata: &Metadata) -> bool {
+    metadata.level() <= max_level()
   }
 
   fn log(&self, record: &Record) {
+    if !self.enabled(record.metadata()) {
+      return;
+    }
+
     use chrono::Timelike;
     use log::Level;
 
@@ -220,24 +198,14 @@ impl Log for PantsLogger {
   }
 }
 
-struct MaybeWriteLogger<W: Write + Send + 'static> {
-  level: LevelFilter,
-  inner: Option<Box<WriteLogger<W>>>,
-}
+struct MaybeWriteLogger<W: Write + Send + 'static>(Option<Box<WriteLogger<W>>>);
 
 impl<W: Write + Send + 'static> MaybeWriteLogger<W> {
   pub fn empty() -> MaybeWriteLogger<W> {
-    MaybeWriteLogger {
-      level: LevelFilter::Off,
-      inner: None,
-    }
+    MaybeWriteLogger(None)
   }
 
-  pub fn new(writable: W, level: LevelFilter) -> MaybeWriteLogger<W> {
-    // We initialize the inner WriteLogger with no filters so that we don't
-    // have to create a new one every time we change the level of the outer
-    // MaybeWriteLogger.
-
+  pub fn new(writable: W) -> MaybeWriteLogger<W> {
     let config = ConfigBuilder::new()
       .set_time_format_str(TIME_FORMAT_STR)
       .set_time_to_local(true)
@@ -245,30 +213,24 @@ impl<W: Write + Send + 'static> MaybeWriteLogger<W> {
       .set_level_padding(LevelPadding::Off)
       .set_target_level(LevelFilter::Off)
       .build();
-
-    MaybeWriteLogger {
-      level,
-      inner: Some(WriteLogger::new(LevelFilter::max(), config, writable)),
-    }
+    MaybeWriteLogger(Some(WriteLogger::new(LevelFilter::max(), config, writable)))
   }
 }
 
 impl<W: Write + Send + 'static> Log for MaybeWriteLogger<W> {
-  fn enabled(&self, metadata: &Metadata) -> bool {
-    metadata.level() <= self.level
+  fn enabled(&self, _metadata: &Metadata) -> bool {
+    // PantsLogger will have already filtered using the global filter.
+    true
   }
 
   fn log(&self, record: &Record) {
-    if !self.enabled(record.metadata()) {
-      return;
-    }
-    if let Some(ref logger) = self.inner {
+    if let Some(ref logger) = self.0 {
       logger.log(record);
     }
   }
 
   fn flush(&self) {
-    if let Some(ref logger) = self.inner {
+    if let Some(ref logger) = self.0 {
       logger.flush();
     }
   }

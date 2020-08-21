@@ -133,11 +133,11 @@ class Native(metaclass=SingletonMetaclass):
     def default_config_path(self) -> str:
         return cast(str, self.lib.default_config_path())
 
-    def setup_pantsd_logger(self, log_file_path, level):
-        return self.lib.setup_pantsd_logger(log_file_path, level)
+    def setup_pantsd_logger(self, log_file_path):
+        return self.lib.setup_pantsd_logger(log_file_path)
 
-    def setup_stderr_logger(self, level):
-        return self.lib.setup_stderr_logger(level)
+    def setup_stderr_logger(self):
+        return self.lib.setup_stderr_logger()
 
     def write_log(self, msg: str, *, level: int, target: str):
         """Proxy a log message to the Rust logging faculties."""

@@ -27,14 +27,11 @@ def init_rust_logger(log_level: LogLevel, log_show_rust_3rdparty: bool, use_colo
 
 
 class NativeHandler(StreamHandler):
-    """This class is installed as a Python logging module handler (using  the logging.addHandler
+    """This class is installed as a Python logging module handler (using the logging.addHandler
     method) and proxies logs to the Rust logging infrastructure."""
 
     def __init__(
-        self,
-        log_level: LogLevel,
-        stream: Optional[TextIO] = None,
-        native_filename: Optional[str] = None,
+        self, stream: Optional[TextIO] = None, native_filename: Optional[str] = None
     ):
 
         if stream is not None and native_filename is not None:
@@ -43,11 +40,10 @@ class NativeHandler(StreamHandler):
         super().__init__(stream)
         self.native = Native()
         self.native_filename = native_filename
-        self.setLevel(log_level.level)
 
         if stream:
             try:
-                self.native.setup_stderr_logger(log_level.level)
+                self.native.setup_stderr_logger()
             except Exception as e:
                 print(f"Error setting up pantsd logger: {e!r}", file=sys.stderr)
                 raise e
@@ -94,7 +90,7 @@ def set_logging_handlers(handlers: Tuple[Handler, ...]):
         logger.addHandler(handler)
 
 
-def _common_logging_setup(level: LogLevel, warnings_filter_regexes: Optional[List[str]]) -> None:
+def _common_logging_setup(warnings_filter_regexes: Optional[List[str]]) -> None:
     def trace_fn(self, message, *args, **kwargs):
         if self.isEnabledFor(LogLevel.TRACE.level):
             self._log(LogLevel.TRACE.level, message, *args, **kwargs)
@@ -102,7 +98,6 @@ def _common_logging_setup(level: LogLevel, warnings_filter_regexes: Optional[Lis
     logging.Logger.trace = trace_fn  # type: ignore[attr-defined]
     logger = logging.getLogger(None)
 
-    level.set_level_for(logger)
     # This routes warnings through our loggers instead of straight to raw stderr.
     logging.captureWarnings(True)
 
@@ -134,30 +129,27 @@ def setup_logging(global_bootstrap_options):
     use_color = global_bootstrap_options.colors
 
     init_rust_logger(global_level, log_show_rust_3rdparty, use_color)
-    setup_logging_to_stderr(global_level, warnings_filter_regexes=ignores)
+    setup_logging_to_stderr(warnings_filter_regexes=ignores)
     if log_dir:
-        setup_logging_to_file(global_level, log_dir=log_dir, warnings_filter_regexes=ignores)
+        setup_logging_to_file(log_dir=log_dir, warnings_filter_regexes=ignores)
 
 
-def setup_logging_to_stderr(
-    level: LogLevel, *, warnings_filter_regexes: Optional[List[str]] = None
-) -> None:
+def setup_logging_to_stderr(*, warnings_filter_regexes: Optional[List[str]] = None) -> None:
     """Sets up Python logging to stderr, proxied to Rust via a NativeHandler.
 
     We deliberately set the most verbose logging possible (i.e. the TRACE log level), here, and let
     the Rust logging faculties take care of filtering.
     """
-    _common_logging_setup(level, warnings_filter_regexes)
+    _common_logging_setup(warnings_filter_regexes)
 
     python_logger = logging.getLogger(None)
-    handler = NativeHandler(level, stream=sys.stderr)
+    handler = NativeHandler(stream=sys.stderr)
     handler.setFormatter(ExceptionFormatter())
     python_logger.addHandler(handler)
     LogLevel.TRACE.set_level_for(python_logger)
 
 
 def setup_logging_to_file(
-    level: LogLevel,
     *,
     log_dir: str,
     log_filename: str = "pants.log",
@@ -166,14 +158,14 @@ def setup_logging_to_file(
     native = Native()
     logger = logging.getLogger(None)
 
-    _common_logging_setup(level, warnings_filter_regexes)
+    _common_logging_setup(warnings_filter_regexes)
 
     safe_mkdir(log_dir)
     log_path = os.path.join(log_dir, log_filename)
 
-    fd = native.setup_pantsd_logger(log_path, level.level)
+    fd = native.setup_pantsd_logger(log_path)
     ExceptionSink.reset_interactive_output_stream(os.fdopen(os.dup(fd), "a"))
-    handler = NativeHandler(level, native_filename=log_path)
+    handler = NativeHandler(native_filename=log_path)
 
     logger.addHandler(handler)
     return handler
