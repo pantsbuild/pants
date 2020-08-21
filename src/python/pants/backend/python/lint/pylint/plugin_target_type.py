@@ -3,7 +3,6 @@
 
 from pants.backend.python.target_types import COMMON_PYTHON_FIELDS, PythonSources
 from pants.engine.target import Dependencies, Target
-from pants.util.ordered_set import FrozenOrderedSet
 
 
 class PylintPluginSources(PythonSources):
@@ -57,8 +56,4 @@ class PylintSourcePlugin(Target):
     """
 
     alias = "pylint_source_plugin"
-    core_fields = (
-        *(FrozenOrderedSet(COMMON_PYTHON_FIELDS) - {Dependencies}),  # type: ignore[misc]
-        PylintPluginDependencies,
-        PylintPluginSources,
-    )
+    core_fields = (*COMMON_PYTHON_FIELDS, PylintPluginDependencies, PylintPluginSources)

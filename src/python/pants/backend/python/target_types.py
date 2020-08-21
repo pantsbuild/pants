@@ -56,11 +56,7 @@ class PythonInterpreterCompatibility(StringOrStringSequenceField):
         return python_setup.compatibility_or_constraints(self.value)
 
 
-COMMON_PYTHON_FIELDS = (
-    *COMMON_TARGET_FIELDS,
-    Dependencies,
-    PythonInterpreterCompatibility,
-)
+COMMON_PYTHON_FIELDS = (*COMMON_TARGET_FIELDS, PythonInterpreterCompatibility)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -112,6 +108,10 @@ class PythonBinarySources(PythonSources):
             return None
         module_base, _ = os.path.splitext(stripped_sources[0])
         return module_base.replace(os.path.sep, ".")
+
+
+class PythonBinaryDependencies(Dependencies):
+    supports_transitive_excludes = True
 
 
 class PythonEntryPoint(StringField):
@@ -226,6 +226,7 @@ class PythonBinary(Target):
     core_fields = (
         *COMMON_PYTHON_FIELDS,
         PythonBinarySources,
+        PythonBinaryDependencies,
         PythonEntryPoint,
         PythonPlatforms,
         PexInheritPath,
@@ -244,6 +245,10 @@ class PythonBinary(Target):
 
 class PythonTestsSources(PythonSources):
     default = ("test_*.py", "*_test.py", "tests.py", "conftest.py")
+
+
+class PythonTestsDependencies(Dependencies):
+    supports_transitive_excludes = True
 
 
 class PythonTestsTimeout(IntField):
@@ -291,7 +296,12 @@ class PythonTests(Target):
     """
 
     alias = "python_tests"
-    core_fields = (*COMMON_PYTHON_FIELDS, PythonTestsSources, PythonTestsTimeout)
+    core_fields = (
+        *COMMON_PYTHON_FIELDS,
+        PythonTestsSources,
+        PythonTestsDependencies,
+        PythonTestsTimeout,
+    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -307,7 +317,7 @@ class PythonLibrary(Target):
     """A Python library that may be imported by other targets."""
 
     alias = "python_library"
-    core_fields = (*COMMON_PYTHON_FIELDS, PythonLibrarySources)
+    core_fields = (*COMMON_PYTHON_FIELDS, Dependencies, PythonLibrarySources)
 
 
 # -----------------------------------------------------------------------------------------------
@@ -377,6 +387,10 @@ class PythonRequirementsFile(Target):
 # -----------------------------------------------------------------------------------------------
 
 
+class PythonDistributionDependencies(Dependencies):
+    supports_transitive_excludes = True
+
+
 class PythonProvidesField(ScalarField, ProvidesField):
     """The`setup.py` kwargs for the external artifact built from this target.
 
@@ -399,4 +413,4 @@ class PythonDistribution(Target):
     """A publishable Python distribution."""
 
     alias = "python_distribution"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, PythonProvidesField)
+    core_fields = (*COMMON_TARGET_FIELDS, PythonDistributionDependencies, PythonProvidesField)

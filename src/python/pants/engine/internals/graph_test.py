@@ -42,6 +42,7 @@ from pants.engine.internals.graph import (
     Owners,
     OwnersRequest,
     TooManyTargetsException,
+    TransitiveExcludesNotSupportedError,
     parse_dependencies_field,
 )
 from pants.engine.internals.scheduler import ExecutionError
@@ -78,9 +79,13 @@ from pants.testutil.test_base import TestBase
 from pants.util.ordered_set import FrozenOrderedSet
 
 
+class MockDependencies(Dependencies):
+    supports_transitive_excludes = True
+
+
 class MockTarget(Target):
     alias = "target"
-    core_fields = (Dependencies, Sources)
+    core_fields = (MockDependencies, Sources)
 
 
 class GraphTest(TestBase):
@@ -132,6 +137,41 @@ class GraphTest(TestBase):
         # NB: `//:d2` is both a target root and a dependency of `//:root`.
         assert transitive_targets.dependencies == FrozenOrderedSet([d1, d2, d3, t2, t1])
         assert transitive_targets.closure == FrozenOrderedSet([root, d2, d1, d3, t2, t1])
+
+    def transitive_targets_transitive_exclude(self) -> None:
+        self.add_to_build_file(
+            "",
+            dedent(
+                """\
+                target(name='base')
+                target(name='intermediate', dependencies=[':base'])
+                target(name='root', dependencies=[':intermediate', '!!:base'])
+                """
+            ),
+        )
+
+        bootstrapper = create_options_bootstrapper()
+
+        def get_target(name: str) -> Target:
+            return self.request_single_product(
+                WrappedTarget, Params(Address("", target_name=name), bootstrapper)
+            ).target
+
+        base = get_target("base")
+        intermediate = get_target("intermediate")
+        root = get_target("root")
+
+        intermediate_direct_deps = self.request_single_product(
+            Targets, Params(DependenciesRequest(intermediate[Dependencies]), bootstrapper)
+        )
+        assert intermediate_direct_deps == Targets([base])
+
+        transitive_targets = self.request_single_product(
+            TransitiveTargets, Params(Addresses([root.address, intermediate.address]), bootstrapper)
+        )
+        assert transitive_targets.roots == (root, intermediate)
+        assert transitive_targets.dependencies == FrozenOrderedSet([intermediate])
+        assert transitive_targets.closure == FrozenOrderedSet([root, intermediate])
 
     def test_transitive_targets_tolerates_subtarget_cycles(self) -> None:
         """For generated subtargets, we should tolerate cycles between targets.
@@ -933,21 +973,53 @@ class TestCodegen(TestBase):
 # -----------------------------------------------------------------------------------------------
 
 
+def test_transitive_excludes_error() -> None:
+    class Valid1(Target):
+        alias = "valid1"
+        core_fields = (MockDependencies,)
+
+    class Valid2(Target):
+        alias = "valid2"
+        core_fields = (MockDependencies,)
+
+    class Invalid(Target):
+        alias = "invalid"
+        core_fields = (Dependencies,)
+
+    exc = TransitiveExcludesNotSupportedError(
+        bad_value="!!//:bad",
+        address=Address("demo"),
+        registered_target_types=[Valid1, Valid2, Invalid],
+        union_membership=UnionMembership({}),
+    )
+    assert "Bad value '!!//:bad' in the `dependencies` field for demo." in exc.args[0]
+    assert "work with these target types: ['valid1', 'valid2']" in exc.args[0]
+
+
 def test_parse_dependencies_field() -> None:
-    """Ensure that we correctly handle `!` ignores.
+    """Ensure that we correctly handle `!` and `!!` ignores.
 
     We leave the rest of the parsing to AddressInput and Address.
     """
     result = parse_dependencies_field(
-        ["a/b/c", "!a/b/c", "f.txt", "!f.txt"], spec_path="demo/subdir", subproject_roots=[],
+        MockDependencies(
+            ["a/b/c", "!a/b/c", "f.txt", "!f.txt", "!!transitive_exclude.txt"],
+            address=Address("demo/subdir"),
+        ),
+        subproject_roots=[],
+        registered_target_types=[],
+        union_membership=UnionMembership({}),
     )
     expected_addresses = {AddressInput("a/b/c"), AddressInput("f.txt")}
     assert set(result.addresses) == expected_addresses
-    assert set(result.ignored_addresses) == expected_addresses
+    assert set(result.ignored_addresses) == {
+        *expected_addresses,
+        AddressInput("transitive_exclude.txt"),
+    }
 
 
 class SmalltalkDependencies(Dependencies):
-    pass
+    supports_transitive_excludes = True
 
 
 class CustomSmalltalkDependencies(SmalltalkDependencies):
@@ -980,7 +1052,8 @@ class SmalltalkLibrarySources(SmalltalkSources):
 
 class SmalltalkLibrary(Target):
     alias = "smalltalk"
-    core_fields = (Dependencies, SmalltalkLibrarySources)
+    # Note that we use MockDependencies so that we support transitive excludes (`!!`).
+    core_fields = (MockDependencies, SmalltalkLibrarySources)
 
 
 class InferSmalltalkDependencies(InferDependenciesRequest):
@@ -1052,11 +1125,13 @@ class TestDependencies(TestBase):
         self.assert_dependencies_resolved(requested_address=Address("no_deps"), expected=[])
 
         # An ignore should override an include.
-        self.add_to_build_file("ignore", "smalltalk(dependencies=['//:dep', '!//:dep'])")
+        self.add_to_build_file(
+            "ignore", "smalltalk(dependencies=['//:dep1', '!//:dep1', '//:dep2', '!!//:dep2'])"
+        )
         self.assert_dependencies_resolved(requested_address=Address("ignore"), expected=[])
 
     def test_explicit_file_dependencies(self) -> None:
-        self.create_files("src/smalltalk/util", ["f1.st", "f2.st", "f3.st"])
+        self.create_files("src/smalltalk/util", ["f1.st", "f2.st", "f3.st", "f4.st"])
         self.add_to_build_file("src/smalltalk/util", "smalltalk(sources=['*.st'])")
         self.add_to_build_file(
             "src/smalltalk",
@@ -1067,7 +1142,9 @@ class TestDependencies(TestBase):
                     './util/f1.st',
                     'src/smalltalk/util/f2.st',
                     './util/f3.st',
-                    '!./util/f3.st'
+                    './util/f4.st',
+                    '!./util/f3.st',
+                    '!!./util/f4.st',
                   ]
                 )
                 """

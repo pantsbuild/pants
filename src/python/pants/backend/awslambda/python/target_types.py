@@ -6,7 +6,11 @@ from typing import Match, Optional, Tuple, cast
 
 from pants.backend.python.target_types import COMMON_PYTHON_FIELDS, PythonSources
 from pants.engine.addresses import Address
-from pants.engine.target import InvalidFieldException, StringField, Target
+from pants.engine.target import Dependencies, InvalidFieldException, StringField, Target
+
+
+class PythonAwsLambdaDependencies(Dependencies):
+    supports_transitive_excludes = True
 
 
 class PythonAwsLambdaHandler(StringField):
@@ -52,6 +56,7 @@ class PythonAWSLambda(Target):
     core_fields = (
         *COMMON_PYTHON_FIELDS,
         PythonSources,
+        PythonAwsLambdaDependencies,
         PythonAwsLambdaHandler,
         PythonAwsLambdaRuntime,
     )
