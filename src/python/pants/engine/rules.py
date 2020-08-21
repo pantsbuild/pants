@@ -438,25 +438,6 @@ class TaskRule(Rule):
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class RootRule(Rule):
-    """Represents a root input to an execution of a rule graph.
-
-    Roots act roughly like parameters, in that in some cases the only source of a particular type
-    might be when a value is provided as a root subject at the beginning of an execution.
-    """
-
-    _output_type: Type
-
-    def __init__(self, output_type: Type) -> None:
-        self._output_type = output_type
-
-    @property
-    def output_type(self):
-        return self._output_type
-
-
-@frozen_after_init
-@dataclass(unsafe_hash=True)
 class QueryRule(Rule):
     """A QueryRule declares that a given set of Params will be used to request an output type.
 

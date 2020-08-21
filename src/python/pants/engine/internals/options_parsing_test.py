@@ -1,9 +1,10 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.engine.rules import QueryRule
+from pants.engine.rules import QueryRule, SubsystemRule
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.scope import GLOBAL_SCOPE, Scope, ScopedOptions
+from pants.python.python_setup import PythonSetup
 from pants.testutil.engine_util import Params
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
@@ -13,12 +14,15 @@ from pants.util.logging import LogLevel
 class TestEngineOptionsParsing(TestBase):
     @classmethod
     def rules(cls):
-        return (*super().rules(), QueryRule(ScopedOptions, (Scope, OptionsBootstrapper)))
+        return (
+            *super().rules(),
+            SubsystemRule(PythonSetup),
+            QueryRule(ScopedOptions, (Scope, OptionsBootstrapper)),
+        )
 
     def test_options_parse_scoped(self):
         options_bootstrapper = create_options_bootstrapper(
-            args=["-ldebug", "--backend-packages=pants.backend.python"],
-            env=dict(PANTS_PANTSD="True", PANTS_BUILD_IGNORE='["ignoreme/"]'),
+            args=["-ldebug"], env=dict(PANTS_PANTSD="True", PANTS_BUILD_IGNORE='["ignoreme/"]')
         )
         global_options = self.request_single_product(
             ScopedOptions, Params(Scope(GLOBAL_SCOPE), options_bootstrapper)

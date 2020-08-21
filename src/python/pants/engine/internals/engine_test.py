@@ -218,24 +218,26 @@ class EngineTest(unittest.TestCase, SchedulerTestBase):
             remove_locations_from_traceback(str(cm.exception)),
         )
 
-    def test_illegal_root_selection(self):
+    def test_nonexistent_root(self) -> None:
         rules = [QueryRule(A, [B])]
-        scheduler = self.scheduler(rules, include_trace_on_error=False)
-
         # No rules are available to compute A.
-        with self.assertRaises(Exception) as cm:
-            scheduler.product_request(A, subjects=[(B())])
+        with self.assertRaises(ValueError) as cm:
+            self.scheduler(rules, include_trace_on_error=False)
+        assert (
+            "No installed rules return the type A: Is the rule that you're expecting to run "
+            "registered?"
+        ) in str(cm.exception)
 
-        self.assert_equal_with_printing(
-            "No installed @rules return the type A. Is the @rule that you're expecting to run registered?",
-            str(cm.exception),
-        )
-
-    def test_nonexistent_root_fails_differently(self):
-        rules = [upcast]
+    def test_missing_query_rule(self) -> None:
+        # Even if we register the rule to go from MyInt -> MyFloat, we must register a QueryRule
+        # for the graph to work when making a synchronous call via `Scheduler.product_request`.
+        scheduler = self.mk_scheduler(rules=[upcast], include_trace_on_error=False)
         with self.assertRaises(Exception) as cm:
-            self.mk_scheduler(rules=rules, include_trace_on_error=False)
-        assert "consider declaring RootRule(MyInt)" in str(cm.exception)
+            scheduler.product_request(MyFloat, subjects=[MyInt(0)])
+        assert (
+            "No installed QueryRules return the type MyFloat. Try registering QueryRule(MyFloat "
+            "for MyInt)."
+        ) in str(cm.exception)
 
 
 @dataclass
