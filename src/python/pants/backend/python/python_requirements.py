@@ -1,10 +1,12 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import os
+from pathlib import Path
 from typing import Iterable, Mapping, Optional
 
 from pkg_resources import Requirement
+
+from pants.base.build_environment import get_buildroot
 
 
 class PythonRequirements:
@@ -16,16 +18,13 @@ class PythonRequirements:
 
       python_requirement_library(
         name="foo",
-        requirements=[python_requirement("foo>=3.14")],
+        requirements=["foo>=3.14"],
       )
 
       python_requirement_library(
         name="bar",
-        requirements=[python_requirement("bar>=2.7")],
+        requirements=["bar>=2.7"],
       )
-
-    Note that some requirements files can't be unambiguously translated due to issues like multiple
-    find links. For these files, a ValueError will be raised that points out the issue.
 
     See the requirements file spec here:
     https://pip.pypa.io/en/latest/reference/pip_install.html#requirements-file-format
@@ -49,6 +48,7 @@ class PythonRequirements:
     def __call__(
         self,
         requirements_relpath: str = "requirements.txt",
+        *,
         module_mapping: Optional[Mapping[str, Iterable[str]]] = None,
     ) -> None:
         """
@@ -60,48 +60,36 @@ class PythonRequirements:
             `modules=["django"]`.
         """
 
+        req_file = Path(get_buildroot(), self._parse_context.rel_path, requirements_relpath)
         requirements = []
-        repository = None
+        for i, line in enumerate(req_file.read_text().splitlines()):
+            line = line.strip()
+            if not line or line.startswith("#") or line.startswith("-"):
+                continue
+            try:
+                req = Requirement.parse(line)
+            except Exception as e:
+                raise ValueError(
+                    f"Invalid requirement in {req_file.relative_to(get_buildroot())} at line "
+                    f"{i + 1} due to value '{line}'.\n\n{e}"
+                )
+            requirements.append(req)
 
-        requirements_path = os.path.join(self._parse_context.rel_path, requirements_relpath)
-        with open(requirements_path, "r") as fp:
-            for line in fp:
-                line = line.strip()
-                if line and not line.startswith("#"):
-                    if not line.startswith("-"):
-                        requirements.append(line)
-                    else:
-                        # handle flags we know about
-                        flag_value = line.split(" ", 1)
-                        if len(flag_value) == 2:
-                            flag = flag_value[0].strip()
-                            value = flag_value[1].strip()
-                            if flag in ("-f", "--find-links"):
-                                if repository is not None:
-                                    raise ValueError(
-                                        "Only 1 --find-links url is supported per requirements file"
-                                    )
-                                repository = value
-
-        requirements_file_target_name = requirements_relpath
         self._parse_context.create_object(
-            "_python_requirements_file",
-            name=requirements_file_target_name,
-            sources=[requirements_relpath],
+            "_python_requirements_file", name=requirements_relpath, sources=[requirements_relpath]
         )
-        requirements_dep = f":{requirements_file_target_name}"
+        requirements_dep = f":{requirements_relpath}"
 
-        for req_str in requirements:
-            parsed_req = Requirement.parse(req_str)
-            python_req_object = self._parse_context.create_object(
-                "python_requirement",
-                parsed_req,
-                repository=repository,
-                modules=module_mapping.get(parsed_req.project_name) if module_mapping else None,
+        for parsed_req in requirements:
+            req_module_mapping = (
+                {parsed_req.project_name: module_mapping[parsed_req.project_name]}
+                if module_mapping and parsed_req.project_name in module_mapping
+                else None
             )
             self._parse_context.create_object(
                 "python_requirement_library",
                 name=parsed_req.project_name,
-                requirements=[python_req_object],
+                requirements=[parsed_req],
+                module_mapping=req_module_mapping,
                 dependencies=[requirements_dep],
             )

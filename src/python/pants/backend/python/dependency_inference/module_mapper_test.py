@@ -17,11 +17,9 @@ from pants.backend.python.dependency_inference.module_mapper import (
     map_third_party_modules_to_addresses,
 )
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
-from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.util_rules import source_files, stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.rules import RootRule
-from pants.python.python_requirement import PythonRequirement
 from pants.testutil.engine.util import Params
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
@@ -75,10 +73,6 @@ def test_third_party_modules_mapping() -> None:
 
 
 class ModuleMapperTest(TestBase):
-    @classmethod
-    def alias_groups(cls) -> BuildFileAliases:
-        return BuildFileAliases(objects={"python_requirement": PythonRequirement})
-
     @classmethod
     def rules(cls):
         return (
@@ -135,23 +129,18 @@ class ModuleMapperTest(TestBase):
                 """\
                 python_requirement_library(
                   name='ansicolors',
-                  requirements=[python_requirement('ansicolors==1.21', modules=['colors'])],
+                  requirements=['ansicolors==1.21'],
+                  module_mapping={'ansicolors': ['colors']},
                 )
 
                 python_requirement_library(
                   name='req1',
-                  requirements=[
-                    python_requirement('req1'),
-                    python_requirement('two_owners'),
-                  ],
+                  requirements=['req1', 'two_owners'],
                 )
 
                 python_requirement_library(
                   name='un_normalized',
-                  requirements=[
-                    python_requirement('Un-Normalized-Project>3'),
-                    python_requirement('two_owners'),
-                  ],
+                  requirements=['Un-Normalized-Project>3', 'two_owners'],
                 )
                 """
             ),
@@ -184,7 +173,8 @@ class ModuleMapperTest(TestBase):
                 """\
                 python_requirement_library(
                   name='ansicolors',
-                  requirements=[python_requirement('ansicolors==1.21', modules=['colors'])],
+                  requirements=['ansicolors==1.21'],
+                  module_mapping={'ansicolors': ['colors']},
                 )
                 """
             ),

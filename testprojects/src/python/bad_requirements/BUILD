@@ -3,9 +3,7 @@
 
 python_requirement_library(
   name='badreq',
-  requirements=[
-    python_requirement('badreq==99.99.99')
-  ],
+  requirements=['badreq==99.99.99'],
 )
 
 python_binary(

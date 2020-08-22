@@ -12,14 +12,12 @@ from pants.backend.python.rules import pex, pex_from_targets, pytest_runner, pyt
 from pants.backend.python.rules.coverage import create_coverage_config
 from pants.backend.python.rules.pytest_runner import PythonTestFieldSet
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary, PythonTests
-from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.test import TestDebugRequest, TestResult
 from pants.core.util_rules import source_files, stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, FileContent
 from pants.engine.process import InteractiveRunner
 from pants.engine.rules import RootRule
-from pants.python.python_requirement import PythonRequirement
 from pants.testutil.engine.util import Params
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.interpreter_selection_utils import skip_unless_python27_and_python3_present
@@ -100,15 +98,11 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
                 """\
                 python_requirement_library(
                   name='ordered-set',
-                  requirements=[python_requirement('ordered-set==3.1.1')],
+                  requirements=['ordered-set==3.1.1'],
                 )
                 """
             ),
         )
-
-    @classmethod
-    def alias_groups(cls) -> BuildFileAliases:
-        return BuildFileAliases(objects={"python_requirement": PythonRequirement})
 
     @classmethod
     def target_types(cls):

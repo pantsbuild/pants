@@ -3,9 +3,13 @@
 
 from dataclasses import dataclass
 from pathlib import PurePath
-from typing import Dict, Optional, Set
+from typing import Dict, Mapping, Optional, Sequence, Set
 
-from pants.backend.python.target_types import PythonRequirementsField, PythonSources
+from pants.backend.python.target_types import (
+    ModuleMappingField,
+    PythonRequirementsField,
+    PythonSources,
+)
 from pants.base.specs import AddressSpecs, DescendantAddresses
 from pants.core.util_rules.source_files import SourceFilesRequest
 from pants.core.util_rules.stripped_source_files import StrippedSourceFiles
@@ -107,8 +111,12 @@ async def map_third_party_modules_to_addresses() -> ThirdPartyModuleToAddressMap
     for tgt in all_targets:
         if not tgt.has_field(PythonRequirementsField):
             continue
+        module_map: Mapping[str, Sequence[str]] = tgt.get(ModuleMappingField).value or {}
         for python_req in tgt[PythonRequirementsField].value:
-            for module in python_req.modules:
+            modules = module_map.get(
+                python_req.project_name, [python_req.project_name.lower().replace("-", "_")],
+            )
+            for module in modules:
                 if module in modules_to_addresses:
                     modules_with_multiple_owners.add(module)
                 else:

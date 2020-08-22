@@ -6,17 +6,11 @@ from typing import List, Optional
 
 from pants.backend.project_info.dependencies import Dependencies, DependencyType, rules
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
-from pants.build_graph.build_file_aliases import BuildFileAliases
-from pants.python.python_requirement import PythonRequirement
 from pants.testutil.goal_rule_test_base import GoalRuleTestBase
 
 
 class DependenciesIntegrationTest(GoalRuleTestBase):
     goal_cls = Dependencies
-
-    @classmethod
-    def alias_groups(cls) -> BuildFileAliases:
-        return BuildFileAliases(objects={"python_requirement": PythonRequirement})
 
     @classmethod
     def target_types(cls):
@@ -38,7 +32,7 @@ class DependenciesIntegrationTest(GoalRuleTestBase):
                 f"""\
                 python_requirement_library(
                     name='{name}',
-                    requirements=[python_requirement('{name}==1.0.0')],
+                    requirements=['{name}==1.0.0'],
                 )
                 """
             ),
