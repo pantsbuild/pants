@@ -77,12 +77,22 @@ class SubprojectIntegrationTest(PantsIntegrationTest):
     def test_subproject(self) -> None:
         with harness():
             # If `--subproject-roots` are not specified, we expect a failure.
-            self.assert_failure(self.run_pants(["dependencies", "--transitive", SUBPROJ_SPEC]))
+            self.assert_failure(
+                self.run_pants(
+                    [
+                        "--backend-packages=pants.backend.python",
+                        "dependencies",
+                        "--transitive",
+                        SUBPROJ_SPEC,
+                    ]
+                )
+            )
 
             # The same command should succeed when `--subproject-roots` are specified.
             self.assert_success(
                 self.run_pants(
                     [
+                        "--backend-packages=pants.backend.python",
                         f"--subproject-roots={SUBPROJ_ROOT}",
                         "dependencies",
                         "--transitive",
@@ -94,6 +104,11 @@ class SubprojectIntegrationTest(PantsIntegrationTest):
             # Both relative and absolute dependencies should work.
             self.assert_success(
                 self.run_pants(
-                    [f"--subproject-roots={SUBPROJ_ROOT}", "dependencies", f"{SUBPROJ_ROOT}:local"]
+                    [
+                        "--backend-packages=pants.backend.python",
+                        f"--subproject-roots={SUBPROJ_ROOT}",
+                        "dependencies",
+                        f"{SUBPROJ_ROOT}:local",
+                    ]
                 )
             )

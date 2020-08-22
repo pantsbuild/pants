@@ -14,6 +14,8 @@ from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegratio
 
 
 class ExceptionSinkIntegrationTest(PantsDaemonIntegrationTestBase):
+    use_pantsd = False
+
     def _assert_unhandled_exception_log_matches(self, pid, file_contents, namespace):
         self.assertRegex(
             file_contents,
@@ -100,7 +102,11 @@ Exception message:.* 1 Exception encountered:
         directory = "examples/src/python/example/hello/main"
         with temporary_dir() as tmpdir:
             pants_run = self.run_pants_with_workdir(
-                ["--no-pantsd", "list", f"{directory}:this-target-does-not-exist"],
+                [
+                    "--backend-packages=pants.backend.python",
+                    "list",
+                    f"{directory}:this-target-does-not-exist",
+                ],
                 workdir=tmpdir,
                 # The backtrace should be omitted when --print-exception-stacktrace=False.
                 print_exception_stacktrace=False,
@@ -205,9 +211,8 @@ Current thread [^\n]+ \\(most recent call first\\):
         )
         testproject_backend_pkg_name = "test_pants_plugin"
         lifecycle_stub_cmdline = [
-            "--no-pantsd",
             f"--pythonpath=+['{testproject_backend_src_dir}']",
-            f"--backend-packages=+['{testproject_backend_pkg_name}']",
+            f"--backend-packages=['pants.backend.python', '{testproject_backend_pkg_name}']",
             # This task will always raise an exception.
             "lifecycle-stub-goal",
         ]

@@ -25,7 +25,7 @@ class TestHelpIntegration(PantsIntegrationTest):
         assert "--pants-bootstrapdir" in pants_run.stdout
 
     def test_help_all(self):
-        command = ["help-all"]
+        command = ["--backend-packages=pants.backend.python", "help-all"]
         pants_run = self.run_pants(command=command)
         self.assert_success(pants_run)
         all_help = json.loads(pants_run.stdout)

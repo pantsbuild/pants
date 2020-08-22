@@ -16,12 +16,11 @@ class NativeEngineLoggingTest(PantsIntegrationTest):
 
 
 class PantsdNativeLoggingTest(PantsDaemonIntegrationTestBase):
-    # TODO: Set hermetic=True after rewriting this test to stop using real files.
-    hermetic = False
-
     def test_pantsd_file_logging(self) -> None:
         with self.pantsd_successful_run_context("debug") as ctx:
-            daemon_run = ctx.runner(["list", "3rdparty::"])
+            daemon_run = ctx.runner(
+                ["--backend-packages=pants.backend.python", "list", "3rdparty::"]
+            )
             ctx.checker.assert_started()
             assert "[DEBUG] connecting to pantsd on port" in daemon_run.stderr_data
 

@@ -131,6 +131,7 @@ class CoverageIntegrationTest(PantsIntegrationTest):
 
     def _run_tests(self, tmpdir_relative, *more_args: str) -> PantsResult:
         command = [
+            "--backend-packages=pants.backend.python",
             "test",
             "--use-coverage",
             f"{tmpdir_relative}/src/python/project:tests",

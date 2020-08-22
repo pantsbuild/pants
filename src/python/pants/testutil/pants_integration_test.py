@@ -207,10 +207,11 @@ class PantsIntegrationTest(unittest.TestCase):
             f"--print-exception-stacktrace={print_exception_stacktrace}",
         ]
 
+        if "--no-pantsd" not in args and "--pantsd" not in args:
+            args.append("--pantsd" if self.use_pantsd else "--no-pantsd")
+
         if self.hermetic:
             args.append("--pants-config-files=[]")
-        if self.use_pantsd:
-            args.append("--pantsd")
 
         if config:
             toml_file_name = os.path.join(workdir, "pants.toml")

@@ -135,6 +135,8 @@ def create_isolated_git_repo():
 
 
 class ChangedIntegrationTest(PantsIntegrationTest, AbstractTestGenerator):
+    # Git isn't detected if hermetic=True for some reason.
+    hermetic = False
 
     TEST_MAPPING = {
         # A `python_binary` with `sources=['file.name']`.

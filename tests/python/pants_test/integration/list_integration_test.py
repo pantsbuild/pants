@@ -5,11 +5,8 @@ from pants.testutil.pants_integration_test import PantsIntegrationTest
 
 
 class ListIntegrationTest(PantsIntegrationTest):
-    # TODO: Set hermetic=True after rewriting this test to stop using a testproject.
-    hermetic = False
-
     def test_list_all(self) -> None:
-        pants_run = self.run_pants(["list", "::"])
+        pants_run = self.run_pants(["--backend-packages=pants.backend.python", "list", "::"])
         self.assert_success(pants_run)
         self.assertGreater(len(pants_run.stdout.strip().split()), 1)
 
@@ -24,7 +21,13 @@ class ListIntegrationTest(PantsIntegrationTest):
         self.assertIn("ResolveError", pants_run.stderr)
 
     def test_list_testproject(self) -> None:
-        pants_run = self.run_pants(["list", "testprojects/tests/python/pants/build_parsing::"])
+        pants_run = self.run_pants(
+            [
+                "--backend-packages=pants.backend.python",
+                "list",
+                "testprojects/tests/python/pants/build_parsing::",
+            ]
+        )
         self.assert_success(pants_run)
         self.assertEqual(
             pants_run.stdout.strip(),

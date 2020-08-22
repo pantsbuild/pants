@@ -48,7 +48,6 @@ python_binary(
     'build-support/flake8',
     'build-support/mypy',
     'build-support/regexes',
-    'pants-plugins/src/python/internal_backend/rules_for_testing',
     'pants-plugins/src/python/internal_backend/utilities',
   ],
   # We depend on twitter.common libraries that trigger pex warnings for not properly declaring their
