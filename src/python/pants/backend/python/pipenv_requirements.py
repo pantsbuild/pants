@@ -1,18 +1,15 @@
 # Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from json import load
 import os
+from json import load
 from typing import Iterable, Mapping, Optional
 
 from pkg_resources import Requirement
 
 
 class PipenvRequirements:
-    """
-    Translates a Pipenv.lock file into an equivalent set `python_requirement_library`
-    targets.
-
+    """Translates a Pipenv.lock file into an equivalent set `python_requirement_library` targets.
 
     You may also use the parameter `module_mapping` to teach Pants what modules each of your
     requirements provide. For any requirement unspecified, Pants will default to the name of the
