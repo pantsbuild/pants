@@ -9,10 +9,10 @@ from textwrap import dedent
 from typing import Iterator
 
 from pants.option.scope import GLOBAL_SCOPE_CONFIG_SECTION
-from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
+from pants.testutil.pants_integration_test import PantsIntegrationTest
 
 
-class GraphIntegrationTest(PantsRunIntegrationTest):
+class GraphIntegrationTest(PantsIntegrationTest):
     @classmethod
     def use_pantsd_env_var(cls):
         """Some of the tests here expect to read the standard error after an intentional failure.
@@ -103,12 +103,12 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
                 if len(unmatched_globs) == 1:
                     assert (
                         f"[WARN] Unmatched glob {error_origin}: {formatted_globs}"
-                        in pants_run.stderr_data
+                        in pants_run.stderr
                     )
                 else:
                     assert (
                         f"[WARN] Unmatched globs {error_origin}: [{formatted_globs}]"
-                        in pants_run.stderr_data
+                        in pants_run.stderr
                     )
 
     @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/8520")
@@ -119,12 +119,12 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
             config={GLOBAL_SCOPE_CONFIG_SECTION: {"files_not_found_behavior": "warn"}},
         )
         self.assert_success(pants_run)
-        assert "[WARN] Unmatched glob" not in pants_run.stderr_data
+        assert "[WARN] Unmatched glob" not in pants_run.stderr
 
     def test_existing_directory_with_no_build_files_fails(self):
         pants_run = self.run_pants(["list", f"{self._NO_BUILD_FILE_TARGET_BASE}::"])
         self.assert_failure(pants_run)
-        self.assertIn("does not match any targets.", pants_run.stderr_data)
+        self.assertIn("does not match any targets.", pants_run.stderr)
 
     @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/6787")
     def test_error_message(self):
@@ -137,4 +137,4 @@ class GraphIntegrationTest(PantsRunIntegrationTest):
                 )
                 self.assert_failure(pants_run)
                 for excerpt in expected_excerpts:
-                    self.assertIn(excerpt, pants_run.stderr_data)
+                    self.assertIn(excerpt, pants_run.stderr)

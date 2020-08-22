@@ -1,11 +1,11 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest, read_pantsd_log
+from pants.testutil.pants_integration_test import PantsIntegrationTest, read_pantsd_log
 from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
 
 
-class NativeEngineLoggingTest(PantsRunIntegrationTest):
+class NativeEngineLoggingTest(PantsIntegrationTest):
     @classmethod
     def use_pantsd_env_var(cls):
         """Some of the tests here expect to read the standard error after an intentional failure.
@@ -18,10 +18,10 @@ class NativeEngineLoggingTest(PantsRunIntegrationTest):
     def test_native_logging(self) -> None:
         expected_msg = r"\[DEBUG\] Launching \d+ root"
         pants_run = self.run_pants(["-linfo", "list", "3rdparty::"])
-        self.assertNotRegex(pants_run.stderr_data, expected_msg)
+        self.assertNotRegex(pants_run.stderr, expected_msg)
 
         pants_run = self.run_pants(["-ldebug", "list", "3rdparty::"])
-        self.assertRegex(pants_run.stderr_data, expected_msg)
+        self.assertRegex(pants_run.stderr, expected_msg)
 
 
 class PantsdNativeLoggingTest(PantsDaemonIntegrationTestBase):

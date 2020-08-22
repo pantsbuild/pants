@@ -1561,7 +1561,7 @@ fn run_local_interactive_process(
             command.current_dir(tempdir.path());
           }
 
-          let env = externs::project_tuple_encoded_map(&value, "env")?;
+          let env = externs::project_frozendict(&value, "env");
           for (key, value) in env.iter() {
             command.env(key, value);
           }

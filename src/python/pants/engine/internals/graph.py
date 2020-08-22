@@ -321,9 +321,20 @@ async def transitive_targets(targets: Targets) -> TransitiveTargets:
         )
         visited.update(queued)
 
-    transitive_targets = TransitiveTargets(tuple(targets), FrozenOrderedSet(visited))
     _detect_cycles(tuple(t.address for t in targets), dependency_mapping)
-    return transitive_targets
+
+    transitive_wrapped_excludes = await MultiGet(
+        Get(WrappedTarget, AddressInput, address_input)
+        for t in (*targets, *visited)
+        for address_input in t.get(Dependencies).unevaluated_transitive_excludes
+    )
+    transitive_excludes = FrozenOrderedSet(
+        wrapped_t.target for wrapped_t in transitive_wrapped_excludes
+    )
+
+    return TransitiveTargets(
+        tuple(targets), FrozenOrderedSet(visited.difference(transitive_excludes))
+    )
 
 
 # -----------------------------------------------------------------------------------------------
@@ -665,19 +676,61 @@ class ParsedDependencies(NamedTuple):
     ignored_addresses: List[AddressInput]
 
 
+class TransitiveExcludesNotSupportedError(ValueError):
+    def __init__(
+        self,
+        *,
+        bad_value: str,
+        address: Address,
+        registered_target_types: Sequence[Type[Target]],
+        union_membership: UnionMembership,
+    ) -> None:
+        valid_target_types = sorted(
+            target_type.alias
+            for target_type in registered_target_types
+            if (
+                target_type.class_has_field(Dependencies, union_membership=union_membership)
+                and target_type.class_get_field(
+                    Dependencies, union_membership=union_membership
+                ).supports_transitive_excludes
+            )
+        )
+        super().__init__(
+            f"Bad value '{bad_value}' in the `dependencies` field for {address}. "
+            "Transitive excludes with `!!` are not supported for this target type. Did you mean "
+            "to use a single `!` for a direct exclude?\n\nTransitive excludes work with these "
+            f"target types: {valid_target_types}"
+        )
+
+
 def parse_dependencies_field(
-    raw_value: Iterable[str], *, spec_path: str, subproject_roots: Sequence[str]
+    field: Dependencies,
+    *,
+    subproject_roots: Sequence[str],
+    registered_target_types: Sequence[Type[Target]],
+    union_membership: UnionMembership,
 ) -> ParsedDependencies:
     parse = functools.partial(
-        AddressInput.parse, relative_to=spec_path, subproject_roots=subproject_roots
+        AddressInput.parse, relative_to=field.address.spec_path, subproject_roots=subproject_roots
     )
 
     addresses: List[AddressInput] = []
     ignored_addresses: List[AddressInput] = []
-    for v in raw_value:
+    for v in field.sanitized_raw_value or ():
         is_ignore = v.startswith("!")
         if is_ignore:
-            v = v[1:]
+            # Check if it's a transitive exclude, rather than a direct exclude.
+            if v.startswith("!!"):
+                if not field.supports_transitive_excludes:
+                    raise TransitiveExcludesNotSupportedError(
+                        bad_value=v,
+                        address=field.address,
+                        registered_target_types=registered_target_types,
+                        union_membership=union_membership,
+                    )
+                v = v[2:]
+            else:
+                v = v[1:]
         result = parse(v)
         if is_ignore:
             ignored_addresses.append(result)
@@ -688,12 +741,16 @@ def parse_dependencies_field(
 
 @rule
 async def resolve_dependencies(
-    request: DependenciesRequest, union_membership: UnionMembership, global_options: GlobalOptions
+    request: DependenciesRequest,
+    union_membership: UnionMembership,
+    registered_target_types: RegisteredTargetTypes,
+    global_options: GlobalOptions,
 ) -> Addresses:
     provided = parse_dependencies_field(
-        request.field.sanitized_raw_value or (),
-        spec_path=request.field.address.spec_path,
+        request.field,
         subproject_roots=global_options.options.subproject_roots,
+        registered_target_types=registered_target_types.types,
+        union_membership=union_membership,
     )
     literal_addresses = await MultiGet(Get(Address, AddressInput, ai) for ai in provided.addresses)
     ignored_addresses = set(

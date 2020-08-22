@@ -90,7 +90,7 @@ async def dependencies(
         if include_3rdparty:
             if tgt.has_field(PythonRequirementsField):
                 third_party_requirements.update(
-                    str(python_req.requirement) for python_req in tgt[PythonRequirementsField].value
+                    str(python_req) for python_req in tgt[PythonRequirementsField].value
                 )
 
     with dependencies_subsystem.line_oriented(console) as print_stdout:

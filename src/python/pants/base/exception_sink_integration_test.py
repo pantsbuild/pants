@@ -54,7 +54,7 @@ Exception message:.* 1 Exception encountered:
 
                 self.assertIn(
                     "KeyboardInterrupt: ctrl-c interrupted execution of a ffi method!",
-                    pants_run.stderr_data,
+                    pants_run.stderr,
                 )
 
                 pid_specific_log_file, shared_log_file = self._get_log_file_paths(
@@ -86,7 +86,7 @@ Exception message:.* 1 Exception encountered:
                         ctrl-c during import!
                         """
                     ),
-                    pants_run.stderr_data,
+                    pants_run.stderr,
                 )
 
                 pid_specific_log_file, shared_log_file = self._get_log_file_paths(
@@ -107,7 +107,7 @@ Exception message:.* 1 Exception encountered:
             )
             self.assert_failure(pants_run)
             self.assertRegex(
-                pants_run.stderr_data,
+                pants_run.stderr,
                 f"""\
 'this-target-does-not-exist' was not found in namespace '{directory}'\\. Did you mean one of:
 """,

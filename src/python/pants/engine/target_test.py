@@ -151,10 +151,20 @@ def test_get_field() -> None:
     # Example of a call site applying its own default value instead of the field's default value.
     assert default_field_tgt[FortranExtensions].value or 123 == 123
 
+    assert (
+        FortranTarget.class_get_field(FortranExtensions, union_membership=UnionMembership({}))
+        is FortranExtensions
+    )
+
     # Field is not registered on the target.
     with pytest.raises(KeyError) as exc:
         default_field_tgt[UnrelatedField]
     assert UnrelatedField.__name__ in str(exc)
+
+    with pytest.raises(KeyError) as exc:
+        FortranTarget.class_get_field(UnrelatedField, union_membership=UnionMembership({}))
+    assert UnrelatedField.__name__ in str(exc)
+
     assert default_field_tgt.get(UnrelatedField).value == UnrelatedField.default
     assert default_field_tgt.get(
         UnrelatedField, default_raw_value=not UnrelatedField.default
@@ -176,7 +186,7 @@ def test_has_fields() -> None:
     tgt = FortranTarget({}, address=Address.parse(":lib"))
 
     assert tgt.field_types == (FortranExtensions, FortranSources)
-    assert tgt.class_field_types(union_membership=empty_union_membership) == (
+    assert FortranTarget.class_field_types(union_membership=empty_union_membership) == (
         FortranExtensions,
         FortranSources,
     )
@@ -280,6 +290,9 @@ def test_add_custom_fields() -> None:
         CustomField,
     )
     assert FortranTarget.class_has_field(CustomField, union_membership=union_membership) is True
+    assert (
+        FortranTarget.class_get_field(CustomField, union_membership=union_membership) is CustomField
+    )
 
     assert tgt[CustomField].value is True
 
@@ -344,6 +357,10 @@ def test_override_preexisting_field_via_new_target() -> None:
     assert custom_tgt.has_field(FortranExtensions) is True
     assert custom_tgt.has_field(CustomFortranExtensions) is True
     assert custom_tgt.has_fields([FortranExtensions, CustomFortranExtensions]) is True
+    assert (
+        CustomFortranTarget.class_get_field(FortranExtensions, union_membership=UnionMembership({}))
+        is CustomFortranExtensions
+    )
 
     # Ensure that subclasses not defined on a target are not accepted. This allows us to, for
     # example, filter every target with `PythonSources` (or a subclass) and to ignore targets with

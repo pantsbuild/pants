@@ -5,11 +5,11 @@ from pathlib import Path
 from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
-from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
+from pants.testutil.pants_integration_test import PantsIntegrationTest
 from pants.util.contextutil import temporary_dir
 
 
-class RunPythonBinaryIntegrationTest(PantsRunIntegrationTest):
+class RunPythonBinaryIntegrationTest(PantsIntegrationTest):
     def test_sample_script(self) -> None:
         """Test that we properly run a `python_binary` target.
 
@@ -63,6 +63,6 @@ class RunPythonBinaryIntegrationTest(PantsRunIntegrationTest):
                 ]
             )
 
-        assert "Hola, mundo.\n" in result.stderr_data
-        assert result.stdout_data == "HELLO WORLD.\n"
-        assert result.returncode == 23
+        assert "Hola, mundo.\n" in result.stderr
+        assert result.stdout == "HELLO WORLD.\n"
+        assert result.exit_code == 23

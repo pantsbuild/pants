@@ -4,10 +4,10 @@
 from pathlib import Path
 from typing import List
 
-from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
+from pants.testutil.pants_integration_test import PantsIntegrationTest
 
 
-class LoadBackendsIntegrationTest(PantsRunIntegrationTest):
+class LoadBackendsIntegrationTest(PantsIntegrationTest):
     """Ensure that the rule graph can be loaded properly for each backend."""
 
     @staticmethod

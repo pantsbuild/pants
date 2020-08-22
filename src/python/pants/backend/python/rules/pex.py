@@ -59,9 +59,7 @@ class PexRequirements(DeduplicatedCollection[str]):
         *,
         additional_requirements: Iterable[str] = (),
     ) -> "PexRequirements":
-        field_requirements = {
-            str(python_req.requirement) for field in fields for python_req in field.value
-        }
+        field_requirements = {str(python_req) for field in fields for python_req in field.value}
         return PexRequirements({*field_requirements, *additional_requirements})
 
 

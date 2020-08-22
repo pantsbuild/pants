@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from textwrap import dedent
 from typing import Iterator
 
-from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
+from pants.testutil.pants_integration_test import PantsIntegrationTest
 from pants.util.dirutil import safe_file_dump, safe_rmtree
 
 """
@@ -73,7 +73,7 @@ def harness() -> Iterator[None]:
         safe_rmtree(SUBPROJ_SPEC)
 
 
-class SubprojectIntegrationTest(PantsRunIntegrationTest):
+class SubprojectIntegrationTest(PantsIntegrationTest):
     def test_subproject(self) -> None:
         with harness():
             # If `--subproject-roots` are not specified, we expect a failure.

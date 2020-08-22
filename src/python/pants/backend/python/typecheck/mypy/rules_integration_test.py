@@ -3,18 +3,17 @@
 
 from pathlib import PurePath
 from textwrap import dedent
-from typing import List, Optional
+from typing import List, Optional, Sequence
 
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
 from pants.backend.python.target_types import PythonLibrary
 from pants.backend.python.typecheck.mypy.rules import MyPyFieldSet, MyPyRequest
 from pants.backend.python.typecheck.mypy.rules import rules as mypy_rules
-from pants.base.specs import AddressLiteralSpec
-from pants.core.goals.typecheck import TypecheckResults
+from pants.core.goals.typecheck import TypecheckResult, TypecheckResults
 from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
 from pants.engine.rules import RootRule
-from pants.engine.target import TargetWithOrigin, WrappedTarget
+from pants.engine.target import Target, WrappedTarget
 from pants.testutil.engine.util import Params
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option.util import create_options_bootstrapper
@@ -77,13 +76,13 @@ class MyPyIntegrationTest(ExternalToolTestBase):
     def target_types(cls):
         return [PythonLibrary]
 
-    def make_target_with_origin(
+    def make_target(
         self,
         source_files: List[FileContent],
         *,
         package: Optional[str] = None,
         name: str = "target",
-    ) -> TargetWithOrigin:
+    ) -> Target:
         if not package:
             package = self.package
         for source_file in source_files:
@@ -100,25 +99,23 @@ class MyPyIntegrationTest(ExternalToolTestBase):
                 """
             ),
         )
-        target = self.request_single_product(
+        return self.request_single_product(
             WrappedTarget,
             Params(
                 Address(package, target_name=name),
                 create_options_bootstrapper(args=self.global_args),
             ),
         ).target
-        origin = AddressLiteralSpec(package, name)
-        return TargetWithOrigin(target, origin)
 
     def run_mypy(
         self,
-        targets: List[TargetWithOrigin],
+        targets: List[Target],
         *,
         config: Optional[str] = None,
         passthrough_args: Optional[str] = None,
         skip: bool = False,
         additional_args: Optional[List[str]] = None,
-    ) -> TypecheckResults:
+    ) -> Sequence[TypecheckResult]:
         args = list(self.global_args)
         if config:
             self.create_file(relpath="mypy.ini", contents=config)
@@ -129,30 +126,31 @@ class MyPyIntegrationTest(ExternalToolTestBase):
             args.append("--mypy-skip")
         if additional_args:
             args.extend(additional_args)
-        return self.request_single_product(
+        result = self.request_single_product(
             TypecheckResults,
             Params(
                 MyPyRequest(MyPyFieldSet.create(tgt) for tgt in targets),
                 create_options_bootstrapper(args=args),
             ),
         )
+        return result.results
 
     def test_passing_source(self) -> None:
-        target = self.make_target_with_origin([self.good_source])
+        target = self.make_target([self.good_source])
         result = self.run_mypy([target])
         assert len(result) == 1
         assert result[0].exit_code == 0
         assert "Success: no issues found" in result[0].stdout.strip()
 
     def test_failing_source(self) -> None:
-        target = self.make_target_with_origin([self.bad_source])
+        target = self.make_target([self.bad_source])
         result = self.run_mypy([target])
         assert len(result) == 1
         assert result[0].exit_code == 1
         assert f"{self.package}/bad.py:4" in result[0].stdout
 
     def test_mixed_sources(self) -> None:
-        target = self.make_target_with_origin([self.good_source, self.bad_source])
+        target = self.make_target([self.good_source, self.bad_source])
         result = self.run_mypy([target])
         assert len(result) == 1
         assert result[0].exit_code == 1
@@ -162,8 +160,8 @@ class MyPyIntegrationTest(ExternalToolTestBase):
 
     def test_multiple_targets(self) -> None:
         targets = [
-            self.make_target_with_origin([self.good_source], name="t1"),
-            self.make_target_with_origin([self.bad_source], name="t2"),
+            self.make_target([self.good_source], name="t1"),
+            self.make_target([self.bad_source], name="t2"),
         ]
         result = self.run_mypy(targets)
         assert len(result) == 1
@@ -173,21 +171,21 @@ class MyPyIntegrationTest(ExternalToolTestBase):
         assert "checked 2 source files" in result[0].stdout
 
     def test_respects_config_file(self) -> None:
-        target = self.make_target_with_origin([self.needs_config_source])
+        target = self.make_target([self.needs_config_source])
         result = self.run_mypy([target], config="[mypy]\ndisallow_any_expr = True\n")
         assert len(result) == 1
         assert result[0].exit_code == 1
         assert f"{self.package}/needs_config.py:4" in result[0].stdout
 
     def test_respects_passthrough_args(self) -> None:
-        target = self.make_target_with_origin([self.needs_config_source])
+        target = self.make_target([self.needs_config_source])
         result = self.run_mypy([target], passthrough_args="--disallow-any-expr")
         assert len(result) == 1
         assert result[0].exit_code == 1
         assert f"{self.package}/needs_config.py:4" in result[0].stdout
 
     def test_skip(self) -> None:
-        target = self.make_target_with_origin([self.bad_source])
+        target = self.make_target([self.bad_source])
         result = self.run_mypy([target], skip=True)
         assert not result
 
@@ -234,7 +232,7 @@ class MyPyIntegrationTest(ExternalToolTestBase):
             ),
             FileContent(f"{self.package}/__init__.py", b""),
         ]
-        target = self.make_target_with_origin(sources_content)
+        target = self.make_target(sources_content)
         result = self.run_mypy([target])
         assert len(result) == 1
         assert result[0].exit_code == 1

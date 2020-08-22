@@ -5,11 +5,11 @@ from pathlib import Path
 from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
-from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
+from pants.testutil.pants_integration_test import PantsIntegrationTest
 from pants.util.contextutil import temporary_dir
 
 
-class LogOutputIntegrationTest(PantsRunIntegrationTest):
+class LogOutputIntegrationTest(PantsIntegrationTest):
     def _prepare_sources(self, tmpdir: str, build_root: str) -> Path:
         tmpdir_relative = Path(tmpdir).relative_to(build_root)
         src_root = Path(tmpdir, "src", "python", "project")
@@ -32,8 +32,8 @@ class LogOutputIntegrationTest(PantsRunIntegrationTest):
             tmpdir_relative = self._prepare_sources(tmpdir, build_root)
 
             test_run_result = self.run_pants(
-                ["--no-dynamic-ui", "typecheck", f"{tmpdir_relative}/src/python/project"]
+                ["--no-dynamic-ui", "-ldebug", "typecheck", f"{tmpdir_relative}/src/python/project"]
             )
 
-            assert "[INFO] Starting: Run MyPy on" in test_run_result.stderr_data
-            assert "[INFO] Completed: Run MyPy on" in test_run_result.stderr_data
+            assert "[DEBUG] Starting: Run MyPy on" in test_run_result.stderr
+            assert "[DEBUG] Completed: Run MyPy on" in test_run_result.stderr

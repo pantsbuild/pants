@@ -27,7 +27,7 @@ from typing import (
 from typing_extensions import final
 
 from pants.base.specs import Spec
-from pants.engine.addresses import Address, assert_single_address
+from pants.engine.addresses import Address, AddressInput, assert_single_address
 from pants.engine.collection import Collection, DeduplicatedCollection
 from pants.engine.fs import GlobExpansionConjunction, GlobMatchErrorBehavior, PathGlobs, Snapshot
 from pants.engine.unions import UnionMembership, UnionRule, union
@@ -289,7 +289,12 @@ class Target(ABC):
         # For undefined fields, mark the raw value as None.
         for field_type in set(self.field_types) - set(field_values.keys()):
             field_values[field_type] = field_type(raw_value=None, address=address)
-        self.field_values = FrozenDict(field_values)
+        self.field_values = FrozenDict(
+            sorted(
+                field_values.items(),
+                key=lambda field_type_to_val_pair: field_type_to_val_pair[0].alias,
+            )
+        )
 
     @final
     @property
@@ -469,6 +474,31 @@ class Target(ABC):
         return cls._has_fields(
             fields, registered_fields=cls.class_field_types(union_membership=union_membership)
         )
+
+    @final
+    @classmethod
+    def class_get_field(cls, field: Type[_F], *, union_membership: UnionMembership) -> Type[_F]:
+        """Get the requested Field type registered with this target type.
+
+        This will error if the field is not registered, so you should call Target.class_has_field()
+        first.
+        """
+        class_fields = cls.class_field_types(union_membership=union_membership)
+        result = next(
+            (
+                registered_field
+                for registered_field in class_fields
+                if issubclass(registered_field, field)
+            ),
+            None,
+        )
+        if result is None:
+            raise KeyError(
+                f"The target type `{cls.alias}` does not have a field `{field.__name__}`. Before "
+                f"calling `TargetType.class_get_field({field.__name__})`, call "
+                f"`TargetType.class_has_field({field.__name__})`."
+            )
+        return result
 
     @final
     @classmethod
@@ -1443,6 +1473,7 @@ class Dependencies(AsyncField):
     alias = "dependencies"
     sanitized_raw_value: Optional[Tuple[str, ...]]
     default: ClassVar[Optional[Tuple[str, ...]]] = None
+    supports_transitive_excludes = False
 
     @classmethod
     def sanitize_raw_value(
@@ -1461,6 +1492,14 @@ class Dependencies(AsyncField):
                 expected_type="an iterable of strings (e.g. a list of strings)",
             )
         return tuple(sorted(value_or_default))
+
+    @memoized_property
+    def unevaluated_transitive_excludes(self) -> Tuple[AddressInput, ...]:
+        if not self.supports_transitive_excludes or not self.sanitized_raw_value:
+            return ()
+        return tuple(
+            AddressInput.parse(v[2:]) for v in self.sanitized_raw_value if v.startswith("!!")
+        )
 
 
 @dataclass(frozen=True)
