@@ -7,7 +7,6 @@ from typing import Iterable, Optional
 from pants.base.build_environment import pants_version
 from pants.base.exceptions import TargetDefinitionException
 from pants.build_graph.address import Address
-from pants.python.python_requirement import PythonRequirement
 from pants.util.meta import classproperty
 
 
@@ -40,11 +39,11 @@ class PantsRequirement:
     ):
         """
         :param name: The name to use for the target, defaults to the dist name if specified and
-                     otherwise the parent dir name.
+            otherwise the parent dir name.
         :param dist: The Pants dist to create a requirement for. This must be a 'pantsbuild.pants*'
-                     distribution; eg: 'pantsbuild.pants.testutil'.
+            distribution; eg: 'pantsbuild.pants.testutil'.
         :param modules: The modules exposed by the dist, e.g. `['pants.testutil']`. This defaults
-                        to the name of the dist without the leading `pantsbuild`.
+            to the name of the dist without the leading `pantsbuild`.
         """
         name = name or dist or os.path.basename(self._parse_context.rel_path)
         dist = dist or "pantsbuild.pants"
@@ -60,7 +59,9 @@ class PantsRequirement:
 
         if not modules:
             modules = [dist.replace("pantsbuild.", "")]
-        requirement = PythonRequirement(requirement=f"{dist}=={pants_version()}", modules=modules)
         self._parse_context.create_object(
-            "python_requirement_library", name=name, requirements=[requirement]
+            "python_requirement_library",
+            name=name,
+            requirements=[f"{dist}=={pants_version()}"],
+            module_mapping={dist: modules},
         )

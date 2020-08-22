@@ -44,7 +44,6 @@ from pants.engine.fs import Snapshot
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import RootRule
 from pants.engine.target import Target, Targets, WrappedTarget
-from pants.python.python_requirement import PythonRequirement
 from pants.source.source_root import SourceRootConfig
 from pants.testutil.engine.util import Params
 from pants.testutil.option.util import create_options_bootstrapper
@@ -56,9 +55,7 @@ _namespace_decl = "__import__('pkg_resources').declare_namespace(__name__)"
 class TestSetupPyBase(TestBase):
     @classmethod
     def alias_groups(cls) -> BuildFileAliases:
-        return BuildFileAliases(
-            objects={"python_requirement": PythonRequirement, "setup_py": PythonArtifact}
-        )
+        return BuildFileAliases(objects={"setup_py": PythonArtifact})
 
     @classmethod
     def target_types(cls):
@@ -370,15 +367,15 @@ class TestGetRequirements(TestSetupPyBase):
                 """
                 python_requirement_library(
                     name='ext1',
-                    requirements=[python_requirement('ext1==1.22.333')],
+                    requirements=['ext1==1.22.333'],
                 )
                 python_requirement_library(
                     name='ext2',
-                    requirements=[python_requirement('ext2==4.5.6')],
+                    requirements=['ext2==4.5.6'],
                 )
                 python_requirement_library(
                     name='ext3',
-                    requirements=[python_requirement('ext3==0.0.1')],
+                    requirements=['ext3==0.0.1'],
                 )
                 """
             ),

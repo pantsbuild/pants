@@ -1,21 +1,27 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+import collections.abc
 import os.path
 from typing import Iterable, Optional, Sequence, Tuple, Union, cast
 
+from pkg_resources import Requirement
+
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.subsystems.pytest import PyTest
+from pants.base.deprecated import warn_or_error
 from pants.engine.addresses import Address
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
     Dependencies,
+    DictStringToStringSequenceField,
     IntField,
     InvalidFieldException,
+    InvalidFieldTypeException,
+    PrimitiveField,
     ProvidesField,
     ScalarField,
-    SequenceField,
     Sources,
     StringField,
     StringOrStringSequenceField,
@@ -325,30 +331,75 @@ class PythonLibrary(Target):
 # -----------------------------------------------------------------------------------------------
 
 
-class PythonRequirementsField(SequenceField):
-    """A sequence of `python_requirement` objects.
-
-    For example:
-
-        requirements = [
-            python_requirement('dep1==1.8'),
-            python_requirement('dep2>=3.0,<3.1'),
-        ]
-    """
+class PythonRequirementsField(PrimitiveField):
+    """A sequence of pip-style requirement strings, e.g. ['foo==1.8', 'bar<=3 ;
+    python_version<'3']."""
 
     alias = "requirements"
-    expected_element_type = PythonRequirement
-    expected_type_description = "an iterable of `python_requirement` objects (e.g. a list)"
     required = True
-    value: Tuple[PythonRequirement, ...]
+    value: Tuple[Requirement, ...]
 
     @classmethod
     def compute_value(
-        cls, raw_value: Optional[Iterable[PythonRequirement]], *, address: Address
-    ) -> Tuple[PythonRequirement, ...]:
-        return cast(
-            Tuple[PythonRequirement, ...], super().compute_value(raw_value, address=address)
+        cls, raw_value: Optional[Iterable[str]], *, address: Address
+    ) -> Tuple[Requirement, ...]:
+        value = super().compute_value(raw_value, address=address)
+        invalid_type_error = InvalidFieldTypeException(
+            address,
+            cls.alias,
+            value,
+            expected_type="an iterable of pip-style requirement strings (e.g. a list)",
         )
+        if isinstance(value, (str, PythonRequirement)) or not isinstance(
+            value, collections.abc.Iterable
+        ):
+            raise invalid_type_error
+        result = []
+        for v in value:
+            # We allow passing a pre-parsed `Requirement`. This is intended for macros which might
+            # have already parsed so that we can avoid parsing multiple times.
+            if isinstance(v, Requirement):
+                result.append(v)
+            elif isinstance(v, str):
+                try:
+                    parsed = Requirement.parse(v)
+                except Exception as e:
+                    raise InvalidFieldException(
+                        f"Invalid requirement string '{v}' in the '{cls.alias}' field for the "
+                        f"target {address}: {e}"
+                    )
+                result.append(parsed)
+            elif isinstance(v, PythonRequirement):
+                extra_suggestions = ""
+                if v.repository:
+                    extra_suggestions += (
+                        f"\n\nInstead of setting 'repository={v.repository}`, add this to the "
+                        "option `repos` in the `[python-repos]` options scope."
+                    )
+                warn_or_error(
+                    removal_version="2.1.0.dev0",
+                    deprecated_entity_description="Using `pants_requirement`",
+                    hint=(
+                        f"In the '{cls.alias}' field for {address}, use '{str(v.requirement)}' "
+                        f"instead of 'pants_requirement('{str(v.requirement)}').{extra_suggestions}"
+                    ),
+                )
+                result.append(v.requirement)
+            else:
+                raise invalid_type_error
+        return tuple(result)
+
+
+class ModuleMappingField(DictStringToStringSequenceField):
+    """A mapping of requirement names to a list of the modules they provide.
+
+    For example, `{"ansicolors": ["colors"]}`. Any unspecified requirements will use the
+    requirement name as the default module, e.g. "Django" will default to ["django"]`.
+
+    This is used for Pants to be able to infer dependencies in BUILD files.
+    """
+
+    alias = "module_mapping"
 
 
 class PythonRequirementLibrary(Target):
@@ -363,7 +414,7 @@ class PythonRequirementLibrary(Target):
     """
 
     alias = "python_requirement_library"
-    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, PythonRequirementsField)
+    core_fields = (*COMMON_TARGET_FIELDS, Dependencies, PythonRequirementsField, ModuleMappingField)
 
 
 # -----------------------------------------------------------------------------------------------

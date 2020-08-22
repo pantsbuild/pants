@@ -289,7 +289,12 @@ class Target(ABC):
         # For undefined fields, mark the raw value as None.
         for field_type in set(self.field_types) - set(field_values.keys()):
             field_values[field_type] = field_type(raw_value=None, address=address)
-        self.field_values = FrozenDict(field_values)
+        self.field_values = FrozenDict(
+            sorted(
+                field_values.items(),
+                key=lambda field_type_to_val_pair: field_type_to_val_pair[0].alias,
+            )
+        )
 
     @final
     @property

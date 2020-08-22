@@ -9,13 +9,11 @@ from pants.backend.python.lint.pylint.plugin_target_type import PylintSourcePlug
 from pants.backend.python.lint.pylint.rules import PylintFieldSet, PylintRequest
 from pants.backend.python.lint.pylint.rules import rules as pylint_rules
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
-from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.goals.lint import LintResult, LintResults
 from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
 from pants.engine.rules import RootRule
 from pants.engine.target import Target, WrappedTarget
-from pants.python.python_requirement import PythonRequirement
 from pants.testutil.engine.util import Params
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.interpreter_selection_utils import skip_unless_python27_and_python3_present
@@ -35,10 +33,6 @@ class PylintIntegrationTest(ExternalToolTestBase):
         "--backend-packages=pants.backend.python.lint.pylint",
         "--source-root-patterns=['src/python', 'tests/python']",
     )
-
-    @classmethod
-    def alias_groups(cls):
-        return BuildFileAliases(objects={"python_requirement": PythonRequirement})
 
     @classmethod
     def target_types(cls):
@@ -205,12 +199,12 @@ class PylintIntegrationTest(ExternalToolTestBase):
                 """\
                 python_requirement_library(
                     name='transitive_req',
-                    requirements=[python_requirement('django')],
+                    requirements=['django'],
                 )
 
                 python_requirement_library(
                     name='direct_req',
-                    requirements=[python_requirement('ansicolors')],
+                    requirements=['ansicolors'],
                 )
                 """
             ),
@@ -330,12 +324,12 @@ class PylintIntegrationTest(ExternalToolTestBase):
                 """\
                 python_requirement_library(
                     name='pylint',
-                    requirements=[python_requirement('pylint>=2.4.4,<2.5')],
+                    requirements=['pylint>=2.4.4,<2.5'],
                 )
 
                 python_requirement_library(
                     name='colors',
-                    requirements=[python_requirement('ansicolors')],
+                    requirements=['ansicolors'],
                 )
                 """
             ),
