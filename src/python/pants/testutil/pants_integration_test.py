@@ -207,7 +207,9 @@ class PantsIntegrationTest(unittest.TestCase):
             f"--print-exception-stacktrace={print_exception_stacktrace}",
         ]
 
-        if "--no-pantsd" not in args and "--pantsd" not in args:
+        pantsd_in_command = "--no-pantsd" in command or "--pantsd" in command
+        pantsd_in_config = config and "GLOBAL" in config and "pantsd" in config["GLOBAL"]
+        if not pantsd_in_command and not pantsd_in_config:
             args.append("--pantsd" if self.use_pantsd else "--no-pantsd")
 
         if self.hermetic:

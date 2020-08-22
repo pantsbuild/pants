@@ -42,6 +42,8 @@ def launch_file_toucher(f):
 
 
 class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
+    hermetic = False
+
     def test_pantsd_run(self):
         with self.pantsd_successful_run_context(log_level="debug") as ctx:
             ctx.runner(["list", "3rdparty::"])
