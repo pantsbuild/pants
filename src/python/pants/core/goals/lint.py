@@ -13,7 +13,7 @@ from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSourcesRequest,
 )
 from pants.engine.console import Console
-from pants.engine.engine_aware import EngineAware
+from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult
@@ -39,7 +39,7 @@ class InvalidLinterReportsError(Exception):
 
 
 @dataclass(frozen=True)
-class LintResult(EngineAware):
+class LintResult:
     exit_code: int
     stdout: str
     stderr: str
@@ -69,7 +69,7 @@ class LintResult(EngineAware):
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class LintResults(EngineAware):
+class LintResults(EngineAwareReturnType):
     """Zero or more LintResult objects for a single linter.
 
     Typically, linters will return one result. If they no-oped, they will return zero results.

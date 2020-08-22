@@ -23,7 +23,7 @@ use crate::selectors;
 use crate::tasks::{self, Rule};
 use boxfuture::{BoxFuture, Boxable};
 use bytes::{self, BufMut};
-use cpython::PythonObject;
+use cpython::{Python, PythonObject};
 use fs::{
   self, Dir, DirectoryListing, File, FileContent, GlobExpansionConjunction, GlobMatching, Link,
   PathGlobs, PathStat, PreparedPathGlobs, RelativePath, StrictGlobMatching, VFS,
@@ -1085,12 +1085,22 @@ impl Node for NodeKey {
         let name = user_facing_name
           .clone()
           .unwrap_or_else(|| workunit_name.clone());
+        let engine_aware_param_ty =
+          externs::type_for_type_id(context.core.types.engine_aware_parameter);
         let displayable_param_names: Vec<_> = task
           .params
           .keys()
           .filter_map(|key| {
             let value = externs::val_for(key);
-            engine_aware::DebugHint::retrieve(&value)
+
+            let gil = Python::acquire_gil();
+            let py = gil.python();
+            let python_type = value.get_type(py);
+            if python_type.is_subtype_of(py, &engine_aware_param_ty) {
+              engine_aware::DebugHint::retrieve(&value)
+            } else {
+              None
+            }
           })
           .collect();
         if displayable_param_names.is_empty() {

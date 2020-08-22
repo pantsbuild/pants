@@ -8,45 +8,51 @@ from pants.engine.fs import Digest
 from pants.util.logging import LogLevel
 
 
-class EngineAware(ABC):
-    """`EngineAware` is a marker class used to send metadata about types serving as the input
-    parameters or return type of an `@rule` to the engine.
+class EngineAwareParameter(ABC):
+    """A marker class for rule parameters that allows sending additional metadata to the engine.
 
-    Every method defined on `EngineAware` has a return type `Optional[T]` and
-    a default implementation that returns None. When Pants executes a goal,
-    the engine will call these methods on rule inputs and outputs that subclass
-    EngineAware. If the method call returns `None`, the engine will do nothing,
-    but will change its behavior in some way if the method returns a non-`None` value.
+    When Pants executes a rule, the engine will call this marker class's methods on the rule's
+    inputs to see if they implement any of the methods. If the method returns `None`, the engine
+    will do nothing; otherwise, it will use the additional metadata provided.
+    """
 
-    `EngineAware` subclasses may implement whichever subset of these methods
-    they need, leaving the others alone. Subclassing `EngineAware` and
-    implementing none of these methods is equivalent to not subclassing
-    `EngineAware` at all.
+    def debug_hint(self) -> Optional[str]:
+        """If implemented, this string will be shown in `@rule` debug contexts if that rule takes
+        the annotated type as a parameter."""
+        return None
+
+
+class EngineAwareReturnType(ABC):
+    """A marker class for types that are returned by rules to allow sending additional metadata to
+    the engine.
+
+    When Pants finishes executing a rule, the engine will call this marker class's methods to see if
+    it implements any of the methods. If the method returns `None`, the engine will do nothing;
+    otherwise, it will use the additional metadata provided.
     """
 
     def level(self) -> Optional[LogLevel]:
-        """If implemented for a type returned by an `@rule`, this method will modify the level of
-        the workunit associated with that `@rule`.
+        """If implemented, this method will modify the level of the workunit associated with any
+        `@rule`s that return the annotated type.
 
         For instance, this can be used to change a workunit that would normally be at `Debug` level
-        to `Warn` if an anomalous condition occurs within the `@rule`, leaving it alone otherwise.
+        to `Warn` if an anomalous condition occurs within the `@rule`.
         """
         return None
 
     def message(self) -> Optional[str]:
-        """If implemented for a type returned by an `@rule`, sets an optional result message on the
-        workunit for that `@rule`."""
-        return None
+        """If implemented, this adds a result message to the workunit for any `@rule`'s that return
+        the annotated type.
 
-    def artifacts(self) -> Optional[Dict[str, Digest]]:
-        """If implemented on a type returned by an `@rule`, sets the `artifacts` entry of that
-        `@rule`'s workunit.
-
-        `artifacts` is a mapping of arbitrary string keys to `Digest`s.
+        The final message will take the form "Completed: <Rule description> - <this method's return
+        value>". This method may use newlines.
         """
         return None
 
-    def debug_hint(self) -> Optional[str]:
-        """If implemented on an input parameter to an `@rule`, this string will be shown in certain
-        `@rule` debug contexts in the engine."""
+    def artifacts(self) -> Optional[Dict[str, Digest]]:
+        """If implemented, this sets the `artifacts` entry for the workunit of any `@rule`'s that
+        return the annotated type.
+
+        `artifacts` is a mapping of arbitrary string keys to `Digest`s.
+        """
         return None

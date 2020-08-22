@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from textwrap import dedent
 from typing import List, Optional
 
-from pants.engine.engine_aware import EngineAware
+from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import EMPTY_DIGEST
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.internals.scheduler_test_base import SchedulerTestBase
@@ -544,7 +544,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
 
     def test_engine_aware_rule(self):
         @dataclass(frozen=True)
-        class ModifiedOutput(EngineAware):
+        class ModifiedOutput(EngineAwareReturnType):
             _level: LogLevel
             val: int
 
@@ -580,7 +580,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
         @dataclass(frozen=True)
         # If level() returns None, the engine shouldn't try to set
         # a new workunit level.
-        class ModifiedOutput(EngineAware):
+        class ModifiedOutput(EngineAwareReturnType):
             _level: Optional[LogLevel]
             val: int
 
@@ -614,7 +614,7 @@ class StreamingWorkunitTests(unittest.TestCase, SchedulerTestBase):
 
     def test_artifacts_on_engine_aware_type(self) -> None:
         @dataclass(frozen=True)
-        class Output(EngineAware):
+        class Output(EngineAwareReturnType):
             val: int
 
             def artifacts(self):

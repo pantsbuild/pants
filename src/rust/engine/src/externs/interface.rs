@@ -421,7 +421,8 @@ py_class!(class PyTypes |py| {
       bytes: PyType,
       interactive_process: PyType,
       interactive_process_result: PyType,
-      digest_subset: PyType
+      digest_subset: PyType,
+      engine_aware_parameter: PyType
   ) -> CPyResult<Self> {
     Self::create_instance(
         py,
@@ -449,6 +450,7 @@ py_class!(class PyTypes |py| {
         interactive_process: externs::type_for(interactive_process),
         interactive_process_result: externs::type_for(interactive_process_result),
         digest_subset: externs::type_for(digest_subset),
+        engine_aware_parameter: externs::type_for(engine_aware_parameter),
     })),
     )
   }

@@ -10,7 +10,7 @@ from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSourcesRequest,
 )
 from pants.engine.console import Console
-from pants.engine.engine_aware import EngineAware
+from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, goal_rule
@@ -49,7 +49,7 @@ class TypecheckResult:
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class TypecheckResults(EngineAware):
+class TypecheckResults(EngineAwareReturnType):
     """Zero or more TypecheckResult objects for a single type checker.
 
     Typically, type checkers will return one result. If they no-oped, they will return zero results.
