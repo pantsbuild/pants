@@ -276,7 +276,11 @@ async def generate_coverage_reports(
             )
             continue
         report_types.append(report_type)
-        output_file = f"coverage.{report_type.value}" if report_type in {CoverageReportType.XML, CoverageReportType.JSON} else None
+        output_file = (
+            f"coverage.{report_type.value}"
+            if report_type in {CoverageReportType.XML, CoverageReportType.JSON}
+            else None
+        )
         pex_processes.append(
             PexProcess(
                 coverage_setup.pex,

@@ -222,7 +222,9 @@ class CoverageIntegrationTest(PantsIntegrationTest):
         build_root = get_buildroot()
         with temporary_dir(root_dir=build_root) as tmpdir:
             tmpdir_relative = self._prepare_sources(tmpdir, build_root)
-            result = self._run_tests(tmpdir_relative, "--coverage-py-report=['xml', 'html', 'json']")
+            result = self._run_tests(
+                tmpdir_relative, "--coverage-py-report=['xml', 'html', 'json']"
+            )
             coverage_path = Path(build_root, "dist", "coverage", "python")
             assert coverage_path.exists() is True
 
