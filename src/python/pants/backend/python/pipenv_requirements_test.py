@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from json import dumps
+from textwrap import dedent
 from typing import Iterable
 
 from pkg_resources import Requirement
@@ -12,7 +13,6 @@ from pants.base.specs import AddressSpecs, DescendantAddresses, FilesystemSpecs,
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.addresses import Address
 from pants.engine.target import Targets
-from pants.python.python_requirement import PythonRequirement
 from pants.testutil.engine.util import Params
 from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
@@ -22,7 +22,6 @@ class PipenvRequirementsTest(TestBase):
     @classmethod
     def alias_groups(cls):
         return BuildFileAliases(
-            objects={"python_requirement": PythonRequirement},
             context_aware_object_factories={"pipenv_requirements": PipenvRequirements},
         )
 
@@ -57,33 +56,15 @@ class PipenvRequirementsTest(TestBase):
 
         Edge cases:
         * Develop and Default requirements are used
-        * A library entry that specifies a repo url uses it.
-        * A library entry that specifies a repo name matches against the _meta.sources object.
-        * A library entry can specify a dict or string index.
         * If a module_mapping is given, and the project is in the map, we copy over a subset of the mapping to the created target.
         """
 
         self.assert_pipenv_requirements(
             "pipenv_requirements(module_mapping={'ansicolors': ['colors']})",
             {
-                "_meta": {"sources": [{"name": "repo1", "url": "https://repo1.pypi.org"}]},
-                "default": {
-                    "ansicolors": {"version": ">=1.18.0"}
-                    #     "cachetools": {
-                    #         "markers": "python_version ~= '3.5'",
-                    #         "version": "==4.1.1"
-                    #         "index": "repo1"
-                    #     },
-                    # },
-                    # "develop": {
-                    #     "deprecated": {
-                    #         "index": "https://repo2.pypi.org",
-                    #         "version": "==1.2.10"
-                    #     },
-                    #     "edgegrid-python": {
-                    #         "index": { "url": "https://repo3.pypi.org" },
-                    #         "version": "==1.1.1"
-                    #     },
+                "default": {"ansicolors": {"version": ">=1.18.0"},},
+                "develop": {
+                    "cachetools": {"markers": "python_version ~= '3.5'", "version": "==4.1.1"},
                 },
             },
             expected_file_dep=PythonRequirementsFile(
@@ -92,29 +73,54 @@ class PipenvRequirementsTest(TestBase):
             expected_targets=[
                 PythonRequirementLibrary(
                     {
-                        "requirements": [
-                            PythonRequirement(
-                                Requirement.parse("ansicolors>=1.18.0"),
-                                repository="https://repo1.pypi.org",
-                                modules=["colors"],
-                            )
-                        ],
+                        "requirements": [Requirement.parse("ansicolors>=1.18.0")],
                         "dependencies": [":Pipfile.lock"],
+                        "module_mapping": {"ansicolors": ["colors"]},
                     },
                     address=Address("", target_name="ansicolors"),
                 ),
-                # PythonRequirementLibrary(
-                #     {
-                #         "dependencies": [":Pipfile.lock"],
-                #         "requirements": [
-                #             PythonRequirement(
-                #                 Requirement.parse("cachetools>=1.18.0"),
-                #                 repository="https://repo1.pypi.org"
-                #                 modules=["colors"]
-                #             )],
-                #         "module_mapping":
-                #     },
-                #     address=Address("", target_name="ansicolors")
-                # ),
+                PythonRequirementLibrary(
+                    {
+                        "requirements": [
+                            Requirement.parse("cachetools==4.1.1;python_version ~= '3.5'")
+                        ],
+                        "dependencies": [":Pipfile.lock"],
+                    },
+                    address=Address("", target_name="cachetools"),
+                ),
             ],
+        )
+
+    def test_supply_python_requirements_file(self) -> None:
+        """This tests that we can supply our own `_python_requirements_file`."""
+
+        self.assert_pipenv_requirements(
+            dedent(
+                """
+            pipenv_requirements(
+                requirements_relpath='custom/pipfile/Pipfile.lock',
+                pipfile_target='//:custom_pipfile_target'
+            )
+
+            _python_requirements_file(
+                name='custom_pipfile_target',
+                sources=['custom/pipfile/Pipfile.lock']
+            )
+            """
+            ),
+            {"default": {"ansicolors": {"version": ">=1.18.0"},},},
+            expected_file_dep=PythonRequirementsFile(
+                {"sources": ["custom/pipfile/Pipfile.lock"]},
+                address=Address("", target_name="custom_pipfile_target"),
+            ),
+            expected_targets=[
+                PythonRequirementLibrary(
+                    {
+                        "requirements": [Requirement.parse("ansicolors>=1.18.0")],
+                        "dependencies": ["//:custom_pipfile_target"],
+                    },
+                    address=Address("", target_name="ansicolors"),
+                ),
+            ],
+            pipfile_lock_relpath="custom/pipfile/Pipfile.lock",
         )
