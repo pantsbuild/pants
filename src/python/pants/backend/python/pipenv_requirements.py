@@ -1,4 +1,4 @@
-# Copyright 2014 Pants project contributors (see CONTRIBUTORS.md).
+# Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import os
@@ -6,6 +6,8 @@ from json import load
 from typing import Iterable, Mapping, Optional
 
 from pkg_resources import Requirement
+
+from pants.base.build_environment import get_buildroot
 
 
 class PipenvRequirements:
@@ -47,7 +49,9 @@ class PipenvRequirements:
         repository = None
         lock_info = {}
 
-        requirements_path = os.path.join(self._parse_context.rel_path, requirements_relpath)
+        requirements_path = os.path.join(
+            get_buildroot(), self._parse_context.rel_path, requirements_relpath
+        )
         with open(requirements_path, "r") as fp:
             lock_info = load(fp)
             repos = lock_info.get("_meta", {}).get("sources", [])

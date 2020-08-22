@@ -22,7 +22,8 @@ class PipenvRequirementsTest(TestBase):
     @classmethod
     def alias_groups(cls):
         return BuildFileAliases(
-            context_aware_object_factories={"pipenv_requirements": PipenvRequirements}
+            objects={"python_requirement": PythonRequirement},
+            context_aware_object_factories={"pipenv_requirements": PipenvRequirements},
         )
 
     @classmethod
@@ -91,7 +92,6 @@ class PipenvRequirementsTest(TestBase):
             expected_targets=[
                 PythonRequirementLibrary(
                     {
-                        "dependencies": [":Pipfile.lock"],
                         "requirements": [
                             PythonRequirement(
                                 Requirement.parse("ansicolors>=1.18.0"),
@@ -99,6 +99,7 @@ class PipenvRequirementsTest(TestBase):
                                 modules=["colors"],
                             )
                         ],
+                        "dependencies": [":Pipfile.lock"],
                     },
                     address=Address("", target_name="ansicolors"),
                 ),
