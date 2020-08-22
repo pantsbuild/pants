@@ -95,10 +95,7 @@ class PantsdRunContext:
 
 
 class PantsDaemonIntegrationTestBase(PantsIntegrationTest):
-    @classmethod
-    def use_pantsd_env_var(cls):
-        """We set our own ad-hoc pantsd configuration in most of these tests."""
-        return False
+    use_pantsd = False  # We set our own ad-hoc pantsd configuration in most of these tests.
 
     @contextmanager
     def pantsd_test_context(
@@ -140,7 +137,6 @@ class PantsDaemonIntegrationTestBase(PantsIntegrationTest):
         extra_config: Optional[Dict[str, Any]] = None,
         extra_env: Optional[Dict[str, str]] = None,
         success: bool = True,
-        no_track_run_counts: bool = False,
     ) -> Iterator[PantsdRunContext]:
         with self.pantsd_test_context(log_level=log_level, extra_config=extra_config) as (
             workdir,
@@ -185,12 +181,7 @@ class PantsDaemonIntegrationTestBase(PantsIntegrationTest):
         run_count = self._run_count(workdir)
         start_time = time.time()
         run = self.run_pants_with_workdir(
-            cmd,
-            workdir,
-            combined_config,
-            extra_env=extra_env,
-            # TODO: With this uncommented, `test_pantsd_run` fails.
-            # tee_output=True
+            cmd, workdir=workdir, config=combined_config, extra_env=extra_env
         )
         elapsed = time.time() - start_time
         print(bold(cyan(f"\ncompleted in {elapsed} seconds")))

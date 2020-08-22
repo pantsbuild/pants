@@ -6,15 +6,6 @@ from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegratio
 
 
 class NativeEngineLoggingTest(PantsIntegrationTest):
-    @classmethod
-    def use_pantsd_env_var(cls):
-        """Some of the tests here expect to read the standard error after an intentional failure.
-
-        However, when pantsd is enabled, these errors are logged to logs/exceptions.<pid>.log So
-        stderr appears empty. (see #7320)
-        """
-        return False
-
     def test_native_logging(self) -> None:
         expected_msg = r"\[DEBUG\] Launching \d+ root"
         pants_run = self.run_pants(["-linfo", "list", "3rdparty::"])
@@ -25,6 +16,9 @@ class NativeEngineLoggingTest(PantsIntegrationTest):
 
 
 class PantsdNativeLoggingTest(PantsDaemonIntegrationTestBase):
+    # TODO: Set hermetic=True after rewriting this test to stop using real files.
+    hermetic = False
+
     def test_pantsd_file_logging(self) -> None:
         with self.pantsd_successful_run_context("debug") as ctx:
             daemon_run = ctx.runner(["list", "3rdparty::"])

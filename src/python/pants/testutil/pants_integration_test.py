@@ -8,17 +8,15 @@ import sys
 import unittest
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
-from operator import eq, ne
 from pathlib import Path
 from threading import Lock
-from typing import Callable, Iterator, List, Optional, Union
+from typing import Any, Callable, Iterator, List, Mapping, Optional, Union
 
 from pants.base.build_environment import get_buildroot
 from pants.base.deprecated import warn_or_error
 from pants.base.exiter import PANTS_SUCCEEDED_EXIT_CODE
 from pants.option.config import TomlSerializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.option.subsystem import Subsystem
 from pants.pantsd.pants_daemon_client import PantsDaemonClient
 from pants.testutil.process_handler import SubprocessProcessHandler
 from pants.util.contextutil import environment_as, temporary_dir
@@ -141,7 +139,7 @@ def ensure_daemon(f):
     return wrapper
 
 
-def render_logs(workdir):
+def render_logs(workdir: str) -> None:
     """Renders all potentially relevant logs from the given workdir to stdout."""
     filenames = list(glob.glob(os.path.join(workdir, "logs/exceptions*log"))) + list(
         glob.glob(os.path.join(workdir, "pantsd/pantsd.log"))
@@ -154,14 +152,14 @@ def render_logs(workdir):
         print(f"{rel_filename} --- ")
 
 
-def read_pantsd_log(workdir):
+def read_pantsd_log(workdir: str) -> Iterator[str]:
     """Yields all lines from the pantsd log under the given workdir."""
     # Surface the pantsd log for easy viewing via pytest's `-s` (don't capture stdio) option.
     for line in _read_log(f"{workdir}/pantsd/pantsd.log"):
         yield line
 
 
-def _read_log(filename):
+def _read_log(filename: str) -> Iterator[str]:
     with open(filename, "r") as f:
         for line in f:
             yield line.rstrip()
@@ -170,62 +168,15 @@ def _read_log(filename):
 class PantsIntegrationTest(unittest.TestCase):
     """A base class for integration tests that run Pants."""
 
-    class InvalidTestEnvironmentError(Exception):
-        """Raised when the external environment is not set up properly to run integration tests."""
-
-    @classmethod
-    def use_pantsd_env_var(cls):
-        """Subclasses may override to acknowledge that the tests cannot run when pantsd is enabled,
-        or they want to configure pantsd themselves.
-
-        In those cases, --pantsd will not be added to their configuration.
-        This approach is coarsely grained, meaning we disable pantsd in some tests that actually run
-        when pantsd is enabled. However:
-          - The number of mislabeled tests is currently small (~20 tests).
-          - Those tests will still run, just with pantsd disabled.
-
-        N.B. Currently, this doesn't interact with test hermeticity.
-        This means that, if the test coordinator has set PANTS_PANTSD, and a test is not marked
-        as hermetic, it will run under pantsd regardless of the value of this function.
-        """
-        should_pantsd = os.getenv("USE_PANTSD_FOR_INTEGRATION_TESTS")
-        return should_pantsd in ["True", "true", "1"]
-
-    @classmethod
-    def hermetic(cls):
-        """Subclasses may override to acknowledge that they are hermetic.
-
-        That is, that they should run without reading the real pants.toml.
-        """
-        return False
-
-    @classmethod
-    def hermetic_env_whitelist(cls):
-        """A whitelist of environment variables to propagate to tests when hermetic=True."""
-        return [
-            # Used in the wrapper script to locate a rust install.
-            "HOME",
-            # Needed to find python interpreters and other binaries.
-            "PATH",
-            "PANTS_PROFILE",
-            # Ensure that the underlying ./pants invocation doesn't run from sources
-            # (and therefore bootstrap) if we don't want it to.
-            "RUN_PANTS_FROM_PEX",
-        ]
-
-    def setUp(self):
-        super().setUp()
-        # Some integration tests rely on clean subsystem state (e.g., to set up a DistributionLocator).
-        Subsystem.reset()
-
-    def temporary_workdir(self, cleanup=True):
-        # We can hard-code '.pants.d' here because we know that will always be its value
-        # in the pantsbuild/pants repo (e.g., that's what we .gitignore in that repo).
-        # Grabbing the pants_workdir config would require this pants's config object,
-        # which we don't have a reference to here.
-        root = os.path.join(get_buildroot(), ".pants.d", "tmp")
-        safe_mkdir(root)
-        return temporary_dir(root_dir=root, cleanup=cleanup, suffix=".pants.d")
+    # Classes can optionally override these.
+    hermetic = True  # If False, pants.toml will be used.
+    hermetic_env_allowlist = (
+        "HOME",
+        "PATH",  # Needed to find Python interpreters and other binaries.
+        "PANTS_PROFILE",
+        "RUN_PANTS_FROM_PEX",
+    )
+    use_pantsd = True
 
     # Incremented each time we spawn a pants subprocess.
     # Appended to PANTS_PROFILE in the called pants process, so that each subprocess
@@ -234,7 +185,7 @@ class PantsIntegrationTest(unittest.TestCase):
     _profile_disambiguator_lock = Lock()
 
     @classmethod
-    def _get_profile_disambiguator(cls):
+    def _get_profile_disambiguator(cls) -> int:
         with cls._profile_disambiguator_lock:
             ret = cls._profile_disambiguator
             cls._profile_disambiguator += 1
@@ -242,13 +193,13 @@ class PantsIntegrationTest(unittest.TestCase):
 
     def run_pants_with_workdir_without_waiting(
         self,
-        command,
-        workdir,
-        config=None,
-        extra_env=None,
-        build_root=None,
-        print_exception_stacktrace=True,
-        **kwargs,
+        command: Command,
+        *,
+        workdir: str,
+        config: Optional[Mapping] = None,
+        extra_env: Optional[Mapping[str, str]] = None,
+        print_exception_stacktrace: bool = True,
+        **kwargs: Any,
     ) -> PantsJoinHandle:
         args = [
             "--no-pantsrc",
@@ -256,48 +207,38 @@ class PantsIntegrationTest(unittest.TestCase):
             f"--print-exception-stacktrace={print_exception_stacktrace}",
         ]
 
-        if self.hermetic():
-            args.extend(
-                [
-                    "--pants-config-files=[]",
-                    # Turn off cache globally.  A hermetic integration test shouldn't rely on cache,
-                    # or we have no idea if it's actually testing anything.
-                    "--no-cache-read",
-                    "--no-cache-write",
-                    # Turn cache on just for tool bootstrapping, for performance.
-                    "--cache-bootstrap-read",
-                    "--cache-bootstrap-write",
-                ]
-            )
-
-        if self.use_pantsd_env_var():
+        if self.hermetic:
+            args.append("--pants-config-files=[]")
+        if self.use_pantsd:
             args.append("--pantsd")
 
         if config:
             toml_file_name = os.path.join(workdir, "pants.toml")
             with safe_open(toml_file_name, mode="w") as fp:
-                fp.write(TomlSerializer(config).serialize())
-            args.append("--pants-config-files=" + toml_file_name)
+                fp.write(TomlSerializer(config).serialize())  # type: ignore[arg-type]
+            args.append(f"--pants-config-files={toml_file_name}")
 
         pants_script = [sys.executable, "-m", "pants"]
 
         # Permit usage of shell=True and string-based commands to allow e.g. `./pants | head`.
+        pants_command: Command
         if kwargs.get("shell") is True:
             assert not isinstance(
                 command, list
             ), "must pass command as a string when using shell=True"
             pants_command = " ".join([*pants_script, " ".join(args), command])
         else:
-            pants_command = pants_script + args + command
+            pants_command = [*pants_script, *args, *command]
 
-        # Only whitelisted entries will be included in the environment if hermetic=True.
-        if self.hermetic():
-            env = dict()
+        # Only allow-listed entries will be included in the environment if hermetic=True. Note that
+        # the env will already be fairly hermetic thanks to the v2 engine; this provides an
+        # additional layer of hermiticity.
+        if self.hermetic:
             # With an empty environment, we would generally get the true underlying system default
             # encoding, which is unlikely to be what we want (it's generally ASCII, still). So we
             # explicitly set an encoding here.
-            env["LC_ALL"] = "en_US.UTF-8"
-            for h in self.hermetic_env_whitelist():
+            env = {"LC_ALL": "en_US.UTF-8"}
+            for h in self.hermetic_env_allowlist:
                 value = os.getenv(h)
                 if value is not None:
                     env[h] = value
@@ -322,7 +263,8 @@ class PantsIntegrationTest(unittest.TestCase):
         if env.get("PANTS_PROFILE"):
             prof = f"{env['PANTS_PROFILE']}.{self._get_profile_disambiguator()}"
             env["PANTS_PROFILE"] = prof
-            # Make a note the subprocess command, so the user can correctly interpret the profile files.
+            # Make a note of the subprocess command, so the user can correctly interpret the
+            # profile files.
             with open(f"{prof}.cmd", "w") as fp:
                 fp.write(" ".join(pants_command))
 
@@ -340,42 +282,66 @@ class PantsIntegrationTest(unittest.TestCase):
         )
 
     def run_pants_with_workdir(
-        self, command, workdir, config=None, stdin_data=None, tee_output=False, **kwargs
+        self,
+        command: Command,
+        *,
+        workdir: str,
+        config: Optional[Mapping] = None,
+        stdin_data: Optional[Union[bytes, str]] = None,
+        tee_output: bool = False,
+        **kwargs: Any,
     ) -> PantsResult:
         if config:
             kwargs["config"] = config
-        handle = self.run_pants_with_workdir_without_waiting(command, workdir, **kwargs)
+        handle = self.run_pants_with_workdir_without_waiting(command, workdir=workdir, **kwargs)
         return handle.join(stdin_data=stdin_data, tee_output=tee_output)
 
     def run_pants(
-        self, command, config=None, stdin_data=None, extra_env=None, cleanup_workdir=True, **kwargs
+        self,
+        command: Command,
+        config: Optional[Mapping] = None,
+        stdin_data: Optional[Union[bytes, str]] = None,
+        extra_env: Optional[Mapping[str, str]] = None,
+        **kwargs: Any,
     ) -> PantsResult:
-        """Runs pants in a subprocess.
+        """Runs Pants in a subprocess.
 
-        :param list command: A list of command line arguments coming after `./pants`.
+        :param command: A list of command line arguments coming after `./pants`.
         :param config: Optional data for a generated TOML file. A map of <section-name> ->
-        map of key -> value.
+            map of key -> value.
         :param kwargs: Extra keyword args to pass to `subprocess.Popen`.
         """
         with self.temporary_workdir() as workdir:
             return self.run_pants_with_workdir(
-                command, workdir, config, stdin_data=stdin_data, extra_env=extra_env, **kwargs
+                command,
+                workdir=workdir,
+                config=config,
+                stdin_data=stdin_data,
+                extra_env=extra_env,
+                **kwargs,
             )
 
-    def assert_success(self, pants_run: PantsResult, msg=None):
-        self.assert_result(pants_run, PANTS_SUCCEEDED_EXIT_CODE, expected=True, msg=msg)
+    def assert_success(self, pants_run: PantsResult, msg: Optional[str] = None) -> None:
+        self._assert_result(pants_run, success_expected=True, msg=msg)
 
-    def assert_failure(self, pants_run: PantsResult, msg=None):
-        self.assert_result(pants_run, PANTS_SUCCEEDED_EXIT_CODE, expected=False, msg=msg)
+    def assert_failure(self, pants_run: PantsResult, msg: Optional[str] = None) -> None:
+        self._assert_result(pants_run, success_expected=False, msg=msg)
 
-    def assert_result(self, pants_run: PantsResult, value, expected=True, msg=None):
-        check, assertion = (eq, self.assertEqual) if expected else (ne, self.assertNotEqual)
-        if check(pants_run.exit_code, value):
+    @staticmethod
+    def _assert_result(
+        pants_run: PantsResult, *, success_expected: bool, msg: Optional[str]
+    ) -> None:
+        is_expected_exit_code = (
+            pants_run.exit_code == PANTS_SUCCEEDED_EXIT_CODE
+            if success_expected
+            else pants_run.exit_code != PANTS_SUCCEEDED_EXIT_CODE
+        )
+        if is_expected_exit_code:
             return
 
         details = [msg] if msg else []
         details.append(" ".join(pants_run.command))
-        details.append(f"returncode: {pants_run.exit_code}")
+        details.append(f"exit_code: {pants_run.exit_code}")
 
         def indent(content):
             return "\n\t".join(content.splitlines())
@@ -384,20 +350,20 @@ class PantsIntegrationTest(unittest.TestCase):
         details.append(f"stderr:\n\t{indent(pants_run.stderr)}")
         error_msg = "\n".join(details)
 
-        assertion(value, pants_run.exit_code, error_msg)
+        assert is_expected_exit_code, error_msg
+
+    @staticmethod
+    def temporary_workdir(cleanup: bool = True):
+        # We can hard-code '.pants.d' here because we know that will always be its value
+        # in the pantsbuild/pants repo (e.g., that's what we .gitignore in that repo).
+        # Grabbing the pants_workdir config would require this pants's config object,
+        # which we don't have a reference to here.
+        root = os.path.join(get_buildroot(), ".pants.d", "tmp")
+        safe_mkdir(root)
+        return temporary_dir(root_dir=root, cleanup=cleanup, suffix=".pants.d")
 
     @contextmanager
-    def file_renamed(self, prefix, test_name, real_name):
-        real_path = os.path.join(prefix, real_name)
-        test_path = os.path.join(prefix, test_name)
-        try:
-            os.rename(test_path, real_path)
-            yield
-        finally:
-            os.rename(real_path, test_path)
-
-    @contextmanager
-    def temporary_directory_literal(self, path: Union[str, Path],) -> Iterator[None]:
+    def temporary_directory_literal(self, path: Union[str, Path]) -> Iterator[None]:
         """Temporarily create the given literal directory under the buildroot.
 
         The path being created must not already exist. Any parent directories will also be created
@@ -423,7 +389,7 @@ class PantsIntegrationTest(unittest.TestCase):
 
     @contextmanager
     def temporary_file_content(
-        self, path: Union[str, Path], content, binary_mode=True
+        self, path: Union[str, Path], content, binary_mode: bool = True
     ) -> Iterator[None]:
         """Temporarily write content to a file for the purpose of an integration test."""
         path = os.path.realpath(path)
@@ -478,17 +444,3 @@ class PantsIntegrationTest(unittest.TestCase):
         finally:
             with open(file_path, "wb") as f:
                 f.write(file_original_content)
-
-    def do_command(self, *args, **kwargs) -> PantsResult:
-        """Wrapper around run_pants method.
-
-        :param args: command line arguments used to run pants
-        """
-        cmd = list(args)
-        success = kwargs.pop("success", True)
-        pants_run = self.run_pants(cmd, **kwargs)
-        if success:
-            self.assert_success(pants_run)
-        else:
-            self.assert_failure(pants_run)
-        return pants_run

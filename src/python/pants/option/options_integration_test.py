@@ -14,10 +14,6 @@ from pants.util.contextutil import temporary_dir
 
 @pytest.mark.skip("Skip until https://github.com/pantsbuild/pants/issues/10206")
 class TestOptionsIntegration(PantsIntegrationTest):
-    @classmethod
-    def hermetic(cls) -> bool:
-        return True
-
     def test_options_works_at_all(self) -> None:
         self.assert_success(self.run_pants(["options"]))
 
@@ -302,7 +298,8 @@ class TestOptionsIntegration(PantsIntegrationTest):
             physical_workdir = f"{physical_workdir_base}/{safe_filename_from_path(symlink_workdir)}"
 
             pants_run = self.run_pants_with_workdir(
-                [f"--pants-physical-workdir-base={physical_workdir_base}", "help"], symlink_workdir
+                [f"--pants-physical-workdir-base={physical_workdir_base}", "help"],
+                workdir=symlink_workdir,
             )
             self.assert_success(pants_run)
             # Make sure symlink workdir is pointing to physical workdir
@@ -310,7 +307,7 @@ class TestOptionsIntegration(PantsIntegrationTest):
 
             self.run_pants_with_workdir(
                 [f"--pants-physical-workdir-base={physical_workdir_base}", "clean-all"],
-                symlink_workdir,
+                workdir=symlink_workdir,
             )
             # Make sure both physical_workdir and symlink_workdir are empty after running clean-all
             self.assertTrue(not os.listdir(symlink_workdir) and not os.listdir(physical_workdir))
