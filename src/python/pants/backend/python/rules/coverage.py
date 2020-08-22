@@ -170,7 +170,7 @@ async def create_coverage_config(coverage: CoverageSubsystem) -> CoverageConfig:
         config_contents = await Get(
             DigestContents,
             PathGlobs(
-                globs=coverage.config,
+                globs=tuple(coverage.config,),
                 glob_match_error_behavior=GlobMatchErrorBehavior.error,
                 description_of_origin=f"the option `--{coverage.options_scope}-config`",
             ),
