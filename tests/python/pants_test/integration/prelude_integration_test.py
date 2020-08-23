@@ -28,5 +28,5 @@ class PreludeIntegrationTest(PantsIntegrationTest):
                     f"{tmpdir}:main",
                 ]
             )
-        self.assert_success(run)
+        run.assert_success()
         assert "Hello world!" in run.stdout

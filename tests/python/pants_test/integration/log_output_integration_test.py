@@ -29,5 +29,6 @@ class LogOutputIntegrationTest(PantsIntegrationTest):
                 ]
             )
 
+        result.assert_success()
         assert "[DEBUG] Starting: Run MyPy on" in result.stderr
         assert "[DEBUG] Completed: Run MyPy on" in result.stderr

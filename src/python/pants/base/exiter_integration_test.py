@@ -16,5 +16,5 @@ class ExiterIntegrationTest(PantsIntegrationTest):
                 "testprojects/src/python/unicode/compilation_failure",
             ]
         )
-        self.assert_failure(pants_run)
+        pants_run.assert_failure()
         self.assertIn("import sys¡", pants_run.stderr)

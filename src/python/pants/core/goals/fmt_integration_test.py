@@ -14,15 +14,14 @@ class FmtIntegrationTest(PantsIntegrationTest):
         with self.temporary_workdir() as workdir:
 
             def run() -> None:
-                result = self.run_pants_with_workdir(
+                self.run_pants_with_workdir(
                     [
                         "--backend-packages=['pants.backend.python', 'pants.backend.python.lint.black']",
                         "fmt",
                         f,
                     ],
                     workdir=workdir,
-                )
-                self.assert_success(result)
+                ).assert_success()
 
             # Run once to start up, and then capture the file content.
             run()

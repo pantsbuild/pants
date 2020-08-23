@@ -19,7 +19,7 @@ class SchedulerIntegrationTest(PantsIntegrationTest):
                 "list",
                 "examples/src/python/example/hello/greet",
             ]
-            self.assert_success(self.run_pants(args))
+            self.run_pants(args).assert_success()
             destdir_files = list(Path(destdir).iterdir())
             self.assertTrue(len(destdir_files) > 0)
 
@@ -30,7 +30,7 @@ class SchedulerIntegrationTest(PantsIntegrationTest):
             "list-and-die-for-testing",
             "examples/src/python/example/hello/greet",
         ]
-        pants_result = self.run_pants(args)
-        self.assert_failure(pants_result)
-        self.assertEqual(pants_result.stdout, "examples/src/python/example/hello/greet\n")
-        self.assertEqual(pants_result.exit_code, 42)
+        result = self.run_pants(args)
+        result.assert_failure()
+        self.assertEqual(result.stdout, "examples/src/python/example/hello/greet\n")
+        self.assertEqual(result.exit_code, 42)

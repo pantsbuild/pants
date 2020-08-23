@@ -52,7 +52,7 @@ Exception message:.* 1 Exception encountered:
                 pants_run = self.run_pants_with_workdir(
                     self._lifecycle_stub_cmdline(), workdir=tmpdir
                 )
-                self.assert_failure(pants_run)
+                pants_run.assert_failure()
 
                 self.assertIn(
                     "KeyboardInterrupt: ctrl-c interrupted execution of a ffi method!",
@@ -79,7 +79,7 @@ Exception message:.* 1 Exception encountered:
                 pants_run = self.run_pants_with_workdir(
                     self._lifecycle_stub_cmdline(), workdir=tmpdir
                 )
-                self.assert_failure(pants_run)
+                pants_run.assert_failure()
 
                 self.assertIn(
                     dedent(
@@ -107,7 +107,7 @@ Exception message:.* 1 Exception encountered:
                 # The backtrace should be omitted when --print-exception-stacktrace=False.
                 print_exception_stacktrace=False,
             )
-            self.assert_failure(pants_run)
+            pants_run.assert_failure()
             self.assertRegex(
                 pants_run.stderr,
                 f"""\

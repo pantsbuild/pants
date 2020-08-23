@@ -64,6 +64,24 @@ class PantsResult:
         )
         return self.stderr
 
+    def _format_unexpected_error_code_msg(self, msg: Optional[str]) -> str:
+        details = [msg] if msg else []
+        details.append(" ".join(self.command))
+        details.append(f"exit_code: {self.exit_code}")
+
+        def indent(content):
+            return "\n\t".join(content.splitlines())
+
+        details.append(f"stdout:\n\t{indent(self.stdout)}")
+        details.append(f"stderr:\n\t{indent(self.stderr)}")
+        return "\n".join(details)
+
+    def assert_success(self, msg: Optional[str] = None) -> None:
+        assert self.exit_code == 0, self._format_unexpected_error_code_msg(msg)
+
+    def assert_failure(self, msg: Optional[str] = None) -> None:
+        assert self.exit_code != 0, self._format_unexpected_error_code_msg(msg)
+
 
 @dataclass(frozen=True)
 class PantsJoinHandle:
@@ -324,36 +342,13 @@ class PantsIntegrationTest(unittest.TestCase):
                 **kwargs,
             )
 
-    def assert_success(self, pants_run: PantsResult, msg: Optional[str] = None) -> None:
-        self._assert_result(pants_run, success_expected=True, msg=msg)
-
-    def assert_failure(self, pants_run: PantsResult, msg: Optional[str] = None) -> None:
-        self._assert_result(pants_run, success_expected=False, msg=msg)
+    @staticmethod
+    def assert_success(pants_run: PantsResult, msg: Optional[str] = None) -> None:
+        pants_run.assert_success(msg)
 
     @staticmethod
-    def _assert_result(
-        pants_run: PantsResult, *, success_expected: bool, msg: Optional[str]
-    ) -> None:
-        is_expected_exit_code = (
-            pants_run.exit_code == PANTS_SUCCEEDED_EXIT_CODE
-            if success_expected
-            else pants_run.exit_code != PANTS_SUCCEEDED_EXIT_CODE
-        )
-        if is_expected_exit_code:
-            return
-
-        details = [msg] if msg else []
-        details.append(" ".join(pants_run.command))
-        details.append(f"exit_code: {pants_run.exit_code}")
-
-        def indent(content):
-            return "\n\t".join(content.splitlines())
-
-        details.append(f"stdout:\n\t{indent(pants_run.stdout)}")
-        details.append(f"stderr:\n\t{indent(pants_run.stderr)}")
-        error_msg = "\n".join(details)
-
-        assert is_expected_exit_code, error_msg
+    def assert_failure(pants_run: PantsResult, msg: Optional[str] = None) -> None:
+        pants_run.assert_failure(msg)
 
     @staticmethod
     @contextmanager
@@ -386,9 +381,9 @@ class PantsIntegrationTest(unittest.TestCase):
         safe_mkdir(root)
         return temporary_dir(root_dir=root, cleanup=cleanup, suffix=".pants.d")
 
+    @staticmethod
     @contextmanager
     def overwrite_file_content(
-        self,
         file_path: Union[str, Path],
         temporary_content: Optional[Union[bytes, str, Callable[[bytes], bytes]]] = None,
     ) -> Iterator[None]:

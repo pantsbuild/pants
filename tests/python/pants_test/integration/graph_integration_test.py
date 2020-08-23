@@ -86,7 +86,7 @@ class GraphIntegrationTest(PantsIntegrationTest):
                     ["filedeps", target_full],
                     config={GLOBAL_SCOPE_CONFIG_SECTION: {"files_not_found_behavior": "warn"}},
                 )
-                self.assert_success(pants_run)
+                pants_run.assert_success()
                 unmatched_globs = target_to_unmatched_globs[target]
                 formatted_globs = ", ".join(
                     f'"{os.path.join(self._SOURCES_TARGET_BASE, glob)}"' for glob in unmatched_globs
@@ -110,12 +110,12 @@ class GraphIntegrationTest(PantsIntegrationTest):
             ["filedeps", target_full],
             config={GLOBAL_SCOPE_CONFIG_SECTION: {"files_not_found_behavior": "warn"}},
         )
-        self.assert_success(pants_run)
+        pants_run.assert_success()
         assert "[WARN] Unmatched glob" not in pants_run.stderr
 
     def test_existing_directory_with_no_build_files_fails(self):
         pants_run = self.run_pants(["list", f"{self._NO_BUILD_FILE_TARGET_BASE}::"])
-        self.assert_failure(pants_run)
+        pants_run.assert_failure()
         self.assertIn("does not match any targets.", pants_run.stderr)
 
     @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/6787")
@@ -127,6 +127,6 @@ class GraphIntegrationTest(PantsIntegrationTest):
                     ["filedeps", target],
                     config={GLOBAL_SCOPE_CONFIG_SECTION: {"files_not_found_behavior": "error"}},
                 )
-                self.assert_failure(pants_run)
+                pants_run.assert_failure()
                 for excerpt in expected_excerpts:
                     self.assertIn(excerpt, pants_run.stderr)

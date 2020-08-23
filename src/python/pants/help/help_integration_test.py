@@ -10,7 +10,7 @@ class TestHelpIntegration(PantsIntegrationTest):
     def test_help(self):
         command = ["help"]
         pants_run = self.run_pants(command=command)
-        self.assert_success(pants_run)
+        pants_run.assert_success()
         assert "Usage:" in pants_run.stdout
         # spot check to see that a public global option is printed
         assert "--level" in pants_run.stdout
@@ -19,7 +19,7 @@ class TestHelpIntegration(PantsIntegrationTest):
     def test_help_advanced(self):
         command = ["help-advanced"]
         pants_run = self.run_pants(command=command)
-        self.assert_success(pants_run)
+        pants_run.assert_success()
         assert "Global advanced options" in pants_run.stdout
         # Spot check to see that a global advanced option is printed
         assert "--pants-bootstrapdir" in pants_run.stdout
@@ -27,7 +27,7 @@ class TestHelpIntegration(PantsIntegrationTest):
     def test_help_all(self):
         command = ["--backend-packages=pants.backend.python", "help-all"]
         pants_run = self.run_pants(command=command)
-        self.assert_success(pants_run)
+        pants_run.assert_success()
         all_help = json.loads(pants_run.stdout)
 
         # Spot check the data.

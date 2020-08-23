@@ -215,7 +215,7 @@ class ChangedIntegrationTest(PantsIntegrationTest, AbstractTestGenerator):
 
     def run_list(self, extra_args: Optional[List[str]] = None) -> str:
         pants_run = self.run_pants(["list", *(extra_args or ())])
-        self.assert_success(pants_run)
+        pants_run.assert_success()
         return pants_run.stdout
 
     def test_changed_exclude_root_targets_only(self):
@@ -242,7 +242,7 @@ class ChangedIntegrationTest(PantsIntegrationTest, AbstractTestGenerator):
                         workdir=workdir,
                     )
 
-            self.assert_success(pants_run)
+            pants_run.assert_success()
             for expected_item in expected_set:
                 self.assertIn(expected_item, pants_run.stdout)
 
@@ -273,7 +273,7 @@ class ChangedIntegrationTest(PantsIntegrationTest, AbstractTestGenerator):
                         workdir=workdir,
                     )
 
-            self.assert_success(pants_run)
+            pants_run.assert_success()
             for expected_item in expected_set:
                 self.assertIn(expected_item, pants_run.stdout)
 
@@ -292,14 +292,14 @@ class ChangedIntegrationTest(PantsIntegrationTest, AbstractTestGenerator):
         with create_isolated_git_repo() as worktree:
             safe_delete(os.path.join(worktree, "src/python/sources/sources.py"))
             pants_run = self.run_pants(["list", "--changed-since=HEAD"])
-            self.assert_success(pants_run)
+            pants_run.assert_success()
             self.assertEqual(pants_run.stdout.strip(), "src/python/sources")
 
     def test_changed_with_deleted_resource(self):
         with create_isolated_git_repo() as worktree:
             safe_delete(os.path.join(worktree, "src/python/sources/sources.txt"))
             pants_run = self.run_pants(["list", "--changed-since=HEAD"])
-            self.assert_success(pants_run)
+            pants_run.assert_success()
             self.assertEqual(pants_run.stdout.strip(), "src/python/sources:text")
 
     @pytest.mark.skip(reason="Unskip after rewriting these tests to stop using testprojects.")
@@ -311,7 +311,7 @@ class ChangedIntegrationTest(PantsIntegrationTest, AbstractTestGenerator):
             pants_run = self.run_pants(
                 ["list", "--changed-since=HEAD", "--changed-dependees=transitive"]
             )
-            self.assert_failure(pants_run)
+            pants_run.assert_failure()
             self.assertRegex(
                 pants_run.stderr, "src/resources/org/pantsbuild/resourceonly:.*did not exist"
             )
@@ -320,7 +320,7 @@ class ChangedIntegrationTest(PantsIntegrationTest, AbstractTestGenerator):
         with create_isolated_git_repo() as worktree:
             create_file_in(worktree, "new-project/README.txt", "This is important.")
             pants_run = self.run_pants(["list", "--changed-since=HEAD"])
-            self.assert_success(pants_run)
+            pants_run.assert_success()
             self.assertEqual(pants_run.stdout.strip(), "")
 
     @ensure_daemon
@@ -330,7 +330,7 @@ class ChangedIntegrationTest(PantsIntegrationTest, AbstractTestGenerator):
         with create_isolated_git_repo() as worktree:
             safe_delete(os.path.join(worktree, deleted_file))
             pants_run = self.run_pants(["--changed-since=HEAD", "list"])
-            self.assert_success(pants_run)
+            pants_run.assert_success()
             self.assertEqual(pants_run.stdout.strip(), "src/python/sources")
 
 

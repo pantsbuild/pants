@@ -187,9 +187,9 @@ class PantsDaemonIntegrationTestBase(PantsIntegrationTest):
         print(bold(cyan(f"\ncompleted in {elapsed} seconds")))
 
         if success:
-            self.assert_success(run)
+            run.assert_success()
         else:
-            self.assert_failure(run)
+            run.assert_failure()
 
         runs_created = self._run_count(workdir) - run_count
         self.assertEqual(

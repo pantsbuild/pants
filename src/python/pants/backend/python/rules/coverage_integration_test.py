@@ -109,7 +109,7 @@ class CoverageIntegrationTest(PantsIntegrationTest):
             *more_args,
         ]
         result = self.run_pants(command)
-        self.assert_success(result)
+        result.assert_success()
         # Regression test: make sure that individual tests do not complain about failing to
         # generate reports. This was showing up at test-time, even though the final merged
         # report would work properly.

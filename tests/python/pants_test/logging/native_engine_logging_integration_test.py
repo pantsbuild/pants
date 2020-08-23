@@ -9,9 +9,11 @@ class NativeEngineLoggingTest(PantsIntegrationTest):
     def test_native_logging(self) -> None:
         expected_msg = r"\[DEBUG\] Launching \d+ root"
         pants_run = self.run_pants(["-linfo", "list", "3rdparty::"])
+        pants_run.assert_success()
         self.assertNotRegex(pants_run.stderr, expected_msg)
 
         pants_run = self.run_pants(["-ldebug", "list", "3rdparty::"])
+        pants_run.assert_success()
         self.assertRegex(pants_run.stderr, expected_msg)
 
 

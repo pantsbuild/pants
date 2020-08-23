@@ -15,17 +15,17 @@ from pants.util.contextutil import temporary_dir
 @pytest.mark.skip("Skip until https://github.com/pantsbuild/pants/issues/10206")
 class TestOptionsIntegration(PantsIntegrationTest):
     def test_options_works_at_all(self) -> None:
-        self.assert_success(self.run_pants(["options"]))
+        self.run_pants(["options"]).assert_success()
 
     def test_options_scope(self) -> None:
         pants_run = self.run_pants(["options", "--no-colors", "--scope=options"])
-        self.assert_success(pants_run)
+        pants_run.assert_success()
         self.assertIn("options.scope = options", pants_run.stdout)
         self.assertIn("options.name = None", pants_run.stdout)
         self.assertNotIn("pytest.timeouts = ", pants_run.stdout)
 
         pants_run = self.run_pants(["options", "--no-colors", "--scope=pytest"])
-        self.assert_success(pants_run)
+        pants_run.assert_success()
         self.assertNotIn("options.colors = False", pants_run.stdout)
         self.assertNotIn("options.scope = options", pants_run.stdout)
         self.assertNotIn("options.name = None", pants_run.stdout)
@@ -33,7 +33,7 @@ class TestOptionsIntegration(PantsIntegrationTest):
 
     def test_valid_json(self) -> None:
         pants_run = self.run_pants(["options", "--output-format=json"])
-        self.assert_success(pants_run)
+        pants_run.assert_success()
         try:
             output_map = json.loads(pants_run.stdout)
             self.assertIn("time", output_map)
@@ -44,7 +44,7 @@ class TestOptionsIntegration(PantsIntegrationTest):
 
     def test_valid_json_with_history(self) -> None:
         pants_run = self.run_pants(["options", "--output-format=json", "--show-history"])
-        self.assert_success(pants_run)
+        pants_run.assert_success()
         try:
             output_map = json.loads(pants_run.stdout)
             self.assertIn("time", output_map)
@@ -60,14 +60,14 @@ class TestOptionsIntegration(PantsIntegrationTest):
         pants_run = self.run_pants(
             ["options", "--no-colors", "--name=colors", "--no-skip-inherited"]
         )
-        self.assert_success(pants_run)
+        pants_run.assert_success()
         self.assertIn("options.colors = ", pants_run.stdout)
         self.assertIn("pytest.colors = ", pants_run.stdout)
         self.assertNotIn("options.scope = ", pants_run.stdout)
 
     def test_options_only_overridden(self) -> None:
         pants_run = self.run_pants(["options", "--no-colors", "--only-overridden"])
-        self.assert_success(pants_run)
+        pants_run.assert_success()
         self.assertIn("options.only_overridden = True", pants_run.stdout)
         self.assertNotIn("options.scope =", pants_run.stdout)
         self.assertNotIn("from HARDCODED", pants_run.stdout)
@@ -75,7 +75,7 @@ class TestOptionsIntegration(PantsIntegrationTest):
 
     def test_options_rank(self) -> None:
         pants_run = self.run_pants(["options", "--no-colors", "--rank=FLAG"])
-        self.assert_success(pants_run)
+        pants_run.assert_success()
         self.assertIn("options.rank = ", pants_run.stdout)
         self.assertIn("(from FLAG)", pants_run.stdout)
         self.assertNotIn("(from CONFIG", pants_run.stdout)
@@ -86,7 +86,7 @@ class TestOptionsIntegration(PantsIntegrationTest):
         pants_run = self.run_pants(
             ["options", "--no-colors", "--only-overridden", "--show-history"]
         )
-        self.assert_success(pants_run)
+        pants_run.assert_success()
         self.assertIn("options.only_overridden = True", pants_run.stdout)
         self.assertIn("overrode False (from HARDCODED", pants_run.stdout)
 
@@ -106,7 +106,7 @@ class TestOptionsIntegration(PantsIntegrationTest):
                     )
                 )
             pants_run = self.run_pants([f"--pants-config-files={config_path}", "options"])
-            self.assert_success(pants_run)
+            pants_run.assert_success()
             self.assertIn("options.only_overridden = True", pants_run.stdout)
             self.assertIn(f"(from CONFIG in {config_path})", pants_run.stdout)
 
@@ -133,7 +133,7 @@ class TestOptionsIntegration(PantsIntegrationTest):
                     )
                 )
             pants_run = self.run_pants([f"--pants-config-files={config_path}", "options"])
-        self.assert_success(pants_run)
+        pants_run.assert_success()
         self.assertIn("mock-options.normal_option", pants_run.stdout)
         self.assertIn("mock-options.crufty_deprecated_but_still_functioning", pants_run.stdout)
 
@@ -158,7 +158,7 @@ class TestOptionsIntegration(PantsIntegrationTest):
                     )
                 )
             pants_run = self.run_pants([f"--pants-config-files={config_path}", "goals"])
-            self.assert_failure(pants_run)
+            pants_run.assert_failure()
             self.assertIn("ERROR] Invalid scope [invalid_scope]", pants_run.stderr)
             self.assertIn("ERROR] Invalid scope [another_invalid_scope]", pants_run.stderr)
 
@@ -179,7 +179,7 @@ class TestOptionsIntegration(PantsIntegrationTest):
                     )
                 )
             pants_run = self.run_pants([f"--pants-config-files={config_path}", "goals"])
-            self.assert_failure(pants_run)
+            pants_run.assert_failure()
             self.assertIn("ERROR] Invalid option 'invalid_option' under [pytest]", pants_run.stderr)
 
     def test_from_config_invalid_global_option(self) -> None:
@@ -204,7 +204,7 @@ class TestOptionsIntegration(PantsIntegrationTest):
                     )
                 )
             pants_run = self.run_pants([f"--pants-config-files={config_path}", "goals"])
-            self.assert_failure(pants_run)
+            pants_run.assert_failure()
             self.assertIn("ERROR] Invalid option 'invalid_global' under [GLOBAL]", pants_run.stderr)
             self.assertIn(
                 "ERROR] Invalid option 'another_invalid_global' under [GLOBAL]", pants_run.stderr,
@@ -232,7 +232,7 @@ class TestOptionsIntegration(PantsIntegrationTest):
             pants_run = self.run_pants(
                 [f"--pants-config-files={config_path}", "--pytest-invalid=ALL", "goals"]
             )
-            self.assert_failure(pants_run)
+            pants_run.assert_failure()
             self.assertIn(
                 "Unrecognized command line flag '--invalid' on scope 'pytest'", pants_run.stderr,
             )
@@ -240,13 +240,13 @@ class TestOptionsIntegration(PantsIntegrationTest):
             # Run with invalid config only.
             # Should error out with `bad_option` and `invalid_scope` in config.
             pants_run = self.run_pants([f"--pants-config-files={config_path}", "goals"])
-            self.assert_failure(pants_run)
+            pants_run.assert_failure()
             self.assertIn("ERROR] Invalid option 'bad_option' under [pytest]", pants_run.stderr)
             self.assertIn("ERROR] Invalid scope [invalid_scope]", pants_run.stderr)
 
     def test_command_line_option_unused_by_goals(self) -> None:
-        self.assert_success(self.run_pants(["filter", "--test-debug"]))
-        self.assert_failure(self.run_pants(["filter", "--debug"]))
+        self.run_pants(["filter", "--test-debug"]).assert_success()
+        self.run_pants(["filter", "--debug"]).assert_failure()
 
     def test_skip_inherited(self) -> None:
         pants_run = self.run_pants(
@@ -260,7 +260,7 @@ class TestOptionsIntegration(PantsIntegrationTest):
                 "--name=colors",
             ]
         )
-        self.assert_success(pants_run)
+        pants_run.assert_success()
         unstripped_lines = (s.split("(", 1)[0] for s in pants_run.stdout.split("\n") if "(" in s)
         lines = [s.strip() for s in unstripped_lines]
         # This should be included because it has no super-scopes.
@@ -285,7 +285,7 @@ class TestOptionsIntegration(PantsIntegrationTest):
             pants_run = self.run_pants(
                 [f"--pants-config-files={config_path}", "--no-colors", "options"]
             )
-            self.assert_success(pants_run)
+            pants_run.assert_success()
             self.assertIn(
                 f"pants_ignore = ['.*/', '/dist/', 'some/random/dir'] (from CONFIG in {config_path})",
                 pants_run.stdout,
@@ -301,7 +301,7 @@ class TestOptionsIntegration(PantsIntegrationTest):
                 [f"--pants-physical-workdir-base={physical_workdir_base}", "help"],
                 workdir=symlink_workdir,
             )
-            self.assert_success(pants_run)
+            pants_run.assert_success()
             # Make sure symlink workdir is pointing to physical workdir
             self.assertTrue(os.readlink(symlink_workdir) == physical_workdir)
 

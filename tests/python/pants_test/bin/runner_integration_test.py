@@ -22,7 +22,7 @@ class RunnerIntegrationTest(PantsIntegrationTest):
         ]
 
         warning_run = self.run_pants(cmdline)
-        self.assert_success(warning_run)
+        warning_run.assert_success()
         self.assertRegex(
             warning_run.stderr,
             "\\[WARN\\].*DeprecationWarning: DEPRECATED: This is a test warning!",
@@ -39,5 +39,5 @@ class RunnerIntegrationTest(PantsIntegrationTest):
                 },
             },
         )
-        self.assert_success(non_warning_run)
+        non_warning_run.assert_success()
         self.assertNotIn("test warning", non_warning_run.stderr)

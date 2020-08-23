@@ -24,7 +24,7 @@ class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
     @ensure_daemon
     def test_list(self):
         result = self.run_pants(["list", self.target])
-        self.assert_success(result)
+        result.assert_success()
         output_lines = result.stdout.splitlines()
         self.assertEqual(len(output_lines), 4)
         self.assertIn("examples/src/python/example/hello/main", output_lines)
@@ -37,14 +37,14 @@ class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
                 ctx.checker.assert_started()
                 return result
 
-            first_run = run_list().stdout_data.splitlines()
-            second_run = run_list().stdout_data.splitlines()
+            first_run = run_list().stdout.splitlines()
+            second_run = run_list().stdout.splitlines()
             self.assertTrue(sorted(first_run), sorted(second_run))
 
     @ensure_daemon
     def test_goal_validation(self):
         result = self.run_pants(["blah", "::"])
-        self.assert_failure(result)
+        result.assert_failure()
         self.assertIn("Unknown goals: blah", result.stdout)
 
     def test_list_loop(self):
@@ -78,7 +78,7 @@ class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
 
             # Verify that the three different target states were listed, and that the process exited.
             pants_result = handle.join()
-            self.assert_success(pants_result)
+            pants_result.assert_success()
             assert [
                 f"{rel_tmpdir}:{name}" for name in ("one", "two", "three")
             ] == pants_result.stdout.splitlines()
@@ -88,10 +88,8 @@ class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
         # and will fail when given the glob `::`.
         command_prefix = ["--pants-config-files=[]"]
         target = "testprojects/tests/python/pants/dummies::"
-        result = self.run_pants([*command_prefix, "--backend-packages=[]", "run", target])
-        self.assert_success(result)
+        self.run_pants([*command_prefix, "--backend-packages=[]", "run", target]).assert_success()
 
-        result = self.run_pants(
+        self.run_pants(
             [*command_prefix, "--backend-packages='pants.backend.python'", "run", target]
-        )
-        self.assert_failure(result)
+        ).assert_failure()

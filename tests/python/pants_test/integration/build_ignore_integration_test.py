@@ -5,15 +5,15 @@ from pants.testutil.pants_integration_test import PantsIntegrationTest
 
 
 class BuildIgnoreIntegrationTest(PantsIntegrationTest):
-    def test_build_ignore_list(self):
+    def test_build_ignore_list(self) -> None:
         with self.setup_tmpdir({"dir/BUILD": "files(sources=[])"}) as tmpdir:
             ignore_result = self.run_pants(
                 [f"--build-ignore={tmpdir}/dir", "list", f"{tmpdir}/dir"]
             )
             no_ignore_result = self.run_pants(["list", f"{tmpdir}/dir"])
-        self.assert_failure(ignore_result)
+        ignore_result.assert_failure()
         assert f"{tmpdir}/dir" in ignore_result.stderr
-        self.assert_success(no_ignore_result)
+        no_ignore_result.assert_success()
         assert f"{tmpdir}/dir" in no_ignore_result.stdout
 
     def test_build_ignore_dependency(self) -> None:
@@ -26,7 +26,7 @@ class BuildIgnoreIntegrationTest(PantsIntegrationTest):
                 [f"--build-ignore={tmpdir}/dir1", "dependencies", f"{tmpdir}/dir2"]
             )
             no_ignore_result = self.run_pants(["dependencies", f"{tmpdir}/dir2"])
-        self.assert_failure(ignore_result)
+        ignore_result.assert_failure()
         assert f"{tmpdir}/dir1" in ignore_result.stderr
-        self.assert_success(no_ignore_result)
+        no_ignore_result.assert_success()
         assert f"{tmpdir}/dir1" in no_ignore_result.stdout

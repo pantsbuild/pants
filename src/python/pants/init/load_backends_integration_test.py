@@ -21,10 +21,9 @@ class LoadBackendsIntegrationTest(PantsIntegrationTest):
         return sorted(backends - always_activated)
 
     def assert_backends_load(self, backends: List[str]) -> None:
-        result = self.run_pants(
+        self.run_pants(
             ["--no-verify-config", "--version"], config={"GLOBAL": {"backend_packages": backends}}
-        )
-        self.assert_success(result, msg=f"Failed to load: {backends}")
+        ).assert_success(f"Failed to load: {backends}")
 
     def test_no_backends_loaded(self) -> None:
         self.assert_backends_load([])
