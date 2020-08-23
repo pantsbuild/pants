@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from textwrap import dedent
 from typing import Iterator
 
-from pants.testutil.pants_integration_test import PantsIntegrationTest
+from pants.testutil.pants_integration_test import run_pants
 from pants.util.dirutil import safe_file_dump, safe_rmtree
 
 """
@@ -73,42 +73,35 @@ def harness() -> Iterator[None]:
         safe_rmtree(SUBPROJ_SPEC)
 
 
-class SubprojectIntegrationTest(PantsIntegrationTest):
-    def test_subproject(self) -> None:
-        with harness():
-            # If `--subproject-roots` are not specified, we expect a failure.
-            self.assert_failure(
-                self.run_pants(
-                    [
-                        "--backend-packages=pants.backend.python",
-                        "dependencies",
-                        "--transitive",
-                        SUBPROJ_SPEC,
-                    ]
-                )
-            )
+def test_subproject() -> None:
+    with harness():
+        # If `--subproject-roots` are not specified, we expect a failure.
+        run_pants(
+            [
+                "--backend-packages=pants.backend.python",
+                "dependencies",
+                "--transitive",
+                SUBPROJ_SPEC,
+            ]
+        ).assert_failure()
 
-            # The same command should succeed when `--subproject-roots` are specified.
-            self.assert_success(
-                self.run_pants(
-                    [
-                        "--backend-packages=pants.backend.python",
-                        f"--subproject-roots={SUBPROJ_ROOT}",
-                        "dependencies",
-                        "--transitive",
-                        SUBPROJ_SPEC,
-                    ]
-                )
-            )
+        # The same command should succeed when `--subproject-roots` are specified.
+        run_pants(
+            [
+                "--backend-packages=pants.backend.python",
+                f"--subproject-roots={SUBPROJ_ROOT}",
+                "dependencies",
+                "--transitive",
+                SUBPROJ_SPEC,
+            ]
+        ).assert_success()
 
-            # Both relative and absolute dependencies should work.
-            self.assert_success(
-                self.run_pants(
-                    [
-                        "--backend-packages=pants.backend.python",
-                        f"--subproject-roots={SUBPROJ_ROOT}",
-                        "dependencies",
-                        f"{SUBPROJ_ROOT}:local",
-                    ]
-                )
-            )
+        # Both relative and absolute dependencies should work.
+        run_pants(
+            [
+                "--backend-packages=pants.backend.python",
+                f"--subproject-roots={SUBPROJ_ROOT}",
+                "dependencies",
+                f"{SUBPROJ_ROOT}:local",
+            ]
+        ).assert_success()

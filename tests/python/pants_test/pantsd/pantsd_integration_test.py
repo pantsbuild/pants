@@ -12,7 +12,7 @@ from textwrap import dedent
 
 import pytest
 
-from pants.testutil.pants_integration_test import read_pantsd_log
+from pants.testutil.pants_integration_test import read_pantsd_log, temporary_workdir
 from pants.util.contextutil import environment_as, temporary_dir, temporary_file
 from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, safe_open, touch
 from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
@@ -63,19 +63,17 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     def test_pantsd_pantsd_runner_doesnt_die_after_failed_run(self):
         with self.pantsd_test_context() as (workdir, pantsd_config, checker):
             # Run target that throws an exception in pants.
-            self.assert_failure(
-                self.run_pants_with_workdir(
-                    ["lint", "testprojects/src/python/unicode/compilation_failure"],
-                    workdir=workdir,
-                    config=pantsd_config,
-                )
-            )
+            self.run_pants_with_workdir(
+                ["lint", "testprojects/src/python/unicode/compilation_failure"],
+                workdir=workdir,
+                config=pantsd_config,
+            ).assert_failure()
             checker.assert_started()
 
             # Assert pantsd is in a good functional state.
-            self.assert_success(
-                self.run_pants_with_workdir(["help"], workdir=workdir, config=pantsd_config)
-            )
+            self.run_pants_with_workdir(
+                ["help"], workdir=workdir, config=pantsd_config
+            ).assert_success()
             checker.assert_running()
 
     def test_pantsd_lifecycle_invalidation(self):
@@ -129,17 +127,13 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     def test_pantsd_lifecycle_shutdown_for_broken_scheduler(self):
         with self.pantsd_test_context() as (workdir, config, checker):
             # Run with valid options.
-            self.assert_success(
-                self.run_pants_with_workdir(["help"], workdir=workdir, config=config)
-            )
+            self.run_pants_with_workdir(["help"], workdir=workdir, config=config).assert_success()
             checker.assert_started()
 
             # And again with invalid scheduler-fingerprinted options that trigger a re-init.
-            self.assert_failure(
-                self.run_pants_with_workdir(
-                    ["--backend-packages=nonsensical", "help"], workdir=workdir, config=config
-                )
-            )
+            self.run_pants_with_workdir(
+                ["--backend-packages=nonsensical", "help"], workdir=workdir, config=config
+            ).assert_failure()
             checker.assert_stopped()
 
     def test_pantsd_aligned_output(self) -> None:
@@ -210,18 +204,16 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     def test_pantsd_launch_env_var_is_not_inherited_by_pantsd_runner_children(self):
         with self.pantsd_test_context() as (workdir, pantsd_config, checker):
             with environment_as(NO_LEAKS="33"):
-                self.assert_success(
-                    self.run_pants_with_workdir(["help"], workdir=workdir, config=pantsd_config)
-                )
+                self.run_pants_with_workdir(
+                    ["help"], workdir=workdir, config=pantsd_config
+                ).assert_success()
                 checker.assert_started()
 
-            self.assert_failure(
-                self.run_pants_with_workdir(
-                    ["run", "testprojects/src/python/print_env", "--", "NO_LEAKS"],
-                    workdir=workdir,
-                    config=pantsd_config,
-                )
-            )
+            self.run_pants_with_workdir(
+                ["run", "testprojects/src/python/print_env", "--", "NO_LEAKS"],
+                workdir=workdir,
+                config=pantsd_config,
+            ).assert_failure()
             checker.assert_running()
 
     def test_pantsd_touching_a_file_does_not_restart_daemon(self):
@@ -325,10 +317,10 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             # NB: This doesn't actually run against all testprojects, only those that are in the chroot,
             # i.e. explicitly declared in this test file's BUILD.
             cmd = ["list", "testprojects::"]
-            self.assert_success(ctx.runner(cmd))
+            ctx.runner(cmd).assert_success()
             initial_memory_usage = ctx.checker.current_memory_usage()
             for _ in range(number_of_runs):
-                self.assert_success(ctx.runner(cmd))
+                ctx.runner(cmd).assert_success()
                 ctx.checker.assert_running()
 
             final_memory_usage = ctx.checker.current_memory_usage()
@@ -439,8 +431,8 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                 config=config,
             )
 
-            self.assert_success(creator_handle.join())
-            self.assert_success(waiter_handle.join())
+            creator_handle.join().assert_success()
+            waiter_handle.join().assert_success()
 
     def _assert_pantsd_keyboardinterrupt_signal(self, signum, regexps=[], quit_timeout=None):
         """Send a signal to the thin pailgun client and observe the error messaging.
@@ -478,7 +470,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             # This should kill the pantsd processes through the RemotePantsRunner signal handler.
             os.kill(client_pid, signum)
             waiter_run = waiter_handle.join()
-            self.assert_failure(waiter_run)
+            waiter_run.assert_failure()
 
             for regexp in regexps:
                 self.assertRegex(waiter_run.stderr, regexp)
@@ -605,14 +597,14 @@ Interrupted by user over pailgun client!
 
             # Send exit() to the repl, and exit it.
             result = first_run_handle.join(stdin_data="exit()")
-            self.assert_success(result)
+            result.assert_success()
             checker.assert_running()
 
     def test_pantsd_unicode_environment(self):
         with self.pantsd_successful_run_context(extra_env={"XXX": "¡"},) as ctx:
             result = ctx.runner(["help"])
             ctx.checker.assert_started()
-            self.assert_success(result)
+            result.assert_success()
 
     # This is a regression test for a bug where we would incorrectly detect a cycle if two targets swapped their
     # dependency relationship (#7404).
@@ -643,7 +635,7 @@ Interrupted by user over pailgun client!
                 def list_and_verify():
                     result = ctx.runner(["list", f"{directory}:"])
                     ctx.checker.assert_started()
-                    self.assert_success(result)
+                    result.assert_success()
                     expected_targets = {f"{directory}:{target}" for target in ("A", "B")}
                     self.assertEqual(expected_targets, set(result.stdout_data.strip().split("\n")))
 
@@ -659,10 +651,9 @@ Interrupted by user over pailgun client!
         """Tests that the --concurrent flag overrides the --pantsd flag, because we don't allow
         concurrent runs under pantsd."""
         config = {"GLOBAL": {"concurrent": True, "pantsd": True}}
-        with self.temporary_workdir() as workdir:
+        with temporary_workdir() as workdir:
             pants_run = self.run_pants_with_workdir(["goals"], workdir=workdir, config=config)
-            self.assert_success(pants_run)
-            # TODO migrate to pathlib when we cut 1.18.x
+            pants_run.assert_success()
             pantsd_log_location = os.path.join(workdir, "pantsd", "pantsd.log")
             self.assertFalse(os.path.exists(pantsd_log_location))
 
@@ -677,7 +668,7 @@ Interrupted by user over pailgun client!
         with self.pantsd_run_context(success=False) as ctx:
             result = ctx.runner(["run", "testprojects/src/python/bad_requirements:use_badreq"])
             ctx.checker.assert_running()
-            self.assert_failure(result)
+            result.assert_failure()
             # Assert that the desired exception has been triggered once.
             self.assertRegex(result.stderr_data, r"ERROR:.*badreq==99.99.99")
             # Assert that it has only been triggered once.

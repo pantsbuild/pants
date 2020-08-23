@@ -3,35 +3,38 @@
 
 import re
 
-from pants.testutil.pants_integration_test import PantsIntegrationTest, ensure_daemon
+from pants.testutil.pants_integration_test import (
+    ensure_daemon,
+    run_pants_with_workdir,
+    temporary_workdir,
+)
+from pants.util.contextutil import overwrite_file_content
 from pants.util.dirutil import read_file
 
 
-class FmtIntegrationTest(PantsIntegrationTest):
-    @ensure_daemon
-    def test_fmt_then_edit(self):
-        f = "examples/src/python/example/hello/greet/greet.py"
-        with self.temporary_workdir() as workdir:
+@ensure_daemon
+def test_fmt_then_edit():
+    f = "examples/src/python/example/hello/greet/greet.py"
+    with temporary_workdir() as workdir:
 
-            def run() -> None:
-                result = self.run_pants_with_workdir(
-                    [
-                        "--backend-packages=['pants.backend.python', 'pants.backend.python.lint.black']",
-                        "fmt",
-                        f,
-                    ],
-                    workdir=workdir,
-                )
-                self.assert_success(result)
+        def run() -> None:
+            run_pants_with_workdir(
+                [
+                    "--backend-packages=['pants.backend.python', 'pants.backend.python.lint.black']",
+                    "fmt",
+                    f,
+                ],
+                workdir=workdir,
+            ).assert_success()
 
-            # Run once to start up, and then capture the file content.
+        # Run once to start up, and then capture the file content.
+        run()
+        good_content = read_file(f)
+
+        # Edit the file.
+        with overwrite_file_content(f, lambda c: re.sub(b"def greet", b"def  greet", c)):
+            assert good_content != read_file(f)
+
+            # Re-run and confirm that the file was fixed.
             run()
-            good_content = read_file(f)
-
-            # Edit the file.
-            with self.overwrite_file_content(f, lambda c: re.sub(b"def greet", b"def  greet", c)):
-                assert good_content != read_file(f)
-
-                # Re-run and confirm that the file was fixed.
-                run()
-                assert good_content == read_file(f)
+            assert good_content == read_file(f)
