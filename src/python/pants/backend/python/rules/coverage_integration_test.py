@@ -218,11 +218,13 @@ class CoverageIntegrationTest(PantsIntegrationTest):
             result = self._run_tests(tmpdir_relative, "--coverage-py-report=raw")
             self._assert_raw_coverage(result, build_root)
 
-    def test_coverage_html_and_xml(self) -> None:
+    def test_coverage_html_xml_json(self) -> None:
         build_root = get_buildroot()
         with temporary_dir(root_dir=build_root) as tmpdir:
             tmpdir_relative = self._prepare_sources(tmpdir, build_root)
-            result = self._run_tests(tmpdir_relative, "--coverage-py-report=['xml', 'html']")
+            result = self._run_tests(
+                tmpdir_relative, "--coverage-py-report=['xml', 'html', 'json']"
+            )
             coverage_path = Path(build_root, "dist", "coverage", "python")
             assert coverage_path.exists() is True
 
@@ -234,3 +236,7 @@ class CoverageIntegrationTest(PantsIntegrationTest):
             html_cov_dir = coverage_path / "htmlcov"
             assert html_cov_dir.exists() is True
             assert (html_cov_dir / "index.html").exists() is True
+
+            assert "Wrote json coverage report to `dist/coverage/python`" in result.stderr_data
+            json_coverage = coverage_path / "coverage.json"
+            assert json_coverage.exists() is True

@@ -39,6 +39,7 @@ class CoverageReportType(Enum):
     XML = ("xml", None)
     HTML = ("html", None)
     RAW = ("raw", None)
+    JSON = ("json", None)
 
     _report_name: str
 
