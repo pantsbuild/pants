@@ -69,7 +69,7 @@ class GraphIntegrationTest(PantsIntegrationTest):
             )
             """
         )
-        with self.with_overwritten_file_content(build_path, f"{original_content}\n{new_content}"):
+        with self.overwrite_file_content(build_path, f"{original_content}\n{new_content}"):
             yield
 
     @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/8520")
