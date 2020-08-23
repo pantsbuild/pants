@@ -54,7 +54,9 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
     def test_pantsd_broken_pipe(self):
         with self.pantsd_test_context() as (workdir, pantsd_config, checker):
-            run = self.run_pants_with_workdir("help | head -1", workdir, pantsd_config, shell=True)
+            run = self.run_pants_with_workdir(
+                "help | head -1", workdir=workdir, config=pantsd_config, shell=True
+            )
             self.assertNotIn("broken pipe", run.stderr.lower())
             checker.assert_started()
 
@@ -64,14 +66,16 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             self.assert_failure(
                 self.run_pants_with_workdir(
                     ["lint", "testprojects/src/python/unicode/compilation_failure"],
-                    workdir,
-                    pantsd_config,
+                    workdir=workdir,
+                    config=pantsd_config,
                 )
             )
             checker.assert_started()
 
             # Assert pantsd is in a good functional state.
-            self.assert_success(self.run_pants_with_workdir(["help"], workdir, pantsd_config))
+            self.assert_success(
+                self.run_pants_with_workdir(["help"], workdir=workdir, config=pantsd_config)
+            )
             checker.assert_running()
 
     def test_pantsd_lifecycle_invalidation(self):
@@ -125,13 +129,15 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     def test_pantsd_lifecycle_shutdown_for_broken_scheduler(self):
         with self.pantsd_test_context() as (workdir, config, checker):
             # Run with valid options.
-            self.assert_success(self.run_pants_with_workdir(["help"], workdir, config))
+            self.assert_success(
+                self.run_pants_with_workdir(["help"], workdir=workdir, config=config)
+            )
             checker.assert_started()
 
             # And again with invalid scheduler-fingerprinted options that trigger a re-init.
             self.assert_failure(
                 self.run_pants_with_workdir(
-                    ["--backend-packages=nonsensical", "help"], workdir, config
+                    ["--backend-packages=nonsensical", "help"], workdir=workdir, config=config
                 )
             )
             checker.assert_stopped()
@@ -203,14 +209,16 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     def test_pantsd_launch_env_var_is_not_inherited_by_pantsd_runner_children(self):
         with self.pantsd_test_context() as (workdir, pantsd_config, checker):
             with environment_as(NO_LEAKS="33"):
-                self.assert_success(self.run_pants_with_workdir(["help"], workdir, pantsd_config))
+                self.assert_success(
+                    self.run_pants_with_workdir(["help"], workdir=workdir, config=pantsd_config)
+                )
                 checker.assert_started()
 
             self.assert_failure(
                 self.run_pants_with_workdir(
                     ["run", "testprojects/src/python/print_env", "--", "NO_LEAKS"],
-                    workdir,
-                    pantsd_config,
+                    workdir=workdir,
+                    config=pantsd_config,
                 )
             )
             checker.assert_running()
@@ -417,8 +425,8 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             file_to_make = os.path.join(workdir, "some_magic_file")
             waiter_handle = self.run_pants_with_workdir_without_waiting(
                 ["run", "testprojects/src/python/coordinated_runs:waiter", "--", file_to_make],
-                workdir,
-                config,
+                workdir=workdir,
+                config=config,
             )
 
             checker.assert_started()
@@ -426,8 +434,8 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
             creator_handle = self.run_pants_with_workdir_without_waiting(
                 ["run", "testprojects/src/python/coordinated_runs:creator", "--", file_to_make],
-                workdir,
-                config,
+                workdir=workdir,
+                config=config,
             )
 
             self.assert_success(creator_handle.join())
@@ -458,7 +466,9 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                 "--",
                 file_to_make,
             ]
-            waiter_handle = self.run_pants_with_workdir_without_waiting(argv, workdir, config)
+            waiter_handle = self.run_pants_with_workdir_without_waiting(
+                argv, workdir=workdir, config=config
+            )
             client_pid = waiter_handle.process.pid
 
             checker.assert_started()
