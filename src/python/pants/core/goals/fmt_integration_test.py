@@ -29,9 +29,7 @@ class FmtIntegrationTest(PantsIntegrationTest):
             good_content = read_file(f)
 
             # Edit the file.
-            with self.with_overwritten_file_content(
-                f, lambda c: re.sub(b"def greet", b"def  greet", c)
-            ):
+            with self.overwrite_file_content(f, lambda c: re.sub(b"def greet", b"def  greet", c)):
                 assert good_content != read_file(f)
 
                 # Re-run and confirm that the file was fixed.

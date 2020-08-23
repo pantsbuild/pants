@@ -6,7 +6,7 @@ import os
 import subprocess
 import sys
 import unittest
-from contextlib import contextmanager, suppress
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Lock
@@ -20,7 +20,7 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.pantsd.pants_daemon_client import PantsDaemonClient
 from pants.testutil.process_handler import SubprocessProcessHandler
 from pants.util.contextutil import environment_as, temporary_dir
-from pants.util.dirutil import fast_relpath, safe_mkdir, safe_open
+from pants.util.dirutil import fast_relpath, safe_file_dump, safe_mkdir, safe_open
 from pants.util.osutil import Pid
 from pants.util.strutil import ensure_binary
 
@@ -356,6 +356,27 @@ class PantsIntegrationTest(unittest.TestCase):
         assert is_expected_exit_code, error_msg
 
     @staticmethod
+    @contextmanager
+    def setup_tmpdir(files: Mapping[str, str]) -> Iterator[str]:
+        """Create a temporary directory with the given files and return the tmpdir (relative to the
+        build root).
+
+        The `files` parameter is a dictionary of file paths to content. All file paths will be
+        prefixed with the tmpdir. The file content can use `{tmpdir}` to have it substituted with
+        the actual tmpdir via a format string.
+
+        This is useful to set up controlled test environments, such as setting up source files and
+        BUILD files.
+        """
+        with temporary_dir(root_dir=get_buildroot()) as tmpdir:
+            rel_tmpdir = os.path.relpath(tmpdir, get_buildroot())
+            for path, content in files.items():
+                safe_file_dump(
+                    os.path.join(tmpdir, path), content.format(tmpdir=rel_tmpdir), makedirs=True
+                )
+            yield rel_tmpdir
+
+    @staticmethod
     def temporary_workdir(cleanup: bool = True):
         # We can hard-code '.pants.d' here because we know that will always be its value
         # in the pantsbuild/pants repo (e.g., that's what we .gitignore in that repo).
@@ -366,84 +387,31 @@ class PantsIntegrationTest(unittest.TestCase):
         return temporary_dir(root_dir=root, cleanup=cleanup, suffix=".pants.d")
 
     @contextmanager
-    def temporary_directory_literal(self, path: Union[str, Path]) -> Iterator[None]:
-        """Temporarily create the given literal directory under the buildroot.
-
-        The path being created must not already exist. Any parent directories will also be created
-        temporarily.
-        """
-        path = os.path.realpath(path)
-        assert path.startswith(
-            os.path.realpath(get_buildroot())
-        ), "cannot write paths outside of the buildroot!"
-        assert not os.path.exists(path), "refusing to overwrite an existing path!"
-
-        parent = os.path.dirname(path)
-        parent_ctx = (
-            suppress() if os.path.isdir(parent) else self.temporary_directory_literal(parent)
-        )
-
-        with parent_ctx:
-            try:
-                os.mkdir(path)
-                yield
-            finally:
-                os.rmdir(path)
-
-    @contextmanager
-    def temporary_file_content(
-        self, path: Union[str, Path], content, binary_mode: bool = True
-    ) -> Iterator[None]:
-        """Temporarily write content to a file for the purpose of an integration test."""
-        path = os.path.realpath(path)
-        assert path.startswith(
-            os.path.realpath(get_buildroot())
-        ), "cannot write paths outside of the buildroot!"
-        assert not os.path.exists(path), "refusing to overwrite an existing path!"
-        mode = "wb" if binary_mode else "w"
-
-        parent = os.path.dirname(path)
-        parent_ctx = (
-            suppress() if os.path.isdir(parent) else self.temporary_directory_literal(parent)
-        )
-        with parent_ctx:
-            try:
-                with open(path, mode) as fh:
-                    fh.write(content)
-                yield
-            finally:
-                os.unlink(path)
-
-    @contextmanager
-    def with_overwritten_file_content(
+    def overwrite_file_content(
         self,
         file_path: Union[str, Path],
         temporary_content: Optional[Union[bytes, str, Callable[[bytes], bytes]]] = None,
     ) -> Iterator[None]:
         """A helper that resets a file after the method runs.
 
-         It will read a file, save the content, maybe write temporary_content to it, yield, then write the
-         original content to the file.
+         It will read a file, save the content, maybe write temporary_content to it, yield, then
+         write the original content to the file.
 
         :param file_path: Absolute path to the file to be reset after the method runs.
         :param temporary_content: Content to write to the file, or a function from current content
           to new temporary content.
         """
-        with open(file_path, "rb") as f:
-            file_original_content = f.read()
-
+        file_path = Path(file_path)
+        original_content = file_path.read_bytes()
         try:
             if temporary_content is not None:
                 if callable(temporary_content):
-                    content = temporary_content(file_original_content)
+                    content = temporary_content(original_content)
                 elif isinstance(temporary_content, bytes):
                     content = temporary_content
                 else:
                     content = temporary_content.encode()
-                with open(file_path, "wb") as f:
-                    f.write(content)
+                file_path.write_bytes(content)
             yield
-
         finally:
-            with open(file_path, "wb") as f:
-                f.write(file_original_content)
+            file_path.write_bytes(original_content)
