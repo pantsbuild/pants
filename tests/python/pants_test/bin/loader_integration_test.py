@@ -24,7 +24,7 @@ def test_alternate_entrypoint() -> None:
     pants_run = run_pants(
         command=["help"], extra_env={"PANTS_ENTRYPOINT": "pants.bin.pants_exe:test"}
     )
-    pants_run.assert_failure()
+    pants_run.assert_success()
     assert "T E S T" in pants_run.stdout
 
 

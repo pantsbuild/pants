@@ -9,11 +9,15 @@ from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegratio
 
 def test_native_logging() -> None:
     expected_msg = r"\[DEBUG\] Launching \d+ root"
-    pants_run = run_pants(["-linfo", "list", "3rdparty::"])
+    pants_run = run_pants(
+        ["-linfo", "--backend-packages=pants.backend.python", "list", "3rdparty::"]
+    )
     pants_run.assert_success()
     assert not bool(re.search(expected_msg, pants_run.stderr))
 
-    pants_run = run_pants(["-ldebug", "list", "3rdparty::"])
+    pants_run = run_pants(
+        ["-ldebug", "--backend-packages=pants.backend.python", "list", "3rdparty::"]
+    )
     pants_run.assert_success()
     assert bool(re.search(expected_msg, pants_run.stderr))
 
