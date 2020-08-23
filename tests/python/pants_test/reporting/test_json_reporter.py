@@ -4,7 +4,6 @@
 from pants.base.workunit import WorkUnit
 from pants.reporting.json_reporter import JsonReporter
 from pants.reporting.report import Report
-from pants.testutil.test_base import TestBase
 
 
 class FakeRunTracker:
@@ -57,159 +56,158 @@ def generate_callbacks(workunit_data, reporter, parent=None):
     reporter.end_workunit(workunit)
 
 
-class JsonReporterTest(TestBase):
-    def _check_callbacks(self, root_workunit_dict, reporter):
-        generate_callbacks(root_workunit_dict, reporter)
-        self.assertDictEqual(root_workunit_dict, reporter.results[root_workunit_dict["id"]])
+def _check_callbacks(root_workunit_dict, reporter):
+    generate_callbacks(root_workunit_dict, reporter)
+    assert root_workunit_dict == reporter.results[root_workunit_dict["id"]]
 
-    def test_nested_grandchild(self):
-        expected = {
-            "name": "root",
-            "id": "root_id",
-            "parent_name": "",
-            "parent_id": "",
-            "labels": ["IAMROOT"],
-            "cmd": "",
-            "start_time": -5419800.0,
-            "outputs": {},
-            "children": [
-                {
-                    "name": "child1",
-                    "id": "child1_id",
-                    "parent_name": "root",
-                    "parent_id": "root_id",
-                    "labels": [],
-                    "cmd": "",
-                    "start_time": 31564800.0,
-                    "outputs": {},
-                    "children": [
-                        {
-                            "name": "grandchild",
-                            "id": "grandchild_id",
-                            "parent_name": "child1",
-                            "parent_id": "child1_id",
-                            "labels": ["LABEL1"],
-                            "cmd": "",
-                            "start_time": 479721600.0,
-                            "outputs": {},
-                            "children": [],
-                            "log_entries": [],
-                            "outcome": "SUCCESS",
-                            "end_time": 479721610.0,
-                            "unaccounted_time": 0,
-                        }
-                    ],
-                    "log_entries": [],
-                    "outcome": "SUCCESS",
-                    "end_time": 31564810.0,
-                    "unaccounted_time": 0,
-                },
-                {
-                    "name": "child2",
-                    "id": "child2_id",
-                    "parent_name": "root",
-                    "parent_id": "root_id",
-                    "labels": [],
-                    "cmd": "",
-                    "start_time": 684140400.0,
-                    "outputs": {},
-                    "children": [],
-                    "log_entries": [],
-                    "outcome": "SUCCESS",
-                    "end_time": 684140410.0,
-                    "unaccounted_time": 0,
-                },
-            ],
-            "log_entries": [],
-            "outcome": "SUCCESS",
-            "end_time": -5419790.0,
-            "unaccounted_time": 0,
-        }
 
-        reporter = JsonReporter(FakeRunTracker(), JsonReporter.Settings(log_level=Report.INFO))
+def test_nested_grandchild():
+    expected = {
+        "name": "root",
+        "id": "root_id",
+        "parent_name": "",
+        "parent_id": "",
+        "labels": ["IAMROOT"],
+        "cmd": "",
+        "start_time": -5419800.0,
+        "outputs": {},
+        "children": [
+            {
+                "name": "child1",
+                "id": "child1_id",
+                "parent_name": "root",
+                "parent_id": "root_id",
+                "labels": [],
+                "cmd": "",
+                "start_time": 31564800.0,
+                "outputs": {},
+                "children": [
+                    {
+                        "name": "grandchild",
+                        "id": "grandchild_id",
+                        "parent_name": "child1",
+                        "parent_id": "child1_id",
+                        "labels": ["LABEL1"],
+                        "cmd": "",
+                        "start_time": 479721600.0,
+                        "outputs": {},
+                        "children": [],
+                        "log_entries": [],
+                        "outcome": "SUCCESS",
+                        "end_time": 479721610.0,
+                        "unaccounted_time": 0,
+                    }
+                ],
+                "log_entries": [],
+                "outcome": "SUCCESS",
+                "end_time": 31564810.0,
+                "unaccounted_time": 0,
+            },
+            {
+                "name": "child2",
+                "id": "child2_id",
+                "parent_name": "root",
+                "parent_id": "root_id",
+                "labels": [],
+                "cmd": "",
+                "start_time": 684140400.0,
+                "outputs": {},
+                "children": [],
+                "log_entries": [],
+                "outcome": "SUCCESS",
+                "end_time": 684140410.0,
+                "unaccounted_time": 0,
+            },
+        ],
+        "log_entries": [],
+        "outcome": "SUCCESS",
+        "end_time": -5419790.0,
+        "unaccounted_time": 0,
+    }
 
-        self._check_callbacks(expected, reporter)
+    reporter = JsonReporter(FakeRunTracker(), JsonReporter.Settings(log_level=Report.INFO))
+    _check_callbacks(expected, reporter)
 
-    def test_nested_great_grandchildren(self):
-        expected = {
-            "name": "root",
-            "id": "root_id",
-            "parent_name": "",
-            "parent_id": "",
-            "labels": [],
-            "cmd": "",
-            "start_time": -5419800.0,
-            "outputs": {},
-            "children": [
-                {
-                    "name": "child",
-                    "id": "child_id",
-                    "parent_name": "root",
-                    "parent_id": "root_id",
-                    "labels": [],
-                    "cmd": "",
-                    "start_time": 31564800.0,
-                    "outputs": {},
-                    "children": [
-                        {
-                            "name": "grandchild",
-                            "id": "grandchild_id",
-                            "parent_name": "child",
-                            "parent_id": "child_id",
-                            "labels": ["LABEL1"],
-                            "cmd": "",
-                            "start_time": 479721600.0,
-                            "outputs": {},
-                            "children": [
-                                {
-                                    "name": "great_grandchild1",
-                                    "id": "great_grandchild1_id",
-                                    "parent_name": "grandchild",
-                                    "parent_id": "grandchild_id",
-                                    "labels": [],
-                                    "cmd": "",
-                                    "start_time": 684140400.0,
-                                    "outputs": {},
-                                    "children": [],
-                                    "log_entries": [],
-                                    "outcome": "SUCCESS",
-                                    "end_time": 684140410.0,
-                                    "unaccounted_time": 0,
-                                },
-                                {
-                                    "name": "great_grandchild2",
-                                    "id": "great_grandchild2_id",
-                                    "parent_name": "grandchild",
-                                    "parent_id": "grandchild_id",
-                                    "labels": ["TURTLES"],
-                                    "cmd": "",
-                                    "start_time": 1234.0,
-                                    "outputs": {},
-                                    "children": [],
-                                    "log_entries": [],
-                                    "outcome": "SUCCESS",
-                                    "end_time": 1244.0,
-                                    "unaccounted_time": 0,
-                                },
-                            ],
-                            "log_entries": [],
-                            "outcome": "SUCCESS",
-                            "end_time": 479721610.0,
-                            "unaccounted_time": 0,
-                        }
-                    ],
-                    "log_entries": [],
-                    "outcome": "SUCCESS",
-                    "end_time": 31564810.0,
-                    "unaccounted_time": 0,
-                },
-            ],
-            "log_entries": [],
-            "outcome": "SUCCESS",
-            "end_time": -5419790.0,
-            "unaccounted_time": 0,
-        }
 
-        reporter = JsonReporter(FakeRunTracker(), JsonReporter.Settings(log_level=Report.INFO))
+def test_nested_great_grandchildren():
+    expected = {
+        "name": "root",
+        "id": "root_id",
+        "parent_name": "",
+        "parent_id": "",
+        "labels": [],
+        "cmd": "",
+        "start_time": -5419800.0,
+        "outputs": {},
+        "children": [
+            {
+                "name": "child",
+                "id": "child_id",
+                "parent_name": "root",
+                "parent_id": "root_id",
+                "labels": [],
+                "cmd": "",
+                "start_time": 31564800.0,
+                "outputs": {},
+                "children": [
+                    {
+                        "name": "grandchild",
+                        "id": "grandchild_id",
+                        "parent_name": "child",
+                        "parent_id": "child_id",
+                        "labels": ["LABEL1"],
+                        "cmd": "",
+                        "start_time": 479721600.0,
+                        "outputs": {},
+                        "children": [
+                            {
+                                "name": "great_grandchild1",
+                                "id": "great_grandchild1_id",
+                                "parent_name": "grandchild",
+                                "parent_id": "grandchild_id",
+                                "labels": [],
+                                "cmd": "",
+                                "start_time": 684140400.0,
+                                "outputs": {},
+                                "children": [],
+                                "log_entries": [],
+                                "outcome": "SUCCESS",
+                                "end_time": 684140410.0,
+                                "unaccounted_time": 0,
+                            },
+                            {
+                                "name": "great_grandchild2",
+                                "id": "great_grandchild2_id",
+                                "parent_name": "grandchild",
+                                "parent_id": "grandchild_id",
+                                "labels": ["TURTLES"],
+                                "cmd": "",
+                                "start_time": 1234.0,
+                                "outputs": {},
+                                "children": [],
+                                "log_entries": [],
+                                "outcome": "SUCCESS",
+                                "end_time": 1244.0,
+                                "unaccounted_time": 0,
+                            },
+                        ],
+                        "log_entries": [],
+                        "outcome": "SUCCESS",
+                        "end_time": 479721610.0,
+                        "unaccounted_time": 0,
+                    }
+                ],
+                "log_entries": [],
+                "outcome": "SUCCESS",
+                "end_time": 31564810.0,
+                "unaccounted_time": 0,
+            },
+        ],
+        "log_entries": [],
+        "outcome": "SUCCESS",
+        "end_time": -5419790.0,
+        "unaccounted_time": 0,
+    }
 
-        self._check_callbacks(expected, reporter)
+    reporter = JsonReporter(FakeRunTracker(), JsonReporter.Settings(log_level=Report.INFO))
+    _check_callbacks(expected, reporter)

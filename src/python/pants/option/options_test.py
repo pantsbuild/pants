@@ -4,7 +4,9 @@
 import json
 import os
 import shlex
+import unittest
 import unittest.mock
+import warnings
 from collections import defaultdict
 from enum import Enum
 from functools import partial
@@ -45,8 +47,6 @@ from pants.option.parser import Parser
 from pants.option.parser_hierarchy import enclosing_scope
 from pants.option.ranked_value import Rank, RankedValue
 from pants.option.scope import GLOBAL_SCOPE, ScopeInfo
-from pants.testutil.test_base import TestBase
-from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_file, temporary_file_path
 from pants.util.dirutil import safe_mkdtemp
 from pants.util.strutil import safe_shlex_join
@@ -180,7 +180,7 @@ def create_options(options, passthru_args=None, fingerprintable_options=None):
     return FakeOptions()
 
 
-class OptionsTest(TestBase):
+class OptionsTest(unittest.TestCase):
     @staticmethod
     def _create_config(config: Optional[Dict[str, Dict[str, str]]] = None) -> Config:
         with open(os.path.join(safe_mkdtemp(), "test_config.toml"), "w") as fp:
@@ -1016,17 +1016,17 @@ class OptionsTest(TestBase):
         )
 
     def test_at_most_one_goal_with_passthru_args(self):
-        with self.assertRaisesWithMessageContaining(
-            Options.AmbiguousPassthroughError,
-            """Specifying multiple goals (in this case: ['test', 'fmt']) """
-            """along with passthrough args (args after `--`) is ambiguous.""",
-        ):
-            _ = Options.create(
+        with pytest.raises(Options.AmbiguousPassthroughError) as exc:
+            Options.create(
                 env={},
                 config={},
                 known_scope_infos=[global_scope(), task("test"), task("fmt")],
                 args=["./pants", "test", "fmt", "target", "--", "bar", "--baz"],
             )
+        assert (
+            "Specifying multiple goals (in this case: ['test', 'fmt']) along with passthrough args "
+            "(args after `--`) is ambiguous."
+        ) in str(exc.value)
 
     def test_global_scope_env_vars(self):
         def check_pants_foo(expected_val, env):
@@ -1100,20 +1100,13 @@ class OptionsTest(TestBase):
 
     def test_enum_option_type_parse_error(self) -> None:
         self.maxDiff = None
-        with self.assertRaisesWithMessageContaining(
-            ParseError,
-            "Error applying type 'SomeEnumOption' to option value 'invalid-value', for option "
-            "'--some_enum' in scope 'enum-opt'",
-        ):
+        with pytest.raises(ParseError) as exc:
             options = self._parse(flags="enum-opt --some-enum=invalid-value")
             options.for_scope("enum-opt").some_enum
-
-    def assertOptionWarning(self, w, option_string):
-        single_warning = assert_single_element(w)
-        self.assertEqual(single_warning.category, DeprecationWarning)
-        warning_message = str(single_warning.message)
-        self.assertIn("will be removed in version", warning_message)
-        self.assertIn(option_string, warning_message)
+        assert (
+            "Error applying type 'SomeEnumOption' to option value 'invalid-value', for option "
+            "'--some_enum' in scope 'enum-opt'"
+        ) in str(exc.value)
 
     def test_deprecated_options(self) -> None:
         def assert_deprecation_triggered(
@@ -1125,13 +1118,17 @@ class OptionsTest(TestBase):
             env: Optional[Dict[str, str]] = None,
             config: Optional[Dict[str, Dict[str, str]]] = None,
         ) -> None:
-            with self.warnings_catcher() as w:
+            warnings.simplefilter("always")
+            with pytest.warns(DeprecationWarning) as record:
                 options = self._parse(flags=flags, env=env, config=config)
                 scoped_options = (
                     options.for_global_scope() if not scope else options.for_scope(scope)
                 )
+
             assert getattr(scoped_options, option) == expected
-            self.assertOptionWarning(w, option)
+            assert len(record) == 1
+            assert "will be removed in version" in str(record[0].message)
+            assert option in str(record[0].message)
 
         assert_deprecation_triggered(
             flags="--global-crufty=crufty1", option="global_crufty", expected="crufty1",
@@ -1180,29 +1177,32 @@ class OptionsTest(TestBase):
         )
 
         # Make sure the warnings don't come out for regular options.
-        with self.warnings_catcher() as w:
+        with pytest.warns(None) as record:
             self._parse(flags="stale --pants-foo stale --still-good")
-            self.assertEqual(0, len(w))
+        assert len(record) == 0
 
     @unittest.mock.patch("pants.base.deprecated.PANTS_SEMVER", Version(_FAKE_CUR_VERSION))
     def test_delayed_deprecated_option(self) -> None:
-        with self.warnings_catcher() as w:
+        warnings.simplefilter("always")
+        with pytest.warns(None) as record:
             delayed_deprecation_option_value = (
                 self._parse(flags="--global-delayed-deprecated-option=xxx")
                 .for_global_scope()
                 .global_delayed_deprecated_option
             )
-            self.assertEqual(delayed_deprecation_option_value, "xxx")
-            self.assertEqual(0, len(w))
+            assert delayed_deprecation_option_value == "xxx"
+            assert len(record) == 0
 
-        with self.warnings_catcher() as w:
+        with pytest.warns(DeprecationWarning) as record:
             delayed_passed_option_value = (
                 self._parse(flags="--global-delayed-but-already-passed-deprecated-option=xxx")
                 .for_global_scope()
                 .global_delayed_but_already_passed_deprecated_option
             )
-            self.assertEqual(delayed_passed_option_value, "xxx")
-            self.assertOptionWarning(w, "global_delayed_but_already_passed_deprecated_option")
+            assert delayed_passed_option_value == "xxx"
+            assert len(record) == 1
+            assert "will be removed in version" in str(record[0].message)
+            assert "global_delayed_but_already_passed_deprecated_option" in str(record[0].message)
 
     def test_mutually_exclusive_options(self) -> None:
         """Ensure error is raised when mutual exclusive options are given together."""
@@ -1556,8 +1556,6 @@ class OptionsTest(TestBase):
         self.assertEqual(4, options.for_scope("compile.java").c)
 
     def test_invalid_option_errors(self) -> None:
-        self.maxDiff = None
-
         def parse_joined_command_line(*args):
             bootstrap_options = create_options(
                 {
@@ -1575,37 +1573,21 @@ class OptionsTest(TestBase):
                 bootstrap_option_values=bootstrap_options.for_global_scope(),
             )
 
-        with self.assertRaisesWithMessage(
-            ParseError,
-            (
-                "Unrecognized command line flag '--aasdf' on global scope.\n\n(Run `./pants "
-                "help-advanced` for all available options.)"
-            ),
-        ):
+        with pytest.raises(ParseError) as exc:
             parse_joined_command_line("--aasdf").for_global_scope()
+        assert (
+            "Unrecognized command line flag '--aasdf' on global scope.\n\n(Run `./pants "
+            "help-advanced` for all available options.)"
+        ) in str(exc.value)
 
-        with self.assertRaisesWithMessage(
-            ParseError,
-            (
-                "Unrecognized command line flags on global scope: --aasdf, --aasdy.\n\n(Run "
-                "`./pants help-advanced` for all available options.)"
-            ),
-        ):
+        with pytest.raises(ParseError) as exc:
             parse_joined_command_line("--aasdf", "--aasdy").for_global_scope()
+        assert (
+            "Unrecognized command line flags on global scope: --aasdf, --aasdy.\n\n(Run "
+            "`./pants help-advanced` for all available options.)"
+        ) in str(exc.value)
 
-        with self.assertRaisesWithMessage(
-            ParseError,
-            dedent(
-                """\
-                Unrecognized command line flags on global scope: -v, --config-overridden, --c.
-                Suggestions:
-                -v: [--v2, --verbose, --a, --b, --y, -n, -z, --compile-c]
-                --config-overridden: [--config-override]
-                --c: [--compile-c, --compile-scala-modifycompile, --compile-scala-modifylogs, --compile-scala-modifypassthrough, --config-override, --a, --b, --y, -n, -z, --v2]
-
-                (Run `./pants help-advanced` for all available options.)"""
-            ),
-        ):
+        with pytest.raises(ParseError) as exc:
             parse_joined_command_line(
                 # A nonexistent short-form option -- other short-form options should be displayed.
                 "-vd",
@@ -1616,51 +1598,68 @@ class OptionsTest(TestBase):
                 # same or similar unscoped option names.
                 "--c=[]",
             ).for_global_scope()
+        assert (
+            dedent(
+                """\
+                Unrecognized command line flags on global scope: -v, --config-overridden, --c.
+                Suggestions:
+                -v: [--v2, --verbose, --a, --b, --y, -n, -z, --compile-c]
+                --config-overridden: [--config-override]
+                --c: [--compile-c, --compile-scala-modifycompile, --compile-scala-modifylogs, --compile-scala-modifypassthrough, --config-override, --a, --b, --y, -n, -z, --v2]
+
+                (Run `./pants help-advanced` for all available options.)"""
+            )
+            in str(exc.value)
+        )
 
         # Test when only some flags have suggestsions.
-        with self.assertRaisesWithMessage(
-            ParseError,
-            (
-                "Unrecognized command line flags on global scope: --aasdf, --config-overridden.\n"
-                "Suggestions:\n"
-                "--config-overridden: [--config-override]\n\n"
-                "(Run `./pants help-advanced` for all available options.)"
-            ),
-        ):
+        with pytest.raises(ParseError) as exc:
             parse_joined_command_line("--aasdf", "--config-overridden").for_global_scope()
+        assert (
+            "Unrecognized command line flags on global scope: --aasdf, --config-overridden.\n"
+            "Suggestions:\n"
+            "--config-overridden: [--config-override]\n\n"
+            "(Run `./pants help-advanced` for all available options.)"
+        ) in str(exc.value)
 
-        with self.assertRaisesWithMessage(
-            ParseError,
+        with pytest.raises(ParseError) as exc:
+            parse_joined_command_line(
+                # Verify that misspelling searches work for options in non-global scopes.
+                "--simple-sam=val",
+            ).for_scope("simple")
+        assert (
             dedent(
                 """\
                 Unrecognized command line flag '--sam' on scope 'simple'. Suggestions:
                 --simple-spam, --simple-dashed-spam, --a, --num, --scoped-a-bit-spam, --scoped-and-dashed-spam
 
                 (Run `./pants help-advanced simple` for all available options.)"""
-            ),
-        ):
-            parse_joined_command_line(
-                # Verify that misspelling searches work for options in non-global scopes.
-                "--simple-sam=val",
-            ).for_scope("simple")
+            )
+            in str(exc.value)
+        )
 
-        with self.assertRaisesWithMessage(
-            ParseError,
+        with pytest.raises(ParseError) as exc:
+            parse_joined_command_line(
+                # Verify that options with too shallow scoping match the correct option.
+                "--compile-modifylogs=val",
+            ).for_scope("compile")
+        assert (
             dedent(
                 """\
                 Unrecognized command line flag '--modifylogs' on scope 'compile'. Suggestions:
                 --compile-scala-modifylogs
 
                 (Run `./pants help-advanced compile` for all available options.)"""
-            ),
-        ):
-            parse_joined_command_line(
-                # Verify that options with too shallow scoping match the correct option.
-                "--compile-modifylogs=val",
-            ).for_scope("compile")
+            )
+            in str(exc.value)
+        )
 
-        with self.assertRaisesWithMessage(
-            ParseError,
+        with pytest.raises(ParseError) as exc:
+            parse_joined_command_line(
+                # Verify that options with too deep scoping match the correct option.
+                "--cache-compile-scala-modifylogs=val",
+            ).for_scope("cache.compile.scala")
+        assert (
             dedent(
                 """\
                 Unrecognized command line flag '--modifylogs' on scope 'cache.compile.scala'.
@@ -1668,12 +1667,9 @@ class OptionsTest(TestBase):
                 --compile-scala-modifylogs
 
                 (Run `./pants help-advanced cache.compile.scala` for all available options.)"""
-            ),
-        ):
-            parse_joined_command_line(
-                # Verify that options with too deep scoping match the correct option.
-                "--cache-compile-scala-modifylogs=val",
-            ).for_scope("cache.compile.scala")
+            )
+            in str(exc.value)
+        )
 
     def test_pants_global_with_default(self) -> None:
         """This test makes sure values under [DEFAULT] still gets read."""
@@ -1706,6 +1702,8 @@ class OptionsTest(TestBase):
     def test_scope_deprecation(self) -> None:
         # Note: This test demonstrates that two different new scopes can deprecate the same
         # old scope. I.e., it's possible to split an old scope's options among multiple new scopes.
+        warnings.simplefilter("always")
+
         class DummyOptionable1(Optionable):
             options_scope = "new-scope1"
             deprecated_options_scope = "deprecated-scope"
@@ -1744,13 +1742,12 @@ class OptionsTest(TestBase):
         options.register(DummyOptionable1.options_scope, "--baz")
         options.register(DummyOptionable2.options_scope, "--qux")
 
-        with self.warnings_catcher() as w:
+        with pytest.warns(DeprecationWarning) as record:
             vals1 = options.for_scope(DummyOptionable1.options_scope)
 
         # Check that we got a warning, but not for the inherited option.
-        single_warning_dummy1 = assert_single_element(w)
-        self.assertEqual(single_warning_dummy1.category, DeprecationWarning)
-        self.assertNotIn("inherited", str(single_warning_dummy1.message))
+        assert len(record) == 1
+        assert "inherited" not in str(record[0].message)
 
         # Check values.
         # Deprecated scope takes precedence at equal rank.
@@ -1759,13 +1756,12 @@ class OptionsTest(TestBase):
         # New scope takes precedence at higher rank.
         self.assertEqual("vv", vals1.baz)
 
-        with self.warnings_catcher() as w:
+        with pytest.warns(DeprecationWarning) as record:
             vals2 = options.for_scope(DummyOptionable2.options_scope)
 
         # Check that we got a warning.
-        single_warning_dummy2 = assert_single_element(w)
-        self.assertEqual(single_warning_dummy2.category, DeprecationWarning)
-        self.assertNotIn("inherited", str(single_warning_dummy2.message))
+        assert len(record) == 1
+        assert "inherited" not in str(record[0].message)
 
         # Check values.
         self.assertEqual("uu", vals2.qux)
@@ -1773,6 +1769,8 @@ class OptionsTest(TestBase):
     def test_scope_deprecation_parent(self) -> None:
         # Note: This test demonstrates that a scope can mark itself as deprecating a subscope of
         # another scope.
+        warnings.simplefilter("always")
+
         class DummyOptionable1(Optionable):
             options_scope = "test"
 
@@ -1808,16 +1806,17 @@ class OptionsTest(TestBase):
         DummyOptionable2.register_options_on_scope(options)
         DummyOptionable1.register_options_on_scope(options)
 
-        with self.warnings_catcher() as w:
+        with pytest.warns(DeprecationWarning) as record:
             vals = options.for_scope(DummyOptionable2.options_scope)
 
         # Check that we got a warning, but also the correct value.
-        single_warning_dummy1 = assert_single_element(w)
-        self.assertEqual(single_warning_dummy1.category, DeprecationWarning)
-        self.assertEqual("vv", vals.foo)
+        assert len(record) == 1
+        assert vals.foo == "vv"
 
     def test_scope_deprecation_defaults(self) -> None:
         # Confirms that a DEFAULT option does not trigger deprecation warnings for a deprecated scope.
+        warnings.simplefilter("always")
+
         class DummyOptionable1(Optionable):
             options_scope = "new-scope1"
             deprecated_options_scope = "deprecated-scope"
@@ -1834,15 +1833,17 @@ class OptionsTest(TestBase):
 
         options.register(DummyOptionable1.options_scope, "--foo")
 
-        with self.warnings_catcher() as w:
+        with pytest.warns(None) as record:
             vals1 = options.for_scope(DummyOptionable1.options_scope)
 
         # Check that we got no warnings and that the actual scope took precedence.
-        self.assertEqual(0, len(w))
-        self.assertEqual("xx", vals1.foo)
+        assert len(record) == 0
+        assert vals1.foo == "xx"
 
     def test_scope_dependency_deprecation(self) -> None:
         # Test that a dependency scope can be deprecated.
+        warnings.simplefilter("always")
+
         class DummyOptionable1(Optionable):
             options_scope = "scope"
 
@@ -1866,13 +1867,12 @@ class OptionsTest(TestBase):
 
         options.register(DummyOptionable1.options_scope, "--foo")
 
-        with self.warnings_catcher() as w:
+        with pytest.warns(DeprecationWarning) as record:
             vals1 = options.for_scope(DummyOptionable1.subscope("sub"))
 
         # Check that we got a warning, but also the correct value.
-        single_warning_dummy1 = assert_single_element(w)
-        self.assertEqual(single_warning_dummy1.category, DeprecationWarning)
-        self.assertEqual("vv", vals1.foo)
+        assert len(record) == 1
+        assert vals1.foo == "vv"
 
     def test_list_of_enum_single_value(self) -> None:
         options = self._parse(flags="other-enum-scope --some-list-enum=another-value")

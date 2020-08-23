@@ -258,8 +258,9 @@ class TestInputFileCreation(TestBase):
             argv=("./echo.sh",), input_digest=digest, description="cat the contents of this file",
         )
 
-        with self.assertRaisesWithMessageContaining(ExecutionError, "Permission"):
+        with pytest.raises(ExecutionError) as exc:
             self.request_product(ProcessResult, req)
+        assert "Permission" in str(exc.value)
 
     def test_executable(self):
         file_name = "echo.sh"

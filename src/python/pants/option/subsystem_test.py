@@ -1,12 +1,11 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import logging
+import pytest
 
 from pants.option.optionable import Optionable
 from pants.option.scope import ScopeInfo
 from pants.option.subsystem import Subsystem
-from pants.testutil.test_base import TestBase
 
 
 class WorkunitSubscriptableSubsystem(Subsystem):
@@ -46,292 +45,295 @@ def si(scope, subsystem_cls):
     return ScopeInfo(scope, subsystem_cls)
 
 
-class SubsystemTest(TestBase):
-    def setUp(self):
-        DummySubsystem._options = DummyOptions()
-        WorkunitSubscriptableSubsystem._options = DummyOptions()
+@pytest.fixture(autouse=True)
+def init_subsystems():
+    DummySubsystem._options = DummyOptions()
+    WorkunitSubscriptableSubsystem._options = DummyOptions()
 
-    def test_global_instance(self) -> None:
-        # Verify that we get the same instance back every time.
-        global_instance = DummySubsystem.global_instance()
-        self.assertIs(global_instance, DummySubsystem.global_instance())
 
-    def test_scoped_instance(self) -> None:
-        # Verify that we get the same instance back every time.
-        task = DummyOptionable()
-        task_instance = DummySubsystem.scoped_instance(task)
-        self.assertIs(task_instance, DummySubsystem.scoped_instance(task))
+def test_global_instance() -> None:
+    # Verify that we get the same instance back every time.
+    global_instance = DummySubsystem.global_instance()
+    assert global_instance is DummySubsystem.global_instance()
 
-    def test_invalid_subsystem_class(self):
-        class NoScopeSubsystem(Subsystem):
-            pass
 
-        NoScopeSubsystem._options = DummyOptions()
-        with self.assertRaises(NotImplementedError):
-            NoScopeSubsystem.global_instance()
+def test_scoped_instance() -> None:
+    # Verify that we get the same instance back every time.
+    task = DummyOptionable()
+    task_instance = DummySubsystem.scoped_instance(task)
+    assert task_instance is DummySubsystem.scoped_instance(task)
 
-    def test_scoping_simple(self) -> None:
-        self.assertEqual({si("dummy", DummySubsystem)}, DummySubsystem.known_scope_infos())
-        self.assertEqual(
-            {
-                si("scoped-dependent-subsystem", ScopedDependentSubsystem),
-                si("dummy", DummySubsystem),
-                si("dummy.scoped-dependent-subsystem", DummySubsystem),
-            },
-            ScopedDependentSubsystem.known_scope_infos(),
-        )
 
-    def test_scoping_tree(self) -> None:
-        class SubsystemB(Subsystem):
-            options_scope = "b"
+def test_invalid_subsystem_class():
+    class NoScopeSubsystem(Subsystem):
+        pass
 
-        class SubsystemA(Subsystem):
-            options_scope = "a"
+    NoScopeSubsystem._options = DummyOptions()
+    with pytest.raises(NotImplementedError):
+        NoScopeSubsystem.global_instance()
 
-            @classmethod
-            def subsystem_dependencies(cls):
-                return (DummySubsystem, SubsystemB)
 
-        self.assertEqual(
-            {si("dummy", DummySubsystem), si("a", SubsystemA), si("b", SubsystemB)},
-            SubsystemA.known_scope_infos(),
-        )
+def test_scoping_simple() -> None:
+    assert {si("dummy", DummySubsystem)} == DummySubsystem.known_scope_infos()
+    assert {
+        si("scoped-dependent-subsystem", ScopedDependentSubsystem),
+        si("dummy", DummySubsystem),
+        si("dummy.scoped-dependent-subsystem", DummySubsystem),
+    } == ScopedDependentSubsystem.known_scope_infos()
 
-    def test_scoping_graph(self) -> None:
-        class SubsystemB(Subsystem):
-            options_scope = "b"
 
-            @classmethod
-            def subsystem_dependencies(cls):
-                return (DummySubsystem,)
+def test_scoping_tree() -> None:
+    class SubsystemB(Subsystem):
+        options_scope = "b"
 
-        class SubsystemA(Subsystem):
-            options_scope = "a"
+    class SubsystemA(Subsystem):
+        options_scope = "a"
 
-            @classmethod
-            def subsystem_dependencies(cls):
-                return (DummySubsystem, SubsystemB)
+        @classmethod
+        def subsystem_dependencies(cls):
+            return (DummySubsystem, SubsystemB)
 
-        self.assertEqual(
-            {si("dummy", DummySubsystem), si("b", SubsystemB)}, SubsystemB.known_scope_infos()
-        )
+    assert {
+        si("dummy", DummySubsystem),
+        si("a", SubsystemA),
+        si("b", SubsystemB),
+    } == SubsystemA.known_scope_infos()
 
-        self.assertEqual(
-            {si("dummy", DummySubsystem), si("a", SubsystemA), si("b", SubsystemB)},
-            SubsystemA.known_scope_infos(),
-        )
 
-    def test_option_class_cycle(self) -> None:
-        class SubsystemC(Subsystem):
-            options_scope = "c"
+def test_scoping_graph() -> None:
+    class SubsystemB(Subsystem):
+        options_scope = "b"
 
-            @classmethod
-            def subsystem_dependencies(cls):
-                return (SubsystemA,)
+        @classmethod
+        def subsystem_dependencies(cls):
+            return (DummySubsystem,)
 
-        class SubsystemB(Subsystem):
-            options_scope = "b"
+    class SubsystemA(Subsystem):
+        options_scope = "a"
 
-            @classmethod
-            def subsystem_dependencies(cls):
-                # Ensure that we detect cycles via scoped deps as well as global deps.
-                return (SubsystemC.scoped(cls),)
+        @classmethod
+        def subsystem_dependencies(cls):
+            return (DummySubsystem, SubsystemB)
 
-        class SubsystemA(Subsystem):
-            options_scope = "a"
+    assert {si("dummy", DummySubsystem), si("b", SubsystemB)} == SubsystemB.known_scope_infos()
+    assert {
+        si("dummy", DummySubsystem),
+        si("a", SubsystemA),
+        si("b", SubsystemB),
+    } == SubsystemA.known_scope_infos()
 
-            @classmethod
-            def subsystem_dependencies(cls):
-                return (SubsystemB,)
 
-        for root in SubsystemA, SubsystemB, SubsystemC:
-            with self.assertRaises(Subsystem.CycleException):
-                root.known_scope_infos()
+def test_option_class_cycle() -> None:
+    class SubsystemC(Subsystem):
+        options_scope = "c"
 
-    def test_scoping_complex(self) -> None:
-        """
-        Subsystem dep structure is (-s-> = scoped dep, -g-> = global dep):
+        @classmethod
+        def subsystem_dependencies(cls):
+            return (SubsystemA,)
 
-        D -s-> E
-        |
-        + -s->
-              \
-        A -s-> B -s-> C
-               |
-               + -g-> E
-        """
+    class SubsystemB(Subsystem):
+        options_scope = "b"
 
-        class SubsystemE(Subsystem):
-            options_scope = "e"
+        @classmethod
+        def subsystem_dependencies(cls):
+            # Ensure that we detect cycles via scoped deps as well as global deps.
+            return (SubsystemC.scoped(cls),)
 
-        class SubsystemD(Subsystem):
-            options_scope = "d"
+    class SubsystemA(Subsystem):
+        options_scope = "a"
 
-            @classmethod
-            def subsystem_dependencies(cls):
-                return (SubsystemE.scoped(cls), SubsystemB.scoped(cls))
+        @classmethod
+        def subsystem_dependencies(cls):
+            return (SubsystemB,)
 
-        class SubsystemC(Subsystem):
-            options_scope = "c"
+    for root in SubsystemA, SubsystemB, SubsystemC:
+        with pytest.raises(Subsystem.CycleException):
+            root.known_scope_infos()
 
-        class SubsystemB(Subsystem):
-            options_scope = "b"
 
-            @classmethod
-            def subsystem_dependencies(cls):
-                return (SubsystemE, SubsystemC.scoped(cls))
+def test_scoping_complex() -> None:
+    """
+    Subsystem dep structure is (-s-> = scoped dep, -g-> = global dep):
 
-        class SubsystemA(Subsystem):
-            options_scope = "a"
+    D -s-> E
+    |
+    + -s->
+          \
+    A -s-> B -s-> C
+           |
+           + -g-> E
+    """
 
-            @classmethod
-            def subsystem_dependencies(cls):
-                return (SubsystemB.scoped(cls),)
+    class SubsystemE(Subsystem):
+        options_scope = "e"
 
-        expected_known_scope_infos_c = {si("c", SubsystemC)}
-        self.assertSetEqual(expected_known_scope_infos_c, set(SubsystemC.known_scope_infos()))
+    class SubsystemD(Subsystem):
+        options_scope = "d"
 
-        expected_known_scope_infos_b = {
-            si("b", SubsystemB),
-            si("e", SubsystemE),
-            si("c", SubsystemC),
-            si("c.b", SubsystemC),
-        }
-        self.assertSetEqual(expected_known_scope_infos_b, set(SubsystemB.known_scope_infos()))
+        @classmethod
+        def subsystem_dependencies(cls):
+            return (SubsystemE.scoped(cls), SubsystemB.scoped(cls))
 
-        expected_known_scope_infos_a = {
-            si("a", SubsystemA),
-            si("e", SubsystemE),
-            si("b", SubsystemB),
-            si("b.a", SubsystemB),
-            si("c", SubsystemC),
-            si("c.b", SubsystemC),
-            si("c.b.a", SubsystemC),
-        }
-        self.assertSetEqual(expected_known_scope_infos_a, set(SubsystemA.known_scope_infos()))
+    class SubsystemC(Subsystem):
+        options_scope = "c"
 
-        expected_known_scope_infos_d = {
-            si("d", SubsystemD),
-            si("e.d", SubsystemE),
-            si("b", SubsystemB),
-            si("b.d", SubsystemB),
-            si("c", SubsystemC),
-            si("c.b", SubsystemC),
-            si("c.b.d", SubsystemC),
-            si("e", SubsystemE),
-        }
-        self.assertSetEqual(expected_known_scope_infos_d, set(SubsystemD.known_scope_infos()))
+    class SubsystemB(Subsystem):
+        options_scope = "b"
 
-    def test_uninitialized_global(self) -> None:
-        Subsystem.reset()
-        with self.assertRaisesRegex(
-            Subsystem.UninitializedSubsystemError, r"UninitializedSubsystem.*uninitialized-scope"
-        ):
-            UninitializedSubsystem.global_instance()
+        @classmethod
+        def subsystem_dependencies(cls):
+            return (SubsystemE, SubsystemC.scoped(cls))
 
-    def test_uninitialized_scoped_instance(self) -> None:
-        Subsystem.reset()
+    class SubsystemA(Subsystem):
+        options_scope = "a"
 
-        class UninitializedOptional(Optionable):
-            options_scope = "optional"
+        @classmethod
+        def subsystem_dependencies(cls):
+            return (SubsystemB.scoped(cls),)
 
-        optional = UninitializedOptional()
-        with self.assertRaisesRegex(
-            Subsystem.UninitializedSubsystemError, r"UninitializedSubsystem.*uninitialized-scope"
-        ):
-            UninitializedSubsystem.scoped_instance(optional)
+    assert set(SubsystemC.known_scope_infos()) == {si("c", SubsystemC)}
+    assert set(SubsystemB.known_scope_infos()) == {
+        si("b", SubsystemB),
+        si("e", SubsystemE),
+        si("c", SubsystemC),
+        si("c.b", SubsystemC),
+    }
+    assert set(SubsystemA.known_scope_infos()) == {
+        si("a", SubsystemA),
+        si("e", SubsystemE),
+        si("b", SubsystemB),
+        si("b.a", SubsystemB),
+        si("c", SubsystemC),
+        si("c.b", SubsystemC),
+        si("c.b.a", SubsystemC),
+    }
+    assert set(SubsystemD.known_scope_infos()) == {
+        si("d", SubsystemD),
+        si("e.d", SubsystemE),
+        si("b", SubsystemB),
+        si("b.d", SubsystemB),
+        si("c", SubsystemC),
+        si("c.b", SubsystemC),
+        si("c.b.d", SubsystemC),
+        si("e", SubsystemE),
+    }
 
-    def test_subsystem_dependencies_iter(self) -> None:
-        class SubsystemB(Subsystem):
-            options_scope = "b"
 
-        class SubsystemA(Subsystem):
-            options_scope = "a"
+def test_uninitialized_global() -> None:
+    Subsystem.reset()
+    with pytest.raises(
+        Subsystem.UninitializedSubsystemError, match=r"UninitializedSubsystem.*uninitialized-scope",
+    ):
+        UninitializedSubsystem.global_instance()
 
-            @classmethod
-            def subsystem_dependencies(cls):
-                return (DummySubsystem.scoped(cls), SubsystemB)
 
-        dep_scopes = {dep.options_scope for dep in SubsystemA.subsystem_dependencies_iter()}
-        self.assertEqual({"b", "dummy.a"}, dep_scopes)
+def test_uninitialized_scoped_instance() -> None:
+    Subsystem.reset()
 
-    def test_subsystem_closure_iter(self) -> None:
-        class SubsystemA(Subsystem):
-            options_scope = "a"
+    class UninitializedOptional(Optionable):
+        options_scope = "optional"
 
-        class SubsystemB(Subsystem):
-            options_scope = "b"
+    optional = UninitializedOptional()
+    with pytest.raises(
+        Subsystem.UninitializedSubsystemError, match=r"UninitializedSubsystem.*uninitialized-scope",
+    ):
+        UninitializedSubsystem.scoped_instance(optional)
 
-            @classmethod
-            def subsystem_dependencies(cls):
-                return (SubsystemA,)
 
-        class SubsystemC(Subsystem):
-            options_scope = "c"
+def test_subsystem_dependencies_iter() -> None:
+    class SubsystemB(Subsystem):
+        options_scope = "b"
 
-            @classmethod
-            def subsystem_dependencies(cls):
-                return (SubsystemA, SubsystemB.scoped(cls))
+    class SubsystemA(Subsystem):
+        options_scope = "a"
 
-        class SubsystemD(Subsystem):
-            options_scope = "d"
+        @classmethod
+        def subsystem_dependencies(cls):
+            return (DummySubsystem.scoped(cls), SubsystemB)
 
-            @classmethod
-            def subsystem_dependencies(cls):
-                return (SubsystemC, SubsystemB)
+    dep_scopes = {dep.options_scope for dep in SubsystemA.subsystem_dependencies_iter()}
+    assert {"b", "dummy.a"} == dep_scopes
 
-        dep_scopes = {dep.options_scope for dep in SubsystemD.subsystem_closure_iter()}
-        self.assertEqual({"c", "a", "b.c", "b"}, dep_scopes)
 
-    def test_subsystem_closure_iter_cycle(self) -> None:
-        class SubsystemA(Subsystem):
-            options_scope = "a"
+def test_subsystem_closure_iter() -> None:
+    class SubsystemA(Subsystem):
+        options_scope = "a"
 
-            @classmethod
-            def subsystem_dependencies(cls):
-                return (SubsystemB,)
+    class SubsystemB(Subsystem):
+        options_scope = "b"
 
-        class SubsystemB(Subsystem):
-            options_scope = "b"
+        @classmethod
+        def subsystem_dependencies(cls):
+            return (SubsystemA,)
 
-            @classmethod
-            def subsystem_dependencies(cls):
-                return (SubsystemA,)
+    class SubsystemC(Subsystem):
+        options_scope = "c"
 
-        with self.assertRaises(Subsystem.CycleException):
-            list(SubsystemB.subsystem_closure_iter())
+        @classmethod
+        def subsystem_dependencies(cls):
+            return (SubsystemA, SubsystemB.scoped(cls))
 
-    def test_get_streaming_workunit_callbacks(self) -> None:
-        import_str = "pants.option.subsystem_test.WorkunitSubscriptableSubsystem"
-        callables_list = Subsystem.get_streaming_workunit_callbacks([import_str])
-        assert len(callables_list) == 1
+    class SubsystemD(Subsystem):
+        options_scope = "d"
 
-    def test_streaming_workunit_callbacks_bad_module(self) -> None:
-        import_str = "nonexistent_module.AClassThatDoesntActuallyExist"
-        with self.captured_logging(level=logging.WARNING) as captured:
-            callables_list = Subsystem.get_streaming_workunit_callbacks([import_str])
-            warnings = captured.warnings()
-            assert len(warnings) == 1
-            assert len(callables_list) == 0
-            assert "No module named 'nonexistent_module'" in warnings[0]
+        @classmethod
+        def subsystem_dependencies(cls):
+            return (SubsystemC, SubsystemB)
 
-    def test_streaming_workunit_callbacks_good_module_bad_class(self) -> None:
-        import_str = "pants.option.subsystem_test.ANonexistentClass"
-        with self.captured_logging(level=logging.WARNING) as captured:
-            callables_list = Subsystem.get_streaming_workunit_callbacks([import_str])
-            warnings = captured.warnings()
-            assert len(warnings) == 1
-            assert len(callables_list) == 0
-            assert (
-                "module 'pants.option.subsystem_test' has no attribute 'ANonexistentClass'"
-                in warnings[0]
-            )
+    dep_scopes = {dep.options_scope for dep in SubsystemD.subsystem_closure_iter()}
+    assert {"c", "a", "b.c", "b"} == dep_scopes
 
-    def test_streaming_workunit_callbacks_with_invalid_subsystem(self) -> None:
-        import_str = "pants.option.subsystem_test.DummySubsystem"
-        with self.captured_logging(level=logging.WARNING) as captured:
-            callables_list = Subsystem.get_streaming_workunit_callbacks([import_str])
-            warnings = captured.warnings()
-            assert len(warnings) == 1
-            assert "does not have a method named `handle_workunits` defined" in warnings[0]
-            assert len(callables_list) == 0
+
+def test_subsystem_closure_iter_cycle() -> None:
+    class SubsystemA(Subsystem):
+        options_scope = "a"
+
+        @classmethod
+        def subsystem_dependencies(cls):
+            return (SubsystemB,)
+
+    class SubsystemB(Subsystem):
+        options_scope = "b"
+
+        @classmethod
+        def subsystem_dependencies(cls):
+            return (SubsystemA,)
+
+    with pytest.raises(Subsystem.CycleException):
+        list(SubsystemB.subsystem_closure_iter())
+
+
+def test_get_streaming_workunit_callbacks() -> None:
+    import_str = "pants.option.subsystem_test.WorkunitSubscriptableSubsystem"
+    callables_list = Subsystem.get_streaming_workunit_callbacks([import_str])
+    assert len(callables_list) == 1
+
+
+def test_streaming_workunit_callbacks_bad_module(caplog) -> None:
+    import_str = "nonexistent_module.AClassThatDoesntActuallyExist"
+    callables_list = Subsystem.get_streaming_workunit_callbacks([import_str])
+    assert len(callables_list) == 0
+    warnings = [record for record in caplog.records if record.levelname == "WARNING"]
+    assert len(warnings) == 1
+    assert "No module named 'nonexistent_module'" in warnings[0].msg
+
+
+def test_streaming_workunit_callbacks_good_module_bad_class(caplog) -> None:
+    import_str = "pants.option.subsystem_test.ANonexistentClass"
+    callables_list = Subsystem.get_streaming_workunit_callbacks([import_str])
+    assert len(callables_list) == 0
+    warnings = [record for record in caplog.records if record.levelname == "WARNING"]
+    assert len(warnings) == 1
+    assert (
+        "module 'pants.option.subsystem_test' has no attribute 'ANonexistentClass'"
+        in warnings[0].msg
+    )
+
+
+def test_streaming_workunit_callbacks_with_invalid_subsystem(caplog) -> None:
+    import_str = "pants.option.subsystem_test.DummySubsystem"
+    callables_list = Subsystem.get_streaming_workunit_callbacks([import_str])
+    assert len(callables_list) == 0
+    warnings = [record for record in caplog.records if record.levelname == "WARNING"]
+    assert len(warnings) == 1
+    assert "does not have a method named `handle_workunits` defined" in warnings[0].msg

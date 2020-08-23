@@ -1,11 +1,11 @@
 # Copyright 2015 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-import unittest
 from abc import ABC, abstractmethod
 from dataclasses import FrozenInstanceError, dataclass
 
-from pants.testutil.test_base import TestBase
+import pytest
+
 from pants.util.meta import (
     SingletonMetaclass,
     classproperty,
@@ -15,33 +15,11 @@ from pants.util.meta import (
 )
 
 
-class AbstractClassTest(TestBase):
-    def test_abstract_property(self):
-        class AbstractProperty(ABC):
-            @property
-            @abstractmethod
-            def property(self):
-                pass
+def test_singleton() -> None:
+    class One(metaclass=SingletonMetaclass):
+        pass
 
-        with self.assertRaises(TypeError):
-            AbstractProperty()
-
-    def test_abstract_method(self):
-        class AbstractMethod(ABC):
-            @abstractmethod
-            def method(self):
-                pass
-
-        with self.assertRaises(TypeError):
-            AbstractMethod()
-
-
-class SingletonTest(TestBase):
-    def test_singleton(self):
-        class One(metaclass=SingletonMetaclass):
-            pass
-
-        self.assertIs(One(), One())
+    assert One() is One()
 
 
 class WithProp:
@@ -113,243 +91,251 @@ class OverridingMethodDefSuper(WithProp):
         return super().class_property + cls._other_value
 
 
-class ClassPropertyTest(TestBase):
-    def test_access(self):
-        self.assertEqual("val0", WithProp.class_property)
-        self.assertEqual("val0", WithProp().class_property)
+def test_access() -> None:
+    assert "val0" == WithProp.class_property
+    assert "val0" == WithProp().class_property
 
-        self.assertEqual("val0", WithProp.class_method())
-        self.assertEqual("val0", WithProp().class_method())
+    assert "val0" == WithProp.class_method()
+    assert "val0" == WithProp().class_method()
 
-        self.assertEqual("static_property", WithProp.static_property)
-        self.assertEqual("static_property", WithProp().static_property)
+    assert "static_property" == WithProp.static_property
+    assert "static_property" == WithProp().static_property
 
-        self.assertEqual("static_method", WithProp.static_method())
-        self.assertEqual("static_method", WithProp().static_method())
-
-    def test_has_attr(self):
-        self.assertTrue(hasattr(WithProp, "class_property"))
-        self.assertTrue(hasattr(WithProp(), "class_property"))
-
-    def test_docstring(self):
-        self.assertEqual("class_property docs.", WithProp.__dict__["class_property"].__doc__)
-        self.assertEqual("static_property docs.", WithProp.__dict__["static_property"].__doc__)
-
-    def test_override_value(self):
-        self.assertEqual("val1", OverridingValueField.class_property)
-        self.assertEqual("val1", OverridingValueField().class_property)
-
-    def test_override_inst_value(self):
-        obj = OverridingValueInit("v1")
-        self.assertEqual("val0", obj.class_property)
-        self.assertEqual("val0", obj.class_method())
-        self.assertEqual("v1", obj.instance_property)
-        self.assertEqual("v1", obj.instance_method())
-
-    def test_override_inst_method(self):
-        obj = WithShadowingInstanceMethod("v1")
-        self.assertEqual("v1", obj.class_property)
-        self.assertEqual("v1", obj.class_method())
-
-    def test_override_method_super(self):
-        self.assertEqual("val0o0", OverridingMethodDefSuper.class_property)
-        self.assertEqual("val0o0", OverridingMethodDefSuper().class_property)
-
-    def test_modify_class_value(self):
-        class WithFieldToModify:
-            _z = "z0"
-
-            @classproperty
-            def class_property(cls):
-                return cls._z
-
-        self.assertEqual("z0", WithFieldToModify.class_property)
-
-        # The classproperty reflects the change in state (is not cached by python or something else
-        # weird we might do).
-        WithFieldToModify._z = "z1"
-        self.assertEqual("z1", WithFieldToModify.class_property)
-
-    def test_set_attr(self):
-        class SetValue:
-            _x = "x0"
-
-            @staticproperty
-            def static_property():
-                return "s0"
-
-            @classproperty
-            def class_property(cls):
-                return cls._x
-
-        self.assertEqual("x0", SetValue.class_property)
-        self.assertEqual("s0", SetValue.static_property)
-
-        # The @classproperty is gone, this is just a regular property now.
-        SetValue.class_property = "x1"
-        self.assertEqual("x1", SetValue.class_property)
-        # The source field is unmodified.
-        self.assertEqual("x0", SetValue._x)
-
-        SetValue.static_property = "s1"
-        self.assertEqual("s1", SetValue.static_property)
-
-    def test_delete_attr(self):
-        class DeleteValue:
-            _y = "y0"
-
-            @classproperty
-            def class_property(cls):
-                return cls._y
-
-            @staticproperty
-            def static_property():
-                return "s0"
-
-        self.assertEqual("y0", DeleteValue.class_property)
-        self.assertEqual("s0", DeleteValue.static_property)
-
-        # The @classproperty is gone, but the source field is still alive.
-        del DeleteValue.class_property
-        self.assertFalse(hasattr(DeleteValue, "class_property"))
-        self.assertTrue(hasattr(DeleteValue, "_y"))
-
-        del DeleteValue.static_property
-        self.assertFalse(hasattr(DeleteValue, "static_property"))
-
-    def test_abstract_classproperty(self):
-        class Abstract(ABC):
-            @classproperty
-            @property
-            @abstractmethod
-            def f(cls):
-                pass
-
-        with self.assertRaisesWithMessage(
-            TypeError,
-            """\
-The classproperty 'f' in type 'Abstract' was an abstractproperty, meaning that type \
-Abstract must override it by setting it as a variable in the class body or defining a method \
-with an @classproperty decorator.""",
-        ):
-            Abstract.f
-
-        class WithoutOverriding(Abstract):
-            """Show that subclasses failing to override the abstract classproperty will raise."""
-
-            pass
-
-        with self.assertRaisesWithMessage(
-            TypeError,
-            """\
-The classproperty 'f' in type 'WithoutOverriding' was an abstractproperty, meaning that type \
-WithoutOverriding must override it by setting it as a variable in the class body or defining a method \
-with an @classproperty decorator.""",
-        ):
-            WithoutOverriding.f
-
-        class Concrete(Abstract):
-            f = 3
-
-        self.assertEqual(Concrete.f, 3)
-
-        class Concrete2(Abstract):
-            @classproperty
-            def f(cls):
-                return "hello"
-
-        self.assertEqual(Concrete2.f, "hello")
+    assert "static_method" == WithProp.static_method()
+    assert "static_method" == WithProp().static_method()
 
 
-class SentinelAttributeTest(unittest.TestCase):
-    def test_decorated_type_checkable(self):
-        @decorated_type_checkable
+def test_has_attr() -> None:
+    assert hasattr(WithProp, "class_property") is True
+    assert hasattr(WithProp(), "class_property") is True
+
+
+def test_docstring() -> None:
+    assert "class_property docs." == WithProp.__dict__["class_property"].__doc__
+    assert "static_property docs." == WithProp.__dict__["static_property"].__doc__
+
+
+def test_override_value() -> None:
+    assert "val1" == OverridingValueField.class_property
+    assert "val1" == OverridingValueField().class_property
+
+
+def test_override_inst_value() -> None:
+    obj = OverridingValueInit("v1")
+    assert "val0" == obj.class_property
+    assert "val0" == obj.class_method()
+    assert "v1" == obj.instance_property
+    assert "v1" == obj.instance_method()
+
+
+def test_override_inst_method() -> None:
+    obj = WithShadowingInstanceMethod("v1")
+    assert "v1" == obj.class_property
+    assert "v1" == obj.class_method()
+
+
+def test_override_method_super() -> None:
+    assert "val0o0" == OverridingMethodDefSuper.class_property
+    assert "val0o0" == OverridingMethodDefSuper().class_property
+
+
+def test_modify_class_value() -> None:
+    class WithFieldToModify:
+        _z = "z0"
+
+        @classproperty
+        def class_property(cls):
+            return cls._z
+
+    assert "z0" == WithFieldToModify.class_property
+
+    # The classproperty reflects the change in state (is not cached by python or something else
+    # weird we might do).
+    WithFieldToModify._z = "z1"
+    assert "z1" == WithFieldToModify.class_property
+
+
+def test_set_attr():
+    class SetValue:
+        _x = "x0"
+
+        @staticproperty
+        def static_property():
+            return "s0"
+
+        @classproperty
+        def class_property(cls):
+            return cls._x
+
+    assert "x0" == SetValue.class_property
+    assert "s0" == SetValue.static_property
+
+    # The @classproperty is gone, this is just a regular property now.
+    SetValue.class_property = "x1"
+    assert "x1" == SetValue.class_property
+    # The source field is unmodified.
+    assert "x0" == SetValue._x
+
+    SetValue.static_property = "s1"
+    assert "s1" == SetValue.static_property
+
+
+def test_delete_attr():
+    class DeleteValue:
+        _y = "y0"
+
+        @classproperty
+        def class_property(cls):
+            return cls._y
+
+        @staticproperty
+        def static_property():
+            return "s0"
+
+    assert "y0" == DeleteValue.class_property
+    assert "s0" == DeleteValue.static_property
+
+    # The @classproperty is gone, but the source field is still alive.
+    del DeleteValue.class_property
+    assert hasattr(DeleteValue, "class_property") is False
+    assert hasattr(DeleteValue, "_y") is True
+
+    del DeleteValue.static_property
+    assert hasattr(DeleteValue, "static_property") is False
+
+
+def test_abstract_classproperty():
+    class Abstract(ABC):
+        @classproperty
+        @property
+        @abstractmethod
         def f(cls):
-            return f.define_instance_of(cls)
-
-        @f
-        class C:
             pass
 
-        self.assertEqual(C._decorated_type_checkable_type, type(f))
-        self.assertTrue(f.is_instance(C))
+    with pytest.raises(TypeError) as exc:
+        Abstract.f
+    assert str(exc.value) == (
+        "The classproperty 'f' in type 'Abstract' was an abstractproperty, meaning that type "
+        "Abstract must override it by setting it as a variable in the class body or defining a "
+        "method with an @classproperty decorator."
+    )
 
-        # Check that .is_instance() is only true for exactly the decorator @g used on the class D!
-        @decorated_type_checkable
-        def g(cls):
-            return g.define_instance_of(cls)
+    class WithoutOverriding(Abstract):
+        """Show that subclasses failing to override the abstract classproperty will raise."""
 
-        @g
-        class D:
-            pass
+    with pytest.raises(TypeError) as exc:
+        WithoutOverriding.f
+    assert str(exc.value) == (
+        "The classproperty 'f' in type 'WithoutOverriding' was an abstractproperty, meaning that "
+        "type WithoutOverriding must override it by setting it as a variable in the class body or "
+        "defining a method with an @classproperty decorator."
+    )
 
-        self.assertEqual(D._decorated_type_checkable_type, type(g))
-        self.assertTrue(g.is_instance(D))
-        self.assertFalse(f.is_instance(D))
+    class Concrete(Abstract):
+        f = 3
+
+    assert Concrete.f == 3
+
+    class Concrete2(Abstract):
+        @classproperty
+        def f(cls):
+            return "hello"
+
+    assert Concrete2.f == "hello"
 
 
-class FrozenAfterInitTest(unittest.TestCase):
-    def test_no_init(self) -> None:
-        @frozen_after_init
-        class Test:
-            pass
+def test_decorated_type_checkable():
+    @decorated_type_checkable
+    def f(cls):
+        return f.define_instance_of(cls)
 
-        test = Test()
-        with self.assertRaises(FrozenInstanceError):
-            test.x = 1  # type: ignore[attr-defined]
+    @f
+    class C:
+        pass
 
-    def test_init_still_works(self):
-        @frozen_after_init
-        class Test:
-            def __init__(self, x: int) -> None:
-                self.x = x
-                self.y = "abc"
+    assert C._decorated_type_checkable_type == type(f)
+    assert f.is_instance(C) is True
 
-        test = Test(x=0)
-        self.assertEqual(test.x, 0)
-        self.assertEqual(test.y, "abc")
+    # Check that .is_instance() is only true for exactly the decorator @g used on the class D!
+    @decorated_type_checkable
+    def g(cls):
+        return g.define_instance_of(cls)
 
-    def test_modify_preexisting_field_after_init(self) -> None:
-        @frozen_after_init
-        class Test:
-            def __init__(self, x: int) -> None:
-                self.x = x
+    @g
+    class D:
+        pass
 
-        test = Test(x=0)
-        with self.assertRaises(FrozenInstanceError):
-            test.x = 1
+    assert D._decorated_type_checkable_type == type(g)
+    assert g.is_instance(D) is True
+    assert f.is_instance(D) is False
 
-    def test_add_new_field_after_init(self) -> None:
-        @frozen_after_init
-        class Test:
-            def __init__(self, x: int) -> None:
-                self.x = x
 
-        test = Test(x=0)
-        with self.assertRaises(FrozenInstanceError):
-            test.y = "abc"  # type: ignore[attr-defined]
+def test_no_init() -> None:
+    @frozen_after_init
+    class Test:
+        pass
 
-    def test_explicitly_call_setattr_after_init(self) -> None:
-        @frozen_after_init
-        class Test:
-            def __init__(self, x: int) -> None:
-                self.x = x
+    test = Test()
+    with pytest.raises(FrozenInstanceError):
+        test.x = 1  # type: ignore[attr-defined]
 
-        test = Test(x=0)
-        with self.assertRaises(FrozenInstanceError):
-            setattr(test, "x", 1)
 
-    def test_works_with_dataclass(self) -> None:
-        @frozen_after_init
-        @dataclass(frozen=False)
-        class Test:
-            x: int
-            y: str
+def test_init_still_works() -> None:
+    @frozen_after_init
+    class Test:
+        def __init__(self, x: int) -> None:
+            self.x = x
+            self.y = "abc"
 
-            def __init__(self, x: int) -> None:
-                self.x = x
-                self.y = "abc"
+    test = Test(x=0)
+    assert test.x == 0
+    assert test.y == "abc"
 
-        test = Test(x=0)
-        with self.assertRaises(FrozenInstanceError):
-            test.x = 1
+
+def test_modify_preexisting_field_after_init() -> None:
+    @frozen_after_init
+    class Test:
+        def __init__(self, x: int) -> None:
+            self.x = x
+
+    test = Test(x=0)
+    with pytest.raises(FrozenInstanceError):
+        test.x = 1
+
+
+def test_add_new_field_after_init() -> None:
+    @frozen_after_init
+    class Test:
+        def __init__(self, x: int) -> None:
+            self.x = x
+
+    test = Test(x=0)
+    with pytest.raises(FrozenInstanceError):
+        test.y = "abc"  # type: ignore[attr-defined]
+
+
+def test_explicitly_call_setattr_after_init() -> None:
+    @frozen_after_init
+    class Test:
+        def __init__(self, x: int) -> None:
+            self.x = x
+
+    test = Test(x=0)
+    with pytest.raises(FrozenInstanceError):
+        setattr(test, "x", 1)
+
+
+def test_works_with_dataclass() -> None:
+    @frozen_after_init
+    @dataclass(frozen=False)
+    class Test:
+        x: int
+        y: str
+
+        def __init__(self, x: int) -> None:
+            self.x = x
+            self.y = "abc"
+
+    test = Test(x=0)
+    with pytest.raises(FrozenInstanceError):
+        test.x = 1
