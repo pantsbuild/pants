@@ -154,8 +154,8 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
             PythonTestFieldSet.create(PythonTests({}, address=address)),
             create_options_bootstrapper(args=args),
         )
-        test_result = self.request_single_product(TestResult, params)
-        debug_request = self.request_single_product(TestDebugRequest, params)
+        test_result = self.request_product(TestResult, params)
+        debug_request = self.request_product(TestDebugRequest, params)
         if debug_request.process is not None:
             debug_result = InteractiveRunner(self.scheduler).run(debug_request.process)
             assert test_result.exit_code == debug_result.exit_code
@@ -341,7 +341,7 @@ class PytestRunnerIntegrationTest(ExternalToolTestBase):
         assert result.exit_code == 0
         assert f"{self.package}/test_good.py ." in result.stdout
         assert result.xml_results is not None
-        digest_contents = self.request_single_product(DigestContents, result.xml_results)
+        digest_contents = self.request_product(DigestContents, result.xml_results)
         assert len(digest_contents) == 1
         file = digest_contents[0]
         assert file.path.startswith("dist/test-results")

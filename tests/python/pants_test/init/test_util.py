@@ -8,6 +8,7 @@ from typing import Iterator
 from pants.fs.fs import safe_filename_from_path
 from pants.init.util import init_workdir
 from pants.option.option_value_container import OptionValueContainer
+from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
 
@@ -16,9 +17,9 @@ class UtilTest(TestBase):
     @contextmanager
     def physical_workdir_base(self) -> Iterator[OptionValueContainer]:
         with temporary_dir(cleanup=False) as physical_workdir_base:
-            bootstrap_options = self.get_bootstrap_options(
-                [f"--pants-physical-workdir-base={physical_workdir_base}"]
-            )
+            bootstrap_options = create_options_bootstrapper(
+                args=[f"--pants-physical-workdir-base={physical_workdir_base}"]
+            ).bootstrap_options.for_global_scope()
             yield bootstrap_options
 
     def assert_exists(self, path):

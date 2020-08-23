@@ -57,7 +57,7 @@ class BanditIntegrationTest(ExternalToolTestBase):
             args.append("--bandit-skip")
         if additional_args:
             args.extend(additional_args)
-        results = self.request_single_product(
+        results = self.request_product(
             LintResults,
             Params(
                 BanditRequest(BanditFieldSet.create(tgt) for tgt in targets),
@@ -180,7 +180,7 @@ class BanditIntegrationTest(ExternalToolTestBase):
         assert result[0].exit_code == 1
         assert result[0].stdout.strip() == ""
         assert result[0].report is not None
-        report_files = self.request_single_product(DigestContents, result[0].report.digest)
+        report_files = self.request_product(DigestContents, result[0].report.digest)
         assert len(report_files) == 1
         assert (
             "Issue: [B303:blacklist] Use of insecure MD2, MD4, MD5"

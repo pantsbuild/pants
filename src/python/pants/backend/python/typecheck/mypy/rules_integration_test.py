@@ -99,7 +99,7 @@ class MyPyIntegrationTest(ExternalToolTestBase):
                 """
             ),
         )
-        return self.request_single_product(
+        return self.request_product(
             WrappedTarget,
             Params(
                 Address(package, target_name=name),
@@ -126,7 +126,7 @@ class MyPyIntegrationTest(ExternalToolTestBase):
             args.append("--mypy-skip")
         if additional_args:
             args.extend(additional_args)
-        result = self.request_single_product(
+        result = self.request_product(
             TypecheckResults,
             Params(
                 MyPyRequest(MyPyFieldSet.create(tgt) for tgt in targets),

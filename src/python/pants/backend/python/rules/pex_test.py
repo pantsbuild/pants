@@ -211,7 +211,7 @@ class PexTest(ExternalToolTestBase):
             additional_inputs=additional_inputs,
             additional_args=additional_pex_args,
         )
-        pex = self.request_single_product(
+        pex = self.request_product(
             Pex,
             Params(
                 request,
@@ -258,7 +258,7 @@ class PexTest(ExternalToolTestBase):
         )
 
     def test_pex_execution(self) -> None:
-        sources = self.request_single_product(
+        sources = self.request_product(
             Digest,
             CreateDigest(
                 (
@@ -284,7 +284,7 @@ class PexTest(ExternalToolTestBase):
             input_digest=pex_output["pex"].digest,
             description="Run the pex and make sure it works",
         )
-        result = self.request_single_product(ProcessResult, process)
+        result = self.request_product(ProcessResult, process)
         assert result.stdout == b"from main\n"
 
     def test_resolves_dependencies(self) -> None:
@@ -355,7 +355,7 @@ class PexTest(ExternalToolTestBase):
         # This verifies that the file was indeed provided as additional input to the pex call.
         preamble_file = "custom_preamble.txt"
         preamble = "#!CUSTOM PREAMBLE\n"
-        additional_inputs = self.request_single_product(
+        additional_inputs = self.request_product(
             Digest, CreateDigest([FileContent(path=preamble_file, content=preamble.encode())])
         )
         additional_pex_args = (f"--preamble-file={preamble_file}",)

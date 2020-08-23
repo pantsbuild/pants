@@ -46,7 +46,7 @@ class TestTimeout(TestBase):
             args.append(f"--pytest-timeout-default={global_default}")
         if global_max is not None:
             args.append(f"--pytest-timeout-maximum={global_max}")
-        pytest = self.request_single_product(PyTest, create_options_bootstrapper(args=args))
+        pytest = self.request_product(PyTest, create_options_bootstrapper(args=args))
         field = PythonTestsTimeout(field_value, address=Address.parse(":tests"))
         assert field.calculate_from_global_options(pytest) == expected
 

@@ -43,10 +43,10 @@ class InjectAncestorFilesTest(TestBase):
             "__init__.py", self.make_snapshot({fp: "# declared" for fp in original_declared_files}),
         )
         bootstrapper = create_options_bootstrapper(args=[f"--source-root-patterns={source_roots}"])
-        result = self.request_single_product(AncestorFiles, Params(request, bootstrapper)).snapshot
+        result = self.request_product(AncestorFiles, Params(request, bootstrapper)).snapshot
         assert list(result.files) == sorted(expected_discovered)
 
-        materialized_result = self.request_single_product(DigestContents, result.digest)
+        materialized_result = self.request_product(DigestContents, result.digest)
         for file_content in materialized_result:
             path = file_content.path
             if not path.endswith("__init__.py"):

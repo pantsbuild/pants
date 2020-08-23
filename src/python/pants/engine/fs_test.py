@@ -369,17 +369,15 @@ class FSTest(TestBase, SchedulerTestBase):
                 )
             )
 
-            empty_merged = self.request_single_product(
-                Digest, MergeDigests((empty_snapshot.digest,)),
-            )
+            empty_merged = self.request_product(Digest, MergeDigests((empty_snapshot.digest,)),)
             assert empty_snapshot.digest == empty_merged
 
-            roland_merged = self.request_single_product(
+            roland_merged = self.request_product(
                 Digest, MergeDigests((roland_snapshot.digest, empty_snapshot.digest)),
             )
             assert roland_snapshot.digest == roland_merged
 
-            both_merged = self.request_single_product(
+            both_merged = self.request_product(
                 Digest, MergeDigests((roland_snapshot.digest, susannah_snapshot.digest)),
             )
             assert both_snapshot.digest == both_merged
@@ -391,7 +389,7 @@ class FSTest(TestBase, SchedulerTestBase):
         assert Path(self.build_root, "test/roland").read_text() == "European Burmese"
 
     def test_add_prefix(self) -> None:
-        digest = self.request_single_product(
+        digest = self.request_product(
             Digest,
             CreateDigest(
                 (
@@ -402,10 +400,8 @@ class FSTest(TestBase, SchedulerTestBase):
         )
 
         # Two components.
-        output_digest = self.request_single_product(
-            Digest, AddPrefix(digest, "outer_dir/middle_dir")
-        )
-        snapshot = self.request_single_product(Snapshot, output_digest)
+        output_digest = self.request_product(Digest, AddPrefix(digest, "outer_dir/middle_dir"))
+        snapshot = self.request_product(Snapshot, output_digest)
         assert sorted(snapshot.files) == [
             "outer_dir/middle_dir/main.py",
             "outer_dir/middle_dir/subdir/sub.py",
@@ -417,14 +413,14 @@ class FSTest(TestBase, SchedulerTestBase):
         ]
 
         # Empty.
-        output_digest = self.request_single_product(Digest, AddPrefix(digest, ""))
+        output_digest = self.request_product(Digest, AddPrefix(digest, ""))
         assert digest == output_digest
 
         # Illegal.
         with self.assertRaisesRegex(
             Exception, r"Cannot add component .*ParentDir.* of path prefix `../something`."
         ):
-            self.request_single_product(Digest, AddPrefix(digest, "../something"))
+            self.request_product(Digest, AddPrefix(digest, "../something"))
 
     def test_remove_prefix(self) -> None:
         # Set up files:
@@ -466,13 +462,13 @@ class FSTest(TestBase, SchedulerTestBase):
             assert snapshot_with_extra_files.files == all_files
 
             # Strip empty prefix:
-            zero_prefix_stripped_digest = self.request_single_product(
+            zero_prefix_stripped_digest = self.request_product(
                 Digest, RemovePrefix(snapshot.digest, ""),
             )
             assert snapshot.digest == zero_prefix_stripped_digest
 
             # Strip a non-empty prefix shared by all files:
-            stripped_digest = self.request_single_product(
+            stripped_digest = self.request_product(
                 Digest, RemovePrefix(snapshot.digest, "characters/dark_tower"),
             )
             assert stripped_digest == Digest(
@@ -493,13 +489,13 @@ class FSTest(TestBase, SchedulerTestBase):
                 "867f0c8d577d2ada2f06b03fc8e5ef2d780e8942713b26c5e3f434b8>, 243) - root directory "
                 "contained non-matching directory named: books and file named: index",
             ):
-                self.request_single_product(
+                self.request_product(
                     Digest, RemovePrefix(snapshot_with_extra_files.digest, "characters/dark_tower"),
                 )
 
     def test_lift_digest_to_snapshot(self) -> None:
         digest = self.prime_store_with_roland_digest()
-        snapshot = self.request_single_product(Snapshot, digest)
+        snapshot = self.request_product(Snapshot, digest)
         assert snapshot.files == ("roland",)
         assert snapshot.digest == digest
 
@@ -514,7 +510,7 @@ class FSTest(TestBase, SchedulerTestBase):
         digest = Digest(fingerprint=hasher.hexdigest(), serialized_bytes_length=len(text))
 
         with self.assertRaisesWithMessageContaining(ExecutionError, "unknown directory"):
-            self.request_single_product(Snapshot, digest)
+            self.request_product(Snapshot, digest)
 
     def test_glob_match_error(self) -> None:
         test_name = f"{__name__}.{self.test_glob_match_error.__name__}()"
@@ -591,7 +587,7 @@ class FSTest(TestBase, SchedulerTestBase):
     def test_download(self) -> None:
         with self.isolated_local_store():
             with http_server(StubHandler) as port:
-                snapshot = self.request_single_product(
+                snapshot = self.request_product(
                     Snapshot,
                     DownloadFile(
                         f"http://localhost:{port}/do_not_remove_or_edit.txt", self.pantsbuild_digest
@@ -607,7 +603,7 @@ class FSTest(TestBase, SchedulerTestBase):
         with self.isolated_local_store():
             with http_server(StubHandler) as port:
                 with self.assertRaises(ExecutionError) as cm:
-                    self.request_single_product(
+                    self.request_product(
                         Snapshot,
                         DownloadFile(f"http://localhost:{port}/notfound", self.pantsbuild_digest),
                     )
@@ -617,7 +613,7 @@ class FSTest(TestBase, SchedulerTestBase):
         with self.isolated_local_store():
             with http_server(StubHandler) as port:
                 with self.assertRaises(ExecutionError) as cm:
-                    self.request_single_product(
+                    self.request_product(
                         Snapshot,
                         DownloadFile(
                             f"http://localhost:{port}/do_not_remove_or_edit.txt",
@@ -632,7 +628,7 @@ class FSTest(TestBase, SchedulerTestBase):
     # It's a shame that this isn't hermetic, but setting up valid local HTTPS certificates is a pain.
     def test_download_https(self) -> None:
         with self.isolated_local_store():
-            snapshot = self.request_single_product(
+            snapshot = self.request_product(
                 Snapshot,
                 DownloadFile(
                     "https://binaries.pantsbuild.org/do_not_remove_or_edit.txt",
@@ -657,7 +653,7 @@ class FSTest(TestBase, SchedulerTestBase):
                     f"http://localhost:{port}/roland",
                     Digest("693d8db7b05e99c6b7a7c0616456039d89c555029026936248085193559a0b5d", 16),
                 )
-                snapshot = self.request_single_product(Snapshot, url)
+                snapshot = self.request_product(Snapshot, url)
                 self.assert_snapshot_equals(
                     snapshot,
                     ["roland"],
@@ -666,7 +662,7 @@ class FSTest(TestBase, SchedulerTestBase):
 
     def generate_original_digest(self) -> Digest:
         content = b"dummy content"
-        return self.request_single_product(
+        return self.request_product(
             Digest,
             CreateDigest(
                 (
@@ -683,7 +679,7 @@ class FSTest(TestBase, SchedulerTestBase):
 
     def test_empty_digest_subset(self) -> None:
         ds = DigestSubset(self.generate_original_digest(), PathGlobs(()))
-        subset_snapshot = self.request_single_product(Snapshot, ds)
+        subset_snapshot = self.request_product(Snapshot, ds)
         assert subset_snapshot.digest == EMPTY_DIGEST
         assert subset_snapshot.files == ()
         assert subset_snapshot.dirs == ()
@@ -693,7 +689,7 @@ class FSTest(TestBase, SchedulerTestBase):
             self.generate_original_digest(), PathGlobs(("a.txt", "c.txt", "subdir2/**")),
         )
 
-        subset_snapshot = self.request_single_product(Snapshot, ds)
+        subset_snapshot = self.request_product(Snapshot, ds)
         assert set(subset_snapshot.files) == {
             "a.txt",
             "c.txt",
@@ -711,7 +707,7 @@ class FSTest(TestBase, SchedulerTestBase):
                 FileContent(path="subdir2/nested_subdir/x.txt", content=content),
             )
         )
-        subset_digest = self.request_single_product(Digest, subset_input)
+        subset_digest = self.request_product(Digest, subset_input)
         assert subset_snapshot.digest == subset_digest
 
     def test_digest_subset_globs_2(self) -> None:
@@ -719,7 +715,7 @@ class FSTest(TestBase, SchedulerTestBase):
             self.generate_original_digest(), PathGlobs(("a.txt", "c.txt", "subdir2/*"))
         )
 
-        subset_snapshot = self.request_single_product(Snapshot, ds)
+        subset_snapshot = self.request_product(Snapshot, ds)
         assert set(subset_snapshot.files) == {"a.txt", "c.txt", "subdir2/a.txt"}
         assert set(subset_snapshot.dirs) == {"subdir2", "subdir2/nested_subdir"}
 
@@ -729,13 +725,13 @@ class FSTest(TestBase, SchedulerTestBase):
             self.generate_original_digest(), PathGlobs(("some_file_not_in_snapshot.txt", "a.txt")),
         )
 
-        subset_snapshot = self.request_single_product(Snapshot, ds)
+        subset_snapshot = self.request_product(Snapshot, ds)
         assert set(subset_snapshot.files) == {"a.txt"}
 
         content = b"dummy content"
         subset_input = CreateDigest((FileContent(path="a.txt", content=content),))
 
-        subset_digest = self.request_single_product(Digest, subset_input)
+        subset_digest = self.request_product(Digest, subset_input)
         assert subset_snapshot.digest == subset_digest
 
     def test_file_content_invalidated(self) -> None:

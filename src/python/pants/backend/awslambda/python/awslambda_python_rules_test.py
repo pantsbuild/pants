@@ -40,13 +40,13 @@ class TestPythonAWSLambdaCreation(ExternalToolTestBase):
                 "--source-root-patterns=src/python",
             ]
         )
-        target = self.request_single_product(
+        target = self.request_product(
             WrappedTarget, Params(Address.parse(addr), bootstrapper)
         ).target
-        created_awslambda = self.request_single_product(
+        created_awslambda = self.request_product(
             CreatedAWSLambda, Params(PythonAwsLambdaFieldSet.create(target), bootstrapper)
         )
-        created_awslambda_digest_contents = self.request_single_product(
+        created_awslambda_digest_contents = self.request_product(
             DigestContents, created_awslambda.digest
         )
         assert len(created_awslambda_digest_contents) == 1

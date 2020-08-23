@@ -83,7 +83,7 @@ class PexTest(TestBase):
                 args.append(f"--python-setup-resolve-all-constraints={resolve_all.value}")
             if constraints_file:
                 args.append(f"--python-setup-requirement-constraints={constraints_file}")
-            return self.request_single_product(
+            return self.request_product(
                 PexRequest, Params(request, create_options_bootstrapper(args=args))
             )
 

@@ -55,7 +55,7 @@ class SourceFilesTest(TestBase):
         expected: Iterable[TargetSources],
         expected_unrooted: Iterable[str] = (),
     ) -> None:
-        result = self.request_single_product(
+        result = self.request_product(
             SourceFiles, Params(SourceFilesRequest(sources_fields), create_options_bootstrapper()),
         )
         assert list(result.snapshot.files) == sorted(

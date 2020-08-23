@@ -41,7 +41,7 @@ class PantsRequirementTest(TestBase):
         expected_module: str = "pants",
     ) -> None:
         self.add_to_build_file("3rdparty/python", f"{build_file_entry}\n")
-        target = self.request_single_product(
+        target = self.request_product(
             WrappedTarget,
             Params(
                 Address("3rdparty/python", target_name=expected_target_name),

@@ -69,7 +69,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
                 """
             ),
         )
-        return self.request_single_product(
+        return self.request_product(
             WrappedTarget,
             Params(
                 Address(package, target_name=name),
@@ -96,7 +96,7 @@ class PylintIntegrationTest(ExternalToolTestBase):
             args.append("--pylint-skip")
         if additional_args:
             args.extend(additional_args)
-        results = self.request_single_product(
+        results = self.request_product(
             LintResults,
             Params(
                 PylintRequest(PylintFieldSet.create(tgt) for tgt in targets),

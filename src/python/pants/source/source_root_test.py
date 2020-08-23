@@ -277,7 +277,7 @@ class SourceRootsRequestTest(TestBase):
             files=(PurePath("src/python/foo/bar.py"), PurePath("tests/python/foo/bar_test.py")),
             dirs=(PurePath("src/python/foo"), PurePath("src/python/baz/qux")),
         )
-        res = self.request_single_product(
+        res = self.request_product(
             SourceRootsResult,
             Params(
                 req,
