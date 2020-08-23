@@ -18,7 +18,19 @@ python_distribution(
 )
 
 python_library(
-  sources=['*.py', '!pants_integration_test.py', '!pants_run_integration_test.py', '!_test.py'],
+  sources=[
+    "*.py",
+    "!test_base.py",
+    "!pants_integration_test.py",
+    "!pants_run_integration_test.py",
+    "!_test.py",
+  ],
+)
+
+python_library(
+  name="test_base",
+  sources=["test_base.py"],
+  dependencies=["//:build_root"],
 )
 
 python_library(
