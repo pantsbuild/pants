@@ -24,6 +24,7 @@ class PreludeIntegrationTest(PantsIntegrationTest):
         ), self.temporary_file_content("main.py", python):
             run = self.run_pants(
                 [
+                    "--backend-packages=pants.backend.python",
                     "--build-file-prelude-globs=prelude",
                     "--source-root-patterns=['/']",
                     "run",

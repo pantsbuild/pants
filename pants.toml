@@ -11,7 +11,6 @@ backend_packages.add = [
   "pants.backend.python.lint.flake8",
   "pants.backend.python.lint.isort",
   "pants.backend.python.typecheck.mypy",
-  "internal_backend.rules_for_testing",
   "internal_backend.utilities",
 ]
 

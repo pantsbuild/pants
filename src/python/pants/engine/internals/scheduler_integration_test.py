@@ -15,6 +15,7 @@ class SchedulerIntegrationTest(PantsIntegrationTest):
         with temporary_dir() as destdir:
             args = [
                 f"--native-engine-visualize-to={destdir}",
+                "--backend-packages=pants.backend.python",
                 "list",
                 "examples/src/python/example/hello/greet",
             ]
@@ -25,6 +26,7 @@ class SchedulerIntegrationTest(PantsIntegrationTest):
     @ensure_daemon
     def test_graceful_termination(self):
         args = [
+            "--backend-packages=['pants.backend.python', 'internal_backend.rules_for_testing']",
             "list-and-die-for-testing",
             "examples/src/python/example/hello/greet",
         ]

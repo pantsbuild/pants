@@ -14,6 +14,8 @@ from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegratio
 
 
 class ExceptionSinkIntegrationTest(PantsDaemonIntegrationTestBase):
+    hermetic = False
+
     def _assert_unhandled_exception_log_matches(self, pid, file_contents, namespace):
         self.assertRegex(
             file_contents,

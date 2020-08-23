@@ -5,6 +5,7 @@ import os
 import shutil
 from contextlib import contextmanager
 from textwrap import dedent
+from typing import List, Optional
 
 import pytest
 
@@ -134,6 +135,8 @@ def create_isolated_git_repo():
 
 
 class ChangedIntegrationTest(PantsIntegrationTest, AbstractTestGenerator):
+    # Git isn't detected if hermetic=True for some reason.
+    hermetic = False
 
     TEST_MAPPING = {
         # A `python_binary` with `sources=['file.name']`.
@@ -210,8 +213,9 @@ class ChangedIntegrationTest(PantsIntegrationTest, AbstractTestGenerator):
                     inner_integration_coverage_test,
                 )
 
-    def run_list(self, extra_args, success=True):
-        pants_run = self.do_command("list", *extra_args, success=success)
+    def run_list(self, extra_args: Optional[List[str]] = None) -> str:
+        pants_run = self.run_pants(["list", *(extra_args or ())])
+        self.assert_success(pants_run)
         return pants_run.stdout
 
     def test_changed_exclude_root_targets_only(self):
@@ -280,7 +284,7 @@ class ChangedIntegrationTest(PantsIntegrationTest, AbstractTestGenerator):
         new_build_file = "src/python/python_targets/BUILD.new"
         with create_isolated_git_repo() as worktree:
             touch(os.path.join(worktree, new_build_file))
-            stdout_data = self.run_list([])
+            stdout_data = self.run_list()
             self.assertEqual(stdout_data.strip(), "")
 
     def test_changed_with_deleted_source(self):

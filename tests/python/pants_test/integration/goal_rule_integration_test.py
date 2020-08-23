@@ -16,11 +16,15 @@ from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegratio
 @pytest.mark.skip(reason="Flaky test. https://github.com/pantsbuild/pants/issues/10478")
 class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
 
+    # TODO: Set hermetic=True after rewriting this test to stop using an example project.
+    hermetic = False
+
     target = "examples/src/python/example/hello::"
 
     @ensure_daemon
     def test_list(self):
-        result = self.do_command("list", self.target, success=True)
+        result = self.run_pants(["list", self.target])
+        self.assert_success(result)
         output_lines = result.stdout.splitlines()
         self.assertEqual(len(output_lines), 4)
         self.assertIn("examples/src/python/example/hello/main", output_lines)
@@ -39,8 +43,8 @@ class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
 
     @ensure_daemon
     def test_goal_validation(self):
-        result = self.do_command("blah", "::", success=False)
-
+        result = self.run_pants(["blah", "::"])
+        self.assert_failure(result)
         self.assertIn("Unknown goals: blah", result.stdout)
 
     def test_list_loop(self):
@@ -60,7 +64,7 @@ class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
 
             # Launch the loop as a background process.
             handle = self.run_pants_with_workdir_without_waiting(
-                ["--loop", "--loop-max=3", "list", f"{tmpdir}:",], workdir, config,
+                ["--loop", "--loop-max=3", "list", f"{tmpdir}:"], workdir=workdir, config=config
             )
 
             # Wait for pantsd to come up and for the loop to stabilize.
@@ -84,11 +88,10 @@ class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
         # and will fail when given the glob `::`.
         command_prefix = ["--pants-config-files=[]"]
         target = "testprojects/tests/python/pants/dummies::"
-        self.do_command(*command_prefix, "--backend-packages=[]", "run", target, success=True)
-        self.do_command(
-            *command_prefix,
-            "--backend-packages='pants.backend.python'",
-            "run",
-            target,
-            success=False,
+        result = self.run_pants([*command_prefix, "--backend-packages=[]", "run", target])
+        self.assert_success(result)
+
+        result = self.run_pants(
+            [*command_prefix, "--backend-packages='pants.backend.python'", "run", target]
         )
+        self.assert_failure(result)
