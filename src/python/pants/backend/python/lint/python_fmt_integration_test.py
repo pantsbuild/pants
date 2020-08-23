@@ -44,13 +44,13 @@ class PythonFmtIntegrationTest(ExternalToolTestBase):
             "--backend-packages=['pants.backend.python.lint.black', 'pants.backend.python.lint.isort']",
             *(extra_args or []),
         ]
-        results = self.request_single_product(
+        results = self.request_product(
             LanguageFmtResults, Params(targets, create_options_bootstrapper(args=args)),
         )
         return results
 
     def get_digest(self, source_files: List[FileContent]) -> Digest:
-        return self.request_single_product(Digest, CreateDigest(source_files))
+        return self.request_product(Digest, CreateDigest(source_files))
 
     def test_multiple_formatters_changing_the_same_file(self) -> None:
         original_source = FileContent(

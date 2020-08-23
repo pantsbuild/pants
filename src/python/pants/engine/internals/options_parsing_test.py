@@ -51,7 +51,7 @@ class TestEngineOptionsParsing(TestBase):
 
         def parse(ob):
             params = Params(Scope(str(GLOBAL_SCOPE)), ob)
-            return self.request_single_product(ScopedOptions, params)
+            return self.request_product(ScopedOptions, params)
 
         # If two OptionsBootstrapper instances are not equal, memoization will definitely not kick in.
         one_opts = ob()

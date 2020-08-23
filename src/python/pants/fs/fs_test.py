@@ -60,7 +60,7 @@ class WorkspaceTest(TestBase):
         # TODO(#8336): at some point, this test should require that Workspace only be invoked from
         #  an @goal_rule
         workspace = Workspace(self.scheduler)
-        digest = self.request_single_product(
+        digest = self.request_product(
             Digest,
             CreateDigest([FileContent("a.txt", b"hello"), FileContent("subdir/b.txt", b"goodbye")]),
         )

@@ -34,13 +34,11 @@ class ArchiveTest(TestBase):
                 zf.writestr(name, content)
         io.flush()
         input_snapshot = self.make_snapshot({"test.zip": io.getvalue()})
-        extracted_digest = self.request_single_product(
+        extracted_digest = self.request_product(
             ExtractedDigest, Params(MaybeExtractable(input_snapshot.digest))
         )
 
-        digest_contents = self.request_single_product(
-            DigestContents, Params(extracted_digest.digest)
-        )
+        digest_contents = self.request_product(DigestContents, Params(extracted_digest.digest))
         assert self.expected_digest_contents == digest_contents
 
     def test_extract_zip_stored(self) -> None:
@@ -61,13 +59,11 @@ class ArchiveTest(TestBase):
                 tf.addfile(tarinfo, BytesIO(content))
         ext = f"tar.{compression}" if compression else "tar"
         input_snapshot = self.make_snapshot({f"test.{ext}": io.getvalue()})
-        extracted_digest = self.request_single_product(
+        extracted_digest = self.request_product(
             ExtractedDigest, Params(MaybeExtractable(input_snapshot.digest))
         )
 
-        digest_contents = self.request_single_product(
-            DigestContents, Params(extracted_digest.digest)
-        )
+        digest_contents = self.request_product(DigestContents, Params(extracted_digest.digest))
         assert self.expected_digest_contents == digest_contents
 
     def test_extract_tar(self) -> None:
@@ -84,11 +80,9 @@ class ArchiveTest(TestBase):
 
     def test_non_archive(self) -> None:
         input_snapshot = self.make_snapshot({"test.sh": b"# A shell script"})
-        extracted_digest = self.request_single_product(
+        extracted_digest = self.request_product(
             ExtractedDigest, Params(MaybeExtractable(input_snapshot.digest))
         )
 
-        digest_contents = self.request_single_product(
-            DigestContents, Params(extracted_digest.digest)
-        )
+        digest_contents = self.request_product(DigestContents, Params(extracted_digest.digest))
         assert DigestContents([FileContent("test.sh", b"# A shell script")]) == digest_contents

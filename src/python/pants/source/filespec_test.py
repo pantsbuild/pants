@@ -25,7 +25,7 @@ class FilespecTest(TestBase):
                 self.create_dir(expected_match)
             else:
                 self.create_file(expected_match)
-        snapshot = self.request_single_product(Snapshot, PathGlobs([glob]))
+        snapshot = self.request_product(Snapshot, PathGlobs([glob]))
         if should_match:
             assert sorted(paths) == sorted(snapshot.files)
         else:

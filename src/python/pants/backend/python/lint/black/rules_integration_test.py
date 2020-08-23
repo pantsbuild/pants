@@ -54,17 +54,17 @@ class BlackIntegrationTest(ExternalToolTestBase):
             args.append("--black-skip")
         options_bootstrapper = create_options_bootstrapper(args=args)
         field_sets = [BlackFieldSet.create(tgt) for tgt in targets]
-        lint_results = self.request_single_product(
+        lint_results = self.request_product(
             LintResults, Params(BlackRequest(field_sets), options_bootstrapper)
         )
-        input_sources = self.request_single_product(
+        input_sources = self.request_product(
             SourceFiles,
             Params(
                 SourceFilesRequest(field_set.sources for field_set in field_sets),
                 options_bootstrapper,
             ),
         )
-        fmt_result = self.request_single_product(
+        fmt_result = self.request_product(
             FmtResult,
             Params(
                 BlackRequest(field_sets, prior_formatter_result=input_sources.snapshot),
@@ -74,7 +74,7 @@ class BlackIntegrationTest(ExternalToolTestBase):
         return lint_results.results, fmt_result
 
     def get_digest(self, source_files: List[FileContent]) -> Digest:
-        return self.request_single_product(Digest, CreateDigest(source_files))
+        return self.request_product(Digest, CreateDigest(source_files))
 
     def test_passing_source(self) -> None:
         target = self.make_target([self.good_source])

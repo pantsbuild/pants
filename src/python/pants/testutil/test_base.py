@@ -8,8 +8,9 @@ import warnings
 from abc import ABC, ABCMeta, abstractmethod
 from collections import defaultdict
 from contextlib import contextmanager
+from pathlib import PurePath
 from tempfile import mkdtemp
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Type, TypeVar, Union, cast
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Type, TypeVar, Union, cast
 
 from pants.base.build_root import BuildRoot
 from pants.build_graph.build_configuration import BuildConfiguration
@@ -24,6 +25,7 @@ from pants.init.engine_initializer import EngineInitializer
 from pants.init.util import clean_global_runtime_state
 from pants.option.global_options import ExecutionOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.option.scope import GLOBAL_SCOPE
 from pants.option.subsystem import Subsystem
 from pants.source import source_root
 from pants.testutil.engine_util import Params
@@ -31,7 +33,6 @@ from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import (
     recursive_dirname,
-    relative_symlink,
     safe_file_dump,
     safe_mkdir,
     safe_mkdtemp,
@@ -73,7 +74,7 @@ class AbstractTestGenerator(ABC):
 
 
 class TestBase(unittest.TestCase, metaclass=ABCMeta):
-    """A baseclass useful for tests requiring a temporary buildroot.
+    """A baseclass useful for tests that run rules with a temporary build root.
 
     :API: public
     """
@@ -81,42 +82,14 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     additional_options: List[str] = []
 
     _scheduler: Optional[SchedulerSession] = None
-    _build_graph = None
-    _address_mapper = None
 
-    def build_path(self, relpath: str) -> str:
-        """Returns the canonical BUILD file path for the given relative build path.
+    _P = TypeVar("_P")
 
-        :API: public
-        """
-        if os.path.basename(relpath).startswith("BUILD"):
-            return relpath
-        else:
-            return os.path.join(relpath, "BUILD")
-
-    def create_dir(self, relpath: str) -> str:
-        """Creates a directory under the buildroot.
-
-        :API: public
-
-        relpath: The relative path to the directory from the build root.
-        """
-        path = os.path.join(self.build_root, relpath)
-        safe_mkdir(path)
-        self.invalidate_for(relpath)
-        return path
-
-    def create_workdir_dir(self, relpath: str) -> str:
-        """Creates a directory under the work directory.
-
-        :API: public
-
-        relpath: The relative path to the directory from the work directory.
-        """
-        path = os.path.join(self.pants_workdir, relpath)
-        safe_mkdir(path)
-        self.invalidate_for(relpath)
-        return path
+    def request_product(
+        self, product_type: Type["TestBase._P"], subject: Union[Params, Any]
+    ) -> "TestBase._P":
+        result = assert_single_element(self.scheduler.product_request(product_type, [subject]))
+        return cast(TestBase._P, result)
 
     def invalidate_for(self, *relpaths):
         """Invalidates all files from the relpath, recursively up to the root.
@@ -129,18 +102,17 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         files = {f for relpath in relpaths for f in recursive_dirname(relpath)}
         return self._scheduler.invalidate_files(files)
 
-    def create_link(self, relsrc: str, reldst: str) -> None:
-        """Creates a symlink within the buildroot.
+    def create_dir(self, relpath: str) -> str:
+        """Creates a directory under the buildroot.
 
         :API: public
 
-        relsrc: A relative path for the source of the link.
-        reldst: A relative path for the destination of the link.
+        relpath: The relative path to the directory from the build root.
         """
-        src = os.path.join(self.build_root, relsrc)
-        dst = os.path.join(self.build_root, reldst)
-        relative_symlink(src, dst)
-        self.invalidate_for(reldst)
+        path = os.path.join(self.build_root, relpath)
+        safe_mkdir(path)
+        self.invalidate_for(relpath)
+        return path
 
     def create_file(self, relpath: str, contents: str = "", mode: str = "w") -> str:
         """Writes to a file under the buildroot.
@@ -168,21 +140,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         for f in files:
             self.create_file(os.path.join(path, f), contents=f)
 
-    def create_workdir_file(self, relpath: str, contents: str = "", mode: str = "w") -> str:
-        """Writes to a file under the work directory.
-
-        :API: public
-
-        relpath:  The relative path to the file from the work directory.
-        contents: A string containing the contents of the file - '' by default..
-        mode:     The mode to write to the file in - over-write by default.
-        """
-        path = os.path.join(self.pants_workdir, relpath)
-        with safe_open(path, mode=mode) as fp:
-            fp.write(contents)
-        return path
-
-    def add_to_build_file(self, relpath: str, target: str) -> str:
+    def add_to_build_file(self, relpath: Union[str, PurePath], target: str) -> str:
         """Adds the given target specification to the BUILD file at relpath.
 
         :API: public
@@ -190,7 +148,10 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         relpath: The relative path to the BUILD file from the build root.
         target:  A string containing the target definition as it would appear in a BUILD file.
         """
-        return self.create_file(self.build_path(relpath), target, mode="a")
+        build_path = (
+            relpath if PurePath(relpath).name.startswith("BUILD") else PurePath(relpath, "BUILD")
+        )
+        return self.create_file(str(build_path), target, mode="a")
 
     @classmethod
     def alias_groups(cls):
@@ -235,37 +196,15 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         self.subprocess_dir = os.path.join(self.build_root, ".pids")
 
         self.options = defaultdict(dict)  # scope -> key-value mapping.
-        self.options[""] = {
+        self.options[GLOBAL_SCOPE] = {
             "pants_workdir": self.pants_workdir,
             "pants_supportdir": os.path.join(self.build_root, "build-support"),
             "pants_distdir": os.path.join(self.build_root, "dist"),
             "pants_configdir": os.path.join(self.build_root, "config"),
             "pants_subprocessdir": self.subprocess_dir,
-            "cache_key_gen_version": "0-test",
-        }
-        self.options["cache"] = {
-            "read_from": [],
-            "write_to": [],
         }
 
         self._build_configuration = self.build_config()
-
-    def buildroot_files(self, relpath: Optional[str] = None) -> Set[str]:
-        """Returns the set of all files under the test build root.
-
-        :API: public
-
-        :param string relpath: If supplied, only collect files from this subtree.
-        :returns: All file paths found.
-        :rtype: set
-        """
-
-        def scan():
-            for root, dirs, files in os.walk(os.path.join(self.build_root, relpath or "")):
-                for f in files:
-                    yield os.path.relpath(os.path.join(root, f), self.build_root)
-
-        return set(scan())
 
     def _reset_engine(self):
         if self._scheduler is not None:
@@ -335,23 +274,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     def scheduler(self) -> SchedulerSession:
         if self._scheduler is None:
             self._init_engine()
-            self.post_scheduler_init()
         return cast(SchedulerSession, self._scheduler)
-
-    def post_scheduler_init(self):
-        """Run after initializing the Scheduler, it will have the same lifetime."""
-        pass
-
-    _P = TypeVar("_P")
-
-    def request_single_product(
-        self, product_type: Type["TestBase._P"], subject: Union[Params, Any]
-    ) -> "TestBase._P":
-        result = assert_single_element(self.scheduler.product_request(product_type, [subject]))
-        return cast(TestBase._P, result)
-
-    def set_options_for_scope(self, scope, **kwargs):
-        self.options[scope].update(kwargs)
 
     def tearDown(self):
         """
@@ -395,17 +318,6 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
             yield
         except exc_class as e:
             raise AssertionError(f"section should not have raised, but did: {e}") from e
-
-    @staticmethod
-    def get_bootstrap_options(cli_options=()):
-        """Retrieves bootstrap options.
-
-        :param cli_options: An iterable of CLI flags to pass as arguments to `OptionsBootstrapper`.
-        """
-        args = tuple(["--pants-config-files=[]"]) + tuple(cli_options)
-        return OptionsBootstrapper.create(
-            env={}, args=args, allow_pantsrc=False
-        ).bootstrap_options.for_global_scope()
 
     def make_snapshot(self, files: Dict[str, Union[str, bytes]]) -> Snapshot:
         """Makes a snapshot from a map of file name to file content."""

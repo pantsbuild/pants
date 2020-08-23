@@ -24,7 +24,7 @@ from pants.testutil.test_base import TestBase
 
 class RunTest(TestBase):
     def create_mock_run_request(self, program_text: bytes) -> RunRequest:
-        digest = self.request_single_product(
+        digest = self.request_product(
             Digest,
             CreateDigest(
                 [FileContent(path="program.py", content=program_text, is_executable=True)]

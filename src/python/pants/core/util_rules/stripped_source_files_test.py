@@ -39,7 +39,7 @@ class StrippedSourceFilesTest(TestBase):
         if not has_source_root_patterns:
             source_root_patterns = ["src/python", "src/java", "tests/python"]
             args.append(f"--source-root-patterns={json.dumps(source_root_patterns)}")
-        result = self.request_single_product(
+        result = self.request_product(
             StrippedSourceFiles, Params(request, create_options_bootstrapper(args=args)),
         )
         return list(result.snapshot.files)

@@ -69,7 +69,7 @@ class TestSetupPyBase(TestBase):
         ]
 
     def tgt(self, addr: str) -> Target:
-        return self.request_single_product(
+        return self.request_product(
             WrappedTarget, Params(Address.parse(addr), create_options_bootstrapper())
         ).target
 
@@ -88,21 +88,21 @@ class TestGenerateChroot(TestSetupPyBase):
         ]
 
     def assert_chroot(self, expected_files, expected_setup_kwargs, addr):
-        chroot = self.request_single_product(
+        chroot = self.request_product(
             SetupPyChroot,
             Params(
                 SetupPyChrootRequest(ExportedTarget(self.tgt(addr)), py2=False),
                 create_options_bootstrapper(),
             ),
         )
-        snapshot = self.request_single_product(Snapshot, Params(chroot.digest))
+        snapshot = self.request_product(Snapshot, Params(chroot.digest))
         assert sorted(expected_files) == sorted(snapshot.files)
         kwargs = json.loads(chroot.setup_keywords_json)
         assert expected_setup_kwargs == kwargs
 
     def assert_error(self, addr: str, exc_cls: Type[Exception]):
         with pytest.raises(ExecutionError) as excinfo:
-            self.request_single_product(
+            self.request_product(
                 SetupPyChroot,
                 Params(
                     SetupPyChrootRequest(ExportedTarget(self.tgt(addr)), py2=False),
@@ -248,14 +248,14 @@ class TestGetSources(TestSetupPyBase):
         expected_package_data,
         addrs,
     ):
-        srcs = self.request_single_product(
+        srcs = self.request_product(
             SetupPySources,
             Params(
                 SetupPySourcesRequest(Targets([self.tgt(addr) for addr in addrs]), py2=False),
                 create_options_bootstrapper(),
             ),
         )
-        chroot_snapshot = self.request_single_product(Snapshot, Params(srcs.digest))
+        chroot_snapshot = self.request_product(Snapshot, Params(srcs.digest))
 
         assert sorted(expected_files) == sorted(chroot_snapshot.files)
         assert sorted(expected_packages) == sorted(srcs.packages)
@@ -354,7 +354,7 @@ class TestGetRequirements(TestSetupPyBase):
         ]
 
     def assert_requirements(self, expected_req_strs, addr):
-        reqs = self.request_single_product(
+        reqs = self.request_product(
             ExportedTargetRequirements,
             Params(DependencyOwner(ExportedTarget(self.tgt(addr))), create_options_bootstrapper()),
         )
@@ -440,7 +440,7 @@ class TestGetOwnedDependencies(TestSetupPyBase):
     def assert_owned(self, owned: Iterable[str], exported: str):
         assert sorted(owned) == sorted(
             od.target.address.spec
-            for od in self.request_single_product(
+            for od in self.request_product(
                 OwnedDependencies,
                 Params(
                     DependencyOwner(ExportedTarget(self.tgt(exported))),
@@ -533,7 +533,7 @@ class TestGetExportingOwner(TestSetupPyBase):
     def assert_is_owner(self, owner: str, owned: str):
         assert (
             owner
-            == self.request_single_product(
+            == self.request_product(
                 ExportedTarget,
                 Params(OwnedDependency(self.tgt(owned)), create_options_bootstrapper()),
             ).target.address.spec
@@ -541,7 +541,7 @@ class TestGetExportingOwner(TestSetupPyBase):
 
     def assert_error(self, owned: str, exc_cls: Type[Exception]):
         with pytest.raises(ExecutionError) as excinfo:
-            self.request_single_product(
+            self.request_product(
                 ExportedTarget,
                 Params(OwnedDependency(self.tgt(owned)), create_options_bootstrapper()),
             )

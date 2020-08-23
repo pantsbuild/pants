@@ -105,7 +105,7 @@ class ModuleMapperTest(TestBase):
         # not generate subtargets.
         self.create_file("tests/python/project_test/demo_test/__init__.py")
         self.add_to_build_file("tests/python/project_test/demo_test", "python_library()")
-        result = self.request_single_product(FirstPartyModuleToAddressMapping, options_bootstrapper)
+        result = self.request_product(FirstPartyModuleToAddressMapping, options_bootstrapper)
         assert result.mapping == FrozenDict(
             {
                 "project.util.dirutil": Address(
@@ -145,7 +145,7 @@ class ModuleMapperTest(TestBase):
                 """
             ),
         )
-        result = self.request_single_product(
+        result = self.request_product(
             ThirdPartyModuleToAddressMapping, Params(create_options_bootstrapper())
         )
         assert result.mapping == FrozenDict(
@@ -162,7 +162,7 @@ class ModuleMapperTest(TestBase):
         )
 
         def get_owner(module: str) -> Optional[Address]:
-            return self.request_single_product(
+            return self.request_product(
                 PythonModuleOwner, Params(PythonModule(module), options_bootstrapper)
             ).address
 

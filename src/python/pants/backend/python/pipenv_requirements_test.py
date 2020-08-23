@@ -40,7 +40,7 @@ class PipenvRequirementsTest(TestBase):
     ) -> None:
         self.add_to_build_file("", f"{build_file_entry}\n")
         self.create_file(pipfile_lock_relpath, dumps(pipfile_lock))
-        targets = self.request_single_product(
+        targets = self.request_product(
             Targets,
             Params(
                 Specs(AddressSpecs([DescendantAddresses("")]), FilesystemSpecs([])),

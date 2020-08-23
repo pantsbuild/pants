@@ -40,7 +40,7 @@ class FilterEmptySourcesTest(TestBase):
             empty_addr, Sources(None, address=empty_addr), Tags(None, address=empty_addr)
         )
 
-        result = self.request_single_product(
+        result = self.request_product(
             FieldSetsWithSources,
             Params(
                 FieldSetsWithSourcesRequest([valid_field_set, empty_field_set]),
@@ -65,7 +65,7 @@ class FilterEmptySourcesTest(TestBase):
         empty_tgt = MockTarget({}, address=Address("", target_name="empty"))
         invalid_tgt = MockTargetWithNoSourcesField({}, address=Address("", target_name="invalid"))
 
-        result = self.request_single_product(
+        result = self.request_product(
             TargetsWithSources,
             Params(
                 TargetsWithSourcesRequest([valid_tgt, empty_tgt, invalid_tgt]),
