@@ -6,12 +6,10 @@ from typing import List, Optional
 
 from pants.backend.project_info.dependencies import Dependencies, DependencyType, rules
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
-from pants.testutil.goal_rule_test_base import GoalRuleTestBase
+from pants.testutil.test_base import TestBase
 
 
-class DependenciesIntegrationTest(GoalRuleTestBase):
-    goal_cls = Dependencies
-
+class DependenciesIntegrationTest(TestBase):
     @classmethod
     def target_types(cls):
         return [PythonLibrary, PythonRequirementLibrary]
@@ -46,11 +44,11 @@ class DependenciesIntegrationTest(GoalRuleTestBase):
         transitive: bool = False,
         dependency_type: DependencyType = DependencyType.SOURCE,
     ) -> None:
-        env = {"PANTS_BACKEND_PACKAGES2": "pants.backend.project_info"}
         args = [f"--type={dependency_type.value}"]
         if transitive:
             args.append("--transitive")
-        self.assert_console_output(*expected, args=[*args, *specs], env=env)
+        result = self.run_goal_rule(Dependencies, args=[*args, *specs])
+        assert result.stdout.splitlines() == expected
 
     def test_no_target(self) -> None:
         self.assert_dependencies(specs=[], expected=[])
@@ -84,7 +82,7 @@ class DependenciesIntegrationTest(GoalRuleTestBase):
             specs=["some/other/target"],
             transitive=True,
             dependency_type=DependencyType.SOURCE,
-            expected=["3rdparty/python:req2", "some/target", "3rdparty/python:req1", "dep/target",],
+            expected=["3rdparty/python:req1", "3rdparty/python:req2", "dep/target", "some/target"],
         )
 
         # `--type=3rdparty`
@@ -112,10 +110,10 @@ class DependenciesIntegrationTest(GoalRuleTestBase):
             transitive=True,
             dependency_type=DependencyType.SOURCE_AND_THIRD_PARTY,
             expected=[
-                "some/target",
-                "dep/target",
                 "3rdparty/python:req1",
                 "3rdparty/python:req2",
+                "dep/target",
+                "some/target",
                 "req1==1.0.0",
                 "req2==1.0.0",
             ],
@@ -125,10 +123,10 @@ class DependenciesIntegrationTest(GoalRuleTestBase):
         # on it.
         self.assert_dependencies(
             specs=["::"],
-            expected=["3rdparty/python:req1", "3rdparty/python:req2", "dep/target", "some/target",],
+            expected=["3rdparty/python:req1", "3rdparty/python:req2", "dep/target", "some/target"],
         )
         self.assert_dependencies(
             specs=["::"],
             transitive=True,
-            expected=["3rdparty/python:req1", "3rdparty/python:req2", "dep/target", "some/target",],
+            expected=["3rdparty/python:req1", "3rdparty/python:req2", "dep/target", "some/target"],
         )

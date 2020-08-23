@@ -7,51 +7,53 @@ from pathlib import Path
 from pants.engine.console import Console
 from pants.engine.fs import CreateDigest, Digest, FileContent, Snapshot, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
-from pants.engine.rules import Get, RootRule, goal_rule
+from pants.engine.rules import Get, goal_rule, rule
 from pants.fs.fs import is_child_of
-from pants.testutil.goal_rule_test_base import GoalRuleTestBase
 from pants.testutil.test_base import TestBase
 
 
+class WorkspaceGoalSubsystem(GoalSubsystem):
+    name = "workspace-goal"
+
+
+class WorkspaceGoal(Goal):
+    subsystem_cls = WorkspaceGoalSubsystem
+
+
 @dataclass(frozen=True)
-class MessageToGoalRule:
+class DigestRequest:
     create_digest: CreateDigest
 
 
-class MockWorkspaceGoalSubsystem(GoalSubsystem):
-    name = "mock-workspace-goal"
-
-
-class MockWorkspaceGoal(Goal):
-    subsystem_cls = MockWorkspaceGoalSubsystem
+@rule
+def digest_request_singleton() -> DigestRequest:
+    fc = FileContent(path="a.txt", content=b"hello")
+    return DigestRequest(CreateDigest([fc]))
 
 
 @goal_rule
 async def workspace_goal_rule(
-    console: Console, workspace: Workspace, msg: MessageToGoalRule
-) -> MockWorkspaceGoal:
-    snapshot = await Get(Snapshot, CreateDigest, msg.create_digest)
+    console: Console, workspace: Workspace, digest_request: DigestRequest
+) -> WorkspaceGoal:
+    snapshot = await Get(Snapshot, CreateDigest, digest_request.create_digest)
     workspace.write_digest(snapshot.digest)
     console.print_stdout(snapshot.files[0], end="")
-    return MockWorkspaceGoal(exit_code=0)
+    return WorkspaceGoal(exit_code=0)
 
 
-class WorkspaceInGoalRuleTest(GoalRuleTestBase):
+class WorkspaceInGoalRuleTest(TestBase):
     """This test is meant to ensure that the Workspace type successfully invokes the rust FFI
     function to write to disk in the context of a @goal_rule, without crashing or otherwise
     failing."""
 
-    goal_cls = MockWorkspaceGoal
-
     @classmethod
     def rules(cls):
-        return super().rules() + [RootRule(MessageToGoalRule), workspace_goal_rule]
+        return (*super().rules(), workspace_goal_rule, digest_request_singleton)
 
-    def test(self):
-        msg = MessageToGoalRule(
-            create_digest=CreateDigest([FileContent(path="a.txt", content=b"hello")])
-        )
-        self.assert_console_output_contains("a.txt", additional_params=[msg])
+    def test_goal(self) -> None:
+        result = self.run_goal_rule(WorkspaceGoal)
+        assert result.exit_code == 0
+        assert result.stdout == "a.txt"
         assert Path(self.build_root, "a.txt").read_text() == "hello"
 
 

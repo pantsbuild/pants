@@ -8,27 +8,46 @@ import warnings
 from abc import ABC, ABCMeta, abstractmethod
 from collections import defaultdict
 from contextlib import contextmanager
+from dataclasses import dataclass
+from io import StringIO
 from pathlib import PurePath
 from tempfile import mkdtemp
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Type, TypeVar, Union, cast
+from typing import (
+    Any,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Type,
+    TypeVar,
+    Union,
+    cast,
+)
 
 from pants.base.build_root import BuildRoot
+from pants.base.specs_parser import SpecsParser
 from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.addresses import Address
-from pants.engine.fs import PathGlobs, PathGlobsAndRoot, Snapshot
+from pants.engine.console import Console
+from pants.engine.fs import PathGlobs, PathGlobsAndRoot, Snapshot, Workspace
+from pants.engine.goal import Goal
 from pants.engine.internals.native import Native
 from pants.engine.internals.scheduler import SchedulerSession
+from pants.engine.process import InteractiveRunner
 from pants.engine.rules import RootRule
 from pants.engine.target import Target
 from pants.init.engine_initializer import EngineInitializer
 from pants.init.util import clean_global_runtime_state
-from pants.option.global_options import ExecutionOptions
+from pants.option.global_options import ExecutionOptions, GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.scope import GLOBAL_SCOPE
 from pants.option.subsystem import Subsystem
 from pants.source import source_root
 from pants.testutil.engine_util import Params
+from pants.testutil.option_util import create_options_bootstrapper
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import (
@@ -73,6 +92,17 @@ class AbstractTestGenerator(ABC):
         setattr(cls, method_name, method)
 
 
+@dataclass(frozen=True)
+class GoalRuleResult:
+    exit_code: int
+    stdout: str
+    stderr: str
+
+    @staticmethod
+    def noop() -> "GoalRuleResult":
+        return GoalRuleResult(0, stdout="", stderr="")
+
+
 class TestBase(unittest.TestCase, metaclass=ABCMeta):
     """A baseclass useful for tests that run rules with a temporary build root.
 
@@ -90,6 +120,40 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     ) -> "TestBase._P":
         result = assert_single_element(self.scheduler.product_request(product_type, [subject]))
         return cast(TestBase._P, result)
+
+    def run_goal_rule(
+        self,
+        goal: Type[Goal],
+        *,
+        global_args: Optional[Iterable[str]] = None,
+        args: Optional[Iterable[str]] = None,
+        env: Optional[Mapping[str, str]] = None,
+    ) -> GoalRuleResult:
+        options_bootstrapper = create_options_bootstrapper(
+            args=(*(global_args or []), goal.name, *(args or [])), env=env,
+        )
+
+        raw_specs = options_bootstrapper.get_full_options(
+            [*GlobalOptions.known_scope_infos(), *goal.subsystem_cls.known_scope_infos()]
+        ).specs
+        specs = SpecsParser(self.build_root).parse_specs(raw_specs)
+
+        stdout, stderr = StringIO(), StringIO()
+        console = Console(stdout=stdout, stderr=stderr)
+
+        exit_code = self.scheduler.run_goal_rule(
+            goal,
+            Params(
+                specs,
+                console,
+                options_bootstrapper,
+                Workspace(self.scheduler),
+                InteractiveRunner(self.scheduler),
+            ),
+        )
+
+        console.flush()
+        return GoalRuleResult(exit_code, stdout.getvalue(), stderr.getvalue())
 
     def invalidate_for(self, *relpaths):
         """Invalidates all files from the relpath, recursively up to the root.

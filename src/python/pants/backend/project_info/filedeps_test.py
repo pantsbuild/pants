@@ -6,7 +6,7 @@ from typing import List, Optional, Set
 from pants.backend.codegen.protobuf.target_types import ProtobufLibrary
 from pants.backend.project_info import filedeps
 from pants.engine.target import Dependencies, Sources, Target
-from pants.testutil.goal_rule_test_base import GoalRuleTestBase
+from pants.testutil.test_base import TestBase
 
 
 class MockTarget(Target):
@@ -14,9 +14,7 @@ class MockTarget(Target):
     core_fields = (Sources, Dependencies)
 
 
-class FiledepsTest(GoalRuleTestBase):
-    goal_cls = filedeps.Filedeps
-
+class FiledepsTest(TestBase):
     @classmethod
     def rules(cls):
         return (*super().rules(), *filedeps.rules())
@@ -51,7 +49,8 @@ class FiledepsTest(GoalRuleTestBase):
             args.append("--filedeps-globs")
         if transitive:
             args.append("--filedeps-transitive")
-        self.assert_console_output(*expected, args=(*args, *targets))
+        result = self.run_goal_rule(filedeps.Filedeps, args=(*args, *targets))
+        assert result.stdout.splitlines() == sorted(expected)
 
     def test_no_target(self) -> None:
         self.assert_filedeps(targets=[], expected=set())
