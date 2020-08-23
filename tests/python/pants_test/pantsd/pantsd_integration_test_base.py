@@ -13,7 +13,6 @@ from colors import bold, cyan, magenta
 
 from pants.pantsd.process_manager import ProcessManager
 from pants.testutil.pants_integration_test import PantsIntegrationTest, kill_daemon, read_pantsd_log
-from pants.testutil.retry import attempts
 from pants.util.collections import recursively_update
 from pants.util.contextutil import temporary_dir
 
@@ -22,6 +21,23 @@ def banner(s):
     print(cyan("=" * 63))
     print(cyan(f"- {s} {('-' * (60 - len(s)))}"))
     print(cyan("=" * 63))
+
+
+def attempts(
+    msg: str, *, delay: float = 0.5, timeout: float = 30, backoff: float = 1.2,
+) -> Iterator[None]:
+    """A generator that yields a number of times before failing.
+
+    A caller should break out of a loop on the generator in order to succeed.
+    """
+    count = 0
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        count += 1
+        yield
+        time.sleep(delay)
+        delay *= backoff
+    raise AssertionError(f"After {count} attempts in {timeout} seconds: {msg}")
 
 
 class PantsDaemonMonitor(ProcessManager):

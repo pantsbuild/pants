@@ -8,7 +8,8 @@ from pants.backend.project_info.list_targets import ListSubsystem, list_targets
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.engine.addresses import Address, Addresses
 from pants.engine.target import DescriptionField, ProvidesField, Target, UnexpandedTargets
-from pants.testutil.engine.util import MockConsole, MockGet, create_goal_subsystem, run_rule
+from pants.testutil.engine_util import MockConsole, MockGet, run_rule
+from pants.testutil.option_util import create_goal_subsystem
 
 
 class MockTarget(Target):

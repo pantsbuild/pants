@@ -17,13 +17,8 @@ from pants.engine.target import (
     TargetWithOrigin,
 )
 from pants.option.global_options import GlobalOptions
-from pants.testutil.engine.util import (
-    MockConsole,
-    MockGet,
-    create_goal_subsystem,
-    create_subsystem,
-    run_rule,
-)
+from pants.testutil.engine_util import MockConsole, MockGet, run_rule
+from pants.testutil.option_util import create_goal_subsystem, create_subsystem
 from pants.testutil.test_base import TestBase
 
 

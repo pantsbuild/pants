@@ -19,7 +19,8 @@ from pants.engine.addresses import Address
 from pants.engine.fs import EMPTY_DIGEST, Digest, FileContent, MergeDigests, Workspace
 from pants.engine.target import Sources, Target, Targets
 from pants.engine.unions import UnionMembership
-from pants.testutil.engine.util import MockConsole, MockGet, create_goal_subsystem, run_rule
+from pants.testutil.engine_util import MockConsole, MockGet, run_rule
+from pants.testutil.option_util import create_goal_subsystem
 from pants.testutil.test_base import TestBase
 from pants.util.logging import LogLevel
 

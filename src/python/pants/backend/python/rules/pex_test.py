@@ -25,9 +25,9 @@ from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import RootRule
 from pants.engine.target import FieldSet
 from pants.python.python_setup import PythonSetup
-from pants.testutil.engine.util import Params, create_subsystem
+from pants.testutil.engine_util import Params
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
-from pants.testutil.option.util import create_options_bootstrapper
+from pants.testutil.option_util import create_options_bootstrapper, create_subsystem
 from pants.util.frozendict import FrozenDict
 
 

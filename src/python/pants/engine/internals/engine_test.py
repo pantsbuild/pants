@@ -18,7 +18,7 @@ from pants.reporting.streaming_workunit_handler import (
     StreamingWorkunitContext,
     StreamingWorkunitHandler,
 )
-from pants.testutil.engine.util import assert_equal_with_printing, remove_locations_from_traceback
+from pants.testutil.engine_util import assert_equal_with_printing, remove_locations_from_traceback
 from pants.testutil.test_base import TestBase
 from pants.util.logging import LogLevel
 

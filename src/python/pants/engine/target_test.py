@@ -39,7 +39,7 @@ from pants.engine.target import (
     generate_subtarget_address,
 )
 from pants.engine.unions import UnionMembership
-from pants.testutil.engine.util import MockGet, run_rule
+from pants.testutil.engine_util import MockGet, run_rule
 from pants.util.collections import ensure_str_list
 from pants.util.frozendict import FrozenDict
 from pants.util.ordered_set import OrderedSet

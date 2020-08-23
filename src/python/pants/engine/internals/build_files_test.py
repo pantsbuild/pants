@@ -42,8 +42,8 @@ from pants.engine.rules import RootRule
 from pants.engine.target import Dependencies, Sources, Tags, Target
 from pants.option.global_options import GlobalOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.testutil.engine.util import MockGet, Params, create_subsystem, run_rule
-from pants.testutil.option.util import create_options_bootstrapper
+from pants.testutil.engine_util import MockGet, Params, run_rule
+from pants.testutil.option_util import create_options_bootstrapper, create_subsystem
 from pants.testutil.test_base import TestBase
 from pants.util.frozendict import FrozenDict
 

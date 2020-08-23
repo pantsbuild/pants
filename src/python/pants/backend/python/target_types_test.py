@@ -16,7 +16,7 @@ from pants.engine.addresses import Address
 from pants.engine.rules import SubsystemRule
 from pants.engine.target import InvalidFieldException, InvalidFieldTypeException
 from pants.python.python_requirement import PythonRequirement
-from pants.testutil.option.util import create_options_bootstrapper
+from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
 

@@ -16,6 +16,7 @@ from pants.build_graph.build_configuration import BuildConfiguration
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.addresses import Address
 from pants.engine.fs import PathGlobs, PathGlobsAndRoot, Snapshot
+from pants.engine.internals.native import Native
 from pants.engine.internals.scheduler import SchedulerSession
 from pants.engine.rules import RootRule
 from pants.engine.target import Target
@@ -25,7 +26,7 @@ from pants.option.global_options import ExecutionOptions
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.subsystem import Subsystem
 from pants.source import source_root
-from pants.testutil.engine.util import Params, init_native
+from pants.testutil.engine_util import Params
 from pants.util.collections import assert_single_element
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import (
@@ -322,7 +323,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
             local_store_dir=local_store_dir,
             local_execution_root_dir=local_execution_root_dir,
             named_caches_dir=named_caches_dir,
-            native=init_native(),
+            native=Native(),
             options_bootstrapper=options_bootstrapper,
             build_root=self.build_root,
             build_configuration=self.build_config(),

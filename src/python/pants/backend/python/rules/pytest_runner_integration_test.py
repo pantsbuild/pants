@@ -18,10 +18,10 @@ from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, FileContent
 from pants.engine.process import InteractiveRunner
 from pants.engine.rules import RootRule
-from pants.testutil.engine.util import Params
+from pants.testutil.engine_util import Params
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
-from pants.testutil.interpreter_selection_utils import skip_unless_python27_and_python3_present
-from pants.testutil.option.util import create_options_bootstrapper
+from pants.testutil.option_util import create_options_bootstrapper
+from pants.testutil.python_interpreter_selection import skip_unless_python27_and_python3_present
 
 
 class PytestRunnerIntegrationTest(ExternalToolTestBase):
