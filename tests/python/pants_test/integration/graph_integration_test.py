@@ -10,6 +10,7 @@ from typing import Iterator
 
 from pants.option.scope import GLOBAL_SCOPE_CONFIG_SECTION
 from pants.testutil.pants_integration_test import PantsIntegrationTest
+from pants.util.contextutil import overwrite_file_content
 
 
 class GraphIntegrationTest(PantsIntegrationTest):
@@ -69,7 +70,7 @@ class GraphIntegrationTest(PantsIntegrationTest):
             )
             """
         )
-        with self.overwrite_file_content(build_path, f"{original_content}\n{new_content}"):
+        with overwrite_file_content(build_path, f"{original_content}\n{new_content}"):
             yield
 
     @unittest.skip("flaky: https://github.com/pantsbuild/pants/issues/8520")

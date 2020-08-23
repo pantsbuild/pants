@@ -1,12 +1,12 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.testutil.pants_integration_test import PantsIntegrationTest
+from pants.testutil.pants_integration_test import PantsIntegrationTest, setup_tmpdir
 
 
 class BuildIgnoreIntegrationTest(PantsIntegrationTest):
     def test_build_ignore_list(self) -> None:
-        with self.setup_tmpdir({"dir/BUILD": "files(sources=[])"}) as tmpdir:
+        with setup_tmpdir({"dir/BUILD": "files(sources=[])"}) as tmpdir:
             ignore_result = self.run_pants(
                 [f"--build-ignore={tmpdir}/dir", "list", f"{tmpdir}/dir"]
             )
@@ -21,7 +21,7 @@ class BuildIgnoreIntegrationTest(PantsIntegrationTest):
             "dir1/BUILD": "files(sources=[])",
             "dir2/BUILD": "files(sources=[], dependencies=['{tmpdir}/dir1'])",
         }
-        with self.setup_tmpdir(sources) as tmpdir:
+        with setup_tmpdir(sources) as tmpdir:
             ignore_result = self.run_pants(
                 [f"--build-ignore={tmpdir}/dir1", "dependencies", f"{tmpdir}/dir2"]
             )

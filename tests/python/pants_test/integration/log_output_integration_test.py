@@ -3,7 +3,7 @@
 
 from textwrap import dedent
 
-from pants.testutil.pants_integration_test import PantsIntegrationTest
+from pants.testutil.pants_integration_test import PantsIntegrationTest, setup_tmpdir
 
 
 class LogOutputIntegrationTest(PantsIntegrationTest):
@@ -18,7 +18,7 @@ class LogOutputIntegrationTest(PantsIntegrationTest):
             ),
             "src/python/project/BUILD": "python_library()",
         }
-        with self.setup_tmpdir(sources) as tmpdir:
+        with setup_tmpdir(sources) as tmpdir:
             result = self.run_pants(
                 [
                     "--no-dynamic-ui",

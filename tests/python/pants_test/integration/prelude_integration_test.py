@@ -4,7 +4,7 @@
 import os
 from textwrap import dedent
 
-from pants.testutil.pants_integration_test import PantsIntegrationTest
+from pants.testutil.pants_integration_test import PantsIntegrationTest, setup_tmpdir
 
 
 class PreludeIntegrationTest(PantsIntegrationTest):
@@ -19,7 +19,7 @@ class PreludeIntegrationTest(PantsIntegrationTest):
             "BUILD": "make_binary_macro()",
             "main.py": "print('Hello world!')",
         }
-        with self.setup_tmpdir(sources) as tmpdir:
+        with setup_tmpdir(sources) as tmpdir:
             run = self.run_pants(
                 [
                     "--backend-packages=pants.backend.python",

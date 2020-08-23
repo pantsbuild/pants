@@ -119,6 +119,49 @@ class PantsJoinHandle:
         )
 
 
+# -----------------------------------------------------------------------------------------------
+# Environment setup.
+# -----------------------------------------------------------------------------------------------
+
+
+@contextmanager
+def setup_tmpdir(files: Mapping[str, str]) -> Iterator[str]:
+    """Create a temporary directory with the given files and return the tmpdir (relative to the
+    build root).
+
+    The `files` parameter is a dictionary of file paths to content. All file paths will be prefixed
+    with the tmpdir. The file content can use `{tmpdir}` to have it substituted with the actual
+    tmpdir via a format string.
+
+    This is useful to set up controlled test environments, such as setting up source files and
+    BUILD files.
+    """
+    with temporary_dir(root_dir=get_buildroot()) as tmpdir:
+        rel_tmpdir = os.path.relpath(tmpdir, get_buildroot())
+        for path, content in files.items():
+            safe_file_dump(
+                os.path.join(tmpdir, path), content.format(tmpdir=rel_tmpdir), makedirs=True
+            )
+        yield rel_tmpdir
+
+
+@contextmanager
+def temporary_workdir(cleanup: bool = True) -> Iterator[str]:
+    # We can hard-code '.pants.d' here because we know that will always be its value
+    # in the pantsbuild/pants repo (e.g., that's what we .gitignore in that repo).
+    # Grabbing the pants_workdir config would require this pants's config object,
+    # which we don't have a reference to here.
+    root = os.path.join(get_buildroot(), ".pants.d", "tmp")
+    safe_mkdir(root)
+    with temporary_dir(root_dir=root, cleanup=cleanup, suffix=".pants.d") as tmpdir:
+        yield tmpdir
+
+
+# -----------------------------------------------------------------------------------------------
+# Pantsd and logs.
+# -----------------------------------------------------------------------------------------------
+
+
 def kill_daemon(pid_dir=None):
     args = ["./pants"]
     if pid_dir:
@@ -332,7 +375,7 @@ class PantsIntegrationTest(unittest.TestCase):
             map of key -> value.
         :param kwargs: Extra keyword args to pass to `subprocess.Popen`.
         """
-        with self.temporary_workdir() as workdir:
+        with temporary_workdir() as workdir:
             return self.run_pants_with_workdir(
                 command,
                 workdir=workdir,
@@ -351,35 +394,12 @@ class PantsIntegrationTest(unittest.TestCase):
         pants_run.assert_failure(msg)
 
     @staticmethod
-    @contextmanager
-    def setup_tmpdir(files: Mapping[str, str]) -> Iterator[str]:
-        """Create a temporary directory with the given files and return the tmpdir (relative to the
-        build root).
-
-        The `files` parameter is a dictionary of file paths to content. All file paths will be
-        prefixed with the tmpdir. The file content can use `{tmpdir}` to have it substituted with
-        the actual tmpdir via a format string.
-
-        This is useful to set up controlled test environments, such as setting up source files and
-        BUILD files.
-        """
-        with temporary_dir(root_dir=get_buildroot()) as tmpdir:
-            rel_tmpdir = os.path.relpath(tmpdir, get_buildroot())
-            for path, content in files.items():
-                safe_file_dump(
-                    os.path.join(tmpdir, path), content.format(tmpdir=rel_tmpdir), makedirs=True
-                )
-            yield rel_tmpdir
-
-    @staticmethod
     def temporary_workdir(cleanup: bool = True):
         # We can hard-code '.pants.d' here because we know that will always be its value
         # in the pantsbuild/pants repo (e.g., that's what we .gitignore in that repo).
         # Grabbing the pants_workdir config would require this pants's config object,
         # which we don't have a reference to here.
-        root = os.path.join(get_buildroot(), ".pants.d", "tmp")
-        safe_mkdir(root)
-        return temporary_dir(root_dir=root, cleanup=cleanup, suffix=".pants.d")
+        return temporary_workdir(cleanup=cleanup)
 
     @staticmethod
     @contextmanager

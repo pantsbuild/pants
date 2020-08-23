@@ -12,7 +12,7 @@ from textwrap import dedent
 
 import pytest
 
-from pants.testutil.pants_integration_test import read_pantsd_log
+from pants.testutil.pants_integration_test import read_pantsd_log, temporary_workdir
 from pants.util.contextutil import environment_as, temporary_dir, temporary_file
 from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, safe_open, touch
 from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
@@ -650,7 +650,7 @@ Interrupted by user over pailgun client!
         """Tests that the --concurrent flag overrides the --pantsd flag, because we don't allow
         concurrent runs under pantsd."""
         config = {"GLOBAL": {"concurrent": True, "pantsd": True}}
-        with self.temporary_workdir() as workdir:
+        with temporary_workdir() as workdir:
             pants_run = self.run_pants_with_workdir(["goals"], workdir=workdir, config=config)
             pants_run.assert_success()
             pantsd_log_location = os.path.join(workdir, "pantsd", "pantsd.log")

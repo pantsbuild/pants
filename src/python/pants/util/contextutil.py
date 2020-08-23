@@ -10,9 +10,10 @@ import termios
 import threading
 import zipfile
 from contextlib import contextmanager
+from pathlib import Path
 from queue import Queue
 from socketserver import TCPServer
-from typing import IO, Any, Iterator, Mapping, Optional, Tuple, Type, Union
+from typing import IO, Any, Callable, Iterator, Mapping, Optional, Tuple, Type, Union
 
 from colors import green
 
@@ -223,6 +224,36 @@ def temporary_file(
         finally:
             if cleanup:
                 safe_delete(fd.name)
+
+
+@contextmanager
+def overwrite_file_content(
+    file_path: Union[str, Path],
+    temporary_content: Optional[Union[bytes, str, Callable[[bytes], bytes]]] = None,
+) -> Iterator[None]:
+    """A helper that resets a file after the method runs.
+
+     It will read a file, save the content, maybe write temporary_content to it, yield, then
+     write the original content to the file.
+
+    :param file_path: Absolute path to the file to be reset after the method runs.
+    :param temporary_content: Content to write to the file, or a function from current content
+      to new temporary content.
+    """
+    file_path = Path(file_path)
+    original_content = file_path.read_bytes()
+    try:
+        if temporary_content is not None:
+            if callable(temporary_content):
+                content = temporary_content(original_content)
+            elif isinstance(temporary_content, bytes):
+                content = temporary_content
+            else:
+                content = temporary_content.encode()
+            file_path.write_bytes(content)
+        yield
+    finally:
+        file_path.write_bytes(original_content)
 
 
 @contextmanager

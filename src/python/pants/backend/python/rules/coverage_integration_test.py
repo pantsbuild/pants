@@ -6,7 +6,7 @@ from pathlib import Path
 from textwrap import dedent
 
 from pants.base.build_environment import get_buildroot
-from pants.testutil.pants_integration_test import PantsIntegrationTest, PantsResult
+from pants.testutil.pants_integration_test import PantsIntegrationTest, PantsResult, setup_tmpdir
 
 
 class CoverageIntegrationTest(PantsIntegrationTest):
@@ -117,7 +117,7 @@ class CoverageIntegrationTest(PantsIntegrationTest):
         return result
 
     def test_coverage(self) -> None:
-        with self.setup_tmpdir(self.sources) as tmpdir:
+        with setup_tmpdir(self.sources) as tmpdir:
             result = self.run_coverage(tmpdir)
         assert (
             dedent(
@@ -140,7 +140,7 @@ class CoverageIntegrationTest(PantsIntegrationTest):
         )
 
     def test_coverage_with_filter(self) -> None:
-        with self.setup_tmpdir(self.sources) as tmpdir:
+        with setup_tmpdir(self.sources) as tmpdir:
             result = self.run_coverage(
                 tmpdir, "--coverage-py-filter=['project.lib', 'project_test.no_src']"
             )
@@ -160,7 +160,7 @@ class CoverageIntegrationTest(PantsIntegrationTest):
         )
 
     def test_coverage_raw(self) -> None:
-        with self.setup_tmpdir(self.sources) as tmpdir:
+        with setup_tmpdir(self.sources) as tmpdir:
             result = self.run_coverage(tmpdir, "--coverage-py-report=raw")
         assert "Wrote raw coverage report to `dist/coverage/python`" in result.stderr
         coverage_data = Path(get_buildroot(), "dist", "coverage", "python", ".coverage")
@@ -179,7 +179,7 @@ class CoverageIntegrationTest(PantsIntegrationTest):
         }
 
     def test_coverage_html_xml_json(self) -> None:
-        with self.setup_tmpdir(self.sources) as tmpdir:
+        with setup_tmpdir(self.sources) as tmpdir:
             result = self.run_coverage(tmpdir, "--coverage-py-report=['xml', 'html', 'json']")
         coverage_path = Path(get_buildroot(), "dist", "coverage", "python")
         assert coverage_path.exists() is True

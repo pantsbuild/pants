@@ -3,7 +3,7 @@
 
 from textwrap import dedent
 
-from pants.testutil.pants_integration_test import PantsIntegrationTest
+from pants.testutil.pants_integration_test import PantsIntegrationTest, setup_tmpdir
 
 
 class RunPythonBinaryIntegrationTest(PantsIntegrationTest):
@@ -37,7 +37,7 @@ class RunPythonBinaryIntegrationTest(PantsIntegrationTest):
             ),
             "src_root2/utils/BUILD": "python_library()",
         }
-        with self.setup_tmpdir(sources) as tmpdir:
+        with setup_tmpdir(sources) as tmpdir:
             result = self.run_pants(
                 [
                     "--backend-packages=pants.backend.python",
