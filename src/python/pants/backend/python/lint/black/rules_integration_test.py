@@ -13,9 +13,9 @@ from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.rules import RootRule
 from pants.engine.target import Target
-from pants.testutil.engine.util import Params
+from pants.testutil.engine_util import Params
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
-from pants.testutil.option.util import create_options_bootstrapper
+from pants.testutil.option_util import create_options_bootstrapper
 
 
 class BlackIntegrationTest(ExternalToolTestBase):

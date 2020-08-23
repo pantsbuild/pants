@@ -6,8 +6,6 @@ python_distribution(
   dependencies=[
     ':testutil',
     ':int-test-for-export',
-    'src/python/pants/testutil/engine',
-    'src/python/pants/testutil/option',
   ],
   provides=pants_setup_py(
     name='pantsbuild.pants.testutil',

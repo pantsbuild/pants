@@ -13,8 +13,8 @@ from pants.core.util_rules import stripped_source_files
 from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.fs import DigestContents
 from pants.engine.rules import RootRule
-from pants.testutil.engine.util import Params
-from pants.testutil.option.util import create_options_bootstrapper
+from pants.testutil.engine_util import Params
+from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
 

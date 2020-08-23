@@ -10,7 +10,7 @@ from typing import Any, FrozenSet
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import Get, RootRule, rule
 from pants.engine.unions import UnionRule, union
-from pants.testutil.engine.util import (
+from pants.testutil.engine_util import (
     Params,
     assert_equal_with_printing,
     remove_locations_from_traceback,

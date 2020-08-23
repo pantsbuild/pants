@@ -20,8 +20,8 @@ from pants.backend.python.target_types import PythonLibrary, PythonRequirementLi
 from pants.core.util_rules import source_files, stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.rules import RootRule
-from pants.testutil.engine.util import Params
-from pants.testutil.option.util import create_options_bootstrapper
+from pants.testutil.engine_util import Params
+from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 from pants.util.frozendict import FrozenDict
 

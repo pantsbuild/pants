@@ -10,8 +10,8 @@ from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.core.util_rules.source_files import rules as source_files_rules
 from pants.engine.addresses import Address
 from pants.engine.target import Sources as SourcesField
-from pants.testutil.engine.util import Params
-from pants.testutil.option.util import create_options_bootstrapper
+from pants.testutil.engine_util import Params
+from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
 

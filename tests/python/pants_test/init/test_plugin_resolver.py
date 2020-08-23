@@ -21,14 +21,14 @@ from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import RootRule
 from pants.init.plugin_resolver import PluginResolver
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.testutil.engine.util import Params
-from pants.testutil.interpreter_selection_utils import (
+from pants.testutil.engine_util import Params
+from pants.testutil.option_util import create_options_bootstrapper
+from pants.testutil.python_interpreter_selection import (
     PY_36,
     PY_37,
     python_interpreter_path,
     skip_unless_python36_and_python37_present,
 )
-from pants.testutil.option.util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import safe_mkdir, safe_rmtree, touch

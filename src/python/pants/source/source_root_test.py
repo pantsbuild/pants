@@ -21,8 +21,8 @@ from pants.source.source_root import (
     get_optional_source_root,
 )
 from pants.source.source_root import rules as source_root_rules
-from pants.testutil.engine.util import MockGet, create_subsystem, run_rule
-from pants.testutil.option.util import create_options_bootstrapper
+from pants.testutil.engine_util import MockGet, run_rule
+from pants.testutil.option_util import create_options_bootstrapper, create_subsystem
 from pants.testutil.test_base import TestBase
 
 
