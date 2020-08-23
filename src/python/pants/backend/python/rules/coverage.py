@@ -170,7 +170,7 @@ async def create_coverage_config(coverage: CoverageSubsystem) -> CoverageConfig:
         config_contents = await Get(
             DigestContents,
             PathGlobs(
-                globs=coverage.config,
+                globs=tuple(coverage.config,),
                 glob_match_error_behavior=GlobMatchErrorBehavior.error,
                 description_of_origin=f"the option `--{coverage.options_scope}-config`",
             ),
@@ -276,6 +276,11 @@ async def generate_coverage_reports(
             )
             continue
         report_types.append(report_type)
+        output_file = (
+            f"coverage.{report_type.value}"
+            if report_type in {CoverageReportType.XML, CoverageReportType.JSON}
+            else None
+        )
         pex_processes.append(
             PexProcess(
                 coverage_setup.pex,
@@ -284,7 +289,7 @@ async def generate_coverage_reports(
                 argv=(report_type.report_name, "--ignore-errors"),
                 input_digest=input_digest,
                 output_directories=("htmlcov",) if report_type == CoverageReportType.HTML else None,
-                output_files=("coverage.xml",) if report_type == CoverageReportType.XML else None,
+                output_files=(output_file,) if output_file else None,
                 description=f"Generate Pytest {report_type.report_name} coverage report.",
                 level=LogLevel.DEBUG,
             )
@@ -312,6 +317,8 @@ def _get_coverage_reports(
             report_file = output_dir / "htmlcov" / "index.html"
         elif report_type == CoverageReportType.XML:
             report_file = output_dir / "coverage.xml"
+        elif report_type == CoverageReportType.JSON:
+            report_file = output_dir / "coverage.json"
         else:
             raise ValueError(f"Invalid coverage report type: {report_type}")
         coverage_reports.append(

@@ -8,6 +8,7 @@ See https://www.pantsbuild.org/docs/python-backend.
 
 from pants.backend.python.dependency_inference import rules as dependency_inference_rules
 from pants.backend.python.pants_requirement import PantsRequirement
+from pants.backend.python.pipenv_requirements import PipenvRequirements
 from pants.backend.python.python_artifact import PythonArtifact
 from pants.backend.python.python_requirements import PythonRequirements
 from pants.backend.python.rules import (
@@ -46,6 +47,7 @@ def build_file_aliases():
         },
         context_aware_object_factories={
             "python_requirements": PythonRequirements,
+            "pipenv_requirements": PipenvRequirements,
             PantsRequirement.alias: PantsRequirement,
         },
     )

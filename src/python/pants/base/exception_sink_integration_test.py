@@ -14,6 +14,8 @@ from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegratio
 
 
 class ExceptionSinkIntegrationTest(PantsDaemonIntegrationTestBase):
+    hermetic = False
+
     def _assert_unhandled_exception_log_matches(self, pid, file_contents, namespace):
         self.assertRegex(
             file_contents,
@@ -54,7 +56,7 @@ Exception message:.* 1 Exception encountered:
 
                 self.assertIn(
                     "KeyboardInterrupt: ctrl-c interrupted execution of a ffi method!",
-                    pants_run.stderr_data,
+                    pants_run.stderr,
                 )
 
                 pid_specific_log_file, shared_log_file = self._get_log_file_paths(
@@ -86,7 +88,7 @@ Exception message:.* 1 Exception encountered:
                         ctrl-c during import!
                         """
                     ),
-                    pants_run.stderr_data,
+                    pants_run.stderr,
                 )
 
                 pid_specific_log_file, shared_log_file = self._get_log_file_paths(
@@ -107,7 +109,7 @@ Exception message:.* 1 Exception encountered:
             )
             self.assert_failure(pants_run)
             self.assertRegex(
-                pants_run.stderr_data,
+                pants_run.stderr,
                 f"""\
 'this-target-does-not-exist' was not found in namespace '{directory}'\\. Did you mean one of:
 """,

@@ -1,33 +1,35 @@
 # Copyright 2016 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
+from pants.testutil.pants_integration_test import PantsIntegrationTest
 
 
-class ListIntegrationTest(PantsRunIntegrationTest):
-    def get_target_set(self, std_out):
-        return sorted([l for l in std_out.split("\n") if l])
+class ListIntegrationTest(PantsIntegrationTest):
+    def test_list_all(self) -> None:
+        pants_run = self.run_pants(["--backend-packages=pants.backend.python", "list", "::"])
+        self.assert_success(pants_run)
+        self.assertGreater(len(pants_run.stdout.strip().split()), 1)
 
-    def run_engine_list(self, success, *args):
-        return self.get_target_set(self.do_command(*args, success=success).stdout_data)
+    def test_list_none(self) -> None:
+        pants_run = self.run_pants(["list"])
+        self.assert_success(pants_run)
+        self.assertIn("WARNING: No targets were matched in", pants_run.stderr)
 
-    def test_list_all(self):
-        pants_run = self.do_command("list", "::", success=True)
-        self.assertGreater(len(pants_run.stdout_data.strip().split()), 1)
+    def test_list_invalid_dir(self) -> None:
+        pants_run = self.run_pants(["list", "abcde::"])
+        self.assert_failure(pants_run)
+        self.assertIn("ResolveError", pants_run.stderr)
 
-    def test_list_none(self):
-        pants_run = self.do_command("list", success=True)
-        self.assertIn("WARNING: No targets were matched in", pants_run.stderr_data)
-
-    def test_list_invalid_dir(self):
-        pants_run = self.do_command("list", "abcde::", success=False)
-        self.assertIn("ResolveError", pants_run.stderr_data)
-
-    def test_list_nested_function_scopes(self):
-        pants_run = self.do_command(
-            "list", "testprojects/tests/python/pants/build_parsing::", success=True
+    def test_list_testproject(self) -> None:
+        pants_run = self.run_pants(
+            [
+                "--backend-packages=pants.backend.python",
+                "list",
+                "testprojects/tests/python/pants/build_parsing::",
+            ]
         )
+        self.assert_success(pants_run)
         self.assertEqual(
-            pants_run.stdout_data.strip(),
+            pants_run.stdout.strip(),
             "testprojects/tests/python/pants/build_parsing:test-nested-variable-access-in-function-call",
         )

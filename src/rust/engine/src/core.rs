@@ -10,7 +10,7 @@ use std::{fmt, hash};
 use crate::externs;
 
 use cpython::{FromPyObject, PyClone, PyDict, PyErr, PyObject, PyResult, Python, ToPyObject};
-use smallvec::{smallvec, SmallVec};
+use smallvec::SmallVec;
 
 pub type FNV = hash::BuildHasherDefault<FnvHasher>;
 
@@ -23,7 +23,7 @@ pub type FNV = hash::BuildHasherDefault<FnvHasher>;
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct Params(SmallVec<[Key; 4]>);
 
-impl Params {
+impl<'x> Params {
   pub fn new<I: IntoIterator<Item = Key>>(param_inputs: I) -> Result<Params, String> {
     let mut params = param_inputs.into_iter().collect::<SmallVec<[Key; 4]>>();
     params.sort_by_key(|k| *k.type_id());
@@ -46,8 +46,8 @@ impl Params {
     Ok(Params(params))
   }
 
-  pub fn new_single(param: Key) -> Params {
-    Params(smallvec![param])
+  pub fn keys(&'x self) -> impl Iterator<Item = &'x Key> {
+    self.0.iter()
   }
 
   ///
@@ -84,30 +84,28 @@ impl Params {
   pub fn type_ids<'a>(&'a self) -> impl Iterator<Item = TypeId> + 'a {
     self.0.iter().map(|k| *k.type_id())
   }
+}
 
-  ///
-  /// Given a set of either param type or param value strings: sort, join, and render as one string.
-  ///
-  pub fn display<T>(params: T) -> String
-  where
-    T: Iterator,
-    T::Item: fmt::Display,
-  {
-    let mut params: Vec<_> = params.map(|p| format!("{}", p)).collect();
-    match params.len() {
-      0 => "()".to_string(),
-      1 => params.pop().unwrap(),
-      _ => {
-        params.sort();
-        format!("({})", params.join(", "))
-      }
+///
+pub fn display_sorted_in_parens<T>(items: T) -> String
+where
+  T: Iterator,
+  T::Item: fmt::Display,
+{
+  let mut items: Vec<_> = items.map(|p| format!("{}", p)).collect();
+  match items.len() {
+    0 => "()".to_string(),
+    1 => items.pop().unwrap(),
+    _ => {
+      items.sort();
+      format!("({})", items.join(", "))
     }
   }
 }
 
 impl fmt::Display for Params {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}", Self::display(self.0.iter()))
+    write!(f, "Params{}", display_sorted_in_parens(self.0.iter()))
   }
 }
 
@@ -133,7 +131,7 @@ impl rule_graph::TypeId for TypeId {
   where
     I: Iterator<Item = TypeId>,
   {
-    Params::display(type_ids)
+    display_sorted_in_parens(type_ids)
   }
 }
 
@@ -211,7 +209,7 @@ impl hash::Hash for Key {
 
 impl fmt::Display for Key {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}", externs::key_to_str(self))
+    write!(f, "{}", externs::type_to_str(self.type_id))
   }
 }
 

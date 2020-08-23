@@ -17,7 +17,7 @@ from pants.engine.addresses import Address
 from pants.engine.collection import Collection
 from pants.engine.console import Console
 from pants.engine.desktop import OpenFiles, OpenFilesRequest
-from pants.engine.engine_aware import EngineAware
+from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.fs import Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import FallibleProcessResult, InteractiveProcess, InteractiveRunner
@@ -39,6 +39,7 @@ class CoverageReportType(Enum):
     XML = ("xml", None)
     HTML = ("html", None)
     RAW = ("raw", None)
+    JSON = ("json", None)
 
     _report_name: str
 
@@ -89,7 +90,7 @@ class TestResult:
 
 
 @dataclass(frozen=True)
-class EnrichedTestResult(EngineAware):
+class EnrichedTestResult(EngineAwareReturnType):
     exit_code: Optional[int]
     stdout: str
     stderr: str
@@ -159,12 +160,15 @@ class TestDebugRequest:
 
 
 @union
-class TestFieldSet(FieldSet, metaclass=ABCMeta):
+class TestFieldSet(FieldSet, EngineAwareParameter, metaclass=ABCMeta):
     """The fields necessary to run tests on a target."""
 
     sources: Sources
 
     __test__ = False
+
+    def debug_hint(self):
+        return self.address.spec
 
 
 class CoverageData(ABC):
@@ -234,7 +238,7 @@ class FilesystemCoverageReport(CoverageReport):
 
 
 @dataclass(frozen=True)
-class CoverageReports(EngineAware):
+class CoverageReports(EngineAwareReturnType):
     reports: Tuple[CoverageReport, ...]
 
     def materialize(self, console: Console, workspace: Workspace) -> Tuple[PurePath, ...]:

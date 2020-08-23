@@ -8,7 +8,7 @@ from textwrap import dedent
 from typing import TYPE_CHECKING, Dict, Iterable, Mapping, Optional, Tuple, Union
 
 from pants.base.exception_sink import ExceptionSink
-from pants.engine.engine_aware import EngineAware
+from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent
 from pants.engine.platform import Platform, PlatformConstraint
 from pants.engine.rules import Get, RootRule, collect_rules, rule, side_effecting
@@ -313,16 +313,13 @@ class BinaryPathRequest:
 
 @frozen_after_init
 @dataclass(unsafe_hash=True)
-class BinaryPaths(EngineAware):
+class BinaryPaths(EngineAwareReturnType):
     binary_name: str
     paths: Tuple[str, ...]
 
     def __init__(self, binary_name: str, paths: Iterable[str]):
         self.binary_name = binary_name
         self.paths = tuple(OrderedSet(paths))
-
-    def level(self) -> LogLevel:
-        return LogLevel.DEBUG
 
     def message(self) -> str:
         if not self.paths:
@@ -338,7 +335,7 @@ class BinaryPaths(EngineAware):
         return next(iter(self.paths), None)
 
 
-@rule(desc="Find binary path")
+@rule(desc="Find binary path", level=LogLevel.DEBUG)
 async def find_binary(request: BinaryPathRequest) -> BinaryPaths:
     # TODO(John Sirois): Replace this script with a statically linked native binary so we don't
     #  depend on either /bin/bash being available on the Process host.

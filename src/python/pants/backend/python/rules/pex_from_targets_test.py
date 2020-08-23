@@ -10,13 +10,11 @@ from pants.backend.python.rules.pex_from_targets import PexFromTargetsRequest
 from pants.backend.python.rules.python_sources import PythonSourceFilesRequest
 from pants.backend.python.target_types import PythonLibrary, PythonRequirementLibrary
 from pants.build_graph.address import Address
-from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import RootRule, SubsystemRule
-from pants.python.python_requirement import PythonRequirement
 from pants.python.python_setup import PythonSetup, ResolveAllConstraintsOption
-from pants.testutil.engine.util import Params
-from pants.testutil.option.util import create_options_bootstrapper
+from pants.testutil.engine_util import Params
+from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
 
@@ -33,10 +31,6 @@ class PexTest(TestBase):
         )
 
     @classmethod
-    def alias_groups(cls):
-        return BuildFileAliases(objects={"python_requirement": PythonRequirement})
-
-    @classmethod
     def target_types(cls):
         return [PythonLibrary, PythonRequirementLibrary]
 
@@ -46,12 +40,9 @@ class PexTest(TestBase):
             "",
             dedent(
                 """
-                python_requirement_library(name="foo",
-                    requirements=[python_requirement("foo-bar>=0.1.2")])
-                python_requirement_library(name="bar",
-                    requirements=[ python_requirement("bar==5.5.5")])
-                python_requirement_library(name="baz",
-                    requirements=[python_requirement("baz")])
+                python_requirement_library(name="foo", requirements=["foo-bar>=0.1.2"])
+                python_requirement_library(name="bar", requirements=["bar==5.5.5"])
+                python_requirement_library(name="baz", requirements=["baz"])
                 python_library(name="tgt", sources=[], dependencies=[":foo", ":bar", ":baz"])
                 """
             ),

@@ -15,23 +15,17 @@ from pants.backend.python.target_types import (
     PythonSources,
     PythonTests,
 )
-from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.core.util_rules import source_files, stripped_source_files
 from pants.engine.addresses import Address
 from pants.engine.rules import RootRule
 from pants.engine.target import InferredDependencies, WrappedTarget
-from pants.python.python_requirement import PythonRequirement
 from pants.source.source_root import all_roots
-from pants.testutil.engine.util import Params
-from pants.testutil.option.util import create_options_bootstrapper
+from pants.testutil.engine_util import Params
+from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
 
 class PythonDependencyInferenceTest(TestBase):
-    @classmethod
-    def alias_groups(cls) -> BuildFileAliases:
-        return BuildFileAliases(objects={"python_requirement": PythonRequirement})
-
     @classmethod
     def rules(cls):
         return (
@@ -56,7 +50,7 @@ class PythonDependencyInferenceTest(TestBase):
                 """\
                 python_requirement_library(
                   name='Django',
-                  requirements=[python_requirement('Django==1.21')],
+                  requirements=['Django==1.21'],
                 )
                 """
             ),

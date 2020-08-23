@@ -5,7 +5,7 @@ import subprocess
 import unittest
 from textwrap import dedent
 
-from pants.testutil.process_handler import SubprocessProcessHandler
+from pants.testutil._process_handler import SubprocessProcessHandler
 
 
 class TestSubprocessProcessHandler(unittest.TestCase):

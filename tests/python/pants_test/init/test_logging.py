@@ -7,8 +7,8 @@ from logging import Logger
 from pathlib import Path
 from typing import Iterator, Tuple
 
+from pants.engine.internals.native import Native
 from pants.init.logging import NativeHandler, setup_logging_to_file
-from pants.testutil.engine.util import init_native
 from pants.testutil.test_base import TestBase
 from pants.util.contextutil import temporary_dir
 from pants.util.logging import LogLevel
@@ -21,7 +21,7 @@ class LoggingTest(TestBase):
         # NB: We must set this up at the class level, rather than per-test level, because
         # `init_rust_logging` must never be called more than once. The Rust logger is global and static,
         # and initializing it twice in the same test class results in a SIGABRT.
-        init_native().init_rust_logging(
+        Native().init_rust_logging(
             # We set the level to the least verbose possible, as individual tests will increase the
             # verbosity as necessary.
             level=LogLevel.ERROR.level,

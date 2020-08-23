@@ -5,30 +5,13 @@ import re
 from dataclasses import dataclass
 from io import StringIO
 from types import CoroutineType, GeneratorType
-from typing import (
-    Any,
-    Callable,
-    List,
-    Optional,
-    Sequence,
-    Tuple,
-    Type,
-    TypeVar,
-    Union,
-    cast,
-    get_type_hints,
-)
+from typing import Any, Callable, Optional, Sequence, Type
 
 from colors import blue, cyan, green, magenta, red, yellow
 
-from pants.engine.goal import GoalSubsystem
-from pants.engine.internals.native import Native
 from pants.engine.internals.selectors import Params as Params  # noqa: F401
 from pants.engine.rules import Get
 from pants.engine.unions import UnionMembership
-from pants.option.option_value_container import OptionValueContainer
-from pants.option.ranked_value import Rank, RankedValue, Value
-from pants.option.subsystem import Subsystem
 
 
 # TODO(#6742): Improve the type signature by using generics and type vars. `mock` should be
@@ -38,55 +21,6 @@ class MockGet:
     product_type: Type
     subject_type: Type
     mock: Callable[[Any], Any]
-
-
-def _create_scoped_options(
-    default_rank: Rank, **options: Union[RankedValue, Value]
-) -> OptionValueContainer:
-    scoped_options = OptionValueContainer()
-    for key, value in options.items():
-        if not isinstance(value, RankedValue):
-            value = RankedValue(default_rank, value)
-        setattr(scoped_options, key, value)
-    return scoped_options
-
-
-GS = TypeVar("GS", bound=GoalSubsystem)
-
-
-def create_goal_subsystem(
-    goal_subsystem_type: Type[GS],
-    default_rank: Rank = Rank.NONE,
-    **options: Union[RankedValue, Value],
-) -> GS:
-    """Creates a new goal subsystem instance populated with the given option values.
-
-    :param goal_subsystem_type: The `GoalSubsystem` type to create.
-    :param default_rank: The rank to assign any raw option values passed.
-    :param options: The option values to populate the new goal subsystem instance with.
-    """
-    return goal_subsystem_type(
-        scope=goal_subsystem_type.name,
-        scoped_options=_create_scoped_options(default_rank, **options),
-    )
-
-
-SS = TypeVar("SS", bound=Subsystem)
-
-
-def create_subsystem(
-    subsystem_type: Type[SS], default_rank: Rank = Rank.NONE, **options: Union[RankedValue, Value],
-) -> SS:
-    """Creates a new subsystem instance populated with the given option values.
-
-    :param subsystem_type: The `Subsystem` type to create.
-    :param default_rank: The rank to assign any raw option values passed.
-    :param options: The option values to populate the new subsystem instance with.
-    """
-    options_scope = cast(str, subsystem_type.options_scope)
-    return subsystem_type(
-        scope=options_scope, scoped_options=_create_scoped_options(default_rank, **options),
-    )
 
 
 def run_rule(
@@ -191,45 +125,6 @@ def run_rule(
                 return e.value
 
 
-def init_native():
-    """Return the `Native` instance."""
-    return Native()
-
-
-def assert_equal_with_printing(
-    test_case, expected, actual, uniform_formatter: Optional[Callable[[str], str]] = None
-):
-    """Asserts equality, but also prints the values so they can be compared on failure.
-
-    Usage:
-
-       class FooTest(unittest.TestCase):
-         assert_equal_with_printing = assert_equal_with_printing
-
-         def test_foo(self):
-           self.assert_equal_with_printing("a", "b")
-    """
-    str_actual = str(actual)
-    print("Expected:")
-    print(expected)
-    print("Actual:")
-    print(str_actual)
-
-    if uniform_formatter is not None:
-        expected = uniform_formatter(expected)
-        str_actual = uniform_formatter(str_actual)
-
-    test_case.assertEqual(expected, str_actual)
-
-
-def remove_locations_from_traceback(trace: str) -> str:
-    location_pattern = re.compile(r'"/.*", line \d+')
-    address_pattern = re.compile(r"0x[0-9a-f]+")
-    new_trace = location_pattern.sub("LOCATION-INFO", trace)
-    new_trace = address_pattern.sub("0xEEEEEEEEE", new_trace)
-    return new_trace
-
-
 class MockConsole:
     """An implementation of pants.engine.console.Console which captures output."""
 
@@ -272,37 +167,35 @@ class MockConsole:
         return self._safe_color(text, yellow)
 
 
-def fmt_rust_function(func: Callable) -> str:
-    """Generate the str for a Rust Function, which is how Rust refers to `@rule`s.
+def assert_equal_with_printing(
+    test_case, expected, actual, uniform_formatter: Optional[Callable[[str], str]] = None
+):
+    """Asserts equality, but also prints the values so they can be compared on failure.
 
-    This is useful when comparing strings against engine error messages. See
-    https://github.com/pantsbuild/pants/blob/5b97905443836b71dfa77cefc7cbc1735c7457cb/src/rust/engine/src/core.rs#L164.
+    Usage:
+
+       class FooTest(unittest.TestCase):
+         assert_equal_with_printing = assert_equal_with_printing
+
+         def test_foo(self):
+           self.assert_equal_with_printing("a", "b")
     """
-    return f"{func.__module__}:{func.__code__.co_firstlineno}:{func.__name__}"
+    str_actual = str(actual)
+    print("Expected:")
+    print(expected)
+    print("Actual:")
+    print(str_actual)
+
+    if uniform_formatter is not None:
+        expected = uniform_formatter(expected)
+        str_actual = uniform_formatter(str_actual)
+
+    test_case.assertEqual(expected, str_actual)
 
 
-def fmt_rule(
-    rule: Callable, *, gets: Optional[List[Tuple[str, str]]] = None, multiline: bool = False
-) -> str:
-    """Generate the str that the engine will use for the rule.
-
-    This is useful when comparing strings against engine error messages. Emulates the implementation
-    of the DisplayForGraph trait.
-    """
-    line_sep = "\n" if multiline else " "
-    optional_line_sep = "\n" if multiline else ""
-
-    type_hints = get_type_hints(rule)
-    product = type_hints.pop("return").__name__
-    params = f",{line_sep}".join(t.__name__ for t in type_hints.values())
-    params_str = (
-        f"{optional_line_sep}{params}{optional_line_sep}" if len(type_hints) > 1 else params
-    )
-    gets_str = ""
-    if gets:
-        get_members = f",{line_sep}".join(
-            f"Get({product_subject_pair[0]}, {product_subject_pair[1]})"
-            for product_subject_pair in gets
-        )
-        gets_str = f", gets=[{optional_line_sep}{get_members}{optional_line_sep}]"
-    return f"@rule({fmt_rust_function(rule)}({params_str}) -> {product}{gets_str})"
+def remove_locations_from_traceback(trace: str) -> str:
+    location_pattern = re.compile(r'"/.*", line \d+')
+    address_pattern = re.compile(r"0x[0-9a-f]+")
+    new_trace = location_pattern.sub("LOCATION-INFO", trace)
+    new_trace = address_pattern.sub("0xEEEEEEEEE", new_trace)
+    return new_trace

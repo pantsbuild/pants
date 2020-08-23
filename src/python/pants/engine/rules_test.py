@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from textwrap import dedent
-from typing import Callable, List, Optional, Tuple, Type, Union
+from typing import Callable, List, Optional, Tuple, Type, Union, get_type_hints
 
 import pytest
 
@@ -30,7 +30,7 @@ from pants.engine.rules import (
 )
 from pants.engine.unions import UnionMembership
 from pants.option.global_options import DEFAULT_EXECUTION_OPTIONS
-from pants.testutil.engine.util import MockGet, assert_equal_with_printing, fmt_rule, run_rule
+from pants.testutil.engine_util import MockGet, assert_equal_with_printing, run_rule
 from pants.testutil.test_base import TestBase
 from pants.util.enums import match
 from pants.util.logging import LogLevel
@@ -52,6 +52,37 @@ def create_scheduler(rules, validate=True, native=None):
         execution_options=DEFAULT_EXECUTION_OPTIONS,
         validate=validate,
     )
+
+
+def fmt_rule(
+    rule: Callable, *, gets: Optional[List[Tuple[str, str]]] = None, multiline: bool = False
+) -> str:
+    """Generate the str that the engine will use for the rule.
+
+    This is useful when comparing strings against engine error messages. Emulates the implementation
+    of the DisplayForGraph trait.
+    """
+
+    def fmt_rust_function(func: Callable) -> str:
+        return f"{func.__module__}:{func.__code__.co_firstlineno}:{func.__name__}"
+
+    line_sep = "\n" if multiline else " "
+    optional_line_sep = "\n" if multiline else ""
+
+    type_hints = get_type_hints(rule)
+    product = type_hints.pop("return").__name__
+    params = f",{line_sep}".join(t.__name__ for t in type_hints.values())
+    params_str = (
+        f"{optional_line_sep}{params}{optional_line_sep}" if len(type_hints) > 1 else params
+    )
+    gets_str = ""
+    if gets:
+        get_members = f",{line_sep}".join(
+            f"Get({product_subject_pair[0]}, {product_subject_pair[1]})"
+            for product_subject_pair in gets
+        )
+        gets_str = f", gets=[{optional_line_sep}{get_members}{optional_line_sep}]"
+    return f"@rule({fmt_rust_function(rule)}({params_str}) -> {product}{gets_str})"
 
 
 class RuleVisitorTest(unittest.TestCase):

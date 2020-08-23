@@ -11,7 +11,7 @@ from pants.core.util_rules.external_tool import (
 )
 from pants.engine.fs import Digest, DownloadFile
 from pants.engine.platform import Platform
-from pants.testutil.engine.util import create_subsystem
+from pants.testutil.option_util import create_subsystem
 
 
 class FooBar(ExternalTool):

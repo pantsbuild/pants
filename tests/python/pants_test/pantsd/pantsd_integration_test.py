@@ -12,7 +12,7 @@ from textwrap import dedent
 
 import pytest
 
-from pants.testutil.pants_run_integration_test import read_pantsd_log
+from pants.testutil.pants_integration_test import read_pantsd_log
 from pants.util.contextutil import environment_as, temporary_dir, temporary_file
 from pants.util.dirutil import rm_rf, safe_file_dump, safe_mkdir, safe_open, touch
 from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
@@ -42,6 +42,8 @@ def launch_file_toucher(f):
 
 
 class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
+    hermetic = False
+
     def test_pantsd_run(self):
         with self.pantsd_successful_run_context(log_level="debug") as ctx:
             ctx.runner(["list", "3rdparty::"])
@@ -52,8 +54,10 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
     def test_pantsd_broken_pipe(self):
         with self.pantsd_test_context() as (workdir, pantsd_config, checker):
-            run = self.run_pants_with_workdir("help | head -1", workdir, pantsd_config, shell=True)
-            self.assertNotIn("broken pipe", run.stderr_data.lower())
+            run = self.run_pants_with_workdir(
+                "help | head -1", workdir=workdir, config=pantsd_config, shell=True
+            )
+            self.assertNotIn("broken pipe", run.stderr.lower())
             checker.assert_started()
 
     def test_pantsd_pantsd_runner_doesnt_die_after_failed_run(self):
@@ -62,14 +66,16 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             self.assert_failure(
                 self.run_pants_with_workdir(
                     ["lint", "testprojects/src/python/unicode/compilation_failure"],
-                    workdir,
-                    pantsd_config,
+                    workdir=workdir,
+                    config=pantsd_config,
                 )
             )
             checker.assert_started()
 
             # Assert pantsd is in a good functional state.
-            self.assert_success(self.run_pants_with_workdir(["help"], workdir, pantsd_config))
+            self.assert_success(
+                self.run_pants_with_workdir(["help"], workdir=workdir, config=pantsd_config)
+            )
             checker.assert_running()
 
     def test_pantsd_lifecycle_invalidation(self):
@@ -123,13 +129,15 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     def test_pantsd_lifecycle_shutdown_for_broken_scheduler(self):
         with self.pantsd_test_context() as (workdir, config, checker):
             # Run with valid options.
-            self.assert_success(self.run_pants_with_workdir(["help"], workdir, config))
+            self.assert_success(
+                self.run_pants_with_workdir(["help"], workdir=workdir, config=config)
+            )
             checker.assert_started()
 
             # And again with invalid scheduler-fingerprinted options that trigger a re-init.
             self.assert_failure(
                 self.run_pants_with_workdir(
-                    ["--backend-packages=nonsensical", "help"], workdir, config
+                    ["--backend-packages=nonsensical", "help"], workdir=workdir, config=config
                 )
             )
             checker.assert_stopped()
@@ -151,7 +159,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             self.assertNotEqual(run.stdout_data, "", f"Empty stdout for {cmd}")
 
         for run_pair in zip(non_daemon_runs, daemon_runs):
-            non_daemon_stdout = run_pair[0].stdout_data
+            non_daemon_stdout = run_pair[0].stdout
             daemon_stdout = run_pair[1].stdout_data
 
             for line_pair in zip(non_daemon_stdout.splitlines(), daemon_stdout.splitlines()):
@@ -202,14 +210,16 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
     def test_pantsd_launch_env_var_is_not_inherited_by_pantsd_runner_children(self):
         with self.pantsd_test_context() as (workdir, pantsd_config, checker):
             with environment_as(NO_LEAKS="33"):
-                self.assert_success(self.run_pants_with_workdir(["help"], workdir, pantsd_config))
+                self.assert_success(
+                    self.run_pants_with_workdir(["help"], workdir=workdir, config=pantsd_config)
+                )
                 checker.assert_started()
 
             self.assert_failure(
                 self.run_pants_with_workdir(
                     ["run", "testprojects/src/python/print_env", "--", "NO_LEAKS"],
-                    workdir,
-                    pantsd_config,
+                    workdir=workdir,
+                    config=pantsd_config,
                 )
             )
             checker.assert_running()
@@ -416,8 +426,8 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             file_to_make = os.path.join(workdir, "some_magic_file")
             waiter_handle = self.run_pants_with_workdir_without_waiting(
                 ["run", "testprojects/src/python/coordinated_runs:waiter", "--", file_to_make],
-                workdir,
-                config,
+                workdir=workdir,
+                config=config,
             )
 
             checker.assert_started()
@@ -425,8 +435,8 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
 
             creator_handle = self.run_pants_with_workdir_without_waiting(
                 ["run", "testprojects/src/python/coordinated_runs:creator", "--", file_to_make],
-                workdir,
-                config,
+                workdir=workdir,
+                config=config,
             )
 
             self.assert_success(creator_handle.join())
@@ -457,7 +467,9 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
                 "--",
                 file_to_make,
             ]
-            waiter_handle = self.run_pants_with_workdir_without_waiting(argv, workdir, config)
+            waiter_handle = self.run_pants_with_workdir_without_waiting(
+                argv, workdir=workdir, config=config
+            )
             client_pid = waiter_handle.process.pid
 
             checker.assert_started()
@@ -469,7 +481,7 @@ class TestPantsDaemonIntegration(PantsDaemonIntegrationTestBase):
             self.assert_failure(waiter_run)
 
             for regexp in regexps:
-                self.assertRegex(waiter_run.stderr_data, regexp)
+                self.assertRegex(waiter_run.stderr, regexp)
 
             time.sleep(5)
             checker.assert_stopped()

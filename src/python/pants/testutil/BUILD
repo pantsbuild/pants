@@ -6,8 +6,6 @@ python_distribution(
   dependencies=[
     ':testutil',
     ':int-test-for-export',
-    'src/python/pants/testutil/engine',
-    'src/python/pants/testutil/option',
   ],
   provides=pants_setup_py(
     name='pantsbuild.pants.testutil',
@@ -20,12 +18,24 @@ python_distribution(
 )
 
 python_library(
-  sources=['*.py', '!pants_run_integration_test.py', '!_test.py'],
+  sources=[
+    "*.py",
+    "!test_base.py",
+    "!pants_integration_test.py",
+    "!pants_run_integration_test.py",
+    "!_test.py",
+  ],
+)
+
+python_library(
+  name="test_base",
+  sources=["test_base.py"],
+  dependencies=["//:build_root"],
 )
 
 python_library(
   name = 'int-test-for-export',
-  sources = ['pants_run_integration_test.py'],
+  sources = ['pants_integration_test.py', 'pants_run_integration_test.py'],
   dependencies = [
     '//:build_root',
     'src/python/pants:entry_point'
@@ -44,5 +54,5 @@ target(
 
 python_tests(
   name='tests',
-  sources=['*_test.py', '!pants_run_integration_test.py']
+  sources=['*_test.py', '!pants_integration_test.py', '!pants_run_integration_test.py']
 )

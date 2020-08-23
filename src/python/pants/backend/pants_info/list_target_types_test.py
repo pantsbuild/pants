@@ -9,7 +9,8 @@ from pants.backend.pants_info.list_target_types import TargetTypesSubsystem, lis
 from pants.core.util_rules.pants_bin import PantsBin
 from pants.engine.target import BoolField, IntField, RegisteredTargetTypes, StringField, Target
 from pants.engine.unions import UnionMembership
-from pants.testutil.engine.util import MockConsole, create_goal_subsystem, run_rule
+from pants.testutil.engine_util import MockConsole, run_rule
+from pants.testutil.option_util import create_goal_subsystem
 
 
 # Note no docstring.

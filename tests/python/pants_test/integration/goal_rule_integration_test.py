@@ -7,7 +7,7 @@ import time
 import pytest
 
 from pants.base.build_environment import get_buildroot
-from pants.testutil.pants_run_integration_test import ensure_daemon
+from pants.testutil.pants_integration_test import ensure_daemon
 from pants.util.contextutil import temporary_dir
 from pants.util.dirutil import fast_relpath, safe_file_dump
 from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
@@ -16,12 +16,16 @@ from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegratio
 @pytest.mark.skip(reason="Flaky test. https://github.com/pantsbuild/pants/issues/10478")
 class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
 
+    # TODO: Set hermetic=True after rewriting this test to stop using an example project.
+    hermetic = False
+
     target = "examples/src/python/example/hello::"
 
     @ensure_daemon
     def test_list(self):
-        result = self.do_command("list", self.target, success=True)
-        output_lines = result.stdout_data.splitlines()
+        result = self.run_pants(["list", self.target])
+        self.assert_success(result)
+        output_lines = result.stdout.splitlines()
         self.assertEqual(len(output_lines), 4)
         self.assertIn("examples/src/python/example/hello/main", output_lines)
 
@@ -39,9 +43,9 @@ class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
 
     @ensure_daemon
     def test_goal_validation(self):
-        result = self.do_command("blah", "::", success=False)
-
-        self.assertIn("Unknown goals: blah", result.stdout_data)
+        result = self.run_pants(["blah", "::"])
+        self.assert_failure(result)
+        self.assertIn("Unknown goals: blah", result.stdout)
 
     def test_list_loop(self):
         # Create a BUILD file in a nested temporary directory, and add additional targets to it.
@@ -60,7 +64,7 @@ class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
 
             # Launch the loop as a background process.
             handle = self.run_pants_with_workdir_without_waiting(
-                ["--loop", "--loop-max=3", "list", f"{tmpdir}:",], workdir, config,
+                ["--loop", "--loop-max=3", "list", f"{tmpdir}:"], workdir=workdir, config=config
             )
 
             # Wait for pantsd to come up and for the loop to stabilize.
@@ -77,18 +81,17 @@ class TestGoalRuleIntegration(PantsDaemonIntegrationTestBase):
             self.assert_success(pants_result)
             assert [
                 f"{rel_tmpdir}:{name}" for name in ("one", "two", "three")
-            ] == pants_result.stdout_data.splitlines()
+            ] == pants_result.stdout.splitlines()
 
     def test_unimplemented_goals_noop(self) -> None:
         # If the goal is actually run, it should fail because `run` expects a single target
         # and will fail when given the glob `::`.
         command_prefix = ["--pants-config-files=[]"]
         target = "testprojects/tests/python/pants/dummies::"
-        self.do_command(*command_prefix, "--backend-packages=[]", "run", target, success=True)
-        self.do_command(
-            *command_prefix,
-            "--backend-packages='pants.backend.python'",
-            "run",
-            target,
-            success=False,
+        result = self.run_pants([*command_prefix, "--backend-packages=[]", "run", target])
+        self.assert_success(result)
+
+        result = self.run_pants(
+            [*command_prefix, "--backend-packages='pants.backend.python'", "run", target]
         )
+        self.assert_failure(result)

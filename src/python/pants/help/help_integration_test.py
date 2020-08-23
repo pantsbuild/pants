@@ -3,32 +3,32 @@
 
 import json
 
-from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest
+from pants.testutil.pants_integration_test import PantsIntegrationTest
 
 
-class TestHelpIntegration(PantsRunIntegrationTest):
+class TestHelpIntegration(PantsIntegrationTest):
     def test_help(self):
         command = ["help"]
         pants_run = self.run_pants(command=command)
         self.assert_success(pants_run)
-        assert "Usage:" in pants_run.stdout_data
+        assert "Usage:" in pants_run.stdout
         # spot check to see that a public global option is printed
-        assert "--level" in pants_run.stdout_data
-        assert "Global options" in pants_run.stdout_data
+        assert "--level" in pants_run.stdout
+        assert "Global options" in pants_run.stdout
 
     def test_help_advanced(self):
         command = ["help-advanced"]
         pants_run = self.run_pants(command=command)
         self.assert_success(pants_run)
-        assert "Global advanced options" in pants_run.stdout_data
+        assert "Global advanced options" in pants_run.stdout
         # Spot check to see that a global advanced option is printed
-        assert "--pants-bootstrapdir" in pants_run.stdout_data
+        assert "--pants-bootstrapdir" in pants_run.stdout
 
     def test_help_all(self):
-        command = ["help-all"]
+        command = ["--backend-packages=pants.backend.python", "help-all"]
         pants_run = self.run_pants(command=command)
         self.assert_success(pants_run)
-        all_help = json.loads(pants_run.stdout_data)
+        all_help = json.loads(pants_run.stdout)
 
         # Spot check the data.
         assert "name_to_goal_info" in all_help

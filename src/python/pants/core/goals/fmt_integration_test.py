@@ -3,27 +3,35 @@
 
 import re
 
-from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
+from pants.testutil.pants_integration_test import PantsIntegrationTest, ensure_daemon
 from pants.util.dirutil import read_file
 
 
-class FmtIntegrationTest(PantsRunIntegrationTest):
+class FmtIntegrationTest(PantsIntegrationTest):
     @ensure_daemon
     def test_fmt_then_edit(self):
         f = "examples/src/python/example/hello/greet/greet.py"
         with self.temporary_workdir() as workdir:
-            run = lambda: self.run_pants_with_workdir(["fmt", f], workdir=workdir)
+
+            def run() -> None:
+                result = self.run_pants_with_workdir(
+                    [
+                        "--backend-packages=['pants.backend.python', 'pants.backend.python.lint.black']",
+                        "fmt",
+                        f,
+                    ],
+                    workdir=workdir,
+                )
+                self.assert_success(result)
 
             # Run once to start up, and then capture the file content.
-            self.assert_success(run())
+            run()
             good_content = read_file(f)
 
             # Edit the file.
-            with self.with_overwritten_file_content(
-                f, lambda c: re.sub(b"def greet", b"def  greet", c)
-            ):
+            with self.overwrite_file_content(f, lambda c: re.sub(b"def greet", b"def  greet", c)):
                 assert good_content != read_file(f)
 
                 # Re-run and confirm that the file was fixed.
-                self.assert_success(run())
+                run()
                 assert good_content == read_file(f)

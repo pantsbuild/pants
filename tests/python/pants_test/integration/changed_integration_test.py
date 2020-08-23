@@ -3,17 +3,52 @@
 
 import os
 import shutil
+import subprocess
 from contextlib import contextmanager
 from textwrap import dedent
+from typing import Iterator, List, Optional
 
 import pytest
 
 from pants.base.build_environment import get_buildroot
-from pants.testutil.git_util import initialize_repo
-from pants.testutil.pants_run_integration_test import PantsRunIntegrationTest, ensure_daemon
+from pants.scm.git import Git
+from pants.testutil.pants_integration_test import PantsIntegrationTest, ensure_daemon
 from pants.testutil.test_base import AbstractTestGenerator
 from pants.util.contextutil import environment_as, temporary_dir
 from pants.util.dirutil import safe_delete, safe_mkdir, safe_open, touch
+
+
+@contextmanager
+def initialize_repo(worktree: str, *, gitdir: Optional[str] = None) -> Iterator[Git]:
+    """Initialize a git repository for the given `worktree`.
+
+    NB: The given `worktree` must contain at least one file which will be committed to form an initial
+    commit.
+
+    :param worktree: The path to the git work tree.
+    :param gitdir: An optional path to the `.git` dir to use.
+    :returns: A `Git` repository object that can be used to interact with the repo.
+    """
+
+    @contextmanager
+    def use_gitdir() -> Iterator[str]:
+        if gitdir:
+            yield gitdir
+        else:
+            with temporary_dir() as d:
+                yield d
+
+    with use_gitdir() as git_dir, environment_as(GIT_DIR=git_dir, GIT_WORK_TREE=worktree):
+        subprocess.run(["git", "init"], check=True)
+        subprocess.run(["git", "config", "user.email", "you@example.com"], check=True)
+        # TODO: This method inherits the global git settings, so if a developer has gpg signing on,
+        #  this will turn that off. We should probably just disable reading from the global config
+        #  somehow: https://git-scm.com/docs/git-config.
+        subprocess.run(["git", "config", "commit.gpgSign", "false"], check=True)
+        subprocess.run(["git", "config", "user.name", "Your Name"], check=True)
+        subprocess.run(["git", "add", "."], check=True)
+        subprocess.run(["git", "commit", "-am", "Add project files."], check=True)
+        yield Git(gitdir=git_dir, worktree=worktree)
 
 
 def lines_to_set(str_or_list):
@@ -133,7 +168,9 @@ def create_isolated_git_repo():
                 yield worktree
 
 
-class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
+class ChangedIntegrationTest(PantsIntegrationTest, AbstractTestGenerator):
+    # Git isn't detected if hermetic=True for some reason.
+    hermetic = False
 
     TEST_MAPPING = {
         # A `python_binary` with `sources=['file.name']`.
@@ -210,9 +247,10 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
                     inner_integration_coverage_test,
                 )
 
-    def run_list(self, extra_args, success=True):
-        pants_run = self.do_command("list", *extra_args, success=success)
-        return pants_run.stdout_data
+    def run_list(self, extra_args: Optional[List[str]] = None) -> str:
+        pants_run = self.run_pants(["list", *(extra_args or ())])
+        self.assert_success(pants_run)
+        return pants_run.stdout
 
     def test_changed_exclude_root_targets_only(self):
         changed_src = "src/python/python_targets/test_library.py"
@@ -240,10 +278,10 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
 
             self.assert_success(pants_run)
             for expected_item in expected_set:
-                self.assertIn(expected_item, pants_run.stdout_data)
+                self.assertIn(expected_item, pants_run.stdout)
 
             for excluded_item in excluded_set:
-                self.assertNotIn(excluded_item, pants_run.stdout_data)
+                self.assertNotIn(excluded_item, pants_run.stdout)
 
     def test_changed_not_exclude_inner_targets(self):
         changed_src = "src/python/python_targets/test_library.py"
@@ -271,16 +309,16 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
 
             self.assert_success(pants_run)
             for expected_item in expected_set:
-                self.assertIn(expected_item, pants_run.stdout_data)
+                self.assertIn(expected_item, pants_run.stdout)
 
             for excluded_item in excluded_set:
-                self.assertNotIn(excluded_item, pants_run.stdout_data)
+                self.assertNotIn(excluded_item, pants_run.stdout)
 
     def test_changed_with_multiple_build_files(self):
         new_build_file = "src/python/python_targets/BUILD.new"
         with create_isolated_git_repo() as worktree:
             touch(os.path.join(worktree, new_build_file))
-            stdout_data = self.run_list([])
+            stdout_data = self.run_list()
             self.assertEqual(stdout_data.strip(), "")
 
     def test_changed_with_deleted_source(self):
@@ -289,14 +327,14 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
             safe_delete(os.path.join(worktree, "src/python/sources/sources.py"))
             pants_run = self.run_pants(["list", "--changed-since=HEAD"])
             self.assert_success(pants_run)
-            self.assertEqual(pants_run.stdout_data.strip(), "src/python/sources")
+            self.assertEqual(pants_run.stdout.strip(), "src/python/sources")
 
     def test_changed_with_deleted_resource(self):
         with create_isolated_git_repo() as worktree:
             safe_delete(os.path.join(worktree, "src/python/sources/sources.txt"))
             pants_run = self.run_pants(["list", "--changed-since=HEAD"])
             self.assert_success(pants_run)
-            self.assertEqual(pants_run.stdout_data.strip(), "src/python/sources:text")
+            self.assertEqual(pants_run.stdout.strip(), "src/python/sources:text")
 
     @pytest.mark.skip(reason="Unskip after rewriting these tests to stop using testprojects.")
     def test_changed_with_deleted_target_transitive(self):
@@ -309,7 +347,7 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
             )
             self.assert_failure(pants_run)
             self.assertRegex(
-                pants_run.stderr_data, "src/resources/org/pantsbuild/resourceonly:.*did not exist"
+                pants_run.stderr, "src/resources/org/pantsbuild/resourceonly:.*did not exist"
             )
 
     def test_changed_in_directory_without_build_file(self):
@@ -317,7 +355,7 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
             create_file_in(worktree, "new-project/README.txt", "This is important.")
             pants_run = self.run_pants(["list", "--changed-since=HEAD"])
             self.assert_success(pants_run)
-            self.assertEqual(pants_run.stdout_data.strip(), "")
+            self.assertEqual(pants_run.stdout.strip(), "")
 
     @ensure_daemon
     def test_list_changed(self):
@@ -327,7 +365,7 @@ class ChangedIntegrationTest(PantsRunIntegrationTest, AbstractTestGenerator):
             safe_delete(os.path.join(worktree, deleted_file))
             pants_run = self.run_pants(["--changed-since=HEAD", "list"])
             self.assert_success(pants_run)
-            self.assertEqual(pants_run.stdout_data.strip(), "src/python/sources")
+            self.assertEqual(pants_run.stdout.strip(), "src/python/sources")
 
 
 ChangedIntegrationTest.generate_tests()

@@ -3,7 +3,7 @@
 
 from pants.pantsd.pants_daemon_core import PantsDaemonCore
 from pants.pantsd.service.pants_service import PantsServices
-from pants.testutil.option.util import create_options_bootstrapper
+from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
 

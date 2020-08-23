@@ -19,7 +19,7 @@ from pants.core.util_rules.filter_empty_sources import (
 from pants.engine.addresses import Address
 from pants.engine.target import FieldSet, Sources, Target, Targets
 from pants.engine.unions import UnionMembership
-from pants.testutil.engine.util import MockConsole, MockGet, run_rule
+from pants.testutil.engine_util import MockConsole, MockGet, run_rule
 from pants.testutil.test_base import TestBase
 from pants.util.logging import LogLevel
 

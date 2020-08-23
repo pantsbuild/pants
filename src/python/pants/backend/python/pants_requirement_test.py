@@ -2,25 +2,29 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 import pytest
+from pkg_resources import Requirement
 
 from pants.backend.python.pants_requirement import PantsRequirement
-from pants.backend.python.target_types import PythonRequirementLibrary, PythonRequirementsField
+from pants.backend.python.target_types import (
+    ModuleMappingField,
+    PythonRequirementLibrary,
+    PythonRequirementsField,
+)
 from pants.base.build_environment import pants_version
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import WrappedTarget
-from pants.python.python_requirement import PythonRequirement
-from pants.testutil.engine.util import Params
-from pants.testutil.option.util import create_options_bootstrapper
+from pants.testutil.engine_util import Params
+from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
+from pants.util.frozendict import FrozenDict
 
 
 class PantsRequirementTest(TestBase):
     @classmethod
     def alias_groups(cls):
         return BuildFileAliases(
-            objects={"python_requirement": PythonRequirement},
             context_aware_object_factories={PantsRequirement.alias: PantsRequirement},
         )
 
@@ -45,14 +49,10 @@ class PantsRequirementTest(TestBase):
             ),
         ).target
         assert isinstance(target, PythonRequirementLibrary)
-        expected = PythonRequirement(
-            f"{expected_dist}=={pants_version()}", modules=[expected_module]
+        assert target[PythonRequirementsField].value == (
+            Requirement.parse(f"{expected_dist}=={pants_version()}"),
         )
-        requirements = target[PythonRequirementsField].value
-        assert len(requirements) == 1
-        req = requirements[0]
-        assert req.requirement == expected.requirement
-        assert req.modules == expected.modules
+        assert target[ModuleMappingField].value == FrozenDict({expected_dist: (expected_module,)})
 
     def test_target_name(self) -> None:
         self.assert_pants_requirement("pants_requirement()", expected_target_name="python")

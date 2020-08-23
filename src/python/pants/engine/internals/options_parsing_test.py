@@ -4,7 +4,7 @@
 from pants.init.options_initializer import BuildConfigInitializer
 from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.scope import GLOBAL_SCOPE, Scope, ScopedOptions
-from pants.testutil.engine.util import Params
+from pants.testutil.engine_util import Params
 from pants.testutil.test_base import TestBase
 from pants.util.logging import LogLevel
 

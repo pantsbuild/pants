@@ -73,8 +73,8 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership, UnionRule, union
 from pants.option.options_bootstrapper import OptionsBootstrapper
-from pants.testutil.engine.util import Params
-from pants.testutil.option.util import create_options_bootstrapper
+from pants.testutil.engine_util import Params
+from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 from pants.util.ordered_set import FrozenOrderedSet
 

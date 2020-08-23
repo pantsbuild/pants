@@ -4,7 +4,8 @@
 from pants.engine.console import Console
 from pants.engine.goal import Goal, GoalSubsystem, LineOriented
 from pants.engine.rules import goal_rule
-from pants.testutil.engine.util import MockConsole, create_goal_subsystem, run_rule
+from pants.testutil.engine_util import MockConsole, run_rule
+from pants.testutil.option_util import create_goal_subsystem
 
 
 def test_line_oriented_goal() -> None:
