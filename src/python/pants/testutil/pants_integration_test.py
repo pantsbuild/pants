@@ -314,7 +314,7 @@ def kill_daemon(pid_dir=None):
 def ensure_daemon(f):
     """A decorator for running an integration test with and without the daemon enabled."""
 
-    def wrapper(self, *args, **kwargs):
+    def wrapper(*args, **kwargs):
         for enable_daemon in [False, True]:
             enable_daemon_str = str(enable_daemon)
             env = {
@@ -323,7 +323,7 @@ def ensure_daemon(f):
             }
             with environment_as(**env):
                 try:
-                    f(self, *args, **kwargs)
+                    f(*args, **kwargs)
                 except Exception:
                     print(f"Test failed with enable-pantsd={enable_daemon}:")
                     if not enable_daemon:

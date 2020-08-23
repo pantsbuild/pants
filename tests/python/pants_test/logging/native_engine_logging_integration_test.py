@@ -1,20 +1,21 @@
 # Copyright 2018 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from pants.testutil.pants_integration_test import PantsIntegrationTest, read_pantsd_log
+import re
+
+from pants.testutil.pants_integration_test import read_pantsd_log, run_pants
 from pants_test.pantsd.pantsd_integration_test_base import PantsDaemonIntegrationTestBase
 
 
-class NativeEngineLoggingTest(PantsIntegrationTest):
-    def test_native_logging(self) -> None:
-        expected_msg = r"\[DEBUG\] Launching \d+ root"
-        pants_run = self.run_pants(["-linfo", "list", "3rdparty::"])
-        pants_run.assert_success()
-        self.assertNotRegex(pants_run.stderr, expected_msg)
+def test_native_logging() -> None:
+    expected_msg = r"\[DEBUG\] Launching \d+ root"
+    pants_run = run_pants(["-linfo", "list", "3rdparty::"])
+    pants_run.assert_success()
+    assert not bool(re.search(expected_msg, pants_run.stderr))
 
-        pants_run = self.run_pants(["-ldebug", "list", "3rdparty::"])
-        pants_run.assert_success()
-        self.assertRegex(pants_run.stderr, expected_msg)
+    pants_run = run_pants(["-ldebug", "list", "3rdparty::"])
+    pants_run.assert_success()
+    assert bool(re.search(expected_msg, pants_run.stderr))
 
 
 class PantsdNativeLoggingTest(PantsDaemonIntegrationTestBase):
