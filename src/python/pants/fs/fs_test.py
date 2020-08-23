@@ -81,16 +81,15 @@ class WorkspaceTest(TestBase):
         assert Path(self.build_root, "prefix", path2).is_file()
 
 
-class IsChildOfTest(TestBase):
-    def test_is_child_of(self):
-        mock_build_root = Path("/mock/build/root")
+def test_is_child_of() -> None:
+    mock_build_root = Path("/mock/build/root")
 
-        assert is_child_of(Path("/mock/build/root/dist/dir"), mock_build_root)
-        assert is_child_of(Path("dist/dir"), mock_build_root)
-        assert is_child_of(Path("./dist/dir"), mock_build_root)
-        assert is_child_of(Path("../root/dist/dir"), mock_build_root)
-        assert is_child_of(Path(""), mock_build_root)
-        assert is_child_of(Path("./"), mock_build_root)
+    assert is_child_of(Path("/mock/build/root/dist/dir"), mock_build_root)
+    assert is_child_of(Path("dist/dir"), mock_build_root)
+    assert is_child_of(Path("./dist/dir"), mock_build_root)
+    assert is_child_of(Path("../root/dist/dir"), mock_build_root)
+    assert is_child_of(Path(""), mock_build_root)
+    assert is_child_of(Path("./"), mock_build_root)
 
-        assert not is_child_of(Path("/other/random/directory/root/dist/dir"), mock_build_root)
-        assert not is_child_of(Path("../not_root/dist/dir"), mock_build_root)
+    assert not is_child_of(Path("/other/random/directory/root/dist/dir"), mock_build_root)
+    assert not is_child_of(Path("../not_root/dist/dir"), mock_build_root)

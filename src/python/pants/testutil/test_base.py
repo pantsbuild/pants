@@ -4,7 +4,6 @@
 import logging
 import os
 import unittest
-import warnings
 from abc import ABC, ABCMeta, abstractmethod
 from collections import defaultdict
 from contextlib import contextmanager
@@ -347,42 +346,6 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         super().tearDown()
         Subsystem.reset()
 
-    @contextmanager
-    def assertRaisesWithMessage(self, exception_type, error_text):
-        """Verifies than an exception message is equal to `error_text`.
-
-        :param type exception_type: The exception type which is expected to be raised within the body.
-        :param str error_text: Text that the exception message should match exactly with
-                               `self.assertEqual()`.
-        :API: public
-        """
-        with self.assertRaises(exception_type) as cm:
-            yield cm
-        self.assertEqual(error_text, str(cm.exception))
-
-    @contextmanager
-    def assertRaisesWithMessageContaining(self, exception_type, error_text):
-        """Verifies that the string `error_text` appears in an exception message.
-
-        :param type exception_type: The exception type which is expected to be raised within the body.
-        :param str error_text: Text that the exception message should contain with `self.assertIn()`.
-        :API: public
-        """
-        with self.assertRaises(exception_type) as cm:
-            yield cm
-        self.assertIn(error_text, str(cm.exception))
-
-    @contextmanager
-    def assertDoesNotRaise(self, exc_class: Type[BaseException] = Exception):
-        """Verifies that the block does not raise an exception of the specified type.
-
-        :API: public
-        """
-        try:
-            yield
-        except exc_class as e:
-            raise AssertionError(f"section should not have raised, but did: {e}") from e
-
     def make_snapshot(self, files: Dict[str, Union[str, bytes]]) -> Snapshot:
         """Makes a snapshot from a map of file name to file content."""
         with temporary_dir() as temp_dir:
@@ -404,7 +367,7 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         """
         return self.make_snapshot({fp: "" for fp in files})
 
-    class LoggingRecorder:
+    class _LoggingRecorder:
         """Simple logging handler to record warnings."""
 
         def __init__(self):
@@ -437,22 +400,10 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
         old_level = root_logger.level
         root_logger.setLevel(level or logging.NOTSET)
 
-        handler = self.LoggingRecorder()
+        handler = self._LoggingRecorder()
         root_logger.addHandler(handler)
         try:
             yield handler
         finally:
             root_logger.setLevel(old_level)
             root_logger.removeHandler(handler)
-
-    @contextmanager
-    def warnings_catcher(self):
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            yield w
-
-    def assertWarning(self, w, category, warning_text):
-        single_warning = assert_single_element(w)
-        self.assertEqual(single_warning.category, category)
-        warning_message = single_warning.message
-        self.assertEqual(warning_text, str(warning_message))

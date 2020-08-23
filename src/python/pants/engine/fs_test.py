@@ -13,6 +13,8 @@ from http.server import BaseHTTPRequestHandler
 from pathlib import Path
 from typing import Callable, List
 
+import pytest
+
 from pants.base.file_system_project_tree import FileSystemProjectTree
 from pants.engine.fs import (
     EMPTY_DIGEST,
@@ -483,15 +485,15 @@ class FSTest(TestBase, SchedulerTestBase):
             assert stripped_digest == expected_snapshot.digest
 
             # Try to strip a prefix which isn't shared by all files:
-            with self.assertRaisesWithMessageContaining(
-                Exception,
-                "Cannot strip prefix characters/dark_tower from root directory Digest(Fingerprint<28c47f77"
-                "867f0c8d577d2ada2f06b03fc8e5ef2d780e8942713b26c5e3f434b8>, 243) - root directory "
-                "contained non-matching directory named: books and file named: index",
-            ):
+            with pytest.raises(Exception) as exc:
                 self.request_product(
                     Digest, RemovePrefix(snapshot_with_extra_files.digest, "characters/dark_tower"),
                 )
+            assert (
+                "Cannot strip prefix characters/dark_tower from root directory Digest(Fingerprint<"
+                "28c47f77867f0c8d577d2ada2f06b03fc8e5ef2d780e8942713b26c5e3f434b8>, 243) - root "
+                "directory contained non-matching directory named: books and file named: index"
+            ) in str(exc.value)
 
     def test_lift_digest_to_snapshot(self) -> None:
         digest = self.prime_store_with_roland_digest()
@@ -509,8 +511,9 @@ class FSTest(TestBase, SchedulerTestBase):
         hasher.update(text)
         digest = Digest(fingerprint=hasher.hexdigest(), serialized_bytes_length=len(text))
 
-        with self.assertRaisesWithMessageContaining(ExecutionError, "unknown directory"):
+        with pytest.raises(ExecutionError) as exc:
             self.request_product(Snapshot, digest)
+        assert "unknown directory" in str(exc.value)
 
     def test_glob_match_error(self) -> None:
         test_name = f"{__name__}.{self.test_glob_match_error.__name__}()"

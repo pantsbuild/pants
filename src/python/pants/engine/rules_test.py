@@ -421,15 +421,13 @@ class RuleTest(TestBase):
         assert "pants.util.meta.Console" in error_str
 
 
-class RuleIndexTest(TestBase):
-    def test_creation_fails_with_bad_declaration_type(self):
-        with self.assertRaisesWithMessage(
-            TypeError,
-            "Rule entry A() had an unexpected type: <class "
-            "'pants.engine.rules_test.A'>. Rules either extend Rule or UnionRule, or "
-            "are static functions decorated with @rule.",
-        ):
-            RuleIndex.create([A()])
+def test_rule_index_creation_fails_with_bad_declaration_type():
+    with pytest.raises(TypeError) as exc:
+        RuleIndex.create([A()])
+    assert str(exc.value) == (
+        "Rule entry A() had an unexpected type: <class 'pants.engine.rules_test.A'>. Rules "
+        "either extend Rule or UnionRule, or are static functions decorated with @rule."
+    )
 
 
 class RuleArgumentAnnotationTest(unittest.TestCase):
@@ -513,25 +511,27 @@ class GraphVertexTypeAnnotationTest(unittest.TestCase):
                 return False
 
 
-class GoalRuleValidation(TestBase):
-    def test_not_properly_marked_goal_rule(self) -> None:
-        with self.assertRaisesWithMessage(
-            TypeError,
-            "An `@rule` that returns a `Goal` must instead be declared with `@goal_rule`.",
-        ):
+def test_goal_rule_not_properly_marked_goal_rule() -> None:
+    with pytest.raises(TypeError) as exc:
 
-            @rule
-            def normal_rule_trying_to_return_a_goal() -> Example:
-                return Example(0)
+        @rule
+        def normal_rule_trying_to_return_a_goal() -> Example:
+            return Example(0)
 
-    def test_goal_rule_not_returning_a_goal(self) -> None:
-        with self.assertRaisesWithMessage(
-            TypeError, "An `@goal_rule` must return a subclass of `engine.goal.Goal`."
-        ):
+    assert (
+        str(exc.value)
+        == "An `@rule` that returns a `Goal` must instead be declared with `@goal_rule`."
+    )
 
-            @goal_rule
-            def goal_rule_returning_a_non_goal() -> int:
-                return 0
+
+def test_goal_rule_not_returning_a_goal() -> None:
+    with pytest.raises(TypeError) as exc:
+
+        @goal_rule
+        def goal_rule_returning_a_non_goal() -> int:
+            return 0
+
+    assert str(exc.value) == "An `@goal_rule` must return a subclass of `engine.goal.Goal`."
 
 
 class RuleGraphTest(TestBase):

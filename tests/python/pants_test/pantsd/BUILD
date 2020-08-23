@@ -3,6 +3,7 @@
 
 python_tests(
   sources=['test_*.py'],
+  dependencies=["//:build_root"],
 )
 
 python_library(

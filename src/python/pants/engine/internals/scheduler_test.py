@@ -231,10 +231,9 @@ class SchedulerTest(TestBase):
             remove_locations_from_traceback(consumes_a_and_b(a, transitive_b_c(c))),
         )
 
-        # Test that an inner Get in transitive_coroutine_rule() is able to resolve B from C due to the
-        # existence of transitive_b_c().
-        with self.assertDoesNotRaise():
-            _ = self.request_product(D, Params(c))
+        # Test that an inner Get in transitive_coroutine_rule() is able to resolve B from C due to
+        # the existence of transitive_b_c().
+        self.request_product(D, Params(c))
 
     def test_consumed_types(self):
         assert {A, B, C, str} == set(
@@ -258,10 +257,8 @@ class SchedulerTest(TestBase):
             yield
 
     def test_union_rules(self):
-        with self.assertDoesNotRaise():
-            _ = self.request_product(A, Params(UnionWrapper(UnionA())))
-        with self.assertDoesNotRaise():
-            _ = self.request_product(A, Params(UnionWrapper(UnionB())))
+        self.request_product(A, Params(UnionWrapper(UnionA())))
+        self.request_product(A, Params(UnionWrapper(UnionB())))
         # Fails due to no union relationship from A -> UnionBase.
         with self._assert_execution_error("Type A is not a member of the UnionBase @union"):
             self.request_product(A, Params(UnionWrapper(A())))
