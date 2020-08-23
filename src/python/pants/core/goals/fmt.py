@@ -9,7 +9,7 @@ from typing import ClassVar, Iterable, List, Optional, Tuple, Type, cast
 from pants.base.deprecated import resolve_conflicting_options
 from pants.core.util_rules.filter_empty_sources import TargetsWithSources, TargetsWithSourcesRequest
 from pants.engine.console import Console
-from pants.engine.engine_aware import EngineAware
+from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.fs import EMPTY_DIGEST, Digest, MergeDigests, Workspace
 from pants.engine.goal import Goal, GoalSubsystem
 from pants.engine.process import ProcessResult
@@ -21,7 +21,7 @@ from pants.util.strutil import strip_v2_chroot_path
 
 
 @dataclass(frozen=True)
-class FmtResult(EngineAware):
+class FmtResult(EngineAwareReturnType):
     input: Digest
     output: Digest
     stdout: str

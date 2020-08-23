@@ -15,7 +15,7 @@ from pants.base.exception_sink import ExceptionSink
 from pants.base.project_tree import Dir, File, Link
 from pants.engine.addresses import Address
 from pants.engine.collection import Collection
-from pants.engine.engine_aware import EngineAware
+from pants.engine.engine_aware import EngineAwareParameter, EngineAwareReturnType
 from pants.engine.fs import (
     AddPrefix,
     CreateDigest,
@@ -151,6 +151,7 @@ class Scheduler:
             interactive_process=InteractiveProcess,
             interactive_process_result=InteractiveProcessResult,
             digest_subset=DigestSubset,
+            engine_aware_parameter=EngineAwareParameter,
         )
 
         self._scheduler = native.new_scheduler(
@@ -210,7 +211,7 @@ class Scheduler:
             tasks,
             rule.func,
             output_type,
-            issubclass(output_type, EngineAware),
+            issubclass(output_type, EngineAwareReturnType),
             rule.cacheable,
             rule.canonical_name,
             rule.desc or "",

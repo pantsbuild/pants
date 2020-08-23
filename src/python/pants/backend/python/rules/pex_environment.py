@@ -8,7 +8,7 @@ from typing import Iterable, Mapping, Optional, Tuple, cast
 from pants.backend.python.subsystems import subprocess_environment
 from pants.backend.python.subsystems.subprocess_environment import SubprocessEnvironment
 from pants.engine import process
-from pants.engine.engine_aware import EngineAware
+from pants.engine.engine_aware import EngineAwareReturnType
 from pants.engine.process import BinaryPathRequest, BinaryPaths
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.option.subsystem import Subsystem
@@ -90,7 +90,7 @@ class PexRuntimeEnvironment(Subsystem):
 
 
 @dataclass(frozen=True)
-class PexEnvironment(EngineAware):
+class PexEnvironment(EngineAwareReturnType):
     path: Tuple[str, ...]
     interpreter_search_paths: Tuple[str, ...]
     subprocess_environment_dict: FrozenDict[str, str]

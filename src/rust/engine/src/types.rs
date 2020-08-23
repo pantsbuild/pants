@@ -27,4 +27,5 @@ pub struct Types {
   pub interactive_process: TypeId,
   pub interactive_process_result: TypeId,
   pub digest_subset: TypeId,
+  pub engine_aware_parameter: TypeId,
 }
