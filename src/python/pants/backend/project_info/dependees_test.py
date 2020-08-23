@@ -8,7 +8,7 @@ from pants.backend.project_info.dependees import DependeesGoal
 from pants.backend.project_info.dependees import DependeesOutputFormat as OutputFormat
 from pants.backend.project_info.dependees import rules as dependee_rules
 from pants.engine.target import Dependencies, Target
-from pants.testutil.goal_rule_test_base import GoalRuleTestBase
+from pants.testutil.test_base import TestBase
 
 
 class MockTarget(Target):
@@ -16,9 +16,7 @@ class MockTarget(Target):
     core_fields = (Dependencies,)
 
 
-class DependeesTest(GoalRuleTestBase):
-    goal_cls = DependeesGoal
-
+class DependeesTest(TestBase):
     @classmethod
     def target_types(cls):
         return [MockTarget]
@@ -47,11 +45,8 @@ class DependeesTest(GoalRuleTestBase):
             args.append("--transitive")
         if closed:
             args.append("--closed")
-        self.assert_console_output_ordered(
-            *expected,
-            args=[*args, *targets],
-            global_args=["--backend-packages=pants.backend.project_info"],
-        )
+        result = self.run_goal_rule(DependeesGoal, args=[*args, *targets])
+        assert result.stdout.splitlines() == expected
 
     def test_no_targets(self) -> None:
         self.assert_dependees(targets=[], expected=[])

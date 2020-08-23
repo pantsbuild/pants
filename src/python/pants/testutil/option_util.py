@@ -1,7 +1,7 @@
 # Copyright 2020 Pants project contributors (see CONTRIBUTORS.md).
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-from typing import Dict, Iterable, Optional, Type, TypeVar, Union, cast
+from typing import Iterable, Mapping, Optional, Type, TypeVar, Union, cast
 
 from pants.engine.goal import GoalSubsystem
 from pants.option.option_value_container import OptionValueContainer
@@ -11,7 +11,7 @@ from pants.option.subsystem import Subsystem
 
 
 def create_options_bootstrapper(
-    *, args: Optional[Iterable[str]] = None, env: Optional[Dict[str, str]] = None,
+    *, args: Optional[Iterable[str]] = None, env: Optional[Mapping[str, str]] = None,
 ) -> OptionsBootstrapper:
     return OptionsBootstrapper.create(
         args=("--pants-config-files=[]", *(args or [])), env=env or {}, allow_pantsrc=False,
