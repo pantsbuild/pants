@@ -26,6 +26,7 @@ from pants.core.util_rules.filter_empty_sources import (
     FieldSetsWithSourcesRequest,
 )
 from pants.engine.addresses import Address
+from pants.engine.desktop import OpenFiles, OpenFilesRequest
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, MergeDigests, Workspace
 from pants.engine.process import InteractiveProcess, InteractiveRunner
 from pants.engine.target import (
@@ -180,6 +181,11 @@ class TestTest(TestBase):
                     product_type=CoverageReports,
                     subject_type=CoverageDataCollection,
                     mock=mock_coverage_report_generation,
+                ),
+                MockGet(
+                    product_type=OpenFiles,
+                    subject_type=OpenFilesRequest,
+                    mock=lambda _: OpenFiles(()),
                 ),
             ],
             union_membership=union_membership,
