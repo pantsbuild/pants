@@ -23,15 +23,19 @@ class PyTest(Subsystem):
             help='Arguments to pass directly to Pytest, e.g. `--pytest-args="-k test_foo --quiet"`',
         )
         register(
-            "--version", default="pytest>=6.0.1,<6.1", help="Requirement string for Pytest.",
+            "--version",
+            default="pytest>=6.0.1,<6.1",
+            advanced=True,
+            help="Requirement string for Pytest.",
         )
         register(
             "--pytest-plugins",
             type=list,
+            advanced=True,
             default=[
-                "pytest-timeout>=1.4.2,<1.5",
                 "pytest-cov>=2.10.1,<2.11",
-                # NB: zipp has frequently destabilized builds due to floating transitive versions under pytest.
+                # NB: zipp has frequently destabilized builds due to floating transitive versions
+                # under pytest.
                 "zipp==2.1.0",
             ],
             help="Requirement strings for any plugins or additional requirements you'd like to use.",
@@ -78,8 +82,10 @@ class PyTest(Subsystem):
             type=str,
             default=None,
             advanced=True,
-            help="If a non-empty string, the process execution slot id (an integer) will be exposed to tests under this "
-            "environment variable name.",
+            help=(
+                "If a non-empty string, the process execution slot id (an integer) will be exposed "
+                "to tests under this environment variable name."
+            ),
         )
 
     def get_requirement_strings(self) -> Tuple[str, ...]:
