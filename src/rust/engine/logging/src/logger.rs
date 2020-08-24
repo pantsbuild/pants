@@ -10,7 +10,7 @@ use std::convert::{TryFrom, TryInto};
 use std::fs::File;
 use std::fs::OpenOptions;
 use std::future::Future;
-use std::io::{stderr, Stderr, Write};
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -31,7 +31,6 @@ lazy_static! {
 
 pub struct PantsLogger {
   pantsd_log: Mutex<MaybeWriteLogger<File>>,
-  stderr_log: Mutex<MaybeWriteLogger<Stderr>>,
   use_color: AtomicBool,
   show_rust_3rdparty_logs: AtomicBool,
   stderr_handlers: Mutex<HashMap<Uuid, StdioHandler>>,
@@ -41,7 +40,6 @@ impl PantsLogger {
   pub fn new() -> PantsLogger {
     PantsLogger {
       pantsd_log: Mutex::new(MaybeWriteLogger::empty()),
-      stderr_log: Mutex::new(MaybeWriteLogger::empty()),
       show_rust_3rdparty_logs: AtomicBool::new(true),
       use_color: AtomicBool::new(false),
       stderr_handlers: Mutex::new(HashMap::new()),
@@ -64,11 +62,6 @@ impl PantsLogger {
       }
       Err(err) => panic!("Unrecognised log level from Python: {}: {}", max_level, err),
     };
-  }
-
-  pub fn set_stderr_logger(&self) -> Result<(), String> {
-    *self.stderr_log.lock() = MaybeWriteLogger::new(stderr());
-    Ok(())
   }
 
   ///
@@ -190,7 +183,7 @@ impl Log for PantsLogger {
             }
           }
           if handlers_map.len() == 0 || any_handler_failed {
-            self.stderr_log.lock().log(record);
+            eprintln!("{}", log_string);
           }
         }
       }
@@ -199,7 +192,6 @@ impl Log for PantsLogger {
   }
 
   fn flush(&self) {
-    self.stderr_log.lock().flush();
     self.pantsd_log.lock().flush();
   }
 }

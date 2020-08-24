@@ -1681,9 +1681,6 @@ fn setup_pantsd_logger(py: Python, log_file: String) -> CPyResult<i64> {
 
 fn setup_stderr_logger(_: Python) -> PyUnitResult {
   logging::set_thread_destination(Destination::Stderr);
-  PANTS_LOGGER
-    .set_stderr_logger()
-    .expect("Error setting up STDERR logger");
   Ok(None)
 }
 
