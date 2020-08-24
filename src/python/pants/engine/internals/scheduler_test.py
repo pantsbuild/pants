@@ -10,11 +10,7 @@ from typing import Any, FrozenSet
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import Get, RootRule, rule
 from pants.engine.unions import UnionRule, union
-from pants.testutil.engine_util import (
-    Params,
-    assert_equal_with_printing,
-    remove_locations_from_traceback,
-)
+from pants.testutil.engine_util import assert_equal_with_printing, remove_locations_from_traceback
 from pants.testutil.test_base import TestBase
 
 
@@ -207,11 +203,11 @@ class SchedulerTest(TestBase):
     def test_use_params(self):
         # Confirm that we can pass in Params in order to provide multiple inputs to an execution.
         a, b = A(), B()
-        result_str = self.request_product(str, Params(a, b))
+        result_str = self.request_product(str, [a, b])
         self.assertEqual(result_str, consumes_a_and_b(a, b))
 
         # And confirm that a superset of Params is also accepted.
-        result_str = self.request_product(str, Params(a, b, self))
+        result_str = self.request_product(str, [a, b, self])
         self.assertEqual(result_str, consumes_a_and_b(a, b))
 
         # But not a subset.
@@ -219,13 +215,13 @@ class SchedulerTest(TestBase):
             str.__name__
         )
         with self.assertRaisesRegex(Exception, re.escape(expected_msg)):
-            self.request_product(str, Params(a))
+            self.request_product(str, [a])
 
     def test_transitive_params(self):
         # Test that C can be provided and implicitly converted into a B with transitive_b_c() to satisfy
         # the selectors of consumes_a_and_b().
         a, c = A(), C()
-        result_str = self.request_product(str, Params(a, c))
+        result_str = self.request_product(str, [a, c])
         self.assertEqual(
             remove_locations_from_traceback(result_str),
             remove_locations_from_traceback(consumes_a_and_b(a, transitive_b_c(c))),
@@ -233,7 +229,7 @@ class SchedulerTest(TestBase):
 
         # Test that an inner Get in transitive_coroutine_rule() is able to resolve B from C due to
         # the existence of transitive_b_c().
-        self.request_product(D, Params(c))
+        self.request_product(D, [c])
 
     def test_consumed_types(self):
         assert {A, B, C, str} == set(
@@ -245,11 +241,11 @@ class SchedulerTest(TestBase):
         # engine that behavior would be surprising, and would cause both of these Params to intern
         # to the same value, triggering an error. Instead, the engine additionally includes the
         # type of a value in equality.
-        assert A() == self.request_product(A, Params(1, True))
+        assert A() == self.request_product(A, [1, True])
 
     def test_weak_gets(self):
-        assert {True, False} == set(self.request_product(BooleanDeps, True))
-        assert {True, False} == set(self.request_product(BooleanDeps, False))
+        assert {True, False} == set(self.request_product(BooleanDeps, [True]))
+        assert {True, False} == set(self.request_product(BooleanDeps, [False]))
 
     @contextmanager
     def _assert_execution_error(self, expected_msg):
@@ -257,15 +253,15 @@ class SchedulerTest(TestBase):
             yield
 
     def test_union_rules(self):
-        self.request_product(A, Params(UnionWrapper(UnionA())))
-        self.request_product(A, Params(UnionWrapper(UnionB())))
+        self.request_product(A, [UnionWrapper(UnionA())])
+        self.request_product(A, [UnionWrapper(UnionB())])
         # Fails due to no union relationship from A -> UnionBase.
         with self._assert_execution_error("Type A is not a member of the UnionBase @union"):
-            self.request_product(A, Params(UnionWrapper(A())))
+            self.request_product(A, [UnionWrapper(A())])
 
     def test_union_rules_no_docstring(self):
         with self._assert_execution_error("specific error message for UnionA instance"):
-            self.request_product(UnionX, Params(UnionWrapper(UnionA())))
+            self.request_product(UnionX, [UnionWrapper(UnionA())])
 
 
 class SchedulerWithNestedRaiseTest(TestBase):
@@ -286,7 +282,7 @@ class SchedulerWithNestedRaiseTest(TestBase):
 
         with self.assertRaises(ExecutionError) as cm:
             # `a_typecheck_fail_test` above expects `wrapper.inner` to be a `B`.
-            self.request_product(A, Params(TypeCheckFailWrapper(A())))
+            self.request_product(A, [TypeCheckFailWrapper(A())])
 
         expected_regex = "WithDeps.*did not declare a dependency on JustGet"
         self.assertRegex(str(cm.exception), expected_regex)
@@ -295,13 +291,13 @@ class SchedulerWithNestedRaiseTest(TestBase):
         """Test that unhashable root params result in a structured error."""
         # This will fail at the rust boundary, before even entering the engine.
         with self.assertRaisesRegex(TypeError, "unhashable type: 'list'"):
-            self.request_product(C, Params(CollectionType([1, 2, 3])))
+            self.request_product(C, [CollectionType([1, 2, 3])])
 
     def test_unhashable_get_params_failure(self):
         """Test that unhashable Get(...) params result in a structured error."""
         # This will fail inside of `c_unhashable_dataclass`.
         with self.assertRaisesRegex(ExecutionError, "unhashable type: 'list'"):
-            self.request_product(C, Params(CollectionType(tuple())))
+            self.request_product(C, [CollectionType(tuple())])
 
     def test_trace_includes_rule_exception_traceback(self):
         # Execute a request that will trigger the nested raise, and then directly inspect its trace.

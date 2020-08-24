@@ -49,7 +49,7 @@ class PythonFmtIntegrationTest(ExternalToolTestBase):
         return results
 
     def get_digest(self, source_files: List[FileContent]) -> Digest:
-        return self.request_product(Digest, CreateDigest(source_files))
+        return self.request_product(Digest, [CreateDigest(source_files)])
 
     def test_multiple_formatters_changing_the_same_file(self) -> None:
         original_source = FileContent(
