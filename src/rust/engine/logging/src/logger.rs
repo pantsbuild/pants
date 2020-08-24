@@ -16,7 +16,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use lazy_static::lazy_static;
 use log::{debug, log, max_level, set_logger, set_max_level, LevelFilter, Log, Metadata, Record};
 use parking_lot::Mutex;
-use simplelog::WriteLogger;
 use tokio::task_local;
 use uuid::Uuid;
 
@@ -199,32 +198,6 @@ impl Log for PantsLogger {
   }
 
   fn flush(&self) {}
-}
-
-struct MaybeWriteLogger<W: Write + Send + 'static> {
-  inner: Option<Box<WriteLogger<W>>>,
-}
-
-impl<W: Write + Send + 'static> Log for MaybeWriteLogger<W> {
-  fn enabled(&self, _metadata: &Metadata) -> bool {
-    // PantsLogger will have already filtered using the global filter.
-    true
-  }
-
-  fn log(&self, record: &Record) {
-    if !self.enabled(record.metadata()) {
-      return;
-    }
-    if let Some(ref logger) = self.inner {
-      logger.log(record);
-    }
-  }
-
-  fn flush(&self) {
-    if let Some(ref logger) = self.inner {
-      logger.flush();
-    }
-  }
 }
 
 ///

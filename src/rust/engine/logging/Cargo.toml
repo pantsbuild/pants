@@ -12,9 +12,7 @@ lazy_static = "1"
 log = "0.4"
 num_enum = "0.4"
 parking_lot = "0.11"
-simplelog = "0.7.4"
-# TODO: See #10291.
-tokio = { version = "=0.2.20", features = ["rt-util"] }
+tokio = { version = "=0.2.20", features = ["rt-util"] } # TODO: see https://github.com/pantsbuild/pants/issues/10291
 uuid = { version = "0.7", features = ["v4"] }
 
 [build-dependencies]
