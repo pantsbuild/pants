@@ -12,7 +12,6 @@ from pants.core.util_rules.filter_empty_sources import (
 from pants.core.util_rules.filter_empty_sources import rules as filter_empty_sources_rules
 from pants.engine.addresses import Address
 from pants.engine.target import FieldSet, Sources, Tags, Target
-from pants.testutil.engine_util import Params
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
@@ -42,10 +41,10 @@ class FilterEmptySourcesTest(TestBase):
 
         result = self.request_product(
             FieldSetsWithSources,
-            Params(
+            [
                 FieldSetsWithSourcesRequest([valid_field_set, empty_field_set]),
                 create_options_bootstrapper(),
-            ),
+            ],
         )
         assert tuple(result) == (valid_field_set,)
 
@@ -67,9 +66,9 @@ class FilterEmptySourcesTest(TestBase):
 
         result = self.request_product(
             TargetsWithSources,
-            Params(
+            [
                 TargetsWithSourcesRequest([valid_tgt, empty_tgt, invalid_tgt]),
                 create_options_bootstrapper(),
-            ),
+            ],
         )
         assert tuple(result) == (valid_tgt,)

@@ -8,12 +8,11 @@ from pants.testutil.test_base import TestBase
 
 class PlatformTest(TestBase):
     def test_platform_on_local_epr_result(self) -> None:
-
         this_platform = Platform.current
 
         process = Process(
             argv=("/bin/echo", "test"), description="Run some program that will exit cleanly."
         )
-        result = self.request_product(FallibleProcessResultWithPlatform, process)
+        result = self.request_product(FallibleProcessResultWithPlatform, [process])
         assert result.exit_code == 0
         assert result.platform == this_platform

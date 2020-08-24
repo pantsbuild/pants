@@ -64,7 +64,11 @@ class WorkspaceTest(TestBase):
         workspace = Workspace(self.scheduler)
         digest = self.request_product(
             Digest,
-            CreateDigest([FileContent("a.txt", b"hello"), FileContent("subdir/b.txt", b"goodbye")]),
+            [
+                CreateDigest(
+                    [FileContent("a.txt", b"hello"), FileContent("subdir/b.txt", b"goodbye")]
+                )
+            ],
         )
 
         path1 = Path(self.build_root, "a.txt")

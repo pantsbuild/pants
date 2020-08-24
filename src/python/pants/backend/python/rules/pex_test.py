@@ -25,7 +25,6 @@ from pants.engine.process import Process, ProcessResult
 from pants.engine.rules import RootRule
 from pants.engine.target import FieldSet
 from pants.python.python_setup import PythonSetup
-from pants.testutil.engine_util import Params
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option_util import create_options_bootstrapper, create_subsystem
 from pants.util.frozendict import FrozenDict
@@ -213,12 +212,12 @@ class PexTest(ExternalToolTestBase):
         )
         pex = self.request_product(
             Pex,
-            Params(
+            [
                 request,
                 create_options_bootstrapper(
                     args=["--backend-packages=pants.backend.python", *additional_pants_args]
                 ),
-            ),
+            ],
         )
         self.scheduler.write_digest(pex.digest)
         pex_path = os.path.join(self.build_root, "test.pex")
@@ -260,12 +259,14 @@ class PexTest(ExternalToolTestBase):
     def test_pex_execution(self) -> None:
         sources = self.request_product(
             Digest,
-            CreateDigest(
-                (
-                    FileContent(path="main.py", content=b'print("from main")'),
-                    FileContent(path="subdir/sub.py", content=b'print("from sub")'),
+            [
+                CreateDigest(
+                    (
+                        FileContent(path="main.py", content=b'print("from main")'),
+                        FileContent(path="subdir/sub.py", content=b'print("from sub")'),
+                    )
                 )
-            ),
+            ],
         )
         pex_output = self.create_pex_and_get_all_data(entry_point="main", sources=sources)
 
@@ -284,7 +285,7 @@ class PexTest(ExternalToolTestBase):
             input_digest=pex_output["pex"].digest,
             description="Run the pex and make sure it works",
         )
-        result = self.request_product(ProcessResult, process)
+        result = self.request_product(ProcessResult, [process])
         assert result.stdout == b"from main\n"
 
     def test_resolves_dependencies(self) -> None:
@@ -356,7 +357,7 @@ class PexTest(ExternalToolTestBase):
         preamble_file = "custom_preamble.txt"
         preamble = "#!CUSTOM PREAMBLE\n"
         additional_inputs = self.request_product(
-            Digest, CreateDigest([FileContent(path=preamble_file, content=preamble.encode())])
+            Digest, [CreateDigest([FileContent(path=preamble_file, content=preamble.encode())])]
         )
         additional_pex_args = (f"--preamble-file={preamble_file}",)
         pex_output = self.create_pex_and_get_all_data(

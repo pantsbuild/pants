@@ -15,7 +15,6 @@ from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents
 from pants.engine.rules import RootRule
 from pants.engine.target import WrappedTarget
-from pants.testutil.engine_util import Params
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option_util import create_options_bootstrapper
 
@@ -40,14 +39,12 @@ class TestPythonAWSLambdaCreation(ExternalToolTestBase):
                 "--source-root-patterns=src/python",
             ]
         )
-        target = self.request_product(
-            WrappedTarget, Params(Address.parse(addr), bootstrapper)
-        ).target
+        target = self.request_product(WrappedTarget, [Address.parse(addr), bootstrapper]).target
         created_awslambda = self.request_product(
-            CreatedAWSLambda, Params(PythonAwsLambdaFieldSet.create(target), bootstrapper)
+            CreatedAWSLambda, [PythonAwsLambdaFieldSet.create(target), bootstrapper]
         )
         created_awslambda_digest_contents = self.request_product(
-            DigestContents, created_awslambda.digest
+            DigestContents, [created_awslambda.digest]
         )
         assert len(created_awslambda_digest_contents) == 1
         return created_awslambda.zip_file_relpath, created_awslambda_digest_contents[0].content

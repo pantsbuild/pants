@@ -200,7 +200,7 @@ class TestInputFileCreation(TestBase):
         file_contents = b"some file contents"
 
         digest = self.request_product(
-            Digest, CreateDigest([FileContent(path=file_name, content=file_contents)])
+            Digest, [CreateDigest([FileContent(path=file_name, content=file_contents)])]
         )
         req = Process(
             argv=("/bin/cat", file_name),
@@ -208,18 +208,20 @@ class TestInputFileCreation(TestBase):
             description="cat the contents of this file",
         )
 
-        result = self.request_product(ProcessResult, req)
+        result = self.request_product(ProcessResult, [req])
         self.assertEqual(result.stdout, file_contents)
 
     def test_multiple_file_creation(self):
         digest = self.request_product(
             Digest,
-            CreateDigest(
-                (
-                    FileContent(path="a.txt", content=b"hello"),
-                    FileContent(path="b.txt", content=b"goodbye"),
+            [
+                CreateDigest(
+                    (
+                        FileContent(path="a.txt", content=b"hello"),
+                        FileContent(path="b.txt", content=b"goodbye"),
+                    )
                 )
-            ),
+            ],
         )
 
         req = Process(
@@ -228,7 +230,7 @@ class TestInputFileCreation(TestBase):
             description="cat the contents of this file",
         )
 
-        result = self.request_product(ProcessResult, req)
+        result = self.request_product(ProcessResult, [req])
         self.assertEqual(result.stdout, b"hellogoodbye")
 
     def test_file_in_directory_creation(self):
@@ -236,7 +238,7 @@ class TestInputFileCreation(TestBase):
         content = b"file contents"
 
         digest = self.request_product(
-            Digest, CreateDigest([FileContent(path=path, content=content)])
+            Digest, [CreateDigest([FileContent(path=path, content=content)])]
         )
         req = Process(
             argv=("/bin/cat", "somedir/filename"),
@@ -244,7 +246,7 @@ class TestInputFileCreation(TestBase):
             description="Cat a file in a directory to make sure that doesn't break",
         )
 
-        result = self.request_product(ProcessResult, req)
+        result = self.request_product(ProcessResult, [req])
         self.assertEqual(result.stdout, content)
 
     def test_not_executable(self):
@@ -252,14 +254,14 @@ class TestInputFileCreation(TestBase):
         file_contents = b'#!/bin/bash -eu\necho "Hello"\n'
 
         digest = self.request_product(
-            Digest, CreateDigest([FileContent(path=file_name, content=file_contents)])
+            Digest, [CreateDigest([FileContent(path=file_name, content=file_contents)])]
         )
         req = Process(
             argv=("./echo.sh",), input_digest=digest, description="cat the contents of this file",
         )
 
         with pytest.raises(ExecutionError) as exc:
-            self.request_product(ProcessResult, req)
+            self.request_product(ProcessResult, [req])
         assert "Permission" in str(exc.value)
 
     def test_executable(self):
@@ -268,13 +270,17 @@ class TestInputFileCreation(TestBase):
 
         digest = self.request_product(
             Digest,
-            CreateDigest([FileContent(path=file_name, content=file_contents, is_executable=True)]),
+            [
+                CreateDigest(
+                    [FileContent(path=file_name, content=file_contents, is_executable=True)]
+                )
+            ],
         )
         req = Process(
             argv=("./echo.sh",), input_digest=digest, description="cat the contents of this file",
         )
 
-        result = self.request_product(ProcessResult, req)
+        result = self.request_product(ProcessResult, [req])
         self.assertEqual(result.stdout, b"Hello\n")
 
 
@@ -299,12 +305,12 @@ class ProcessTest(TestBase):
 
         cat_exe_req = CatExecutionRequest(ShellCat(BinaryLocation("/bin/cat")), PathGlobs(["f*"]),)
 
-        concatted = self.request_product(Concatted, cat_exe_req)
+        concatted = self.request_product(Concatted, [cat_exe_req])
         self.assertEqual(Concatted("one\ntwo\n"), concatted)
 
     def test_javac_version_example(self):
         request = JavacVersionExecutionRequest(BinaryLocation("/usr/bin/javac"))
-        result = self.request_product(JavacVersionOutput, request)
+        result = self.request_product(JavacVersionOutput, [request])
         self.assertIn("javac", result.value)
 
     def test_write_file(self):
@@ -314,7 +320,7 @@ class ProcessTest(TestBase):
             output_files=("roland",),
         )
 
-        process_result = self.request_product(ProcessResult, request)
+        process_result = self.request_product(ProcessResult, [request])
 
         self.assertEqual(
             process_result.output_digest,
@@ -324,7 +330,7 @@ class ProcessTest(TestBase):
             ),
         )
 
-        digest_contents = self.request_product(DigestContents, process_result.output_digest,)
+        digest_contents = self.request_product(DigestContents, [process_result.output_digest])
         assert digest_contents == DigestContents(
             [FileContent("roland", b"European Burmese", False)]
         )
@@ -335,7 +341,7 @@ class ProcessTest(TestBase):
             timeout_seconds=0.1,
             description="sleepy-cat",
         )
-        result = self.request_product(FallibleProcessResult, request)
+        result = self.request_product(FallibleProcessResult, [request])
         self.assertNotEqual(result.exit_code, 0)
         self.assertIn(b"Exceeded timeout", result.stdout)
         self.assertIn(b"sleepy-cat", result.stdout)
@@ -354,8 +360,8 @@ class Simple {
         request = JavacCompileRequest(
             BinaryLocation("/usr/bin/javac"), JavacSources(("simple/Simple.java",)),
         )
-        result = self.request_product(JavacCompileResult, request)
-        digest_contents = self.request_product(DigestContents, result.digest)
+        result = self.request_product(JavacCompileResult, [request])
+        digest_contents = self.request_product(DigestContents, [result.digest])
         assert sorted(["simple/Simple.java", "simple/Simple.class"]) == sorted(
             file.path for file in digest_contents
         )
@@ -376,7 +382,7 @@ class Broken {
         )
 
         with self.assertRaises(ExecutionError) as cm:
-            self.request_product(JavacCompileResult, request)
+            self.request_product(JavacCompileResult, [request])
         e = cm.exception.wrapped_exceptions[0]
         self.assertIsInstance(e, ProcessExecutionFailure)
         self.assertEqual(1, e.exit_code)
@@ -390,13 +396,13 @@ class Broken {
             request = Process(
                 argv=("/bin/cat", ".jdk/roland"), description="cat JDK roland", jdk_home=temp_dir,
             )
-            result = self.request_product(ProcessResult, request)
+            result = self.request_product(ProcessResult, [request])
             self.assertEqual(result.stdout, b"European Burmese")
 
     def test_fallible_failing_command_returns_exited_result(self):
         request = Process(argv=("/bin/bash", "-c", "exit 1"), description="one-cat")
 
-        result = self.request_product(FallibleProcessResult, request)
+        result = self.request_product(FallibleProcessResult, [request])
 
         self.assertEqual(result.exit_code, 1)
 
@@ -404,7 +410,7 @@ class Broken {
         request = Process(argv=("/bin/bash", "-c", "exit 1"), description="one-cat")
 
         with self.assertRaises(ExecutionError) as cm:
-            self.request_product(ProcessResult, request)
+            self.request_product(ProcessResult, [request])
         assert "Process 'one-cat' failed with exit code 1." in str(cm.exception)
 
 

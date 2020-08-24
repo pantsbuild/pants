@@ -14,7 +14,6 @@ from pants.engine.addresses import Address
 from pants.engine.fs import FileContent
 from pants.engine.rules import RootRule
 from pants.engine.target import Target, WrappedTarget
-from pants.testutil.engine_util import Params
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option_util import create_options_bootstrapper
 
@@ -101,10 +100,10 @@ class MyPyIntegrationTest(ExternalToolTestBase):
         )
         return self.request_product(
             WrappedTarget,
-            Params(
+            [
                 Address(package, target_name=name),
                 create_options_bootstrapper(args=self.global_args),
-            ),
+            ],
         ).target
 
     def run_mypy(
@@ -128,10 +127,10 @@ class MyPyIntegrationTest(ExternalToolTestBase):
             args.extend(additional_args)
         result = self.request_product(
             TypecheckResults,
-            Params(
+            [
                 MyPyRequest(MyPyFieldSet.create(tgt) for tgt in targets),
                 create_options_bootstrapper(args=args),
-            ),
+            ],
         )
         return result.results
 

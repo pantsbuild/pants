@@ -21,7 +21,6 @@ from pants.engine.target import (
     WrappedTarget,
 )
 from pants.source.source_root import NoSourceRootError
-from pants.testutil.engine_util import Params
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option_util import create_options_bootstrapper
 
@@ -51,13 +50,13 @@ class ProtobufPythonIntegrationTest(ExternalToolTestBase):
                 f"--source-root-patterns={repr(source_roots)}",
             ]
         )
-        tgt = self.request_product(WrappedTarget, Params(Address.parse(spec), bootstrapper)).target
+        tgt = self.request_product(WrappedTarget, [Address.parse(spec), bootstrapper]).target
         protocol_sources = self.request_product(
-            HydratedSources, Params(HydrateSourcesRequest(tgt[ProtobufSources]), bootstrapper),
+            HydratedSources, [HydrateSourcesRequest(tgt[ProtobufSources]), bootstrapper],
         )
         generated_sources = self.request_product(
             GeneratedSources,
-            Params(GeneratePythonFromProtobufRequest(protocol_sources.snapshot, tgt), bootstrapper),
+            [GeneratePythonFromProtobufRequest(protocol_sources.snapshot, tgt), bootstrapper],
         )
         assert set(generated_sources.snapshot.files) == set(expected_files)
 

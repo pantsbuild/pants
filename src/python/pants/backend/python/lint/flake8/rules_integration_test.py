@@ -11,7 +11,6 @@ from pants.engine.addresses import Address
 from pants.engine.fs import DigestContents, FileContent
 from pants.engine.rules import RootRule
 from pants.engine.target import Target
-from pants.testutil.engine_util import Params
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.python_interpreter_selection import skip_unless_python27_and_python3_present
@@ -58,10 +57,10 @@ class Flake8IntegrationTest(ExternalToolTestBase):
             args.extend(additional_args)
         results = self.request_product(
             LintResults,
-            Params(
+            [
                 Flake8Request(Flake8FieldSet.create(tgt) for tgt in targets),
                 create_options_bootstrapper(args=args),
-            ),
+            ],
         )
         return results.results
 
@@ -168,6 +167,6 @@ class Flake8IntegrationTest(ExternalToolTestBase):
         assert result[0].exit_code == 1
         assert result[0].stdout.strip() == ""
         assert result[0].report is not None
-        report_files = self.request_product(DigestContents, result[0].report.digest)
+        report_files = self.request_product(DigestContents, [result[0].report.digest])
         assert len(report_files) == 1
         assert "bad.py:1:1: F401" in report_files[0].content.decode()

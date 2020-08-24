@@ -667,7 +667,7 @@ class StreamingWorkunitProcessTests(TestBase):
         )
 
         with handler.session():
-            result = self.request_product(ProcessResult, stdout_process)
+            result = self.request_product(ProcessResult, [stdout_process])
 
         assert tracker.finished
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
@@ -696,7 +696,7 @@ class StreamingWorkunitProcessTests(TestBase):
         )
 
         with handler.session():
-            result = self.request_product(ProcessResult, stderr_process)
+            result = self.request_product(ProcessResult, [stderr_process])
 
         assert tracker.finished
         finished = list(itertools.chain.from_iterable(tracker.finished_workunit_chunks))
@@ -749,4 +749,4 @@ class StreamingWorkunitProcessTests(TestBase):
         )
 
         with handler.session():
-            self.request_product(ProcessResult, stdout_process)
+            self.request_product(ProcessResult, [stdout_process])

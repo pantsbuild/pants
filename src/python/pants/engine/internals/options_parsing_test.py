@@ -50,8 +50,7 @@ class TestEngineOptionsParsing(TestBase):
             return self._ob(args=("./pants", "-ldebug", "binary", "src/python::"))
 
         def parse(ob):
-            params = Params(Scope(str(GLOBAL_SCOPE)), ob)
-            return self.request_product(ScopedOptions, params)
+            return self.request_product(ScopedOptions, [Scope(GLOBAL_SCOPE), ob])
 
         # If two OptionsBootstrapper instances are not equal, memoization will definitely not kick in.
         one_opts = ob()

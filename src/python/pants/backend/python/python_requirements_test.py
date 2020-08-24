@@ -14,7 +14,6 @@ from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.addresses import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.target import Targets
-from pants.testutil.engine_util import Params
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
@@ -43,10 +42,10 @@ class PantsRequirementTest(TestBase):
         self.create_file(requirements_txt_relpath, requirements_txt)
         targets = self.request_product(
             Targets,
-            Params(
+            [
                 Specs(AddressSpecs([DescendantAddresses("")]), FilesystemSpecs([])),
                 create_options_bootstrapper(),
-            ),
+            ],
         )
         assert {expected_file_dep, *expected_targets} == set(targets)
 

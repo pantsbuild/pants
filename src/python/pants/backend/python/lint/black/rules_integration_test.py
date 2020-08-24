@@ -13,7 +13,6 @@ from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.rules import RootRule
 from pants.engine.target import Target
-from pants.testutil.engine_util import Params
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option_util import create_options_bootstrapper
 
@@ -55,26 +54,26 @@ class BlackIntegrationTest(ExternalToolTestBase):
         options_bootstrapper = create_options_bootstrapper(args=args)
         field_sets = [BlackFieldSet.create(tgt) for tgt in targets]
         lint_results = self.request_product(
-            LintResults, Params(BlackRequest(field_sets), options_bootstrapper)
+            LintResults, [BlackRequest(field_sets), options_bootstrapper]
         )
         input_sources = self.request_product(
             SourceFiles,
-            Params(
+            [
                 SourceFilesRequest(field_set.sources for field_set in field_sets),
                 options_bootstrapper,
-            ),
+            ],
         )
         fmt_result = self.request_product(
             FmtResult,
-            Params(
+            [
                 BlackRequest(field_sets, prior_formatter_result=input_sources.snapshot),
                 options_bootstrapper,
-            ),
+            ],
         )
         return lint_results.results, fmt_result
 
     def get_digest(self, source_files: List[FileContent]) -> Digest:
-        return self.request_product(Digest, CreateDigest(source_files))
+        return self.request_product(Digest, [CreateDigest(source_files)])
 
     def test_passing_source(self) -> None:
         target = self.make_target([self.good_source])

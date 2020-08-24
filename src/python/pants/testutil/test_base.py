@@ -115,9 +115,11 @@ class TestBase(unittest.TestCase, metaclass=ABCMeta):
     _P = TypeVar("_P")
 
     def request_product(
-        self, product_type: Type["TestBase._P"], subject: Union[Params, Any]
+        self, product_type: Type["TestBase._P"], subjects: Iterable[Any]
     ) -> "TestBase._P":
-        result = assert_single_element(self.scheduler.product_request(product_type, [subject]))
+        result = assert_single_element(
+            self.scheduler.product_request(product_type, [Params(*subjects)])
+        )
         return cast(TestBase._P, result)
 
     def run_goal_rule(

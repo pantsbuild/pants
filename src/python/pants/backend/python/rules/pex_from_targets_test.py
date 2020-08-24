@@ -13,7 +13,6 @@ from pants.build_graph.address import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.engine.rules import RootRule, SubsystemRule
 from pants.python.python_setup import PythonSetup, ResolveAllConstraintsOption
-from pants.testutil.engine_util import Params
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 
@@ -84,7 +83,7 @@ class PexTest(TestBase):
             if constraints_file:
                 args.append(f"--python-setup-requirement-constraints={constraints_file}")
             return self.request_product(
-                PexRequest, Params(request, create_options_bootstrapper(args=args))
+                PexRequest, [request, create_options_bootstrapper(args=args)]
             )
 
         pex_req1 = get_pex_request("constraints1.txt", ResolveAllConstraintsOption.NEVER)
