@@ -12,7 +12,7 @@ from pants.backend.awslambda.python.awslambda_python_rules import rules as awsla
 from pants.backend.awslambda.python.target_types import PythonAWSLambda
 from pants.backend.python.target_types import PythonLibrary
 from pants.engine.addresses import Address
-from pants.engine.fs import Digest, DigestContents
+from pants.engine.fs import DigestContents
 from pants.engine.rules import QueryRule
 from pants.engine.target import WrappedTarget
 from pants.option.options_bootstrapper import OptionsBootstrapper

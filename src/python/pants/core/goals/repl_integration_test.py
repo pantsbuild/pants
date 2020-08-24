@@ -9,10 +9,10 @@ from pants.backend.python.target_types import PythonLibrary
 from pants.core.goals.repl import Repl
 from pants.core.goals.repl import rules as repl_rules
 from pants.core.util_rules import archive, external_tool, stripped_source_files
-from pants.testutil.test_base import TestBase
 from pants.engine.process import Process
 from pants.engine.rules import QueryRule
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.testutil.test_base import TestBase
 
 
 class ReplTest(TestBase):

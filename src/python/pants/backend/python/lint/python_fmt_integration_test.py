@@ -12,8 +12,8 @@ from pants.engine.addresses import Address
 from pants.engine.fs import CreateDigest, Digest, FileContent
 from pants.engine.rules import QueryRule
 from pants.engine.target import Targets
-from pants.testutil.engine_util import Params
 from pants.option.options_bootstrapper import OptionsBootstrapper
+from pants.testutil.engine_util import Params
 from pants.testutil.external_tool_test_base import ExternalToolTestBase
 from pants.testutil.option_util import create_options_bootstrapper
 

@@ -13,9 +13,9 @@ from pants.core.util_rules.filter_empty_sources import rules as filter_empty_sou
 from pants.engine.addresses import Address
 from pants.engine.rules import QueryRule
 from pants.engine.target import FieldSet, Sources, Tags, Target
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.engine_util import Params
 from pants.testutil.option_util import create_options_bootstrapper
-from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.test_base import TestBase
 
 

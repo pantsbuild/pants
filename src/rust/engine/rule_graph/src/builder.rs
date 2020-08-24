@@ -309,7 +309,7 @@ impl<'t, R: Rule> Builder<'t, R> {
               None
             }
           },
-          |_, edge_weight| Some(edge_weight.clone()),
+          |_, edge_weight| Some(*edge_weight),
         );
 
         log::debug!(
@@ -478,7 +478,7 @@ impl<'t, R: Rule> Builder<'t, R> {
 
           dbos
             .entry(out_set)
-            .or_insert_with(|| vec![])
+            .or_insert_with(Vec::new)
             .push((edge_ref.weight().0, edge_ref.source()));
         }
         dbos
@@ -512,13 +512,7 @@ impl<'t, R: Rule> Builder<'t, R> {
 
       // Generate the monomorphizations of this Node, where each key is a potential node to
       // create, and the dependees and dependencies to give it (respectively).
-      let mut monomorphizations: HashMap<
-        ParamsLabeled<R>,
-        (
-          HashSet<(R::DependencyKey, _)>,
-          HashSet<(R::DependencyKey, _)>,
-        ),
-      > = HashMap::new();
+      let mut monomorphizations = HashMap::new();
       for (out_set, dependees) in dependees_by_out_set {
         for (in_set, dependencies) in
           Self::monomorphizations(&graph, node_id, out_set.clone(), &dependencies_by_key)
@@ -558,19 +552,19 @@ impl<'t, R: Rule> Builder<'t, R> {
       if let Some((_, dependencies)) = monomorphizations.get(&graph[node_id].0) {
         // We generated an identical node: if there was only one output node and its dependencies were
         // also identical, then we have nooped.
-        if monomorphizations.len() == 1
-          && dependencies
-            == &graph
-              .edges_directed(node_id, Direction::Outgoing)
-              .filter_map(|edge_ref| {
-                if graph[edge_ref.target()].is_deleted() {
-                  None
-                } else {
-                  edge_ref.weight().inner().map(|dk| (*dk, edge_ref.target()))
-                }
-              })
-              .collect::<HashSet<_>>()
-        {
+        let original_dependencies = || {
+          graph
+            .edges_directed(node_id, Direction::Outgoing)
+            .filter_map(|edge_ref| {
+              if graph[edge_ref.target()].is_deleted() {
+                None
+              } else {
+                edge_ref.weight().inner().map(|dk| (*dk, edge_ref.target()))
+              }
+            })
+            .collect::<HashSet<_>>()
+        };
+        if monomorphizations.len() == 1 && dependencies == &original_dependencies() {
           // This node can not be reduced (at this time at least).
           if looping {
             log::debug!(
@@ -682,14 +676,15 @@ impl<'t, R: Rule> Builder<'t, R> {
         for (dependency_key, dependee_id) in &dependees {
           // Add a new edge (and confirm that we're not creating a duplicate if this is not a new
           // node).
-          if is_new_node
-            || graph
+          let is_new_edge = || {
+            graph
               .edges_directed(*dependee_id, Direction::Outgoing)
               .all(|edge_ref| {
                 edge_ref.target() != replacement_id
                   || edge_ref.weight().inner() != Some(dependency_key)
               })
-          {
+          };
+          if is_new_node || is_new_edge() {
             let mut edge = MaybeDeleted::new(*dependency_key);
             if let Some(p) = dependency_key.provided_param() {
               // NB: If the edge is invalid because it does not consume the provide param, we
@@ -714,12 +709,7 @@ impl<'t, R: Rule> Builder<'t, R> {
         // don't create dupes).
         let existing_edges = graph
           .edges_directed(replacement_id, Direction::Outgoing)
-          .filter_map(|edge_ref| {
-            edge_ref
-              .weight()
-              .inner()
-              .map(|dk| (dk.clone(), edge_ref.target()))
-          })
+          .filter_map(|edge_ref| edge_ref.weight().inner().map(|dk| (*dk, edge_ref.target())))
           .collect::<HashSet<_>>();
         for (dependency_key, dependency_id) in dependencies {
           // NB: When a node depends on itself, we adjust the destination of that self-edge to point to
@@ -928,6 +918,7 @@ impl<'t, R: Rule> Builder<'t, R> {
         // We prefer the dependency with the smallest set of input Params, as that minimizes Rule
         // identities in the graph and biases toward receiving values from dependencies (which do not
         // affect our identity) rather than dependents.
+        #[allow(clippy::comparison_chain)]
         let chosen_edges = {
           let mut minimum_param_set_size = ::std::usize::MAX;
           let mut chosen_edges = Vec::new();
@@ -1117,6 +1108,7 @@ impl<'t, R: Rule> Builder<'t, R> {
   /// Groups the DependencyKeys of the given node (regardless of whether it is deleted) including
   /// any empty groups for any keys that were declared by the node but didn't have edges.
   ///
+  #[allow(clippy::type_complexity)]
   fn edges_by_dependency_key(
     graph: &MonomorphizedGraph<R>,
     node_id: NodeIndex<u32>,
@@ -1233,6 +1225,7 @@ impl<'t, R: Rule> Builder<'t, R> {
   /// direct dependency on a Param node that is not present in the out_set, or a DependencyKey's
   /// provided_param that is not in the in_set of a combination.
   ///
+  #[allow(clippy::type_complexity)]
   fn monomorphizations(
     graph: &MonomorphizedGraph<R>,
     node_id: NodeIndex<u32>,

@@ -416,7 +416,7 @@ impl<R: Rule> RuleGraph<R> {
     }
 
     // TODO: This method is currently a noop: see https://github.com/pantsbuild/pants/issues/10649.
-    return Ok(());
+    Ok(())
   }
 
   pub fn visualize(&self, f: &mut dyn io::Write) -> io::Result<()> {
