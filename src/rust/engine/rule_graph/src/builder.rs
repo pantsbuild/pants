@@ -965,7 +965,20 @@ impl<'t, R: Rule> Builder<'t, R> {
                 node,
                 edge_refs
                   .iter()
-                  .map(|edge_ref| graph[edge_ref.target()].to_string())
+                  .map(|edge_ref| {
+                    let node = &graph[edge_ref.target()];
+                    let reason_suffix = if let Some(reason) = node.deleted_reason() {
+                      format!("{:?}: ", reason)
+                    } else {
+                      "".to_owned()
+                    };
+                    format!(
+                      "{}{} (for {})",
+                      reason_suffix,
+                      node.0.node,
+                      params_str(&node.0.in_set)
+                    )
+                  })
                   .collect::<Vec<_>>()
               ),
             );
@@ -981,7 +994,13 @@ impl<'t, R: Rule> Builder<'t, R> {
                 node,
                 chosen_edges
                   .iter()
-                  .map(|edge_ref| graph[edge_ref.target()].to_string())
+                  .map(|edge_ref| {
+                    format!(
+                      "{} (for {})",
+                      graph[edge_ref.target()].0.node,
+                      params_str(&graph[edge_ref.target()].0.in_set)
+                    )
+                  })
                   .collect::<Vec<_>>()
               ),
             );

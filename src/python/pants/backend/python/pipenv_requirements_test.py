@@ -12,7 +12,9 @@ from pants.backend.python.target_types import PythonRequirementLibrary, PythonRe
 from pants.base.specs import AddressSpecs, DescendantAddresses, FilesystemSpecs, Specs
 from pants.build_graph.build_file_aliases import BuildFileAliases
 from pants.engine.addresses import Address
+from pants.engine.rules import QueryRule
 from pants.engine.target import Targets
+from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.testutil.engine_util import Params
 from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
@@ -23,6 +25,13 @@ class PipenvRequirementsTest(TestBase):
     def alias_groups(cls):
         return BuildFileAliases(
             context_aware_object_factories={"pipenv_requirements": PipenvRequirements},
+        )
+
+    @classmethod
+    def rules(cls):
+        return (
+            *super().rules(),
+            QueryRule(Targets, (OptionsBootstrapper, Specs)),
         )
 
     @classmethod

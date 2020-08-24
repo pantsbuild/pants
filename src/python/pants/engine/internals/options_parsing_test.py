@@ -6,7 +6,7 @@ from pants.option.options_bootstrapper import OptionsBootstrapper
 from pants.option.scope import GLOBAL_SCOPE, Scope, ScopedOptions
 from pants.python.python_setup import PythonSetup
 from pants.testutil.engine_util import Params
-from pants.testutil.option.util import create_options_bootstrapper
+from pants.testutil.option_util import create_options_bootstrapper
 from pants.testutil.test_base import TestBase
 from pants.util.logging import LogLevel
 
@@ -24,10 +24,10 @@ class TestEngineOptionsParsing(TestBase):
         options_bootstrapper = create_options_bootstrapper(
             args=["-ldebug"], env=dict(PANTS_PANTSD="True", PANTS_BUILD_IGNORE='["ignoreme/"]')
         )
-        global_options = self.request_single_product(
+        global_options = self.request_product(
             ScopedOptions, Params(Scope(GLOBAL_SCOPE), options_bootstrapper)
         )
-        python_setup_options = self.request_single_product(
+        python_setup_options = self.request_product(
             ScopedOptions, Params(Scope("python-setup"), options_bootstrapper)
         )
 
